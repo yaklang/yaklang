@@ -1,7 +1,6 @@
 package loop_java_decompiler
 
 import (
-	"bytes"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -15,7 +14,7 @@ import (
 )
 
 var rewriteJavaFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
-	return reactloops.WithRegisterLoopActionWithStreamField(
+	return reactloops.WithRegisterLoopAction(
 		"rewrite_java_file",
 		`Rewrite decompiled Java code to improve readability and fix issues. This is the PRIMARY action for improving decompiled code.
 
@@ -34,17 +33,11 @@ var rewriteJavaFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 			aitool.WithStringParam("file_path", aitool.WithParam_Description("Path to the Java file to rewrite (can be relative to working directory or absolute)"), aitool.WithParam_Required(true)),
 			aitool.WithIntegerParam("rewrite_start_line", aitool.WithParam_Description("Starting line number to rewrite (1-based, inclusive). Leave empty to rewrite entire file.")),
 			aitool.WithIntegerParam("rewrite_end_line", aitool.WithParam_Description("Ending line number to rewrite (1-based, inclusive). Leave empty to rewrite entire file.")),
-			aitool.WithStringParam("rewrite_reason", aitool.WithParam_Description("Detailed explanation of what needs to be improved and why (e.g., 'Fix syntax errors', 'Rename obfuscated variables', 'Improve readability')")),
-		},
-		[]*reactloops.LoopStreamField{
-			{
-				FieldName: "rewrite_reason",
-				AINodeId:  "re-act-loop-thought",
-			},
 		},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 			filePath := action.GetString("file_path")
 			if filePath == "" {
+				log.Warnf("[rewrite_java_file] file_path is required")
 				r.AddToTimeline("rewrite_no_path", `【缺少文件路径】未指定要重写的Java文件路径
 
 【立即行动】：
@@ -56,7 +49,6 @@ var rewriteJavaFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 				return utils.Error("file_path parameter is required")
 			}
 
-			// If not absolute, make it relative to working directory
 			if !filepath.IsAbs(filePath) {
 				workingDir := l.Get("working_directory")
 				if workingDir != "" {
@@ -64,10 +56,10 @@ var rewriteJavaFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 				}
 			}
 
-			// Check if file exists using filesys
 			fs := filesys.NewLocalFs()
 			exists, err := fs.Exists(filePath)
 			if err != nil {
+				log.Errorf("[rewrite_java_file] failed to check file %s: %v", filePath, err)
 				r.AddToTimeline("rewrite_check_error", fmt.Sprintf(`【文件检查失败】无法检查文件：%s
 
 【错误信息】：%v
@@ -85,8 +77,8 @@ var rewriteJavaFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 【下一步】：修正路径后重试`, filePath, err))
 				return utils.Errorf("failed to check file: %v", err)
 			}
-
 			if !exists {
+				log.Warnf("[rewrite_java_file] file not found: %s", filePath)
 				r.AddToTimeline("rewrite_file_not_found", fmt.Sprintf(`【文件不存在】指定的文件未找到：%s
 
 【可能原因】：
@@ -105,9 +97,8 @@ var rewriteJavaFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 
 			start := action.GetInt("rewrite_start_line")
 			end := action.GetInt("rewrite_end_line")
-
-			// Validate line range if provided
 			if (start > 0 || end > 0) && (start <= 0 || end <= 0 || end < start) {
+				log.Warnf("[rewrite_java_file] invalid line range: %d-%d", start, end)
 				r.AddToTimeline("rewrite_invalid_range", fmt.Sprintf(`【行号范围无效】指定的行号范围不正确：%d-%d
 
 【规则】：
@@ -128,17 +119,12 @@ var rewriteJavaFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 				return utils.Error("rewrite_java_file requires valid line range (start <= end, both > 0) or no line numbers for full file rewrite")
 			}
 
-			l.GetEmitter().EmitDefaultStreamEvent(
-				"thought",
-				bytes.NewReader([]byte(fmt.Sprintf("Preparing to rewrite Java file %s", filePath))),
-				l.GetCurrentTask().GetIndex())
-
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
-			filePath := action.GetString("file_path")
+			const nodeID = "java-rewrite-file"
 
-			// If not absolute, make it relative to working directory
+			filePath := action.GetString("file_path")
 			if !filepath.IsAbs(filePath) {
 				workingDir := loop.Get("working_directory")
 				if workingDir != "" {
@@ -148,9 +134,6 @@ var rewriteJavaFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 
 			rewriteStartLine := action.GetInt("rewrite_start_line")
 			rewriteEndLine := action.GetInt("rewrite_end_line")
-			rewriteReason := action.GetString("rewrite_reason")
-
-			invoker := loop.GetInvoker()
 
 			var mode string
 			if rewriteStartLine > 0 && rewriteEndLine > 0 {
@@ -159,17 +142,16 @@ var rewriteJavaFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 				mode = "entire file"
 			}
 
-			msg := fmt.Sprintf("Rewriting Java file %s (%s)", filePath, mode)
-			invoker.AddToTimeline("rewrite_file", msg)
+			invoker := loop.GetInvoker()
+			startLine := fmt.Sprintf("重写 Java 文件: %s (%s)", filepath.Base(filePath), mode)
+			reactloops.EmitActionLog(loop, nodeID, startLine)
+			reactloops.EmitStatus(loop, "重写文件中 / Rewriting File...")
 
-			if rewriteReason != "" {
-				r.AddToTimeline("rewrite_reason", "重写原因："+rewriteReason)
-			}
-
-			// Read current file content using filesys
 			fs := filesys.NewLocalFs()
 			content, err := fs.ReadFile(filePath)
 			if err != nil {
+				log.Errorf("[rewrite_java_file] failed to read %s: %v", filePath, err)
+				reactloops.EmitStatus(loop, "读取失败 / Read Failed")
 				r.AddToTimeline("rewrite_read_failed", fmt.Sprintf(`【读取文件失败】无法读取文件内容：%s
 
 【错误信息】：%v
@@ -189,31 +171,27 @@ var rewriteJavaFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 				return
 			}
 
-			// Create backup if it doesn't exist yet
 			backupPath := filePath + ".bak"
 			backupExists, _ := fs.Exists(backupPath)
 			if !backupExists {
-				err = fs.WriteFile(backupPath, content, 0644)
-				if err != nil {
-					log.Warnf("failed to create backup file: %v", err)
-					r.AddToTimeline("backup_warning", "备份创建失败："+err.Error())
+				if writeErr := fs.WriteFile(backupPath, content, 0644); writeErr != nil {
+					log.Warnf("[rewrite_java_file] failed to create backup %s: %v", backupPath, writeErr)
+					r.AddToTimeline("backup_warning", "备份创建失败："+writeErr.Error())
 				} else {
+					log.Infof("[rewrite_java_file] created backup: %s", backupPath)
 					r.AddToTimeline("backup_created", "已创建备份："+backupPath)
 				}
 			} else {
 				r.AddToTimeline("backup_exists", "备份已存在："+backupPath)
 			}
 
-			// Get rewritten content from AI-generated code
-			// Try to get from loop context (from <JAVA_CODE> tag) first
 			newCode := loop.Get("java_code")
-
-			// Fall back to action parameter (for testing scenarios)
 			if newCode == "" {
 				newCode = action.GetString("new_code")
 			}
-
 			if newCode == "" {
+				log.Warnf("[rewrite_java_file] no rewritten code provided for %s", filePath)
+				reactloops.EmitStatus(loop, "缺少重写代码 / No Rewritten Code")
 				r.AddToTimeline("rewrite_no_code", `【缺少重写代码】未提供新的Java代码
 
 【原因】：
@@ -243,13 +221,11 @@ public class Example {
 			}
 
 			var finalContent string
-
-			// Determine if rewriting entire file or specific lines
 			if rewriteStartLine > 0 && rewriteEndLine > 0 {
-				// Partial rewrite: replace specific line range
 				lines := strings.Split(string(content), "\n")
-
 				if rewriteStartLine > len(lines) || rewriteEndLine > len(lines) {
+					log.Warnf("[rewrite_java_file] line range %d-%d exceeds file length %d", rewriteStartLine, rewriteEndLine, len(lines))
+					reactloops.EmitStatus(loop, "行号超出范围 / Line Range Out of Bounds")
 					r.AddToTimeline("rewrite_line_out_of_range", fmt.Sprintf(`【行号超出范围】指定的行号超出文件范围
 
 【文件信息】：
@@ -266,10 +242,8 @@ public class Example {
 					return
 				}
 
-				// Build new content: before + new code + after
 				before := lines[:rewriteStartLine-1]
 				after := lines[rewriteEndLine:]
-
 				finalContent = strings.Join(before, "\n")
 				if len(before) > 0 {
 					finalContent += "\n"
@@ -278,19 +252,18 @@ public class Example {
 				if len(after) > 0 {
 					finalContent += "\n" + strings.Join(after, "\n")
 				}
-
-				log.Infof("rewrote Java file lines %d-%d in %s", rewriteStartLine, rewriteEndLine, filePath)
+				log.Infof("[rewrite_java_file] partial rewrite lines %d-%d in %s", rewriteStartLine, rewriteEndLine, filePath)
 				r.AddToTimeline("rewrite_partial", fmt.Sprintf("部分重写：第 %d-%d 行（共 %d 行）", rewriteStartLine, rewriteEndLine, len(lines)))
 			} else {
-				// Full file rewrite
 				finalContent = newCode
-				log.Infof("rewrote entire Java file %s", filePath)
+				log.Infof("[rewrite_java_file] full rewrite of %s", filePath)
 				r.AddToTimeline("rewrite_full", "完全重写整个文件")
 			}
 
-			// Write back to file
 			err = fs.WriteFile(filePath, []byte(finalContent), 0644)
 			if err != nil {
+				log.Errorf("[rewrite_java_file] failed to write %s: %v", filePath, err)
+				reactloops.EmitStatus(loop, "写入失败 / Write Failed")
 				r.AddToTimeline("rewrite_write_failed", fmt.Sprintf(`【写入文件失败】无法保存重写后的代码：%s
 
 【错误信息】：%v
@@ -314,84 +287,64 @@ public class Example {
 				return
 			}
 
-			// Update context
 			loop.Set("current_file", filePath)
 			loop.Set("current_file_content", finalContent)
 
-			// Increment rewritten files counter
 			rewrittenFiles := loop.GetInt("rewritten_files")
 			loop.Set("rewritten_files", rewrittenFiles+1)
 
-			// Automatically check syntax after rewriting (similar to yaklang code loop)
 			ctx := op.GetContext()
 			if ctx == nil {
 				ctx = invoker.GetConfig().GetContext()
 			}
 			syntaxIssues := checkJavaFileSyntax(ctx, finalContent, filePath)
 			hasSyntaxErrors := len(syntaxIssues) > 0
-
-			// If there are syntax errors, prevent loop exit and provide feedback
 			if hasSyntaxErrors {
 				op.DisallowNextLoopExit()
-				log.Infof("rewrite_java_file completed but has syntax errors, will not allow loop exit")
+				log.Infof("[rewrite_java_file] syntax errors remain in %s", filePath)
 			}
 
-			// Prepare feedback
-			preview := utils.ShrinkTextBlock(newCode, 800)
-			feedback := fmt.Sprintf(`成功重写 Java 文件：%s
-
-【重写模式】：%s
-
-【文件信息】：
-- 文件路径：%s
-- 备份位置：%s
-
-【重写后代码预览】：
-%s
-
-【统计】：
-- 本次重写：第 %d 个文件
-- 新代码长度：%d 字节`,
-				filePath,
-				mode,
-				filePath,
-				backupPath,
-				preview,
-				rewrittenFiles+1,
-				len(finalContent))
-
-			// Add syntax check results to feedback
+			preview := utils.ShrinkTextBlock(newCode, 500)
+			var syntaxStatus string
 			if hasSyntaxErrors {
-				feedback += "\n\n--[语法检查]--\n重写后的代码仍存在语法问题：\n" + strings.Join(syntaxIssues, "\n")
-				feedback += "\n\n【必须修复】：代码存在语法错误，无法结束任务。请继续修复这些问题。"
+				syntaxStatus = fmt.Sprintf("语法问题 %d 个", len(syntaxIssues))
 			} else {
-				feedback += "\n\n--[语法检查]--\n✓ 语法检查通过，代码没有明显错误。"
+				syntaxStatus = "语法检查通过"
 			}
 
-			feedback += "\n\n【下一步建议】："
+			finishLine := fmt.Sprintf("完成: %s (%s, %d 字节, %s)",
+				filepath.Base(filePath), mode, len(finalContent), syntaxStatus)
 			if hasSyntaxErrors {
-				feedback += "\n1. 分析上述语法错误信息"
-				feedback += "\n2. 使用 rewrite_java_file 再次修复代码"
-				feedback += "\n3. 或使用 read_java_file 重新查看文件内容"
+				reactloops.EmitStatus(loop, "重写完成，仍有语法问题 / Rewrite Complete, Syntax Issues Remain")
 			} else {
-				feedback += "\n1. 使用 compare_with_backup 查看具体改动"
-				feedback += "\n2. 继续处理其他文件"
-				feedback += "\n3. 或使用 check_syntax 对所有文件进行最终验证"
+				reactloops.EmitStatus(loop, "重写完成 / Rewrite Complete")
 			}
 
-			if rewriteReason != "" {
-				feedback += "\n\n【重写原因】：" + rewriteReason
-			}
-
-			var syntaxStatus, nextAction string
+			reference := fmt.Sprintf("备份: %s\n新代码预览:\n%s", backupPath, preview)
 			if hasSyntaxErrors {
-				syntaxStatus = "存在错误，需要继续修复"
-				nextAction = "必须修复语法错误"
-			} else {
-				syntaxStatus = "检查通过"
-				nextAction = "可以处理其他文件或验证全部文件"
+				issueText := strings.Join(syntaxIssues, "\n")
+				issueSummary, _ := spillOrPreview(loop, "rewrite_syntax_issues", issueText)
+				reference += "\n\n语法问题:\n" + issueSummary
+			}
+			reactloops.EmitActionLog(loop, nodeID, finishLine, reference)
+
+			feedbackMsg := fmt.Sprintf(
+				"Rewrote %s (%s): %d bytes, backup=%s, syntax_ok=%v",
+				filePath, mode, len(finalContent), backupPath, !hasSyntaxErrors,
+			)
+			if hasSyntaxErrors {
+				feedbackMsg += "; issues: " + strings.Join(syntaxIssues[:min(len(syntaxIssues), 5)], "; ")
+				if len(syntaxIssues) > 5 {
+					feedbackMsg += fmt.Sprintf(" (and %d more)", len(syntaxIssues)-5)
+				}
 			}
 
+			var nextAction string
+			if hasSyntaxErrors {
+				nextAction = "必须修复语法错误：分析语法问题，继续使用 rewrite_java_file 修复，或使用 read_java_file 重新查看文件内容"
+			} else {
+				nextAction = "可以使用 compare_with_backup 查看具体改动，继续处理其他文件，或使用 check_syntax 对全部文件做最终验证"
+			}
 			timelineMsg := fmt.Sprintf(`【重写完成】%s
 
 【模式】：%s
@@ -406,14 +359,15 @@ public class Example {
 				len(finalContent),
 				syntaxStatus,
 				nextAction)
-
 			if hasSyntaxErrors {
 				r.AddToTimeline("rewrite_with_errors", timelineMsg)
 			} else {
 				r.AddToTimeline("rewrite_success", timelineMsg)
 			}
+			log.Infof("[rewrite_java_file] completed %s: mode=%s bytes=%d syntax_ok=%v",
+				filePath, mode, len(finalContent), !hasSyntaxErrors)
 
-			op.Feedback(feedback)
+			op.Feedback(feedbackMsg)
 			op.Continue()
 		},
 	)

@@ -31,7 +31,6 @@ var checkJavaSyntaxAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 			dirPath := action.GetString("directory_path")
 
 			if filePath == "" && dirPath == "" {
-				// Use working directory if neither specified
 				dirPath = l.Get("working_directory")
 				if dirPath == "" {
 					return utils.Error("either file_path or directory_path must be specified")
@@ -41,19 +40,26 @@ var checkJavaSyntaxAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+			const nodeID = "java-check-syntax"
+
 			filePath := action.GetString("file_path")
 			dirPath := action.GetString("directory_path")
-
 			if filePath == "" && dirPath == "" {
 				dirPath = loop.Get("working_directory")
 			}
 
 			invoker := loop.GetInvoker()
+			var startLine string
+			if filePath != "" {
+				startLine = fmt.Sprintf("检查语法: %s", filePath)
+			} else {
+				startLine = fmt.Sprintf("检查语法: 目录 %s", dirPath)
+			}
+			reactloops.EmitActionLog(loop, nodeID, startLine)
+			reactloops.EmitStatus(loop, "检查语法中 / Checking Syntax...")
 
 			var filesToCheck []string
-
 			if filePath != "" {
-				// Check single file
 				if !filepath.IsAbs(filePath) {
 					workingDir := loop.Get("working_directory")
 					if workingDir != "" {
@@ -61,27 +67,27 @@ var checkJavaSyntaxAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 					}
 				}
 				filesToCheck = append(filesToCheck, filePath)
-				invoker.AddToTimeline("check_syntax", fmt.Sprintf("Checking syntax for file: %s", filePath))
 			} else {
-				// Check all Java files in directory
 				if !filepath.IsAbs(dirPath) {
 					workingDir := loop.Get("working_directory")
 					if workingDir != "" {
 						dirPath = filepath.Join(workingDir, dirPath)
 					}
 				}
-
 				filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 					if err == nil && !info.IsDir() && strings.HasSuffix(path, ".java") {
 						filesToCheck = append(filesToCheck, path)
 					}
 					return nil
 				})
-				invoker.AddToTimeline("check_syntax", fmt.Sprintf("Checking syntax for %d Java files in: %s", len(filesToCheck), dirPath))
 			}
 
 			if len(filesToCheck) == 0 {
-				errorMsg := `【未找到Java文件】指定的位置没有找到任何Java文件
+				log.Warnf("[check_syntax] no Java files found")
+				reactloops.EmitStatus(loop, "未找到 Java 文件 / No Java Files Found")
+				finishLine := "完成: 未找到可检查的 Java 文件"
+				reactloops.EmitActionLog(loop, nodeID, finishLine)
+				invoker.AddToTimeline("check_syntax_no_files", `【未找到Java文件】指定的位置没有找到任何Java文件
 
 【可能原因】：
 1. 指定的目录路径不正确
@@ -100,70 +106,81 @@ var checkJavaSyntaxAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 - 确认当前工作目录是反编译的输出目录
 - 使用绝对路径指定目录
 
-【下一步】：使用 decompile_jar 反编译JAR文件，或使用 list_files 查看当前目录内容`
-				invoker.AddToTimeline("check_syntax_no_files", errorMsg)
+【下一步】：使用 decompile_jar 反编译JAR文件，或使用 list_files 查看当前目录内容`)
 				op.Feedback("No Java files found to check")
 				op.Continue()
 				return
 			}
 
-			// Get context from task operator (respects task cancellation)
 			ctx := op.GetContext()
 			if ctx == nil {
 				ctx = context.Background()
 			}
 
-			// Check syntax using SSA or javac
 			filesWithIssues := 0
 			var issueReports []string
+			knownTotal := len(filesToCheck)
 
-			for _, file := range filesToCheck {
+			for i, file := range filesToCheck {
+				if (i+1)%100 == 0 {
+					reactloops.EmitProgress(loop, i+1, knownTotal, "检查进度", "Checking")
+				}
+
 				content, err := os.ReadFile(file)
 				if err != nil {
 					filesWithIssues++
 					issueReports = append(issueReports, fmt.Sprintf("- %s: failed to read file: %v", file, err))
+					log.Errorf("[check_syntax] failed to read %s: %v", file, err)
 					continue
 				}
 
-				// Try to check syntax
 				issues := checkJavaFileSyntax(ctx, string(content), file)
 				if len(issues) > 0 {
 					filesWithIssues++
 					relPath, _ := filepath.Rel(loop.Get("working_directory"), file)
-					if relPath == "" {
+					if relPath == "" || strings.HasPrefix(relPath, "..") {
 						relPath = file
 					}
 					issueReports = append(issueReports, fmt.Sprintf("- %s:\n  %s", relPath, strings.Join(issues, "\n  ")))
 				}
 			}
 
-			// Update statistics
 			loop.Set("files_with_issues", filesWithIssues)
-
-			// If there are syntax issues, prevent loop exit (similar to yaklang code loop)
 			if filesWithIssues > 0 {
 				op.DisallowNextLoopExit()
-				log.Infof("check_syntax found %d files with issues, will not allow loop exit", filesWithIssues)
+				log.Infof("[check_syntax] found issues in %d/%d files", filesWithIssues, len(filesToCheck))
 			}
 
-			// Prepare feedback
-			var msg string
+			var finishLine string
+			var feedbackMsg string
+			var reference string
+
 			if filesWithIssues == 0 {
-				msg = fmt.Sprintf("All %d Java files passed basic syntax checks. No issues found.", len(filesToCheck))
+				finishLine = fmt.Sprintf("完成: %d 个文件全部通过语法检查", len(filesToCheck))
+				reactloops.EmitStatus(loop, fmt.Sprintf(
+					"语法检查通过 (%d 个文件) / Syntax Check Passed (%d files)",
+					len(filesToCheck), len(filesToCheck),
+				))
+				feedbackMsg = fmt.Sprintf("All %d Java files passed basic syntax checks.", len(filesToCheck))
 				invoker.AddToTimeline("check_syntax_success", fmt.Sprintf("所有 %d 个Java文件语法检查通过，可以继续下一步操作", len(filesToCheck)))
 			} else {
-				msg = fmt.Sprintf("Found issues in %d out of %d Java files:\n\n%s",
-					filesWithIssues,
-					len(filesToCheck),
-					strings.Join(issueReports, "\n"))
-
-				// Add detailed suggestions for fixing syntax issues
-				timelineMsg := fmt.Sprintf(`【发现语法错误】在 %d/%d 个文件中发现语法问题
+				fullReport := strings.Join(issueReports, "\n")
+				summary, ref := spillOrPreview(loop, "syntax_check_report", fullReport)
+				reference = ref
+				finishLine = fmt.Sprintf("完成: %d/%d 个文件存在语法问题", filesWithIssues, len(filesToCheck))
+				reactloops.EmitStatus(loop, fmt.Sprintf(
+					"发现语法问题 (%d/%d) / Syntax Issues Found (%d/%d)",
+					filesWithIssues, len(filesToCheck), filesWithIssues, len(filesToCheck),
+				))
+				feedbackMsg = fmt.Sprintf("Found issues in %d/%d Java files.\n\n%s",
+					filesWithIssues, len(filesToCheck), summary)
+				invoker.AddToTimeline("check_syntax_issues_found", fmt.Sprintf(`【发现语法错误】在 %d/%d 个文件中发现语法问题
 
 【问题分布】：
 - 检查文件总数：%d
 - 存在问题的文件：%d
 - 通过检查的文件：%d
+- 问题报告：%s
 
 【常见语法错误类型】：
 1. 括号不匹配（{} [] ()）
@@ -192,69 +209,60 @@ var checkJavaSyntaxAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 - 批量修复相同类型的错误更高效
 
 【下一步行动】：选择一个有问题的文件，使用 read_java_file 查看详细内容`,
-					filesWithIssues, len(filesToCheck), len(filesToCheck), filesWithIssues, len(filesToCheck)-filesWithIssues)
-				invoker.AddToTimeline("check_syntax_issues_found", timelineMsg)
+					filesWithIssues, len(filesToCheck), len(filesToCheck), filesWithIssues, len(filesToCheck)-filesWithIssues, summary))
 			}
 
-			op.Feedback(msg)
+			reactloops.EmitActionLog(loop, nodeID, finishLine, reference)
+			log.Infof("[check_syntax] completed: checked=%d issues=%d", len(filesToCheck), filesWithIssues)
+
+			op.Feedback(feedbackMsg)
 			op.Continue()
 		},
 	)
 }
 
 // checkJavaFileSyntax checks Java file syntax using SSA or javac
-// Priority: 1. SSA in-memory compilation (safe), 2. javac (only compilation, no execution)
 func checkJavaFileSyntax(ctx context.Context, content string, filePath string) []string {
 	var issues []string
 
-	// Basic checks first
 	issues = append(issues, checkBasicJavaSyntax(content)...)
 
-	// If basic checks fail critically, no need to try compilation
 	if len(issues) > 3 {
 		return issues
 	}
 
-	// Try SSA compilation first (preferred, in-memory, safe)
 	ssaIssues := trySSACompilation(ctx, content, filePath)
 	if ssaIssues != nil {
 		issues = append(issues, ssaIssues...)
 		return issues
 	}
 
-	// If SSA succeeded, no syntax errors
 	if len(issues) == 0 {
 		return nil
 	}
 
-	// If only basic issues found and SSA succeeded, still report basic issues
 	return issues
 }
 
-// checkBasicJavaSyntax performs basic Java syntax checks
 func checkBasicJavaSyntax(content string) []string {
 	var issues []string
 
-	// Check for common decompilation issues
 	if strings.Contains(content, "/* Error decompiling") {
 		issues = append(issues, "Contains decompilation error markers")
 	}
 
-	// Check for unbalanced braces
 	openBraces := strings.Count(content, "{")
 	closeBraces := strings.Count(content, "}")
 	if openBraces != closeBraces {
 		issues = append(issues, fmt.Sprintf("Unbalanced braces: %d opening, %d closing", openBraces, closeBraces))
 	}
 
-	// Check for unbalanced parentheses
 	openParens := strings.Count(content, "(")
 	closeParens := strings.Count(content, ")")
 	if openParens != closeParens {
 		issues = append(issues, fmt.Sprintf("Unbalanced parentheses: %d opening, %d closing", openParens, closeParens))
 	}
 
-	// Check if file is empty or too small
 	trimmed := strings.TrimSpace(content)
 	if len(trimmed) < 10 {
 		issues = append(issues, "File is empty or too small")
@@ -263,32 +271,24 @@ func checkBasicJavaSyntax(content string) []string {
 	return issues
 }
 
-// trySSACompilation attempts to compile Java code using yaklang SSA in memory
-// This is the preferred method as it's safe (no file execution) and doesn't require external tools
-// Returns nil if compilation succeeded, error messages if failed
 func trySSACompilation(ctx context.Context, content string, filePath string) []string {
-	// Create a context with timeout to prevent hanging
 	compileCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	// Try to compile using SSA in memory mode
-	// This is SAFE - it only parses and compiles to SSA, never executes Java code
 	_, err := ssaapi.Parse(
 		content,
 		ssaapi.WithLanguage(ssaconfig.JAVA),
-		ssaapi.WithMemory(), // In-memory only, cache for 1 hour
+		ssaapi.WithMemory(),
 		ssaapi.WithContext(compileCtx),
 	)
 
 	if err != nil {
-		// SSA compilation failed, extract error messages
 		errMsg := err.Error()
 		var issues []string
 
-		// Simplify error messages
 		lines := strings.Split(errMsg, "\n")
 		for i, line := range lines {
-			if i >= 5 { // Limit to first 5 error lines
+			if i >= 5 {
 				issues = append(issues, "... (more compilation errors)")
 				break
 			}
@@ -297,7 +297,6 @@ func trySSACompilation(ctx context.Context, content string, filePath string) []s
 			}
 		}
 
-		// If SSA failed, try javac as fallback (still safe - only compilation)
 		javacIssues := tryJavacCompilation(compileCtx, content)
 		if javacIssues != nil {
 			issues = append(issues, javacIssues...)
@@ -306,24 +305,17 @@ func trySSACompilation(ctx context.Context, content string, filePath string) []s
 		return issues
 	}
 
-	// SSA compilation succeeded
 	log.Debugf("SSA compilation succeeded for: %s", filePath)
 	return nil
 }
 
-// tryJavacCompilation attempts to use javac for compilation checking if available
-// SECURITY: Only uses javac for compilation (-encoding UTF-8), NEVER executes the compiled code
-// This respects the task context for cancellation
 func tryJavacCompilation(ctx context.Context, content string) []string {
-	// Check if javac is available
 	javacPath, err := exec.LookPath("javac")
 	if err != nil {
-		// javac not available, skip silently
 		log.Debugf("javac not available for syntax checking: %v", err)
 		return nil
 	}
 
-	// Create a temporary file
 	tmpFile, err := os.CreateTemp("", "syntax_check_*.java")
 	if err != nil {
 		log.Debugf("Failed to create temp file for javac: %v", err)
@@ -332,7 +324,6 @@ func tryJavacCompilation(ctx context.Context, content string) []string {
 	tmpFilePath := tmpFile.Name()
 	defer os.Remove(tmpFilePath)
 	defer func() {
-		// Also remove .class file if generated
 		classFile := strings.TrimSuffix(tmpFilePath, ".java") + ".class"
 		os.Remove(classFile)
 	}()
@@ -344,19 +335,16 @@ func tryJavacCompilation(ctx context.Context, content string) []string {
 	}
 	tmpFile.Close()
 
-	// SECURITY: Only compile with javac, do NOT execute
-	// Use fixed, safe parameters - no user-controlled parameters
 	cmd := exec.CommandContext(ctx, javacPath, "-encoding", "UTF-8", tmpFilePath)
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
-		// Compilation failed, extract error messages
 		errMsg := string(output)
 		if errMsg != "" {
 			var issues []string
 			lines := strings.Split(errMsg, "\n")
 			for i, line := range lines {
-				if i >= 5 { // Limit to first 5 error lines
+				if i >= 5 {
 					issues = append(issues, "... (more javac errors)")
 					break
 				}
@@ -369,7 +357,6 @@ func tryJavacCompilation(ctx context.Context, content string) []string {
 		}
 	}
 
-	// Compilation succeeded
 	log.Debugf("javac compilation succeeded")
 	return nil
 }
