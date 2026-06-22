@@ -1,4 +1,4 @@
-//go:build cgo && minirehs_cgo
+//go:build cgo
 
 package minirehs
 
@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
-// 本文件仅在 CGO SIMD 构建 (-tags minirehs_cgo) 下编译, 专门覆盖 cgoPrefilter 的
-// 构造、扫描、缓冲扩容重扫与释放等本地路径, 把 CGO 构建的覆盖率也推到生产级.
+// 本文件在 CGO 构建 (CGO_ENABLED=1, Teddy 默认化后无需额外 tag) 下编译, 专门覆盖 cgoPrefilter
+// 的构造、扫描、缓冲扩容重扫与释放等本地路径, 把 CGO 构建的覆盖率也推到生产级.
 
 func TestCGOPrefilterBasic(t *testing.T) {
 	li := buildLiteralIndex([]*compiledPattern{

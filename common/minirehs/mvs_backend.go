@@ -31,9 +31,12 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 		anchorable: make([]bool, len(patterns)),
 		win:        make([]litWindow, len(patterns)),
 		gateHead:   make([]int32, len(patterns)),
+		biAnchorable: make([]bool, len(patterns)),
+		revNFAs:      make([]*mvsNFA, len(patterns)),
 		reportLoc:  cfg.reportLocation,
 	}
-	perPatHeads := make(map[int]map[string]int32, len(patterns)) // 锚定式 pattern 的 per-literal head
+	perPatHeads := make(map[int]map[string]int32, len(patterns))         // 锚定式 pattern 的 per-literal head
+	perPatBiCover := make(map[int]map[string]litBiCover, len(patterns)) // 双向锚定 pattern 的 per-literal headF/tailR
 	for i := range db.win {
 		db.win[i] = litWindow{head: -1, tail: -1} // 默认不收窄 (整段)
 		db.gateHead[i] = -1                       // 默认不局部化门复核
@@ -128,6 +131,39 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 							}
 						}
 					}
+					// 双向锚定 (Rose-lite 完全体): 仅对当前会落整段 batch (非 window/anchor) 的 lean、
+					// 无文本锚 pattern. 若每个必需字面量"每个出现处 head 或 tail 至少一侧有界"且至少一条
+					// 字面量需反向 (tailR>=0), 则编反向 NFA, 走前向锚定 ∪ 反向锚定替换整段扫. 头有界出现处
+					// 由前向覆盖、尾有界出现处由反向覆盖, 二者并集 = 全部匹配 (零假阴, 见 mvs_bicover.go).
+					if biAnchorEnabled && !nfa.hasAssert && !nfa.anchoredStart && !nfa.requireEnd &&
+						!db.windowable[cp.idx] && !db.anchorable[cp.idx] {
+						bc := computeLitBiCover(analysisExpr, cp.literals)
+						allOK, needRev := true, false
+						for _, l := range cp.literals {
+							c, ok := bc[l]
+							if !ok || !c.ok {
+								allOK = false
+								break
+							}
+							if c.tailR >= 0 {
+								needRev = true
+							}
+						}
+						if allOK && needRev {
+							if rev := compileReverseExprToNFA(analysisExpr); rev != nil && !rev.hasAssert {
+								db.biAnchorable[cp.idx] = true
+								db.revNFAs[cp.idx] = rev
+								db.hasBiAnchor = true
+								perPatBiCover[cp.idx] = bc
+								if nfa.nword > db.maxAnchorNword {
+									db.maxAnchorNword = nfa.nword
+								}
+								if rev.nword > db.maxAnchorNword {
+									db.maxAnchorNword = rev.nword
+								}
+							}
+						}
+					}
 				}
 			}
 		}
@@ -152,19 +188,32 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 		db.pf = newPrefilter(li)
 		db.litToPat = li.litToPat
 		// litHead 与 litToPat 同形: 为锚定式 pattern 填该 (litID,pattern) 的 per-literal head; 其余 -1.
+		// litBiHead/litBiTail 同形: 为双向锚定 pattern 填该字面量的前向 headF / 反向 tailR; 其余 -1.
 		db.litHead = make([][]int32, len(li.litToPat))
+		db.litBiHead = make([][]int32, len(li.litToPat))
+		db.litBiTail = make([][]int32, len(li.litToPat))
 		for litID, pats := range li.litToPat {
 			heads := make([]int32, len(pats))
+			biH := make([]int32, len(pats))
+			biT := make([]int32, len(pats))
 			litStr := li.literals[litID]
 			for k, idx := range pats {
 				heads[k] = -1
+				biH[k], biT[k] = -1, -1
 				if db.anchorable[int(idx)] {
 					if h, ok := perPatHeads[int(idx)][litStr]; ok {
 						heads[k] = h
 					}
 				}
+				if db.biAnchorable[int(idx)] {
+					if c, ok := perPatBiCover[int(idx)][litStr]; ok {
+						biH[k], biT[k] = c.headF, c.tailR
+					}
+				}
 			}
 			db.litHead[litID] = heads
+			db.litBiHead[litID] = biH
+			db.litBiTail[litID] = biT
 		}
 	}
 	db.merged = buildMergedNFA(mergeMembers)
@@ -175,8 +224,17 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 	// blob, 交纯 C99 运行期内核执行存在性扫描 (与纯 Go 参考执行器逐位一致). 非该构建返回 nil,
 	// 自动退化为纯 Go existsIn / scanExist. 定位 (findAllLoc) 始终走已验证的 Go 路径.
 	db.kernel = newMVSKernel(db)
-	cfg.logger.Infof("minirehs/mvs compiled %d pattern(s): nfa=%d (assert=%d gate=%d) fallback=%d always_on=%d (merged_nfa=%d assert=%d other=%d) c_kernel=%v",
-		db.n, nfaCount, assertCount, gateCount, db.n-nfaCount,
+	anchorCount, biAnchorCount := 0, 0
+	for i := 0; i < db.n; i++ {
+		if db.anchorable[i] {
+			anchorCount++
+		}
+		if db.biAnchorable[i] {
+			biAnchorCount++
+		}
+	}
+	cfg.logger.Infof("minirehs/mvs compiled %d pattern(s): nfa=%d (assert=%d gate=%d) fallback=%d anchor=%d bi_anchor=%d always_on=%d (merged_nfa=%d assert=%d other=%d) c_kernel=%v",
+		db.n, nfaCount, assertCount, gateCount, db.n-nfaCount, anchorCount, biAnchorCount,
 		db.mergedCount+len(db.assertAlwaysOn)+len(db.otherAlwaysOn),
 		db.mergedCount, len(db.assertAlwaysOn), len(db.otherAlwaysOn), db.kernel != nil)
 	return db, nil
@@ -273,6 +331,19 @@ type mvsDB struct {
 	win        []litWindow // 按 idx; 命中字面量结尾两侧上下文界 (head/tail; -1=该侧无界不收窄)
 	nfaCount   int
 
+	// 双向锚定 (Rose-lite 完全体): biAnchorable[idx]=true 表示该 lean pattern 当前会落整段 batch,
+	// 但每个必需字面量"每个出现处 head 或 tail 至少一侧有界" (computeLitBiCover.ok), 可用前向锚定
+	// (头有界出现处) ∪ 反向锚定 (尾有界出现处) 替换整段扫. revNFAs[idx] 为该 pattern 的反向 NFA
+	// (反转语言的同构 Glushkov 自动机, 见 mvs_reverse.go), nil 表示非 biAnchorable.
+	biAnchorable []bool
+	revNFAs      []*mvsNFA
+	hasBiAnchor  bool
+	// litBiHead/litBiTail 与 litToPat 同形: 该字面量在该 biAnchorable pattern 的 per-literal
+	// 前向回看上限 headF (>=0 才注入前向区间) 与反向前看上限 tailR (>=0 才注入反向区间); 非
+	// biAnchorable 项为 -1. 见 computeLitBiCover / scan 双向锚定批处理.
+	litBiHead [][]int32
+	litBiTail [][]int32
+
 	// litHead 与 litToPat 同形 (litHead[litID][k] 对应 litToPat[litID][k] 那条 pattern): 该字面量在
 	// 该 pattern 的 per-literal 回看上限 head (-1=无界, 锚定式退化为 [0,hitEnd] 整段注入). 仅锚定式
 	// pattern 的项有意义, 其余为 -1. 见 computeLitHeads / scan 锚定批处理。
@@ -341,6 +412,10 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 		sc.batchSeen = resetBoolBuf(sc.batchSeen, d.n)
 		anchorBatch := sc.anchorBatch[:0]
 		sc.anchorSeen = resetBoolBuf(sc.anchorSeen, d.n)
+		biBatch := sc.biBatch[:0]
+		if d.hasBiAnchor {
+			sc.biSeen = resetBoolBuf(sc.biSeen, d.n)
+		}
 		for _, h := range hits {
 			if int(h.litID) >= len(d.litToPat) {
 				continue
@@ -375,6 +450,31 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 						anchorBatch = append(anchorBatch, idx)
 					}
 					sc.anchorRanges[idx] = append(sc.anchorRanges[idx], anchorSpan{int32(lo), h.end})
+					continue
+				}
+				// 双向锚定: 据该字面量 headF/tailR 分别累积前向区间 [h.end-headF, h.end] (头有界) 与
+				// 反向区间 [h.end, h.end+tailR] (尾有界), 批后做前向锚定 ∪ 反向锚定单趟替换整段扫.
+				if d.biAnchorable[idx] {
+					if !sc.biSeen[idx] {
+						sc.biSeen[idx] = true
+						sc.biFwdRanges[idx] = sc.biFwdRanges[idx][:0]
+						sc.biRevRanges[idx] = sc.biRevRanges[idx][:0]
+						biBatch = append(biBatch, idx)
+					}
+					if hf := d.litBiHead[h.litID][k]; hf >= 0 {
+						lo := int(h.end) - int(hf)
+						if lo < 0 {
+							lo = 0
+						}
+						sc.biFwdRanges[idx] = append(sc.biFwdRanges[idx], anchorSpan{int32(lo), h.end})
+					}
+					if tr := d.litBiTail[h.litID][k]; tr >= 0 {
+						hi := int(h.end) + int(tr)
+						if hi > n {
+							hi = n
+						}
+						sc.biRevRanges[idx] = append(sc.biRevRanges[idx], anchorSpan{h.end, int32(hi)})
+					}
 					continue
 				}
 				// 批处理 (有 C 内核且非断言 lean NFA): 累积本 idx 全部命中点的窗口 union, 批后用收窄
@@ -447,6 +547,37 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 				hit = nfa.existsInAnchored1(data, spans)
 			default:
 				hit = nfa.existsInAnchored(data, spans, sc.anchorPrev, sc.anchorCand, sc.anchorActive)
+			}
+			if hit {
+				if stop := d.finalizeHit(idx, data, sc, handler); stop {
+					return true, nil
+				}
+			}
+		}
+		// 双向锚定批处理: 前向锚定 (头有界出现处) ∪ 反向锚定 (尾有界出现处) 替换整段 batch. 任一向命中
+		// 即真匹配 (子串/邻域关系无假阳); 二者并集覆盖全部匹配 (每出现处至少一侧有界, 无假阴).
+		sc.biBatch = biBatch
+		for _, idx32 := range biBatch {
+			idx := int(idx32)
+			sc.fullDone[idx] = true
+			var hit bool
+			if fwdSpans := mergeAnchorSpans(sc.biFwdRanges[idx]); len(fwdSpans) > 0 {
+				fwd := d.nfas[idx]
+				if fwd.single {
+					hit = fwd.existsInAnchored1(data, fwdSpans)
+				} else {
+					hit = fwd.existsInAnchored(data, fwdSpans, sc.anchorPrev, sc.anchorCand, sc.anchorActive)
+				}
+			}
+			if !hit {
+				if revSpans := mergeAnchorSpans(sc.biRevRanges[idx]); len(revSpans) > 0 {
+					rev := d.revNFAs[idx]
+					if rev.single {
+						hit = rev.existsInReverseAnchored1(data, revSpans)
+					} else {
+						hit = rev.existsInReverseAnchored(data, revSpans, sc.anchorPrev, sc.anchorCand, sc.anchorActive)
+					}
+				}
 			}
 			if hit {
 				if stop := d.finalizeHit(idx, data, sc, handler); stop {
@@ -644,6 +775,18 @@ func (d *mvsDB) resetScratch(sc *scratch) {
 			sc.anchorRanges = make([][]anchorSpan, d.n)
 		} else {
 			sc.anchorRanges = sc.anchorRanges[:d.n]
+		}
+	}
+	if d.hasBiAnchor {
+		if cap(sc.biFwdRanges) < d.n {
+			sc.biFwdRanges = make([][]anchorSpan, d.n)
+		} else {
+			sc.biFwdRanges = sc.biFwdRanges[:d.n]
+		}
+		if cap(sc.biRevRanges) < d.n {
+			sc.biRevRanges = make([][]anchorSpan, d.n)
+		} else {
+			sc.biRevRanges = sc.biRevRanges[:d.n]
 		}
 	}
 }

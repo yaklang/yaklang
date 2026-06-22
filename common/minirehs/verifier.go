@@ -76,6 +76,9 @@ func (v *re2Verifier) findAllInWindow(data []byte, winStart, winEnd int) [][2]in
 // regexp2Verifier 基于 yaklang 的 regexp-utils 包 (优先 RE2, 失败回退 regexp2),
 // 用于承载 backref / lookaround 等自动机无法表达、但 regexp2 可处理的 pattern.
 // 这类 pattern 报告"存在命中" (偏移 -1), 满足 MITM 打标等以命中为准的场景.
+//
+// 注: regexp-utils 的 regexp2 后端已全局切换为 go-pcre2-lite (PCRE2, 线性时间, 远低回溯成本),
+// 故本 verifier 经 yak.Match 自动享有该加速, 无需 minirehs 内单独旁路.
 type regexp2Verifier struct {
 	yak *regexp_utils.YakRegexpUtils
 }

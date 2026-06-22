@@ -386,7 +386,14 @@ func compileMVSNFA(re *syntax.Regexp) (*mvsNFA, bool) {
 	if !ok {
 		return nil, false
 	}
+	return glushkovNFA(root, anchoredStart, requireEnd)
+}
 
+// glushkovNFA 由 rune 级 bnode 根 (经 synToRune/anchor 剥离后) 与文本锚标志构造位置自动机.
+// 正向 (compileMVSNFA) 与反向 (compileReverseExprToNFA, 反转 bnode 后调用) 共用此构造器, 保证
+// 二者位并行结构、字母表压缩口径完全一致 —— 反向 NFA 即"反转语言的同构 Glushkov 自动机",
+// 配合反向扫描 (DecodeLastRune 自尾向头) 与正向 existsIn 对同一 data 判定同真伪 (见差分护栏).
+func glushkovNFA(root *bnode, anchoredStart, requireEnd bool) (*mvsNFA, bool) {
 	g := &glushkovBuilder{}
 	rootNullable, first, last := g.visit(root)
 	if g.over {

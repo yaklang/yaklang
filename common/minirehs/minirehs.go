@@ -5,8 +5,8 @@
 //
 // 设计第一约束是可移植: 默认构建 (CGO_ENABLED=0, 不加任何 build tag) 必须在所有
 // 平台/架构上编译运行且功能完整, 走纯 Go 自研引擎 (字面量预过滤 Aho-Corasick +
-// RE2 验证). 当启用 CGO 且带 minirehs_cgo tag 时, 字面量预过滤这一步会切换为
-// 自带的 SIMD (Teddy/AC 加速) 实现, 不依赖任何外部 C 库, 缺失时优雅退化为纯 Go.
+// RE2 验证). 启用 CGO (CGO_ENABLED=1, 无需额外 build tag) 时, 字面量预过滤默认切换为
+// 自带的 Teddy SIMD 实现 (SSSE3/NEON, 标量孪生兜底), 不依赖任何外部 C 库, 缺失时优雅退化为纯 Go.
 //
 // 重要语义说明: 本引擎与 Go 标准库 regexp 一样是 RE2 自动机方法, 不支持
 // backreference 与任意 lookaround. 这是数学本质决定的, 不是实现缺陷.

@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"sync"
 
-	"github.com/dlclark/regexp2"
+	regexp2 "github.com/VillanCh/go-pcre2-lite/regexp2"
 	"github.com/samber/lo"
 )
 

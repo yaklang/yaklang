@@ -1,4 +1,4 @@
-//go:build cgo && minirehs_cgo
+//go:build cgo
 
 package minirehs
 

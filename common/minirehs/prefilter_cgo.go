@@ -1,9 +1,9 @@
-//go:build cgo && minirehs_cgo
+//go:build cgo
 
 package minirehs
 
 /*
-#cgo CFLAGS: -O3 -Wall
+#cgo CFLAGS: -O3 -std=gnu11 -Wall
 
 #include <stdint.h>
 #include <stddef.h>
@@ -35,11 +35,21 @@ func simdPrefilterAvailable() bool { return true }
 // engineTier 是 SIMD 预过滤构建的引擎档位.
 const engineTier = 2
 
-// newPrefilter 在 cgo && minirehs_cgo 构建下优先返回 SIMD 预过滤; 构造失败则优雅退化到
-// 纯 Go 标量 Aho-Corasick, 保证功能一致.
+// newPrefilter 在 cgo 构建 (CGO_ENABLED=1, 无需额外 tag) 下默认返回 Teddy SIMD 预过滤;
+// 构造失败则优雅退化到纯 Go 标量 Aho-Corasick, 保证功能一致. CGO_ENABLED=0 时见 prefilter_nocgo.go.
+//
+// Teddy 默认化的"只赚不亏"门控: 仅当 Teddy 真正激活 (全部必需字面量长度 >= 2, 见 build_teddy
+// 的 M=min(最短字面量,4)>=2 条件) 时才用 cgo SIMD 预过滤——此时 SSSE3/NEON 一次 16 字节的指纹
+// 扫描显著快于逐字节 AC. 若字面量集含长度 1 字面量 (Teddy 退化为 C-AC), 则改用纯 Go 标量 AC:
+// 此时无 SIMD 收益, 走 cgo 只会白付每报文一次跨界成本 (实测真实对抗集 3.47->3.24 MB/s 的小幅回归),
+// 退回纯 Go 既避免回归, 又保持"标量孪生兜底"的可移植语义. 正确性: 两条路径命中集合逐项一致
+// (teddy_cgo_test.go: Teddy SIMD == 标量孪生 == 纯 Go AC), 预过滤只决定验证哪些位置, 不改判定.
 func newPrefilter(li *literalIndex) prefilter {
 	if p := newCGOPrefilter(li); p != nil {
-		return p
+		if p.useTeddy() {
+			return p
+		}
+		p.release() // Teddy 未激活 (含长度 1 字面量): 释放 cgo 资源, 退回纯 Go 标量 AC 避免跨界开销.
 	}
 	return newScalarPrefilter(li)
 }

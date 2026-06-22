@@ -66,7 +66,7 @@ group.Close()
 | Tier | 后端 | 技术 | 语义 | 触发条件 |
 |------|------|------|------|----------|
 | 1 | mvs | 自托管 mvscan: rune/字节级 Glushkov 位并行 NFA + 字面量预过滤 (CGO 时纯 C99 内核) | **存在性** (From/To=-1) 或精确偏移 | `WithBackend(BackendMVS)`; `BuildGroup` 默认选用 |
-| 2 | engine | 自带 SIMD (NEON / SSSE3) Aho-Corasick 跳过 | RE2 精确偏移 | `CGO_ENABLED=1` 且 `-tags minirehs_cgo` |
+| 2 | engine | 自带 Teddy SIMD (NEON / SSSE3) 多字面量预过滤 | RE2 精确偏移 | `CGO_ENABLED=1` (默认, 无需额外 tag) |
 | 3 | engine | 纯 Go 标量 Aho-Corasick | RE2 精确偏移 | 默认 (任意平台) |
 | 4 | stdlib | 无 (逐条全量匹配) | RE2 精确偏移 | 显式 `WithBackend(BackendStdlib)`, 作 oracle / 基线 |
 

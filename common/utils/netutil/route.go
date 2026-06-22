@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dlclark/regexp2"
+	regexp2 "github.com/VillanCh/go-pcre2-lite/regexp2"
 	"github.com/gopacket/gopacket/routing"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"

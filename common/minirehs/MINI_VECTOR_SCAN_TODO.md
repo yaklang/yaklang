@@ -17,8 +17,11 @@
 > `-tags minirehs_mvs` 接入,内置 SSE2/NEON 多字 SIMD 加速档 + 标量孪生逐位一致;并由 `tools/amalgamate`
 > 拼为"丢两个文件即可编"的单文件发行,在 darwin/arm64(clang/NEON)、linux/amd64(gcc/SSE2)、
 > linux/arm64(gcc/NEON,qemu) 真实运行 + ASan/UBSan 干净,Windows/x64(MinGW) 编译链接通过。**
-> 下一步(尚未落地,按收益排序):Teddy SIMD 预过滤默认化(替标量 AC,逼近 Hyperscan 吞吐的主路径)、
-> Rose-lite 字面量链分解(消除"尾部无界"模式的整段扫描)、断言 NFA 合并单趟。详见 IMPL 第 0'.4 节。
+> **已落地(2026-06)**:Teddy SIMD 默认化(替标量 AC)、Rose-lite 双向锚定(前向 ∪ 反向锚定,消除"双无界
+> keyword 类"整段扫;`mvs_reverse.go`/`mvs_bicover.go`,见 IMPL 0'.5)。cgocall 28%→11%、RE2-only 存在性
+> +25%(CGO)/+32.5%(NoCGO)、零假阴(差分 oracle 全 1332 + 反向独立护栏)。
+> 下一步(按收益):前端 regexp2→go-pcre2-lite 迁移(现 ~40% CPU 的绝对瓶颈,**单独 PR**)、断言 NFA 合并单趟、
+> Rose 子串图多跳链(>2 字面量按图边逐跳)。详见 IMPL 第 0'.4 / 0'.5 节。
 
 ---
 
@@ -393,13 +396,14 @@ docker run --rm --platform linux/amd64 -v $PWD:/amalg:ro -v /tmp/mvs_fixture:/fi
 
 ## 4. 当前瓶颈(数据驱动,profile 已确认)
 
-NFA 本身几乎免费(`existsIn` 合计 ~31% CPU 且低分配)。热点在**那 10 条回退正则的 always-on 全量扫描**:
+> **2026-06 更新**:Teddy 默认化 + Rose-lite 双向锚定(见 0'.5 节 / `mvs_reverse.go`)已落地。后者把
+> `runtime.cgocall`(C 内核整段扫)从 ~28% 砍到 ~11%、C `nfaExists` 扫描字节 16.35MB→3.93MB(降 76%)。
+> 此后 profile 的**绝对瓶颈是 regexp2**(`regexp2.execute`/`IsWordChar`/`CharIn` 系列合计 ~40% CPU)。
 
-- regexp2-only(回溯引擎):~**32% CPU、~75% 分配**(`regexp2.getRunes` / `Regexp2Wrapper.Match`)。
-- stdlib regexp 回退:~**25% CPU**(`regexp.(*machine).match`)。
-
-这是现有 engine 也背的"regexp2 always-on 税"。**纯 Go 再上台阶,核心是让回退正则别每条都全量跑**,
-而不是继续优化 NFA。
+- **regexp2 前端(最大头,~40% CPU)**:`regexp2.execute` 回溯。下一步独立工作项 = 前端从 `dlclark/regexp2`
+  迁移到 `go-pcre2-lite`(线性时间),**单独 PR 处理**,不在双向锚定本次范围。该迁移落地后双向锚定省下的占比会放大。
+- 断言 NFA always-on(`existsInAssertShared` ~9.5% + `existsInAssertAnchored` ~4%):IMPL 0'.4 #2 的"断言 NFA 合并"。
+- 前向/反向锚定(`existsInAnchored*` ~15% + `existsInReverseAnchored` ~5%):双向锚定本体,已是收窄后的局部扫描。
 
 ---
 
@@ -466,8 +470,20 @@ NFA 本身几乎免费(`existsIn` 合计 ~31% CPU 且低分配)。热点在**那
   命中点邻域的 union 窗口;锚定 / 尾部无界者安全退回整段(零假阴,`mvs_window_test.go` 对抗护栏)。
 - 实测(darwin/arm64,C 内核):存在性 2.13→**2.44 MB/s**、定位 1.52→**1.75**、纯 RE2 子集 3.21→**3.83**;
   纯 RE2 子集该路径内存 29.5→**0.45 MB/op(降 65x)**。
-- **下一步(未落地,按收益)**:Teddy 默认化(替标量 AC)→ Rose-lite 链分解(消除尾部无界整段扫描)→
-  断言 NFA 合并单趟。详见 IMPL 第 0'.4 节。
+### Phase 5 — Rose-lite 双向锚定(前向 ∪ 反向)✅ 已落地(2026-06)
+- **反向 NFA**(`mvs_reverse.go` `reverseBnode`/`compileReverseExprToNFA`):结构反转 rune 级 `bnode` 树后复用
+  `glushkovNFA`,得反转语言的同构自动机;`existsInReverseAnchored`(`utf8.DecodeLastRune` 自尾向头扫 + rune-end
+  注入 + 提前消亡)。
+- **可救性分析**(`mvs_bicover.go` `computeLitBiCover`):per-occurrence 两侧界,判"每出现处 head 或 tail 至少一侧
+  有界";头有界出现处→前向锚定、尾有界出现处→反向锚定,并集 = 全部匹配(零假阴代数保证)。
+- **接线**(`mvs_backend.go` `biAnchorable`/`revNFAs`/`litBiHead`/`litBiTail` + `scan` 双向锚定批处理):替换
+  双无界 keyword 类(`参数-用户名/敏感参数/密码泄露` 等 9 条,含 3 大热点)的整段 C 扫。
+- **零假阴护栏**(`mvs_reverse_test.go`):反向 NFA(全区间注入)== 正向 `existsIn`,6407 随机正则×含非法 UTF-8 +
+  74 真实 MITM×1332 记录,零 mismatch(证 `DecodeLastRune` 与 `DecodeRune` 切分一致)。
+- 实测(A/B `biAnchorEnabled`):RE2-only 存在性 +25%(CGO 6.04→7.55)/+32.5%(NoCGO 5.66→7.50);`runtime.cgocall`
+  28%→11%;C `nfaExists` 字节 16.35MB→3.93MB(降 76%);差分 oracle 全 1332(定位+存在性)+ 一致性 87 条全绿。
+- **下一步(未落地,按收益)**:前端 regexp2→go-pcre2-lite(现 ~40% CPU 绝对瓶颈,**单独 PR**)→ 断言 NFA 合并单趟
+  → Rose 子串图多跳链。详见 IMPL 第 0'.4 / 0'.5 节。
 
 ### 可选 — 扩 NFA 覆盖率 ✅ 已完成(2026-06-22,见 1e 节零宽断言扩展)
 - 词边界 `\b\B` / 行锚 `(?m)^$` / 中缀 `^$` / `\A\z` 已由守卫式自动机 `mvs_assert.go` 支持,

@@ -13,7 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 
-	regexp "github.com/dlclark/regexp2"
+	regexp "github.com/VillanCh/go-pcre2-lite/regexp2"
 )
 
 func init() {
