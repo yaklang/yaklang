@@ -27,6 +27,8 @@ func createYakitAction(schema string) Action {
 		return &wsm.YakShellResourceAction{}
 	case "javadec":
 		return java_decompiler.NewJavaDecompilerAction()
+	case "openapi":
+		return newOpenAPIAction()
 	default:
 		return nil
 	}
