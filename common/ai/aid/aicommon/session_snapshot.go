@@ -31,10 +31,10 @@ type SessionSnapshot struct {
 }
 
 type SessionSnapshotExecution struct {
-	TaskName          string `json:"task_name,omitempty"`
+	TaskName          string `json:"task_name"`
 	Status            string `json:"status"`
-	StartedAt         int64  `json:"started_at,omitempty"`
-	EndedAt           int64  `json:"ended_at,omitempty"`
+	StartedAt         int64  `json:"started_at"`
+	EndedAt           int64  `json:"ended_at"`
 	ToolCallSuccess   int    `json:"tool_call_success"`
 	ToolCallFailed    int    `json:"tool_call_failed"`
 	ToolCallTotal     int    `json:"tool_call_total"`
@@ -46,31 +46,31 @@ type SessionSnapshotExecution struct {
 
 type SessionSnapshotPerception struct {
 	Summary      string  `json:"summary"`
-	Topics       []string `json:"topics,omitempty"`
-	Keywords     []string `json:"keywords,omitempty"`
+	Topics       []string `json:"topics"`
+	Keywords     []string `json:"keywords"`
 	Confidence   float64 `json:"confidence"`
 	Changed      bool    `json:"changed"`
 	Epoch        int     `json:"epoch"`
 	LastTrigger  string  `json:"last_trigger"`
-	IntentShift  string  `json:"intent_shift,omitempty"`
+	IntentShift  string  `json:"intent_shift"`
 	LastUpdateAt int64   `json:"last_update_at"`
 
-	CapabilityMatches *SessionSnapshotPerceptionCapabilityMatches `json:"capability_matches,omitempty"`
-	Knowledge         *SessionSnapshotPerceptionKnowledge         `json:"knowledge,omitempty"`
+	CapabilityMatches *SessionSnapshotPerceptionCapabilityMatches `json:"capability_matches"`
+	Knowledge         *SessionSnapshotPerceptionKnowledge         `json:"knowledge"`
 }
 
 type SessionSnapshotPerceptionCapabilityMatches struct {
 	Query                    string   `json:"query"`
-	MatchedToolNames         []string `json:"matched_tool_names,omitempty"`
-	MatchedForgeNames        []string `json:"matched_forge_names,omitempty"`
-	MatchedSkillNames        []string `json:"matched_skill_names,omitempty"`
-	MatchedFocusModeNames    []string `json:"matched_focus_mode_names,omitempty"`
-	RecommendedCapabilities  []string `json:"recommended_capabilities,omitempty"`
+	MatchedToolNames         []string `json:"matched_tool_names"`
+	MatchedForgeNames        []string `json:"matched_forge_names"`
+	MatchedSkillNames        []string `json:"matched_skill_names"`
+	MatchedFocusModeNames    []string `json:"matched_focus_mode_names"`
+	RecommendedCapabilities  []string `json:"recommended_capabilities"`
 }
 
 type SessionSnapshotPerceptionKnowledge struct {
 	Query           string   `json:"query"`
-	KnowledgeBases  []string `json:"knowledge_bases,omitempty"`
+	KnowledgeBases  []string `json:"knowledge_bases"`
 	Content         string   `json:"content"`
 }
 
