@@ -66,7 +66,7 @@ func TestRouteBExtractKnownRules(t *testing.T) {
 	}{
 		{"参数-URL设计", `(\b(?![\w]{0,10}?https?://)(([-A-Za-z0-9]{1,20})://[-A-Za-z0-9+&@#/%?=~_|!:,.;]+[-A-Za-z0-9+&@#/%=~_|]))`, []string{"://"}},
 		{"Url信息", `(https?://[-A-Za-z0-9+&@#/%?=~_|!:,.;\u4E00-\u9FFF]+[-A-Za-z0-9+&@#/%=~_|])`, []string{"http"}},
-		{"Email", `(([a-z0-9]+[_|\.])*[a-z0-9]+@([a-z0-9]+[-|_|\.])*[a-z0-9]+\.((?!js|css|jpg|jpeg|png|ico)[a-z]{2,5}))`, nil}, // 仅 "@" 长度 1 < minLen
+		{"Email", `(([a-z0-9]+[_|\.])*[a-z0-9]+@([a-z0-9]+[-|_|\.])*[a-z0-9]+\.((?!js|css|jpg|jpeg|png|ico)[a-z]{2,5}))`, []string{"@"}}, // "@" 为稀有锚字节, 即便长度 1 也保留以门控 (见 isRareAnchorLiteral)
 	}
 	for _, c := range cases {
 		got := extractRequiredLiteralsApprox(c.expr, 2)

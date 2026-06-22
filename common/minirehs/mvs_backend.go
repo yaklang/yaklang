@@ -2,6 +2,7 @@ package minirehs
 
 import (
 	"regexp/syntax"
+	"strings"
 )
 
 // mvsBackend 是自托管 mvscan 引擎的纯 Go 参考实现 (M1): 把每条 RE2 pattern 编译为字节级
@@ -27,11 +28,15 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 		re2Loc:     make([]bool, len(patterns)),
 		windowable: make([]bool, len(patterns)),
 		batchable:  make([]bool, len(patterns)),
+		anchorable: make([]bool, len(patterns)),
 		win:        make([]litWindow, len(patterns)),
+		gateHead:   make([]int32, len(patterns)),
 		reportLoc:  cfg.reportLocation,
 	}
+	perPatHeads := make(map[int]map[string]int32, len(patterns)) // 锚定式 pattern 的 per-literal head
 	for i := range db.win {
 		db.win[i] = litWindow{head: -1, tail: -1} // 默认不收窄 (整段)
+		db.gateHead[i] = -1                       // 默认不局部化门复核
 	}
 
 	var withLit []*compiledPattern // 有必需字面量 (nfa 或兜底): 进字面量索引, 命中才验证
@@ -51,6 +56,11 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 			}
 			if gate {
 				gateCount++
+				// 超集门局部化: 命中字面量后, 把 regexp2 复核 + 断言超集预检收窄到 data[winLo:]
+				// (winLo=firstHitEnd-gateHead-1). gateHead 取超集骨架下全部字面量的最大回看上限。
+				if len(cp.literals) > 0 {
+					db.gateHead[cp.idx] = computeGateHead(cp)
+				}
 			}
 			// 窗口化存在性快路径资格: 有界宽 (windowed) 且无零宽断言、非超集门的 lean NFA.
 			// 仅 !reportLoc 时启用 (见 scan); 定位档仍整段, 保定位语义不变.
@@ -60,11 +70,24 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 			// 批处理资格: 非断言 lean NFA 已序列化进 C blob, 可走 nfaExistsMany 一次 cgo 多条验证.
 			if !nfa.hasAssert {
 				db.batchable[cp.idx] = true
-				// 存在性本地化界: 仅 RE2-exact (NFA 由 cp.expr 直接编译) 才能用 cp.expr 上下文界
-				// 安全收窄; gate/re2Loc 的 NFA 源自超集骨架 (宽度可能更大), 保留整段。命中字面量
-				// 后, 运行期把整段 existsIn 收到 [h.end-head, h.end+tail] 的 union (见 scan)。
-				if !gate && !re2Loc && len(cp.literals) > 0 {
-					w := computeLitWindow(cp.expr, cp.literals)
+			}
+			// 存在性本地化界 (lean 与断言通用): 窗口/锚定分析用一条 RE2 可解析的表达式 analysisExpr:
+			//   - RE2-exact (!gate && !re2Loc): 直接用 cp.expr (NFA 即由它编译, 界精确)。
+			//   - re2Loc (语言等价超集, widened=false): 用超集骨架 —— cp.expr 可能含 \u / 原子组等
+			//     RE2 不可解析构造 (syntax.Parse 会失败, 退化整段), 而超集已归一为 \x{} 且与原语言等价,
+			//     故界精确、可安全窗口化/锚定 (修复 \u 类 pattern 如 "Url信息" 被迫整段扫的退化)。
+			//   - gate (widened 超集 ⊋ 原): 不在此锚定 (NFA 命中仍需 regexp2 复核); 其局部化由 gateHead 覆盖。
+			if !gate && len(cp.literals) > 0 {
+				analysisExpr := cp.expr
+				if re2Loc {
+					if super, _, ok := re2SupersetEx(cp.expr); ok {
+						analysisExpr = super
+					} else {
+						analysisExpr = "" // 超集都不可解析: 保守整段
+					}
+				}
+				if analysisExpr != "" {
+					w := computeLitWindow(analysisExpr, cp.literals)
 					if nfa.anchoredStart {
 						w.head = -1 // ^ \A 锚: 匹配必起于偏移 0, 不可左截
 					}
@@ -72,6 +95,39 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 						w.tail = -1 // $ \z 锚: 匹配必止于偏移 n, 不可右截
 					}
 					db.win[cp.idx] = w
+
+					// 锚定式单趟资格: 命中字面量后只在邻域 [h.end-head_L, h.end] 注入起点, 靠 NFA 提前
+					// 消亡省去整段扫 (整段 existsIn/existsInAssertShared 每步重注入 first, 活跃集永不消亡,
+					// 非匹配报文被迫扫满窗口; 锚定式注入区间外不注入, 失配后即消亡退出):
+					//   - 断言 NFA: 本就 Go 侧整段扫, 锚定后大幅省尾; 位置锚 (^ $ \b) 编码为 guard 按真实
+					//     bound 门控, 多注入位置自动滤除, 无害。
+					//   - lean NFA: 仅当尾部无界 (tail<0)、头部有界、非 ^ 锚 (anchoredStart) 且未走廉价小窗
+					//     (windowable) 时锚定 —— 这类当前在 C 内核被迫扫 [hit,n] 整段, 锚定式提前消亡可显著
+					//     省去非匹配报文的尾部扫描。尾有界者已被 C 小窗廉价覆盖, 不替换。
+					// per-literal head 见 perPatHeads (单条 pattern 内有界分支字面量仍可锚定, 无界分支退化整段)。
+					eligible := false
+					if nfa.hasAssert {
+						eligible = true
+					} else if !nfa.anchoredStart && w.tail < 0 && !db.windowable[cp.idx] {
+						eligible = true
+					}
+					if eligible {
+						heads := computeLitHeads(analysisExpr, cp.literals)
+						anyBoundedHead := false
+						for _, h := range heads {
+							if h >= 0 {
+								anyBoundedHead = true
+								break
+							}
+						}
+						if anyBoundedHead {
+							db.anchorable[cp.idx] = true
+							perPatHeads[cp.idx] = heads
+							if nfa.nword > db.maxAnchorNword {
+								db.maxAnchorNword = nfa.nword
+							}
+						}
+					}
 				}
 			}
 		}
@@ -95,6 +151,21 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 		li := buildLiteralIndex(withLit)
 		db.pf = newPrefilter(li)
 		db.litToPat = li.litToPat
+		// litHead 与 litToPat 同形: 为锚定式 pattern 填该 (litID,pattern) 的 per-literal head; 其余 -1.
+		db.litHead = make([][]int32, len(li.litToPat))
+		for litID, pats := range li.litToPat {
+			heads := make([]int32, len(pats))
+			litStr := li.literals[litID]
+			for k, idx := range pats {
+				heads[k] = -1
+				if db.anchorable[int(idx)] {
+					if h, ok := perPatHeads[int(idx)][litStr]; ok {
+						heads[k] = h
+					}
+				}
+			}
+			db.litHead[litID] = heads
+		}
 	}
 	db.merged = buildMergedNFA(mergeMembers)
 	db.mergedCount = len(mergeMembers)
@@ -139,6 +210,41 @@ func tryCompileNFA(cp *compiledPattern) (nfa *mvsNFA, gate bool, re2Loc bool) {
 	return nfa, widened, true
 }
 
+// computeGateHead 计算超集门 gate 的局部化回看上限: 超集骨架下全部必需字面量的最大 head
+// (match-start 到字面量结尾的最大字节宽). 任一字面量无界 / 含 lookbehind / verifier 可给精确偏移
+// (非 regexp2-only) 时返回 -1 (不局部化, 保守整段).
+//
+// 正确性: gate 语言只增不减 (R_super ⊇ R_orig), 故超集 head >= 原 head; winLo=firstHitEnd-head-1
+// 必 <= 任一原匹配起点 (绝不漏报), 且 winLo+head < firstHitEnd <= 任一字面量结尾 (winLo 前无该门
+// 字面量可达, 子切片首位起不了匹配 -> 绝不误报). lookbehind 会读 match-start 左侧可能越过 winLo, 故排除。
+func computeGateHead(cp *compiledPattern) int32 {
+	if cp.v == nil || cp.v.exact() {
+		return -1 // 仅对 regexp2-only (命中报 -1/-1) 局部化, 避免精确 verifier 偏移错位
+	}
+	if strings.Contains(cp.expr, "(?<=") || strings.Contains(cp.expr, "(?<!") {
+		return -1 // lookbehind: 读 match-start 左侧上下文, 可能越过 winLo
+	}
+	super, _, ok := re2SupersetEx(cp.expr)
+	if !ok {
+		return -1
+	}
+	heads := computeLitHeads(super, cp.literals)
+	if len(heads) == 0 {
+		return -1
+	}
+	maxHead := int32(-1)
+	for _, lit := range cp.literals {
+		h, ok := heads[lit]
+		if !ok || h < 0 {
+			return -1 // 任一字面量无界 -> 不能安全收窄
+		}
+		if h > maxHead {
+			maxHead = h
+		}
+	}
+	return maxHead
+}
+
 // compileExprToNFA 把一条 RE2 可解析的 expr 编为 mvsNFA (先 lean 后断言扩展); 失败返回 nil.
 func compileExprToNFA(expr string) *mvsNFA {
 	parsed, err := syntax.Parse(expr, syntax.Perl)
@@ -163,8 +269,22 @@ type mvsDB struct {
 	re2Loc     []bool    // 按 idx; true=精确定位交 regexp2 (regexp2-origin, 保 PCRE span 语义)
 	windowable []bool    // 按 idx; true=可在字面量命中点邻域窗口内做存在性验证 (有界宽 lean NFA)
 	batchable  []bool    // 按 idx; true=非断言且有 NFA (在 C blob 中), 可走 nfaExistsMany 批处理
+	anchorable []bool    // 按 idx; true=可走锚定式单趟存在性 (有界头/无界尾, 命中字面量后只在邻域注入起点)
 	win        []litWindow // 按 idx; 命中字面量结尾两侧上下文界 (head/tail; -1=该侧无界不收窄)
 	nfaCount   int
+
+	// litHead 与 litToPat 同形 (litHead[litID][k] 对应 litToPat[litID][k] 那条 pattern): 该字面量在
+	// 该 pattern 的 per-literal 回看上限 head (-1=无界, 锚定式退化为 [0,hitEnd] 整段注入). 仅锚定式
+	// pattern 的项有意义, 其余为 -1. 见 computeLitHeads / scan 锚定批处理。
+	litHead [][]int32
+	// maxAnchorNword 是全部锚定式 pattern 的 nfa.nword 最大值, 用于一次性分配锚定执行器工作缓冲。
+	maxAnchorNword int
+
+	// gateHead 按 idx; 仅对"可局部化的超集门 gate" >=0, 表示该 pattern 全部字面量在超集骨架下的
+	// 最大回看上限 (match-start 到字面量结尾的字节宽). gate 命中字面量后, 把 regexp2 复核与断言 NFA
+	// 超集预检都收窄到 data[winLo:] (winLo=firstHitEnd-gateHead-1, rune 对齐), 省去字面量前的整段扫.
+	// -1 表示不局部化 (无字面量 / 任一字面量无界 / 含 lookbehind / verifier 可给精确偏移). 见 verifyGateLocalized.
+	gateHead []int32
 
 	pf       prefilter // 可能为 nil (无任何字面量 pattern)
 	litToPat [][]int32 // litID -> pattern idx
@@ -184,6 +304,17 @@ type mvsDB struct {
 func (d *mvsDB) numAlwaysOn() int {
 	return d.mergedCount + len(d.assertAlwaysOn) + len(d.otherAlwaysOn)
 }
+
+// cgo 调用诊断计数器 (仅 cgoDiagEnabled=true 时累加, 默认关闭, 近零开销). 用于量化
+// "cgo 跨界次数 vs 实际扫描字节" 以判定瓶颈是跨界开销还是扫描工作量 (见 TestMVSCgoCallDiag).
+// 声明置于无构建标签文件, 使 cgo / 非 cgo 构建与测试均可引用 (增量仅在 mvs_cgo.go 的真实调用处).
+var (
+	cgoDiagEnabled    bool
+	cgoNfaExistsCalls int64
+	cgoNfaExistsBytes int64
+	cgoMergedCalls    int64
+	cgoMergedBytes    int64
+)
 
 func (d *mvsDB) close() error {
 	if r, ok := d.pf.(prefilterReleaser); ok {
@@ -208,11 +339,13 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 		n := len(data)
 		batch := sc.batchIdx[:0]
 		sc.batchSeen = resetBoolBuf(sc.batchSeen, d.n)
+		anchorBatch := sc.anchorBatch[:0]
+		sc.anchorSeen = resetBoolBuf(sc.anchorSeen, d.n)
 		for _, h := range hits {
 			if int(h.litID) >= len(d.litToPat) {
 				continue
 			}
-			for _, idx := range d.litToPat[h.litID] {
+			for k, idx := range d.litToPat[h.litID] {
 				if sc.fullDone[idx] {
 					continue
 				}
@@ -223,6 +356,25 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 							return true, nil
 						}
 					}
+					continue
+				}
+				// 锚定式单趟 (有界头/无界尾的 lean 或断言 NFA): 累积本 idx 全部命中点的注入区间
+				// [h.end-head_L, h.end] (head_L<0 退化为 [0,h.end]), 批后做一次锚定式存在性. 只在
+				// 这些区间注入起点 => NFA 可提前消亡, 省去无界尾整段扫. 见 mvs_anchored.go 正确性说明.
+				if d.anchorable[idx] {
+					head := d.litHead[h.litID][k]
+					lo := 0
+					if head >= 0 {
+						if lo = int(h.end) - int(head); lo < 0 {
+							lo = 0
+						}
+					}
+					if !sc.anchorSeen[idx] {
+						sc.anchorSeen[idx] = true
+						sc.anchorRanges[idx] = sc.anchorRanges[idx][:0]
+						anchorBatch = append(anchorBatch, idx)
+					}
+					sc.anchorRanges[idx] = append(sc.anchorRanges[idx], anchorSpan{int32(lo), h.end})
 					continue
 				}
 				// 批处理 (有 C 内核且非断言 lean NFA): 累积本 idx 全部命中点的窗口 union, 批后用收窄
@@ -245,8 +397,22 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 					}
 					continue
 				}
-				// 其余 (无内核 / 断言 NFA / 无 NFA 兜底): 立即逐条验证.
+				// 可局部化超集门: 命中字面量后只在 data[winLo:] 复核 (winLo=h.end-gateHead-1, rune
+				// 对齐). 本 idx 首个命中 => h.end 最小, 取超集 max head 必覆盖任一原匹配起点 (见
+				// computeGateHead / verifyGateLocalized 正确性), 省去字面量前的整段 regexp2/断言扫。
 				sc.fullDone[idx] = true
+				if gh := d.gateHead[idx]; gh >= 0 {
+					winLo := int(h.end) - int(gh) - 1
+					if winLo < 0 {
+						winLo = 0
+					}
+					winLo = alignRuneStart(data, winLo)
+					if stop := d.verifyGateLocalized(int(idx), data, winLo, sc, handler); stop {
+						return true, nil
+					}
+					continue
+				}
+				// 其余 (无内核 / 断言 NFA / 无 NFA 兜底): 立即逐条验证.
 				if stop := d.verifyOne(int(idx), data, sc, handler); stop {
 					return true, nil
 				}
@@ -258,7 +424,32 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 			sc.fullDone[idx] = true
 			lo, hi := int(sc.winLo[idx]), int(sc.winHi[idx])
 			if d.kernel.nfaExists(idx, data[lo:hi]) {
-				if stop := d.finalizeHit(idx, data, handler); stop {
+				if stop := d.finalizeHit(idx, data, sc, handler); stop {
+					return true, nil
+				}
+			}
+		}
+		// 锚定式批处理: 对本报文每条触发的锚定式 pattern, 合并其注入区间后做一次锚定式单趟存在性.
+		sc.anchorBatch = anchorBatch
+		for _, idx32 := range anchorBatch {
+			idx := int(idx32)
+			sc.fullDone[idx] = true
+			spans := mergeAnchorSpans(sc.anchorRanges[idx])
+			nfa := d.nfas[idx]
+			var hit bool
+			// nword==1 (绝大多数真实 pattern) 走标量零分配快路径, 否则走多字通用版.
+			switch {
+			case nfa.hasAssert && nfa.single:
+				hit = nfa.existsInAssertAnchored1(data, d.sharedBound(data, sc), spans)
+			case nfa.hasAssert:
+				hit = nfa.existsInAssertAnchored(data, d.sharedBound(data, sc), spans, sc.anchorPrev, sc.anchorCand)
+			case nfa.single:
+				hit = nfa.existsInAnchored1(data, spans)
+			default:
+				hit = nfa.existsInAnchored(data, spans, sc.anchorPrev, sc.anchorCand, sc.anchorActive)
+			}
+			if hit {
+				if stop := d.finalizeHit(idx, data, sc, handler); stop {
 					return true, nil
 				}
 			}
@@ -281,7 +472,7 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 				continue
 			}
 			sc.fullDone[idx] = true
-			if stop := d.reportLocated(idx, data, handler); stop {
+			if stop := d.reportLocated(idx, data, sc, handler); stop {
 				return true, nil
 			}
 		}
@@ -313,8 +504,8 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 
 // reportLocated 对一条已由合并自动机确认命中的成员产出最终上报 (合并自动机的存在性判定与
 // 单条 existsIn 同源; 差分测试为护栏). 实际上报逻辑收敛到 finalizeHit (含 gate 复核 / re2Loc 定位).
-func (d *mvsDB) reportLocated(idx int, data []byte, handler MatchHandler) bool {
-	return d.finalizeHit(idx, data, handler)
+func (d *mvsDB) reportLocated(idx int, data []byte, sc *scratch, handler MatchHandler) bool {
+	return d.finalizeHit(idx, data, sc, handler)
 }
 
 // windowExists 在字面量命中点 h 的邻域窗口内做一条 (有界宽 lean NFA) pattern 的存在性判定.
@@ -339,7 +530,7 @@ func (d *mvsDB) windowExists(idx int, data []byte, h litHit) bool {
 //   - 仅存在性 (reportLoc=false): 命中即上报 (-1,-1), 不做定位扫描 (80x 快门档).
 //   - 需定位: regexp2-origin (re2Loc) 或断言 NFA 交 verifier 定位 (保 PCRE/既有 span 语义);
 //     纯 RE2 lean NFA 用自身 findAllLoc 给精确非重叠区间.
-func (d *mvsDB) finalizeHit(idx int, data []byte, handler MatchHandler) bool {
+func (d *mvsDB) finalizeHit(idx int, data []byte, sc *scratch, handler MatchHandler) bool {
 	cp := d.all[idx]
 	if d.gate[idx] {
 		// 超集门: regexp2 复核 (不命中则不上报, 命中按 verifier 语义上报).
@@ -354,7 +545,7 @@ func (d *mvsDB) finalizeHit(idx int, data []byte, handler MatchHandler) bool {
 		return d.reportViaVerifier(cp, data, handler)
 	}
 	stopped := false
-	nfa.findAllLoc(data, func(from, to int) bool {
+	nfa.findAllLoc(data, sc, func(from, to int) bool {
 		if !handler(Match{ID: cp.id, From: from, To: to}) {
 			stopped = true
 			return false
@@ -376,6 +567,8 @@ func (d *mvsDB) verifyOne(idx int, data []byte, sc *scratch, handler MatchHandle
 		// lean NFA 有 C 内核走 C (与 Go existsIn 逐位一致), 否则纯 Go.
 		var hit bool
 		switch {
+		case nfa.hasAssert && nfa.single:
+			hit = nfa.existsInAssertShared1(data, d.sharedBound(data, sc))
 		case nfa.hasAssert:
 			hit = nfa.existsInAssertShared(data, d.sharedBound(data, sc))
 		case d.kernel != nil:
@@ -387,10 +580,43 @@ func (d *mvsDB) verifyOne(idx int, data []byte, sc *scratch, handler MatchHandle
 			return false
 		}
 		// 命中后统一收敛到 finalizeHit (含 gate 超集复核 / re2Loc / 断言定位 / 纯 NFA 定位).
-		return d.finalizeHit(idx, data, handler)
+		return d.finalizeHit(idx, data, sc, handler)
 	}
 	// 无 NFA 的兜底: verifier 命中即存在; regexp2-only 无精确字节偏移, 以 -1/-1 表示存在性命中.
 	return d.reportViaVerifier(cp, data, handler)
+}
+
+// verifyGateLocalized 对可局部化超集门做"收窄到 data[winLo:]"的存在性门 + regexp2 复核.
+// winLo 已 rune 对齐且满足 winLo < 任一原匹配起点、winLo 前无该门字面量可达 (见 computeGateHead),
+// 故 data[winLo:] 上的判定与整段一致:
+//   - 无假阴: regexp2 真匹配整体落在 [winLo, n) 内 (其字面量结尾 >= firstHitEnd > winLo+head);
+//   - 无假阳: 子切片首位 (winLo) 起不了匹配 (前方 head 距内无该门字面量), 内部命中左上下文真实。
+// gate 的 verifier 命中报 -1/-1, 偏移无需换算; 与整段 reportViaVerifier 同上报。
+func (d *mvsDB) verifyGateLocalized(idx int, data []byte, winLo int, sc *scratch, handler MatchHandler) bool {
+	sub := data
+	if winLo > 0 {
+		sub = data[winLo:]
+	}
+	nfa := d.nfas[idx]
+	// 超集存在性预检 (收窄): 断言 NFA 用局部边界, lean NFA 走 C 内核/纯 Go.
+	var hit bool
+	switch {
+	case nfa.hasAssert && nfa.single:
+		sc.gateBound = computeBoundaries(sub, sc.gateBound)
+		hit = nfa.existsInAssertShared1(sub, sc.gateBound)
+	case nfa.hasAssert:
+		sc.gateBound = computeBoundaries(sub, sc.gateBound)
+		hit = nfa.existsInAssertShared(sub, sc.gateBound)
+	case d.kernel != nil:
+		hit = d.kernel.nfaExists(idx, sub)
+	default:
+		hit = nfa.existsIn(sub)
+	}
+	if !hit {
+		return false
+	}
+	// regexp2 复核 (收窄): gate verifier 命中报 -1/-1, 偏移无需换算。
+	return d.reportViaVerifier(d.all[idx], sub, handler)
 }
 
 // reportViaVerifier 用 verifier 给出的非重叠区间上报命中 (regexp2-only 为 -1/-1 存在性).
@@ -408,7 +634,26 @@ func (d *mvsDB) resetScratch(sc *scratch) {
 	sc.assertBoundReady = false
 	sc.winLo = ensureInt32(sc.winLo, d.n)
 	sc.winHi = ensureInt32(sc.winHi, d.n)
-	// batchSeen 在使用前由 scan 用 resetBoolBuf 清零 (仅 pf != nil 时需要)。
+	// batchSeen / anchorSeen 在使用前由 scan 用 resetBoolBuf 清零 (仅 pf != nil 时需要)。
+	if d.maxAnchorNword > 0 {
+		// 锚定执行器工作缓冲: 一次分配到最大 nword, 各 pattern 内部按自身 nword 切片复用。
+		sc.anchorPrev = ensureU64(sc.anchorPrev, d.maxAnchorNword)
+		sc.anchorCand = ensureU64(sc.anchorCand, d.maxAnchorNword)
+		sc.anchorActive = ensureU64(sc.anchorActive, d.maxAnchorNword)
+		if cap(sc.anchorRanges) < d.n {
+			sc.anchorRanges = make([][]anchorSpan, d.n)
+		} else {
+			sc.anchorRanges = sc.anchorRanges[:d.n]
+		}
+	}
+}
+
+// ensureU64 返回长度为 n 的 []uint64 (尽量复用底层数组; 内容由调用方按需清零)。
+func ensureU64(buf []uint64, n int) []uint64 {
+	if cap(buf) < n {
+		return make([]uint64, n)
+	}
+	return buf[:n]
 }
 
 // litSpan 计算 idx 的 pattern 在字面量命中点 (结束于 hitEnd) 的收窄子切片 [lo,hi]:

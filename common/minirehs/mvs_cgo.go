@@ -19,6 +19,7 @@ import "C"
 
 import (
 	"runtime"
+	"sync/atomic"
 	"unsafe"
 )
 
@@ -94,6 +95,10 @@ func (k *mvsKernel) nfaExistsImpl(idx int, data []byte, scalar bool) bool {
 	if k == nil || k.db == nil {
 		return false
 	}
+	if cgoDiagEnabled {
+		atomic.AddInt64(&cgoNfaExistsCalls, 1)
+		atomic.AddInt64(&cgoNfaExistsBytes, int64(len(data)))
+	}
 	var dptr *C.uint8_t
 	if len(data) > 0 {
 		dptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
@@ -168,6 +173,10 @@ func (k *mvsKernel) mergedScanImpl(data []byte, sc *scratch, scalar bool) []int 
 		sc.cmerged = sc.cmerged[:capOut]
 	}
 
+	if cgoDiagEnabled {
+		atomic.AddInt64(&cgoMergedCalls, 1)
+		atomic.AddInt64(&cgoMergedBytes, int64(len(data)))
+	}
 	var dptr *C.uint8_t
 	if len(data) > 0 {
 		dptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))

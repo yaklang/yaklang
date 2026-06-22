@@ -142,6 +142,89 @@ func (a *litWindowAcc) walk(re *syntax.Regexp, pre int, preB bool, suf int, sufB
 	}
 }
 
+// computeLitHeads 为 expr 的每个必需字面量分别计算"命中点回看上限 head" (match-start 到字面量
+// 结尾的最大字节宽; -1 表示该字面量任一出现处 head 侧无界). 与 computeLitWindow 同源、同样的安全性
+// 论证 (见本文件顶部), 区别在于 *按字面量分别给界* 而非全 pattern 取 max —— 这样"同一 pattern 内
+// 多分支、仅个别分支含无界前缀"(如 \b(pass|...|\[...\]Password=.*extension:ica)\b) 时, 有界分支的
+// 字面量 (pass/key/...) 仍可走锚定式单趟, 只有真正无界的分支字面量退化为整段.
+//
+// 锚定式只需 head (注入位置), 不需 tail (前向扫描 + 提前消亡自然收尾), 故此处只算 head.
+// 返回 map[字面量(已小写)] -> head; 未在 AST 命中的字面量不入表 (调用方按 -1 即整段处理, 安全)。
+func computeLitHeads(expr string, lits []string) map[string]int32 {
+	out := make(map[string]int32, len(lits))
+	if len(lits) == 0 {
+		return out
+	}
+	re, err := syntax.Parse(expr, syntax.Perl)
+	if err != nil {
+		return out
+	}
+	re = re.Simplify()
+	set := make(map[string]struct{}, len(lits))
+	for _, l := range lits {
+		set[l] = struct{}{}
+	}
+	acc := &litHeadAcc{set: set, heads: out}
+	acc.walk(re, 0, true)
+	return out
+}
+
+type litHeadAcc struct {
+	set   map[string]struct{}
+	heads map[string]int32
+}
+
+func (a *litHeadAcc) record(lit string, litLen, pre int, preB bool) {
+	h := int32(-1)
+	if preB {
+		if hh := pre + litLen; hh <= litWindowCap {
+			h = int32(hh)
+		}
+	}
+	cur, ok := a.heads[lit]
+	if !ok {
+		a.heads[lit] = h
+		return
+	}
+	// 同一字面量多处出现: 任一处无界则该字面量无界; 否则取 max (保守覆盖所有出现)。
+	if cur < 0 || h < 0 {
+		a.heads[lit] = -1
+	} else if h > cur {
+		a.heads[lit] = h
+	}
+}
+
+func (a *litHeadAcc) walk(re *syntax.Regexp, pre int, preB bool) {
+	switch re.Op {
+	case syntax.OpLiteral:
+		s := strings.ToLower(string(re.Rune))
+		if _, ok := a.set[s]; ok {
+			a.record(s, len(string(re.Rune)), pre, preB)
+		}
+	case syntax.OpCapture:
+		if len(re.Sub) == 1 {
+			a.walk(re.Sub[0], pre, preB)
+		}
+	case syntax.OpConcat:
+		for i, sub := range re.Sub {
+			lw, lb := sumWidthRange(re.Sub, 0, i)
+			a.walk(sub, addSat(pre, lw), preB && lb)
+		}
+	case syntax.OpAlternate:
+		for _, sub := range re.Sub {
+			a.walk(sub, pre, preB)
+		}
+	case syntax.OpQuest:
+		if len(re.Sub) == 1 {
+			a.walk(re.Sub[0], pre, preB)
+		}
+	case syntax.OpStar, syntax.OpPlus, syntax.OpRepeat:
+		if len(re.Sub) == 1 {
+			a.walk(re.Sub[0], pre, false)
+		}
+	}
+}
+
 // sumWidthRange 求 subs[lo:hi) 的 maxByteWidth 之和与整体有界性。
 func sumWidthRange(subs []*syntax.Regexp, lo, hi int) (int, bool) {
 	total := 0

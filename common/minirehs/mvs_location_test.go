@@ -11,7 +11,7 @@ import (
 // nfaFindAll 用本核 NFA 枚举 data 上所有非重叠匹配区间, 便于与 oracle 对照.
 func nfaFindAll(nfa *mvsNFA, data []byte) [][2]int {
 	var out [][2]int
-	nfa.findAllLoc(data, func(from, to int) bool {
+	nfa.findAllLoc(data, nil, func(from, to int) bool {
 		out = append(out, [2]int{from, to})
 		return true
 	})

@@ -581,11 +581,18 @@ func (nfa *mvsNFA) existsInAssertShared(data []byte, bound []uint8) bool {
 
 	i := 0
 	for i < n {
-		r, size := utf8.DecodeRune(data[i:])
-		ni := i + size
+		c := data[i]
+		var sym, ni int
+		if c < utf8.RuneSelf {
+			sym = int(nfa.asciiSym[c])
+			ni = i + 1
+		} else {
+			r, size := utf8.DecodeRune(data[i:])
+			sym = nfa.symbolOf(r)
+			ni = i + size
+		}
 		bpre := bound[i]
 		bpost := bound[ni]
-		sym := nfa.symbolOf(r)
 
 		// 候选 = 无条件 first + 条件 first (按 bpre 门控) + 活跃位置的后继.
 		copy(cand, nfa.first)
@@ -635,6 +642,66 @@ func (nfa *mvsNFA) existsInAssertShared(data []byte, bound []uint8) bool {
 			}
 		}
 
+		i = ni
+	}
+	return false
+}
+
+// existsInAssertShared1 是 existsInAssertShared 的 nword==1 标量快路径: 活跃集为单个 uint64,
+// 全程寄存器位运算且零分配 (多字版每调用 make 两个 []uint64; 本版用本地标量, 显著省分配 + 位运算).
+// 语义与 existsInAssertShared 完全一致, 仅用于 nfa.single 的断言 NFA. guard 位集取 gb.bits[0].
+// 含 ASCII 快路径 (省 utf8.DecodeRune + symbolOf 调用). bound 为整段共享边界 (computeBoundaries).
+func (nfa *mvsNFA) existsInAssertShared1(data []byte, bound []uint8) bool {
+	first := nfa.first1
+	lastAny := nfa.lastAny1
+	follow := nfa.follow1
+	reach := nfa.reach1
+	n := len(data)
+
+	var prev uint64
+	i := 0
+	for i < n {
+		c := data[i]
+		var sym, ni int
+		if c < utf8.RuneSelf {
+			sym = int(nfa.asciiSym[c])
+			ni = i + 1
+		} else {
+			r, size := utf8.DecodeRune(data[i:])
+			sym = nfa.symbolOf(r)
+			ni = i + size
+		}
+		bpre := bound[i]
+
+		cand := first
+		for _, gb := range nfa.condFirst {
+			if guardHolds(gb.g, bpre) {
+				cand |= gb.bits[0]
+			}
+		}
+		for pw := prev; pw != 0; pw &= pw - 1 {
+			p := bits.TrailingZeros64(pw)
+			cand |= follow[p]
+			for _, gb := range nfa.condFollow[p] {
+				if guardHolds(gb.g, bpre) {
+					cand |= gb.bits[0]
+				}
+			}
+		}
+
+		active := cand & reach[sym]
+		if active&lastAny != 0 {
+			return true
+		}
+		if len(nfa.condAccept) > 0 {
+			bpost := bound[ni]
+			for _, gb := range nfa.condAccept {
+				if guardHolds(gb.g, bpost) && active&gb.bits[0] != 0 {
+					return true
+				}
+			}
+		}
+		prev = active
 		i = ni
 	}
 	return false
