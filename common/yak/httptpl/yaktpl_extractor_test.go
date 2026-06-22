@@ -474,11 +474,12 @@ as
 // TestYakExtractor_REGEXP_LookbehindLookahead 测试 lookbehind/lookahead 断言正则的匹配效果
 func TestYakExtractor_REGEXP_LookbehindLookahead(t *testing.T) {
 	tests := []struct {
-		name     string
-		data     string
-		regex    string
-		key      string
-		expected string
+		name      string
+		data      string
+		regex     string
+		key       string
+		expected  string
+		expectErr bool // 该正则在当前后端无法编译 (如变长 lookbehind), 期望 Execute 返回错误
 	}{
 		{
 			name:     "lookbehind lookahead 提取 JSON text 字段值（带空格）",
@@ -527,14 +528,18 @@ Content-Type: application/json
 			expected: "", // 正则要求 "text":" 无空格，但实际 JSON 是 "text": " 有空格，故不匹配
 		},
 		{
-			name: "Werkzeug 实际响应 - 兼容带/不带空格的正则",
+			// regexp2 后端已由 dlclark/.NET 切换为 go-pcre2-lite (PCRE2). PCRE2 只支持定长 lookbehind,
+			// 变长 lookbehind (此处 \s* 长度不定) 会在编译期报 "lookbehind assertion is not fixed length",
+			// 而 RE2 完全不支持 lookbehind, 故两档后端均无法编译, Execute 返回错误. 这是切换 PCRE2 内核
+			// 的已知边界 (dlclark 支持变长 lookbehind). 需要兼容带/不带空格时, 应改用捕获组等定长写法.
+			name: "Werkzeug 实际响应 - 变长 lookbehind 在 pcre2 后端不被支持(期望编译报错)",
 			data: `HTTP/1.1 200 OK
 Content-Type: application/json
 
 {"text": "ZZXS"}`,
-			regex:    `(?<="text":\s*")[^"]+(?=")`,
-			key:      "data",
-			expected: "ZZXS",
+			regex:     `(?<="text":\s*")[^"]+(?=")`,
+			key:       "data",
+			expectErr: true,
 		},
 		{
 			name:     "用户场景 - POST 请求 body 中提取 key 的值",
@@ -553,6 +558,12 @@ Content-Type: application/json
 				Groups: []string{tt.regex},
 			}
 			results, err := extractor.Execute([]byte(tt.data))
+			if tt.expectErr {
+				if err == nil {
+					t.Fatalf("expected compile error for unsupported regex %q, got none", tt.regex)
+				}
+				return
+			}
 			if err != nil {
 				t.Fatalf("Execute failed: %v", err)
 			}
