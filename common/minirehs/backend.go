@@ -13,6 +13,8 @@ func selectBackend(cfg *config) (backendImpl, error) {
 		return &engineBackend{}, nil
 	case BackendStdlib:
 		return &stdlibBackend{}, nil
+	case BackendMVS:
+		return &mvsBackend{}, nil
 	case BackendVectorscan:
 		if b := newVectorscanBackend(); b != nil {
 			return b, nil
