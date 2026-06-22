@@ -163,11 +163,20 @@ func (s *ScanNode) handleJSONLog(
 }
 
 func (s *ScanNode) handleStatusCardLog(
-	_ *ScannerAgentReporter,
+	reporter *ScannerAgentReporter,
 	info string,
 ) {
 	if utils.InDebugMode() {
 		log.Infof("skip feature-status-card-data for legion event projection: %s", info)
+	}
+
+	var card yaklib.YakitStatusCard
+	if err := json.Unmarshal([]byte(info), &card); err == nil && card.Id == "ssa-scan-detail" {
+		if reporter != nil {
+			if pubErr := reporter.PublishScanDetail("rule-detail", card.Data); pubErr != nil {
+				log.Warnf("publish scan detail failed: %v", pubErr)
+			}
+		}
 	}
 }
 
