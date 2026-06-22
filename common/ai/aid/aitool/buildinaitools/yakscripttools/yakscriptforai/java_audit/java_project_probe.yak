@@ -1,0 +1,26 @@
+__DESC__ = "探测 Java 项目构建系统、主流框架与 CMS，并推荐后续 java_audit 架构/依赖/配置/密钥审计工具。"
+__VERBOSE_NAME__ = "Java 项目探测"
+__KEYWORDS__ = "java,audit,probe,framework detection,spring boot,struts,mybatis,architecture baseline,Java审计,框架探测"
+yakit.AutoInitYakit()
+
+target = cli.String("target", cli.setRequired(true), cli.setHelp("Absolute path to Java project root"))
+outputMd = cli.String("output-md", cli.setDefault(""), cli.setHelp("Optional path to write markdown summary"))
+auditOptionsRaw = cli.String("audit-options", cli.setDefault(""), cli.setHelp("Optional JSON overrides for detection/scope/tool behavior"))
+scopeModules = cli.String("scope-modules", cli.setDefault(""), cli.setHelp("Comma-separated module subdirs to include, e.g. ruoyi-admin,ruoyi-system"))
+scopeExclude = cli.String("scope-exclude", cli.setDefault(""), cli.setHelp("Comma-separated path fragments to exclude from scan"))
+detectionMode = cli.String("detection-mode", cli.setDefault("balanced"), cli.setHelp("Framework/CMS detection: permissive | balanced | strict"))
+minConfidence = cli.Float("min-confidence", cli.setDefault(0), cli.setHelp("Override framework detection threshold (0 = use detection-mode default)"))
+cmsMinConfidence = cli.Float("cms-min-confidence", cli.setDefault(0), cli.setHelp("Override CMS product threshold (0 = use detection-mode default)"))
+includeFrameworks = cli.String("include-frameworks", cli.setDefault(""), cli.setHelp("Force-include frameworks even below threshold"))
+excludeFrameworks = cli.String("exclude-frameworks", cli.setDefault(""), cli.setHelp("Force-exclude frameworks even if detected"))
+toolProfile = cli.String("tool-profile", cli.setDefault("full"), cli.setHelp("Recommended tools: full | minimal | config-only | deps-secrets"))
+resolveMonorepoRoot = cli.Bool("resolve-monorepo-root", cli.setDefault(false), cli.setHelp("Walk up to parent Maven/Gradle aggregator when target is a submodule"))
+cmsProducts = cli.String("cms-products", cli.setDefault(""), cli.setHelp("Force CMS product ids to audit (comma-separated), e.g. ruoyi,mcms"))
+configScope = cli.String("config-scope", cli.setDefault("framework"), cli.setHelp("Default config scan scope for downstream tools: framework | all"))
+riskyMode = cli.String("risky-mode", cli.setDefault("name"), cli.setHelp("Risky dependency matching: name | off"))
+dedupeFindings = cli.String("dedupe-findings", cli.setDefault("true"), cli.setHelp("Dedupe repeated findings per rule id: true | false"))
+cli.check()
+
+opts = javaAuditParseOptionsFromValues(auditOptionsRaw, scopeModules, scopeExclude, configScope, riskyMode, dedupeFindings, detectionMode, minConfidence, cmsMinConfidence, includeFrameworks, excludeFrameworks, toolProfile, resolveMonorepoRoot, cmsProducts)
+report = javaAuditRunProjectProbe(target, opts)
+javaAuditEmitReport(report, outputMd)

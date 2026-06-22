@@ -1,0 +1,377 @@
+// Java CMS / admin product fingerprints and product-specific audits.
+
+javaAuditCmsCatalog = [
+    {
+        "id": "ruoyi",
+        "display": "RuoYi 若依",
+        "family": "ruoyi",
+        "file_markers": ["ruoyi-admin", "ruoyi-common", "RuoYiApplication.java"],
+        "content_markers": ["com\\.ruoyi", "RuoYiApplication", "artifactId>ruoyi", "ruoyi-ui", "ruoyi-system"],
+        "config_globs": ["application*.yml", "application*.yaml", "application*.properties"],
+    },
+    {
+        "id": "ruoyi-cloud",
+        "display": "RuoYi-Cloud 若依微服务",
+        "family": "ruoyi",
+        "file_markers": ["ruoyi-gateway", "ruoyi-auth", "ruoyi-modules"],
+        "content_markers": ["com\\.ruoyi", "spring\\.cloud", "ruoyi-gateway", "ruoyi-auth"],
+        "config_globs": ["bootstrap*.yml", "application*.yml", "application*.yaml", "docker/nacos"],
+    },
+    {
+        "id": "mcms",
+        "display": "铭飞 MCMS",
+        "family": "mingsoft",
+        "file_markers": ["ms-mcms", "MSApplication.java", "ShiroConfig.java"],
+        "content_markers": ["net\\.mingsoft", "ms-mcms", "mybatis-plus", "mingsoft"],
+        "config_globs": ["application*.yml", "application*.yaml"],
+    },
+    {
+        "id": "halo",
+        "display": "Halo CMS",
+        "family": "halo",
+        "file_markers": ["settings.gradle", "settings.gradle.kts"],
+        "content_markers": ["run\\.halo\\.app", "halo\\.run", "artifactId>halo", "group>run\\.halo", "run.halo.app.Application"],
+        "config_globs": ["application*.yaml", "application*.yml"],
+        "min_score": 0.50,
+    },
+    {
+        "id": "publiccms",
+        "display": "PublicCMS",
+        "family": "publiccms",
+        "file_markers": ["publiccms-parent", "publiccms-core"],
+        "content_markers": ["com\\.publiccms", "publiccms", "PublicCMS"],
+        "config_globs": ["application*.properties", "application*.yml"],
+    },
+    {
+        "id": "lin-cms",
+        "display": "Lin CMS",
+        "family": "lin-cms",
+        "file_markers": ["lin-cms-core", "lin-cms-model"],
+        "content_markers": ["io\\.github\\.talelin", "lin-cms", "talelin"],
+        "config_globs": ["application*.yml", "application*.properties"],
+    },
+    {
+        "id": "mall",
+        "display": "mall 电商后台",
+        "family": "macrozheng",
+        "file_markers": ["mall-admin", "mall-portal"],
+        "content_markers": ["com\\.macro\\.mall", "macro\\.mall", "mall-admin"],
+        "config_globs": ["application*.yml", "application*.properties"],
+    },
+    {
+        "id": "ofbiz",
+        "display": "Apache OFBiz",
+        "family": "ofbiz",
+        "file_markers": ["ofbiz-framework", "ControlServlet.java"],
+        "content_markers": ["org\\.apache\\.ofbiz", "ControlServlet", "entityengine"],
+        "config_globs": ["*.properties", "web.xml"],
+    },
+]
+
+javaAuditDetectCmsProducts = (index, opts) => {
+    allContentMarkers = []
+    for cms in javaAuditCmsCatalog {
+        for m in cms["content_markers"] {
+            allContentMarkers = append(allContentMarkers, m)
+        }
+    }
+    contentHits = javaAuditIndexScanContentMarkers(index, allContentMarkers, 2)
+
+    minScore = 0.35
+    if opts != nil && opts["cms_min_confidence"] != nil {
+        minScore = opts["cms_min_confidence"]
+    }
+
+    detected = []
+    for cms in javaAuditCmsCatalog {
+        signals = []
+        score = 0.0
+        for marker in cms["file_markers"] {
+            hits = javaAuditIndexFindByName(index, marker, "")
+            if len(hits) > 0 {
+                score += 0.35
+                signals = append(signals, sprintf("file:%v", marker))
+            }
+        }
+        for marker in cms["content_markers"] {
+            hits = contentHits[marker]
+            if hits == nil {
+                hits = []
+            }
+            if len(hits) > 0 {
+                score += 0.25
+                signals = append(signals, sprintf("content:%v", marker))
+            }
+        }
+        cmsMin = minScore
+        if cms["min_score"] != nil && cms["min_score"] > cmsMin {
+            cmsMin = cms["min_score"]
+        }
+        if score < cmsMin {
+            continue
+        }
+        confidence = score
+        if confidence > 1.0 {
+            confidence = 1.0
+        }
+        detected = append(detected, {
+            "id": cms["id"],
+            "display": cms["display"],
+            "family": cms["family"],
+            "confidence": confidence,
+            "signals": signals,
+            "audit_tool": "java_audit/java_cms_product_audit",
+        })
+    }
+    detected = javaAuditDedupeCmsByFamily(detected)
+    return javaAuditFilterCmsProductsByOptions(detected, opts)
+}
+
+javaAuditFilterCmsProductsByOptions = (detected, opts) => {
+    if opts == nil {
+        return detected
+    }
+    forced = opts["cms_products"]
+    if forced == nil || len(forced) == 0 {
+        return detected
+    }
+    forceSet = {}
+    for f in forced {
+        forceSet[str.ToLower(str.TrimSpace(f))] = true
+    }
+    out = []
+    for item in detected {
+        if forceSet[str.ToLower(item["id"])] || forceSet[str.ToLower(item["family"])] {
+            out = append(out, item)
+        }
+    }
+    if len(out) > 0 {
+        return out
+    }
+    for cms in javaAuditCmsCatalog {
+        idl = str.ToLower(cms["id"])
+        if !forceSet[idl] && !forceSet[str.ToLower(cms["family"])] {
+            continue
+        }
+        out = append(out, {
+            "id": cms["id"],
+            "display": cms["display"],
+            "family": cms["family"],
+            "confidence": 1.0,
+            "signals": ["forced:cms-products"],
+            "audit_tool": "java_audit/java_cms_product_audit",
+        })
+    }
+    return javaAuditDedupeCmsByFamily(out)
+}
+
+javaAuditDedupeCmsByFamily = (detected) => {
+    best = {}
+    order = []
+    for item in detected {
+        fam = item["family"]
+        if best[fam] == nil || item["confidence"] > best[fam]["confidence"] {
+            best[fam] = item
+        }
+    }
+    for item in detected {
+        fam = item["family"]
+        if best[fam] != nil && best[fam]["id"] == item["id"] {
+            order = append(order, item)
+        }
+    }
+    return order
+}
+
+javaAuditCollectCmsConfigFiles = (index, cmsMeta) => {
+    globs = cmsMeta["config_globs"]
+    if globs == nil {
+        globs = ["application"]
+    }
+    patterns = []
+    for g in globs {
+        g2 = str.ReplaceAll(g, "*", ".*")
+        patterns = append(patterns, g2)
+    }
+    return javaAuditIndexCollectConfigFiles(index, patterns)
+}
+
+javaAuditAuditRuoYiConfigs = (report, files) => {
+    for fp in files {
+        content, ok = javaAuditReadTextLimited(fp, 1000000)
+        if !ok {
+            continue
+        }
+        kv, _ = javaAuditLoadConfigMap(fp)
+        if re.Match(`(?i)token:\s*\n(?:[^\n]+\n)*?\s*secret:\s*\S+`, content) {
+            if re.Match(`(?i)secret:\s*(abcdefghijklmnopqrstuvwxyz|123456|ruoyi|changeme)`, content) {
+                javaAuditAddFinding(report, "ruoyi.token.weak", "high", "RuoYi JWT token secret is weak or default", "rotate token.secret and store in env/secret manager", [{"file": fp, "line": 0, "snippet": "token.secret weak/default"}])
+            }
+        }
+        if re.Match(`(?i)druid:[\s\S]*login-password:\s*123456`, content) {
+            javaAuditAddFinding(report, "ruoyi.druid.console.weak", "high", "Druid monitor console uses default password 123456", "change druid stat-view-servlet login password and restrict allow IPs", [{"file": fp, "line": 0, "snippet": "druid login-password: 123456"}])
+        }
+        if re.Match(`(?i)stat-view-servlet:[\s\S]*enabled:\s*true`, content) && re.Match(`(?i)allow:\s*$`, content) {
+            javaAuditAddFinding(report, "ruoyi.druid.exposed", "medium", "Druid console enabled without IP allow list", "set druid allow/deny and disable in production", [{"file": fp, "line": 0, "snippet": "druid stat-view-servlet enabled"}])
+        }
+        if re.Match(`(?i)com\.ruoyi:\s*debug`, content) {
+            javaAuditAddFinding(report, "ruoyi.logging.debug", "medium", "RuoYi package logging at debug level", "set com.ruoyi to info/warn in production", [{"file": fp, "line": 0, "snippet": "com.ruoyi: debug"}])
+        }
+        if re.Match(`(?i)devtools:[\s\S]*restart:[\s\S]*enabled:\s*true`, content) {
+            javaAuditAddFinding(report, "ruoyi.devtools.enabled", "medium", "Spring DevTools restart enabled", "disable devtools in production builds", [{"file": fp, "line": 0, "snippet": "devtools.restart.enabled: true"}])
+        }
+        for k, v in kv {
+            kl = str.ToLower(k)
+            if str.Contains(kl, "swagger") && (v == "true" || v == "enabled") {
+                javaAuditAddFinding(report, "ruoyi.swagger.enabled", "medium", "Swagger/OpenAPI may be enabled in RuoYi", "disable springdoc/swagger in production", [{"file": fp, "line": 0, "snippet": sprintf("%v=%v", k, v)}])
+            }
+        }
+    }
+}
+
+javaAuditAuditRuoYiCloudConfigs = (report, files) => {
+    for fp in files {
+        content, ok = javaAuditReadTextLimited(fp, 1000000)
+        if !ok {
+            continue
+        }
+        if re.Match(`(?i)nacos\.core\.auth\.[^\n=]*token\.secret\.key\s*=`, content) {
+            javaAuditAddFinding(report, "ruoyi-cloud.nacos.token.default", "high", "RuoYi-Cloud Nacos auth token secret configured inline", "rotate nacos.core.auth token secret and restrict access to nacos console", [{"file": fp, "line": 0, "snippet": "nacos token secret key in config"}])
+        }
+        if re.Match(`(?i)spring\.cloud\.nacos\.`, content) && re.Match(`(?i)server-addr:\s*127\.0\.0\.1`, content) {
+            javaAuditAddFinding(report, "ruoyi-cloud.nacos.localhost", "low", "RuoYi-Cloud Nacos points to localhost", "use dedicated config service endpoints in production", [{"file": fp, "line": 0, "snippet": "nacos server-addr: 127.0.0.1"}])
+        }
+    }
+}
+
+javaAuditAuditMcmsConfigs = (report, files) => {
+    for fp in files {
+        content, ok = javaAuditReadTextLimited(fp, 1000000)
+        if !ok {
+            continue
+        }
+        if re.Match(`(?i)springdoc:[\s\S]*enabled:\s*true`, content) {
+            javaAuditAddFinding(report, "mcms.springdoc.enabled", "medium", "MCMS springdoc/swagger enabled", "set springdoc.api-docs.enabled=false in production", [{"file": fp, "line": 0, "snippet": "springdoc enabled true"}])
+        }
+        if re.Match(`(?i)include-exception:\s*true`, content) {
+            javaAuditAddFinding(report, "mcms.error.exception.leak", "medium", "MCMS server.error.include-exception=true", "disable detailed exception responses in production", [{"file": fp, "line": 0, "snippet": "include-exception: true"}])
+        }
+        if re.Match(`(?i)include-message:\s*always`, content) {
+            javaAuditAddFinding(report, "mcms.error.message.leak", "low", "MCMS exposes error messages always", "restrict server.error.include-message for production", [{"file": fp, "line": 0, "snippet": "include-message: always"}])
+        }
+        if re.Match(`(?i)manager:[\s\S]*path:\s*/ms`, content) {
+            javaAuditAddFinding(report, "mcms.manager.default_path", "low", "MCMS uses default /ms admin path", "change ms.manager.path to non-default value", [{"file": fp, "line": 0, "snippet": "manager.path: /ms"}])
+        }
+    }
+}
+
+javaAuditAuditHaloConfigs = (report, files) => {
+    for fp in files {
+        content, ok = javaAuditReadTextLimited(fp, 1000000)
+        if !ok {
+            continue
+        }
+        if re.Match(`(?i)security:[\s\S]*initial-password:\s*\S+`, content) {
+            javaAuditAddFinding(report, "halo.initial-password.set", "medium", "Halo initial admin password configured in file", "use env var and rotate after first login", [{"file": fp, "line": 0, "snippet": "initial-password in config"}])
+        }
+        if re.Match(`(?i)show-api-doc:\s*true`, content) {
+            javaAuditAddFinding(report, "halo.api-doc.enabled", "medium", "Halo API doc exposure enabled", "disable show-api-doc in production", [{"file": fp, "line": 0, "snippet": "show-api-doc: true"}])
+        }
+    }
+}
+
+javaAuditAuditPublicCmsConfigs = (report, files) => {
+    for fp in files {
+        content, ok = javaAuditReadTextLimited(fp, 1000000)
+        if !ok {
+            continue
+        }
+        if re.Match(`(?i)hibernate\.show_sql\s*=\s*true`, content) {
+            javaAuditAddFinding(report, "publiccms.hibernate.show_sql", "medium", "PublicCMS hibernate.show_sql enabled", "disable SQL logging in production", [{"file": fp, "line": 0, "snippet": "hibernate.show_sql=true"}])
+        }
+    }
+}
+
+javaAuditAuditMallConfigs = (report, files) => {
+    for fp in files {
+        content, ok = javaAuditReadTextLimited(fp, 1000000)
+        if !ok {
+            continue
+        }
+        if re.Match(`(?i)jwt:[\s\S]*secret:\s*\S+`, content) && re.Match(`(?i)secret:\s*(mySecret|123456|mall)`, content) {
+            javaAuditAddFinding(report, "mall.jwt.weak", "high", "mall project JWT secret looks weak", "use strong random jwt secret via env", [{"file": fp, "line": 0, "snippet": "jwt secret weak"}])
+        }
+    }
+}
+
+javaAuditRunCmsProductAudit = (target, opts) => {
+    if opts == nil {
+        opts = javaAuditApplyDetectionModeDefaults(javaAuditDefaultOptions())
+    }
+    start = javaAuditNowMs()
+    root = javaAuditResolveScanRoot(target, opts)
+    index = javaAuditBuildProjectIndex(root, opts)
+    products = javaAuditDetectCmsProducts(index, opts)
+
+    report = javaAuditNewReport("java_audit/java_cms_product_audit", root, "java")
+    report["artifacts"] = {
+        "detected_cms_products": products,
+        "audited_products": [],
+        "audit_options": opts,
+        "scan_root": root,
+    }
+
+    if len(products) == 0 {
+        report["status"] = "partial"
+        report["summary"] = "no known Java CMS/admin product fingerprint matched"
+        return javaAuditFinishReport(report, start, index["files_scanned"], opts)
+    }
+
+    names = []
+    for p in products {
+        names = append(names, p["display"])
+        cmsMeta = nil
+        for c in javaAuditCmsCatalog {
+            if c["id"] == p["id"] {
+                cmsMeta = c
+                break
+            }
+        }
+        if cmsMeta == nil {
+            continue
+        }
+        files = javaAuditCollectCmsConfigFiles(index, cmsMeta)
+        report["artifacts"]["audited_products"] = append(report["artifacts"]["audited_products"], {"id": p["id"], "config_files": len(files)})
+
+        if p["id"] == "ruoyi" || p["id"] == "ruoyi-cloud" || p["family"] == "ruoyi" {
+            javaAuditAuditRuoYiConfigs(report, files)
+        }
+        if p["id"] == "ruoyi-cloud" {
+            javaAuditAuditRuoYiCloudConfigs(report, files)
+        }
+        if p["id"] == "mcms" {
+            javaAuditAuditMcmsConfigs(report, files)
+        }
+        if p["id"] == "halo" {
+            javaAuditAuditHaloConfigs(report, files)
+        }
+        if p["id"] == "publiccms" {
+            javaAuditAuditPublicCmsConfigs(report, files)
+        }
+        if p["id"] == "mall" {
+            javaAuditAuditMallConfigs(report, files)
+        }
+    }
+
+    report["summary"] = sprintf("CMS product audit for %v: %v finding(s)", str.Join(names, ", "), len(report["findings"]))
+    return javaAuditFinishReport(report, start, index["files_scanned"], opts)
+}
+
+javaAuditGetCmsMeta = (cmsId) => {
+    for c in javaAuditCmsCatalog {
+        if c["id"] == cmsId {
+            return c
+        }
+    }
+    return nil
+}

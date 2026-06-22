@@ -21,8 +21,12 @@ func TestLoadAllYakScriptFromEmbedFS(t *testing.T) {
 			return err
 		}
 		if !d.IsDir() && strings.HasSuffix(d.Name(), ".yak") {
-			// 获取工具名（文件名去掉.yak后缀）
 			toolName := strings.TrimSuffix(d.Name(), ".yak")
+			dirname := strings.TrimPrefix(path, "yakscriptforai/")
+			dirname = strings.TrimSuffix(dirname, "/"+d.Name())
+			if ShouldSkipYakScriptEmbedPath(dirname, toolName) {
+				return nil
+			}
 			expectedToolNames[toolName] = true
 		}
 		return nil

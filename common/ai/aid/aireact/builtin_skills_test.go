@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
@@ -32,6 +33,7 @@ var allBuiltinSkills = []struct {
 	{"pentest-task-design", "skills/pentest-task-design/SKILL.md", []string{"scan_port", "do_http_request", "OWASP", "Phase"}},
 	{"how-to-use-browser", "skills/how-to-use-browser/SKILL.md", []string{"snapshot", "click", "fill", "screenshot", "CDP"}},
 	{"authorization-bypass", "skills/authorization-bypass/SKILL.md", []string{"IDOR", "WSTG-ATHZ-02", "Horizontal", "Vertical", "do_http_request"}},
+	{"java-audit", "skills/java-audit/SKILL.md", []string{"java_project_probe", "java_audit", "RuoYi", "spring_boot", "scope-modules"}},
 }
 
 func useTempBuiltinSkillReleaseDB(t *testing.T) {
@@ -469,5 +471,45 @@ func TestBuiltinSkills_DisabledDoesNotExtractBuiltinFiles(t *testing.T) {
 	}
 	if raw := yakit.GetKey(builtinSkillReleaseDB(), builtinSkillReleaseKey(relPath)); raw != "" {
 		t.Fatalf("expected no release record when auto-skills are disabled, got %q", raw)
+	}
+}
+
+func TestSyncBuiltinAndLocalSkillsToDB_ImportsJavaAudit(t *testing.T) {
+	useTempBuiltinSkillReleaseDB(t)
+	dbPath := filepath.Join(t.TempDir(), "profile.db")
+	db, err := consts.CreateProfileDatabase(dbPath)
+	if err != nil {
+		t.Fatalf("create profile db failed: %v", err)
+	}
+	consts.BindProfileDatabase(db, dbPath)
+
+	if err := syncSkillsToDB(db); err != nil {
+		t.Fatalf("syncSkillsToDB failed: %v", err)
+	}
+
+	var names []string
+	if err := db.Model(&schema.AIForge{}).Where("forge_type = ?", schema.FORGE_TYPE_SkillMD).Pluck("forge_name", &names).Error; err != nil {
+		t.Fatalf("query skillmd forges failed: %v", err)
+	}
+	found := false
+	for _, name := range names {
+		if name == "java-audit" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected java-audit in ai_forges after sync, got skillmd names: %v", names)
+	}
+
+	forge, err := yakit.GetAIForgeByNameAndTypes(db, "java-audit", schema.FORGE_TYPE_SkillMD)
+	if err != nil {
+		t.Fatalf("expected java-audit in ai_forges after sync: %v", err)
+	}
+	if !forge.IsBuiltin {
+		t.Fatal("expected java-audit to be marked builtin")
+	}
+	if forge.Description == "" {
+		t.Fatal("expected java-audit description in skill library")
 	}
 }

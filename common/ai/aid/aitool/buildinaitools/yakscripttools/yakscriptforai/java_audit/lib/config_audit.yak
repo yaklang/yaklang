@@ -1,0 +1,315 @@
+// Configuration security checks per Java framework.
+
+javaAuditCheckConfigKeyValue = (report, filePath, kv, key, badValues, id, severity, title, recommendation) => {
+    if kv[key] == nil {
+        return
+    }
+    val = str.TrimSpace(str.ToLower(string(kv[key])))
+    for bad in badValues {
+        if val == str.ToLower(bad) || str.Contains(val, str.ToLower(bad)) {
+            javaAuditAddFinding(report, id, severity, title, recommendation, [{"file": filePath, "line": 0, "snippet": sprintf("%v=%v", key, kv[key])}])
+            return
+        }
+    }
+}
+
+javaAuditFilterJFinalConfigFiles = (root, files, index) => {
+    jfinalDirs = {}
+    if index != nil {
+        hits = javaAuditIndexGrepRelevant(index, `extends\s+JFinalConfig|class\s+\w+\s+extends\s+JFinalConfig`, 50)
+        for h in hits {
+            jfinalDirs[javaAuditDirectoryOf(h["file"])] = true
+        }
+    }
+    out = []
+    for fp in files {
+        base = str.ToLower(javaAuditBaseName(fp))
+        if str.Contains(base, "jfinal") {
+            out = append(out, fp)
+            continue
+        }
+        if base != "config.properties" && !str.Contains(base, "jfinal") {
+            continue
+        }
+        content, ok = javaAuditReadTextLimited(fp, 100000)
+        if ok && re.Match(`(?i)(com\.jfinal|jfinal\.)`, content) {
+            out = append(out, fp)
+            continue
+        }
+        if jfinalDirs[javaAuditDirectoryOf(fp)] {
+            out = append(out, fp)
+        }
+    }
+    return out
+}
+
+javaAuditAuditSpringYamlConfigs = (report, root, opts, patterns) => {
+    files = javaAuditCollectConfigFiles(root, patterns, opts)
+    for fp in files {
+        content, ok = javaAuditReadTextLimited(fp, 1000000)
+        if !ok {
+            continue
+        }
+        kv, _ = javaAuditLoadConfigMap(fp)
+        javaAuditCheckConfigKeyValue(report, fp, kv, "management.endpoints.web.exposure.include", ["*"], "spring.actuator.exposed", "high", "Actuator endpoints overly exposed", "restrict management endpoints and protect with authentication")
+        javaAuditCheckConfigKeyValue(report, fp, kv, "server.error.include-stacktrace", ["always"], "spring.error.stacktrace", "medium", "stack traces may leak in HTTP errors", "set server.error.include-stacktrace=never in production")
+        javaAuditCheckConfigKeyValue(report, fp, kv, "spring.devtools.remote.secret", ["", "changeme"], "spring.devtools.secret", "high", "Spring DevTools remote secret missing or weak", "disable devtools remotely in production or set a strong secret")
+        if re.Match(`(?is)management:[\s\S]*endpoints:[\s\S]*exposure:[\s\S]*include:\s*["']?\*`, content) {
+            javaAuditAddFinding(report, "spring.actuator.exposed", "high", "Actuator endpoints overly exposed", "restrict management endpoints and protect with authentication", [{"file": fp, "line": 0, "snippet": "management.endpoints.web.exposure.include=*"}])
+        }
+        if re.Match(`(?i)include-stacktrace:\s*always`, content) {
+            javaAuditAddFinding(report, "spring.error.stacktrace", "medium", "stack traces may leak in HTTP errors", "set server.error.include-stacktrace=never in production", [{"file": fp, "line": 0, "snippet": "include-stacktrace: always"}])
+        }
+        if re.Match(`(?i)(^|\n)\s*password\s*:\s*\S+`, content) {
+            javaAuditAddFinding(report, "spring.datasource.password.plain", "high", "database password in configuration", "use env vars or encrypted config", [{"file": fp, "line": 0, "snippet": "password: ***"}])
+        }
+        if re.Match(`(?i)allowedorigins:\s*["']?\*`, content) {
+            javaAuditAddFinding(report, "spring.cors.wildcard", "medium", "CORS allows wildcard origins", "restrict allowedOrigins to trusted domains", [{"file": fp, "line": 0, "snippet": "allowedOrigins: *"}])
+        }
+        for k, v in kv {
+            kl = str.ToLower(k)
+            if str.Contains(kl, "password") && !javaAuditIsPlaceholderSecret(v) && v != "${" {
+                if str.Contains(kl, "datasource") || str.Contains(kl, "spring.datasource") {
+                    javaAuditAddFinding(report, "spring.datasource.password.plain", "high", "database password in configuration", "use env vars or encrypted config", [{"file": fp, "line": 0, "snippet": sprintf("%v=***", k)}])
+                }
+            }
+            if str.Contains(kl, "allowedorigins") && (v == "*" || str.Contains(v, "*")) {
+                javaAuditAddFinding(report, "spring.cors.wildcard", "medium", "CORS allows wildcard origins", "restrict allowedOrigins to trusted domains", [{"file": fp, "line": 0, "snippet": sprintf("%v=%v", k, v)}])
+            }
+        }
+    }
+    return files
+}
+
+javaAuditAuditShiroJavaConfigs = (report, root, opts) => {
+    matches = javaAuditGrepInTree(root, `filterChainDefinitionMap|ShiroFilterFactoryBean|FilterChainDefinition`, ".java", 80)
+    for m in matches {
+        if !javaAuditIsInScanScope(m["file"], root, opts) {
+            continue
+        }
+        sn = m["snippet"]
+        if re.Match(`(?i)["']/[^"']+["']\s*,\s*["']anon["']`, sn) || re.Match(`(?i)=\s*anon`, sn) {
+            javaAuditAddFinding(report, "shiro.anonymous_urls", "medium", "Shiro Java filter chain includes anon rules", "review anonymous URL mappings for sensitive paths", javaAuditEvidenceFromMatch(m))
+        }
+        if re.Match(`(?i)setCipherKey\s*\(|rememberMeManager|cipherKey`, sn) {
+            javaAuditAddFinding(report, "shiro.rememberme.hardcoded", "high", "Shiro rememberMe cipherKey may be configured in Java", "use random cipherKey and keep it secret", javaAuditEvidenceFromMatch(m))
+        }
+    }
+}
+
+javaAuditAuditJpaSpringConfigs = (report, root, opts) => {
+    files = javaAuditCollectConfigFiles(root, ["application", "bootstrap"], opts)
+    for fp in files {
+        content, ok = javaAuditReadTextLimited(fp, 1000000)
+        if !ok {
+            continue
+        }
+        kv, _ = javaAuditLoadConfigMap(fp)
+        if re.Match(`(?i)show[-_]?sql:\s*true|hibernate\.show_sql:\s*true`, content) {
+            javaAuditAddFinding(report, "jpa.show_sql.enabled", "low", "SQL logging enabled in Spring config", "disable show_sql in production", [{"file": fp, "line": 0, "snippet": "show_sql/show-sql enabled"}])
+        }
+        for k, v in kv {
+            kl = str.ToLower(k)
+            if (str.Contains(kl, "jpa") || str.Contains(kl, "hibernate")) && str.Contains(kl, "password") && !javaAuditIsPlaceholderSecret(v) {
+                javaAuditAddFinding(report, "jpa.password.inline", "high", "JPA/Hibernate password in Spring config", "externalize credentials", [{"file": fp, "line": 0, "snippet": sprintf("%v=***", k)}])
+            }
+        }
+    }
+    return files
+}
+
+javaAuditRunConfigAudit = (target, framework, opts) => {
+    if opts == nil {
+        opts = javaAuditApplyDetectionModeDefaults(javaAuditDefaultOptions())
+    }
+    start = javaAuditNowMs()
+    root = javaAuditResolveScanRoot(target, opts)
+    index = javaAuditBuildProjectIndex(root, opts)
+    meta = javaAuditGetFrameworkMeta(framework)
+    toolPath = sprintf("java_audit/%v_config_audit", framework)
+    if meta != nil && meta["config_tool"] != nil {
+        toolPath = meta["config_tool"]
+    }
+    report = javaAuditNewReport(toolPath, root, framework)
+    configFiles = []
+
+    if framework == "spring_boot" || framework == "spring_security" || framework == "spring_cloud" {
+        springFiles = javaAuditAuditSpringYamlConfigs(report, root, opts, ["application", "bootstrap"])
+        configFiles = append(configFiles, springFiles...)
+    }
+
+    if framework == "servlet" {
+        webxmlFiles = javaAuditCollectConfigFiles(root, ["web\\.xml"], opts)
+        configFiles = append(configFiles, webxmlFiles...)
+        for fp in webxmlFiles {
+            content, ok = javaAuditReadTextLimited(fp, 500000)
+            if !ok {
+                continue
+            }
+            if !re.Match(`(?i)<security-constraint>`, content) {
+                javaAuditAddFinding(report, "servlet.missing_security_constraint", "low", "web.xml has no security-constraint", "define authentication constraints for sensitive paths", [{"file": fp, "line": 0, "snippet": "no <security-constraint> found"}])
+            }
+            if re.Match(`(?i)<session-config>`, content) && !re.Match(`(?i)<secure>true</secure>`, content) {
+                javaAuditAddFinding(report, "servlet.cookie.not_secure", "medium", "session cookie may not be marked secure", "enable secure/http-only cookie flags", [{"file": fp, "line": 0, "snippet": "session-config without secure=true"}])
+            }
+        }
+    }
+
+    if framework == "struts2" {
+        files = javaAuditCollectConfigFiles(root, ["struts"], opts)
+        configFiles = append(configFiles, files...)
+        for fp in files {
+            content, ok = javaAuditReadTextLimited(fp, 500000)
+            if !ok {
+                continue
+            }
+            if re.Match(`(?i)devMode\s*=\s*"true"`, content) || re.Match(`(?i)<constant name="struts\.devMode" value="true"`, content) || re.Match(`(?i)struts\.devMode\s*=\s*true`, content) {
+                javaAuditAddFinding(report, "struts2.devmode.enabled", "high", "Struts devMode enabled", "disable devMode in production", [{"file": fp, "line": 0, "snippet": "devMode=true"}])
+            }
+            if re.Match(`(?i)struts\.enable\.DynamicMethodInvocation`, content) && re.Match(`(?i)value="true"`, content) {
+                javaAuditAddFinding(report, "struts2.dmi.enabled", "high", "Dynamic Method Invocation enabled", "disable DMI to reduce attack surface", [{"file": fp, "line": 0, "snippet": "DynamicMethodInvocation enabled"}])
+            }
+        }
+    }
+
+    if framework == "shiro" {
+        files = javaAuditCollectConfigFiles(root, ["shiro"], opts)
+        configFiles = append(configFiles, files...)
+        for fp in files {
+            content, ok = javaAuditReadTextLimited(fp, 200000)
+            if !ok {
+                continue
+            }
+            if re.Match(`(?m)^\[urls\][\s\S]*=\s*anon`, content) {
+                javaAuditAddFinding(report, "shiro.anonymous_urls", "medium", "Shiro URL chain includes anon rules", "review anonymous URL mappings for sensitive paths", [{"file": fp, "line": 0, "snippet": "[urls] contains anon mapping"}])
+            }
+            if re.Match(`(?i)securityManager\.rememberMeManager\.cipherKey\s*=\s*`, content) {
+                javaAuditAddFinding(report, "shiro.rememberme.hardcoded", "high", "Shiro rememberMe cipherKey configured inline", "use random cipherKey and keep it secret", [{"file": fp, "line": 0, "snippet": "rememberMe cipherKey in shiro.ini"}])
+            }
+        }
+        javaAuditAuditShiroJavaConfigs(report, root, opts)
+    }
+
+    if framework == "mybatis" {
+        files = javaAuditCollectConfigFiles(root, ["mybatis-config\\.xml"], opts)
+        configFiles = append(configFiles, files...)
+        for fp in files {
+            content, ok = javaAuditReadTextLimited(fp, 300000)
+            if !ok {
+                continue
+            }
+            if re.Match(`(?i)<property name="password" value="[^$"]`, content) {
+                javaAuditAddFinding(report, "mybatis.datasource.password", "high", "MyBatis datasource password in XML", "externalize database credentials", [{"file": fp, "line": 0, "snippet": "password property in mybatis-config.xml"}])
+            }
+        }
+        ymlFiles = javaAuditCollectConfigFiles(root, ["application"], opts)
+        for fp in ymlFiles {
+            kv, _ = javaAuditLoadConfigMap(fp)
+            for k, v in kv {
+                kl = str.ToLower(k)
+                if str.Contains(kl, "mybatis") && str.Contains(kl, "password") && !javaAuditIsPlaceholderSecret(v) {
+                    javaAuditAddFinding(report, "mybatis.datasource.password", "high", "MyBatis password in Spring config", "externalize database credentials", [{"file": fp, "line": 0, "snippet": sprintf("%v=***", k)}])
+                }
+            }
+        }
+        configFiles = append(configFiles, ymlFiles...)
+    }
+
+    if framework == "jpa" {
+        files = javaAuditCollectConfigFiles(root, ["persistence\\.xml", "hibernate\\.cfg\\.xml"], opts)
+        configFiles = append(configFiles, files...)
+        for fp in files {
+            content, ok = javaAuditReadTextLimited(fp, 300000)
+            if !ok {
+                continue
+            }
+            if re.Match(`(?i)hibernate\.show_sql\s*=\s*true`, content) {
+                javaAuditAddFinding(report, "jpa.show_sql.enabled", "low", "SQL logging enabled", "disable show_sql in production", [{"file": fp, "line": 0, "snippet": "hibernate.show_sql=true"}])
+            }
+            if re.Match(`(?i)(password|connection\.password)[^<]*>[^<$][^<]+<`, content) {
+                javaAuditAddFinding(report, "jpa.password.inline", "high", "JPA/Hibernate password in config", "externalize credentials", [{"file": fp, "line": 0, "snippet": "inline password in persistence/hibernate config"}])
+            }
+        }
+        springJpa = javaAuditAuditJpaSpringConfigs(report, root, opts)
+        configFiles = append(configFiles, springJpa...)
+    }
+
+    if framework == "dubbo" {
+        files = javaAuditCollectConfigFiles(root, ["dubbo\\.properties", "application\\.properties", "application\\.ya?ml"], opts)
+        configFiles = append(configFiles, files...)
+        for fp in files {
+            kv, _ = javaAuditLoadConfigMap(fp)
+            for k, v in kv {
+                kl = str.ToLower(k)
+                if (str.Contains(kl, "token") || str.Contains(kl, "secret") || str.Contains(kl, "password")) && !javaAuditIsPlaceholderSecret(v) {
+                    if str.Contains(kl, "dubbo") || str.Contains(kl, "token") {
+                        javaAuditAddFinding(report, "dubbo.token.inline", "medium", "Dubbo token/secret configured inline", "protect registry/API tokens", [{"file": fp, "line": 0, "snippet": sprintf("%v=***", k)}])
+                    }
+                }
+            }
+        }
+    }
+
+    if framework == "spring_cloud" {
+        files = javaAuditCollectConfigFiles(root, ["bootstrap\\.ya?ml", "bootstrap\\.properties", "application\\.ya?ml", "application\\.properties"], opts)
+        configFiles = append(configFiles, files...)
+        for fp in files {
+            kv, _ = javaAuditLoadConfigMap(fp)
+            for k, v in kv {
+                kl = str.ToLower(k)
+                if str.Contains(kl, "password") || str.Contains(kl, "secret") || (str.Contains(kl, "nacos") && str.Contains(kl, "key")) {
+                    if !javaAuditIsPlaceholderSecret(v) && v != "${" {
+                        javaAuditAddFinding(report, "spring_cloud.secret.inline", "high", "Spring Cloud secret in config", "use config server encryption or env injection", [{"file": fp, "line": 0, "snippet": sprintf("%v=***", k)}])
+                    }
+                }
+            }
+        }
+    }
+
+    if framework == "jfinal" {
+        rawFiles = javaAuditCollectConfigFiles(root, ["config\\.properties", "jfinal.*\\.properties"], opts)
+        files = javaAuditFilterJFinalConfigFiles(root, rawFiles, index)
+        configFiles = append(configFiles, files...)
+        for fp in files {
+            kv, _ = javaAuditLoadConfigMap(fp)
+            for k, v in kv {
+                if str.Contains(str.ToLower(k), "password") && !javaAuditIsPlaceholderSecret(v) {
+                    javaAuditAddFinding(report, "jfinal.password.inline", "high", "JFinal password in config.properties", "externalize credentials", [{"file": fp, "line": 0, "snippet": sprintf("%v=***", k)}])
+                }
+            }
+        }
+    }
+
+    if framework == "vertx" {
+        files = javaAuditCollectConfigFiles(root, ["vertx\\.json"], opts)
+        configFiles = append(configFiles, files...)
+        for fp in files {
+            content, ok = javaAuditReadTextLimited(fp, 200000)
+            if !ok {
+                continue
+            }
+            if re.Match(`(?i)"admin":\s*true`, content) {
+                javaAuditAddFinding(report, "vertx.admin.enabled", "medium", "Vert.x admin/embedded admin may be enabled", "disable admin interfaces in production", [{"file": fp, "line": 0, "snippet": "admin:true in vertx.json"}])
+            }
+        }
+    }
+
+    if framework == "play" {
+        files = javaAuditCollectConfigFiles(root, ["application\\.conf"], opts)
+        configFiles = append(configFiles, files...)
+        for fp in files {
+            content, ok = javaAuditReadTextLimited(fp, 300000)
+            if !ok {
+                continue
+            }
+            if re.Match(`(?i)play\.crypto\.secret=`, content) && !re.Match(`(?i)changeme`, content) {
+                javaAuditAddFinding(report, "play.crypto.secret", "medium", "Play application secret in config", "ensure strong secret and protect config file", [{"file": fp, "line": 0, "snippet": "play.crypto.secret set in application.conf"}])
+            }
+        }
+    }
+
+    report["artifacts"] = {"config_files": configFiles, "audit_options": opts, "scan_root": root}
+    report["summary"] = sprintf("%v config audit completed with %v finding(s)", framework, len(report["findings"]))
+    filesScanned = len(configFiles)
+    return javaAuditFinishReport(report, start, filesScanned, opts)
+}

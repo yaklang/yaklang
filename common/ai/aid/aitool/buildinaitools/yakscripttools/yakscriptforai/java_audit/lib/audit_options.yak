@@ -1,0 +1,449 @@
+// Shared audit options: balance generality (permissive) vs precision (strict).
+
+javaAuditDefaultOptions = () => {
+    return {
+        "detection_mode": "balanced",
+        "min_confidence": 0.35,
+        "cms_min_confidence": 0.35,
+        "include_frameworks": [],
+        "exclude_frameworks": [],
+        "scope_modules": [],
+        "scope_exclude": [],
+        "tool_profile": "full",
+        "skip_arch_tools": false,
+        "skip_config_tools": false,
+        "config_scope": "framework",
+        "risky_mode": "name",
+        "dedupe_findings": true,
+        "max_findings_per_rule": 5,
+        "resolve_monorepo_root": false,
+        "cms_products": [],
+    }
+}
+
+javaAuditModeThresholds = {
+    "permissive": 0.25,
+    "balanced": 0.35,
+    "strict": 0.60,
+}
+
+javaAuditApplyDetectionModeDefaults = (opts) => {
+    mode = str.ToLower(str.TrimSpace(string(opts["detection_mode"])))
+    if mode == "" {
+        mode = "balanced"
+    }
+    opts["detection_mode"] = mode
+    if opts["min_confidence"] == nil || opts["min_confidence"] <= 0 {
+        th = javaAuditModeThresholds[mode]
+        if th == nil {
+            th = 0.35
+        }
+        opts["min_confidence"] = th
+    }
+    if opts["cms_min_confidence"] == nil || opts["cms_min_confidence"] <= 0 {
+        if mode == "strict" {
+            opts["cms_min_confidence"] = 0.50
+        } else if mode == "permissive" {
+            opts["cms_min_confidence"] = 0.35
+        } else {
+            opts["cms_min_confidence"] = opts["min_confidence"]
+        }
+    }
+    if mode == "strict" {
+        if opts["dedupe_findings"] == nil {
+            opts["dedupe_findings"] = true
+        }
+        if opts["max_findings_per_rule"] == nil || opts["max_findings_per_rule"] > 5 {
+            opts["max_findings_per_rule"] = 3
+        }
+    }
+    return opts
+}
+
+javaAuditSplitCSV = (raw) => {
+    out = []
+    for part in str.Split(raw, ",") {
+        p = str.TrimSpace(part)
+        if p != "" {
+            out = append(out, p)
+        }
+    }
+    return out
+}
+
+javaAuditMergeOptions = (base, overlay) => {
+    if overlay == nil {
+        return base
+    }
+    for k, v in overlay {
+        if v == nil {
+            continue
+        }
+        if k == "include_frameworks" || k == "exclude_frameworks" || k == "scope_modules" || k == "scope_exclude" || k == "cms_products" {
+            if len(v) > 0 {
+                base[k] = v
+            }
+            continue
+        }
+        base[k] = v
+    }
+    return javaAuditApplyDetectionModeDefaults(base)
+}
+
+javaAuditParseOptionsFromValues = (auditJSON, scopeModulesRaw, scopeExcludeRaw, configScope, riskyMode, dedupeRaw, detectionMode, minConfidence, cmsMinConfidence, includeFrameworksRaw, excludeFrameworksRaw, toolProfile, resolveMonorepoRoot, cmsProductsRaw) => {
+    opts = javaAuditDefaultOptions()
+    if str.TrimSpace(auditJSON) != "" {
+        parsed = json.loads(auditJSON)~
+        opts = javaAuditMergeOptions(opts, parsed)
+    }
+    if str.TrimSpace(scopeModulesRaw) != "" {
+        opts["scope_modules"] = javaAuditSplitCSV(scopeModulesRaw)
+    }
+    if str.TrimSpace(scopeExcludeRaw) != "" {
+        opts["scope_exclude"] = javaAuditSplitCSV(scopeExcludeRaw)
+    }
+    if str.TrimSpace(configScope) != "" {
+        opts["config_scope"] = str.ToLower(str.TrimSpace(configScope))
+    }
+    if str.TrimSpace(riskyMode) != "" {
+        opts["risky_mode"] = str.ToLower(str.TrimSpace(riskyMode))
+    }
+    if str.TrimSpace(dedupeRaw) != "" {
+        opts["dedupe_findings"] = str.ToLower(str.TrimSpace(dedupeRaw)) != "false"
+    }
+    if str.TrimSpace(detectionMode) != "" {
+        opts["detection_mode"] = str.ToLower(str.TrimSpace(detectionMode))
+    }
+    if minConfidence != nil && minConfidence > 0 {
+        opts["min_confidence"] = minConfidence
+    }
+    if cmsMinConfidence != nil && cmsMinConfidence > 0 {
+        opts["cms_min_confidence"] = cmsMinConfidence
+    }
+    if str.TrimSpace(includeFrameworksRaw) != "" {
+        opts["include_frameworks"] = javaAuditSplitCSV(includeFrameworksRaw)
+    }
+    if str.TrimSpace(excludeFrameworksRaw) != "" {
+        opts["exclude_frameworks"] = javaAuditSplitCSV(excludeFrameworksRaw)
+    }
+    if str.TrimSpace(toolProfile) != "" {
+        opts["tool_profile"] = str.ToLower(str.TrimSpace(toolProfile))
+    }
+    if resolveMonorepoRoot != nil {
+        opts["resolve_monorepo_root"] = resolveMonorepoRoot
+    }
+    if str.TrimSpace(cmsProductsRaw) != "" {
+        opts["cms_products"] = javaAuditSplitCSV(cmsProductsRaw)
+    }
+    return javaAuditApplyDetectionModeDefaults(opts)
+}
+
+javaAuditOptionsFromCli = (readProbeFlags) => {
+    auditJSON = cli.String("audit-options", cli.setDefault(""), cli.setHelp("Optional JSON overrides for detection/scope/tool behavior"))
+    scopeModules = cli.String("scope-modules", cli.setDefault(""), cli.setHelp("Comma-separated module subdirs to include, e.g. ruoyi-admin,ruoyi-system"))
+    scopeExclude = cli.String("scope-exclude", cli.setDefault(""), cli.setHelp("Comma-separated path fragments to exclude from scan"))
+    configScope = cli.String("config-scope", cli.setDefault("framework"), cli.setHelp("Config scan scope: framework | all"))
+    riskyMode = cli.String("risky-mode", cli.setDefault("name"), cli.setHelp("Risky dependency matching: name | off"))
+    dedupe = cli.String("dedupe-findings", cli.setDefault("true"), cli.setHelp("Dedupe repeated findings per rule id: true | false"))
+
+    detectionMode = ""
+    minConf = 0.0
+    cmsMinConf = 0.0
+    includeFW = ""
+    excludeFW = ""
+    toolProfile = ""
+    resolveRoot = false
+    cmsProducts = ""
+    if readProbeFlags {
+        detectionMode = cli.String("detection-mode", cli.setDefault("balanced"), cli.setHelp("Framework/CMS detection: permissive | balanced | strict"))
+        minConf = cli.Float("min-confidence", cli.setDefault(0), cli.setHelp("Override framework detection threshold (0 = use detection-mode default)"))
+        cmsMinConf = cli.Float("cms-min-confidence", cli.setDefault(0), cli.setHelp("Override CMS product threshold (0 = use detection-mode default)"))
+        includeFW = cli.String("include-frameworks", cli.setDefault(""), cli.setHelp("Force-include frameworks even below threshold"))
+        excludeFW = cli.String("exclude-frameworks", cli.setDefault(""), cli.setHelp("Force-exclude frameworks even if detected"))
+        toolProfile = cli.String("tool-profile", cli.setDefault("full"), cli.setHelp("Recommended tools: full | minimal | config-only | deps-secrets"))
+        resolveRoot = cli.Bool("resolve-monorepo-root", cli.setDefault(false), cli.setHelp("Walk up to parent Maven/Gradle aggregator when target is a submodule"))
+        cmsProducts = cli.String("cms-products", cli.setDefault(""), cli.setHelp("Force CMS product ids to audit (comma-separated), e.g. ruoyi,mcms"))
+    }
+
+    return javaAuditParseOptionsFromValues(auditJSON, scopeModules, scopeExclude, configScope, riskyMode, dedupe, detectionMode, minConf, cmsMinConf, includeFW, excludeFW, toolProfile, resolveRoot, cmsProducts)
+}
+
+javaAuditPathMatchesScopeExclude = (pathName, opts) => {
+    excludes = opts["scope_exclude"]
+    if excludes == nil || len(excludes) == 0 {
+        return false
+    }
+    lower = str.ToLower(pathName)
+    for ex in excludes {
+        exl = str.ToLower(str.TrimSpace(ex))
+        if exl == "" {
+            continue
+        }
+        if str.Contains(lower, exl) {
+            return true
+        }
+    }
+    return false
+}
+
+javaAuditPathMatchesScopeModules = (pathName, root, opts) => {
+    modules = opts["scope_modules"]
+    if modules == nil || len(modules) == 0 {
+        return true
+    }
+    lower = str.ToLower(pathName)
+    rootl = str.ToLower(root)
+    rootBase = str.ToLower(javaAuditBaseName(root))
+
+    // When scan root is itself a scoped module (e.g. ruoyi-gateway), include all files under it.
+    for m in modules {
+        ml = str.ToLower(str.TrimSpace(m))
+        if ml == "" {
+            continue
+        }
+        if ml == rootBase && str.HasPrefix(lower, rootl) {
+            return true
+        }
+    }
+
+    rel = lower
+    if str.HasPrefix(rel, rootl) {
+        rel = str.TrimPrefix(rel, rootl)
+    }
+    rel = str.TrimPrefix(rel, "/")
+    for m in modules {
+        ml = str.ToLower(str.TrimSpace(m))
+        if ml == "" {
+            continue
+        }
+        if rel == ml || str.HasPrefix(rel, ml+"/") || str.Contains(rel, "/"+ml+"/") {
+            return true
+        }
+    }
+    return false
+}
+
+javaAuditCountScopeModuleDirs = (base, moduleSet) => {
+    n = 0
+    for ml, _ in moduleSet {
+        dp = file.Join(base, ml)
+        if file.IsDir(dp) {
+            n++
+        }
+    }
+    return n
+}
+
+javaAuditBuildScopeModuleSet = (opts) => {
+    moduleSet = {}
+    if opts == nil || opts["scope_modules"] == nil {
+        return moduleSet
+    }
+    for m in opts["scope_modules"] {
+        ml = str.ToLower(str.TrimSpace(m))
+        if ml != "" {
+            moduleSet[ml] = true
+        }
+    }
+    return moduleSet
+}
+
+javaAuditExpandRootForScopeModules = (root, opts) => {
+    moduleSet = javaAuditBuildScopeModuleSet(opts)
+    if len(moduleSet) == 0 {
+        return root
+    }
+    if javaAuditCountScopeModuleDirs(root, moduleSet) >= 2 {
+        return root
+    }
+    rootBase = str.ToLower(javaAuditBaseName(root))
+    if !moduleSet[rootBase] {
+        return root
+    }
+    cur = root
+    for i = 0; i < 8; i++ {
+        parent = javaAuditDirectoryOf(cur)
+        if parent == "" || parent == cur {
+            break
+        }
+        if !file.IsExisted(parent) {
+            break
+        }
+        parent = file.Abs(parent)~
+        if !file.IsDir(parent) {
+            break
+        }
+        if javaAuditCountScopeModuleDirs(parent, moduleSet) >= 2 {
+            return parent
+        }
+        cur = parent
+    }
+    return root
+}
+
+javaAuditResolveMonorepoAggregatorRoot = (root) => {
+    cur = root
+    for i = 0; i < 6; i++ {
+        parent = javaAuditDirectoryOf(cur)
+        if parent == "" || parent == cur {
+            break
+        }
+        if !file.IsExisted(parent) {
+            break
+        }
+        parent = file.Abs(parent)~
+        if !file.IsDir(parent) {
+            break
+        }
+        agg = false
+        pomPath = file.Join(parent, "pom.xml")
+        if file.IsExisted(pomPath) {
+            content, ok = javaAuditReadTextLimited(pomPath, 500000)
+            if ok && re.Match(`(?is)<modules>|<packaging>pom</packaging>`, content) {
+                agg = true
+            }
+        }
+        if !agg {
+            for name in ["build.gradle", "build.gradle.kts"] {
+                gp = file.Join(parent, name)
+                if !file.IsExisted(gp) {
+                    continue
+                }
+                content, ok = javaAuditReadTextLimited(gp, 200000)
+                if ok && (re.Match(`(?m)^\s*include\s*\(`, content) || re.Match(`(?i)subprojects\s*\{`, content)) {
+                    agg = true
+                    break
+                }
+            }
+        }
+        if agg {
+            return parent
+        }
+        cur = parent
+    }
+    return root
+}
+
+javaAuditResolveScanRoot = (target, opts) => {
+    root = javaAuditNormalizeTarget(target)
+    if opts == nil {
+        return root
+    }
+    if opts["resolve_monorepo_root"] {
+        root = javaAuditResolveMonorepoAggregatorRoot(root)
+    }
+    if opts["scope_modules"] != nil && len(opts["scope_modules"]) > 0 {
+        root = javaAuditExpandRootForScopeModules(root, opts)
+    }
+    return root
+}
+
+javaAuditIsInScanScope = (pathName, root, opts) => {
+    if opts == nil {
+        return true
+    }
+    if javaAuditPathMatchesScopeExclude(pathName, opts) {
+        return false
+    }
+    return javaAuditPathMatchesScopeModules(pathName, root, opts)
+}
+
+javaAuditFilterFrameworksByOptions = (detected, opts) => {
+    if opts == nil {
+        return detected
+    }
+    minConf = opts["min_confidence"]
+    includes = opts["include_frameworks"]
+    excludes = opts["exclude_frameworks"]
+    excludeSet = {}
+    for ex in excludes {
+        excludeSet[str.ToLower(ex)] = true
+    }
+    includeSet = {}
+    for inc in includes {
+        includeSet[str.ToLower(inc)] = true
+    }
+
+    out = []
+    for fw in detected {
+        name = str.ToLower(fw["name"])
+        if excludeSet[name] {
+            continue
+        }
+        if includeSet[name] {
+            out = append(out, fw)
+            continue
+        }
+        conf = fw["confidence"]
+        if conf == nil {
+            conf = 0.0
+        }
+        if conf >= minConf {
+            out = append(out, fw)
+        }
+    }
+    for inc, _ in includeSet {
+        if excludeSet[inc] {
+            continue
+        }
+        found = false
+        for fw in out {
+            if str.ToLower(fw["name"]) == inc {
+                found = true
+                break
+            }
+        }
+        if found {
+            continue
+        }
+        meta = javaAuditGetFrameworkMeta(inc)
+        if meta == nil {
+            continue
+        }
+        out = append(out, {
+            "name": meta["name"],
+            "display": meta["display"],
+            "confidence": 1.0,
+            "signals": ["forced:include-frameworks"],
+            "arch_tool": meta["arch_tool"],
+            "config_tool": meta["config_tool"],
+        })
+    }
+    return out
+}
+
+javaAuditDedupeReportFindings = (report, opts) => {
+    if opts == nil || !opts["dedupe_findings"] {
+        return report
+    }
+    maxPer = opts["max_findings_per_rule"]
+    if maxPer == nil || maxPer <= 0 {
+        maxPer = 5
+    }
+    seen = {}
+    counts = {}
+    out = []
+    for f in report["findings"] {
+        id = f["id"]
+        key = id
+        if f["evidence"] != nil && len(f["evidence"]) > 0 {
+            ev = f["evidence"][0]
+            key = sprintf("%v|%v", id, ev["file"])
+        }
+        if seen[key] {
+            continue
+        }
+        n = counts[id]
+        if n == nil {
+            n = 0
+        }
+        if n >= maxPer {
+            continue
+        }
+        counts[id] = n + 1
+        seen[key] = true
+        out = append(out, f)
+    }
+    report["findings"] = out
+    return report
+}

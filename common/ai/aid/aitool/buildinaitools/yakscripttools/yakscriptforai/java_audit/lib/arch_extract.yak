@@ -1,0 +1,171 @@
+// Architecture baseline extraction per Java framework.
+
+javaAuditRunArchInfo = (target, framework, opts) => {
+    if opts == nil {
+        opts = javaAuditDefaultOptions()
+    }
+    start = javaAuditNowMs()
+    root = javaAuditResolveScanRoot(target, opts)
+    meta = javaAuditGetFrameworkMeta(framework)
+    toolPath = sprintf("java_audit/%v_arch_info", framework)
+    if meta != nil && meta["arch_tool"] != nil {
+        toolPath = meta["arch_tool"]
+    }
+    report = javaAuditNewReport(toolPath, root, framework)
+    artifacts = {
+        "entry_points": [],
+        "modules": [],
+        "config_files": [],
+        "routes": [],
+        "framework_specific": {},
+    }
+
+    // common baseline
+    artifacts["modules"] = javaAuditFindFilesByName(root, "pom.xml", "")
+    gradleFiles = javaAuditFindFilesByName(root, "build.gradle", "")
+    artifacts["modules"] = append(artifacts["modules"], gradleFiles...)
+    artifacts["config_files"] = javaAuditCollectConfigFiles(root, ["application\\.(properties|ya?ml)", "web\\.xml", "struts\\.xml", "shiro\\.ini", "mybatis-config\\.xml"], opts)
+
+    mainHits = javaAuditGrepInTree(root, `@SpringBootApplication|public\s+static\s+void\s+main\s*\(`, ".java", 50)
+    for m in mainHits {
+        artifacts["entry_points"] = append(artifacts["entry_points"], {"file": m["file"], "line": m["line"], "snippet": m["snippet"]})
+    }
+
+    if framework == "spring_boot" {
+        mappings = javaAuditGrepInTree(root, `@(?:Request|Get|Post|Put|Delete|Patch)Mapping`, ".java", 200)
+        routes = []
+        for m in mappings {
+            routes = append(routes, {"file": m["file"], "line": m["line"], "snippet": m["snippet"]})
+        }
+        artifacts["routes"] = routes
+        artifacts["framework_specific"] = {
+            "profiles": javaAuditCollectConfigFiles(root, ["application-.*\\.ya?ml", "application-.*\\.properties"], opts),
+            "packaging": javaAuditFindFilesByName(root, "pom.xml", ""),
+        }
+    }
+
+    if framework == "servlet" {
+        webFiles = javaAuditCollectConfigFiles(root, ["web\\.xml"], opts)
+        servlets = []
+        for fp in webFiles {
+            content, ok = javaAuditReadTextLimited(fp, 500000)
+            if !ok {
+                continue
+            }
+            for m in re.FindAll(content, `(?is)<servlet>\s*<servlet-name>([^<]+)</servlet-name>\s*<servlet-class>([^<]+)</servlet-class>`) {
+                servlets = append(servlets, {"file": fp, "name": m[1], "class": m[2]})
+            }
+        }
+        artifacts["framework_specific"] = {"servlets": servlets, "web_xml": webFiles}
+    }
+
+    if framework == "struts2" {
+        actions = []
+        for fp in javaAuditCollectConfigFiles(root, ["struts\\.xml", "struts-.*\\.xml"], opts) {
+            content, ok = javaAuditReadTextLimited(fp, 500000)
+            if !ok {
+                continue
+            }
+            for m in re.FindAll(content, `(?is)<package[^>]*namespace="([^"]*)"[^>]*>[\s\S]*?<action name="([^"]+)"`) {
+                actions = append(actions, {"file": fp, "namespace": m[1], "action": m[2]})
+            }
+        }
+        artifacts["framework_specific"] = {"actions": actions}
+    }
+
+    if framework == "mybatis" {
+        mappers = javaAuditCollectConfigFiles(root, [`Mapper\\.xml`, `mapper`], opts)
+        mapperNs = []
+        for fp in mappers {
+            content, ok = javaAuditReadTextLimited(fp, 300000)
+            if !ok {
+                continue
+            }
+            if re.Match(`(?i)<mapper`, content) {
+                ns = re.FindSubmatch(content, `namespace="([^"]+)"`)
+                if len(ns) > 1 {
+                    mapperNs = append(mapperNs, {"file": fp, "namespace": ns[1]})
+                }
+            }
+        }
+        artifacts["framework_specific"] = {"mapper_files": mapperNs}
+    }
+
+    if framework == "shiro" {
+        iniFiles = javaAuditCollectConfigFiles(root, ["shiro\\.ini"], opts)
+        chains = []
+        for fp in iniFiles {
+            content, ok = javaAuditReadTextLimited(fp, 200000)
+            if !ok {
+                continue
+            }
+            inUrls = false
+            for line in str.Split(content, "\n") {
+                line = str.TrimSpace(line)
+                if line == "[urls]" {
+                    inUrls = true
+                    continue
+                }
+                if str.HasPrefix(line, "[") {
+                    inUrls = false
+                }
+                if inUrls && str.Contains(line, "=") {
+                    chains = append(chains, {"file": fp, "rule": line})
+                }
+            }
+        }
+        artifacts["framework_specific"] = {"url_chains": chains}
+    }
+
+    if framework == "spring_security" {
+        artifacts["framework_specific"] = {
+            "security_config_hits": javaAuditGrepInTree(root, `SecurityFilterChain|WebSecurityConfigurerAdapter|HttpSecurity`, ".java", 50),
+        }
+    }
+
+    if framework == "jpa" {
+        entities = javaAuditGrepInTree(root, `@Entity`, ".java", 100)
+        artifacts["framework_specific"] = {"entities": entities}
+    }
+
+    if framework == "dubbo" {
+        services = javaAuditGrepInTree(root, `@DubboService|dubbo:service`, "", 100)
+        artifacts["framework_specific"] = {"services": services}
+    }
+
+    if framework == "spring_cloud" {
+        artifacts["framework_specific"] = {
+            "discovery_clients": javaAuditGrepInTree(root, `@EnableDiscoveryClient|@FeignClient`, ".java", 100),
+            "bootstrap_configs": javaAuditCollectConfigFiles(root, ["bootstrap\\.ya?ml", "bootstrap\\.properties"], opts),
+        }
+    }
+
+    if framework == "jfinal" {
+        artifacts["framework_specific"] = {
+            "jfinal_config": javaAuditGrepInTree(root, `extends JFinalConfig|class .*JFinalConfig`, ".java", 20),
+        }
+    }
+
+    if framework == "vertx" {
+        artifacts["framework_specific"] = {
+            "verticles": javaAuditGrepInTree(root, `extends AbstractVerticle|implements Verticle`, ".java", 50),
+        }
+    }
+
+    if framework == "play" {
+        routesFile = javaAuditCollectConfigFiles(root, ["^routes$"], opts)
+        artifacts["framework_specific"] = {"routes_files": routesFile}
+    }
+
+    report["artifacts"] = artifacts
+    artifacts["audit_options"] = opts
+    artifacts["scan_root"] = root
+    report["summary"] = sprintf("%v architecture baseline extracted (%v entry point(s))", framework, len(artifacts["entry_points"]))
+    filesScanned = 0
+    javaAuditWalkFiles(root, (pathName) => {
+        if javaAuditIsInScanScope(pathName, root, opts) {
+            filesScanned++
+        }
+    })
+    return javaAuditFinishReport(report, start, filesScanned, opts)
+}
