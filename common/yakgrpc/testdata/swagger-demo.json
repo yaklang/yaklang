@@ -1,0 +1,121 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Yakit OpenAPI Demo API",
+    "description": "Demo spec for ParseOpenAPIDocument / BuildFuzzerRequest / ImportHTTPFuzzerTask tests",
+    "version": "1.0.0"
+  },
+  "host": "api.example.com",
+  "schemes": ["https", "http"],
+  "basePath": "",
+  "consumes": ["application/json"],
+  "produces": ["application/json"],
+  "paths": {
+    "/users": {
+      "get": {
+        "operationId": "listUsers",
+        "summary": "List users",
+        "tags": ["users"],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "type": "integer",
+            "default": 1
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "type": "integer",
+            "default": 10
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/User" }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createUser",
+        "summary": "Create user",
+        "tags": ["users"],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": { "$ref": "#/definitions/UserCreate" }
+          }
+        ],
+        "responses": {
+          "201": { "description": "Created" }
+        }
+      }
+    },
+    "/users/{id}": {
+      "get": {
+        "operationId": "getUserById",
+        "summary": "Get user by ID",
+        "tags": ["users"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": { "$ref": "#/definitions/User" }
+          }
+        }
+      }
+    },
+    "/bbs/api/follow/tzhThroughList": {
+      "post": {
+        "operationId": "followThroughList",
+        "summary": "Follow list with empty JSON body",
+        "tags": ["follow"],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": false,
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        ],
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "User": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "example": 1 },
+        "name": { "type": "string", "example": "alice" },
+        "email": { "type": "string", "example": "alice@example.com" }
+      }
+    },
+    "UserCreate": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "example": "bob" },
+        "email": { "type": "string", "example": "bob@example.com" }
+      }
+    }
+  }
+}
