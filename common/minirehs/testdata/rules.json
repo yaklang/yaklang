@@ -1,0 +1,1167 @@
+[
+    {
+        "Rule": "(=deleteMe|rememberMe=)",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "Index": 1,
+        "ExtraTag": [
+            "Finger/shiro"
+        ],
+        "VerboseName": "组件-Shiro"
+    },
+    {
+        "Rule": "((swagger-ui.html)|(\\\"swagger\\\":)|(Swagger UI)|(swaggerUi)|(swaggerVersion))",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 2,
+        "ExtraTag": [
+            "Finger/Swagger"
+        ],
+        "VerboseName": "组件-Swagger指纹"
+    },
+    {
+        "Rule": "(?i)ueditor",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 3,
+        "ExtraTag": [
+            "Finger/Ueditor"
+        ],
+        "VerboseName": "组件-Ueditor"
+    },
+    {
+        "Rule": "(?i)Druid",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 4,
+        "ExtraTag": [
+            "Finger/Druid"
+        ],
+        "VerboseName": "组件-Druid"
+    },
+    {
+        "Rule": "(pdf.worker)",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 5,
+        "ExtraTag": [
+            "Finger/pdfjs"
+        ],
+        "VerboseName": "组件-PDF.js Viewer"
+    },
+    {
+        "Rule": "(?:javax\\.faces\\.ViewState|@class|TemplatesImpl|JdbcRowSetImpl|InvokerTransformer)",
+        "NoReplace": true,
+        "Color": "red",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 6,
+        "ExtraTag": [
+            "反序列化/java"
+        ],
+        "VerboseName": "通讯-Java 反序列化"
+    },
+    {
+        "Rule": "(?i)(jsonp_[a-z0-9]+)|((_?callback|_cb|_call|_?jsonp_?)=)",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForRequest": true,
+        "EnableForHeader": true,
+        "Index": 7,
+        "ExtraTag": [
+            "Finger/JsonP"
+        ],
+        "VerboseName": "组件-jsonp"
+    },
+    {
+        "Rule": "(eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9._-]{10,}|eyJ[A-Za-z0-9_\\/+-]{10,}\\.[A-Za-z0-9._\\/+-]{10,})",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 8,
+        "ExtraTag": [
+            "JWT参数"
+        ],
+        "VerboseName": "参数-JWT"
+    },
+    {
+        "Rule": "((access=)|(adm=)|(admin=)|(alter=)|(cfg=)|(clone=)|(config=)|(create=)|(dbg=)|(debug=)|(delete=)|(disable=)|(edit=)|(enable=)|(exec=)|(execute=)|(grant=)|(load=)|(make=)|(modify=)|(rename=)|(reset=)|(root=)|(shell=)|(test=)|(toggl=))",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForRequest": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 9,
+        "ExtraTag": [
+            "Leak/参数"
+        ],
+        "VerboseName": "参数-登录调试"
+    },
+    {
+        "Rule": "(=(https?)(://|%3a%2f%2f))",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 10,
+        "ExtraTag": [
+            "Leak/参数"
+        ],
+        "Disabled": true,
+        "VerboseName": "URL 作参数【停用】"
+    },
+    {
+        "Rule": "(type\\=\\\"file\\\")",
+        "NoReplace": true,
+        "Color": "red",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 11,
+        "ExtraTag": [
+            "Warn/文件上传"
+        ],
+        "VerboseName": "功能-文件上传表单"
+    },
+    {
+        "Rule": "((size=)|(page=)|(num=)|(limit=)|(start=)|(end=)|(count=))",
+        "NoReplace": true,
+        "Color": "grey",
+        "EnableForRequest": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 12,
+        "ExtraTag": [
+            "Leak/参数"
+        ],
+        "VerboseName": "参数-翻页"
+    },
+    {
+        "Rule": "(([a-z0-9]+[_|\\.])*[a-z0-9]+@([a-z0-9]+[-|_|\\.])*[a-z0-9]+\\.((?!js|css|jpg|jpeg|png|ico)[a-z]{2,5}))",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 13,
+        "ExtraTag": [
+            "Leak/邮箱"
+        ],
+        "Disabled": true,
+        "VerboseName": "Email邮箱"
+    },
+    {
+        "Rule": "[^0-9]((\\d{8}(0\\d|10|11|12)([0-2]\\d|30|31)\\d{3}$)|(\\d{6}(18|19|20)\\d{2}(0[1-9]|10|11|12)([0-2]\\d|30|31)\\d{3}(\\d|X|x)))[^0-9]",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 14,
+        "ExtraTag": [
+            "Leak/身份证"
+        ],
+        "VerboseName": "参数-身份证"
+    },
+    {
+        "Rule": "(?:\\+?86|0{0,2}86)?1(?:3\\d|4[5-79]|5[0-35-9]|6[5-7]|7[0-8]|8\\d|9[189])\\d{8}",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 15,
+        "ExtraTag": [
+            "Leak/手机号"
+        ],
+        "VerboseName": "参数-手机号"
+    },
+    {
+        "Rule": "(127\\.0\\.0\\.1)|(10\\.(25[0-5]|2[0-4]\\d|[01]?\\d{1,2})\\.(25[0-5]|2[0-4]\\d|[01]?\\d{1,2})\\.(25[0-5]|2[0-4]\\d|[01]?\\d{1,2}))|(172\\.(1[6-9]|2\\d|3[01])\\.(25[0-5]|2[0-4]\\d|[01]?\\d{1,2})\\.(25[0-5]|2[0-4]\\d|[01]?\\d{1,2}))|(192\\.168\\.(25[0-5]|2[0-4]\\d|[01]?\\d{1,2})\\.(25[0-5]|2[0-4]\\d|[01]?\\d{1,2}))",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 16,
+        "ExtraTag": [
+            "Leak/内网ip"
+        ],
+        "VerboseName": "参数-内网IP"
+    },
+    {
+        "Rule": "(^([a-fA-F0-9]{2}(:[a-fA-F0-9]{2}){5})|[^a-zA-Z0-9]([a-fA-F0-9]{2}(:[a-fA-F0-9]{2}){5}))",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 17,
+        "ExtraTag": [
+            "Leak/Mac地址"
+        ],
+        "VerboseName": "MAC 地址"
+    },
+    {
+        "Rule": "\\b(?:OTP|OAuth|authorization|dotfiles|key-keys|send_key-keys|send,key-keys|login-singin|passkey-passkeys|pass|secret|SecretAccessKey|credentials|security_credentials|connectionstring|ssh2_auth_password|DBPASSWORD|\\[[^]]*\\]\\sPassword=.*extension:ica|access_key|bucket_password|dbpassword|dbuser|secrt)\\b",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 18,
+        "ExtraTag": [
+            "Leak/Key泄露"
+        ],
+        "VerboseName": "参数-云存储 Key"
+    },
+    {
+        "Rule": "[^\\w]([c-gC-G]:\\\\\\\\?(?:[^\u003c\u003e:/\\\\|?*]+\\\\\\\\?)*)([^\u003c\u003e:/\\\\|?*]+(?:\\.[^\u003c\u003e:/\\\\|?*]+)?)",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 19,
+        "ExtraTag": [
+            "Finger/目录遍历"
+        ],
+        "VerboseName": "信息-Windows 路劲遍历"
+    },
+    {
+        "Rule": "(?i)((password)|(pass)|(secret)|(mima))['\"]?\\s*[\\:\\=]",
+        "NoReplace": true,
+        "Color": "red",
+        "EnableForRequest": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 20,
+        "ExtraTag": [
+            "登陆/密码传输"
+        ],
+        "VerboseName": "参数-密码发现"
+    },
+    {
+        "Rule": "(((|\\\\)(|'|\")(|[\\.\\w]{1,10})([p](ass|wd|asswd|assword))(|[\\.\\w]{1,10})(|\\\\)(|'|\")( |)(:|[=]{1,3}|![=]{1,2}|[\\)]{0,1}\\.val\\()( |)(|\\\\)('|\")([^'\"]+?)(|\\\\)('|\")(|,|\\)))|((|\\\\)('|\")([^'\"]+?)(|\\\\)('|\")(|\\\\)(|'|\")( |)(:|[=]{1,3}|![=]{1,2})( |)(|[\\.\\w]{1,10})([p](ass|wd|asswd|assword))(|[\\.\\w]{1,10})(|\\\\)(|'|\")))",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 21,
+        "ExtraTag": [
+            "Leak/密码Pass"
+        ],
+        "VerboseName": "参数-密码泄露"
+    },
+    {
+        "Rule": "(((|\\\\)(|'|\")(|[\\.\\w]{1,10})(([u](ser|name|sername))|(account)|((((create|update)((d|r)|(by|on|at)))|(creator))))(|[\\.\\w]{1,10})(|\\\\)(|'|\")( |)(:|=|!=|[\\)]{0,1}\\.val\\()( |)(|\\\\)('|\")([^'\"]+?)(|\\\\)('|\")(|,|\\)))|((|\\\\)('|\")([^'\"]+?)(|\\\\)('|\")(|\\\\)(|'|\")( |)(:|[=]{1,3}|![=]{1,2})( |)(|[\\.\\w]{1,10})(([u](ser|name|sername))|(account)|((((create|update)((d|r)|(by|on|at)))|(creator))))(|[\\.\\w]{1,10})(|\\\\)(|'|\")))",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 22,
+        "ExtraTag": [
+            "Leak/用户名user"
+        ],
+        "VerboseName": "参数-用户名泄露"
+    },
+    {
+        "Rule": "(((\\[)?('|\")?([\\.\\w]{0,10})(key|secret|token|config|auth|access|admin|ticket)([\\.\\w]{0,10})('|\")?(\\])?( |)(:|=|!=|[\\)]{0,1}\\.val\\()( |)('|\")([^'\"]+?)('|\")(|,|\\)))|((|\\\\)('|\")([^'\"]+?)(|\\\\)('|\")(|\\\\)(|'|\")( |)(:|[=]{1,3}|![=]{1,2})( |)(|[\\.\\w]{1,10})(key|secret|token|config|auth|access|admin|ticket)(|[\\.\\w]{1,10})(|\\\\)(|'|\")))",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 23,
+        "ExtraTag": [
+            "Leak/敏感参数"
+        ],
+        "VerboseName": "参数-敏感参数(响应)"
+    },
+    {
+        "Rule": "((corp)(id|secret))",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 24,
+        "ExtraTag": [
+            "Leak/企业微信"
+        ],
+        "VerboseName": "参数-企业微信IdKey"
+    },
+    {
+        "Rule": "(jdbc:[a-z:]+://[a-z0-9\\.\\-_:;=/@?,\u0026]+)",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 25,
+        "ExtraTag": [
+            "Finger/JDBC"
+        ],
+        "VerboseName": "参数-JDBC"
+    },
+    {
+        "Rule": "((basic [a-z0-9=:_\\+\\/-]{5,100})|(bearer [a-z0-9_.=:_\\+\\/-]{5,100}))",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 26,
+        "ExtraTag": [
+            "Finger/Basic认证"
+        ],
+        "VerboseName": "信息-Basic认证头"
+    },
+    {
+        "Rule": "(?i)([\"']?[\\w.]{0,10}(?:mobile|phone|sjh|shoujihao|shouji|concat)[\\w.]{0,10}[\"']?)\\s*[:=!]\\s*[\"']?(?:\\+?86|0{0,2}86)?1(?:3\\d|4[5-79]|5[0-35-9]|6[5-7]|7[0-8]|8\\d|9[189])\\d{8}[\"']?",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 27,
+        "ExtraTag": [
+            "Leak/手机号"
+        ],
+        "VerboseName": "参数-手机号"
+    },
+    {
+        "Rule": "(?:\"|')((?:(?:[a-zA-Z]{1,10}://|//)[^\"'/]{1,}\\.[a-zA-Z]{2,}[^\"']{0,})|(?:(?:(?:/|\\.\\./|\\./)?[^\"'\u003e\u003c,;|*()(%%$^/\\\\\\[\\]][^\"'\u003e\u003c,;|()]{1,}\\.[a-zA-Z]{1,4})|(?:(?:/|\\.\\./|\\./)?[^\"'\u003e\u003c,;|*()(%%$^/\\\\\\[\\]][^\"'\u003e\u003c,;|()]{1,}/[^\"'\u003e\u003c,;|()]{1,}(?:\\.[a-zA-Z]{1,4}|action)?)))(?:[\\?|#][^\"|']{0,})?(?:\"|')",
+        "NoReplace": true,
+        "Color": "grey",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 28,
+        "ExtraTag": [
+            "Info/常见文件"
+        ],
+        "VerboseName": "信息-常见文件"
+    },
+    {
+        "Rule": "(\\.js\\.map)",
+        "NoReplace": true,
+        "Color": "grey",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 29,
+        "ExtraTag": [
+            "Info/map源文件"
+        ],
+        "VerboseName": "信息-Source源文件"
+    },
+    {
+        "Rule": "[a-zA-Z_\\$][\\w\\$]*\\s*\\[[^]]*\\]\\s*\\+\\s*\"[^\"]*\\.js\"",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 30,
+        "ExtraTag": [
+            "Leak/js链接",
+            "xss/dir"
+        ],
+        "VerboseName": "参数-创建JS脚本(xss)"
+    },
+    {
+        "Rule": "(\\b(?![\\w]{0,10}?https?://)(([-A-Za-z0-9]{1,20})://[-A-Za-z0-9+\u0026@#/%?=~_|!:,.;]+[-A-Za-z0-9+\u0026@#/%=~_|]))",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 31,
+        "ExtraTag": [
+            "Leak/Url链接"
+        ],
+        "VerboseName": "参数-URL设计"
+    },
+    {
+        "Rule": "(\\$router\\.push)",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 32,
+        "ExtraTag": [
+            "Finger/Vue",
+            "Info/Vue路由点"
+        ],
+        "VerboseName": "信息-Vue路由点"
+    },
+    {
+        "Rule": "(https?://[-A-Za-z0-9+\u0026@#/%?=~_|!:,.;\\u4E00-\\u9FFF]+[-A-Za-z0-9+\u0026@#/%=~_|])",
+        "NoReplace": true,
+        "Color": "grey",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 33,
+        "ExtraTag": [
+            "Info/Url信息",
+            "Url信息"
+        ],
+        "Disabled": true,
+        "VerboseName": "Url信息【停用-误报严重】"
+    },
+    {
+        "Rule": "Location: (.*?)\\n",
+        "NoReplace": true,
+        "Color": "grey",
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "Index": 34,
+        "ExtraTag": [
+            "Info/302转跳"
+        ],
+        "VerboseName": "信息-302转跳"
+    },
+    {
+        "Rule": "(?i)((access|admin|api|debug|auth|authorization|gpg|ops|ray|deploy|s3|certificate|aws|app|application|docker|elastic|elasticsearch|secret)[-_]{0,5}(key|token|secret|secretkey|pass|password|sid|debug))|(secret|password)([\"']?\\s*:\\s*|\\s*=\\s*)",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 35,
+        "ExtraTag": [
+            "Leak/敏感信息"
+        ],
+        "VerboseName": "信息-敏感信息"
+    },
+    {
+        "Rule": "(BEGIN PUBLIC KEY).*?(END PUBLIC KEY)",
+        "NoReplace": true,
+        "Color": "purple",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 36,
+        "ExtraTag": [
+            "公钥传输"
+        ],
+        "VerboseName": "信息-公钥发现"
+    },
+    {
+        "Rule": "(?is)(\u003cform.*type=.*?text.*?type=.*?password.*?\u003c/form.*?\u003e)",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 37,
+        "ExtraTag": [
+            "登陆点"
+        ],
+        "VerboseName": "信息-登陆点"
+    },
+    {
+        "Rule": "(?is)(\u003cform.*type=.*?text.*?type=.*?password.*?onclick=.*?\u003c/form.*?\u003e)",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 38,
+        "ExtraTag": [
+            "登陆（验证码）"
+        ],
+        "VerboseName": "登陆（验证码）"
+    },
+    {
+        "Rule": "(?is)\u003cform.*enctype=.*?multipart/form-data.*?type=.*?file.*?\u003c/form\u003e",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 39,
+        "ExtraTag": [
+            "Finger/上传点"
+        ],
+        "VerboseName": "功能-文件上传点"
+    },
+    {
+        "Rule": "(file=|path=|url=|lang=|src=|menu=|meta-inf=|web-inf=|filename=|topic=|page=｜_FilePath=|target=)",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForRequest": true,
+        "EnableForHeader": true,
+        "Index": 40,
+        "ExtraTag": [
+            "Finger/文件包含参数"
+        ],
+        "VerboseName": "文件包含参数"
+    },
+    {
+        "Rule": "((cmd=)|(exec=)|(command=)|(execute=)|(ping=)|(jump=)|(reg=)|(do=)|(func=)|(arg=)|(option=)|(load=)|(process=)|(step=)|(read=)|(function=)|(feature=)|(exe=)|(module=)|(payload=)|(run=)|(daemon=)|(upload=)|(dir=)|(download=)|(log=)|(ip=)|(cli=))|(ipaddress=)|(txt=)|(case=)|(count=)",
+        "NoReplace": true,
+        "Color": "grey",
+        "EnableForRequest": true,
+        "EnableForHeader": true,
+        "Index": 41,
+        "ExtraTag": [
+            "Finger/命令注入参数"
+        ],
+        "VerboseName": "命令注入参数"
+    },
+    {
+        "Rule": "\\b(([^\u003c\u003e()[\\]\\\\.,;:\\s@\"]+(\\.[^\u003c\u003e()[\\]\\\\.,;:\\s@\"]+)*)|(\".+\"))@((\\[[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\])|(([a-zA-Z\\-0-9]+\\.)+(cn|com|edu|gov|int|mil|net|org|biz|info|pro|name|museum|coop|aero|xxx|idv)))\\b",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 42,
+        "ExtraTag": [
+            "Leak/邮箱泄露"
+        ],
+        "VerboseName": "email泄漏"
+    },
+    {
+        "Rule": "((\\[(mysql\\])|(\\[mysqld\\]))",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 43,
+        "ExtraTag": [
+            "Leak/Mysql泄露"
+        ],
+        "VerboseName": "MySQL配置"
+    },
+    {
+        "Rule": "[-]+BEGIN [^\\s]+ PRIVATE KEY[-]",
+        "NoReplace": true,
+        "Color": "purple",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 44,
+        "ExtraTag": [
+            "RSA私钥"
+        ],
+        "VerboseName": "RSA私钥"
+    },
+    {
+        "Rule": "(?i)(access[_-]?(key|secret|id)|accesskey(secret|id)|secret[_-]?(key|id))",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 45,
+        "ExtraTag": [
+            "Leak/Osskey"
+        ],
+        "VerboseName": "OSS Key"
+    },
+    {
+        "Rule": "[\\w-.]+\\.oss\\.aliyuncs\\.com",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 46,
+        "ExtraTag": [
+            "Leak/阿里云oss"
+        ],
+        "VerboseName": "AliyunOSS"
+    },
+    {
+        "Rule": "(?is)^{.*}$",
+        "NoReplace": true,
+        "Color": "grey",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 47,
+        "ExtraTag": [
+            "Finger/Json传输"
+        ],
+        "VerboseName": "JSON传输(响应)"
+    },
+    {
+        "Rule": "(?is)^\u003c\\?xml.*\u003csoap:Body\u003e",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForRequest": true,
+        "EnableForBody": true,
+        "Index": 48,
+        "ExtraTag": [
+            "Finger/SOAP请求"
+        ],
+        "VerboseName": "SOAP请求"
+    },
+    {
+        "Rule": "(?is)^\u003c\\?xml.*\u003e$",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForRequest": true,
+        "EnableForBody": true,
+        "Index": 49,
+        "ExtraTag": [
+            "Finger/Xml请求"
+        ],
+        "VerboseName": "XML请求"
+    },
+    {
+        "Rule": "(?i)(Authorization: .*)|(www-Authenticate: ((Basic)|(Bearer)|(Digest)|(HOBA)|(Mutual)|(Negotiate)|(OAuth)|(SCRAM-SHA-1)|(SCRAM-SHA-256)|(vapid)))",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "Index": 50,
+        "ExtraTag": [
+            "Finger/HTTP认证头"
+        ],
+        "VerboseName": "HTTP认证头"
+    },
+    {
+        "Rule": "(?i)GET\\s+\\S+\\?(?:\\w+=[a-zA-Z]+|%[0-9A-F]{2}+(?:\u0026\\w+=(?:[a-zA-Z]+|%[0-9A-F]{2})*)?)",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 51,
+        "ExtraTag": [
+            "Info/Get字符注入参数"
+        ],
+        "VerboseName": "Get注入点"
+    },
+    {
+        "Rule": "(?i)GET\\s+\\S+\\?\\w+=(?:\\d+|%[0-9A-F]{2})+(?:\u0026\\w+=(?:\\d+|%[0-9A-F]{2})+)*",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 52,
+        "ExtraTag": [
+            "Leak/GET数字注入参数"
+        ],
+        "VerboseName": "Get注入点"
+    },
+    {
+        "Rule": "(?i)(?:query|filter|xpath|search)\\s*=\\s*(?:'.*?[a-z]+\\(|\".*?[a-z]+\\(|\\/\\/.*?[a-z]+\\(|\\/\\/.*?\\/\\/|.*?or\\s*\\d+=\\d+|.*?file:\\/\\/.*)",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 53,
+        "ExtraTag": [
+            "Finger/Xpath注入"
+        ],
+        "VerboseName": "XPath注入测试点"
+    },
+    {
+        "Rule": "((POST.*?wsdl)|(GET.*?wsdl)|(xml=)|(\u003c\\?xml )|(\u0026lt;\\?xml))|((POST.*?asmx)|(GET.*?asmx))",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 54,
+        "ExtraTag": [
+            "Finger/XXE测试"
+        ],
+        "VerboseName": "XXE测试点"
+    },
+    {
+        "Rule": "(?i)\\b(file|path|url|filename|filepath|_FilePath)\\s*=\\s*(?:[\"']?(?:.*?\\.\\w{3,4}|file:\\/\\/|http:\\/\\/|https:\\/\\/|\\/.*|\\\\.*).[\"']?)",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 55,
+        "ExtraTag": [
+            "Leak/文件下载参数"
+        ],
+        "VerboseName": "文件下载参数"
+    },
+    {
+        "Rule": "(kindeditor\\-(all\\-min|all)\\.js)",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 56,
+        "ExtraTag": [
+            "KindEditor测试点"
+        ],
+        "VerboseName": "KindEditor测试点"
+    },
+    {
+        "Rule": "((callback=)|(url=)|(request=)|(redirect_to=)|(jump=)|(to=)|(link=)|(domain=))",
+        "NoReplace": true,
+        "Color": "grey",
+        "EnableForRequest": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 57,
+        "ExtraTag": [
+            "Url重定向参数"
+        ],
+        "VerboseName": "Url重定向参数"
+    },
+    {
+        "Rule": "(wap=|url=|link=|src=|source=|display=|sourceURl=|imageURL=|domain=)",
+        "NoReplace": true,
+        "Color": "grey",
+        "EnableForRequest": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 58,
+        "ExtraTag": [
+            "SSRF测试参数"
+        ],
+        "VerboseName": "SSRF测试参数"
+    },
+    {
+        "Rule": "((GET|POST|http[s]?).*\\.(do|action))[^a-zA-Z]",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForRequest": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 59,
+        "ExtraTag": [
+            "Finger/Struts2"
+        ],
+        "VerboseName": "Struts2测试点"
+    },
+    {
+        "Rule": "((GET|POST|http[s]?).*?\\?.*?(token=|session\\w+=))",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 60,
+        "ExtraTag": [
+            "Session/Token测试点"
+        ],
+        "Disabled": true,
+        "VerboseName": "Session/Token测试点【停用-误报】"
+    },
+    {
+        "Rule": "((AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[a-zA-Z0-9]{16})",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 61,
+        "ExtraTag": [
+            "Leak/亚马逊AK"
+        ],
+        "VerboseName": "Amazon AK"
+    },
+    {
+        "Rule": "(Directory listing for|Parent Directory|Index of|folder listing:)",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 62,
+        "ExtraTag": [
+            "Finger/目录遍历"
+        ],
+        "VerboseName": "目录枚举点"
+    },
+    {
+        "Rule": "(\u003c.*?Unauthorized)",
+        "NoReplace": true,
+        "Color": "grey",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 63,
+        "ExtraTag": [
+            "非授权页面点"
+        ],
+        "VerboseName": "非授权页面点"
+    },
+    {
+        "Rule": "((\"|')?[u](ser|name|ame|sername)(\"|'|\\s)?(:|=).*?,)",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 64,
+        "ExtraTag": [
+            "用户名泄漏点"
+        ],
+        "VerboseName": "用户名泄漏点"
+    },
+    {
+        "Rule": "((\"|')?[p](ass|wd|asswd|assword)(\"|'|\\s)?(:|=).*?,)",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 65,
+        "ExtraTag": [
+            "密码泄漏点"
+        ],
+        "VerboseName": "密码泄漏点"
+    },
+    {
+        "Rule": "(((([a-zA-Z0-9._-]+\\.s3|s3)(\\.|\\-)+[a-zA-Z0-9._-]+|[a-zA-Z0-9._-]+\\.s3|s3)\\.amazonaws\\.com)|(s3:\\/\\/[a-zA-Z0-9-\\.\\_]+)|(s3.console.aws.amazon.com\\/s3\\/buckets\\/[a-zA-Z0-9-\\.\\_]+)|(amzn\\.mws\\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})|(ec2-[0-9-]+.cd-[a-z0-9-]+.compute.amazonaws.com)|(us[_-]?east[_-]?1[_-]?elb[_-]?amazonaws[_-]?com))",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 66,
+        "ExtraTag": [
+            "Finger/亚马逊URL"
+        ],
+        "VerboseName": "Amazon AWS URL"
+    },
+    {
+        "Rule": "(?is)(\u003cform.*type=.*?text.*?\u003c/form.*?\u003e)",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 67,
+        "ExtraTag": [
+            "HTTP XSS测试点"
+        ],
+        "VerboseName": "HTTP XSS测试点"
+    },
+    {
+        "Rule": "(?i)(\u003ctitle\u003e.*?(管理后台|控制面板后台|admin).*?\u003c/title\u003e)",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 68,
+        "ExtraTag": [
+            "后台登陆"
+        ],
+        "VerboseName": "后台登陆"
+    },
+    {
+        "Rule": "((ghp|ghu)\\_[a-zA-Z0-9]{36})",
+        "NoReplace": true,
+        "Color": "red",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 69,
+        "ExtraTag": [
+            "Leak/Github访问令牌"
+        ],
+        "VerboseName": "GithubAccessToken"
+    },
+    {
+        "Rule": "(?i)(jsonp_[a-z0-9]+)|((_?callback|_cb|_call|_?jsonp_?)=)",
+        "NoReplace": true,
+        "Color": "green",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 70,
+        "ExtraTag": [
+            "JSONP 测试点"
+        ],
+        "VerboseName": "jsonp_pre_test"
+    },
+    {
+        "Rule": "(https://outlook\\.office\\.com/webhook/[a-z0-9@-]+/IncomingWebhook/[a-z0-9-]+/[a-z0-9-]+)",
+        "NoReplace": true,
+        "Color": "red",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 71,
+        "ExtraTag": [
+            "Leak/微软webhook"
+        ],
+        "VerboseName": "MicrosoftTeams Webhook"
+    },
+    {
+        "Rule": "https://creator\\.zoho\\.com/api/[A-Za-z0-9/\\-_\\.]+\\?authtoken=[A-Za-z0-9]+",
+        "NoReplace": true,
+        "Color": "red",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 72,
+        "ExtraTag": [
+            "Leak/Zohowebhook"
+        ],
+        "VerboseName": "Zoho Webhook"
+    },
+    {
+        "Rule": "((us(-gov)?|ap|ca|cn|eu|sa)-(central|(north|south)?(east|west)?)-\\d)",
+        "NoReplace": true,
+        "Color": "red",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 73,
+        "ExtraTag": [
+            "Amazon AWS Region泄漏"
+        ],
+        "VerboseName": "Amazon AWS Region泄漏"
+    },
+    {
+        "Rule": "(=(https?://.*|https?%3(a|A)%2(f|F)%2(f|F).*))",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 74,
+        "ExtraTag": [
+            "URL作为参数"
+        ],
+        "VerboseName": "URL作为参数"
+    },
+    {
+        "Rule": "(ya29\\.[0-9A-Za-z_-]+)",
+        "NoReplace": true,
+        "Color": "red",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 75,
+        "ExtraTag": [
+            "Leask/谷歌认证Oauth"
+        ],
+        "VerboseName": "谷歌Oauth认证"
+    },
+    {
+        "Rule": "(Error report|in your SQL syntax|mysql_fetch_array|mysql_connect()|org.apache.catalina)",
+        "NoReplace": true,
+        "Color": "red",
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 76,
+        "ExtraTag": [
+            "网站出错"
+        ],
+        "VerboseName": "网站出错"
+    },
+    {
+        "Rule": "[a-zA-Z]:[\\\\/](?:\\w+[\\\\/])+.*\\.\\w+",
+        "NoReplace": true,
+        "Color": "red",
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 77,
+        "ExtraTag": [
+            "Leak/windows系统文件"
+        ],
+        "VerboseName": "windwos系统文件"
+    },
+    {
+        "Rule": "(?:\\/(?:bin|dev|home|media|opt|root|sbin|sys|usr|boot|data|etc|lib|mnt|proc|run|srv|tmp|var)\\/.*\\.\\w+)",
+        "NoReplace": true,
+        "Color": "red",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForBody": true,
+        "Index": 78,
+        "ExtraTag": [
+            "leak/linux系统文件"
+        ],
+        "VerboseName": "linux系统文件"
+    },
+    {
+        "Rule": "(?://.*?[^\\x00-\\xff].*)",
+        "NoReplace": true,
+        "Color": "cyan",
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 79,
+        "ExtraTag": [
+            "Info/中文注释"
+        ],
+        "VerboseName": "信息-中文注释"
+    },
+    {
+        "Rule": "(?:(?:XMLHttpRequest|\\.open)\\(['\"]?(GET|POST|PUT|DELETE|HEAD|OPTIONS|CONNECT|TRACE|PATCH)['\"]?,\\s*['\"]?([^'\"]+)|fetch\\(['\"]?([^'\"]+)\\s*(['\"]|,.*?method:\\s*['\"]?([A-Z]+)['\"]?)|axios\\.(get|post|put|delete)\\(['\"]?([^'\"]+)|\\$\\.(?:ajax|get|post)\\(['\"]?([^'\"]+)|WebSocket\\(['\"]?([^'\"]+)|['\"]?url['\"]?\\s*:\\s*['\"]?([^'\"]+)[?\u0026]callback=)",
+        "NoReplace": true,
+        "Color": "grey",
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 80,
+        "ExtraTag": [
+            "Leak/JS请求点"
+        ],
+        "Disabled": true,
+        "VerboseName": "JS请求点【调试中/关闭】"
+    },
+    {
+        "Rule": "fetch\\(['\\\"]?([^'\\\"]+).*?(?:method:\\\\s*['\\\"]?([A-Z]+)['\\\"]?)?",
+        "NoReplace": true,
+        "Color": "grey",
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 81,
+        "ExtraTag": [
+            "Leak/JS请求点"
+        ],
+        "VerboseName": "JS请求(fetch)"
+    },
+    {
+        "Rule": "axios\\.(get|post|put|delete)\\(['\"]?([^'\"]+)",
+        "NoReplace": true,
+        "Color": "grey",
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 82,
+        "ExtraTag": [
+            "Leak/JS请求点"
+        ],
+        "VerboseName": "JS请求(axios)"
+    },
+    {
+        "Rule": "\\$\\.(?:ajax|get|head|post|put|delete|connect|options|trace|patch|copy|move|lock|unlock|propfind|proppatch|mkcol)\\(['\\\"]?([^'\\\"]+)",
+        "NoReplace": true,
+        "Color": "grey",
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 83,
+        "ExtraTag": [
+            "Leak/JS请求"
+        ],
+        "VerboseName": "JS请求(ajax)"
+    },
+    {
+        "Rule": "WebSocket\\(['\"]?([^'\"]+)",
+        "NoReplace": true,
+        "Color": "grey",
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 84,
+        "ExtraTag": [
+            "Leak/JS请求"
+        ],
+        "VerboseName": "JS请求(websocket)"
+    },
+    {
+        "Rule": "['\\\"]?url['\\\"]?\\s*:\\s*['\\\"]?([^'\\\"]+)[?\u0026]callback=",
+        "NoReplace": true,
+        "Color": "grey",
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 85,
+        "ExtraTag": [
+            "Leak/JS请求"
+        ],
+        "Disabled": true,
+        "VerboseName": "JS请求(Jsonp)【低下-停用】"
+    },
+    {
+        "Rule": "\\bformData\\.append\\(\\s*[\"']?(\\w+)[\"']?,\\s*(.*?)(?:,\\s*[\"']?(.*?)[\"']?)?\\)",
+        "NoReplace": true,
+        "Color": "grey",
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 86,
+        "ExtraTag": [
+            "Info/表单参数"
+        ],
+        "VerboseName": "参数-表单参数"
+    },
+    {
+        "Rule": "(?i)content-type:\\s*[Mm][Uu][Ll][Tt][Ii][Pp]ART/[Ff][Oo][Rr][Mm]-[Dd][Aa][Tt][Aa];\\s*boundary=.*",
+        "NoReplace": true,
+        "Color": "red",
+        "EnableForRequest": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 87,
+        "ExtraTag": [
+            "Warn/文件上传"
+        ],
+        "VerboseName": "参数-表单传输"
+    },
+    {
+        "Rule": "(?i)\\b(url\\s*:\\s*|fetch|axios\\.\\w+|this\\.\\w+\\.)\\s*[\"']([^\"']+)[\"']",
+        "NoReplace": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 88,
+        "ExtraTag": [
+            "Info/URL接口"
+        ],
+        "VerboseName": "参数-url接口获取"
+    },
+    {
+        "Rule": "this\\.\\$\\w+\\.",
+        "NoReplace": true,
+        "EnableForResponse": true,
+        "EnableForHeader": true,
+        "EnableForBody": true,
+        "Index": 89,
+        "ExtraTag": [
+            "Info/Vue方法点"
+        ],
+        "VerboseName": "参数-Vue方法点"
+    }
+]
