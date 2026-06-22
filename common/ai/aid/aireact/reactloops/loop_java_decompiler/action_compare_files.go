@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
 )
@@ -26,7 +27,6 @@ var compareFilesAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 				return utils.Error("file_path parameter is required")
 			}
 
-			// If not absolute, make it relative to working directory
 			if !filepath.IsAbs(filePath) {
 				workingDir := l.Get("working_directory")
 				if workingDir != "" {
@@ -34,10 +34,9 @@ var compareFilesAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 				}
 			}
 
-			// Check if file exists
 			if _, err := os.Stat(filePath); os.IsNotExist(err) {
-				invoker := l.GetInvoker()
-				errorMsg := fmt.Sprintf(`【文件未找到】无法找到要比较的Java文件：%s
+				log.Warnf("[compare_with_backup] file not found: %s", filePath)
+				l.GetInvoker().AddToTimeline("compare_file_not_found", fmt.Sprintf(`【文件未找到】无法找到要比较的Java文件：%s
 
 【可能原因】：
 1. 文件路径拼写错误
@@ -56,16 +55,14 @@ var compareFilesAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 - 确保文件扩展名为 .java
 - 检查路径分隔符是否正确
 
-【下一步】：使用 list_files 查看可用的文件列表`, filePath)
-				invoker.AddToTimeline("compare_file_not_found", errorMsg)
+【下一步】：使用 list_files 查看可用的文件列表`, filePath))
 				return utils.Errorf("file not found: %s", filePath)
 			}
 
-			// Check if backup exists
 			backupPath := filePath + ".bak"
 			if _, err := os.Stat(backupPath); os.IsNotExist(err) {
-				invoker := l.GetInvoker()
-				errorMsg := fmt.Sprintf(`【备份文件未找到】无法找到原始备份文件：%s
+				log.Warnf("[compare_with_backup] backup not found: %s", backupPath)
+				l.GetInvoker().AddToTimeline("compare_backup_not_found", fmt.Sprintf(`【备份文件未找到】无法找到原始备份文件：%s
 
 【可能原因】：
 1. 该文件从未被反编译（没有创建备份）
@@ -91,17 +88,16 @@ var compareFilesAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 
 【下一步】：
 - 如果需要重新反编译，使用 decompile_jar
-- 如果是新文件，直接使用 check_syntax 验证语法`, backupPath)
-				invoker.AddToTimeline("compare_backup_not_found", errorMsg)
+- 如果是新文件，直接使用 check_syntax 验证语法`, backupPath))
 				return utils.Errorf("backup file not found: %s", backupPath)
 			}
 
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
-			filePath := action.GetString("file_path")
+			const nodeID = "java-compare-backup"
 
-			// If not absolute, make it relative to working directory
+			filePath := action.GetString("file_path")
 			if !filepath.IsAbs(filePath) {
 				workingDir := loop.Get("working_directory")
 				if workingDir != "" {
@@ -110,14 +106,17 @@ var compareFilesAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 			}
 
 			backupPath := filePath + ".bak"
-
 			invoker := loop.GetInvoker()
-			invoker.AddToTimeline("compare_files", fmt.Sprintf("Comparing file %s with backup", filePath))
 
-			// Read both files
+			startLine := fmt.Sprintf("对比备份: %s", filepath.Base(filePath))
+			reactloops.EmitActionLog(loop, nodeID, startLine)
+			reactloops.EmitStatus(loop, "对比文件中 / Comparing Files...")
+
 			originalContent, err := os.ReadFile(backupPath)
 			if err != nil {
-				errorMsg := fmt.Sprintf(`【备份文件读取失败】无法读取备份文件内容
+				log.Errorf("[compare_with_backup] failed to read backup %s: %v", backupPath, err)
+				reactloops.EmitStatus(loop, "读取备份失败 / Failed to Read Backup")
+				invoker.AddToTimeline("compare_read_backup_error", fmt.Sprintf(`【备份文件读取失败】无法读取备份文件内容
 
 【错误详情】：%v
 
@@ -136,15 +135,16 @@ var compareFilesAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 【建议】：
 - 使用系统工具检查文件权限
 - 如果文件损坏，考虑重新反编译
-- 确保没有其他程序占用该文件`, err)
-				invoker.AddToTimeline("compare_read_backup_error", errorMsg)
+- 确保没有其他程序占用该文件`, err))
 				op.Fail("failed to read backup file: " + err.Error())
 				return
 			}
 
 			modifiedContent, err := os.ReadFile(filePath)
 			if err != nil {
-				errorMsg := fmt.Sprintf(`【文件读取失败】无法读取当前文件内容
+				log.Errorf("[compare_with_backup] failed to read file %s: %v", filePath, err)
+				reactloops.EmitStatus(loop, "读取文件失败 / Failed to Read File")
+				invoker.AddToTimeline("compare_read_file_error", fmt.Sprintf(`【文件读取失败】无法读取当前文件内容
 
 【错误详情】：%v
 
@@ -163,16 +163,16 @@ var compareFilesAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 【建议】：
 - 确保有读取权限
 - 如果文件损坏，从备份恢复
-- 检查是否有其他程序在编辑该文件`, err)
-				invoker.AddToTimeline("compare_read_file_error", errorMsg)
+- 检查是否有其他程序在编辑该文件`, err))
 				op.Fail("failed to read modified file: " + err.Error())
 				return
 			}
 
-			// Use yakdiff to generate professional unified diff
 			diffResult, err := yakdiff.Diff(originalContent, modifiedContent)
 			if err != nil {
-				errorMsg := fmt.Sprintf(`【差异生成失败】无法生成文件差异对比
+				log.Errorf("[compare_with_backup] failed to generate diff for %s: %v", filePath, err)
+				reactloops.EmitStatus(loop, "差异生成失败 / Diff Generation Failed")
+				invoker.AddToTimeline("compare_diff_error", fmt.Sprintf(`【差异生成失败】无法生成文件差异对比
 
 【错误详情】：%v
 
@@ -190,20 +190,20 @@ var compareFilesAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 【建议】：
 - 对于大文件，使用外部diff工具
 - 检查文件内容是否为有效文本
-- 确保有足够的系统资源`, err)
-				invoker.AddToTimeline("compare_diff_error", errorMsg)
+- 确保有足够的系统资源`, err))
 				op.Fail("failed to generate diff: " + err.Error())
 				return
 			}
 
-			// Prepare feedback message
-			msg := fmt.Sprintf("Comparison of %s with backup:\n\n", filepath.Base(filePath))
-			msg += fmt.Sprintf("Original file (backup): %d bytes\n", len(originalContent))
-			msg += fmt.Sprintf("Modified file: %d bytes\n\n", len(modifiedContent))
+			var finishLine string
+			var feedbackMsg string
+			var reference string
 
 			if strings.TrimSpace(diffResult) == "" {
-				msg += "No differences found - files are identical."
-				timelineMsg := fmt.Sprintf(`【文件对比完成】文件与备份完全相同：%s
+				finishLine = fmt.Sprintf("完成: %s 与备份完全相同", filepath.Base(filePath))
+				reactloops.EmitStatus(loop, "无差异 / No Differences")
+				feedbackMsg = fmt.Sprintf("No differences found for %s (identical to backup).", filepath.Base(filePath))
+				invoker.AddToTimeline("compare_no_changes", fmt.Sprintf(`【文件对比完成】文件与备份完全相同：%s
 
 【结果】：未发现任何差异
 
@@ -220,41 +220,29 @@ var compareFilesAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 【下一步建议】：
 - 如果预期有修改但未发现差异，检查是否编辑了正确的文件
 - 如果确认无需修改，可以继续处理其他文件
-- 如果需要修改，使用 rewrite_java_file 进行编辑（局部或完整重写）`, filepath.Base(filePath))
-				invoker.AddToTimeline("compare_no_changes", timelineMsg)
+- 如果需要修改，使用 rewrite_java_file 进行编辑（局部或完整重写）`, filepath.Base(filePath)))
 			} else {
-				// Count diff lines (lines starting with + or -)
-				diffLines := strings.Split(diffResult, "\n")
-				addedLines := 0
-				removedLines := 0
-				for _, line := range diffLines {
-					if len(line) > 0 {
-						if line[0] == '+' && !strings.HasPrefix(line, "+++") {
-							addedLines++
-						} else if line[0] == '-' && !strings.HasPrefix(line, "---") {
-							removedLines++
-						}
-					}
-				}
+				addedLines, removedLines := countDiffLines(diffResult)
+				fullDiff := fmt.Sprintf("Comparison of %s with backup:\nOriginal: %d bytes, Modified: %d bytes\n\n%s",
+					filepath.Base(filePath), len(originalContent), len(modifiedContent), diffResult)
+				summary, ref := spillOrPreview(loop, "java_file_diff", fullDiff)
+				reference = ref
 
-				msg += fmt.Sprintf("Changes: +%d lines added, -%d lines removed\n\n", addedLines, removedLines)
-				msg += "Unified Diff:\n"
-				msg += "```diff\n"
-				msg += diffResult
-
-				// Limit total message size
-				if len(msg) > 8000 {
-					msg = msg[:8000] + "\n... (diff truncated)"
-				}
-
-				msg += "\n```"
-
-				timelineMsg := fmt.Sprintf(`【文件对比完成】发现文件修改：%s
+				finishLine = fmt.Sprintf("完成: %s 变更 +%d/-%d 行",
+					filepath.Base(filePath), addedLines, removedLines)
+				reactloops.EmitStatus(loop, fmt.Sprintf(
+					"发现差异 (+%d/-%d) / Changes Found (+%d/-%d)",
+					addedLines, removedLines, addedLines, removedLines,
+				))
+				feedbackMsg = fmt.Sprintf("Changes in %s: +%d/-%d lines.\n\n%s",
+					filepath.Base(filePath), addedLines, removedLines, summary)
+				invoker.AddToTimeline("compare_changes_found", fmt.Sprintf(`【文件对比完成】发现文件修改：%s
 
 【修改统计】：
 - 新增行数：+%d
 - 删除行数：-%d
 - 总变更量：%d 行
+- 差异内容：%s
 
 【对比结果已展示】：
 - Unified Diff 格式已生成
@@ -271,12 +259,28 @@ var compareFilesAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 【注意事项】：
 - 大的修改建议分批验证
 - 关注是否误删了重要代码
-- 确保修改保持代码的逻辑完整性`, filepath.Base(filePath), addedLines, removedLines, addedLines+removedLines)
-				invoker.AddToTimeline("compare_changes_found", timelineMsg)
+- 确保修改保持代码的逻辑完整性`, filepath.Base(filePath), addedLines, removedLines, addedLines+removedLines, summary))
 			}
 
-			op.Feedback(msg)
+			reactloops.EmitActionLog(loop, nodeID, finishLine, reference)
+			log.Infof("[compare_with_backup] completed for %s", filePath)
+
+			op.Feedback(feedbackMsg)
 			op.Continue()
 		},
 	)
+}
+
+func countDiffLines(diffResult string) (added, removed int) {
+	for _, line := range strings.Split(diffResult, "\n") {
+		if len(line) == 0 {
+			continue
+		}
+		if line[0] == '+' && !strings.HasPrefix(line, "+++") {
+			added++
+		} else if line[0] == '-' && !strings.HasPrefix(line, "---") {
+			removed++
+		}
+	}
+	return added, removed
 }

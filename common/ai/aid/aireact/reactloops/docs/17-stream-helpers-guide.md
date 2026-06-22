@@ -8,6 +8,14 @@
 2. 累积 Action 日志：给每个 Action 留下简短、可读、有限的过程记录。
 3. 文件产物：把大体量材料落盘并 pin 到前端，避免刷屏。
 
+本指导只约束**用户可见 stream**。不要把它误解成“删除所有过程信息”：给下一轮 ReAct 使用的 `operator.Feedback`、`AddToTimeline` 仍然需要保留关键上下文、错误恢复建议和下一步行动，只是不能把完整大文件、堆栈、逐条调试日志塞进去。
+
+## 三条底线
+
+- 用户可见输出要少：每个普通 Action 只保留开始/完成两类日志，阶段切换走状态栏。
+- 模型可用信息要准：`Feedback` / timeline 保留可恢复摘要、文件路径、下一步建议，不保留大段原文。
+- 大内容要落盘：列表、源码、diff、报告、扫描明细先 `SaveAndPinFile`，前端和反馈只引用文件与 preview。
+
 ## API 速查
 
 ### `EmitStatus`
@@ -65,9 +73,32 @@ reactloops.EmitActionLog(loop, "http-flow-query", "完成: 找到 18 条流量",
 要求：
 
 - `nodeId` 必须稳定，使用 kebab-case，例如 `http-flow-query`、`http-flow-match`、`http-flow-detail`、`fuzz-test`。
+- 新增 `nodeId` 后，必须在 `common/schema/ai_node_id_i18n.go` 的 `nodeIdMapper` 中补充中英双语条目，否则前端 Action 日志分区会显示原始 id。
 - `lines` 是用户可见日志，必须短而确定；不要逐条 flow 输出，不要发循环内 debug。
 - `reference` 可放较长的查询结果、匹配摘要、证据材料，但仍应经过长度控制或文件化。
 - 不要把 `human_readable_thought` 直接拼进 `lines`。LLM reasoning 已由框架处理，Action 日志只记录事实动作。
+- 不要用 `EmitActionLog` 替代 timeline 的错误恢复指导。用户可见日志写事实，timeline 写下一轮模型需要的恢复步骤。
+
+`nodeId` i18n 示例：
+
+```go
+// common/schema/ai_node_id_i18n.go
+"java-decompile-jar": {
+    Zh: "JAR 反编译",
+    En: "Decompile JAR",
+},
+```
+
+### 共用 schema 与调用说明字段
+
+一个 loop 内所有 action 的参数会合并进**同一份 JSON schema**（`buildSchema` 对同名参数后注册覆盖先注册）。因此：
+
+- **各类「调用原因 / 说明」应收敛到 schema 里同一个共用字段**。当前框架默认字段是 `human_readable_thought`，并已注册到 `re-act-loop-thought`。
+- 如果某个 loop 需要自定义说明字段，必须在 loop 级别只定义一个，并让所有 action 共享；不要在各个 action 上再各自声明 `rewrite_reason`、`read_reason`、`summary` 等同义参数。
+- 不要为多个说明字段分别挂 `LoopStreamField` 打到同一 thought 通道，否则会 schema 冲突或重复输出。
+- Prompt / `output_example` 里只示范这一个共用字段；handler 侧**不要**把它拼进 `EmitActionLog` 的 `lines`。
+
+参考：`loop_plan/action_recon.go`（不在每个 action 单独声明 request）、`loop_java_decompiler`（已去掉 `rewrite_reason` 与 finish 示例里的 `summary`）。
 
 ### `SaveAndPinFile`
 
@@ -92,6 +123,22 @@ if err := reactloops.SaveAndPinFile(loop, filename, []byte(fullSummary)); err !=
 - 前端和 `operator.Feedback` 只放压缩预览、计数和文件路径。
 - 文件名包含业务前缀、迭代号或时间，便于追踪。
 
+## Feedback / Timeline 怎么写
+
+`operator.Feedback` 和 `AddToTimeline` 是给后续 ReAct 决策用的，不是普通前端 stream。迁移时要“限长”，不要“删空”。
+
+推荐保留：
+
+- 失败原因的可恢复摘要，例如路径不存在、权限不足、语法错误数量。
+- 下一步建议，例如先 `list_files`、再 `read_java_file`、最后 `rewrite_java_file` + `check_syntax`。
+- 大内容的文件路径和短 preview，例如完整源码、diff、错误报告。
+
+不应保留：
+
+- 完整源码、完整 diff、完整 HTTP 包、完整扫描列表。
+- 内部堆栈、fallback 调试细节、无意义的逐条循环日志。
+- 与 `human_readable_thought` 重复的模型意图描述。
+
 ## `loop_http_flow_analyze` 的推荐输出结构
 
 每个 Action 按以下顺序组织输出：
@@ -109,7 +156,7 @@ _ = reactloops.SaveAndPinFile(loop, filename, []byte(fullSummary))
 
 reactloops.EmitStatus(loop, "完成 / Complete")
 reactloops.EmitActionLog(loop, nodeId, finishLine, summary)
-operator.Feedback(feedbackMsg)
+operator.Feedback(feedbackMsg) // 限长，保留计数、文件路径、下一步建议
 ```
 
 对照现有代码：
@@ -125,6 +172,7 @@ operator.Feedback(feedbackMsg)
 - 特殊内容类型：HTTP 包、Yak 代码、Markdown 正文等需要特定 `ContentType` 的流，仍使用专门的 stream field 或 emitter 方法。
 - 技术日志：数据库错误、内部 fallback、模型 prompt 长度、执行耗时等只写 `log.*`。
 - 模型下一轮观察：`operator.Feedback` 是给 ReAct 下一轮看的，不是前端展示通道；内容也要限长。
+- timeline 错误恢复指导：`AddToTimeline` 可以保留结构化“可能原因 / 立即行动 / 下一步”，不要因为收敛前端 stream 而删掉。
 
 ## 审查清单
 
@@ -133,6 +181,9 @@ operator.Feedback(feedbackMsg)
 - 是否只有 1 条开始 Action 日志和 1 条完成 Action 日志。
 - 状态是否中英双语、短句、可覆盖。
 - 是否没有把 `human_readable_thought`、prompt、原始调试信息输出到前端。
+- 是否未在各 action 上重复声明 reason/summary 类参数；调用说明是否只走 schema 共用字段。
+- 新增 `EmitActionLog` 的 `nodeId` 是否已在 `ai_node_id_i18n.go` 注册。
 - 循环中是否没有无节制 emit；需要进度时是否有节流。
 - 大内容是否通过 `SaveAndPinFile` 文件化，前端只展示摘要和引用。
+- `Feedback` / timeline 是否仍保留可恢复错误指导和下一步建议。
 - 技术排查信息是否进入 `log.*`，而不是用户可见 stream。

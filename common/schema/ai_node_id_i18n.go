@@ -269,6 +269,30 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "Java反编译器",
 		En: "Java Decompiler",
 	},
+	"java-decompile-jar": {
+		Zh: "JAR 反编译",
+		En: "Decompile JAR",
+	},
+	"java-list-files": {
+		Zh: "列出 Java 文件",
+		En: "List Java Files",
+	},
+	"java-read-file": {
+		Zh: "读取 Java 文件",
+		En: "Read Java File",
+	},
+	"java-rewrite-file": {
+		Zh: "重写 Java 文件",
+		En: "Rewrite Java File",
+	},
+	"java-check-syntax": {
+		Zh: "Java 语法检查",
+		En: "Check Java Syntax",
+	},
+	"java-compare-backup": {
+		Zh: "对比备份",
+		En: "Compare with Backup",
+	},
 	"fast-memory-fetch": {
 		Zh: "快速记忆检索",
 		En: "Fast Memory Fetch",

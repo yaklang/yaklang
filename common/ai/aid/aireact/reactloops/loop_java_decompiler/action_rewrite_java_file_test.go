@@ -58,9 +58,8 @@ func TestRewriteJavaFile_CompleteRewrite(t *testing.T) {
 
 	// Execute rewrite action - complete rewrite (no line numbers specified)
 	err = framework.ExecuteAction("rewrite_java_file", map[string]interface{}{
-		"file_path":      testFile,
-		"rewrite_reason": "Rename obfuscated variables (var1->username, var2->userId) and improve method names",
-		"new_code":       newCode,
+		"file_path": testFile,
+		"new_code":  newCode,
 	})
 
 	if err != nil {
@@ -149,7 +148,6 @@ func TestRewriteJavaFile_PartialRewrite(t *testing.T) {
 		"file_path":          testFile,
 		"rewrite_start_line": 4,
 		"rewrite_end_line":   9,
-		"rewrite_reason":     "Rename obfuscated variables in method1",
 		"new_code":           newMethodBody,
 	})
 
@@ -192,9 +190,8 @@ func TestRewriteJavaFile_MissingFile(t *testing.T) {
 
 	// Execute with non-existent file
 	err := framework.ExecuteAction("rewrite_java_file", map[string]interface{}{
-		"file_path":      "/nonexistent/Test.java",
-		"rewrite_reason": "Test",
-		"new_code":       "public class Test {}",
+		"file_path": "/nonexistent/Test.java",
+		"new_code":  "public class Test {}",
 	})
 
 	// Should handle error gracefully
@@ -231,7 +228,6 @@ func TestRewriteJavaFile_InvalidLineRange(t *testing.T) {
 		"file_path":          testFile,
 		"rewrite_start_line": 10,
 		"rewrite_end_line":   20,
-		"rewrite_reason":     "Test invalid range",
 		"new_code":           "public void newMethod() {}",
 	})
 
@@ -277,9 +273,8 @@ func TestRewriteJavaFile_BackupNotOverwritten(t *testing.T) {
 }`
 
 	err = framework.ExecuteAction("rewrite_java_file", map[string]interface{}{
-		"file_path":      testFile,
-		"rewrite_reason": "Test backup preservation",
-		"new_code":       newCode,
+		"file_path": testFile,
+		"new_code":  newCode,
 	})
 
 	if err != nil {
@@ -319,9 +314,8 @@ func TestRewriteJavaFile_EmptyNewCode(t *testing.T) {
 
 	// Execute with empty new code
 	err = framework.ExecuteAction("rewrite_java_file", map[string]interface{}{
-		"file_path":      testFile,
-		"rewrite_reason": "Test empty code",
-		"new_code":       "",
+		"file_path": testFile,
+		"new_code":  "",
 	})
 
 	// Should handle error gracefully
@@ -355,28 +349,27 @@ func TestRewriteJavaFile_MultipleRewrites(t *testing.T) {
 	for i, filename := range files {
 		// Create a new framework for each file (test framework limitation: global state)
 		framework := reactloopstests.NewActionTestFramework(t, fmt.Sprintf("test-rewrite-multiple-%d", i), actionOption)
-		
+
 		filePath := filepath.Join(tmpDir, filename)
 		className := strings.TrimSuffix(filename, ".java")
 		newCode := "public class " + className + " {\n    private String username;\n}"
 
 		err := framework.ExecuteAction("rewrite_java_file", map[string]interface{}{
-			"file_path":      filePath,
-			"rewrite_reason": "Rename var1 to username",
-			"new_code":       newCode,
+			"file_path": filePath,
+			"new_code":  newCode,
 		})
 
 		if err != nil {
 			t.Fatalf("Failed to rewrite %s: %v", filename, err)
 		}
-		
+
 		// Verify this specific file was rewritten
 		rewrittenContent, err := os.ReadFile(filePath)
 		if err != nil {
 			t.Errorf("Failed to read rewritten file %s: %v", filename, err)
 			continue
 		}
-		
+
 		if strings.Contains(string(rewrittenContent), "username") {
 			rewriteCount++
 		}
@@ -432,9 +425,8 @@ func TestRewriteJavaFile_SyntaxFixing(t *testing.T) {
 }`
 
 	err = framework.ExecuteAction("rewrite_java_file", map[string]interface{}{
-		"file_path":      testFile,
-		"rewrite_reason": "Fix missing semicolons and unbalanced braces",
-		"new_code":       fixedCode,
+		"file_path": testFile,
+		"new_code":  fixedCode,
 	})
 
 	if err != nil {
