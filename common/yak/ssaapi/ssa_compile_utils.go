@@ -80,9 +80,6 @@ func antlrCacheResetEveryBytes() int64 {
 }
 
 func languagePreHandlerBuildsFiles(language ssaconfig.Language) bool {
-	if !ssa.SkeletonTopLevelEnabled() {
-		return false
-	}
 	switch language {
 	case ssaconfig.C, ssaconfig.GO, ssaconfig.JAVA, ssaconfig.PHP, ssaconfig.JS, ssaconfig.TS, ssaconfig.PYTHON:
 		return true

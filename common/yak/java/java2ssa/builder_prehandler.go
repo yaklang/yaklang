@@ -1,7 +1,6 @@
 package java2ssa
 
 import (
-	"path/filepath"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -17,26 +16,6 @@ import (
 )
 
 var _ ssa.PreHandlerAnalyzer = &SSABuilder{}
-
-func (*SSABuilder) FilterPreHandlerFile(path string) bool {
-	extension := strings.ToLower(filepath.Ext(path))
-	path = strings.TrimLeft(filepath.ToSlash(path), "/")
-	lowerPath := strings.ToLower(path)
-	if extension == ".class" {
-		return !strings.Contains(path, "/")
-	}
-	if strings.HasPrefix(lowerPath, ".github/") ||
-		strings.HasPrefix(lowerPath, ".mvn/") ||
-		strings.HasPrefix(lowerPath, "docs/") ||
-		strings.HasPrefix(lowerPath, "eclipse/") {
-		return false
-	}
-	switch extension {
-	case ".java", ".properties", ".yaml", ".yml", ".json", ".xml", ".jsp", ".jspx", ".ftl", ".ftlh", ".ftlx", ".vm", ".html", ".htm":
-		return true
-	}
-	return strings.EqualFold(path, "pom.xml") || strings.HasSuffix(lowerPath, "/pom.xml")
-}
 
 func (s *SSABuilder) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
 	builder.GetProgram().GetApplication().Build(ast, editor, builder)

@@ -131,7 +131,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 		// the pass2 BuildFromAST(whole-ast) top-level closure for Go. In legacy
 		// mode the closure still runs and links imports in the else-branch below,
 		// so skip this task to avoid a redundant (idempotent) ImportAll.
-		if prog := b.GetProgram(); ssa.SkeletonTopLevelEnabled() && prog != nil && pkgLibName != "" && len(importUseNames) > 0 {
+		if prog := b.GetProgram(); prog != nil && pkgLibName != "" && len(importUseNames) > 0 {
 			app := prog.GetApplication()
 			if app == nil {
 				app = prog
@@ -249,28 +249,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 		}
 		exportHandler()
 
-		// Stage 2 — detached subtree (docs/ssa-ast-to-ssa-skeleton-plan.md §4 方案 A).
-		// Every deferred unit has now been captured by a lazy hook: function and
-		// method bodies (via `fun`), package-global initializers (via the
-		// expression subtree in AddGlobalVariable), and import specs (via
-		// b.importMap[].Pos). ANTLR's BaseRuleContext.parentCtx means any one of
-		// those captured descendants otherwise pins the ENTIRE file AST alive
-		// (docs §2.1). Severing every top-level child from the file root cuts the
-		// root->child edge, so once the shared pipeline drops fileContent.AST the
-		// root and all non-captured nodes become collectable, while each captured
-		// subtree survives on its own and is freed as its lazy hook completes.
-		// Detaching the top-level children (rather than each captured node) is
-		// sufficient because every captured node is a descendant of one of them.
-		// Safe: no Go lazy hook walks upward — go2ssa contains zero GetParent
-		// calls, so cutting parentCtx never affects a body/initializer build.
-		// Skipped in legacy mode: there the pass2 closure holds the file root
-		// directly and reaches every node downward, so detaching parentCtx frees
-		// nothing and only muddies the A/B baseline.
-		if ssa.SkeletonTopLevelEnabled() {
-			for _, child := range ast.GetChildren() {
-				ssa.DetachAST(child)
-			}
-		}
+		ssa.ReleaseASTRoot(ast)
 	} else {
 		if packag, ok := ast.PackageClause().(*gol.PackageClauseContext); ok {
 			pkgPath := b.buildPackage(packag)
@@ -846,10 +825,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 	}
 
 	store := b.StoreFunctionBuilder()
-	// NB: the file root is detached wholesale at the end of pass1 (see build()),
-	// which severs this `fun` subtree from the parse tree so capturing it below
-	// does not pin the whole file AST via parentCtx. The body build only descends
-	// into fun's own children, never GetParent().
+	capturedFun := ssa.DetachAST(fun)
 	log.Debugf("add function funcName = %s", funcName)
 	newFunc.AddLazyBuilder(func() {
 		log.Debugf("build function funcName = %s", funcName)
@@ -864,11 +840,11 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 		b.FunctionBuilder = b.PushFunction(newFunc)
 		b.SupportClosure = false
 
-		if para, ok := fun.Signature().(*gol.SignatureContext); ok {
+		if para, ok := capturedFun.Signature().(*gol.SignatureContext); ok {
 			params, result = b.buildSignature(para)
 		}
 
-		if typeps := fun.TypeParameters(); typeps != nil {
+		if typeps := capturedFun.TypeParameters(); typeps != nil {
 			b.tpHandler[funcName] = b.buildTypeParameters(typeps.(*gol.TypeParametersContext))
 		}
 
@@ -879,7 +855,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 		}
 
 		b.SetGlobal = false
-		if block, ok := fun.Block().(*gol.BlockContext); ok {
+		if block, ok := capturedFun.Block().(*gol.BlockContext); ok {
 			b.buildBlock(block, true)
 		}
 		b.Finish()
@@ -1014,10 +990,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 	}
 
 	store := b.StoreFunctionBuilder()
-	// NB: the file root is detached wholesale at the end of pass1 (see build()),
-	// which severs this `fun` subtree from the parse tree so capturing it below
-	// does not pin the whole file AST via parentCtx. The body build only descends
-	// into fun's own children, never GetParent().
+	capturedFun := ssa.DetachAST(fun)
 	log.Debugf("add method funcName = %s", funcName)
 	newFunc.AddLazyBuilder(func() {
 		log.Debugf("build method funcName = %s", funcName)
@@ -1032,7 +1005,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		b.FunctionBuilder = b.PushFunction(newFunc)
 		b.SupportClosure = false
 
-		if para, ok := fun.Signature().(*gol.SignatureContext); ok {
+		if para, ok := capturedFun.Signature().(*gol.SignatureContext); ok {
 			params, result = b.buildSignature(para)
 		}
 
@@ -1043,7 +1016,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		}
 
 		b.SetGlobal = false
-		if block, ok := fun.Block().(*gol.BlockContext); ok {
+		if block, ok := capturedFun.Block().(*gol.BlockContext); ok {
 			b.buildBlock(block, true)
 		}
 		b.Finish()

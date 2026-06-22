@@ -57,9 +57,7 @@ func (y *singleFileBuilder) VisitCompilationUnit(raw javaparser.ICompilationUnit
 		for _, declarationContext := range i.AllTypeDeclaration() {
 			y.VisitTypeDeclaration(declarationContext)
 		}
-		if ssa.SkeletonTopLevelEnabled() {
-			y.registerPostSkeletonImportTask(i)
-		}
+		y.registerPostSkeletonImportTask(i)
 	}
 	y.GetProgram().VisitAst(i)
 

@@ -120,9 +120,7 @@ func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 
 // PreHandlerFile handles preprocessing of a single file.
 func (s *SSABuilder) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	if ssa.SkeletonTopLevelEnabled() {
-		builder.GetProgram().GetApplication().Build(ast, editor, builder)
-	}
+	builder.GetProgram().GetApplication().Build(ast, editor, builder)
 }
 
 // PreHandlerProject handles preprocessing at the project level.

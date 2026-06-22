@@ -132,15 +132,9 @@ func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) erro
 	if mainApp.CurrentIncludingStack.Len() <= 0 {
 		childProgram := b.GetProgram().GetSubProgram(b.GetEditor().GetPureSourceHash())
 		functionBuilder := childProgram.GetAndCreateFunctionBuilder("", string(ssa.MainFunctionName))
-		if b.GetProgram().PreHandler() {
+		if b.PreHandler() {
 			startParse(functionBuilder)
-			if ssa.SkeletonTopLevelEnabled() {
-				registerPHPFileBuild(ast, b)
-			} else {
-				functionBuilder.AddLazyBuilder(func() {
-					startParse(functionBuilder)
-				}, true)
-			}
+			registerPHPFileBuild(ast, b)
 		} else {
 			functionBuilder.AddLazyBuilder(func() {
 				startParse(functionBuilder)
@@ -214,7 +208,7 @@ func (*SSABuilder) FilterFile(path string) bool {
 }
 
 func registerPHPFileBuild(ast phpparser.IHtmlDocumentContext, b *ssa.FunctionBuilder) {
-	if ast == nil || b == nil || !ssa.SkeletonTopLevelEnabled() {
+	if ast == nil || b == nil {
 		return
 	}
 	pass2Capture := collectPHPFilePass2Capture(ast)

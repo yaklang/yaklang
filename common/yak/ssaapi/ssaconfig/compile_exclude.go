@@ -31,6 +31,10 @@ var DefaultCompileExcludeDirNames = []string{
 
 // DefaultCompileExcludeGlobs are built-in glob patterns merged into every compile exclude matcher.
 var DefaultCompileExcludeGlobs = []string{
+	".github/**",
+	".mvn/**",
+	"docs/**",
+	"eclipse/**",
 	"**/Vendor/**",
 	"Vendor/**",
 	"**/vendor/**",
