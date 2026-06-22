@@ -93,6 +93,18 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "额外加载技能资源",
 		En: "Load Extra SKILL Resource",
 	},
+	"load_skill_resources_type": {
+		Zh: "技能资源类型",
+		En: "Skill Resource Type",
+	},
+	"load_skill_resources_pattern": {
+		Zh: "技能资源搜索模式",
+		En: "Skill Resource Search Pattern",
+	},
+	"load_skill_resources_skill_name": {
+		Zh: "技能资源范围",
+		En: "Skill Resource Scope",
+	},
 	"internet_research": {
 		Zh: "互联网调研",
 		En: "Internet Research",
@@ -112,6 +124,14 @@ var nodeIdMapper = map[string]*I18n{
 	"loading_skills_name": {
 		Zh: "加载技能",
 		En: "Loading Skills",
+	},
+	"change_skill_view_offset_name": {
+		Zh: "技能视图技能名",
+		En: "Skill View Skill Name",
+	},
+	"change_skill_view_offset_value": {
+		Zh: "技能视图偏移",
+		En: "Skill View Offset",
 	},
 	"perception": {
 		Zh: "意图感知",
@@ -257,6 +277,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "初始化代码样本搜索",
 		En: "Initialize Code Sample Search",
 	},
+	"init-search-rule-sample": {
+		Zh: "初始化规则样本搜索",
+		En: "Initialize Rule Sample Search",
+	},
 	"code_sample_title": {
 		Zh: "代码样本",
 		En: "Code Sample",
@@ -312,6 +336,10 @@ var nodeIdMapper = map[string]*I18n{
 	"query_yaklang_document": {
 		Zh: "查询 Yaklang 文档",
 		En: "Query Yaklang Document",
+	},
+	"yaklang-init-search": {
+		Zh: "初始化样例搜索",
+		En: "Init Sample Search",
 	},
 	"batch-compress": {
 		Zh: "记忆压缩",
@@ -762,6 +790,10 @@ var nodeIdMapper = map[string]*I18n{
 	"verification": {
 		Zh: "验证",
 		En: "Verification",
+	},
+	"verification_payload": {
+		Zh: "验证说明",
+		En: "Verification Payload",
 	},
 	"answer": {
 		Zh: "回答",
