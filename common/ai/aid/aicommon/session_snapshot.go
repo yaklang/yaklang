@@ -80,9 +80,19 @@ type sessionSnapshotPerceptionExtras struct {
 }
 
 type sessionExecutionTracker struct {
-	mu              sync.Mutex
-	stats           SessionSnapshotExecution
-	callToolIDs     map[string]struct{}
+	mu               sync.Mutex
+	stats            SessionSnapshotExecution
+	callToolIDs      map[string]struct{}
+	firstEmitPending bool
+}
+
+func isSessionSnapshotExecutionTerminal(status string) bool {
+	switch strings.TrimSpace(status) {
+	case "completed", "aborted", "skipped":
+		return true
+	default:
+		return false
+	}
 }
 
 type sessionSnapshotState struct {
@@ -277,11 +287,14 @@ func (c *Config) ResetSessionSnapshotExecution(taskName, status string, startedA
 	}
 	state.execution.mu.Lock()
 	defer state.execution.mu.Unlock()
+	startedUnix := startedAt.Unix()
 	state.execution.stats = SessionSnapshotExecution{
 		TaskName:  strings.TrimSpace(taskName),
 		Status:    strings.TrimSpace(status),
-		StartedAt: startedAt.Unix(),
+		StartedAt: startedUnix,
+		EndedAt:   startedUnix,
 	}
+	state.execution.firstEmitPending = true
 	state.execution.callToolIDs = make(map[string]struct{})
 }
 
@@ -296,10 +309,13 @@ func (c *Config) FinalizeSessionSnapshotExecution(status string, endedAt time.Ti
 	state.execution.mu.Lock()
 	defer state.execution.mu.Unlock()
 	state.execution.stats.Status = strings.TrimSpace(status)
-	state.execution.stats.EndedAt = endedAt.Unix()
-	if !endedAt.IsZero() && state.execution.stats.StartedAt > 0 {
-		state.execution.stats.ExecutionMinutes = int(endedAt.Sub(time.Unix(state.execution.stats.StartedAt, 0)).Minutes())
+	state.execution.firstEmitPending = false
+	if isSessionSnapshotExecutionTerminal(state.execution.stats.Status) {
+		if !endedAt.IsZero() {
+			state.execution.stats.EndedAt = endedAt.Unix()
+		}
 	}
+	c.refreshSessionSnapshotDurationLocked(state, true)
 }
 
 func (c *Config) RecordSessionSnapshotToolCall(result *aitool.ToolResult) {
@@ -326,7 +342,7 @@ func (c *Config) RecordSessionSnapshotToolCall(result *aitool.ToolResult) {
 	}
 
 	c.refreshSessionSnapshotRuntimeCountsLocked(state)
-	c.refreshSessionSnapshotDurationLocked(state)
+	c.refreshSessionSnapshotDurationLocked(state, false)
 }
 
 func (c *Config) RecordSessionSnapshotFileWrite(path string) {
@@ -358,7 +374,7 @@ func (c *Config) RefreshSessionSnapshotRuntimeCounts(callToolID string) {
 		state.execution.callToolIDs[id] = struct{}{}
 	}
 	c.refreshSessionSnapshotRuntimeCountsLocked(state)
-	c.refreshSessionSnapshotDurationLocked(state)
+	c.refreshSessionSnapshotDurationLocked(state, false)
 }
 
 func emptySessionSnapshotExecution() *SessionSnapshotExecution {
@@ -400,12 +416,13 @@ func (c *Config) BuildSessionSnapshotExecution(task AIStatefulTask) *SessionSnap
 		c.syncExecutionToolCountsLocked(state, task)
 	}
 	c.refreshSessionSnapshotRuntimeCountsLocked(state)
-	c.refreshSessionSnapshotDurationLocked(state)
+	if strings.TrimSpace(state.execution.stats.Status) == "" {
+		state.execution.stats.Status = SessionSnapshotStatusFromTask(task)
+	}
+	c.prepareSessionSnapshotEndedAtForEmitLocked(state)
+	c.refreshSessionSnapshotDurationLocked(state, true)
 
 	copied := state.execution.stats
-	if strings.TrimSpace(copied.Status) == "" {
-		copied.Status = SessionSnapshotStatusFromTask(task)
-	}
 	return &copied
 }
 
@@ -430,13 +447,33 @@ func (c *Config) refreshSessionSnapshotRuntimeCountsLocked(state *sessionSnapsho
 	state.execution.stats.RiskCount = riskTotal
 }
 
-func (c *Config) refreshSessionSnapshotDurationLocked(state *sessionSnapshotState) {
+func (c *Config) prepareSessionSnapshotEndedAtForEmitLocked(state *sessionSnapshotState) {
 	if state == nil || state.execution.stats.StartedAt <= 0 {
 		return
 	}
-	endAt := time.Now()
-	if state.execution.stats.EndedAt > 0 {
+	if isSessionSnapshotExecutionTerminal(state.execution.stats.Status) {
+		return
+	}
+	if state.execution.firstEmitPending {
+		state.execution.stats.EndedAt = state.execution.stats.StartedAt
+		state.execution.firstEmitPending = false
+		return
+	}
+	state.execution.stats.EndedAt = time.Now().Unix()
+}
+
+func (c *Config) refreshSessionSnapshotDurationLocked(state *sessionSnapshotState, useStoredEndedAt bool) {
+	if state == nil || state.execution.stats.StartedAt <= 0 {
+		return
+	}
+	var endAt time.Time
+	switch {
+	case isSessionSnapshotExecutionTerminal(state.execution.stats.Status) && state.execution.stats.EndedAt > 0:
 		endAt = time.Unix(state.execution.stats.EndedAt, 0)
+	case useStoredEndedAt && state.execution.stats.EndedAt > 0:
+		endAt = time.Unix(state.execution.stats.EndedAt, 0)
+	default:
+		endAt = time.Now()
 	}
 	state.execution.stats.ExecutionMinutes = int(endAt.Sub(time.Unix(state.execution.stats.StartedAt, 0)).Minutes())
 }

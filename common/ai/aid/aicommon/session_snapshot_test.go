@@ -73,3 +73,29 @@ func TestBuildSessionSnapshotExecution_NilTaskReturnsNonNil(t *testing.T) {
 	require.NotNil(t, exec)
 	require.Equal(t, "processing", exec.Status)
 }
+
+func TestBuildSessionSnapshotExecution_EndedAtOnEmit(t *testing.T) {
+	startedAt := time.Unix(1_700_000_000, 0)
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	cfg.ResetSessionSnapshotExecution("demo-task", "processing", startedAt)
+
+	first := cfg.BuildSessionSnapshotExecution(nil)
+	require.NotNil(t, first)
+	require.Equal(t, startedAt.Unix(), first.StartedAt)
+	require.Equal(t, first.StartedAt, first.EndedAt)
+
+	time.Sleep(10 * time.Millisecond)
+	second := cfg.BuildSessionSnapshotExecution(nil)
+	require.NotNil(t, second)
+	require.GreaterOrEqual(t, second.EndedAt, first.EndedAt)
+	require.Greater(t, second.EndedAt, second.StartedAt)
+
+	cfg.FinalizeSessionSnapshotExecution("completed", time.Unix(1_700_000_100, 0))
+	final := cfg.BuildSessionSnapshotExecution(nil)
+	require.Equal(t, "completed", final.Status)
+	require.Equal(t, int64(1_700_000_100), final.EndedAt)
+
+	time.Sleep(10 * time.Millisecond)
+	afterFinal := cfg.BuildSessionSnapshotExecution(nil)
+	require.Equal(t, final.EndedAt, afterFinal.EndedAt)
+}
