@@ -281,6 +281,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "初始化规则样本搜索",
 		En: "Initialize Rule Sample Search",
 	},
+	"syntaxflow-rule": {
+		Zh: "SyntaxFlow 规则",
+		En: "SyntaxFlow Rule",
+	},
 	"code_sample_title": {
 		Zh: "代码样本",
 		En: "Code Sample",

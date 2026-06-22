@@ -89,14 +89,15 @@ func directlyAnswerSyntaxFlowHandler(loop *reactloops.ReActLoop, action *aicommo
 	if sfFilename != "" {
 		payload = syntaxflowtools.ReplacePayloadRuleWithFileContent(payload, sfFilename)
 	}
-	invoker.EmitFileArtifactWithExt("directly_answer", ".md", payload)
+	answerPath := invoker.EmitFileArtifactWithExt("directly_answer", ".md", payload)
 	invoker.EmitResultAfterStream(payload)
-	invoker.AddToTimeline("directly_answer", fmt.Sprintf("user input: \n"+
-		"%s\n"+
-		"ai directly answer:\n"+
-		"%v",
-		utils.PrefixLines(loop.GetCurrentTask().GetUserInput(), "  > "),
-		utils.PrefixLines(payload, "  | "),
+	userInputPreview := utils.ShrinkTextBlock(loop.GetCurrentTask().GetUserInput(), 200)
+	answerPreview := utils.ShrinkTextBlock(payload, 300)
+	invoker.AddToTimeline("directly_answer", fmt.Sprintf(
+		"user input preview:\n%s\n\nanswer preview:\n%s\n\nanswer file: %s",
+		userInputPreview,
+		answerPreview,
+		answerPath,
 	))
 
 	// directly_answer 绝不 Exit: emit 完答复后统一交给 DirectlyAnswerContinue
