@@ -28,6 +28,7 @@ import (
 	"github.com/tevino/abool"
 	"github.com/yaklang/yaklang/common/mediautils"
 	"github.com/yaklang/yaklang/common/mimetype"
+	"github.com/yaklang/yaklang/common/minirehs"
 	"github.com/yaklang/yaklang/common/thirdparty_bin"
 	"github.com/yaklang/yaklang/common/utils/imageutils"
 
@@ -152,6 +153,8 @@ func initYaklangLib() {
 	yaklang.Import("filesys", filesys.Exports)
 	yaklang.Import("re", yaklib.RegexpExport)
 	yaklang.Import("re2", yaklib.Regexp2Export)
+	// rehs: 多正则统一编译、一次扫描批量匹配 (Hyperscan 式; 默认 CGO 最强 mvscan 内核, 无 CGO 退化纯 Go)
+	yaklang.Import("rehs", minirehs.Exports)
 	yaklang.Import("regen", yaklib.RegenExports)
 	yaklang.Import("env", yaklib.EnvExports)
 	// yaklang.Import("grok", yaklib.GrokExports)

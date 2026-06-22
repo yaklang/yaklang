@@ -11,10 +11,15 @@ package minirehs
 typedef struct mrehs_pf mrehs_pf;
 mrehs_pf *mrehs_pf_new(const int32_t *next, int32_t numStates,
                        const int32_t *outOff, const int32_t *outFlat,
-                       int32_t outFlatLen, int32_t numLit);
+                       int32_t outFlatLen, int32_t numLit,
+                       const uint8_t *litFlat, const int32_t *litOff);
 void mrehs_pf_free(mrehs_pf *pf);
 int32_t mrehs_pf_scan(const mrehs_pf *pf, const uint8_t *data, size_t len,
                       int32_t *outPairs, int32_t capPairs);
+int32_t mrehs_pf_scan_scalar(const mrehs_pf *pf, const uint8_t *data, size_t len,
+                             int32_t *outPairs, int32_t capPairs);
+int32_t mrehs_pf_use_teddy(const mrehs_pf *pf);
+int32_t mrehs_pf_teddy_m(const mrehs_pf *pf);
 
 #include "native/teddy.c"
 */
@@ -61,9 +66,17 @@ func newCGOPrefilter(li *literalIndex) *cgoPrefilter {
 		return nil
 	}
 
+	// 拼接字面量字节 + 偏移表 (litOff 长度 numLit+1), 供 C 侧 Teddy 构建指纹与 confirm.
+	// litID == li.literals 下标 == AC add 时的 id, 三者一致.
+	litFlat, litOff := flattenLiterals(li.literals)
+
 	var outFlatPtr *C.int32_t
 	if len(ac.outFlat) > 0 {
 		outFlatPtr = (*C.int32_t)(unsafe.Pointer(&ac.outFlat[0]))
+	}
+	var litFlatPtr *C.uint8_t
+	if len(litFlat) > 0 {
+		litFlatPtr = (*C.uint8_t)(unsafe.Pointer(&litFlat[0]))
 	}
 	handle := C.mrehs_pf_new(
 		(*C.int32_t)(unsafe.Pointer(&ac.next[0])),
@@ -72,6 +85,8 @@ func newCGOPrefilter(li *literalIndex) *cgoPrefilter {
 		outFlatPtr,
 		C.int32_t(len(ac.outFlat)),
 		C.int32_t(ac.numLit),
+		litFlatPtr,
+		(*C.int32_t)(unsafe.Pointer(&litOff[0])),
 	)
 	if handle == nil {
 		return nil
@@ -82,9 +97,45 @@ func newCGOPrefilter(li *literalIndex) *cgoPrefilter {
 	}
 }
 
+// flattenLiterals 把字面量集合拼接为连续字节 + 偏移表 (litOff 长度 len+1, litOff[0]=0,
+// 第 j 条 = litFlat[litOff[j]:litOff[j+1]]). 供 C 侧 Teddy 零依赖地读取.
+func flattenLiterals(lits []string) (litFlat []byte, litOff []int32) {
+	litOff = make([]int32, len(lits)+1)
+	total := 0
+	for _, l := range lits {
+		total += len(l)
+	}
+	litFlat = make([]byte, 0, total)
+	for i, l := range lits {
+		litFlat = append(litFlat, l...)
+		litOff[i+1] = int32(len(litFlat))
+	}
+	return litFlat, litOff
+}
+
 func (p *cgoPrefilter) simd() bool { return true }
 
+// useTeddy / teddyM 暴露 C 侧 Teddy 启用状态与指纹长度 (供测试与可观测).
+func (p *cgoPrefilter) useTeddy() bool {
+	return p.handle != nil && C.mrehs_pf_use_teddy(p.handle) != 0
+}
+func (p *cgoPrefilter) teddyM() int {
+	if p.handle == nil {
+		return 0
+	}
+	return int(C.mrehs_pf_teddy_m(p.handle))
+}
+
 func (p *cgoPrefilter) scanHits(data []byte, sc *scratch) []litHit {
+	return p.scanHitsImpl(data, sc, false)
+}
+
+// scanHitsScalar 强制走 C 标量孪生 (Teddy 标量 / AC), 仅供差分测试对照 SIMD 分发.
+func (p *cgoPrefilter) scanHitsScalar(data []byte, sc *scratch) []litHit {
+	return p.scanHitsImpl(data, sc, true)
+}
+
+func (p *cgoPrefilter) scanHitsImpl(data []byte, sc *scratch, scalar bool) []litHit {
 	sc.hits = sc.hits[:0]
 	if p.handle == nil || len(data) == 0 {
 		return sc.hits
@@ -98,25 +149,31 @@ func (p *cgoPrefilter) scanHits(data []byte, sc *scratch) []litHit {
 	}
 	sc.cpairs = sc.cpairs[:capPairs*2]
 
-	got := int(C.mrehs_pf_scan(
-		p.handle,
-		(*C.uint8_t)(unsafe.Pointer(&lower[0])),
-		C.size_t(len(lower)),
-		(*C.int32_t)(unsafe.Pointer(&sc.cpairs[0])),
-		C.int32_t(capPairs),
-	))
-
-	// 命中数超过缓冲容量时扩容重扫一次, 保证不漏报.
-	if got > capPairs {
-		capPairs = got
-		sc.cpairs = make([]int32, capPairs*2)
-		got = int(C.mrehs_pf_scan(
+	scan := func(cap int) int {
+		if scalar {
+			return int(C.mrehs_pf_scan_scalar(
+				p.handle,
+				(*C.uint8_t)(unsafe.Pointer(&lower[0])),
+				C.size_t(len(lower)),
+				(*C.int32_t)(unsafe.Pointer(&sc.cpairs[0])),
+				C.int32_t(cap),
+			))
+		}
+		return int(C.mrehs_pf_scan(
 			p.handle,
 			(*C.uint8_t)(unsafe.Pointer(&lower[0])),
 			C.size_t(len(lower)),
 			(*C.int32_t)(unsafe.Pointer(&sc.cpairs[0])),
-			C.int32_t(capPairs),
+			C.int32_t(cap),
 		))
+	}
+
+	got := scan(capPairs)
+	// 命中数超过缓冲容量时扩容重扫一次, 保证不漏报.
+	if got > capPairs {
+		capPairs = got
+		sc.cpairs = make([]int32, capPairs*2)
+		got = scan(capPairs)
 		if got > capPairs {
 			got = capPairs
 		}
