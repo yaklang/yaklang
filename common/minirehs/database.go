@@ -48,6 +48,30 @@ type scratch struct {
 	assertBound      []uint8
 	assertBoundReady bool
 
+	// gateBound 是"超集门局部化复核"的零宽断言边界缓冲: gate 命中字面量后在 data[winLo:] 子切片上
+	// 跑断言超集预检需逐切片重算边界 (winLo 随报文不同), 故不与 assertBound 共享; 复用底层数组减分配。
+	gateBound []uint8
+
+	// 锚定式单趟 (anchored single-pass) 每报文缓冲: anchorSeen 标记某 idx 是否已入锚定批,
+	// anchorRanges[idx] 累积其全部命中点的注入区间 (批后 mergeAnchorSpans 排序合并),
+	// anchorBatch 收集本报文触发的锚定式 pattern idx. anchorPrev/Cand/Active 为锚定执行器复用的
+	// 位并行状态缓冲 (长度 = 全部锚定 pattern 的 max nword), 避免热路径分配.
+	anchorSeen   []bool
+	anchorRanges [][]anchorSpan
+	anchorBatch  []int32
+	anchorPrev   []uint64
+	anchorCand   []uint64
+	anchorActive []uint64
+
+	// 定位 (findLocFrom / findAllLoc) 的位并行状态缓冲: locPrev/locCand 长度 = NFA nword,
+	// locCandStart/locPrevStart 长度 = NFA npos (每活跃 position 的起点字节偏移). 定位被
+	// finalizeHit 每命中调用, 旧版每调用 make 四个切片 (位置模式 alloc 大头); 改为复用本缓冲,
+	// 按需增长. 缓冲内每元素均"写后读" (见 findLocFrom 注释), 无需逐次清零, 故零初始化开销.
+	locPrev      []uint64
+	locCand      []uint64
+	locCandStart []int
+	locPrevStart []int
+
 	// 诊断计数 (仅供测试观察热点, 每个 scratch 独占, 无并发竞争).
 	statWindowVerify int64 // 邻域窗口验证次数
 	statFullScan     int64 // 非窗口 exact (有字面量) 命中字面量后触发的整段验证次数

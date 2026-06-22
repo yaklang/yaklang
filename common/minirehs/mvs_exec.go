@@ -31,9 +31,16 @@ func (nfa *mvsNFA) existsIn(data []byte) bool {
 	i := 0
 	for i < n {
 		atStart := i == 0
-		r, size := utf8.DecodeRune(data[i:])
-		i += size
-		sym := nfa.symbolOf(r)
+		c := data[i]
+		var sym int
+		if c < utf8.RuneSelf {
+			sym = int(nfa.asciiSym[c])
+			i++
+		} else {
+			r, size := utf8.DecodeRune(data[i:])
+			sym = nfa.symbolOf(r)
+			i += size
+		}
 
 		if !nfa.anchoredStart || atStart {
 			copy(cand, nfa.first)
@@ -88,11 +95,11 @@ func (nfa *mvsNFA) existsIn(data []byte) bool {
 // stdlib regexp; 正确性由差分测试逐字节对照 regexp.Longest().FindAllIndex 保证.
 //
 // 关键词: mvscan, match location, leftmost-longest, 匹配定位, 匹配内容
-func (nfa *mvsNFA) findAllLoc(data []byte, emit func(from, to int) bool) {
+func (nfa *mvsNFA) findAllLoc(data []byte, sc *scratch, emit func(from, to int) bool) {
 	pos := 0
 	n := len(data)
 	for pos <= n {
-		from, to, ok := nfa.findLocFrom(data, pos)
+		from, to, ok := nfa.findLocFrom(data, pos, sc)
 		if !ok {
 			return
 		}
@@ -119,7 +126,7 @@ func (nfa *mvsNFA) findAllLoc(data []byte, emit func(from, to int) bool) {
 //     起点更小则替换, 起点相同则取更大终点 (longest).
 //
 // 当所有"起点 <= best 起点"的活跃线程都消亡时即可停止 (后续注入起点只会更大, 不可能更优).
-func (nfa *mvsNFA) findLocFrom(data []byte, searchFrom int) (int, int, bool) {
+func (nfa *mvsNFA) findLocFrom(data []byte, searchFrom int, sc *scratch) (int, int, bool) {
 	if searchFrom < 0 {
 		searchFrom = 0
 	}
@@ -130,10 +137,24 @@ func (nfa *mvsNFA) findLocFrom(data []byte, searchFrom int) (int, int, bool) {
 	const inf = int(^uint(0) >> 1)
 	nword := nfa.nword
 	npos := nfa.npos
-	prevActive := make([]uint64, nword)
-	cand := make([]uint64, nword)
-	candStart := make([]int, npos)
-	prevStart := make([]int, npos)
+	// 位并行状态缓冲: 有 scratch 则复用 (零分配热路径), 否则就地分配 (测试/无 sc 调用兜底).
+	// 各缓冲均"写后读"语义 (prevActive 每步全写; cand 每步起始清零; candStart/prevStart 仅对
+	// 已置位 position 写后读), 故复用无需逐次清零.
+	var prevActive, cand []uint64
+	var candStart, prevStart []int
+	if sc != nil {
+		sc.locPrev = ensureU64Len(sc.locPrev, nword)
+		sc.locCand = ensureU64Len(sc.locCand, nword)
+		sc.locCandStart = ensureIntLen(sc.locCandStart, npos)
+		sc.locPrevStart = ensureIntLen(sc.locPrevStart, npos)
+		prevActive, cand = sc.locPrev, sc.locCand
+		candStart, prevStart = sc.locCandStart, sc.locPrevStart
+	} else {
+		prevActive = make([]uint64, nword)
+		cand = make([]uint64, nword)
+		candStart = make([]int, npos)
+		prevStart = make([]int, npos)
+	}
 	anchored := nfa.anchoredStart
 	requireEnd := nfa.requireEnd
 	n := len(data)
@@ -144,9 +165,16 @@ func (nfa *mvsNFA) findLocFrom(data []byte, searchFrom int) (int, int, bool) {
 	i := searchFrom
 	for i < n {
 		runeStart := i
-		r, size := utf8.DecodeRune(data[i:])
-		i += size
-		sym := nfa.symbolOf(r)
+		c := data[i]
+		var sym int
+		if c < utf8.RuneSelf {
+			sym = int(nfa.asciiSym[c])
+			i++
+		} else {
+			r, size := utf8.DecodeRune(data[i:])
+			sym = nfa.symbolOf(r)
+			i += size
+		}
 
 		for w := range cand {
 			cand[w] = 0
@@ -277,8 +305,18 @@ func (nfa *mvsNFA) existsIn1(data []byte) bool {
 	i := 0
 	for i < n {
 		atStart := i == 0
-		r, size := utf8.DecodeRune(data[i:])
-		i += size
+		// ASCII 快路径: 单字节 rune 直接查 asciiSym, 省去 utf8.DecodeRune + symbolOf 调用开销
+		// (语料绝大多数字节为 ASCII; 非 ASCII 才回退完整解码 + 切点二分).
+		c := data[i]
+		var sym int
+		if c < utf8.RuneSelf {
+			sym = int(nfa.asciiSym[c])
+			i++
+		} else {
+			r, size := utf8.DecodeRune(data[i:])
+			sym = nfa.symbolOf(r)
+			i += size
+		}
 
 		var cand uint64
 		if !anchored || atStart {
@@ -287,7 +325,7 @@ func (nfa *mvsNFA) existsIn1(data []byte) bool {
 		for pw := prev; pw != 0; pw &= pw - 1 {
 			cand |= follow[bits.TrailingZeros64(pw)]
 		}
-		active := cand & reach[nfa.symbolOf(r)]
+		active := cand & reach[sym]
 		if active&lastAny != 0 {
 			return true
 		}
@@ -300,4 +338,21 @@ func (nfa *mvsNFA) existsIn1(data []byte) bool {
 		prev = active
 	}
 	return false
+}
+
+// ensureU64Len 返回长度恰为 n 的 []uint64: cap 足够则复用底层数组 (b[:n]), 否则新分配.
+// 供定位热路径复用 scratch 缓冲, 避免每次命中重新分配.
+func ensureU64Len(b []uint64, n int) []uint64 {
+	if cap(b) >= n {
+		return b[:n]
+	}
+	return make([]uint64, n)
+}
+
+// ensureIntLen 返回长度恰为 n 的 []int: cap 足够则复用底层数组, 否则新分配.
+func ensureIntLen(b []int, n int) []int {
+	if cap(b) >= n {
+		return b[:n]
+	}
+	return make([]int, n)
 }
