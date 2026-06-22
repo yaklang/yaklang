@@ -528,18 +528,17 @@ Content-Type: application/json
 			expected: "", // 正则要求 "text":" 无空格，但实际 JSON 是 "text": " 有空格，故不匹配
 		},
 		{
-			// regexp2 后端已由 dlclark/.NET 切换为 go-pcre2-lite (PCRE2). PCRE2 只支持定长 lookbehind,
-			// 变长 lookbehind (此处 \s* 长度不定) 会在编译期报 "lookbehind assertion is not fixed length",
-			// 而 RE2 完全不支持 lookbehind, 故两档后端均无法编译, Execute 返回错误. 这是切换 PCRE2 内核
-			// 的已知边界 (dlclark 支持变长 lookbehind). 需要兼容带/不带空格时, 应改用捕获组等定长写法.
-			name: "Werkzeug 实际响应 - 变长 lookbehind 在 pcre2 后端不被支持(期望编译报错)",
+			// regexp2 后端 go-pcre2-lite (PCRE2) 不支持变长 lookbehind, 但 regexp-utils 现已加
+			// dlclark 兜底 (YakRegexpUtils 第三档): PCRE2 与 RE2 都编译失败时回退 dlclark/.NET,
+			// 它原生支持变长 lookbehind. 故此处 \s* (长度不定) 经兜底可正常编译并匹配带空格 JSON.
+			name: "Werkzeug 实际响应 - 变长 lookbehind 经 dlclark 兜底可匹配",
 			data: `HTTP/1.1 200 OK
 Content-Type: application/json
 
 {"text": "ZZXS"}`,
-			regex:     `(?<="text":\s*")[^"]+(?=")`,
-			key:       "data",
-			expectErr: true,
+			regex:    `(?<="text":\s*")[^"]+(?=")`,
+			key:      "data",
+			expected: "ZZXS",
 		},
 		{
 			name:     "用户场景 - POST 请求 body 中提取 key 的值",
