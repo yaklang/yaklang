@@ -36,7 +36,6 @@ require (
 	github.com/denisenkom/go-mssqldb v0.12.3
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13
-	github.com/dlclark/regexp2 v1.11.0
 	github.com/docker/docker v25.0.6+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/dop251/goja v0.0.0-20240220182346-e401ed450204
@@ -155,9 +154,12 @@ require (
 	rsc.io/qr v0.2.0
 )
 
+require github.com/dlclark/regexp2 v1.11.0 // indirect
+
 require (
 	dario.cat/mergo v1.0.0 // indirect
 	github.com/ProtonMail/go-crypto v1.1.3 // indirect
+	github.com/VillanCh/go-pcre2-lite v0.0.0-00010101000000-000000000000
 	github.com/andybalholm/cascadia v1.1.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
@@ -265,3 +267,5 @@ require (
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	mellium.im/sasl v0.3.1 // indirect
 )
+
+replace github.com/VillanCh/go-pcre2-lite => /Users/v1ll4n/Projects/go-pcre2-lite

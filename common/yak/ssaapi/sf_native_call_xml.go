@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	regexp "github.com/dlclark/regexp2"
+	regexp "github.com/VillanCh/go-pcre2-lite/regexp2"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"

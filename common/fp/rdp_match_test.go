@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/dlclark/regexp2"
+	regexp2 "github.com/VillanCh/go-pcre2-lite/regexp2"
 	"github.com/yaklang/yaklang/common/log"
 	utils2 "github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/text/encoding/unicode"

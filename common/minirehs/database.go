@@ -63,6 +63,15 @@ type scratch struct {
 	anchorCand   []uint64
 	anchorActive []uint64
 
+	// 双向锚定 (Rose-lite 完全体) 每报文缓冲: biSeen 标记某 idx 是否已入双向锚定批; biFwdRanges[idx]
+	// 累积前向注入区间 [h.end-headF, h.end] (头有界字面量), biRevRanges[idx] 累积反向注入区间
+	// [h.end, h.end+tailR] (尾有界字面量); biBatch 收集本报文触发的双向锚定 pattern idx. 位并行状态
+	// 复用 anchorPrev/Cand/Active (前向锚定与反向锚定顺序执行, 可共用缓冲).
+	biSeen      []bool
+	biFwdRanges [][]anchorSpan
+	biRevRanges [][]anchorSpan
+	biBatch     []int32
+
 	// 定位 (findLocFrom / findAllLoc) 的位并行状态缓冲: locPrev/locCand 长度 = NFA nword,
 	// locCandStart/locPrevStart 长度 = NFA npos (每活跃 position 的起点字节偏移). 定位被
 	// finalizeHit 每命中调用, 旧版每调用 make 四个切片 (位置模式 alloc 大头); 改为复用本缓冲,
@@ -171,7 +180,7 @@ func Compile(patterns []Pattern, opts ...Option) (Database, error) {
 				}
 			}
 		} else {
-			// RE2 不可表达 (lookaround/backref 等), 用 regexp2 验证.
+			// RE2 不可表达 (lookaround/backref 等), 用 regexp2 验证 (后端已全局切 go-pcre2-lite).
 			cp.v = &regexp2Verifier{yak: yak}
 			// route-B: 在不触碰 regexp2 AST 的前提下, 用"语言超集改写 + RE2 字面量提取"取必需字面量,
 			// 命中才验证, 避免每条记录都跑昂贵的 regexp2. 提不出则保持 always-on. (健全性见 literal_routeb.go)

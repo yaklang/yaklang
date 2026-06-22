@@ -71,6 +71,43 @@
 >    风险：guard 合并的正确性需专门差分护栏。
 > 3. **真正的 Rose-lite 链分解（回收阉割②的完全体）**：对"尾部无界"（`token=\w+`、`.*foo`）这类目前仍
 >    整段扫描的 pattern，做字面量链 + 片段 FA 的邻域验证，彻底消除整段 forward 扫描。工程量最大、收益最高。
+>    **【2026-06 已落地：双向锚定 variant，见 0'.5】**——以"前向锚定 ∪ 反向锚定"的并集，零假阴地吃掉
+>    "双无界 keyword 类"（`key:"val"` 与 `"val":key` 两分支互为头/尾无界）这批占整段扫 ~90% 字节的热点。
+>
+> ### 0'.5 Rose-lite 双向锚定（2026-06 落地，回收阉割②；新增文件 `mvs_reverse.go` / `mvs_bicover.go`）
+>
+> **问题定位（先测量后改）**：profile 显示 `runtime.cgocall`（C 内核整段 `nfaExists`）占 ~28% CPU，几乎全部来自
+> 3 条双无界 keyword 规则（`参数-用户名泄露` / `参数-敏感参数` / `参数-密码泄露`）。它们形如
+> `(["]?KEY["]? : "[^"]+")|("[^"]+" : ["]?KEY["]?)`：分支①里 KEY 的**回看有界**（前向锚定可救）、分支②里
+> KEY 的**前看有界**（反向锚定可救）。`computeLitHeads` 因分支②取 `-1` 使整条退化为 `[0,n]` 整段 C 扫。
+>
+> **核心做法（零假阴的代数保证）**：对每个必需字面量做 **per-occurrence** 两侧界分析（`computeLitBiCover`）：
+> 只要"每个出现处 head 或 tail 至少一侧有界"，则
+>
+> - 头有界出现处 → **前向锚定** `existsInAnchored`（注入区间 `[h.end-headF, h.end]`）覆盖；
+> - 尾有界出现处 → **反向锚定** `existsInReverseAnchored`（注入区间 `[h.end, h.end+tailR]`，自尾向头扫）覆盖；
+> - 任一匹配必属某出现处、该处至少一侧有界 ⇒ **前向 ∪ 反向 = 全部匹配，绝不漏报**；子串/邻域关系 ⇒ 无假阳。
+>
+> **反向 NFA**：把 rune 级 `bnode` 树**结构反转**（concat 翻转、其余递归）后复用同一 Glushkov 构造器
+> （`glushkovNFA`），得"反转语言的同构自动机"，配合 `utf8.DecodeLastRune` 自尾向头扫描。`DecodeLastRune`
+> 与正向 `DecodeRune` 在合法/非法 UTF-8 上切分一致——已由 6407 随机正则×含非法 UTF-8 输入 + 74 真实 MITM×
+> 1332 记录差分护栏（`mvs_reverse_test.go`）强校验零分歧。
+>
+> **实测（真实 MITM 规则 + 5.2MB 真实流量，A/B = `biAnchorEnabled` ON/OFF）**：
+>
+> | 基准 (越大越好) | OFF | ON | 增益 |
+> |---|---|---|---|
+> | `MVS_Exist_RE2only`（CGO，纯 RE2） | 6.04 MB/s | **7.55 MB/s** | **+25%** |
+> | `MVS_Exist_RE2only`（NoCGO，纯 Go） | 5.66 MB/s | **7.50 MB/s** | **+32.5%** |
+> | `MVS_Exist`（全规则，被 regexp2 稀释） | 3.34 MB/s | **3.86 MB/s** | +15.6% |
+> | `runtime.cgocall` 占比（CGO） | ~28% | **~11%** | 砍半余 |
+> | C 内核 `nfaExists` 扫描字节 | 16.35 MB | **3.93 MB** | **降 76%** |
+>
+> **当前天花板**：profile 显示 `regexp2.execute` 系列已升为绝对瓶颈（~40% CPU），属"前端 regexp2 → go-pcre2-lite
+> 迁移"另一独立工作项（单独 PR），不在本次范围；该迁移落地后，双向锚定省下的占比会进一步放大。
+>
+> **正确性回归**：差分 oracle（全 1332 记录，定位档 + 存在性档，MVS==stdlib）+ 一致性（87 条全量）+ CGO/NoCGO
+> 双构建全绿；反向半边独立零假阴护栏全绿。
 
 ## 0. 一个必须先讲清的查证结论（影响架构）
 
@@ -267,7 +304,7 @@ type UnifyNode struct {
 | 丢弃项 | HS 里的作用 | 为什么现在可丢 | **未来回收触发条件** |
 |---|---|---|---|
 | **自写 C parser** | 文本→AST | 改用 Go syntax/regexp2，省最大风险/工时 | 若要让 C 后端脱离 Go 完全独立分发给非 Go 项目（远期） |
-| **Rose 完整图分解** | 子串+FA 挂图边，极致编排 | 存在性用"字面量→pattern 触发"最朴素编排即可达标 | 当编排粒度不足、需子串级触发以压低误触发率时 |
+| **Rose 完整图分解** | 子串+FA 挂图边，极致编排 | 存在性用"字面量→pattern 触发"最朴素编排即可达标。**已部分回收：2026-06 落地"双向锚定"(前向 ∪ 反向锚定, `mvs_reverse.go`/`mvs_bicover.go`, 见 0'.5)，吃掉双无界 keyword 类整段扫**。 | 仍未回收"子串图多跳链"(>2 字面量按图边逐跳验证)；当双向锚定的两端锚不足以压低误触发率、需中间子串级编排时回收 |
 | **FDR** | >300 字面量大规模多串 | 规则数百级，Teddy 足够 | 当字面量规模膨胀到 Teddy bucket 饱和、误报率升高时 |
 | **DFA 族 (Sheng/McClellan/Gough)** | 小状态组件转 DFA 更快 | 只用 bit-NFA 一种模型，省整套 DFA 构建/最小化 | 当少数热点 pattern 的 bit-NFA 成为 profile 瓶颈、且其状态数小适合转 DFA 时 |
 | **Castle** | bounded repeat 专用引擎 | NFA 内展开近似（状态可控） | 当大量大区间 repeat 导致状态爆炸、展开成本不可接受时 |
