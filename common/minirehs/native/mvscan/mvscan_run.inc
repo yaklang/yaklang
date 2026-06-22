@@ -28,10 +28,21 @@ static int NFA_RUN_NAME(const mvs_nfa *a, const uint8_t *data, size_t len, int m
     size_t i = 0;
     while (i < len) {
         int atStart = (i == 0);
-        int32_t r;
-        int size = mvs_decode_rune(data + i, len - i, &r);
-        i += (size_t)size;
-        int sym = symbol_of(a, r);
+        /* ASCII 快路径: 单字节 (<0x80) 直接查 asciiSym, 省去 mvs_decode_rune 的
+         * mvs_utf8_first 表查 + 多级分支 + symbol_of 调用 (语料绝大多数为 ASCII).
+         * 与 mvs_decode_rune(ASCII)->symbol_of 逐位等价: ASCII 字节解码为自身, asciiSym[c]
+         * 即其符号. 非 ASCII 才回退完整 UTF-8 解码 + 切点查找. */
+        int sym;
+        uint8_t c0 = data[i];
+        if (c0 < 0x80) {
+            sym = (int)a->asciiSym[c0];
+            i += 1;
+        } else {
+            int32_t r;
+            int size = mvs_decode_rune(data + i, len - i, &r);
+            i += (size_t)size;
+            sym = symbol_of(a, r);
+        }
         int atEnd = (i == len);
 
         /* cand = firstUnanchored (每步注入) | firstAnchored (仅起点). */
