@@ -9,12 +9,65 @@ import (
 	"time"
 
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
+
+func init() {
+	yakit.RegisterPostInitDatabaseFunction(func() error {
+		return syncBuiltinAndLocalSkillsToDB()
+	}, "sync-ai-skills-to-forge")
+}
+
+// syncBuiltinAndLocalSkillsToDB materializes embedded skills and imports all
+// discovered SKILL.md files into ai_forges so Yakit skill library search works.
+func syncBuiltinAndLocalSkillsToDB() error {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return nil
+	}
+	return syncSkillsToDB(db)
+}
+
+func syncSkillsToDB(db *gorm.DB) error {
+	if db == nil {
+		return nil
+	}
+
+	aiSkillsDir := consts.GetDefaultAISkillsDir()
+	if err := ExtractBuiltinSkillsToDir(aiSkillsDir); err != nil {
+		log.Warnf("extract builtin skills to %s failed: %v", aiSkillsDir, err)
+	}
+
+	total := 0
+	n, err := aiskillloader.ImportAISkillsFromAllDirsToDB(db, consts.GetAllAISkillsDirs())
+	if err != nil {
+		log.Warnf("import local skill directories failed: %v", err)
+	} else {
+		total += n
+	}
+
+	if embedFS := GetBuiltinSkillsFS(); embedFS != nil {
+		n, err := aiskillloader.ImportAISkillsFromFileSystemToDB(db, embedFS, aiskillloader.ImportSkillDBOptions{
+			Author:    schema.AIResourceAuthorBuiltin,
+			IsBuiltin: true,
+		})
+		if err != nil {
+			log.Warnf("import embedded builtin skills failed: %v", err)
+		} else {
+			total += n
+		}
+	}
+	if total > 0 {
+		log.Infof("synced %d skill(s) into ai_forges skill library", total)
+	}
+	return nil
+}
 
 //go:generate gzip-embed -cache --source ./skills --gz skills.tar.gz --root-path --no-embed
 

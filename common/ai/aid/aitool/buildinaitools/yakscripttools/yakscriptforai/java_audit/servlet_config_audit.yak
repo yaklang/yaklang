@@ -1,0 +1,18 @@
+__DESC__ = "审计 web.xml 等 Servlet 配置安全风险。"
+__VERBOSE_NAME__ = "Servlet 配置审计"
+__KEYWORDS__ = "java,audit,config,security,servlet,Servlet,配置"
+yakit.AutoInitYakit()
+
+target = cli.String("target", cli.setRequired(true), cli.setHelp("Absolute path to Java project root"))
+outputMd = cli.String("output-md", cli.setDefault(""), cli.setHelp("Optional path to write markdown summary"))
+auditOptionsRaw = cli.String("audit-options", cli.setDefault(""), cli.setHelp("Optional JSON audit overrides"))
+scopeModules = cli.String("scope-modules", cli.setDefault(""), cli.setHelp("Comma-separated module subdirs to include"))
+scopeExclude = cli.String("scope-exclude", cli.setDefault(""), cli.setHelp("Comma-separated path fragments to exclude"))
+configScope = cli.String("config-scope", cli.setDefault("framework"), cli.setHelp("Config scan scope: framework | all"))
+dedupeFindings = cli.String("dedupe-findings", cli.setDefault("true"), cli.setHelp("Dedupe repeated findings: true | false"))
+cli.check()
+
+opts = javaAuditParseOptionsFromValues(auditOptionsRaw, scopeModules, scopeExclude, configScope, "name", dedupeFindings, "", 0, 0, "", "", "", false, "")
+
+report = javaAuditRunConfigAudit(target, "servlet", opts)
+javaAuditEmitReport(report, outputMd)

@@ -2,6 +2,7 @@ package yakscripttools_test
 
 import (
 	"io/fs"
+	"strings"
 	"testing"
 
 	"github.com/samber/lo"
@@ -20,15 +21,20 @@ func TestSSAParse(t *testing.T) {
 		filename := info.Name()
 		_, filename = filesystem.PathSplit(filename)
 		dirname, _ := filesystem.PathSplit(s)
-		_ = dirname
 		if filesystem.Ext(filename) != ".yak" {
+			return nil
+		}
+		toolname := strings.TrimSuffix(filename, ".yak")
+		if yakscripttools.ShouldSkipYakScriptEmbedPath(dirname, toolname) {
 			return nil
 		}
 
 		content, err := filesystem.ReadFile(s)
 		require.NoError(t, err)
 
-		res := yak.StaticAnalyze(string(content))
+		namePath := strings.Trim(strings.TrimPrefix(dirname, "yakscriptforai"), "/")
+		prepared := yakscripttools.PrepareJavaAuditToolContent(namePath, string(content))
+		res := yak.StaticAnalyze(prepared)
 		errRes := lo.Filter(res, func(item *result.StaticAnalyzeResult, _ int) bool {
 			return item.Severity == result.Error
 		})

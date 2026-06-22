@@ -1,0 +1,63 @@
+// Dependency scanning via SCA for java_audit.
+
+javaAuditRunDependencyScan = (target, opts) => {
+    if opts == nil {
+        opts = javaAuditDefaultOptions()
+    }
+    start = javaAuditNowMs()
+    root = javaAuditResolveScanRoot(target, opts)
+    report = javaAuditNewReport("java_audit/java_maven_gradle_dependencies", root, "java")
+    deps = []
+    risky = []
+    filesScanned = 0
+    report["artifacts"] = {"dependencies": deps, "risky_components": risky, "audit_options": opts, "scan_root": root}
+
+    pkgs = []
+    err = nil
+    try {
+        pkgs = sca.ScanLocalFilesystem(root, sca.scanMode(sca.MODE_LANGUAGE), sca.analyzers(sca.ANALYZER_TYPE_JAVA_POM, sca.ANALYZER_TYPE_JAVA_GRADLE, sca.ANALYZER_TYPE_JAVA_JAR))~
+    } catch e {
+        err = e
+    }
+    if err != nil {
+        report["status"] = "partial"
+        report["summary"] = sprintf("SCA scan partial failure: %v", err)
+        javaAuditAddFinding(report, "sca.scan.error", "medium", "dependency scan incomplete", "verify pom.xml / gradle files manually", [])
+        return javaAuditFinishReport(report, start, filesScanned, opts)
+    }
+
+    riskyMode = "name"
+    if opts["risky_mode"] != nil {
+        riskyMode = opts["risky_mode"]
+    }
+
+    seen = {}
+    for pkg in pkgs {
+        name = pkg.Name
+        version = pkg.Version
+        foundBy = ""
+        if pkg.FromAnalyzer != nil && len(pkg.FromAnalyzer) > 0 {
+            foundBy = pkg.FromAnalyzer[0]
+        }
+        key = sprintf("%v@%v", name, version)
+        if seen[key] {
+            continue
+        }
+        seen[key] = true
+        item = {"name": name, "version": version, "found_by": foundBy}
+        deps = append(deps, item)
+        if riskyMode != "off" {
+            rh = javaAuditMatchRiskyDependency(name, version)
+            if len(rh) > 0 {
+                risky = append(risky, rh...)
+                for r in rh {
+                    javaAuditAddFinding(report, sprintf("sca.risky.%v", r["label"]), r["risk"], sprintf("risky component detected: %v %v", name, version), r["note"], [])
+                }
+            }
+        }
+    }
+    report["artifacts"] = {"dependencies": deps, "risky_components": risky, "audit_options": opts, "scan_root": root}
+    filesScanned = len(javaAuditFindFilesByName(root, "pom.xml", "")) + len(javaAuditFindFilesByName(root, "build.gradle", ""))
+    report["summary"] = sprintf("found %v dependency entries, %v risky component hit(s)", len(deps), len(risky))
+    return javaAuditFinishReport(report, start, filesScanned, opts)
+}
