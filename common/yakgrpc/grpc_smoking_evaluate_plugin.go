@@ -10,7 +10,6 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
-	"google.golang.org/grpc"
 
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/mutate"
@@ -24,7 +23,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
@@ -32,38 +30,10 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 	_ "github.com/yaklang/yaklang/common/yak/static_analyzer/score_rules"
+	"github.com/yaklang/yaklang/common/yak/yakscript"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
-
-type fakeStreamInstance struct {
-	ctx     context.Context
-	handler func(*ypb.ExecResult) error
-	grpc.ServerStream
-}
-
-func (f *fakeStreamInstance) Send(result *ypb.ExecResult) error {
-	if f == nil {
-		log.Error("fakeStreamInstance empty")
-		return nil
-	}
-	if f.handler != nil {
-		return f.handler(result)
-	}
-	log.Infof("*fakeStreamInstance.Send Called with: %v", spew.Sdump(result))
-	return nil
-}
-
-func (f *fakeStreamInstance) Context() context.Context {
-	return f.ctx
-}
-
-func NewFakeStream(ctx context.Context, handler func(result *ypb.ExecResult) error) *fakeStreamInstance {
-	return &fakeStreamInstance{
-		ctx:     ctx,
-		handler: handler,
-	}
-}
 
 func (s *Server) SmokingEvaluatePlugin(ctx context.Context, req *ypb.SmokingEvaluatePluginRequest) (*ypb.SmokingEvaluatePluginResponse, error) {
 	pluginName := req.GetPluginName()
@@ -284,7 +254,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 
 		log.Info("start to echo debug script")
 		runtimeId := uuid.New().String()
-		err := s.debugScript(target, pluginType, pluginCode, NewFakeStream(ctx, func(result *ypb.ExecResult) error {
+		err := s.debugScript(target, pluginType, pluginCode, yakscript.NewFakeStream(ctx, func(result *ypb.ExecResult) error {
 			if result.IsMessage {
 				m := make(map[string]any)
 				err := json.Unmarshal(result.Message, &m)
