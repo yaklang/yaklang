@@ -51,6 +51,11 @@ func mitmPatterns(tb testing.TB) ([]Pattern, map[PatternID]string) {
 
 // loadCorpus 读取 testdata/traffic_corpus.bin (来自本地 yaklang 项目库的真实流量),
 // 解析为一组报文记录. 同时返回拼接后的总字节切片.
+//
+// 性能: 默认在"快速回归"模式下截断到前 corpusDefaultLimit 条 (仍覆盖多样报文形态),
+// 让 minirehs 全量回归不被真实语料 (1332 条 / 5.2MB) 的反复 oracle 扫描卡住.
+// 全量语料通过环境变量 MINIREHS_FULL_CORPUS=1 恢复 (CI / 发布回归).
+// testing.Short() 时由各调用方进一步裁剪 (已遍布各测试).
 func loadCorpus(tb testing.TB) (records [][]byte, joined []byte) {
 	tb.Helper()
 	raw, err := os.ReadFile("testdata/traffic_corpus.bin")
@@ -71,6 +76,13 @@ func loadCorpus(tb testing.TB) (records [][]byte, joined []byte) {
 	}
 	if len(records) == 0 {
 		tb.Skip("empty corpus")
+	}
+	if !fullCorpusRequested() && len(records) > corpusDefaultLimit {
+		records = records[:corpusDefaultLimit]
+		joined = joined[:0]
+		for _, r := range records {
+			joined = append(joined, r...)
+		}
 	}
 	return records, joined
 }

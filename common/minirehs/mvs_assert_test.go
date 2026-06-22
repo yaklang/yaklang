@@ -115,7 +115,7 @@ func randAssertInput(r *rand.Rand) []byte {
 func TestMVSAssertRandomDifferential(t *testing.T) {
 	r := rand.New(rand.NewSource(0xA55E27))
 	compiled, checks := 0, 0
-	for iter := 0; iter < 4000; iter++ {
+	for iter := 0; iter < diffIters(t, 800); iter++ {
 		expr := randAssertRegex(r)
 		nfa, ok := buildAssertNFA(t, expr)
 		if !ok {

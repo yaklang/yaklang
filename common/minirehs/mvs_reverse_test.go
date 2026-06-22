@@ -39,7 +39,7 @@ func genRevInput(r *rand.Rand, maxLen int) []byte {
 // 此测试必失败 -> 提示改走"正向切分边界反向遍历". 同时校验 nword==1 标量快路径与通用版一致.
 func TestMVSReverseNFADifferential(t *testing.T) {
 	r := rand.New(rand.NewSource(0x5EED9))
-	const iters = 20000
+	iters := diffIters(t, defaultDiffIters)
 	tested, skipped := 0, 0
 	for it := 0; it < iters; it++ {
 		expr := genRE(r, 2)

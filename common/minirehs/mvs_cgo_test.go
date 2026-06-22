@@ -106,7 +106,7 @@ func TestMVSKernelExistsDirect(t *testing.T) {
 // C nfaExists == Go existsIn == stdlib oracle. 这是 C utf8 解码 / 字母表 / 位并行递推的主护栏.
 func TestMVSKernelRandomDifferential(t *testing.T) {
 	r := rand.New(rand.NewSource(0x5EED7))
-	const iters = 20000
+	iters := diffIters(t, defaultDiffIters)
 	tested, skipped := 0, 0
 	for it := 0; it < iters; it++ {
 		expr := genRE(r, 2)

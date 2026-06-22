@@ -98,7 +98,7 @@ func TestMVSFindLocDirect(t *testing.T) {
 // NFA 定位 (findAllLoc) 与 stdlib leftmost-longest oracle 的匹配区间序列, 逐字节一致.
 func TestMVSFindLocRandomDifferential(t *testing.T) {
 	r := rand.New(rand.NewSource(0x10C8))
-	const iters = 20000
+	iters := diffIters(t, defaultDiffIters)
 	tested, skipped, checks := 0, 0, 0
 	for it := 0; it < iters; it++ {
 		expr := genRE(r, 2)
