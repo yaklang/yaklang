@@ -42,6 +42,22 @@ func (r *ScannerAgentReporter) publishJobProgress(process float64) error {
 	)
 }
 
+func (r *ScannerAgentReporter) PublishScanDetail(stage string, detailJSON string) error {
+	r.touchActiveAttempt()
+	publisher, ref, ok, err := r.legionPublisher()
+	if err != nil || !ok {
+		return err
+	}
+	return publisher.PublishProgress(
+		r.agent.node.GetRootContext(),
+		*ref,
+		stage,
+		detailJSON,
+		progressUnits(r.progressCheckpoint.lastObservedProcess),
+		legionProgressTotalUnits,
+	)
+}
+
 func (r *ScannerAgentReporter) reportJobProgress(process float64) error {
 	if r == nil {
 		return nil
