@@ -2141,6 +2141,14 @@ func (d *Decompiler) ParseStatement() error {
 			if len(pairs) != 2 {
 				return
 			}
+			// A newly created array (new T[...]) assigned through javac's dup idiom must not go through
+			// the chained-assignment dup-collapse: that path assumes the duplicated value feeds two
+			// plain assignment statements (a = b = expr) and, for an array whose element stores are
+			// later folded into an initializer, it drops the array's own declaration, leaving the
+			// local undefined. Let it fall through to the normal single-use fold instead.
+			if ne, ok := val.(*values.NewExpression); ok && ne.IsArray() {
+				return
+			}
 			isDup := pairs[0].CurrentOpcode.Instr.OpCode == OP_DUP && pairs[1].CurrentOpcode.Instr.OpCode == OP_DUP
 			isSameCode := pairs[0].CurrentOpcode.Id == pairs[1].CurrentOpcode.Id
 			if !isDup || !isSameCode {
