@@ -23,7 +23,12 @@
 > **已落地(2026-06-23)**:regexp2→go-pcre2-lite **全局迁移**(yaklang 整库,原 ~40% CPU 绝对瓶颈消除),
 > `MVS_Exist` 全规则存在性 3.86→**5.79 MB/s(+50%)**;minirehs 测试提速 477s→36s(差分迭代/语料/诊断
 > 分档,见 `diff_iters_test.go` + 环境变量 `MINIREHS_DIFF_ITERS`/`MINIREHS_FULL_CORPUS`/`MINIREHS_DIAG`)。
-> **当前性能(实测,vs Go RE2 逐条 0.18 MB/s 基线)**:存在性 **32x**(全规则)/**42x**(纯 RE2 子集)、定位 **16x**;
+> **已落地(2026-06-23 增量)**:**gate 超集 NFA 预检移除**(`gateSupersetPrecheck=false`):PCRE2 复核线性后,
+> 复核前的超集存在性预检 (多字断言 `existsInAssertShared` + `computeBoundaries` 整段 `data[winLo:]`,
+> 原 MVS_Exist 第 2 CPU 头 ~16%) 对 gate 几乎不过滤、反成净开销 => 直接 PCRE2 复核 (权威判定, 结果恒等)。
+> A/B(实测): `MVS_Exist` 5.72→**6.0 MB/s(+5%)**、allocs 16.3K→**14.3K/op**;`RE2only` 不变 (无 gate, 健全性)。
+> 差分 oracle 全 1332(存在性+NoLoc)+ 两档短回归全绿。
+> **当前性能(实测,vs Go RE2 逐条 0.18 MB/s 基线)**:存在性 **~33x**(全规则)/**42x**(纯 RE2 子集)、定位 **16x**;
 > dlopen 真 hyperscan 历史天花板 87x,故现实目标 = 存在性冲 80x(再 ~2x)。详见第 4' 节倍数评估与路线。
 > 下一步(按收益):**R1 字面量门控合并单趟**(现最大头,结构性)→ R2 断言 NFA 合并 → R3 AVX2 → R5 定位 C 内核。
 > 详见 IMPL 第 0'.4 / 0'.5 节 + 本文件第 4' 节。
@@ -409,6 +414,10 @@ docker run --rm --platform linux/amd64 -v $PWD:/amalg:ro -v /tmp/mvs_fixture:/fi
 - **regexp2 前端**(原最大头 ~40% CPU,**已解决**):**【2026-06-23 已落地】** yaklang 全局把 regexp2 后端从
   `dlclark/regexp2`(.NET 回溯)切换为 `go-pcre2-lite/regexp2`(PCRE2,线性时间)。`regexp2Verifier` 经
   `regexp_utils.YakRegexpUtils.Match()` 自动享有该加速,无需 minirehs 内旁路。
+- **gate 超集 NFA 预检**(原 MVS_Exist 第 2 CPU 头 ~16% `existsInAssertShared`,**已解决**):**【2026-06-23 已落地】**
+  PCRE2 复核线性后, 复核前的超集存在性预检 (整段 `data[winLo:]` 跑多字断言 NFA + computeBoundaries)
+  对 gate 几乎不过滤 (字面量命中 => 超集结构通常已成立), 反成净开销。`verifyGateLocalized` 默认直接
+  PCRE2 复核 (`gateSupersetPrecheck=false`); A/B `MVS_Exist` +5% / allocs 16.3K→14.3K。
 - **字面量门控 pattern 逐条 existsIn(现最大头,结构性)**:每条字面量命中的 lean pattern 各自调一次
   C `nfaExists`/Go `existsIn`。合并 NFA(`mvs_merged.go`)目前只覆盖"无字面量 always-on";门控 pattern
   尚未合并 ⇒ N 条门控 = N 次 cgo 跨界 + N 趟位递推。这是逼近 80x 的下一个主战场(见 4' 节 R1)。
