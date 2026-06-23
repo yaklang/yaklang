@@ -164,6 +164,18 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			desc:           "float/double constant fields render as valid Java literals with F/D suffix",
 			mustContain:    []string{"3.14F", "2.718281828D", "-1.5F"},
 		},
+		{
+			file: "multi_catch.class",
+			desc: "multi-catch (A | B): exception-table entries sharing one handler PC reconstruct the full union clause",
+			// both the 2-type and 3-type unions must be reconstructed in handler order
+			mustContain: []string{
+				"catch(NumberFormatException | NullPointerException",
+				"catch(IllegalStateException | IllegalArgumentException | NullPointerException",
+				"catch(ArithmeticException",
+			},
+			// a single catch must not gain a spurious union separator, and nothing is stubbed
+			mustNotContain: []string{"catch(ArithmeticException |", "yak-decompiler"},
+		},
 	}
 
 	for _, tc := range cases {
