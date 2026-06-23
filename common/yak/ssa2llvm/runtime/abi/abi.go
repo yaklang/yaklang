@@ -87,11 +87,6 @@ type FuncID int64
 // NOTE: IDs must stay stable once published, otherwise old binaries or cached
 // IR will call wrong functions.
 const (
-	// poc
-	IDPocTimeout           FuncID = 1
-	IDPocGet               FuncID = 2
-	IDPocGetHTTPPacketBody FuncID = 3
-
 	// os
 	IDOsGetenv FuncID = 4
 

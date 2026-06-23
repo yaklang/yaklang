@@ -102,18 +102,6 @@ var defaultExternBindings = map[string]ExternBinding{
 		Return:     ExternTypePtr,
 		DispatchID: abi.IDSyncNewCond,
 	},
-	"poc.timeout": {
-		Return:     ExternTypePtr,
-		DispatchID: abi.IDPocTimeout,
-	},
-	"poc.Get": {
-		Return:     ExternTypePtr,
-		DispatchID: abi.IDPocGet,
-	},
-	"poc.GetHTTPPacketBody": {
-		Return:     ExternTypePtr,
-		DispatchID: abi.IDPocGetHTTPPacketBody,
-	},
 	"os.Getenv": {
 		Return:     ExternTypePtr,
 		DispatchID: abi.IDOsGetenv,

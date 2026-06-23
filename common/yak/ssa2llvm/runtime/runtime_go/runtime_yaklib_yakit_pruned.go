@@ -19,12 +19,5 @@ func runtimePrunedYakitExports() map[string]any {
 	})
 	yaklib.InitYakit(client)
 
-	exports := make(map[string]any, len(yaklib.YakitExports))
-	for name, value := range yaklib.YakitExports {
-		exports[name] = value
-	}
-	for name, value := range yaklib.GetExtYakitLibByClient(client) {
-		exports[name] = value
-	}
-	return exports
+	return yaklib.YakitExports
 }

@@ -64,13 +64,14 @@ func TestPocScriptPrunedRuntimeDependencies(t *testing.T) {
 	require.NotNil(t, comp)
 	defer comp.Dispose()
 
-	dispatchDeps := comp.RuntimeDispatchDependencies()
-	require.Contains(t, dispatchDeps, abi.IDPocTimeout)
-	require.Contains(t, dispatchDeps, abi.IDPocGet)
-	require.Contains(t, dispatchDeps, abi.IDPocGetHTTPPacketBody)
+	yaklibDeps := comp.YaklibDependencies()
+	requireYaklibDependency(t, yaklibDeps, "poc", "timeout")
+	requireYaklibDependency(t, yaklibDeps, "poc", "Get")
+	requireYaklibDependency(t, yaklibDeps, "poc", "GetHTTPPacketBody")
 
-	runtimeDeps := runtimeDepsFromCompiler(comp)
-	require.Contains(t, runtimeDeps.RuntimeDispatch, abi.IDPocGet)
+	runtimeDeps := runtimeYaklibDepsFromCompiler(comp)
+	err = runtimeembed.ValidatePrunedRuntimeDependencies(runtimeDeps)
+	require.NoError(t, err)
 }
 
 func requireYaklibDependency(t *testing.T, deps map[string][]string, module, method string) {
