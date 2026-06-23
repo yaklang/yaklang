@@ -177,23 +177,10 @@ func prunedRuntimeBuildTags(deps PrunedRuntimeDependencies) []string {
 	if prunedRuntimeNeedsModule(deps.Yaklib, "cli") {
 		tags = append(tags, "ssa2llvm_runtime_cli")
 	}
-	if prunedRuntimeNeedsPoc(deps.RuntimeDispatch) {
-		tags = append(tags, "ssa2llvm_runtime_poc")
-	}
 	if prunedRuntimeNeedsModule(deps.Yaklib, "yakit") {
 		tags = append(tags, "ssa2llvm_runtime_yakit")
 	}
 	return tags
-}
-
-func prunedRuntimeNeedsPoc(ids []abi.FuncID) bool {
-	for _, id := range ids {
-		switch id {
-		case abi.IDPocTimeout, abi.IDPocGet, abi.IDPocGetHTTPPacketBody:
-			return true
-		}
-	}
-	return false
 }
 
 func prunedRuntimeNeedsModule(deps []YaklibDependency, module string) bool {

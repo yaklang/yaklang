@@ -37,12 +37,9 @@ var defaultBindings = map[string]HostBinding{
 	"sync.NewRWMutex":        {Dispatch: abi.IDSyncNewRWMutex},
 	"sync.NewMap":            {Dispatch: abi.IDSyncNewMap},
 	"sync.NewOnce":           {Dispatch: abi.IDSyncNewOnce},
-	"sync.NewPool":           {Dispatch: abi.IDSyncNewPool},
-	"sync.NewCond":           {Dispatch: abi.IDSyncNewCond},
-	"poc.timeout":            {Dispatch: abi.IDPocTimeout},
-	"poc.Get":                {Dispatch: abi.IDPocGet},
-	"poc.GetHTTPPacketBody":  {Dispatch: abi.IDPocGetHTTPPacketBody},
-	"os.Getenv":              {Dispatch: abi.IDOsGetenv},
+	"sync.NewPool": {Dispatch: abi.IDSyncNewPool},
+	"sync.NewCond": {Dispatch: abi.IDSyncNewCond},
+	"os.Getenv":    {Dispatch: abi.IDOsGetenv},
 }
 
 func Execute(blobHex, seedHex, funcName, hostBindingSpec string, args []int64,
