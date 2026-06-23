@@ -146,21 +146,26 @@ func detachedPlanSelectors(coordinatorID string) []map[string]any {
 	}
 }
 
+type executeDetachedPlanRequest struct {
+	CoordinatorID string
+	SessionID     string
+	ReactTaskID   string
+	Plans         *aid.PlanResponse
+	LegacyInput   *aicommon.ExecutePlanInput
+}
+
 func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) error {
-	coordinatorID, sessionID, reactTaskID, input, err := parseExecuteDetachedPlanParams(event.SyncJsonInput)
+	req, err := parseExecuteDetachedPlanRequest(event.SyncJsonInput)
 	if err != nil {
 		r.EmitSyncEventError("execute_detached_plan", err, event.SyncID)
 		return nil
 	}
+	sessionID := req.SessionID
 	if sessionID == "" {
 		sessionID = r.config.PersistentSessionId
 	}
-	if coordinatorID == "" {
+	if req.CoordinatorID == "" {
 		r.EmitSyncEventError("execute_detached_plan", errors.New("coordinator_id is empty"), event.SyncID)
-		return nil
-	}
-	if input == nil || strings.TrimSpace(input.PlanData) == "" {
-		r.EmitSyncEventError("execute_detached_plan", errors.New("plan_data is empty"), event.SyncID)
 		return nil
 	}
 	db := r.config.GetDB()
@@ -169,7 +174,7 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 		return nil
 	}
 
-	record, err := yakit.GetAISessionPlanAndExecByCoordinatorID(db, coordinatorID)
+	record, err := yakit.GetAISessionPlanAndExecByCoordinatorID(db, req.CoordinatorID)
 	if err != nil || record == nil {
 		if err == nil {
 			err = errors.New("detached plan session record not found")
@@ -182,8 +187,13 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 		return nil
 	}
 
-	planPayload := strings.TrimSpace(input.PlanPayload)
-	rootTask, err := r.buildRootTaskForDetachedPlan(r.config.Ctx, planPayload, input)
+	planPayload, approvedInput, reactTaskID, err := r.resolveExecuteDetachedPlanInput(record, req)
+	if err != nil {
+		r.EmitSyncEventError("execute_detached_plan", err, event.SyncID)
+		return nil
+	}
+
+	rootTask, err := r.buildRootTaskForDetachedPlan(r.config.Ctx, planPayload, approvedInput)
 	if err != nil {
 		r.EmitSyncEventError("execute_detached_plan", err, event.SyncID)
 		return nil
@@ -202,23 +212,16 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 		return nil
 	}
 
-	approvedInput := &aicommon.ExecutePlanInput{
-		PlanPayload:  planPayload,
-		PlanData:     input.PlanData,
-		PlanFacts:    input.PlanFacts,
-		PlanDocument: input.PlanDocument,
-	}
-
 	r.EmitSyncEvent("execute_detached_plan", map[string]any{
 		"started":        true,
 		"session_id":     record.SessionID,
-		"coordinator_id": coordinatorID,
+		"coordinator_id": req.CoordinatorID,
 		"react_task_id":  reactTaskID,
 	}, event.SyncID)
 
-	go r.AsyncRecoverPlanAndExecute(r.config.Ctx, coordinatorID, "", func(err error) {
+	go r.AsyncRecoverPlanAndExecute(r.config.Ctx, req.CoordinatorID, "", func(err error) {
 		if err != nil {
-			log.Errorf("execute detached plan via recovery failed: coordinator=%s err=%v", coordinatorID, err)
+			log.Errorf("execute detached plan via recovery failed: coordinator=%s err=%v", req.CoordinatorID, err)
 		}
 	},
 		WithInvokePlanAndExecutePlanPayload(planPayload),
@@ -227,22 +230,185 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 	return nil
 }
 
-func parseExecuteDetachedPlanParams(syncJSON string) (coordinatorID, sessionID, reactTaskID string, input *aicommon.ExecutePlanInput, err error) {
+func parseExecuteDetachedPlanRequest(syncJSON string) (*executeDetachedPlanRequest, error) {
 	if strings.TrimSpace(syncJSON) == "" {
-		return "", "", "", nil, errors.New("sync json input is empty")
+		return nil, errors.New("sync json input is empty")
 	}
 	var params map[string]any
-	if err = json.Unmarshal([]byte(syncJSON), &params); err != nil {
-		return "", "", "", nil, fmt.Errorf("failed to parse execute detached plan params: %w", err)
+	if err := json.Unmarshal([]byte(syncJSON), &params); err != nil {
+		return nil, fmt.Errorf("failed to parse execute detached plan params: %w", err)
 	}
-	coordinatorID = utils.InterfaceToString(params["coordinator_id"])
-	sessionID = utils.InterfaceToString(params["session_id"])
-	reactTaskID = utils.InterfaceToString(params["react_task_id"])
-	input = &aicommon.ExecutePlanInput{
+
+	req := &executeDetachedPlanRequest{
+		CoordinatorID: utils.InterfaceToString(params["coordinator_id"]),
+		SessionID:     utils.InterfaceToString(params["session_id"]),
+		ReactTaskID:   utils.InterfaceToString(params["react_task_id"]),
+	}
+	if rawPlans, ok := params["plans"]; ok && rawPlans != nil {
+		plansDTO, err := parseDetachedPlansDTO(rawPlans)
+		if err != nil {
+			return nil, err
+		}
+		req.Plans = &aid.PlanResponse{
+			RootTask: detachedPlanTaskDTOToAiTask(&plansDTO.RootTask),
+			Facts:    plansDTO.Facts,
+			Document: plansDTO.Document,
+		}
+	}
+
+	legacyInput := &aicommon.ExecutePlanInput{
 		PlanPayload:  utils.InterfaceToString(params["plan_payload"]),
 		PlanData:     utils.InterfaceToString(params["plan_data"]),
 		PlanFacts:    utils.InterfaceToString(params["plan_facts"]),
 		PlanDocument: utils.InterfaceToString(params["plan_document"]),
 	}
-	return coordinatorID, sessionID, reactTaskID, input, nil
+	if strings.TrimSpace(legacyInput.PlanData) != "" ||
+		strings.TrimSpace(legacyInput.PlanPayload) != "" ||
+		strings.TrimSpace(legacyInput.PlanFacts) != "" ||
+		strings.TrimSpace(legacyInput.PlanDocument) != "" {
+		req.LegacyInput = legacyInput
+	}
+	return req, nil
+}
+
+func loadDetachedPlanProgress(raw string) *detachedPlanProgress {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return &detachedPlanProgress{}
+	}
+	progress := &detachedPlanProgress{}
+	if err := json.Unmarshal([]byte(raw), progress); err != nil {
+		return &detachedPlanProgress{}
+	}
+	return progress
+}
+
+type detachedPlanTaskDTO struct {
+	TaskId             string                `json:"task_id"`
+	Index              string                `json:"index"`
+	Name               string                `json:"name"`
+	Goal               string                `json:"goal"`
+	SemanticIdentifier string                `json:"semantic_identifier"`
+	DependsOn          []string              `json:"depends_on,omitempty"`
+	Subtasks           []detachedPlanTaskDTO `json:"subtasks,omitempty"`
+}
+
+type detachedPlansDTO struct {
+	RootTask detachedPlanTaskDTO `json:"root_task"`
+	Facts    string              `json:"facts"`
+	Document string              `json:"document"`
+}
+
+func parseDetachedPlansDTO(raw any) (*detachedPlansDTO, error) {
+	if raw == nil {
+		return nil, errors.New("plans is nil")
+	}
+	plans := &detachedPlansDTO{}
+	if err := json.Unmarshal(utils.Jsonify(raw), plans); err != nil {
+		return nil, fmt.Errorf("failed to parse plans: %w", err)
+	}
+	if strings.TrimSpace(plans.RootTask.Name) == "" && len(plans.RootTask.Subtasks) == 0 {
+		return nil, errors.New("plans.root_task is empty")
+	}
+	return plans, nil
+}
+
+func parseDetachedPlanRootTaskDTO(raw string) (*detachedPlanTaskDTO, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, errors.New("task tree is empty")
+	}
+	rootTask := &detachedPlanTaskDTO{}
+	if err := json.Unmarshal([]byte(raw), rootTask); err != nil {
+		return nil, fmt.Errorf("failed to parse task tree: %w", err)
+	}
+	if strings.TrimSpace(rootTask.Name) == "" && len(rootTask.Subtasks) == 0 {
+		return nil, errors.New("task tree is empty")
+	}
+	return rootTask, nil
+}
+
+func detachedPlanTaskDTOToAiTask(dto *detachedPlanTaskDTO) *aid.AiTask {
+	if dto == nil {
+		return nil
+	}
+	task := &aid.AiTask{
+		TaskId:             strings.TrimSpace(dto.TaskId),
+		Index:              dto.Index,
+		Name:               dto.Name,
+		Goal:               dto.Goal,
+		SemanticIdentifier: dto.SemanticIdentifier,
+		DependsOn:          dto.DependsOn,
+	}
+	if task.TaskId == "" && task.Index != "" {
+		task.TaskId = fmt.Sprintf("pe-task-%s", task.Index)
+	}
+	for i := range dto.Subtasks {
+		task.Subtasks = append(task.Subtasks, detachedPlanTaskDTOToAiTask(&dto.Subtasks[i]))
+	}
+	return task
+}
+
+func (r *ReAct) resolveExecuteDetachedPlanInput(
+	record *schema.AISessionPlanAndExec,
+	req *executeDetachedPlanRequest,
+) (planPayload string, input *aicommon.ExecutePlanInput, reactTaskID string, err error) {
+	if record == nil {
+		return "", nil, "", errors.New("detached plan session record is nil")
+	}
+	if req == nil {
+		return "", nil, "", errors.New("execute detached plan request is nil")
+	}
+
+	progress := loadDetachedPlanProgress(record.TaskProgress)
+	planPayload = strings.TrimSpace(progress.PlanPayload)
+	reactTaskID = strings.TrimSpace(req.ReactTaskID)
+	if reactTaskID == "" {
+		reactTaskID = strings.TrimSpace(progress.ReactTaskID)
+	}
+
+	if req.LegacyInput != nil && strings.TrimSpace(req.LegacyInput.PlanData) != "" {
+		if strings.TrimSpace(req.LegacyInput.PlanPayload) != "" {
+			planPayload = strings.TrimSpace(req.LegacyInput.PlanPayload)
+		}
+		return planPayload, req.LegacyInput, reactTaskID, nil
+	}
+
+	var rootTask *aid.AiTask
+	var planFacts, planDocument string
+	switch {
+	case req.Plans != nil && req.Plans.RootTask != nil:
+		rootTask = req.Plans.RootTask
+		planFacts = strings.TrimSpace(req.Plans.Facts)
+		planDocument = strings.TrimSpace(req.Plans.Document)
+	default:
+		rootDTO, err := parseDetachedPlanRootTaskDTO(record.TaskTree)
+		if err != nil {
+			return "", nil, "", err
+		}
+		rootTask = detachedPlanTaskDTOToAiTask(rootDTO)
+		planFacts = strings.TrimSpace(progress.PlanFacts)
+		planDocument = strings.TrimSpace(progress.PlanDocument)
+	}
+	if planFacts == "" {
+		planFacts = strings.TrimSpace(progress.PlanFacts)
+	}
+	if planDocument == "" {
+		planDocument = strings.TrimSpace(progress.PlanDocument)
+	}
+
+	planData := strings.TrimSpace(aid.SerializeRootTaskToPlanData(rootTask))
+	if planData == "" {
+		return "", nil, "", errors.New("plans is empty")
+	}
+	if len(rootTask.Subtasks) <= 0 {
+		return "", nil, "", errors.New("plan has no subtasks")
+	}
+
+	return planPayload, &aicommon.ExecutePlanInput{
+		PlanPayload:  planPayload,
+		PlanData:     planData,
+		PlanFacts:    planFacts,
+		PlanDocument: planDocument,
+	}, reactTaskID, nil
 }

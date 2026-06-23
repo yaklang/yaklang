@@ -71,6 +71,18 @@ func TestPublishDetachedPlan_PersistsSessionAndEmitsEvent(t *testing.T) {
 }
 
 func TestHandleSyncTypeExecuteDetachedPlanEvent_UsesRecoveryPath(t *testing.T) {
+	testHandleSyncTypeExecuteDetachedPlanEvent(t, "legacy")
+}
+
+func TestHandleSyncTypeExecuteDetachedPlanEvent_WithCoordinatorIDOnly(t *testing.T) {
+	testHandleSyncTypeExecuteDetachedPlanEvent(t, "coordinator_only")
+}
+
+func TestHandleSyncTypeExecuteDetachedPlanEvent_WithPlansOnly(t *testing.T) {
+	testHandleSyncTypeExecuteDetachedPlanEvent(t, "plans")
+}
+
+func testHandleSyncTypeExecuteDetachedPlanEvent(t *testing.T, mode string) {
 	sessionID := uuid.NewString()
 	db := consts.GetGormProjectDatabase()
 	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}).Error)
@@ -105,19 +117,45 @@ func TestHandleSyncTypeExecuteDetachedPlanEvent_UsesRecoveryPath(t *testing.T) {
 		return nil
 	}
 
-	syncPayload, err := json.Marshal(map[string]any{
+	syncPayload := map[string]any{
 		"coordinator_id": coordinatorID,
-		"session_id":     sessionID,
-		"react_task_id":  "react-task-async",
-		"plan_payload":   input.PlanPayload,
-		"plan_data":      input.PlanData,
-		"plan_facts":     input.PlanFacts,
-		"plan_document":  input.PlanDocument,
-	})
+	}
+	switch mode {
+	case "legacy":
+		syncPayload["session_id"] = sessionID
+		syncPayload["react_task_id"] = "react-task-async"
+		syncPayload["plan_payload"] = input.PlanPayload
+		syncPayload["plan_data"] = input.PlanData
+		syncPayload["plan_facts"] = input.PlanFacts
+		syncPayload["plan_document"] = input.PlanDocument
+	case "plans":
+		syncPayload["plans"] = map[string]any{
+			"root_task": map[string]any{
+				"task_id": "pe-task-1",
+				"index":   "1",
+				"name":    "test-plan",
+				"goal":    "verify detached recovery execute",
+				"subtasks": []map[string]any{
+					{
+						"task_id": "pe-task-1-1",
+						"index":   "1-1",
+						"name":    "step-1",
+						"goal":    "do something",
+					},
+				},
+			},
+			"facts":    "facts",
+			"document": "document",
+		}
+	case "coordinator_only":
+	default:
+		t.Fatalf("unsupported execute detached plan test mode: %s", mode)
+	}
+	syncJSON, err := json.Marshal(syncPayload)
 	require.NoError(t, err)
 
 	require.NoError(t, reactIns.HandleSyncTypeExecuteDetachedPlanEvent(&ypb.AIInputEvent{
-		SyncJsonInput: string(syncPayload),
+		SyncJsonInput: string(syncJSON),
 		SyncID:        uuid.NewString(),
 	}))
 
