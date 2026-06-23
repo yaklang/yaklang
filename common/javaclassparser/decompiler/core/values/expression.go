@@ -180,6 +180,22 @@ func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) str
 					return argType
 				})
 			}
+		} else if expectPrim, okp := argType.RawType().(*types.JavaPrimer); okp {
+			// Method-invocation context (JLS 5.3) forbids implicit narrowing, even for constant
+			// expressions, but the JVM stack collapses byte/short/char to int (iconst/bipush/sipush),
+			// so an int-typed value flowing into a byte/short/char parameter must be cast explicitly or
+			// the decompiled call fails to recompile ("possible lossy conversion from int to char").
+			if expectPrim.Name == types.JavaByte || expectPrim.Name == types.JavaShort || expectPrim.Name == types.JavaChar {
+				if actualPrim, oka := arg.Type().RawType().(*types.JavaPrimer); oka && actualPrim.Name == types.JavaInteger {
+					argStr := arg.String(funcCtx)
+					argTypeStr := expectPrim.Name
+					arg = NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+						return fmt.Sprintf("(%s)(%s)", argTypeStr, argStr)
+					}, func() types.JavaType {
+						return argType
+					})
+				}
+			}
 		}
 		paramStrs = append(paramStrs, arg.String(funcCtx))
 	}
