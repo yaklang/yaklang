@@ -95,7 +95,7 @@ func recommendCapabilitiesFromForgePrompts(loop *reactloops.ReActLoop, invoker a
 		return ""
 	}
 	if loop != nil {
-		loop.LoadingStatus("正在匹配相关能力 / Matching related capabilities...")
+		loopInfraStatus(loop, "正在匹配相关能力 / Matching Related Capabilities...")
 	}
 	matches := reactloops.MatchCapabilitiesByText(corpus, skillLoaderFromLoop(loop), reactloops.IsPlanAndExecAllowed(loop, invoker))
 	return recommendCapabilitiesFromMatches(loop, invoker, matches, sourceLabel)
@@ -115,7 +115,7 @@ func recommendCapabilitiesFromSkillContent(loop *reactloops.ReActLoop, invoker a
 		return ""
 	}
 	if loop != nil {
-		loop.LoadingStatus("正在匹配相关能力 / Matching related capabilities...")
+		loopInfraStatus(loop, "正在匹配相关能力 / Matching Related Capabilities...")
 	}
 	matches := reactloops.MatchCapabilitiesByText(content, loader, reactloops.IsPlanAndExecAllowed(loop, invoker))
 	return recommendCapabilitiesFromMatches(loop, invoker, matches, sourceLabel)
