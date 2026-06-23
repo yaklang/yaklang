@@ -28,7 +28,14 @@
 > 原 MVS_Exist 第 2 CPU 头 ~16%) 对 gate 几乎不过滤、反成净开销 => 直接 PCRE2 复核 (权威判定, 结果恒等)。
 > A/B(实测): `MVS_Exist` 5.72→**6.0 MB/s(+5%)**、allocs 16.3K→**14.3K/op**;`RE2only` 不变 (无 gate, 健全性)。
 > 差分 oracle 全 1332(存在性+NoLoc)+ 两档短回归全绿。
-> **当前性能(实测,vs Go RE2 逐条 0.18 MB/s 基线)**:存在性 **~33x**(全规则)/**42x**(纯 RE2 子集)、定位 **16x**;
+> **已落地(2026-06-23 增量)**:**断言 NFA 标量快路径启用** —— `compileMVSNFAAssert` 此前漏置 `single`,
+> 致所有断言 NFA (含 always-on 身份证/MAC 每报文整段扫) 恒走多字 `existsInAssertShared` (每调用 2 次
+> `make([]uint64)`), 标量孪生 `existsInAssertShared1`/`existsInAssertAnchored1` (寄存器位运算 + 零分配 +
+> ASCII 快路径) 形同虚设。抽出 `initScalar()` 供 glushkov 与断言核共用; dispatch 均 hasAssert 优先, 标量
+> 只路由到断言版。A/B(实测): `MVS_Exist` 6.0→**6.20 MB/s**、allocs 14.3K→**8.9K/op(-38%)**。新护栏
+> `TestMVSAssertScalarEquivalence` (680 个 nword==1 断言 NFA × 随机输入, 53706 例标量==多字) + 全 1332
+> 差分 + 两档短回归全绿。两项增量合计 `MVS_Exist` 5.79→**6.20 MB/s(+7%)**。
+> **当前性能(实测,vs Go RE2 逐条 0.18 MB/s 基线)**:存在性 **~34x**(全规则)/**42x**(纯 RE2 子集)、定位 **16x**;
 > dlopen 真 hyperscan 历史天花板 87x,故现实目标 = 存在性冲 80x(再 ~2x)。详见第 4' 节倍数评估与路线。
 > 下一步(按收益):**R1 字面量门控合并单趟**(现最大头,结构性)→ R2 断言 NFA 合并 → R3 AVX2 → R5 定位 C 内核。
 > 详见 IMPL 第 0'.4 / 0'.5 节 + 本文件第 4' 节。

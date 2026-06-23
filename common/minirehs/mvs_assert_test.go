@@ -182,3 +182,50 @@ func TestMVSAssertRecoversFallback(t *testing.T) {
 		t.Fatalf("expected >=7 assertion fallbacks recovered, got %d", recovered)
 	}
 }
+
+// TestMVSAssertScalarEquivalence 守护 nword==1 断言 NFA 的标量快路径 (existsInAssertShared1 /
+// existsInAssertAnchored1) 与多字通用版逐例一致。compileMVSNFAAssert 此前漏置 single, 致这两条
+// 标量孪生形同虚设 (所有断言 NFA 恒走多字版); 现已启用 (见 initScalar), 故须专项护栏防回归 ——
+// 随机断言正则 × 随机输入 (含非法 UTF-8), 标量与多字判定必须恒等, 否则启用标量即引入假阴/假阳。
+func TestMVSAssertScalarEquivalence(t *testing.T) {
+	r := rand.New(rand.NewSource(0x5CA1A2))
+	singleN, checks := 0, 0
+	for iter := 0; iter < diffIters(t, 800); iter++ {
+		expr := randAssertRegex(r)
+		nfa, ok := buildAssertNFA(t, expr)
+		if !ok {
+			continue
+		}
+		if !nfa.single {
+			continue // 仅测标量快路径资格 (nword==1); 多字版由其它差分覆盖
+		}
+		singleN++
+		for j := 0; j < 40; j++ {
+			data := randAssertInput(r)
+			bound := computeBoundaries(data, nil)
+			// 共享存在性: 标量 == 多字 (同一 NFA, 同一边界).
+			gotShared := nfa.existsInAssertShared1(data, bound)
+			wantShared := nfa.existsInAssertShared(data, bound)
+			checks++
+			if gotShared != wantShared {
+				t.Fatalf("SHARED DIVERGE expr=%q data=%q scalar=%v multi=%v", expr, data, gotShared, wantShared)
+			}
+			// 锚定存在性: 标量 == 多字 (全区间注入 spans=[0,len], 等价整段存在性).
+			if len(data) > 0 {
+				spans := []anchorSpan{{0, int32(len(data))}}
+				prev := make([]uint64, nfa.nword)
+				cand := make([]uint64, nfa.nword)
+				gotAnc := nfa.existsInAssertAnchored1(data, bound, spans)
+				wantAnc := nfa.existsInAssertAnchored(data, bound, spans, prev, cand)
+				checks++
+				if gotAnc != wantAnc {
+					t.Fatalf("ANCHORED DIVERGE expr=%q data=%q scalar=%v multi=%v", expr, data, gotAnc, wantAnc)
+				}
+			}
+		}
+	}
+	t.Logf("assert scalar equivalence: single=%d nfas, checks=%d (all consistent)", singleN, checks)
+	if singleN < 50 {
+		t.Fatalf("too few single (nword==1) assert NFAs (%d); coverage/generator problem", singleN)
+	}
+}

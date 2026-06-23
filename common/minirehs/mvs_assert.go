@@ -512,6 +512,11 @@ func compileMVSNFAAssert(re *syntax.Regexp) (*mvsNFA, bool) {
 	}
 
 	nfa.buildAlphabet(b.posClass)
+	// nword==1 的断言 NFA 也启用标量快路径 (existsInAssertShared1 / existsInAssertAnchored1):
+	// 此前 compileMVSNFAAssert 漏置 single, 致所有断言 NFA (含 always-on 身份证/MAC 整段扫) 恒走
+	// 多字 existsInAssertShared, 标量孪生形同虚设。dispatch 处均 hasAssert 优先, 故 single 只会路由到
+	// 断言标量版, 不会误入 lean existsIn1。
+	nfa.initScalar()
 	return nfa, true
 }
 

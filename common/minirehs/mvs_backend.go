@@ -700,6 +700,9 @@ func (d *mvsDB) verifyOne(idx int, data []byte, sc *scratch, handler MatchHandle
 	if nfa := d.nfas[idx]; nfa != nil {
 		// 存在性门控: 断言 NFA 走 Go existsInAssertShared (不进 C 内核, 复用每报文共享边界);
 		// lean NFA 有 C 内核走 C (与 Go existsIn 逐位一致), 否则纯 Go.
+		// 注: 此处 gate (gateHead<0, 整段 regexp2 复核) 仍保留超集预检 —— 整段 PCRE2 复核较贵 (cgo),
+		// 超集 NFA 预检能滤掉"字面量在但无完整结构"的报文, 实测移除为净亏 (与 verifyGateLocalized 不同:
+		// 后者复核已收窄到 data[winLo:] 廉价, 故移除预检为净赚)。真正的杠杆是把该 gate 也局部化 (gateHead>=0)。
 		var hit bool
 		switch {
 		case nfa.hasAssert && nfa.single:
