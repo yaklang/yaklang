@@ -171,6 +171,39 @@ func TestDecompileNegativeLiterals(t *testing.T) {
 	}
 }
 
+// TestDecompileBalancedTernary guards the structural ternary reconstruction. A conditional whose
+// BOTH arms are themselves ternaries (a balanced tree c?(a?:):(b?:)) defeated the old chain-based
+// combiner: the bottom-up merge detection only recorded the if-nodes nearest the leaves, so the
+// outer condition (which has no direct leaf arm) was missing and an arm was silently dropped,
+// producing an empty-slot stub or a malformed if. The reconstruction now rebuilds the if-node tree by
+// structure and adopts dominating conditions, so these fully decompile. We assert no stub and that
+// each conditional is reconstructed with both nested arms intact.
+func TestDecompileBalancedTernary(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/balanced_ternary.class")
+	if err != nil {
+		t.Fatalf("read embedded class failed: %v", err)
+	}
+	source, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile failed: %v", err)
+	}
+	if _, ferr := java2ssa.Frontend(source); ferr != nil {
+		t.Fatalf("frontend parse failed: %v\n----- source -----\n%s", ferr, source)
+	}
+	if strings.Contains(source, "yak-decompiler") {
+		t.Fatalf("balanced ternary degraded to a stub (structural reconstruction regression)\n----- source -----\n%s", source)
+	}
+	compact := strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(source)
+	// balanced(x,y) must keep a nested ternary in BOTH arms; the old combiner collapsed one arm.
+	if !strings.Contains(compact, "?(((var1)>(5))?(1):(2)):(((var1)>(5))?(3):(4))") {
+		t.Fatalf("balanced both-arms ternary not reconstructed (an arm was dropped)\n----- source -----\n%s", source)
+	}
+	// boolArms must reconstruct boolean comparison arms (type propagated), not int 1/0.
+	if !strings.Contains(compact, "?((var0)<(10)):((var0)<(-10))") {
+		t.Fatalf("boolean-arm ternary not reconstructed\n----- source -----\n%s", source)
+	}
+}
+
 //go:embed testdata/regression/*.class
 var regressionFS embed.FS
 

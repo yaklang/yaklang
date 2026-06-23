@@ -1309,12 +1309,199 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 	for _, code := range ternaryExpMergeNode {
 		mergeNode := code
 		ifNodes := mergeToIfNode[code]
-		sort.Slice(ifNodes, func(i, j int) bool {
-			return ifNodes[i].Id > ifNodes[j].Id
-		})
-		//var preVal values.JavaValue
-		var trueFalseValuePair []values.JavaValue
-		if len(ifNodes) > 0 {
+		if len(ifNodes) == 0 {
+			continue
+		}
+		// A conditional (?:) converges all of its arms at a single mergeNode; the if-nodes feeding it
+		// form a binary tree (outer condition = root, a ternary nested in an arm = subtree). The legacy
+		// combiner below walks them as a right-leaning chain and also reconstructs short-circuit &&/||
+		// (which compile to a DAG that shares a boolean value node), and it handles those correctly.
+		// It only breaks when BOTH arms are nested ternaries (a balanced tree c?(a?:):(b?:)): the
+		// bottom-up merge detection records only the if-nodes nearest the leaves, so the outer
+		// condition - which has no direct leaf arm - is missing, and an arm is silently dropped. We
+		// detect exactly that case by trying to adopt missing dominating conditions (the expansion
+		// below); if it grows the if-set we rebuild the tree structurally, otherwise we keep the proven
+		// legacy path so short-circuit and simple/chain ternaries are unaffected.
+		ifSet := map[*OpCode]bool{}
+		for _, n := range ifNodes {
+			ifSet[n] = true
+		}
+		// branchReachesNestedIf reports whether the straight-line path from entry reaches an existing
+		// condition node of THIS merge (a nested ternary) before anything else. We deliberately do NOT
+		// accept a branch that flows directly into mergeNode (a plain leaf value): adopting an ancestor
+		// is only correct for the balanced BOTH-arms shape c?(a?:):(b?:), where each arm is itself a
+		// nested ternary. Accepting a leaf arm would also match ordinary if/else dispatch (e.g. a lexer
+		// nextToken) whose branches merely converge, and committing that as a ternary corrupts the CFG.
+		branchReachesNestedIf := func(entry *OpCode) bool {
+			cur := entry
+			for step := 0; cur != nil && step < 1<<16; step++ {
+				if ifSet[cur] {
+					return true
+				}
+				if slices.Contains(cur.Target, mergeNode) {
+					return false
+				}
+				if len(cur.Target) != 1 {
+					return false
+				}
+				cur = cur.Target[0]
+			}
+			return false
+		}
+		// nearestIfAncestor walks straight back through the single-predecessor chain to the condition
+		// node that branches into n (n's dominating if), or nil if the chain forks first.
+		nearestIfAncestor := func(n *OpCode) *OpCode {
+			cur := n
+			for step := 0; cur != nil && step < 1<<16; step++ {
+				if len(cur.Source) != 1 {
+					return nil
+				}
+				p := cur.Source[0]
+				if isIfNode(p) {
+					return p
+				}
+				cur = p
+			}
+			return nil
+		}
+		// The bottom-up merge detection records only the if-nodes nearest the leaves. An outer
+		// condition whose arms are BOTH nested ternaries (a balanced tree, c?(a?:):(b?:)) has no
+		// direct leaf arm and is therefore absent from ifNodes, leaving two disconnected sub-ternaries
+		// with no common root. Walk up from each known condition to its nearest condition ancestor and
+		// adopt it when both of its branches feed this same merge, repeating until a fixpoint. The
+		// both-branches guard prevents adopting an enclosing if-statement (whose other branch escapes).
+		adopted := []*OpCode{}
+		for changed := true; changed; {
+			changed = false
+			for _, n := range append(append([]*OpCode{}, ifNodes...), adopted...) {
+				p := nearestIfAncestor(n)
+				if p == nil || ifSet[p] || len(p.Target) < 2 {
+					continue
+				}
+				if branchReachesNestedIf(p.Target[0]) && branchReachesNestedIf(p.Target[1]) {
+					ifSet[p] = true
+					adopted = append(adopted, p)
+					changed = true
+				}
+			}
+		}
+		if len(adopted) > 0 {
+			// A dominating condition was missing (its arms are BOTH nested ternaries), so the legacy
+			// combiner would drop an arm. Probe a structural rebuild WITHOUT global side effects and
+			// commit only if it forms a clean ternary TREE. Short-circuit &&/|| compile to a DAG that
+			// shares a boolean value node; the probe detects the shared leaf (dag) and declines, so we
+			// fall through to the proven legacy path rather than regressing those shapes to a stub.
+			treeNodes := append(append([]*OpCode{}, ifNodes...), adopted...)
+			built := map[*OpCode]*values.TernaryExpression{}
+			visited := map[*OpCode]bool{}
+			usedLeaf := map[*OpCode]bool{}
+			var failed, dag bool
+			var probe func(ifNode *OpCode) *values.TernaryExpression
+			// A genuine ?: arm leaves its value on the operand stack and never writes a local/field. A
+			// store on an arm path means the "merge" is really statement dispatch (e.g. a lexer's
+			// if/else chain assigning a token, all branches converging via astore;goto), not a value
+			// ternary. Committing that as a tree steals the branch conditions and orphans the stores
+			// ("multiple next"), so the probe declines and we keep the legacy path.
+			isStoreOp := func(op int) bool {
+				switch op {
+				case OP_ISTORE, OP_ASTORE, OP_LSTORE, OP_DSTORE, OP_FSTORE,
+					OP_ISTORE_0, OP_ASTORE_0, OP_LSTORE_0, OP_DSTORE_0, OP_FSTORE_0,
+					OP_ISTORE_1, OP_ASTORE_1, OP_LSTORE_1, OP_DSTORE_1, OP_FSTORE_1,
+					OP_ISTORE_2, OP_ASTORE_2, OP_LSTORE_2, OP_DSTORE_2, OP_FSTORE_2,
+					OP_ISTORE_3, OP_ASTORE_3, OP_LSTORE_3, OP_DSTORE_3, OP_FSTORE_3,
+					OP_IINC, OP_PUTFIELD, OP_PUTSTATIC,
+					OP_AASTORE, OP_IASTORE, OP_BASTORE, OP_CASTORE, OP_FASTORE, OP_LASTORE, OP_DASTORE, OP_SASTORE:
+					return true
+				default:
+					return false
+				}
+			}
+			arm := func(entry *OpCode) values.JavaValue {
+				cur := entry
+				for step := 0; cur != nil && step < 1<<16; step++ {
+					if failed {
+						return nil
+					}
+					if ifSet[cur] {
+						return probe(cur)
+					}
+					if isStoreOp(cur.Instr.OpCode) {
+						failed = true
+						return nil
+					}
+					if slices.Contains(cur.Target, mergeNode) {
+						if cur.StackEntry == nil {
+							failed = true
+							return nil
+						}
+						if usedLeaf[cur] {
+							dag = true // a leaf shared by two branches => not a tree (short-circuit)
+						}
+						usedLeaf[cur] = true
+						return cur.StackEntry.value
+					}
+					if len(cur.Target) != 1 {
+						failed = true
+						return nil
+					}
+					cur = cur.Target[0]
+				}
+				failed = true
+				return nil
+			}
+			probe = func(ifNode *OpCode) *values.TernaryExpression {
+				if t, ok := built[ifNode]; ok {
+					dag = true // a condition reached from two parents => not a tree
+					return t
+				}
+				if len(ifNode.Target) < 2 {
+					failed = true
+					return nil
+				}
+				visited[ifNode] = true
+				tern := values.NewTernaryExpression(values.NewSlotValue(nil, types.NewJavaPrimer(types.JavaBoolean)), nil, nil)
+				built[ifNode] = tern
+				tern.TrueValue = arm(ifNode.Target[1])
+				tern.FalseValue = arm(ifNode.Target[0])
+				return tern
+			}
+			root := treeNodes[0]
+			for _, n := range treeNodes {
+				if n.Id < root.Id {
+					root = n
+				}
+			}
+			rootTern := probe(root)
+			allVisited := rootTern != nil
+			for _, n := range treeNodes {
+				if !visited[n] {
+					allVisited = false
+				}
+			}
+			if !failed && !dag && allVisited {
+				// Clean tree: wire each condition callback and publish the tree as the merge value.
+				// Iterate treeNodes (a stable slice), not the built map, so callback wiring is
+				// deterministic; built's keys equal treeNodes for a committed tree.
+				for _, ifNode := range treeNodes {
+					t := built[ifNode]
+					t.ConditionFromOp = ifNode.Id
+					ifNodeToConditionCallback[ifNode] = func(value values.JavaValue) {
+						t.Condition = value
+					}
+				}
+				ternaryExpMergeNodeSlot[code].ResetValue(rootTern)
+				code.conditionOpId = 0
+				continue
+			}
+			// Probe declined (DAG / unresolved arm); fall through to the legacy reconstruction.
+		}
+		// Legacy chain/short-circuit reconstruction. Handles simple, chained, and short-circuit &&/||
+		// shapes, and is the safe fallback when the structural probe above declines.
+		{
+			sort.Slice(ifNodes, func(i, j int) bool {
+				return ifNodes[i].Id > ifNodes[j].Id
+			})
+			var trueFalseValuePair []values.JavaValue
 			ifNode := ifNodes[0]
 			var source []*OpCode
 			falseSource := []*OpCode{}
@@ -1345,7 +1532,6 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 					return errors.New("found invalid ternary expression")
 				}
 			}
-
 			var defaultTarnaryValue *values.TernaryExpression
 			for i, opCode := range ifNodes {
 				if i == 0 {
@@ -1440,6 +1626,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 					}
 				}
 			}
+			continue
 		}
 	}
 	for _, slotVal := range ternaryExpMergeNodeSlot {
