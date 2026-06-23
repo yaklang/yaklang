@@ -184,6 +184,12 @@ func (d *Decompiler) ScanJmp() error {
 					gotoOp := d.offsetToOpcodeIndex[entry.HandlerPc]
 					d.opCodes[gotoOp].IsCatch = true
 					d.opCodes[gotoOp].ExceptionTypeIndex = entry.CatchType
+					// Accumulate every catch type that shares this handler PC so multi-catch
+					// (`catch (A | B)`) can be reconstructed. Dedupe because the exception-table
+					// scan may revisit the same start opcode while walking the graph.
+					if !slices.Contains(d.opCodes[gotoOp].ExceptionTypeIndexes, entry.CatchType) {
+						d.opCodes[gotoOp].ExceptionTypeIndexes = append(d.opCodes[gotoOp].ExceptionTypeIndexes, entry.CatchType)
+					}
 					deferWalkId = append(deferWalkId, gotoOp)
 					walkNode(gotoOp)
 					if pre != nil {
@@ -1247,9 +1253,21 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		})
 		if code.IsCatch {
 			var typ types.JavaType
-			if code.ExceptionTypeIndex != 0 {
+			// Reconstruct a multi-catch clause when several catch types share this handler.
+			multiTypes := make([]types.JavaType, 0, len(code.ExceptionTypeIndexes))
+			for _, idx := range code.ExceptionTypeIndexes {
+				if idx != 0 {
+					multiTypes = append(multiTypes, d.GetValueFromPool(int(idx)).Type())
+				}
+			}
+			switch {
+			case len(multiTypes) > 1:
+				typ = types.NewMultiCatchType(multiTypes)
+			case len(multiTypes) == 1:
+				typ = multiTypes[0]
+			case code.ExceptionTypeIndex != 0:
 				typ = d.GetValueFromPool(int(code.ExceptionTypeIndex)).Type()
-			} else {
+			default:
 				typ = types.NewJavaClass("Throwable")
 			}
 			exceptionValue := values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
