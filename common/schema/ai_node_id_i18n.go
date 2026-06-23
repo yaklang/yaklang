@@ -121,6 +121,14 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "加载工具",
 		En: "Loading Tools",
 	},
+	"query_mcp_servers": {
+		Zh: "查询 MCP 服务器",
+		En: "Query MCP Servers",
+	},
+	"query_mcp_tools": {
+		Zh: "查询 MCP 工具",
+		En: "Query MCP Tools",
+	},
 	"loading_skills_name": {
 		Zh: "加载技能",
 		En: "Loading Skills",

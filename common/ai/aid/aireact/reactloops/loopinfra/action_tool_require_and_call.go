@@ -2,7 +2,6 @@ package loopinfra
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -45,32 +44,18 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 			ctx = t.GetContext()
 		}
 
-		// loading file or tool
-		pr, pw := utils.NewPipe()
-		pw.WriteString("loading tool: ")
-		pw.WriteString(toolPayload)
-		pw.WriteString("...")
-		closeOnce := new(sync.Once)
-		closeStatusPipe := func() {
-			closeOnce.Do(func() {
-				pw.Close()
-			})
-		}
-		loop.GetEmitter().EmitDefaultSystemStreamEvent("load_tool", pr, operator.GetTask().GetId())
-		defer closeStatusPipe()
-
-		toolIns, err := loop.GetConfig().GetAiToolManager().GetToolByName(toolPayload)
-		if err != nil {
-			pw.WriteString(fmt.Sprintf("Error: %v", err.Error()))
+		loopInfraStatus(loop, "准备工具调用 / Preparing Tool Call...")
+		toolLoadMessage := fmt.Sprintf("loading tool: %s...", toolPayload)
+		if toolIns, err := loop.GetConfig().GetAiToolManager().GetToolByName(toolPayload); err != nil {
+			toolLoadMessage += fmt.Sprintf(" Error: %v", err)
 		} else {
-			pw.WriteString(utils.MustRenderTemplate(
-				`done! {{ .Name }}{{ if .VerboseName}}({{.VerboseName}}){{ end }} is prepared`,
-				map[string]interface{}{
-					"Name":        toolIns.GetName(),
-					"VerboseName": toolIns.GetVerboseName(),
-				}),
-			)
+			displayName := toolIns.GetName()
+			if toolIns.GetVerboseName() != "" {
+				displayName = fmt.Sprintf("%s(%s)", toolIns.GetName(), toolIns.GetVerboseName())
+			}
+			toolLoadMessage += fmt.Sprintf(" done! %s is prepared", displayName)
 		}
+		loopInfraSystemLog(loop, "load_tool", toolLoadMessage)
 
 		result, directly, callErr := invoker.ExecuteToolRequiredAndCall(ctx, toolPayload)
 

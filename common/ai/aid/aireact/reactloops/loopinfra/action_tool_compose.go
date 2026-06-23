@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
-	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -96,24 +96,7 @@ Example - Sequential file operations(With AI-Tag tags):
 	<|WORKFLOW_DAG_END_{{.Nonce}}|>
 `,
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
-		emitter := loop.GetEmitter()
-		isDone := utils.NewBool(false)
-		pr, pw := utils.NewPipe()
-		defer func() {
-			pw.Close()
-			isDone.SetTo(true)
-		}()
-		emitter.EmitDefaultStreamEvent("thought", pr, loop.GetCurrentTask().GetId())
-		pw.WriteString("智能工具编排中..")
-		go func() {
-			for {
-				time.Sleep(time.Second)
-				if isDone.IsSet() {
-					return
-				}
-				pw.WriteString(".")
-			}
-		}()
+		loopInfraStatus(loop, "解析工具编排 / Parsing Tool Compose...")
 		action.WaitStream(loop.GetCurrentTask().GetContext())
 
 		payload := action.GetString("tool_compose_payload")
@@ -183,6 +166,10 @@ Example - Sequential file operations(With AI-Tag tags):
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to build tool compose DAG: %v", err)
 			invoker.AddToTimeline("[TOOL_COMPOSE_ERROR]", errMsg)
+			loopInfraStatus(loop, "工具编排失败 / Tool Compose Failed")
+			loopInfraActionFinish(loop, loopInfraNodeToolCompose,
+				"工具编排解析失败 / Tool Compose Build Failed",
+				utils.ShrinkTextBlock(errMsg, 800))
 			operator.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
 			operator.SetReflectionData("dag_build_error", err.Error())
 			operator.Feedback(utils.Error(errMsg))
@@ -262,6 +249,10 @@ Example - Sequential file operations(With AI-Tag tags):
 		if err != nil {
 			errMsg := fmt.Sprintf("Tool compose DAG execution failed: %v", err)
 			invoker.AddToTimeline("[TOOL_COMPOSE_FAILED]", errMsg)
+			loopInfraStatus(loop, "工具编排执行失败 / Tool Compose Execution Failed")
+			loopInfraActionFinish(loop, loopInfraNodeToolCompose,
+				"工具编排执行失败 / Tool Compose Execution Failed",
+				utils.ShrinkTextBlock(errMsg, 800))
 			operator.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
 			operator.SetReflectionData("dag_execution_error", err.Error())
 			operator.SetReflectionData("execution_errors", executionErrors)
@@ -284,6 +275,10 @@ Example - Sequential file operations(With AI-Tag tags):
 
 		invoker.AddToTimeline("[TOOL_COMPOSE_COMPLETE]",
 			fmt.Sprintf("All tool calls completed. Results: %v", resultSummary))
+		loopInfraStatus(loop, "工具编排完成 / Tool Compose Complete")
+		loopInfraActionFinish(loop, loopInfraNodeToolCompose,
+			fmt.Sprintf("工具编排完成: %d nodes / Tool Compose Complete: %d nodes", len(resultSummary), len(resultSummary)),
+			strings.Join(resultSummary, "\n"))
 
 		// Verify user satisfaction
 		task := loop.GetCurrentTask()
