@@ -124,7 +124,8 @@ func buildReadAuditReportAction(state *AuditState) reactloops.ReActLoopOption {
 				op.Feedback(fmt.Sprintf("读取审计报告失败 %s: %v", path, err))
 				return
 			}
-			op.Feedback(utils.ShrinkTextBlock(string(content), 12000))
+			summary, _ := reactloops.SpillLongContent(loop, "audit_report", string(content))
+			op.Feedback(fmt.Sprintf("审计报告 (%s, %d bytes):\n\n%s", path, len(content), summary))
 		},
 	)
 }

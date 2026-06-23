@@ -225,6 +225,34 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "工具编排",
 		En: "Tool Compose",
 	},
+	"infra-file-write": {
+		Zh: "写入文件",
+		En: "Write File",
+	},
+	"infra-file-modify": {
+		Zh: "修改文件",
+		En: "Modify File",
+	},
+	"infra-file-insert": {
+		Zh: "插入文件内容",
+		En: "Insert File Content",
+	},
+	"infra-file-delete": {
+		Zh: "删除文件内容",
+		En: "Delete File Content",
+	},
+	"code-audit-scan": {
+		Zh: "代码审计扫描",
+		En: "Code Audit Scan",
+	},
+	"code-audit-verify": {
+		Zh: "漏洞验证",
+		En: "Vulnerability Verify",
+	},
+	"code-audit-report": {
+		Zh: "审计报告",
+		En: "Audit Report",
+	},
 	"knowledge-compress": {
 		Zh: "压缩精炼",
 		En: "Knowledge Compress",
@@ -910,6 +938,10 @@ var nodeIdMapper = map[string]*I18n{
 	"skill-audit-phase2": {
 		Zh: "Skill 静态分析",
 		En: "Skill Static Analysis",
+	},
+	"skill-audit-findings": {
+		Zh: "Skill 审计发现",
+		En: "Skill Audit Findings",
 	},
 	"skill-audit-report": {
 		Zh: "Skill 审计报告",
