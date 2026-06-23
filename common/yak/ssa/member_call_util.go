@@ -21,13 +21,6 @@ func setMemberCallRelationship(obj, key, member Value) {
 	if user, ok := obj.(User); ok {
 		key.AddUser(user)
 	}
-	if next, ok := obj.(*Next); ok && next.Iter > 0 {
-		if iter, ok := next.GetValueById(next.Iter); ok && iter != nil && iter.GetId() != obj.GetId() {
-			if _, exists := GetLatestMemberByKey(iter, key); !exists {
-				setMemberCallRelationship(iter, key, member)
-			}
-		}
-	}
 	//todo：fix one value for more object-key
 
 	handlerMemberCall := func(phi *Phi) {
@@ -39,24 +32,17 @@ func setMemberCallRelationship(obj, key, member Value) {
 			if !ok || edgeValue == nil {
 				continue
 			}
-
-			shouldPropagate := edgeValue.IsObject()
-			switch ins := edgeValue.(type) {
-			case *Make, *Next:
-				shouldPropagate = true
-			case *Call:
-				shouldPropagate = true
-			case *Undefined:
-				shouldPropagate = ins.Kind == UndefinedValueInValid
-			}
-			if !shouldPropagate {
-				continue
-			}
-
 			if _, ok := GetLatestMemberByKey(edgeValue, key); ok { // 避免循环
 				continue
 			}
-			setMemberCallRelationship(edgeValue, key, member)
+			if _, ok := edgeValue.(*Call); ok {
+				setMemberCallRelationship(edgeValue, key, member)
+			}
+			if und, ok := edgeValue.(*Undefined); ok {
+				if und.Kind == UndefinedValueInValid {
+					setMemberCallRelationship(edgeValue, key, member)
+				}
+			}
 		}
 	}
 
