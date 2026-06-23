@@ -546,6 +546,83 @@ func isUnconditionalTerminalStatement(st statements.Statement, funcCtx *class_co
 		case strings.HasPrefix(t, "break "), strings.HasPrefix(t, "continue "), strings.HasPrefix(t, "throw "):
 			return true
 		}
+	case *statements.DoWhileStatement:
+		// An infinite loop (condition is the constant true) that never breaks back to its own
+		// successor transfers control away forever, so any sibling after it is unreachable.
+		// This is common after CFG structuring: a nested loop's exit is wired straight to the
+		// outer loop's `continue LABEL`, leaving the inner do-while(true) with no break and a
+		// dangling `continue;` behind it that javac rejects as an unreachable statement.
+		if loopConditionIsConstTrue(s.ConditionValue, funcCtx) &&
+			!loopBodyHasEscapingBreak(s.Body, s.Label, true, funcCtx) {
+			return true
+		}
+	case *statements.WhileStatement:
+		if loopConditionIsConstTrue(s.ConditionValue, funcCtx) &&
+			!loopBodyHasEscapingBreak(s.Body, "", true, funcCtx) {
+			return true
+		}
+	}
+	return false
+}
+
+// loopConditionIsConstTrue reports whether a loop condition is the literal true (an infinite loop).
+func loopConditionIsConstTrue(cond values.JavaValue, funcCtx *class_context.ClassContext) bool {
+	return cond != nil && strings.TrimSpace(cond.String(funcCtx)) == "true"
+}
+
+// loopBodyHasEscapingBreak reports whether body (the body of a loop whose label is loopLabel)
+// contains a break that hands control to the statement following THAT loop: an unlabeled `break`
+// that is not nested inside a deeper loop or switch, or a `break <loopLabel>` at any depth. continue
+// statements and breaks targeting other constructs do not return control to this loop's successor,
+// so they are not counted. directlyInLoop becomes false once the walk descends into a nested loop or
+// switch, where an unlabeled break belongs to that inner construct instead of to our loop. The
+// walker covers every statement kind that can hold a nested break; leaf statements without nested
+// bodies cannot contain one.
+func loopBodyHasEscapingBreak(body []statements.Statement, loopLabel string, directlyInLoop bool, funcCtx *class_context.ClassContext) bool {
+	for _, st := range body {
+		switch s := st.(type) {
+		case *statements.CustomStatement:
+			t := strings.TrimSpace(s.String(funcCtx))
+			if directlyInLoop && t == "break" {
+				return true
+			}
+			if loopLabel != "" && t == "break "+loopLabel {
+				return true
+			}
+		case *statements.IfStatement:
+			if loopBodyHasEscapingBreak(s.IfBody, loopLabel, directlyInLoop, funcCtx) ||
+				loopBodyHasEscapingBreak(s.ElseBody, loopLabel, directlyInLoop, funcCtx) {
+				return true
+			}
+		case *statements.TryCatchStatement:
+			if loopBodyHasEscapingBreak(s.TryBody, loopLabel, directlyInLoop, funcCtx) {
+				return true
+			}
+			for _, cb := range s.CatchBodies {
+				if loopBodyHasEscapingBreak(cb, loopLabel, directlyInLoop, funcCtx) {
+					return true
+				}
+			}
+		case *statements.SynchronizedStatement:
+			if loopBodyHasEscapingBreak(s.Body, loopLabel, directlyInLoop, funcCtx) {
+				return true
+			}
+		case *statements.DoWhileStatement:
+			// Nested loop: an unlabeled break is its own; only `break <loopLabel>` escapes to us.
+			if loopBodyHasEscapingBreak(s.Body, loopLabel, false, funcCtx) {
+				return true
+			}
+		case *statements.WhileStatement:
+			if loopBodyHasEscapingBreak(s.Body, loopLabel, false, funcCtx) {
+				return true
+			}
+		case *statements.SwitchStatement:
+			for _, c := range s.Cases {
+				if loopBodyHasEscapingBreak(c.Body, loopLabel, false, funcCtx) {
+					return true
+				}
+			}
+		}
 	}
 	return false
 }

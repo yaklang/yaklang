@@ -1772,14 +1772,28 @@ func (d *Decompiler) ParseStatement() error {
 			switchStatement := statements.NewMiddleStatement(statements.MiddleSwitch, []any{opcode.SwitchJmpCase1, opcode.stackConsumed[0]})
 			appendNode(switchStatement)
 		case OP_IINC:
+			// The iinc increment is a SIGNED constant. Reading it unsigned turns `i--`
+			// (iinc i, -1 => byte 0xFF) into `i + 255`, and because the renderer prints any
+			// INC op as `i++` it silently became `i++`, inverting every descending loop.
+			// Sign-extend (int8 / int16) and pick the faithful form: ++ / -- / += k / -= k.
 			var inc int
 			if opcode.IsWide {
-				inc = int(Convert2bytesToInt(opcode.Data[2:]))
+				inc = int(int16(Convert2bytesToInt(opcode.Data[2:])))
 			} else {
-				inc = int(opcode.Data[1])
+				inc = int(int8(opcode.Data[1]))
 			}
 			ref := opcode.Ref
-			appendNode(values.NewBinaryExpression(ref, values.NewJavaLiteral(inc, types.NewJavaPrimer(types.JavaInteger)), INC, ref.Type()))
+			intType := types.NewJavaPrimer(types.JavaInteger)
+			switch {
+			case inc == 1:
+				appendNode(values.NewBinaryExpression(ref, values.NewJavaLiteral(1, intType), INC, ref.Type()))
+			case inc == -1:
+				appendNode(values.NewBinaryExpression(ref, values.NewJavaLiteral(1, intType), values.DEC, ref.Type()))
+			case inc >= 0:
+				appendNode(statements.NewAssignStatement(ref, values.NewBinaryExpression(ref, values.NewJavaLiteral(inc, intType), ADD, ref.Type()), false))
+			default:
+				appendNode(statements.NewAssignStatement(ref, values.NewBinaryExpression(ref, values.NewJavaLiteral(-inc, intType), SUB, ref.Type()), false))
+			}
 		case OP_END:
 			endNode := statements.NewMiddleStatement("end", nil)
 			appendNode(endNode)

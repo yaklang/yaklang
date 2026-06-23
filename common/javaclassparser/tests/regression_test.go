@@ -81,6 +81,64 @@ func TestDecompileNoUnreachableJump(t *testing.T) {
 	}
 }
 
+// TestDecompileLoopControlFlow guards the loop control-flow correctness fixes. Three distinct
+// bytecode bugs silently corrupted loop semantics while still parsing through the syntax net, so we
+// assert the structural signatures explicitly (a javac-free guard; the executable end-to-end check
+// lives in TestLoopSemanticsRoundTrip):
+//   - descending loop: `iinc i,-1` was read unsigned and always rendered `i++`, turning `for(;;i--)`
+//     into an infinite/ascending loop. The descending body must now render `var2--`.
+//   - bottom-tested do-while: RebuildLoopNode appended the redirected back-edge, swapping the
+//     condition node's two successors so break/continue landed on the wrong branch. The exit
+//     condition must now guard `break`, not `continue`.
+//   - nested loop: a nested loop whose exit flows straight to the outer `continue` left the inner
+//     do-while(true) with no break and a dangling, unreachable `continue;`/`break;` after it that
+//     javac rejects. No dead jump may follow a `} while (true);`.
+func TestDecompileLoopControlFlow(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/loop_control_flow.class")
+	if err != nil {
+		t.Fatalf("read embedded class failed: %v", err)
+	}
+	source, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile failed: %v", err)
+	}
+	if _, ferr := java2ssa.Frontend(source); ferr != nil {
+		t.Fatalf("frontend parse failed: %v\n----- source -----\n%s", ferr, source)
+	}
+	if strings.Contains(source, "yak-decompiler") {
+		t.Fatalf("expected full decompilation, got a stub\n----- source -----\n%s", source)
+	}
+
+	// Whitespace-insensitive view so the assertions do not depend on indentation/formatting.
+	compact := strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(source)
+
+	// descending loop: iinc -1 must reconstruct as a decrement, not the old `++`.
+	if !strings.Contains(compact, "var2--") {
+		t.Fatalf("descending loop did not reconstruct a decrement (iinc-sign regression)\n----- source -----\n%s", source)
+	}
+
+	// bottom-tested do-while: the exit condition must guard break (not continue).
+	if !strings.Contains(compact, ">=(var0)){break;") {
+		t.Fatalf("do-while exit branch missing break (back-edge polarity regression)\n----- source -----\n%s", source)
+	}
+	if strings.Contains(compact, ">=(var0)){continue;") {
+		t.Fatalf("do-while inverted: exit condition guards continue instead of break\n----- source -----\n%s", source)
+	}
+
+	// nested loop: no unreachable jump may follow an infinite do-while.
+	lines := strings.Split(source, "\n")
+	for i := 1; i < len(lines); i++ {
+		cur := strings.TrimSpace(lines[i])
+		prev := strings.TrimSpace(lines[i-1])
+		isDeadJump := cur == "break;" || cur == "continue;" ||
+			strings.HasPrefix(cur, "break ") || strings.HasPrefix(cur, "continue ")
+		if isDeadJump && strings.HasSuffix(prev, "while (true);") {
+			t.Fatalf("unreachable %q after infinite loop close %q (line %d)\n----- source -----\n%s",
+				cur, prev, i+1, source)
+		}
+	}
+}
+
 //go:embed testdata/regression/*.class
 var regressionFS embed.FS
 
