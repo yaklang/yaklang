@@ -23,20 +23,39 @@ func RebuildLoopNode(manager *RewriteManager) error {
 	for _, node := range manager.CircleEntryPoint {
 		doWhileSt := statements.NewDoWhileStatement(values.NewJavaLiteral(true, types.NewJavaPrimer(types.JavaBoolean)), nil)
 		doWhileNode := manager.NewNode(doWhileSt)
-		//doWhileNode.LoopEndNode = node.GetLoopEndNode()
-		circleNodeSource := slices.Clone(node.Source)
-		node.RemoveAllSource()
-
-		//node.LoopNode = doWhileNode
-		//doWhileNode.AddNext(circleNode)
-		for _, n := range circleNodeSource {
-			doWhileNode.AddSource(n)
+		// Redirect every edge `source -> circleNode` to `source -> doWhileNode` while preserving the
+		// edge's index in source.Next. The previous remove-all-source + AddSource approach appended
+		// the redirected edge to the end of source.Next; for a bottom-tested loop the loop-condition
+		// node is itself a back-edge source, so its branch to circleNode was shoved to index 1,
+		// swapping the if's two successors and inverting the reconstructed do-while condition (break
+		// and continue landed on the wrong branch). In-place replacement keeps branch polarity.
+		for _, n := range slices.Clone(node.Source) {
+			replaceNextInPlace(n, node, doWhileNode)
 		}
 		doWhileNode.AddNext(node)
 		manager.WhileNode = append(manager.WhileNode, doWhileNode)
 	}
 	return nil
 }
+// replaceNextInPlace rewires the edge node->oldNext to node->newNext while keeping the edge at
+// its original index inside node.Next. Position matters: a ConditionStatement's TrueNode()/
+// FalseNode() are bound to fixed Next indices computed during graph construction, so appending a
+// freshly created break/continue node (the old RemoveNext + AddNext pair) would shift it to the
+// other branch and silently invert the loop condition - body and exit swap, producing
+// "if (i < n) break; else { body }" instead of "if (i < n) { body } else break;". Replacing in
+// place preserves the branch polarity so the reconstructed loop keeps its original semantics.
+func replaceNextInPlace(node, oldNext, newNext *core.Node) {
+	idx := slices.Index(node.Next, oldNext)
+	node.RemoveNext(oldNext)
+	if idx < 0 || idx > len(node.Next) {
+		node.AddNext(newNext)
+		return
+	}
+	node.Next = slices.Insert(node.Next, idx, newNext)
+	// newNext is already spliced into node.Next; AddNext only fixes the reverse Source link here.
+	node.AddNext(newNext)
+}
+
 func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 	loopEnd := searchCircleEndNode(circleNode, circleNode.Next[0])
 	preWhileNodes := utils.NodeFilter(manager.WhileNode, func(node *core.Node) bool {
@@ -65,8 +84,7 @@ func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 				}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
 				}))
 				continueNode.IsJmp = true
-				node.RemoveNext(next)
-				node.AddNext(continueNode)
+				replaceNextInPlace(node, next, continueNode)
 				continueNode.AddNext(next)
 				continue
 			}
@@ -142,8 +160,7 @@ func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 					return "break"
 				}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
 				}))
-				node.RemoveNext(next)
-				node.AddNext(breakNode)
+				replaceNextInPlace(node, next, breakNode)
 				breakNode.AddNext(circleNode)
 				circleNode.AddNext(next)
 				breakNode.IsJmp = true
@@ -169,8 +186,7 @@ func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 						}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
 						})
 						breakNode.IsJmp = true
-						node.RemoveNext(next)
-						node.AddNext(breakNode)
+						replaceNextInPlace(node, next, breakNode)
 						breakNode.AddNext(matched[0])
 					}
 					//} else {
@@ -198,8 +214,7 @@ func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 							}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
 							})
 							breakNode.IsJmp = true
-							node.RemoveNext(next)
-							node.AddNext(breakNode)
+							replaceNextInPlace(node, next, breakNode)
 							breakNode.AddNext(endNode)
 							break
 						}
