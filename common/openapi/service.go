@@ -513,7 +513,7 @@ Host: www.example.com
 		return nil, utils.Errorf("method %q not found for path %q", method, path)
 	}
 
-	methodRoot = appendOpenAPIPath(methodRoot, path).FuzzMethod(strings.ToLower(method))
+	methodRoot = appendOpenAPIPath(methodRoot, path).FuzzMethod(strings.ToUpper(method))
 	if len(op.Consumes) > 0 {
 		methodRoot = methodRoot.FuzzHTTPHeader("Content-Type", op.Consumes[0])
 	}
@@ -549,6 +549,15 @@ Host: www.example.com
 			methodRoot = methodRoot.FuzzGetParams(p.Name, paramValueOverride(opts, p.Name, ValueViaField(p.Name, p.Type, p.Default)))
 		case "header":
 			methodRoot = methodRoot.FuzzHTTPHeader(p.Name, fmt.Sprint(paramValueOverride(opts, p.Name, ValueViaField(p.Name, p.Type, p.Default))))
+		case "formData":
+			value := paramValueOverride(opts, p.Name, ValueViaField(p.Name, p.Type, p.Default))
+			if p.Type == "file" {
+				methodRoot = methodRoot.FuzzUploadFile(p.Name, "filename.txt", []byte(`[[file-placeholder]]`))
+			} else if v2ConsumesMultipart(op) {
+				methodRoot = methodRoot.FuzzFormEncoded(p.Name, value)
+			} else {
+				methodRoot = methodRoot.FuzzPostParams(p.Name, value)
+			}
 		case "body":
 			if p.Schema != nil {
 				if p.Schema.Ref != "" {
@@ -612,7 +621,7 @@ Host: www.example.com
 		}
 	}
 
-	methodRoot := pathRoot.FuzzMethod(strings.ToLower(method))
+	methodRoot := pathRoot.FuzzMethod(strings.ToUpper(method))
 	pr := methodRoot.FirstFuzzHTTPRequest().GetPath()
 	originPath, _ := codec.PathUnescape(pr)
 	if originPath == "" {
@@ -657,6 +666,15 @@ Host: www.example.com
 		results = append(results, reqs...)
 	}
 	return results, nil
+}
+
+func v2ConsumesMultipart(op *openapi2.Operation) bool {
+	for _, c := range op.Consumes {
+		if strings.Contains(strings.ToLower(c), "multipart") {
+			return true
+		}
+	}
+	return false
 }
 
 func applyParametersWithOverrides(data openapi3.T, param *openapi3.Parameter, methodRoot mutate.FuzzHTTPRequestIf, originPath string, opts *BuildOptions) (mutate.FuzzHTTPRequestIf, string) {

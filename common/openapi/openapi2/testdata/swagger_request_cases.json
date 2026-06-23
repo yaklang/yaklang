@@ -1,0 +1,251 @@
+{
+  "document": "openapi2/testdata/swagger.json",
+  "defaultParameterValues": {
+    "petId": "1",
+    "orderId": "1",
+    "username": "user1",
+    "status": "available",
+    "tags": "tag1",
+    "api_key": "special-key",
+    "name": "doggie",
+    "password": "pass123",
+    "additionalMetadata": "meta"
+  },
+  "cases": [
+    {
+      "name": "addPet",
+      "operationId": "addPet",
+      "path": "/pet",
+      "method": "POST",
+      "expect": {
+        "requestLine": "POST /v2/pet HTTP/1.1",
+        "host": "petstore.swagger.io",
+        "headerEquals": {
+          "Content-Type": "application/json"
+        },
+        "bodyJsonKeys": ["name", "photoUrls", "status", "tags", "category", "id"],
+        "bodyMustNotContain": ["[]"]
+      }
+    },
+    {
+      "name": "updatePet",
+      "operationId": "updatePet",
+      "path": "/pet",
+      "method": "PUT",
+      "expect": {
+        "requestLine": "PUT /v2/pet HTTP/1.1",
+        "host": "petstore.swagger.io",
+        "headerEquals": {
+          "Content-Type": "application/json"
+        },
+        "bodyJsonKeys": ["name", "photoUrls", "status", "tags", "category", "id"],
+        "bodyMustNotContain": ["[]"]
+      }
+    },
+    {
+      "name": "findPetsByStatus",
+      "operationId": "findPetsByStatus",
+      "path": "/pet/findByStatus",
+      "method": "GET",
+      "expect": {
+        "expectedRequest": "GET /v2/pet/findByStatus?status=available HTTP/1.1\r\nHost: petstore.swagger.io\r\n\r\n"
+      }
+    },
+    {
+      "name": "findPetsByTags",
+      "operationId": "findPetsByTags",
+      "path": "/pet/findByTags",
+      "method": "GET",
+      "expect": {
+        "expectedRequest": "GET /v2/pet/findByTags?tags=tag1 HTTP/1.1\r\nHost: petstore.swagger.io\r\n\r\n"
+      }
+    },
+    {
+      "name": "getPetById",
+      "operationId": "getPetById",
+      "path": "/pet/{petId}",
+      "method": "GET",
+      "expect": {
+        "expectedRequest": "GET /v2/pet/1 HTTP/1.1\r\nHost: petstore.swagger.io\r\n\r\n"
+      }
+    },
+    {
+      "name": "updatePetWithForm",
+      "operationId": "updatePetWithForm",
+      "path": "/pet/{petId}",
+      "method": "POST",
+      "expect": {
+        "expectedRequest": "POST /v2/pet/1 HTTP/1.1\r\nHost: petstore.swagger.io\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nname=doggie&status=available"
+      }
+    },
+    {
+      "name": "deletePet",
+      "operationId": "deletePet",
+      "path": "/pet/{petId}",
+      "method": "DELETE",
+      "expect": {
+        "expectedRequest": "DELETE /v2/pet/1 HTTP/1.1\r\nHost: petstore.swagger.io\r\nApi_key: special-key\r\n\r\n"
+      }
+    },
+    {
+      "name": "uploadFile",
+      "operationId": "uploadFile",
+      "path": "/pet/{petId}/uploadImage",
+      "method": "POST",
+      "expect": {
+        "requestLine": "POST /v2/pet/1/uploadImage HTTP/1.1",
+        "host": "petstore.swagger.io",
+        "headerPrefix": {
+          "Content-Type": "multipart/form-data; boundary="
+        },
+        "bodyMustContain": [
+          "name=\"additionalMetadata\"",
+          "meta",
+          "name=\"file\"",
+          "filename=\"filename.txt\"",
+          "[[file-placeholder]]"
+        ]
+      }
+    },
+    {
+      "name": "getInventory",
+      "operationId": "getInventory",
+      "path": "/store/inventory",
+      "method": "GET",
+      "expect": {
+        "expectedRequest": "GET /v2/store/inventory HTTP/1.1\r\nHost: petstore.swagger.io\r\n\r\n"
+      }
+    },
+    {
+      "name": "placeOrder",
+      "operationId": "placeOrder",
+      "path": "/store/order",
+      "method": "POST",
+      "expect": {
+        "requestLine": "POST /v2/store/order HTTP/1.1",
+        "host": "petstore.swagger.io",
+        "headerEquals": {
+          "Content-Type": "application/json"
+        },
+        "bodyJsonKeys": ["id", "petId", "quantity", "shipDate", "status", "complete"],
+        "bodyMustNotContain": ["[]"]
+      }
+    },
+    {
+      "name": "getOrderById",
+      "operationId": "getOrderById",
+      "path": "/store/order/{orderId}",
+      "method": "GET",
+      "expect": {
+        "expectedRequest": "GET /v2/store/order/1 HTTP/1.1\r\nHost: petstore.swagger.io\r\n\r\n"
+      }
+    },
+    {
+      "name": "deleteOrder",
+      "operationId": "deleteOrder",
+      "path": "/store/order/{orderId}",
+      "method": "DELETE",
+      "expect": {
+        "expectedRequest": "DELETE /v2/store/order/1 HTTP/1.1\r\nHost: petstore.swagger.io\r\n\r\n"
+      }
+    },
+    {
+      "name": "createUser",
+      "operationId": "createUser",
+      "path": "/user",
+      "method": "POST",
+      "expect": {
+        "requestLine": "POST /v2/user HTTP/1.1",
+        "host": "petstore.swagger.io",
+        "headerEquals": {
+          "Content-Type": "application/json"
+        },
+        "bodyJsonKeys": ["id", "username", "firstName", "lastName", "email", "password", "phone", "userStatus"],
+        "bodyMustNotContain": ["[]"]
+      }
+    },
+    {
+      "name": "createUsersWithArrayInput",
+      "operationId": "createUsersWithArrayInput",
+      "path": "/user/createWithArray",
+      "method": "POST",
+      "expect": {
+        "requestLine": "POST /v2/user/createWithArray HTTP/1.1",
+        "host": "petstore.swagger.io",
+        "headerEquals": {
+          "Content-Type": "application/json"
+        },
+        "bodyJsonArray": true,
+        "bodyJsonKeys": ["id", "username", "firstName", "lastName", "email", "password", "phone", "userStatus"],
+        "bodyMustNotContain": ["[]"]
+      }
+    },
+    {
+      "name": "createUsersWithListInput",
+      "operationId": "createUsersWithListInput",
+      "path": "/user/createWithList",
+      "method": "POST",
+      "expect": {
+        "requestLine": "POST /v2/user/createWithList HTTP/1.1",
+        "host": "petstore.swagger.io",
+        "headerEquals": {
+          "Content-Type": "application/json"
+        },
+        "bodyJsonArray": true,
+        "bodyJsonKeys": ["id", "username", "firstName", "lastName", "email", "password", "phone", "userStatus"],
+        "bodyMustNotContain": ["[]"]
+      }
+    },
+    {
+      "name": "loginUser",
+      "operationId": "loginUser",
+      "path": "/user/login",
+      "method": "GET",
+      "expect": {
+        "expectedRequest": "GET /v2/user/login?username=user1&password=pass123 HTTP/1.1\r\nHost: petstore.swagger.io\r\n\r\n"
+      }
+    },
+    {
+      "name": "logoutUser",
+      "operationId": "logoutUser",
+      "path": "/user/logout",
+      "method": "GET",
+      "expect": {
+        "expectedRequest": "GET /v2/user/logout HTTP/1.1\r\nHost: petstore.swagger.io\r\n\r\n"
+      }
+    },
+    {
+      "name": "getUserByName",
+      "operationId": "getUserByName",
+      "path": "/user/{username}",
+      "method": "GET",
+      "expect": {
+        "expectedRequest": "GET /v2/user/user1 HTTP/1.1\r\nHost: petstore.swagger.io\r\n\r\n"
+      }
+    },
+    {
+      "name": "updateUser",
+      "operationId": "updateUser",
+      "path": "/user/{username}",
+      "method": "PUT",
+      "expect": {
+        "requestLine": "PUT /v2/user/user1 HTTP/1.1",
+        "host": "petstore.swagger.io",
+        "headerEquals": {
+          "Content-Type": "application/json"
+        },
+        "bodyJsonKeys": ["id", "username", "firstName", "lastName", "email", "password", "phone", "userStatus"],
+        "bodyMustNotContain": ["[]"]
+      }
+    },
+    {
+      "name": "deleteUser",
+      "operationId": "deleteUser",
+      "path": "/user/{username}",
+      "method": "DELETE",
+      "expect": {
+        "expectedRequest": "DELETE /v2/user/user1 HTTP/1.1\r\nHost: petstore.swagger.io\r\n\r\n"
+      }
+    }
+  ]
+}
