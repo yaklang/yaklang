@@ -15,15 +15,16 @@ const (
 )
 
 // EmitAICallFailureIfApplicable emits a system structured event when any AI call fails.
-// It includes model tier, provider name, model name and the error cause.
+// It includes model tier, provider name, model name, the error cause, and optional raw HTTP dump.
 // Extra context fields (e.g. liteforge_action, react_loop_name) can be passed via extra.
-func EmitAICallFailureIfApplicable(c AICallerConfigIf, tier consts.ModelTier, rsp *AIResponse, err error, extra map[string]any) {
+// Returns true when the structured failure event was emitted successfully.
+func EmitAICallFailureIfApplicable(c AICallerConfigIf, tier consts.ModelTier, rsp *AIResponse, err error, extra map[string]any) bool {
 	if err == nil || c == nil {
-		return
+		return false
 	}
 	em := c.GetEmitter()
 	if utils.IsNil(em) {
-		return
+		return false
 	}
 
 	payload := map[string]any{
@@ -36,6 +37,9 @@ func EmitAICallFailureIfApplicable(c AICallerConfigIf, tier consts.ModelTier, rs
 	if rsp != nil && !utils.IsNil(rsp) {
 		payload["provider_name"] = rsp.GetProviderName()
 		payload["model_name"] = rsp.GetModelName()
+		if rawDump := rsp.GetRawHTTPResponseDump(); rawDump != "" {
+			payload["raw_http_response_dump"] = utils.ShrinkString(rawDump, 4096)
+		}
 	}
 	for k, v := range extra {
 		payload[k] = v
@@ -44,5 +48,7 @@ func EmitAICallFailureIfApplicable(c AICallerConfigIf, tier consts.ModelTier, rs
 	_, emitErr := em.EmitAPIRequestFailed(NodeAICallFailure, payload)
 	if emitErr != nil {
 		log.Errorf("emit ai call failure event: %v", emitErr)
+		return false
 	}
+	return true
 }

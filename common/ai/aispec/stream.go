@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http/httputil"
@@ -21,6 +22,47 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
+
+// streamReadErrGetter returns the first stream-body read error observed while
+// draining the upstream AI response (nil when the stream ended cleanly).
+type streamReadErrGetter func() error
+
+type streamReadErrBox struct {
+	mu  sync.Mutex
+	err error
+}
+
+func (b *streamReadErrBox) set(err error) {
+	err = normalizeStreamReadError(err)
+	if err == nil {
+		return
+	}
+	b.mu.Lock()
+	if b.err == nil {
+		b.err = err
+	}
+	b.mu.Unlock()
+}
+
+func (b *streamReadErrBox) get() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.err
+}
+
+func normalizeStreamReadError(err error) error {
+	if err == nil || errors.Is(err, io.EOF) {
+		return nil
+	}
+	return err
+}
+
+func wrapStreamReadError(err error) error {
+	if err = normalizeStreamReadError(err); err == nil {
+		return nil
+	}
+	return utils.Errorf("ai stream read failed: %v", err)
+}
 
 func mergeReasonIntoOutputStream(reason io.Reader, out io.Reader) io.Reader {
 	pr, pw := utils.NewBufPipe(nil)
@@ -152,7 +194,7 @@ func extractLastChatUsageFromPayload(raw []byte) *ChatUsage {
 // SSE/body payload (Qwen Omni stream_options.include_usage=true). It is
 // called with nil when no usage block was observed.
 // 关键词: processAIResponse, SSE usage 抽取, 视频 token 用量解析
-func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage)) {
+func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage)) error {
 	// lastUsage 始终持有响应里最后一次出现的 usage 字段；对于 dashscope omni
 	// 等 SSE 接口，真实 token 数通常出现在末帧，前面的 chunk usage 多为 null。
 	// 关键词: lastUsage, SSE 末帧 usage
@@ -212,8 +254,8 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 
 	// 429 rate limit: read body for rawResponseCallback then return early
 	if statusCode == 429 {
-		io.Copy(&mirrorResponse, closer)
-		return
+		_, _ = io.Copy(&mirrorResponse, closer)
+		return nil
 	}
 
 	var reader io.Reader = closer
@@ -224,8 +266,11 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 	var firstbuf = make([]byte, 1)
 	n, err := io.ReadFull(ioReader, firstbuf)
 	if n <= 0 && err != nil {
-		log.Debugf("no body read")
-		return
+		if normalizeStreamReadError(err) == nil {
+			log.Debugf("no body read")
+			return nil
+		}
+		return wrapStreamReadError(err)
 	}
 	utils.Debug(func() {
 		log.Infof("read first byte [%#v] delay: %v", string(firstbuf), time.Since(start))
@@ -249,11 +294,12 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 	for {
 		line, err := utils.BufioReadLine(lineReader)
 		if err != nil && string(line) == "" {
-			if err != io.EOF {
+			if streamErr := wrapStreamReadError(err); streamErr != nil {
 				log.Warnf("failed to read chunk line: %v, mirror: %#v", err, utils.ShrinkString(chunkedErrorMirror.String(), 200))
 				fmt.Println(chunkedErrorMirror.String())
+				return streamErr
 			}
-			return
+			return nil
 		}
 		if string(line) == "" {
 			continue
@@ -344,8 +390,9 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 			)
 			if handleResponseErr != nil {
 				log.Errorf("error in non-stream json extraction: %v", handleResponseErr)
+				return wrapStreamReadError(handleResponseErr)
 			}
-			return
+			return nil
 		}
 
 		lineStr := string(line)
@@ -495,11 +542,13 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 			}
 		}
 	}
+	return nil
 }
 
-func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage)) (io.Reader, io.Reader, []poc.PocConfigOption, func()) {
+func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage)) (io.Reader, io.Reader, []poc.PocConfigOption, func(), streamReadErrGetter) {
 	outReader, outWriter := utils.NewBufPipe(nil)
 	reasonReader, reasonWriter := utils.NewBufPipe(nil)
+	streamErrBox := &streamReadErrBox{}
 
 	cancelFunc := func() {
 		outWriter.Close()
@@ -507,7 +556,9 @@ func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, t
 	}
 
 	opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
-		processAIResponse(r, closer, outWriter, reasonWriter, toolCallCallback, rawResponseHeaderCallback, rawResponseCallback, usageCallback)
+		if err := processAIResponse(r, closer, outWriter, reasonWriter, toolCallCallback, rawResponseHeaderCallback, rawResponseCallback, usageCallback); err != nil {
+			streamErrBox.set(err)
+		}
 	}))
 
 	opts = append(opts, poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"))
@@ -519,12 +570,13 @@ func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, t
 		)
 	}
 
-	return outReader, reasonReader, opts, cancelFunc
+	return outReader, reasonReader, opts, cancelFunc, streamErrBox.get
 }
 
-func appendResponsesStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage)) (io.Reader, io.Reader, []poc.PocConfigOption, func()) {
+func appendResponsesStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage)) (io.Reader, io.Reader, []poc.PocConfigOption, func(), streamReadErrGetter) {
 	outReader, outWriter := utils.NewBufPipe(nil)
 	reasonReader, reasonWriter := utils.NewBufPipe(nil)
+	streamErrBox := &streamReadErrBox{}
 
 	cancelFunc := func() {
 		outWriter.Close()
@@ -541,13 +593,15 @@ func appendResponsesStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfig
 	}
 
 	opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
-		processAIResponseForResponses(r, closer, outWriter, reasonWriter, toolCallCallback, rawResponseHeaderCallback, rawResponseCallback, usageCallback)
+		if err := processAIResponseForResponses(r, closer, outWriter, reasonWriter, toolCallCallback, rawResponseHeaderCallback, rawResponseCallback, usageCallback); err != nil {
+			streamErrBox.set(err)
+		}
 	}))
 
-	return outReader, reasonReader, opts, cancelFunc
+	return outReader, reasonReader, opts, cancelFunc, streamErrBox.get
 }
 
-func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage)) {
+func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage)) error {
 	// /responses 接口的 usage 目前仍以兜底扫描原始 payload 为主，
 	// 保持与 chat_completions 路径一致的系统态回调签名。
 	// 关键词: responses 接口 usage 兜底提取
@@ -607,8 +661,8 @@ func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.
 	}()
 
 	if statusCode == 429 {
-		io.Copy(&mirrorResponse, closer)
-		return
+		_, _ = io.Copy(&mirrorResponse, closer)
+		return nil
 	}
 
 	var reader io.Reader = io.TeeReader(closer, &mirrorResponse)
@@ -619,16 +673,16 @@ func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.
 	contentType := strings.ToLower(lowhttp.GetHTTPPacketHeader(r, "content-type"))
 	bufferedReader := bufio.NewReader(reader)
 	if strings.Contains(contentType, "text/event-stream") {
-		handleResponsesSSEStream(bufferedReader, outWriter, reasonWriter, toolCallCallback)
-		return
+		return handleResponsesSSEStream(bufferedReader, outWriter, reasonWriter, toolCallCallback)
 	}
 
 	prefix, firstNonSpace, err := readResponsesPrefix(bufferedReader)
 	if err != nil && len(prefix) == 0 {
-		if err != io.EOF {
+		if streamErr := wrapStreamReadError(err); streamErr != nil {
 			log.Warnf("failed to read responses body prefix: %v", err)
+			return streamErr
 		}
-		return
+		return nil
 	}
 
 	fullReader := io.MultiReader(bytes.NewReader(prefix), bufferedReader)
@@ -636,20 +690,19 @@ func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.
 		body, readErr := io.ReadAll(fullReader)
 		if readErr != nil {
 			log.Warnf("failed to read responses body: %v", readErr)
-			return
+			return wrapStreamReadError(readErr)
 		}
 		bodyTrim := bytes.TrimSpace(body)
 		if len(bodyTrim) == 0 {
-			return
+			return nil
 		}
 		if handleResponsesJSONPayload(bodyTrim, outWriter, reasonWriter, toolCallCallback) {
-			return
+			return nil
 		}
-		handleResponsesSSEStream(bytes.NewReader(body), outWriter, reasonWriter, toolCallCallback)
-		return
+		return handleResponsesSSEStream(bytes.NewReader(body), outWriter, reasonWriter, toolCallCallback)
 	}
 
-	handleResponsesSSEStream(fullReader, outWriter, reasonWriter, toolCallCallback)
+	return handleResponsesSSEStream(fullReader, outWriter, reasonWriter, toolCallCallback)
 }
 
 type responsesToolCallState struct {
@@ -710,14 +763,14 @@ func handleResponsesSSEPayload(body []byte, outWriter io.Writer, reasonWriter io
 	handleResponsesSSEStream(bytes.NewReader(body), outWriter, reasonWriter, toolCallCallback)
 }
 
-func handleResponsesSSEStream(reader io.Reader, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall)) {
+func handleResponsesSSEStream(reader io.Reader, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall)) error {
 	lineReader := bufio.NewReader(reader)
 	toolState := newResponsesToolCallState()
 
 	for {
 		line, err := utils.BufioReadLine(lineReader)
 		if err != nil && len(line) == 0 {
-			return
+			return wrapStreamReadError(err)
 		}
 		lineStr := strings.TrimSpace(string(line))
 		if lineStr == "" {
@@ -748,6 +801,7 @@ func handleResponsesSSEStream(reader io.Reader, outWriter io.Writer, reasonWrite
 			handleResponsesSSEEvent(eventMap, outWriter, reasonWriter, toolCallCallback, toolState)
 		}
 	}
+	return nil
 }
 
 func readResponsesPrefix(reader *bufio.Reader) ([]byte, byte, error) {
