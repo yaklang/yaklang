@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -32,49 +31,8 @@ var syntaxFs embed.FS
 //go:embed large/***
 var largeSyntaxFs embed.FS
 
-var phpTestAntlrCache = func() *ssa.AntlrCache {
-	return php2ssa.CreateBuilder().GetAntlrCache()
-}()
-
-const phpFreshSyntaxCacheMinBytes = 64 * 1024
-
-var phpTestCacheResetState = struct {
-	mu          sync.Mutex
-	filesParsed int
-	resetEvery  int
-}{
-	resetEvery: phpTestCacheResetEveryFiles(),
-}
-
 func newPHPTestAntlrCache() *ssa.AntlrCache {
 	return php2ssa.CreateBuilder().GetAntlrCache()
-}
-
-func phpTestCacheResetEveryFiles() int {
-	raw := strings.TrimSpace(os.Getenv("YAK_ANTLR_CACHE_RESET_FILES"))
-	if raw == "" {
-		return 100
-	}
-	v, err := strconv.Atoi(raw)
-	if err != nil || v <= 0 {
-		return 0
-	}
-	return v
-}
-
-func nextPHPTestAntlrCache(src string) *ssa.AntlrCache {
-	if len(src) >= phpFreshSyntaxCacheMinBytes {
-		return newPHPTestAntlrCache()
-	}
-
-	phpTestCacheResetState.mu.Lock()
-	defer phpTestCacheResetState.mu.Unlock()
-
-	phpTestCacheResetState.filesParsed++
-	if phpTestAntlrCache != nil && phpTestCacheResetState.resetEvery > 0 && phpTestCacheResetState.filesParsed%phpTestCacheResetState.resetEvery == 0 {
-		phpTestAntlrCache.ResetRuntimeCaches()
-	}
-	return phpTestAntlrCache
 }
 
 var syntaxNonASTAssets = map[string]struct{}{
@@ -167,7 +125,7 @@ func validateSourceWithBudget(t *testing.T, filename string, src string, budget 
 			t.Fatalf("Lexer failed: %v", errListener.GetErrorString())
 		}
 
-		cache := nextPHPTestAntlrCache(src)
+		cache := newPHPTestAntlrCache()
 
 		start := time.Now()
 		_, err := php2ssa.Frontend(src, cache)
