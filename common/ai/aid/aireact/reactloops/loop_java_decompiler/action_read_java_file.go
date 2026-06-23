@@ -134,7 +134,7 @@ var readJavaFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 			lines := strings.Split(contentStr, "\n")
 			contentWithLines := utils.PrefixLinesWithLineNumbers(contentStr)
 
-			savedPath, preview := saveSpillContent(loop, "java_file_content", contentWithLines)
+			savedPath, preview := reactloops.SaveSpillContent(loop, "java_file_content", contentWithLines)
 			if savedPath == "" {
 				savedPath = filePath
 				preview = utils.ShrinkTextBlock(contentWithLines, 500)

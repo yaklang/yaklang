@@ -111,6 +111,23 @@ if err := reactloops.SaveAndPinFile(loop, filename, []byte(fullSummary)); err !=
 
 用于把完整内容保存到文件，并通过 `EmitPinFilename` 让前端展示可点击文件。
 
+### `SpillLongContent` / `SaveSpillContent`
+
+长内容文件化的推荐封装，定义在 `reactloops/content_spill.go`：
+
+```go
+// 超过 5KB 时自动 SaveAndPinFile，返回摘要 + reference（供 EmitActionLog / Feedback / timeline）
+summary, reference := reactloops.SpillLongContent(loop, "grep_search", resultContent)
+
+// 无条件落盘（例如已确认内容很长，需要固定产出文件路径）
+filename, preview := reactloops.SaveSpillContent(loop, "java_file_content", contentWithLines)
+```
+
+- `SpillLongContent`：短内容原样返回；长内容落盘后返回「字节数 + preview + 文件路径」模板文案。
+- `SaveContentReference`：按 preview 阈值决定是否落盘，供 `loopinfra` 等场景复用。
+
+各 loop 不应再各自复制 `spillXxxContent` helper，统一调用以上 API。
+
 适用场景：
 
 - HTTP flow 列表、匹配详情、原始请求响应、fuzz 结果等可能很长的材料。

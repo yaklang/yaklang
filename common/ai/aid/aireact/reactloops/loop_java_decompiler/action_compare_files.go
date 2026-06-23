@@ -225,7 +225,7 @@ var compareFilesAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 				addedLines, removedLines := countDiffLines(diffResult)
 				fullDiff := fmt.Sprintf("Comparison of %s with backup:\nOriginal: %d bytes, Modified: %d bytes\n\n%s",
 					filepath.Base(filePath), len(originalContent), len(modifiedContent), diffResult)
-				summary, ref := spillOrPreview(loop, "java_file_diff", fullDiff)
+				summary, ref := reactloops.SpillLongContent(loop, "java_file_diff", fullDiff)
 				reference = ref
 
 				finishLine = fmt.Sprintf("完成: %s 变更 +%d/-%d 行",

@@ -99,7 +99,7 @@ var readReferenceFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 			newRef := fmt.Sprintf("\n=== Reference from: %s ===\n%s\n", filePath, resultContent)
 			loop.Set("collected_references", existingRefs+newRef)
 
-			summary, reference := spillReportContent(loop, "read_reference", resultContent)
+			summary, reference := reactloops.SpillLongContent(loop, "read_reference", resultContent)
 
 			// 添加到时间线
 			invoker := loop.GetInvoker()
