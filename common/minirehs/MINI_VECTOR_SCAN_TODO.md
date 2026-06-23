@@ -34,11 +34,18 @@
 > ASCII 快路径) 形同虚设。抽出 `initScalar()` 供 glushkov 与断言核共用; dispatch 均 hasAssert 优先, 标量
 > 只路由到断言版。A/B(实测): `MVS_Exist` 6.0→**6.20 MB/s**、allocs 14.3K→**8.9K/op(-38%)**。新护栏
 > `TestMVSAssertScalarEquivalence` (680 个 nword==1 断言 NFA × 随机输入, 53706 例标量==多字) + 全 1332
-> 差分 + 两档短回归全绿。两项增量合计 `MVS_Exist` 5.79→**6.20 MB/s(+7%)**。
-> **当前性能(实测,vs Go RE2 逐条 0.18 MB/s 基线)**:存在性 **~34x**(全规则)/**42x**(纯 RE2 子集)、定位 **16x**;
+> 差分 + 两档短回归全绿。两项增量合计 `MVS_Exist` 5.79→**6.16~6.23 MB/s(+7%)**、allocs 16.3K→**8.9K(-45%)**。
+> **本会话收尾复测(2026-06-23, C 内核, FULL_CORPUS, 8x)**:`MVS_Exist` **6.16 MB/s / 8915 allocs**、
+> `MVS_Located` 3.04 MB/s、`MVS_Exist_RE2only` 8.12 MB/s(无 gate, 健全性);**完整非 short 套件全绿(40s)**。
+> **当前性能(实测,vs Go RE2 逐条 0.18 MB/s 基线)**:存在性 **~34x**(全规则)/**45x**(纯 RE2 子集)、定位 **17x**;
 > dlopen 真 hyperscan 历史天花板 87x,故现实目标 = 存在性冲 80x(再 ~2x)。详见第 4' 节倍数评估与路线。
-> 下一步(按收益):**R1 字面量门控合并单趟**(现最大头,结构性)→ R2 断言 NFA 合并 → R3 AVX2 → R5 定位 C 内核。
-> 详见 IMPL 第 0'.4 / 0'.5 节 + 本文件第 4' 节。
+> **剩余瓶颈(本会话剖析, 干净小改已出尽)**:① `runtime.cgocall` 28%(合并 always-on 整段扫 5.25MB + 不可
+> 局部化 lean 的 nfaExists 3.93MB);② 门控 lean anchored 系 ~32%(`existsInAnchored` 16% + `…1` 7% +
+> `existsInReverseAnchored` 9%, 纯 Go 位递归无 SIMD);③ 断言系 ~18%;④ PCRE2 gate 对**非法 UTF-8(二进制流量)**
+> 经 `subjectBytes` 走 rune 正规化(`stringtoslicerune` 4.3%, 依赖库内, 仅靠缩小输入缓解但触发 FP 风险路径)。
+> 下一步(按收益, **均为大型结构性改动, 净收益不确定, 需决策**):**R1 字面量门控合并单趟**(吃掉②, 现最大 Go 头)
+> → R1' 把门控 lean anchored 扫描下沉 C 内核走 SIMD(吃掉②, 但需 C 内核加锚定注入入口 + amalgamation + 跨平台)
+> → R2 断言 NFA 合并 → R3 AVX2 → R5 定位 C 内核。详见 IMPL 第 0'.4 / 0'.5 节 + 本文件第 4' 节。
 
 ---
 
