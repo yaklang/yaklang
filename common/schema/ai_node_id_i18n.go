@@ -293,6 +293,18 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "证据",
 		En: "Plan Evidence",
 	},
+	"plan-recon": {
+		Zh: "侦察工具执行",
+		En: "Recon Tool Execution",
+	},
+	"plan-web-search": {
+		Zh: "联网搜索",
+		En: "Web Search",
+	},
+	"plan-file-ops": {
+		Zh: "文件检索",
+		En: "File Operations",
+	},
 	"self-reflection-suggestions": {
 		Zh: "自我反思",
 		En: "Self-Reflection",

@@ -54,7 +54,7 @@ func generateGuidanceDocument(loop *reactloops.ReActLoop, task aicommon.AIStatef
 		return ""
 	}
 
-	loop.LoadingStatus("正在生成任务执行指导文档... / Generating guidance document...")
+	reactloops.EmitStatus(loop, "正在生成任务执行指导文档... / Generating guidance document...")
 
 	taskIndex := ""
 	if task != nil {
@@ -140,7 +140,7 @@ func generatePlanFromDocument(loop *reactloops.ReActLoop, task aicommon.AIStatef
 		return ""
 	}
 
-	loop.LoadingStatus("正在生成任务计划... / Generating execution plan...")
+	reactloops.EmitStatus(loop, "正在生成任务计划... / Generating execution plan...")
 
 	taskIndex := ""
 	if task != nil {
