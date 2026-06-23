@@ -175,6 +175,8 @@ func TestWriteAction_NoFilename_EmitsNewFileAndWrites(t *testing.T) {
 	require.NoError(t, readErr)
 	assert.Equal(t, "println(\"ok\")", string(content))
 	assert.True(t, runtime.timelineContains("write_success"))
+	assert.True(t, runtime.timelineContains("file_write"))
+	assert.True(t, runtime.timelineContentContains("file_write", "println"))
 }
 
 func TestWriteAction_WriteError_AddToTimelineAndFail(t *testing.T) {
@@ -307,6 +309,9 @@ func TestModifyAction_Success_ReplacesLines(t *testing.T) {
 	require.NoError(t, readErr)
 	assert.Equal(t, "a\nB\nc", string(content))
 	assert.True(t, runtime.timelineContains("modify_success"))
+	assert.True(t, runtime.timelineContains("file_modify"))
+	assert.True(t, runtime.timelineContentContains("file_modify", "-b"))
+	assert.True(t, runtime.timelineContentContains("file_modify", "+B"))
 }
 
 func TestModifyAction_CodeLineBase_AbsoluteLineNumbers(t *testing.T) {
@@ -419,6 +424,8 @@ func TestInsertAction_VerifierAndSuccess(t *testing.T) {
 	require.NoError(t, readErr)
 	assert.Equal(t, "a\nb\nc", string(content))
 	assert.True(t, runtime.timelineContains("insert_success"))
+	assert.True(t, runtime.timelineContains("file_insert"))
+	assert.True(t, runtime.timelineContentContains("file_insert", "+b"))
 }
 
 func TestInsertAction_InsertError_AddToTimeline(t *testing.T) {
@@ -459,6 +466,8 @@ func TestDeleteAction_VerifierAndSuccess(t *testing.T) {
 	require.NoError(t, readErr)
 	assert.Equal(t, "a\nc", string(content))
 	assert.True(t, runtime.timelineContains("delete_success"))
+	assert.True(t, runtime.timelineContains("file_delete"))
+	assert.True(t, runtime.timelineContentContains("file_delete", "-b"))
 }
 
 func TestWriteAction_Yaklang_CodeChangeEventMatchesDiskOverwrite(t *testing.T) {

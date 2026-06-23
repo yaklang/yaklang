@@ -70,6 +70,13 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 				return
 			}
 
+			loopInfraAddFileOpSuccessTimeline(loop, loopInfraFileOpTimeline{
+				Op:         "write",
+				Filename:   filename,
+				NewSegment: code,
+				Deferred:   f.ShouldDeferDiskWrite(),
+			})
+
 			if !f.ShouldDeferDiskWrite() {
 				// Verify file was written correctly
 				writtenBytes, verifyErr := os.ReadFile(filename)
@@ -182,6 +189,7 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 			}
 
 			log.Infof("start to modify code lines %d to %d", modifyStartLine, modifyEndLine)
+			oldSegment := loopInfraExtractLineRange(fullCode, modifyStartLine, modifyEndLine)
 			err := editor.ReplaceLineRange(modifyStartLine, modifyEndLine, partialCode)
 			if err != nil {
 				runtime.AddToTimeline("modify_failed", "Failed to replace line range: "+err.Error())
@@ -200,6 +208,16 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 				op.Fail(fmt.Sprintf("failed to write modified content to file: %v", writeErr))
 				return
 			}
+
+			loopInfraAddFileOpSuccessTimeline(loop, loopInfraFileOpTimeline{
+				Op:         "modify",
+				Filename:   filename,
+				OldSegment: oldSegment,
+				NewSegment: partialCode,
+				StartLine:  modifyStartLine,
+				EndLine:    modifyEndLine,
+				Deferred:   f.ShouldDeferDiskWrite(),
+			})
 
 			// Call file changed callback
 			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
@@ -323,6 +341,14 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 				return
 			}
 
+			loopInfraAddFileOpSuccessTimeline(loop, loopInfraFileOpTimeline{
+				Op:         "insert",
+				Filename:   filename,
+				NewSegment: partialCode,
+				InsertLine: insertLine,
+				Deferred:   f.ShouldDeferDiskWrite(),
+			})
+
 			// Call file changed callback
 			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
 			f.applySyntaxLintResult(loop, op, hasBlockingErrors, f.ShouldExitWhenSyntaxClean())
@@ -404,18 +430,22 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 
 			var msg string
 			var err error
+			var deletedStart, deletedEnd int
 
 			if deleteEndLine > 0 {
 				// Delete line range
 				msg = fmt.Sprintf("decided to delete code lines, from start_line[%v] to end_line:[%v]", deleteStartLine, deleteEndLine)
 				log.Infof("start to delete code lines %d to %d", deleteStartLine, deleteEndLine)
+				deletedStart, deletedEnd = deleteStartLine, deleteEndLine
 				err = editor.DeleteLineRange(deleteStartLine, deleteEndLine)
 			} else {
 				// Delete single line
 				msg = fmt.Sprintf("decided to delete code line[%v]", deleteStartLine)
 				log.Infof("start to delete code line %d", deleteStartLine)
+				deletedStart, deletedEnd = deleteStartLine, deleteStartLine
 				err = editor.DeleteLine(deleteStartLine)
 			}
+			oldSegment := loopInfraExtractLineRange(fullCode, deletedStart, deletedEnd)
 
 			invoker.AddToTimeline("delete_lines", msg)
 			loopInfraActionStart(loop, loopInfraNodeSingleFileDelete,
@@ -445,6 +475,15 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 				op.Fail(fmt.Sprintf("failed to write content after delete: %v", writeErr))
 				return
 			}
+
+			loopInfraAddFileOpSuccessTimeline(loop, loopInfraFileOpTimeline{
+				Op:         "delete",
+				Filename:   filename,
+				OldSegment: oldSegment,
+				StartLine:  deletedStart,
+				EndLine:    deletedEnd,
+				Deferred:   f.ShouldDeferDiskWrite(),
+			})
 
 			// Call file changed callback
 			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
