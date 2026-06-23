@@ -1621,23 +1621,23 @@ public class NewClass {
 			},
 			ExpectedTaskResults: []TaskResultConfig{
 				// 第一个任务（diff program，最新的）
-				// 当前项目流下，diff 任务汇总总风险数为 14，新增风险数为 7。
+				// pair-first member 关系下，overlay diff 扫描汇总 10 条风险，新增 5 条（#-> 路径较 main 的 map 存储减少重复）。
 				{
 					Status:       "done",
 					LowCount:     0,
-					HighCount:    14,
-					RiskCount:    14,
+					HighCount:    10,
+					RiskCount:    10,
 					NewLowCount:  0,
-					NewHighCount: 7,
-					NewRiskCount: 7,
+					NewHighCount: 5,
+					NewRiskCount: 5,
 				},
 				// 第二个任务（base program，较旧的）
-				// Base.java 的规则命中在当前项目流下稳定为 7。
+				// pair-first member 关系下，base 扫描稳定为 5 条风险。
 				{
 					Status:       "done",
 					LowCount:     0,
-					HighCount:    7,
-					RiskCount:    7,
+					HighCount:    5,
+					RiskCount:    5,
 					NewLowCount:  0,
 					NewHighCount: 0,
 					NewRiskCount: 0,
