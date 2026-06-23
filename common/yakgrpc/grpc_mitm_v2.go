@@ -29,6 +29,7 @@ import (
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/crep"
+	"github.com/yaklang/yaklang/common/crep/trafficguard"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/schema"
@@ -1495,6 +1496,14 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			}
 		}
 
+		// 内置高危凭证检测(TrafficGuard): 在过滤判定之前无条件扫描(不受任何过滤策略影响)。
+		// 命中敏感凭证的流量, 即使命中静态资源/大 JS 等过滤规则, 也强制取消过滤、保留并保存,
+		// 让用户一定能看到红色高危流量与对应的 Risk。一次扫描, 复用结果, 不二次开销。
+		tgFindings := trafficguard.ScanFindings(plainRequest, plainResponse)
+		if len(tgFindings) > 0 {
+			isFiltered = false
+		}
+
 		shouldBeHijacked := !isFiltered
 
 		pluginCtx := httpctx.GetPluginContext(req)
@@ -1672,6 +1681,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			if len(userTags) > 0 {
 				flow.AddTagToFirst(userTags...)
 			}
+			// 内置高危凭证检测(TrafficGuard): 复用上面过滤前已扫描的 tgFindings, 标红并生成 Risk。
+			trafficguard.ApplyToFlow(s.GetProjectDatabase(), flow, tgFindings, plainRequest, plainResponse)
 			tags := flow.Tags
 			err := yakit.InsertHTTPFlowEx(flow, false, func() {
 				saveBarePacketHandler(flow.ID)
