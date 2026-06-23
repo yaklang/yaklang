@@ -2,27 +2,15 @@ package pcre
 
 import (
 	"fmt"
-	"time"
-
-	dlclark "github.com/dlclark/regexp2"
 	regexp2 "github.com/VillanCh/go-pcre2-lite/regexp2"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata/data"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/utils/regen"
-	"regexp"
 	"regexp/syntax"
 	"strings"
 )
-
-// dlclarkRe2 是 dlclark/regexp2 的编译产物类型 (指针), 与 go-pcre2-lite/regexp2.Regexp 类型独立.
-// 用于 suricata pcre 的终极兜底 (PCRE2 与 Go RE2 都编译失败时).
-type dlclarkRe2 = *dlclark.Regexp
-
-// dlclarkFallbackTimeout: dlclark 兜底的单次匹配超时, 防灾难回溯挂死; suricata 规则匹配
-// 可能扫大报文, 留宽裕 5 分钟. dlclark 默认 NoTimeout, 不设上限会被 (a+)+ 类 pattern 拖垮.
-const dlclarkFallbackTimeout = 5 * time.Minute
 
 type PCRE struct {
 	expr string
@@ -38,14 +26,6 @@ type PCRE struct {
 type Matcher struct {
 	*PCRE
 	matcher *regexp2.Regexp
-	// re2 回退: PCRE2 比 dlclark/.NET 更严格 (如 [\d\w-_] 被判 invalid range), 而 Go RE2 与
-	// 生成器侧 (regen 用 RE2) 一致且更宽松. 当 PCRE2 编译失败但 RE2 能编译时改走 re2, 保住真实
-	// suricata 规则的匹配能力. lookbehind/backref 等 RE2 不支持者 RE2 同样失败, 此时仍返回原错.
-	re2 *regexp.Regexp
-	// dlclark 兜底: 真实 suricata 规则集里存在 RE2 也不接受的畸形/边界构造 (如转义损坏的
-	// [\d\w-_]{50,} 被规则源误写成 [\d\w-_]50,}). dlclark/.NET 宽容这类, 作为终极兜底
-	// 保住规则可加载; 仅在 PCRE2 与 RE2 都编译失败时启用.
-	dlclarkMatcher dlclarkRe2
 }
 
 type Generator struct {
@@ -160,52 +140,13 @@ func ParsePCREStr(pattern string) (*PCRE, error) {
 
 func (p *PCRE) Matcher() (*Matcher, error) {
 	matcher, err := regexp2.Compile(p.expr, p.opts)
-	if err == nil {
-		return &Matcher{
-			PCRE:    p,
-			matcher: matcher,
-		}, nil
+	if err != nil {
+		return nil, errors.Wrap(err, "invalid pcre pattern")
 	}
-	// PCRE2 编译失败: 尝试 Go RE2 回退 (更宽松, 与生成器一致). RE2 也无法表达者 (lookbehind/
-	// backref) 回退同样失败, 返回原 PCRE2 错误, 保持原有失败语义.
-	if re2, re2Err := compileRE2Fallback(p.expr, p.opts); re2Err == nil {
-		log.Debugf("pcre2 compile failed (%v), fell back to RE2 for: %s", err, p.expr)
-		return &Matcher{
-			PCRE: p,
-			re2:  re2,
-		}, nil
-	}
-	// 终极兜底: dlclark/.NET 语义. 真实 suricata 规则集里存在 PCRE2 与 RE2 都拒绝的畸形/边界
-	// 构造 (典型: 规则源转义损坏导致 [\d\w\-_]{50,} 被写成 [\d\w-_]50,}, RE2 判 invalid range).
-	// dlclark 宽容这类, 保住规则可加载与匹配; 用 MatchTimeout 防灾难回溯.
-	if dc, dcErr := dlclark.Compile(p.expr, dlclark.RegexOptions(p.opts)); dcErr == nil {
-		dc.MatchTimeout = dlclarkFallbackTimeout
-		log.Debugf("pcre2 and RE2 both failed (pcre2: %v), fell back to dlclark for: %s", err, p.expr)
-		return &Matcher{
-			PCRE:           p,
-			dlclarkMatcher: dc,
-		}, nil
-	}
-	return nil, errors.Wrap(err, "invalid pcre pattern")
-}
-
-// compileRE2Fallback 把 PCRE2 选项翻成 RE2 内联标志后用 Go regexp 编译, 作为 PCRE2 不可编译时的回退.
-func compileRE2Fallback(expr string, opts regexp2.RegexOptions) (*regexp.Regexp, error) {
-	var flags string
-	if opts&regexp2.IgnoreCase != 0 {
-		flags += "i"
-	}
-	if opts&regexp2.Multiline != 0 {
-		flags += "m"
-	}
-	if opts&regexp2.Singleline != 0 {
-		flags += "s"
-	}
-	pattern := expr
-	if flags != "" {
-		pattern = "(?" + flags + ")" + expr
-	}
-	return regexp.Compile(pattern)
+	return &Matcher{
+		PCRE:    p,
+		matcher: matcher,
+	}, nil
 }
 
 func (p *PCRE) Modifier() modifier.Modifier {
@@ -248,28 +189,6 @@ func (p *PCRE) IgnoreCase() bool {
 
 func (p *Matcher) Match(content []byte) []data.Matched {
 	var matches []data.Matched
-	if p.matcher == nil {
-		// dlclark 兜底路径 (PCRE2 与 RE2 都编译失败时启用).
-		if p.dlclarkMatcher != nil {
-			match, _ := p.dlclarkMatcher.FindStringMatch(string(content))
-			for match != nil {
-				matches = append(matches, data.Matched{
-					Pos: match.Index,
-					Len: match.Length,
-				})
-				match, _ = p.dlclarkMatcher.FindNextMatch(match)
-			}
-			return matches
-		}
-		// RE2 回退路径 (PCRE2 编译失败时启用).
-		for _, loc := range p.re2.FindAllIndex(content, -1) {
-			matches = append(matches, data.Matched{
-				Pos: loc[0],
-				Len: loc[1] - loc[0],
-			})
-		}
-		return matches
-	}
 	match, _ := p.matcher.FindStringMatch(string(content))
 	for match != nil {
 		matches = append(matches, data.Matched{
