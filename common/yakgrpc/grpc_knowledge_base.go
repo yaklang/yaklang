@@ -612,6 +612,18 @@ func (ri *RAGInstaller) Install(descriptor *thirdparty_bin.BinaryDescriptor, opt
 	if err != nil {
 		return utils.Errorf("导入知识库失败: %v", err)
 	}
+
+	if thirdparty_bin.IsYaklangCodeAIKBDownload(descriptor.Name, filename) {
+		ri.sendProgress("正在安装 Yaklang 代码样例库 (yaklang-aikb.zip)...", 95)
+		if zipErr := thirdparty_bin.InstallYaklangCodeAIKBZip(&thirdparty_bin.InstallOptions{
+			Context: options.Context,
+			Force:   options.Force,
+			Proxy:   options.Proxy,
+		}); zipErr != nil {
+			return utils.Errorf("导入 RAG 成功，但安装 yaklang-aikb.zip 失败: %v", zipErr)
+		}
+	}
+
 	ri.sendProgress("知识库下载和导入完成", 100)
 
 	return nil
