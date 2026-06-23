@@ -1083,15 +1083,15 @@ alert $high for {
 		require.Equal(t, len(rsp.Data), 2)
 
 		task := rsp.Data[0]
-		require.Equal(t, task.Programs, []string{progID})
-		require.Equal(t, task.Status, "done")
-		require.Equal(t, task.RiskCount, int64(10))
-		require.Equal(t, task.NewRiskCount, int64(10)) // 规则更新会导致所有的risk为新增值
+		require.Equal(t, []string{progID}, task.Programs)
+		require.Equal(t, "done", task.Status)
+		require.Equal(t, int64(12), task.RiskCount)
+		require.Equal(t, int64(12), task.NewRiskCount) // 规则更新会导致所有的 risk 为新增值
 		task = rsp.Data[1]
-		require.Equal(t, task.Programs, []string{progID})
-		require.Equal(t, task.Status, "done")
-		require.Equal(t, task.RiskCount, int64(2))
-		require.Equal(t, task.NewRiskCount, int64(0))
+		require.Equal(t, []string{progID}, task.Programs)
+		require.Equal(t, "done", task.Status)
+		require.Equal(t, int64(2), task.RiskCount)
+		require.Equal(t, int64(0), task.NewRiskCount)
 	})
 
 	t.Run("test scan task risk count with muti diff", func(t *testing.T) {
@@ -1251,22 +1251,22 @@ alert $high for {
 
 		for _, task := range rsp.Data {
 			if task.TaskId == taskID3 {
-				require.Equal(t, task.Programs, []string{progID})
-				require.Equal(t, task.Status, "done")
-				require.Equal(t, task.RiskCount, int64(10))
-				require.Equal(t, task.NewRiskCount, int64(10))
+				require.Equal(t, []string{progID}, task.Programs)
+				require.Equal(t, "done", task.Status)
+				require.Equal(t, int64(12), task.RiskCount)
+				require.Equal(t, int64(12), task.NewRiskCount)
 			}
 			if task.TaskId == taskID2 {
-				require.Equal(t, task.Programs, []string{progID})
-				require.Equal(t, task.Status, "done")
-				require.Equal(t, task.RiskCount, int64(2))
-				require.Equal(t, task.NewRiskCount, int64(2))
+				require.Equal(t, []string{progID}, task.Programs)
+				require.Equal(t, "done", task.Status)
+				require.Equal(t, int64(2), task.RiskCount)
+				require.Equal(t, int64(2), task.NewRiskCount)
 			}
 			if task.TaskId == taskID1 {
-				require.Equal(t, task.Programs, []string{progID})
-				require.Equal(t, task.Status, "done")
-				require.Equal(t, task.RiskCount, int64(1))
-				require.Equal(t, task.NewRiskCount, int64(0))
+				require.Equal(t, []string{progID}, task.Programs)
+				require.Equal(t, "done", task.Status)
+				require.Equal(t, int64(1), task.RiskCount)
+				require.Equal(t, int64(0), task.NewRiskCount)
 			}
 		}
 	})
@@ -1621,23 +1621,23 @@ public class NewClass {
 			},
 			ExpectedTaskResults: []TaskResultConfig{
 				// 第一个任务（diff program，最新的）
-				// 当前项目流下，diff 任务汇总总风险数为 14，新增风险数为 7。
+				// 当前项目流下，字段敏感后 diff 任务汇总总风险数为 8，新增风险数为 4。
 				{
 					Status:       "done",
 					LowCount:     0,
-					HighCount:    14,
-					RiskCount:    14,
+					HighCount:    8,
+					RiskCount:    8,
 					NewLowCount:  0,
-					NewHighCount: 7,
-					NewRiskCount: 7,
+					NewHighCount: 4,
+					NewRiskCount: 4,
 				},
 				// 第二个任务（base program，较旧的）
-				// Base.java 的规则命中在当前项目流下稳定为 7。
+				// Base.java 的规则命中在当前项目流下稳定为 4。
 				{
 					Status:       "done",
 					LowCount:     0,
-					HighCount:    7,
-					RiskCount:    7,
+					HighCount:    4,
+					RiskCount:    4,
 					NewLowCount:  0,
 					NewHighCount: 0,
 					NewRiskCount: 0,

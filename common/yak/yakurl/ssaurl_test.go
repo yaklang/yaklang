@@ -591,7 +591,7 @@ func main() {
 				.QueryRow(* #-> as $a)
 			`,
 			[]variableResult{
-				{variable: "a", number: 8},
+				{variable: "a", number: 10},
 				{variable: "_", number: 1},
 			},
 		)

@@ -27,6 +27,7 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 	var replaceMemberCallRecursive func(holder Value, replacement Value, visited map[int64]struct{}) map[string]Value
 	replaceMemberCallRecursive = func(holder Value, replacement Value, visited map[int64]struct{}) map[string]Value {
 		holderRet := make(map[string]Value)
+		sourceKeyOverrides := make(map[int64]Value)
 
 		if !utils.IsNil(holder) {
 			holderID := holder.GetId()
@@ -40,16 +41,27 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 			if utils.IsNil(root) || utils.IsNil(targetObj) {
 				return
 			}
-			if currentObj := root.GetObject(); !utils.IsNil(currentObj) && currentObj.GetId() != target.GetId() && currentObj.GetId() != holder.GetId() {
-				// 已指向有效对象，无需修改
+			pairs := GetObjectKeyPairs(root)
+			if len(pairs) == 0 {
+				root.AddObjectKeyPair(targetObj, pickMemberKey(root, rootKey))
 				return
 			}
-			root.SetObject(targetObj)
-			if root.IsMember() {
-				currentKey := root.GetKey()
-				if utils.IsNil(currentKey) || currentKey.GetId() == target.GetId() || currentKey.GetId() == holder.GetId() {
-					root.SetKey(pickMemberKey(root, rootKey))
+			updated := make([]ObjectKeyPair, 0, len(pairs))
+			changed := false
+			for _, pair := range pairs {
+				if !utils.IsNil(pair.Object) && pair.Object.GetId() != target.GetId() && pair.Object.GetId() != holder.GetId() {
+					updated = append(updated, pair)
+					continue
 				}
+				key := pair.Key
+				if utils.IsNil(key) || key.GetId() == target.GetId() || key.GetId() == holder.GetId() {
+					key = pickMemberKey(root, rootKey)
+				}
+				updated = append(updated, ObjectKeyPair{Object: targetObj, Key: key})
+				changed = true
+			}
+			if changed {
+				SetObjectKeyPairs(root, updated)
 			}
 		}
 
@@ -59,27 +71,54 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 				return
 			}
 
-			trueKey := member.GetKey()
-			if _, ok := container.GetMember(key); ok {
+			trueKey := pickMemberKey(member, key)
+			if member.GetOpcode() == SSAOpcodeUndefined {
+				if sourceKey, ok := sourceKeyOverrides[member.GetId()]; ok {
+					trueKey = sourceKey
+				} else {
+					trueKey = pickUndefinedMemberSourceKey(member, key)
+				}
+			}
+			if _, ok := GetLatestMemberByKey(container, key); ok {
 				container.DeleteMember(key)
 			}
 
 			res := checkCanMemberCallExist(replacement, key)
 			trueRes := checkCanMemberCallExist(replacement, trueKey)
 			name, typ := res.name, res.typ
-			toMember := builder.PeekValue(trueRes.name)
+			targetMember := builder.PeekValue(res.name)
+			if utils.IsNil(targetMember) {
+				if existing, ok := GetLatestMemberByKey(replacement, key); ok {
+					targetMember = existing
+				}
+			}
+			movingMember := member
+			if member.GetOpcode() == SSAOpcodeUndefined {
+				if existing, ok := GetLatestMemberByKey(replacement, trueKey); ok {
+					movingMember = existing
+				} else if existing := builder.PeekValue(trueRes.name); !utils.IsNil(existing) {
+					movingMember = existing
+				}
+			}
+			toMember := targetMember
+			var mergedMember Value
 
-			if member.GetOpcode() != SSAOpcodeUndefined {
-				member.SetName(name)
-				member.SetType(typ)
-				setMemberCallRelationship(replacement, key, member)
-				if utils.IsNil(toMember) {
-					holderRet[name] = member
+			if movingMember.GetOpcode() != SSAOpcodeUndefined {
+				movingMember.SetName(name)
+				movingMember.SetType(typ)
+				setMemberCallRelationship(replacement, key, movingMember)
+				if utils.IsNil(targetMember) || targetMember.GetId() == movingMember.GetId() {
+					toMember = movingMember
+					holderRet[name] = movingMember
 				} else {
 					if res.typ != nil {
-						toMember.SetType(res.typ)
+						targetMember.SetType(res.typ)
 					}
-					holderRet[name] = createPhi(name, []Value{toMember, member})
+					mergedMember = createPhi(name, []Value{movingMember, targetMember})
+					if !utils.IsNil(mergedMember) {
+						setMemberCallRelationship(replacement, key, mergedMember)
+						holderRet[name] = mergedMember
+					}
 				}
 			}
 
@@ -94,7 +133,7 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 				toMember = builder.ReadMemberCallValue(replacement, key)
 			}
 
-			if utils.IsNil(toMember.GetObject()) || toMember.GetObject().GetId() == target.GetId() || toMember.GetObject().GetId() == holder.GetId() {
+			if toMemberObj := GetLatestObject(toMember); utils.IsNil(toMemberObj) || toMemberObj.GetId() == target.GetId() || toMemberObj.GetId() == holder.GetId() {
 				fixBranch(toMember, replacement, key)
 			}
 
@@ -108,28 +147,34 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 			if member.IsObject() && !utils.IsNil(toMember) {
 				memberID := member.GetId()
 				toMemberID := toMember.GetId()
-				if memberID != toMemberID {
-					_, memberVisited := visited[memberID]
-					_, toMemberVisited := visited[toMemberID]
-					holderID := holder.GetId()
-					targetID := target.GetId()
-					replacementID := replacement.GetId()
+				_, memberVisited := visited[memberID]
+				_, toMemberVisited := visited[toMemberID]
+				holderID := holder.GetId()
+				targetID := target.GetId()
+				replacementID := replacement.GetId()
 
-					// 检查循环引用和已访问状态
-					if !memberVisited && !toMemberVisited &&
-						memberID != holderID && toMemberID != holderID &&
-						memberID != targetID && toMemberID != targetID &&
-						memberID != replacementID && toMemberID != replacementID {
+				if memberID == toMemberID {
+					if !memberVisited &&
+						memberID != holderID &&
+						memberID != targetID &&
+						memberID != replacementID {
 						memberForRecursion = member
 						toMemberForRecursion = toMember
 						shouldRecurse = true
 					}
+				} else if !memberVisited && !toMemberVisited &&
+					memberID != holderID && toMemberID != holderID &&
+					memberID != targetID && toMemberID != targetID &&
+					memberID != replacementID && toMemberID != replacementID {
+					memberForRecursion = member
+					toMemberForRecursion = toMember
+					shouldRecurse = true
 				}
 			}
 
 			// 处理 IsMember 情况：如果 member 是成员访问，需要递归处理其 object
 			if !shouldRecurse && member.IsMember() && !utils.IsNil(toMember) {
-				memberObj := member.GetObject()
+				memberObj := GetLatestObject(member)
 				if !utils.IsNil(memberObj) && memberObj.IsObject() {
 					memberObjID := memberObj.GetId()
 					if memberObjID == target.GetId() {
@@ -138,7 +183,7 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 						toMemberForRecursion = replacement
 						shouldRecurse = true
 					} else {
-						toMemberObj := toMember.GetObject()
+						toMemberObj := GetLatestObject(toMember)
 						if !utils.IsNil(toMemberObj) && toMemberObj.IsObject() && memberObjID != toMemberObj.GetId() {
 							_, memberObjVisited := visited[memberObjID]
 							_, toMemberObjVisited := visited[toMemberObj.GetId()]
@@ -161,8 +206,12 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 
 			// 替换 member 的值引用
 			memberT := member
-			switch member.GetOpcode() {
-			case SSAOpcodeBinOp, SSAOpcodeUnOp:
+			switch {
+			case !utils.IsNil(mergedMember):
+				memberT = mergedMember
+			case !utils.IsNil(toMember) && toMember.GetId() == member.GetId():
+				memberT = member
+			case member.GetOpcode() == SSAOpcodeBinOp || member.GetOpcode() == SSAOpcodeUnOp:
 				// 保留原始指令供后续替换
 			default:
 				ReplaceAllValue(member, toMember)
@@ -183,16 +232,18 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 
 		// 处理 holder 的所有成员，先处理非 Call 成员，再处理 Call 成员
 		if holder.IsObject() {
-			callMap := make(map[Value]Value)
-			for key, member := range holder.GetAllMember() {
-				if _, ok := ToCall(member); ok {
-					callMap[key] = member
+			callPairs := make([]MemberPair, 0)
+			memberPairs := holder.GetMemberPairs()
+			sourceKeyOverrides = repeatedMemberSourceKeys(memberPairs)
+			for _, pair := range memberPairs {
+				if _, ok := ToCall(pair.Member); ok {
+					callPairs = append(callPairs, pair)
 					continue
 				}
-				replace(holder, key, member)
+				replace(holder, pair.Key, pair.Member)
 			}
-			for key, member := range callMap {
-				replace(holder, key, member)
+			for _, pair := range callPairs {
+				replace(holder, pair.Key, pair.Member)
 			}
 		}
 
@@ -208,8 +259,50 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 
 func pickMemberKey(member, fallback Value) Value {
 	if !utils.IsNil(member) {
-		if k := member.GetKey(); !utils.IsNil(k) {
+		if k := GetLatestKey(member); !utils.IsNil(k) {
 			return k
+		}
+	}
+	return fallback
+}
+
+func repeatedMemberSourceKeys(pairs []MemberPair) map[int64]Value {
+	firstKeys := make(map[int64]Value)
+	sourceKeys := make(map[int64]Value)
+	for _, pair := range pairs {
+		if utils.IsNil(pair.Member) || utils.IsNil(pair.Key) {
+			continue
+		}
+		memberID := pair.Member.GetId()
+		if firstKey, ok := firstKeys[memberID]; ok {
+			if memberKeySignature(firstKey) != memberKeySignature(pair.Key) {
+				sourceKeys[memberID] = firstKey
+			}
+			continue
+		}
+		firstKeys[memberID] = pair.Key
+	}
+	return sourceKeys
+}
+
+func pickUndefinedMemberSourceKey(member, fallback Value) Value {
+	pairs := GetObjectKeyPairs(member)
+	if len(pairs) == 0 || utils.IsNil(fallback) {
+		return fallback
+	}
+	fallbackSignature := memberKeySignature(fallback)
+	latestFallbackIndex := -1
+	for index := len(pairs) - 1; index >= 0; index-- {
+		if memberKeySignature(pairs[index].Key) == fallbackSignature {
+			latestFallbackIndex = index
+			break
+		}
+	}
+	if latestFallbackIndex == len(pairs)-1 {
+		for index := latestFallbackIndex - 1; index >= 0; index-- {
+			if memberKeySignature(pairs[index].Key) != fallbackSignature {
+				return pairs[index].Key
+			}
 		}
 	}
 	return fallback
