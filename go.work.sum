@@ -20,8 +20,8 @@ github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.24.2
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.25.0 h1:3c8yed4lgqTt+oTQ+JNMDo+F4xprBf+O/il4ZC0nRLw=
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.25.0/go.mod h1:obipzmGjfSjam60XLwGfqUkJsfiheAl+TUjG+4yzyPM=
 github.com/OneOfOne/xxhash v1.2.2 h1:KMrpdQIwFcEqXDklaen+P1axHaj9BSKzvpUUfnHldSE=
-github.com/VillanCh/go-pcre2-lite v0.1.1 h1:4EzA+r/1iQEZceFqs+rPeXCCA9zIMrgJ7bCZXWmRW2c=
-github.com/VillanCh/go-pcre2-lite v0.1.1/go.mod h1:AhCwGtvHoBofEocvSxAKNhNEHTdtNcPUBYZvY6Co1Vo=
+github.com/VillanCh/go-pcre2-lite v0.1.2 h1:DIZkJDqsbx/90GPCWu/7vJTg1rVAP+XG4NWkoIA6RkE=
+github.com/VillanCh/go-pcre2-lite v0.1.2/go.mod h1:AhCwGtvHoBofEocvSxAKNhNEHTdtNcPUBYZvY6Co1Vo=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc h1:cAKDfWh5VpdgMhJosfJnn5/FoN2SRZ4p7fJNX58YPaU=
 github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf h1:qet1QNfXsQxTZqLG4oE62mJzwPIB8+Tee4RNCL9ulrY=
 github.com/antlr4-go/antlr/v4 v4.13.0 h1:lxCg3LAv+EUK6t1i0y1V6/SLeUi0eKEKdhQAlS8TVTI=
