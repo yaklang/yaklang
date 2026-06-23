@@ -305,6 +305,18 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "文件检索",
 		En: "File Operations",
 	},
+	"infosec-recon-tool": {
+		Zh: "侦察工具执行",
+		En: "Recon Tool Execution",
+	},
+	"infosec-api-pool": {
+		Zh: "API 池整理",
+		En: "API Pool Collecting",
+	},
+	"infosec-js-crawl": {
+		Zh: "JS 爬取分析",
+		En: "JS Crawl Analysis",
+	},
 	"self-reflection-suggestions": {
 		Zh: "自我反思",
 		En: "Self-Reflection",

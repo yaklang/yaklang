@@ -36,7 +36,7 @@ const (
 // Markers for idempotent merge of infosec_recon-specific interval-review (progress audit) extra prompts.
 // If already present in ToolCallIntervalReviewExtraPrompt, we do not append again.
 const (
-	markerIntervalReviewCrawlJs  = "<!-- infosec_recon_interval_review:crawl_js_collector -->"
+	markerIntervalReviewCrawlJs    = "<!-- infosec_recon_interval_review:crawl_js_collector -->"
 	markerIntervalReviewJsStaticAI = "<!-- infosec_recon_interval_review:js_static_extract_ai -->"
 )
 
@@ -93,6 +93,8 @@ func workDirFromInvoker(r aicommon.AIInvokeRuntime) string {
 
 func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
+		reactloops.EmitStatus(loop, "初始化信息搜集任务... / Initializing infosec recon task...")
+
 		wd := workDirFromInvoker(r)
 		if wd == "" {
 			log.Warnf("infosec_recon: workdir empty, pool path may be invalid")
@@ -117,6 +119,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		}
 
 		r.AddToTimeline("infosec_recon_init", "API surface recon loop ready. recon_register_seed → "+ToolCrawlJsCollector+" (optional deep_js) → "+ToolJsStaticExtractAI+"(paths / verified JS dir) → api_pool_merge / probe_api_candidates as needed.")
+		reactloops.EmitStatus(loop, "信息搜集任务就绪 / Infosec recon task ready")
 		operator.Continue()
 	}
 }

@@ -1,6 +1,8 @@
 package loop_infosec_recon
 
 import (
+	"fmt"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -33,6 +35,9 @@ var searchKnowledgeInfosec = func(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 				loop.RemoveAction("search_knowledge")
 			}
 			input := action.GetString("input")
+			reactloops.EmitActionLog(loop, infosecReconToolNodeID, fmt.Sprintf("开始: search_knowledge / Start: search_knowledge (%s)", input))
+			reactloops.EmitStatus(loop, "知识检索中 / Searching knowledge base...")
+
 			invoker := loop.GetInvoker()
 			ctx := loop.GetConfig().GetContext()
 			task := loop.GetCurrentTask()
@@ -48,6 +53,8 @@ var searchKnowledgeInfosec = func(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			loop.Set(keyInfosecEnhanceData, enhanceData)
 			appendInfosecReconLog(loop, "=== search_knowledge ===\n"+utils.ShrinkString(enhanceData, 8000))
 			op.Feedback("search_knowledge completed")
+			reactloops.EmitStatus(loop, "完成 / Complete")
+			reactloops.EmitActionLog(loop, infosecReconToolNodeID, fmt.Sprintf("完成: search_knowledge (%d bytes) / Done: search_knowledge (%d bytes)", len(enhanceData), len(enhanceData)))
 			op.Continue()
 		},
 	)
