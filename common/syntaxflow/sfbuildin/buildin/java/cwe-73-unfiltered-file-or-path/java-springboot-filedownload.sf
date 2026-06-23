@@ -31,32 +31,32 @@ DESC
 ```java
 @GetMapping("/download/{filename}")
 public ResponseEntity<FileSystemResource> downloadFile(@PathVariable String filename) {
-// 修复代码示例：白名单过滤和校验
-// 1. 校验文件名，防止目录遍历
-if (filename.contains("..") || filename.contains("/") || filename.contains("\")) {
-return ResponseEntity.badRequest().build(); // 拒绝包含非法字符的文件名
-}
-// 2. 结合安全的基础目录构建完整路径
-String baseDir = "/path/to/your/secure/files/";
-File file = new File(baseDir + filename);
-// 3. 进一步校验文件是否确实位于安全的基础目录内（重要！）
-try {
-if (!file.getCanonicalPath().startsWith(new File(baseDir).getCanonicalPath())) {
-return ResponseEntity.badRequest().build(); // 文件路径不在允许的目录下
-}
-} catch (IOException e) {
-return ResponseEntity.internalServerError().build(); // 处理文件路径标准化异常
-}
-// 4. 校验文件是否存在等其他逻辑
-if (!file.exists() || !file.isFile()) {
-return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-}
-// 设置响应头和返回文件
-HttpHeaders headers = new HttpHeaders();
-headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + file.getName());
-return ResponseEntity.ok()
-.headers(headers)
-.body(new FileSystemResource(file));
+    // 修复代码示例：白名单过滤和校验
+    // 1. 校验文件名，防止目录遍历
+    if (filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+        return ResponseEntity.badRequest().build(); // 拒绝包含非法字符的文件名
+    }
+    // 2. 结合安全的基础目录构建完整路径
+    String baseDir = "/path/to/your/secure/files/";
+    File file = new File(baseDir + filename);
+    // 3. 进一步校验文件是否确实位于安全的基础目录内（重要！）
+    try {
+        if (!file.getCanonicalPath().startsWith(new File(baseDir).getCanonicalPath())) {
+            return ResponseEntity.badRequest().build(); // 文件路径不在允许的目录下
+        }
+    } catch (IOException e) {
+        return ResponseEntity.internalServerError().build(); // 处理文件路径标准化异常
+    }
+    // 4. 校验文件是否存在等其他逻辑
+    if (!file.exists() || !file.isFile()) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+    }
+    // 设置响应头和返回文件
+    HttpHeaders headers = new HttpHeaders();
+    headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + file.getName());
+    return ResponseEntity.ok()
+        .headers(headers)
+        .body(new FileSystemResource(file));
 }
 ```
 #### 2. 使用安全的API或框架功能
@@ -89,32 +89,32 @@ alert $sink for {
 ```java
 @GetMapping("/download/{filename}")
 public ResponseEntity<FileSystemResource> downloadFile(@PathVariable String filename) {
-// 修复代码示例：白名单过滤和校验
-// 1. 校验文件名，防止目录遍历
-if (filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
-return ResponseEntity.badRequest().build(); // 拒绝包含非法字符的文件名
-}
-// 2. 结合安全的基础目录构建完整路径
-String baseDir = "/path/to/your/secure/files/";
-File file = new File(baseDir + filename);
-// 3. 进一步校验文件是否确实位于安全的基础目录内（重要！）
-try {
-if (!file.getCanonicalPath().startsWith(new File(baseDir).getCanonicalPath())) {
-return ResponseEntity.badRequest().build(); // 文件路径不在允许的目录下
-}
-} catch (IOException e) {
-return ResponseEntity.internalServerError().build(); // 处理文件路径标准化异常
-}
-// 4. 校验文件是否存在等其他逻辑
-if (!file.exists() || !file.isFile()) {
-return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-}
-// 设置响应头和返回文件
-HttpHeaders headers = new HttpHeaders();
-headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + file.getName());
-return ResponseEntity.ok()
-.headers(headers)
-.body(new FileSystemResource(file));
+    // 修复代码示例：白名单过滤和校验
+    // 1. 校验文件名，防止目录遍历
+    if (filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+        return ResponseEntity.badRequest().build(); // 拒绝包含非法字符的文件名
+    }
+    // 2. 结合安全的基础目录构建完整路径
+    String baseDir = "/path/to/your/secure/files/";
+    File file = new File(baseDir + filename);
+    // 3. 进一步校验文件是否确实位于安全的基础目录内（重要！）
+    try {
+        if (!file.getCanonicalPath().startsWith(new File(baseDir).getCanonicalPath())) {
+            return ResponseEntity.badRequest().build(); // 文件路径不在允许的目录下
+        }
+    } catch (IOException e) {
+        return ResponseEntity.internalServerError().build(); // 处理文件路径标准化异常
+    }
+    // 4. 校验文件是否存在等其他逻辑
+    if (!file.exists() || !file.isFile()) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+    }
+    // 设置响应头和返回文件
+    HttpHeaders headers = new HttpHeaders();
+    headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + file.getName());
+    return ResponseEntity.ok()
+        .headers(headers)
+        .body(new FileSystemResource(file));
 }
 ```
 #### 2. 使用安全的API或框架功能

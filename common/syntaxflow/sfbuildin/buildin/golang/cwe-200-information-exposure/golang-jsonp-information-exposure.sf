@@ -98,7 +98,48 @@ alert $low for {
 	title: "Detect Golang Json Information Exposure",
 	title_zh: "检测到Golang Json信息泄露",
 	solution: <<<SOLUTION
-### 修复建议\n#### 1. 避免敏感信息序列化\n在使用`json.Marshal`等函数时，避免将包含敏感信息（如密码、密钥等）的结构体或映射直接序列化为JSON字符串。\n```go\n// 示例：过滤敏感字段\ntype SafeUser struct {\nUsername string `json:\"username\"\`\nPassword string `json:\"-\"` // 使用 `-` 忽略字段\n}\nuser := SafeUser{\nUsername: \"admin\",\nPassword: \"admin@123\", // 密码不会被序列化\n}\ndata, err := json.Marshal(user)\nif err != nil {\npanic(err)\n}\nfmt.Println(string(data)) // 输出中不包含密码字段\n```\n#### 2. 添加数据脱敏逻辑\n对可能暴露敏感信息的数据进行脱敏处理，例如隐藏部分字符。\n```go\n// 示例：对密码字段脱敏\nfunc maskSensitiveData(data map[string]interface{}) map[string]interface{} {\nif pwd, ok := data[\"password\"].(string); ok {\ndata[\"password\"] = \"*****\" // 替换为掩码值\n}\nreturn data\n}\njsonp := map[string]interface{}{\n\"username\": \"admin\",\n\"password\": \"admin@123\",\n}\nmaskedJsonp := maskSensitiveData(jsonp)\ndata, err := json.Marshal(maskedJsonp)\nif err != nil {\npanic(err)\n}\nfmt.Println(string(data)) // 密码字段被替换为 *****\n```\n#### 3. 审查输出内容\n确保所有通过API返回的数据都经过审查，并仅包含必要的非敏感信息。
+### 修复建议
+#### 1. 避免敏感信息序列化
+在使用 `json.Marshal` 等函数时，避免将包含敏感信息（如密码、密钥等）的结构体或映射直接序列化为 JSON 字符串。
+```go
+// 示例：过滤敏感字段
+type SafeUser struct {
+	Username string `json:"username"`
+	Password string `json:"-"` // 使用 `-` 忽略字段
+}
+user := SafeUser{
+	Username: "admin",
+	Password: "admin@123", // 密码不会被序列化
+}
+data, err := json.Marshal(user)
+if err != nil {
+	panic(err)
+}
+fmt.Println(string(data)) // 输出中不包含密码字段
+```
+#### 2. 添加数据脱敏逻辑
+对可能暴露敏感信息的数据进行脱敏处理，例如隐藏部分字符。
+```go
+// 示例：对密码字段脱敏
+func maskSensitiveData(data map[string]interface{}) map[string]interface{} {
+	if pwd, ok := data["password"].(string); ok {
+		data["password"] = "*****" // 替换为掩码值
+	}
+	return data
+}
+jsonp := map[string]interface{}{
+	"username": "admin",
+	"password": "admin@123",
+}
+maskedJsonp := maskSensitiveData(jsonp)
+data, err := json.Marshal(maskedJsonp)
+if err != nil {
+	panic(err)
+}
+fmt.Println(string(data)) // 密码字段被替换为 *****
+```
+#### 3. 审查输出内容
+确保所有通过 API 返回的数据都经过审查，并仅包含必要的非敏感信息。
 SOLUTION
 	desc: <<<DESC
 ### 漏洞描述
