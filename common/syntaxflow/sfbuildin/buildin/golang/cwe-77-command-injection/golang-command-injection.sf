@@ -112,7 +112,7 @@ REFERENCE
 <include('golang-os-exec')> as $sink;
 <include('golang-user-input')> as $input;
 
-$sink(* ?{ * #{until: "* & $input"}-> }) as $high
+$sink?(* ?{ * #{until: "* & $input"}-> }) as $high
 
 
 alert $high for {
