@@ -20,9 +20,6 @@ var (
 type YakRegexpUtils struct {
 	reg  *RegexpWrapper
 	reg2 *Regexp2Wrapper
-	// reg3 是 dlclark/regexp2 兜底 (.NET 语义, 支持变长 lookbehind 等 PCRE2 拒绝的构造).
-	// 仅当 stdlib RE2 (reg) 与 PCRE2 (reg2) 都不可用时启用, 保证用户这类正则不致整体失效.
-	reg3 *dlclarkWrapper
 
 	regexpRaw    string
 	regexpOption regexp2.RegexOptions
@@ -72,7 +69,6 @@ func NewYakRegexpUtils(raw string, options ...YakRegexpUtilsOption) *YakRegexpUt
 
 	reg.reg = NewRegexpWrapper(RegexpAppendOption(raw, reg.regexpOption))
 	reg.reg2 = NewRegexp2Wrapper(raw, reg.regexpOption)
-	reg.reg3 = newDlclarkWrapper(raw, pcre2OptionsToDlclark(reg.regexpOption))
 
 	return reg
 }
@@ -105,21 +101,13 @@ func (m *YakRegexpUtils) getSecondaryRegexp() RegWrapperInterface {
 	}
 }
 
-// getUsableRegexp 返回第一个可用的 regexp（优先标准库，失败时回退 regexp2 支持 lookbehind/lookahead）。
-// 三档 fallback:
-//  1. priority (默认 stdlib RE2; 用户设 RegexpMode2 时为 PCRE2)
-//  2. secondary (与 priority 互补的那一档)
-//  3. dlclark 兜底 (.NET 语义): 仅当 stdlib RE2 与 PCRE2 都不可用时启用,
-//     覆盖 PCRE2 不支持的构造 (典型: 变长 lookbehind (?<=a.*b), PCRE2 code 125).
+// getUsableRegexp 返回第一个可用的 regexp（优先标准库，失败时回退 regexp2 支持 lookbehind/lookahead）
 func (m *YakRegexpUtils) getUsableRegexp() RegWrapperInterface {
 	if reg := m.getPriorityRegexp(); reg.CanUse() {
 		return reg
 	}
 	if reg := m.getSecondaryRegexp(); reg.CanUse() {
 		return reg
-	}
-	if m.reg3 != nil && m.reg3.CanUse() {
-		return m.reg3
 	}
 	return nil
 }

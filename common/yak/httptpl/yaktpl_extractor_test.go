@@ -474,12 +474,11 @@ as
 // TestYakExtractor_REGEXP_LookbehindLookahead 测试 lookbehind/lookahead 断言正则的匹配效果
 func TestYakExtractor_REGEXP_LookbehindLookahead(t *testing.T) {
 	tests := []struct {
-		name      string
-		data      string
-		regex     string
-		key       string
-		expected  string
-		expectErr bool // 该正则在当前后端无法编译 (如变长 lookbehind), 期望 Execute 返回错误
+		name     string
+		data     string
+		regex    string
+		key      string
+		expected string
 	}{
 		{
 			name:     "lookbehind lookahead 提取 JSON text 字段值（带空格）",
@@ -528,10 +527,7 @@ Content-Type: application/json
 			expected: "", // 正则要求 "text":" 无空格，但实际 JSON 是 "text": " 有空格，故不匹配
 		},
 		{
-			// regexp2 后端 go-pcre2-lite (PCRE2) 不支持变长 lookbehind, 但 regexp-utils 现已加
-			// dlclark 兜底 (YakRegexpUtils 第三档): PCRE2 与 RE2 都编译失败时回退 dlclark/.NET,
-			// 它原生支持变长 lookbehind. 故此处 \s* (长度不定) 经兜底可正常编译并匹配带空格 JSON.
-			name: "Werkzeug 实际响应 - 变长 lookbehind 经 dlclark 兜底可匹配",
+			name: "Werkzeug 实际响应 - 兼容带/不带空格的正则",
 			data: `HTTP/1.1 200 OK
 Content-Type: application/json
 
@@ -557,12 +553,6 @@ Content-Type: application/json
 				Groups: []string{tt.regex},
 			}
 			results, err := extractor.Execute([]byte(tt.data))
-			if tt.expectErr {
-				if err == nil {
-					t.Fatalf("expected compile error for unsupported regex %q, got none", tt.regex)
-				}
-				return
-			}
 			if err != nil {
 				t.Fatalf("Execute failed: %v", err)
 			}

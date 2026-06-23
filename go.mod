@@ -154,12 +154,12 @@ require (
 	rsc.io/qr v0.2.0
 )
 
-require github.com/dlclark/regexp2 v1.11.0
+require github.com/dlclark/regexp2 v1.11.0 // indirect
 
 require (
 	dario.cat/mergo v1.0.0 // indirect
 	github.com/ProtonMail/go-crypto v1.1.3 // indirect
-	github.com/VillanCh/go-pcre2-lite v0.1.0
+	github.com/VillanCh/go-pcre2-lite v0.1.1
 	github.com/andybalholm/cascadia v1.1.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
