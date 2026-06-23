@@ -42,6 +42,45 @@ func TestDecompileSwitchCaseOrder(t *testing.T) {
 	}
 }
 
+// TestDecompileNoUnreachableJump guards the unreachable-code fix: a conditional return/throw
+// inside a loop used to make the decompiler append a structural `break;`/`continue;` right after
+// the `return`/`throw`, which the ANTLR syntax net accepts but javac rejects as an "unreachable
+// statement". The decompiler must now drop those dead trailing jumps. We assert no `break;`/
+// `continue;` line immediately follows a `return`/`throw` line (and the method fully decompiles).
+func TestDecompileNoUnreachableJump(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/unreachable_break.class")
+	if err != nil {
+		t.Fatalf("read embedded class failed: %v", err)
+	}
+	source, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile failed: %v", err)
+	}
+	if _, ferr := java2ssa.Frontend(source); ferr != nil {
+		t.Fatalf("frontend parse failed: %v\n----- source -----\n%s", ferr, source)
+	}
+	if strings.Contains(source, "yak-decompiler") {
+		t.Fatalf("expected full decompilation, got a stub\n----- source -----\n%s", source)
+	}
+	lines := strings.Split(source, "\n")
+	isTerminal := func(s string) bool {
+		s = strings.TrimSpace(s)
+		return strings.HasPrefix(s, "return ") || s == "return;" ||
+			strings.HasPrefix(s, "throw ")
+	}
+	isDeadJump := func(s string) bool {
+		s = strings.TrimSpace(s)
+		return s == "break;" || s == "continue;" ||
+			strings.HasPrefix(s, "break ") || strings.HasPrefix(s, "continue ")
+	}
+	for i := 1; i < len(lines); i++ {
+		if isDeadJump(lines[i]) && isTerminal(lines[i-1]) {
+			t.Fatalf("unreachable jump %q after terminal %q (line %d)\n----- source -----\n%s",
+				strings.TrimSpace(lines[i]), strings.TrimSpace(lines[i-1]), i+1, source)
+		}
+	}
+}
+
 //go:embed testdata/regression/*.class
 var regressionFS embed.FS
 
