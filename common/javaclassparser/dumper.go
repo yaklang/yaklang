@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -115,6 +116,19 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	packageName := strings.Join(splits[:len(splits)-1], ".")
 	c.PackageName = packageName
 	className := splits[len(splits)-1]
+	// module-info / package-info are synthetic descriptor pseudo-classes; their internal
+	// name ("module-info" / "package-info") is not a legal Java identifier, so emitting
+	// `class module-info {}` yields un-parseable source. Render a valid minimal compilation
+	// unit instead. (Full JPMS module / package-info annotation reconstruction is a
+	// separate feature.)
+	if className == "module-info" || className == "package-info" {
+		var sb strings.Builder
+		if className == "package-info" && packageName != "" {
+			sb.WriteString(fmt.Sprintf("package %s;\n\n", packageName))
+		}
+		sb.WriteString(fmt.Sprintf("// decompiled from a synthetic %s descriptor\n", className))
+		return sb.String(), nil
+	}
 	supperClassName := c.obj.GetSupperClassName()
 	supperClassName = strings.Replace(supperClassName, "/", ".", -1)
 	c.ClassName = strings.Replace(name, "/", ".", -1)
@@ -202,67 +216,80 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	if err != nil {
 		return "", utils.Wrap(err, "DumpMethods failed")
 	}
-	attrs := ""
 	fields, err := c.DumpFields()
 	if err != nil {
 		return "", utils.Wrap(err, "DumpFields failed")
-	}
-	if len(fields) > 0 {
-		attrs += "\n\t// Fields\n"
-		enumFields := make([]dumpedFields, 0, len(fields))
-		ordinaryFields := make([]string, 0, len(fields))
-		for _, field := range fields {
-			if isEnum && field.typeName == className && (field.modifier == "public static final enum" || field.modifier == "public static final") {
-				enumFields = append(enumFields, field)
-				continue
-			}
-			ordinaryFields = append(ordinaryFields, field.code)
-		}
-		for idx, enumSimple := range enumFields {
-			attrs += fmt.Sprintf("\t%s", enumSimple.fieldName)
-			if idx == len(enumFields)-1 {
-				attrs += ";\n"
-			} else {
-				attrs += ",\n"
-			}
-		}
-		for _, ordinaryField := range ordinaryFields {
-			attrs += fmt.Sprintf("\t%s\n", ordinaryField)
-		}
-	}
-	if len(methods) > 0 {
-		attrs += "\n"
-		for _, method := range methods {
-			if isEnum {
-				//if method.methodName == "values" {
-				//	continue
-				//}
-				//if method.methodName == "valueOf" {
-				//	continue
-				//}
-			}
-			attrs += fmt.Sprintf("\t%s\n", method.code)
-		}
 	}
 	var classKeyword string
 	if !nonClassKeyword {
 		classKeyword = " class"
 	}
-	result := fmt.Sprintf("%s%s %s%s {%s}", accessFlags, classKeyword, className, superStr, attrs)
-	if len(annoStrs) > 0 {
-		result = fmt.Sprintf("%s\n%s", strings.Join(annoStrs, "\n"), result)
-	}
-	importsStr := ""
-	for _, s := range funcCtx.GetAllImported() {
-		if utils.StringSliceContain(buildInLib, s) {
-			continue
+	// assemble renders the full compilation unit from the current methods/fields. It is a
+	// closure so the syntax safety net can re-render after degrading malformed members.
+	assemble := func() string {
+		attrs := ""
+		if len(fields) > 0 {
+			attrs += "\n\t// Fields\n"
+			enumFields := make([]dumpedFields, 0, len(fields))
+			ordinaryFields := make([]string, 0, len(fields))
+			for _, field := range fields {
+				if isEnum && field.typeName == className && (field.modifier == "public static final enum" || field.modifier == "public static final") {
+					enumFields = append(enumFields, field)
+					continue
+				}
+				ordinaryFields = append(ordinaryFields, field.code)
+			}
+			for idx, enumSimple := range enumFields {
+				attrs += fmt.Sprintf("\t%s", enumSimple.fieldName)
+				if idx == len(enumFields)-1 {
+					attrs += ";\n"
+				} else {
+					attrs += ",\n"
+				}
+			}
+			for _, ordinaryField := range ordinaryFields {
+				attrs += fmt.Sprintf("\t%s\n", ordinaryField)
+			}
 		}
-		importsStr += fmt.Sprintf("import %s;\n", s)
+		if len(methods) > 0 {
+			attrs += "\n"
+			for _, method := range methods {
+				attrs += fmt.Sprintf("\t%s\n", method.code)
+			}
+		}
+		result := fmt.Sprintf("%s%s %s%s {%s}", accessFlags, classKeyword, className, superStr, attrs)
+		if len(annoStrs) > 0 {
+			result = fmt.Sprintf("%s\n%s", strings.Join(annoStrs, "\n"), result)
+		}
+		importsStr := ""
+		for _, s := range funcCtx.GetAllImported() {
+			if utils.StringSliceContain(buildInLib, s) {
+				continue
+			}
+			importsStr += fmt.Sprintf("import %s;\n", s)
+		}
+		if len(importsStr) > 0 {
+			importsStr += "\n"
+		}
+		return packageSource + importsStr + result
 	}
-	if len(importsStr) > 0 {
-		importsStr += "\n"
+
+	full := assemble()
+	if EnableDecompileSyntaxValidation {
+		if err := validateJavaSyntax(full); err != nil {
+			// The assembled class is not valid Java. Degrade malformed members (using the real
+			// class header so interface/enum/constructor context is honored) and re-render, so a
+			// single broken method/field cannot make the whole class un-parseable.
+			header := fmt.Sprintf("%s%s %s%s", accessFlags, classKeyword, className, superStr)
+			methods = c.degradeInvalidMethods(header, methods)
+			fields = c.degradeInvalidFields(header, className, isEnum, fields)
+			full = assemble()
+			if err := validateJavaSyntax(full); err != nil {
+				log.Warnf("decompiled class %s still has syntax errors after degradation: %v", c.ClassName, err)
+			}
+		}
 	}
-	return packageSource + importsStr + result, nil
+	return full, nil
 }
 
 type dumpedFields struct {
@@ -329,6 +356,10 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 					if !strings.HasSuffix(valueLiteral, "L") {
 						valueLiteral += "L"
 					}
+				case *ConstantFloatInfo:
+					valueLiteral = javaFloatLiteral(constVal.Value)
+				case *ConstantDoubleInfo:
+					valueLiteral = javaDoubleLiteral(constVal.Value)
 				default:
 					log.Errorf("when handling for fields unknown constant type: %T", constVal)
 				}
@@ -898,6 +929,39 @@ type dumpedMethods struct {
 	methodName string
 	code       string
 	bodyCode   string
+	// member/descriptor are retained so the post-decompile syntax safety net can rebuild a
+	// stub for a method whose generated body turns out to be un-parseable.
+	member     *MemberInfo
+	descriptor string
+}
+
+// javaFloatLiteral renders a float constant as a valid Java float literal (with the
+// mandatory 'F' suffix), handling NaN/Infinity which have no plain literal form.
+func javaFloatLiteral(f float32) string {
+	v := float64(f)
+	switch {
+	case math.IsNaN(v):
+		return "Float.NaN"
+	case math.IsInf(v, 1):
+		return "Float.POSITIVE_INFINITY"
+	case math.IsInf(v, -1):
+		return "Float.NEGATIVE_INFINITY"
+	}
+	return strconv.FormatFloat(v, 'g', -1, 32) + "F"
+}
+
+// javaDoubleLiteral renders a double constant as a valid Java double literal (with a
+// 'D' suffix so an integral value is not mistaken for an int), handling NaN/Infinity.
+func javaDoubleLiteral(f float64) string {
+	switch {
+	case math.IsNaN(f):
+		return "Double.NaN"
+	case math.IsInf(f, 1):
+		return "Double.POSITIVE_INFINITY"
+	case math.IsInf(f, -1):
+		return "Double.NEGATIVE_INFINITY"
+	}
+	return strconv.FormatFloat(f, 'g', -1, 64) + "D"
 }
 
 // DecompileStubMarker tags a method body that could not be decompiled and was replaced by a
@@ -1016,6 +1080,12 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 		// 	continue
 		// }
 		res, err := c.safeDumpMethod(name, descriptor)
+		if err == nil && res != nil && strings.Contains(res.code, values.EmptySlotValuePlaceholder) {
+			// The decompiled body leaked an internal placeholder ("empty slot value"),
+			// which means the stack simulation was incomplete and the emitted source is
+			// not valid Java. Degrade to a stub instead of producing un-compilable code.
+			err = utils.Errorf("incomplete stack simulation: empty stack slot leaked into method body")
+		}
 		if err != nil {
 			// Graceful degradation: an un-decompilable method body must not fail the whole
 			// class. Emit a stub method (correct signature, throwing body) so the rest of
@@ -1036,6 +1106,13 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 			if !slices.Contains(accessFlagsVerbose, "abstract") && !slices.Contains(accessFlagsVerbose, "annotation") && !slices.Contains(accessFlagsVerbose, "interface") && !slices.Contains(accessFlagsVerbose, "enum") {
 				continue
 			}
+		}
+		// retain identity so the syntax safety net can re-derive a stub if needed
+		if res.member == nil {
+			res.member = method
+		}
+		if res.descriptor == "" {
+			res.descriptor = descriptor
 		}
 		result = append(result, res)
 	}

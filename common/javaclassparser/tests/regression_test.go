@@ -74,6 +74,23 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			// hasNext() decompiles fine; next() (ternary with post-increment side effects) is stubbed
 			mustContain: []string{"boolean hasNext()", "yak-decompiler", "throw new RuntimeException"},
 		},
+		{
+			file: "empty_slot_stub.class",
+			desc: "incomplete stack simulation leaking 'empty slot value' degrades the method to a stub instead of emitting invalid code",
+			// the offending method is stubbed; the internal placeholder never reaches the output
+			mustContain:    []string{"yak-decompiler"},
+			mustNotContain: []string{"empty slot value"},
+		},
+		{
+			file:           "module_info.class",
+			desc:           "module-info synthetic descriptor renders as a valid compilation unit, not `class module-info {}`",
+			mustNotContain: []string{"class module-info"},
+		},
+		{
+			file:           "float_double_consts.class",
+			desc:           "float/double constant fields render as valid Java literals with F/D suffix",
+			mustContain:    []string{"3.14F", "2.718281828D", "-1.5F"},
+		},
 	}
 
 	for _, tc := range cases {

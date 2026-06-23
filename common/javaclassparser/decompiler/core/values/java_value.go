@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
@@ -50,9 +50,17 @@ func (j *JavaRef) String(funcCtx *class_context.ClassContext) string {
 	return j.Id.String()
 }
 
+// javaRefUidCounter backs VarUid generation. VarUid only needs to be unique per
+// JavaRef instance (it is used as a map key and for instance equality), so a process
+// wide monotonic counter is sufficient. This replaces a per-variable uuid.NewString()
+// call: under the parallel jdsc workload its crypto/rand getentropy() syscalls
+// serialize on a kernel lock and burn a large fraction of CPU (profiled as the top
+// cost), which the counter eliminates entirely.
+var javaRefUidCounter atomic.Int64
+
 func NewJavaRef(id *utils.VariableId, val JavaValue, typ types.JavaType) *JavaRef {
 	return &JavaRef{
-		VarUid: uuid.NewString(),
+		VarUid: "ref-" + strconv.FormatInt(javaRefUidCounter.Add(1), 10),
 		Id:     id,
 		Val:    val,
 		typ:    typ,
@@ -369,6 +377,12 @@ func NewTernaryExpression(condition, v1, v2 JavaValue) *TernaryExpression {
 	}
 }
 
+// EmptySlotValuePlaceholder is rendered when a SlotValue has no underlying value,
+// which means the stack simulation produced an incomplete result for the method.
+// It is not valid Java; the dumper detects this marker and degrades the affected
+// method to a stub instead of emitting un-compilable source.
+const EmptySlotValuePlaceholder = "empty slot value"
+
 type SlotValue struct {
 	val     JavaValue
 	TmpType types.JavaType
@@ -376,6 +390,11 @@ type SlotValue struct {
 
 // ReplaceVar implements JavaValue.
 func (s *SlotValue) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	// val may be nil for an empty slot (see Type/String which already guard this);
+	// without the guard rewriteVar panics with a nil pointer dereference.
+	if s.val == nil {
+		return
+	}
 	s.val.ReplaceVar(oldId, newId)
 }
 
@@ -387,7 +406,7 @@ func (s *SlotValue) Type() types.JavaType {
 }
 func (s *SlotValue) String(funcCtx *class_context.ClassContext) string {
 	if s.val == nil {
-		return "empty slot value"
+		return EmptySlotValuePlaceholder
 	}
 	return s.val.String(funcCtx)
 }

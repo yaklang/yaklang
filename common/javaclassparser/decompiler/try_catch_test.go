@@ -23,7 +23,7 @@ func TestTryCatch(t *testing.T) {
 	}
 	println(sourceCode)
 	assert.Equal(t, `start
-if (try){
+if ("try"){
 tryBody1
 }else{
 catchBody1

@@ -11,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"github.com/yaklang/yaklang/common/log"
-	"strings"
 )
 
 func getNameAndType(pool []ConstantInfo, index uint16) (string, string) {
@@ -45,7 +44,7 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 	}
 	convertMemberInfo := func(classMemberInfo *ConstantMemberrefInfo) values.JavaValue {
 		className := getClassName(classMemberInfo.ClassIndex)
-		className = strings.Replace(className, "/", ".", -1)
+		className = types.SlashToDot(className)
 		name, desc := getNameAndType(pool, classMemberInfo.NameAndTypeIndex)
 		typ, err := types.ParseMethodDescriptor(desc)
 		if err != nil {
@@ -69,7 +68,7 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 		refNameInfo := indexFromPool(int(nameAndType.NameIndex)).(*ConstantUtf8Info)
 		descInfo := indexFromPool(int(nameAndType.DescriptorIndex)).(*ConstantUtf8Info)
 		typeName := nameInfo.Value
-		typeName = strings.Replace(typeName, "/", ".", -1)
+		typeName = types.SlashToDot(typeName)
 		typ, err := types.ParseDescriptor(descInfo.Value)
 		if err != nil {
 			log.Errorf("parse descriptor failed:%s", descInfo.Value)
@@ -84,7 +83,7 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 		refNameInfo := indexFromPool(int(nameAndType.NameIndex)).(*ConstantUtf8Info)
 		descInfo := indexFromPool(int(nameAndType.DescriptorIndex)).(*ConstantUtf8Info)
 		typeName := nameInfo.Value
-		typeName = strings.Replace(typeName, "/", ".", -1)
+		typeName = types.SlashToDot(typeName)
 		typ, err := types.ParseMethodDescriptor(descInfo.Value)
 		if err != nil {
 			log.Errorf("parse descriptor failed:%s", descInfo.Value)
@@ -94,18 +93,18 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 	case *ConstantClassInfo:
 		nameInfo := indexFromPool(int(ret.NameIndex)).(*ConstantUtf8Info)
 		typeName := nameInfo.Value
-		typeName = strings.Replace(typeName, "/", ".", -1)
+		typeName = types.SlashToDot(typeName)
 		return values.NewJavaClassValue(types.NewJavaClass(typeName))
 	case *ConstantModuleInfo:
 		nameInfo := indexFromPool(int(ret.NameIndex)).(*ConstantUtf8Info)
 		typeName := nameInfo.Value
-		typeName = strings.Replace(typeName, "/", ".", -1)
+		typeName = types.SlashToDot(typeName)
 		log.Warn("TODO: the java module should be a new java type")
 		return values.NewJavaClassValue(types.NewJavaClass(typeName))
 	case *ConstantPackageInfo:
 		nameInfo := indexFromPool(int(ret.NameIndex)).(*ConstantUtf8Info)
 		typeName := nameInfo.Value
-		typeName = strings.Replace(typeName, "/", ".", -1)
+		typeName = types.SlashToDot(typeName)
 		log.Warn("TODO: the java module should be a new java type")
 		return values.NewJavaClassValue(types.NewJavaClass(typeName))
 	case *ConstantMethodTypeInfo:
