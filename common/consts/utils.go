@@ -64,19 +64,21 @@ func TempFile(pattern string) (*os.File, error) {
 	return ioutil.TempFile(GetDefaultYakitBaseTempDir(), pattern)
 }
 
-func TempAIFile(pattern string) (*os.File, error) {
+// GetDefaultAISpaceDir returns ~/yakit-projects/aispace (or $YAKIT_HOME/../aispace).
+func GetDefaultAISpaceDir() string {
 	dirname := filepath.Clean(filepath.Join(GetDefaultYakitBaseTempDir(), "..", "aispace"))
 	if os.MkdirAll(dirname, os.ModePerm) != nil {
-		dirname = GetDefaultYakitBaseTempDir()
+		return GetDefaultYakitBaseTempDir()
 	}
-	return ioutil.TempFile(dirname, pattern)
+	return dirname
+}
+
+func TempAIFile(pattern string) (*os.File, error) {
+	return ioutil.TempFile(GetDefaultAISpaceDir(), pattern)
 }
 
 func TempAIDir(pattern ...string) string {
-	dirname := filepath.Clean(filepath.Join(GetDefaultYakitBaseTempDir(), "..", "aispace"))
-	if os.MkdirAll(dirname, os.ModePerm) != nil {
-		dirname = GetDefaultYakitBaseTempDir()
-	}
+	dirname := GetDefaultAISpaceDir()
 	var p string
 	if len(pattern) <= 0 {
 		p = filepath.Join(dirname, uuid.New().String())
