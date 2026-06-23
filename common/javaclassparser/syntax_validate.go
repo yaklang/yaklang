@@ -3,8 +3,10 @@ package javaclassparser
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/java/javasyntax"
 )
 
@@ -19,10 +21,46 @@ import (
 // extra parse per class.
 var EnableDecompileSyntaxValidation = true
 
+// DecompileSyntaxValidationBudget bounds how long the post-decompile syntax safety net spends
+// parsing a single compilation unit (or member) before giving up. The SLL fast path returns in
+// milliseconds, but ANTLR's LL fallback can blow up super-linearly on pathological decompiler
+// output (e.g. a method carrying dozens of switch statements), which would otherwise make a
+// single class take tens of seconds to validate and effectively hang batch scans. When the
+// budget is exceeded we conservatively treat the input as invalid so the offending member is
+// degraded to a stub: this both keeps decompilation time bounded and preserves the "never emit
+// un-parseable Java" guarantee. Set to <= 0 to disable the budget (validate synchronously).
+var DecompileSyntaxValidationBudget = 4 * time.Second
+
 // validateJavaSyntax reports whether a full compilation unit is syntactically valid Java
-// (after decompiler normalization). nil means the grammar accepts it.
+// (after decompiler normalization). nil means the grammar accepts it. The parse runs under
+// DecompileSyntaxValidationBudget so a single pathological input cannot stall decompilation.
 func validateJavaSyntax(src string) error {
-	return javasyntax.Validate(src)
+	return validateJavaSyntaxWithBudget(src, DecompileSyntaxValidationBudget)
+}
+
+// validateJavaSyntaxWithBudget runs javasyntax.Validate but abandons the parse once budget
+// elapses, returning a sentinel error. A budget <= 0 means "no limit" (validate inline). The
+// abandoned goroutine still finishes on its own (ANTLR has no cancellation hook), but its result
+// is dropped via the buffered channel so nothing blocks or leaks permanently.
+func validateJavaSyntaxWithBudget(src string, budget time.Duration) error {
+	if budget <= 0 {
+		return javasyntax.Validate(src)
+	}
+	ch := make(chan error, 1)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				ch <- utils.Errorf("panic during syntax validation: %v", r)
+			}
+		}()
+		ch <- javasyntax.Validate(src)
+	}()
+	select {
+	case err := <-ch:
+		return err
+	case <-time.After(budget):
+		return utils.Errorf("syntax validation exceeded budget %s (treated as invalid for safe degradation)", budget)
+	}
 }
 
 // validateMemberInHeader reports whether a single member (method or field) is syntactically
@@ -31,7 +69,7 @@ func validateJavaSyntax(src string) error {
 // a constructor body only parses when the enclosing type name matches, so a generic `class X`
 // wrapper would give wrong answers.
 func validateMemberInHeader(header, memberCode string) error {
-	return javasyntax.Validate(header + " {\n" + memberCode + "\n}")
+	return validateJavaSyntaxWithBudget(header+" {\n"+memberCode+"\n}", DecompileSyntaxValidationBudget)
 }
 
 // degradeInvalidMethods returns methods whose generated source is valid Java in the class

@@ -9,6 +9,39 @@ import (
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 )
 
+// TestDecompileSwitchCaseOrder guards against the switch case-mapping corruption caused by the
+// invalid sort.Slice comparators (always returning true) that scrambled the switch successor order
+// at both the opcode level (CalcOpcodeStackInfo) and the rewriter level (SwitchRewriter). The bug
+// produced syntactically-valid but semantically-wrong output (each case mapped to the wrong body),
+// which the syntax safety net cannot catch, so we assert the case -> body mapping explicitly.
+func TestDecompileSwitchCaseOrder(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/switch_case_order.class")
+	if err != nil {
+		t.Fatalf("read embedded class failed: %v", err)
+	}
+	source, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile failed: %v", err)
+	}
+	if _, ferr := java2ssa.Frontend(source); ferr != nil {
+		t.Fatalf("frontend parse failed: %v\n----- source -----\n%s", ferr, source)
+	}
+	// pick(int): case 0 -> "zero", case 1 -> "one", case 2 -> "two", default -> "many".
+	// The bug reversed this ordering, so verify the bodies appear in the correct relative order.
+	order := []string{`"zero"`, `"one"`, `"two"`, `"many"`}
+	prev := -1
+	for _, lit := range order {
+		idx := strings.Index(source, lit)
+		if idx < 0 {
+			t.Fatalf("expected output to contain %s\n----- source -----\n%s", lit, source)
+		}
+		if idx <= prev {
+			t.Fatalf("switch case bodies out of order (%s appeared too early) - case mapping corrupted\n----- source -----\n%s", lit, source)
+		}
+		prev = idx
+	}
+}
+
 //go:embed testdata/regression/*.class
 var regressionFS embed.FS
 
@@ -70,9 +103,10 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 		},
 		{
 			file: "decompile_stub_partial.class",
-			desc: "graceful degradation: an un-decompilable method becomes a stub, rest of class is intact",
-			// hasNext() decompiles fine; next() (ternary with post-increment side effects) is stubbed
-			mustContain: []string{"boolean hasNext()", "yak-decompiler", "throw new RuntimeException"},
+			desc: "post-increment side effect inside a ternary folds into `x++` and the method decompiles fully",
+			// hasNext() and next() both decompile; next() is `(cond) ? (this.index++) : (... - this.index++)`
+			mustContain:    []string{"boolean hasNext()", "int next()", "this.index++"},
+			mustNotContain: []string{"yak-decompiler", "throw new RuntimeException"},
 		},
 		{
 			file: "empty_slot_stub.class",
