@@ -48,18 +48,25 @@ func (n *NewExpression) String(funcCtx *class_context.ClassContext) string {
 			base = base.ElementType()
 		}
 		s := fmt.Sprintf("new %s", base.String(funcCtx))
-		for _, l := range n.Length {
-			s += fmt.Sprintf("[%v]", l.(JavaValue).String(funcCtx))
-		}
-		for i := len(n.Length); i < n.JavaType.ArrayDim(); i++ {
-			s += "[]"
-		}
+		// An explicit initializer (new T[]{...}) is incompatible with a sized dimension
+		// (new T[3]{...} is a javac error); the literal supplies the length, so drop the
+		// first numeric dimension and emit empty brackets per array dimension instead.
 		if len(n.Initializer) != 0 {
+			for i := 0; i < n.JavaType.ArrayDim(); i++ {
+				s += "[]"
+			}
 			vsStr := []string{}
 			for _, v := range n.Initializer {
 				vsStr = append(vsStr, v.String(funcCtx))
 			}
 			s += fmt.Sprintf("{%s}", strings.Join(vsStr, ","))
+			return s
+		}
+		for _, l := range n.Length {
+			s += fmt.Sprintf("[%v]", l.(JavaValue).String(funcCtx))
+		}
+		for i := len(n.Length); i < n.JavaType.ArrayDim(); i++ {
+			s += "[]"
 		}
 		return s
 	}
