@@ -1373,7 +1373,7 @@ func init() {
 				if !ok {
 					return nil
 				}
-				obj := val.GetObject()
+				obj := resolveGetObject(val)
 				if obj != nil {
 					obj.AppendPredecessor(val, frame.WithPredecessorContext("getObject"))
 					sfvm.MergeAnchor(val, obj)

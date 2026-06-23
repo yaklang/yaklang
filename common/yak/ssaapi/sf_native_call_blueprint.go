@@ -5,12 +5,36 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+func resolveGetObject(val *Value) *Value {
+	if val == nil || val.IsNil() {
+		return nil
+	}
+	raw := val.getValue()
+	if raw == nil {
+		return nil
+	}
+	if fun, ok := ssa.ToFunction(raw); ok && fun.IsMethod() {
+		if bp := fun.GetCurrentBlueprint(); bp != nil && bp.Container() != nil {
+			return val.NewValue(bp.Container())
+		}
+	}
+	for _, pair := range ssa.GetObjectKeyPairs(raw) {
+		if pair.Object == nil {
+			continue
+		}
+		if _, ok := ssa.ToBluePrintType(pair.Object.GetType()); ok {
+			return val.NewValue(pair.Object)
+		}
+	}
+	return val.GetObject()
+}
+
 func walkCurrentBlueprint(v any, handle func(src *Value, bp *ssa.Blueprint)) {
 	getBlueprint := func(v *Value) *ssa.Blueprint {
 		if v == nil {
 			return nil
 		}
-		bp, isBlueprint := ssa.ToClassBluePrintType(v.getValue().GetType())
+		bp, isBlueprint := ssa.ToBluePrintType(v.getValue().GetType())
 		if isBlueprint {
 			return bp
 		}
