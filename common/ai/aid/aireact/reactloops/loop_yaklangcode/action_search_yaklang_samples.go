@@ -384,7 +384,7 @@ semantic_search_yaklang_samples(questions=["Yaklang中如何处理错误？", "Y
 				}
 			}
 
-			summary, reference := spillYaklangContent(loop, "semantic_search", resultStr)
+			summary, reference := reactloops.SpillLongContent(loop, "semantic_search", resultStr)
 			finishLine := fmt.Sprintf("完成: 找到 %d 个相关片段（%d 个问题）", len(results), len(questions))
 			reactloops.EmitStatus(loop, "完成 / Complete")
 			reactloops.EmitActionLog(loop, nodeID, finishLine, reference)

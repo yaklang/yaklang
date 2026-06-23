@@ -261,7 +261,7 @@ var listFilesAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOptio
 			}
 
 			fullList := strings.Join(javaFiles, "\n")
-			summary, reference := spillOrPreview(loop, "java_file_list", fullList)
+			summary, reference := reactloops.SpillLongContent(loop, "java_file_list", fullList)
 
 			finishLine := fmt.Sprintf("完成: 找到 %d 个 Java 文件 (%s)", len(javaFiles), dirPath)
 			reactloops.EmitStatus(loop, fmt.Sprintf(

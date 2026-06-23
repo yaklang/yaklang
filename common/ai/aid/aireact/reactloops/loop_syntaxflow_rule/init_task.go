@@ -462,7 +462,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 
 			if initialSamples != "" {
 				reactloops.EmitStatus(loop, "压缩样例中 / Compressing samples...")
-				summary, reference := spillSyntaxFlowContent(loop, "init_rule_samples", initialSamples)
+				summary, reference := reactloops.SpillLongContent(loop, "init_rule_samples", initialSamples)
 				reactloops.EmitStatus(loop, "样例准备完成 / Samples ready")
 				reactloops.EmitActionLog(loop, "init-search-rule-sample",
 					fmt.Sprintf("初始化规则样例: %s", utils.ByteSize(uint64(len(initialSamples)))),

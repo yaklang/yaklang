@@ -321,7 +321,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 
 			if initialSamples != "" {
 				reactloops.EmitStatus(loop, "压缩样例中 / Compressing samples...")
-				summary, reference := spillYaklangContent(loop, "init_code_samples", initialSamples)
+				summary, reference := reactloops.SpillLongContent(loop, "init_code_samples", initialSamples)
 				reactloops.EmitStatus(loop, "样例准备完成 / Samples ready")
 				reactloops.EmitActionLog(loop, "yaklang-init-search",
 					fmt.Sprintf("初始化样例: %s", utils.ByteSize(uint64(len(initialSamples)))),

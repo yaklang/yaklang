@@ -521,7 +521,7 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 				}
 			}
 
-			summary, reference := spillYaklangContent(loop, "grep_search", resultStr)
+			summary, reference := reactloops.SpillLongContent(loop, "grep_search", resultStr)
 			finishLine := fmt.Sprintf("完成: 找到 %d 个匹配, pattern=%s", len(results), pattern)
 			reactloops.EmitStatus(loop, "完成 / Complete")
 			reactloops.EmitActionLog(loop, nodeID, finishLine, reference)

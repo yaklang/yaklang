@@ -32,7 +32,7 @@ func yakdocHandleSuccess(
 	actionName, timelineKey, result string,
 ) {
 	invoker := loop.GetInvoker()
-	summary, reference := spillYaklangContent(loop, "yakdoc_"+actionName, result)
+	summary, reference := reactloops.SpillLongContent(loop, "yakdoc_"+actionName, result)
 	finishLine := fmt.Sprintf("完成: %s", actionName)
 	reactloops.EmitStatus(loop, "完成 / Complete")
 	reactloops.EmitActionLog(loop, "query_yaklang_document", finishLine, reference)

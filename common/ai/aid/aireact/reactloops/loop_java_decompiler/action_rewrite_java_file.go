@@ -323,7 +323,7 @@ public class Example {
 			reference := fmt.Sprintf("备份: %s\n新代码预览:\n%s", backupPath, preview)
 			if hasSyntaxErrors {
 				issueText := strings.Join(syntaxIssues, "\n")
-				issueSummary, _ := spillOrPreview(loop, "rewrite_syntax_issues", issueText)
+				issueSummary, _ := reactloops.SpillLongContent(loop, "rewrite_syntax_issues", issueText)
 				reference += "\n\n语法问题:\n" + issueSummary
 			}
 			reactloops.EmitActionLog(loop, nodeID, finishLine, reference)

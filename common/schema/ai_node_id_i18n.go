@@ -903,6 +903,18 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "检索报告参考",
 		En: "Grep Report Reference",
 	},
+	"skill-audit-phase1": {
+		Zh: "Skill 审计探索",
+		En: "Skill Audit Explore",
+	},
+	"skill-audit-phase2": {
+		Zh: "Skill 静态分析",
+		En: "Skill Static Analysis",
+	},
+	"skill-audit-report": {
+		Zh: "Skill 审计报告",
+		En: "Skill Audit Report",
+	},
 	"python-script": {
 		Zh: "Python 脚本",
 		En: "Python Script",

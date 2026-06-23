@@ -181,7 +181,7 @@ var grepReferenceAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 			existingRefs := loop.Get("collected_references")
 			loop.Set("collected_references", existingRefs+"\n"+resultContent)
 
-			summary, reference := spillReportContent(loop, "grep_reference", resultContent)
+			summary, reference := reactloops.SpillLongContent(loop, "grep_reference", resultContent)
 
 			// 添加到时间线
 			invoker := loop.GetInvoker()

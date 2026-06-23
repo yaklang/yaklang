@@ -165,7 +165,7 @@ var checkJavaSyntaxAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 				invoker.AddToTimeline("check_syntax_success", fmt.Sprintf("所有 %d 个Java文件语法检查通过，可以继续下一步操作", len(filesToCheck)))
 			} else {
 				fullReport := strings.Join(issueReports, "\n")
-				summary, ref := spillOrPreview(loop, "syntax_check_report", fullReport)
+				summary, ref := reactloops.SpillLongContent(loop, "syntax_check_report", fullReport)
 				reference = ref
 				finishLine = fmt.Sprintf("完成: %d/%d 个文件存在语法问题", filesWithIssues, len(filesToCheck))
 				reactloops.EmitStatus(loop, fmt.Sprintf(

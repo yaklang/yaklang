@@ -2,12 +2,9 @@ package loopinfra
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 const (
@@ -21,8 +18,6 @@ const (
 	loopInfraNodeQueryMCPServers    = "query_mcp_servers"
 	loopInfraNodeQueryMCPTools      = "query_mcp_tools"
 )
-
-const loopInfraReferencePreviewBytes = 1200
 
 func loopInfraStatus(loop *reactloops.ReActLoop, message string) {
 	reactloops.EmitStatus(loop, message)
@@ -53,27 +48,7 @@ func loopInfraActionFinish(loop *reactloops.ReActLoop, nodeID, line string, refe
 }
 
 func loopInfraSaveReference(loop *reactloops.ReActLoop, prefix, content string, previewBytes int) (filename string, preview string) {
-	content = strings.TrimSpace(content)
-	if content == "" || loop == nil {
-		return "", ""
-	}
-	if previewBytes <= 0 {
-		previewBytes = loopInfraReferencePreviewBytes
-	}
-	preview = utils.ShrinkTextBlock(content, previewBytes)
-	if len(content) <= previewBytes {
-		return "", preview
-	}
-	dataDir := loop.GetLoopContentDir("data")
-	if dataDir == "" {
-		return "", preview
-	}
-	filename = filepath.Join(dataDir, fmt.Sprintf("%s_%d_%s.txt", prefix, loop.GetCurrentIterationIndex(), utils.DatetimePretty2()))
-	if err := reactloops.SaveAndPinFile(loop, filename, []byte(content)); err != nil {
-		log.Warnf("loopinfra: failed to save %s reference: %v", prefix, err)
-		return "", preview
-	}
-	return filename, preview
+	return reactloops.SaveContentReference(loop, prefix, content, previewBytes)
 }
 
 func loopInfraFileReferenceSummary(title, filename, preview string) string {
