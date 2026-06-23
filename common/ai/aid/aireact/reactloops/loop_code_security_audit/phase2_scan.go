@@ -274,6 +274,7 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *AuditState, 
 		}),
 
 		reactloops.WithInitTask(func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, op *reactloops.InitTaskOperator) {
+			reactloops.EmitStatus(loop, fmt.Sprintf("扫描类别 %s / Scanning category %s", category.Name, category.ID))
 			log.Infof("[CodeAudit/Phase2] Category '%s' scan started", category.ID)
 			op.Continue()
 		}),
@@ -458,7 +459,6 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *AuditState, 
 					"total":   len(state.GetFindings()),
 				})
 
-				jsonBytes, _ := json.MarshalIndent(f, "", "  ")
 				log.Infof("[CodeAudit/Phase2] Finding added: %s - %s (%s:%d)", f.ID, f.Category, f.File, f.Line)
 
 				// 实时落盘：全量 + 当前类别独立文件
@@ -482,8 +482,8 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *AuditState, 
 					}
 				}
 
-				op.Feedback(fmt.Sprintf("Finding %s 已记录（%s, %s:%d）。\n```json\n%s\n```\n继续审计当前文件，完成后调用 mark_file_done。",
-					f.ID, f.Category, f.File, f.Line, string(jsonBytes)))
+				op.Feedback(fmt.Sprintf("Finding %s 已记录（%s, %s:%d, %s）。继续审计当前文件，完成后调用 mark_file_done。",
+					f.ID, f.Category, f.File, f.Line, f.Title))
 			},
 		),
 
@@ -498,8 +498,9 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *AuditState, 
 					op.Feedback(fmt.Sprintf("无法读取项目背景报告: %v\n请直接使用 grep/read_file 查找所需信息。", err))
 					return
 				}
+				summary, _ := reactloops.SpillLongContent(loop, "recon_notes", content)
 				r.AddToTimeline("read_recon_notes", fmt.Sprintf("[Phase2/%s] 读取项目背景报告 (%d 字节)", category.ID, len(content)))
-				op.Feedback("=== 项目背景报告 ===\n\n" + content)
+				op.Feedback(fmt.Sprintf("=== 项目背景报告 (%d bytes) ===\n\n%s", len(content), summary))
 			},
 		),
 
@@ -515,6 +516,7 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *AuditState, 
 			nil,
 			func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 				coverageSummary := action.GetString("coverage_summary")
+				coverageSpill, _ := reactloops.SpillLongContent(loop, "scan_coverage_"+category.ID, coverageSummary)
 
 				obs := &ScanObservation{
 					CategoryID:      category.ID,
@@ -551,7 +553,7 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *AuditState, 
 					}
 				}
 
-				op.Feedback(fmt.Sprintf("类别 [%s] 扫描完成。%s", category.Name, coverageSummary))
+				op.Feedback(fmt.Sprintf("类别 [%s] 扫描完成。\n%s", category.Name, coverageSpill))
 				op.Exit()
 			},
 		),
