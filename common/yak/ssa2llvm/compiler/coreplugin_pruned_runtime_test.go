@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/coreplugin"
-	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 	runtimeembed "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/embed"
 )
 

@@ -14,8 +14,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-
-	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/embed"
 )
 
 const cachedCompileVersion = "ssa2llvm-cache-v3"
@@ -105,30 +103,10 @@ func cachedWorkKeyFromConfig(cfg *CompileConfig) (string, error) {
 	}
 	if cfg.StdlibCompile {
 		write("goTool=" + goToolVersionKey())
-		if h, ok, err := embed.EmbeddedRuntimeSourceHash(); ok {
-			if err != nil {
-				write("embeddedRuntimeSourceHash=error:" + err.Error())
-			} else {
-				write("embeddedRuntimeSourceHash=" + h)
-			}
-		} else {
-			write("embeddedRuntimeSourceHash=<none>")
-		}
-	} else {
-		if h, ok, err := embed.EmbeddedRuntimeHash(); ok {
-			if err != nil {
-				write("embeddedRuntimeHash=error:" + err.Error())
-			} else {
-				write("embeddedRuntimeHash=" + h)
-			}
-		} else {
-			write("embeddedRuntimeHash=<none>")
-		}
-	}
-	write("obf=" + strings.Join(obf, ","))
-	if strings.TrimSpace(cfg.RuntimeArchive) != "" {
+	} else if strings.TrimSpace(cfg.RuntimeArchive) != "" {
 		write("runtimeArchive=" + strings.TrimSpace(cfg.RuntimeArchive))
 	}
+	write("obf=" + strings.Join(obf, ","))
 	if len(cfg.ExtraLinkArgs) > 0 {
 		write("extraLinkArgs=" + strings.Join(cfg.ExtraLinkArgs, "\x00"))
 	}

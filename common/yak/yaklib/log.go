@@ -10,6 +10,7 @@ import (
 	"github.com/kataras/golog"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
+	"github.com/yaklang/yaklang/common/yak/yaklib/loglite"
 )
 
 // setLevel 根据传入的字符串设置日志级别
@@ -140,6 +141,24 @@ func _logWarn(format string, args ...interface{}) {
 // ```
 func _logError(format string, args ...interface{}) {
 	log.Errorf(format, args...)
+}
+
+// YakitInfo logs in the yakit UI style to stderr. Used by yakit.* logging exports
+// and ssa2llvm AOT binaries without a Yakit client.
+func YakitInfo(format string, items ...interface{}) {
+	loglite.YakitInfo(format, items...)
+}
+
+func YakitWarn(format string, items ...interface{}) {
+	loglite.YakitWarn(format, items...)
+}
+
+func YakitDebug(format string, items ...interface{}) {
+	loglite.YakitDebug(format, items...)
+}
+
+func YakitError(format string, items ...interface{}) {
+	loglite.YakitError(format, items...)
 }
 
 var LogExports = map[string]interface{}{

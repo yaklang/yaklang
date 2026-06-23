@@ -42,7 +42,7 @@ func TestStdlibCompileFromGomodsrcTree(t *testing.T) {
 	require.NoError(t, os.MkdirAll(gcDstDir, 0o755))
 	require.NoError(t, copyFileBytes(libgcPath, filepath.Join(gcDstDir, "libgc.a")))
 
-	archivePath, gcLibDir, err := embed.BuildRuntimeArchiveFromSourceTree(buildDir, srcDir)
+	archivePath, gcLibDir, err := embed.BuildPrunedRuntimeArchiveFromSourceTreeWithDeps(buildDir, srcDir, embed.PrunedRuntimeDependencies{})
 	require.NoError(t, err)
 
 	// Compile a known-good yak program using this runtime archive and run it.
