@@ -895,6 +895,14 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "报告已完成",
 		En: "Report Finished",
 	},
+	"report-read-reference": {
+		Zh: "读取报告参考",
+		En: "Read Report Reference",
+	},
+	"report-grep-reference": {
+		Zh: "检索报告参考",
+		En: "Grep Report Reference",
+	},
 	"python-script": {
 		Zh: "Python 脚本",
 		En: "Python Script",

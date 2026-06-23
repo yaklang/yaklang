@@ -74,9 +74,9 @@ func analyzeUserIntent(ctx context.Context, r aicommon.AIInvokeRuntime, userInpu
 // buildInitTask creates the initialization task handler for report generating loop
 func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
-		emitter := r.GetConfig().GetEmitter()
 		userInput := task.GetUserInput()
 
+		reactloops.EmitStatus(loop, "初始化报告任务... / Initializing report task...")
 		log.Infof("report_generating init task: analyzing user requirements")
 
 		// Step 1: 解析用户输入，确定输出文件路径和参考资料
@@ -107,6 +107,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		// Step 2: 使用 LiteForge 分析用户意图
 		isModifyExisting := false
 		if outputFilename == "" {
+			reactloops.EmitStatus(loop, "分析用户需求... / Analyzing user requirements...")
 			isModify, targetFile, err := analyzeUserIntent(task.GetContext(), r, userInput, referenceFiles)
 			if err == nil {
 				isModifyExisting = isModify
@@ -156,18 +157,20 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			}
 		}
 
-		// Step 5: 如果是新文件，创建空文件并 emit artifact
-		if isNewFile {
-			if err := os.WriteFile(outputFilename, []byte(""), 0644); err != nil {
-				log.Errorf("report_generating: failed to create output file: %v", err)
-				operator.Failed(utils.Errorf("cannot create output file: %v", err))
-				return
+		// Step 5: 保存并 pin 输出文件
+		if err := reactloops.SaveAndPinFile(loop, outputFilename, []byte(existingContent)); err != nil {
+			log.Errorf("report_generating: failed to save output file: %v", err)
+			operator.Failed(utils.Errorf("cannot save output file: %v", err))
+			return
+		}
+
+		// pin 用户附加的参考文件（已存在于磁盘，仅 pin 不覆写）
+		if emitter := r.GetConfig().GetEmitter(); emitter != nil {
+			for _, refFile := range referenceFiles {
+				if utils.FileExists(refFile) {
+					emitter.EmitPinFilename(refFile)
+				}
 			}
-			// 新创建的文件也要 emit artifact
-			emitter.EmitPinFilename(outputFilename)
-		} else {
-			// 修改现有文件也要 emit artifact
-			emitter.EmitPinFilename(outputFilename)
 		}
 
 		// 构建可用文件列表
@@ -209,8 +212,11 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		loop.Set("collected_references", "")
 		loop.Set("is_modify_mode", fmt.Sprintf("%v", isModifyExisting && existingContent != ""))
 
-		r.AddToTimeline("task_initialized", fmt.Sprintf("Report task initialized: %s, output=%s, ref_files=%d, knowledge_bases=%d",
-			modeDescription, outputFilename, len(referenceFiles), len(knowledgeBases)))
+		r.AddToTimeline("task_initialized", fmt.Sprintf(
+			"Report task initialized: %s, output=%s (%d bytes), ref_files=%d, knowledge_bases=%d",
+			modeDescription, outputFilename, len(existingContent), len(referenceFiles), len(knowledgeBases)))
+
+		reactloops.EmitStatus(loop, "报告任务就绪 / Report task ready")
 
 		log.Infof("report_generating init completed: filename=%s, is_modify=%v, existing_content=%d bytes, references=%d, kbs=%d",
 			outputFilename, isModifyExisting, len(existingContent), len(referenceFiles), len(knowledgeBases))
