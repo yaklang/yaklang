@@ -9,8 +9,15 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yak/yakurl"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func setupOpenAPIGRPCTest(t *testing.T) {
+	t.Helper()
+	t.Setenv("YAKIT_HOME", t.TempDir())
+	yakurl.ResetOpenAPIDocumentStoreForTest()
+}
 
 func readOpenAPIDemoFixture(t *testing.T) []byte {
 	t.Helper()
@@ -20,6 +27,7 @@ func readOpenAPIDemoFixture(t *testing.T) []byte {
 }
 
 func TestGRPCMUSTPASS_OpenAPIYakURLUploadAndList(t *testing.T) {
+	setupOpenAPIGRPCTest(t)
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 
@@ -52,6 +60,7 @@ func TestGRPCMUSTPASS_OpenAPIYakURLUploadAndList(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_OpenAPIYakURLBuildOperation(t *testing.T) {
+	setupOpenAPIGRPCTest(t)
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 
@@ -120,6 +129,7 @@ func TestGRPCMUSTPASS_OpenAPIYakURLBuildOperation(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_OpenAPIYakURLImportAll(t *testing.T) {
+	setupOpenAPIGRPCTest(t)
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 
@@ -150,4 +160,41 @@ func TestGRPCMUSTPASS_OpenAPIYakURLImportAll(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(resp.GetResources()), 4)
+}
+
+func TestGRPCMUSTPASS_OpenAPIYakURLHistory(t *testing.T) {
+	setupOpenAPIGRPCTest(t)
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	content := readOpenAPIDemoFixture(t)
+	for i := 0; i < 2; i++ {
+		_, err := client.RequestYakURL(context.Background(), &ypb.RequestYakURLParams{
+			Method: "POST",
+			Url: &ypb.YakURL{
+				Schema:   "openapi",
+				Location: "upload",
+				Path:     "/",
+				Query: []*ypb.KVPair{
+					{Key: "fileName", Value: "swagger-demo.json"},
+				},
+			},
+			Body: content,
+		})
+		require.NoError(t, err)
+	}
+
+	historyResp, err := client.RequestYakURL(context.Background(), &ypb.RequestYakURLParams{
+		Method: "GET",
+		Url: &ypb.YakURL{
+			Schema:   "openapi",
+			Location: "history",
+			Path:     "/",
+		},
+	})
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, len(historyResp.GetResources()), 2)
+	for _, resource := range historyResp.GetResources() {
+		require.Equal(t, "openapi-document", resource.GetResourceType())
+	}
 }

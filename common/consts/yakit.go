@@ -146,6 +146,7 @@ func initializeYakitDirectories() {
 	GetDefaultYakitPprofDir()    // yakit-projects/pprof-log
 	GetDefaultYakitBaseTempDir() // yakit-projects/temp
 	GetDefaultAISkillsDir()      // yakit-projects/ai-skills
+	GetDefaultYakitOpenAPIDocumentsDir() // yakit-projects/openapi-documents
 
 	log.Debug("yakit directories initialized")
 }
