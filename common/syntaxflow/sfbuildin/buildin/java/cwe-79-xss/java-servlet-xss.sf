@@ -19,20 +19,20 @@ desc(
 ```java
 // 示例1: 直接输出请求参数
 protected void doGet(HttpServletRequest request, HttpServletResponse response)
-throws IOException {
-response.setContentType("text/html");
-PrintWriter out = response.getWriter();
-String name = request.getParameter("name");
-out.println("<h1>Welcome, " + name + "!</h1>"); // 未对name进行转义
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String name = request.getParameter("name");
+    out.println("<h1>Welcome, " + name + "!</h1>"); // 未对name进行转义
 }
 
 // 示例2: 在JS中输出请求参数
 protected void doPost(HttpServletRequest request, HttpServletResponse response)
-throws IOException {
-response.setContentType("text/html");
-PrintWriter out = response.getWriter();
-String data = request.getParameter("data");
-out.println("<script>var userInput = '" + data + "'; eval(userInput);</script>"); // 将data嵌入到JS字符串中并执行，未转义
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String data = request.getParameter("data");
+    out.println("<script>var userInput = '" + data + "'; eval(userInput);</script>"); // 将data嵌入到JS字符串中并执行，未转义
 }
 ```
 
@@ -56,26 +56,26 @@ DESC
 import org.owasp.encoder.Encode;
 // ...
 protected void doGet(HttpServletRequest request, HttpServletResponse response)
-throws IOException {
-response.setContentType("text/html");
-PrintWriter out = response.getWriter();
-String name = request.getParameter("name");
-// 对name进行HTML转义，确保即使包含恶意HTML标签也不会被执行
-String safeName = Encode.forHtml(name);
-out.println("<h1>Welcome, " + safeName + "!</h1>");
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String name = request.getParameter("name");
+    // 对name进行HTML转义，确保即使包含恶意HTML标签也不会被执行
+    String safeName = Encode.forHtml(name);
+    out.println("<h1>Welcome, " + safeName + "!</h1>");
 }
 ```
 *   **JavaScript上下文转义:** 如果用户输入要嵌入到JavaScript代码中，需要进行JavaScript字符串转义，例如将单引号`(')`、双引号`(")`、反斜杠`\`、换行符`\n`、回车符`\r`等特殊字符转义为`\'`、`\"`、`\\`、`\n`、`\r`。同样推荐使用安全编码库。
 ```java
 // 修复代码示例：使用OWASP Java Encoder进行JavaScript转义
 protected void doPost(HttpServletRequest request, HttpServletResponse response)
-throws IOException {
-response.setContentType("text/html");
-PrintWriter out = response.getWriter();
-String data = request.getParameter("data");
-// 对data进行JavaScript转义，确保嵌入到JS字符串中不会改变代码结构
-String safeData = Encode.forJavaScriptString(data);
-out.println("<script>var userInput = \"" + safeData + "\"; eval(userInput);</script>");
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String data = request.getParameter("data");
+    // 对data进行JavaScript转义，确保嵌入到JS字符串中不会改变代码结构
+    String safeData = Encode.forJavaScriptString(data);
+    out.println("<script>var userInput = \"" + safeData + "\"; eval(userInput);</script>");
 }
 ```
 
@@ -127,26 +127,26 @@ alert $mid for {
 import org.owasp.encoder.Encode;
 // ...
 protected void doGet(HttpServletRequest request, HttpServletResponse response)
-throws IOException {
-response.setContentType("text/html");
-PrintWriter out = response.getWriter();
-String name = request.getParameter("name");
-// 对name进行HTML转义，确保即使包含恶意HTML标签也不会被执行
-String safeName = Encode.forHtml(name);
-out.println("<h1>Welcome, " + safeName + "!</h1>");
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String name = request.getParameter("name");
+    // 对name进行HTML转义，确保即使包含恶意HTML标签也不会被执行
+    String safeName = Encode.forHtml(name);
+    out.println("<h1>Welcome, " + safeName + "!</h1>");
 }
 ```
 *   **JavaScript上下文转义:** 如果用户输入要嵌入到JavaScript代码中，需要进行JavaScript字符串转义，例如将单引号`(`)`、双引号`(")`、反斜杠`\`、换行符`\n`、回车符`\r`等特殊字符转义为`\'`、`\"`、`\\`、`\n`、`\r`。同样推荐使用安全编码库。
 ```java
 // 修复代码示例：使用OWASP Java Encoder进行JavaScript转义
 protected void doPost(HttpServletRequest request, HttpServletResponse response)
-throws IOException {
-response.setContentType("text/html");
-PrintWriter out = response.getWriter();
-String data = request.getParameter("data");
-// 对data进行JavaScript转义，确保嵌入到JS字符串中不会改变代码结构
-String safeData = Encode.forJavaScriptString(data);
-out.println("<script>var userInput = \"" + safeData + "\"; eval(userInput);</script>");
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String data = request.getParameter("data");
+    // 对data进行JavaScript转义，确保嵌入到JS字符串中不会改变代码结构
+    String safeData = Encode.forJavaScriptString(data);
+    out.println("<script>var userInput = \"" + safeData + "\"; eval(userInput);</script>");
 }
 ```
 #### 2. 使用安全的模板引擎
@@ -172,19 +172,19 @@ SOLUTION
 ```java
 // 示例1: 直接输出请求参数
 protected void doGet(HttpServletRequest request, HttpServletResponse response)
-throws IOException {
-response.setContentType("text/html");
-PrintWriter out = response.getWriter();
-String name = request.getParameter("name");
-out.println("<h1>Welcome, " + name + "!</h1>"); // 未对name进行转义
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String name = request.getParameter("name");
+    out.println("<h1>Welcome, " + name + "!</h1>"); // 未对name进行转义
 }
 // 示例2: 在JS中输出请求参数
 protected void doPost(HttpServletRequest request, HttpServletResponse response)
-throws IOException {
-response.setContentType("text/html");
-PrintWriter out = response.getWriter();
-String data = request.getParameter("data");
-out.println("<script>var userInput = '" + data + "'; eval(userInput);</script>"); // 将data嵌入到JS字符串中并执行，未转义
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String data = request.getParameter("data");
+    out.println("<script>var userInput = '" + data + "'; eval(userInput);</script>"); // 将data嵌入到JS字符串中并执行，未转义
 }
 ```
 3. **潜在影响**
@@ -221,26 +221,26 @@ alert $low for {
 import org.owasp.encoder.Encode;
 // ...
 protected void doGet(HttpServletRequest request, HttpServletResponse response)
-throws IOException {
-response.setContentType("text/html");
-PrintWriter out = response.getWriter();
-String name = request.getParameter("name");
-// 对name进行HTML转义，确保即使包含恶意HTML标签也不会被执行
-String safeName = Encode.forHtml(name);
-out.println("<h1>Welcome, " + safeName + "!</h1>");
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String name = request.getParameter("name");
+    // 对name进行HTML转义，确保即使包含恶意HTML标签也不会被执行
+    String safeName = Encode.forHtml(name);
+    out.println("<h1>Welcome, " + safeName + "!</h1>");
 }
 ```
 *   **JavaScript上下文转义:** 如果用户输入要嵌入到JavaScript代码中，需要进行JavaScript字符串转义，例如将单引号`(`)`、双引号`(")`、反斜杠`\`、换行符`\n`、回车符`\r`等特殊字符转义为`\'`、`\"`、`\\`、`\n`、`\r`。同样推荐使用安全编码库。
 ```java
 // 修复代码示例：使用OWASP Java Encoder进行JavaScript转义
 protected void doPost(HttpServletRequest request, HttpServletResponse response)
-throws IOException {
-response.setContentType("text/html");
-PrintWriter out = response.getWriter();
-String data = request.getParameter("data");
-// 对data进行JavaScript转义，确保嵌入到JS字符串中不会改变代码结构
-String safeData = Encode.forJavaScriptString(data);
-out.println("<script>var userInput = \"" + safeData + "\"; eval(userInput);</script>");
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String data = request.getParameter("data");
+    // 对data进行JavaScript转义，确保嵌入到JS字符串中不会改变代码结构
+    String safeData = Encode.forJavaScriptString(data);
+    out.println("<script>var userInput = \"" + safeData + "\"; eval(userInput);</script>");
 }
 ```
 #### 2. 使用安全的模板引擎
@@ -266,19 +266,19 @@ SOLUTION
 ```java
 // 示例1: 直接输出请求参数
 protected void doGet(HttpServletRequest request, HttpServletResponse response)
-throws IOException {
-response.setContentType("text/html");
-PrintWriter out = response.getWriter();
-String name = request.getParameter("name");
-out.println("<h1>Welcome, " + name + "!</h1>"); // 未对name进行转义
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String name = request.getParameter("name");
+    out.println("<h1>Welcome, " + name + "!</h1>"); // 未对name进行转义
 }
 // 示例2: 在JS中输出请求参数
 protected void doPost(HttpServletRequest request, HttpServletResponse response)
-throws IOException {
-response.setContentType("text/html");
-PrintWriter out = response.getWriter();
-String data = request.getParameter("data");
-out.println("<script>var userInput = '" + data + "'; eval(userInput);</script>"); // 将data嵌入到JS字符串中并执行，未转义
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String data = request.getParameter("data");
+    out.println("<script>var userInput = '" + data + "'; eval(userInput);</script>"); // 将data嵌入到JS字符串中并执行，未转义
 }
 ```
 3. **潜在影响**
