@@ -55,17 +55,15 @@ func TestYaklibExtern_ModeAllConstantDoesNotRecordRuntimeDependency(t *testing.T
 	require.Empty(t, deps)
 }
 
-func TestYaklibDispatch_YakitInfoUsesDedicatedFuncID(t *testing.T) {
+func TestYaklibDispatch_YakitInfoUsesGenericYaklibPath(t *testing.T) {
 	code := `check = () => { yakit.Info("ok"); return 1 }`
 	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
 	require.NoError(t, err)
 
-	binding, ok := defaultExternBindings["yakit.Info"]
-	require.True(t, ok)
-	require.Equal(t, abi.IDYakitInfo, binding.DispatchID)
-
-	require.NotContains(t, ir, "yaklib_pkg_")
+	require.Contains(t, ir, "yaklib_pkg_")
+	require.Contains(t, ir, "yaklib_method_")
 	require.Contains(t, ir, "call void @"+abi.InvokeSymbol)
+	requireIRAvoidsLegacyCallEntrypoints(t, ir)
 }
 
 func TestYaklibDispatch_NonStdlibGlobalDoesNotUseGenericYaklibPath(t *testing.T) {

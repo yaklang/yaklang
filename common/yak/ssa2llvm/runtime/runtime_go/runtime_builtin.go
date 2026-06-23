@@ -62,10 +62,6 @@ func normalizePrintArgs(args []any) []any {
 	return out
 }
 
-func runtimeBuiltinGetenv(key string) string {
-	return os.Getenv(key)
-}
-
 func runtimeBuiltinPrint(args ...any) {
 	_, _ = fmt.Fprint(os.Stdout, normalizePrintArgs(args)...)
 }
@@ -76,25 +72,4 @@ func runtimeBuiltinPrintln(args ...any) {
 
 func runtimeBuiltinPrintf(format string, args ...any) {
 	_, _ = fmt.Fprintf(os.Stdout, format, normalizePrintArgs(args)...)
-}
-
-func runtimeBuiltinYakitInfo(format string, args ...any) {
-	runtimeBuiltinYakitLog("info", format, args...)
-}
-
-func runtimeBuiltinYakitWarn(format string, args ...any) {
-	runtimeBuiltinYakitLog("warn", format, args...)
-}
-
-func runtimeBuiltinYakitDebug(format string, args ...any) {
-	runtimeBuiltinYakitLog("debug", format, args...)
-}
-
-func runtimeBuiltinYakitError(format string, args ...any) {
-	runtimeBuiltinYakitLog("error", format, args...)
-}
-
-func runtimeBuiltinYakitLog(level string, format string, args ...any) {
-	msg := fmt.Sprintf(format, normalizePrintArgs(args)...)
-	_, _ = fmt.Fprintf(os.Stderr, "[yakit][%s] %s\n", level, msg)
 }
