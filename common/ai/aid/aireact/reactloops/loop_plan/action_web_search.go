@@ -41,7 +41,8 @@ var webSearchAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOptio
 			if query == "" {
 				query = action.GetString("search_query")
 			}
-			loop.LoadingStatus(fmt.Sprintf("searching internet: %s", query))
+			reactloops.EmitActionLog(loop, planWebSearchNodeID, fmt.Sprintf("开始: %s / Start: %s", query, query))
+			reactloops.EmitStatus(loop, "联网搜索中 / Searching the web...")
 
 			params := aitool.InvokeParams{"query": query}
 			result, _, err := invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, "web_search", params)
@@ -79,6 +80,8 @@ var webSearchAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOptio
 				fmt.Sprintf("Web search: %s\n\n%s", query, utils.ShrinkString(content, 2048)))
 
 			op.Feedback(fmt.Sprintf("web search completed for: '%s'", query))
+			reactloops.EmitStatus(loop, "完成 / Complete")
+			reactloops.EmitActionLog(loop, planWebSearchNodeID, fmt.Sprintf("完成: %s (%d bytes) / Done: %s (%d bytes)", query, len(content), query, len(content)))
 			op.Continue()
 		},
 	)
