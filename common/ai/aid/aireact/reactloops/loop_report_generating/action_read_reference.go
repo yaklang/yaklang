@@ -99,7 +99,7 @@ var readReferenceFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 			newRef := fmt.Sprintf("\n=== Reference from: %s ===\n%s\n", filePath, resultContent)
 			loop.Set("collected_references", existingRefs+newRef)
 
-			summary, reference := reactloops.SpillLongContent(loop, "read_reference", resultContent)
+			summary, _ := reactloops.SpillLongContent(loop, "read_reference", resultContent)
 
 			// 添加到时间线
 			invoker := loop.GetInvoker()
@@ -113,9 +113,7 @@ var readReferenceFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 				filePath, len(resultContent), len(lines), summary)
 			op.Feedback(feedback)
 
-			finishLog := fmt.Sprintf("完成: %s (%d bytes)", filePath, len(resultContent))
 			reactloops.EmitStatus(loop, "完成 / Complete")
-			reactloops.EmitActionLog(loop, readReferenceNodeID, finishLog, reference)
 
 			log.Infof("read_reference_file: completed, added to collected references")
 		},
