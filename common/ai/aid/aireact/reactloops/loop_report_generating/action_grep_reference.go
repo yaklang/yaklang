@@ -13,6 +13,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+const grepReferenceNodeID = "report-grep-reference"
+
 // GrepResult represents a single grep match result
 type GrepResult struct {
 	LineNumber int
@@ -64,6 +66,10 @@ var grepReferenceAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 			if contextLines <= 0 {
 				contextLines = 3
 			}
+
+			startLog := fmt.Sprintf("检索参考: pattern='%s', file=%s", pattern, filePath)
+			reactloops.EmitActionLog(loop, grepReferenceNodeID, startLog)
+			reactloops.EmitStatus(loop, "检索参考文件中 / Grep searching reference...")
 
 			log.Infof("grep_reference: searching pattern '%s' in file %s (context=%d, case_insensitive=%v)",
 				pattern, filePath, contextLines, caseInsensitive)
@@ -175,12 +181,23 @@ var grepReferenceAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 			existingRefs := loop.Get("collected_references")
 			loop.Set("collected_references", existingRefs+"\n"+resultContent)
 
+			summary, reference := spillReportContent(loop, "grep_reference", resultContent)
+
 			// 添加到时间线
 			invoker := loop.GetInvoker()
-			invoker.AddToTimeline("grep_search", fmt.Sprintf("Grep search: pattern='%s', file=%s, matches=%d", pattern, filePath, len(results)))
+			invoker.AddToTimeline("grep_search", fmt.Sprintf(
+				"Grep search: pattern='%s', file=%s, matches=%d\n%s",
+				pattern, filePath, len(results), summary,
+			))
 
 			// 反馈结果
-			op.Feedback(resultContent)
+			feedback := fmt.Sprintf("Grep completed: pattern='%s', file=%s, matches=%d\n\n%s",
+				pattern, filePath, len(results), summary)
+			op.Feedback(feedback)
+
+			finishLog := fmt.Sprintf("完成: %d 个匹配, pattern='%s'", len(results), pattern)
+			reactloops.EmitStatus(loop, "完成 / Complete")
+			reactloops.EmitActionLog(loop, grepReferenceNodeID, finishLog, reference)
 
 			log.Infof("grep_reference: completed, %d matches added to collected references", len(results))
 		},

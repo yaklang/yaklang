@@ -13,6 +13,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+const readReferenceNodeID = "report-read-reference"
+
 // readReferenceFileAction creates an action for reading reference files
 var readReferenceFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopAction(
@@ -41,6 +43,13 @@ var readReferenceFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 			filePath := action.GetString("file_path")
 			startLine := action.GetInt("start_line")
 			endLine := action.GetInt("end_line")
+
+			startLog := fmt.Sprintf("读取参考文件: %s", filePath)
+			if startLine > 0 || endLine > 0 {
+				startLog = fmt.Sprintf("读取参考文件: %s (lines %d-%d)", filePath, startLine, endLine)
+			}
+			reactloops.EmitActionLog(loop, readReferenceNodeID, startLog)
+			reactloops.EmitStatus(loop, "读取参考文件中 / Reading reference file...")
 
 			log.Infof("read_reference_file: reading file %s (lines %d-%d)", filePath, startLine, endLine)
 
@@ -90,18 +99,23 @@ var readReferenceFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 			newRef := fmt.Sprintf("\n=== Reference from: %s ===\n%s\n", filePath, resultContent)
 			loop.Set("collected_references", existingRefs+newRef)
 
+			summary, reference := spillReportContent(loop, "read_reference", resultContent)
+
 			// 添加到时间线
 			invoker := loop.GetInvoker()
-			invoker.AddToTimeline("reference_read", fmt.Sprintf("Read reference file: %s (%d bytes)", filePath, len(resultContent)))
+			invoker.AddToTimeline("reference_read", fmt.Sprintf(
+				"Read reference file: %s (%d bytes, %d lines)\n%s",
+				filePath, len(resultContent), len(lines), summary,
+			))
 
 			// 反馈结果
-			summary := fmt.Sprintf("Successfully read file: %s\nContent size: %d bytes\nLines: %d", filePath, len(resultContent), len(lines))
-			if len(resultContent) > 500 {
-				summary += fmt.Sprintf("\n\nPreview:\n%s\n...", resultContent[:500])
-			} else {
-				summary += fmt.Sprintf("\n\nContent:\n%s", resultContent)
-			}
-			op.Feedback(summary)
+			feedback := fmt.Sprintf("Successfully read file: %s\nContent size: %d bytes\nLines: %d\n\n%s",
+				filePath, len(resultContent), len(lines), summary)
+			op.Feedback(feedback)
+
+			finishLog := fmt.Sprintf("完成: %s (%d bytes)", filePath, len(resultContent))
+			reactloops.EmitStatus(loop, "完成 / Complete")
+			reactloops.EmitActionLog(loop, readReferenceNodeID, finishLog, reference)
 
 			log.Infof("read_reference_file: completed, added to collected references")
 		},
