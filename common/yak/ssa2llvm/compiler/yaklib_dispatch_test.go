@@ -43,16 +43,11 @@ func TestYaklibDispatch_BuiltinsDoNotRecordRuntimeDependencies(t *testing.T) {
 	require.Empty(t, deps)
 }
 
-func TestRuntimeDispatchDependencies_RecordPocDispatcher(t *testing.T) {
-	deps := compileRuntimeDispatchDependencies(t, `check = () => { poc.timeout(2); return 0 }`)
-	require.Contains(t, deps, abi.IDPocTimeout)
-}
-
-func TestRuntimeDispatchDependencies_PrintlnDoesNotRecordPocDispatcher(t *testing.T) {
-	deps := compileRuntimeDispatchDependencies(t, `check = () => { println("yak"); return 0 }`)
-	require.NotContains(t, deps, abi.IDPocTimeout)
-	require.NotContains(t, deps, abi.IDPocGet)
-	require.NotContains(t, deps, abi.IDPocGetHTTPPacketBody)
+func TestYaklibDispatch_PocUsesGenericYaklibPath(t *testing.T) {
+	code := `check = () => { poc.Get("http://example.com", poc.timeout(2)); return 0 }`
+	deps := compileYaklibDependencies(t, code)
+	require.Contains(t, deps["poc"], "Get")
+	require.Contains(t, deps["poc"], "timeout")
 }
 
 func TestYaklibExtern_ModeAllConstantDoesNotRecordRuntimeDependency(t *testing.T) {

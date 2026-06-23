@@ -225,22 +225,10 @@ func TestWritePrunedRuntimeImports_YakitDependencyUsesRuntimeClient(t *testing.T
 	assertNotContains(t, got, `yaklib "github.com/yaklang/yaklang/common/yak/yaklib"`)
 }
 
-func TestPrunedRuntimeBuildTags_ExcludePocByDefault(t *testing.T) {
+func TestPrunedRuntimeBuildTags_BaseTagIncluded(t *testing.T) {
 	tags := prunedRuntimeBuildTags(PrunedRuntimeDependencies{})
 	if !containsString(tags, "ssa2llvm_pruned_runtime") {
 		t.Fatalf("expected base pruned runtime tag in %#v", tags)
-	}
-	if containsString(tags, "ssa2llvm_runtime_poc") {
-		t.Fatalf("did not expect POC runtime tag by default: %#v", tags)
-	}
-}
-
-func TestPrunedRuntimeBuildTags_IncludePocForPocDispatch(t *testing.T) {
-	tags := prunedRuntimeBuildTags(PrunedRuntimeDependencies{
-		RuntimeDispatch: []abi.FuncID{abi.IDPrintln, abi.IDPocGet},
-	})
-	if !containsString(tags, "ssa2llvm_runtime_poc") {
-		t.Fatalf("expected POC runtime tag for POC dispatch: %#v", tags)
 	}
 }
 
