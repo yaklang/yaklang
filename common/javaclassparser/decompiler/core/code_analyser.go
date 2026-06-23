@@ -56,6 +56,13 @@ type Decompiler struct {
 	varUserMap     *omap.OrderedMap[*values.JavaRef, []*VarFoldRule]
 	disFoldRef     []*values.JavaRef
 	delRefUserAttr map[string][3]int // [0] = del times,[1] = assign times, [2] = self assign
+
+	// selfOpFoldedRefs holds the VarUid of dup/dup_x1-created temporaries whose only purpose was
+	// to carry the old value of a field/static post-increment/decrement (the `x++` / `x--`
+	// idiom). When the putfield/putstatic is folded into the post-op expression, the temporary's
+	// assignment statement must not be emitted, otherwise it would leave a side-effect statement
+	// in a ternary/expression branch and break structuring (multiple next).
+	selfOpFoldedRefs map[string]bool
 }
 type VarFoldRule struct {
 	Replace          func(v values.JavaValue)
@@ -74,6 +81,7 @@ func NewDecompiler(bytecodes []byte, constantPoolGetter func(id int) values.Java
 		opcodeIdToRef:       map[*OpCode][][2]any{},
 		varUserMap:          omap.NewEmptyOrderedMap[*values.JavaRef, []*VarFoldRule](),
 		delRefUserAttr:      map[string][3]int{},
+		selfOpFoldedRefs:    map[string]bool{},
 	}
 }
 
@@ -275,6 +283,78 @@ func (d *Decompiler) DropUnreachableOpcode() error {
 }
 func (d *Decompiler) getPoolValue(index int) values.JavaValue {
 	return d.constantPoolGetter(index)
+}
+
+// isLiteralIntOne reports whether a java literal is the integer constant 1, regardless of the
+// concrete numeric Go type produced by the various *const/push opcodes.
+func isLiteralIntOne(v values.JavaValue) bool {
+	lit, ok := UnpackSoltValue(v).(*values.JavaLiteral)
+	if !ok {
+		return false
+	}
+	switch n := lit.Data.(type) {
+	case int:
+		return n == 1
+	case int8:
+		return n == 1
+	case int16:
+		return n == 1
+	case int32:
+		return n == 1
+	case int64:
+		return n == 1
+	case uint8:
+		return n == 1
+	case uint16:
+		return n == 1
+	case uint32:
+		return n == 1
+	case uint64:
+		return n == 1
+	default:
+		return fmt.Sprint(lit.Data) == "1"
+	}
+}
+
+// tryFoldPostIncDec recognizes the post-increment / post-decrement idiom for a field or static
+// whose stored value is `old (+|-) 1`, where `old` (the loaded field value) was duplicated on the
+// stack via dup/dup_x1 and is reused as the expression result. When the value currently on top of
+// the stack is exactly that same `old` object, the putfield/putstatic is the post-inc/dec of the
+// field, so we return the folded `old++` / `old--` expression. The caller replaces the bare old
+// value on the stack with this expression and drops the standalone assignment, keeping
+// ternary/expression branches side-effect-free so the structuring pass can fold them.
+func (d *Decompiler) tryFoldPostIncDec(stack StackSimulation, storedValue values.JavaValue) (values.JavaValue, bool) {
+	expr, ok := UnpackSoltValue(storedValue).(*values.JavaExpression)
+	if !ok || len(expr.Values) != 2 {
+		return nil, false
+	}
+	if expr.Op != ADD && expr.Op != SUB {
+		return nil, false
+	}
+	if !isLiteralIntOne(expr.Values[1]) {
+		return nil, false
+	}
+	if stack.Size() == 0 {
+		return nil, false
+	}
+	// The old field value must be exactly the value currently on top of the stack (placed there
+	// by the dup/dup_x1 that captured it for reuse), proving this is the post-op idiom.
+	top := stack.Peek()
+	if UnpackSoltValue(top) != UnpackSoltValue(expr.Values[0]) {
+		return nil, false
+	}
+	// Suppress the temporary that dup/dup_x1 created to carry the old value, if any, so its
+	// assignment statement is not emitted into the (ternary/expression) branch.
+	if ref, ok := UnpackSoltValue(top).(*values.JavaRef); ok {
+		d.selfOpFoldedRefs[ref.VarUid] = true
+	}
+	op := INC
+	if expr.Op == SUB {
+		op = DEC
+	}
+	// Render against the real field reference (this.f / Class.f), not the synthetic temporary.
+	target := GetRealValue(UnpackSoltValue(top))
+	return values.NewBinaryExpression(target, expr.Values[1], op, target.Type()), true
 }
 
 func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation, opcode *OpCode) error {
@@ -681,13 +761,31 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 	case OP_PUTSTATIC:
 		index := Convert2bytesToInt(opcode.Data)
 		staticVal := d.constantPoolGetter(int(index))
-		statements.NewAssignStatement(staticVal, runtimeStackSimulation.Pop().(values.JavaValue), false)
+		value := runtimeStackSimulation.Pop().(values.JavaValue)
+		if selfOp, ok := d.tryFoldPostIncDec(runtimeStackSimulation, value); ok {
+			// static field post-increment/decrement reused as a value: drop the bare old
+			// value left by dup and push `field++` / `field--` instead.
+			runtimeStackSimulation.Pop()
+			runtimeStackSimulation.Push(selfOp)
+			opcode.SelfOpFolded = true
+		} else {
+			statements.NewAssignStatement(staticVal, value, false)
+		}
 	case OP_PUTFIELD:
 		index := Convert2bytesToInt(opcode.Data)
 		staticVal := d.constantPoolGetter(int(index))
 		value := runtimeStackSimulation.Pop().(values.JavaValue)
 		field := values.NewRefMember(runtimeStackSimulation.Pop().(values.JavaValue), staticVal.(*values.JavaClassMember).Member, staticVal.(*values.JavaClassMember).JavaType)
-		statements.NewAssignStatement(field, value, false)
+		if selfOp, ok := d.tryFoldPostIncDec(runtimeStackSimulation, value); ok {
+			// instance field post-increment/decrement reused as a value (dup_x1 idiom): drop
+			// the bare old value and push `field++` / `field--` so the surrounding ternary or
+			// expression branch stays side-effect-free and can be structured.
+			runtimeStackSimulation.Pop()
+			runtimeStackSimulation.Push(selfOp)
+			opcode.SelfOpFolded = true
+		} else {
+			statements.NewAssignStatement(field, value, false)
+		}
 	case OP_SWAP:
 		v1 := runtimeStackSimulation.Pop()
 		v2 := runtimeStackSimulation.Pop()
@@ -1605,21 +1703,32 @@ func (d *Decompiler) ParseStatement() error {
 		case OP_GETFIELD:
 		case OP_GETSTATIC:
 		case OP_PUTSTATIC:
-			index := Convert2bytesToInt(opcode.Data)
-			staticVal := d.constantPoolGetter(int(index))
-			appendNode(statements.NewAssignStatement(staticVal, opcode.stackConsumed[0], false))
+			if !opcode.SelfOpFolded {
+				index := Convert2bytesToInt(opcode.Data)
+				staticVal := d.constantPoolGetter(int(index))
+				appendNode(statements.NewAssignStatement(staticVal, opcode.stackConsumed[0], false))
+			}
 		case OP_PUTFIELD:
-			index := Convert2bytesToInt(opcode.Data)
-			staticVal := d.constantPoolGetter(int(index))
-			value := opcode.stackConsumed[0]
-			field := values.NewRefMember(opcode.stackConsumed[1], staticVal.(*values.JavaClassMember).Member, staticVal.(*values.JavaClassMember).JavaType)
-			assignSt := statements.NewAssignStatement(field, value, false)
-			appendNode(assignSt)
+			if !opcode.SelfOpFolded {
+				index := Convert2bytesToInt(opcode.Data)
+				staticVal := d.constantPoolGetter(int(index))
+				value := opcode.stackConsumed[0]
+				field := values.NewRefMember(opcode.stackConsumed[1], staticVal.(*values.JavaClassMember).Member, staticVal.(*values.JavaClassMember).JavaType)
+				assignSt := statements.NewAssignStatement(field, value, false)
+				appendNode(assignSt)
+			}
 		case OP_DUP, OP_DUP_X1, OP_DUP_X2, OP_DUP2, OP_DUP2_X1, OP_DUP2_X2:
 			refInfos := d.opcodeIdToRef[opcode]
 			for i, refInfo := range refInfos {
 				value := opcode.stackConsumed[i]
 				ref := refInfo[0].(*values.JavaRef)
+				// This temporary only carried the old value of a folded field/static
+				// post-increment/decrement; its `x++` / `x--` expression already embeds the
+				// field reference, so emitting the assignment would be both redundant and a
+				// branch side-effect that breaks structuring.
+				if d.selfOpFoldedRefs[ref.VarUid] {
+					continue
+				}
 				isFirst := refInfo[1].(bool)
 				assignSt := statements.NewAssignStatement(ref, value, isFirst)
 				appendNode(assignSt)

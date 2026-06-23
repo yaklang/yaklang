@@ -3,6 +3,7 @@ package values
 const (
 	ADD  = "add"
 	INC  = "inc"
+	DEC  = "dec"
 	New  = "new"
 	NEQ  = "!="
 	EQ   = "=="

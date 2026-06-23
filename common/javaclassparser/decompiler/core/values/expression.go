@@ -100,6 +100,8 @@ func (j *JavaExpression) String(funcCtx *class_context.ClassContext) string {
 		return fmt.Sprintf("(%s) + (%s)", vs[0], vs[1])
 	case INC:
 		return fmt.Sprintf("%s++", vs[0])
+	case DEC:
+		return fmt.Sprintf("%s--", vs[0])
 	case GT, SUB:
 		return fmt.Sprintf("(%s) %s (%s)", vs[0], j.Op, vs[1])
 	default:

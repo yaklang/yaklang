@@ -10,6 +10,7 @@ const TypeCaseDouble = "double"
 const (
 	ADD  = "add"
 	INC  = "inc"
+	DEC  = "dec"
 	New  = "new"
 	NEQ  = "!="
 	EQ   = "=="

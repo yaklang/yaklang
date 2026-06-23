@@ -36,6 +36,12 @@ type OpCode struct {
 	Info                           any
 	IsCustom                       bool
 	conditionOpId                  int
+	// SelfOpFolded marks a putfield/putstatic whose stored value is the post-increment /
+	// post-decrement of the field itself, with the old value reused on the stack (the
+	// dup_x1/dup idiom). When set, statement generation skips the standalone assignment
+	// because the side effect is folded into the `x++` / `x--` expression left on the stack,
+	// keeping ternary/expression branches side-effect-free so they can be structured.
+	SelfOpFolded bool
 }
 type CatchNode struct {
 	ExceptionTypeIndex uint16

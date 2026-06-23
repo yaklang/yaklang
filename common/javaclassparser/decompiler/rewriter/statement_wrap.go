@@ -154,13 +154,14 @@ func (s *RewriteManager) mergeIf() bool {
 				if !ok {
 					continue
 				}
-				s.DominatorMap = GenerateDominatorTree(s.RootNode)
-				// CalcEnd(s.DominatorMap, parentNode)
-				// if len(childNode.Next) == 1 {
-				// 	childNode.MergeNode = childNode.Next[0]
-				// } else {
-				// 	CalcEnd(s.DominatorMap, childNode)
-				// }
+				// A whole-function dominator tree used to be rebuilt here, inside this
+				// doubly-nested loop run to a fixpoint, to feed the CalcEnd calls below.
+				// Those calls are disabled, and s.DominatorMap is unconditionally
+				// recomputed in Rewrite()/ScanCoreInfo() before any reader, so this was
+				// dead computation -- yet it dominated decompile CPU for if-heavy classes
+				// (~28% of total on a worst case, e.g. AggregateOperations). The merge
+				// decision below depends only on the local graph shape (CheckCanBeMerge),
+				// not on dominance, so it is correct to drop it entirely.
 				sourceSet := utils.NewSet[*core.Node]()
 				sourceSet.AddList(childNode.Source)
 				if sourceSet.Len() == 1 && CheckCanBeMerge(parentNode, childNode) {

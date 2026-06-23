@@ -3,7 +3,76 @@ package types
 import (
 	"fmt"
 	"strings"
+	"sync"
+	"sync/atomic"
 )
+
+// SlashToDot converts a JVM internal class name ("java/lang/String") to its binary
+// form ("java.lang.String"). It is on the hottest decompiler path (every descriptor and
+// every constant-pool class reference).
+//
+// vs strings.Replace(s, "/", ".", -1): strings.Replace scans the input twice (a Count
+// pre-pass plus the copy loop). We scan once with IndexByte and copy the runs between
+// separators in bulk, which benchmarks at or below strings.Replace while keeping the
+// zero-allocation fast path for already-dotted / separator-free names. (A naive
+// byte-at-a-time loop was measurably slower than strings.Replace, so don't "simplify" to
+// one.)
+func SlashToDot(s string) string {
+	i := strings.IndexByte(s, '/')
+	if i < 0 {
+		return s
+	}
+	var sb strings.Builder
+	sb.Grow(len(s))
+	for {
+		sb.WriteString(s[:i])
+		sb.WriteByte('.')
+		s = s[i+1:]
+		i = strings.IndexByte(s, '/')
+		if i < 0 {
+			sb.WriteString(s)
+			break
+		}
+	}
+	return sb.String()
+}
+
+// javaClassTypeCache memoizes the immutable *JavaClass produced for each JVM internal
+// class name. Descriptor parsing is one of the hottest paths (every method/field/lambda
+// descriptor) and the same names ("java/lang/Object", ...) recur enormously, so this
+// turns a strings.Replace plus an object allocation per occurrence into one map lookup.
+//
+// Safety: only the *JavaClass leaf is shared. Its Name is never mutated (type-inference
+// rewrites such as ResetType/ResetTypeRef/MergeTypes mutate the surrounding
+// JavaTypeWrap/javaTypeRef, which callers still allocate fresh via newJavaTypeWrap on
+// every parse), so sharing the leaf across callers and goroutines is race-free. The key
+// is the internal ('/') form so a cache hit also skips slashToDot.
+var javaClassTypeCache sync.Map // map[string]*JavaClass
+var javaClassTypeCacheLen atomic.Int64
+
+// javaClassTypeCacheCap soft-bounds the flyweight cache so Decompile stays memory-safe
+// in long-running hosts (e.g. yakit) that may process unbounded distinct class names.
+// The hottest names (java/lang/*, ...) recur immediately and are interned first, so the
+// cap barely affects the hit rate while preventing unbounded growth. It is a soft cap:
+// a benign race may let it overshoot slightly, which is harmless.
+const javaClassTypeCacheCap = 1 << 16
+
+func cachedClassType(internalName string) *JavaClass {
+	if v, ok := javaClassTypeCache.Load(internalName); ok {
+		return v.(*JavaClass)
+	}
+	jc := &JavaClass{Name: SlashToDot(internalName)}
+	if javaClassTypeCacheLen.Load() >= javaClassTypeCacheCap {
+		// Cache is full; return a fresh (uncached) instance. Still immutable and correct,
+		// just not interned.
+		return jc
+	}
+	actual, loaded := javaClassTypeCache.LoadOrStore(internalName, jc)
+	if !loaded {
+		javaClassTypeCacheLen.Add(1)
+	}
+	return actual.(*JavaClass)
+}
 
 func GetPrimerArrayType(id int) JavaType {
 	switch id {
@@ -106,12 +175,11 @@ func ParseJavaDescription(descriptor string) (JavaType, string, error) {
 	case 'V':
 		return NewJavaPrimer(JavaVoid), descriptor[1:], nil
 	case 'L':
-		endIndex := strings.Index(descriptor, ";")
+		endIndex := strings.IndexByte(descriptor, ';')
 		if endIndex == -1 {
 			return nil, "", fmt.Errorf("invalid class descriptor format")
 		}
-		name := strings.Replace(descriptor[1:endIndex], "/", ".", -1)
-		return NewJavaClass(name), descriptor[endIndex+1:], nil
+		return newJavaTypeWrap(cachedClassType(descriptor[1:endIndex])), descriptor[endIndex+1:], nil
 	case '[':
 		elemType, rest, err := ParseJavaDescription(descriptor[1:])
 		if err != nil {

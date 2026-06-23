@@ -28,7 +28,7 @@ func TestIfElse(t *testing.T) {
 	}
 	println(source)
 	assert.Equal(t, `start
-if (if1){
+if ("if1"){
 body1
 }else{
 body2
@@ -56,7 +56,7 @@ func TestIf(t *testing.T) {
 	}
 	println(source)
 	assert.Equal(t, `start
-if (if1){
+if ("if1"){
 body1
 }else{
 

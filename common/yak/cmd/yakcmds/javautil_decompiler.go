@@ -162,7 +162,8 @@ var JavaDecompilerSelfChecking = &cli.Command{
 					return nil
 				}
 
-				if strings.Contains(filepath.Base(s), "package-info.class") {
+				base := filepath.Base(s)
+				if strings.Contains(base, "package-info.class") || strings.Contains(base, "module-info.class") {
 					return nil
 				}
 
