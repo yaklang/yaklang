@@ -528,6 +528,28 @@ func (c *ClassObjectDumper) DumpAnnotation(anno *AnnotationAttribute) (string, e
 	return result, nil
 }
 
+// isUnconditionalTerminalStatement reports whether st unconditionally transfers control out of
+// the current block: return / throw / break / continue (with or without a label). In valid Java
+// any sibling statement that follows such a statement at the same nesting level is unreachable and
+// is rejected by javac as a compile error. The decompiler occasionally synthesizes a structural
+// jump (e.g. a `break;` to leave a loop) right after a real `return`/`throw`; emitting it would
+// make the output uncompilable, so callers stop rendering a statement list once this returns true.
+func isUnconditionalTerminalStatement(st statements.Statement, funcCtx *class_context.ClassContext) bool {
+	switch s := st.(type) {
+	case *statements.ReturnStatement:
+		return true
+	case *statements.CustomStatement:
+		t := strings.TrimSpace(s.String(funcCtx))
+		switch {
+		case t == "break", t == "continue", t == "return":
+			return true
+		case strings.HasPrefix(t, "break "), strings.HasPrefix(t, "continue "), strings.HasPrefix(t, "throw "):
+			return true
+		}
+	}
+	return false
+}
+
 func (c *ClassObjectDumper) DumpMethod(methodName, desc string) (*dumpedMethods, error) {
 	return c.DumpMethodWithInitialId(methodName, desc, utils2.NewRootVariableId())
 }
@@ -683,14 +705,21 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 					if _, ok := statement.(*statements.MiddleStatement); ok {
 						continue
 					}
-					_, ok := statement.(*statements.StackAssignStatement)
-					if ok {
-						continue
-					}
-					res = append(res, statementToString(statement))
+				_, ok := statement.(*statements.StackAssignStatement)
+				if ok {
+					continue
 				}
-				return strings.Join(res, "\n")
+				res = append(res, statementToString(statement))
+				// Drop unreachable trailing siblings: once an unconditional terminal
+				// (return/throw/break/continue) is emitted, anything after it in the same
+				// block is dead code that javac would reject (e.g. a synthetic `break;`
+				// appended after a `return;` by the loop rewriter).
+				if isUnconditionalTerminalStatement(statement, funcCtx) {
+					break
+				}
 			}
+			return strings.Join(res, "\n")
+		}
 			statementToString = func(statement statements.Statement) (statementStr string) {
 				defer func() {
 					if debugMode {
