@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 var (
@@ -15,6 +16,27 @@ var (
 	REACT_TASK_clear     = "react_task_cleared"
 )
 
+func (r *ReAct) emitReActTaskStructured(t aicommon.AIStatefulTask, nodeId string, payload map[string]interface{}) {
+	if t == nil || r == nil {
+		return
+	}
+	emitter := t.GetEmitter()
+	if emitter == nil && r.Emitter != nil {
+		// Fallback for tasks without a dedicated emitter (e.g. unit tests).
+		emitter = r.Emitter.PushEventProcesser(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
+			if event != nil {
+				event.TaskId = t.GetId()
+				event.TaskUUID = t.GetUUID()
+			}
+			return event
+		})
+	}
+	if emitter == nil {
+		return
+	}
+	_, _ = emitter.EmitStructured(nodeId, payload)
+}
+
 func (r *ReAct) EmitEnqueueReActTask(t aicommon.AIStatefulTask) {
 	if t == nil {
 		return
@@ -23,7 +45,7 @@ func (r *ReAct) EmitEnqueueReActTask(t aicommon.AIStatefulTask) {
 		log.Warnf("ReAct task queue is not initialized, cannot emit enqueue event for task [%s]", t.GetId())
 		return
 	}
-	r.EmitStructured(REACT_TASK_enqueue, map[string]interface{}{
+	r.emitReActTaskStructured(t, REACT_TASK_enqueue, map[string]interface{}{
 		"react_task_id":    t.GetId(),
 		"react_task_input": t.GetUserInput(),
 		"queue_len":        r.taskQueue.Len(),
@@ -38,7 +60,7 @@ func (r *ReAct) EmitDequeueReActTask(t aicommon.AIStatefulTask, reason string) {
 		log.Warnf("ReAct task queue is not initialized, cannot emit dequeue event for task [%s]", t.GetId())
 		return
 	}
-	r.EmitStructured(REACT_TASK_dequeue, map[string]interface{}{
+	r.emitReActTaskStructured(t, REACT_TASK_dequeue, map[string]interface{}{
 		"react_task_id":    t.GetId(),
 		"react_task_input": t.GetUserInput(),
 		"reason":           reason,
