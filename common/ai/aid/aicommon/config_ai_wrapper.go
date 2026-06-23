@@ -278,6 +278,9 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 				rsp = TeeAIResponse(config, rsp, nil, func() {
 					c.finalizeTierConsumption(tier, int64(tokenSize), origRsp)
 				})
+				if !waitOrigAIResponseCallback(c, origRsp) {
+					return nil, c.Ctx.Err()
+				}
 				return rsp, err
 			}
 			if rsp != nil {
@@ -481,6 +484,9 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 					}
 				}
 			})
+			if !waitOrigAIResponseCallback(c, origRsp) {
+				return nil, c.Ctx.Err()
+			}
 			if c.DebugPrompt {
 				rsp.Debug(true)
 			}
@@ -491,6 +497,15 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		}
 		return rsp, utils.Errorf("ai request err with max retry: %v", err)
 	}
+}
+
+// waitOrigAIResponseCallback blocks until the async AIChatToAICallbackType goroutine on
+// origRsp finishes (SetError + Close). TeeAIResponse may return before that happens.
+func waitOrigAIResponseCallback(c *Config, origRsp *AIResponse) bool {
+	if c == nil || origRsp == nil {
+		return true
+	}
+	return origRsp.WaitForCallbackDone(c.Ctx)
 }
 
 type AIResponseSimple struct {

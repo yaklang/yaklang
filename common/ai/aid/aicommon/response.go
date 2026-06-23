@@ -70,6 +70,62 @@ type AIResponse struct {
 
 	setErrorFunc func(error)  // 设置错误的函数，支持 TeeAIResponse 拷贝
 	getErrorFunc func() error // 获取错误的函数，支持 TeeAIResponse 拷贝
+
+	// asyncState tracks AIChatToAICallbackType goroutine completion (SetError + Close).
+	// TeeAIResponse shares the same pointer so WaitForCallbackDone works on tee'd responses.
+	asyncState *aiResponseAsyncState
+}
+
+type aiResponseAsyncState struct {
+	callbackDoneOnce sync.Once
+	callbackDone     chan struct{}
+}
+
+func newAIResponseAsyncState(alreadyDone bool) *aiResponseAsyncState {
+	s := &aiResponseAsyncState{callbackDone: make(chan struct{})}
+	if alreadyDone {
+		s.markCallbackDone()
+	}
+	return s
+}
+
+func (s *aiResponseAsyncState) markCallbackDone() {
+	if s == nil {
+		return
+	}
+	s.callbackDoneOnce.Do(func() {
+		close(s.callbackDone)
+	})
+}
+
+func (s *aiResponseAsyncState) waitForCallbackDone(ctx context.Context) bool {
+	if s == nil || s.callbackDone == nil {
+		return true
+	}
+	select {
+	case <-s.callbackDone:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
+// markCallbackDone signals that the async AI callback goroutine has finished
+// (including SetError). No-op for responses that were never async.
+func (a *AIResponse) markCallbackDone() {
+	if a == nil || a.asyncState == nil {
+		return
+	}
+	a.asyncState.markCallbackDone()
+}
+
+// WaitForCallbackDone blocks until the async AI callback goroutine completes or ctx is canceled.
+// Returns true when the callback finished, false when ctx was canceled first.
+func (a *AIResponse) WaitForCallbackDone(ctx context.Context) bool {
+	if a == nil || a.asyncState == nil {
+		return true
+	}
+	return a.asyncState.waitForCallbackDone(ctx)
 }
 
 // SetError 设置 AI 调用过程中的错误
@@ -590,6 +646,7 @@ func (r *AIResponse) Close() {
 		}
 	}()
 
+	r.markCallbackDone()
 	r.SetHeaderReady()
 	r.ch.Close()
 }
@@ -612,6 +669,7 @@ func NewAIResponse(caller AICallerConfigIf) *AIResponse {
 			caller.CallAIResponseOutputFinishedCallback(s)
 		},
 		httpHeaderReady: make(chan struct{}),
+		asyncState:      newAIResponseAsyncState(false),
 		setErrorFunc: func(e error) {
 			errMu.Lock()
 			err = e
@@ -735,5 +793,6 @@ func newUnboundAIResponse() *AIResponse {
 		consumptionCallback: func(current int) {},
 		onOutputFinished:    func(s string) {},
 		httpHeaderReady:     make(chan struct{}),
+		asyncState:          newAIResponseAsyncState(true),
 	}
 }

@@ -129,15 +129,12 @@ func callAITransaction(
 			return utils.Errorf("context is done, cannot continue transaction")
 		}
 		lastRsp = rsp
+		if !rsp.WaitForCallbackDone(c.GetContext()) {
+			return c.GetContext().Err()
+		}
 		postHandlerErr = postHandler(rsp)
 		// 检查 rsp 的 error（由 AIChatToAICallbackType 等设置），合并错误
-		if rspErr := rsp.GetError(); rspErr != nil {
-			if postHandlerErr != nil {
-				postHandlerErr = utils.Errorf("post handler: %v; ai callback: %v", postHandlerErr, rspErr)
-			} else {
-				postHandlerErr = rspErr
-			}
-		}
+		postHandlerErr = mergePostHandlerAndCallbackError(postHandlerErr, rsp.GetError())
 		if postHandlerErr != nil {
 			lastErr = postHandlerErr
 			i++
@@ -187,19 +184,20 @@ func callAITransaction(
 			"4. Check network connectivity and API rate limits",
 		trcRetry, modelInfo, finalErr,
 	)
-	if lastRsp != nil {
-		rawDump := lastRsp.GetRawHTTPResponseDump()
-		if rawDump != "" {
-			finalErrMsg += "\n\n--- Last Raw HTTP Response ---\n" + utils.ShrinkString(rawDump, 4096)
-		}
-	}
-	bindEmitter(lastRsp).EmitDefaultStreamEvent("ai-error", strings.NewReader(finalErrMsg), "")
-
 	var tier consts.ModelTier
 	if lastReq != nil {
 		tier = consts.ModelTier(lastReq.GetModelTier())
 	}
-	EmitAICallFailureIfApplicable(c, tier, lastRsp, finalErr, failureExtra)
+	emittedStructuredFailure := EmitAICallFailureIfApplicable(c, tier, lastRsp, finalErr, failureExtra)
+	if !emittedStructuredFailure {
+		if lastRsp != nil {
+			rawDump := lastRsp.GetRawHTTPResponseDump()
+			if rawDump != "" {
+				finalErrMsg += "\n\n--- Last Raw HTTP Response ---\n" + utils.ShrinkString(rawDump, 4096)
+			}
+		}
+		bindEmitter(lastRsp).EmitDefaultStreamEvent("ai-error", strings.NewReader(finalErrMsg), "")
+	}
 
 	if finalErr != nil {
 		return utils.Wrap(finalErr, fmt.Sprintf("max retry count[%v] reached in transaction", trcRetry))
