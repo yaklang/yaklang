@@ -328,7 +328,7 @@ func (bi *BaseInstaller) GetInstallPath(descriptor *BinaryDescriptor, options *I
 
 	targetPath := bi.GetTargetPath(descriptor, options)
 
-	allPaths = append(allPaths, targetPath)
+	allPaths = append(allPaths, installPathCandidates(targetPath)...)
 	if runtime.GOOS == "darwin" {
 		allPaths = append(allPaths, filepath.Join("/", "usr", "local", "bin", descriptor.Name))
 		allPaths = append(allPaths, filepath.Join("/", "bin", descriptor.Name))

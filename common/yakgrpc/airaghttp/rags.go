@@ -143,6 +143,18 @@ func DownloadRag(ctx context.Context, name string, force bool, downloadDir strin
 		return utils.Errorf("import rag %s failed: %v", info.Name, importErr)
 	}
 
+	if thirdparty_bin.IsYaklangCodeAIKBDownload(info.Name, info.Filename()) {
+		if onProgress != nil {
+			onProgress(info.Name, 92, "installing yaklang-aikb.zip")
+		}
+		if zipErr := thirdparty_bin.InstallYaklangCodeAIKBZip(&thirdparty_bin.InstallOptions{
+			Context: ctx,
+			Force:   force,
+		}); zipErr != nil {
+			return utils.Errorf("import rag %s ok but install yaklang-aikb.zip failed: %v", info.Name, zipErr)
+		}
+	}
+
 	if onProgress != nil {
 		onProgress(info.Name, 100, "download and import finished")
 	}
