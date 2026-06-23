@@ -324,14 +324,76 @@ func WithNoHTTPS(b bool) AIConfigOption {
 	}
 }
 
-func NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
-	c := &AIConfig{
+func newBaseAIConfig() *AIConfig {
+	return &AIConfig{
 		Timeout:                120,
 		FunctionCallRetryTimes: 5,
 		HTTPErrorHandler: func(err error) {
 			log.Debugf("ai request failed: %s", err)
 		},
 	}
+}
+
+func hasExplicitConfigBeyondType(c *AIConfig) bool {
+	if c == nil {
+		return false
+	}
+	if c.APIKey != "" ||
+		c.Model != "" ||
+		c.Domain != "" ||
+		c.BaseURL != "" ||
+		c.Endpoint != "" ||
+		c.Proxy != "" ||
+		c.Host != "" ||
+		c.Port != 0 ||
+		c.NoHttps ||
+		c.EnableEndpoint ||
+		strings.TrimSpace(c.APIType) != "" ||
+		len(c.Headers) > 0 ||
+		c.EnableThinking != nil ||
+		c.MaxTokens != nil ||
+		c.Temperature != nil ||
+		c.TopP != nil ||
+		c.TopK != nil ||
+		c.FrequencyPenalty != nil ||
+		strings.TrimSpace(c.ReasoningEffort) != "" ||
+		c.PreferredTier != "" ||
+		c.DisableProviderFallback ||
+		c.Context != nil ||
+		len(c.Images) > 0 ||
+		len(c.Videos) > 0 {
+		return true
+	}
+	return false
+}
+
+func optsOnlySetType(opts ...AIConfigOption) bool {
+	probe := newBaseAIConfig()
+	for _, p := range opts {
+		p(probe)
+	}
+	if strings.TrimSpace(probe.Type) == "" {
+		return false
+	}
+	return !hasExplicitConfigBeyondType(probe)
+}
+
+// NewDefaultAIConfig builds AIConfig from options.
+// Tiered / legacy third-party defaults are applied only when the caller passes Type alone.
+func NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
+	if optsOnlySetType(opts...) {
+		return _NewDefaultAIConfig(opts...)
+	}
+
+	c := newBaseAIConfig()
+	for _, p := range opts {
+		p(c)
+	}
+	return c
+}
+
+func _NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
+	c := newBaseAIConfig()
 	// 加载Type参数
 	for _, p := range opts {
 		p(c)
