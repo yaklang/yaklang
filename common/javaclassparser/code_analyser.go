@@ -45,6 +45,7 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 	}
 	convertMemberInfo := func(classMemberInfo *ConstantMemberrefInfo) values.JavaValue {
 		className := getClassName(classMemberInfo.ClassIndex)
+		className = strings.Replace(className, "/", ".", -1)
 		name, desc := getNameAndType(pool, classMemberInfo.NameAndTypeIndex)
 		typ, err := types.ParseMethodDescriptor(desc)
 		if err != nil {

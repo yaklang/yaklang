@@ -49,21 +49,46 @@ var buildinBootstrapMethods = map[string]func(args ...values.JavaValue) BuildinB
 	},
 	"java.lang.invoke.LambdaMetafactory.metafactory": func(args1 ...values.JavaValue) BuildinBootstrapMethod {
 		return func(d *Decompiler, sim StackSimulation, typ types.JavaType, args2 ...values.JavaValue) (values.JavaValue, error) {
-			classMember := args1[1].(*values.JavaClassMember)
-			if classMember.Name != d.FunctionContext.ClassName {
+			// args1 are the bootstrap static arguments:
+			//   args1[0] = samMethodType, args1[1] = implMethod(MethodHandle), args1[2] = instantiatedMethodType
+			// args2 are the dynamic captured arguments.
+			if len(args1) < 2 {
+				return nil, fmt.Errorf("lambda metafactory requires at least 2 bootstrap args, got %d", len(args1))
+			}
+			classMember, ok := args1[1].(*values.JavaClassMember)
+			if !ok {
+				return nil, fmt.Errorf("lambda metafactory: unexpected impl method handle type %T", args1[1])
+			}
+			member := classMember.Member
+			implClassName := strings.ReplaceAll(classMember.Name, "/", ".")
+			currentClassName := strings.ReplaceAll(d.FunctionContext.ClassName, "/", ".")
+			// Synthetic lambda bodies are emitted by javac as private methods named "lambda$...".
+			// Only those should be inlined as lambda expressions; everything else is a method reference.
+			isSyntheticLambda := strings.HasPrefix(member, "lambda$")
+			if isSyntheticLambda && implClassName == currentClassName {
+				methodStr, err := d.DumpClassLambdaMethod(member, classMember.Description, sim.GetVarId())
+				if err != nil {
+					return nil, fmt.Errorf("dump lambda method `%s.%s` error: %w", classMember.Name, member, err)
+				}
 				return values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
-					return d.FunctionContext.ShortTypeName(classMember.Name) + "::" + classMember.Member
+					return methodStr
 				}, func() types.JavaType {
 					return typ
 				}), nil
-				// return nil, fmt.Errorf("call external lamada: %s.%s", classMember.Name, classMember.Member)
 			}
-			methodStr, err := d.DumpClassLambdaMethod(classMember.Member, classMember.Description, sim.GetVarId())
-			if err != nil {
-				return nil, fmt.Errorf("dump lambda method `%s.%s` error: %w", classMember.Name, classMember.Member, err)
-			}
+
+			// Method reference: constructor / static / (bound|unbound) instance method.
+			capturedArgs := append([]values.JavaValue{}, args2...)
 			return values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
-				return methodStr
+				refMember := member
+				if member == "<init>" {
+					// constructor method reference: ClassName::new
+					refMember = "new"
+				} else if len(capturedArgs) > 0 {
+					// bound instance method reference: receiver::method
+					return capturedArgs[0].String(funcCtx) + "::" + refMember
+				}
+				return funcCtx.ShortTypeName(implClassName) + "::" + refMember
 			}, func() types.JavaType {
 				return typ
 			}), nil

@@ -180,7 +180,7 @@ func NewForStatement(subStatements []Statement) *ForStatement {
 func (f *ForStatement) String(funcCtx *class_context.ClassContext) string {
 	datas := []string{}
 	datas = append(datas, f.InitVar.String(funcCtx))
-	datas = append(datas, fmt.Sprintf("%s %s %s", f.Condition.String(funcCtx)))
+	datas = append(datas, f.Condition.String(funcCtx))
 	datas = append(datas, f.EndExp.String(funcCtx))
 	statementStr := []string{}
 	for _, statement := range f.SubStatements {
