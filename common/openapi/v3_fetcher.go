@@ -142,11 +142,11 @@ func v3_mockSchemaValue(data openapi3.T, i *openapi3.Schema, fieldName ...string
 	}
 
 	m := omap.NewGeneralOrderedMap()
-	if i.Items == nil {
-		return m
-	}
 	switch i.Type {
 	case "array":
+		if i.Items == nil {
+			return m
+		}
 		if i.Items.Ref != "" {
 			scheme, err := v3_schemaToValue(data, i.Items.Ref)
 			if err != nil {

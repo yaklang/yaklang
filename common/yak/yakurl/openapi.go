@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/openapi"
@@ -15,8 +16,9 @@ import (
 )
 
 const (
-	openAPIUploadLocation     = "upload"
-	openAPIQueryOp            = "op"
+	openAPIUploadLocation      = "upload"
+	openAPIHistoryLocation     = "history"
+	openAPIQueryOp             = "op"
 	openAPIQueryMethod        = "method"
 	openAPIQueryPath          = "path"
 	openAPIQueryOperationID   = "operationId"
@@ -36,6 +38,7 @@ const (
 type cachedOpenAPIDocument struct {
 	Content string
 	Parsed  *openapi.ParsedDocument
+	Session openAPIDocumentSession
 }
 
 var (
@@ -54,6 +57,11 @@ func (a *openapiAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURL
 		return nil, utils.Error("url is nil")
 	}
 	location := strings.TrimSpace(u.GetLocation())
+	query := openAPIQueryValues(u.GetQuery())
+	if location == openAPIHistoryLocation || query.Get(openAPIQueryOp) == openAPIHistoryLocation {
+		ensureOpenAPIDocumentStoreLoaded()
+		return listOpenAPIDocumentHistory()
+	}
 	if location == "" || location == openAPIUploadLocation {
 		return nil, utils.Error("openapi document id is required")
 	}
@@ -63,7 +71,6 @@ func (a *openapiAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURL
 		return nil, err
 	}
 
-	query := openAPIQueryValues(u.GetQuery())
 	if query.Get(openAPIQueryOp) == openAPIOpDetail || (query.Get(openAPIQueryMethod) != "" && query.Get(openAPIQueryPath) != "") {
 		op, err := resolveOpenAPIOperation(doc.Parsed, query)
 		if err != nil {
@@ -117,7 +124,12 @@ func (a *openapiAction) Delete(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 	if location == "" || location == openAPIUploadLocation {
 		return nil, utils.Error("openapi document id is required")
 	}
-	openAPIDocumentStore.Delete(location)
+	if err := validateOpenAPIDocumentID(location); err != nil {
+		return nil, err
+	}
+	if err := removeOpenAPIDocument(location); err != nil {
+		return nil, err
+	}
 	return &ypb.RequestYakURLResponse{}, nil
 }
 
@@ -149,16 +161,90 @@ func uploadOpenAPIDocument(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLR
 	}
 
 	docID := uuid.NewString()
-	openAPIDocumentStore.Store(docID, &cachedOpenAPIDocument{
+	now := time.Now().Unix()
+	specFile := openAPISpecFileName(strings.TrimSpace(query.Get("fileName")), content)
+	title := strings.TrimSpace(parsed.Info.Title)
+	doc := &cachedOpenAPIDocument{
 		Content: content,
 		Parsed:  parsed,
-	})
+		Session: newOpenAPIDocumentSession(docID, title, query.Get("fileName"), specFile, now),
+	}
+	if err := storeOpenAPIDocument(docID, doc); err != nil {
+		return nil, err
+	}
 
 	root, err := listOpenAPIDocumentResources(docID, parsed)
 	if err != nil {
 		return nil, err
 	}
 	return root, nil
+}
+
+func listOpenAPIDocumentHistory() (*ypb.RequestYakURLResponse, error) {
+	ensureOpenAPIDocumentStoreLoaded()
+	type historyItem struct {
+		docID string
+		doc   *cachedOpenAPIDocument
+	}
+	items := make([]historyItem, 0)
+	openAPIDocumentStore.Range(func(key, value any) bool {
+		docID, ok := key.(string)
+		if !ok || docID == "" {
+			return true
+		}
+		doc, ok := value.(*cachedOpenAPIDocument)
+		if !ok || doc == nil || doc.Parsed == nil {
+			return true
+		}
+		items = append(items, historyItem{docID: docID, doc: doc})
+		return true
+	})
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].doc.Session.LastUsedAt == items[j].doc.Session.LastUsedAt {
+			return items[i].docID > items[j].docID
+		}
+		return items[i].doc.Session.LastUsedAt > items[j].doc.Session.LastUsedAt
+	})
+
+	resources := make([]*ypb.YakURLResource, 0, len(items))
+	for _, item := range items {
+		resource := openAPIDocumentRootResource(item.docID, item.doc.Parsed)
+		resource.Extra = append(resource.GetExtra(), openAPIDocumentHistoryExtras(item.docID, item.doc)...)
+		resources = append(resources, resource)
+	}
+	return &ypb.RequestYakURLResponse{
+		Page:      1,
+		PageSize:  int64(len(resources)),
+		Total:     int64(len(resources)),
+		Resources: resources,
+	}, nil
+}
+
+func openAPIDocumentHistoryExtras(docID string, doc *cachedOpenAPIDocument) []*ypb.KVPair {
+	sess := doc.Session
+	if sess.SessionID == "" {
+		sess.SessionID = docID
+	}
+	title := strings.TrimSpace(sess.Title)
+	if title == "" && doc.Parsed != nil {
+		title = strings.TrimSpace(doc.Parsed.Info.Title)
+	}
+	extras := []*ypb.KVPair{
+		{Key: "session_id", Value: sess.SessionID},
+		{Key: "title", Value: title},
+		{Key: "source", Value: sess.Source},
+		{Key: "created_at", Value: fmt.Sprint(sess.CreatedAt)},
+		{Key: "updated_at", Value: fmt.Sprint(sess.UpdatedAt)},
+		{Key: "last_used_at", Value: fmt.Sprint(sess.LastUsedAt)},
+		{Key: "uploaded_at", Value: fmt.Sprint(sess.CreatedAt)},
+	}
+	if sess.FileName != "" {
+		extras = append(extras, &ypb.KVPair{Key: "file_name", Value: sess.FileName})
+	}
+	if doc.Parsed != nil {
+		extras = append(extras, &ypb.KVPair{Key: "operation_count", Value: fmt.Sprint(len(doc.Parsed.Operations))})
+	}
+	return extras
 }
 
 func listOpenAPIDocumentResources(docID string, parsed *openapi.ParsedDocument) (*ypb.RequestYakURLResponse, error) {
@@ -250,14 +336,25 @@ func importAllOpenAPIRequests(docID string, doc *cachedOpenAPIDocument, params *
 }
 
 func loadCachedOpenAPIDocument(docID string) (*cachedOpenAPIDocument, error) {
+	ensureOpenAPIDocumentStoreLoaded()
+	if err := validateOpenAPIDocumentID(docID); err != nil {
+		return nil, err
+	}
 	raw, ok := openAPIDocumentStore.Load(docID)
-	if !ok {
+	if ok {
+		doc, ok := raw.(*cachedOpenAPIDocument)
+		if !ok || doc == nil {
+			return nil, utils.Errorf("invalid openapi document cache for %q", docID)
+		}
+		touchOpenAPIDocumentLastUsed(docID, doc)
+		return doc, nil
+	}
+	doc, err := loadOpenAPIDocumentFromDisk(docID)
+	if err != nil {
 		return nil, utils.Errorf("openapi document %q not found", docID)
 	}
-	doc, ok := raw.(*cachedOpenAPIDocument)
-	if !ok || doc == nil {
-		return nil, utils.Errorf("invalid openapi document cache for %q", docID)
-	}
+	touchOpenAPIDocumentLastUsed(docID, doc)
+	openAPIDocumentStore.Store(docID, doc)
 	return doc, nil
 }
 
