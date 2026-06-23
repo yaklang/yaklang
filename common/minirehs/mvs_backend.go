@@ -376,6 +376,10 @@ func (d *mvsDB) numAlwaysOn() int {
 	return d.mergedCount + len(d.assertAlwaysOn) + len(d.otherAlwaysOn)
 }
 
+// gateSupersetPrecheck 控制可局部化超集门复核前是否先跑超集 NFA 存在性预检 (见 verifyGateLocalized).
+// PCRE2 (go-pcre2-lite) 线性复核后该预检对 gate 几乎不过滤、反成净开销, 故默认关闭; 仅 A/B 基准临时开。
+var gateSupersetPrecheck = false
+
 // cgo 调用诊断计数器 (仅 cgoDiagEnabled=true 时累加, 默认关闭, 近零开销). 用于量化
 // "cgo 跨界次数 vs 实际扫描字节" 以判定瓶颈是跨界开销还是扫描工作量 (见 TestMVSCgoCallDiag).
 // 声明置于无构建标签文件, 使 cgo / 非 cgo 构建与测试均可引用 (增量仅在 mvs_cgo.go 的真实调用处).
@@ -728,25 +732,30 @@ func (d *mvsDB) verifyGateLocalized(idx int, data []byte, winLo int, sc *scratch
 	if winLo > 0 {
 		sub = data[winLo:]
 	}
-	nfa := d.nfas[idx]
-	// 超集存在性预检 (收窄): 断言 NFA 用局部边界, lean NFA 走 C 内核/纯 Go.
-	var hit bool
-	switch {
-	case nfa.hasAssert && nfa.single:
-		sc.gateBound = computeBoundaries(sub, sc.gateBound)
-		hit = nfa.existsInAssertShared1(sub, sc.gateBound)
-	case nfa.hasAssert:
-		sc.gateBound = computeBoundaries(sub, sc.gateBound)
-		hit = nfa.existsInAssertShared(sub, sc.gateBound)
-	case d.kernel != nil:
-		hit = d.kernel.nfaExists(idx, sub)
-	default:
-		hit = nfa.existsIn(sub)
+	// 超集 NFA 预检 (gateSupersetPrecheck): 历史上用来在 dlclark/regexp2 (回溯, 极贵) 之前廉价过滤,
+	// 避免对每个字面量命中都跑昂贵复核。regexp2 后端切到 go-pcre2-lite (PCRE2, 线性) 后, 复核本身已
+	// 很廉价, 而预检 (尤其多字断言超集 existsInAssertShared + computeBoundaries 整段 data[winLo:]) 对
+	// gate 几乎不过滤 (字面量命中 => 超集结构通常已成立), 反成净开销。故默认关 (直接复核), 仅 A/B 保留。
+	if gateSupersetPrecheck {
+		nfa := d.nfas[idx]
+		var hit bool
+		switch {
+		case nfa.hasAssert && nfa.single:
+			sc.gateBound = computeBoundaries(sub, sc.gateBound)
+			hit = nfa.existsInAssertShared1(sub, sc.gateBound)
+		case nfa.hasAssert:
+			sc.gateBound = computeBoundaries(sub, sc.gateBound)
+			hit = nfa.existsInAssertShared(sub, sc.gateBound)
+		case d.kernel != nil:
+			hit = d.kernel.nfaExists(idx, sub)
+		default:
+			hit = nfa.existsIn(sub)
+		}
+		if !hit {
+			return false
+		}
 	}
-	if !hit {
-		return false
-	}
-	// regexp2 复核 (收窄): gate verifier 命中报 -1/-1, 偏移无需换算。
+	// regexp2 复核 (收窄到 data[winLo:]) 即权威判定 (与 oracle 同 verifier 对象): gate 命中报 -1/-1。
 	return d.reportViaVerifier(d.all[idx], sub, handler)
 }
 
