@@ -273,6 +273,38 @@ func directlyCallParamKeys(params aitool.InvokeParams) []string {
 	return keys
 }
 
+func emitDirectlyCallToolParamsNodeStream(
+	loop *reactloops.ReActLoop,
+	action *aicommon.Action,
+	params aitool.InvokeParams,
+	mergedBlockParams []string,
+) {
+	emitter := loop.GetEmitter()
+	if emitter == nil {
+		return
+	}
+
+	taskIndex := ""
+	if task := loop.GetCurrentTask(); task != nil {
+		taskIndex = task.GetIndex()
+	}
+
+	var buf strings.Builder
+	buf.WriteString("[开始处理参数] → ")
+	emitDirectlyCallParamProgress(func(part string) {
+		buf.WriteString(part)
+		buf.WriteString(" → ")
+	}, params, mergedBlockParams)
+	if ce := action.GetString("directly_call_expectations"); strings.TrimSpace(ce) != "" {
+		buf.WriteString("[note] ")
+		buf.WriteString(ce)
+		buf.WriteString(" → ")
+	}
+	buf.WriteString(" [done]")
+
+	_, _ = emitter.EmitDefaultStreamEvent(directlyCallToolParamsNodeID, strings.NewReader(buf.String()), taskIndex)
+}
+
 var loopAction_directlyCallTool = &reactloops.LoopAction{
 	ActionType: schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
 	Description: "directly call a recently used tool (skip require & param-generation phases). " +
@@ -414,6 +446,7 @@ Few-shot example 2 (valid direct retry):
 		feedbackItems := buildDirectlyCallParamFeedbackItems(params, mergedBlockParams)
 		reportStatus(fmt.Sprintf("normalized %d param fields: %s", len(paramKeys), strings.Join(paramKeys, ", ")))
 		operator.Feedback(fmt.Sprintf("Prepared directly_call_tool params for '%s': %d fields [%s]", toolName, len(feedbackItems), strings.Join(feedbackItems, ", ")))
+		emitDirectlyCallToolParamsNodeStream(loop, action, params, mergedBlockParams)
 
 		// 2. inject reserved keys from directly_call_ prefixed fields
 		if id := action.GetString("directly_call_identifier"); id != "" {
