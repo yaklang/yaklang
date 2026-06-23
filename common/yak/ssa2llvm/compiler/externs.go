@@ -33,6 +33,9 @@ type ExternBinding struct {
 	DispatchID abi.FuncID
 }
 
+// defaultExternBindings lists runtime builtins that stay in the minimal runtime
+// instead of yaklib registration. Everything else (os, sync, yakit, poc, ...)
+// is resolved via compile-time yaklib dependency collection.
 var defaultExternBindings = map[string]ExternBinding{
 	"println": {
 		Return:     ExternTypeVoid,
@@ -49,62 +52,6 @@ var defaultExternBindings = map[string]ExternBinding{
 	"append": {
 		Return:     ExternTypePtr,
 		DispatchID: abi.IDAppend,
-	},
-	"yakit.Info": {
-		Return:     ExternTypeVoid,
-		DispatchID: abi.IDYakitInfo,
-	},
-	"yakit.Warn": {
-		Return:     ExternTypeVoid,
-		DispatchID: abi.IDYakitWarn,
-	},
-	"yakit.Debug": {
-		Return:     ExternTypeVoid,
-		DispatchID: abi.IDYakitDebug,
-	},
-	"yakit.Error": {
-		Return:     ExternTypeVoid,
-		DispatchID: abi.IDYakitError,
-	},
-	"sync.NewWaitGroup": {
-		Return:     ExternTypePtr,
-		DispatchID: abi.IDSyncNewWaitGroup,
-	},
-	"sync.NewSizedWaitGroup": {
-		Return:     ExternTypePtr,
-		DispatchID: abi.IDSyncNewSizedWaitGroup,
-	},
-	"sync.NewLock": {
-		Return:     ExternTypePtr,
-		DispatchID: abi.IDSyncNewLock,
-	},
-	"sync.NewMutex": {
-		Return:     ExternTypePtr,
-		DispatchID: abi.IDSyncNewMutex,
-	},
-	"sync.NewRWMutex": {
-		Return:     ExternTypePtr,
-		DispatchID: abi.IDSyncNewRWMutex,
-	},
-	"sync.NewMap": {
-		Return:     ExternTypePtr,
-		DispatchID: abi.IDSyncNewMap,
-	},
-	"sync.NewOnce": {
-		Return:     ExternTypePtr,
-		DispatchID: abi.IDSyncNewOnce,
-	},
-	"sync.NewPool": {
-		Return:     ExternTypePtr,
-		DispatchID: abi.IDSyncNewPool,
-	},
-	"sync.NewCond": {
-		Return:     ExternTypePtr,
-		DispatchID: abi.IDSyncNewCond,
-	},
-	"os.Getenv": {
-		Return:     ExternTypePtr,
-		DispatchID: abi.IDOsGetenv,
 	},
 }
 

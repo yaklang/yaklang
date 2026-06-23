@@ -22,24 +22,10 @@ type HostBinding struct {
 var regionCache sync.Map // map[string]*pir.Region
 
 var defaultBindings = map[string]HostBinding{
-	"println":                {Dispatch: abi.IDPrintln},
-	"print":                  {Dispatch: abi.IDPrint},
-	"printf":                 {Dispatch: abi.IDPrintf},
-	"append":                 {Dispatch: abi.IDAppend},
-	"yakit.Info":             {Dispatch: abi.IDYakitInfo},
-	"yakit.Warn":             {Dispatch: abi.IDYakitWarn},
-	"yakit.Debug":            {Dispatch: abi.IDYakitDebug},
-	"yakit.Error":            {Dispatch: abi.IDYakitError},
-	"sync.NewWaitGroup":      {Dispatch: abi.IDSyncNewWaitGroup},
-	"sync.NewSizedWaitGroup": {Dispatch: abi.IDSyncNewSizedWaitGroup},
-	"sync.NewLock":           {Dispatch: abi.IDSyncNewLock},
-	"sync.NewMutex":          {Dispatch: abi.IDSyncNewMutex},
-	"sync.NewRWMutex":        {Dispatch: abi.IDSyncNewRWMutex},
-	"sync.NewMap":            {Dispatch: abi.IDSyncNewMap},
-	"sync.NewOnce":           {Dispatch: abi.IDSyncNewOnce},
-	"sync.NewPool": {Dispatch: abi.IDSyncNewPool},
-	"sync.NewCond": {Dispatch: abi.IDSyncNewCond},
-	"os.Getenv":    {Dispatch: abi.IDOsGetenv},
+	"println": {Dispatch: abi.IDPrintln},
+	"print":   {Dispatch: abi.IDPrint},
+	"printf":  {Dispatch: abi.IDPrintf},
+	"append":  {Dispatch: abi.IDAppend},
 }
 
 func Execute(blobHex, seedHex, funcName, hostBindingSpec string, args []int64,

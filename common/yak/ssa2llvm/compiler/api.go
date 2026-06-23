@@ -2,7 +2,6 @@ package compiler
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -563,48 +562,18 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 		}
 	}
 
-	// Prepare full embedded runtime archive when linking and stdlib pruning is disabled.
-	// Pruned stdlib compilation needs SSA/lowering information, so it is done later,
-	// immediately before native linking.
 	runtimeArchive := strings.TrimSpace(cfg.RuntimeArchive)
 	extraLinkArgs := append([]string{}, cfg.ExtraLinkArgs...)
-	if linking && runtimeArchive == "" && !cfg.StdlibCompile {
-		if archivePath, extractErr := embed.ExtractLibyakToDir(cfg.WorkDir); extractErr == nil {
-			runtimeArchive = archivePath
-			cfg.RuntimeArchive = archivePath
-		} else if extractErr != embed.ErrNoEmbeddedRuntime {
-			return CompileResult{}, extractErr
-		}
-
-		if _, gcErr := embed.ExtractLibgcToDir(cfg.WorkDir); gcErr == nil {
-			// Extracted libgc.a into the work dir; clang will use -L$WORK -lgc.
-			extraLinkArgs = append(extraLinkArgs, "-L"+cfg.WorkDir)
-		} else if gcErr != embed.ErrNoEmbeddedRuntime {
-			return CompileResult{}, gcErr
-		}
-	}
 	cfg.ExtraLinkArgs = extraLinkArgs
 
-	// When embedding is disabled, ExtractLibyakToDir leaves RuntimeArchive empty and
-	// CompileLLVMToBinary falls back to findRuntimeArchive() at link time. Linkprep
-	// must see the same path up front so archives are rewritten before clang runs.
-	if linking && strings.TrimSpace(cfg.RuntimeArchive) == "" && !cfg.StdlibCompile {
+	// When stdlib pruning is disabled, use a prebuilt runtime archive from disk.
+	if linking && runtimeArchive == "" && !cfg.StdlibCompile {
 		p, err := findRuntimeArchive()
-		if err == nil {
-			cfg.RuntimeArchive = p
-			runtimeArchive = p
-		} else {
-			archivePath, gcLibDir, fullBuildErr := embed.BuildRuntimeArchiveFromLocalSource(cfg.WorkDir)
-			if fullBuildErr != nil {
-				return CompileResult{}, fullBuildErr
-			}
-			cfg.RuntimeArchive = archivePath
-			runtimeArchive = archivePath
-			if strings.TrimSpace(gcLibDir) != "" {
-				extraLinkArgs = append(extraLinkArgs, "-L"+gcLibDir)
-				cfg.ExtraLinkArgs = extraLinkArgs
-			}
+		if err != nil {
+			return CompileResult{}, err
 		}
+		cfg.RuntimeArchive = p
+		runtimeArchive = p
 	}
 
 	_, comp, ir, err := compileInputWithConfig(cfg)
@@ -737,50 +706,15 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 	linkingNative := !cfg.SkipRuntimeLink
 	if linkingNative && strings.TrimSpace(cfg.RuntimeArchive) == "" && cfg.StdlibCompile {
 		deps := runtimeDepsFromCompiler(comp)
-		archivePath, gcLibDir, buildErr := embed.BuildPrunedRuntimeArchiveFromEmbeddedSourceWithDeps(cfg.WorkDir, deps)
-		if errors.Is(buildErr, embed.ErrNoEmbeddedRuntimeSource) {
-			archivePath, gcLibDir, buildErr = embed.BuildPrunedRuntimeArchiveFromLocalSourceWithDeps(cfg.WorkDir, deps)
-		}
-		if buildErr == nil {
-			runtimeArchive = archivePath
-			cfg.RuntimeArchive = archivePath
-			if strings.TrimSpace(gcLibDir) != "" {
-				extraLinkArgs = append(extraLinkArgs, "-L"+gcLibDir)
-				cfg.ExtraLinkArgs = extraLinkArgs
-			}
-		} else if errors.Is(buildErr, embed.ErrUnsupportedPrunedRuntime) || errors.Is(buildErr, embed.ErrNoEmbeddedRuntimeSource) {
-			if archivePath, extractErr := embed.ExtractLibyakToDir(cfg.WorkDir); extractErr == nil {
-				runtimeArchive = archivePath
-				cfg.RuntimeArchive = archivePath
-			} else if extractErr != embed.ErrNoEmbeddedRuntime {
-				return CompileResult{}, extractErr
-			}
-			if _, gcErr := embed.ExtractLibgcToDir(cfg.WorkDir); gcErr == nil {
-				extraLinkArgs = append(extraLinkArgs, "-L"+cfg.WorkDir)
-				cfg.ExtraLinkArgs = extraLinkArgs
-			} else if gcErr != embed.ErrNoEmbeddedRuntime {
-				return CompileResult{}, gcErr
-			}
-			if strings.TrimSpace(cfg.RuntimeArchive) == "" {
-				p, err := findRuntimeArchive()
-				if err == nil {
-					cfg.RuntimeArchive = p
-					runtimeArchive = p
-				} else {
-					archivePath, gcLibDir, fullBuildErr := embed.BuildRuntimeArchiveFromLocalSource(cfg.WorkDir)
-					if fullBuildErr != nil {
-						return CompileResult{}, fullBuildErr
-					}
-					cfg.RuntimeArchive = archivePath
-					runtimeArchive = archivePath
-					if strings.TrimSpace(gcLibDir) != "" {
-						extraLinkArgs = append(extraLinkArgs, "-L"+gcLibDir)
-						cfg.ExtraLinkArgs = extraLinkArgs
-					}
-				}
-			}
-		} else {
+		archivePath, gcLibDir, buildErr := embed.BuildPrunedRuntimeArchiveFromLocalSourceWithDeps(cfg.WorkDir, deps)
+		if buildErr != nil {
 			return CompileResult{}, buildErr
+		}
+		runtimeArchive = archivePath
+		cfg.RuntimeArchive = archivePath
+		if strings.TrimSpace(gcLibDir) != "" {
+			extraLinkArgs = append(extraLinkArgs, "-L"+gcLibDir)
+			cfg.ExtraLinkArgs = extraLinkArgs
 		}
 	}
 	var linkprepCleanup func()

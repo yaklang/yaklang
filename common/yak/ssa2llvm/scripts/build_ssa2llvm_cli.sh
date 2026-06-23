@@ -15,10 +15,7 @@ fi
 
 cd "${REPO_ROOT}"
 
-echo "[ssa2llvm] generating embedded runtime archive..."
-"${SSA2LLVM_DIR}/scripts/build_runtime_embed.sh"
-
-echo "[ssa2llvm] building CLI with embedded runtime..."
-go build -tags ssa2llvm_gzip_embed -ldflags "${GO_LDFLAGS}" -o "${OUT}" ./common/yak/ssa2llvm/cmd
+echo "[ssa2llvm] building CLI..."
+go build -ldflags "${GO_LDFLAGS}" -o "${OUT}" ./common/yak/ssa2llvm/cmd
 
 echo "[ssa2llvm] done: ${OUT}"

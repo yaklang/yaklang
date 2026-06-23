@@ -1,6 +1,7 @@
 package embed
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"go/format"
@@ -12,7 +13,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/trace"
 )
 
@@ -26,8 +26,7 @@ type YaklibDependency struct {
 }
 
 type PrunedRuntimeDependencies struct {
-	Yaklib          []YaklibDependency
-	RuntimeDispatch []abi.FuncID
+	Yaklib []YaklibDependency
 }
 
 func ValidatePrunedRuntimeDependencies(deps []YaklibDependency) error {
@@ -44,12 +43,11 @@ func ValidatePrunedRuntimeDependencies(deps []YaklibDependency) error {
 }
 
 func UnsupportedPrunedRuntimeDependencies(deps []YaklibDependency) []YaklibDependency {
-	registry, _ := scriptEngineRegistryFromLocalSource()
 	out := make([]YaklibDependency, 0)
 	for _, dep := range normalizeYaklibDependencies(deps) {
 		methods := make([]string, 0, len(dep.Methods))
 		for _, method := range dep.Methods {
-			if !isPrunedRuntimeDependencySupportedWithRegistry(registry, dep.Module, method) {
+			if !isPrunedRuntimeDependencySupported(dep.Module, method) {
 				methods = append(methods, method)
 			}
 		}
@@ -61,18 +59,6 @@ func UnsupportedPrunedRuntimeDependencies(deps []YaklibDependency) []YaklibDepen
 		}
 	}
 	return out
-}
-
-func BuildPrunedRuntimeArchiveFromEmbeddedSource(buildDir string, deps []YaklibDependency) (archivePath string, gcLibDir string, err error) {
-	return BuildPrunedRuntimeArchiveFromEmbeddedSourceWithDeps(buildDir, PrunedRuntimeDependencies{Yaklib: deps})
-}
-
-func BuildPrunedRuntimeArchiveFromEmbeddedSourceWithDeps(buildDir string, deps PrunedRuntimeDependencies) (archivePath string, gcLibDir string, err error) {
-	srcDir := filepath.Join(buildDir, "ssa2llvm-stdlib-src")
-	if _, err := ExtractRuntimeSourceToDir(srcDir); err != nil {
-		return "", "", err
-	}
-	return BuildPrunedRuntimeArchiveFromSourceTreeWithDeps(buildDir, srcDir, deps)
 }
 
 func BuildPrunedRuntimeArchiveFromLocalSource(buildDir string, deps []YaklibDependency) (archivePath string, gcLibDir string, err error) {
@@ -88,27 +74,9 @@ func BuildPrunedRuntimeArchiveFromLocalSourceWithDeps(buildDir string, deps Prun
 	if err != nil {
 		return "", "", err
 	}
-	srcDir := filepath.Join(buildDir, "ssa2llvm-stdlib-src")
-	_ = os.RemoveAll(srcDir)
-	goPath, err := exec.LookPath("go")
-	if err != nil {
-		return "", "", fmt.Errorf("go toolchain not found in PATH: %w", err)
-	}
-	cmd := exec.Command(goPath, "run", "./common/utils/gomodsrc/cmd",
-		"--pkg", "./common/yak/ssa2llvm/runtime/runtime_go",
-		"--dst", srcDir,
-	)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GOWORK=off")
-	trace.PrintCmd(cmd)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", "", fmt.Errorf("build pruned runtime archive failed: gomodsrc: %v\n%s", err, out)
-	}
-	if err := copyLocalLibgc(srcDir); err != nil {
-		return "", "", err
-	}
-	if err := copyPrunedRuntimeBuildTagSources(root, srcDir); err != nil {
+	srcDir := root
+	runtimeDir := filepath.Join(root, "common", "yak", "ssa2llvm", "runtime", "runtime_go")
+	if err := ensureLocalLibgc(runtimeDir); err != nil {
 		return "", "", err
 	}
 	return BuildPrunedRuntimeArchiveFromSourceTreeWithDeps(buildDir, srcDir, deps)
@@ -134,9 +102,17 @@ func BuildPrunedRuntimeArchiveFromSourceTreeWithDeps(buildDir, srcDir string, de
 	}
 
 	runtimeDir := filepath.Join(srcDir, "common", "yak", "ssa2llvm", "runtime", "runtime_go")
-	if err := writePrunedRuntimeImports(runtimeDir, deps.Yaklib); err != nil {
+	generatedPath := filepath.Join(buildDir, "runtime_imports_generated.go")
+	canonicalGeneratedPath := filepath.Join(runtimeDir, "runtime_imports_generated.go")
+	if err := writePrunedRuntimeImportsToFile(generatedPath, deps.Yaklib); err != nil {
 		return "", "", err
 	}
+	overlayPath, err := writeBuildOverlay(buildDir, canonicalGeneratedPath, generatedPath)
+	if err != nil {
+		return "", "", err
+	}
+	defer os.Remove(generatedPath)
+	defer os.Remove(overlayPath)
 
 	goPath, err := exec.LookPath("go")
 	if err != nil {
@@ -144,12 +120,11 @@ func BuildPrunedRuntimeArchiveFromSourceTreeWithDeps(buildDir, srcDir string, de
 	}
 
 	archivePath = filepath.Join(buildDir, "libyak.a")
-	buildTags := prunedRuntimeBuildTags(deps)
 	cmd := exec.Command(goPath, "build",
 		"-trimpath",
-		"-tags="+strings.Join(buildTags, ","),
 		"-ldflags=-s -w",
 		"-buildmode=c-archive",
+		"-overlay", overlayPath,
 		"-o", archivePath,
 		"./common/yak/ssa2llvm/runtime/runtime_go",
 	)
@@ -166,34 +141,10 @@ func BuildPrunedRuntimeArchiveFromSourceTreeWithDeps(buildDir, srcDir string, de
 	if _, err := os.Stat(archivePath); err != nil {
 		return "", "", fmt.Errorf("build pruned runtime archive failed: output libyak.a missing: %v", err)
 	}
-	if _, err := writeRuntimeLinkArgsFileWithTags(buildDir, srcDir, buildTags...); err != nil {
+	if _, err := writeRuntimeLinkArgsFile(buildDir, srcDir, overlayPath); err != nil {
 		return "", "", err
 	}
 	return archivePath, gcLibDir, nil
-}
-
-func prunedRuntimeBuildTags(deps PrunedRuntimeDependencies) []string {
-	tags := []string{"ssa2llvm_pruned_runtime"}
-	if prunedRuntimeNeedsModule(deps.Yaklib, "cli") {
-		tags = append(tags, "ssa2llvm_runtime_cli")
-	}
-	if prunedRuntimeNeedsModule(deps.Yaklib, "yakit") {
-		tags = append(tags, "ssa2llvm_runtime_yakit")
-	}
-	return tags
-}
-
-func prunedRuntimeNeedsModule(deps []YaklibDependency, module string) bool {
-	module = strings.TrimSpace(module)
-	if module == "" {
-		return false
-	}
-	for _, dep := range deps {
-		if strings.TrimSpace(dep.Module) == module {
-			return true
-		}
-	}
-	return false
 }
 
 func localGoModuleRoot() (string, error) {
@@ -257,36 +208,24 @@ func findYaklangModuleRoot(start string) (string, error) {
 	}
 }
 
-func copyLocalLibgc(srcDir string) error {
+func copyLocalLibgc(runtimeDir string) error {
 	libgc, err := resolveLibgcArchive()
 	if err != nil {
 		return err
 	}
-	dstDir := filepath.Join(srcDir, "common", "yak", "ssa2llvm", "runtime", "runtime_go", "libs")
+	dstDir := filepath.Join(runtimeDir, "libs")
 	if err := os.MkdirAll(dstDir, 0o755); err != nil {
 		return fmt.Errorf("build pruned runtime archive failed: mkdir %s: %w", dstDir, err)
 	}
 	return copyFile(libgc, filepath.Join(dstDir, "libgc.a"))
 }
 
-func copyPrunedRuntimeBuildTagSources(root, srcDir string) error {
-	files := []string{
-		filepath.Join("common", "yak", "ssa2llvm", "runtime", "runtime_go", "runtime_yaklib_builtins_pruned.go"),
-		filepath.Join("common", "yak", "ssa2llvm", "runtime", "runtime_go", "runtime_yaklib_lookup_pruned.go"),
-		filepath.Join("common", "yak", "ssa2llvm", "runtime", "runtime_go", "runtime_yaklib_yakit_pruned.go"),
-		filepath.Join("common", "yak", "ssa2llvm", "runtime", "runtime_go", "runtime_sync_pruned.go"),
+func ensureLocalLibgc(runtimeDir string) error {
+	libgcPath := filepath.Join(runtimeDir, "libs", "libgc.a")
+	if info, err := os.Stat(libgcPath); err == nil && !info.IsDir() && info.Size() > 0 {
+		return nil
 	}
-	for _, rel := range files {
-		src := filepath.Join(root, rel)
-		dst := filepath.Join(srcDir, rel)
-		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-			return fmt.Errorf("build pruned runtime archive failed: mkdir %s: %w", filepath.Dir(dst), err)
-		}
-		if err := copyFile(src, dst); err != nil {
-			return err
-		}
-	}
-	return nil
+	return copyLocalLibgc(runtimeDir)
 }
 
 func resolveLibgcArchive() (string, error) {
@@ -342,70 +281,70 @@ type goImportSpec struct {
 	Path  string
 }
 
+type globalExportRef struct {
+	TableExpr string
+	Key       string
+}
+
 func writePrunedRuntimeImports(runtimeDir string, deps []YaklibDependency) error {
-	registry, registryErr := scriptEngineRegistryForRuntimeDir(runtimeDir)
+	return writePrunedRuntimeImportsToFile(filepath.Join(runtimeDir, "runtime_imports_generated.go"), deps)
+}
+
+func writePrunedRuntimeImportsToFile(outputPath string, deps []YaklibDependency) error {
 	imports := map[string]goImportSpec{}
 	modules := map[string]map[string]string{}
 	globals := map[string]string{}
-	globalTables := map[string]scriptEngineExport{}
+	globalTables := map[string]ModuleImportSpec{}
+	registeredGlobals := map[string]globalExportRef{}
 
 	for _, dep := range normalizeYaklibDependencies(deps) {
 		module := dep.Module
 		methods := dep.Methods
-		switch module {
-		case "":
+
+		if module == "" {
 			for _, method := range methods {
-				expr, ok := prunedBuiltinGlobalExportExpr(method)
-				if ok {
+				if expr, ok := prunedBuiltinGlobalExportExpr(method); ok {
 					globals[method] = expr
 					continue
 				}
-				export, ok := registry.globalForMethod(method)
-				if !ok {
-					return formatUnsupportedPrunedRuntimeDependency(module, method)
+				if spec, ok := globalBuiltinImportSpecs[method]; ok {
+					imports[spec.ImportAlias] = goImportSpec{
+						Alias: spec.ImportAlias,
+						Path:  spec.GoImportPath,
+					}
+					globalTables[spec.ExportExpr] = spec
+					continue
 				}
-				if err := addExportImports(imports, export); err != nil {
-					return err
+				if tableExpr, importSpec, ok := lookupRegisteredGlobalExport(method); ok {
+					imports[importSpec.ImportAlias] = goImportSpec{
+						Alias: importSpec.ImportAlias,
+						Path:  importSpec.GoImportPath,
+					}
+					registeredGlobals[method] = globalExportRef{
+						TableExpr: tableExpr,
+						Key:       method,
+					}
+					continue
 				}
-				globalTables[export.Expr] = export
+				return formatUnsupportedPrunedRuntimeDependency(module, method)
 			}
-		case "codec":
-			for _, method := range methods {
-				expr, ok := prunedCodecExportExpr(method)
-				if !ok {
-					return formatUnsupportedPrunedRuntimeDependency(module, method)
-				}
-				imports["codec"] = goImportSpec{Alias: "codec", Path: "github.com/yaklang/yaklang/common/yak/yaklib/codec"}
-				modules[module] = setModuleExport(modules[module], method, expr)
-			}
-		case "cli":
-			imports["cli"] = goImportSpec{Alias: "cli", Path: "github.com/yaklang/yaklang/common/utils/cli"}
-			modules[module] = setModuleExport(modules[module], "*", "cli.CliExports")
-		case "poc":
-			imports["poc"] = goImportSpec{Alias: "poc", Path: "github.com/yaklang/yaklang/common/utils/lowhttp/poc"}
-			modules[module] = setModuleExport(modules[module], "*", "poc.PoCExports")
-		case "http":
-			imports["yakhttp"] = goImportSpec{Alias: "yakhttp", Path: "github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"}
-			modules[module] = setModuleExport(modules[module], "*", "yakhttp.HttpExports")
-		case "yakit":
-			modules[module] = setModuleExport(modules[module], "*", "runtimePrunedYakitExports()")
-		default:
-			if registryErr != nil {
-				return fmt.Errorf("%w: %s: %v", ErrUnsupportedPrunedRuntime, module, registryErr)
-			}
-			export, ok := registry.module(module)
-			if !ok {
-				return formatUnsupportedPrunedRuntimeDependency(module, "")
-			}
-			if err := addExportImports(imports, export); err != nil {
-				return err
-			}
-			modules[module] = setModuleExport(modules[module], "*", export.Expr)
+			continue
 		}
+
+		spec, ok := LookupModuleSpec(module)
+		if !ok {
+			return formatUnsupportedPrunedRuntimeDependency(module, "")
+		}
+
+		imports[spec.ImportAlias] = goImportSpec{
+			Alias: spec.ImportAlias,
+			Path:  spec.GoImportPath,
+		}
+		modules[module] = setModuleExport(modules[module], "*", spec.ExportExpr)
+		_ = methods
 	}
 
 	var b strings.Builder
-	b.WriteString("//go:build ssa2llvm_pruned_runtime\n\n")
 	b.WriteString("package main\n\n")
 	if len(imports) > 0 {
 		b.WriteString("import (\n")
@@ -422,19 +361,27 @@ func writePrunedRuntimeImports(runtimeDir string, deps []YaklibDependency) error
 	}
 	b.WriteString("func init() {\n")
 	if len(globalTables) > 0 {
-		for _, expr := range orderedGlobalTableExprs(registry, globalTables) {
-			b.WriteString(fmt.Sprintf("\truntimeRegisterYaklibGlobals(%s)\n", expr))
+		for _, spec := range globalTables {
+			b.WriteString(fmt.Sprintf("\truntimeRegisterYaklibGlobals(%s)\n", spec.ExportExpr))
 		}
 	}
-	if len(globals) > 0 {
-		names := make([]string, 0, len(globals))
+	if len(globals) > 0 || len(registeredGlobals) > 0 {
+		names := make([]string, 0, len(globals)+len(registeredGlobals))
 		for name := range globals {
+			names = append(names, name)
+		}
+		for name := range registeredGlobals {
 			names = append(names, name)
 		}
 		sort.Strings(names)
 		b.WriteString("\truntimeRegisterYaklibGlobals(map[string]any{\n")
 		for _, name := range names {
-			b.WriteString(fmt.Sprintf("\t\t%q: %s,\n", name, globals[name]))
+			if expr, ok := globals[name]; ok {
+				b.WriteString(fmt.Sprintf("\t\t%q: %s,\n", name, expr))
+				continue
+			}
+			ref := registeredGlobals[name]
+			b.WriteString(fmt.Sprintf("\t\t%q: %s[%q],\n", name, ref.TableExpr, ref.Key))
 		}
 		b.WriteString("\t})\n")
 	}
@@ -462,56 +409,72 @@ func writePrunedRuntimeImports(runtimeDir string, deps []YaklibDependency) error
 	}
 	b.WriteString("}\n")
 
-	path := filepath.Join(runtimeDir, "runtime_imports_generated.go")
+	outputPath = strings.TrimSpace(outputPath)
+	if outputPath == "" {
+		return fmt.Errorf("build pruned runtime archive failed: empty generated imports path")
+	}
 	src := []byte(b.String())
 	if formatted, err := format.Source(src); err == nil {
 		src = formatted
 	}
-	return os.WriteFile(path, src, 0o644)
+	return os.WriteFile(outputPath, src, 0o644)
 }
 
-func addExportImports(imports map[string]goImportSpec, export scriptEngineExport) error {
-	for _, spec := range export.Imports {
-		if err := addImportSpec(imports, spec); err != nil {
-			return err
-		}
+func writeBuildOverlay(buildDir, canonicalPath, generatedPath string) (string, error) {
+	canonicalPath, err := filepath.Abs(canonicalPath)
+	if err != nil {
+		return "", fmt.Errorf("build pruned runtime archive failed: abs canonical overlay path: %w", err)
 	}
-	return nil
+	generatedPath, err = filepath.Abs(generatedPath)
+	if err != nil {
+		return "", fmt.Errorf("build pruned runtime archive failed: abs generated overlay path: %w", err)
+	}
+	payload := map[string]map[string]string{
+		"Replace": {
+			canonicalPath: generatedPath,
+		},
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("build pruned runtime archive failed: marshal overlay: %w", err)
+	}
+	overlayPath := filepath.Join(buildDir, "runtime-overlay.json")
+	if err := os.WriteFile(overlayPath, data, 0o644); err != nil {
+		return "", fmt.Errorf("build pruned runtime archive failed: write overlay %s: %w", overlayPath, err)
+	}
+	return overlayPath, nil
 }
 
-func addImportSpec(imports map[string]goImportSpec, spec goImportSpec) error {
-	if spec.Alias == "" || spec.Path == "" {
-		return nil
+func writeRuntimeLinkArgsFile(buildDir, srcDir, overlayPath string) (string, error) {
+	goPath, err := exec.LookPath("go")
+	if err != nil {
+		return "", fmt.Errorf("go toolchain not found in PATH: %w", err)
 	}
-	existing, ok := imports[spec.Alias]
-	if ok && existing.Path != spec.Path {
-		return fmt.Errorf("build pruned runtime archive failed: import alias %s maps to both %s and %s", spec.Alias, existing.Path, spec.Path)
-	}
-	imports[spec.Alias] = spec
-	return nil
-}
 
-func orderedGlobalTableExprs(registry *scriptEngineLibRegistry, selected map[string]scriptEngineExport) []string {
-	out := make([]string, 0, len(selected))
-	seen := make(map[string]struct{}, len(selected))
-	if registry != nil {
-		for _, export := range registry.Globals {
-			if _, ok := selected[export.Expr]; !ok {
-				continue
-			}
-			out = append(out, export.Expr)
-			seen[export.Expr] = struct{}{}
-		}
+	overlayPath = strings.TrimSpace(overlayPath)
+	if overlayPath == "" {
+		return "", fmt.Errorf("build pruned runtime archive failed: empty overlay path for link args")
 	}
-	extras := make([]string, 0)
-	for expr := range selected {
-		if _, ok := seen[expr]; ok {
-			continue
-		}
-		extras = append(extras, expr)
+
+	args := []string{"list", "-deps", "-overlay", overlayPath}
+	args = append(args, "-f", "{{if .CgoLDFLAGS}}{{range .CgoLDFLAGS}}{{printf \"%s\\n\" .}}{{end}}{{end}}", "./common/yak/ssa2llvm/runtime/runtime_go")
+	cmd := exec.Command(goPath, args...)
+	cmd.Dir = srcDir
+	cmd.Env = append(os.Environ(),
+		"CGO_ENABLED=1",
+		"GOWORK=off",
+	)
+	trace.PrintCmd(cmd)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("build pruned runtime archive failed: collect runtime link args: %v\n%s", err, out)
 	}
-	sort.Strings(extras)
-	return append(out, extras...)
+
+	linkFlagsPath := filepath.Join(buildDir, "libyak.linkflags")
+	if err := os.WriteFile(linkFlagsPath, out, 0o644); err != nil {
+		return "", fmt.Errorf("build pruned runtime archive failed: write %s: %v", linkFlagsPath, err)
+	}
+	return linkFlagsPath, nil
 }
 
 func setModuleExport(exports map[string]string, name, expr string) map[string]string {
@@ -523,32 +486,26 @@ func setModuleExport(exports map[string]string, name, expr string) map[string]st
 }
 
 func isPrunedRuntimeDependencySupported(module, method string) bool {
-	registry, _ := scriptEngineRegistryFromLocalSource()
-	return isPrunedRuntimeDependencySupportedWithRegistry(registry, module, method)
-}
-
-func isPrunedRuntimeDependencySupportedWithRegistry(registry *scriptEngineLibRegistry, module, method string) bool {
 	module = strings.TrimSpace(module)
 	method = strings.TrimSpace(method)
-	if method == "" {
-		return false
-	}
-	switch module {
-	case "":
+	if module == "" {
+		if method == "" {
+			return false
+		}
+		if globalBuiltinNames[method] {
+			return true
+		}
 		if _, ok := prunedBuiltinGlobalExportExpr(method); ok {
 			return true
 		}
-		_, ok := registry.globalForMethod(method)
-		return ok
-	case "codec":
-		_, ok := prunedCodecExportExpr(method)
-		return ok
-	case "cli", "poc", "http", "yakit":
-		return true
-	default:
-		_, ok := registry.module(module)
+		if _, ok := globalBuiltinImportSpecs[method]; ok {
+			return true
+		}
+		_, _, ok := lookupRegisteredGlobalExport(method)
 		return ok
 	}
+	_, ok := LookupModuleSpec(module)
+	return ok
 }
 
 func formatUnsupportedPrunedRuntimeDependency(module, method string) error {
@@ -604,66 +561,4 @@ func normalizeYaklibDependencies(deps []YaklibDependency) []YaklibDependency {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Module < out[j].Module })
 	return out
-}
-
-func prunedCodecExportExpr(method string) (string, bool) {
-	switch method {
-	case "EncodeToHex":
-		return "codec.EncodeToHex", true
-	case "DecodeHex":
-		return "codec.DecodeHex", true
-	case "EncodeBase64":
-		return "codec.EncodeBase64", true
-	case "DecodeBase64":
-		return "codec.DecodeBase64", true
-	case "EncodeBase32":
-		return "codec.EncodeBase32", true
-	case "DecodeBase32":
-		return "codec.DecodeBase32", true
-	case "EncodeBase64Url":
-		return "codec.EncodeBase64Url", true
-	case "DecodeBase64Url":
-		return "codec.DecodeBase64Url", true
-	case "Sha1":
-		return "codec.Sha1", true
-	case "Sha224":
-		return "codec.Sha224", true
-	case "Sha256":
-		return "codec.Sha256", true
-	case "Sha384":
-		return "codec.Sha384", true
-	case "Sha512":
-		return "codec.Sha512", true
-	case "Md5":
-		return "codec.Md5", true
-	case "EncodeUrl", "EscapeQueryUrl", "EscapeUrl":
-		return "codec.QueryEscape", true
-	case "DecodeUrl", "UnescapeQueryUrl":
-		return "codec.QueryUnescape", true
-	case "EscapePathUrl":
-		return "codec.PathEscape", true
-	case "UnescapePathUrl":
-		return "codec.PathUnescape", true
-	case "DoubleEncodeUrl":
-		return "codec.DoubleEncodeUrl", true
-	case "DoubleDecodeUrl":
-		return "codec.DoubleDecodeUrl", true
-	case "EncodeHtml":
-		return "codec.EncodeHtmlEntity", true
-	case "EncodeHtmlHex":
-		return "codec.EncodeHtmlEntityHex", true
-	case "EscapeHtml":
-		return "codec.EscapeHtmlString", true
-	case "DecodeHtml":
-		return "codec.UnescapeHtmlString", true
-	case "EncodeChunked":
-		return "codec.HTTPChunkedEncode", true
-	case "DecodeChunked":
-		return "codec.HTTPChunkedDecode", true
-	case "StrconvQuote":
-		return "codec.StrConvQuote", true
-	case "StrconvUnquote":
-		return "codec.StrConvUnquote", true
-	}
-	return "", false
 }

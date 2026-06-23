@@ -10,25 +10,13 @@ import (
 
 type runtimeDispatchFunc func(args []uint64) (int64, error)
 
+// runtimeDispatchTargets holds minimal runtime builtins that are not registered
+// via yaklib module imports (print/append). All other stdlib calls use IDYaklibCall.
 var runtimeDispatchTargets = map[abi.FuncID]any{
-	abi.IDOsGetenv:              runtimeBuiltinGetenv,
-	abi.IDPrint:                 runtimeBuiltinPrint,
-	abi.IDPrintf:                runtimeBuiltinPrintf,
-	abi.IDPrintln:               runtimeBuiltinPrintln,
-	abi.IDYakitInfo:             runtimeBuiltinYakitInfo,
-	abi.IDYakitWarn:             runtimeBuiltinYakitWarn,
-	abi.IDYakitDebug:            runtimeBuiltinYakitDebug,
-	abi.IDYakitError:            runtimeBuiltinYakitError,
-	abi.IDSyncNewWaitGroup:      runtimeSyncNewWaitGroup,
-	abi.IDSyncNewSizedWaitGroup: runtimeSyncNewSizedWaitGroup,
-	abi.IDSyncNewLock:           runtimeSyncNewLock,
-	abi.IDSyncNewMutex:          runtimeSyncNewMutex,
-	abi.IDSyncNewRWMutex:        runtimeSyncNewRWMutex,
-	abi.IDAppend:                runtimeSliceAppend,
-	abi.IDSyncNewMap:            runtimeSyncNewMap,
-	abi.IDSyncNewOnce:           runtimeSyncNewOnce,
-	abi.IDSyncNewPool:           runtimeSyncNewPool,
-	abi.IDSyncNewCond:           runtimeSyncNewCond,
+	abi.IDPrint:   runtimeBuiltinPrint,
+	abi.IDPrintf:  runtimeBuiltinPrintf,
+	abi.IDPrintln: runtimeBuiltinPrintln,
+	abi.IDAppend:  runtimeSliceAppend,
 }
 
 func runtimeRegisterDispatchTarget(id abi.FuncID, target any) {
