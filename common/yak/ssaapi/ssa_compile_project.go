@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -230,9 +231,34 @@ func ParseProject(opts ...ssaconfig.Option) (prog Programs, err error) {
 	return
 }
 
+func EnsureCompileProgramReady(opts ...ssaconfig.Option) error {
+	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, opts...)
+	if err != nil {
+		return err
+	}
+	if cfg.GetCompileMemory() {
+		return nil
+	}
+	programName := strings.TrimSpace(cfg.GetProgramName())
+	if programName == "" {
+		return nil
+	}
+	if !programExistsInDB(programName) {
+		return nil
+	}
+	if !cfg.GetCompileReCompile() {
+		return utils.Errorf(
+			"program name %v existed in this database, please use `re-compile` flag to re-compile or change program name",
+			programName,
+		)
+	}
+	return nil
+}
+
 func (c *Config) parseProject() (progs Programs, err error) {
 	// 添加defer清理逻辑，确保编译失败或panic时清理已保存的数据
 	programName := c.GetProgramName()
+	compileStarted := false
 	// 对于增量编译，需要删除最新的 layer，而不是第一个 layer
 	isIncrementalCompile := c.GetEnableIncrementalCompile() && c.fs != nil
 	isDiffCompile := isIncrementalCompile && c.GetBaseProgramName() != ""
@@ -257,7 +283,7 @@ func (c *Config) parseProject() (progs Programs, err error) {
 				log.Infof("cleaning up program data due to panic: %s", programNameToDelete)
 				ssadb.DeleteProgram(ssadb.GetDB(), programNameToDelete)
 			}
-		} else if err != nil {
+		} else if err != nil && compileStarted {
 			// 编译出错时清理已保存的Program数据
 			if programNameToDelete != "" {
 				log.Infof("cleaning up program data due to error: %s", programNameToDelete)
@@ -270,6 +296,11 @@ func (c *Config) parseProject() (progs Programs, err error) {
 	// 如果 isIncremental 为 true，表示启用了增量编译
 	// 如果 baseProgramName 不为空，表示这是差量编译（基于已有程序）
 	// 如果 baseProgramName 为空，表示这是第一次增量编译（base program，全量编译但设置 IsOverlay = true）
+
+	if err := c.ensureCompileProgramReady(programName, isDiffCompile); err != nil {
+		return nil, err
+	}
+	compileStarted = true
 
 	if c.GetCompileReCompile() {
 		if !isIncrementalCompile {
@@ -325,6 +356,36 @@ func (c *Config) parseProject() (progs Programs, err error) {
 			return Programs{prog}, nil
 		}
 	}
+}
+
+func (c *Config) ensureCompileProgramReady(programName string, isDiffCompile bool) error {
+	if c.databaseKind == ssa.ProgramCacheMemory || c.GetCompileMemory() {
+		return nil
+	}
+	programName = strings.TrimSpace(programName)
+	if programName == "" || isDiffCompile {
+		return nil
+	}
+	if !programExistsInDB(programName) {
+		return nil
+	}
+	if !c.GetCompileReCompile() {
+		return utils.Errorf(
+			"program name %v existed in this database, please use `re-compile` flag to re-compile or change program name",
+			programName,
+		)
+	}
+	return nil
+}
+
+func programExistsInDB(programName string) bool {
+	if strings.TrimSpace(programName) == "" {
+		return false
+	}
+	if prog, err := ssadb.GetProgram(programName, ssadb.Application); prog != nil && err == nil {
+		return true
+	}
+	return slices.Contains(ssadb.AllProgramNames(ssadb.GetDB()), programName)
 }
 
 func (c *Config) peephole() (Programs, error) {

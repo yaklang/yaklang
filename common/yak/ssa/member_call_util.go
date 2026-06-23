@@ -2,36 +2,10 @@ package ssa
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
-
-func traceMemberND(stage string, object, key Value, detail string) {
-	if os.Getenv("YAK_SSA_TRACE_MEMBER_ND") == "" {
-		return
-	}
-	if utils.IsNil(object) || utils.IsNil(key) {
-		return
-	}
-	if _, ok := ToParameter(object); !ok {
-		if _, ok := ToParameterMember(object); !ok {
-			return
-		}
-	}
-	keyRange := ""
-	if r := key.GetRange(); r != nil {
-		keyRange = r.GetText()
-	}
-	keyStable := buildMemberKeyStableSignature(key)
-	log.Infof("[member-nd] %s obj=%s(id=%d,op=%s) key=%s(id=%d,op=%s) key_verbose=%q key_range=%q detail=%s",
-		stage,
-		object.GetVerboseName(), object.GetId(), object.GetOpcode(),
-		GetKeyString(key), key.GetId(), key.GetOpcode(),
-		key.GetVerboseName(), keyRange, fmt.Sprintf("%s key_stable=%q", detail, keyStable),
-	)
-}
 
 func buildMemberKeyStableSignature(key Value) string {
 	return buildMemberKeyStableSignatureWithVisited(key, make(map[int64]bool))
@@ -181,17 +155,14 @@ func getExistingMemberValue(object, key Value) (Value, bool) {
 		return nil, false
 	}
 	if existed, ok := object.GetMember(key); ok && !utils.IsNil(existed) {
-		traceMemberND("direct-hit", object, key, fmt.Sprintf("member=%s(id=%d)", existed.GetVerboseName(), existed.GetId()))
 		return existed, true
 	}
 	keyStable := buildMemberKeyStableSignature(key)
 	var found Value
-	foundStable := ""
 	object.ForEachMember(func(memberKey, member Value) bool {
 		switch {
 		case sameMemberKey(memberKey, key):
 			found = member
-			foundStable = buildMemberKeyStableSignature(memberKey)
 			return false
 		case keyStable != "":
 			memberStable := getStoredMemberKeyStableSignature(member)
@@ -199,16 +170,13 @@ func getExistingMemberValue(object, key Value) (Value, bool) {
 				return true
 			}
 			found = member
-			foundStable = memberStable
 			return false
 		}
 		return true
 	})
 	if utils.IsNil(found) {
-		traceMemberND("semantic-fallback-miss", object, key, fmt.Sprintf("wanted_stable=%q", keyStable))
 		return nil, false
 	}
-	traceMemberND("semantic-fallback-hit", object, key, fmt.Sprintf("member=%s(id=%d) matched_stable=%q", found.GetVerboseName(), found.GetId(), foundStable))
 	return found, true
 }
 

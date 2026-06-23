@@ -200,7 +200,10 @@ func compileProjectByPlugin(ctx context.Context, config *ssaconfig.Config, force
 		}
 	}
 
-	var compiledProgramName string
+	var (
+		compiledProgramName string
+		compileErr          error
+	)
 	err = yakscript.ExecScriptWithParam(ctx, compilePluginName, compileParam,
 		"", func(exec *ypb.ExecResult) error {
 			if !exec.IsMessage {
@@ -209,7 +212,8 @@ func compileProjectByPlugin(ctx context.Context, config *ssaconfig.Config, force
 			rawMsg := exec.GetMessage()
 			var msg execMsg
 			json.Unmarshal(rawMsg, &msg)
-			if msg.Type == "log" && msg.Content.Level == "code" {
+			switch {
+			case msg.Type == "log" && msg.Content.Level == "code":
 				var result struct {
 					ProgramName string `json:"program_name"`
 				}
@@ -217,12 +221,20 @@ func compileProjectByPlugin(ctx context.Context, config *ssaconfig.Config, force
 				if err == nil && result.ProgramName != "" {
 					compiledProgramName = result.ProgramName
 				}
+			case msg.Type == "log" && msg.Content.Level == "text":
+				const compileErrPrefix = "编译错误信息:\n"
+				if strings.HasPrefix(msg.Content.Data, compileErrPrefix) {
+					compileErr = utils.Error(strings.TrimPrefix(msg.Content.Data, compileErrPrefix))
+				}
 			}
 			return nil
 		},
 	)
 	if err != nil {
 		return "", utils.Errorf("failed to compile project: %s", err)
+	}
+	if compileErr != nil {
+		return "", compileErr
 	}
 	return compiledProgramName, nil
 }

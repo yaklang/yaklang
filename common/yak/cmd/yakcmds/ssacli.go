@@ -261,9 +261,6 @@ use log=info for [ssa.compile.summary] and log=debug for per-phase timings (ssa.
 			Usage: "enable syntax flow debug mode",
 		},
 		cli.BoolFlag{
-			Name: "no-override", Usage: "do not delete existing program before compile",
-		},
-		cli.BoolFlag{
 			Name: "re-compile", Usage: "allow recompiling an existing program name",
 		},
 		cli.BoolFlag{

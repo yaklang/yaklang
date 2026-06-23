@@ -1,5 +1,9 @@
 package ssautil
 
+import (
+	"github.com/yaklang/yaklang/common/utils/omap"
+)
+
 type node[T versionedValue] struct {
 	next  *node[T]
 	value VersionedIF[T]
@@ -7,14 +11,12 @@ type node[T versionedValue] struct {
 }
 
 func (n *node[T]) Append(val VersionedIF[T]) *node[T] {
-	// first node
 	node := &node[T]{
 		next:  nil,
 		value: val,
 		ID:    0,
 	}
 	if n != nil {
-		// append
 		n.next = node
 		node.ID = n.ID + 1
 	}
@@ -34,7 +36,6 @@ func (n *LinkNode[T]) Append(val VersionedIF[T]) {
 	if n.header == nil {
 		n.header = n.last
 	}
-	return
 }
 
 func (n *LinkNode[T]) Last() VersionedIF[T] {
@@ -50,12 +51,8 @@ func (n *LinkNode[T]) All() []VersionedIF[T] {
 		return nil
 	}
 
-	// Preserve existing order: newest -> oldest (last appended first).
-	// Previous implementation prepended into a slice on each iteration (O(n^2) allocations).
-	// We instead allocate once and fill from the tail.
 	length := 0
 	if n.last != nil && n.last.ID >= 0 {
-		// IDs are assigned sequentially from 0.
 		length = int(n.last.ID + 1)
 	}
 	if length <= 0 {
@@ -74,58 +71,55 @@ func (n *LinkNode[T]) All() []VersionedIF[T] {
 }
 
 type linkNodeMap[T versionedValue] struct {
-	val      map[string]*LinkNode[T]
+	val      *omap.OrderedMap[string, *LinkNode[T]]
 	callBack linkNodeCallback[T]
 }
 
 func newLinkNodeMap[T versionedValue](callback ...linkNodeCallback[T]) linkNodeMap[T] {
-	// return make(map[string]*LinkNode[T])
 	cb := func(i VersionedIF[T]) {}
 	if len(callback) > 0 {
 		cb = callback[0]
 	}
 	return linkNodeMap[T]{
-		val:      make(map[string]*LinkNode[T]),
+		val:      omap.NewEmptyOrderedMap[string, *LinkNode[T]](),
 		callBack: cb,
 	}
 }
 
 func (m linkNodeMap[T]) Get(key string) VersionedIF[T] {
-	if v, ok := m.val[key]; ok {
+	if v, ok := m.val.Get(key); ok {
 		return v.Last()
 	}
 	return nil
 }
 
 func (m linkNodeMap[T]) GetAll(key string) []VersionedIF[T] {
-	if v, ok := m.val[key]; ok {
+	if v, ok := m.val.Get(key); ok {
 		return v.All()
 	}
 	return nil
 }
 
 func (m linkNodeMap[T]) GetHead(key string) VersionedIF[T] {
-	if v, ok := m.val[key]; ok {
+	if v, ok := m.val.Get(key); ok {
 		return v.First()
 	}
 	return nil
 }
 
 func (m linkNodeMap[T]) ForEach(handler VariableHandler[T]) {
-	for _, k := range sortedStringKeys(m.val) {
-		v := m.val[k]
+	m.val.ForEach(func(k string, v *LinkNode[T]) bool {
 		handler(k, v.Last())
-	}
+		return true
+	})
 }
 
 func (m linkNodeMap[T]) Append(key string, val VersionedIF[T]) {
-	if _, ok := m.val[key]; !ok {
-		m.val[key] = &LinkNode[T]{
-			last:   nil,
-			header: nil,
-		}
+	ln, ok := m.val.Get(key)
+	if !ok {
+		ln = &LinkNode[T]{}
+		m.val.Set(key, ln)
 	}
-	m.val[key].Append(val)
+	ln.Append(val)
 	m.callBack(val)
-	return
 }

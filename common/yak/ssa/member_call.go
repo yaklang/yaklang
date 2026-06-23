@@ -6,9 +6,6 @@ import (
 
 // get field value
 func (b *FunctionBuilder) getFieldValue(object, key Value, wantFunction bool) Value {
-	if existed, ok := getExistingMemberValue(object, key); ok {
-		return existed
-	}
 	res := checkCanMemberCallExist(object, key, wantFunction)
 	// normal member
 	// use name  peek value

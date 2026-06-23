@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 // for builder
@@ -141,9 +142,9 @@ type ScopedVersionedTable[T versionedValue] struct {
 	callback        func(VersionedIF[T])
 	linkValues      linkNodeMap[T]
 	linkVariable    map[T]VersionedIF[T]
-	linkCaptured    map[string]VersionedIF[T]
-	linkIncomingPhi map[string]VersionedIF[T]
-	linkSideEffect  map[string][]VersionedIF[T]
+	linkCaptured    *omap.OrderedMap[string, VersionedIF[T]]
+	linkIncomingPhi *omap.OrderedMap[string, VersionedIF[T]]
+	linkSideEffect  *omap.OrderedMap[string, []VersionedIF[T]]
 
 	//// record the lexical variable
 	//values   *omap.OrderedMap[string, *omap.OrderedMap[string, VersionedIF[T]]] // from variable get value, assigned variable
@@ -201,9 +202,9 @@ func NewScope[T versionedValue](
 		callback: func(vi VersionedIF[T]) {},
 		// linkValues:      newLinkNodeMap[T](callback),
 		linkVariable:    make(map[T]VersionedIF[T]),
-		linkCaptured:    make(map[string]VersionedIF[T]),
-		linkSideEffect:  make(map[string][]VersionedIF[T]),
-		linkIncomingPhi: make(map[string]VersionedIF[T]),
+		linkCaptured:    omap.NewEmptyOrderedMap[string, VersionedIF[T]](),
+		linkSideEffect:  omap.NewEmptyOrderedMap[string, []VersionedIF[T]](),
+		linkIncomingPhi: omap.NewEmptyOrderedMap[string, VersionedIF[T]](),
 		externInfo:      utils.NewSafeMap[any](),
 	}
 	s.linkValues = newLinkNodeMap[T](func(i VersionedIF[T]) {
@@ -375,7 +376,7 @@ func (scope *ScopedVersionedTable[T]) ReadVariable(name string, current ...bool)
 			t := scope.CreateVariable(name, isLocal)
 			scope.AssignVariable(t, scope.createEmptyPhi(name))
 			// t.origin = ret
-			scope.linkIncomingPhi[name] = t
+			scope.linkIncomingPhi.Set(name, t)
 			ret = t
 		}
 	}
@@ -473,29 +474,29 @@ func (scope *ScopedVersionedTable[T]) GetVariableFromValue(value T) VersionedIF[
 }
 
 func (ps *ScopedVersionedTable[T]) ForEachCapturedVariable(handler VariableHandler[T]) {
-	for _, name := range sortedStringKeys(ps.linkCaptured) {
-		ver := ps.linkCaptured[name]
+	ps.linkCaptured.ForEach(func(name string, ver VersionedIF[T]) bool {
 		handler(name, ver)
-	}
+		return true
+	})
 }
 
 func (ps *ScopedVersionedTable[T]) ForEachCapturedSideEffect(handler func(string, []VersionedIF[T])) {
-	for _, name := range sortedStringKeys(ps.linkSideEffect) {
-		ver := ps.linkSideEffect[name]
+	ps.linkSideEffect.ForEach(func(name string, ver []VersionedIF[T]) bool {
 		handler(name, ver)
-	}
+		return true
+	})
 }
 
 func (scope *ScopedVersionedTable[T]) SetCapturedVariable(name string, ver VersionedIF[T]) {
-	scope.linkCaptured[name] = ver
+	scope.linkCaptured.Set(name, ver)
 }
 
 func (scope *ScopedVersionedTable[T]) SetCapturedSideEffect(name string, ver, bind VersionedIF[T]) {
-	scope.linkSideEffect[name] = []VersionedIF[T]{ver, bind}
+	scope.linkSideEffect.Set(name, []VersionedIF[T]{ver, bind})
 }
 
 func (scope *ScopedVersionedTable[T]) ChangeCapturedSideEffect(name string, ver VersionedIF[T]) {
-	if vers, ok := scope.linkSideEffect[name]; ok {
+	if vers, ok := scope.linkSideEffect.Get(name); ok {
 		vers[0] = ver
 	}
 }
@@ -538,7 +539,7 @@ func (v *ScopedVersionedTable[T]) tryRegisterCapturedVariable(name string, ver V
 		// v.GetParent().AssignVariable(variable, ver.GetValue())
 	}
 	// mark original captured variable
-	v.linkCaptured[name] = ver
+	v.linkCaptured.Set(name, ver)
 	//v.captured.Set(name, ver)
 }
 

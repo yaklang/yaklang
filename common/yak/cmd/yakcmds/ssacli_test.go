@@ -132,11 +132,6 @@ func TestCompileDefaultProgramNameRequiresRecompile(t *testing.T) {
 	require.Contains(t, err.Error(), "please use `re-compile` flag to re-compile or change program name")
 	require.Equal(t, firstCount, countProgramIrCodes(t, programName))
 
-	err = app.Run([]string{"yak", "ssa-compile", "-t", targetDir, "--re-compile", "--no-override"})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "no-override is set")
-	require.Equal(t, firstCount, countProgramIrCodes(t, programName))
-
 	err = app.Run([]string{"yak", "ssa-compile", "-t", targetDir, "--re-compile"})
 	require.NoError(t, err)
 	require.Equal(t, firstCount, countProgramIrCodes(t, programName))

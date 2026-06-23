@@ -907,7 +907,12 @@ func (y *builder) VisitMemberCallKey(raw phpparser.IMemberCallKeyContext) ssa.Va
 
 	if i.Variable() != nil {
 		name := y.VisitVariable(i.Variable())
-		return y.ReadValue(name)
+		value := y.ReadValue(name)
+		if value.IsUndefined() {
+			return y.EmitConstInstPlaceholder(strings.TrimPrefix(value.GetName(), "$"))
+		} else {
+			return y.EmitConstInstPlaceholder(value.String())
+		}
 	}
 
 	if i.String_() != nil {

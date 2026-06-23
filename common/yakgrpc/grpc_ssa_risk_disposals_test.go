@@ -620,7 +620,14 @@ alert $result for {
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("test.yak", testCode)
 
-		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.Yak), ssaapi.WithProgramName(programName))
+		compileOpts := []ssaconfig.Option{
+			ssaapi.WithLanguage(ssaconfig.Yak),
+			ssaapi.WithProgramName(programName),
+		}
+		if i > 0 {
+			compileOpts = append(compileOpts, ssaapi.WithReCompile(true))
+		}
+		programs, err := ssaapi.ParseProjectWithFS(vf, compileOpts...)
 		require.NoError(t, err)
 		require.NotEmpty(t, programs)
 
