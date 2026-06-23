@@ -494,8 +494,8 @@
   {
     "rule_id": "c12cbcab-12de-4e6a-8715-4143224a36ed",
     "rule_name": "检测Golang命令注入漏洞",
-    "hash": "d374728244de001c949486df27d3b58c2d0416f4ead79e7482b15c1721930253",
-    "version": "20260326.0001"
+    "hash": "8f06e118a35d7f7c0d6a571019f781bfc042cbf2347534f1cf4099978a652db8",
+    "version": "20260623.0001"
   },
   {
     "rule_id": "c7872ddf-bab4-4cd5-8e12-d470a889dbd1",
