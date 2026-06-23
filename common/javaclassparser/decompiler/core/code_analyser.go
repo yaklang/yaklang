@@ -453,9 +453,14 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 	case OP_DCONST_1:
 		runtimeStackSimulation.Push(values.NewJavaLiteral(float64(1), types.NewJavaPrimer(types.JavaDouble)))
 	case OP_BIPUSH:
-		runtimeStackSimulation.Push(values.NewJavaLiteral(opcode.Data[0], types.NewJavaPrimer(types.JavaInteger)))
+		// The bipush operand is a SIGNED byte. Reading it unsigned turns -5 (0xFB) into 251 and
+		// silently corrupts every negative byte literal; sign-extend via int8. Using a plain int
+		// (not byte) also lets JavaLiteral.String render boolean 0/1 as false/true.
+		runtimeStackSimulation.Push(values.NewJavaLiteral(int(int8(opcode.Data[0])), types.NewJavaPrimer(types.JavaInteger)))
 	case OP_SIPUSH:
-		runtimeStackSimulation.Push(values.NewJavaLiteral(Convert2bytesToInt(opcode.Data), types.NewJavaPrimer(types.JavaInteger)))
+		// The sipush operand is a SIGNED short. Convert2bytesToInt returns uint16, so -10 (0xFFF6)
+		// would become 65526; sign-extend through int16 before widening to int.
+		runtimeStackSimulation.Push(values.NewJavaLiteral(int(int16(Convert2bytesToInt(opcode.Data))), types.NewJavaPrimer(types.JavaInteger)))
 	case OP_ISTORE, OP_ASTORE, OP_LSTORE, OP_DSTORE, OP_FSTORE, OP_ISTORE_0, OP_ASTORE_0, OP_LSTORE_0, OP_DSTORE_0, OP_FSTORE_0, OP_ISTORE_1, OP_ASTORE_1, OP_LSTORE_1, OP_DSTORE_1, OP_FSTORE_1, OP_ISTORE_2, OP_ASTORE_2, OP_LSTORE_2, OP_DSTORE_2, OP_FSTORE_2, OP_ISTORE_3, OP_ASTORE_3, OP_LSTORE_3, OP_DSTORE_3, OP_FSTORE_3:
 		slot := GetStoreIdx(opcode)
 		value := runtimeStackSimulation.Pop().(values.JavaValue)

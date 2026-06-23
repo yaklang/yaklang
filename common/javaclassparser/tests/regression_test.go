@@ -139,6 +139,38 @@ func TestDecompileLoopControlFlow(t *testing.T) {
 	}
 }
 
+// TestDecompileNegativeLiterals guards the bipush/sipush sign fix: the bipush operand is a signed
+// byte and the sipush operand a signed short, but they were read unsigned, so -5 (0xFB) decompiled
+// as 251 and -3000 (0xF448) as 62536. This is silent corruption the syntax net cannot catch (the
+// wrong number still parses), so we assert the negative literals are reconstructed faithfully.
+func TestDecompileNegativeLiterals(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/negative_literals.class")
+	if err != nil {
+		t.Fatalf("read embedded class failed: %v", err)
+	}
+	source, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile failed: %v", err)
+	}
+	if _, ferr := java2ssa.Frontend(source); ferr != nil {
+		t.Fatalf("frontend parse failed: %v\n----- source -----\n%s", ferr, source)
+	}
+	if strings.Contains(source, "yak-decompiler") {
+		t.Fatalf("expected full decompilation, got a stub\n----- source -----\n%s", source)
+	}
+	compact := strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(source)
+	for _, want := range []string{"return-5;", "return-3000;", "return100;", "return3000;"} {
+		if !strings.Contains(compact, want) {
+			t.Fatalf("expected decompiled output to contain %q (bipush/sipush sign regression)\n----- source -----\n%s", want, source)
+		}
+	}
+	for _, bad := range []string{"return251;", "return62536;"} {
+		if strings.Contains(compact, bad) {
+			t.Fatalf("found unsigned-read literal %q - bipush/sipush sign regression\n----- source -----\n%s", bad, source)
+		}
+	}
+}
+
 //go:embed testdata/regression/*.class
 var regressionFS embed.FS
 
