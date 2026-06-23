@@ -302,7 +302,20 @@ func emitDirectlyCallToolParamsNodeStream(
 	}
 	buf.WriteString(" [done]")
 
-	_, _ = emitter.EmitDefaultStreamEvent(directlyCallToolParamsNodeID, strings.NewReader(buf.String()), taskIndex)
+	event, _ := emitter.EmitDefaultStreamEvent(directlyCallToolParamsNodeID, strings.NewReader(buf.String()), taskIndex)
+	if event == nil {
+		return
+	}
+	streamID := event.GetStreamEventWriterId()
+	if streamID == "" {
+		return
+	}
+	aicommon.EmitAIRequestAndResponseReferenceMaterials(
+		emitter,
+		streamID,
+		loop.Get(directlyCallToolPromptLoopKey),
+		loop.Get(directlyCallToolResponseLoopKey),
+	)
 }
 
 var loopAction_directlyCallTool = &reactloops.LoopAction{
