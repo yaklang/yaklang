@@ -1,0 +1,105 @@
+package tests
+
+import (
+	"embed"
+	"strings"
+	"testing"
+
+	"github.com/yaklang/yaklang/common/javaclassparser"
+	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
+)
+
+//go:embed testdata/regression/*.class
+var regressionFS embed.FS
+
+// TestDecompileSyntaxRegression decompiles a set of real-world .class files that previously
+// produced syntactically-invalid Java, and asserts the decompiled output now parses cleanly
+// through the java2ssa frontend. Each entry guards a specific decompiler fix.
+func TestDecompileSyntaxRegression(t *testing.T) {
+	cases := []struct {
+		file string
+		desc string
+		// substrings that MUST appear in the decompiled output (positive assertions)
+		mustContain []string
+		// substrings that MUST NOT appear (the previously-buggy rendering)
+		mustNotContain []string
+	}{
+		{
+			file: "lambda_methodref.class",
+			desc: "invokedynamic lambda metafactory: method references and lambda expressions",
+			// constructor reference must use ::new, static method reference must be Class::method
+			mustContain: []string{"::new", "GeoTileGridAggregation::setupGeoTileGridAggregationDeserializer"},
+			// the impl method must not be inlined as a full method declaration in argument position
+			mustNotContain: []string{"::<init>", "ObjectBuilderDeserializer.lazy(GeoTileGridAggregation$Builder::new,protected"},
+		},
+		{
+			file:           "annotation_classvalue.class",
+			desc:           "annotation class-valued element renders as Type.class",
+			mustContain:    []string{".class"},
+			mustNotContain: []string{"LaQute/bnd/signing/JartoolSigner$Config;"},
+		},
+		{
+			file:           "enum_subclass.class",
+			desc:           "synthetic enum-constant subclass rendered as a normal class",
+			mustNotContain: []string{"enum FileMagicNumber$"},
+		},
+		{
+			file:           "string_escape_esc.class",
+			desc:           "ESC control char escaped as \\u001b instead of \\x1b",
+			mustNotContain: []string{`\x1b`},
+		},
+		{
+			file:           "string_escape_cesu8.class",
+			desc:           "CESU-8 / invalid bytes escaped as \\u00XX instead of \\xXX",
+			mustNotContain: []string{`\xed`, `\xa1`},
+		},
+		{
+			file:           "string_escape_vtab.class",
+			desc:           "vertical tab escaped as \\u000b instead of \\v",
+			mustNotContain: []string{`\v`},
+		},
+		{
+			file:           "array_classliteral.class",
+			desc:           "array class literal rendered as T[].class",
+			mustContain:    []string{"[].class"},
+		},
+		{
+			file:           "catch_primitive_type.class",
+			desc:           "catch clause with degraded primitive type falls back to Throwable",
+			mustNotContain: []string{"catch(boolean", "catch(int", "catch(long", "catch(double"},
+		},
+		{
+			file: "decompile_stub_partial.class",
+			desc: "graceful degradation: an un-decompilable method becomes a stub, rest of class is intact",
+			// hasNext() decompiles fine; next() (ternary with post-increment side effects) is stubbed
+			mustContain: []string{"boolean hasNext()", "yak-decompiler", "throw new RuntimeException"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.file, func(t *testing.T) {
+			raw, err := regressionFS.ReadFile("testdata/regression/" + tc.file)
+			if err != nil {
+				t.Fatalf("read embedded class %s failed: %v", tc.file, err)
+			}
+			source, err := javaclassparser.Decompile(raw)
+			if err != nil {
+				t.Fatalf("decompile %s failed (%s): %v", tc.file, tc.desc, err)
+			}
+			// the decompiled output must parse as syntactically-valid Java
+			if _, ferr := java2ssa.Frontend(source); ferr != nil {
+				t.Fatalf("frontend parse failed for %s (%s): %v\n----- decompiled source -----\n%s", tc.file, tc.desc, ferr, source)
+			}
+			for _, must := range tc.mustContain {
+				if !strings.Contains(source, must) {
+					t.Errorf("%s (%s): expected output to contain %q\n----- decompiled source -----\n%s", tc.file, tc.desc, must, source)
+				}
+			}
+			for _, mustNot := range tc.mustNotContain {
+				if strings.Contains(source, mustNot) {
+					t.Errorf("%s (%s): expected output NOT to contain %q\n----- decompiled source -----\n%s", tc.file, tc.desc, mustNot, source)
+				}
+			}
+		})
+	}
+}

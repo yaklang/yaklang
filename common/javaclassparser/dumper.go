@@ -80,11 +80,20 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	nonClassKeyword := false
 	isInterface := false
 	isEnum := false
+	syntheticEnumSubclass := false
+	superRawName := strings.Replace(c.obj.GetSupperClassName(), "/", ".", -1)
 	for _, k := range c.obj.AccessFlagsVerbose {
 		if k == "interface" || k == "enum" || k == "annotation" {
 			if k == "interface" {
 				isInterface = true
 			} else if k == "enum" {
+				// A genuine enum extends java.lang.Enum directly. Synthetic enum-constant
+				// subclasses (e.g. Foo$1) carry ACC_ENUM but extend the enum type itself and
+				// cannot be declared with the `enum` keyword; render them as ordinary classes.
+				if superRawName != "java.lang.Enum" {
+					syntheticEnumSubclass = true
+					break
+				}
 				isEnum = true
 			}
 
@@ -97,6 +106,10 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	//	return "", utils.Error("accessFlagsVerbose is empty")
 	//}
 	accessFlags := accessFlagsToCode
+	if syntheticEnumSubclass {
+		// Drop the `enum` keyword so the synthetic subclass renders as a normal class.
+		accessFlags = strings.TrimSpace(strings.ReplaceAll(accessFlags, "enum", ""))
+	}
 	name := c.obj.GetClassName()
 	splits := strings.Split(name, "/")
 	packageName := strings.Join(splits[:len(splits)-1], ".")
@@ -308,7 +321,7 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 				switch constVal := value.(type) {
 				case *ConstantStringInfo:
 					constStr, _ := c.obj.getUtf8(constVal.StringIndex)
-					valueLiteral = strconv.Quote(constStr)
+					valueLiteral = values.JavaStringToLiteral(constStr)
 				case *ConstantIntegerInfo:
 					valueLiteral = strconv.Itoa(int(constVal.Value))
 				case *ConstantLongInfo:
@@ -408,8 +421,21 @@ func (c *ClassObjectDumper) DumpAnnotation(anno *AnnotationAttribute) (string, e
 		case 's':
 			valStr = values.JavaStringToLiteral(element.Value) // fmt.Sprintf("\"%s\"", element.Value.(string))
 		case 'c':
-			//ele.Value = getUtf8(reader.readUint16())
-			valStr = element.Value.(string)
+			// class element value: the raw value is a field descriptor like
+			// "Lcom/example/Foo;" or "[I"; render it as a Java class literal "Foo.class".
+			descStr, _ := element.Value.(string)
+			classTyp, perr := types.ParseDescriptor(descStr)
+			if perr != nil || classTyp == nil {
+				fallback := strings.TrimSuffix(strings.TrimPrefix(descStr, "L"), ";")
+				valStr = strings.Replace(fallback, "/", ".", -1) + ".class"
+			} else {
+				typeStr := classTyp.String(c.FuncCtx)
+				if !classTyp.IsArray() {
+					c.FuncCtx.Import(typeStr)
+					typeStr = c.FuncCtx.ShortTypeName(typeStr)
+				}
+				valStr = typeStr + ".class"
+			}
 		case '@':
 			//ele.Value = ParseAnnotation(cp)
 			annotation := element.Value.(*AnnotationAttribute)
@@ -675,9 +701,18 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 						"%s\n"+
 						c.GetTabString()+"}", statementListToString(ret.TryBody))
 					for i, body := range ret.CatchBodies {
+						excType := ret.Exception[i].Type().String(funcCtx)
+						// A catch clause type must be a reference type (subtype of Throwable).
+						// When upstream type inference degrades the exception variable to a
+						// primitive (e.g. "boolean" from a reused slot), fall back to Throwable
+						// so the output stays syntactically valid.
+						switch excType {
+						case "boolean", "byte", "char", "short", "int", "long", "float", "double", "void":
+							excType = "Throwable"
+						}
 						statementStr += fmt.Sprintf("catch(%s %s){\n"+
 							"%s\n"+
-							c.GetTabString()+"}", ret.Exception[i].Type().String(funcCtx), ret.Exception[i].String(funcCtx), statementListToString(body))
+							c.GetTabString()+"}", excType, ret.Exception[i].String(funcCtx), statementListToString(body))
 					}
 					haveCatch := len(ret.CatchBodies) > 0
 					if !haveCatch {
@@ -865,6 +900,95 @@ type dumpedMethods struct {
 	bodyCode   string
 }
 
+// DecompileStubMarker tags a method body that could not be decompiled and was replaced by a
+// throwing stub (graceful degradation). Tooling such as the jdsc self-check can scan decompiled
+// output for this marker to detect partial results and keep surfacing method-level bugs.
+const DecompileStubMarker = "yak-decompiler:"
+
+// safeDumpMethod wraps DumpMethod with panic recovery and tab-state restoration so a
+// single broken method cannot abort the whole class. DumpMethod uses a non-deferred
+// Tab()/UnTab() pair, which leaves the indentation stack unbalanced if it panics midway;
+// we rewind it here.
+func (c *ClassObjectDumper) safeDumpMethod(name, descriptor string) (res *dumpedMethods, err error) {
+	tabSaved := c.deepStack.Len()
+	defer func() {
+		if rec := recover(); rec != nil {
+			err = utils.Errorf("panic: %v", rec)
+		}
+		for c.deepStack.Len() > tabSaved {
+			c.deepStack.Pop()
+		}
+	}()
+	return c.DumpMethod(name, descriptor)
+}
+
+// dumpStubMethod builds a syntactically-valid placeholder for a method whose body could
+// not be decompiled. It reconstructs the signature purely from the access flags and the
+// method descriptor (independent of the bytecode), so a single un-decompilable method
+// degrades gracefully instead of failing the entire class. Returns nil when even the
+// signature cannot be derived, in which case the caller should drop the method.
+func (c *ClassObjectDumper) dumpStubMethod(method *MemberInfo, name, descriptor, reason string) (stub *dumpedMethods) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			stub = nil
+		}
+	}()
+	methodType, perr := types.ParseMethodDescriptor(descriptor)
+	if perr != nil || methodType == nil || methodType.FunctionType() == nil {
+		return nil
+	}
+	ft := methodType.FunctionType()
+	funcCtx := c.FuncCtx
+	funcCtx.IsStatic = method.AccessFlags&StaticFlag == StaticFlag
+	accessFlagsVerbose, accessFlags := getMethodAccessFlagsVerbose(method.AccessFlags)
+	isVarArgs := slices.Contains(accessFlagsVerbose, "varargs")
+	isAbstract := slices.Contains(accessFlagsVerbose, "abstract") || slices.Contains(accessFlagsVerbose, "native")
+	isInterface := slices.Contains(c.obj.AccessFlagsVerbose, "interface")
+
+	paramList := []string{}
+	for idx, pt := range ft.ParamTypes {
+		if isVarArgs && idx == len(ft.ParamTypes)-1 && pt.IsArray() {
+			paramList = append(paramList, fmt.Sprintf("%s... var%d", pt.ElementType().String(funcCtx), idx))
+		} else {
+			paramList = append(paramList, fmt.Sprintf("%s var%d", pt.String(funcCtx), idx))
+		}
+	}
+	paramsStr := strings.Join(paramList, ", ")
+
+	// sanitize the failure reason so it can live inside a block comment on one line
+	reason = strings.ReplaceAll(reason, "*/", "* /")
+	reason = strings.NewReplacer("\n", " ", "\r", " ", "\t", " ").Replace(reason)
+	if len(reason) > 160 {
+		reason = reason[:160]
+	}
+
+	prefix := ""
+	if accessFlags != "" {
+		prefix = accessFlags + " "
+	}
+	// A non-abstract, non-static interface method is a default method.
+	if isInterface && !isAbstract && name != "<clinit>" && !strings.Contains(prefix, "static") {
+		prefix += "default "
+	}
+	throwBody := fmt.Sprintf(" { throw new RuntimeException(%s); /* %s %s */ }",
+		strconv.Quote(DecompileStubMarker+" undecompilable method body"), DecompileStubMarker, reason)
+
+	var src string
+	switch name {
+	case "<clinit>":
+		src = fmt.Sprintf("static { /* %s undecompilable <clinit>: %s */ }", DecompileStubMarker, reason)
+	case "<init>":
+		src = fmt.Sprintf("%s%s(%s)%s", prefix, c.GetConstructorMethodName(), paramsStr, throwBody)
+	default:
+		if isAbstract {
+			src = fmt.Sprintf("%s%s %s(%s);", prefix, ft.ReturnType.String(funcCtx), name, paramsStr)
+		} else {
+			src = fmt.Sprintf("%s%s %s(%s)%s", prefix, ft.ReturnType.String(funcCtx), name, paramsStr, throwBody)
+		}
+	}
+	return &dumpedMethods{methodName: name, code: src, bodyCode: "stub"}
+}
+
 func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 	c.Tab()
 	defer c.UnTab()
@@ -881,12 +1005,31 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 		if v := c.lambdaMethods[name]; slices.Contains(v, descriptor) {
 			continue
 		}
+		// Synthetic lambda bodies (javac emits "lambda$...") must never be dumped as
+		// standalone methods: they are only valid inlined as lambda expressions.
+		// Dumping them here would also poison the method cache with a method-declaration
+		// form, breaking later inline rendering at the invokedynamic call site.
+		if strings.HasPrefix(name, "lambda$") && isSyntheticMethod(method.AccessFlags) {
+			continue
+		}
 		// if name != "isSymlink" {
 		// 	continue
 		// }
-		res, err := c.DumpMethod(name, descriptor)
+		res, err := c.safeDumpMethod(name, descriptor)
 		if err != nil {
-			return nil, fmt.Errorf("dump method %s failed, %w", name, err)
+			// Graceful degradation: an un-decompilable method body must not fail the whole
+			// class. Emit a stub method (correct signature, throwing body) so the rest of
+			// the class still decompiles.
+			log.Warnf("decompile method %s%s failed, emitting stub: %v", name, descriptor, err)
+			stub := c.dumpStubMethod(method, name, descriptor, err.Error())
+			if stub == nil {
+				// even the signature could not be derived; drop the method to keep output valid
+				log.Warnf("stub for method %s%s could not be built, skipping", name, descriptor)
+				continue
+			}
+			traitId := fmt.Sprintf("name:%s,desc:%s", name, descriptor)
+			c.dumpedMethodsSet[traitId] = stub
+			res = stub
 		}
 		accessFlagsVerbose, _ := getMethodAccessFlagsVerbose(method.AccessFlags)
 		if strings.TrimSpace(res.bodyCode) == "" {

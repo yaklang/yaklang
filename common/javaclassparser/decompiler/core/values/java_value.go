@@ -105,11 +105,18 @@ func JavaStringToLiteral(i any) string {
 	if mimeType != nil && mimeType.IsChineseCharset() {
 		result, ok := mimeType.TryUTF8Convertor([]byte(data))
 		if ok {
-			return strconv.Quote(string(result))
+			return fixJavaStringEscapes(strconv.Quote(string(result)))
 		}
 	}
+	return fixJavaStringEscapes(strconv.Quote(data))
+}
 
-	raw := strconv.Quote(data)
+// fixJavaStringEscapes converts Go-style escapes (emitted by strconv.Quote) that are not
+// valid in Java string literals into Java-compatible "\uXXXX" escapes:
+//   - "\xHH"  -> "\u00HH"   (Java has no \x hex escape)
+//   - "\a"    -> "\u0007"   (Java has no bell escape)
+//   - "\v"    -> "\u000b"   (Java has no vertical-tab escape)
+func fixJavaStringEscapes(raw string) string {
 	results, err := regexp_utils.NewRegexpWrapper(`(\\+)x[0-9a-fA-F]{2}`).ReplaceAllStringFunc(raw, func(s string) string {
 		if strings.Count(s, `\`)%2 == 0 {
 			return s
@@ -120,8 +127,24 @@ func JavaStringToLiteral(i any) string {
 		return pre + after
 	})
 	if err != nil {
-		return raw
+		results = raw
 	}
+	// single-char escapes that Java does not support
+	convertSingle := func(input, escChar, replacement string) string {
+		out, e := regexp_utils.NewRegexpWrapper(`(\\+)` + escChar).ReplaceAllStringFunc(input, func(s string) string {
+			if strings.Count(s, `\`)%2 == 0 {
+				return s // even number of backslashes => literal, not an escape
+			}
+			// drop the trailing "\<escChar>" and append the replacement (which carries its own backslash)
+			return s[:len(s)-2] + replacement
+		})
+		if e != nil {
+			return input
+		}
+		return out
+	}
+	results = convertSingle(results, "a", `\u0007`)
+	results = convertSingle(results, "v", `\u000b`)
 	return results
 }
 
@@ -159,6 +182,12 @@ func (j *JavaClassValue) ReplaceVar(oldId *utils.VariableId, newId *utils.Variab
 // String implements JavaValue.
 // Subtle: this method shadows the method (JavaType).String of JavaClassValue.JavaType.
 func (j *JavaClassValue) String(funcCtx *class_context.ClassContext) string {
+	// An array-typed class value can only appear as a class literal (e.g. boolean[].class),
+	// never as a cast target or static-call receiver (those bypass this method via Type()).
+	// Rendering the bare type "boolean[]" would be invalid in expression position.
+	if j.JavaType != nil && j.JavaType.IsArray() {
+		return j.JavaType.String(funcCtx) + ".class"
+	}
 	return j.JavaType.String(funcCtx)
 }
 
