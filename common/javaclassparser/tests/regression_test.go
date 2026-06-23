@@ -165,6 +165,14 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			mustContain:    []string{"3.14F", "2.718281828D", "-1.5F"},
 		},
 		{
+			file: "ternary_in_try.class",
+			desc: "value-producing ternary inside a try: structuring fails, so the method degrades to an honest stub instead of leaking `X = Exception;` + a bogus catch-all-rethrow",
+			// the corrupted renderings must never reach output; the broken method is stubbed,
+			// while the sibling ternary (no try) and plain try/catch still decompile fully
+			mustContain:    []string{"yak-decompiler", "(var1) ? (var2) : (var3)", "catch(Exception var3)"},
+			mustNotContain: []string{"= Exception;", "catch(Exception e) { throw e; }"},
+		},
+		{
 			file: "multi_catch.class",
 			desc: "multi-catch (A | B): exception-table entries sharing one handler PC reconstruct the full union clause",
 			// both the 2-type and 3-type unions must be reconstructed in handler order

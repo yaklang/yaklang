@@ -776,7 +776,10 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 					}
 					haveCatch := len(ret.CatchBodies) > 0
 					if !haveCatch {
-						statementStr += "catch(Exception e) { throw e; }"
+						// A try with no catch/finally is malformed (structuring failed). Emit the
+						// internal marker so the method degrades to a stub rather than leaking the
+						// broken body that produced this bare try.
+						statementStr += "catch(Exception e) { throw e; /* " + malformedTryNoCatchMarker + " */ }"
 					}
 				case *statements.WhileStatement:
 					statementStr = fmt.Sprintf(c.GetTabString()+"while (%s){\n"+
@@ -998,6 +1001,14 @@ func javaDoubleLiteral(f float64) string {
 // output for this marker to detect partial results and keep surfacing method-level bugs.
 const DecompileStubMarker = "yak-decompiler:"
 
+// malformedTryNoCatchMarker is an internal sentinel emitted when a TryCatchStatement ends up with
+// no catch (or finally) handler. That is always a structuring failure -- e.g. a value-producing
+// ternary inside the try region confuses the CFG and the catch handler is mis-attributed, leaking
+// broken Java like `Exception v = Exception;` that the ANTLR syntax net still accepts. Detecting
+// the marker degrades the whole method to an honest stub instead of emitting silently-wrong code.
+// It never survives into final output because the offending method is re-rendered as a stub.
+const malformedTryNoCatchMarker = "yak-decompiler-internal: try without catch handler"
+
 // safeDumpMethod wraps DumpMethod with panic recovery and tab-state restoration so a
 // single broken method cannot abort the whole class. DumpMethod uses a non-deferred
 // Tab()/UnTab() pair, which leaves the indentation stack unbalanced if it panics midway;
@@ -1114,6 +1125,12 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 			// which means the stack simulation was incomplete and the emitted source is
 			// not valid Java. Degrade to a stub instead of producing un-compilable code.
 			err = utils.Errorf("incomplete stack simulation: empty stack slot leaked into method body")
+		}
+		if err == nil && res != nil && strings.Contains(res.code, malformedTryNoCatchMarker) {
+			// The try-region structuring failed and produced a try with no catch handler,
+			// which means the body is semantically corrupted (e.g. the caught-exception
+			// placeholder leaked into the try). Degrade to a stub.
+			err = utils.Errorf("try-region structuring failed: try without catch handler")
 		}
 		if err != nil {
 			// Graceful degradation: an un-decompilable method body must not fail the whole
