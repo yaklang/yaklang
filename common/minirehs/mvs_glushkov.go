@@ -432,21 +432,30 @@ func glushkovNFA(root *bnode, anchoredStart, requireEnd bool) (*mvsNFA, bool) {
 
 	nfa.buildAlphabet(g.posClass)
 
-	if nword == 1 {
-		nfa.single = true
-		nfa.first1 = nfa.first[0]
-		nfa.lastAny1 = nfa.lastAny[0]
-		nfa.lastEnd1 = nfa.lastEnd[0]
-		nfa.follow1 = make([]uint64, npos)
-		for p := 0; p < npos; p++ {
-			nfa.follow1[p] = nfa.follow[p][0]
-		}
-		nfa.reach1 = make([]uint64, nfa.nsym)
-		for s := 0; s < nfa.nsym; s++ {
-			nfa.reach1[s] = nfa.reach[s][0]
-		}
-	}
+	nfa.initScalar()
 	return nfa, true
+}
+
+// initScalar 在 nword==1 (位置数<=64) 时填充标量快路径字段, 供 existsIn1 / existsInAnchored1 /
+// existsInAssertShared1 / existsInAssertAnchored1 全程寄存器位运算且零分配地执行 (须在 buildAlphabet
+// 建好 reach 之后调用)。lean 与断言 NFA 共用: 断言额外的 condFirst/condFollow/condAccept 在标量执行器里
+// 直接取 gb.bits[0] (nword==1 时其长度即 1), 无需此处单独镜像。nword>1 时不置 single, 走多字通用路径。
+func (nfa *mvsNFA) initScalar() {
+	if nfa.nword != 1 {
+		return
+	}
+	nfa.single = true
+	nfa.first1 = nfa.first[0]
+	nfa.lastAny1 = nfa.lastAny[0]
+	nfa.lastEnd1 = nfa.lastEnd[0]
+	nfa.follow1 = make([]uint64, nfa.npos)
+	for p := 0; p < nfa.npos; p++ {
+		nfa.follow1[p] = nfa.follow[p][0]
+	}
+	nfa.reach1 = make([]uint64, nfa.nsym)
+	for s := 0; s < nfa.nsym; s++ {
+		nfa.reach1[s] = nfa.reach[s][0]
+	}
 }
 
 // buildAlphabet 用所有位置类的区间边界切分码点空间为若干"符号", 建立 rune->符号 映射与
