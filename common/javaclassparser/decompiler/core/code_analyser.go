@@ -1070,11 +1070,10 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 	var preRuntimeStackSimulation *StackSimulationImpl
 	varTable := map[int]*values.JavaRef{}
 	err := WalkGraph[*OpCode](d.RootOpCode, func(code *OpCode) ([]*OpCode, error) {
-		if IsSwitchOpcode(code.Instr.OpCode) {
-			sort.Slice(code.Target, func(i, j int) bool {
-				return true
-			})
-		}
+		// NOTE: do not sort code.Target for switch opcodes. The previous sort.Slice used an
+		// invalid comparator (always returning true), which scrambled the case successor order
+		// (which must stay aligned with SwitchJmpCase1's case-value -> index mapping). That made
+		// every case map to the wrong body. Target is already in the correct case-index order.
 		var runtimeStackSimulation *StackSimulationImpl
 		if len(code.Source) == 0 {
 			if code.Instr.OpCode == OP_START {

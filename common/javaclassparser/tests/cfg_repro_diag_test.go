@@ -21,6 +21,10 @@ func TestCFGReproDiag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read class: %v", err)
 	}
+	if os.Getenv("CFG_NOVALIDATE") != "" {
+		javaclassparser.EnableDecompileSyntaxValidation = false
+		defer func() { javaclassparser.EnableDecompileSyntaxValidation = true }()
+	}
 	out, err := javaclassparser.Decompile(raw)
 	if err != nil {
 		t.Fatalf("decompile error: %v", err)

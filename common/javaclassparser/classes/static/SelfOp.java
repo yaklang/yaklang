@@ -14,11 +14,7 @@ public class SelfOp {
 		int var3 = (this.value) - (1);
 		this.value = var3;
 		int var4 = var3;
-		int var5 = this.value;
-		this.value = (var5) + (1);
-		var2 = var5;
-		int var6 = this.value;
-		this.value = (var6) - (1);
-		var4 = var6;
+		var2 = this.value++;
+		var4 = this.value--;
 	}
 }
