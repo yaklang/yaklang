@@ -103,6 +103,12 @@ func (m *Timeline) findCompressSplitByRecentKeepTokens(keepTokens int64) int {
 //
 // 关键词: compressForSizeLimit, recent keep token 切分, batch compress 触发
 func (m *Timeline) compressForSizeLimit() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.compressForSizeLimitLocked()
+}
+
+func (m *Timeline) compressForSizeLimitLocked() {
 	if m.ai == nil || m.totalDumpContentLimit <= 0 {
 		return
 	}
@@ -113,8 +119,9 @@ func (m *Timeline) compressForSizeLimit() {
 		return // 不能压缩到少于1个项目
 	}
 
-	// 计算当前活跃区 token 数（不含 reducer），与触发同口径
-	currentSize := m.calculateActualContentSize()
+	// Caller already holds Timeline.mu. Do not call calculateActualContentSize(),
+	// because it would try to RLock the same RWMutex and deadlock.
+	currentSize := m.calculateActualContentSizeLocked()
 	if currentSize <= m.totalDumpContentLimit {
 		return
 	}

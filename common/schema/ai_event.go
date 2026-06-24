@@ -84,6 +84,7 @@ const (
 	AI_REACT_LOOP_ACTION_ADJUST_TODOLIST          = "adjust_todolist"
 	AI_REACT_LOOP_ACTION_QUERY_MCP_SERVERS        = "query_mcp_servers"
 	AI_REACT_LOOP_ACTION_QUERY_MCP_TOOLS          = "query_mcp_tools"
+	AI_REACT_LOOP_ACTION_LIST_ASYNC_TASKS         = "list_async_tasks"
 )
 
 const (

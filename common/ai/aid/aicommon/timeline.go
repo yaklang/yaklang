@@ -637,7 +637,7 @@ func (m *Timeline) dumpSizeCheckLocked() {
 	log.Infof("timeline content too large (%d > %d), triggering batch compression", contentSize, m.totalDumpContentLimit)
 
 	// 压缩到合适的大小
-	m.compressForSizeLimit()
+	m.compressForSizeLimitLocked()
 }
 
 // emergencyCompress performs non-AI compression by removing oldest items
