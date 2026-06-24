@@ -1505,6 +1505,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 				for _, ifNode := range treeNodes {
 					t := built[ifNode]
 					t.ConditionFromOp = ifNode.Id
+					ifNode.TernaryChainArm = true
 					ifNodeToConditionCallback[ifNode] = func(value values.JavaValue) {
 						t.Condition = value
 					}
@@ -1602,6 +1603,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 							newValue := values.NewTernaryExpression(values.NewSlotValue(nil, types.NewJavaPrimer(types.JavaBoolean)), ternaryExpMergeNodeSlot[code].GetValue(), target.StackEntry.value)
 							newValue.Type().ResetType(ternaryExpMergeNodeSlot[code].TmpType)
 							newValue.ConditionFromOp = opCode.Id
+							opCode.TernaryChainArm = true
 							ifNodeToConditionCallback[opCode] = func(value values.JavaValue) {
 								newValue.Condition = value
 							}
@@ -1637,6 +1639,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 							newValue := values.NewTernaryExpression(values.NewSlotValue(nil, types.NewJavaPrimer(types.JavaBoolean)), target.StackEntry.value, ternaryExpMergeNodeSlot[code].GetValue())
 							newValue.Type().ResetType(ternaryExpMergeNodeSlot[code].TmpType)
 							newValue.ConditionFromOp = opCode.Id
+							opCode.TernaryChainArm = true
 							ifNodeToConditionCallback[opCode] = func(value values.JavaValue) {
 								newValue.Condition = value
 							}
@@ -1693,6 +1696,7 @@ func (d *Decompiler) ParseStatement() error {
 					conditionSt.Callback = func(value values.JavaValue) {
 						cb(value)
 					}
+					conditionSt.TernaryChainArm = opcode.TernaryChainArm
 				}
 			}
 		}

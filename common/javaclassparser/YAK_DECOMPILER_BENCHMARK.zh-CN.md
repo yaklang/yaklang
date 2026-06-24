@@ -18,9 +18,9 @@
 
 | 维度 | 结果 | 度量方式 |
 |------|------|----------|
-| 语法安全（解析或降级） | 25/25 语料组产出**语法可解析的 Java**；0 语法错误、0 硬错误、0 panic | `TestSyntaxCoverageMatrix` |
-| 重建覆盖率（无 stub） | 23/25 组产出**未降级输出**（无 stub）；2 组隔离出具体缺口 | `TestSyntaxCoverageMatrix` |
-| 正确性（javac round-trip） | **18/20** 个可评估语料干净重编译（起始为 4/13）；经典语料现已**零 stub**；四个内部类/嵌套类组全部可重编译；新增两个专用边界语料并纳入门禁 | `TestRecompileRoundtrip` |
+| 语法安全（解析或降级） | 28/28 语料组产出**语法可解析的 Java**；0 语法错误、0 硬错误、0 panic | `TestSyntaxCoverageMatrix` |
+| 重建覆盖率（无 stub） | 26/28 组产出**未降级输出**（无 stub）；2 组隔离出具体缺口 | `TestSyntaxCoverageMatrix` |
+| 正确性（javac round-trip） | **21/23** 个可评估语料干净重编译（起始为 4/13）；经典语料现已**零 stub**；四个内部类/嵌套类组全部可重编译；专用边界语料与复杂形态语料均已纳入门禁 | `TestRecompileRoundtrip` |
 | 确定性 | 多次反编译逐字节一致；性能改动通过逐类 sha256 指纹证明输出等价 | `TestCorpusDeterminism`、`TestDumpJarFingerprint` |
 | 测试套件 | 绿且快：`./...` ≈ 22s，从 150s 以上降下来（**至少 6.8 倍**），无机器相关依赖 | `go test ./common/javaclassparser/...` |
 | 分配开销 | 核心 **≈246 ms** 且 **≈182 MB 累计堆分配** / 106 类的 jar；校验相对 core-only 增加运行时 ≈ +18%、累计分配 ≈ +23% | `BenchmarkDecompileJar` |
@@ -30,9 +30,9 @@
 
 ### Round-trip 正确性细节
 
-在 20 个可进入严格 `javac` round-trip 验证的经典语料组中（16 个单类组 + 4 个多类内部/嵌套类组）：
+在 23 个可进入严格 `javac` round-trip 验证的经典语料组中（19 个单类组 + 4 个多类内部/嵌套类组）：
 
-- **18 个成功重编译**：Annotations、Arrays、Boundary、CastsInstanceof、Concurrency、ControlFlow、ControlFlowEdge、Enums、Exceptions、Generics、Inheritance、Initializers、InnerClasses、Literals、Loops、Strings、Switches、TryWithResources。
+- **21 个成功重编译**：Annotations、Arrays、Boundary、CastsInstanceof、ComplexExpressions、ComplexMisc、Concurrency、ControlFlow、ControlFlowEdge、Enums、Exceptions、ExceptionsComplex、Generics、Inheritance、Initializers、InnerClasses、Literals、Loops、Strings、Switches、TryWithResources。
 - **2 个暴露具体的语义/类型缺陷**：Lambdas（lambda 形参作用域冲突 + 泛型擦除）、Operators（短路布尔 `||` 返回值恢复）。
 - **经典语料 0 stub**：每个方法都结构化为真实 Java。
 
@@ -54,12 +54,13 @@ go test -run TestSyntaxCoverageMatrix -v ./common/javaclassparser/tests/
 
 每组的结果分类：`OK`（完整重建且合法）、`STUB`（某成员降级为 stub 但类仍合法）、`SYNTAX`（输出了非法 Java——真实缺陷）、`ERROR`（反编译返回错误）、`PANIC`。
 
-### 经典语料（Java 8 字节码）——20 组
+### 经典语料（Java 8 字节码）——23 组
 ```
-ok=20  stub=0  syntax=0  error=0  panic=0
+ok=23  stub=0  syntax=0  error=0  panic=0
 ```
 - 原先的 `STUB`（**Exceptions** → `tryCatchFinally(int[],int)` 失败于 `ParseBytesCode failed: multiple next`）已修复；见第 3 节第 5 轮。
-- 本轮新增两个边界条件组（**Boundary**、**ControlFlowEdge**）以加固门禁；二者均完整重建（见第 3 节第 7 轮）。
+- 第 7 轮新增两个边界条件组（**Boundary**、**ControlFlowEdge**）以加固门禁；二者均完整重建（见第 3 节第 7 轮）。
+- 本轮新增三个复杂形态组（**ComplexExpressions**、**ComplexMisc**、**ExceptionsComplex**）；三者均完整重建，并为此修复了两个正确性缺陷（见第 3 节第 8 轮）。
 
 ### 现代语料（Java 17 字节码）——5 组
 ```
@@ -89,10 +90,10 @@ go test -run TestRecompileRoundtrip -v ./common/javaclassparser/tests/
 ### 语料 round-trip 结果
 该 oracle 会反编译一个组的**每一个** class（含内部类、嵌套类、匿名类、局部类），并把这些单元**一起编译**，因此内部类重建是端到端验证而非被跳过。
 ```
-recompile-ok:  18  (Annotations, Arrays, Boundary, CastsInstanceof, Concurrency,
-                    ControlFlow, ControlFlowEdge, Enums, Exceptions, Generics,
-                    Inheritance, Initializers, InnerClasses, Literals, Loops, Strings,
-                    Switches, TryWithResources)
+recompile-ok:  21  (Annotations, Arrays, Boundary, CastsInstanceof, ComplexExpressions,
+                    ComplexMisc, Concurrency, ControlFlow, ControlFlowEdge, Enums,
+                    Exceptions, ExceptionsComplex, Generics, Inheritance, Initializers,
+                    InnerClasses, Literals, Loops, Strings, Switches, TryWithResources)
 recompile-fail: 2  (Lambdas, Operators)
 stub:          0
 dec-err:       0
@@ -115,6 +116,19 @@ multiclass:    0   (现已一起编译，不再跳过)
 > labeled-continue 惯用法可能在运行期产生分歧。已在 backlog 的"循环惯用法恢复"下跟踪；
 > 循环语义 round-trip 电池（`TestLoopSemanticsRoundTrip`，执行并比对指纹）覆盖所有非 labeled
 > 形态且全部通过。
+
+### 本轮落地的正确性修复 + 语料扩充——第 8 轮（复杂形态）
+新增三个复杂形态语料并**纳入门禁**，使严格 round-trip 达到 **21/23**、经典覆盖率矩阵达到 **23/23（零 stub）**。新语料暴露的两个真实正确性缺陷被修复（二者在真实代码中都很常见，因此收益远超语料本身）：
+
+- **ComplexExpressions**——1 维/2 维数组初始化、`int/long/float/double` 混合提升、`StringBuilder` 与 `+` 字符串拼接、递归（阶乘/斐波那契）、可变参数、增强 `for`，以及**深层右倾链式三元**（`a?:b?:c?:...`）。
+- **ExceptionsComplex**——嵌套 `try/catch/finally`、单资源与多资源 try-with-resources、重抛、`return` 后的 `finally`、带 `finally` 的多 catch 链。一次性重编译通过。
+- **ComplexMisc**——从嵌套循环跳出的带标签 `break`/`continue`、`StringBuilder` 流式链、**default 在中间的 switch**、`do/while`、作为方法实参的三元、`instanceof`+强转派发链。
+
+**修复 1——链式三元 condition 被错误合并（`rewriter/statement_wrap.go`、`core/code_analyser.go`）。** 深层右倾三元（`x<0?-1:x==0?0:x<10?1:...`）会降级为 stub 并报 *"empty stack slot leaked into method body"*。结构化组合器其实已正确构建出值树（`-1,0,1,...` 右倾嵌套），但随后 `MergeIf` 把各臂的**条件**节点折叠成了一个短路 `||`（`(x<0)||(x==0)||(x<10)`），只触发了最外层条件回调，使内层三元的 `Condition` 槽位为空（渲染为空槽占位符，从而触发方法降级）。根因：当某个三元臂的叶子值被抽取后，各臂条件都汇聚到 merge 节点，*看起来*像短路链。修复：为供给**独立嵌套三元臂**的条件 opcode 打上 `TernaryChainArm` 标记（在组合器的嵌套三元分支与结构化探测提交处设置），并传播到其 `ConditionStatement`；`MergeIf` 拒绝把已标记的条件折叠进 `&&`/`||`。真正的短路条件（全部供给**同一个**三元条件）不打标记，合并行为与之前完全一致——已由 `TestDecompiler/LogicalOperation*` 与 `empty_slot_stub` 仍通过验证。
+
+**修复 2——switch case 变量作用域提升（`rewriter/rewrite_var.go`）。** 极常见的写法 `int r; switch(x){ case 1: r=...; break; ... } return r;` 无法重编译，报 *"cannot find symbol: variable r"*：反编译器把 `int r = ...` 放进了第一个 case 体内，于是 switch 之后的读取越界（switch 体是单一块，但困在某个 case 里的声明在 switch 之后不可见）。修复：新增一个后处理 pass（`hoistSwitchDeclarations`，在声明放置**之后**运行，使其 `IsFirst` 决策已最终确定）检测"声明于 case 内**且**在 switch 之后被读取"的局部，把 case 内的 `T r = ...` 降级为 `r = ...`，并在 switch 之前插入单条 `T r;`。"switch 之后被读取"的触发判定是精确的（对 switch 之后语句做按变量名的引用扫描），因此仅在后续 case 中使用、本就合法的变量保持不变（`SwitchTest` golden 未变）。提升只会扩大作用域，绝不删除或破坏可达代码。
+
+两处修复均为外科手术式改动，已由完整 `./common/javaclassparser/...` 套件、`TestCorpusDeterminism` 与 `TestDecompileDeterminism` 验证。
 
 ### 本轮落地的语料扩充——第 7 轮（边界条件语料）
 新增两个专用边界语料并**纳入门禁**，使严格 round-trip 达到 **18/20**、经典覆盖率矩阵达到 **20/20（零 stub）**：
@@ -305,7 +319,8 @@ runtime.greyobject     13.3% cum
 4. **Record / sealed 的 `invokedynamic ObjectMethods` bootstrap**——端到端解锁现代（Java 17+）值类型。
 5. **idiomatic `finally` 折叠**——`try/catch/finally` 的 round-trip 当前已正确（采用忠实的脱糖形式：finally 体重复 + `catch (Throwable)` 重抛，与字节码运行完全一致）。未来可加一个 pass 把它折叠为单个 idiomatic 的 `finally {}` 块以提升可读性。
 
-*本轮（第 7 轮）落地：* 边界条件语料（Boundary、ControlFlowEdge）新增并纳入门禁——严格 round-trip 现为 18/20，经典覆盖率 20/20 且零 stub。
+*本轮（第 8 轮）落地：* 复杂形态语料（ComplexExpressions、ComplexMisc、ExceptionsComplex）新增并纳入门禁——严格 round-trip 现为 **21/23**，经典覆盖率 **23/23** 且零 stub。修复两个真实正确性缺陷：(1) 深层链式三元的各臂条件不再被错误折叠为短路 `||`（不再出现空槽 stub），通过 `MergeIf` 尊重的 `TernaryChainArm` 标记实现；(2) 声明于 switch case 内但在 switch 之后被读取的局部，会被提升到 switch 之前，修复了极常见的 `int r; switch{...} return r;` 写法。
+*第 7 轮落地：* 边界条件语料（Boundary、ControlFlowEdge）新增并纳入门禁——严格 round-trip 18/20，经典覆盖率 20/20 且零 stub。
 *第 6 轮：* 不可达语句裁剪（Loops）——跟在不顺序穿过的内层区域之后的回边 `continue;` 用 JLS 可达性规则的严格子集删除。
 *第 5 轮：* try/catch/finally 处理器分组（Exceptions）——经典语料现已零 stub；真实 jar 的 stub 标记大幅下降（gson 38 → 18）。
 *第 4 轮：* null 初始化 slot 的类型加宽（Generics）——null slot 采纳后续具体引用类型而非拆分。

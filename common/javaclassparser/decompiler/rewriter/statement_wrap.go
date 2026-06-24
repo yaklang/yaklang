@@ -88,8 +88,23 @@ func (s *RewriteManager) mergeIf() bool {
 	})
 	result := false
 	delNodesSet := utils.NewSet[*core.Node]()
+	// isTernaryChainArm reports whether a condition node supplies a DISTINCT nested ternary arm
+	// (a right-leaning chain a?:b?:c?: or a structurally-rebuilt tree). Such a node must NOT be
+	// folded into a short-circuit &&/|| here: its value flows individually into its own ternary
+	// arm, so merging it (the arms converge on the same merge node once their leaf values are
+	// extracted, making them look like a short-circuit) collapses several distinct conditions
+	// into one and leaves the others' callbacks unfired, leaking an empty stack slot. Genuine
+	// short-circuit &&/|| conditions all feed the SAME ternary condition and are NOT marked, so
+	// they continue to merge normally.
+	isTernaryChainArm := func(n *core.Node) bool {
+		cond, ok := n.Statement.(*statements.ConditionStatement)
+		return ok && cond.TernaryChainArm
+	}
 	for _, node := range ifNodes {
 		if delNodesSet.Has(node) {
+			continue
+		}
+		if isTernaryChainArm(node) {
 			continue
 		}
 		var nextStNode *core.Node
@@ -153,7 +168,7 @@ func (s *RewriteManager) mergeIf() bool {
 					}
 				}
 			}
-			if slices.Contains(ifNodes, n) && !delNodesSet.Has(n) {
+			if slices.Contains(ifNodes, n) && !delNodesSet.Has(n) && !isTernaryChainArm(n) {
 				parentNode := n
 				childNode := node
 				if parentNode.Id >= childNode.Id {
