@@ -1015,7 +1015,9 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 	return nil
 }
 func (d *Decompiler) CalcOpcodeStackInfo() error {
-	opcodeToSim := map[*OpCode]*StackSimulationImpl{}
+	// Pre-sized to the opcode count: this map gets one entry per opcode, so sizing it up
+	// front avoids the incremental rehash-growth garbage (it was a top per-opcode allocator).
+	opcodeToSim := make(map[*OpCode]*StackSimulationImpl, len(d.opCodes))
 	//dominatorMap := GenerateDominatorTree(d.RootOpCode)
 	//codes := GraphToList(d.RootOpCode)
 	//codes = lo.Filter(codes, func(code *OpCode, index int) bool {
@@ -1106,7 +1108,8 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			mergeNodeToIfNode[mergeNode] = append(mergeNodeToIfNode[mergeNode], opcode)
 		}
 	}
-	nodeToVarScope := map[*OpCode]*Scope{}
+	// One scope entry per opcode; pre-size to avoid rehash-growth garbage (see opcodeToSim).
+	nodeToVarScope := make(map[*OpCode]*Scope, len(d.opCodes))
 	getVarScope := func(code *OpCode) *Scope {
 		if vt, ok := nodeToVarScope[code]; ok {
 			return vt

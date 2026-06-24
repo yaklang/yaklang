@@ -40,7 +40,7 @@ authority for automated semantic decisions.
 | Correctness (javac round-trip) | **24/26** eligible corpora recompile cleanly (was 4/13 at start); the classic corpus now emits **zero stubs**; all four inner/nested-class groups recompile; dedicated boundary-condition, numeric-edge, field/array and nested-control-flow corpora gated | `TestRecompileRoundtrip` |
 | Determinism | byte-identical output across repeated decompiles; perf changes proven equivalent by per-class sha256 fingerprints | `TestCorpusDeterminism`, `TestDumpJarFingerprint` |
 | Test suite | green & fast: `./...` ≈ 22s, down from more than 150s (**at least 6.8x**), no machine-specific dependencies | `go test ./common/javaclassparser/...` |
-| Allocation cost | core **≈222 ms** and **≈167 MB cumulative heap allocation** per 106-class jar (down from ≈246 ms / ≈182 MB); the post-decompile ANTLR re-parse adds ≈ +58% runtime and ≈ +40% bytes relative to core-only | `BenchmarkDecompileJar` |
+| Allocation cost | core **≈218 ms** and **≈163 MB cumulative heap allocation** per 106-class jar (down from ≈246 ms / ≈182 MB); the post-decompile ANTLR re-parse adds ≈ +58% runtime and ≈ +42% bytes relative to core-only | `BenchmarkDecompileJar` |
 | Scalability | near-linear to ~8 workers (3.6×), then **GC-bound regression** | `BenchmarkDecompileJarParallel` |
 
 The decompiler's **safety guarantee holds**: for every input in the corpus it
@@ -512,8 +512,8 @@ post-decompile ANTLR re-parse and isolates the **decompiler core** from the
 
 | Configuration | ns/op | B/op | allocs/op |
 |---------------|------:|-----:|----------:|
-| Full pipeline (validation on) | ~351 M | 234 MB | 3.59 M |
-| Core only (validation off) | **222 M** | **167 MB** | 2.34 M |
+| Full pipeline (validation on) | ~344 M | 231 MB | 3.59 M |
+| Core only (validation off) | **218 M** | **163 MB** | 2.33 M |
 | **Validation safety-net share** | **≈ 37%** time | **≈ 29%** bytes | **≈ 35%** allocs |
 
 The safety net is not free, but it is the contract that guarantees no un-parseable
@@ -594,6 +594,16 @@ output. (A chunked OpCode arena was prototyped and **rejected**: it cut malloc c
 over-allocated per small method, regressing bytes by +7% — a memory loss the project does
 not accept for a small CPU gain.)
 
+**Follow-up map pre-size round (still in place).** Profiling the post-round core showed the
+two largest per-opcode allocators inside `CalcOpcodeStackInfo` were plain map *growth*:
+`opcodeToSim` (`map[*OpCode]*StackSimulationImpl`, ~104 MB) and `nodeToVarScope`
+(`map[*OpCode]*Scope`, ~102 MB). Both receive exactly one entry per opcode, and the opcode
+count (`len(d.opCodes)`) is already known at that point, so both are now pre-sized with
+`make(…, len(d.opCodes))`. Pre-sizing only changes capacity (Go map iteration is randomized
+regardless), so output is unchanged. Result: **core 222 → 218 ms/op, 167 → 163 MB/op** with
+the allocation count flat; **full pipeline 351 → 344 ms/op, 234 → 231 MB/op**. Fingerprint
+diff against the pre-optimization baseline remains byte-for-byte identical.
+
 **Prior allocation/CPU round (still in place):**
 
 1. **`WalkGraph` visited set — drop interface boxing and the mutex.**
@@ -611,8 +621,8 @@ not accept for a small CPU gain.)
    identical). **Core: 254 → 246 ms/op, 193 → 182 MB/op.**
 
 Cumulative for that prior round: **core 315 → 246 ms/op (−22%), 217 → 182 MB/op (−16%)**;
-end-to-end bytes 282 → 248 MB (−12%). The latest round (above) carries this further to
-core 222 ms / 167 MB.
+end-to-end bytes 282 → 248 MB (−12%). The latest rounds (above) carry this further to
+core 218 ms / 163 MB.
 
 Earlier-round optimizations still in place:
 - **`ParseOpcode` pre-sizing** (opcode slice + both offset maps sized from bytecode
