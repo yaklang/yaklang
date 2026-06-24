@@ -30,6 +30,6 @@ public class VarFold {
 	}
 	void typeCase() {
 		Integer var1 = Integer.valueOf(1);
-		List var2 = (var1 instanceof Object) ? ((List)(var1)) : (var1.getClass());
+		List var2 = (var1 instanceof Object) ? (((List)(var1))) : (var1.getClass());
 	}
 }
