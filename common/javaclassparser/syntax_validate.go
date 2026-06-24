@@ -29,7 +29,14 @@ var EnableDecompileSyntaxValidation = true
 // budget is exceeded we conservatively treat the input as invalid so the offending member is
 // degraded to a stub: this both keeps decompilation time bounded and preserves the "never emit
 // un-parseable Java" guarantee. Set to <= 0 to disable the budget (validate synchronously).
-var DecompileSyntaxValidationBudget = 4 * time.Second
+//
+// The budget is sized to comfortably clear large-but-valid methods (e.g. a 600+ line SQL parser
+// method validates in ~4s via the LL fallback) so the net does not falsely degrade them under load,
+// while still bounding genuinely pathological members. Raised from 4s to 8s because borderline
+// methods were intermittently timing out on busy machines, turning a valid+deterministic decompile
+// into a spurious stub (false positive). 8s only matters for the rare member that exceeds it; valid
+// methods return as soon as the parse finishes, well under the cap.
+var DecompileSyntaxValidationBudget = 8 * time.Second
 
 // validateJavaSyntax reports whether a full compilation unit is syntactically valid Java
 // (after decompiler normalization). nil means the grammar accepts it. The parse runs under
