@@ -10,6 +10,9 @@ Browser automation tool (go-rod/CDP). Two interaction strategies:
 
 Both "target" for click/fill accept @eN refs AND CSS selectors (e.g. "input[name=username]").
 The browser instance persists across tool calls via session ID.
+
+Native alert/confirm/prompt: dialog text is returned to AI; use op=get subop=dialog then
+op=handle_dialog action=accept|dismiss (value for prompt). Do NOT ignore blocking dialogs.
 DESC_BLOCK
 __VERBOSE_NAME__ = "Browser Automation Tool"
 __KEYWORDS__ = "browser,chrome,automation,click,fill,type,snapshot,screenshot,navigate,scrape,web,form,login,CDP,headless,accessibility,ref,DOM,page,wait,scroll,eval,tab,cookie,selector,javascript"
@@ -50,7 +53,8 @@ Conditional:
   source    (string)  @eN ref OR CSS selector for op=drag that is element drag from
                       Examples: "@e1", "input[name=username]", "#login-btn", "button[type=submit]"
   value     (string)  Text for op=fill/type/setfiles/select/press
-  subop     (string)  Sub-op for "get": title, url, html, text, cookies
+  subop     (string)  Sub-op for "get": title, url, html, text, cookies, dialog
+  action    (string)  For op=handle_dialog: accept|dismiss (aliases ok/cancel/yes/no)
   js        (string)  JavaScript for op=eval. Use AITAG for multi-line JS.
 
 Optional:
@@ -221,6 +225,22 @@ If eval returns 0 elements after open:
 
 Signs of SPA pages: URL contains #/, empty title after load, hasVue/hasReact/hasAngular in page info.
 
+## Native alert / confirm / prompt (AI must decide)
+
+When a page calls alert(), confirm(), or prompt(), page JS is BLOCKED until the dialog is handled.
+The tool does NOT auto-click. Output includes dialog_type and dialog_message for AI to read.
+
+Workflow:
+  1. open/click may stop with dialog info in output, OR op=get subop=dialog
+  2. Read dialog_message and decide:
+     - alert   -> op=handle_dialog action=accept
+     - confirm -> action=accept (OK) or action=dismiss (Cancel)
+     - prompt  -> action=accept value=<text to enter>
+  3. Continue snapshot/click/eval after dialog is handled
+
+IMPORTANT: After login submit (op=click), many sites call alert() immediately.
+Do NOT call op=eval until handle_dialog completes — eval will block or fail while alert is open.
+
 ## Key Rules
 
 1. For login/form pages, PREFER JavaScript strategy over snapshot strategy.
@@ -237,12 +257,13 @@ USAGE_BLOCK
 yakit.AutoInitYakit()
 
 // ========== CLI Parameters ==========
-op = cli.String("op", cli.setRequired(true), cli.setHelp("browser operation: open/snapshot/click/fill/type/get/wait/screenshot/eval/back/forward/reload/close/tab_list/tab_new/tab_switch/tab_close/drag/setfiles/hover/select/check/uncheck/scrollintoview/press"))
+op = cli.String("op", cli.setRequired(true), cli.setHelp("browser operation: open/snapshot/click/fill/type/get/wait/screenshot/eval/back/forward/reload/close/tab_list/tab_new/tab_switch/tab_close/drag/setfiles/hover/select/check/uncheck/scrollintoview/press/handle_dialog"))
 url = cli.String("url", cli.setRequired(false), cli.setHelp("URL for open/tab_new operations"))
 target = cli.String("target", cli.setRequired(false), cli.setHelp("element ref (@eN) or CSS selector for click/fill/drag/setfiles/hover/select/check/uncheck/scrollintoview"))
 source = cli.String("source", cli.setRequired(false), cli.setHelp("element ref (@eN) or CSS selector for drag"))
 value = cli.String("value", cli.setRequired(false), cli.setHelp("text value for fill/type/setfiles/select/press"))
-subop = cli.String("subop", cli.setRequired(false), cli.setHelp("sub-operation for get: title/url/html/text/cookies"))
+subop = cli.String("subop", cli.setRequired(false), cli.setHelp("sub-operation for get: title/url/html/text/cookies/dialog"))
+action = cli.String("action", cli.setRequired(false), cli.setHelp("for handle_dialog: accept|dismiss (ok/cancel/yes/no)"))
 js = cli.String("js", cli.setRequired(false), cli.setHelp("JavaScript code for eval operation. Use AITAG for multi-line scripts."))
 session = cli.String("session", cli.setRequired(false), cli.setHelp("browser session ID for instance reuse"), cli.setDefault("ai-browser"))
 headless = cli.String("headless", cli.setRequired(false), cli.setHelp("yes/no to show browser window (default: no, visible)"), cli.setDefault("no"))
@@ -277,6 +298,33 @@ getPage = func() {
     return page, nil
 }
 
+// ========== Helper: surface native alert/confirm/prompt to AI ==========
+reportPendingDialog = func(page) {
+    d, ok = page.GetPendingDialog()
+    if !ok || d == nil {
+        return false
+    }
+    yakit.Info("*** NATIVE JAVASCRIPT DIALOG (page JS blocked until handled) ***")
+    yakit.Info("dialog_type: %v", d.Type)
+    yakit.Info("dialog_message: %v", d.Message)
+    yakit.Info("Required next step: op=handle_dialog action=accept|dismiss value=<text for prompt>")
+    yakit.Info("  alert   -> typically action=accept")
+    yakit.Info("  confirm -> action=accept (OK) or action=dismiss (Cancel) based on message")
+    yakit.Info("  prompt  -> action=accept value=<input text>")
+    return true
+}
+
+// ========== Helper: fail fast when native dialog blocks page JS ==========
+abortIfDialogBlocking = func(page, opName) {
+    d, ok = page.GetPendingDialog()
+    if !ok || d == nil {
+        return false
+    }
+    reportPendingDialog(page)
+    yakit.Error("op=%v blocked: native javascript dialog is open — call op=handle_dialog first, then retry", opName)
+    return true
+}
+
 // ========== Browser installation check for open ==========
 if str.ToLower(op) == "open" {
     if !browser.HaveBrowserInstalled() {
@@ -308,6 +356,10 @@ case "open":
 
     page, err = b.Navigate(url)
     if err != nil {
+        pageTmp, _ = b.CurrentPage()
+        if pageTmp != nil {
+            reportPendingDialog(pageTmp)
+        }
         yakit.Error("failed to navigate to %v: %v", url, err)
         return
     }
@@ -349,6 +401,8 @@ case "open":
         snapText = snapText[:5000] + "\n... (truncated)"
     }
     yakit.Info("page opened and snapshot taken (%v nodes, %v refs):\n%v", snap.NodeCount, snap.RefMap.Count(), snapText)
+
+    reportPendingDialog(page)
 
     if snap.RefMap.Count() <= 0 {
         yakit.Info("WARNING: snapshot returned 0 interactive element refs on this page.")
@@ -405,6 +459,12 @@ case "click":
     yakit.Info("clicked %v (both @eN refs and CSS selectors like 'button[type=submit]' are supported as target)", target)
     sleep(0.5)
 
+    // alert/confirm often appears right after submit click — surface to AI before eval/snapshot
+    if reportPendingDialog(page) {
+        yakit.Info("TIP: login/submit often triggers alert(). Read dialog_message, then op=handle_dialog action=accept before op=eval.")
+        return
+    }
+
     // 点击后自动 snapshot 以获取新的引用
     snap, snapErr = page.Snapshot()
     if snapErr == nil {
@@ -453,7 +513,7 @@ case "type":
 
 case "get":
     if subop == "" {
-        yakit.Error("op=get requires --subop parameter (title/url/html/text/cookies)")
+        yakit.Error("op=get requires --subop parameter (title/url/html/text/cookies/dialog)")
         return
     }
     page, err = getPage()
@@ -508,8 +568,55 @@ case "get":
             yakit.Info("  %v=%v (domain=%v, path=%v)", c.Name, c.Value, c.Domain, c.Path)
         }
 
+    case "dialog":
+        if !reportPendingDialog(page) {
+            yakit.Info("no pending javascript dialog")
+        }
+
     default:
-        yakit.Error("unknown get subop: %v (supported: title, url, html, text, cookies)", subop)
+        yakit.Error("unknown get subop: %v (supported: title, url, html, text, cookies, dialog)", subop)
+    }
+
+case "handle_dialog":
+    if action == "" {
+        yakit.Error("op=handle_dialog requires --action (accept|dismiss, aliases ok/cancel/yes/no)")
+        return
+    }
+    page, err = getPage()
+    if err != nil {
+        return
+    }
+    d, hasDialog = page.GetPendingDialog()
+    if !hasDialog || d == nil {
+        yakit.Error("no pending javascript dialog on this page")
+        return
+    }
+    yakit.Info("handling dialog: type=%v message=%v action=%v value=%v", d.Type, d.Message, action, value)
+
+    act = str.ToLower(action)
+    accept = false
+    switch act {
+    case "accept", "ok", "yes", "true":
+        accept = true
+    case "dismiss", "cancel", "no", "false":
+        accept = false
+    default:
+        yakit.Error("unknown action: %v (use accept or dismiss)", action)
+        return
+    }
+
+    err = page.HandleJavaScriptDialog(accept, value)
+    if err != nil {
+        yakit.Error("handle_dialog failed: %v", err)
+        return
+    }
+    if accept {
+        yakit.Info("dialog handled: accepted (OK/Yes)")
+    } else {
+        yakit.Info("dialog handled: dismissed (Cancel/No)")
+    }
+    if value != "" {
+        yakit.Info("prompt input: %v", value)
     }
 
 case "wait":
@@ -622,9 +729,13 @@ case "eval":
     if err != nil {
         return
     }
+    if abortIfDialogBlocking(page, "eval") {
+        return
+    }
     result, err = page.Evaluate(js)
     if err != nil {
         yakit.Error("eval failed: %v", err)
+        reportPendingDialog(page)
         return
     }
     resultStr = sprint(result)
@@ -924,5 +1035,5 @@ case "press":
     yakit.Info("press %v done", value)
 
 default:
-    yakit.Error("unknown op: %v. Supported: open, snapshot, click, fill, type, get, wait, screenshot, eval, back, forward, reload, close, tab_list, tab_new, tab_switch, tab_close, drag, setfiles, hover, select, check, uncheck, scrollintoview, press", op)
+    yakit.Error("unknown op: %v. Supported: open, snapshot, click, fill, type, get, wait, screenshot, eval, back, forward, reload, close, tab_list, tab_new, tab_switch, tab_close, drag, setfiles, hover, select, check, uncheck, scrollintoview, press, handle_dialog", op)
 }
