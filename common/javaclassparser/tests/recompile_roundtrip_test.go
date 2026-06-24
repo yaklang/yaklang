@@ -228,16 +228,24 @@ func firstJavacError(stderr string) string {
 // block-scoped variable read out of scope). Exceptions joined once try/catch/finally stopped
 // stubbing: a real catch and the synthetic finally catch-all share one try-region end index
 // and must group under a single tryStart node instead of dropping the real catch ("multiple
-// next"). Categories still failing the roundtrip and tracked for follow-up: Lambdas
-// (captured-variable naming), Loops (do/while lowering emits javac-unreachable code),
-// Operators (short-circuit boolean recovery).
+// next"). Loops joined once the unreachable-statement prune removed the back-edge `continue;`
+// that do/while(true) lowering emitted after a non-falling-through inner region. Boundary is a
+// dedicated boundary-condition corpora: Boundary covers numeric extremes, cast chains, nested
+// ternaries, bit manipulation, multi-dimensional array access and compound assignment;
+// ControlFlowEdge covers switch fall-through, string/sparse switch, nested break/continue,
+// short-circuit booleans used as conditions and chained if/else-if dispatch. Both recompile
+// cleanly. Categories still failing the roundtrip and tracked for follow-up: Lambdas
+// (lambda-param scope collision + erased generics) and Operators (short-circuit boolean
+// ||-merge value recovery, i.e. a returned `(a&&b)||c`).
 func recompileGateBaseline() []string {
 	return []string{
 		"Annotations",
 		"Arrays",
+		"Boundary",
 		"CastsInstanceof",
 		"Concurrency",
 		"ControlFlow",
+		"ControlFlowEdge",
 		"Enums",
 		"Exceptions",
 		"Generics",
@@ -245,6 +253,7 @@ func recompileGateBaseline() []string {
 		"Initializers",
 		"InnerClasses",
 		"Literals",
+		"Loops",
 		"Strings",
 		"Switches",
 		"TryWithResources",

@@ -35,9 +35,9 @@ authority for automated semantic decisions.
 
 | Axis | Result | How it is measured |
 |------|--------|--------------------|
-| Syntax safety (parse-or-degrade) | 23/23 corpus groups produce **syntax-parseable Java**; 0 syntax errors, 0 hard errors, 0 panics | `TestSyntaxCoverageMatrix` |
-| Reconstruction coverage (no stub) | 20/23 groups emit **non-degraded output** (no stub); 3 groups isolate concrete gaps | `TestSyntaxCoverageMatrix` |
-| Correctness (javac round-trip) | **16/18** eligible corpora recompile cleanly (was 4/13 at start); the classic corpus now emits **zero stubs**; all four inner/nested-class groups recompile | `TestRecompileRoundtrip` |
+| Syntax safety (parse-or-degrade) | 25/25 corpus groups produce **syntax-parseable Java**; 0 syntax errors, 0 hard errors, 0 panics | `TestSyntaxCoverageMatrix` |
+| Reconstruction coverage (no stub) | 23/25 groups emit **non-degraded output** (no stub); 2 groups isolate concrete gaps | `TestSyntaxCoverageMatrix` |
+| Correctness (javac round-trip) | **18/20** eligible corpora recompile cleanly (was 4/13 at start); the classic corpus now emits **zero stubs**; all four inner/nested-class groups recompile; two dedicated boundary-condition corpora gated | `TestRecompileRoundtrip` |
 | Determinism | byte-identical output across repeated decompiles; perf changes proven equivalent by per-class sha256 fingerprints | `TestCorpusDeterminism`, `TestDumpJarFingerprint` |
 | Test suite | green & fast: `./...` ≈ 22s, down from more than 150s (**at least 6.8x**), no machine-specific dependencies | `go test ./common/javaclassparser/...` |
 | Allocation cost | core **≈246 ms** and **≈182 MB cumulative heap allocation** per 106-class jar; validation increases runtime ≈ +18% and cumulative allocation ≈ +23% relative to core-only | `BenchmarkDecompileJar` |
@@ -50,15 +50,16 @@ out of `Decompile`.
 
 ### Round-trip correctness detail
 
-Of the 18 classic corpus groups eligible for strict `javac` round-trip validation
-(14 single-class groups plus 4 multi-class inner/nested-class groups):
+Of the 20 classic corpus groups eligible for strict `javac` round-trip validation
+(16 single-class groups plus 4 multi-class inner/nested-class groups):
 
-- **16 recompile successfully**: Annotations, Arrays, CastsInstanceof,
-  Concurrency, ControlFlow, Enums, Exceptions, Generics, Inheritance,
-  Initializers, InnerClasses, Literals, Loops, Strings, Switches,
+- **18 recompile successfully**: Annotations, Arrays, Boundary, CastsInstanceof,
+  Concurrency, ControlFlow, ControlFlowEdge, Enums, Exceptions, Generics,
+  Inheritance, Initializers, InnerClasses, Literals, Loops, Strings, Switches,
   TryWithResources.
-- **2 expose concrete semantic/typing defects**: Lambdas (captured-variable
-  naming) and Operators (short-circuit boolean `||` return recovery).
+- **2 expose concrete semantic/typing defects**: Lambdas (lambda-param scope
+  collision + erased generics) and Operators (short-circuit boolean `||` return
+  recovery).
 - **0 stubs** in the classic corpus: every method now structures to real Java.
 
 All four multi-class groups now recompile, exercising inner-class reconstruction
@@ -93,12 +94,14 @@ Outcome classes per group: `OK` (fully reconstructed + valid), `STUB` (some
 member degraded to a stub but class still valid), `SYNTAX` (invalid Java emitted
 — a real defect), `ERROR` (decompile returned an error), `PANIC`.
 
-### Classic corpus (Java 8 bytecode) — 18 groups
+### Classic corpus (Java 8 bytecode) — 20 groups
 ```
-ok=18  stub=0  syntax=0  error=0  panic=0
+ok=20  stub=0  syntax=0  error=0  panic=0
 ```
 - The former `STUB` (**Exceptions** → `tryCatchFinally(int[],int)` failing with
   `ParseBytesCode failed: multiple next`) is fixed; see §3 round 5.
+- Two boundary-condition groups (**Boundary**, **ControlFlowEdge**) were added this
+  round to harden the gate; both reconstruct fully (see §3 round 7).
 
 ### Modern corpus (Java 17 bytecode) — 5 groups
 ```
@@ -144,9 +147,10 @@ The oracle decompiles **every** class of a group (including inner, nested,
 anonymous and local classes) and recompiles the units together, so inner-class
 reconstruction is exercised end to end rather than skipped.
 ```
-recompile-ok:  16  (Annotations, Arrays, CastsInstanceof, Concurrency, ControlFlow,
-                    Enums, Exceptions, Generics, Inheritance, Initializers,
-                    InnerClasses, Literals, Loops, Strings, Switches, TryWithResources)
+recompile-ok:  18  (Annotations, Arrays, Boundary, CastsInstanceof, Concurrency,
+                    ControlFlow, ControlFlowEdge, Enums, Exceptions, Generics,
+                    Inheritance, Initializers, InnerClasses, Literals, Loops, Strings,
+                    Switches, TryWithResources)
 recompile-fail: 2  (Lambdas, Operators)
 stub:          0
 dec-err:       0
@@ -164,7 +168,7 @@ guessed:
 | Lambdas | `variable v already defined` + incompatible lambda param types + invalid method ref (5 errors) | two independent causes: **(A)** the lambda body is dumped with the *enclosing* method's `VariableId`, so its parameters (`var2,var3`) share the outer namespace and collide with the lambda's own assignment target (`BiFunction var2 = (Integer var2,…)`); **(B)** generics are erased — there is no `LocalVariableTypeTable`, so the target renders as raw `BiFunction`/`List`/`Function`, and the explicit `Integer` lambda params + `Integer::intValue` refs no longer typecheck against the raw type. The type arguments are only recoverable from the synthetic `lambda$…` method's own signature | hard (fresh lambda-param scope + generic `Signature` recovery) |
 
 Passing categories are pinned by `recompileGateBaseline`, so a regression that breaks
-any of the 16 green categories fails CI; the rest are tracked as the backlog.
+any of the 18 green categories fails CI; the rest are tracked as the backlog.
 
 > **Known semantic limitation (not a recompile failure).** `Loops.labeled`
 > recompiles cleanly, but a `continue <label>` whose target is an outer `for`
@@ -176,6 +180,25 @@ any of the 16 green categories fails CI; the rest are tracked as the backlog.
 > Tracked under "loop idiom recovery" in the backlog; the loop-semantics
 > round-trip battery (`TestLoopSemanticsRoundTrip`, which executes and compares
 > fingerprints) covers every non-labeled shape and passes.
+
+### Corpus expansion landed in this evaluation — round 7 (boundary-condition corpora)
+Two dedicated boundary corpora were added and **gated**, taking the strict round-trip
+to **18/20** and the classic coverage matrix to **20/20 (zero stubs)**:
+
+- **Boundary** — numeric extremes (`Integer.MIN/MAX_VALUE`, `Long.MIN/MAX_VALUE`),
+  signed integer division/modulo, narrowing cast chains (`double→long→int→short→byte`),
+  nested ternaries, full-width bit manipulation on `long` (`& | ^ << >> >>> ~`),
+  `char` arithmetic, multi-dimensional array traversal, and compound assignment on
+  array elements.
+- **ControlFlowEdge** — switch fall-through, `String` switch, sparse (lookup) vs dense
+  (table) switch, nested loops with plain `break`/`continue`, short-circuit booleans
+  used **as conditions** (which reconstruct correctly — the Operators gap is specific
+  to a *returned* `(a&&b)||c`), chained `if/else-if` dispatch, and `while(true)`+break.
+
+Both recompiled on the first attempt, evidence that the operand-typing, literal
+rendering, precedence, switch-case mapping and CFG structuring are robust across these
+edges. They are now hard regression gates. Verified by the full package suite and
+`TestCorpusDeterminism`.
 
 ### Correctness fix landed in this evaluation — round 6 (unreachable-statement prune)
 **Loops** flipped to a clean recompile, taking the round-trip to **16/18**. Because
@@ -540,9 +563,11 @@ recorded as future work.
    `catch (Throwable)` rethrow, exactly as the bytecode runs). A future pass can
    collapse this into a single idiomatic `finally {}` block for readability.
 
-*Landed this round (round 6):* unreachable-statement prune (Loops) — a back-edge
+*Landed this round (round 7):* boundary-condition corpora (Boundary, ControlFlowEdge)
+added and gated — strict round-trip now 18/20, classic coverage 20/20 with zero stubs.
+*Round 6:* unreachable-statement prune (Loops) — a back-edge
 `continue;` emitted after a non-falling-through inner region is deleted using a
-strict subset of the JLS reachability rules; round-trip is now 16/18.
+strict subset of the JLS reachability rules.
 *Round 5:* try/catch/finally handler grouping (Exceptions) —
 the classic corpus now emits zero stubs; real-jar stub markers fell sharply
 (gson 38 → 18).
