@@ -1,11 +1,11 @@
 package aicommon
 
 import (
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/linktable"
 )
 
 type TimelineFork struct {
@@ -18,10 +18,10 @@ type TimelineFork struct {
 }
 
 type TimelineMergeResult struct {
-	TaskIndex         string
-	ActiveItemsMerged int
-	ReducersMerged    int
-	RebasedIDs        int
+	TaskIndex             string
+	ActiveItemsMerged     int
+	CompressedHeadsMerged int
+	RebasedIDs            int
 }
 
 func (m *Timeline) ForkForTask(taskIndex, taskName string, config AICallerConfigIf, ai AICaller) (*TimelineFork, error) {
@@ -62,15 +62,13 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 		id   int64
 		item *TimelineItem
 	}
-	type reducerSnapshot struct {
-		id   int64
-		text string
-		ts   int64
+	type compressedHeadSnapshot struct {
+		head *TimelineCompressedHead
 		ref  *TimelineArchiveRef
 	}
 
 	var activeItems []activeSnapshot
-	var reducers []reducerSnapshot
+	var compressedHead *compressedHeadSnapshot
 	f.Branch.mu.RLock()
 	for _, id := range f.Branch.idToTimelineItem.Keys() {
 		if id <= f.BaseMaxID {
@@ -82,22 +80,16 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 		}
 		activeItems = append(activeItems, activeSnapshot{id: id, item: item})
 	}
-	for _, id := range f.Branch.reducers.Keys() {
-		if id <= f.BaseMaxID {
-			continue
+	// Forks are created from a snapshot of the parent timeline, so a compressed head
+	// whose covered end is still inside BaseMaxID belongs to the inherited prefix.
+	// Only a head covering IDs produced by the branch is merged back to the parent.
+	if head := f.Branch.compressedHead; head != nil && head.CoveredEndItemID > f.BaseMaxID && strings.TrimSpace(head.Text) != "" {
+		s := &compressedHeadSnapshot{head: cloneTimelineCompressedHead(head)}
+		if ref, ok := f.Branch.archiveRefs.Get(head.CoveredEndItemID); ok && ref != nil {
+			refCopy := *ref
+			s.ref = &refCopy
 		}
-		reducer, ok := f.Branch.reducers.Get(id)
-		if !ok || reducer == nil {
-			continue
-		}
-		s := reducerSnapshot{id: id, text: reducer.Value()}
-		if ts, ok := f.Branch.reducerTs.Get(id); ok && ts > 0 {
-			s.ts = ts
-		}
-		if ref, ok := f.Branch.archiveRefs.Get(id); ok && ref != nil {
-			s.ref = ref
-		}
-		reducers = append(reducers, s)
+		compressedHead = s
 	}
 	f.Branch.mu.RUnlock()
 
@@ -122,7 +114,7 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 	}
 
 	// Merge strategy (deterministic order first):
-	// 1) active/reducer entries from every branch are merged by runtime stage task order;
+	// 1) active entries and branch-local compressed heads are merged by runtime stage task order;
 	// 2) each merged entry is rebased to parent-generated IDs;
 	// 3) timestamps are regenerated as a monotonic merge sequence.
 	// This intentionally prefers deterministic replay/stable prompt order over preserving
@@ -142,19 +134,18 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 		result.ActiveItemsMerged++
 	}
 
-	for _, reducer := range reducers {
+	if compressedHead != nil && compressedHead.head != nil {
 		targetID := allocateID()
-		if targetID != reducer.id {
+		if targetID != compressedHead.head.CoveredEndItemID {
 			result.RebasedIDs++
 		}
-		parent.reducers.Set(targetID, linktable.NewUnlimitedStringLinkTable(reducer.text))
-		if reducer.ts > 0 {
-			parent.reducerTs.Set(targetID, reducer.ts)
+		compressedHead.head.CoveredEndItemID = targetID
+		parent.updateCompressedHead(compressedHead.head)
+		if compressedHead.ref != nil {
+			compressedHead.ref.ReducerKeyID = targetID
+			parent.archiveRefs.Set(targetID, compressedHead.ref)
 		}
-		if reducer.ref != nil {
-			parent.archiveRefs.Set(targetID, reducer.ref)
-		}
-		result.ReducersMerged++
+		result.CompressedHeadsMerged++
 	}
 
 	parent.dumpSizeCheckLocked()

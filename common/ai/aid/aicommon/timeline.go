@@ -56,11 +56,11 @@ type Timeline struct {
 	// 关键词: bucketSizer, 动态桶大小, 主动缓存调优
 	bucketSizer BucketSizer
 
-	compressing          *utils.Once
-	forkProtectedMaxID   int64
-	autoCompressDisabled bool
-	branchTimeline       bool
-	branchArchiveStore   TimelineArchiveStore
+	compressing               *utils.Once
+	forkProtectedMaxID        int64
+	autoCompressDisabled      bool
+	branchTimeline            bool
+	branchArchiveStore        TimelineArchiveStore
 	branchPersistentSessionID string
 }
 
@@ -199,6 +199,14 @@ func (m *Timeline) getMaxIDLocked() int64 {
 	for _, id := range ids {
 		if id > maxID {
 			maxID = id
+		}
+	}
+	if m.compressedHead != nil && m.compressedHead.CoveredEndItemID > maxID {
+		maxID = m.compressedHead.CoveredEndItemID
+	}
+	for _, h := range m.compressedHistory {
+		if h != nil && h.CoveredEndItemID > maxID {
+			maxID = h.CoveredEndItemID
 		}
 	}
 	return maxID

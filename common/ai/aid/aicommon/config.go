@@ -406,10 +406,10 @@ type Config struct {
 	forgeHotloadHandler            forgeHotloadHandler
 	skillUnloadHandler             skillUnloadHandler
 	forgeUnloadHandler             forgeUnloadHandler
-	capabilityInventoryEmitHandler   capabilityInventoryEmitHandler
-	sessionSnapshot                  *sessionSnapshotState
-	hotpatchCurrentTaskIdResolver    func() string
-	capabilityHotpatchHandler        func(enable bool, caps []EnabledCapability)
+	capabilityInventoryEmitHandler capabilityInventoryEmitHandler
+	sessionSnapshot                *sessionSnapshotState
+	hotpatchCurrentTaskIdResolver  func() string
+	capabilityHotpatchHandler      func(enable bool, caps []EnabledCapability)
 
 	/*
 		Lazy WorkDir for semantic artifact directory naming
@@ -653,7 +653,7 @@ func newConfig(ctx context.Context) *Config {
 		EnablePlanAndExec:                  true,
 		AllowRequireForUserInteract:        true,
 		ToolComposeConcurrency:             2,
-		PlanExecTaskConcurrency:            3,
+		PlanExecTaskConcurrency:            1,
 		Workdir:                            "",
 		MemoryPoolSize:                     10 * 1024, // 10k tokens
 		MemoryPool:                         omap.NewOrderedMap(make(map[string]*MemoryEntity)),
