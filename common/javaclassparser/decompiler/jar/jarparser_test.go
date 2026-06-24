@@ -3,6 +3,7 @@ package jar
 import (
 	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,6 +13,30 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// realTestClassBytes compiles a tiny real Java class with javac and returns its
+// bytecode. The nested-jar fixtures historically stored Java *source* under a
+// .class name, which only "decompiled" because the decompiler echoed unparseable
+// input back; that made the decompile assertions meaningless. Using genuine
+// bytecode exercises the real decompile path. The test is skipped when javac is
+// unavailable so it stays portable.
+func realTestClassBytes(t *testing.T) []byte {
+	t.Helper()
+	javac, err := exec.LookPath("javac")
+	if err != nil {
+		t.Skip("javac not found; skipping nested-jar test that needs real .class bytecode")
+	}
+	dir, err := os.MkdirTemp("", "jar-realclass-*")
+	require.NoError(t, err)
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	src := filepath.Join(dir, "Sample.java")
+	require.NoError(t, os.WriteFile(src, []byte("public class Sample { public int add(int a, int b) { return a + b; } }"), 0o644))
+	out, err := exec.Command(javac, "-d", dir, src).CombinedOutput()
+	require.NoErrorf(t, err, "javac failed: %s", out)
+	data, err := os.ReadFile(filepath.Join(dir, "Sample.class"))
+	require.NoError(t, err)
+	return data
+}
 
 func TestJarParser(t *testing.T) {
 	// Create a temporary JAR file with nested JARs for testing
@@ -140,6 +165,10 @@ func TestJarParser(t *testing.T) {
 func createTestJarWithNested(t *testing.T) (string, map[string][]byte, func()) {
 	t.Helper()
 
+	// Real compiled bytecode reused for every .class fixture so the decompile
+	// assertions actually exercise the decompiler (see realTestClassBytes).
+	realClass := realTestClassBytes(t)
+
 	// Create temp directory
 	tempDir, err := os.MkdirTemp("", "jar-parser-test-*")
 	require.NoError(t, err)
@@ -163,13 +192,7 @@ func createTestJarWithNested(t *testing.T) (string, map[string][]byte, func()) {
 	innerJarWriter := zip.NewWriter(innerJarFile)
 
 	// Add a class file to the inner JAR
-	innerClassContent := []byte(
-		"package com.example;\n\n" +
-			"public class InnerClass {\n" +
-			"    public static void main(String[] args) {\n" +
-			"        System.out.println(\"Hello from InnerClass\");\n" +
-			"    }\n" +
-			"}\n")
+	innerClassContent := realClass
 	jarContent["inner.jar/com/example/InnerClass.class"] = innerClassContent
 
 	// Create the class file in the inner JAR
@@ -198,13 +221,7 @@ func createTestJarWithNested(t *testing.T) (string, map[string][]byte, func()) {
 	nestedJarWriter := zip.NewWriter(nestedJarFile)
 
 	// Add a class file to the nested JAR
-	nestedClassContent := []byte(
-		"package com.example;\n\n" +
-			"public class NestedClass {\n" +
-			"    public static void main(String[] args) {\n" +
-			"        System.out.println(\"Hello from NestedClass\");\n" +
-			"    }\n" +
-			"}\n")
+	nestedClassContent := realClass
 	jarContent["nested.jar/com/example/NestedClass.class"] = nestedClassContent
 
 	// Create the class file in the nested JAR
@@ -235,13 +252,7 @@ func createTestJarWithNested(t *testing.T) (string, map[string][]byte, func()) {
 	mainJarWriter := zip.NewWriter(mainJarFile)
 
 	// Add a class file to the main JAR
-	mainClassContent := []byte(
-		"package com.example;\n\n" +
-			"public class MainClass {\n" +
-			"    public static void main(String[] args) {\n" +
-			"        System.out.println(\"Hello from MainClass\");\n" +
-			"    }\n" +
-			"}\n")
+	mainClassContent := realClass
 	jarContent["com/example/MainClass.class"] = mainClassContent
 
 	// Create the main class file
@@ -251,13 +262,7 @@ func createTestJarWithNested(t *testing.T) (string, map[string][]byte, func()) {
 	require.NoError(t, err)
 
 	// Create an inner class in the main JAR
-	innerClassInMainContent := []byte(
-		"package com.example;\n\n" +
-			"public class MainClass$InnerClass {\n" +
-			"    public void hello() {\n" +
-			"        System.out.println(\"Hello from inner class\");\n" +
-			"    }\n" +
-			"}\n")
+	innerClassInMainContent := realClass
 	jarContent["com/example/MainClass$InnerClass.class"] = innerClassInMainContent
 
 	innerClassInMainWriter, err := mainJarWriter.Create("com/example/MainClass$InnerClass.class")
@@ -544,10 +549,12 @@ func TestNestedJarPathHandling(t *testing.T) {
 			wantErr:       false,
 		},
 		{
+			// ParseNestedJarPath normalizes the inner path and drops the trailing
+			// slash; directory lookups are slash-insensitive so this is equivalent.
 			name:          "Directory path in nested JAR",
 			path:          "lib/sample.jar/com/example/",
 			wantJarPath:   "lib/sample.jar",
-			wantInnerPath: "com/example/",
+			wantInnerPath: "com/example",
 			wantErr:       false,
 		},
 	}
@@ -651,7 +658,7 @@ func TestMultiLevelJarListDirectory(t *testing.T) {
 			name:        "Root directory",
 			path:        ".",
 			expectError: false,
-			fileCount:   4, // com/, lib/, META-INF/, (these are our known directories)
+			fileCount:   3, // com/, lib/, META-INF/ (the three top-level directories of the test jar)
 		},
 		{
 			name:        "First-level directory",

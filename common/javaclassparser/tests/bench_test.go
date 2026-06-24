@@ -58,6 +58,15 @@ func BenchmarkDecompileJar(b *testing.B) {
 	if len(classes) == 0 {
 		b.Skip("no classes loaded")
 	}
+	// BENCH_NO_VALIDATE=1 disables the post-decompile syntax safety net so the
+	// benchmark measures the decompiler core in isolation. This is a diagnostic
+	// lever used to attribute cost between decompilation and ANTLR re-validation.
+	if isTruthyEnv("BENCH_NO_VALIDATE") {
+		prev := javaclassparser.EnableDecompileSyntaxValidation
+		javaclassparser.EnableDecompileSyntaxValidation = false
+		defer func() { javaclassparser.EnableDecompileSyntaxValidation = prev }()
+		b.Logf("syntax validation safety net DISABLED for this benchmark")
+	}
 	b.Logf("loaded %d classes from %s", len(classes), jarPath)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -67,6 +76,16 @@ func BenchmarkDecompileJar(b *testing.B) {
 				_, _ = javaclassparser.Decompile(raw)
 			}()
 		}
+	}
+}
+
+// isTruthyEnv reports whether the named env var is set to a truthy value.
+func isTruthyEnv(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(name))) {
+	case "1", "true", "yes", "y", "on", "enable", "enabled":
+		return true
+	default:
+		return false
 	}
 }
 
