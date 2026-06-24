@@ -12,6 +12,21 @@
 - 若用户要**修改该文件**：应使用 `modify_code`（不要用 `write_code` 覆盖）；若确实需要文件内容，请依赖附件选区或磁盘上的文件，而不是臆造代码。
 - 若用户要**新建独立脚本**（create 模式）：忽略上述「打开文件」提示，使用 `@action: write_code`，并在 JSON 后**必须**附带 `<|GEN_CODE_{{ .Nonce }}|>...<|GEN_CODE_END_{{ .Nonce }}|>`；最终会交付新的 `gen_code_*.yak`，不会写入该打开文件路径。
 
+{{ end }}{{ if .HasInitialSamples }}
+## 预检索代码样例（Init 已完成）
+
+以下样例已在初始化阶段注入，**禁止对相同 pattern/question 重复 grep/semantic**。
+
+{{ .InitialCodeSamples }}
+{{ if .InitSearchManifest }}
+已覆盖检索：{{ .InitSearchManifest }}
+{{ end }}
+
+{{ end }}{{ if not .AIKBAvailable }}
+## AIKB 不可用
+
+代码样例库未安装。仅使用 `yakdoc_*` 查询 API 签名；禁止臆造样例或 API。
+
 {{ end }}{{ if .Code }}{{ else }}## Yaklang 脚本编写规则说明
 <|YAKLANG_CODER_RULE_{{ .Nonce }}|>
 
@@ -449,10 +464,10 @@ When you receive a request, first understand the user's goal. Then, structure yo
 * 根据<|YAKLANG_CODER_RULE|>内容生成代码；
 * 系统自动运行静态代码分析，发现语法错误或者警告，会放在后续的<|ERR/LINT_WARNING|>区域，你需要再下一次循环中修正错误；
 * 创建一个新的脚本或代码，可以直接使用 @action: 'write_code' 来完成；
-* 如果要对已有代码进行修改，请使用 'modify_code' 工具，精确到行；
+* 如果要对已有代码进行修改，优先使用 `modify_code` + old_snippet（精确匹配）；大块行号修改用 modify_start_line/modify_end_line；
 * 如果代码内容过大，系统会将代码保存到临时文件中，你可以使用 'read_file' 或者 'grep' 等工具来查看；
 * 代码运行结束的时候，可以使用系统命令 'yak your-script.yak' 来运行脚本，并查看输出结果，是否符合预期；
-* 如果代码报错，或者执行结果不符合预期，你可以使用 'modify_code' 工具来修正代码，API 错误用 'yakdoc_*' 查文档，语法/样例用 'grep_yaklang_samples'；
+* 如果代码报错，或者执行结果不符合预期，API 错误用 'yakdoc_*' 查文档；若 Init 样例未覆盖该主题，再用 'grep_yaklang_samples'；
 
 {{ end }}
 
@@ -461,9 +476,9 @@ When you receive a request, first understand the user's goal. Then, structure yo
 * 如果代码内容不是特别大的话，请直接在下面的代码块中展示
 * 代码内容过大，会保存到临时文件中，你可以使用 'read_file' 或者 'grep' 等工具来查看
 * 下面的代码块儿为了方便展示，将会展示行列号，你需要正确读取并区分
-* 如果你要修改代码，请你使用 'modify_code' 工具来进行，精确修改到具体行
+* 如果你要修改代码，优先使用 `modify_code` + old_snippet（精确匹配）；行号修改用 modify_start_line/modify_end_line
 * 如果是库/API 使用问题，必须使用 'yakdoc_library_details' / 'yakdoc_function_details' 查询标准库文档
-* 如果出现了语法错误，使用 'grep_yaklang_samples' 搜索相似代码片段来参考
+* 如果出现了语法错误且 Init 样例未覆盖，使用 'grep_yaklang_samples' 搜索相似代码片段来参考
 * 调试时，你可以使用 `desc(instance)` 来查看变量的类型和属性
 * 你可以在必要的地方使用 `log.Info("Hello %v", name)` 来打印日志到标准输出以辅助调试
 
@@ -493,10 +508,16 @@ When you receive a request, first understand the user's goal. Then, structure yo
 {{ .FeedbackMessages }}
 <|ERR/LINT_WARNING_END_{{ .Nonce }}|>
 
-### [重要] 错误处理强制规则 - 必须立即 grep
+### [重要] 错误处理规则
 
-**如果上述错误包含 ExternLib API 错误，优先阅读【已自动附加 YakDocument】中的相近 API 与建议签名，直接 modify_code；信息不足再用 yakdoc_function_details。**
-**如果是 SyntaxError 或语法/D DSL 问题，你必须立即使用 grep_yaklang_samples：**
+{{ if .FeedbackMessages }}
+**当前代码仍有静态分析 Error，必须优先 `modify_code` 修复；SyntaxError 可 grep/semantic 查样例（Init 已覆盖的 pattern 在 lint 未通过时仍允许重搜）。**
+{{ else if .HasInitialSamples }}
+**先查阅上方「预检索代码样例」；若未覆盖当前 API/语法，再使用 grep_yaklang_samples 或 yakdoc_*。**
+{{ else }}
+**如果上述错误包含 ExternLib API 错误，优先阅读【已自动附加 YakDocument】中的相近 API 与建议签名，直接 modify_code（old_snippet 或行号）；信息不足再用 yakdoc_function_details。**
+**如果是 SyntaxError 或语法/DSL 问题，你必须立即使用 grep_yaklang_samples：**
+{{ end }}
 
 #### 错误类型1：API 不存在
 ```
@@ -659,10 +680,10 @@ undefined: xxx
 
 ### 下一步行动
 
-* [首选] 使用 `grep_yaklang_samples` 搜索代码样例（快速、直接）
+* [首选] {{ if .HasInitialSamples }}查阅 Init 预检索样例；未覆盖时用 `grep_yaklang_samples`{{ else }}使用 `grep_yaklang_samples` 搜索代码样例{{ end }}
 * [备选] 使用 `yakdoc_function_details` 查询标准库 API 文档
-* [最后] 使用 `modify_code` 基于搜索结果修改代码
-* [禁止] 在没有 grep 的情况下猜测性修改代码
+* [修改] 小改优先 `modify_code` + old_snippet；行号修改用 modify_start_line/modify_end_line
+* [禁止] 在没有样例依据的情况下猜测性修改代码
 
 ## 核心循环结束条件
 

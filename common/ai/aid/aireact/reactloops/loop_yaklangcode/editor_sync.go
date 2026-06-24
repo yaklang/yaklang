@@ -7,6 +7,8 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
@@ -65,6 +67,11 @@ func withYaklangDeferredEditorSync() reactloops.ReActLoopOption {
 			}
 			flushYaklangDeferredEditorSync(l)
 		})(loop)
+
+		// Safety net: some terminal paths break out of the iteration loop without isDone post hooks.
+		reactloops.WithOnLoopRelease(func() {
+			flushYaklangDeferredEditorSync(loop)
+		})(loop)
 	}
 }
 
@@ -77,21 +84,40 @@ func flushYaklangDeferredEditorSync(loop *reactloops.ReActLoop) {
 	}
 	content := strings.TrimSpace(loop.Get("full_code"))
 	if content == "" {
+		log.Infof("skip yaklang_code_change flush: full_code is empty")
 		return
 	}
-	if loop.GetInt(yaklangCodeVersionLoopKey) <= 0 && !isYaklangEditorSyncPending(loop) {
+
+	version := loopinfra.ResolvedYaklangCodeChangeVersion(loop, "full_code")
+	committed := loopinfra.HasCommittedYaklangCodeChange(loop, "full_code")
+	pending := isYaklangEditorSyncPending(loop)
+
+	if !committed && !pending {
+		return
+	}
+	if !committed && loopinfra.IsLoopCodeSeededOnly(loop) && yaklangDeferredFlushWouldRepeatSeed(loop, content) {
+		log.Infof("skip yaklang_code_change flush: no committed edits in this loop (seed=%d bytes)", len(strings.TrimSpace(loop.Get(loopinfra.LoopVarInitSeedFullCode))))
+		loop.Set(yaklangEditorSyncPendingLoopKey, false)
+		loop.Set(yaklangEditorSyncFlushedLoopKey, true)
 		return
 	}
 
 	path, eventOp, err := resolveYaklangDeliveryTarget(loop)
-	if err != nil || path == "" {
+	if err != nil {
+		log.Warnf("skip yaklang_code_change flush: resolve delivery target failed: %v", err)
+		return
+	}
+	if path == "" {
+		log.Warnf("skip yaklang_code_change flush: delivery path is empty")
 		return
 	}
 
-	_ = writeYaklangDeliveryFile(path, content)
+	if writeErr := writeYaklangDeliveryFile(path, content); writeErr != nil {
+		log.Warnf("skip yaklang_code_change flush: write delivery file failed: %v", writeErr)
+		return
+	}
 	loop.Set("filename", path)
 
-	version := loop.GetInt(yaklangCodeVersionLoopKey)
 	if version <= 0 {
 		version = 1
 	}
@@ -107,6 +133,7 @@ func flushYaklangDeferredEditorSync(loop *reactloops.ReActLoop) {
 		Reason:       strings.TrimSpace(loop.Get(yaklangCodeChangeReasonLoopKey)),
 		SourceAction: strings.TrimSpace(loop.Get(yaklangCodeSourceActionLoopKey)),
 	})
+	log.Infof("yaklang_code_change flush: path=%s op=%s version=%d bytes=%d", path, eventOp, version, len(content))
 	loop.Set(yaklangEditorSyncPendingLoopKey, false)
 	loop.Set(yaklangEditorSyncFlushedLoopKey, true)
 }
@@ -161,6 +188,17 @@ func isYaklangEditorSyncPending(loop *reactloops.ReActLoop) bool {
 	default:
 		return false
 	}
+}
+
+func yaklangDeferredFlushWouldRepeatSeed(loop *reactloops.ReActLoop, content string) bool {
+	if loop == nil {
+		return false
+	}
+	seed := strings.TrimSpace(loop.Get(loopinfra.LoopVarInitSeedFullCode))
+	if seed == "" {
+		return false
+	}
+	return strings.TrimSpace(content) == seed
 }
 
 func buildYaklangCodeSummary(content string) string {

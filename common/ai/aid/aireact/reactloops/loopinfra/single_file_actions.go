@@ -3,6 +3,7 @@ package loopinfra
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -23,7 +24,7 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 			fullCodeVar := f.GetFullCodeVariableName()
 			existing := l.Get(fullCodeVar)
-			if existing != "" {
+			if existing != "" && !AllowWriteCodeDespiteExistingSeed(l, fullCodeVar) {
 				return fmt.Errorf("code already exists (%d bytes). Use 'modify_%s' to make changes instead of 'write_%s'",
 					len(existing), f.actionSuffix, f.actionSuffix)
 			}
@@ -31,7 +32,6 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
 			filenameVar := f.GetFilenameVariableName()
-			fullCodeVar := f.GetFullCodeVariableName()
 			codeVar := f.GetCodeVariableName()
 			runtime := f.GetRuntime()
 
@@ -53,7 +53,6 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 			code := loop.Get(codeVar)
 
 			log.Infof("write_code: extracted code length=%d", len(code))
-			loop.Set(fullCodeVar, code)
 			if code == "" {
 				failMsg := f.DiagnoseMissingWriteCode(loop)
 				runtime.AddToTimeline("error", failMsg)
@@ -87,6 +86,8 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 				}
 				runtime.AddToTimeline("write_verified", fmt.Sprintf("verified: %d bytes on disk", len(writtenBytes)))
 			}
+
+			loop.Set(f.GetFullCodeVariableName(), code)
 
 			// Call file changed callback
 			errMsg, blocking := f.OnFileChanged(code, operator)
@@ -124,17 +125,33 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 	actionName := f.GetActionName("modify")
 	return reactloops.WithRegisterLoopActionWithStreamField(
 		actionName,
-		"do NOT use this action to create new code file, ONLY use it to modify existing code. Modify the code between the specified line numbers (inclusive). The line numbers are 1-based, meaning the first line of the file is line 1. Ensure that the 'modify_start_line' is less than or equal to 'modify_end_line'.",
+		`Modify existing code. Two modes (use one):
+1) Line range: modify_start_line + modify_end_line (1-based, inclusive).
+2) Snippet: old_snippet (exact text match) + optional replace_all for multiple matches.
+
+Prefer old_snippet for small precise fixes; use line range for larger blocks.`,
 		[]aitool.ToolOption{
-			aitool.WithIntegerParam("modify_start_line"),
-			aitool.WithIntegerParam("modify_end_line"),
+			aitool.WithIntegerParam("modify_start_line", aitool.WithParam_Description("Start line for line-range mode (required unless old_snippet is set)")),
+			aitool.WithIntegerParam("modify_end_line", aitool.WithParam_Description("End line for line-range mode (required unless old_snippet is set)")),
+			aitool.WithStringParam("old_snippet", aitool.WithParam_Description("Exact snippet from full_code to replace (snippet mode)")),
+			aitool.WithBoolParam("replace_all", aitool.WithParam_Description("Replace all old_snippet matches (snippet mode, default false)")),
+			aitool.WithStringParam("modify_code_reason", aitool.WithParam_Description(`Fix code errors or issues, and summarize the fixing approach and lessons learned, keeping the original code content for future reference value`)),
 		},
-		nil,
+		[]*reactloops.LoopStreamField{
+			{
+				FieldName: "modify_code_reason",
+				AINodeId:  "re-act-loop-thought",
+			},
+		},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
+			oldSnippet := strings.TrimSpace(action.GetString("old_snippet"))
+			if oldSnippet != "" {
+				return nil
+			}
 			start := action.GetInt("modify_start_line")
 			end := action.GetInt("modify_end_line")
 			if start <= 0 || end <= 0 || end < start {
-				return utils.Error("modify_code action must have valid 'modify_start_line' and 'modify_end_line' parameters")
+				return utils.Error("modify_code action must have valid 'modify_start_line' and 'modify_end_line' parameters, or provide 'old_snippet'")
 			}
 			loopInfraStatus(l, fmt.Sprintf("准备修改文件行 %d-%d / Preparing File Modify Lines %d-%d", start, end, start, end))
 			return nil
@@ -144,6 +161,7 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 			fullCodeVar := f.GetFullCodeVariableName()
 			codeVar := f.GetCodeVariableName()
 			runtime := f.GetRuntime()
+			actionName := f.GetActionName("modify")
 
 			filename := loop.Get(filenameVar)
 			if filename == "" {
@@ -152,6 +170,11 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 			}
 
 			action.WaitStream(op.GetContext())
+
+			if strings.TrimSpace(action.GetString("old_snippet")) != "" {
+				f.handleModifyByOldSnippet(loop, action, op, actionName, filename, fullCodeVar, codeVar)
+				return
+			}
 
 			if loop.GetInt("modify_attempts") >= 3 {
 				op.SetReflectionLevel(reactloops.ReflectionLevel_Deep)
@@ -178,11 +201,28 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 			if fixedCode {
 				start = NormalizeActionLineNumber(loop, fullCodeVar, start)
 				end = NormalizeActionLineNumber(loop, fullCodeVar, end)
+				lineDiffStart := start - modifyStartLine
+				lineDiffEnd := end - modifyEndLine
 				if start == modifyStartLine && end == modifyEndLine {
 					log.Infof("use prettified code segment for 'modify_code' action, fix range %d to %d", start, end)
 					partialCode = codeSegment
+				} else if lineDiffStart >= -2 && lineDiffStart <= 2 && lineDiffEnd >= -2 && lineDiffEnd <= 2 {
+					modifyStartLine = start
+					modifyEndLine = end
+					partialCode = codeSegment
+					correctMsg := fmt.Sprintf("Adjusted modify range to prettified lines [%d-%d] (requested [%d-%d]).",
+						start, end, action.GetInt("modify_start_line"), action.GetInt("modify_end_line"))
+					runtime.AddToTimeline("modify_line_corrected", correctMsg)
+					op.Feedback(correctMsg)
 				} else {
-					runtime.AddToTimeline("modify_warning", fmt.Sprintf("The code segment line numbers [%v-%v] do not match the specified modify line numbers [%v-%v]. Using the original code segment.", start, end, modifyStartLine, modifyEndLine))
+					warnMsg := fmt.Sprintf(`modify_code 行号与 GEN_CODE 块不一致。
+
+指定行号：[%d-%d]
+GEN_CODE 解析行号：[%d-%d]
+
+请使用 modify_code 的 old_snippet 精确匹配，或修正行号后重试。`, modifyStartLine, modifyEndLine, start, end)
+					runtime.AddToTimeline("modify_warning", warnMsg)
+					op.Feedback(warnMsg)
 					op.Continue()
 					return
 				}
@@ -198,7 +238,6 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 			}
 
 			fullCode = editor.GetSourceCode()
-			loop.Set(fullCodeVar, fullCode)
 			writeErr := f.replaceLoopFileContent(
 				runtime, filename, fullCode,
 				"modify_success", "modify_write_failed",
@@ -208,6 +247,7 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 				op.Fail(fmt.Sprintf("failed to write modified content to file: %v", writeErr))
 				return
 			}
+			loop.Set(fullCodeVar, fullCode)
 
 			loopInfraAddFileOpSuccessTimeline(loop, loopInfraFileOpTimeline{
 				Op:         "modify",
@@ -239,8 +279,7 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 			msg = utils.ShrinkTextBlock(fmt.Sprintf("line[%v-%v]:\n", modifyStartLine, modifyEndLine)+partialCode, 256)
 			if errMsg != "" {
 				msg += "\n\n--[linter]--\nWriting Code Linter Check:\n" + utils.PrefixLines(utils.ShrinkTextBlock(errMsg, 2048), "  ")
-				if !isSpinning {
-					// Only feedback error message if not spinning to avoid repetition
+				if hasBlockingErrors || !isSpinning {
 					op.Feedback(errMsg)
 				}
 			} else {
@@ -330,7 +369,6 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 			}
 
 			fullCode = editor.GetSourceCode()
-			loop.Set(fullCodeVar, fullCode)
 			writeErr := f.replaceLoopFileContent(
 				runtime, filename, fullCode,
 				"insert_success", "insert_write_failed",
@@ -340,6 +378,7 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 				op.Fail(fmt.Sprintf("failed to write content after insert: %v", writeErr))
 				return
 			}
+			loop.Set(fullCodeVar, fullCode)
 
 			loopInfraAddFileOpSuccessTimeline(loop, loopInfraFileOpTimeline{
 				Op:         "insert",
@@ -459,7 +498,6 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 			}
 
 			fullCode = editor.GetSourceCode()
-			loop.Set(fullCodeVar, fullCode)
 			var successMsg string
 			if deleteEndLine > 0 {
 				successMsg = fmt.Sprintf("SUCCESS: deleted lines[%d-%d], wrote %d bytes to file: %s", deleteStartLine, deleteEndLine, len(fullCode), filename)
@@ -475,6 +513,7 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 				op.Fail(fmt.Sprintf("failed to write content after delete: %v", writeErr))
 				return
 			}
+			loop.Set(fullCodeVar, fullCode)
 
 			loopInfraAddFileOpSuccessTimeline(loop, loopInfraFileOpTimeline{
 				Op:         "delete",

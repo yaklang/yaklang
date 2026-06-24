@@ -118,6 +118,67 @@ func firstNonEmptyYaklangString(values ...string) string {
 	return ""
 }
 
+// IsLoopCodeSeededOnly reports whether full_code still equals the init seed and this loop
+// has not committed a yaklang code change via applyLoopYaklangCodeChange yet.
+func IsLoopCodeSeededOnly(loop *reactloops.ReActLoop) bool {
+	if loop == nil {
+		return false
+	}
+	switch v := loop.GetVariable(LoopVarCodeSeededOnly).(type) {
+	case bool:
+		return v
+	case string:
+		return v == "true" || v == "1"
+	default:
+		return false
+	}
+}
+
+func isLoopCodeSeededOnly(loop *reactloops.ReActLoop) bool {
+	return IsLoopCodeSeededOnly(loop)
+}
+
+// ResolvedYaklangCodeChangeVersion returns the committed yaklang code version (0 if none).
+func ResolvedYaklangCodeChangeVersion(loop *reactloops.ReActLoop, fullCodeVar string) int {
+	if loop == nil {
+		return 0
+	}
+	_ = fullCodeVar
+	return loop.GetInt(loopYaklangCodeVersionKey)
+}
+
+// HasCommittedYaklangCodeChange reports whether this loop committed code via write/modify/replace.
+func HasCommittedYaklangCodeChange(loop *reactloops.ReActLoop, fullCodeVar string) bool {
+	return ResolvedYaklangCodeChangeVersion(loop, fullCodeVar) > 0
+}
+
+func clearLoopCodeSeededOnly(loop *reactloops.ReActLoop) {
+	if loop == nil {
+		return
+	}
+	loop.Set(LoopVarCodeSeededOnly, false)
+}
+
+// AllowWriteCodeDespiteExistingSeed returns true when full_code was seeded from an external
+// file (another session or disk) and this loop has not committed code changes yet.
+func AllowWriteCodeDespiteExistingSeed(loop *reactloops.ReActLoop, fullCodeVar string) bool {
+	if loop == nil || !isLoopCodeSeededOnly(loop) {
+		return false
+	}
+	if loop.GetInt(loopYaklangCodeVersionKey) > 0 {
+		return false
+	}
+	existing := strings.TrimSpace(loop.Get(fullCodeVar))
+	if existing == "" {
+		return false
+	}
+	seed := strings.TrimSpace(loop.Get(LoopVarInitSeedFullCode))
+	if seed == "" {
+		seed = existing
+	}
+	return existing == seed
+}
+
 func resolveLoopYaklangCodeEventOp(explicitOp string, previousState *loopYaklangCodeState) (string, error) {
 	switch strings.TrimSpace(explicitOp) {
 	case "":
@@ -193,6 +254,7 @@ func (f *SingleFileModificationSuiteFactory) applyLoopYaklangCodeChange(loop *re
 	loop.Set(loopYaklangCodeVersionKey, currentState.Version)
 	loop.Set(loopYaklangCodeSourceActionKey, currentState.SourceAction)
 	loop.Set(loopYaklangCodeChangeReasonKey, currentState.ChangeReason)
+	clearLoopCodeSeededOnly(loop)
 
 	if input.EmitEvent {
 		emitLoopYaklangCodeChangeEvent(loop, currentState, eventOp)

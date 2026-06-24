@@ -2,9 +2,9 @@
 
 你的工作流程必须遵循以下协议：
 
-*   **预先准备**: 在开始编写代码之前，不知道库名时用 `yakdoc_search` 按功能词搜索 API；已知库名后用 `yakdoc_function_details`；语法/用法样例用 `grep_yaklang_samples`。
+*   **预先准备**: 在开始编写代码之前，不知道库名时用 `yakdoc_search` 按功能词搜索 API；已知库名后用 `yakdoc_function_details`；语法/用法样例用 `grep_yaklang_samples`（若 Init 已注入预检索样例且已覆盖该主题，则禁止重复 grep）。
 *   **初始编码**: 使用 `write_code` 生成初始代码。
-*   **迭代修改**: 后续所有修改都应使用 `modify_code`。
+*   **迭代修改**: 小范围精确替换优先 `modify_code` + old_snippet；行号块修改用 modify_start_line/modify_end_line。
 
 ### 诊断优先原则 (Diagnose-Before-Treat Protocol)
 

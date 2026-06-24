@@ -179,6 +179,53 @@ func TestWriteAction_NoFilename_EmitsNewFileAndWrites(t *testing.T) {
 	assert.True(t, runtime.timelineContentContains("file_write", "println"))
 }
 
+func TestWriteAction_AllowedWhenSeededOnly(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, factory, task := newLoopAndFactory(t, runtime, yaklangSingleFileOpts()...)
+	actionName := factory.GetActionName("write")
+	fullCodeVar := factory.GetFullCodeVariableName()
+	codeVar := factory.GetCodeVariableName()
+
+	seed := "seed from previous session"
+	loop.Set(fullCodeVar, seed)
+	loop.Set(LoopVarInitSeedFullCode, seed)
+	loop.Set(LoopVarCodeSeededOnly, true)
+	loop.Set(codeVar, "println(\"replacement\")")
+	loop.Set("filename", filepath.Join(runtime.tmpDir, "demo.yak"))
+
+	action := mustBuildAction(t, actionName, nil)
+	ac, err := loop.GetActionHandler(actionName)
+	require.NoError(t, err)
+	require.NotNil(t, ac.ActionVerifier)
+	require.NoError(t, ac.ActionVerifier(loop, action))
+
+	op := reactloops.NewActionHandlerOperator(task)
+	ac.ActionHandler(loop, action, op)
+
+	assert.Equal(t, "println(\"replacement\")", loop.Get(fullCodeVar))
+	assert.False(t, isLoopCodeSeededOnly(loop))
+	assert.Greater(t, loop.GetInt(loopYaklangCodeVersionKey), 0)
+}
+
+func TestWriteAction_RejectedWhenExistingCodeNotSeedOnly(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, factory, _ := newLoopAndFactory(t, runtime, yaklangSingleFileOpts()...)
+	actionName := factory.GetActionName("write")
+	fullCodeVar := factory.GetFullCodeVariableName()
+
+	loop.Set(fullCodeVar, "already edited code")
+	loop.Set(LoopVarInitSeedFullCode, "seed from disk")
+	loop.Set(LoopVarCodeSeededOnly, false)
+
+	action := mustBuildAction(t, actionName, nil)
+	ac, err := loop.GetActionHandler(actionName)
+	require.NoError(t, err)
+	require.NotNil(t, ac.ActionVerifier)
+	verifyErr := ac.ActionVerifier(loop, action)
+	require.Error(t, verifyErr)
+	assert.Contains(t, verifyErr.Error(), "code already exists")
+}
+
 func TestWriteAction_WriteError_AddToTimelineAndFail(t *testing.T) {
 	runtime := newTestRuntimeForSingleFile(t)
 	runtime.forcedEmit = runtime.tmpDir // writing file into a directory path should fail
@@ -363,8 +410,8 @@ func TestModifyAction_PrettifyMismatch_ContinueAndTimeline(t *testing.T) {
 	loop.Set(factory.GetCodeVariableName(), "1 | X")
 
 	action := mustBuildAction(t, factory.GetActionName("modify"), map[string]any{
-		"modify_start_line": 2,
-		"modify_end_line":   2,
+		"modify_start_line": 10,
+		"modify_end_line":   10,
 	})
 	ac, _ := loop.GetActionHandler(factory.GetActionName("modify"))
 	op := reactloops.NewActionHandlerOperator(task)
@@ -372,6 +419,7 @@ func TestModifyAction_PrettifyMismatch_ContinueAndTimeline(t *testing.T) {
 
 	assert.True(t, op.IsContinued())
 	assert.True(t, runtime.timelineContains("modify_warning"))
+	assert.NotEmpty(t, op.GetFeedback().String())
 }
 
 func TestModifyAction_Spinning_ReflectionAndFeedback(t *testing.T) {
@@ -646,4 +694,65 @@ func TestModifyAction_DeferDiskWrite_PreservesExistingFile(t *testing.T) {
 	assert.Equal(t, "a\nold\nc", string(diskContent))
 	assert.Contains(t, loop.Get(factory.GetFullCodeVariableName()), "new")
 	assert.True(t, runtime.timelineContentContains("modify_success", "disk write deferred"))
+}
+
+func TestModifyAction_OldSnippet_UniqueMatch(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, factory, task := newLoopAndFactory(t, runtime, WithActionSuffix("code"), WithExitAfterWrite(false))
+	filename := filepath.Join(runtime.tmpDir, "snippet.yak")
+	loop.Set(factory.GetFilenameVariableName(), filename)
+	loop.Set(factory.GetFullCodeVariableName(), "yakit.AutoInitYakit()\nx = 1\ny = 2\n")
+	loop.Set(factory.GetCodeVariableName(), "x = 42")
+
+	action := mustBuildAction(t, factory.GetActionName("modify"), map[string]any{
+		"old_snippet": "x = 1",
+	})
+	ac, err := loop.GetActionHandler(factory.GetActionName("modify"))
+	require.NoError(t, err)
+	op := reactloops.NewActionHandlerOperator(task)
+	ac.ActionHandler(loop, action, op)
+
+	assert.Contains(t, loop.Get(factory.GetFullCodeVariableName()), "x = 42")
+	content, readErr := os.ReadFile(filename)
+	require.NoError(t, readErr)
+	assert.Contains(t, string(content), "x = 42")
+	assert.True(t, runtime.timelineContains("modify_success"))
+}
+
+func TestModifyAction_OldSnippet_NotFound_Continue(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, factory, task := newLoopAndFactory(t, runtime, WithActionSuffix("code"), WithExitAfterWrite(false))
+	filename := filepath.Join(runtime.tmpDir, "snippet2.yak")
+	loop.Set(factory.GetFilenameVariableName(), filename)
+	loop.Set(factory.GetFullCodeVariableName(), "a = 1\n")
+	loop.Set(factory.GetCodeVariableName(), "a = 2")
+
+	action := mustBuildAction(t, factory.GetActionName("modify"), map[string]any{
+		"old_snippet": "missing",
+	})
+	ac, _ := loop.GetActionHandler(factory.GetActionName("modify"))
+	op := reactloops.NewActionHandlerOperator(task)
+	ac.ActionHandler(loop, action, op)
+
+	assert.True(t, op.IsContinued())
+	assert.True(t, runtime.timelineContains("modify_snippet_not_found"))
+}
+
+func TestModifyAction_OldSnippet_Ambiguous_Continue(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, factory, task := newLoopAndFactory(t, runtime, WithActionSuffix("code"), WithExitAfterWrite(false))
+	filename := filepath.Join(runtime.tmpDir, "snippet3.yak")
+	loop.Set(factory.GetFilenameVariableName(), filename)
+	loop.Set(factory.GetFullCodeVariableName(), "x=1\nfoo\nx=1\n")
+	loop.Set(factory.GetCodeVariableName(), "x=9")
+
+	action := mustBuildAction(t, factory.GetActionName("modify"), map[string]any{
+		"old_snippet": "x=1",
+	})
+	ac, _ := loop.GetActionHandler(factory.GetActionName("modify"))
+	op := reactloops.NewActionHandlerOperator(task)
+	ac.ActionHandler(loop, action, op)
+
+	assert.True(t, op.IsContinued())
+	assert.True(t, runtime.timelineContains("modify_snippet_ambiguous"))
 }

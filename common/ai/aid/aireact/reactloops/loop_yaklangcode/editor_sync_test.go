@@ -180,6 +180,95 @@ func TestYaklangDeferredEditorSync_EditorFileWinsOverGenCodePath(t *testing.T) {
 	assert.Equal(t, "println(\"target\")", string(data))
 }
 
+func TestYaklangDeferredEditorSync_SkipsFlushWhenSeedUnchanged(t *testing.T) {
+	capture := &editorSyncCapturedEvents{}
+	runtime := mock.NewMockInvoker(context.Background())
+	cfg := runtime.GetConfig().(*mock.MockedAIConfig)
+	cfg.Emitter = aicommon.NewEmitter("yaklang-editor-sync-seed-skip", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		capture.appendEvent(e)
+		return e, nil
+	})
+
+	loop, err := reactloops.NewReActLoop("yaklang-editor-sync-seed-skip", runtime, withYaklangDeferredEditorSync())
+	require.NoError(t, err)
+
+	seed := "println(\"from previous session\")"
+	editorFile := filepath.Join(t.TempDir(), "shared.yak")
+	require.NoError(t, os.WriteFile(editorFile, []byte(seed), 0o644))
+
+	loop.Set("editor_file_path", editorFile)
+	loop.Set("full_code", seed)
+	loop.Set(loopinfra.LoopVarInitSeedFullCode, seed)
+	loop.Set(loopinfra.LoopVarCodeSeededOnly, true)
+	loop.Set(yaklangEditorSyncPendingLoopKey, true)
+
+	flushYaklangDeferredEditorSync(loop)
+
+	assert.Empty(t, capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE))
+
+	data, readErr := os.ReadFile(editorFile)
+	require.NoError(t, readErr)
+	assert.Equal(t, seed, string(data))
+}
+
+func TestYaklangDeferredEditorSync_FlushesAfterWriteCodeOnSeed(t *testing.T) {
+	capture := &editorSyncCapturedEvents{}
+	runtime := mock.NewMockInvoker(context.Background())
+	cfg := runtime.GetConfig().(*mock.MockedAIConfig)
+	cfg.Emitter = aicommon.NewEmitter("yaklang-editor-sync-seed-write", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		capture.appendEvent(e)
+		return e, nil
+	})
+
+	modSuite := loopinfra.NewSingleFileModificationSuiteFactory(
+		runtime,
+		loopinfra.WithLoopVarsPrefix("yak"),
+		loopinfra.WithActionSuffix("code"),
+		loopinfra.WithAITagConfig("GEN_CODE", "yak_code", "yaklang-code", "code/yaklang"),
+		loopinfra.WithFileExtension(".yak"),
+	)
+
+	loop, err := reactloops.NewReActLoop(
+		"yaklang-editor-sync-seed-write",
+		runtime,
+		append(modSuite.GetActions(), withYaklangDeferredEditorSync())...,
+	)
+	require.NoError(t, err)
+
+	task := aicommon.NewStatefulTaskBase("task", "test", context.Background(), cfg.Emitter, true)
+	loop.SetCurrentTask(task)
+
+	seed := "old session code"
+	editorFile := filepath.Join(t.TempDir(), "shared.yak")
+	require.NoError(t, os.WriteFile(editorFile, []byte(seed), 0o644))
+
+	loop.Set("editor_file_path", editorFile)
+	loop.Set("filename", editorFile)
+	loop.Set("full_code", seed)
+	loop.Set(loopinfra.LoopVarInitSeedFullCode, seed)
+	loop.Set(loopinfra.LoopVarCodeSeededOnly, true)
+	loop.Set("yak_code", "println(\"new task code\")")
+
+	writeAction, err := loop.GetActionHandler("write_code")
+	require.NoError(t, err)
+	op := reactloops.NewActionHandlerOperator(task)
+	writeAction.ActionHandler(loop, mustBuildYaklangAction(t, "write_code", nil), op)
+
+	flushYaklangDeferredEditorSync(loop)
+
+	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
+	require.Len(t, events, 1)
+
+	var payload yaklangCodeChangeEvent
+	require.NoError(t, json.Unmarshal(events[0].Content, &payload))
+	assert.Equal(t, "println(\"new task code\")", payload.Code.Content)
+	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpReplace, payload.Op)
+
+	data, readErr := os.ReadFile(editorFile)
+	require.NoError(t, readErr)
+	assert.Equal(t, "println(\"new task code\")", string(data))
+}
+
 func mustBuildYaklangAction(t *testing.T, actionName string, fields map[string]any) *aicommon.Action {
 	t.Helper()
 	payload := map[string]any{"@action": actionName}

@@ -256,7 +256,7 @@ var grepYaklangSamplesAction = func(r aicommon.AIInvokeRuntime, docSearcher *zip
 
 【强制使用场景】：
 1. 编写任何代码前，先 grep 相关函数用法
-2. 遇到 API 错误（ExternLib don't has）时 - 先读 lint 自动附加的 YakDocument；需要完整样例再 grep
+2. 遇到 API 错误（ExternLib don't has）时 - 必须立即 grep
 3. 遇到语法错误（SyntaxError）时 - 必须立即 grep
 4. 不确定函数参数或返回值时
 
@@ -328,38 +328,24 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 
 			invoker := loop.GetInvoker()
 
-			// 检查重复查询
-			lastGrepQuery := loop.Get("last_grep_query")
-			currentQuery := fmt.Sprintf("%s|%v|%d", pattern, caseSensitive, contextLines)
-
-			if lastGrepQuery == currentQuery {
-				errorMsg := fmt.Sprintf(`【严重错误】检测到重复查询！
-				
-上次查询：%s
-本次查询：%s
-
-【拒绝执行】：禁止重复相同的搜索模式！
-
-【必须调整】：
-1. 修改搜索关键词 - 使用同义词或相关词汇
-2. 调整搜索策略 - 扩大或缩小搜索范围  
-3. 改变搜索方向 - 从功能角度而非API角度搜索
-4. 检查拼写错误 - 确认关键词正确性
-
-【建议行动】：
-- 如果之前搜索无结果，尝试更通用的词汇
-- 如果之前结果太多，使用更精确的模式
-- 考虑从业务需求角度重新思考搜索词
-
-【警告】：继续重复查询将浪费时间且无法获得新信息！`, lastGrepQuery, currentQuery)
-
-				invoker.AddToTimeline("grep_duplicate_query_error", errorMsg)
-				log.Warnf("duplicate grep query detected: %s", currentQuery)
+			if covered, msg := GrepAlreadyCovered(loop, pattern); covered {
+				invoker.AddToTimeline("grep_init_covered", msg)
+				op.Feedback(msg)
 				op.Continue()
 				return
 			}
 
-			// 记录当前查询
+			currentQuery := fmt.Sprintf("%s|%v|%d", pattern, caseSensitive, contextLines)
+			dupMsg := fmt.Sprintf(`【严重错误】检测到重复查询！
+
+上次查询：%s
+本次查询：%s
+
+【拒绝执行】：禁止重复相同的搜索模式！请修改 pattern 或使用 semantic_search_yaklang_samples。`, loop.Get("last_grep_query"), currentQuery)
+			if rejectDuplicateQuery(loop, op, "grep_duplicate_query_error", "last_grep_query", currentQuery, dupMsg) {
+				log.Warnf("duplicate grep query detected: %s", currentQuery)
+				return
+			}
 			loop.Set("last_grep_query", currentQuery)
 
 			nodeID := "grep_yaklang_samples"
@@ -385,6 +371,7 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 【建议】：暂停编码任务，优先解决搜索器问题`
 				log.Warn("document searcher not available")
 				invoker.AddToTimeline("grep_system_error", errorMsg)
+				op.Feedback(errorMsg)
 				op.Continue()
 				return
 			}
@@ -429,6 +416,7 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 【警告】：搜索失败将影响代码质量，请务必解决！`, err)
 				log.Errorf("grep search failed: %v", err)
 				invoker.AddToTimeline("grep_execution_error", errorMsg)
+				op.Feedback(errorMsg)
 				op.Continue()
 				return
 			}
@@ -458,6 +446,7 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 【后果警告】：不重新搜索将导致代码错误和调试失败！`, pattern)
 				log.Infof("no grep results found for pattern: %s", pattern)
 				invoker.AddToTimeline("grep_no_results_warning", noResultMsg)
+				op.Feedback(noResultMsg)
 				op.Continue()
 				return
 			}

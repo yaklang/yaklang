@@ -125,7 +125,7 @@ func formatCompilerErrorHint(pattern compilerErrorHint) string {
 func lookupCompilerErrorFallback(normalizedMessage string) string {
 	switch {
 	case strings.HasPrefix(normalizedMessage, "基础语法错误"):
-		return "Yaklang 基础语法解析失败。检查括号/花括号是否匹配、是否误用了 Go/JavaScript 语法，必要时用 grep_yaklang_samples 搜索相似写法。"
+		return "Yaklang 基础语法解析失败。检查括号/花括号是否匹配、是否误用了 Go/JavaScript 语法；若 Init 样例未覆盖该写法，再用 grep_yaklang_samples 搜索相似写法。"
 	case strings.Contains(normalizedMessage, "no viable alternative"):
 		return "语法解析失败（no viable alternative）。常见原因：Go 风格类型声明、import/package、泛型或不被 Yaklang 支持的语法。请对照 Yaklang DSL 改写。"
 	case strings.Contains(normalizedMessage, "mismatched input"):
@@ -135,7 +135,7 @@ func lookupCompilerErrorFallback(normalizedMessage string) string {
 	case strings.Contains(normalizedMessage, "expecting"):
 		return "语法不完整（expecting ...）。补全缺失的括号、分号或语句结束符。"
 	default:
-		return "编译器/静态分析报错。请根据上方错误信息定位行号，修正后再 modify_code；API 问题用 yakdoc_*，语法样例用 grep_yaklang_samples。"
+		return "编译器/静态分析报错。请根据上方错误信息定位行号，优先 modify_code（old_snippet 或行号）；API 问题用 yakdoc_*；若 Init 样例未覆盖，语法样例用 grep_yaklang_samples。"
 	}
 }
 

@@ -180,38 +180,24 @@ semantic_search_yaklang_samples(questions=["Yaklang中如何处理错误？", "Y
 			}
 			questionsStr := strings.Join(questionTexts, "|")
 
-			// 检查重复查询
-			lastSearchQuery := loop.Get("last_semantic_search_query")
-			currentQuery := fmt.Sprintf("%s|%d|%f", questionsStr, topN, scoreThreshold)
-
-			if lastSearchQuery == currentQuery {
-				errorMsg := fmt.Sprintf(`【严重错误】检测到重复语义搜索！
-
-上次查询：%s
-本次查询：%s
-
-【拒绝执行】：禁止重复相同的搜索模式！
-
-【必须调整】：
-1. 修改问题表述 - 使用不同的问法或角度
-2. 拆解或合并问题 - 调整问题粒度
-3. 调整搜索参数 - 修改 top_n 或 score_threshold
-4. 检查问题质量 - 确保问题完整且明确
-
-【建议行动】：
-- 如果之前搜索无结果，尝试更通用的问题
-- 如果之前结果太多，使用更精确的问题
-- 考虑从不同角度提问
-
-【警告】：继续重复查询将浪费时间且无法获得新信息！`, lastSearchQuery, currentQuery)
-
-				invoker.AddToTimeline("semantic_search_duplicate_query_error", errorMsg)
-				log.Warnf("duplicate semantic search query detected: %s", currentQuery)
+			if covered, msg := SemanticAlreadyCovered(loop, questionTexts); covered {
+				invoker.AddToTimeline("semantic_init_covered", msg)
+				op.Feedback(msg)
 				op.Continue()
 				return
 			}
 
-			// 记录当前查询
+			currentQuery := fmt.Sprintf("%s|%d|%f", questionsStr, topN, scoreThreshold)
+			dupMsg := fmt.Sprintf(`【严重错误】检测到重复语义搜索！
+
+上次查询：%s
+本次查询：%s
+
+【拒绝执行】：禁止重复相同的搜索模式！请修改问题表述或调整 top_n/score_threshold。`, loop.Get("last_semantic_search_query"), currentQuery)
+			if rejectDuplicateQuery(loop, op, "semantic_search_duplicate_query_error", "last_semantic_search_query", currentQuery, dupMsg) {
+				log.Warnf("duplicate semantic search query detected: %s", currentQuery)
+				return
+			}
 			loop.Set("last_semantic_search_query", currentQuery)
 
 			nodeID := "search_yaklang_samples"
