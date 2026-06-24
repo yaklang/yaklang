@@ -357,7 +357,19 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 					constStr, _ := c.obj.getUtf8(constVal.StringIndex)
 					valueLiteral = values.JavaStringToLiteral(constStr)
 				case *ConstantIntegerInfo:
-					valueLiteral = strconv.Itoa(int(constVal.Value))
+					// boolean/char are stored as int constants in the pool; render them
+					// in their declared type so the field initializer type-checks
+					// (e.g. `boolean B = true` instead of the illegal `boolean B = 1`).
+					switch fieldType.String(c.FuncCtx) {
+					case types.NewJavaPrimer(types.JavaBoolean).String(c.FuncCtx):
+						if constVal.Value == 0 {
+							valueLiteral = "false"
+						} else {
+							valueLiteral = "true"
+						}
+					default:
+						valueLiteral = strconv.Itoa(int(constVal.Value))
+					}
 				case *ConstantLongInfo:
 					valueLiteral = strconv.Itoa(int(constVal.Value))
 					if !strings.HasSuffix(valueLiteral, "L") {

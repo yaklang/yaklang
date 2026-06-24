@@ -195,6 +195,18 @@ func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) str
 						return argType
 					})
 				}
+			} else if expectPrim.Name == types.JavaBoolean {
+				// The JVM has no boolean opcodes: a boolean argument is pushed as an int
+				// constant (iconst_0/iconst_1). Java forbids int->boolean conversion, so an
+				// int literal flowing into a boolean parameter must be rendered as a boolean
+				// literal or the call fails to recompile (e.g. Boolean.valueOf(1)).
+				if lit, okl := UnpackSoltValue(arg).(*JavaLiteral); okl {
+					if actualPrim, oka := lit.Type().RawType().(*types.JavaPrimer); oka && actualPrim.Name == types.JavaInteger {
+						if iv, oki := lit.Data.(int); oki {
+							arg = NewJavaLiteral(iv, types.NewJavaPrimer(types.JavaBoolean))
+						}
+					}
+				}
 			}
 		}
 		paramStrs = append(paramStrs, arg.String(funcCtx))

@@ -614,7 +614,12 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		}
 		arg := runtimeStackSimulation.Pop().(values.JavaValue)
 		runtimeStackSimulation.Push(values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
-			return fmt.Sprintf("(%s)%s", fname, arg.String(funcCtx))
+			// Parenthesize the operand so the (unary) cast keeps the right precedence
+			// when the operand is a lower-precedence expression: without it,
+			// `(long)a * b` parses as `((long)a) * b` instead of `(long)(a * b)`,
+			// causing "possible lossy conversion" recompile failures. The extra parens
+			// are always valid Java.
+			return fmt.Sprintf("(%s)(%s)", fname, arg.String(funcCtx))
 		}, func() types.JavaType {
 			return typ
 		}))

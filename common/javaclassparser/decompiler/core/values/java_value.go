@@ -2,6 +2,7 @@ package values
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -157,19 +158,90 @@ func fixJavaStringEscapes(raw string) string {
 }
 
 func (j *JavaLiteral) String(funcCtx *class_context.ClassContext) string {
-	if j.JavaType.String(funcCtx) == types.NewJavaPrimer(types.JavaBoolean).String(funcCtx) {
+	typeStr := j.JavaType.String(funcCtx)
+	switch typeStr {
+	case types.NewJavaPrimer(types.JavaBoolean).String(funcCtx):
 		if v, ok := j.Data.(int); ok {
 			if v == 0 {
 				return "false"
 			}
 			return "true"
 		}
+	case types.NewJavaPrimer(types.JavaLong).String(funcCtx):
+		// long literals need an explicit L suffix in expression position. The field
+		// path adds it separately; without it here, values beyond int range fail to
+		// compile ("integer number too large"), e.g. Long.valueOf(9223372036854775807).
+		s := fmt.Sprint(j.Data)
+		if s != "" && !strings.HasSuffix(s, "L") && !strings.HasSuffix(s, "l") {
+			s += "L"
+		}
+		return s
+	case types.NewJavaPrimer(types.JavaFloat).String(funcCtx):
+		// A bare decimal literal is a double in Java, so a float value must carry an
+		// F suffix or it is a type error (e.g. Float.valueOf(3.14) has no overload).
+		return javaFloatLiteralExpr(j.Data)
+	case types.NewJavaPrimer(types.JavaDouble).String(funcCtx):
+		// The D suffix keeps an integral double (e.g. 1.0 -> "1") from being read as
+		// an int, which would break overloads like Double.valueOf(double).
+		return javaDoubleLiteralExpr(j.Data)
 	}
-	if j.JavaType.String(funcCtx) == "java.lang.String" || j.JavaType.String(funcCtx) == "String" {
+	if typeStr == "java.lang.String" || typeStr == "String" {
 		return JavaStringToLiteral(j.Data)
-	} else {
-		return fmt.Sprint(j.Data)
 	}
+	return fmt.Sprint(j.Data)
+}
+
+// literalToFloat64 normalizes the numeric payload of a float/double literal.
+func literalToFloat64(data any) (float64, bool) {
+	switch v := data.(type) {
+	case float32:
+		return float64(v), true
+	case float64:
+		return v, true
+	case int:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	case int32:
+		return float64(v), true
+	}
+	return 0, false
+}
+
+// javaFloatLiteralExpr renders a float constant as a valid Java float literal (with
+// an F suffix), handling NaN/Infinity. Mirrors the field-path renderer in dumper.go.
+func javaFloatLiteralExpr(data any) string {
+	f, ok := literalToFloat64(data)
+	if !ok {
+		return fmt.Sprint(data)
+	}
+	switch {
+	case math.IsNaN(f):
+		return "Float.NaN"
+	case math.IsInf(f, 1):
+		return "Float.POSITIVE_INFINITY"
+	case math.IsInf(f, -1):
+		return "Float.NEGATIVE_INFINITY"
+	}
+	return strconv.FormatFloat(f, 'g', -1, 32) + "F"
+}
+
+// javaDoubleLiteralExpr renders a double constant as a valid Java double literal
+// (with a D suffix), handling NaN/Infinity. Mirrors the field-path renderer.
+func javaDoubleLiteralExpr(data any) string {
+	f, ok := literalToFloat64(data)
+	if !ok {
+		return fmt.Sprint(data)
+	}
+	switch {
+	case math.IsNaN(f):
+		return "Double.NaN"
+	case math.IsInf(f, 1):
+		return "Double.POSITIVE_INFINITY"
+	case math.IsInf(f, -1):
+		return "Double.NEGATIVE_INFINITY"
+	}
+	return strconv.FormatFloat(f, 'g', -1, 64) + "D"
 }
 
 func NewJavaLiteral(data any, typ types.JavaType) *JavaLiteral {
