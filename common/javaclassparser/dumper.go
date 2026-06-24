@@ -883,9 +883,16 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 						statementStr = c.GetTabString() + statement.String(funcCtx) + ";"
 					}
 				case *statements.SynchronizedStatement:
+					// A field lock desugars to `getfield; dup; astore tmp; monitorenter`; the
+					// synthetic temp backs the implicit finally's monitorexit. After the
+					// synchronized rewriter removes that monitorexit the temp is dead, but it
+					// survives in the monitor position as an inline `tmp = lock` assignment,
+					// which references an undeclared variable. Strip it back to the lock
+					// expression (safe: the temp has no other use).
+					arg := monitorTempAssignRe.ReplaceAllString(ret.Argument.String(funcCtx), "$1")
 					statementStr = fmt.Sprintf(c.GetTabString()+"synchronized(%s){\n"+
 						"%s\n"+
-						c.GetTabString()+"}", ret.Argument.String(funcCtx), statementListToString(ret.Body))
+						c.GetTabString()+"}", arg, statementListToString(ret.Body))
 				case *statements.TryCatchStatement:
 					statementStr = fmt.Sprintf(c.GetTabString()+"try{\n"+
 						"%s\n"+
@@ -1103,6 +1110,10 @@ type dumpedMethods struct {
 // `this`, instance fields (this.x), and static members (Class.x) never render this way, so a
 // match means the expression depends on a method-scoped value.
 var localSlotRefRe = regexp.MustCompile(`\bvar\d+\b`)
+
+// monitorTempAssignRe matches a dead synthetic monitor temp left in the synchronized()
+// argument position, e.g. `var2 = this.lock`, capturing the lock expression itself.
+var monitorTempAssignRe = regexp.MustCompile(`^var\d+ = (.+)$`)
 
 // canHoistFieldInitializer reports whether a `final`-field assignment found inside <init>/
 // <clinit> may be lifted into a field initializer. A real field initializer cannot reference
