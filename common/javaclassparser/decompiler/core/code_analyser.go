@@ -103,10 +103,16 @@ func (d *Decompiler) ParseOpcode() (err error) {
 			d.RootOpCode = d.opCodes[0]
 		}
 	}()
-	opcodes := []*OpCode{}
+	// Capacity hint: every opcode consumes at least one bytecode byte, and the
+	// shortest instructions are 1-2 bytes, so len(bytecodes)/2 closely tracks the
+	// real opcode count for typical code while bounding the worst case. Pre-sizing
+	// the slice and offset maps avoids the repeated grow/rehash garbage that made
+	// ParseOpcode the single largest core allocator.
+	sizeHint := len(d.bytecodes)/2 + 8
+	opcodes := make([]*OpCode, 0, sizeHint)
 	opcodes = append(opcodes, &OpCode{Instr: &Instruction{OpCode: OP_START}})
-	offsetToIndex := map[uint16]int{}
-	indexToOffset := map[int]uint16{}
+	offsetToIndex := make(map[uint16]int, sizeHint)
+	indexToOffset := make(map[int]uint16, sizeHint)
 	reader := NewJavaByteCodeReader(d.bytecodes)
 	id := 1
 	isWide := false

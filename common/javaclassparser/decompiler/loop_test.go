@@ -145,10 +145,11 @@ func TestLoopDoWhile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// ifOther's true branch (Next[0]) is loopStart and its false branch (Next[1])
+	// is ifOtherBody, so the correct structuring keeps the condition un-negated and
+	// places the loop in the then-branch and "if other body" in the else-branch.
 	assert.Equal(t, `start
 if ("if other"){
-if other body
-}else{
 do{
 loop startif ("while condition"){
 if ("if1"){
@@ -174,6 +175,8 @@ continue
 break
 }
 }while(true)
+}else{
+if other body
 }
 while end`, sourceCode)
 	//println(strings.Join(statementsStrs, "\n"))

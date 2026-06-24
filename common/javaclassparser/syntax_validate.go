@@ -62,10 +62,17 @@ func validateJavaSyntaxWithBudget(src string, budget time.Duration) error {
 		}()
 		ch <- javasyntax.Validate(src)
 	}()
+	// Use a stoppable timer rather than time.After so the budget timer (and the
+	// src it retains via the closure) is released as soon as validation returns.
+	// time.After would keep one ~budget-long timer alive per validation, which on
+	// large jars (thousands of classes/members) accumulates thousands of pending
+	// timers and goroutines, wasting memory and delaying GC during batch scans.
+	timer := time.NewTimer(budget)
+	defer timer.Stop()
 	select {
 	case err := <-ch:
 		return err
-	case <-time.After(budget):
+	case <-timer.C:
 		return utils.Errorf("syntax validation exceeded budget %s (treated as invalid for safe degradation)", budget)
 	}
 }
