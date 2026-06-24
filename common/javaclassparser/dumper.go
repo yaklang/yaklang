@@ -211,6 +211,20 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	if packageName == "" {
 		packageName = "defaultpackagename"
 	}
+	// Extract class-level type parameters from the Signature attribute so that
+	// fields/methods referencing type variables (e.g. `T value`) compile. A class
+	// without generic parameters or without a Signature attribute yields "".
+	classTypeParams := ""
+	for _, attr := range c.obj.Attributes {
+		if sigAttr, ok := attr.(*SignatureAttribute); ok {
+			if sigStr, err := c.obj.getUtf8(sigAttr.SignatureIndex); err == nil && sigStr != "" {
+				if tp := types.ParseClassSignature(sigStr); tp != "" {
+					classTypeParams = tp
+				}
+			}
+			break
+		}
+	}
 	packageSource := fmt.Sprintf("package %s;\n\n", packageName)
 	if className == "" {
 		return "", utils.Error("className is empty")
@@ -288,7 +302,7 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 			}
 		}
 		attrs := attrsB.String()
-		result := fmt.Sprintf("%s%s %s%s {%s}", accessFlags, classKeyword, className, superStr, attrs)
+		result := fmt.Sprintf("%s%s %s%s%s {%s}", accessFlags, classKeyword, className, classTypeParams, superStr, attrs)
 		if len(annoStrs) > 0 {
 			result = fmt.Sprintf("%s\n%s", strings.Join(annoStrs, "\n"), result)
 		}
@@ -357,6 +371,19 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 			return nil, err
 		}
 
+		// Scan the field attributes once to find the Signature (generic) attribute before
+		// rendering the type. When a parseable generic signature is present, it overrides the
+		// descriptor-derived type to recover erased generics (e.g. List<String> instead of List).
+		for _, attr := range field.Attributes {
+			if sigAttr, ok := attr.(*SignatureAttribute); ok {
+				if sigStr, err := c.obj.getUtf8(sigAttr.SignatureIndex); err == nil && sigStr != "" {
+					if sigType := types.ParseSignature(sigStr); sigType != nil {
+						fieldType = sigType
+					}
+				}
+			}
+		}
+
 		lastPacket := ""
 		if fieldType.IsArray() {
 			javaTyp := fieldType.RawType().(*types.JavaArrayType)
@@ -418,7 +445,6 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 			case *DeprecatedAttribute:
 			// log.Infof("field %s is deprecated", name)
 			case *SignatureAttribute:
-
 			case *UnparsedAttribute:
 				log.Error("cannot handle attribute type: UnparsedAttribute")
 				spew.Dump(ret)
@@ -745,6 +771,26 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	methodType, err := types.ParseMethodDescriptor(descriptor)
 	if err != nil {
 		return dumped, utils.Wrapf(err, "ParseMethodDescriptor(%v) failed", descriptor)
+	}
+	// Override the descriptor-derived method type with generic information from the
+	// Signature attribute, if present and parseable. This recovers erased generics on
+	// method parameters and return types (e.g. BiFunction<Integer,Integer,Integer> vs raw
+	// BiFunction). Falls back silently to the descriptor if the signature cannot be parsed.
+	for _, attr := range method.Attributes {
+		if sigAttr, ok := attr.(*SignatureAttribute); ok {
+			if sigStr, err := c.obj.getUtf8(sigAttr.SignatureIndex); err == nil && sigStr != "" {
+				if sigParams, sigRet := types.ParseMethodSignature(sigStr); sigParams != nil {
+					mt := methodType.FunctionType()
+					// Only override when the param count matches (signature may include
+					// formal type parameters that shift the count; skip those for safety).
+					if len(sigParams) == len(mt.ParamTypes) {
+						mt.ParamTypes = sigParams
+						mt.ReturnType = sigRet
+					}
+				}
+			}
+			break
+		}
 	}
 	c.MethodType = methodType.FunctionType()
 	returnTypeStr := methodType.FunctionType().ReturnType.String(c.FuncCtx)
