@@ -1,5 +1,7 @@
 # YAK JAVA DECOMPILER ENGINEERING BENCHMARK
 
+> Language: **English** | [简体中文](./YAK_DECOMPILER_BENCHMARK.zh-CN.md)
+
 Reproducible evaluation of the Yaklang Java decompiler (`java.Decompile` /
 `javaclassparser.Decompile`) across **syntax safety**, **reconstruction
 coverage**, **javac round-trip correctness**, **determinism**, **test hygiene**,
@@ -35,7 +37,7 @@ authority for automated semantic decisions.
 |------|--------|--------------------|
 | Syntax safety (parse-or-degrade) | 23/23 corpus groups produce **syntax-parseable Java**; 0 syntax errors, 0 hard errors, 0 panics | `TestSyntaxCoverageMatrix` |
 | Reconstruction coverage (no stub) | 20/23 groups emit **non-degraded output** (no stub); 3 groups isolate concrete gaps | `TestSyntaxCoverageMatrix` |
-| Correctness (javac round-trip) | **13/18** eligible corpora recompile cleanly (was 4/13 at start); all four inner/nested-class groups recompile | `TestRecompileRoundtrip` |
+| Correctness (javac round-trip) | **14/18** eligible corpora recompile cleanly (was 4/13 at start); all four inner/nested-class groups recompile | `TestRecompileRoundtrip` |
 | Determinism | byte-identical output across repeated decompiles; perf changes proven equivalent by per-class sha256 fingerprints | `TestCorpusDeterminism`, `TestDumpJarFingerprint` |
 | Test suite | green & fast: `./...` ≈ 22s, down from more than 150s (**at least 6.8x**), no machine-specific dependencies | `go test ./common/javaclassparser/...` |
 | Allocation cost | core **≈246 ms** and **≈182 MB cumulative heap allocation** per 106-class jar; validation increases runtime ≈ +18% and cumulative allocation ≈ +23% relative to core-only | `BenchmarkDecompileJar` |
@@ -48,17 +50,16 @@ out of `Decompile`.
 
 ### Round-trip correctness detail
 
-Of the 18 corpus groups eligible for strict `javac` round-trip validation
-(13 single-class groups plus 4 multi-class inner/nested-class groups, with one
-group held back as a stub):
+Of the 18 classic corpus groups eligible for strict `javac` round-trip validation
+(14 single-class groups plus 4 multi-class inner/nested-class groups, one of which
+— Exceptions — is held back as a stub):
 
-- **13 recompile successfully**: Annotations, Arrays, CastsInstanceof,
-  Concurrency, ControlFlow, Enums, Inheritance, Initializers, InnerClasses,
-  Literals, Strings, Switches, TryWithResources.
-- **4 expose concrete semantic/typing defects**: Generics (a slot split by type
-  widening is read out of its block scope), Lambdas (captured-variable naming),
-  Loops (`do{...}while(true)` lowering emits javac-unreachable code), Operators
-  (short-circuit boolean recovery).
+- **14 recompile successfully**: Annotations, Arrays, CastsInstanceof,
+  Concurrency, ControlFlow, Enums, Generics, Inheritance, Initializers,
+  InnerClasses, Literals, Strings, Switches, TryWithResources.
+- **3 expose concrete semantic/typing defects**: Lambdas (captured-variable
+  naming), Loops (`do{...}while(true)` lowering emits javac-unreachable code),
+  Operators (short-circuit boolean recovery).
 - **1 is held back as a stub**: Exceptions (`try/catch/finally` CFG with multiple
   successors).
 
@@ -144,16 +145,16 @@ The oracle decompiles **every** class of a group (including inner, nested,
 anonymous and local classes) and recompiles the units together, so inner-class
 reconstruction is exercised end to end rather than skipped.
 ```
-recompile-ok:  13  (Annotations, Arrays, CastsInstanceof, Concurrency, ControlFlow,
-                    Enums, Inheritance, Initializers, InnerClasses, Literals,
-                    Strings, Switches, TryWithResources)
-recompile-fail: 4  (Generics, Lambdas, Loops, Operators)
+recompile-ok:  14  (Annotations, Arrays, CastsInstanceof, Concurrency, ControlFlow,
+                    Enums, Generics, Inheritance, Initializers, InnerClasses,
+                    Literals, Strings, Switches, TryWithResources)
+recompile-fail: 3  (Lambdas, Loops, Operators)
 stub:          1   (Exceptions)
 dec-err:       0
 multiclass:    0   (now compiled together, no longer skipped)
 ```
 
-The 4 remaining recompile failures are the actionable correctness frontier. Each
+The 3 remaining recompile failures are the actionable correctness frontier. Each
 root cause below was confirmed by reading the **full** `javac` diagnostic (run
 with `RC_VERBOSE=1` to dump the decompiled source + every error per category), not
 guessed:
@@ -162,11 +163,25 @@ guessed:
 |----------|-------------------|----------------------|-----------|
 | Loops | `unreachable statement` (the `continue;` after a nested infinite region) | every loop lowered to `do{...}while(true)`; the always-taken inner exit makes the synthesized outer `continue` unreachable | hard (loop idiom recovery) |
 | Operators | `missing return statement` (1 error, down from 13) | `(a && b) \|\| (c)` short-circuit `\|\|` lowered to an `if/else` whose true-branch dropped its `return true`; a boolean-expression/`\|\|` reconstruction gap | hard (control-flow recovery) |
-| Generics | `cannot find symbol var4` | one JVM local slot reused across the loop is *split by type widening* (`Object var1 = null` then `Comparable var4 = ...`); the later variable is block-scoped but read after the block | medium–hard (slot merge / scope widening) |
 | Lambdas | `variable v already defined` + erased generics | lambda parameter names collide with the enclosing slot names, and raw functional-interface targets reject the explicit `Integer` param types (generic signatures not recovered) | hard (var naming + generics erasure) |
 
 Passing categories are pinned by `recompileGateBaseline`, so a regression that breaks
-any of the 13 green categories fails CI; the rest are tracked as the backlog.
+any of the 14 green categories fails CI; the rest are tracked as the backlog.
+
+### Correctness fix landed in this evaluation — round 4 (null-slot type widening)
+**Generics** flipped to a clean recompile by fixing slot splitting. A JVM local
+slot reused across a method was split into two variables whenever its type changed,
+because `AssignVar` keyed variable identity on an exact type-string match. The
+pervasive `T x = null; ...; x = v; ...; return x;` idiom typed the first store as
+`java.lang.Object` (the null literal type) and the reassignment as the concrete
+type, so the slot split into `Object var1 = null` plus a second, block-scoped
+`Comparable var4 = v`; the trailing `return var4` then referenced an out-of-scope
+variable. Now a slot whose variable was only null-initialized **adopts** the later
+concrete reference type instead of splitting (a primitive reassignment still
+splits, since a primitive cannot take a null), and the `T x = null` declaration
+renders the variable's refined type — declaration, reassignment and return agree.
+Verified non-regressing by goldens, `TestCorpusDeterminism`, and real-jar
+ok/err/panic/stub counts.
 
 ### Correctness fixes landed in this evaluation — round 3 (inner classes + scope)
 Five further defects were fixed, flipping **TryWithResources** and all four
@@ -452,28 +467,23 @@ recorded as future work.
 ## 6. Backlog (prioritized by impact, from the data above)
 
 **Correctness (semantic fidelity):**
-1. **Slot-split merge / scope widening** (Generics) — a single JVM slot reused
-   across a loop is split into two variables when its type widens
-   (`Object var1 = null` then `Comparable var4 = ...`); the later variable is
-   block-scoped but read after its block (`cannot find symbol var4`). Needs either
-   merging the two SSA names to a common-supertype variable or widening the
-   declaration's scope. (The simpler nested-scope *name collision* case, e.g.
-   nested catch parameters, was fixed this round — see §3 round 3.)
-2. **`try/catch/finally` "multiple next" CFG** — the only classic-corpus stub and the
+1. **`try/catch/finally` "multiple next" CFG** — the only classic-corpus stub and the
    most common *stub* cause observed in real jars.
-3. **Loop idiom recovery** — reconstruct `for`/`while` instead of universal
+2. **Loop idiom recovery** — reconstruct `for`/`while` instead of universal
    `do{...}while(true)`, which also removes the *unreachable statement* failures (Loops).
-4. **Short-circuit `||`/`&&` boolean-expression recovery** (Operators) — fold the
+3. **Short-circuit `||`/`&&` boolean-expression recovery** (Operators) — fold the
    `if(a&&b){return true}else{...}` control flow back into `return (a&&b)||(...)`.
-5. **Generic signature recovery** (Generics, Lambdas) — parse the `Signature` attribute
-   so erased call sites and lambda targets keep their type arguments.
-6. **Record / sealed `invokedynamic ObjectMethods` bootstrap** — unblocks modern
+4. **Generic signature recovery** (Lambdas) — parse the `Signature` attribute so
+   erased call sites and lambda targets keep their type arguments.
+5. **Record / sealed `invokedynamic ObjectMethods` bootstrap** — unblocks modern
    (Java 17+) value types end-to-end.
 
-*Landed this round (round 3):* scope-aware local renaming (TryWithResources +
-real-world nested-catch/slot-reuse collisions), inner/nested-class round-trip
-(InnerClasses), interface `default` methods (Inheritance), `@interface` annotation
-types (Annotations), and full enum reconstruction (Enums) — see §3 round 3.
+*Landed this round (round 4):* null-initialized slot type widening (Generics) — a
+null slot adopts the later concrete reference type instead of splitting.
+*Round 3:* scope-aware local renaming (TryWithResources + real-world
+nested-catch/slot-reuse collisions), inner/nested-class round-trip (InnerClasses),
+interface `default` methods (Inheritance), `@interface` annotation types
+(Annotations), and full enum reconstruction (Enums).
 *Earlier rounds:* JVM boolean/int disambiguation, array dimension typing,
 field-initializer hoisting, the `synchronized(field)` dead-temp (round 2), and
 numeric-literal suffixes, boolean constants/args, cast precedence (round 1).
