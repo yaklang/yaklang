@@ -23,17 +23,23 @@ import (
 )
 
 type ClassObjectDumper struct {
-	obj               *ClassObject
-	FuncCtx           *class_context.ClassContext
-	ClassName         string
-	PackageName       string
-	CurrentMethod     *MemberInfo
-	ConstantPool      []ConstantInfo
-	deepStack         *utils.Stack[int]
-	MethodType        *types.JavaFuncType
-	lambdaMethods     map[string][]string
-	fieldDefaultValue map[string]string
-	dumpedMethodsSet  map[string]*dumpedMethods
+	obj           *ClassObject
+	FuncCtx       *class_context.ClassContext
+	ClassName     string
+	PackageName   string
+	CurrentMethod *MemberInfo
+	ConstantPool  []ConstantInfo
+	deepStack     *utils.Stack[int]
+	MethodType    *types.JavaFuncType
+	lambdaMethods map[string][]string
+	// lambdaCaptureCount records, per synthetic lambda impl method (keyed by name+descriptor),
+	// how many leading parameters are captured variables that javac prepended to the impl
+	// signature. They are not lambda parameters: DumpMethodWithInitialId drops them from the arrow
+	// parameter list and renames them to capture placeholders that the invokedynamic call site
+	// resolves to the actual captured values.
+	lambdaCaptureCount map[string]int
+	fieldDefaultValue  map[string]string
+	dumpedMethodsSet   map[string]*dumpedMethods
 }
 
 func (c *ClassObjectDumper) GetConstructorMethodName() string {
@@ -49,12 +55,13 @@ func (c *ClassObjectDumper) GetConstructorMethodName() string {
 }
 func NewClassObjectDumper(obj *ClassObject) *ClassObjectDumper {
 	return &ClassObjectDumper{
-		obj:               obj,
-		ConstantPool:      obj.ConstantPool,
-		deepStack:         utils.NewStack[int](),
-		lambdaMethods:     map[string][]string{},
-		fieldDefaultValue: map[string]string{},
-		dumpedMethodsSet:  map[string]*dumpedMethods{},
+		obj:                obj,
+		ConstantPool:       obj.ConstantPool,
+		deepStack:          utils.NewStack[int](),
+		lambdaMethods:      map[string][]string{},
+		lambdaCaptureCount: map[string]int{},
+		fieldDefaultValue:  map[string]string{},
+		dumpedMethodsSet:   map[string]*dumpedMethods{},
 	}
 }
 func (c *ClassObjectDumper) TabNumber() int {
@@ -754,14 +761,40 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 			if err != nil {
 				return dumped, utils.Wrap(err, "ParseBytesCode failed")
 			}
+			thisRemoved := false
 			if len(params) > 0 {
 				if v, ok := params[0].(*values.JavaRef); ok && v.IsThis {
 					params = params[1:]
+					thisRemoved = true
+				}
+			}
+			// For a synthetic lambda body, the leading parameters are captured variables that
+			// javac prepended to the impl signature; they are not lambda parameters. Drop them from
+			// the arrow list and rename each to a capture placeholder so every body reference resolves
+			// to the captured value at the invokedynamic call site (see bootstrap_methods.go). For an
+			// instance lambda the receiver was captured as the first dynamic arg but is represented by
+			// the impl method's `this` (already stripped above), so its placeholder index is offset.
+			samParams := params
+			if isLambda {
+				if n := c.lambdaCaptureCount[name+descriptor]; n > 0 {
+					capArgOffset := 0
+					if thisRemoved {
+						capArgOffset = 1
+					}
+					drop := n - capArgOffset
+					if drop > 0 && drop <= len(params) {
+						for i := 0; i < drop; i++ {
+							if ref, ok := params[i].(*values.JavaRef); ok && ref.Id != nil {
+								ref.Id.SetName(fmt.Sprintf("\x00LCAP%d\x00", i+capArgOffset))
+							}
+						}
+						samParams = params[drop:]
+					}
 				}
 			}
 			paramsNewStrList := []string{}
-			for i, val := range params {
-				if i == len(params)-1 && isVarArgs {
+			for i, val := range samParams {
+				if i == len(samParams)-1 && isVarArgs {
 					paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s... %s", val.Type().ElementType().String(c.FuncCtx), val.String(c.FuncCtx)))
 				} else {
 					paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s %s", val.Type().String(c.FuncCtx), val.String(c.FuncCtx)))
@@ -782,21 +815,21 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 					if _, ok := statement.(*statements.MiddleStatement); ok {
 						continue
 					}
-				_, ok := statement.(*statements.StackAssignStatement)
-				if ok {
-					continue
+					_, ok := statement.(*statements.StackAssignStatement)
+					if ok {
+						continue
+					}
+					res = append(res, statementToString(statement))
+					// Drop unreachable trailing siblings: once an unconditional terminal
+					// (return/throw/break/continue) is emitted, anything after it in the same
+					// block is dead code that javac would reject (e.g. a synthetic `break;`
+					// appended after a `return;` by the loop rewriter).
+					if isUnconditionalTerminalStatement(statement, funcCtx) {
+						break
+					}
 				}
-				res = append(res, statementToString(statement))
-				// Drop unreachable trailing siblings: once an unconditional terminal
-				// (return/throw/break/continue) is emitted, anything after it in the same
-				// block is dead code that javac would reject (e.g. a synthetic `break;`
-				// appended after a `return;` by the loop rewriter).
-				if isUnconditionalTerminalStatement(statement, funcCtx) {
-					break
-				}
+				return strings.Join(res, "\n")
 			}
-			return strings.Join(res, "\n")
-		}
 			statementToString = func(statement statements.Statement) (statementStr string) {
 				defer func() {
 					if debugMode {

@@ -46,7 +46,7 @@ type Decompiler struct {
 	opcodeIndexToOffset           map[int]uint16
 	ExceptionTable                []*ExceptionTableEntry
 	BootstrapMethods              []*BootstrapMethod
-	DumpClassLambdaMethod         func(name, desc string, id *utils2.VariableId) (string, error)
+	DumpClassLambdaMethod         func(name, desc string, id *utils2.VariableId, capturedCount int) (string, error)
 	CurrentId                     int
 	BodyStartId                   int
 	BaseVarId                     *utils2.VariableId

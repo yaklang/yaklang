@@ -157,8 +157,9 @@ func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute, id *util
 	parser := core.NewDecompiler(codeAttr.Code, func(id int) values.JavaValue {
 		return GetValueFromCP(dumper.ConstantPool, id)
 	})
-	parser.DumpClassLambdaMethod = func(name, desc string, id *utils.VariableId) (string, error) {
+	parser.DumpClassLambdaMethod = func(name, desc string, id *utils.VariableId, capturedCount int) (string, error) {
 		dumper.lambdaMethods[name] = append(dumper.lambdaMethods[name], desc)
+		dumper.lambdaCaptureCount[name+desc] = capturedCount
 		dumped, err := dumper.DumpMethodWithInitialId(name, desc, id)
 		if err != nil {
 			return "", err

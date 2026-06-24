@@ -66,20 +66,41 @@ var buildinBootstrapMethods = map[string]func(args ...values.JavaValue) BuildinB
 			// Only those should be inlined as lambda expressions; everything else is a method reference.
 			isSyntheticLambda := strings.HasPrefix(member, "lambda$")
 			if isSyntheticLambda && implClassName == currentClassName {
-				methodStr, err := d.DumpClassLambdaMethod(member, classMember.Description, sim.GetVarId())
+				// javac prepends the captured variables to the impl method's parameter list. They are
+				// not lambda parameters, so DumpClassLambdaMethod drops the leading `len(captured)`
+				// params from the arrow signature and renders each as a placeholder ("\x00LCAPi\x00").
+				// We resolve those placeholders here - lazily, at render time, mirroring how
+				// StringConcatFactory renders args2 - to the captured value's final name (post var
+				// rewrite), so `x -> x + base` reads as the captured `base`, not a spurious parameter.
+				// args2 is popped off the operand stack, so it arrives in reverse capture order; restore
+				// forward order so captured[i] lines up with the i-th leading impl parameter (otherwise
+				// multi-capture lambdas swap their captures, e.g. x*a+y*b becomes x*b+y*a).
+				captured := make([]values.JavaValue, len(args2))
+				for i := range args2 {
+					captured[i] = args2[len(args2)-1-i]
+				}
+				methodStr, err := d.DumpClassLambdaMethod(member, classMember.Description, sim.GetVarId(), len(captured))
 				if err != nil {
 					return nil, fmt.Errorf("dump lambda method `%s.%s` error: %w", classMember.Name, member, err)
 				}
-				return values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
-					return methodStr
+				cv := values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+					s := methodStr
+					for i, ca := range captured {
+						s = strings.ReplaceAll(s, fmt.Sprintf("\x00LCAP%d\x00", i), ca.String(funcCtx))
+					}
+					return s
 				}, func() types.JavaType {
 					return typ
-				}), nil
+				})
+				// Mark as a lambda so a call on the lambda itself (the inlined `s.get()` shape) renders
+				// with the functional-interface cast it needs to compile, e.g. ((Supplier)(() -> ...)).get().
+				cv.Flag = "lambda"
+				return cv, nil
 			}
 
 			// Method reference: constructor / static / (bound|unbound) instance method.
 			capturedArgs := append([]values.JavaValue{}, args2...)
-			return values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+			refVal := values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
 				refMember := member
 				if member == "<init>" {
 					// constructor method reference: ClassName::new
@@ -91,7 +112,11 @@ var buildinBootstrapMethods = map[string]func(args ...values.JavaValue) BuildinB
 				return funcCtx.ShortTypeName(implClassName) + "::" + refMember
 			}, func() types.JavaType {
 				return typ
-			}), nil
+			})
+			// A method reference, like a lambda, has no target type when used directly as a call
+			// receiver (`(C::m).apply(x)` does not compile); flag it so the call site adds the cast.
+			refVal.Flag = "lambda"
+			return refVal, nil
 		}
 	},
 	"defaultBootstrapMethod": func(args ...values.JavaValue) BuildinBootstrapMethod {
