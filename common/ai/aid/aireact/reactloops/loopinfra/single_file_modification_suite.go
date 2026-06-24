@@ -2,18 +2,30 @@ package loopinfra
 
 import (
 	"bytes"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
 // LoopVarCodeLineBase is the loop variable storing the 0-based offset between full_code line
 // indices and absolute editor file line numbers when full_code is a selection snippet.
 const LoopVarCodeLineBase = "code_line_base"
+
+// LoopVarInitSeedFullCode stores the initial full_code seeded at loop start (e.g. from disk).
+// Used to detect cross-session editor reuse and to allow one write_code replace in edit mode.
+const LoopVarInitSeedFullCode = "init_seed_full_code"
+
+// LoopVarCodeSeededOnly is true when full_code still equals the init seed and this loop has
+// not committed a write/modify yet.
+const LoopVarCodeSeededOnly = "code_seeded_only"
 
 // NormalizeActionLineNumber maps AI-supplied line numbers onto full_code indices.
 // When code_line_base > 0, the model may pass absolute file line numbers (e.g. 28) while
@@ -222,12 +234,147 @@ func (f *SingleFileModificationSuiteFactory) applySyntaxLintResult(
 	if hasBlockingErrors {
 		loop.Set(lintStatusVar, "false")
 		op.DisallowNextLoopExit()
+		op.Continue()
 		return
 	}
 	loop.Set(lintStatusVar, "true")
 	if exitOnClean {
 		op.Exit()
 	}
+}
+
+// CommitAfterCodeEdit persists code, runs lint, and records yaklang code change state.
+func (f *SingleFileModificationSuiteFactory) CommitAfterCodeEdit(
+	loop *reactloops.ReActLoop,
+	op *reactloops.LoopActionHandlerOperator,
+	filename, fullCode, sourceAction, changeReason, editorPartial string,
+	successTimeline, failTimeline, successMsg string,
+) error {
+	runtime := f.GetRuntime()
+	writeErr := f.replaceLoopFileContent(runtime, filename, fullCode, successTimeline, failTimeline, successMsg)
+	if writeErr != nil {
+		return writeErr
+	}
+	loop.Set(f.GetFullCodeVariableName(), fullCode)
+
+	errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
+	f.applySyntaxLintResult(loop, op, hasBlockingErrors, f.ShouldExitWhenSyntaxClean())
+
+	loop.GetEmitter().EmitPinFilename(filename)
+	_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
+		Content:      fullCode,
+		Path:         filename,
+		SourceAction: sourceAction,
+		ChangeReason: changeReason,
+		EventOp:      loopYaklangCodeEventOpReplace,
+		EmitEvent:    true,
+	})
+	if editorPartial != "" {
+		loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, sourceAction, editorPartial)
+	}
+	if errMsg != "" {
+		op.Feedback(errMsg)
+	}
+	return nil
+}
+
+// handleModifyByOldSnippet replaces exact text matches via modify_code + old_snippet.
+func (f *SingleFileModificationSuiteFactory) handleModifyByOldSnippet(
+	loop *reactloops.ReActLoop,
+	action *aicommon.Action,
+	op *reactloops.LoopActionHandlerOperator,
+	actionName, filename, fullCodeVar, codeVar string,
+) {
+	runtime := f.GetRuntime()
+	invoker := loop.GetInvoker()
+
+	oldSnippet := action.GetString("old_snippet")
+	replaceAll := action.GetBool("replace_all")
+	reason := action.GetString("modify_code_reason")
+	newCode := loop.Get(codeVar)
+
+	_, _, codeSegment, fixedCode := f.PrettifyCode(newCode)
+	if fixedCode {
+		newCode = codeSegment
+	}
+
+	if strings.TrimSpace(newCode) == "" {
+		op.Fail("modify_code with old_snippet requires non-empty new code in GEN_CODE block")
+		return
+	}
+
+	fullCode := loop.Get(fullCodeVar)
+	editor := memedit.NewMemEditor(fullCode)
+
+	var matches []*memedit.Range
+	_ = editor.FindStringRange(oldSnippet, func(r *memedit.Range) error {
+		matches = append(matches, r)
+		return nil
+	})
+
+	if len(matches) == 0 {
+		msg := fmt.Sprintf(`【modify_code 失败】未找到 old_snippet。
+
+请确保 old_snippet 与 full_code 完全一致（含空格与换行）。
+可改用行号 modify_start_line/modify_end_line，或扩大上下文后重试。
+
+old_snippet 预览：
+%s`, utils.ShrinkTextBlock(oldSnippet, 300))
+		invoker.AddToTimeline("modify_snippet_not_found", msg)
+		op.Feedback(msg)
+		op.Continue()
+		return
+	}
+
+	if len(matches) > 1 && !replaceAll {
+		var lines []string
+		for i, r := range matches {
+			pos := editor.GetPositionByOffset(r.GetStartOffset())
+			lines = append(lines, fmt.Sprintf("  match %d: line %d", i+1, pos.GetLine()))
+		}
+		msg := fmt.Sprintf(`【modify_code 失败】old_snippet 匹配 %d 处，不唯一。
+
+%s
+
+请提供更长的 old_snippet 以唯一定位，或设置 replace_all=true。`, len(matches), strings.Join(lines, "\n"))
+		invoker.AddToTimeline("modify_snippet_ambiguous", msg)
+		op.Feedback(msg)
+		op.Continue()
+		return
+	}
+
+	if replaceAll {
+		for i := len(matches) - 1; i >= 0; i-- {
+			if err := editor.UpdateTextByRange(matches[i], newCode); err != nil {
+				op.Fail("failed to replace snippet: " + err.Error())
+				return
+			}
+		}
+	} else {
+		if err := editor.UpdateTextByRange(matches[0], newCode); err != nil {
+			op.Fail("failed to replace snippet: " + err.Error())
+			return
+		}
+	}
+
+	fullCode = editor.GetSourceCode()
+
+	invoker.AddToTimeline("modify_code", fmt.Sprintf("replaced snippet (%d match(es), replace_all=%v)", len(matches), replaceAll))
+	if reason != "" {
+		runtime.AddToTimeline("modify_reason", reason)
+	}
+
+	successMsg := fmt.Sprintf("SUCCESS: replaced snippet, wrote %d bytes to file: %s", len(fullCode), filename)
+	if err := f.CommitAfterCodeEdit(
+		loop, op, filename, fullCode, actionName, reason, newCode,
+		"modify_success", "modify_write_failed", successMsg,
+	); err != nil {
+		op.Fail(fmt.Sprintf("failed to write modified content: %v", err))
+		return
+	}
+
+	log.Infof("modify_code (old_snippet) done")
+	op.Continue()
 }
 
 // GetAITagOption returns the ReActLoopOption for configuring AI tag extraction

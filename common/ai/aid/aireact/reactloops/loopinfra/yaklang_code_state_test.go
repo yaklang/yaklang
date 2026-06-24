@@ -276,3 +276,27 @@ func TestApplyLoopYaklangCodeChange_ExplicitCreateOp(t *testing.T) {
 	payload := parseYaklangCodeChangeEvent(t, events[0])
 	assert.Equal(t, loopYaklangCodeEventOpCreate, payload.Op)
 }
+
+func TestResolvedYaklangCodeChangeVersion_OnlyExplicitCommit(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	factory := newYaklangFactory(t, runtime)
+	loop, _, _ := newLoopWithCapturedEvents(t, runtime, factory)
+
+	fullCodeVar := factory.GetFullCodeVariableName()
+	assert.Equal(t, 0, ResolvedYaklangCodeChangeVersion(loop, fullCodeVar))
+	assert.False(t, HasCommittedYaklangCodeChange(loop, fullCodeVar))
+
+	_, err := factory.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
+		Content:      "println(\"committed\")",
+		Path:         "/tmp/c.yak",
+		SourceAction: "write_code",
+		EmitEvent:    false,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1, ResolvedYaklangCodeChangeVersion(loop, fullCodeVar))
+	assert.True(t, HasCommittedYaklangCodeChange(loop, fullCodeVar))
+
+	loop.Set(fullCodeVar, "println(\"memory only\")")
+	assert.Equal(t, 1, ResolvedYaklangCodeChangeVersion(loop, fullCodeVar))
+	assert.True(t, HasCommittedYaklangCodeChange(loop, fullCodeVar))
+}

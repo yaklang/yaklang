@@ -58,20 +58,13 @@ func yakdocHandleError(
 }
 
 func yakdocCheckDuplicate(loop *reactloops.ReActLoop, op *reactloops.LoopActionHandlerOperator, queryKey, currentQuery string) bool {
-	last := loop.Get(queryKey)
-	if last == "" || last != currentQuery {
-		return false
-	}
 	msg := fmt.Sprintf(`【严重错误】检测到重复的 YakDocument 查询！
 
 上次查询：%s
 本次查询：%s
 
-【拒绝执行】：请调整 library/function/variable 参数后再查询。`, last, currentQuery)
-	loop.GetInvoker().AddToTimeline("yakdoc_duplicate_query_error", msg)
-	op.Feedback(msg)
-	op.Continue()
-	return true
+【拒绝执行】：请调整 library/function/variable 参数后再查询。`, loop.Get(queryKey), currentQuery)
+	return rejectDuplicateQuery(loop, op, "yakdoc_duplicate_query_error", queryKey, currentQuery, msg)
 }
 
 func yakdocSearchAction(_ aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {

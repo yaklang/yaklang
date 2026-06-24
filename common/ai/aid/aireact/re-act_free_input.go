@@ -21,6 +21,7 @@ func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 		return utils.Errorf("user input cannot be empty")
 	}
 	for _, path := range event.AttachedFilePath {
+		r.config.ContextProviderManager.Unregister(path)
 		r.config.ContextProviderManager.RegisterTracedContent(path, aicommon.FileContextProvider(path, userInput))
 	}
 	for _, resource := range event.AttachedResourceInfo {
@@ -28,6 +29,7 @@ func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 			resource.GetKey() == aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH {
 			path := strings.TrimSpace(resource.GetValue())
 			if path != "" {
+				r.config.ContextProviderManager.Unregister(path)
 				r.config.ContextProviderManager.RegisterTracedContent(path, aicommon.FileContextProvider(path, userInput))
 			}
 		}

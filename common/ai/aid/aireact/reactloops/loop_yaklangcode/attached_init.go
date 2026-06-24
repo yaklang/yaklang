@@ -92,6 +92,8 @@ func clearYaklangLoopFileState(loop *reactloops.ReActLoop) {
 	loop.Set("editor_file_path", "")
 	loop.Set("filename", "")
 	loop.Set(loopinfra.LoopVarCodeLineBase, 0)
+	loop.Set(loopinfra.LoopVarInitSeedFullCode, "")
+	loop.Set(loopinfra.LoopVarCodeSeededOnly, false)
 	log.Infof("cleared yaklang loop file state (full_code, editor_file_path, filename, code_line_base)")
 }
 
@@ -103,5 +105,7 @@ func seedYaklangLoopFullCode(loop *reactloops.ReActLoop, editorCtx *aicommon.Yak
 	lineBase := aicommon.YaklangCodeLineBase(editorCtx, fromSelection)
 	loop.Set("full_code", seedCode)
 	loop.Set(loopinfra.LoopVarCodeLineBase, lineBase)
+	loop.Set(loopinfra.LoopVarInitSeedFullCode, seedCode)
+	loop.Set(loopinfra.LoopVarCodeSeededOnly, true)
 	log.Infof("seeded full_code (%d bytes, from_selection=%v, code_line_base=%d)", len(seedCode), fromSelection, lineBase)
 }

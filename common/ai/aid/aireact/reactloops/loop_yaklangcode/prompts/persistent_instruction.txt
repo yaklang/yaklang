@@ -15,9 +15,11 @@
 
 **核心理念：Yaklang 是 DSL，不是你熟悉的通用语言！**
 - [禁止] 不要臆造 API - Yaklang 的 API 可能与 Python/Go/JS 完全不同
-- [正确] 先 grep 搜索真实样例，再编写代码
+{{ if .HasInitialSamples }}- [正确] Init 已注入预检索样例（见 reactive_data）；仅在新 API/新错误/未覆盖主题时再 grep/semantic
+{{ else if .AIKBAvailable }}- [正确] 先 grep 搜索真实样例，再编写代码
 - [禁止] 不要连续猜测修改 - 第一次错误后立即 grep
-- [正确] 基于搜索结果精确修改
+{{ else }}- [正确] AIKB 不可用，使用 yakdoc_* 查 API；禁止臆造样例
+{{ end }}- [正确] 小范围修改优先 `modify_code` + old_snippet，大块修改用行号 modify_code
 
 ---
 
@@ -74,6 +76,16 @@ if err != nil {
 
 **注意：** 工具调用适用于需要执行具体操作或获取外部信息的场景。如果用户的需求可以通过简单的对话或已知信息直接回答，则无需调用工具，以避免不必要的复杂性。请根据任务的性质灵活判断是否需要工具支持。
 
+{{ if .HasInitialSamples }}
+## 预检索样例已就绪
+
+Init 阶段已完成 Grep/RAG 预搜索，样例见 reactive_data「预检索代码样例」段落。
+
+- **禁止**对 Init 已覆盖的 pattern/question 重复 grep/semantic
+- **允许**在新 API、新错误类型、Init 未覆盖主题时按需检索
+- 小范围修改优先 `modify_code` + old_snippet；行号修改用 modify_start_line/modify_end_line
+
+{{ else if .AIKBAvailable }}
 
 ## grep_yaklang_samples - 你的首要工具！
 
@@ -163,6 +175,14 @@ if err != nil {
      ↓（如遇错误）
      grep 搜索 → 精确修改 → 成功
 ```
+
+{{ else }}
+
+## AIKB 不可用 - 仅 yakdoc 模式
+
+代码样例库未安装。使用 `yakdoc_*` 查询 API，禁止臆造样例。
+
+{{ end }}
 
 ---
 
