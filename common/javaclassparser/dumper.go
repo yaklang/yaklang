@@ -819,6 +819,10 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 			c.MethodType = methodType.FunctionType()
 			paramsNewStr = strings.Join(paramsNewStrList, ", ")
 
+			// Rename locals whose slot-derived names collide across nested scopes (e.g. two
+			// nested catch parameters both named var4) so the emitted Java is re-compilable.
+			resolveLocalNameCollisions(params, statementList)
+
 			sourceCode := "\n"
 			statementSet := utils.NewSet[statements.Statement]()
 			var statementToString func(statement statements.Statement) string
@@ -1106,6 +1110,113 @@ type dumpedMethods struct {
 
 // javaFloatLiteral renders a float constant as a valid Java float literal (with the
 // mandatory 'F' suffix), handling NaN/Infinity which have no plain literal form.
+// localDeclVarId returns the VariableId of a local-variable value (var0, var1, ...),
+// or nil for `this`, fields, statics, or values that do not render via their slot id.
+func localDeclVarId(v values.JavaValue) *utils2.VariableId {
+	if v == nil {
+		return nil
+	}
+	ref, ok := values.UnpackSoltValue(v).(*values.JavaRef)
+	if !ok || ref == nil || ref.IsThis || ref.Id == nil {
+		return nil
+	}
+	// CustomValue/StackVar refs do not render via the slot id, so renaming the id would not
+	// change the emitted text; skip them.
+	if ref.CustomValue != nil || ref.StackVar != nil {
+		return nil
+	}
+	return ref.Id
+}
+
+// declareLocalInScope records a local declaration in the current scope, renaming it when its
+// generated name (varN, derived from slot depth) already belongs to a *different* variable
+// that is still live in an enclosing scope. The JVM reuses local slots, so two distinct
+// variables in nested source scopes can collapse to the same varN, which javac rejects
+// ("variable varN is already defined"). The rename uses a `_<n>` suffix the decompiler never
+// generates, guaranteeing it cannot clash with a real slot name.
+func declareLocalInScope(id *utils2.VariableId, live map[string]*utils2.VariableId) {
+	if id == nil {
+		return
+	}
+	name := id.String()
+	if existing, ok := live[name]; ok && existing != id {
+		for i := 1; ; i++ {
+			cand := fmt.Sprintf("%s_%d", name, i)
+			if _, taken := live[cand]; !taken {
+				id.SetName(cand)
+				name = cand
+				break
+			}
+		}
+	}
+	live[name] = id
+}
+
+func cloneScope(live map[string]*utils2.VariableId) map[string]*utils2.VariableId {
+	out := make(map[string]*utils2.VariableId, len(live)+4)
+	for k, v := range live {
+		out[k] = v
+	}
+	return out
+}
+
+// resolveLocalNameCollisions walks the method body in lexical-scope order and renames any
+// local declaration whose slot-derived name collides with a still-live variable from an
+// enclosing scope (see declareLocalInScope). Renaming only fires on a genuine collision, so
+// output for the overwhelmingly common non-colliding case is byte-for-byte unchanged. This
+// fixes nested catch parameters and reused slots that javac would otherwise reject.
+func resolveLocalNameCollisions(params []values.JavaValue, body []statements.Statement) {
+	live := map[string]*utils2.VariableId{}
+	for _, p := range params {
+		if id := localDeclVarId(p); id != nil {
+			live[id.String()] = id
+		}
+	}
+	renameStatementsInScope(body, live)
+}
+
+func renameStatementsInScope(stmts []statements.Statement, live map[string]*utils2.VariableId) {
+	for _, st := range stmts {
+		switch s := st.(type) {
+		case *statements.AssignStatement:
+			if (s.IsFirst || s.IsDeclare) && s.ArrayMember == nil {
+				declareLocalInScope(localDeclVarId(s.LeftValue), live)
+			}
+		case *statements.IfStatement:
+			renameStatementsInScope(s.IfBody, cloneScope(live))
+			renameStatementsInScope(s.ElseBody, cloneScope(live))
+		case *statements.DoWhileStatement:
+			renameStatementsInScope(s.Body, cloneScope(live))
+		case *statements.WhileStatement:
+			renameStatementsInScope(s.Body, cloneScope(live))
+		case *statements.ForStatement:
+			inner := cloneScope(live)
+			if s.InitVar != nil {
+				renameStatementsInScope([]statements.Statement{s.InitVar}, inner)
+			}
+			renameStatementsInScope(s.SubStatements, inner)
+		case *statements.SwitchStatement:
+			// Java switch cases share a single block scope (fallthrough), so declarations in
+			// one case are visible to later cases: use one shared inner scope.
+			inner := cloneScope(live)
+			for _, c := range s.Cases {
+				renameStatementsInScope(c.Body, inner)
+			}
+		case *statements.SynchronizedStatement:
+			renameStatementsInScope(s.Body, cloneScope(live))
+		case *statements.TryCatchStatement:
+			renameStatementsInScope(s.TryBody, cloneScope(live))
+			for i, body := range s.CatchBodies {
+				inner := cloneScope(live)
+				if i < len(s.Exception) && s.Exception[i] != nil {
+					declareLocalInScope(localDeclVarId(s.Exception[i]), inner)
+				}
+				renameStatementsInScope(body, inner)
+			}
+		}
+	}
+}
+
 // localSlotRefRe matches a decompiler-generated local/parameter reference (var0, var1, ...).
 // `this`, instance fields (this.x), and static members (Class.x) never render this way, so a
 // match means the expression depends on a method-scoped value.
