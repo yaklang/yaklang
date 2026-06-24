@@ -3,6 +3,7 @@ package rewriter
 import (
 	"fmt"
 	"maps"
+	"sort"
 
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 
@@ -57,7 +58,28 @@ func RewriteVar(sts *[]statements.Statement, startVarId int, params []*values.Ja
 	//		}
 	//	}
 	//}
-	for key, undefinedVarDeep := range undefined {
+	// Iterate undefined vars in a stable name order: `undefined` is a Go map and each iteration may
+	// prepend a DeclareStatement to scope.sts (below), so a raw map range would emit the leading
+	// declarations in a random order and make the same method decompile differently run to run. The
+	// ref names were already assigned by rewriteVar above, so String() is a deterministic key.
+	undefinedKeys := make([]values.JavaValue, 0, len(undefined))
+	for key := range undefined {
+		undefinedKeys = append(undefinedKeys, key)
+	}
+	// Sort by (name, deep): several keys can share one uid (same variable, different assignment sites)
+	// but carry different deeps, and each iteration overwrites that uid's IsFirst decision, so the
+	// last-processed key wins. Ordering by deep as a tie-breaker makes "which key wins" deterministic;
+	// keys identical in both fields compute the same decision, so their relative order is irrelevant.
+	sort.SliceStable(undefinedKeys, func(i, j int) bool {
+		ni := undefinedKeys[i].(*values.JavaRef).Id.String()
+		nj := undefinedKeys[j].(*values.JavaRef).Id.String()
+		if ni != nj {
+			return ni < nj
+		}
+		return undefined[undefinedKeys[i]] < undefined[undefinedKeys[j]]
+	})
+	for _, key := range undefinedKeys {
+		undefinedVarDeep := undefined[key]
 		uid := key.(*values.JavaRef).Id
 		assignSts := varAssignMap[uid]
 		deepMap := varAssignMapDeep[uid]
