@@ -583,7 +583,9 @@ func (s *ToolInputSchema) FromMap(m map[string]any) error {
 			return fmt.Errorf("properties is not a map[string]any")
 		}
 		for k, v := range properties {
-			s.Properties.Set(k, v)
+			s.Properties.OrderInsert(k, v, func(a, b string) bool {
+				return a > b // Insert in reverse order to maintain the original order
+			})
 		}
 	}
 
