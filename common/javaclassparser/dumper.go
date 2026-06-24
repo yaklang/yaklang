@@ -244,9 +244,13 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	// assemble renders the full compilation unit from the current methods/fields. It is a
 	// closure so the syntax safety net can re-render after degrading malformed members.
 	assemble := func() string {
-		attrs := ""
+		// strings.Builder instead of `attrs += ...`: a class with many methods otherwise
+		// triggers O(n^2) string concatenation (each += re-copies the whole accumulated
+		// body), which profiling flagged as a top dumper allocator. The builder produces
+		// the exact same bytes in O(n).
+		var attrsB strings.Builder
 		if len(fields) > 0 {
-			attrs += "\n\t// Fields\n"
+			attrsB.WriteString("\n\t// Fields\n")
 			enumFields := make([]dumpedFields, 0, len(fields))
 			ordinaryFields := make([]string, 0, len(fields))
 			for _, field := range fields {
@@ -261,23 +265,29 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 				if args := c.enumConstantArgs(enumSimple.fieldName); args != "" {
 					constStr += "(" + args + ")"
 				}
-				attrs += fmt.Sprintf("\t%s", constStr)
+				attrsB.WriteString("\t")
+				attrsB.WriteString(constStr)
 				if idx == len(enumFields)-1 {
-					attrs += ";\n"
+					attrsB.WriteString(";\n")
 				} else {
-					attrs += ",\n"
+					attrsB.WriteString(",\n")
 				}
 			}
 			for _, ordinaryField := range ordinaryFields {
-				attrs += fmt.Sprintf("\t%s\n", ordinaryField)
+				attrsB.WriteString("\t")
+				attrsB.WriteString(ordinaryField)
+				attrsB.WriteString("\n")
 			}
 		}
 		if len(methods) > 0 {
-			attrs += "\n"
+			attrsB.WriteString("\n")
 			for _, method := range methods {
-				attrs += fmt.Sprintf("\t%s\n", method.code)
+				attrsB.WriteString("\t")
+				attrsB.WriteString(method.code)
+				attrsB.WriteString("\n")
 			}
 		}
+		attrs := attrsB.String()
 		result := fmt.Sprintf("%s%s %s%s {%s}", accessFlags, classKeyword, className, superStr, attrs)
 		if len(annoStrs) > 0 {
 			result = fmt.Sprintf("%s\n%s", strings.Join(annoStrs, "\n"), result)

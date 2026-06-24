@@ -65,24 +65,30 @@ func GenerateDominatorTree(rootNode *core.Node) map[*core.Node][]*core.Node {
 		dom[i] = newFullBitset(n, words)
 	}
 
+	// A single scratch bitset is reused across every node and every fixed-point sweep.
+	// The previous code allocated a fresh `netSet` for each node with predecessors on
+	// every sweep, which on large methods dominated the dominator-tree allocation cost.
+	// We now compute the new set into the scratch buffer and, only when it differs, copy
+	// it back into dom[i]'s existing backing array (so dom[i] keeps its identity and other
+	// nodes reading it as a predecessor see the update) -- zero allocation in the loop.
+	netSet := make([]uint64, words)
 	changedFlag := true
 	for changedFlag {
 		changedFlag = false
 		for i := 0; i < n; i++ {
 			preds := predIds[i]
-			var netSet []uint64
+			cur := dom[i]
 			if len(preds) == 0 {
 				// mirror the original aliasing: with no predecessors the working set is
 				// dom[i] itself, so adding self mutates it in place and never reports a change.
-				netSet = dom[i]
-			} else {
-				netSet = make([]uint64, words)
-				copy(netSet, dom[i])
-				for _, pid := range preds {
-					dp := dom[pid]
-					for w := 0; w < words; w++ {
-						netSet[w] &= dp[w]
-					}
+				setBit(cur, i)
+				continue
+			}
+			copy(netSet, cur)
+			for _, pid := range preds {
+				dp := dom[pid]
+				for w := 0; w < words; w++ {
+					netSet[w] &= dp[w]
 				}
 			}
 			setBit(netSet, i)
@@ -92,7 +98,6 @@ func GenerateDominatorTree(rootNode *core.Node) map[*core.Node][]*core.Node {
 			// (Dominator sets only shrink, so in practice this is dom[i] losing bits, but
 			// XOR matches the original semantics exactly regardless of direction.)
 			changed := false
-			cur := dom[i]
 			for w := 0; w < words; w++ {
 				if netSet[w]^cur[w] != 0 {
 					changed = true
@@ -100,7 +105,7 @@ func GenerateDominatorTree(rootNode *core.Node) map[*core.Node][]*core.Node {
 				}
 			}
 			if changed {
-				dom[i] = netSet
+				copy(cur, netSet)
 				changedFlag = true
 			}
 		}

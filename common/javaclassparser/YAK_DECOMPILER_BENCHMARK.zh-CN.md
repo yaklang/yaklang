@@ -23,7 +23,7 @@
 | 正确性（javac round-trip） | **24/26** 个可评估语料干净重编译（起始为 4/13）；经典语料现已**零 stub**；四个内部类/嵌套类组全部可重编译；专用边界、数值边界、字段/数组与嵌套控制流语料均已纳入门禁 | `TestRecompileRoundtrip` |
 | 确定性 | 多次反编译逐字节一致；性能改动通过逐类 sha256 指纹证明输出等价 | `TestCorpusDeterminism`、`TestDumpJarFingerprint` |
 | 测试套件 | 绿且快：`./...` ≈ 22s，从 150s 以上降下来（**至少 6.8 倍**），无机器相关依赖 | `go test ./common/javaclassparser/...` |
-| 分配开销 | 核心 **≈246 ms** 且 **≈182 MB 累计堆分配** / 106 类的 jar；校验相对 core-only 增加运行时 ≈ +18%、累计分配 ≈ +23% | `BenchmarkDecompileJar` |
+| 分配开销 | 核心 **≈223 ms** 且 **≈168 MB 累计堆分配** / 106 类的 jar（自 ≈246 ms / ≈182 MB 降低）；反编译后的 ANTLR 重解析相对 core-only 增加运行时 ≈ +56%、分配 ≈ +40% | `BenchmarkDecompileJar` |
 | 可扩展性 | ~8 worker 前近线性（3.6×），之后出现 **GC 瓶颈回退** | `BenchmarkDecompileJarParallel` |
 
 反编译器的**安全保证成立**：对语料中的每一个输入，要么重建出方法，要么把它降级为带标记、仍可解析的 stub（`yak-decompiler:` 标记），绝不输出不可解析的 Java，也绝不从 `Decompile` 中 panic 逃逸。
@@ -242,11 +242,11 @@ BENCH_JAR=<jar> go test -run xxx -bench 'BenchmarkDecompileJar$' -benchmem ./com
 
 | 配置 | ns/op | B/op | allocs/op |
 |------|------:|-----:|----------:|
-| 完整流水线（开启校验） | ~378 M | 248 MB | 4.54 M |
-| 仅核心（关闭校验） | **246 M** | **182 MB** | 3.31 M |
-| **校验安全网占比** | 时间 **≈ 18%** | 字节 **≈ 23%** | 分配 **≈ 26%** |
+| 完整流水线（开启校验） | ~349 M | 235 MB | 3.65 M |
+| 仅核心（关闭校验） | **223 M** | **168 MB** | 2.39 M |
+| **校验安全网占比** | 时间 **≈ 36%** | 字节 **≈ 29%** | 分配 **≈ 34%** |
 
-安全网并非免费，但它是"绝不让不可解析的 Java 离开 `Decompile`"的契约；~18% 的墙钟时间是这一保证的代价。
+安全网并非免费，但它是"绝不让不可解析的 Java 离开 `Decompile`"的契约；~36% 的墙钟时间是这一保证的代价（它是对整个类的一次 ANTLR 重解析，其 ATN 模拟分配主导了这部分占比，且为第三方运行时的固有成本）。
 
 ### 5.2 profile 是 GC-bound——分配才是真正的货币
 
@@ -264,17 +264,31 @@ runtime.greyobject     13.3% cum
 | 分配源 | 字节 | 占比 | 状态 |
 |--------|-----:|-----:|------|
 | `utils.Set[any].Add`（经由 `WalkGraph`） | 367 MB | 19.4% | **已修（去接口装箱 + 去锁）** |
+| `WalkGraph` 的栈/visited（每次遍历） | — | — | **已修（链表栈 → 切片栈，见下方轮次）** |
 | `ParseOpcode` | 206 MB | 10.9% | 已预分配（上一轮） |
-| `GenerateDominatorTree`（+`func1`） | 193 MB | 10.2% | backlog |
-| `Stack[*].Push` | 94 MB | 4.9% | backlog（预分配） |
+| `GenerateDominatorTree`（+`func1`） | 193 MB | 10.2% | **已修（跨 sweep 复用 scratch 位集）** |
+| `Stack[*].Push` | 94 MB | 4.9% | **已修（`WalkGraph` 改用切片栈）** |
 | `codec.MatchMIMEType` → 每个字符串字面量的 `csv/bufio` | 77 MB | 4.1% | **已修（ASCII 快路径）** |
-| `Set[*OpCode].Add` | 73 MB | 3.9% | backlog |
+| `Set[*OpCode].Add` | 73 MB | 3.9% | **已修（`CalcMergeOpcode` 改用普通 map）** |
+| `fixJavaStringEscapes` 每个字符串字面量重编译 3 个正则 | ~270 MB 累计 | — | **已修（包级预编译正则）** |
 
-在校验路径上，另有约 70% 的分配是 ANTLR ATN 模拟对象（`NewBaseATNConfig`、`BaseATNConfigSet.Add`、prediction-context 合并）——这是逐类重解析的固有成本。
+在校验路径上，绝大部分分配是 ANTLR ATN 模拟对象（`NewBaseATNConfig`、`BaseATNConfigSet.Add`、prediction-context 合并）——这是逐类重解析的固有成本，不改 ANTLR 运行时无法消除。
 
 ### 5.3 本轮落地的优化（每项都证明输出等价）
 
-等价是被证明而非假设：`TestDumpJarFingerprint` 为 `commons-codec` **和** `byte-buddy`（≈3k 类）的每个类写出逐类 `sha256(status+output)`；指纹目录在每次改动前后 `diff` 干净。
+等价是被证明而非假设：`TestDumpJarFingerprint` 为某个 jar 的每个类写出逐类 `sha256(status+output)`；指纹目录在每次改动前后 `diff` 干净。本轮在 `commons-codec`（106 类）**和** `hazelcast-5.1.7`（≈数千类）上重跑——两者 diff 均干净。
+
+**最新一轮分配/CPU 优化（针对 §5.2 的 GC-bound profile）。** 五项输出等价的改动，在 `commons-codec` 上测量（核心 `-benchtime=30x` / 完整 `20x`）：
+
+1. **`WalkGraph` 的 DFS 栈：链表 → 切片。** `utils.Stack[T]` 每次 `Push` 都堆分配一个 node 结构；由于几乎每次 CFG/opcode 遍历都会用到，它占核心字节约 6%。改用普通 `[]T`、保持相同的 LIFO 弹出顺序，摊销增长（遍历顺序一致 ⇒ 输出一致）。
+2. **`GenerateDominatorTree`：复用单个 scratch 位集。** 不动点循环原本为每节点每 sweep 新分配一个 `netSet`；现改为复用单个 scratch，仅在发生变化时拷回 `dom[i]` 既有底层数组。语义不变（仍由 `TestGenerateDominatorTreeEquivalence` 的 4000 个随机 CFG 守护）。
+3. **`CalcMergeOpcode`：去掉互斥 `Set`、复用 `next` 缓冲。** 用普通 map 替换 `utils.Set[*OpCode]`（带互斥锁，占核心字节约 4.6%），并跨访问复用单个 `next` 过滤切片（安全：`WalkGraph` 会把返回切片拷入自己的栈，从不持有它）。
+4. **`fixJavaStringEscapes`：3 个正则只编译一次。** 它对*每个反编译出的字符串字面量*都新建三个 `RegexpWrapper`——每次都重编译模式（累计 ~270 MB）。提升为包级变量、只编译一次（`*regexp.Regexp` 并发安全，共享 wrapper 也服务并行反编译）。
+5. **`DumpClass.assemble`：用 `strings.Builder` 替代 `attrs += …`。** 含大量方法的类原本触发 O(n²) 字符串拼接；builder 为 O(n) 且产出相同字节。
+
+`commons-codec` 上的结果：**核心 246 → 223 ms/op（−9%），182 → 168 MB/op（−8%），3.31 → 2.39 M allocs/op（−28%）**；**完整流水线 378 → 349 ms/op（−8%），248 → 235 MB/op（−5%），4.54 → 3.65 M allocs/op（−20%）**。两种配置三项指标全部改善，且双 jar 指纹 diff 证明输出逐字节一致。（曾原型化一个 OpCode chunk 竞技场分配器并**否决**：它降低了 malloc 次数，但对许多小方法过度分配，使字节回退 +7%——为小幅 CPU 收益换取内存损失，项目不接受。）
+
+**上一轮分配/CPU 优化（仍在生效）：**
 
 1. **`WalkGraph` 的 visited 集合——去掉接口装箱与互斥锁。**
    图遍历用了线程安全的 `Set[any]`：每个节点指针都被装箱成 `interface{}` map key（核心第一大分配源，占 19%），且每次 `Has`/`Add` 都取一次 `RWMutex`，尽管遍历是单 goroutine。把类型参数约束为 `comparable` 并改为普通 `map[T]struct{}`。**核心：315 → 254 ms/op（−19%），217 → 193 MB/op（−11%）。**
@@ -282,9 +296,9 @@ runtime.greyobject     13.3% cum
 2. **纯 ASCII 字符串字面量跳过 MIME 嗅探。**
    `JavaStringToLiteral` 对*每个*字面量都跑完整的魔数检测（`codec.MatchMIMEType`，会分配 `csv`/`bufio` reader），用于恢复可能被错误解码的中文字符集——对 ASCII 字节不可能命中。用纯 ASCII 检查作为前置守卫（ASCII 本就走相同的加引号路径，行为不变）。**核心：254 → 246 ms/op，193 → 182 MB/op。**
 
-本轮累计：**核心 315 → 246 ms/op（−22%），217 → 182 MB/op（−16%）**；端到端字节 282 → 248 MB（−12%）。
+那一轮累计：**核心 315 → 246 ms/op（−22%），217 → 182 MB/op（−16%）**；端到端字节 282 → 248 MB（−12%）。最新一轮（上文）进一步推进到核心 223 ms / 168 MB。
 
-上一轮仍在生效的优化：
+更早仍在生效的优化：
 - **`ParseOpcode` 预分配**（opcode 切片 + 两个 offset map 都按字节码长度预分配）。
 - **校验定时器卫生**（用可停止的 `time.NewTimer` 替代 `time.After`，使每个成员的预算定时器及其保留的源缓冲立即释放）。
 
