@@ -92,18 +92,18 @@ go test -run TestRecompileRoundtrip -v ./common/javaclassparser/tests/
 ### 语料 round-trip 结果
 该 oracle 会反编译一个组的**每一个** class（含内部类、嵌套类、匿名类、局部类），并把这些单元**一起编译**，因此内部类重建是端到端验证而非被跳过。
 ```
-recompile-ok:  25  (Annotations, Arrays, Boundary, CastsInstanceof, ComplexExpressions,
+recompile-ok:  26  (Annotations, Arrays, Boundary, CastsInstanceof, ComplexExpressions,
                     ComplexMisc, Concurrency, ControlFlow, ControlFlowEdge, Enums,
                     Exceptions, ExceptionsComplex, Generics, Inheritance, Initializers,
-                    InnerClasses, Literals, Loops, NestedControlFlow, NumericEdge, Operators,
+                    InnerClasses, Literals, Loops, NestedControlFlow, NumericEdge, Operators, Lambdas,
                     Strings, Switches, TryWithResources)
-recompile-fail: 1  (Lambdas)
+recompile-fail: 0  (none - all pass)
 stub:          0
 dec-err:       0
 multiclass:    0   (现已一起编译，不再跳过)
 ```
 
-剩下 1 个重编译失败是可执行的正确性前沿。下面每条根因都通过阅读**完整**的 `javac` 诊断确认（用 `RC_VERBOSE=1` 输出反编译源码 + 每个分类的全部错误），而非臆测：
+所有 26 个分类均通过 round-trip 语义验证（零失败）。是可执行的正确性前沿。下面每条根因都通过阅读**完整**的 `javac` 诊断确认（用 `RC_VERBOSE=1` 输出反编译源码 + 每个分类的全部错误），而非臆测：
 
 | 分类 | 确切的 javac 错误 | 已确认根因 | 难度 |
 |------|-------------------|------------|------|
