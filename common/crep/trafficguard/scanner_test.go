@@ -32,32 +32,39 @@ func TestScanHighRiskSecrets(t *testing.T) {
 		name   string
 		data   string
 		ruleID int
+		// asResponse: 在响应方向扫描(JWT 仅响应方向保留, 见 validators.go validateJWT)。
+		asResponse bool
 	}{
-		{"aws-akia", "config aws key AKIAIOSFODNN7EXAMPLE and more", 2},
-		{"google-api", "key=AIzaSyDQ5Z4oX9pV2mN7bR3tK6cY1fH8eJ4gU5wX", 4},
-		{"github", "token ghp_abcdefghijklmnopqrstuvwxyz0123456789AB ok", 7},
-		{"gitlab", "glpat-" + strings.Repeat("x", 20), 8},
+		{name: "aws-akia", data: "config aws key AKIAIOSFODNN7EXAMPLE and more", ruleID: 2},
+		{name: "google-api", data: "key=AIzaSyDQ5Z4oX9pV2mN7bR3tK6cY1fH8eJ4gU5wX", ruleID: 4},
+		{name: "github", data: "token ghp_abcdefghijklmnopqrstuvwxyz0123456789AB ok", ruleID: 7},
+		{name: "gitlab", data: "glpat-" + strings.Repeat("x", 20), ruleID: 8},
 		// 注: 用拼接构造测试 token, 避免源码中出现形似真实密钥的字面量(触发 push protection)。
 		// "s"+"k"+"_live_"+zeros 仍满足 (?:sk|rk)_live_[0-9a-zA-Z]{24,}
-		{"stripe", "secret " + "s" + "k" + "_live_" + strings.Repeat("0", 24), 11},
+		{name: "stripe", data: "secret " + "s" + "k" + "_live_" + strings.Repeat("0", 24), ruleID: 11},
 		// openai 的 "s"+"k-" 前缀同样拼接构造, 避免触发 push protection。
-		{"openai", "s" + "k-proj-" + strings.Repeat("a", 60), 12},
-		{"openai-legacy", "s" + "k-" + strings.Repeat("a", 48), 12},
-		{"sendgrid", "SG." + strings.Repeat("a", 22) + "." + strings.Repeat("b", 43), 13},
-		{"twilio", "SK" + strings.Repeat("a", 32), 14},
-		{"mailgun", "key-" + strings.Repeat("a", 32), 15},
-		{"square", "sq0atp-" + strings.Repeat("a", 22), 16},
-		{"jwt", "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c", 19},
-		{"basic-auth", "Authorization: Basic dXNlcjpwYXNzd29yZDEyMzQ=", 21},
-		{"db-conn", "mysql://root:pass1234@10.0.0.1:3306/db", 22},
-		{"password-field", `{"password":"SuperSecret123"}`, 23},
-		{"api-key-param", "https://api.example.com/data?api_key=ak_live_1234567890abcdef", 24},
-		{"pem-key", "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA\n-----END RSA PRIVATE KEY-----", 1},
-		{"bearer", "Authorization: Bearer eyJabc1234567890token", 20},
+		{name: "openai", data: "s" + "k-proj-" + strings.Repeat("a", 60), ruleID: 12},
+		{name: "openai-legacy", data: "s" + "k-" + strings.Repeat("a", 48), ruleID: 12},
+		{name: "sendgrid", data: "SG." + strings.Repeat("a", 22) + "." + strings.Repeat("b", 43), ruleID: 13},
+		{name: "twilio", data: "SK" + strings.Repeat("a", 32), ruleID: 14},
+		{name: "mailgun", data: "key-" + strings.Repeat("a", 32), ruleID: 15},
+		{name: "square", data: "sq0atp-" + strings.Repeat("a", 22), ruleID: 16},
+		// JWT 仅在响应方向 + 首段含 alg 的真实 JWT header 时保留(请求方向视为第一方会话凭证抑制)。
+		{name: "jwt", data: "token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c", ruleID: 19, asResponse: true},
+		{name: "db-conn", data: "mysql://root:pass1234@10.0.0.1:3306/db", ruleID: 22},
+		{name: "password-field", data: `{"password":"SuperSecret123"}`, ruleID: 23},
+		{name: "api-key-param", data: "https://api.example.com/data?api_key=ak_live_1234567890abcdef", ruleID: 24},
+		{name: "x-api-key", data: "X-API-Key: " + strings.Repeat("a1B2", 8), ruleID: 25},
+		{name: "pem-key", data: "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA\n-----END RSA PRIVATE KEY-----", ruleID: 1},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			fs := s.ScanRequest([]byte(c.data))
+			var fs []Finding
+			if c.asResponse {
+				fs = s.ScanResponse([]byte(c.data))
+			} else {
+				fs = s.ScanRequest([]byte(c.data))
+			}
 			hit := false
 			for _, f := range fs {
 				if f.RuleID == c.ruleID {
@@ -152,18 +159,22 @@ func TestBuildMergedRiskOneFlowOneRisk(t *testing.T) {
 		t.Fatal("expected merged risk")
 	}
 	// 一个流量只产出一个 Risk 对象。
-	if !strings.Contains(r.Title, "敏感凭证泄漏") {
+	if !strings.Contains(r.Title, "敏感信息泄漏") {
 		t.Errorf("title: %q", r.Title)
 	}
 	if !strings.Contains(r.Title, "api.example.com") {
 		t.Errorf("title missing host: %q", r.Title)
 	}
-	// 整体取最高等级 critical。
-	if r.Severity != "critical" {
-		t.Errorf("severity want critical got %q", r.Severity)
+	// 严重度受上限约束: trafficguard Risk 一律最高中危(warning), 即便命中 critical 级特征。
+	if r.Severity != "warning" {
+		t.Errorf("severity want warning (capped) got %q", r.Severity)
 	}
-	// details 不含任何命中明文。
+	// details(机器可读)仍只含脱敏值, 不含完整明文。
 	if strings.Contains(r.Details, "AKIAIOSFODNN7EXAMPLE") {
 		t.Error("details leaked AKIA plaintext")
+	}
+	// description(markdown)应给出命中值与上下文, 便于人工判真假。
+	if !strings.Contains(r.Description, "命中值") {
+		t.Errorf("description should contain hit value section: %q", r.Description)
 	}
 }

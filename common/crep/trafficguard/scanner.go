@@ -106,11 +106,14 @@ func (s *Scanner) NumAlwaysOn() int {
 // Ready 表示 Scanner 是否编译成功可用。
 func (s *Scanner) Ready() bool { return s != nil && s.exist != nil && s.initErr == nil }
 
-// scanBuffer 两阶段扫描单个缓冲区。
+// scanBuffer 两/三阶段扫描单个缓冲区。
 //
 // 阶段一: exist.MatchedIndexes(data) -> 若无命中直接返回(纯净流量快路径)。
 // 阶段二: 仅对阶段一命中的规则, 用 PCRE2 底层接口精确定位提取命中值。
-func (s *Scanner) scanBuffer(data []byte, direction, surface string, out []Finding) []Finding {
+// 阶段三: validateFinding 按 host/方向/值形态做上下文校验, 剔除明显误报(见 validators.go)。
+//
+// host 为该缓冲区所属流量的目标 host(小写、无端口); 为空时跳过依赖 host 的校验(如厂商自有域抑制)。
+func (s *Scanner) scanBuffer(host string, data []byte, direction, surface string, out []Finding) []Finding {
 	if len(data) == 0 {
 		return out
 	}
@@ -141,6 +144,10 @@ func (s *Scanner) scanBuffer(data []byte, direction, surface string, out []Findi
 				continue
 			}
 			raw := data[span.Start:span.End]
+			// 阶段三: 上下文/值形态校验, 剔除明显误报(厂商自有域、非真 JWT、源码型口令字段等)。
+			if !validateFinding(&r, raw, validateCtx{host: host, direction: direction}) {
+				continue
+			}
 			out = append(out, Finding{
 				RuleID:      r.ID,
 				RuleName:    r.Name,
@@ -163,11 +170,12 @@ func (s *Scanner) scanBuffer(data []byte, direction, surface string, out []Findi
 }
 
 // ScanRequest 扫描一个完整的 HTTP 请求报文(含请求行、Header、Body)。
+// host 为空: 不做厂商自有域抑制(适合无上下文的单元测试/独立调用)。
 func (s *Scanner) ScanRequest(request []byte) []Finding {
 	if !s.Ready() {
 		return nil
 	}
-	return s.scanBuffer(request, "request", "request", nil)
+	return s.scanBuffer("", request, "request", "request", nil)
 }
 
 // ScanResponse 扫描一个完整的 HTTP 响应报文(含状态行、Header、Body)。
@@ -175,18 +183,18 @@ func (s *Scanner) ScanResponse(response []byte) []Finding {
 	if !s.Ready() {
 		return nil
 	}
-	return s.scanBuffer(response, "response", "response", nil)
+	return s.scanBuffer("", response, "response", "response", nil)
 }
 
 // ScanHTTPFlow 一次性扫描请求 + 响应,返回全部命中(请求命中在前,响应命中在后)。
-// 这是 MITM 集成点调用的主入口。
-func (s *Scanner) ScanHTTPFlow(request, response []byte) []Finding {
+// 这是 MITM 集成点调用的主入口。host 为目标 host(小写、无端口), 用于第三阶段上下文校验。
+func (s *Scanner) ScanHTTPFlow(host string, request, response []byte) []Finding {
 	if !s.Ready() {
 		return nil
 	}
 	out := make([]Finding, 0, 4)
-	out = s.scanBuffer(request, "request", "request", out)
-	out = s.scanBuffer(response, "response", "response", out)
+	out = s.scanBuffer(host, request, "request", "request", out)
+	out = s.scanBuffer(host, response, "response", "response", out)
 	return out
 }
 
