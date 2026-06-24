@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 )
@@ -79,7 +80,11 @@ var buildinBootstrapMethods = map[string]func(args ...values.JavaValue) BuildinB
 				for i := range args2 {
 					captured[i] = args2[len(args2)-1-i]
 				}
-				methodStr, err := d.DumpClassLambdaMethod(member, classMember.Description, sim.GetVarId(), len(captured))
+				// Each lambda body gets its own fresh variable-id namespace so its formal
+				// parameters (var0, var1, ...) never collide with the enclosing method's locals.
+				// Captured values are resolved via LCAP placeholders, which are independent of
+				// the id chain, so a fresh root is safe.
+				methodStr, err := d.DumpClassLambdaMethod(member, classMember.Description, utils.NewRootVariableId(), len(captured))
 				if err != nil {
 					return nil, fmt.Errorf("dump lambda method `%s.%s` error: %w", classMember.Name, member, err)
 				}
