@@ -40,7 +40,7 @@ authority for automated semantic decisions.
 | Correctness (javac round-trip) | **24/26** eligible corpora recompile cleanly (was 4/13 at start); the classic corpus now emits **zero stubs**; all four inner/nested-class groups recompile; dedicated boundary-condition, numeric-edge, field/array and nested-control-flow corpora gated | `TestRecompileRoundtrip` |
 | Determinism | byte-identical output across repeated decompiles; perf changes proven equivalent by per-class sha256 fingerprints | `TestCorpusDeterminism`, `TestDumpJarFingerprint` |
 | Test suite | green & fast: `./...` ≈ 22s, down from more than 150s (**at least 6.8x**), no machine-specific dependencies | `go test ./common/javaclassparser/...` |
-| Allocation cost | core **≈246 ms** and **≈182 MB cumulative heap allocation** per 106-class jar; validation increases runtime ≈ +18% and cumulative allocation ≈ +23% relative to core-only | `BenchmarkDecompileJar` |
+| Allocation cost | core **≈223 ms** and **≈168 MB cumulative heap allocation** per 106-class jar (down from ≈246 ms / ≈182 MB); the post-decompile ANTLR re-parse adds ≈ +56% runtime and ≈ +40% allocation relative to core-only | `BenchmarkDecompileJar` |
 | Scalability | near-linear to ~8 workers (3.6×), then **GC-bound regression** | `BenchmarkDecompileJarParallel` |
 
 The decompiler's **safety guarantee holds**: for every input in the corpus it
@@ -512,12 +512,14 @@ post-decompile ANTLR re-parse and isolates the **decompiler core** from the
 
 | Configuration | ns/op | B/op | allocs/op |
 |---------------|------:|-----:|----------:|
-| Full pipeline (validation on) | ~378 M | 248 MB | 4.54 M |
-| Core only (validation off) | **246 M** | **182 MB** | 3.31 M |
-| **Validation safety-net share** | **≈ 18%** time | **≈ 23%** bytes | **≈ 26%** allocs |
+| Full pipeline (validation on) | ~349 M | 235 MB | 3.65 M |
+| Core only (validation off) | **223 M** | **168 MB** | 2.39 M |
+| **Validation safety-net share** | **≈ 36%** time | **≈ 29%** bytes | **≈ 34%** allocs |
 
 The safety net is not free, but it is the contract that guarantees no un-parseable
-Java ever leaves `Decompile`; ~18% wall-time is the price of that guarantee.
+Java ever leaves `Decompile`; ~36% wall-time is the price of that guarantee (it is an
+ANTLR re-parse of the whole class, whose ATN-simulation allocations dominate that
+share and are intrinsic to the third-party runtime).
 
 ### 5.2 The profile is GC-bound — allocations are the real currency
 
@@ -537,21 +539,56 @@ So **reducing allocations directly buys CPU**. The largest *core* allocators
 | Allocator | Bytes | Share | Status |
 |-----------|------:|------:|--------|
 | `utils.Set[any].Add` (via `WalkGraph`) | 367 MB | 19.4% | **fixed (−interface boxing + mutex)** |
+| `WalkGraph` stack/visited (per traversal) | — | — | **fixed (linked-list stack → slice; see round below)** |
 | `ParseOpcode` | 206 MB | 10.9% | pre-sized (prior round) |
-| `GenerateDominatorTree` (+`func1`) | 193 MB | 10.2% | backlog |
-| `Stack[*].Push` | 94 MB | 4.9% | backlog (pre-size) |
+| `GenerateDominatorTree` (+`func1`) | 193 MB | 10.2% | **fixed (reuse scratch bitset across sweeps)** |
+| `Stack[*].Push` | 94 MB | 4.9% | **fixed (slice stack in `WalkGraph`)** |
 | `codec.MatchMIMEType` → `csv/bufio` per string literal | 77 MB | 4.1% | **fixed (ASCII fast-path)** |
-| `Set[*OpCode].Add` | 73 MB | 3.9% | backlog |
+| `Set[*OpCode].Add` | 73 MB | 3.9% | **fixed (plain map in `CalcMergeOpcode`)** |
+| `fixJavaStringEscapes` re-compiling 3 regexes per string literal | ~270 MB cum | — | **fixed (package-level precompiled regexes)** |
 
-On the validation path, separately, ~70% of allocations are ANTLR ATN-simulation
+On the validation path, separately, the bulk of allocations are ANTLR ATN-simulation
 objects (`NewBaseATNConfig`, `BaseATNConfigSet.Add`, prediction-context merges) —
-inherent to re-parsing each class.
+inherent to re-parsing each class and not addressable without an ANTLR runtime change.
 
 ### 5.3 Optimizations landed this round (each proven output-equivalent)
 
 Equivalence is proven, not assumed: `TestDumpJarFingerprint` writes a per-class
-`sha256(status+output)` for every class of `commons-codec` **and** `byte-buddy`
-(≈3k classes); the fingerprint dirs `diff` clean before vs after every change.
+`sha256(status+output)` for every class of a jar; the fingerprint dirs `diff` clean
+before vs after every change. This round it was re-run over `commons-codec` (106
+classes) **and** `hazelcast-5.1.7` (≈thousands of classes) — both diff clean.
+
+**Latest allocation/CPU round (the GC-bound profile in §5.2).** Five output-equivalent
+changes, measured on `commons-codec` (`-benchtime=30x` core / `20x` full):
+
+1. **`WalkGraph` DFS stack: linked-list → slice.** `utils.Stack[T]` heap-allocates a
+   node struct on every `Push`; since the walk runs on essentially every CFG/opcode
+   traversal this was ~6% of all core bytes. A plain `[]T` with the same LIFO pop order
+   amortizes growth (identical traversal order ⇒ identical output).
+2. **`GenerateDominatorTree`: reuse one scratch bitset.** The fixed-point loop allocated
+   a fresh `netSet` per node per sweep; now a single scratch buffer is reused and copied
+   back into `dom[i]`'s existing backing only on change. Semantics unchanged (still
+   guarded by `TestGenerateDominatorTreeEquivalence`, 4000 random CFGs).
+3. **`CalcMergeOpcode`: drop the mutex `Set`, reuse the `next` buffer.** Replaced the
+   `utils.Set[*OpCode]` (mutex-guarded, ~4.6% of core bytes) with a plain map, and reuse
+   a single `next` filter slice across visits (safe because `WalkGraph` copies the
+   returned slice into its stack and never retains it).
+4. **`fixJavaStringEscapes`: precompile the 3 regexes once.** It built three
+   `RegexpWrapper`s — recompiling each pattern — on *every decompiled string literal*
+   (~270 MB cumulative). Hoisted to package-level vars compiled once (`*regexp.Regexp`
+   is concurrency-safe, so a shared wrapper serves parallel decompiles too).
+5. **`DumpClass.assemble`: `strings.Builder` instead of `attrs += …`.** A class with many
+   methods otherwise triggered O(n²) string concatenation; the builder is O(n) and emits
+   the same bytes.
+
+Result on `commons-codec`: **core 246 → 223 ms/op (−9%), 182 → 168 MB/op (−8%), 3.31 →
+2.39 M allocs/op (−28%)**; **full pipeline 378 → 349 ms/op (−8%), 248 → 235 MB/op (−5%),
+4.54 → 3.65 M allocs/op (−20%)**. All three axes improved on both configurations, and the
+two-jar fingerprint diff confirms byte-for-byte identical output. (A chunked OpCode arena
+was prototyped and **rejected**: it cut malloc count but over-allocated per small method,
+regressing bytes by +7% — a memory loss the project does not accept for a small CPU gain.)
+
+**Prior allocation/CPU round (still in place):**
 
 1. **`WalkGraph` visited set — drop interface boxing and the mutex.**
    The graph walk used a thread-safe `Set[any]`: every node pointer was boxed into
@@ -567,10 +604,11 @@ Equivalence is proven, not assumed: `TestDumpJarFingerprint` writes a per-class
    pure-ASCII check (ASCII already took the same quote path, so behavior is
    identical). **Core: 254 → 246 ms/op, 193 → 182 MB/op.**
 
-Cumulative for the round: **core 315 → 246 ms/op (−22%), 217 → 182 MB/op (−16%)**;
-end-to-end bytes 282 → 248 MB (−12%).
+Cumulative for that prior round: **core 315 → 246 ms/op (−22%), 217 → 182 MB/op (−16%)**;
+end-to-end bytes 282 → 248 MB (−12%). The latest round (above) carries this further to
+core 223 ms / 168 MB.
 
-Prior-round optimizations still in place:
+Earlier-round optimizations still in place:
 - **`ParseOpcode` pre-sizing** (opcode slice + both offset maps sized from bytecode
   length).
 - **Validation timer hygiene** (stoppable `time.NewTimer` instead of `time.After`,

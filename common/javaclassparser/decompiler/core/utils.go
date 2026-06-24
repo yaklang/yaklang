@@ -152,15 +152,22 @@ func WalkGraph[T comparable](node T, next func(T) ([]T, error)) error {
 	if reflect.ValueOf(node).IsNil() {
 		return nil
 	}
-	stack := utils.NewStack[T]()
+	// A plain slice is used as the DFS stack instead of utils.Stack[T]: the linked-list
+	// stack heap-allocates a node struct on every Push, which (because WalkGraph runs on
+	// essentially every opcode/CFG traversal) was ~6% of all decompiler-core bytes. The
+	// slice amortizes growth and keeps the exact same LIFO pop order, so traversal order
+	// (and therefore decompiled output) is byte-for-byte identical. A small initial cap
+	// covers the common shallow graph without an early regrow.
+	stack := make([]T, 0, 16)
 	// A local map keyed by the concrete (comparable) node type avoids both the
 	// per-element interface boxing of Set[any] (the single largest allocator in the
 	// decompiler core, ~19% of all bytes) and the unnecessary RWMutex of the
 	// thread-safe Set -- WalkGraph traverses a single graph on one goroutine.
-	visited := make(map[T]struct{})
-	stack.Push(node)
-	for stack.Len() > 0 {
-		current := stack.Pop()
+	visited := make(map[T]struct{}, 16)
+	stack = append(stack, node)
+	for len(stack) > 0 {
+		current := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
 		if _, ok := visited[current]; ok {
 			continue
 		}
@@ -169,9 +176,7 @@ func WalkGraph[T comparable](node T, next func(T) ([]T, error)) error {
 		if err != nil {
 			return err
 		}
-		for _, n := range n {
-			stack.Push(n)
-		}
+		stack = append(stack, n...)
 	}
 	return nil
 }
@@ -295,20 +300,25 @@ func IsPopInstr(opcode int) bool {
 func CalcMergeOpcode(ifOpcode *OpCode) *OpCode {
 	trueNode := ifOpcode.Target[0]
 	falseNode := ifOpcode.Target[1]
-	trueNodeSet := utils.NewSet[*OpCode]()
+	// A plain map (single-goroutine traversal) replaces utils.Set here: the mutex-guarded
+	// Set.Add was ~4.6% of all decompiler-core bytes. The `next` filter buffer is reused
+	// across visits because WalkGraph copies the returned slice into its own stack and
+	// never retains it, so a single scratch slice is safe and removes a per-node allocation.
+	trueNodeSet := make(map[*OpCode]struct{})
+	nextBuf := make([]*OpCode, 0, 2)
 	WalkGraph[*OpCode](trueNode, func(node *OpCode) ([]*OpCode, error) {
-		next := []*OpCode{}
+		nextBuf = nextBuf[:0]
 		for _, n := range node.Target {
 			if n != ifOpcode {
-				next = append(next, n)
+				nextBuf = append(nextBuf, n)
 			}
 		}
-		trueNodeSet.Add(node)
-		return next, nil
+		trueNodeSet[node] = struct{}{}
+		return nextBuf, nil
 	})
 	var mergeNodes []*OpCode
 	WalkGraph[*OpCode](falseNode, func(node *OpCode) ([]*OpCode, error) {
-		if trueNodeSet.Has(node) {
+		if _, ok := trueNodeSet[node]; ok {
 			mergeNodes = append(mergeNodes, node)
 			return nil, nil
 		}
