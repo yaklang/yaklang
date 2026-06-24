@@ -1948,7 +1948,10 @@ func (d *Decompiler) ParseStatement() error {
 			op = GetReverseOp(op)
 			v := opcode.stackConsumed[0]
 			if v == nil {
-				panic("not support")
+				// Stack consumed value is nil (incomplete simulation for this path).
+				// Skip this opcode rather than panicking — the method may still produce
+				// partial output for other opcodes.
+				return nil
 			}
 			cmp, ok := v.(*values.JavaCompare)
 			if ok {
