@@ -4,7 +4,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -21,7 +20,6 @@ type TimelineMergeResult struct {
 	TaskIndex             string
 	ActiveItemsMerged     int
 	CompressedHeadsMerged int
-	RebasedIDs            int
 }
 
 func (m *Timeline) ForkForTask(taskIndex, taskName string, config AICallerConfigIf, ai AICaller) (*TimelineFork, error) {
@@ -60,6 +58,7 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 
 	type activeSnapshot struct {
 		id   int64
+		ts   int64
 		item *TimelineItem
 	}
 	type compressedHeadSnapshot struct {
@@ -78,7 +77,11 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 		if !ok || item == nil || item.deleted {
 			continue
 		}
-		activeItems = append(activeItems, activeSnapshot{id: id, item: item})
+		var ts int64
+		if branchTS, ok := f.Branch.idToTs.Get(id); ok {
+			ts = branchTS
+		}
+		activeItems = append(activeItems, activeSnapshot{id: id, ts: ts, item: item})
 	}
 	// Forks are created from a snapshot of the parent timeline, so a compressed head
 	// whose covered end is still inside BaseMaxID belongs to the inherited prefix.
@@ -99,12 +102,6 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 
 	result := &TimelineMergeResult{TaskIndex: f.TaskIndex}
 
-	allocateID := func() int64 {
-		if parent.config != nil {
-			return parent.config.AcquireId()
-		}
-		return parent.getMaxIDLocked() + 1
-	}
 	nextTS := int64(time.Now().UnixMilli())
 	if keys := parent.tsToTimelineItem.Keys(); len(keys) > 0 {
 		lastTS := keys[len(keys)-1]
@@ -113,37 +110,35 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 		}
 	}
 
-	// Merge strategy (deterministic order first):
-	// 1) active entries and branch-local compressed heads are merged by runtime stage task order;
-	// 2) each merged entry is rebased to parent-generated IDs;
-	// 3) timestamps are regenerated as a monotonic merge sequence.
-	// This intentionally prefers deterministic replay/stable prompt order over preserving
-	// branch-local wall-clock execution time.
+	// Merge strategy:
+	// 1) branch entries already carry globally allocated IDs from the shared SeqIdProvider;
+	// 2) preserve those IDs on merge (no rebasing);
+	// 3) regenerate timestamps as a monotonic merge sequence when branch timestamps
+	//    would break parent ordering.
 	for _, active := range activeItems {
-		newID := allocateID()
-		if newID != active.id {
-			result.RebasedIDs++
+		if _, exists := parent.idToTimelineItem.Get(active.id); exists {
+			return nil, utils.Errorf("timeline fork merge: id %d already exists in parent timeline", active.id)
 		}
-		setTimelineItemID(active.item, newID)
 		ts := nextTS
-		nextTS++
+		if active.ts > 0 && active.ts >= nextTS {
+			ts = active.ts
+		}
+		nextTS = ts + 1
 		active.item.createdAt = time.Unix(0, ts*int64(time.Millisecond))
-		parent.idToTimelineItem.OrderInsert(newID, active.item, lessInt64)
-		parent.idToTs.Set(newID, ts)
+		parent.idToTimelineItem.OrderInsert(active.id, active.item, lessInt64)
+		parent.idToTs.Set(active.id, ts)
 		parent.tsToTimelineItem.OrderInsert(ts, active.item, lessInt64)
 		result.ActiveItemsMerged++
 	}
 
 	if compressedHead != nil && compressedHead.head != nil {
-		targetID := allocateID()
-		if targetID != compressedHead.head.CoveredEndItemID {
-			result.RebasedIDs++
-		}
-		compressedHead.head.CoveredEndItemID = targetID
+		// CoveredEndItemID references the last compressed item in the branch; it was
+		// allocated by the shared global ID provider and must not be remapped here.
+		coveredID := compressedHead.head.CoveredEndItemID
 		parent.updateCompressedHead(compressedHead.head)
 		if compressedHead.ref != nil {
-			compressedHead.ref.ReducerKeyID = targetID
-			parent.archiveRefs.Set(targetID, compressedHead.ref)
+			compressedHead.ref.ReducerKeyID = coveredID
+			parent.archiveRefs.Set(coveredID, compressedHead.ref)
 		}
 		result.CompressedHeadsMerged++
 	}
@@ -173,20 +168,6 @@ func (f *TimelineFork) Diff() (string, error) {
 		return "", nil
 	}
 	return sub.Dump(), nil
-}
-
-func setTimelineItemID(item *TimelineItem, id int64) {
-	if item == nil || item.value == nil {
-		return
-	}
-	switch v := item.value.(type) {
-	case *aitool.ToolResult:
-		v.ID = id
-	case *UserInteraction:
-		v.ID = id
-	case *TextTimelineItem:
-		v.ID = id
-	}
 }
 
 func lessInt64(a, b int64) bool {
