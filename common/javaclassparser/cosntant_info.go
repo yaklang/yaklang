@@ -1,6 +1,6 @@
 package javaclassparser
 
-import "github.com/davecgh/go-spew/spew"
+import "fmt"
 
 /*
 * See: https://docs.oracle.com/javase/specs/jvms/se9/html/jvms-4.html#jvms-4.4.11
@@ -95,7 +95,7 @@ func newConstantInfo(tag uint8) ConstantInfo {
 	case CONSTANT_Package:
 		return &ConstantPackageInfo{}
 	default:
-		panic("java.lang.ClassFormatError: constant pool tag! met " + spew.Sdump(tag))
+		panic(fmt.Sprintf("java.lang.ClassFormatError: constant pool tag! met 0x%x", tag))
 	}
 }
 

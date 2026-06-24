@@ -379,6 +379,11 @@ func newAttributeInfo(attrName string, attrLen uint32) AttributeInfo {
 		return &SyntheticAttribute{AttrLen: attrLen}
 	case "RuntimeVisibleAnnotations":
 		return &RuntimeVisibleAnnotationsAttribute{AttrLen: attrLen}
+	case "RuntimeInvisibleAnnotations":
+		// RuntimeInvisibleAnnotations has the same binary layout as RuntimeVisibleAnnotations;
+		// reuse the same struct so invisible annotations (compiler-only, e.g. @Override, @Lazy)
+		// are parsed without falling through to UnparsedAttribute.
+		return &RuntimeVisibleAnnotationsAttribute{AttrLen: attrLen}
 	case "BootstrapMethods":
 		return &BootstrapMethodsAttribute{AttributeLength: attrLen}
 	case "InnerClasses":
