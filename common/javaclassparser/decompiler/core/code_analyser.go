@@ -839,7 +839,15 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		runtimeStackSimulation.Push(v1)
 		runtimeStackSimulation.Push(v2)
 	case OP_DUP:
-		checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))(1)
+		// Do not ref-fold NewExpression values from 'new; dup; invokespecial' patterns:
+		// the invokespecial modifies the NewExpression in-place (ArgumentsGetter), and
+		// ref-folding it into a shared temp variable causes both branches of an if/else
+		// to share the same variable, corrupting the output. Array creation NewExpressions
+		// (which have Length set) DO need ref-folding for array-store patterns.
+		peekVal := UnpackSoltValue(runtimeStackSimulation.Peek().(values.JavaValue))
+		if newExpr, ok := peekVal.(*values.NewExpression); !ok || len(newExpr.Length) > 0 {
+			checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))(1)
+		}
 		runtimeStackSimulation.Push(runtimeStackSimulation.Peek())
 	case OP_DUP_X1:
 		checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))(3)
