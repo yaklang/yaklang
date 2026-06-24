@@ -844,6 +844,20 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 			if isEnumCtor && len(samParams) >= 2 {
 				samParams = samParams[2:]
 			}
+			// A lambda body is emitted as an arrow expression `(Type p0, Type p1) -> ...`
+			// inline in the enclosing method, so Java requires its parameter names to be unique
+			// across the entire method scope (no shadowing). The fresh root namespace gives
+			// them var0, var1, ... which can still collide with the enclosing method's own
+			// params/locals (var1, var2, ...). Rename each SAM param to an `l<N>` name that the
+			// slot-based scheme never generates, eliminating the collision while keeping the body
+			// consistent (every body reference shares the same JavaRef/Id).
+			if isLambda {
+				for i, val := range samParams {
+					if ref, ok := val.(*values.JavaRef); ok && ref.Id != nil && !ref.IsThis {
+						ref.Id.SetName(fmt.Sprintf("l%d", i))
+					}
+				}
+			}
 			paramsNewStrList := []string{}
 			for i, val := range samParams {
 				if i == len(samParams)-1 && isVarArgs {
