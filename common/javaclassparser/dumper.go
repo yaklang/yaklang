@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	utils2 "github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 
@@ -446,13 +445,12 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 			// log.Infof("field %s is deprecated", name)
 			case *SignatureAttribute:
 			case *UnparsedAttribute:
-				log.Error("cannot handle attribute type: UnparsedAttribute")
-				spew.Dump(ret)
+				// Silently ignore unrecognized attributes (RuntimeInvisibleTypeAnnotations,
+				// PermittedSubclasses, Record, NestMembers, etc.) rather than flooding logs.
 			case *RuntimeVisibleAnnotationsAttribute:
 
 			default:
-				log.Info(spew.Sdump(ret))
-				log.Errorf("when handling for fields unknown attribute type: %T", ret)
+				// Silently ignore unknown attribute types on fields.
 			}
 		}
 
