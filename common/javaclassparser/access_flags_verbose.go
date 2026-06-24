@@ -39,9 +39,16 @@ func getClassAccessFlagsVerbose(u uint16) ([]string, string) {
 			verbose := maskMap[mask]
 
 			if mask == 0x0200 { // interface
-				result = append(result, verbose)
-				target.WriteString(verbose)
-				target.WriteByte(' ')
+				// An annotation type carries ACC_INTERFACE|ACC_ANNOTATION; it must be declared
+				// with the `@interface` keyword, not a plain `interface`.
+				if u&0x2000 == 0x2000 {
+					result = append(result, "annotation")
+					target.WriteString("@interface ")
+				} else {
+					result = append(result, verbose)
+					target.WriteString(verbose)
+					target.WriteByte(' ')
+				}
 				isInterface = true
 				break // 如果是 interface，则直接跳出，不再添加其他修饰符
 			} else if mask == 0x4000 { // enum

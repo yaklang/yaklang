@@ -89,12 +89,15 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	nonClassKeyword := false
 	isInterface := false
 	isEnum := false
+	isAnnotation := false
 	syntheticEnumSubclass := false
 	superRawName := strings.Replace(c.obj.GetSupperClassName(), "/", ".", -1)
 	for _, k := range c.obj.AccessFlagsVerbose {
 		if k == "interface" || k == "enum" || k == "annotation" {
 			if k == "interface" {
 				isInterface = true
+			} else if k == "annotation" {
+				isAnnotation = true
 			} else if k == "enum" {
 				// A genuine enum extends java.lang.Enum directly. Synthetic enum-constant
 				// subclasses (e.g. Foo$1) carry ACC_ENUM but extend the enum type itself and
@@ -185,7 +188,13 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 		if err != nil {
 			continue
 		}
-		name = funcCtx.ShortTypeName(strings.Replace(name, "/", ".", -1))
+		rawIfaceName := strings.Replace(name, "/", ".", -1)
+		// An annotation type implicitly extends java.lang.annotation.Annotation; emitting it
+		// explicitly ("@interface M extends Annotation") is illegal Java, so drop it.
+		if isAnnotation && rawIfaceName == "java.lang.annotation.Annotation" {
+			continue
+		}
+		name = funcCtx.ShortTypeName(rawIfaceName)
 		if name != "" {
 			interfaceLists = append(interfaceLists, name)
 
@@ -1025,9 +1034,15 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 		return dumped, nil
 	}
 	methodSourceBuffer := strings.Builder{}
+	isInterfaceType := slices.Contains(c.obj.AccessFlagsVerbose, "interface")
 	writeAccessFlags := func(buffer io.Writer) {
 		if accessFlags != "" {
 			methodSourceBuffer.Write([]byte(accessFlags + " "))
+		}
+		// A non-abstract, non-static instance method declared in an interface is a default
+		// method and must carry the `default` keyword, otherwise javac rejects the body.
+		if isInterfaceType && !abstractMethod && name != "<init>" && name != "<clinit>" && !strings.Contains(accessFlags, "static") {
+			methodSourceBuffer.Write([]byte("default "))
 		}
 	}
 	writeName := func(buffer io.Writer) {
