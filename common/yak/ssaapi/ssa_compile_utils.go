@@ -72,19 +72,6 @@ func antlrCacheResetEveryBytes() int64 {
 	return antlrCacheResetEveryBytesCached
 }
 
-func largeProjectCompileConcurrency() int {
-	concurrency := 2
-	if raw := strings.TrimSpace(os.Getenv("YAK_SSA_LARGE_PROJECT_CONCURRENCY")); raw != "" {
-		if v, err := strconv.Atoi(raw); err == nil {
-			concurrency = v
-		}
-	}
-	if concurrency <= 0 {
-		return 1
-	}
-	return concurrency
-}
-
 func languagePreHandlerBuildsFiles(language ssaconfig.Language) bool {
 	if !ssa.SkeletonTopLevelEnabled() {
 		return false
@@ -228,16 +215,6 @@ func (c *Config) GetFileHandler(
 	astBuildWindowOverride := 0
 	if largeProject {
 		astBuildWindowOverride = 1
-	}
-	if largeProject && concurrency > largeProjectCompileConcurrency() {
-		capped := largeProjectCompileConcurrency()
-		log.Infof(
-			"[ssa-compile] large project detected (%s), cap AST parse concurrency: %d -> %d",
-			formatFileSize(int(c.GetCompileProjectBytes())),
-			concurrency,
-			capped,
-		)
-		concurrency = capped
 	}
 	if largeProject {
 		log.Infof(

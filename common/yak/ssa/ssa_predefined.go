@@ -506,11 +506,18 @@ func (n *anValue) IsObject() bool {
 }
 
 func (n *anValue) AddMember(k, v Value) {
+	if utils.IsNil(k) || utils.IsNil(v) {
+		log.Debugf("AddMember called with nil key/member: key=%v member=%v", k, v)
+		return
+	}
 	n.getMemberMap(true).Set(k.GetId(), v.GetId())
 	n.rememberStringMemberKey(k)
 }
 
 func (n *anValue) DeleteMember(k Value) {
+	if utils.IsNil(k) {
+		return
+	}
 	memberMap := n.getMemberMap()
 	if memberMap != nil {
 		memberMap.Delete(k.GetId())
@@ -519,6 +526,9 @@ func (n *anValue) DeleteMember(k Value) {
 }
 
 func (n *anValue) GetMember(key Value) (Value, bool) {
+	if utils.IsNil(key) {
+		return nil, false
+	}
 	memberMap := n.getMemberMap()
 	if memberMap == nil {
 		return nil, false
@@ -623,8 +633,15 @@ func (n *anValue) GetAllMember() map[Value]Value {
 	for key, value := range m.GetMap() {
 		k, ok1 := n.GetValueById(key)
 		v, ok2 := n.GetValueById(value)
-		if !ok1 || !ok2 {
-			log.Warnf("BUG in anValue.GetAllMember(), is nil key[%d](%v) member[%d](%v)", key, k, value, v)
+		if !ok2 {
+			if ok1 {
+				n.forgetStringMemberKey(k)
+			}
+			m.Delete(key)
+			log.Debugf("drop stale object member: key[%d](%v) member[%d](%v)", key, k, value, v)
+			continue
+		}
+		if !ok1 {
 			continue
 		}
 		ret[k] = v
@@ -640,7 +657,14 @@ func (n *anValue) ForEachMember(fn func(Value, Value) bool) {
 	memberMap.ForEach(func(i, v int64) bool {
 		val1, ok1 := n.GetValueById(i)
 		val2, ok2 := n.GetValueById(v)
-		if !ok1 || !ok2 {
+		if !ok2 {
+			if ok1 {
+				n.forgetStringMemberKey(val1)
+			}
+			memberMap.Delete(i)
+			return true
+		}
+		if !ok1 {
 			return true
 		}
 		return fn(val1, val2)

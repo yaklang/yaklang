@@ -1691,9 +1691,9 @@ func (y *builder) VisitLeftVariable(raw phpparser.IFlexiVariableContext) *ssa.Va
 	case *phpparser.IndexLegacyCallVariableContext:
 		obj := y.VisitRightValue(i.FlexiVariable())
 		if key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey()); key != nil {
-			return y.VisitLeftVariable(i.FlexiVariable())
-		} else {
 			return y.CreateMemberCallVariable(obj, key)
+		} else {
+			return y.VisitLeftVariable(i.FlexiVariable())
 		}
 	case *phpparser.FlexiMemberAccessContext:
 		if i.Arguments() != nil {
@@ -1785,10 +1785,16 @@ func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value
 	case *phpparser.IndexVariableContext:
 		obj := y.VisitRightValue(i.FlexiVariable())
 		key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey())
+		if utils.IsNil(key) {
+			return obj
+		}
 		return y.ReadMemberCallValue(obj, key)
 	case *phpparser.IndexLegacyCallVariableContext:
 		obj := y.VisitRightValue(i.FlexiVariable())
 		key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey())
+		if utils.IsNil(key) {
+			return obj
+		}
 		return y.ReadMemberCallValue(obj, key)
 	case *phpparser.FlexiMemberAccessContext:
 		obj := y.VisitRightValue(i.FlexiVariable())
