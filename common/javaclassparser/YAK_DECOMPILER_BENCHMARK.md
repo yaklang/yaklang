@@ -40,7 +40,7 @@ authority for automated semantic decisions.
 | Correctness (javac round-trip) | **24/26** eligible corpora recompile cleanly (was 4/13 at start); the classic corpus now emits **zero stubs**; all four inner/nested-class groups recompile; dedicated boundary-condition, numeric-edge, field/array and nested-control-flow corpora gated | `TestRecompileRoundtrip` |
 | Determinism | byte-identical output across repeated decompiles; perf changes proven equivalent by per-class sha256 fingerprints | `TestCorpusDeterminism`, `TestDumpJarFingerprint` |
 | Test suite | green & fast: `./...` ≈ 22s, down from more than 150s (**at least 6.8x**), no machine-specific dependencies | `go test ./common/javaclassparser/...` |
-| Allocation cost | core **≈223 ms** and **≈168 MB cumulative heap allocation** per 106-class jar (down from ≈246 ms / ≈182 MB); the post-decompile ANTLR re-parse adds ≈ +56% runtime and ≈ +40% allocation relative to core-only | `BenchmarkDecompileJar` |
+| Allocation cost | core **≈222 ms** and **≈167 MB cumulative heap allocation** per 106-class jar (down from ≈246 ms / ≈182 MB); the post-decompile ANTLR re-parse adds ≈ +58% runtime and ≈ +40% bytes relative to core-only | `BenchmarkDecompileJar` |
 | Scalability | near-linear to ~8 workers (3.6×), then **GC-bound regression** | `BenchmarkDecompileJarParallel` |
 
 The decompiler's **safety guarantee holds**: for every input in the corpus it
@@ -512,9 +512,9 @@ post-decompile ANTLR re-parse and isolates the **decompiler core** from the
 
 | Configuration | ns/op | B/op | allocs/op |
 |---------------|------:|-----:|----------:|
-| Full pipeline (validation on) | ~349 M | 235 MB | 3.65 M |
-| Core only (validation off) | **223 M** | **168 MB** | 2.39 M |
-| **Validation safety-net share** | **≈ 36%** time | **≈ 29%** bytes | **≈ 34%** allocs |
+| Full pipeline (validation on) | ~351 M | 234 MB | 3.59 M |
+| Core only (validation off) | **222 M** | **167 MB** | 2.34 M |
+| **Validation safety-net share** | **≈ 37%** time | **≈ 29%** bytes | **≈ 35%** allocs |
 
 The safety net is not free, but it is the contract that guarantees no un-parseable
 Java ever leaves `Decompile`; ~36% wall-time is the price of that guarantee (it is an
@@ -580,13 +580,19 @@ changes, measured on `commons-codec` (`-benchtime=30x` core / `20x` full):
 5. **`DumpClass.assemble`: `strings.Builder` instead of `attrs += …`.** A class with many
    methods otherwise triggered O(n²) string concatenation; the builder is O(n) and emits
    the same bytes.
+6. **`ScanJmp` / `DropUnreachableOpcode`: plain map + drop a per-node copy.** Both used a
+   mutex `utils.Set[*OpCode]` on a single-goroutine walk (→ plain map), and
+   `DropUnreachableOpcode` allocated a fresh `[]*OpCode` copy of `code.Target` on every
+   visited node — now `code.Target` is returned directly (`WalkGraph` copies it into its
+   stack and never mutates/retains it).
 
-Result on `commons-codec`: **core 246 → 223 ms/op (−9%), 182 → 168 MB/op (−8%), 3.31 →
-2.39 M allocs/op (−28%)**; **full pipeline 378 → 349 ms/op (−8%), 248 → 235 MB/op (−5%),
-4.54 → 3.65 M allocs/op (−20%)**. All three axes improved on both configurations, and the
-two-jar fingerprint diff confirms byte-for-byte identical output. (A chunked OpCode arena
-was prototyped and **rejected**: it cut malloc count but over-allocated per small method,
-regressing bytes by +7% — a memory loss the project does not accept for a small CPU gain.)
+Result on `commons-codec`: **core 246 → 222 ms/op (−10%), 182 → 167 MB/op (−8%), 3.31 →
+2.34 M allocs/op (−31%)**; **full pipeline 378 → 351 ms/op (−7%), 248 → 234 MB/op (−6%),
+4.54 → 3.59 M allocs/op (−21%)**. All three axes improved on both configurations, and the
+fingerprint diff against the pre-optimization baseline confirms byte-for-byte identical
+output. (A chunked OpCode arena was prototyped and **rejected**: it cut malloc count but
+over-allocated per small method, regressing bytes by +7% — a memory loss the project does
+not accept for a small CPU gain.)
 
 **Prior allocation/CPU round (still in place):**
 
@@ -606,7 +612,7 @@ regressing bytes by +7% — a memory loss the project does not accept for a smal
 
 Cumulative for that prior round: **core 315 → 246 ms/op (−22%), 217 → 182 MB/op (−16%)**;
 end-to-end bytes 282 → 248 MB (−12%). The latest round (above) carries this further to
-core 223 ms / 168 MB.
+core 222 ms / 167 MB.
 
 Earlier-round optimizations still in place:
 - **`ParseOpcode` pre-sizing** (opcode slice + both offset maps sized from bytecode
