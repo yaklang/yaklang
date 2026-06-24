@@ -502,11 +502,16 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		exp := values.NewNewArrayExpression(arrayType, length)
 		runtimeStackSimulation.Push(exp)
 	case OP_MULTIANEWARRAY:
+		// The constant-pool entry is ALREADY the full array class type (e.g. "[[I" is
+		// int[][]); the third operand byte is the count of explicitly-sized leading
+		// dimensions whose lengths are on the stack (always <= the array rank). The
+		// type must be used as-is: re-wrapping it once per popped dimension doubled the
+		// rank, turning `new int[3][4]` into a 7-dimensional `new int[3][4][][]`.
 		typ := d.constantPoolGetter(int(Convert2bytesToInt(opcode.Data[:2]))).(*values.JavaClassValue).Type()
-		var lens []values.JavaValue
-		for _, d := range runtimeStackSimulation.PopN(typ.ArrayDim()) {
-			lens = append(lens, d.(values.JavaValue))
-			typ = types.NewJavaArrayType(typ)
+		dims := int(opcode.Data[2])
+		lens := make([]values.JavaValue, 0, dims)
+		for _, v := range runtimeStackSimulation.PopN(dims) {
+			lens = append(lens, v.(values.JavaValue))
 		}
 		lens = funk.Reverse(lens).([]values.JavaValue)
 		exp := values.NewNewArrayExpression(typ, lens...)
