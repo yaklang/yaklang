@@ -116,8 +116,24 @@ func (j *JavaExpression) String(funcCtx *class_context.ClassContext) string {
 	}
 }
 
+func isBooleanTyped(v JavaValue) bool {
+	if v == nil {
+		return false
+	}
+	uv := UnpackSoltValue(v)
+	if uv == nil {
+		return false
+	}
+	t := uv.Type()
+	if t == nil {
+		return false
+	}
+	prim, ok := t.RawType().(*types.JavaPrimer)
+	return ok && prim.Name == types.JavaBoolean
+}
+
 func NewUnaryExpression(value1 JavaValue, op string, typ types.JavaType) *JavaExpression {
-	if IsLogicalOperator(op) {
+	if IsStrictBooleanOperator(op) {
 		value1.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
 	}
 	return &JavaExpression{
@@ -127,9 +143,17 @@ func NewUnaryExpression(value1 JavaValue, op string, typ types.JavaType) *JavaEx
 	}
 }
 func NewBinaryExpression(value1, value2 JavaValue, op string, typ types.JavaType) *JavaExpression {
-	if IsLogicalOperator(op) {
+	if IsStrictBooleanOperator(op) {
 		value1.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
 		value2.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
+	} else if (op == AND || op == OR || op == XOR) && (isBooleanTyped(value1) || isBooleanTyped(value2)) {
+		// &, |, ^ are shared between boolean logic and integer bitwise arithmetic. Decide by
+		// the operands: if either side is already boolean (e.g. descriptor-typed parameters or
+		// a negation), this is boolean logic, so align both sides to boolean. Otherwise leave
+		// the operands as their inferred integer type.
+		value1.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
+		value2.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
+		typ = types.NewJavaPrimer(types.JavaBoolean)
 	}
 	return &JavaExpression{
 		Values: []JavaValue{value1, value2},
