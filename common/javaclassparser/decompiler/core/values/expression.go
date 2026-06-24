@@ -244,7 +244,7 @@ func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) str
 	}
 
 	if v, ok := f.Object.(*JavaClassValue); ok {
-		if v.Type().RawType().(*types.JavaClass).Name == funcCtx.ClassName {
+		if classType, ok2 := v.Type().RawType().(*types.JavaClass); ok2 && classType.Name == funcCtx.ClassName {
 			return fmt.Sprintf("%s(%s)", f.FunctionName, strings.Join(paramStrs, ","))
 		}
 	}
