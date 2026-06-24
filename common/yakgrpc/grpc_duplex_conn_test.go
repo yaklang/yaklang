@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -121,6 +124,18 @@ func TestDuplexConnection(t *testing.T) {
 		require.Fail(t, "duplex connection timeout")
 	}
 	cancel()
+}
+
+func TestWatchDatabaseTableMeta_ClosedDB(t *testing.T) {
+	path := filepath.Join(os.TempDir(), "watch-closed-"+uuid.NewString()+".db")
+	db, err := consts.CreateProjectDatabase(path)
+	require.NoError(t, err)
+	defer os.Remove(path)
+	require.NoError(t, db.Close())
+
+	last, changed := WatchDatabaseTableMeta(db, 42, context.Background(), "http_flows")
+	require.False(t, changed)
+	require.Equal(t, int64(42), last)
 }
 
 func TestWatchTable(t *testing.T) {

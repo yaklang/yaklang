@@ -237,9 +237,23 @@ func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 	return stream.Context().Err()
 }
 
+func isDatabaseQueryable(db *gorm.DB) bool {
+	if db == nil {
+		return false
+	}
+	sqlDB := db.DB()
+	if sqlDB == nil {
+		return false
+	}
+	return sqlDB.Ping() == nil
+}
+
 func WatchDatabaseTableMeta(db *gorm.DB, last int64, streamCtx context.Context, tableName string) (_ int64, changed bool) {
 	if db == nil {
 		db = consts.GetGormProjectDatabase()
+	}
+	if !isDatabaseQueryable(db) {
+		return last, false
 	}
 
 	current, err := bizhelper.GetTableCurrentId(db, tableName)
