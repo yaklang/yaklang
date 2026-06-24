@@ -8,6 +8,12 @@ import (
 )
 
 func TestSFVMWithDiagnostics(t *testing.T) {
+	oldLevel := diagnostics.GetLevel()
+	diagnostics.SetLevel(diagnostics.LevelLow)
+	t.Cleanup(func() {
+		diagnostics.SetLevel(oldLevel)
+	})
+
 	// Create a diagnostics recorder
 	recorder := diagnostics.NewRecorder()
 

@@ -48,6 +48,10 @@ func (f *fakeAntlrAnalyzer) PreHandlerFile(ssa.FrontAST, *memedit.MemEditor, *ss
 
 func (f *fakeAntlrAnalyzer) AfterPreHandlerProject(*ssa.FunctionBuilder) {}
 
+func (f *fakeAntlrAnalyzer) UsesDeferredFileBuild() bool {
+	return false
+}
+
 func (f *fakeAntlrAnalyzer) Clearup() {}
 
 func resetAntlrCacheResetConfigForTest() {

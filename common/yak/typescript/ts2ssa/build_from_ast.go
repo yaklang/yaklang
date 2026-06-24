@@ -47,9 +47,6 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 			lib = prog.NewLibrary(fileUrl, []string{fileUrl})
 		}
 
-		defer func() {
-			lib.VisitAst(sourcefile)
-		}()
 		lib.PushEditor(prog.GetCurrentEditor())
 
 		subBuilder := lib.GetAndCreateFunctionBuilder(fileName, string(ssa.MainFunctionName))
@@ -131,10 +128,6 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 			b.FunctionBuilder = currentBuilder
 		}()
 	}
-
-	defer func() {
-		lib.VisitAst(sourcefile)
-	}()
 	if sourcefile.Statements != nil {
 		for _, statement := range sourcefile.Statements.Nodes {
 			if ast.IsPrologueDirective(statement) && statement.AsExpressionStatement().Expression.Text() == "use strict" {

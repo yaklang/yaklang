@@ -59,7 +59,6 @@ func (y *singleFileBuilder) VisitCompilationUnit(raw javaparser.ICompilationUnit
 		}
 		y.registerPostSkeletonImportTask(i)
 	}
-	y.GetProgram().VisitAst(i)
 
 	return nil
 }
