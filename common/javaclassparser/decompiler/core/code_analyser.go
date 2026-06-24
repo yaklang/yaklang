@@ -166,7 +166,8 @@ func (d *Decompiler) ParseOpcode() (err error) {
 
 func (d *Decompiler) ScanJmp() error {
 	opcodes := d.opCodes
-	visitNodeRecord := utils.NewSet[*OpCode]()
+	// Plain map (single-goroutine walk) avoids the mutex + interface boxing of utils.Set.
+	visitNodeRecord := make(map[*OpCode]struct{})
 	endOp := &OpCode{Instr: InstrInfos[OP_END], Id: d.CurrentId}
 	var walkNode func(start int)
 	walkNode = func(start int) {
@@ -221,10 +222,10 @@ func (d *Decompiler) ScanJmp() error {
 				}
 			}
 
-			if visitNodeRecord.Has(opcode) {
+			if _, ok := visitNodeRecord[opcode]; ok {
 				break
 			}
-			visitNodeRecord.Add(opcode)
+			visitNodeRecord[opcode] = struct{}{}
 			pre = opcode
 			switch opcode.Instr.OpCode {
 			case OP_RETURN, OP_IRETURN, OP_ARETURN, OP_LRETURN, OP_DRETURN, OP_FRETURN, OP_ATHROW:
@@ -271,21 +272,20 @@ func (d *Decompiler) ScanJmp() error {
 }
 func (d *Decompiler) DropUnreachableOpcode() error {
 	// DropUnreachableOpcode and nop
-	visitNodeRecord := utils.NewSet[*OpCode]()
+	// Plain map (single-goroutine walk); WalkGraph copies the returned slice into its own
+	// stack and never mutates/retains it, so code.Target can be returned directly instead of
+	// allocating a per-node copy.
+	visitNodeRecord := make(map[*OpCode]struct{})
 	err := WalkGraph[*OpCode](d.opCodes[0], func(code *OpCode) ([]*OpCode, error) {
-		visitNodeRecord.Add(code)
-		target := []*OpCode{}
-		for _, opCode := range code.Target {
-			target = append(target, opCode)
-		}
-		return target, nil
+		visitNodeRecord[code] = struct{}{}
+		return code.Target, nil
 	})
 	if err != nil {
 		return err
 	}
 	var newOpcodes []*OpCode
 	for _, code := range d.opCodes {
-		if !visitNodeRecord.Has(code) {
+		if _, ok := visitNodeRecord[code]; !ok {
 			continue
 		}
 		if code.Instr.OpCode == OP_NOP {

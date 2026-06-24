@@ -23,7 +23,7 @@
 | 正确性（javac round-trip） | **24/26** 个可评估语料干净重编译（起始为 4/13）；经典语料现已**零 stub**；四个内部类/嵌套类组全部可重编译；专用边界、数值边界、字段/数组与嵌套控制流语料均已纳入门禁 | `TestRecompileRoundtrip` |
 | 确定性 | 多次反编译逐字节一致；性能改动通过逐类 sha256 指纹证明输出等价 | `TestCorpusDeterminism`、`TestDumpJarFingerprint` |
 | 测试套件 | 绿且快：`./...` ≈ 22s，从 150s 以上降下来（**至少 6.8 倍**），无机器相关依赖 | `go test ./common/javaclassparser/...` |
-| 分配开销 | 核心 **≈223 ms** 且 **≈168 MB 累计堆分配** / 106 类的 jar（自 ≈246 ms / ≈182 MB 降低）；反编译后的 ANTLR 重解析相对 core-only 增加运行时 ≈ +56%、分配 ≈ +40% | `BenchmarkDecompileJar` |
+| 分配开销 | 核心 **≈222 ms** 且 **≈167 MB 累计堆分配** / 106 类的 jar（自 ≈246 ms / ≈182 MB 降低）；反编译后的 ANTLR 重解析相对 core-only 增加运行时 ≈ +58%、字节 ≈ +40% | `BenchmarkDecompileJar` |
 | 可扩展性 | ~8 worker 前近线性（3.6×），之后出现 **GC 瓶颈回退** | `BenchmarkDecompileJarParallel` |
 
 反编译器的**安全保证成立**：对语料中的每一个输入，要么重建出方法，要么把它降级为带标记、仍可解析的 stub（`yak-decompiler:` 标记），绝不输出不可解析的 Java，也绝不从 `Decompile` 中 panic 逃逸。
@@ -242,9 +242,9 @@ BENCH_JAR=<jar> go test -run xxx -bench 'BenchmarkDecompileJar$' -benchmem ./com
 
 | 配置 | ns/op | B/op | allocs/op |
 |------|------:|-----:|----------:|
-| 完整流水线（开启校验） | ~349 M | 235 MB | 3.65 M |
-| 仅核心（关闭校验） | **223 M** | **168 MB** | 2.39 M |
-| **校验安全网占比** | 时间 **≈ 36%** | 字节 **≈ 29%** | 分配 **≈ 34%** |
+| 完整流水线（开启校验） | ~351 M | 234 MB | 3.59 M |
+| 仅核心（关闭校验） | **222 M** | **167 MB** | 2.34 M |
+| **校验安全网占比** | 时间 **≈ 37%** | 字节 **≈ 29%** | 分配 **≈ 35%** |
 
 安全网并非免费，但它是"绝不让不可解析的 Java 离开 `Decompile`"的契约；~36% 的墙钟时间是这一保证的代价（它是对整个类的一次 ANTLR 重解析，其 ATN 模拟分配主导了这部分占比，且为第三方运行时的固有成本）。
 
@@ -285,8 +285,9 @@ runtime.greyobject     13.3% cum
 3. **`CalcMergeOpcode`：去掉互斥 `Set`、复用 `next` 缓冲。** 用普通 map 替换 `utils.Set[*OpCode]`（带互斥锁，占核心字节约 4.6%），并跨访问复用单个 `next` 过滤切片（安全：`WalkGraph` 会把返回切片拷入自己的栈，从不持有它）。
 4. **`fixJavaStringEscapes`：3 个正则只编译一次。** 它对*每个反编译出的字符串字面量*都新建三个 `RegexpWrapper`——每次都重编译模式（累计 ~270 MB）。提升为包级变量、只编译一次（`*regexp.Regexp` 并发安全，共享 wrapper 也服务并行反编译）。
 5. **`DumpClass.assemble`：用 `strings.Builder` 替代 `attrs += …`。** 含大量方法的类原本触发 O(n²) 字符串拼接；builder 为 O(n) 且产出相同字节。
+6. **`ScanJmp` / `DropUnreachableOpcode`：普通 map + 去掉一次逐节点拷贝。** 两者都在单 goroutine 遍历里用了互斥 `utils.Set[*OpCode]`（→ 普通 map），且 `DropUnreachableOpcode` 每访问一个节点都新分配一份 `code.Target` 的 `[]*OpCode` 拷贝——现在直接返回 `code.Target`（`WalkGraph` 会拷入自己的栈，从不修改/持有它）。
 
-`commons-codec` 上的结果：**核心 246 → 223 ms/op（−9%），182 → 168 MB/op（−8%），3.31 → 2.39 M allocs/op（−28%）**；**完整流水线 378 → 349 ms/op（−8%），248 → 235 MB/op（−5%），4.54 → 3.65 M allocs/op（−20%）**。两种配置三项指标全部改善，且双 jar 指纹 diff 证明输出逐字节一致。（曾原型化一个 OpCode chunk 竞技场分配器并**否决**：它降低了 malloc 次数，但对许多小方法过度分配，使字节回退 +7%——为小幅 CPU 收益换取内存损失，项目不接受。）
+`commons-codec` 上的结果：**核心 246 → 222 ms/op（−10%），182 → 167 MB/op（−8%），3.31 → 2.34 M allocs/op（−31%）**；**完整流水线 378 → 351 ms/op（−7%），248 → 234 MB/op（−6%），4.54 → 3.59 M allocs/op（−21%）**。两种配置三项指标全部改善，且与优化前基线的指纹 diff 证明输出逐字节一致。（曾原型化一个 OpCode chunk 竞技场分配器并**否决**：它降低了 malloc 次数，但对许多小方法过度分配，使字节回退 +7%——为小幅 CPU 收益换取内存损失，项目不接受。）
 
 **上一轮分配/CPU 优化（仍在生效）：**
 
@@ -296,7 +297,7 @@ runtime.greyobject     13.3% cum
 2. **纯 ASCII 字符串字面量跳过 MIME 嗅探。**
    `JavaStringToLiteral` 对*每个*字面量都跑完整的魔数检测（`codec.MatchMIMEType`，会分配 `csv`/`bufio` reader），用于恢复可能被错误解码的中文字符集——对 ASCII 字节不可能命中。用纯 ASCII 检查作为前置守卫（ASCII 本就走相同的加引号路径，行为不变）。**核心：254 → 246 ms/op，193 → 182 MB/op。**
 
-那一轮累计：**核心 315 → 246 ms/op（−22%），217 → 182 MB/op（−16%）**；端到端字节 282 → 248 MB（−12%）。最新一轮（上文）进一步推进到核心 223 ms / 168 MB。
+那一轮累计：**核心 315 → 246 ms/op（−22%），217 → 182 MB/op（−16%）**；端到端字节 282 → 248 MB（−12%）。最新一轮（上文）进一步推进到核心 222 ms / 167 MB。
 
 更早仍在生效的优化：
 - **`ParseOpcode` 预分配**（opcode 切片 + 两个 offset map 都按字节码长度预分配）。
