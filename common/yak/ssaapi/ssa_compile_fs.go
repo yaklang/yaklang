@@ -108,14 +108,9 @@ func buildFileContent(
 func collectCompileTargets(
 	prog *ssa.Program,
 	fileContents []*ssareducer.FileContent,
-	handlerFiles []string,
+	handlerFileSet map[string]struct{},
 ) []*ssareducer.FileContent {
-	handlerFileSet := make(map[string]struct{}, len(handlerFiles))
-	for _, path := range handlerFiles {
-		handlerFileSet[path] = struct{}{}
-	}
-
-	targets := make([]*ssareducer.FileContent, 0, len(handlerFiles))
+	targets := make([]*ssareducer.FileContent, 0, len(handlerFileSet))
 	for _, fileContent := range fileContents {
 		if fileContent == nil {
 			continue
@@ -193,8 +188,6 @@ func (c *Config) parseProjectWithFS(
 	handlerFilesMap := make(map[string]struct{})
 	handlerFiles := make([]string, 0)
 	handlerFileSet := make(map[string]struct{})
-
-	var err error
 	start := time.Now()
 
 	log.Debugf("ssa.compile.phase enter %s", compilePhase)
@@ -225,9 +218,7 @@ func (c *Config) parseProjectWithFS(
 	folder2Save = append(folder2Save, scanResult.Folders...)
 	handlerTotal = scanResult.HandlerTotal
 	handlerFiles = scanResult.HandlerFiles
-	for _, handlerFile := range handlerFiles {
-		handlerFileSet[handlerFile] = struct{}{}
-	}
+	handlerFileSet = scanResult.HandlerFileSet
 	preHandlerTotal = scanResult.PreHandlerTotal
 	preHandlerFiles = scanResult.PreHandlerFiles
 	handlerFilesMap = scanResult.HandlerFilesMap
@@ -297,7 +288,7 @@ func (c *Config) parseProjectWithFS(
 	// When pre-handler already emits file skeletons and schedules remaining file
 	// work, the shared pipeline must not capture the whole file AST in another
 	// closure. See docs/ssa-ast-to-ssa-skeleton-plan.md §1/§3.
-	preHandlerBuildsFiles := languagePreHandlerBuildsFiles(c.GetLanguage())
+	preHandlerBuildsFiles := c.LanguageBuilder != nil && c.LanguageBuilder.UsesDeferredFileBuild()
 	// pre handler  0-40%
 	f1 := func() error {
 		if prog.Cache != nil {

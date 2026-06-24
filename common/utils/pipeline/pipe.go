@@ -21,7 +21,9 @@ type Pipe[T, U any] struct {
 }
 
 func NewSimplePipe[T, U any](ctx context.Context, in <-chan T, handler func(item T) (U, error)) *Pipe[T, U] {
-	ctx = normalizeContext(ctx)
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	ret := &Pipe[T, U]{
 		ctx: ctx,
 		out: chanx.NewUnlimitedChan[U](ctx, defaultPipeSize),
@@ -53,42 +55,6 @@ func NewSimplePipe[T, U any](ctx context.Context, in <-chan T, handler func(item
 
 const defaultPipeSize = 200
 
-func normalizeContext(ctx context.Context) context.Context {
-	if ctx == nil {
-		return context.Background()
-	}
-	return ctx
-}
-
-func normalizePipeSize(initBufSize int) int {
-	if initBufSize > 0 {
-		return initBufSize
-	}
-	return defaultPipeSize
-}
-
-func normalizeBoundedPipeSize(bufSize int) int {
-	if bufSize < 0 {
-		return 0
-	}
-	return bufSize
-}
-
-func normalizeConcurrency(concurrency ...int) int {
-	if len(concurrency) > 0 && concurrency[0] > 0 {
-		return concurrency[0]
-	}
-	return 10
-}
-
-func newUnlimitedPipeIO[T any](ctx context.Context, initBufSize int) chanx.PipeIO[T] {
-	return chanx.NewUnlimitedChan[T](ctx, normalizePipeSize(initBufSize))
-}
-
-func newLimitedPipeIO[T any](ctx context.Context, bufSize int) chanx.PipeIO[T] {
-	return chanx.NewLimitedChan[T](ctx, normalizeBoundedPipeSize(bufSize))
-}
-
 // NewPipe 创建一个基本的 Pipe，兼容不需要 store 的老代码
 func NewPipe[T, U any](
 	ctx context.Context,
@@ -99,7 +65,7 @@ func NewPipe[T, U any](
 	wrappedHandler := func(item T, store *utils.SafeMap[any]) (U, error) {
 		return handler(item)
 	}
-	return NewPipeWithInit(ctx, initBufSize, wrappedHandler, nil, concurrency...)
+	return newPipeWithInit(ctx, initBufSize, false, wrappedHandler, nil, concurrency...)
 }
 
 // NewBoundedPipe creates a Pipe backed by fixed-size channels. It is useful for
@@ -115,7 +81,7 @@ func NewBoundedPipe[T, U any](
 	wrappedHandler := func(item T, store *utils.SafeMap[any]) (U, error) {
 		return handler(item)
 	}
-	return NewBoundedPipeWithStore(ctx, bufSize, wrappedHandler, nil, concurrency...)
+	return newPipeWithInit(ctx, bufSize, true, wrappedHandler, nil, concurrency...)
 }
 
 // NewPipeWithStore 创建一个带有 worker 初始化函数的 Pipe
@@ -126,7 +92,7 @@ func NewPipeWithStore[T, U any](
 	initWorker func() *utils.SafeMap[any],
 	concurrency ...int,
 ) *Pipe[T, U] {
-	return NewPipeWithInit(ctx, initBufSize, handler, initWorker, concurrency...)
+	return newPipeWithInit(ctx, initBufSize, false, handler, initWorker, concurrency...)
 }
 
 // NewBoundedPipeWithStore is NewPipeWithStore plus fixed input/output channel
@@ -142,17 +108,6 @@ func NewBoundedPipeWithStore[T, U any](
 	return newPipeWithInit(ctx, bufSize, true, handler, initWorker, concurrency...)
 }
 
-// NewPipeWithInit 创建一个带有 worker 初始化函数的 Pipe（内部使用）
-func NewPipeWithInit[T, U any](
-	ctx context.Context,
-	initBufSize int,
-	handler func(item T, store *utils.SafeMap[any]) (U, error),
-	initWorker func() *utils.SafeMap[any],
-	concurrency ...int,
-) *Pipe[T, U] {
-	return newPipeWithInit(ctx, initBufSize, false, handler, initWorker, concurrency...)
-}
-
 func newPipeWithInit[T, U any](
 	ctx context.Context,
 	initBufSize int,
@@ -161,20 +116,33 @@ func newPipeWithInit[T, U any](
 	initWorker func() *utils.SafeMap[any],
 	concurrency ...int,
 ) *Pipe[T, U] {
-	ctx = normalizeContext(ctx)
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	con := 10
+	if len(concurrency) > 0 && concurrency[0] > 0 {
+		con = concurrency[0]
+	}
+	bufSize := initBufSize
+	if !bounded && bufSize <= 0 {
+		bufSize = defaultPipeSize
+	}
+	if bounded && bufSize < 0 {
+		bufSize = 0
+	}
+
 	ret := &Pipe[T, U]{
 		ctx:        ctx,
 		handler:    handler,
 		initWorker: initWorker,
 	}
 	if bounded {
-		ret.in = newLimitedPipeIO[T](ctx, initBufSize)
-		ret.out = newLimitedPipeIO[U](ctx, initBufSize)
+		ret.in = chanx.NewLimitedChan[T](ctx, bufSize)
+		ret.out = chanx.NewLimitedChan[U](ctx, bufSize)
 	} else {
-		ret.in = newUnlimitedPipeIO[T](ctx, initBufSize)
-		ret.out = newUnlimitedPipeIO[U](ctx, initBufSize)
+		ret.in = chanx.NewUnlimitedChan[T](ctx, bufSize)
+		ret.out = chanx.NewUnlimitedChan[U](ctx, bufSize)
 	}
-	con := normalizeConcurrency(concurrency...)
 	ret.swg = utils.NewSizedWaitGroup(con)
 
 	for i := 0; i < con; i++ {

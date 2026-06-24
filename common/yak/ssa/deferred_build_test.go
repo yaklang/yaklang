@@ -33,8 +33,7 @@ func TestRunDeferredFileBuildsOnce(t *testing.T) {
 	prog.RunDeferredBuilds()
 	require.Equal(t, 1, count)
 	require.Equal(t, 1, prog.DeferredBuildCount())
-	require.Nil(t, prog.deferredBuildSeq)
-	require.Nil(t, prog.deferredBuildByID)
+	require.Nil(t, prog.deferredBuilds)
 }
 
 func TestRunDeferredBuildsDrainsTasksRegisteredDuringBuild(t *testing.T) {
@@ -51,8 +50,7 @@ func TestRunDeferredBuildsDrainsTasksRegisteredDuringBuild(t *testing.T) {
 	prog.RunDeferredBuilds()
 	require.Equal(t, []string{"first", "second"}, ran)
 	require.Equal(t, 2, prog.DeferredBuildCount())
-	require.Nil(t, prog.deferredBuildSeq)
-	require.Nil(t, prog.deferredBuildByID)
+	require.Nil(t, prog.deferredBuilds)
 
 	prog.RunDeferredBuilds()
 	require.Equal(t, []string{"first", "second"}, ran)

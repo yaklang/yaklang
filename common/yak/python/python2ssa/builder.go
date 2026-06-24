@@ -99,6 +99,10 @@ func (*SSABuilder) GetLanguage() ssaconfig.Language {
 	return ssaconfig.PYTHON
 }
 
+func (*SSABuilder) UsesDeferredFileBuild() bool {
+	return true
+}
+
 // ========================================== PreHandlerAnalyzer Implementation ==========================================
 
 var _ ssa.PreHandlerAnalyzer = &SSABuilder{}

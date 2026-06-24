@@ -26,6 +26,8 @@ type PreHandlerAnalyzer interface {
 
 	AfterPreHandlerProject(builder *FunctionBuilder)
 
+	UsesDeferredFileBuild() bool
+
 	Clearup()
 }
 
@@ -127,6 +129,10 @@ type PreHandlerBase struct {
 
 func (d *PreHandlerBase) AfterPreHandlerProject(builder *FunctionBuilder) {
 	d.InitHandler(builder)
+}
+
+func (*PreHandlerBase) UsesDeferredFileBuild() bool {
+	return false
 }
 
 func NewPreHandlerBase(fs ...initHanlderFunc) *PreHandlerBase {

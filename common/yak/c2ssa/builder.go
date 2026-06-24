@@ -110,6 +110,10 @@ func (*SSABuilder) GetLanguage() ssaconfig.Language {
 	return ssaconfig.C
 }
 
+func (*SSABuilder) UsesDeferredFileBuild() bool {
+	return true
+}
+
 func (s *SSABuilder) GetAntlrCache() *ssa.AntlrCache {
 	return s.CreateAntlrCache(cparser.GetLexerSerializedATN(), cparser.GetParserSerializedATN())
 }

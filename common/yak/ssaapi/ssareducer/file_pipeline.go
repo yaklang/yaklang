@@ -219,33 +219,28 @@ func FilesHandler(
 	)
 	readPipe.FeedSlice(paths)
 
-	var parseOut <-chan *FileContent
+	parseBufSize := parsedASTQueueSize
+	parseConcurrency := concurrency
 	if orderType == OutOfOrder {
-		parsePipe := pipeline.NewSlotPipeWithStore[*FileContent, *FileContent](
-			ctx,
-			parsedASTQueueSize,
-			astBuildWindowSize(concurrency, astBuildWindowOverride),
-			func(fileContent *FileContent, store *utils.SafeMap[any]) (*FileContent, error) {
-				return parseFile(fileContent, store), nil
-			},
-			initWorker,
-			concurrency,
-		)
-		parsePipe.FeedChannel(readPipe.Out())
-		parseOut = releaseTrackedFileContents(ctx, parsePipe.Out())
-	} else {
-		parsePipe := pipeline.NewBoundedPipeWithStore[*FileContent, *FileContent](
-			ctx,
-			parsedASTQueueSize,
-			func(fileContent *FileContent, store *utils.SafeMap[any]) (*FileContent, error) {
-				return parseFile(fileContent, store), nil
-			},
-			initWorker,
-			concurrency,
-		)
-		parsePipe.FeedChannel(readPipe.Out())
-		parseOut = parsePipe.Out()
+		window := astBuildWindowSize(concurrency, astBuildWindowOverride)
+		parseConcurrency = window
+		if parseConcurrency < 1 {
+			parseConcurrency = 1
+		}
+		// Unbuffered channels bound in-flight parsed AST count to the window.
+		parseBufSize = 0
 	}
+	parsePipe := pipeline.NewBoundedPipeWithStore[*FileContent, *FileContent](
+		ctx,
+		parseBufSize,
+		func(fileContent *FileContent, store *utils.SafeMap[any]) (*FileContent, error) {
+			return parseFile(fileContent, store), nil
+		},
+		initWorker,
+		parseConcurrency,
+	)
+	parsePipe.FeedChannel(readPipe.Out())
+	parseOut := parsePipe.Out()
 
 	sort := func(index int) <-chan *FileContent {
 		out := make([]*FileContent, 0, len(paths))
@@ -289,31 +284,6 @@ func FilesHandler(
 	}
 
 	return parseOut
-}
-
-func releaseTrackedFileContents(ctx context.Context, slots <-chan *pipeline.SlotResult[*FileContent]) <-chan *FileContent {
-	out := make(chan *FileContent)
-	go func() {
-		defer close(out)
-		for slot := range slots {
-			if slot == nil {
-				continue
-			}
-			fileContent := slot.Value
-			if fileContent == nil {
-				slot.Release()
-				continue
-			}
-			fileContent.setRelease(slot.Release)
-			select {
-			case <-ctx.Done():
-				fileContent.Release()
-				return
-			case out <- fileContent:
-			}
-		}
-	}()
-	return out
 }
 
 func effectiveASTSequence(orderType ASTSequenceType, pathCount int) ASTSequenceType {
