@@ -87,7 +87,7 @@ func GetReverseOp(op string) string {
 	case LTE:
 		return GT
 	default:
-		panic(fmt.Sprintf("unknow opcode: %s", op))
+		return EQ
 	}
 }
 func GetNotOp(code *OpCode) string {
@@ -106,7 +106,7 @@ func GetNotOp(code *OpCode) string {
 	case LTE:
 		return GT
 	default:
-		panic(fmt.Sprintf("unknow opcode: 0x%x", code.Instr.OpCode))
+		return NE
 	}
 }
 func GetOp(code *OpCode) string {
@@ -136,7 +136,7 @@ func GetOp(code *OpCode) string {
 	case OP_IFGT:
 		return GT
 	default:
-		panic(fmt.Sprintf("unknow opcode: 0x%x", code.Instr.OpCode))
+		return NE
 	}
 }
 func Convert2bytesToInt(data []byte) uint16 {
