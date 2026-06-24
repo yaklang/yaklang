@@ -213,6 +213,12 @@ func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) str
 		}
 	}
 	obj := UnpackSoltValue(f.Object)
+	if cv, ok := obj.(*CustomValue); ok && cv.Flag == "lambda" {
+		// A lambda / method reference inlined directly as a call receiver has no target type of
+		// its own - `(() -> x).get()` does not compile. Supply one by casting to the functional
+		// interface the value carries: `((Supplier)(() -> x)).get()`.
+		return fmt.Sprintf("((%s)(%s)).%s(%s)", cv.Type().String(funcCtx), cv.String(funcCtx), f.FunctionName, strings.Join(paramStrs, ","))
+	}
 	switch obj.(type) {
 	case *JavaExpression, *TernaryExpression, *SlotValue:
 		return fmt.Sprintf("(%s).%s(%s)", f.Object.String(funcCtx), f.FunctionName, strings.Join(paramStrs, ","))
