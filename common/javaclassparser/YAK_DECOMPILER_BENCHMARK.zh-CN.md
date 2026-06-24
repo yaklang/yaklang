@@ -20,7 +20,7 @@
 |------|------|----------|
 | 语法安全（解析或降级） | 23/23 语料组产出**语法可解析的 Java**；0 语法错误、0 硬错误、0 panic | `TestSyntaxCoverageMatrix` |
 | 重建覆盖率（无 stub） | 20/23 组产出**未降级输出**（无 stub）；3 组隔离出具体缺口 | `TestSyntaxCoverageMatrix` |
-| 正确性（javac round-trip） | **15/18** 个可评估语料干净重编译（起始为 4/13）；经典语料现已**零 stub**；四个内部类/嵌套类组全部可重编译 | `TestRecompileRoundtrip` |
+| 正确性（javac round-trip） | **16/18** 个可评估语料干净重编译（起始为 4/13）；经典语料现已**零 stub**；四个内部类/嵌套类组全部可重编译 | `TestRecompileRoundtrip` |
 | 确定性 | 多次反编译逐字节一致；性能改动通过逐类 sha256 指纹证明输出等价 | `TestCorpusDeterminism`、`TestDumpJarFingerprint` |
 | 测试套件 | 绿且快：`./...` ≈ 22s，从 150s 以上降下来（**至少 6.8 倍**），无机器相关依赖 | `go test ./common/javaclassparser/...` |
 | 分配开销 | 核心 **≈246 ms** 且 **≈182 MB 累计堆分配** / 106 类的 jar；校验相对 core-only 增加运行时 ≈ +18%、累计分配 ≈ +23% | `BenchmarkDecompileJar` |
@@ -32,8 +32,8 @@
 
 在 18 个可进入严格 `javac` round-trip 验证的经典语料组中（14 个单类组 + 4 个多类内部/嵌套类组）：
 
-- **15 个成功重编译**：Annotations、Arrays、CastsInstanceof、Concurrency、ControlFlow、Enums、Exceptions、Generics、Inheritance、Initializers、InnerClasses、Literals、Strings、Switches、TryWithResources。
-- **3 个暴露具体的语义/类型缺陷**：Lambdas（捕获变量命名）、Loops（`do{...}while(true)` 降级产生 javac 不可达代码）、Operators（短路布尔表达式恢复）。
+- **16 个成功重编译**：Annotations、Arrays、CastsInstanceof、Concurrency、ControlFlow、Enums、Exceptions、Generics、Inheritance、Initializers、InnerClasses、Literals、Loops、Strings、Switches、TryWithResources。
+- **2 个暴露具体的语义/类型缺陷**：Lambdas（捕获变量命名）、Operators（短路布尔 `||` 返回值恢复）。
 - **经典语料 0 stub**：每个方法都结构化为真实 Java。
 
 四个多类组现在全部可重编译，端到端地检验了内部类重建：合成 `access$NNN` 桥、`this$0` 外部引用、`val$` 捕获字段、接口 `default` 方法、`@interface` 注解类型，以及枚举 synthetic 抑制与常量显式参数。
@@ -88,24 +88,44 @@ go test -run TestRecompileRoundtrip -v ./common/javaclassparser/tests/
 ### 语料 round-trip 结果
 该 oracle 会反编译一个组的**每一个** class（含内部类、嵌套类、匿名类、局部类），并把这些单元**一起编译**，因此内部类重建是端到端验证而非被跳过。
 ```
-recompile-ok:  15  (Annotations, Arrays, CastsInstanceof, Concurrency, ControlFlow,
+recompile-ok:  16  (Annotations, Arrays, CastsInstanceof, Concurrency, ControlFlow,
                     Enums, Exceptions, Generics, Inheritance, Initializers,
-                    InnerClasses, Literals, Strings, Switches, TryWithResources)
-recompile-fail: 3  (Lambdas, Loops, Operators)
+                    InnerClasses, Literals, Loops, Strings, Switches, TryWithResources)
+recompile-fail: 2  (Lambdas, Operators)
 stub:          0
 dec-err:       0
 multiclass:    0   (现已一起编译，不再跳过)
 ```
 
-剩下 3 个重编译失败是可执行的正确性前沿。下面每条根因都通过阅读**完整**的 `javac` 诊断确认（用 `RC_VERBOSE=1` 输出反编译源码 + 每个分类的全部错误），而非臆测：
+剩下 2 个重编译失败是可执行的正确性前沿。下面每条根因都通过阅读**完整**的 `javac` 诊断确认（用 `RC_VERBOSE=1` 输出反编译源码 + 每个分类的全部错误），而非臆测：
 
 | 分类 | 确切的 javac 错误 | 已确认根因 | 难度 |
 |------|-------------------|------------|------|
-| Loops | `unreachable statement`（嵌套无限区域之后的 `continue;`） | 每个循环都被降为 `do{...}while(true)`；内层必走的退出使得合成的外层 `continue` 不可达 | 难（循环惯用法恢复） |
-| Operators | `missing return statement`（1 个错误，原为 13） | `(a && b) \|\| (c)` 短路 `\|\|` 被降为 `if/else`，其 true 分支丢了 `return true`；属布尔表达式/`\|\|` 重建缺口 | 难（控制流恢复） |
+| Operators | `missing return statement`（1 个错误，原为 13） | `(a && b) \|\| (c)` 短路 `\|\|` 作为值返回：`x&&y` 臂被折进 `if` 条件，但合并点的 `iconst_1`（`return true`）臂被丢弃，留下空的 then 分支且无尾随 return；属布尔 OR 合并的值恢复缺口 | 难（值/CFG 恢复） |
 | Lambdas | `variable v already defined` + 泛型擦除 | lambda 形参名与外层 slot 名冲突；裸函数式接口目标拒绝显式 `Integer` 形参类型（泛型签名未恢复） | 难（变量命名 + 泛型擦除） |
 
-通过的分类由 `recompileGateBaseline` 钉死，因此任何破坏 15 个绿色分类的回退都会让 CI 失败；其余作为 backlog 跟踪。
+通过的分类由 `recompileGateBaseline` 钉死，因此任何破坏 16 个绿色分类的回退都会让 CI 失败；其余作为 backlog 跟踪。
+
+> **已知语义限制（非重编译失败）。** `Loops.labeled` 能干净重编译，但当 `continue <label>`
+> 的目标是外层 `for` 循环的*自增*、且该自增节点与循环的自然退出边共享时，该 `continue` 当前会被丢弃：
+> do{...}while(true) 模型只能把共享的自增语句（`i++`）放在某一条后继路径上，另一条路径
+> （`continue outer` 分支）便渲染成空的 `if` 体。这忠实到足以编译通过，但对这一特定的
+> labeled-continue 惯用法可能在运行期产生分歧。已在 backlog 的"循环惯用法恢复"下跟踪；
+> 循环语义 round-trip 电池（`TestLoopSemanticsRoundTrip`，执行并比对指纹）覆盖所有非 labeled
+> 形态且全部通过。
+
+### 本轮落地的正确性修复——第 6 轮（不可达语句裁剪）
+**Loops** 转为干净重编译，使 round-trip 达到 **16/18**。由于结构化阶段把每个循环都降为
+`do{...}while(true)`，一条回边 `continue;` 可能被生成在一个永不顺序穿过的内层区域*之后*
+（内层无限循环只能经 `return` 或对外层的带标签 `continue` 退出）。`javac` 会把这条尾随的
+`continue;` 判为 *unreachable statement*。新增的结构化后处理 pass
+（`rewriter/PruneUnreachableStatements`，在 `parser.go` 中 `RewriteVar` 之后接入）删除同一块内
+跟在*终止*语句之后的语句。终止判定是 JLS "无法正常完成" 规则的一个刻意**严格子集**
+（`return`/`throw`/`break`/`continue`、两臂都终止的 `if/else`，以及无逃逸 `break` 的无限
+`while(true)`/`do{...}while(true)`）；因为是子集，它只会删除 `javac` 同样会拒绝的代码，故任何
+已能重编译的类保持逐字节不变、不丢任何可达代码。`subtreeHasBreak` 辅助对"该循环可能顺序穿出"
+做过近似（任何 break 类标记都会抑制裁剪），只会*少*删、绝不*多*删。已由 golden 套件、
+`TestCorpusDeterminism`、`TestLoopSemanticsRoundTrip` 及完整包套件验证无回归。
 
 ### 本轮落地的正确性修复——第 5 轮（try/catch/finally 处理器分组）
 **Exceptions** 从语料里最后一个 stub 转为干净重编译，经典语料现已**零 stub**。`javac` 把 `finally` 脱糖为一个合成的 catch-all（`any`，catch type 0）处理器——`astore t; <finally>; aload t; athrow`——它同时保护 try 区域与每个真实 catch，并把 finally 体额外内联到每条正常退出路径上。当一个真实 catch 与该 catch-all **共享同一 try 区域的 end index** 时，try 节点构造把"按 end index 分组的处理器"槽位**覆盖**而非追加，丢掉了真实 catch；被丢的处理器残留为 pre-try 语句节点的悬挂后继，使其有两个后继，被线性结构化以 `multiple next` 拒绝。现在构造器把共享同一 end index 的所有处理器**追加**进一个分组（保留原始边的重数：多重 catch `A | B` 共享一个 handler PC、因而在 node.Next 里是两条相同的边，必须保留重数才能把两条边都改接）。重建出的方法语义忠实——finally 体出现在正常路径、catch 路径与 catch-all（`catch (Throwable t) { <finally>; throw t; }`）上，与字节码执行完全一致——且可重编译。在真实 jar 上价值很高：gson 的 stub 标记从 38 降到 18，无新增 error 或 panic。已由 golden、`TestCorpusDeterminism` 及真实 jar 的 ok/err/panic/stub 计数验证无回归（多重 catch `Exceptions.multiCatch` 仍可重编译）。
@@ -269,13 +289,14 @@ runtime.greyobject     13.3% cum
 ## 6. Backlog（按影响排序，源自上文数据）
 
 **正确性（语义保真度）：**
-1. **循环惯用法恢复**——重建 `for`/`while` 而非一律 `do{...}while(true)`，这同时消除 *unreachable statement* 失败（Loops）。
-2. **短路 `||`/`&&` 布尔表达式恢复**（Operators）——把 `if(a&&b){return true}else{...}` 控制流折回 `return (a&&b)||(...)`。
-3. **泛型签名恢复**（Lambdas）——解析 `Signature` 属性，使被擦除的调用点与 lambda 目标保留类型参数。
+1. **短路 `||`/`&&` 布尔表达式恢复**（Operators）——把 `if(a&&b){return true}else{...}` 控制流折回 `return (a&&b)||(...)`。
+2. **泛型签名恢复**（Lambdas）——解析 `Signature` 属性，使被擦除的调用点与 lambda 目标保留类型参数。
+3. **循环惯用法恢复**——重建 `for`/`while` 而非一律 `do{...}while(true)`。*unreachable statement* 失败已被第 6 轮裁剪消除；恢复真正的 `for` 循环还能额外修复 `labeled` 的 `continue <外层自增>` 语义限制（do-while 模型只能把共享自增节点放在一条后继上）。
 4. **Record / sealed 的 `invokedynamic ObjectMethods` bootstrap**——端到端解锁现代（Java 17+）值类型。
 5. **idiomatic `finally` 折叠**——`try/catch/finally` 的 round-trip 当前已正确（采用忠实的脱糖形式：finally 体重复 + `catch (Throwable)` 重抛，与字节码运行完全一致）。未来可加一个 pass 把它折叠为单个 idiomatic 的 `finally {}` 块以提升可读性。
 
-*本轮（第 5 轮）落地：* try/catch/finally 处理器分组（Exceptions）——经典语料现已零 stub；真实 jar 的 stub 标记大幅下降（gson 38 → 18）。
+*本轮（第 6 轮）落地：* 不可达语句裁剪（Loops）——跟在不顺序穿过的内层区域之后的回边 `continue;` 用 JLS 可达性规则的严格子集删除；round-trip 现为 16/18。
+*第 5 轮：* try/catch/finally 处理器分组（Exceptions）——经典语料现已零 stub；真实 jar 的 stub 标记大幅下降（gson 38 → 18）。
 *第 4 轮：* null 初始化 slot 的类型加宽（Generics）——null slot 采纳后续具体引用类型而非拆分。
 *第 3 轮：* 作用域感知的局部变量重命名（TryWithResources + 真实世界的嵌套 catch/slot 复用冲突）、内部/嵌套类 round-trip（InnerClasses）、接口 `default` 方法（Inheritance）、`@interface` 注解类型（Annotations）、完整枚举重建（Enums）。
 *更早轮次：* JVM boolean/int 消歧、数组维度类型、字段初始化器提升、`synchronized(字段)` 死亡临时变量（第 2 轮），以及数值字面量后缀、布尔常量/实参、强转优先级（第 1 轮）。
