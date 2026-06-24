@@ -100,6 +100,20 @@ var buildinBootstrapMethods = map[string]func(args ...values.JavaValue) BuildinB
 				// Mark as a lambda so a call on the lambda itself (the inlined `s.get()` shape) renders
 				// with the functional-interface cast it needs to compile, e.g. ((Supplier)(() -> ...)).get().
 				cv.Flag = "lambda"
+
+				// Upgrade the lambda's type from the erased descriptor type to a parameterized
+				// type using the instantiatedMethodType (3rd bootstrap arg). This only changes
+				// the lambda VALUE's type, not the stack simulation's slot type, so it doesn't
+				// interfere with slot reuse.
+				if len(args1) >= 3 {
+					if upgradedType := inferLambdaTypeFromInstantiated(typ, args1[2]); upgradedType != nil {
+						lambdaType := upgradedType
+						cv = values.NewCustomValue(cv.StringFunc, func() types.JavaType {
+							return lambdaType
+						})
+						cv.Flag = "lambda"
+					}
+				}
 				return cv, nil
 			}
 
@@ -256,4 +270,77 @@ func init() {
 			}), nil
 		}
 	}
+}
+
+// inferLambdaTypeFromInstantiated upgrades a raw functional-interface type to a
+// parameterized type using the instantiatedMethodType (3rd bootstrap arg).
+// The instantiatedMethodType is a MethodType constant whose String() returns its
+// descriptor (e.g. "(Ljava/lang/Integer;Ljava/lang/Integer;)Ljava/lang/Integer;").
+// Only standard JDK functional interfaces are upgraded (exact FQN match).
+func inferLambdaTypeFromInstantiated(rawType types.JavaType, instantiatedMethodType values.JavaValue) types.JavaType {
+	var desc string
+	if cv, ok := instantiatedMethodType.(*values.CustomValue); ok {
+		s := cv.String(&class_context.ClassContext{})
+		if strings.HasPrefix(s, "(") {
+			desc = s
+		}
+	}
+	if desc == "" {
+		return nil
+	}
+
+	// Get the fully qualified class name from the raw type
+	rawName := ""
+	if jc, ok := rawType.RawType().(*types.JavaClass); ok {
+		rawName = jc.Name
+	}
+	if rawName == "" {
+		return nil
+	}
+
+	mt, err := types.ParseMethodDescriptor(desc)
+	if err != nil {
+		return nil
+	}
+	mtParams := mt.FunctionType().ParamTypes
+	mtRet := mt.FunctionType().ReturnType
+
+	typeArgs := []types.JavaType{}
+	switch rawName {
+	case "java.util.function.BiFunction":
+		if len(mtParams) >= 2 {
+			typeArgs = append(typeArgs, mtParams[0], mtParams[1])
+		}
+		typeArgs = append(typeArgs, mtRet)
+	case "java.util.function.Function":
+		if len(mtParams) >= 1 {
+			typeArgs = append(typeArgs, mtParams[0])
+		}
+		typeArgs = append(typeArgs, mtRet)
+	case "java.util.function.Predicate":
+		if len(mtParams) >= 1 {
+			typeArgs = append(typeArgs, mtParams[0])
+		}
+	case "java.util.function.Consumer":
+		if len(mtParams) >= 1 {
+			typeArgs = append(typeArgs, mtParams[0])
+		}
+	case "java.util.function.Supplier":
+		typeArgs = append(typeArgs, mtRet)
+	case "java.util.function.BiConsumer":
+		if len(mtParams) >= 2 {
+			typeArgs = append(typeArgs, mtParams[0], mtParams[1])
+		}
+	case "java.util.function.BiPredicate":
+		if len(mtParams) >= 2 {
+			typeArgs = append(typeArgs, mtParams[0], mtParams[1])
+		}
+	default:
+		return nil
+	}
+
+	if len(typeArgs) == 0 {
+		return nil
+	}
+	return types.NewParameterizedType(rawName, typeArgs)
 }
