@@ -52,8 +52,65 @@ func TestTimelineFork_MergeBranchCompressedHead(t *testing.T) {
 	defer parent.mu.RUnlock()
 	require.NotNil(t, parent.compressedHead)
 	require.Equal(t, "branch compressed head", parent.compressedHead.Text)
-	require.Equal(t, int64(2), parent.compressedHead.CoveredEndItemID)
+	require.Equal(t, int64(9), parent.compressedHead.CoveredEndItemID)
 	require.Equal(t, int64(123456789), parent.compressedHead.CoveredEndAtMs)
+}
+
+func TestTimelineFork_MergePreservesGlobalIDs(t *testing.T) {
+	parent := NewTimeline(nil, nil)
+	parent.PushText(1, "parent-A")
+
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	fork, err := parent.ForkForTask("1-1", "task-1", cfg, cfg)
+	require.NoError(t, err)
+	require.NotNil(t, fork)
+
+	globalID := cfg.AcquireId()
+	fork.Branch.PushText(globalID, "branch-global-id")
+
+	mergeResult, err := fork.MergeBack()
+	require.NoError(t, err)
+	require.NotNil(t, mergeResult)
+	require.Equal(t, 1, mergeResult.ActiveItemsMerged)
+
+	parent.mu.RLock()
+	defer parent.mu.RUnlock()
+	item, ok := parent.idToTimelineItem.Get(globalID)
+	require.True(t, ok)
+	require.NotNil(t, item)
+	require.Contains(t, parent.Dump(), "branch-global-id")
+}
+
+func TestTimelineFork_MergeIDConflict(t *testing.T) {
+	parent := NewTimeline(nil, nil)
+	parent.PushText(1, "parent-A")
+
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	fork, err := parent.ForkForTask("1-1", "task-1", cfg, cfg)
+	require.NoError(t, err)
+	require.NotNil(t, fork)
+
+	conflictID := cfg.AcquireId()
+	fork.Branch.PushText(conflictID, "branch-conflict")
+
+	parent.PushText(conflictID, "parent-conflict")
+
+	_, err = fork.MergeBack()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "already exists in parent timeline")
+}
+
+func TestTimelineFork_ConvertConfigToOptionsSharesSeqIdProvider(t *testing.T) {
+	parent := NewConfig(context.Background(), WithDisableAutoSkills(true), WithSequence(100))
+	require.NotNil(t, parent.SeqIdProvider)
+
+	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
+	require.NotNil(t, child.SeqIdProvider)
+	require.Same(t, parent.SeqIdProvider, child.SeqIdProvider)
+
+	id1 := parent.AcquireId()
+	id2 := child.AcquireId()
+	require.Greater(t, id2, id1)
 }
 
 func TestTimelineFork_InheritedCompressedHeadNotMerged(t *testing.T) {
