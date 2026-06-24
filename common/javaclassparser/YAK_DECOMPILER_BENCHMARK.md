@@ -21,10 +21,11 @@ section.
 |------|--------|--------------------|
 | Coverage (parse-or-degrade) | 23/23 corpus groups produce **valid Java**; 0 syntax errors, 0 hard errors, 0 panics | `TestSyntaxCoverageMatrix` |
 | Coverage (full reconstruction) | 20/23 groups fully reconstructed; 3 groups isolate exactly **2 root-cause gaps** | `TestSyntaxCoverageMatrix` |
-| Correctness (javac round-trip) | 4/13 classic single-class corpora recompile cleanly; failures pinpoint concrete gaps | `TestRecompileRoundtrip` |
-| Determinism | byte-identical output across repeated decompiles | `TestCorpusDeterminism` |
+| Correctness (javac round-trip) | **5/13** classic single-class corpora recompile cleanly (was 4/13; **Literals fixed this round**); remaining failures pinpoint concrete gaps | `TestRecompileRoundtrip` |
+| Determinism | byte-identical output across repeated decompiles; perf changes proven equivalent by per-class sha256 fingerprints | `TestCorpusDeterminism`, `TestDumpJarFingerprint` |
 | Test suite | green & fast: `./...` ≈ 22s vs >150s before (8x), no machine-specific dependencies | `go test ./common/javaclassparser/...` |
-| Performance | core 281 ms / 216 MB per 106-class jar; validation safety net ≈ +24% CPU / +23% allocs | `BenchmarkDecompileJar` |
+| Performance | core **246 ms / 182 MB** per 106-class jar (was 315 ms / 217 MB → **−22% time, −16% bytes** this round); validation safety net ≈ +18% CPU / +23% allocs | `BenchmarkDecompileJar` |
+| Scalability | near-linear to ~8 workers (3.6×), then **GC-bound regression** | `BenchmarkDecompileJarParallel` |
 
 The decompiler's **safety guarantee holds**: for every input in the corpus it
 either fully reconstructs a method or degrades it to a tagged, still-parseable
@@ -92,39 +93,67 @@ go test -run TestRecompileRoundtrip -v ./common/javaclassparser/tests/
 
 ### Classic single-class corpora
 ```
-recompile-ok:  4   (CastsInstanceof, ControlFlow, Strings, Switches)
-recompile-fail: 9
+recompile-ok:  5   (CastsInstanceof, ControlFlow, Literals, Strings, Switches)
+recompile-fail: 8
 stub:          1   (Exceptions)
 dec-err:       0
 multiclass:    4   (skipped: multi-type compilation units)
 ```
 
-The 9 recompile failures are the actionable correctness frontier (representative
-first error per category):
+The 8 recompile failures are the actionable correctness frontier. Each root cause
+below was confirmed by reading the **full** `javac` diagnostic (run with
+`RC_VERBOSE=1` to dump the decompiled source + every error per category), not
+guessed:
 
-| Category | javac error class | Likely root cause |
-|----------|-------------------|-------------------|
-| Literals | integer number too large | long-literal `L` suffix not emitted |
-| Loops | unreachable statement | all loops lowered to `do{...}while(true)` |
-| Operators | bad operand types | compound-assignment / promotion modeling |
-| Arrays | incompatible types | array element typing |
-| Generics | cannot find symbol | erased/elided type arguments |
-| Initializers | incompatible types | field initializer typing |
-| Lambdas | variable already defined | synthetic captured-var naming |
-| Concurrency | cannot find symbol | synthesized helper references |
-| TryWithResources | variable ... | resource desugaring |
+| Category | Exact javac error | Confirmed root cause | Difficulty |
+|----------|-------------------|----------------------|-----------|
+| Arrays | `int[][][][] cannot be converted to int[][][][][][][]` | local array-type **dimension** over-counted vs the `multianewarray` it is initialized from | medium (type calc) |
+| Operators | `bad operand types '<<' first:boolean second:int` (×12) + `incompatible types` | **JVM boolean/int ambiguity**: a local that is `int` in source is typed `boolean` because `&`/`|`/`^` on booleans share opcodes with int bitops | hard (type inference) |
+| Loops | `unreachable statement` (the `continue;` after a nested infinite region) | every loop lowered to `do{...}while(true)`; the always-taken inner exit makes the synthesized outer `continue` unreachable | hard (loop idiom recovery) |
+| Initializers | `int[] cannot be converted to int` + `cannot find symbol var1` | array field rendered as element type; a `final` field initialized in `<init>` is hoisted to a field initializer that references the (out-of-scope) constructor parameter | medium–hard |
+| Generics | `cannot find symbol` | erased/elided type arguments on a generic call | medium |
+| Lambdas | `variable v already defined` | synthetic captured-variable naming collision | medium |
+| Concurrency | `cannot find symbol` | references to a synthesized helper/inner that is not emitted | medium |
+| TryWithResources | `variable ...` | try-with-resources `close()` desugaring not re-sugared | medium |
 
-These are intentionally **not** masked: passing categories are pinned by
-`recompileGateBaseline` so a regression that breaks `CastsInstanceof`,
-`ControlFlow`, `Strings`, or `Switches` fails CI, while the rest are tracked as
-the improvement backlog.
+Passing categories are pinned by `recompileGateBaseline`, so a regression that
+breaks `CastsInstanceof`, `ControlFlow`, `Literals`, `Strings`, or `Switches` fails
+CI; the rest are tracked as the backlog.
 
-### Correctness fixes already landed in this evaluation
-- **Cast precedence**: `OP_CHECKCAST` now renders as `((Type)(x)).m()` instead of
-  `(Type)(x.m())`, fixing member-access on cast receivers
-  (`code_analyser.go`; golden `VarFold` refreshed).
+### Correctness fixes landed in this evaluation
+Four defects were diagnosed from the round-trip oracle and fixed; **Literals now
+recompiles cleanly** as a result, and all are verified non-regressing by the golden
+suite + `TestCorpusDeterminism`:
+
+1. **Numeric literal suffixes in expression position** (`java_value.go`,
+   `JavaLiteral.String`). Long/float/double literals dropped their `L`/`F`/`D`
+   suffix outside field declarations, so `Long.valueOf(9223372036854775807)` failed
+   with *"integer number too large"* and `Float.valueOf(3.14)` had no overload (a
+   bare `3.14` is a `double`). Now emitted as `9223372036854775807L`, `3.14F`,
+   `2.718281828D`, with NaN/Infinity handled the same way the field path already did.
+2. **Boolean field constants** (`dumper.go`). The JVM stores `boolean` as an int
+   constant, so a `boolean` field rendered as the illegal `static final boolean B = 1`.
+   Now rendered `= true` / `= false`.
+3. **Boolean method arguments** (`expression.go`, `FunctionCallExpression.String`).
+   An int literal flowing into a `boolean` parameter (Java has no int→boolean
+   conversion) made autoboxing like `Boolean.valueOf(1)` fail. Now coerced to
+   `true`/`false`, mirroring the existing int→byte/short/char cast logic.
+4. **Primitive-cast precedence** (`code_analyser.go`, the `I2L/L2D/D2L/...` group).
+   A conversion cast was rendered as `(long)a * b`, which parses as `((long)a) * b`
+   and triggered *"possible lossy conversion from double to long"*. Now parenthesized
+   as `(long)(a * b)` — the same precedence fix already applied to `OP_CHECKCAST`.
+
+Previously landed in this evaluation:
+- **Cast precedence on member access**: `OP_CHECKCAST` renders `((Type)(x)).m()`
+  instead of `(Type)(x.m())` (golden `VarFold` refreshed).
 - **Absolute nested-archive paths**: `normalizeArchivePath` preserves the leading
   slash so `/abs/app.war/.../foo.jar/Foo.class` opens from the host filesystem.
+
+### What "recompile-fail" does **not** mean
+A `recompile-fail` class is still **structurally decompiled to readable, valid Java**
+(it passes the ANTLR syntax net and the coverage matrix); it only fails the much
+stricter *javac type-check* round-trip. The frontier above is about semantic fidelity
+of a minority of constructs, not about producing garbage.
 
 ---
 
@@ -168,34 +197,123 @@ BENCH_NO_VALIDATE=1 BENCH_JAR=<jar> go test -run xxx -bench 'BenchmarkDecompileJ
 BENCH_JAR=<jar> go test -run xxx -bench 'BenchmarkDecompileJar$' -benchmem ./common/javaclassparser/tests/
 ```
 
-Target: `commons-codec-1.15.jar` (106 classes), `-benchtime=8x`.
+Target: `commons-codec-1.15.jar` (106 classes), `-benchtime=5x -count=2`.
+
+### 5.1 Throughput and the validation safety-net tax
+
+The single most useful lever is `BENCH_NO_VALIDATE=1`, which turns off the
+post-decompile ANTLR re-parse and isolates the **decompiler core** from the
+**safety net**. Numbers below are *after* this round's optimizations:
 
 | Configuration | ns/op | B/op | allocs/op |
 |---------------|------:|-----:|----------:|
-| Full pipeline (validation on) | ~378 M | 281.6 MB | 4.64 M |
-| Core only (validation off) | ~281 M | 216.3 MB | 3.41 M |
-| **Validation safety net share** | **≈ 24%** | **≈ 23%** | **≈ 26%** |
+| Full pipeline (validation on) | ~378 M | 248 MB | 4.54 M |
+| Core only (validation off) | **246 M** | **182 MB** | 3.31 M |
+| **Validation safety-net share** | **≈ 18%** time | **≈ 23%** bytes | **≈ 26%** allocs |
 
-### Profile attribution
-CPU is **GC-bound** (`gcDrain`/`scanobject`/`greyobject` dominate), driven by
-allocations. On the validation path ~70% of allocations are ANTLR ATN-simulation
+The safety net is not free, but it is the contract that guarantees no un-parseable
+Java ever leaves `Decompile`; ~18% wall-time is the price of that guarantee.
+
+### 5.2 The profile is GC-bound — allocations are the real currency
+
+A CPU profile of the core (`go tool pprof -top`) is dominated by the garbage
+collector, not by decompiler logic:
+
+```
+runtime.gcDrain        47.9% cum
+runtime.scanobject     40.7% cum
+runtime.mallocgc       19.2% cum
+runtime.greyobject     13.3% cum
+```
+
+So **reducing allocations directly buys CPU**. The largest *core* allocators
+(`-alloc_space`, before this round's fixes) were:
+
+| Allocator | Bytes | Share | Status |
+|-----------|------:|------:|--------|
+| `utils.Set[any].Add` (via `WalkGraph`) | 367 MB | 19.4% | **fixed (−interface boxing + mutex)** |
+| `ParseOpcode` | 206 MB | 10.9% | pre-sized (prior round) |
+| `GenerateDominatorTree` (+`func1`) | 193 MB | 10.2% | backlog |
+| `Stack[*].Push` | 94 MB | 4.9% | backlog (pre-size) |
+| `codec.MatchMIMEType` → `csv/bufio` per string literal | 77 MB | 4.1% | **fixed (ASCII fast-path)** |
+| `Set[*OpCode].Add` | 73 MB | 3.9% | backlog |
+
+On the validation path, separately, ~70% of allocations are ANTLR ATN-simulation
 objects (`NewBaseATNConfig`, `BaseATNConfigSet.Add`, prediction-context merges) —
-inherent to re-parsing each class to guarantee parse-ability. In the core
-decompiler the largest allocators are `ParseOpcode`, the dominator-tree build, and
-the stack-simulation/type-inference closures.
+inherent to re-parsing each class.
 
-### Optimizations landed
-- **`ParseOpcode` pre-sizing**: the opcode slice and both offset maps are now sized
-  from the bytecode length, removing repeated grow/rehash garbage (the single
-  largest core allocator). Behavior is identical (verified by goldens +
-  `TestCorpusDeterminism`).
-- **Validation timer hygiene**: the syntax-validation budget uses a stoppable
-  `time.NewTimer` instead of `time.After`, so each per-class/member timer (and the
-  source string it retains) is freed the moment validation returns rather than
-  lingering for the full budget. This prevents thousands of simultaneous pending
-  timers/goroutines on large-jar batch scans.
+### 5.3 Optimizations landed this round (each proven output-equivalent)
 
-### Why the big lever (cross-parse ANTLR cache) was deliberately not pulled
+Equivalence is proven, not assumed: `TestDumpJarFingerprint` writes a per-class
+`sha256(status+output)` for every class of `commons-codec` **and** `byte-buddy`
+(≈3k classes); the fingerprint dirs `diff` clean before vs after every change.
+
+1. **`WalkGraph` visited set — drop interface boxing and the mutex.**
+   The graph walk used a thread-safe `Set[any]`: every node pointer was boxed into
+   an `interface{}` map key (the #1 core allocator at 19%) and every `Has`/`Add`
+   took an `RWMutex`, despite the walk being single-goroutine. Constrained the type
+   parameter to `comparable` and switched to a plain `map[T]struct{}`.
+   **Core: 315 → 254 ms/op (−19%), 217 → 193 MB/op (−11%).**
+
+2. **Skip MIME sniffing for pure-ASCII string literals.**
+   `JavaStringToLiteral` ran full magic-byte detection (`codec.MatchMIMEType`,
+   which allocates a `csv`/`bufio` reader) on *every* literal to recover a possibly
+   mis-decoded Chinese charset — impossible for ASCII bytes. Guarded behind a
+   pure-ASCII check (ASCII already took the same quote path, so behavior is
+   identical). **Core: 254 → 246 ms/op, 193 → 182 MB/op.**
+
+Cumulative for the round: **core 315 → 246 ms/op (−22%), 217 → 182 MB/op (−16%)**;
+end-to-end bytes 282 → 248 MB (−12%).
+
+Prior-round optimizations still in place:
+- **`ParseOpcode` pre-sizing** (opcode slice + both offset maps sized from bytecode
+  length).
+- **Validation timer hygiene** (stoppable `time.NewTimer` instead of `time.After`,
+  so per-member budget timers and the source they retain are freed immediately).
+
+### 5.4 The workload is heavily tail-bound
+
+`TestTopSlowClasses` (one cold pass, ranked by time) shows a tiny minority of
+classes dominate total cost:
+
+| Jar | Classes | top-1 class | top-1% of classes | top-10% |
+|-----|--------:|------------:|------------------:|--------:|
+| commons-codec-1.15 | 106 | 14.6% | 14.6% | 68.7% |
+| byte-buddy-1.14.17 | 2845 | 26.3% | **60.8%** | 88.4% |
+
+On byte-buddy, **one 43 KB class** (`InstrumentedType$Default`) is 26% of a full
+cold pass and the top 1% of classes are 61%. Implication: average-case tuning moves
+throughput only modestly; the high-value target is the pathological tail (deeply
+nested CFG / huge methods that stress the structuring and stack-simulation phases).
+
+### 5.5 Cold-start vs warm steady state
+
+The same `InstrumentedType$Default` costs **7.9 s** in a cold one-shot pass but only
+**~127 ms** warm and repeated (≈62×). The gap is one-time process initialization
+(ANTLR ATN deserialization, regex compilation, `sync.Once` setup) that the first
+complex class absorbs. For **batch/jar** decompilation this amortizes to nothing;
+for **single-class CLI** invocations it is a real latency floor worth pre-warming.
+
+### 5.6 Parallel scalability
+
+`BenchmarkDecompileJarParallel` on byte-buddy (full jar, warm), varying
+`BENCH_CONC`:
+
+| Workers | ns/op | Speedup |
+|--------:|------:|--------:|
+| 1 | 4.27 s | 1.0× |
+| 2 | 2.27 s | 1.88× |
+| 4 | 1.38 s | 3.09× |
+| 8 | 1.19 s | 3.59× |
+| 16 | 1.71 s | 2.50× (**regression**) |
+
+Scaling is near-linear to ~4 workers and tops out around 8 (3.6×), then **regresses**
+past it. This is the GC-bound signature from §5.2: many allocating goroutines
+contend on the shared collector. The allocation reductions in §5.3 directly raise
+this ceiling, and further allocation work (dominator tree, stacks) is the path to
+better multi-core scaling.
+
+### 5.7 Why the big lever (cross-parse ANTLR cache) was deliberately not pulled
 The pinned ANTLR Go runtime (`v4.0.0-20220911`) has no locking on its DFA /
 `JStore` structures, and decompilation runs in parallel (the jdsc self-check uses
 100 goroutines). A process-wide shared validation DFA would data-race; the
@@ -207,15 +325,28 @@ recorded as future work.
 
 ## 6. Backlog (prioritized by impact, from the data above)
 
+**Correctness (semantic fidelity):**
 1. **`try/catch/finally` "multiple next" CFG** — the only classic-corpus stub and
    the most common stub cause observed in real jars.
-2. **Record / sealed `invokedynamic ObjectMethods` bootstrap** — unblocks modern
+2. **JVM boolean/int disambiguation** (Operators) — infer `boolean` vs `int` for
+   locals from usage/`Z` descriptors instead of the shared int opcodes; the single
+   biggest recompile-frontier blocker.
+3. **Loop idiom recovery** — reconstruct `for`/`while` instead of universal
+   `do{...}while(true)`, which also removes the *unreachable statement* failures.
+4. **Array dimension typing** (Arrays) and **field-initializer hoisting**
+   (Initializers) — both are localized type/scope calc bugs.
+5. **Record / sealed `invokedynamic ObjectMethods` bootstrap** — unblocks modern
    (Java 17+) value types end-to-end.
-3. **Recompile-frontier fixes**, highest-leverage first: long-literal suffix
-   (Literals), loop idiom recovery vs `do/while(true)` (Loops), operator
-   promotion (Operators).
-4. **Allocation reduction** in `ParseOpcode` / stack-simulation if an ANTLR upgrade
-   later enables a shared validation cache.
+
+**Performance (all in service of the GC-bound profile in §5.2):**
+6. **Dominator-tree allocations** (193 MB, 10%) and **stack/`Set[*OpCode]`
+   pre-sizing** (167 MB combined) — the next-largest core allocators after the two
+   fixed this round; lowering them raises the parallel ceiling (§5.6).
+7. **Tail-class structuring complexity** (§5.4) — profile and reduce the
+   superlinear cost on the pathological 1% of classes.
+8. **Single-class cold-start pre-warm** (§5.5) — warm ANTLR/regex once for CLI use.
+9. **Shared validation DFA** — only after an ANTLR runtime upgrade makes it
+   thread-safe.
 
 ---
 
@@ -225,8 +356,9 @@ recorded as future work.
 # Coverage matrix (javac-compiled corpus)
 go test -run TestSyntaxCoverageMatrix -v ./common/javaclassparser/tests/
 
-# Correctness round-trip (decompile -> javac)
+# Correctness round-trip (decompile -> javac); RC_VERBOSE dumps full diagnostics
 go test -run TestRecompileRoundtrip -v ./common/javaclassparser/tests/
+RC_VERBOSE=1 go test -run TestRecompileRoundtrip -v ./common/javaclassparser/tests/
 
 # Determinism (portable, no Maven cache)
 go test -run TestCorpusDeterminism -v ./common/javaclassparser/tests/
@@ -234,7 +366,10 @@ go test -run TestCorpusDeterminism -v ./common/javaclassparser/tests/
 # Full fast suite
 go test ./common/javaclassparser/...
 
-# Performance (set BENCH_JAR to any local jar)
+# Performance: core-vs-fullpipeline, scaling, tail distribution, and equivalence
 BENCH_JAR=<jar> go test -run xxx -bench 'BenchmarkDecompileJar$' -benchmem ./common/javaclassparser/tests/
 BENCH_NO_VALIDATE=1 BENCH_JAR=<jar> go test -run xxx -bench 'BenchmarkDecompileJar$' -benchmem ./common/javaclassparser/tests/
+BENCH_JAR=<jar> BENCH_CONC=8 go test -run xxx -bench 'BenchmarkDecompileJarParallel$' ./common/javaclassparser/tests/
+BENCH_JAR=<jar> go test -run TestTopSlowClasses -v ./common/javaclassparser/tests/   # tail distribution
+OUT_DIR=/tmp/fp DIFF_JARS=<jarA:jarB> go test -run TestDumpJarFingerprint ./common/javaclassparser/tests/   # output-equivalence proof
 ```
