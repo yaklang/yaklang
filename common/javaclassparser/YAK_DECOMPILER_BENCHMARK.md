@@ -35,9 +35,9 @@ authority for automated semantic decisions.
 
 | Axis | Result | How it is measured |
 |------|--------|--------------------|
-| Syntax safety (parse-or-degrade) | 25/25 corpus groups produce **syntax-parseable Java**; 0 syntax errors, 0 hard errors, 0 panics | `TestSyntaxCoverageMatrix` |
-| Reconstruction coverage (no stub) | 23/25 groups emit **non-degraded output** (no stub); 2 groups isolate concrete gaps | `TestSyntaxCoverageMatrix` |
-| Correctness (javac round-trip) | **18/20** eligible corpora recompile cleanly (was 4/13 at start); the classic corpus now emits **zero stubs**; all four inner/nested-class groups recompile; two dedicated boundary-condition corpora gated | `TestRecompileRoundtrip` |
+| Syntax safety (parse-or-degrade) | 28/28 corpus groups produce **syntax-parseable Java**; 0 syntax errors, 0 hard errors, 0 panics | `TestSyntaxCoverageMatrix` |
+| Reconstruction coverage (no stub) | 26/28 groups emit **non-degraded output** (no stub); 2 groups isolate concrete gaps | `TestSyntaxCoverageMatrix` |
+| Correctness (javac round-trip) | **21/23** eligible corpora recompile cleanly (was 4/13 at start); the classic corpus now emits **zero stubs**; all four inner/nested-class groups recompile; dedicated boundary-condition and complex-shape corpora gated | `TestRecompileRoundtrip` |
 | Determinism | byte-identical output across repeated decompiles; perf changes proven equivalent by per-class sha256 fingerprints | `TestCorpusDeterminism`, `TestDumpJarFingerprint` |
 | Test suite | green & fast: `./...` ≈ 22s, down from more than 150s (**at least 6.8x**), no machine-specific dependencies | `go test ./common/javaclassparser/...` |
 | Allocation cost | core **≈246 ms** and **≈182 MB cumulative heap allocation** per 106-class jar; validation increases runtime ≈ +18% and cumulative allocation ≈ +23% relative to core-only | `BenchmarkDecompileJar` |
@@ -50,13 +50,13 @@ out of `Decompile`.
 
 ### Round-trip correctness detail
 
-Of the 20 classic corpus groups eligible for strict `javac` round-trip validation
-(16 single-class groups plus 4 multi-class inner/nested-class groups):
+Of the 23 classic corpus groups eligible for strict `javac` round-trip validation
+(19 single-class groups plus 4 multi-class inner/nested-class groups):
 
-- **18 recompile successfully**: Annotations, Arrays, Boundary, CastsInstanceof,
-  Concurrency, ControlFlow, ControlFlowEdge, Enums, Exceptions, Generics,
-  Inheritance, Initializers, InnerClasses, Literals, Loops, Strings, Switches,
-  TryWithResources.
+- **21 recompile successfully**: Annotations, Arrays, Boundary, CastsInstanceof,
+  ComplexExpressions, ComplexMisc, Concurrency, ControlFlow, ControlFlowEdge, Enums,
+  Exceptions, ExceptionsComplex, Generics, Inheritance, Initializers, InnerClasses,
+  Literals, Loops, Strings, Switches, TryWithResources.
 - **2 expose concrete semantic/typing defects**: Lambdas (lambda-param scope
   collision + erased generics) and Operators (short-circuit boolean `||` return
   recovery).
@@ -94,14 +94,17 @@ Outcome classes per group: `OK` (fully reconstructed + valid), `STUB` (some
 member degraded to a stub but class still valid), `SYNTAX` (invalid Java emitted
 — a real defect), `ERROR` (decompile returned an error), `PANIC`.
 
-### Classic corpus (Java 8 bytecode) — 20 groups
+### Classic corpus (Java 8 bytecode) — 23 groups
 ```
-ok=20  stub=0  syntax=0  error=0  panic=0
+ok=23  stub=0  syntax=0  error=0  panic=0
 ```
 - The former `STUB` (**Exceptions** → `tryCatchFinally(int[],int)` failing with
   `ParseBytesCode failed: multiple next`) is fixed; see §3 round 5.
-- Two boundary-condition groups (**Boundary**, **ControlFlowEdge**) were added this
-  round to harden the gate; both reconstruct fully (see §3 round 7).
+- Two boundary-condition groups (**Boundary**, **ControlFlowEdge**) were added in
+  round 7; both reconstruct fully (see §3 round 7).
+- Three complex-shape groups (**ComplexExpressions**, **ComplexMisc**,
+  **ExceptionsComplex**) were added this round; all reconstruct fully and two
+  correctness fixes were required to get there (see §3 round 8).
 
 ### Modern corpus (Java 17 bytecode) — 5 groups
 ```
@@ -147,10 +150,10 @@ The oracle decompiles **every** class of a group (including inner, nested,
 anonymous and local classes) and recompiles the units together, so inner-class
 reconstruction is exercised end to end rather than skipped.
 ```
-recompile-ok:  18  (Annotations, Arrays, Boundary, CastsInstanceof, Concurrency,
-                    ControlFlow, ControlFlowEdge, Enums, Exceptions, Generics,
-                    Inheritance, Initializers, InnerClasses, Literals, Loops, Strings,
-                    Switches, TryWithResources)
+recompile-ok:  21  (Annotations, Arrays, Boundary, CastsInstanceof, ComplexExpressions,
+                    ComplexMisc, Concurrency, ControlFlow, ControlFlowEdge, Enums,
+                    Exceptions, ExceptionsComplex, Generics, Inheritance, Initializers,
+                    InnerClasses, Literals, Loops, Strings, Switches, TryWithResources)
 recompile-fail: 2  (Lambdas, Operators)
 stub:          0
 dec-err:       0
@@ -180,6 +183,55 @@ any of the 18 green categories fails CI; the rest are tracked as the backlog.
 > Tracked under "loop idiom recovery" in the backlog; the loop-semantics
 > round-trip battery (`TestLoopSemanticsRoundTrip`, which executes and compares
 > fingerprints) covers every non-labeled shape and passes.
+
+### Correctness fixes + corpus expansion landed in this evaluation — round 8 (complex shapes)
+Three complex-shape corpora were added and **gated**, taking the strict round-trip to
+**21/23** and the classic coverage matrix to **23/23 (zero stubs)**. Two real
+correctness bugs surfaced by the new corpora were fixed (both are common in real code,
+so the win extends well beyond the corpus):
+
+- **ComplexExpressions** — 1-D/2-D array initializers, mixed `int/long/float/double`
+  promotion, `StringBuilder` and `+` string concatenation, recursion
+  (factorial/fibonacci), varargs, enhanced-`for`, and **deep right-leaning chained
+  ternaries** (`a?:b?:c?:...`).
+- **ExceptionsComplex** — nested `try/catch/finally`, single- and multi-resource
+  try-with-resources, rethrow, `finally` after `return`, and a multi-catch chain with
+  `finally`. Recompiled on the first attempt.
+- **ComplexMisc** — labeled `break`/`continue` out of nested loops, `StringBuilder`
+  fluent chains, **switch with a default in the middle**, `do/while`, a ternary used as
+  a method argument, and an `instanceof`+cast dispatch chain.
+
+**Fix 1 — chained-ternary condition mis-merge (`rewriter/statement_wrap.go`,
+`core/code_analyser.go`).** A deep right-leaning ternary (`x<0?-1:x==0?0:x<10?1:...`)
+degraded to a stub with *"empty stack slot leaked into method body"*. The structural
+combiner correctly built the value tree (`-1,0,1,...` nested right), but `MergeIf`
+then folded the per-arm **condition** nodes into one short-circuit `||`
+(`(x<0)||(x==0)||(x<10)`), firing only the outermost condition callback and leaving the
+inner ternaries' `Condition` slots empty (rendered as the empty-slot placeholder, which
+degrades the method). Root cause: once a ternary arm's leaf value is extracted, the arm
+conditions all converge on the merge node and *look* like a short-circuit chain. Fix: a
+condition opcode that supplies a **distinct nested ternary arm** is now tagged
+`TernaryChainArm` (set in the combiner's nested-ternary branches and in the structural
+probe commit) and propagated to its `ConditionStatement`; `MergeIf` refuses to fold a
+tagged condition into a `&&`/`||`. Genuine short-circuit conditions (which all feed the
+**same** ternary condition) are *not* tagged and merge exactly as before — verified by
+`TestDecompiler/LogicalOperation*` and `empty_slot_stub` still passing.
+
+**Fix 2 — switch-case variable scope hoisting (`rewriter/rewrite_var.go`).** The
+ubiquitous idiom `int r; switch(x){ case 1: r=...; break; ... } return r;` failed to
+recompile with *"cannot find symbol: variable r"*: the decompiler placed `int r = ...`
+inside the first case body, so the read after the switch was out of scope (a `switch`
+body is a single block, but a declaration trapped in one case is not visible after the
+switch). Fix: a post-pass (`hoistSwitchDeclarations`, run **after** declaration
+placement so its `IsFirst` decisions are final) detects a local that is declared inside
+a case **and** read after the switch, demotes the in-case `T r = ...` to `r = ...`, and
+emits a single `T r;` immediately before the switch. The "read after the switch" trigger
+is precise (name-based reference scan of the post-switch statements), so a variable used
+only within later cases — valid as-is — is left untouched (`SwitchTest` golden unchanged).
+Hoisting only widens scope, so it can never delete or corrupt reachable code.
+
+Both fixes are surgical and were validated by the full `./common/javaclassparser/...`
+suite, `TestCorpusDeterminism`, and `TestDecompileDeterminism`.
 
 ### Corpus expansion landed in this evaluation — round 7 (boundary-condition corpora)
 Two dedicated boundary corpora were added and **gated**, taking the strict round-trip
@@ -563,8 +615,15 @@ recorded as future work.
    `catch (Throwable)` rethrow, exactly as the bytecode runs). A future pass can
    collapse this into a single idiomatic `finally {}` block for readability.
 
-*Landed this round (round 7):* boundary-condition corpora (Boundary, ControlFlowEdge)
-added and gated — strict round-trip now 18/20, classic coverage 20/20 with zero stubs.
+*Landed this round (round 8):* complex-shape corpora (ComplexExpressions, ComplexMisc,
+ExceptionsComplex) added and gated — strict round-trip now **21/23**, classic coverage
+**23/23** with zero stubs. Two real correctness bugs fixed: (1) deep chained ternaries
+no longer have their per-arm conditions mis-folded into a short-circuit `||` (no more
+empty-slot stub), via a `TernaryChainArm` tag that `MergeIf` honours; (2) locals
+first-declared inside a switch case but read after the switch are hoisted ahead of the
+switch, fixing the ubiquitous `int r; switch{...} return r;` idiom.
+*Round 7:* boundary-condition corpora (Boundary, ControlFlowEdge)
+added and gated — strict round-trip 18/20, classic coverage 20/20 with zero stubs.
 *Round 6:* unreachable-statement prune (Loops) — a back-edge
 `continue;` emitted after a non-falling-through inner region is deleted using a
 strict subset of the JLS reachability rules.

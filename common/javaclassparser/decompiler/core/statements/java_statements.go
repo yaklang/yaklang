@@ -15,6 +15,9 @@ type ConditionStatement struct {
 	Condition values.JavaValue
 	Neg       bool
 	Callback  func(values.JavaValue)
+	// TernaryChainArm mirrors OpCode.TernaryChainArm: this condition supplies a DISTINCT nested
+	// ternary arm and therefore must not be folded into a short-circuit &&/|| by MergeIf.
+	TernaryChainArm bool
 }
 
 // ReplaceVar implements Statement.

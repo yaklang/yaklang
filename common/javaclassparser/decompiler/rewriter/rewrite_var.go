@@ -3,11 +3,13 @@ package rewriter
 import (
 	"fmt"
 	"maps"
+	"regexp"
 	"sort"
 
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 )
@@ -113,6 +115,9 @@ func RewriteVar(sts *[]statements.Statement, startVarId int, params []*values.Ja
 			*scope.sts = append([]statements.Statement{statements.NewDeclareStatement(key)}, *scope.sts...)
 		}
 	}
+	// Lift cross-case switch-local declarations out of their case bodies. Runs last so the
+	// IsFirst decisions above are final and this pass's demotions are not subsequently undone.
+	hoistSwitchDeclarations(sts)
 }
 
 type Scope struct {
@@ -213,4 +218,131 @@ func rewriteVar(scope *Scope) int {
 		}
 	}
 	return scope.nowId
+}
+
+// hoistSwitchDeclarations lifts the declaration of any local that is declared inside a switch
+// case yet shared across more than one case out to the block that contains the switch. A switch
+// body is a single lexical block, so a local first declared in one case is visible to later
+// cases textually after it - but NOT to cases the decompiler reordered before it, nor to any read
+// after the switch; javac then rejects those uses as "cannot find symbol". A variable assigned in
+// two or more sibling cases is by construction one logical variable spanning the whole switch, so
+// its `T x` declaration belongs ahead of the switch. The case assignments are demoted to plain
+// `x = ...` and a single `T x;` is inserted immediately before the switch. Hoisting only widens
+// scope and is always valid Java, so it never deletes or corrupts reachable code. The pass runs
+// AFTER RewriteVar's declaration placement so its IsFirst decisions are final and are not undone.
+func hoistSwitchDeclarations(sts *[]statements.Statement) {
+	if sts == nil {
+		return
+	}
+	list := *sts
+	out := make([]statements.Statement, 0, len(list))
+	for i, st := range list {
+		switch s := st.(type) {
+		case *statements.IfStatement:
+			hoistSwitchDeclarations(&s.IfBody)
+			hoistSwitchDeclarations(&s.ElseBody)
+		case *statements.ForStatement:
+			hoistSwitchDeclarations(&s.SubStatements)
+		case *statements.WhileStatement:
+			hoistSwitchDeclarations(&s.Body)
+		case *statements.DoWhileStatement:
+			hoistSwitchDeclarations(&s.Body)
+		case *statements.SynchronizedStatement:
+			hoistSwitchDeclarations(&s.Body)
+		case *statements.TryCatchStatement:
+			hoistSwitchDeclarations(&s.TryBody)
+			for i := range s.CatchBodies {
+				hoistSwitchDeclarations(&s.CatchBodies[i])
+			}
+		case *statements.SwitchStatement:
+			for _, c := range s.Cases {
+				hoistSwitchDeclarations(&c.Body)
+			}
+			// Statements after the switch in THIS block are where an out-of-scope read would
+			// occur; pass them so only variables actually read after the switch are hoisted.
+			for _, decl := range switchHoistDeclarations(s, list[i+1:]) {
+				out = append(out, decl)
+			}
+		}
+		out = append(out, st)
+	}
+	*sts = out
+}
+
+var hoistProbeCtx = &class_context.ClassContext{}
+
+// switchHoistDeclarations demotes the in-case declaration of any local that is declared inside a
+// switch case yet read after the switch to a plain assignment, and returns the bare declarations
+// to emit ahead of the switch (deterministic name order). The "read after the switch" test is the
+// precise trigger: a local declared in a case is in scope for later cases (textually after it), so
+// only an outside read is unsafe. afterSts are the statements following the switch in the same
+// block; reference detection is by final variable NAME, which is consistent across the rendered
+// output. See hoistSwitchDeclarations for why this is always safe.
+func switchHoistDeclarations(sw *statements.SwitchStatement, afterSts []statements.Statement) []statements.Statement {
+	declaredInside := map[*utils.VariableId]bool{}
+	assignsByUid := map[*utils.VariableId][]*statements.AssignStatement{}
+	refByUid := map[*utils.VariableId]values.JavaValue{}
+	for _, c := range sw.Cases {
+		for _, st := range c.Body {
+			as, ok := st.(*statements.AssignStatement)
+			if !ok || as.ArrayMember != nil {
+				continue
+			}
+			ref, ok := as.LeftValue.(*values.JavaRef)
+			if !ok {
+				continue
+			}
+			assignsByUid[ref.Id] = append(assignsByUid[ref.Id], as)
+			refByUid[ref.Id] = as.LeftValue
+			if as.IsFirst || as.IsDeclare {
+				declaredInside[ref.Id] = true
+			}
+		}
+	}
+	uids := make([]*utils.VariableId, 0, len(assignsByUid))
+	for uid := range assignsByUid {
+		uids = append(uids, uid)
+	}
+	sort.SliceStable(uids, func(i, j int) bool {
+		return uids[i].String() < uids[j].String()
+	})
+	var declares []statements.Statement
+	for _, uid := range uids {
+		if !declaredInside[uid] {
+			continue
+		}
+		name := refByUid[uid].String(hoistProbeCtx)
+		if name == "" || !statementsReferenceName(afterSts, name) {
+			continue
+		}
+		for _, as := range assignsByUid[uid] {
+			as.IsFirst = false
+			as.IsDeclare = false
+		}
+		declares = append(declares, statements.NewDeclareStatement(refByUid[uid]))
+	}
+	return declares
+}
+
+// statementsReferenceName reports whether any of the statements textually reference the variable
+// name as a whole token (so "var2" does not match "var20"). Rendering uses an empty class context;
+// a render that panics is treated as a reference (conservative: hoisting is always valid Java, so
+// an unnecessary hoist never breaks compilation while a missed one would).
+func statementsReferenceName(sts []statements.Statement, name string) bool {
+	re := regexp.MustCompile(`\b` + regexp.QuoteMeta(name) + `\b`)
+	for _, st := range sts {
+		if statementTextMatches(st, re) {
+			return true
+		}
+	}
+	return false
+}
+
+func statementTextMatches(st statements.Statement, re *regexp.Regexp) (res bool) {
+	defer func() {
+		if recover() != nil {
+			res = true
+		}
+	}()
+	return re.MatchString(st.String(hoistProbeCtx))
 }

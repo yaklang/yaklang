@@ -233,21 +233,35 @@ func firstJavacError(stderr string) string {
 // dedicated boundary-condition corpora: Boundary covers numeric extremes, cast chains, nested
 // ternaries, bit manipulation, multi-dimensional array access and compound assignment;
 // ControlFlowEdge covers switch fall-through, string/sparse switch, nested break/continue,
-// short-circuit booleans used as conditions and chained if/else-if dispatch. Both recompile
-// cleanly. Categories still failing the roundtrip and tracked for follow-up: Lambdas
-// (lambda-param scope collision + erased generics) and Operators (short-circuit boolean
-// ||-merge value recovery, i.e. a returned `(a&&b)||c`).
+// short-circuit booleans used as conditions and chained if/else-if dispatch. ComplexExpressions
+// covers 1-D/2-D array initializers, mixed int/long/float/double promotion, StringBuilder and
+// `+` string concatenation, recursion (factorial/fibonacci), varargs, enhanced-for and deep
+// right-leaning chained ternaries (a?:b?:c?:...). The chained ternary joined once MergeIf
+// stopped folding ternary-arm conditions into a short-circuit &&/|| (which collapsed several
+// distinct conditions into one OR and leaked an empty stack slot). ExceptionsComplex covers
+// nested try/catch/finally, single- and multi-resource try-with-resources, rethrow, finally
+// after return and a multi-catch chain with finally. ComplexMisc covers labeled break/continue
+// out of nested loops, StringBuilder fluent chains, switch with a default in the middle, do/while,
+// a ternary used as a method argument and an instanceof+cast dispatch chain; it joined once locals
+// first-declared inside a switch case but read after the switch were hoisted ahead of the switch
+// (otherwise javac rejects the read as "cannot find symbol"). All recompile cleanly. Categories
+// still failing the roundtrip and tracked for follow-up: Lambdas (lambda-param scope collision +
+// erased generics) and Operators (short-circuit boolean ||-merge value recovery, i.e. a returned
+// `(a&&b)||c`).
 func recompileGateBaseline() []string {
 	return []string{
 		"Annotations",
 		"Arrays",
 		"Boundary",
 		"CastsInstanceof",
+		"ComplexExpressions",
+		"ComplexMisc",
 		"Concurrency",
 		"ControlFlow",
 		"ControlFlowEdge",
 		"Enums",
 		"Exceptions",
+		"ExceptionsComplex",
 		"Generics",
 		"Inheritance",
 		"Initializers",
