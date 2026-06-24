@@ -286,7 +286,10 @@ func (s *RewriteManager) ToStatementsFromNode(node *core.Node, stopCheck func(no
 		}
 		err := s.CheckVisitedNode(current)
 		if err != nil {
-			return nil, err
+			// Node was already visited (shared merge point in a DAG). Instead of
+			// failing the entire method, just stop collecting statements here.
+			// The visited node will appear once (from whichever path reached it first).
+			break
 		}
 		if stopCheck != nil && !stopCheck(current) {
 			break
