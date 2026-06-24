@@ -148,19 +148,23 @@ func Convert4bytesToInt(data []byte) uint32 {
 	return binary.BigEndian.Uint32(data)
 }
 
-func WalkGraph[T any](node T, next func(T) ([]T, error)) error {
+func WalkGraph[T comparable](node T, next func(T) ([]T, error)) error {
 	if reflect.ValueOf(node).IsNil() {
 		return nil
 	}
 	stack := utils.NewStack[T]()
-	visited := utils.NewSet[any]()
+	// A local map keyed by the concrete (comparable) node type avoids both the
+	// per-element interface boxing of Set[any] (the single largest allocator in the
+	// decompiler core, ~19% of all bytes) and the unnecessary RWMutex of the
+	// thread-safe Set -- WalkGraph traverses a single graph on one goroutine.
+	visited := make(map[T]struct{})
 	stack.Push(node)
 	for stack.Len() > 0 {
 		current := stack.Pop()
-		if visited.Has(current) {
+		if _, ok := visited[current]; ok {
 			continue
 		}
-		visited.Add(current)
+		visited[current] = struct{}{}
 		n, err := next(current)
 		if err != nil {
 			return err
