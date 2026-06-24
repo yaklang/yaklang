@@ -281,6 +281,7 @@ func recompileGateBaseline() []string {
 		"Loops",
 		"NestedControlFlow",
 		"NumericEdge",
+		"Operators",
 		"Strings",
 		"Switches",
 		"TryWithResources",
