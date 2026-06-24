@@ -2,13 +2,14 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/schema"
+	"io"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -105,7 +106,38 @@ Host: www.example.com
 		t.Fatal("response is missed")
 	}
 
-	if len(response.GetRequest()) < 1000*1000 {
-		t.Fatal("request is missed")
+	if !response.GetIsTooLargeRequest() {
+		t.Fatal("3MB request should be marked as too large")
+	}
+	if !strings.Contains(string(response.GetRequest()), "request too large") {
+		t.Fatal("GetHTTPFlowById should return truncate notice for oversized request")
+	}
+
+	reqBodyStream, err := client.GetHTTPFlowBodyById(context.Background(), &ypb.GetHTTPFlowBodyByIdRequest{
+		Id:        checkLargeBodyId,
+		IsRequest: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var reqBody []byte
+	for {
+		msg, err := reqBodyStream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			t.Fatal(err)
+		}
+		if msg == nil {
+			break
+		}
+		reqBody = append(reqBody, msg.GetData()...)
+		if msg.GetEOF() {
+			break
+		}
+	}
+	if len(reqBody) < 1000*1000 {
+		t.Fatal("request body is missed")
 	}
 }

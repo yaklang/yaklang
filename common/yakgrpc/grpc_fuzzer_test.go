@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httputil"
 	"sort"
@@ -667,12 +668,12 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ExtractUrl(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                    string
-		request                 string
-		concurrent              int
-		isHTTPS                 bool
-		expected                string
-		expectedWithoutQuery    string
+		name                 string
+		request              string
+		concurrent           int
+		isHTTPS              bool
+		expected             string
+		expectedWithoutQuery string
 	}{
 		{
 			name: "HTTP Base64 Encoded",
@@ -1507,19 +1508,59 @@ Content-Type: image/jpeg
 		}
 	}
 
-	reqId := rsp.GetData()[0].Id
+	listItem := rsp.GetData()[0]
+	if !listItem.IsTooLargeRequest || !listItem.IsRequestOversize {
+		t.Fatal("large request should be marked as too large in list query")
+	}
+	if len(listItem.Request) != 0 {
+		t.Fatal("list query should not return oversized request body")
+	}
+
+	reqId := listItem.Id
 	flow, err := client.GetHTTPFlowById(context.Background(), &ypb.GetHTTPFlowByIdRequest{Id: int64(reqId)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(flow.Request) < 1000 {
-		t.Fatal("request too small")
+	if !flow.IsTooLargeRequest {
+		t.Fatal("GetHTTPFlowById should mark request as too large")
 	}
-	suffix := flow.Request[len(flow.Request)-200:]
+	if flow.TooLargeRequestBodyFile == "" {
+		t.Fatal("too large request body file path missing")
+	}
+	if !strings.Contains(string(flow.Request), "request too large") {
+		t.Fatal("GetHTTPFlowById should return header with truncate notice, got: " + utils.ByteSize(uint64(len(flow.Request))))
+	}
 
-	spew.Dump(suffix)
-	if len(flow.Request) < 11000000 {
-		t.Fatal("request is too small, truncated some reason got: " + utils.ByteSize(uint64(len(flow.Request))))
+	bodyStream, err := client.GetHTTPFlowBodyById(context.Background(), &ypb.GetHTTPFlowBodyByIdRequest{
+		Id:        int64(reqId),
+		IsRequest: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var bodyChunks []byte
+	for {
+		msg, err := bodyStream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			t.Fatal(err)
+		}
+		if msg == nil {
+			break
+		}
+		bodyChunks = append(bodyChunks, msg.GetData()...)
+		if msg.GetEOF() {
+			break
+		}
+	}
+	if len(bodyChunks) < 11000000 {
+		t.Fatal("request body is too small, truncated for some reason got: " + utils.ByteSize(uint64(len(bodyChunks))))
+	}
+	suffix := bodyChunks[len(bodyChunks)-200:]
+	if !strings.Contains(string(suffix), "11") {
+		t.Fatalf("request body suffix should preserve trailing multipart part, got: %q", suffix)
 	}
 }
 
