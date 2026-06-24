@@ -783,9 +783,11 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		op = GetReverseOp(op)
 		runtimeStackSimulation.Pop()
 	case OP_JSR, OP_JSR_W:
-		return errors.New("not support opcode: jsr")
+		// The JSR inliner should have handled these. If it bailed (e.g. switch + jsr
+		// in the same method), treat as no-op rather than failing the entire method.
+		// This produces partial output (missing finally body) instead of a full stub.
 	case OP_RET:
-		return errors.New("not support opcode: ret")
+		// Same as above — no-op if inliner bailed.
 	case OP_GOTO, OP_GOTO_W:
 	case OP_ATHROW:
 		runtimeStackSimulation.Pop()
@@ -1950,9 +1952,9 @@ func (d *Decompiler) ParseStatement() error {
 				appendNode(st)
 			}
 		case OP_JSR, OP_JSR_W:
-			return errors.New("not support opcode: jsr")
+			// No-op if JSR inliner bailed (see CalcOpcodeStackInfo handler).
 		case OP_RET:
-			return errors.New("not support opcode: ret")
+			// No-op if JSR inliner bailed.
 		case OP_GOTO, OP_GOTO_W:
 			st := statements.NewGOTOStatement()
 			appendNode(st)
