@@ -1,12 +1,11 @@
-package loglite
+package shim
 
 import (
 	"fmt"
 	"os"
 )
 
-// Yakit exports used by ssa2llvm AOT binaries. Kept in a standalone package so
-// pruned runtime builds do not link the full yaklib/yakit dependency graph.
+// YakitExports are lightweight yakit stubs for ssa2llvm AOT binaries.
 
 func YakitInfo(format string, items ...interface{}) {
 	yakitStderrLog("info", format, items...)
