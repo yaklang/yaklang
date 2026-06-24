@@ -258,9 +258,16 @@ func registerPHPFileBuild(ast phpparser.IHtmlDocumentContext, b *ssa.FunctionBui
 		if !pass2Building.CAS(false, true) {
 			return
 		}
-		defer pass2Building.Store(false)
+		built := false
+		defer func() {
+			pass2Building.Store(false)
+			if built {
+				pass2Capture.release()
+			}
+		}()
 		visitPHPFilePass2Capture(functionBuilder, callbackBuilder, pass2Capture)
 		pass2Built.Store(true)
+		built = true
 	}
 	functionBuilder.AddLazyBuilder(func() {
 		buildCapturedChildren(capturedBuilder)

@@ -16,7 +16,7 @@ type fakeAntlrAnalyzer struct {
 	cache *ssa.AntlrCache
 }
 
-func (f *fakeAntlrAnalyzer) WrapWithPreprocessedFS(fs fi.FileSystem) fi.FileSystem {
+func (f *fakeAntlrAnalyzer) WrapWithPreprocessedFS(fs fi.FileSystem, _ bool) fi.FileSystem {
 	return fs
 }
 

@@ -112,7 +112,7 @@ func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) (*ssa.Blueprint, s
 	} else if i.Static() != nil {
 		y.GetBluePrint(i.Static().GetText())
 	}
-	log.Warnf("[BUG]: fix it")
+	log.Debugf("fallback php type ref blueprint: %s", raw.GetText())
 	return y.CreateBlueprint(raw.GetText()), raw.GetText()
 }
 

@@ -293,10 +293,11 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	variable := anValue.getVariablesMap()
 	ir.Variable = make(ssadb.StringSlice, 0, variable.Len())
 	variable.ForEach(func(i string, v *Variable) bool {
-		ir.Variable = append(ir.Variable, i)
-		if v.GetValue() == nil {
-			log.Warnf("variable %s has nil value when saving to database, instruction id: %d", i, inst.GetId())
+		if v == nil || utils.IsNil(v.GetValue()) {
+			log.Debugf("skip variable %s with nil value when saving instruction id: %d", i, inst.GetId())
+			return true
 		}
+		ir.Variable = append(ir.Variable, i)
 		return true
 	})
 
@@ -356,7 +357,13 @@ func (c *ProgramCache) valueFromIrCode(cache *ProgramCache, inst Instruction, ir
 		if cache != nil && cache.program != nil {
 			progName = cache.program.GetProgramName()
 		}
-		value.AddVariable(GetVariableFromDB(ir.GetIdInt64(), name, progName))
+		variable := GetVariableFromDB(ir.GetIdInt64(), name, progName)
+		if variable == nil {
+			continue
+		}
+		if err := variable.Assign(value); err != nil {
+			log.Debugf("restore variable %s for instruction %d failed: %v", name, ir.GetIdInt64(), err)
+		}
 	}
 
 	// mask

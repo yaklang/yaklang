@@ -102,6 +102,9 @@ func (i *anInstruction) GetBasicBlockByID(id int64) (*BasicBlock, bool) {
 func (v Values) GetIds() []int64 {
 	ret := make([]int64, 0)
 	for _, v := range v {
+		if utils.IsNil(v) {
+			continue
+		}
 		ret = append(ret, v.GetId())
 	}
 	return ret

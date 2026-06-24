@@ -32,14 +32,29 @@ func (n *phpNamespacePass2) empty() bool {
 		len(n.enums) == 0
 }
 
+func (n *phpNamespacePass2) release() {
+	if n == nil {
+		return
+	}
+	n.name = ""
+	n.path = nil
+	n.uses = nil
+	n.functions = nil
+	n.classes = nil
+	n.globals = nil
+	n.statements = nil
+	n.enums = nil
+}
+
 // phpPass2Capture holds detached AST nodes required for pass2 top-level work only.
 // Function/class skeletons are emitted in pass1 and must not be retained here.
 type phpPass2Capture struct {
-	namespaces []phpNamespacePass2
-	uses       []antlr.Tree
-	globals    []antlr.Tree
-	statements []antlr.Tree
-	enums      []antlr.Tree
+	namespaces     []phpNamespacePass2
+	namespaceDecls []antlr.Tree
+	uses           []antlr.Tree
+	globals        []antlr.Tree
+	statements     []antlr.Tree
+	enums          []antlr.Tree
 }
 
 func (c *phpPass2Capture) empty() bool {
@@ -55,6 +70,21 @@ func (c *phpPass2Capture) empty() bool {
 		}
 	}
 	return true
+}
+
+func (c *phpPass2Capture) release() {
+	if c == nil {
+		return
+	}
+	for i := range c.namespaces {
+		c.namespaces[i].release()
+	}
+	c.namespaces = nil
+	c.namespaceDecls = nil
+	c.uses = nil
+	c.globals = nil
+	c.statements = nil
+	c.enums = nil
 }
 
 func collectPHPFilePass2Capture(ast phpparser.IHtmlDocumentContext) *phpPass2Capture {
@@ -139,6 +169,7 @@ func appendNamespacePass2Nodes(capture *phpPass2Capture, ns phpparser.INamespace
 		return
 	}
 	capture.namespaces = append(capture.namespaces, entry)
+	capture.namespaceDecls = append(capture.namespaceDecls, ssa.DetachAST(ns))
 }
 
 func appendNamespaceStatementPass2Nodes(entry *phpNamespacePass2, stmts []phpparser.INamespaceStatementContext) {
@@ -201,11 +232,15 @@ func visitPHPFilePass2Capture(functionBuilder *ssa.FunctionBuilder, callbackBuil
 	build := newPHPFileBuilder(functionBuilder, callbackBuilder)
 	prog := build.GetProgram()
 	if prog != nil && prog.CurrentIncludingStack.Len() <= 0 {
-		for i := range capture.namespaces {
-			build.visitNamespacePass2OnlyUse(&capture.namespaces[i])
+		for _, raw := range capture.namespaceDecls {
+			if ns, ok := raw.(phpparser.INamespaceDeclarationContext); ok {
+				build.VisitNamespaceOnlyUse(ns)
+			}
 		}
-		for i := range capture.namespaces {
-			build.visitNamespacePass2Declaration(&capture.namespaces[i])
+		for _, raw := range capture.namespaceDecls {
+			if ns, ok := raw.(phpparser.INamespaceDeclarationContext); ok {
+				build.VisitNamespaceDeclaration(ns)
+			}
 		}
 	}
 	for _, raw := range capture.uses {

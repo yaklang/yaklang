@@ -22,6 +22,16 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 	createPhi := generatePhi(builder, nil, nil)
 	target := old
 	visited := make(map[int64]struct{})
+	sameValue := func(left, right Value) bool {
+		return !utils.IsNil(left) && !utils.IsNil(right) && left.GetId() == right.GetId()
+	}
+	resetMemberRelationship := func(obj, key, member Value) {
+		if utils.IsNil(obj) || utils.IsNil(key) || utils.IsNil(member) {
+			return
+		}
+		obj.DeleteMember(key)
+		setMemberCallRelationship(obj, key, member)
+	}
 
 	// 递归处理嵌套成员替换
 	var replaceMemberCallRecursive func(holder Value, replacement Value, visited map[int64]struct{}) map[string]Value
@@ -60,6 +70,9 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 			}
 
 			trueKey := member.GetKey()
+			if utils.IsNil(trueKey) {
+				trueKey = key
+			}
 			if _, ok := container.GetMember(key); ok {
 				container.DeleteMember(key)
 			}
@@ -165,9 +178,15 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 			case SSAOpcodeBinOp, SSAOpcodeUnOp:
 				// 保留原始指令供后续替换
 			default:
-				ReplaceAllValue(member, toMember)
-				DeleteInst(member)
-				memberT = toMember
+				if !utils.IsNil(toMember) && !sameValue(member, toMember) {
+					ReplaceAllValue(member, toMember)
+					DeleteInst(member)
+					memberT = toMember
+					resetMemberRelationship(replacement, key, memberT)
+					if key.GetId() == target.GetId() {
+						resetMemberRelationship(container, replacement, memberT)
+					}
+				}
 			}
 
 			// 递归处理嵌套成员
