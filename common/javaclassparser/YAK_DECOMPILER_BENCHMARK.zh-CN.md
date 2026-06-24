@@ -72,7 +72,7 @@ ok=3  stub=2  syntax=0  error=0  panic=0
 
 ### 覆盖率结论
 经典语料现已零 stub；剩余唯一覆盖缺口在现代语料，且被精确隔离：
-1. **Record / sealed 的 `invokedynamic ObjectMethods` bootstrap**——自动生成的值类型方法尚未合成。
+1. **Record / sealed 的 `invokedynamic ObjectMethods` bootstrap**——自动生成的值类型方法已在第 11 轮修复（ObjectMethods bootstrap 处理器）。现代语料现已全部通过（5/5 零 stub），覆盖率矩阵总计 31/31 零 stub。
 
 （原先的 `try/catch/finally` "multiple next" 缺口已闭合——见第 3 节第 5 轮。）
 
@@ -92,22 +92,23 @@ go test -run TestRecompileRoundtrip -v ./common/javaclassparser/tests/
 ### 语料 round-trip 结果
 该 oracle 会反编译一个组的**每一个** class（含内部类、嵌套类、匿名类、局部类），并把这些单元**一起编译**，因此内部类重建是端到端验证而非被跳过。
 ```
-recompile-ok:  21  (Annotations, Arrays, Boundary, CastsInstanceof, ComplexExpressions,
+recompile-ok:  25  (Annotations, Arrays, Boundary, CastsInstanceof, ComplexExpressions,
                     ComplexMisc, Concurrency, ControlFlow, ControlFlowEdge, Enums,
                     Exceptions, ExceptionsComplex, Generics, Inheritance, Initializers,
-                    InnerClasses, Literals, Loops, Strings, Switches, TryWithResources)
-recompile-fail: 2  (Lambdas, Operators)
+                    InnerClasses, Literals, Loops, NestedControlFlow, NumericEdge, Operators,
+                    Strings, Switches, TryWithResources)
+recompile-fail: 1  (Lambdas)
 stub:          0
 dec-err:       0
 multiclass:    0   (现已一起编译，不再跳过)
 ```
 
-剩下 2 个重编译失败是可执行的正确性前沿。下面每条根因都通过阅读**完整**的 `javac` 诊断确认（用 `RC_VERBOSE=1` 输出反编译源码 + 每个分类的全部错误），而非臆测：
+剩下 1 个重编译失败是可执行的正确性前沿。下面每条根因都通过阅读**完整**的 `javac` 诊断确认（用 `RC_VERBOSE=1` 输出反编译源码 + 每个分类的全部错误），而非臆测：
 
 | 分类 | 确切的 javac 错误 | 已确认根因 | 难度 |
 |------|-------------------|------------|------|
-| Operators | `missing return statement`（1 个错误，原为 13） | `(a && b) \|\| (c)` 作为布尔值返回时是一个 **DAG** 而非树：两个 true 臂汇聚到*同一个* `iconst_1` 叶子，于是 `CalcMergeOpcode` 把外层 `&&` 条件归属到这个常量叶子（而非 `ireturn` 值合并点）。外层条件因而被排除在值折叠之外，泄漏成一个独立的 `if (a&&b){}`——空 then 分支且无尾随 return。已通过对合并检测器插桩（`OPDBG`）确认 | 难（短路-DAG 值恢复，在 `CalcMergeOpcode`/合并器中） |
-| Lambdas | `variable v already defined` + lambda 形参类型不兼容 + 非法方法引用（5 个错误） | 两个独立根因：**(A)** lambda 体用*外层*方法的 `VariableId` 转储，故其形参（`var2,var3`）与外层共享命名空间，并与 lambda 自身的赋值目标冲突（`BiFunction var2 = (Integer var2,…)`）；**(B)** 泛型被擦除——没有 `LocalVariableTypeTable`，目标渲染成裸 `BiFunction`/`List`/`Function`，显式 `Integer` 形参与 `Integer::intValue` 引用便无法对裸类型通过类型检查。类型实参只能从合成 `lambda$…` 方法自身的签名中恢复 | 难（独立 lambda 形参作用域 + 泛型 `Signature` 恢复） |
+| ~~Operators~~ | ~~`missing return statement`~~ | ~~已通过模式恢复修复（第 11 轮）：布尔返回方法的 `if(empty-then)/else(return expr)` 模式现被重写为 `return cond \|\| expr`~~ | **已修复**（第 11 轮） |
+| Lambdas | lambda 形参类型不兼容 + 非法方法引用（2 个错误） | 两个独立根因：**(A)** ~~lambda 体用*外层*方法的 `VariableId` 转储~~（**已在第 11 轮修复**：lambda 体现使用独立命名空间，形参为 l0,l1...）；**(B)** 泛型被擦除，故其形参（`var2,var3`）与外层共享命名空间，并与 lambda 自身的赋值目标冲突（`BiFunction var2 = (Integer var2,…)`）；**(B)** 泛型被擦除——没有 `LocalVariableTypeTable`，目标渲染成裸 `BiFunction`/`List`/`Function`，显式 `Integer` 形参与 `Integer::intValue` 引用便无法对裸类型通过类型检查。类型实参只能从合成 `lambda$…` 方法自身的签名中恢复 | 难（独立 lambda 形参作用域 + 泛型 `Signature` 恢复） |
 
 通过的分类由 `recompileGateBaseline` 钉死，因此任何破坏 18 个绿色分类的回退都会让 CI 失败；其余作为 backlog 跟踪。
 
