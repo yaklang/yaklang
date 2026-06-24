@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -336,7 +337,9 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 			shortName := c.FuncCtx.ShortTypeName(fieldTypeStr)
 			originalType := javaTyp.JavaType
 			javaTyp.JavaType = types.NewJavaClass(shortName)
-			lastPacket = javaTyp.JavaType.String(c.FuncCtx)
+			// Render the array type itself (element + "[]" per dimension); rendering
+			// javaTyp.JavaType here dropped the brackets, typing `int[] TABLE` as `int`.
+			lastPacket = javaTyp.String(c.FuncCtx)
 			javaTyp.JavaType = originalType
 		} else {
 			fieldTypeStr := fieldType.String(c.FuncCtx)
@@ -406,13 +409,11 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 				modifier:  accessFlags,
 				typeName:  lastPacket,
 			})
-		} else if slices.Contains(accessFlagsVerbose, "final") {
-			defaultValue := "0"
-			if c.fieldDefaultValue[name] != "" {
-				defaultValue = c.fieldDefaultValue[name]
-			}
+		} else if slices.Contains(accessFlagsVerbose, "final") && c.fieldDefaultValue[name] != "" {
+			// A final field with a captured, hoistable initializer (constant-folded value
+			// or a parameter-independent <init>/<clinit> assignment). Emit it inline.
 			dumped := dumpedFields{
-				code:      fmt.Sprintf("%s %s %s = %s;", accessFlags, lastPacket, name, defaultValue),
+				code:      fmt.Sprintf("%s %s %s = %s;", accessFlags, lastPacket, name, c.fieldDefaultValue[name]),
 				fieldName: name,
 				modifier:  accessFlags,
 				typeName:  lastPacket,
@@ -420,6 +421,9 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 
 			fields = append(fields, dumped)
 		} else {
+			// No initializer to emit (incl. blank finals assigned in the constructor /
+			// static block). A bogus `= 0` here would be illegal for reference types and is
+			// unnecessary: definite assignment in <init>/<clinit> keeps blank finals valid.
 			fields = append(fields, dumpedFields{
 				code:      fmt.Sprintf("%s %s %s;", accessFlags, lastPacket, name),
 				fieldName: name,
@@ -859,15 +863,19 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 						obj := core.UnpackSoltValue(v.Object)
 						if v1, ok := obj.(*values.JavaRef); ok && v1.IsThis && (funcCtx.FunctionName == "<cinit>" || funcCtx.FunctionName == "<init>" || funcCtx.FunctionName == funcCtx.ClassName) {
 							if _, ok := finalFieldMap[v.Member]; ok {
-								foundFieldInit = true
-								c.fieldDefaultValue[v.Member] = ret.JavaValue.String(funcCtx)
+								if rhs := ret.JavaValue.String(funcCtx); canHoistFieldInitializer(rhs) {
+									foundFieldInit = true
+									c.fieldDefaultValue[v.Member] = rhs
+								}
 							}
 						}
 					} else if v, ok := ret.LeftValue.(*values.JavaClassMember); ok {
 						if funcCtx.FunctionName == "<cinit>" || v.Name == funcCtx.ClassName {
 							if _, ok := finalFieldMap[v.Member]; ok {
-								foundFieldInit = true
-								c.fieldDefaultValue[v.Member] = ret.JavaValue.String(funcCtx)
+								if rhs := ret.JavaValue.String(funcCtx); canHoistFieldInitializer(rhs) {
+									foundFieldInit = true
+									c.fieldDefaultValue[v.Member] = rhs
+								}
 							}
 						}
 					}
@@ -1091,6 +1099,23 @@ type dumpedMethods struct {
 
 // javaFloatLiteral renders a float constant as a valid Java float literal (with the
 // mandatory 'F' suffix), handling NaN/Infinity which have no plain literal form.
+// localSlotRefRe matches a decompiler-generated local/parameter reference (var0, var1, ...).
+// `this`, instance fields (this.x), and static members (Class.x) never render this way, so a
+// match means the expression depends on a method-scoped value.
+var localSlotRefRe = regexp.MustCompile(`\bvar\d+\b`)
+
+// canHoistFieldInitializer reports whether a `final`-field assignment found inside <init>/
+// <clinit> may be lifted into a field initializer. A real field initializer cannot reference
+// constructor parameters or local variables; the JVM models those as slot locals that the
+// decompiler renders as varN. If the right-hand side mentions any such local, lifting it would
+// emit illegal Java (e.g. `final String id = var1;` where var1 is a constructor parameter), so
+// the assignment is kept in the constructor/static block instead. Erring toward NOT hoisting is
+// always safe: `this.f = expr;` / `f = expr;` compiles whether or not it could have been an
+// initializer.
+func canHoistFieldInitializer(rhs string) bool {
+	return !localSlotRefRe.MatchString(rhs)
+}
+
 func javaFloatLiteral(f float32) string {
 	v := float64(f)
 	switch {
