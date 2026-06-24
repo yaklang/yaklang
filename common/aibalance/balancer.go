@@ -37,6 +37,17 @@ type Balancer struct {
 	cancel   context.CancelFunc
 }
 
+// Config 暴露内部 ServerConfig, 供外层 (cmd 入口) 接线 CLI/env 配置,
+// 例如 chat 并发硬上限. 不可为外部持久持有以绕过并发安全约束.
+//
+// 关键词: Balancer.Config, ServerConfig 暴露接线
+func (b *Balancer) Config() *ServerConfig {
+	if b == nil {
+		return nil
+	}
+	return b.config
+}
+
 func NewBalancerFromRawConfig(raw []byte, files ...string) (*Balancer, error) {
 	var configFile = "[::memory::]"
 	if len(files) > 0 {

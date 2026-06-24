@@ -612,6 +612,18 @@ func main() {
 			Value:  10,
 			EnvVar: "PERIODIC_GC_MINUTES",
 		},
+		cli.Int64Flag{
+			Name:   "max-concurrent-chat",
+			Usage:  "Hard cap on concurrent chat/completions requests; over-cap requests queue and wait for a free slot instead of failing fast (0 to disable, default: 256)",
+			Value:  256,
+			EnvVar: "MAX_CONCURRENT_CHAT",
+		},
+		cli.IntFlag{
+			Name:   "chat-queue-wait-seconds",
+			Usage:  "Max seconds an over-cap chat request waits in queue for a free slot before falling back to 429 (default: 30)",
+			Value:  30,
+			EnvVar: "CHAT_QUEUE_WAIT_SECONDS",
+		},
 	}
 
 	app.Before = func(context *cli.Context) error {
@@ -652,6 +664,17 @@ func main() {
 		b, err := aibalance.NewBalancer(configPath)
 		if err != nil {
 			return err
+		}
+
+		// chat 并发硬上限 + 排队等待上限接线.
+		// 关键词: aibalance main 接线 max-concurrent-chat / chat-queue-wait-seconds, 并发闸排队
+		maxConcurrentChat := c.Int64("max-concurrent-chat")
+		chatQueueWaitSeconds := c.Int("chat-queue-wait-seconds")
+		if cfg := b.Config(); cfg != nil {
+			cfg.SetMaxConcurrentChatRequests(maxConcurrentChat)
+			if chatQueueWaitSeconds > 0 {
+				cfg.SetChatQueueWaitTimeout(time.Duration(chatQueueWaitSeconds) * time.Second)
+			}
 		}
 
 		log.Infof("Service started successfully, listening on: %s", listenAddr)
