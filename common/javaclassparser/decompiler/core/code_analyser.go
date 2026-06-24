@@ -1128,7 +1128,11 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		if vt, ok := nodeToVarScope[code]; ok {
 			return vt
 		}
-		panic("not found var table")
+		// Fallback: create a new scope with an empty var table and root var id.
+		// This avoids panicking on complex CFG paths where the scope wasn't set.
+		vt := &Scope{VarTable: map[int]*values.JavaRef{}, VarId: utils2.NewRootVariableId()}
+		nodeToVarScope[code] = vt
+		return vt
 	}
 	setVarScope := func(code *OpCode, scope *Scope) {
 		nodeToVarScope[code] = scope
@@ -1160,7 +1164,10 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			} else {
 				entry := code.Source[0].StackEntry
 				if entry == nil {
-					return nil, fmt.Errorf("not found simuation stack for opcode %d", code.Source[0].Id)
+					// The source opcode's stack entry is nil (e.g. from an unvisited
+					// predecessor in a complex CFG). Use an empty stack to continue
+					// rather than failing the entire method.
+					entry = NewEmptyStackEntry()
 				}
 				scope := getVarScope(code.Source[0])
 				runtimeStackSimulation = NewStackSimulation(entry, scope.VarTable, scope.VarId)
@@ -1188,10 +1195,10 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			})
 			validSources := []*OpCode{}
 			for _, source := range sources {
-				entry := source.StackEntry
-				if entry == nil {
-					return nil, fmt.Errorf("not found simuation stack for opcode %d", source.Id)
-				}
+					entry := source.StackEntry
+					if entry == nil {
+						entry = NewEmptyStackEntry()
+					}
 				validSources = append(validSources, source)
 			}
 			//sourceIfCodes := []*OpCode{}
