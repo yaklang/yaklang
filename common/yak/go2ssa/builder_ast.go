@@ -80,9 +80,6 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 					lib.GlobalVariablesBlueprint.InitializeWithContainer(pkgScope)
 				}
 			}
-			defer func() {
-				lib.VisitAst(ast)
-			}()
 			lib.PushEditor(prog.GetCurrentEditor())
 			init := lib.GetAndCreateFunction(pkgNameCurrent, string(ssa.MainFunctionName))
 			init.SetType(ssa.NewFunctionType("", []ssa.Type{ssa.CreateAnyType()}, ssa.CreateAnyType(), false))
@@ -259,9 +256,6 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			if lib == nil {
 				b.NewError(ssa.Error, TAG, "no library found for package %s", pkgPath[0])
 			}
-			defer func() {
-				lib.VisitAst(ast)
-			}()
 
 			for _, impo := range ast.AllImportDecl() {
 				names, _ := b.buildImportDecl(impo.(*gol.ImportDeclContext))

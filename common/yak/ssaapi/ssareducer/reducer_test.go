@@ -284,6 +284,10 @@ func TestFilesHandler_OutOfOrderWaitsForConsumerBeforeParsingNextAST(t *testing.
 		0,
 	)
 
+	require.Eventually(t, func() bool {
+		return atomic.LoadInt64(&parsed) == 1
+	}, time.Second, time.Millisecond, "only one AST should be parsed before consumer reads")
+
 	first := <-out
 	require.NotNil(t, first)
 	require.Equal(t, int64(1), atomic.LoadInt64(&parsed))

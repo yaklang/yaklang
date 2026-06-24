@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"os"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
@@ -19,9 +20,24 @@ func WithDiagnostics(enabled bool) ssaconfig.Option {
 		if c == nil {
 			return nil
 		}
+		if enabled {
+			ensureDiagnosticsLevelEnabled()
+		}
 		c.SetCompileDiagnostics(enabled)
 		return withRuntimeDiagnostics(enabled)(c)
 	}
+}
+
+func ensureDiagnosticsLevelEnabled() {
+	if diagnostics.GetLevel() != diagnostics.LevelOff {
+		return
+	}
+	if raw := os.Getenv("YAK_DIAGNOSTICS_LOG_LEVEL"); raw != "" {
+		if err := diagnostics.SetLevelFromString(raw); err == nil {
+			return
+		}
+	}
+	diagnostics.SetLevel(diagnostics.LevelLow)
 }
 
 func (c *Config) DiagnosticsEnabled() bool {

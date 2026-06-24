@@ -17,9 +17,9 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 )
 
-// heapLogEnabled gates retained-heap phase logging (docs/ssa-ast-to-ssa-skeleton-plan.md
-// §5 阶段0). Set YAK_SSA_HEAP_LOG=1 to print GC'd HeapInuse after each compile phase.
-// Set YAK_SSA_HEAP_PROFILE_DIR=<dir> to write a heap profile (pprof) after each phase (GC first).
+// heapLogEnabled gates retained-heap phase logging. Set YAK_SSA_HEAP_LOG=1 to print
+// GC'd HeapInuse after each compile phase. Set YAK_SSA_HEAP_PROFILE_DIR=<dir> to write
+// a heap profile (pprof) after each phase (GC first).
 var heapLogEnabled = os.Getenv("YAK_SSA_HEAP_LOG") != ""
 
 func logPhaseHeap(tag string) {
@@ -287,7 +287,7 @@ func (c *Config) parseProjectWithFS(
 	filePerfRecorder := c.filePerformanceRecorder
 	// When pre-handler already emits file skeletons and schedules remaining file
 	// work, the shared pipeline must not capture the whole file AST in another
-	// closure. See docs/ssa-ast-to-ssa-skeleton-plan.md §1/§3.
+	// closure.
 	preHandlerBuildsFiles := c.LanguageBuilder != nil && c.LanguageBuilder.UsesDeferredFileBuild()
 	// pre handler  0-40%
 	f1 := func() error {

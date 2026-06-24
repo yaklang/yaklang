@@ -201,7 +201,6 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 		currentBuilder := y.FunctionBuilder
 		y.FunctionBuilder = functionBuilder
 		return library, func() {
-			library.VisitAst(raw)
 			y.FunctionBuilder = currentBuilder
 		}
 	}
@@ -493,7 +492,6 @@ func (y *builder) VisitNamespaceDeclarationSemi(raw phpparser.INamespaceDeclarat
 		currentBuilder := y.FunctionBuilder
 		y.FunctionBuilder = functionBuilder
 		return library, func() {
-			library.VisitAst(raw)
 			y.FunctionBuilder = currentBuilder
 		}
 	}

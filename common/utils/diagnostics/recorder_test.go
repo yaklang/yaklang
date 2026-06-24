@@ -7,6 +7,7 @@ import (
 )
 
 func TestRecorderTracksMeasurements(t *testing.T) {
+	withDiagnosticsLevel(t, LevelNormal)
 	rec := NewRecorder()
 	if err := rec.Track("capture", func() error { return nil }); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -24,6 +25,7 @@ func TestRecorderTracksMeasurements(t *testing.T) {
 }
 
 func TestRecorderTracksStepErrors(t *testing.T) {
+	withDiagnosticsLevel(t, LevelNormal)
 	rec := NewRecorder()
 	stepErr := errors.New("step failed")
 	if err := rec.Track("fails", func() error { return stepErr }); err == nil || !errors.Is(err, stepErr) {
@@ -42,6 +44,7 @@ func TestRecorderTracksStepErrors(t *testing.T) {
 }
 
 func TestRecorderSnapshotAndReset(t *testing.T) {
+	withDiagnosticsLevel(t, LevelNormal)
 	rec := NewRecorder()
 	rec.Track("foo", func() error { return nil })
 	if len(rec.Snapshot()) != 1 {
@@ -109,6 +112,7 @@ func TestRecorderConcurrentTrackCount(t *testing.T) {
 }
 
 func TestRecorderConcurrentStepExpansion(t *testing.T) {
+	withDiagnosticsLevel(t, LevelNormal)
 	rec := NewRecorder()
 	const workers = 120
 

@@ -362,7 +362,7 @@ use log=info for [ssa.compile.summary] and log=debug for per-phase timings (ssa.
 		reCompile := compileConfig.GetCompileReCompile()
 		targetPath := compileConfig.GetCodeSourceLocalFileOrURL()
 
-		if programName != "" {
+		if programName != "" && compileConfig.diagnosticsEnabled {
 			defer func() {
 				diagnostics.LogRecorder("compile")
 			}()

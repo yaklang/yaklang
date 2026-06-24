@@ -69,6 +69,16 @@ func TestLevelOffBlocksRecordingButRunsSteps(t *testing.T) {
 	require.Empty(t, DefaultRecorder().Snapshot())
 }
 
+func TestDefaultLevelIsOff(t *testing.T) {
+	orig := GetLevel()
+	defer SetLevel(orig)
+	// init() may override from env; reset to package default for this check.
+	SetLevel(LevelOff)
+	require.Equal(t, LevelOff, GetLevel())
+	require.False(t, Enabled(LevelLow))
+	require.False(t, Enabled(LevelNormal))
+}
+
 func TestEnabledTierOrdering(t *testing.T) {
 	orig := GetLevel()
 	defer SetLevel(orig)

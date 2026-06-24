@@ -77,14 +77,6 @@ func (l *LazyBuilder) Build() {
 	}
 }
 
-type ASTIF interface {
-	GetText() string
-}
-
-func (p *Program) VisitAst(ast ASTIF) {
-	_ = ast
-}
-
 func (p *Program) LazyBuild() {
 	for _, key := range p.Blueprint.Keys() {
 		blueprint, ok := p.Blueprint.Get(key)
