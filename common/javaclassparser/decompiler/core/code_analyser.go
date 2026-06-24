@@ -624,7 +624,11 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		classInfo := d.constantPoolGetter(int(Convert2bytesToInt(opcode.Data))).(*values.JavaClassValue).Type()
 		arg := runtimeStackSimulation.Pop().(values.JavaValue)
 		value := values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
-			return fmt.Sprintf("(%s)(%s)", classInfo.String(funcCtx), arg.String(funcCtx))
+			// Wrap the whole cast in parentheses so it keeps the correct precedence
+			// when it becomes the receiver of a member access or method call: without
+			// the outer parens, `(T)(x).m()` parses as `(T)(x.m())` instead of
+			// `((T)x).m()`. The extra parens are always valid Java in every context.
+			return fmt.Sprintf("((%s)(%s))", classInfo.String(funcCtx), arg.String(funcCtx))
 		}, func() types.JavaType {
 			return classInfo
 		})
