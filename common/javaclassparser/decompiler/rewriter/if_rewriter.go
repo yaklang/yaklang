@@ -81,7 +81,9 @@ func IfRewriter(manager *RewriteManager, ifNode *core.Node) error {
 		err := core.WalkGraph[*core.Node](bodyStartNode, func(node *core.Node) ([]*core.Node, error) {
 			err := manager.CheckVisitedNode(node)
 			if err != nil {
-				return nil, err
+				// Node was already visited (shared merge point). Skip it instead
+				// of failing the entire method.
+				return nil, nil
 			}
 			sts = append(sts, node)
 			var next []*core.Node
