@@ -38,6 +38,20 @@ func (j *JavaRef) Type() types.JavaType {
 	return j.typ
 }
 
+// ResetVarType repoints the variable's declared type. Used when a slot first seen as a
+// null initializer (Object-typed) is later assigned a concrete reference type: the slot is
+// kept as one variable and adopts the concrete type instead of being split.
+func (j *JavaRef) ResetVarType(t types.JavaType) {
+	j.typ = t
+}
+
+// IsNullInitialized reports whether this variable's stored value is the `null` literal, i.e.
+// it was declared as `T x = null` with no committed concrete type yet.
+func (j *JavaRef) IsNullInitialized() bool {
+	lit, ok := j.Val.(*JavaLiteral)
+	return ok && lit != nil && fmt.Sprint(lit.Data) == "null"
+}
+
 func (j *JavaRef) String(funcCtx *class_context.ClassContext) string {
 	if j.IsThis {
 		return "this"

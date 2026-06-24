@@ -146,7 +146,16 @@ func (a *AssignStatement) String(funcCtx *class_context.ClassContext) string {
 	}
 	assign := fmt.Sprintf("%s = %s", a.LeftValue.String(funcCtx), a.JavaValue.String(funcCtx))
 	if a.IsFirst {
-		return a.JavaValue.Type().String(funcCtx) + " " + assign
+		// For `T x = null`, the initializer's static type is java.lang.Object, but the
+		// variable's declared type is its (possibly refined) ref type — using the initializer
+		// type would emit `Object x = null` even after the slot adopted a concrete type, and
+		// `return x` would then mismatch the method's return type. Prefer the variable type
+		// for a null initializer; for every other case this is identical to the value type.
+		declType := a.JavaValue.Type()
+		if lit, ok := a.JavaValue.(*values.JavaLiteral); ok && fmt.Sprint(lit.Data) == "null" {
+			declType = a.LeftValue.Type()
+		}
+		return declType.String(funcCtx) + " " + assign
 	} else {
 		return assign
 	}
