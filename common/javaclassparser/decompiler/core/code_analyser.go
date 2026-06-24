@@ -2328,9 +2328,22 @@ func (d *Decompiler) ParseStatement() error {
 			// group by endIndex
 			catchNodeMap := map[int][]*Node{}
 			for _, catchInfo := range catchInfos {
-				catchNodeMap[int(catchInfo.EndIndex)] = NodeFilter(node.Next, func(n *Node) bool {
+				// Multiple catch handlers can protect the same try region (same end index): a real
+				// catch (e.g. ArrayIndexOutOfBoundsException) plus the synthetic catch-all `any`
+				// handler that javac emits for a `finally`. These must be APPENDED into one group so
+				// they all become successors of a single tryStart node; the previous code overwrote
+				// the slot, dropping the earlier handler and leaving it dangling on the pre-try
+				// statement node with two successors ("multiple next"). The raw NodeFilter result is
+				// appended without deduping on purpose: a multi-catch (`A | B`) shares one handler PC
+				// and therefore appears as two identical edges in node.Next, and the construction
+				// below removes one edge per group entry, so preserving the multiplicity is required
+				// to clear both edges. AddNext on the try node dedupes the successor side, and any
+				// surplus RemoveNext calls are safe no-ops.
+				found := NodeFilter(node.Next, func(n *Node) bool {
 					return n.Id == getStatementNextIdByOpcodeId(catchInfo.OpCode.Id)
 				})
+				endIndex := int(catchInfo.EndIndex)
+				catchNodeMap[endIndex] = append(catchNodeMap[endIndex], found...)
 			}
 			endIndexes := []int{}
 			for endIndex := range catchNodeMap {
