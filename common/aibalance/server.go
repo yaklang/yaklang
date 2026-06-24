@@ -1428,8 +1428,10 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		// but wg.Wait() depends on pipes being closed (which happens in stream handlers)
 		// If stream handlers never complete, wg.Wait() blocks forever
 
-		// Request timeout to prevent infinite blocking
-		const requestTimeout = 5 * time.Minute
+		// Request timeout to prevent infinite blocking. Tightened from 5m to 150s:
+		// upstream providers respond (or time out) well within this window, and a
+		// 5m cap let stuck goroutines pile up under load (incident 2026-06-22).
+		const requestTimeout = 150 * time.Second
 
 		var chatErr error
 		select {

@@ -17,6 +17,18 @@ type LatencyWatcher struct {
 	mutex            sync.RWMutex       // Protect concurrent access
 	problematicIDs   map[uint]time.Time // Track problematic provider IDs and when they were detected
 	running          bool               // Whether the watcher is running
+
+	// healthCheckInFlight tracks provider IDs for which a latency-triggered health
+	// check goroutine is currently running, implementing per-provider singleflight
+	// so repeated problematic ticks don't pile up duplicate checks.
+	// (incident 2026-06-22: same provider triggered immediate checks every 10s
+	// while already unhealthy, each spawning a new goroutine that timed out at 20s+.)
+	healthCheckInFlight map[uint]bool
+
+	// lastLatencyCheckAt records when a latency-triggered health check last started
+	// for a provider, used to enforce a cooldown so we don't re-check the same
+	// unhealthy provider on every fast-interval tick.
+	lastLatencyCheckAt map[uint]time.Time
 }
 
 var (
@@ -28,12 +40,14 @@ var (
 // NewLatencyWatcher creates a new latency watcher
 func NewLatencyWatcher() *LatencyWatcher {
 	return &LatencyWatcher{
-		normalInterval:   5 * time.Minute,
-		fastInterval:     10 * time.Second,
-		latencyThreshold: 10000, // 10 seconds
-		stopChan:         make(chan struct{}),
-		problematicIDs:   make(map[uint]time.Time),
-		running:          false,
+		normalInterval:      5 * time.Minute,
+		fastInterval:        10 * time.Second,
+		latencyThreshold:    10000, // 10 seconds
+		stopChan:            make(chan struct{}),
+		problematicIDs:      make(map[uint]time.Time),
+		healthCheckInFlight: make(map[uint]bool),
+		lastLatencyCheckAt:  make(map[uint]time.Time),
+		running:             false,
 	}
 }
 
@@ -149,13 +163,33 @@ func (w *LatencyWatcher) checkProviders(isNormalCheck bool) {
 					p.WrapperName, p.ID, p.LastLatency, p.IsHealthy)
 				w.problematicIDs[p.ID] = time.Now()
 			}
-			// Trigger health check for problematic provider (runs in fast mode)
-			go w.triggerHealthCheck(p.ID, p.WrapperName)
+			// Trigger health check for problematic provider (runs in fast mode),
+			// but only if one is not already running and the per-provider cooldown
+			// has elapsed. This singleflight + cooldown is what prevents the
+			// health-check storm seen in the incident, where the same unhealthy
+			// provider spawned a new 20s-timeout goroutine every fast tick.
+			// 关键词: LatencyWatcher singleflight cooldown, 健康检查放大修复
+			if w.shouldTriggerLatencyCheckLocked(p.ID) {
+				w.healthCheckInFlight[p.ID] = true
+				w.lastLatencyCheckAt[p.ID] = time.Now()
+				pid := p.ID
+				pname := p.WrapperName
+				go func() {
+					defer func() {
+						w.mutex.Lock()
+						w.healthCheckInFlight[pid] = false
+						w.mutex.Unlock()
+					}()
+					w.triggerHealthCheck(pid, pname)
+				}()
+			}
 		} else if wasTracked {
 			// Provider has recovered
 			log.Debugf("LatencyWatcher: provider %s (ID: %d) has recovered, latency: %dms, healthy: %v",
 				p.WrapperName, p.ID, p.LastLatency, p.IsHealthy)
 			delete(w.problematicIDs, p.ID)
+			delete(w.healthCheckInFlight, p.ID)
+			delete(w.lastLatencyCheckAt, p.ID)
 		}
 	}
 
@@ -182,6 +216,30 @@ func (w *LatencyWatcher) isProviderProblematic(p *AiProvider) bool {
 		p.LastLatency <= 0 ||
 		p.LastLatency >= w.latencyThreshold
 }
+// shouldTriggerLatencyCheckLocked returns true if a latency-triggered health
+// check may be started now for the given provider. It enforces:
+//   - singleflight: no check is currently in flight for this provider
+//   - cooldown: at least latencyCheckCooldown has passed since the last check
+//
+// MUST be called with w.mutex held. 关键词: shouldTriggerLatencyCheckLocked
+func (w *LatencyWatcher) shouldTriggerLatencyCheckLocked(providerID uint) bool {
+	if w.healthCheckInFlight[providerID] {
+		return false
+	}
+	last, ok := w.lastLatencyCheckAt[providerID]
+	if ok && time.Since(last) < latencyCheckCooldown {
+		return false
+	}
+	return true
+}
+
+// latencyCheckCooldown is the minimum spacing between latency-triggered health
+// checks for the SAME provider. It is deliberately larger than fastInterval so
+// that even in fast mode a single unhealthy provider can produce at most one
+// check per cooldown window, breaking the amplification loop.
+// 关键词: latencyCheckCooldown, 健康检查去重冷却
+const latencyCheckCooldown = 60 * time.Second
+
 
 // triggerHealthCheck triggers a health check for a specific provider
 func (w *LatencyWatcher) triggerHealthCheck(providerID uint, providerName string) {
@@ -198,7 +256,13 @@ func (w *LatencyWatcher) triggerHealthCheck(providerID uint, providerName string
 	}
 }
 
-// MarkProviderAsProblematic marks a provider as problematic and triggers immediate monitoring
+// MarkProviderAsProblematic marks a provider as problematic and triggers immediate monitoring.
+//
+// It also enforces the same per-provider singleflight + cooldown used by checkProviders,
+// because this method is called from the request hot path (PeekOrderedProvidersWithAffinity)
+// when no low-latency provider is available — without dedup, a burst of requests for a
+// model whose providers are all high-latency would each spawn a health-check goroutine.
+// 关键词: MarkProviderAsProblematic singleflight, 请求热路径健康检查去重
 func (w *LatencyWatcher) MarkProviderAsProblematic(providerID uint, providerName string) {
 	w.mutex.Lock()
 	if _, exists := w.problematicIDs[providerID]; !exists {
@@ -206,10 +270,24 @@ func (w *LatencyWatcher) MarkProviderAsProblematic(providerID uint, providerName
 		log.Infof("LatencyWatcher: provider %s (ID: %d) marked as problematic, will monitor with fast interval",
 			providerName, providerID)
 	}
+	// Respect singleflight + cooldown before spawning a check from the hot path.
+	if !w.shouldTriggerLatencyCheckLocked(providerID) {
+		w.mutex.Unlock()
+		return
+	}
+	w.healthCheckInFlight[providerID] = true
+	w.lastLatencyCheckAt[providerID] = time.Now()
 	w.mutex.Unlock()
 
-	// Trigger immediate health check
-	go w.triggerHealthCheck(providerID, providerName)
+	// Trigger immediate health check (only one in flight per provider at a time).
+	go func() {
+		defer func() {
+			w.mutex.Lock()
+			w.healthCheckInFlight[providerID] = false
+			w.mutex.Unlock()
+		}()
+		w.triggerHealthCheck(providerID, providerName)
+	}()
 }
 
 // GetProblematicProviderCount returns the number of currently tracked problematic providers
