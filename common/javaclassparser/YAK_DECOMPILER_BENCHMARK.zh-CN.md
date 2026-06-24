@@ -18,9 +18,9 @@
 
 | 维度 | 结果 | 度量方式 |
 |------|------|----------|
-| 语法安全（解析或降级） | 23/23 语料组产出**语法可解析的 Java**；0 语法错误、0 硬错误、0 panic | `TestSyntaxCoverageMatrix` |
-| 重建覆盖率（无 stub） | 20/23 组产出**未降级输出**（无 stub）；3 组隔离出具体缺口 | `TestSyntaxCoverageMatrix` |
-| 正确性（javac round-trip） | **16/18** 个可评估语料干净重编译（起始为 4/13）；经典语料现已**零 stub**；四个内部类/嵌套类组全部可重编译 | `TestRecompileRoundtrip` |
+| 语法安全（解析或降级） | 25/25 语料组产出**语法可解析的 Java**；0 语法错误、0 硬错误、0 panic | `TestSyntaxCoverageMatrix` |
+| 重建覆盖率（无 stub） | 23/25 组产出**未降级输出**（无 stub）；2 组隔离出具体缺口 | `TestSyntaxCoverageMatrix` |
+| 正确性（javac round-trip） | **18/20** 个可评估语料干净重编译（起始为 4/13）；经典语料现已**零 stub**；四个内部类/嵌套类组全部可重编译；新增两个专用边界语料并纳入门禁 | `TestRecompileRoundtrip` |
 | 确定性 | 多次反编译逐字节一致；性能改动通过逐类 sha256 指纹证明输出等价 | `TestCorpusDeterminism`、`TestDumpJarFingerprint` |
 | 测试套件 | 绿且快：`./...` ≈ 22s，从 150s 以上降下来（**至少 6.8 倍**），无机器相关依赖 | `go test ./common/javaclassparser/...` |
 | 分配开销 | 核心 **≈246 ms** 且 **≈182 MB 累计堆分配** / 106 类的 jar；校验相对 core-only 增加运行时 ≈ +18%、累计分配 ≈ +23% | `BenchmarkDecompileJar` |
@@ -30,10 +30,10 @@
 
 ### Round-trip 正确性细节
 
-在 18 个可进入严格 `javac` round-trip 验证的经典语料组中（14 个单类组 + 4 个多类内部/嵌套类组）：
+在 20 个可进入严格 `javac` round-trip 验证的经典语料组中（16 个单类组 + 4 个多类内部/嵌套类组）：
 
-- **16 个成功重编译**：Annotations、Arrays、CastsInstanceof、Concurrency、ControlFlow、Enums、Exceptions、Generics、Inheritance、Initializers、InnerClasses、Literals、Loops、Strings、Switches、TryWithResources。
-- **2 个暴露具体的语义/类型缺陷**：Lambdas（捕获变量命名）、Operators（短路布尔 `||` 返回值恢复）。
+- **18 个成功重编译**：Annotations、Arrays、Boundary、CastsInstanceof、Concurrency、ControlFlow、ControlFlowEdge、Enums、Exceptions、Generics、Inheritance、Initializers、InnerClasses、Literals、Loops、Strings、Switches、TryWithResources。
+- **2 个暴露具体的语义/类型缺陷**：Lambdas（lambda 形参作用域冲突 + 泛型擦除）、Operators（短路布尔 `||` 返回值恢复）。
 - **经典语料 0 stub**：每个方法都结构化为真实 Java。
 
 四个多类组现在全部可重编译，端到端地检验了内部类重建：合成 `access$NNN` 桥、`this$0` 外部引用、`val$` 捕获字段、接口 `default` 方法、`@interface` 注解类型，以及枚举 synthetic 抑制与常量显式参数。
@@ -54,11 +54,12 @@ go test -run TestSyntaxCoverageMatrix -v ./common/javaclassparser/tests/
 
 每组的结果分类：`OK`（完整重建且合法）、`STUB`（某成员降级为 stub 但类仍合法）、`SYNTAX`（输出了非法 Java——真实缺陷）、`ERROR`（反编译返回错误）、`PANIC`。
 
-### 经典语料（Java 8 字节码）——18 组
+### 经典语料（Java 8 字节码）——20 组
 ```
-ok=18  stub=0  syntax=0  error=0  panic=0
+ok=20  stub=0  syntax=0  error=0  panic=0
 ```
 - 原先的 `STUB`（**Exceptions** → `tryCatchFinally(int[],int)` 失败于 `ParseBytesCode failed: multiple next`）已修复；见第 3 节第 5 轮。
+- 本轮新增两个边界条件组（**Boundary**、**ControlFlowEdge**）以加固门禁；二者均完整重建（见第 3 节第 7 轮）。
 
 ### 现代语料（Java 17 字节码）——5 组
 ```
@@ -88,9 +89,10 @@ go test -run TestRecompileRoundtrip -v ./common/javaclassparser/tests/
 ### 语料 round-trip 结果
 该 oracle 会反编译一个组的**每一个** class（含内部类、嵌套类、匿名类、局部类），并把这些单元**一起编译**，因此内部类重建是端到端验证而非被跳过。
 ```
-recompile-ok:  16  (Annotations, Arrays, CastsInstanceof, Concurrency, ControlFlow,
-                    Enums, Exceptions, Generics, Inheritance, Initializers,
-                    InnerClasses, Literals, Loops, Strings, Switches, TryWithResources)
+recompile-ok:  18  (Annotations, Arrays, Boundary, CastsInstanceof, Concurrency,
+                    ControlFlow, ControlFlowEdge, Enums, Exceptions, Generics,
+                    Inheritance, Initializers, InnerClasses, Literals, Loops, Strings,
+                    Switches, TryWithResources)
 recompile-fail: 2  (Lambdas, Operators)
 stub:          0
 dec-err:       0
@@ -104,7 +106,7 @@ multiclass:    0   (现已一起编译，不再跳过)
 | Operators | `missing return statement`（1 个错误，原为 13） | `(a && b) \|\| (c)` 作为布尔值返回时是一个 **DAG** 而非树：两个 true 臂汇聚到*同一个* `iconst_1` 叶子，于是 `CalcMergeOpcode` 把外层 `&&` 条件归属到这个常量叶子（而非 `ireturn` 值合并点）。外层条件因而被排除在值折叠之外，泄漏成一个独立的 `if (a&&b){}`——空 then 分支且无尾随 return。已通过对合并检测器插桩（`OPDBG`）确认 | 难（短路-DAG 值恢复，在 `CalcMergeOpcode`/合并器中） |
 | Lambdas | `variable v already defined` + lambda 形参类型不兼容 + 非法方法引用（5 个错误） | 两个独立根因：**(A)** lambda 体用*外层*方法的 `VariableId` 转储，故其形参（`var2,var3`）与外层共享命名空间，并与 lambda 自身的赋值目标冲突（`BiFunction var2 = (Integer var2,…)`）；**(B)** 泛型被擦除——没有 `LocalVariableTypeTable`，目标渲染成裸 `BiFunction`/`List`/`Function`，显式 `Integer` 形参与 `Integer::intValue` 引用便无法对裸类型通过类型检查。类型实参只能从合成 `lambda$…` 方法自身的签名中恢复 | 难（独立 lambda 形参作用域 + 泛型 `Signature` 恢复） |
 
-通过的分类由 `recompileGateBaseline` 钉死，因此任何破坏 16 个绿色分类的回退都会让 CI 失败；其余作为 backlog 跟踪。
+通过的分类由 `recompileGateBaseline` 钉死，因此任何破坏 18 个绿色分类的回退都会让 CI 失败；其余作为 backlog 跟踪。
 
 > **已知语义限制（非重编译失败）。** `Loops.labeled` 能干净重编译，但当 `continue <label>`
 > 的目标是外层 `for` 循环的*自增*、且该自增节点与循环的自然退出边共享时，该 `continue` 当前会被丢弃：
@@ -113,6 +115,14 @@ multiclass:    0   (现已一起编译，不再跳过)
 > labeled-continue 惯用法可能在运行期产生分歧。已在 backlog 的"循环惯用法恢复"下跟踪；
 > 循环语义 round-trip 电池（`TestLoopSemanticsRoundTrip`，执行并比对指纹）覆盖所有非 labeled
 > 形态且全部通过。
+
+### 本轮落地的语料扩充——第 7 轮（边界条件语料）
+新增两个专用边界语料并**纳入门禁**，使严格 round-trip 达到 **18/20**、经典覆盖率矩阵达到 **20/20（零 stub）**：
+
+- **Boundary**——数值极值（`Integer.MIN/MAX_VALUE`、`Long.MIN/MAX_VALUE`）、有符号整数除法/取模、窄化强转链（`double→long→int→short→byte`）、嵌套三元、`long` 全宽位运算（`& | ^ << >> >>> ~`）、`char` 算术、多维数组遍历、对数组元素的复合赋值。
+- **ControlFlowEdge**——switch 穿透、`String` switch、稀疏（lookup）vs 稠密（table）switch、嵌套循环的普通 `break`/`continue`、**作为条件**使用的短路布尔（这些能正确重建——Operators 的缺口仅限于*被返回*的 `(a&&b)||c`）、链式 `if/else-if` 派发、`while(true)`+break。
+
+二者均一次性重编译通过，证明操作数定型、字面量渲染、优先级、switch-case 映射与 CFG 结构化在这些边界上是健壮的。它们现已成为硬回归门禁。已由完整包套件与 `TestCorpusDeterminism` 验证。
 
 ### 本轮落地的正确性修复——第 6 轮（不可达语句裁剪）
 **Loops** 转为干净重编译，使 round-trip 达到 **16/18**。由于结构化阶段把每个循环都降为
@@ -295,7 +305,8 @@ runtime.greyobject     13.3% cum
 4. **Record / sealed 的 `invokedynamic ObjectMethods` bootstrap**——端到端解锁现代（Java 17+）值类型。
 5. **idiomatic `finally` 折叠**——`try/catch/finally` 的 round-trip 当前已正确（采用忠实的脱糖形式：finally 体重复 + `catch (Throwable)` 重抛，与字节码运行完全一致）。未来可加一个 pass 把它折叠为单个 idiomatic 的 `finally {}` 块以提升可读性。
 
-*本轮（第 6 轮）落地：* 不可达语句裁剪（Loops）——跟在不顺序穿过的内层区域之后的回边 `continue;` 用 JLS 可达性规则的严格子集删除；round-trip 现为 16/18。
+*本轮（第 7 轮）落地：* 边界条件语料（Boundary、ControlFlowEdge）新增并纳入门禁——严格 round-trip 现为 18/20，经典覆盖率 20/20 且零 stub。
+*第 6 轮：* 不可达语句裁剪（Loops）——跟在不顺序穿过的内层区域之后的回边 `continue;` 用 JLS 可达性规则的严格子集删除。
 *第 5 轮：* try/catch/finally 处理器分组（Exceptions）——经典语料现已零 stub；真实 jar 的 stub 标记大幅下降（gson 38 → 18）。
 *第 4 轮：* null 初始化 slot 的类型加宽（Generics）——null slot 采纳后续具体引用类型而非拆分。
 *第 3 轮：* 作用域感知的局部变量重命名（TryWithResources + 真实世界的嵌套 catch/slot 复用冲突）、内部/嵌套类 round-trip（InnerClasses）、接口 `default` 方法（Inheritance）、`@interface` 注解类型（Annotations）、完整枚举重建（Enums）。
