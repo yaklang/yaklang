@@ -289,6 +289,15 @@ runtime.greyobject     13.3% cum
 
 `commons-codec` 上的结果：**核心 246 → 222 ms/op（−10%），182 → 167 MB/op（−8%），3.31 → 2.34 M allocs/op（−31%）**；**完整流水线 378 → 351 ms/op（−7%），248 → 234 MB/op（−6%），4.54 → 3.59 M allocs/op（−21%）**。两种配置三项指标全部改善，且与优化前基线的指纹 diff 证明输出逐字节一致。（曾原型化一个 OpCode chunk 竞技场分配器并**否决**：它降低了 malloc 次数，但对许多小方法过度分配，使字节回退 +7%——为小幅 CPU 收益换取内存损失，项目不接受。）
 
+**后续 map 预分配一轮（仍在生效）。** 对上一轮后的核心再做 profiling，发现 `CalcOpcodeStackInfo`
+内两个最大的 per-opcode 分配点其实是普通 map 的*扩容*：`opcodeToSim`
+（`map[*OpCode]*StackSimulationImpl`，约 104 MB）与 `nodeToVarScope`
+（`map[*OpCode]*Scope`，约 102 MB）。两者每个 opcode 恰好写入一条，而此处 opcode 数量
+（`len(d.opCodes)`）已知，因此都改为 `make(…, len(d.opCodes))` 预分配。预分配只改变容量
+（Go map 迭代顺序本就随机），输出不变。结果：**核心 222 → 218 ms/op，167 → 163 MB/op**，
+分配次数持平；**完整流水线 351 → 344 ms/op，234 → 231 MB/op**。与优化前基线的指纹 diff
+仍逐字节一致。
+
 **上一轮分配/CPU 优化（仍在生效）：**
 
 1. **`WalkGraph` 的 visited 集合——去掉接口装箱与互斥锁。**
@@ -297,7 +306,7 @@ runtime.greyobject     13.3% cum
 2. **纯 ASCII 字符串字面量跳过 MIME 嗅探。**
    `JavaStringToLiteral` 对*每个*字面量都跑完整的魔数检测（`codec.MatchMIMEType`，会分配 `csv`/`bufio` reader），用于恢复可能被错误解码的中文字符集——对 ASCII 字节不可能命中。用纯 ASCII 检查作为前置守卫（ASCII 本就走相同的加引号路径，行为不变）。**核心：254 → 246 ms/op，193 → 182 MB/op。**
 
-那一轮累计：**核心 315 → 246 ms/op（−22%），217 → 182 MB/op（−16%）**；端到端字节 282 → 248 MB（−12%）。最新一轮（上文）进一步推进到核心 222 ms / 167 MB。
+那一轮累计：**核心 315 → 246 ms/op（−22%），217 → 182 MB/op（−16%）**；端到端字节 282 → 248 MB（−12%）。最新几轮（上文）进一步推进到核心 218 ms / 163 MB。
 
 更早仍在生效的优化：
 - **`ParseOpcode` 预分配**（opcode 切片 + 两个 offset map 都按字节码长度预分配）。
