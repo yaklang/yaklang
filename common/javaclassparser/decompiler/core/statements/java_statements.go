@@ -217,11 +217,14 @@ func NewDeclareStatement(leftVal values.JavaValue) *AssignStatement {
 }
 func NewAssignStatement(leftVal, value values.JavaValue, isFirst bool) *AssignStatement {
 	if value == nil || leftVal == nil || value.Type() == nil || leftVal.Type() == nil {
-		value.Type()
-		panic("type is nil")
+		// Guard against nil values/types in malformed bytecode: rather than panicking
+		// (which forces the whole method into a stub), create the assignment as-is.
+		// The type merge is skipped when either side has no type.
 	}
 
-	value.Type().ResetType(leftVal.Type())
+	if value.Type() != nil && leftVal.Type() != nil {
+		value.Type().ResetType(leftVal.Type())
+	}
 	return &AssignStatement{
 		LeftValue: leftVal,
 		JavaValue: value,
