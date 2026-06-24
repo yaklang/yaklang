@@ -244,10 +244,20 @@ func firstJavacError(stderr string) string {
 // out of nested loops, StringBuilder fluent chains, switch with a default in the middle, do/while,
 // a ternary used as a method argument and an instanceof+cast dispatch chain; it joined once locals
 // first-declared inside a switch case but read after the switch were hoisted ahead of the switch
-// (otherwise javac rejects the read as "cannot find symbol"). All recompile cleanly. Categories
-// still failing the roundtrip and tracked for follow-up: Lambdas (lambda-param scope collision +
-// erased generics) and Operators (short-circuit boolean ||-merge value recovery, i.e. a returned
-// `(a&&b)||c`).
+// (otherwise javac rejects the read as "cannot find symbol"). NumericEdge covers integer overflow
+// wrap, shift counts at/over the type width, mixed int/long/byte/short/char promotion, compound
+// assignment with implicit narrowing, hex/binary/octal/underscore literals, char arithmetic and
+// float/double special values. FieldsAndArrays covers instance/static fields, compound assignment
+// and pre/post increment on FIELD array elements, multi-dimensional and jagged arrays and array
+// initializers; it joined once dup2 stopped sharing one ref-fold callback across the duplicated
+// (arrayref, index) pair (which folded the index into the array-ref temp for `this.f[i] op= v`,
+// emitting `int t = i; t[i] = ...`). NestedControlFlow covers three-level loop nesting, labeled
+// break/continue across more than two levels, a while-with-inner-switch, deep if/else-if chains
+// and a break/continue mix. All recompile cleanly. Categories still failing the roundtrip and
+// tracked for follow-up: Lambdas (lambda-param scope collision + erased generics) and Operators
+// (short-circuit boolean ||-merge value recovery, i.e. a returned `(a&&b)||c`). Two further deep
+// structuring gaps are tracked but not yet gated: a `continue`/`break` that targets the enclosing
+// loop from inside a switch case (extra switch exit), and 3-D+ array parameter type inference.
 func recompileGateBaseline() []string {
 	return []string{
 		"Annotations",
@@ -262,12 +272,15 @@ func recompileGateBaseline() []string {
 		"Enums",
 		"Exceptions",
 		"ExceptionsComplex",
+		"FieldsAndArrays",
 		"Generics",
 		"Inheritance",
 		"Initializers",
 		"InnerClasses",
 		"Literals",
 		"Loops",
+		"NestedControlFlow",
+		"NumericEdge",
 		"Strings",
 		"Switches",
 		"TryWithResources",
