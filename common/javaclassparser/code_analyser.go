@@ -115,7 +115,9 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 		}
 		_ = typ
 		return values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
-			return "<MethodType Class Instance>"
+			// Return the descriptor itself so lambda type inference can read it.
+			// Other consumers (non-lambda bootstraps) ignore the string value.
+			return descInfo.Value
 		}, func() types.JavaType {
 			return types.NewJavaClass("java.lang.invoke.MethodType")
 		})
