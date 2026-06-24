@@ -38,6 +38,7 @@ authority for automated semantic decisions.
 | Syntax safety (parse-or-degrade) | 31/31 corpus groups produce **syntax-parseable Java**; 0 syntax errors, 0 hard errors, 0 panics | `TestSyntaxCoverageMatrix` |
 | Reconstruction coverage (no stub) | 29/31 groups emit **non-degraded output** (no stub); 2 preview groups (Records, SealedVar) isolate concrete gaps | `TestSyntaxCoverageMatrix` |
 | Correctness (javac round-trip) | **24/26** eligible corpora recompile cleanly (was 4/13 at start); the classic corpus now emits **zero stubs**; all four inner/nested-class groups recompile; dedicated boundary-condition, numeric-edge, field/array and nested-control-flow corpora gated | `TestRecompileRoundtrip` |
+| Real-jar correctness (.m2 corpus) | pre-Java-6 `jsr`/`ret` finally subroutines are now inlined — over 80 jars / 12000 classes, partial **242 → 170 (−72, all partial→ok)**, with syntax and err pinned at 0; a per-class sha256 fingerprint diff proves **zero regressions** and byte-identical output for already-ok classes | `TestM2RegressionHarness` |
 | Determinism | byte-identical output across repeated decompiles; perf changes proven equivalent by per-class sha256 fingerprints | `TestCorpusDeterminism`, `TestDumpJarFingerprint` |
 | Test suite | green & fast: `./...` ≈ 22s, down from more than 150s (**at least 6.8x**), no machine-specific dependencies | `go test ./common/javaclassparser/...` |
 | Allocation cost | core **≈215 ms** and **≈161 MB cumulative heap allocation** per 106-class jar (down from ≈246 ms / ≈182 MB); the post-decompile ANTLR re-parse adds ≈ +60% runtime and ≈ +42% bytes relative to core-only | `BenchmarkDecompileJar` |
@@ -184,6 +185,64 @@ any of the 18 green categories fails CI; the rest are tracked as the backlog.
 > Tracked under "loop idiom recovery" in the backlog; the loop-semantics
 > round-trip battery (`TestLoopSemanticsRoundTrip`, which executes and compares
 > fingerprints) covers every non-labeled shape and passes.
+
+### Correctness fix + real-jar corpus validation landed in this evaluation — round 10 (JSR/RET subroutine inlining)
+This round shifted focus from corpus gates to the **dominant remaining degradation reason on real
+jars**. Scanning the host's `~/.m2` with `TestM2StubReasons` (which normalizes and tallies every
+stub reason) showed that pre-Java-6 **`jsr`/`ret` subroutines** are the **single largest** stub
+cause on real jars (concentrated in older libraries such as `ant-1.6.5.jar` and
+`backport-util-concurrent-3.1.jar`).
+
+**Root cause.** Before Java 6, `javac` compiled `try { ... } finally { ... }` using bytecode
+**subroutines**: the finally body is emitted once, entered with `jsr <finally>` from both the
+normal-completion path and the catch-any exception path, and left with `ret <local>` (the local
+holds the return address pushed by `jsr`). Java 6+ instead **duplicates the finally body inline**,
+which is the only form this decompiler's CFG/structuring stage understands. Any method containing
+`jsr`/`ret` therefore failed at `ParseOpcode` with "not support opcode" and degraded to a stub.
+
+**Fix — an OpCode-level subroutine-inlining pass (new `core/jsr_inline.go`).** A rewrite pass is
+inserted after `ParseOpcode` and before `ScanJmp` that rewrites the canonical javac subroutine
+shape into the modern inlined-duplicate form: (1) the finally body is **duplicated at every `jsr`
+call site**; (2) the subroutine's entry `astore <retAddr>` and trailing `ret <retAddr>` are
+eliminated in each copy — the `ret` becomes a `goto` to that call site's return address; (3) any
+back-edge that **targets the `jsr` instruction itself** (e.g. a loop head that is the jsr) is
+redirected to that jsr's first inlined opcode; (4) **`try/catch` exception-table entries nested
+inside the finally body** are **cloned per call site** along with the subroutine (a try/catch
+inside a finally is canonical and should be duplicated, not degraded); (5) byte offsets, relative
+branch operands and exception-table PCs are recomputed wholesale.
+
+**Conservatism (first principle of a security tool: a compilable-but-wrong output is worse than a
+clearly-marked stub).** All validation happens **before** any mutation, so a bail never corrupts
+the opcode list: any non-canonical shape — `jsr_w`/`goto_w`/`switch` (absolute/wide targets that
+cannot be safely recomputed in index space), an exception entry that **straddles a subroutine
+boundary**, a fallen-through-into entry, a return site that is not ordinary code, an unmappable
+branch target, or a method that overflows the 16-bit offset space — leaves the bytecode untouched
+(degrading to exactly today's stub). It is a **no-op** for methods with no `jsr`/`ret`, so ~99% of
+modern classes are byte-for-byte unaffected. An outer `defer recover()` ensures no unexpected shape
+can crash the whole decompile, and a `JSR_INLINE_OFF` kill-switch reverts to the old behavior.
+
+**Result (`ant-1.6.5.jar`, jsr-heavy).** 93 methods inlined successfully; jsr stubs fell from
+**42 to 1** (the one remainder mixes `jsr` with a `switch`/wide branch — a rare shape left
+conservatively untouched); that jar's partials fell from **53 to 18**, with syntax=0, err=0.
+
+**Result (corpus-wide, 80 jars / 12000 classes).** `TestM2RegressionHarness` was run with inlining
+**off and on** over the same jar set, and the per-class fingerprints diffed:
+
+```
+baseline (JSR_INLINE_OFF=1): ok=11758  partial=242  syntax=0  err=0
+this round (inliner on)    : ok=11830  partial=170  syntax=0  err=0
+per-class fingerprint diff : only transition partial -> ok (72 classes); 0 regressions; 0 byte-drift on already-ok classes
+```
+
+That is partial **242 → 170 (−72)**, ok **+72**, with syntax and err pinned at 0. The per-class
+sha256 diff rigorously proves the **only** status transition is partial→ok, there is **no**
+ok→worse regression, and every already-ok class is **byte-for-byte identical** — promoting the
+"perfect no-op on non-jsr code" property from 2 sample jars to corpus-scale evidence over 12000
+classes.
+
+Verified non-regressing by the full `./common/javaclassparser/...` suite, `TestRecompileRoundtrip`
+(all 18 gated categories), `TestCorpusDeterminism`/`TestDecompileDeterminism`,
+`TestDumpJarFingerprint`, and the before/after .m2 harness fingerprint diff above.
 
 ### Correctness fixes + corpus expansion landed in this evaluation — round 9 (numeric/field/nested)
 Three more corpora were added and **gated**, taking the strict round-trip to **24/26** and
@@ -723,7 +782,16 @@ recorded as future work.
    `catch (Throwable)` rethrow, exactly as the bytecode runs). A future pass can
    collapse this into a single idiomatic `finally {}` block for readability.
 
-*Landed this round (round 9):* numeric-edge, field/array and nested-control-flow corpora
+*Landed this round (round 10):* JSR/RET subroutine inlining — pre-Java-6 `try/finally` bytecode
+subroutines (`jsr`/`ret`, the **single largest** stub cause on real jars) are now rewritten into
+the modern inlined-duplicate form. New `core/jsr_inline.go` duplicates the finally body per call
+site, rewrites `ret`→`goto`, redirects jsr back-edges, clones try/catch exception entries nested
+inside the finally per call site, and conservatively leaves any non-canonical shape untouched
+(degrading to the old stub, never emitting wrong code; `JSR_INLINE_OFF` kill-switch provided).
+`ant-1.6.5.jar` jsr stubs 42→1; corpus-wide (80 jars / 12000 classes) partial 242→170 (−72, **all
+partial→ok**), with a per-class fingerprint diff proving zero regressions and zero byte-drift on
+already-ok classes.
+*Round 9:* numeric-edge, field/array and nested-control-flow corpora
 (NumericEdge, FieldsAndArrays, NestedControlFlow) added and gated — strict round-trip now
 **24/26**, classic coverage **26/26** with zero stubs. One real correctness bug fixed:
 compound assignment / pre-post increment on a **field array element** (`this.f[i] op= v`,

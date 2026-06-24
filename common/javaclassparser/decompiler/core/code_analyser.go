@@ -1686,6 +1686,10 @@ func (d *Decompiler) ParseStatement() error {
 	if err != nil {
 		return err
 	}
+	// Rewrite pre-Java-6 jsr/ret finally subroutines into the modern inlined-duplicate form so the
+	// CFG/structuring below never sees jsr/ret. No-op when the method has none; conservatively
+	// leaves the bytecode (and thus the existing stub path) untouched for non-canonical shapes.
+	d.inlineJSRSubroutines()
 	err = d.ScanJmp()
 	if err != nil {
 		return err

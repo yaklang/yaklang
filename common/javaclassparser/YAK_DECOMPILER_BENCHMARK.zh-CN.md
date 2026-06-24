@@ -21,6 +21,7 @@
 | 语法安全（解析或降级） | 31/31 语料组产出**语法可解析的 Java**；0 语法错误、0 硬错误、0 panic | `TestSyntaxCoverageMatrix` |
 | 重建覆盖率（无 stub） | 29/31 组产出**未降级输出**（无 stub）；2 个预览组（Records、SealedVar）隔离出具体缺口 | `TestSyntaxCoverageMatrix` |
 | 正确性（javac round-trip） | **24/26** 个可评估语料干净重编译（起始为 4/13）；经典语料现已**零 stub**；四个内部类/嵌套类组全部可重编译；专用边界、数值边界、字段/数组与嵌套控制流语料均已纳入门禁 | `TestRecompileRoundtrip` |
+| 真实 jar 正确性（.m2 语料） | pre-Java-6 的 `jsr`/`ret` finally 子程序现已内联——80 jar / 12000 类的 partial **242 → 170（−72，全部为 partial→ok）**，syntax 与 err 恒为 0；逐类 sha256 指纹 diff 证明**零回归**且原本 ok 的类逐字节不变 | `TestM2RegressionHarness` |
 | 确定性 | 多次反编译逐字节一致；性能改动通过逐类 sha256 指纹证明输出等价 | `TestCorpusDeterminism`、`TestDumpJarFingerprint` |
 | 测试套件 | 绿且快：`./...` ≈ 22s，从 150s 以上降下来（**至少 6.8 倍**），无机器相关依赖 | `go test ./common/javaclassparser/...` |
 | 分配开销 | 核心 **≈215 ms** 且 **≈161 MB 累计堆分配** / 106 类的 jar（自 ≈246 ms / ≈182 MB 降低）；反编译后的 ANTLR 重解析相对 core-only 增加运行时 ≈ +60%、字节 ≈ +42% | `BenchmarkDecompileJar` |
@@ -117,6 +118,29 @@ multiclass:    0   (现已一起编译，不再跳过)
 > labeled-continue 惯用法可能在运行期产生分歧。已在 backlog 的"循环惯用法恢复"下跟踪；
 > 循环语义 round-trip 电池（`TestLoopSemanticsRoundTrip`，执行并比对指纹）覆盖所有非 labeled
 > 形态且全部通过。
+
+### 本轮落地的正确性修复 + 真实 jar 语料验证——第 10 轮（JSR/RET 子程序内联）
+本轮把焦点从语料门禁转向**真实 jar 的剩余降级原因**。先用 `TestM2StubReasons` 扫描本机 `~/.m2`，对每个降级 stub 的原因归一化计数，结果显示 pre-Java-6 的 **`jsr`/`ret` 子程序**是真实 jar 中**单一最大**的降级原因（集中在 `ant-1.6.5.jar`、`backport-util-concurrent-3.1.jar` 等老库）。
+
+**根因。** Java 6 之前的 `javac` 把 `try { ... } finally { ... }` 编译为字节码**子程序**：finally 体只发射一次，由正常退出路径与 catch-any 异常路径用 `jsr <finally>` 进入，用 `ret <local>` 返回（local 持有 jsr 压入的返回地址）。Java 6+ 改为把 finally 体**逐处内联复制**——这是本反编译器 CFG/结构化阶段唯一理解的形态。因此任何含 `jsr`/`ret` 的方法此前在 `ParseOpcode` 阶段直接报 "not support opcode" 并降级为 stub。
+
+**修复——OpCode 层的子程序内联 pass（新增 `core/jsr_inline.go`）。** 在 `ParseOpcode` 之后、`ScanJmp` 之前插入一个改写 pass，把规范的 javac 子程序形态重写为现代内联复制形态：(1) 把 finally 体**复制到每个 `jsr` 调用点**；(2) 子程序入口的 `astore <retAddr>` 与结尾的 `ret <retAddr>` 在每份副本中分别消除——`ret` 改写为跳向该调用点返回地址的 `goto`；(3) 任何**以 `jsr` 指令本身为目标**的回边（如循环头正好是 jsr）重定向到该 jsr 的首条内联指令；(4) **嵌套在 finally 体内的 `try/catch` 异常表项**随子程序按调用点**克隆**（finally 内部的 try/catch 是规范形态，应复制而非降级）；(5) 整体重算字节偏移、分支相对量与异常表 PC。
+
+**保守性（安全工具的第一原则：可编译但错误的输出比明确标记的 stub 更糟）。** 所有校验都在任何改写**之前**完成，bail 永不破坏 opcode 列表：含 `jsr_w`/`goto_w`/`switch`（绝对/宽目标无法在索引空间安全重算）、**跨子程序边界**的异常表项、入口被 fall-through、返回点非普通代码、分支目标无法重映射、方法体超过 16-bit 偏移空间等任何非规范形态，都让 pass **原样保留字节码**（退化为今天的 stub）。对不含 `jsr`/`ret` 的方法是**no-op**，故约 99% 的现代类逐字节不受影响。外层 `defer recover()` 兜底，任何意外形态都不会让整次反编译 crash。并提供 `JSR_INLINE_OFF` 紧急开关一键回退到旧行为。
+
+**结果（`ant-1.6.5.jar`，jsr 密集）。** 93 个方法成功内联；jsr 降级 stub 从 **42 降到 1**（仅剩一个把 `jsr` 与 `switch`/宽分支混用的罕见形态，保守保留）；该 jar 的 partial 从 **53 降到 18**，syntax=0、err=0。
+
+**结果（语料级，80 jar / 12000 类）。** 用 `TestM2RegressionHarness` 在内联**开/关**同一 jar 集各跑一遍并 diff 逐类指纹：
+
+```
+基线（JSR_INLINE_OFF=1）: ok=11758  partial=242  syntax=0  err=0
+本轮（内联开启）        : ok=11830  partial=170  syntax=0  err=0
+逐类指纹 diff            : 唯一迁移 partial -> ok（72 类）；0 回归；原本 ok 的类 0 字节漂移
+```
+
+即 partial **242 → 170（−72）**、ok **+72**，syntax 与 err 恒为 0。逐类 sha256 diff 严格证明：**唯一**的状态迁移是 partial→ok，**没有任何** ok→更差的回归，且所有原本 ok 的类输出**逐字节不变**——这把"该 pass 对不含 jsr 的代码是完美 no-op"从 2 个样本 jar 提升到了 12000 类的语料级证据。
+
+经完整 `./common/javaclassparser/...` 套件、`TestRecompileRoundtrip`（18 个门禁分类无回归）、`TestCorpusDeterminism`/`TestDecompileDeterminism`、`TestDumpJarFingerprint` 及上述 .m2 harness 前后指纹 diff 验证无回归。
 
 ### 本轮落地的正确性修复 + 语料扩充——第 9 轮（数值/字段/嵌套）
 再新增三个语料并**纳入门禁**，使严格 round-trip 达到 **24/26**、经典覆盖率矩阵达到 **26/26（零 stub）**。新语料暴露的一个真实正确性缺陷被修复；另有两个更深层的结构化缺口被隔离并显式跟踪。
@@ -364,7 +388,9 @@ CFG 上仍全部通过）。结果：**核心 218 → 215 ms/op，163 → 161 MB
 4. **Record / sealed 的 `invokedynamic ObjectMethods` bootstrap**——端到端解锁现代（Java 17+）值类型。
 5. **idiomatic `finally` 折叠**——`try/catch/finally` 的 round-trip 当前已正确（采用忠实的脱糖形式：finally 体重复 + `catch (Throwable)` 重抛，与字节码运行完全一致）。未来可加一个 pass 把它折叠为单个 idiomatic 的 `finally {}` 块以提升可读性。
 
-*本轮（第 8 轮）落地：* 复杂形态语料（ComplexExpressions、ComplexMisc、ExceptionsComplex）新增并纳入门禁——严格 round-trip 现为 **21/23**，经典覆盖率 **23/23** 且零 stub。修复两个真实正确性缺陷：(1) 深层链式三元的各臂条件不再被错误折叠为短路 `||`（不再出现空槽 stub），通过 `MergeIf` 尊重的 `TernaryChainArm` 标记实现；(2) 声明于 switch case 内但在 switch 之后被读取的局部，会被提升到 switch 之前，修复了极常见的 `int r; switch{...} return r;` 写法。
+*本轮（第 10 轮）落地：* JSR/RET 子程序内联——pre-Java-6 的 `try/finally` 字节码子程序（`jsr`/`ret`，真实 jar 中**单一最大**的降级原因）现被改写为现代内联复制形态。新增 `core/jsr_inline.go`：finally 体逐调用点复制、`ret`→`goto`、jsr 回边重定向、finally 内嵌套 try/catch 异常表项按调用点克隆，并对一切非规范形态保守保留（退化为旧 stub，绝不产出错误代码；提供 `JSR_INLINE_OFF` 开关）。`ant-1.6.5.jar` 的 jsr stub 42→1；语料级（80 jar/12000 类）partial 242→170（−72，**全部 partial→ok**），逐类指纹 diff 证明零回归、原 ok 类零字节漂移。
+*第 9 轮落地：* 数值/字段/嵌套语料（NumericEdge、FieldsAndArrays、NestedControlFlow）新增并纳入门禁——严格 round-trip **24/26**、经典覆盖率 **26/26** 且零 stub；修复 `dup2` 在两个被复制槽位间共享 ref-fold 回调导致的字段数组元素复合赋值缺陷。
+*第 8 轮落地：* 复杂形态语料（ComplexExpressions、ComplexMisc、ExceptionsComplex）新增并纳入门禁——严格 round-trip 现为 **21/23**，经典覆盖率 **23/23** 且零 stub。修复两个真实正确性缺陷：(1) 深层链式三元的各臂条件不再被错误折叠为短路 `||`（不再出现空槽 stub），通过 `MergeIf` 尊重的 `TernaryChainArm` 标记实现；(2) 声明于 switch case 内但在 switch 之后被读取的局部，会被提升到 switch 之前，修复了极常见的 `int r; switch{...} return r;` 写法。
 *第 7 轮落地：* 边界条件语料（Boundary、ControlFlowEdge）新增并纳入门禁——严格 round-trip 18/20，经典覆盖率 20/20 且零 stub。
 *第 6 轮：* 不可达语句裁剪（Loops）——跟在不顺序穿过的内层区域之后的回边 `continue;` 用 JLS 可达性规则的严格子集删除。
 *第 5 轮：* try/catch/finally 处理器分组（Exceptions）——经典语料现已零 stub；真实 jar 的 stub 标记大幅下降（gson 38 → 18）。
