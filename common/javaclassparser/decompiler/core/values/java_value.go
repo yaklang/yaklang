@@ -110,14 +110,31 @@ func (j *JavaLiteral) Type() types.JavaType {
 
 func JavaStringToLiteral(i any) string {
 	data := fmt.Sprint(i)
-	mimeType, _ := codec.MatchMIMEType(data)
-	if mimeType != nil && mimeType.IsChineseCharset() {
-		result, ok := mimeType.TryUTF8Convertor([]byte(data))
-		if ok {
-			return fixJavaStringEscapes(strconv.Quote(string(result)))
+	// MatchMIMEType runs full magic-byte sniffing (allocating a csv/bufio reader) and
+	// is only useful to recover a mis-decoded Chinese charset, which by definition needs
+	// non-ASCII bytes. Pure-ASCII literals (the overwhelming majority) can never match a
+	// Chinese charset, so skip the expensive detection -- it was ~4% of all decompiler
+	// allocations. Behavior is unchanged: ASCII already fell through to the quote path.
+	if !isPureASCII(data) {
+		mimeType, _ := codec.MatchMIMEType(data)
+		if mimeType != nil && mimeType.IsChineseCharset() {
+			result, ok := mimeType.TryUTF8Convertor([]byte(data))
+			if ok {
+				return fixJavaStringEscapes(strconv.Quote(string(result)))
+			}
 		}
 	}
 	return fixJavaStringEscapes(strconv.Quote(data))
+}
+
+// isPureASCII reports whether s contains only bytes < 0x80.
+func isPureASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= 0x80 {
+			return false
+		}
+	}
+	return true
 }
 
 // fixJavaStringEscapes converts Go-style escapes (emitted by strconv.Quote) that are not
