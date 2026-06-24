@@ -2,11 +2,9 @@ package tests
 
 import (
 	_ "embed"
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/javaclassparser"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
+	"github.com/yaklang/yaklang/common/yak/java/javasyntax"
 	"testing"
 )
 
@@ -201,7 +199,6 @@ func TestEnumBasic(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkJavaCode(t, results)
-	fmt.Println(results)
 	assert.Contains(t, results, "enum Node$Type")
 	assert.Contains(t, results, "\tLITERAL,\n\tVARIABLE;\n")
 }
@@ -212,16 +209,12 @@ func TestInterfaceExtends(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkJavaCode(t, results)
-	fmt.Println(results)
 	assert.Contains(t, results, "NavigableSet extends SortedSet")
 }
 
 // checkjavacode
 func checkJavaCode(t *testing.T, code string) {
-	fmt.Println(code)
-	ssatest.CheckJava(t, code, func(prog *ssaapi.Program) error {
-		prog.Show()
-		return nil
-	})
-	fmt.Println(code)
+	if err := javasyntax.Validate(code); err != nil {
+		t.Fatalf("decompiled Java has syntax errors: %v\n--- code ---\n%s", err, code)
+	}
 }
