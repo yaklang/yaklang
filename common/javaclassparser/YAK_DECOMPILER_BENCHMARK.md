@@ -1,11 +1,11 @@
-# YAK DECOMPILER REPORT BENCHMARK
+# YAK JAVA DECOMPILER ENGINEERING BENCHMARK
 
-A full-spectrum evaluation of the Yaklang Java decompiler (`java.Decompile` /
-`javaclassparser.Decompile`) across four axes: **syntax coverage**,
-**correctness**, **test hygiene**, and **performance**. Every number below is
-produced by a reproducible test or benchmark in this repository (no synthetic or
-hand-waved figures) and can be regenerated with the commands shown in each
-section.
+Reproducible evaluation of the Yaklang Java decompiler (`java.Decompile` /
+`javaclassparser.Decompile`) across **syntax safety**, **reconstruction
+coverage**, **javac round-trip correctness**, **determinism**, **test hygiene**,
+and **allocation cost**. Every number below is produced by a reproducible test or
+benchmark in this repository (no synthetic or hand-waved figures) and can be
+regenerated with the commands shown in each section.
 
 - Decompiler entry points: `javaclassparser.Decompile([]byte) (string, error)`
   and the Yaklang library wrapper `java.Decompile`.
@@ -13,24 +13,70 @@ section.
 - Reproduce everything fast (no network, no local Maven cache required):
   `go test ./common/javaclassparser/...`
 
+> **Scope note.** "No stub" is **not** the same as "correct reconstruction", and
+> parsing under ANTLR is **not** the same as recompiling under `javac`. This
+> report therefore separates three distinct claims: (1) the output is
+> syntax-parseable, (2) the output is produced without a degraded stub, and (3)
+> the output recompiles under `javac`. Only (3) is evidence of semantic fidelity.
+
 ---
 
 ## 1. Executive summary
 
+This report evaluates the current Yaklang Java decompiler across syntax safety,
+reconstruction coverage, `javac` round-trip correctness, determinism, test
+portability, and allocation cost. The implementation is suitable as a
+best-effort, partially fault-tolerant source-reconstruction component for
+interactive inspection and security-analysis workflows. It is **not yet a
+source-equivalent Java decompiler** and should not be treated as the sole
+authority for automated semantic decisions.
+
 | Axis | Result | How it is measured |
 |------|--------|--------------------|
-| Coverage (parse-or-degrade) | 23/23 corpus groups produce **valid Java**; 0 syntax errors, 0 hard errors, 0 panics | `TestSyntaxCoverageMatrix` |
-| Coverage (full reconstruction) | 20/23 groups fully reconstructed; 3 groups isolate exactly **2 root-cause gaps** | `TestSyntaxCoverageMatrix` |
-| Correctness (javac round-trip) | **8/13** classic single-class corpora recompile cleanly (was 4/13 at start; +Literals, Arrays, Initializers, Concurrency, and Operators 13→1 errors); remaining failures pinpoint concrete gaps | `TestRecompileRoundtrip` |
+| Syntax safety (parse-or-degrade) | 23/23 corpus groups produce **syntax-parseable Java**; 0 syntax errors, 0 hard errors, 0 panics | `TestSyntaxCoverageMatrix` |
+| Reconstruction coverage (no stub) | 20/23 groups emit **non-degraded output** (no stub); 3 groups isolate concrete gaps | `TestSyntaxCoverageMatrix` |
+| Correctness (javac round-trip) | **13/18** eligible corpora recompile cleanly (was 4/13 at start); all four inner/nested-class groups recompile | `TestRecompileRoundtrip` |
 | Determinism | byte-identical output across repeated decompiles; perf changes proven equivalent by per-class sha256 fingerprints | `TestCorpusDeterminism`, `TestDumpJarFingerprint` |
-| Test suite | green & fast: `./...` ≈ 22s vs >150s before (8x), no machine-specific dependencies | `go test ./common/javaclassparser/...` |
-| Performance | core **246 ms / 182 MB** per 106-class jar (was 315 ms / 217 MB → **−22% time, −16% bytes** this round); validation safety net ≈ +18% CPU / +23% allocs | `BenchmarkDecompileJar` |
+| Test suite | green & fast: `./...` ≈ 22s, down from more than 150s (**at least 6.8x**), no machine-specific dependencies | `go test ./common/javaclassparser/...` |
+| Allocation cost | core **≈246 ms** and **≈182 MB cumulative heap allocation** per 106-class jar; validation increases runtime ≈ +18% and cumulative allocation ≈ +23% relative to core-only | `BenchmarkDecompileJar` |
 | Scalability | near-linear to ~8 workers (3.6×), then **GC-bound regression** | `BenchmarkDecompileJarParallel` |
 
 The decompiler's **safety guarantee holds**: for every input in the corpus it
-either fully reconstructs a method or degrades it to a tagged, still-parseable
-stub (`yak-decompiler:` marker), never emitting un-parseable Java and never
-panicking out of `Decompile`.
+either reconstructs a method or degrades it to a tagged, still-parseable stub
+(`yak-decompiler:` marker), never emitting un-parseable Java and never panicking
+out of `Decompile`.
+
+### Round-trip correctness detail
+
+Of the 18 corpus groups eligible for strict `javac` round-trip validation
+(13 single-class groups plus 4 multi-class inner/nested-class groups, with one
+group held back as a stub):
+
+- **13 recompile successfully**: Annotations, Arrays, CastsInstanceof,
+  Concurrency, ControlFlow, Enums, Inheritance, Initializers, InnerClasses,
+  Literals, Strings, Switches, TryWithResources.
+- **4 expose concrete semantic/typing defects**: Generics (a slot split by type
+  widening is read out of its block scope), Lambdas (captured-variable naming),
+  Loops (`do{...}while(true)` lowering emits javac-unreachable code), Operators
+  (short-circuit boolean recovery).
+- **1 is held back as a stub**: Exceptions (`try/catch/finally` CFG with multiple
+  successors).
+
+All four multi-class groups now recompile, exercising inner-class reconstruction
+end to end: synthetic `access$NNN` bridges, `this$0` outer references, `val$`
+capture fields, interface `default` methods, `@interface` annotation types, and
+enum synthetic suppression with explicit constant arguments.
+
+### Readiness assessment
+
+The decompiler meets the bar of an **engineering beta** for best-effort code
+presentation, provided that: degraded methods remain explicitly tagged;
+downstream analysis does not assume semantic equivalence from syntax-valid
+output; and resource limits plus untrusted-input fuzzing are added before
+exposure to hostile inputs. General-availability readiness requires substantial
+further improvement in `javac` round-trip correctness, real-world jar coverage,
+malformed-input resilience, modern bytecode support, and peak-resource
+characterization.
 
 ---
 
@@ -74,7 +120,9 @@ The two remaining gaps are precisely isolated and orthogonal:
 Everything else (operators, literals, control flow, loops, switches,
 try-with-resources, arrays, generics, inheritance, inner classes, enums, lambdas,
 strings, annotations, initializers, concurrency, casts/instanceof, pattern
-matching, switch expressions, text blocks) reconstructs to valid Java.
+matching, switch expressions, text blocks) emits **syntax-parseable** source for
+the tested corpus. Syntax-parseable is a weaker claim than `javac`-recompilable;
+see §3 for the round-trip results that measure semantic fidelity.
 
 ---
 
@@ -91,30 +139,71 @@ go test -run TestRecompileRoundtrip -v ./common/javaclassparser/tests/
 `javac` is pinned to the English locale (`-J-Duser.language=en -J-Duser.country=US`,
 `-nowarn -Xlint:none`) so diagnostics are stable across machines.
 
-### Classic single-class corpora
+### Corpus round-trip results
+The oracle decompiles **every** class of a group (including inner, nested,
+anonymous and local classes) and recompiles the units together, so inner-class
+reconstruction is exercised end to end rather than skipped.
 ```
-recompile-ok:  8   (Arrays, CastsInstanceof, Concurrency, ControlFlow, Initializers, Literals, Strings, Switches)
-recompile-fail: 5
+recompile-ok:  13  (Annotations, Arrays, CastsInstanceof, Concurrency, ControlFlow,
+                    Enums, Inheritance, Initializers, InnerClasses, Literals,
+                    Strings, Switches, TryWithResources)
+recompile-fail: 4  (Generics, Lambdas, Loops, Operators)
 stub:          1   (Exceptions)
 dec-err:       0
-multiclass:    4   (skipped: multi-type compilation units)
+multiclass:    0   (now compiled together, no longer skipped)
 ```
 
-The 5 remaining recompile failures are the actionable correctness frontier. Each root
-cause below was confirmed by reading the **full** `javac` diagnostic (run with
-`RC_VERBOSE=1` to dump the decompiled source + every error per category), not
+The 4 remaining recompile failures are the actionable correctness frontier. Each
+root cause below was confirmed by reading the **full** `javac` diagnostic (run
+with `RC_VERBOSE=1` to dump the decompiled source + every error per category), not
 guessed:
 
 | Category | Exact javac error | Confirmed root cause | Difficulty |
 |----------|-------------------|----------------------|-----------|
 | Loops | `unreachable statement` (the `continue;` after a nested infinite region) | every loop lowered to `do{...}while(true)`; the always-taken inner exit makes the synthesized outer `continue` unreachable | hard (loop idiom recovery) |
 | Operators | `missing return statement` (1 error, down from 13) | `(a && b) \|\| (c)` short-circuit `\|\|` lowered to an `if/else` whose true-branch dropped its `return true`; a boolean-expression/`\|\|` reconstruction gap | hard (control-flow recovery) |
-| Generics | `cannot find symbol var4` | one JVM local slot reused across nested scopes is mis-split into two SSA variables; the later one is block-scoped but read after the block | medium–hard (var scoping) |
+| Generics | `cannot find symbol var4` | one JVM local slot reused across the loop is *split by type widening* (`Object var1 = null` then `Comparable var4 = ...`); the later variable is block-scoped but read after the block | medium–hard (slot merge / scope widening) |
 | Lambdas | `variable v already defined` + erased generics | lambda parameter names collide with the enclosing slot names, and raw functional-interface targets reject the explicit `Integer` param types (generic signatures not recovered) | hard (var naming + generics erasure) |
-| TryWithResources | `variable var4 is already defined` | nested try-with-resources `close()` desugaring reuses the slot name `var4` for two catch variables in overlapping source scopes | medium (var naming) |
 
 Passing categories are pinned by `recompileGateBaseline`, so a regression that breaks
-any of the 8 green categories fails CI; the rest are tracked as the backlog.
+any of the 13 green categories fails CI; the rest are tracked as the backlog.
+
+### Correctness fixes landed in this evaluation — round 3 (inner classes + scope)
+Five further defects were fixed, flipping **TryWithResources** and all four
+multi-class inner/nested-class groups (**InnerClasses, Inheritance, Annotations,
+Enums**) to clean recompiles. Verified non-regressing by the golden suite,
+`TestCorpusDeterminism`, and an `ok`/`err`/`panic`/stub-count diff on real jars
+(commons-codec, gson: identical counts before vs after):
+
+1. **Scope-aware local renaming** (`dumper.go`). The JVM reuses local slots and
+   the decompiler names locals by slot depth (`varN`), so two distinct variables
+   in nested source scopes can collapse to the same name (e.g. two nested
+   `catch (Throwable var4)` in try-with-resources `close()` desugaring). A
+   pre-render pass walks the body in lexical-scope order and renames a declaration
+   **only** when its name is still live from an enclosing scope owned by a
+   different variable, using a `_<n>` suffix the decompiler never generates.
+   Non-colliding output is byte-for-byte unchanged. → **TryWithResources green**;
+   broadly fixes real-world nested-catch/slot-reuse collisions.
+2. **Round-trip oracle now compiles inner classes together** (`recompile_roundtrip_test.go`).
+   Each `.class` of a group is decompiled into its own `$`-named unit and the units
+   are recompiled together — the real check for synthetic `access$NNN` bridges,
+   `this$0` captures, `val$` fields and `Outer$Inner` references. → **InnerClasses green.**
+3. **Interface `default` methods** (`dumper.go`). A non-abstract, non-static
+   interface instance method was emitted without `default`, so its body was illegal
+   ("interface abstract methods cannot have body"). → **Inheritance green.**
+4. **`@interface` annotation types** (`access_flags_verbose.go`, `dumper.go`). An
+   annotation type (ACC_INTERFACE|ACC_ANNOTATION) rendered as a plain `interface`
+   ("X is not an annotation interface") with its implicit `Annotation`
+   superinterface spelled out. Now rendered with the `@interface` keyword and the
+   implicit superinterface dropped. → **Annotations green.**
+5. **Enum reconstruction** (`dumper.go`). The synthetic `values()`/`valueOf()`/
+   `$values()` methods and `$VALUES` field were emitted ("method already defined"),
+   the constructor exposed its synthetic `(String name, int ordinal)` params and
+   `super(name, ordinal)` call ("call to super not allowed in enum constructor"),
+   and constants carried no arguments. Now genuine enums suppress all synthetics,
+   strip the constructor's synthetic prefix, and emit each constant with the
+   explicit arguments parsed from the `new EnumType(name, ordinal, args...)`
+   expression in `<clinit>` (e.g. `EARTH(5.976e+24D, 6.37814e+06D)`). → **Enums green.**
 
 ### Correctness fixes landed in this evaluation — round 2 (accuracy push)
 Five further defects were diagnosed from the round-trip oracle and fixed, flipping
@@ -185,10 +274,12 @@ Previously landed in this evaluation:
   slash so `/abs/app.war/.../foo.jar/Foo.class` opens from the host filesystem.
 
 ### What "recompile-fail" does **not** mean
-A `recompile-fail` class is still **structurally decompiled to readable, valid Java**
-(it passes the ANTLR syntax net and the coverage matrix); it only fails the much
-stricter *javac type-check* round-trip. The frontier above is about semantic fidelity
-of a minority of constructs, not about producing garbage.
+A `recompile-fail` class is still **structurally decompiled to readable,
+syntax-parseable Java** (it passes the ANTLR syntax net and the coverage matrix);
+it only fails the much stricter *javac type-check* round-trip. The frontier above
+is about semantic fidelity of a minority of constructs, not about producing
+garbage. It is, however, a real correctness limitation: syntax-parseable output is
+**not** evidence that the reconstruction is semantically equivalent to the input.
 
 ---
 
@@ -361,12 +452,13 @@ recorded as future work.
 ## 6. Backlog (prioritized by impact, from the data above)
 
 **Correctness (semantic fidelity):**
-1. **Scope-aware local renaming** — one JVM slot reused across non-overlapping
-   bytecode ranges but **overlapping source scopes** is named purely by slot, producing
-   `variable var4 is already defined` (TryWithResources) and `cannot find symbol var4`
-   (Generics, a block-scoped store read after its block). A renaming/scoping pass that
-   guarantees unique names per lexical scope flips two corpus categories and is the
-   single most common remaining defect class in real jars.
+1. **Slot-split merge / scope widening** (Generics) — a single JVM slot reused
+   across a loop is split into two variables when its type widens
+   (`Object var1 = null` then `Comparable var4 = ...`); the later variable is
+   block-scoped but read after its block (`cannot find symbol var4`). Needs either
+   merging the two SSA names to a common-supertype variable or widening the
+   declaration's scope. (The simpler nested-scope *name collision* case, e.g.
+   nested catch parameters, was fixed this round — see §3 round 3.)
 2. **`try/catch/finally` "multiple next" CFG** — the only classic-corpus stub and the
    most common *stub* cause observed in real jars.
 3. **Loop idiom recovery** — reconstruct `for`/`while` instead of universal
@@ -378,9 +470,13 @@ recorded as future work.
 6. **Record / sealed `invokedynamic ObjectMethods` bootstrap** — unblocks modern
    (Java 17+) value types end-to-end.
 
-*Landed this round (was items 2/4 of the previous backlog):* JVM boolean/int
-disambiguation, array dimension typing, field-initializer hoisting, and the
-`synchronized(field)` dead-temp — see §3 round 2.
+*Landed this round (round 3):* scope-aware local renaming (TryWithResources +
+real-world nested-catch/slot-reuse collisions), inner/nested-class round-trip
+(InnerClasses), interface `default` methods (Inheritance), `@interface` annotation
+types (Annotations), and full enum reconstruction (Enums) — see §3 round 3.
+*Earlier rounds:* JVM boolean/int disambiguation, array dimension typing,
+field-initializer hoisting, the `synchronized(field)` dead-temp (round 2), and
+numeric-literal suffixes, boolean constants/args, cast precedence (round 1).
 
 **Performance (all in service of the GC-bound profile in §5.2):**
 6. **Dominator-tree allocations** (193 MB, 10%) and **stack/`Set[*OpCode]`
