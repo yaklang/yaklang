@@ -37,7 +37,7 @@ authority for automated semantic decisions.
 |------|--------|--------------------|
 | Syntax safety (parse-or-degrade) | 23/23 corpus groups produce **syntax-parseable Java**; 0 syntax errors, 0 hard errors, 0 panics | `TestSyntaxCoverageMatrix` |
 | Reconstruction coverage (no stub) | 20/23 groups emit **non-degraded output** (no stub); 3 groups isolate concrete gaps | `TestSyntaxCoverageMatrix` |
-| Correctness (javac round-trip) | **14/18** eligible corpora recompile cleanly (was 4/13 at start); all four inner/nested-class groups recompile | `TestRecompileRoundtrip` |
+| Correctness (javac round-trip) | **15/18** eligible corpora recompile cleanly (was 4/13 at start); the classic corpus now emits **zero stubs**; all four inner/nested-class groups recompile | `TestRecompileRoundtrip` |
 | Determinism | byte-identical output across repeated decompiles; perf changes proven equivalent by per-class sha256 fingerprints | `TestCorpusDeterminism`, `TestDumpJarFingerprint` |
 | Test suite | green & fast: `./...` ≈ 22s, down from more than 150s (**at least 6.8x**), no machine-specific dependencies | `go test ./common/javaclassparser/...` |
 | Allocation cost | core **≈246 ms** and **≈182 MB cumulative heap allocation** per 106-class jar; validation increases runtime ≈ +18% and cumulative allocation ≈ +23% relative to core-only | `BenchmarkDecompileJar` |
@@ -51,17 +51,15 @@ out of `Decompile`.
 ### Round-trip correctness detail
 
 Of the 18 classic corpus groups eligible for strict `javac` round-trip validation
-(14 single-class groups plus 4 multi-class inner/nested-class groups, one of which
-— Exceptions — is held back as a stub):
+(14 single-class groups plus 4 multi-class inner/nested-class groups):
 
-- **14 recompile successfully**: Annotations, Arrays, CastsInstanceof,
-  Concurrency, ControlFlow, Enums, Generics, Inheritance, Initializers,
-  InnerClasses, Literals, Strings, Switches, TryWithResources.
+- **15 recompile successfully**: Annotations, Arrays, CastsInstanceof,
+  Concurrency, ControlFlow, Enums, Exceptions, Generics, Inheritance,
+  Initializers, InnerClasses, Literals, Strings, Switches, TryWithResources.
 - **3 expose concrete semantic/typing defects**: Lambdas (captured-variable
   naming), Loops (`do{...}while(true)` lowering emits javac-unreachable code),
   Operators (short-circuit boolean recovery).
-- **1 is held back as a stub**: Exceptions (`try/catch/finally` CFG with multiple
-  successors).
+- **0 stubs** in the classic corpus: every method now structures to real Java.
 
 All four multi-class groups now recompile, exercising inner-class reconstruction
 end to end: synthetic `access$NNN` bridges, `this$0` outer references, `val$`
@@ -97,10 +95,10 @@ member degraded to a stub but class still valid), `SYNTAX` (invalid Java emitted
 
 ### Classic corpus (Java 8 bytecode) — 18 groups
 ```
-ok=17  stub=1  syntax=0  error=0  panic=0
+ok=18  stub=0  syntax=0  error=0  panic=0
 ```
-- The single `STUB` is **Exceptions** → `tryCatchFinally(int[],int)` fails with
-  `ParseBytesCode failed: multiple next`.
+- The former `STUB` (**Exceptions** → `tryCatchFinally(int[],int)` failing with
+  `ParseBytesCode failed: multiple next`) is fixed; see §3 round 5.
 
 ### Modern corpus (Java 17 bytecode) — 5 groups
 ```
@@ -112,11 +110,12 @@ ok=3  stub=2  syntax=0  error=0  panic=0
   `ObjectMethods` bootstrap).
 
 ### Coverage conclusion
-The two remaining gaps are precisely isolated and orthogonal:
-1. **`try/catch/finally` CFG reconstruction** ("multiple next") — a control-flow
-   structuring limitation when a region has multiple successors.
-2. **Record / sealed `invokedynamic ObjectMethods` bootstrap** — the auto-generated
+The classic corpus now emits zero stubs; the one remaining coverage gap is in the
+modern corpus and is precisely isolated:
+1. **Record / sealed `invokedynamic ObjectMethods` bootstrap** — the auto-generated
    value-type methods are not yet synthesized.
+
+(The former `try/catch/finally` "multiple next" gap is closed — see §3 round 5.)
 
 Everything else (operators, literals, control flow, loops, switches,
 try-with-resources, arrays, generics, inheritance, inner classes, enums, lambdas,
@@ -145,11 +144,11 @@ The oracle decompiles **every** class of a group (including inner, nested,
 anonymous and local classes) and recompiles the units together, so inner-class
 reconstruction is exercised end to end rather than skipped.
 ```
-recompile-ok:  14  (Annotations, Arrays, CastsInstanceof, Concurrency, ControlFlow,
-                    Enums, Generics, Inheritance, Initializers, InnerClasses,
-                    Literals, Strings, Switches, TryWithResources)
+recompile-ok:  15  (Annotations, Arrays, CastsInstanceof, Concurrency, ControlFlow,
+                    Enums, Exceptions, Generics, Inheritance, Initializers,
+                    InnerClasses, Literals, Strings, Switches, TryWithResources)
 recompile-fail: 3  (Lambdas, Loops, Operators)
-stub:          1   (Exceptions)
+stub:          0
 dec-err:       0
 multiclass:    0   (now compiled together, no longer skipped)
 ```
@@ -166,7 +165,27 @@ guessed:
 | Lambdas | `variable v already defined` + erased generics | lambda parameter names collide with the enclosing slot names, and raw functional-interface targets reject the explicit `Integer` param types (generic signatures not recovered) | hard (var naming + generics erasure) |
 
 Passing categories are pinned by `recompileGateBaseline`, so a regression that breaks
-any of the 14 green categories fails CI; the rest are tracked as the backlog.
+any of the 15 green categories fails CI; the rest are tracked as the backlog.
+
+### Correctness fix landed in this evaluation — round 5 (try/catch/finally grouping)
+**Exceptions** flipped from the corpus's last stub to a clean recompile, and the
+classic corpus now emits **zero stubs**. `javac` desugars a `finally` into a
+synthetic catch-all (`any`, catch type 0) handler — `astore t; <finally>; aload t;
+athrow` — that protects the try region *and* every real catch, with the finally
+body additionally inlined on each normal-exit path. When a real catch and that
+catch-all shared the **same try-region end index**, the try-node builder overwrote
+its per-end-index handler group instead of appending, dropping the real catch; the
+dropped handler stayed dangling on the pre-try statement node, giving it two
+successors that the linear structuring rejected with `multiple next`. The builder
+now appends all handlers sharing an end index into one group (keeping the raw edge
+multiplicity so a multi-catch `A | B`, which shares one handler PC and thus two
+identical edges, still has both edges rewired). The reconstructed method is
+semantically faithful — the finally body appears on the normal path, the catch
+path, and the catch-all (`catch (Throwable t) { <finally>; throw t; }`), exactly as
+the bytecode executes it — and recompiles. On real jars this is high-value: gson's
+stub markers dropped from 38 to 18 with no new errors or panics. Verified
+non-regressing by goldens, `TestCorpusDeterminism`, and real-jar
+ok/err/panic/stub counts (multi-catch `Exceptions.multiCatch` still recompiles).
 
 ### Correctness fix landed in this evaluation — round 4 (null-slot type widening)
 **Generics** flipped to a clean recompile by fixing slot splitting. A JVM local
@@ -467,19 +486,24 @@ recorded as future work.
 ## 6. Backlog (prioritized by impact, from the data above)
 
 **Correctness (semantic fidelity):**
-1. **`try/catch/finally` "multiple next" CFG** — the only classic-corpus stub and the
-   most common *stub* cause observed in real jars.
-2. **Loop idiom recovery** — reconstruct `for`/`while` instead of universal
+1. **Loop idiom recovery** — reconstruct `for`/`while` instead of universal
    `do{...}while(true)`, which also removes the *unreachable statement* failures (Loops).
-3. **Short-circuit `||`/`&&` boolean-expression recovery** (Operators) — fold the
+2. **Short-circuit `||`/`&&` boolean-expression recovery** (Operators) — fold the
    `if(a&&b){return true}else{...}` control flow back into `return (a&&b)||(...)`.
-4. **Generic signature recovery** (Lambdas) — parse the `Signature` attribute so
+3. **Generic signature recovery** (Lambdas) — parse the `Signature` attribute so
    erased call sites and lambda targets keep their type arguments.
-5. **Record / sealed `invokedynamic ObjectMethods` bootstrap** — unblocks modern
+4. **Record / sealed `invokedynamic ObjectMethods` bootstrap** — unblocks modern
    (Java 17+) value types end-to-end.
+5. **Idiomatic `finally` folding** — the `try/catch/finally` round-trip is correct
+   today via the faithful desugared form (duplicated finally body plus a
+   `catch (Throwable)` rethrow, exactly as the bytecode runs). A future pass can
+   collapse this into a single idiomatic `finally {}` block for readability.
 
-*Landed this round (round 4):* null-initialized slot type widening (Generics) — a
-null slot adopts the later concrete reference type instead of splitting.
+*Landed this round (round 5):* try/catch/finally handler grouping (Exceptions) —
+the classic corpus now emits zero stubs; real-jar stub markers fell sharply
+(gson 38 → 18).
+*Round 4:* null-initialized slot type widening (Generics) — a null slot adopts the
+later concrete reference type instead of splitting.
 *Round 3:* scope-aware local renaming (TryWithResources + real-world
 nested-catch/slot-reuse collisions), inner/nested-class round-trip (InnerClasses),
 interface `default` methods (Inheritance), `@interface` annotation types

@@ -20,7 +20,7 @@
 |------|------|----------|
 | 语法安全（解析或降级） | 23/23 语料组产出**语法可解析的 Java**；0 语法错误、0 硬错误、0 panic | `TestSyntaxCoverageMatrix` |
 | 重建覆盖率（无 stub） | 20/23 组产出**未降级输出**（无 stub）；3 组隔离出具体缺口 | `TestSyntaxCoverageMatrix` |
-| 正确性（javac round-trip） | **14/18** 个可评估语料干净重编译（起始为 4/13）；四个内部类/嵌套类组全部可重编译 | `TestRecompileRoundtrip` |
+| 正确性（javac round-trip） | **15/18** 个可评估语料干净重编译（起始为 4/13）；经典语料现已**零 stub**；四个内部类/嵌套类组全部可重编译 | `TestRecompileRoundtrip` |
 | 确定性 | 多次反编译逐字节一致；性能改动通过逐类 sha256 指纹证明输出等价 | `TestCorpusDeterminism`、`TestDumpJarFingerprint` |
 | 测试套件 | 绿且快：`./...` ≈ 22s，从 150s 以上降下来（**至少 6.8 倍**），无机器相关依赖 | `go test ./common/javaclassparser/...` |
 | 分配开销 | 核心 **≈246 ms** 且 **≈182 MB 累计堆分配** / 106 类的 jar；校验相对 core-only 增加运行时 ≈ +18%、累计分配 ≈ +23% | `BenchmarkDecompileJar` |
@@ -30,11 +30,11 @@
 
 ### Round-trip 正确性细节
 
-在 18 个可进入严格 `javac` round-trip 验证的经典语料组中（14 个单类组 + 4 个多类内部/嵌套类组，其中 Exceptions 一组以 stub 形式保留）：
+在 18 个可进入严格 `javac` round-trip 验证的经典语料组中（14 个单类组 + 4 个多类内部/嵌套类组）：
 
-- **14 个成功重编译**：Annotations、Arrays、CastsInstanceof、Concurrency、ControlFlow、Enums、Generics、Inheritance、Initializers、InnerClasses、Literals、Strings、Switches、TryWithResources。
+- **15 个成功重编译**：Annotations、Arrays、CastsInstanceof、Concurrency、ControlFlow、Enums、Exceptions、Generics、Inheritance、Initializers、InnerClasses、Literals、Strings、Switches、TryWithResources。
 - **3 个暴露具体的语义/类型缺陷**：Lambdas（捕获变量命名）、Loops（`do{...}while(true)` 降级产生 javac 不可达代码）、Operators（短路布尔表达式恢复）。
-- **1 个以 stub 保留**：Exceptions（`try/catch/finally` 控制流有多个后继）。
+- **经典语料 0 stub**：每个方法都结构化为真实 Java。
 
 四个多类组现在全部可重编译，端到端地检验了内部类重建：合成 `access$NNN` 桥、`this$0` 外部引用、`val$` 捕获字段、接口 `default` 方法、`@interface` 注解类型，以及枚举 synthetic 抑制与常量显式参数。
 
@@ -56,9 +56,9 @@ go test -run TestSyntaxCoverageMatrix -v ./common/javaclassparser/tests/
 
 ### 经典语料（Java 8 字节码）——18 组
 ```
-ok=17  stub=1  syntax=0  error=0  panic=0
+ok=18  stub=0  syntax=0  error=0  panic=0
 ```
-- 唯一的 `STUB` 是 **Exceptions** → `tryCatchFinally(int[],int)` 失败于 `ParseBytesCode failed: multiple next`。
+- 原先的 `STUB`（**Exceptions** → `tryCatchFinally(int[],int)` 失败于 `ParseBytesCode failed: multiple next`）已修复；见第 3 节第 5 轮。
 
 ### 现代语料（Java 17 字节码）——5 组
 ```
@@ -67,9 +67,10 @@ ok=3  stub=2  syntax=0  error=0  panic=0
 - `STUB` 组 **Records** 与 **SealedVar** 仅在编译器合成的 `toString()/hashCode()/equals()` 上失败，报 `ParseBytesCode failed: call bootstrap method error`（即 `invokedynamic` 的 `ObjectMethods` bootstrap）。
 
 ### 覆盖率结论
-剩余两个缺口被精确隔离且彼此正交：
-1. **`try/catch/finally` 控制流重建**（"multiple next"）——当区域有多个后继时的控制流结构化限制。
-2. **Record / sealed 的 `invokedynamic ObjectMethods` bootstrap**——自动生成的值类型方法尚未合成。
+经典语料现已零 stub；剩余唯一覆盖缺口在现代语料，且被精确隔离：
+1. **Record / sealed 的 `invokedynamic ObjectMethods` bootstrap**——自动生成的值类型方法尚未合成。
+
+（原先的 `try/catch/finally` "multiple next" 缺口已闭合——见第 3 节第 5 轮。）
 
 其余一切（运算符、字面量、控制流、循环、switch、try-with-resources、数组、泛型、继承、内部类、枚举、lambda、字符串、注解、初始化器、并发、强转/instanceof、模式匹配、switch 表达式、文本块）对受测语料都产出**语法可解析**的源码。"语法可解析"是比"可被 `javac` 重新编译"更弱的断言；衡量语义保真度的 round-trip 结果见第 3 节。
 
@@ -87,11 +88,11 @@ go test -run TestRecompileRoundtrip -v ./common/javaclassparser/tests/
 ### 语料 round-trip 结果
 该 oracle 会反编译一个组的**每一个** class（含内部类、嵌套类、匿名类、局部类），并把这些单元**一起编译**，因此内部类重建是端到端验证而非被跳过。
 ```
-recompile-ok:  14  (Annotations, Arrays, CastsInstanceof, Concurrency, ControlFlow,
-                    Enums, Generics, Inheritance, Initializers, InnerClasses,
-                    Literals, Strings, Switches, TryWithResources)
+recompile-ok:  15  (Annotations, Arrays, CastsInstanceof, Concurrency, ControlFlow,
+                    Enums, Exceptions, Generics, Inheritance, Initializers,
+                    InnerClasses, Literals, Strings, Switches, TryWithResources)
 recompile-fail: 3  (Lambdas, Loops, Operators)
-stub:          1   (Exceptions)
+stub:          0
 dec-err:       0
 multiclass:    0   (现已一起编译，不再跳过)
 ```
@@ -104,7 +105,10 @@ multiclass:    0   (现已一起编译，不再跳过)
 | Operators | `missing return statement`（1 个错误，原为 13） | `(a && b) \|\| (c)` 短路 `\|\|` 被降为 `if/else`，其 true 分支丢了 `return true`；属布尔表达式/`\|\|` 重建缺口 | 难（控制流恢复） |
 | Lambdas | `variable v already defined` + 泛型擦除 | lambda 形参名与外层 slot 名冲突；裸函数式接口目标拒绝显式 `Integer` 形参类型（泛型签名未恢复） | 难（变量命名 + 泛型擦除） |
 
-通过的分类由 `recompileGateBaseline` 钉死，因此任何破坏 14 个绿色分类的回退都会让 CI 失败；其余作为 backlog 跟踪。
+通过的分类由 `recompileGateBaseline` 钉死，因此任何破坏 15 个绿色分类的回退都会让 CI 失败；其余作为 backlog 跟踪。
+
+### 本轮落地的正确性修复——第 5 轮（try/catch/finally 处理器分组）
+**Exceptions** 从语料里最后一个 stub 转为干净重编译，经典语料现已**零 stub**。`javac` 把 `finally` 脱糖为一个合成的 catch-all（`any`，catch type 0）处理器——`astore t; <finally>; aload t; athrow`——它同时保护 try 区域与每个真实 catch，并把 finally 体额外内联到每条正常退出路径上。当一个真实 catch 与该 catch-all **共享同一 try 区域的 end index** 时，try 节点构造把"按 end index 分组的处理器"槽位**覆盖**而非追加，丢掉了真实 catch；被丢的处理器残留为 pre-try 语句节点的悬挂后继，使其有两个后继，被线性结构化以 `multiple next` 拒绝。现在构造器把共享同一 end index 的所有处理器**追加**进一个分组（保留原始边的重数：多重 catch `A | B` 共享一个 handler PC、因而在 node.Next 里是两条相同的边，必须保留重数才能把两条边都改接）。重建出的方法语义忠实——finally 体出现在正常路径、catch 路径与 catch-all（`catch (Throwable t) { <finally>; throw t; }`）上，与字节码执行完全一致——且可重编译。在真实 jar 上价值很高：gson 的 stub 标记从 38 降到 18，无新增 error 或 panic。已由 golden、`TestCorpusDeterminism` 及真实 jar 的 ok/err/panic/stub 计数验证无回归（多重 catch `Exceptions.multiCatch` 仍可重编译）。
 
 ### 本轮落地的正确性修复——第 4 轮（null slot 类型加宽）
 **Generics** 通过修复 slot 拆分转绿。一个跨方法复用的 JVM 局部 slot，只要类型发生变化就会被拆成两个变量，因为 `AssignVar` 用类型字符串精确匹配来判定变量身份。极其常见的 `T x = null; ...; x = v; ...; return x;` 惯用法把首次存储类型推断为 `java.lang.Object`（null 字面量类型），把重新赋值推断为具体类型，于是 slot 被拆成 `Object var1 = null` 加上第二个块作用域的 `Comparable var4 = v`；末尾的 `return var4` 便引用了越界变量。现在：若某 slot 的变量仅被 null 初始化，则在后续赋具体**引用**类型时**采纳**该类型而不再拆分（赋基本类型仍拆分，因为基本类型不能接受 null），且 `T x = null` 声明渲染变量的细化类型——声明、重新赋值与 return 三者一致。已由 golden、`TestCorpusDeterminism` 及真实 jar 的 ok/err/panic/stub 计数验证无回归。
@@ -265,13 +269,14 @@ runtime.greyobject     13.3% cum
 ## 6. Backlog（按影响排序，源自上文数据）
 
 **正确性（语义保真度）：**
-1. **`try/catch/finally` 的 "multiple next" CFG**——唯一的经典语料 stub，也是真实 jar 中观察到的最常见 *stub* 成因。
-2. **循环惯用法恢复**——重建 `for`/`while` 而非一律 `do{...}while(true)`，这同时消除 *unreachable statement* 失败（Loops）。
-3. **短路 `||`/`&&` 布尔表达式恢复**（Operators）——把 `if(a&&b){return true}else{...}` 控制流折回 `return (a&&b)||(...)`。
-4. **泛型签名恢复**（Lambdas）——解析 `Signature` 属性，使被擦除的调用点与 lambda 目标保留类型参数。
-5. **Record / sealed 的 `invokedynamic ObjectMethods` bootstrap**——端到端解锁现代（Java 17+）值类型。
+1. **循环惯用法恢复**——重建 `for`/`while` 而非一律 `do{...}while(true)`，这同时消除 *unreachable statement* 失败（Loops）。
+2. **短路 `||`/`&&` 布尔表达式恢复**（Operators）——把 `if(a&&b){return true}else{...}` 控制流折回 `return (a&&b)||(...)`。
+3. **泛型签名恢复**（Lambdas）——解析 `Signature` 属性，使被擦除的调用点与 lambda 目标保留类型参数。
+4. **Record / sealed 的 `invokedynamic ObjectMethods` bootstrap**——端到端解锁现代（Java 17+）值类型。
+5. **idiomatic `finally` 折叠**——`try/catch/finally` 的 round-trip 当前已正确（采用忠实的脱糖形式：finally 体重复 + `catch (Throwable)` 重抛，与字节码运行完全一致）。未来可加一个 pass 把它折叠为单个 idiomatic 的 `finally {}` 块以提升可读性。
 
-*本轮（第 4 轮）落地：* null 初始化 slot 的类型加宽（Generics）——null slot 采纳后续具体引用类型而非拆分。
+*本轮（第 5 轮）落地：* try/catch/finally 处理器分组（Exceptions）——经典语料现已零 stub；真实 jar 的 stub 标记大幅下降（gson 38 → 18）。
+*第 4 轮：* null 初始化 slot 的类型加宽（Generics）——null slot 采纳后续具体引用类型而非拆分。
 *第 3 轮：* 作用域感知的局部变量重命名（TryWithResources + 真实世界的嵌套 catch/slot 复用冲突）、内部/嵌套类 round-trip（InnerClasses）、接口 `default` 方法（Inheritance）、`@interface` 注解类型（Annotations）、完整枚举重建（Enums）。
 *更早轮次：* JVM boolean/int 消歧、数组维度类型、字段初始化器提升、`synchronized(字段)` 死亡临时变量（第 2 轮），以及数值字面量后缀、布尔常量/实参、强转优先级（第 1 轮）。
 
