@@ -2,7 +2,6 @@ package rewriter
 
 import (
 	"math/bits"
-	"sort"
 
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 )
@@ -111,9 +110,13 @@ func GenerateDominatorTree(rootNode *core.Node) map[*core.Node][]*core.Node {
 		}
 	}
 
-	dominatorMap := map[*core.Node][]*core.Node{}
+	// First pass: resolve each node's immediate dominator id (-1 if none) and count how
+	// many children every idom collects, so the result lists can be allocated at their
+	// exact final capacity (the per-idom append growth was the top dominator allocator).
+	idomIds := make([]int, n)
+	childCount := make([]int, n)
+	idomCount := 0
 	for i := 0; i < n; i++ {
-		node := nodes[i]
 		// immediate dominator = strict dominator with the greatest node id
 		idomId := -1
 		b := dom[i]
@@ -131,16 +134,29 @@ func GenerateDominatorTree(rootNode *core.Node) map[*core.Node][]*core.Node {
 				}
 			}
 		}
+		idomIds[i] = idomId
+		if idomId != -1 {
+			if childCount[idomId] == 0 {
+				idomCount++
+			}
+			childCount[idomId]++
+		}
+	}
+	dominatorMap := make(map[*core.Node][]*core.Node, idomCount)
+	// Second pass: append children in increasing node-id order into exactly-sized slices.
+	// nodeToId[nodes[i]] == i, so this in-order fill already yields the sorted order the
+	// previous explicit sort.Slice produced (each node id is unique => no ties).
+	for i := 0; i < n; i++ {
+		idomId := idomIds[i]
 		if idomId == -1 {
 			continue
 		}
 		idom := nodes[idomId]
-		dominatorMap[idom] = append(dominatorMap[idom], node)
-	}
-	for _, nodeList := range dominatorMap {
-		sort.Slice(nodeList, func(i, j int) bool {
-			return nodeToId[nodeList[i]] < nodeToId[nodeList[j]]
-		})
+		lst := dominatorMap[idom]
+		if lst == nil {
+			lst = make([]*core.Node, 0, childCount[idomId])
+		}
+		dominatorMap[idom] = append(lst, nodes[i])
 	}
 	return dominatorMap
 }
