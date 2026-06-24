@@ -1,0 +1,456 @@
+// AIVE 价值评估采集 - aibalance mirror 回调脚本 (改良版)
+//
+// 用途: 作为 aibalance portal 中一条 mirror 规则的回调脚本使用.
+//   - Condition Type: action_eq
+//   - Action Name:    ai_value_feedback
+//   - Enabled:        true
+//   - Concurrency:    4
+//   - Queue Size:     64        (建议; aibalance 会把 queue 钳制到 [1,256])
+//   - Timeout(ms):    10000
+//   - Callback Script: 本文件内容
+//
+// 运行环境约定 (由 aibalance mirror runner 提供):
+//   - runner 会在脚本末尾自动追加 handle(getParam("MIRROR_DATA"))
+//   - save / save(x) / save("tag") / save("tag", x) 由 runner 注入为全局函数,
+//     落盘到 data_sink (本脚本用带 tag 的永久留存分片保存训练样本)
+//   - data 是 MirrorSnapshot.ToScriptMap() 的产物
+//
+// 相比初版的改良 (针对卡死事故的脚本侧加固):
+//   1. collectRequestText 改用 list + str.Join 一次性拼接, 消除原 O(n^2) 的
+//      reqText = reqText + ... 字符串累加 (超大 prompt 下这是主要 CPU 热点).
+//   2. jsonstream 解析前先按 <aive_record_json> 标记定位并裁剪扫描区间, 并设
+//      MAX_SCAN_BYTES 长度上限, 避免对整段超大 prompt 做全量流式扫描.
+//   3. 完整保留原有 recover / 双 guard (action+model) / 兜底落盘 语义不变.
+//
+// 设计要点:
+//   - 客户端 (common/ai/aid/aive) 把整条 ValueFeedbackRecord 以 JSON 形式嵌入
+//     请求 prompt 中, 用成对标记 <aive_record_json>...</aive_record_json> 包裹,
+//     顶层唯一键为 aive_schema. 本脚本优先用 jsonstream 流式解析定位该对象,
+//     失败时用定界标记 + json.loads 兜底, 不靠正则猜文本.
+//   - 同时从 data 提取尽量多的上下文字段 (provider / domain / usage / 耗时 /
+//     字节数 等), 与小模型给出的价值分一起组装成一条扁平且自描述的训练样本.
+//
+// 关键词: aive value feedback mirror, jsonstream 解析, ai_value_feedback,
+//        data_sink 落盘, 训练样本富化, str.Join 拼接, 扫描区间裁剪
+
+VALUE_FEEDBACK_ACTION = "ai_value_feedback"
+SMALL_MODEL = "memfit-light-free"
+SAVE_TAG = "ai-value-feedback"
+ARCHIVE_SCHEMA_KEY = "aive_schema"
+ARCHIVE_BEGIN = "<aive_record_json>"
+ARCHIVE_END = "</aive_record_json>"
+
+// MAX_SCAN_BYTES 限制喂给 jsonstream 的扫描文本上限 (2MB). 嵌入记录本身远小于
+// 此值, 设上限是为了在超大 prompt 洪峰下避免对整段文本做全量流式扫描而占满 CPU.
+// 关键词: MAX_SCAN_BYTES, jsonstream 扫描区间长度上限
+MAX_SCAN_BYTES = 2 * 1024 * 1024
+
+// mapGet 安全取值: m 为 nil 或键缺失时返回 nil, 避免 nil 索引 panic.
+func mapGet(m, k) {
+    if m == nil {
+        return nil
+    }
+    return m[k]
+}
+
+// collectRequestText 把 request_messages 里所有 content 拼成一整段文本.
+// content 在协议上是 any: 既可能是普通字符串, 也可能是多模态数组
+// ([{type,text}, {type,image_url}, ...]). 两种形态都要能取出文本段,
+// 否则嵌入的归档标记会被打散导致解析不出记录.
+//
+// 改良: 先把所有片段收进 list, 最后用 str.Join 一次性拼接, 避免原先
+// reqText = reqText + seg 的 O(n^2) 重复分配 (超大 prompt 下是主要热点).
+// 关键词: collectRequestText, str.Join 一次性拼接, 消除 O(n^2) 字符串累加
+func collectRequestText(data) {
+    segments = []
+    msgs = mapGet(data, "request_messages")
+    if msgs == nil {
+        return ""
+    }
+    for msg in msgs {
+        if msg == nil {
+            continue
+        }
+        c = mapGet(msg, "content")
+        if c == nil {
+            continue
+        }
+        // 多模态数组: 逐段取 text 字段, 非 map 段直接字符串化.
+        if str.Contains(sprintf("%T", c), "[]") {
+            for part in c {
+                if part == nil {
+                    continue
+                }
+                if str.Contains(sprintf("%T", part), "map") {
+                    tv = part["text"]
+                    if tv != nil {
+                        segments = append(segments, sprintf("%v", tv))
+                    }
+                } else {
+                    segments = append(segments, sprintf("%v", part))
+                }
+            }
+        } else {
+            segments = append(segments, sprintf("%v", c))
+        }
+    }
+    return str.Join(segments, "\n")
+}
+
+// narrowScanRegion 在丢给 jsonstream 前裁剪扫描区间:
+//   - 若能定位成对标记, 截取 [<aive_record_json> ... </aive_record_json>];
+//   - 若只有起始标记, 从起始标记起取一段;
+//   - 始终用 MAX_SCAN_BYTES 封顶, 避免对整段超大 prompt 做全量扫描.
+// 关键词: narrowScanRegion, 标记定位裁剪, 扫描区间长度上限
+func narrowScanRegion(reqText) {
+    if reqText == "" {
+        return reqText
+    }
+    region = reqText
+    bi = str.Index(reqText, ARCHIVE_BEGIN)
+    if bi >= 0 {
+        ei = str.Index(reqText, ARCHIVE_END)
+        if ei > bi {
+            region = reqText[bi : ei+len(ARCHIVE_END)]
+        } else {
+            region = reqText[bi:]
+        }
+    }
+    if len(region) > MAX_SCAN_BYTES {
+        region = region[:MAX_SCAN_BYTES]
+    }
+    return region
+}
+
+// extractRecordByStream 用 jsonstream 流式解析定位嵌入的 ValueFeedbackRecord.
+// 通过顶层唯一键 (aive_schema + record) 命中归档对象, 返回其中的 record 子对象.
+// 改良: 先 narrowScanRegion 裁剪扫描区间, 再做流式解析.
+func extractRecordByStream(reqText) {
+    // 用空 map 起手 (map[string]interface{}), 再逐键赋值, 规避 yak 对
+    // "首值为 nil 的 map 字面量" 的 reflect.MapOf 限制.
+    holder = {}
+    // 解析失败/库内 panic 时退化为 nil, 让 handle 继续走标记兜底并照常落盘.
+    defer func() {
+        e = recover()
+        if e != nil {
+            log.warn("aive mirror: extractRecordByStream recovered: %v", e)
+        }
+    }()
+    scanText = narrowScanRegion(reqText)
+    err = jsonstream.Extract(
+        scanText,
+        jsonstream.onConditionalObject([ARCHIVE_SCHEMA_KEY, "record"], func(obj) {
+            if obj == nil {
+                return
+            }
+            rec = obj["record"]
+            if rec != nil {
+                holder["record"] = rec
+            }
+        }),
+    )
+    if err != nil {
+        log.warn("aive mirror: jsonstream extract record failed: %v", err)
+    }
+    return holder["record"]
+}
+
+// extractRecordByMarker 兜底路径: 用成对定界标记截取归档 JSON 再 json.loads.
+func extractRecordByMarker(reqText) {
+    defer func() {
+        e = recover()
+        if e != nil {
+            log.warn("aive mirror: extractRecordByMarker recovered: %v", e)
+        }
+    }()
+    parts = str.Split(reqText, ARCHIVE_BEGIN)
+    if len(parts) < 2 {
+        return nil
+    }
+    tail = str.SplitN(parts[1], ARCHIVE_END, 2)
+    if len(tail) < 1 {
+        return nil
+    }
+    block = str.TrimSpace(tail[0])
+    if block == "" {
+        return nil
+    }
+    obj = json.loads(block)
+    if obj == nil {
+        return nil
+    }
+    return obj["record"]
+}
+
+// extractValuePayload 取小模型给出的价值判断: 优先用 aibalance 已解析的
+// action_payload, 缺失时用 jsonstream 从 response_text 兜底解析.
+func extractValuePayload(data) {
+    payload = mapGet(data, "action_payload")
+    if payload != nil {
+        return payload
+    }
+
+    holder = {}
+    defer func() {
+        e = recover()
+        if e != nil {
+            log.warn("aive mirror: extractValuePayload recovered: %v", e)
+        }
+    }()
+    rt = mapGet(data, "response_text")
+    if rt != nil {
+        err = jsonstream.Extract(
+            sprintf("%v", rt),
+            jsonstream.onConditionalObject(["@action", "value_score"], func(obj) {
+                if obj != nil {
+                    holder["payload"] = obj
+                }
+            }),
+        )
+        if err != nil {
+            log.warn("aive mirror: jsonstream parse response_text failed: %v", err)
+        }
+    }
+    return holder["payload"]
+}
+
+// computeApprovalWeight 依据审批事实 (谁做的决定 / 是否改动 / 等待时延) 推导一个
+// 确定性的人工反馈权重 human_feedback_weight (0.0-1.0), 作为 rule 注释落盘, 供
+// 训练管线对样本加权采样.
+//
+// 核心原则 (与监督信号的人工价值对齐):
+//   - source=policy (YOLO/Auto 策略自动放行): 几乎都是 AI 自己拍板, 价值极低;
+//     尤其低 latency 的"快速自动同意"几乎不含人工纠正信号, 给最低权重.
+//   - source=human 且发生改动/拒绝: 真人工纠正, 价值最高.
+//   - source=human 但秒过未改 (橡皮图章): 适度降权.
+//   - source=model_judge / timeout_fallback: 非人工, 低权重.
+func computeApprovalWeight(approval) {
+    source = mapGet(approval, "source")
+    decision = mapGet(approval, "decision")
+    changed = mapGet(approval, "changed")
+    latency = mapGet(approval, "review_latency_ms")
+
+    w = 0.1
+    if source == "human" {
+        if changed == true || decision == "approve_with_edit" {
+            w = 1.0
+        } else if decision == "reject" {
+            w = 0.9
+        } else if decision == "cancel" {
+            w = 0.5
+        } else {
+            // 人工放行但未改动; 若秒过 (橡皮图章) 再降权.
+            w = 0.6
+            if latency != nil {
+                if latency < 1500 {
+                    w = 0.4
+                }
+            }
+        }
+    } else if source == "model_judge" {
+        w = 0.3
+    } else if source == "policy" {
+        // YOLO/Auto 自动放行: 基本是 AI 自己决定, 价值最低; 快速放行再降权.
+        w = 0.1
+        if latency == nil {
+            w = 0.05
+        } else if latency < 1000 {
+            w = 0.05
+        }
+    } else if source == "timeout_fallback" {
+        w = 0.1
+    }
+    return w
+}
+
+func handle(data) {
+    // state 用 map 持有, 保证 defer 闭包能可靠读到最新值 (引用语义).
+    //   - saved: 富化记录是否已成功落盘, 避免兜底重复落盘
+    //   - guarded: 是否已通过 action/model 双重过滤 (未通过的无关流量不兜底落盘)
+    state = {}
+    state["saved"] = false
+    state["guarded"] = false
+
+    // 价值评估埋点绝不能影响 mirror 主流程, 全程兜底 recover.
+    // 关键兜底: 一旦 handle 在落盘前 panic, 直接把原始快照 data 落盘, 绝不丢样本.
+    defer func() {
+        err = recover()
+        if err == nil {
+            return
+        }
+        log.warn("aive mirror: handle panic recovered: %v", err)
+        // 只有"已确认是价值反馈流量"且"还没落过盘"时才兜底, 防止误存无关流量/重复存.
+        if !state["guarded"] || state["saved"] {
+            return
+        }
+        rawOk = save(SAVE_TAG, data)
+        if rawOk {
+            log.info("aive mirror: panic fallback saved raw snapshot, req_id=%v", mapGet(data, "req_id"))
+        } else {
+            log.warn("aive mirror: panic fallback raw save not persisted, req_id=%v", mapGet(data, "req_id"))
+        }
+    }()
+
+    if data == nil {
+        return
+    }
+
+    // 二次确认 (condition=action_eq 已在投递前过滤), 防止误配规则把无关流量落盘.
+    action = mapGet(data, "action")
+    if action != VALUE_FEEDBACK_ACTION {
+        log.info("aive mirror: skip non value-feedback action: %v", action)
+        return
+    }
+
+    // 仅采集 memfit-light-free 小模型出的价值反馈 (双保险, 防误配).
+    model = mapGet(data, "model")
+    if model != SMALL_MODEL {
+        log.info("aive mirror: skip unexpected model: %v", model)
+        return
+    }
+    // 已确认是价值反馈流量: 此后若 panic, 兜底直接落原始 data.
+    state["guarded"] = true
+
+    // 1) 从请求里解析出客户端嵌入的整条 ValueFeedbackRecord.
+    reqText = collectRequestText(data)
+    record = extractRecordByStream(reqText)
+    if record == nil {
+        record = extractRecordByMarker(reqText)
+    }
+    if record == nil {
+        log.warn("aive mirror: embedded value feedback record not found, fallback to raw snapshot: req_id=%v", mapGet(data, "req_id"))
+    }
+
+    // 2) 取小模型 (model_judge) 给出的弱标签, 组装成一条 annotation (而非终态标签).
+    //    生产侧只记录事实, 标签收进 annotations 数组, 接收方可区分 事实/人工/规则/模型弱标签.
+    payload = extractValuePayload(data)
+    labels = {}
+    labels["value_score"] = mapGet(payload, "value_score")
+    labels["sft_candidate"] = mapGet(payload, "sft_candidate")
+    labels["dpo_candidate"] = mapGet(payload, "dpo_candidate")
+
+    modelAnnotation = {}
+    modelAnnotation["annotator_type"] = "model_judge"
+    modelAnnotation["annotator_name"] = mapGet(data, "model")
+    modelAnnotation["annotation_version"] = "v1"
+    modelAnnotation["created_at_ms"] = time.Now().UnixNano() / 1000000
+    modelAnnotation["labels"] = labels
+    modelAnnotation["annotation_confidence"] = mapGet(payload, "annotation_confidence")
+    modelAnnotation["confidence_basis"] = "model_judge_only"
+    modelAnnotation["reason"] = mapGet(payload, "reason")
+
+    // 3) 从 data 提取尽量多的上下文字段, 组装富化后的训练样本.
+    enriched = {}
+    enriched["schema"] = "aive.value_feedback.enriched.v2"
+    enriched["saved_at"] = time.Now().Unix()
+
+    // 快照元信息
+    enriched["req_id"] = mapGet(data, "req_id")
+    enriched["timestamp_ms"] = mapGet(data, "timestamp_ms")
+    enriched["provider_type"] = mapGet(data, "type_name")
+    enriched["provider_domain"] = mapGet(data, "domain")
+    enriched["small_model"] = mapGet(data, "model")
+    enriched["is_free_model"] = mapGet(data, "is_free_model")
+    enriched["stream"] = mapGet(data, "stream")
+    enriched["duration_ms"] = mapGet(data, "duration_ms")
+    enriched["input_bytes"] = mapGet(data, "input_bytes")
+    enriched["output_bytes"] = mapGet(data, "output_bytes")
+    enriched["usage"] = mapGet(data, "usage")
+
+    // 注释数组: 先放模型弱标签, 稍后若有审批事实再追加确定性的 rule 权重注释.
+    // 训练管线后续还可再追加 人工 注释到同一数组.
+    annotations = [modelAnnotation]
+
+    // 客户端嵌入的完整过程记录 (主模型 / focus mode / 触发条件 / 动作 /
+    // 审批事实 approval / 客观结局 / timeline 轨迹 等)
+    enriched["record"] = record
+
+    // 4) 把 record 里高频查询字段拍平到顶层, 方便下游直接索引.
+    if record != nil {
+        enriched["record_id"] = mapGet(record, "id")
+        enriched["signature"] = mapGet(record, "signature")
+        enriched["focus_mode"] = mapGet(record, "focus_mode")
+        enriched["trigger_condition"] = mapGet(record, "trigger_condition")
+        enriched["main_model"] = mapGet(record, "main_model")
+        enriched["execution_policy"] = mapGet(record, "execution_policy")
+        approval = mapGet(record, "approval")
+        enriched["approval"] = approval
+        enriched["session_id"] = mapGet(record, "session_id")
+        enriched["task_id"] = mapGet(record, "task_id")
+
+        // 规则注释 (确定性): 对审批来源/时延做降权, 尤其是 YOLO 策略自动放行.
+        // 只有 review_decision 类记录才带 approval; iteration/loop 记录无此注释.
+        if approval != nil {
+            ruleLabels = {}
+            ruleLabels["human_feedback_weight"] = computeApprovalWeight(approval)
+            ruleAnnotation = {}
+            ruleAnnotation["annotator_type"] = "rule"
+            ruleAnnotation["annotator_name"] = "approval_signal_weight.v1"
+            ruleAnnotation["annotation_version"] = "v1"
+            ruleAnnotation["created_at_ms"] = time.Now().UnixNano() / 1000000
+            ruleAnnotation["labels"] = ruleLabels
+            ruleAnnotation["confidence_basis"] = "deterministic_rule"
+            ruleAnnotation["reason"] = sprintf("derived from approval source=%v decision=%v changed=%v latency_ms=%v",
+                mapGet(approval, "source"), mapGet(approval, "decision"), mapGet(approval, "changed"), mapGet(approval, "review_latency_ms"))
+            annotations = append(annotations, ruleAnnotation)
+        }
+    }
+
+    // 模型弱标签 + (可选) 规则权重注释一并落盘.
+    enriched["annotations"] = annotations
+
+    // 5) 落盘到带 tag 的永久留存分片 (训练样本不参与日分片容量治理, 永不清理).
+    ok = save(SAVE_TAG, enriched)
+    if !ok {
+        // 试运行或 data sink 未启用时 ok=false, 仅告警, 不影响主流程.
+        log.warn("aive mirror: value feedback record not persisted (test run or data sink disabled): req_id=%v", mapGet(data, "req_id"))
+        return
+    }
+    // 标记已落盘, 防止 defer 兜底重复落盘.
+    state["saved"] = true
+    log.info("aive mirror: value feedback saved, req_id=%v record_id=%v signature=%v score=%v",
+        mapGet(data, "req_id"), enriched["record_id"], enriched["signature"], labels["value_score"])
+}
+
+// ------------------------------------------------------------------
+// 本地自测入口: 复制本脚本到任意 .yak 文件, 用 `yak xxx.yak` 直接跑.
+// YAK_MAIN 默认 false, aibalance 调度时不会进入此块 (双保险), 不污染统计.
+//
+// 注意: 这里只自测纯解析辅助函数 (collectRequestText / narrowScanRegion /
+// extractRecordByStream / extractRecordByMarker / computeApprovalWeight),
+// 不调用 handle —— 因为 handle 依赖 runner 注入的全局 save, 而在脚本里定义
+// 同名 save 会在生产环境覆盖 runner 注入的版本, 故绝不在脚本中定义 save.
+// 关键词: YAK_MAIN local test, 只测纯函数, 不覆盖 runner 注入的 save
+// ------------------------------------------------------------------
+if YAK_MAIN {
+    recordJSON = `{"aive_schema":"v1","record":{"id":"rec-1","signature":"sig-abc","focus_mode":"secure","main_model":"big-model","approval":{"source":"human","decision":"approve_with_edit","changed":true,"review_latency_ms":4200}}}`
+    sample = {
+        "request_messages": [
+            {"role": "user", "content": "please score this: " + ARCHIVE_BEGIN + recordJSON + ARCHIVE_END},
+        ],
+    }
+
+    // 1) collectRequestText + str.Join 正常拼出文本.
+    reqText = collectRequestText(sample)
+    assert str.Contains(reqText, ARCHIVE_BEGIN), "collectRequestText should keep the begin marker"
+
+    // 2) narrowScanRegion 裁剪到标记区间 (远小于上限).
+    region = narrowScanRegion(reqText)
+    assert str.Contains(region, ARCHIVE_END), "narrowScanRegion should keep the closing marker"
+    assert len(region) <= MAX_SCAN_BYTES, "scan region must be capped"
+
+    // 3) jsonstream 流式解析能命中 record.
+    record = extractRecordByStream(reqText)
+    if record == nil {
+        // 4) 标记兜底也应能解析出 record.
+        record = extractRecordByMarker(reqText)
+    }
+    assert record != nil, "should extract embedded record"
+    assert mapGet(record, "id") == "rec-1", "record id mismatch"
+
+    // 5) computeApprovalWeight 对人工改动给最高权重.
+    w = computeApprovalWeight(mapGet(record, "approval"))
+    assert w == 1.0, sprintf("human approve_with_edit should weight 1.0, got %v", w)
+
+    log.info("local self-test passed: record_id=%v approval_weight=%v", mapGet(record, "id"), w)
+}

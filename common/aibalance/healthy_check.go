@@ -1,6 +1,7 @@
 package aibalance
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"sort"
@@ -86,6 +87,14 @@ func (m *HealthCheckManager) RecordCheck(providerID uint) {
 func ExecuteHealthCheckLogic(p *Provider, providerIdentifierForLog string) (isHealthy bool, latencyMs int64, checkErr error) {
 	log.Debugf("Executing health check logic for provider: %s (mode: %s)", providerIdentifierForLog, p.ProviderMode)
 
+	// 健康检查超时上下文: 20s 到点后 cancel, 各 gateway 的 BuildHTTPOptions 会把
+	// 该 ctx 接到 poc.WithContext, 取消底层 HTTP 请求, 使内层 Chat/Embedding
+	// goroutine 能及时返回. 这是杜绝事故里"上游卡死 -> 健康检查 goroutine 永久
+	// 泄漏 -> 越积越多"的关键修复.
+	// 关键词: ExecuteHealthCheckLogic 可取消 ctx, 20s 超时取消底层 HTTP, 杜绝泄漏
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
 	startTime := time.Now()
 	var firstByteDuration time.Duration
 	rspOnce := new(sync.Once)
@@ -97,7 +106,7 @@ func ExecuteHealthCheckLogic(p *Provider, providerIdentifierForLog string) (isHe
 		// Embedding 模式：使用 embedding 接口进行健康检查
 		log.Debugf("Using embedding health check for provider: %s", providerIdentifierForLog)
 
-		embClient, err := p.GetEmbeddingClient()
+		embClient, err := p.GetEmbeddingClientWithContext(ctx)
 		if err != nil {
 			errMsg := fmt.Errorf("failed to get embedding client for %s: %v", providerIdentifierForLog, err)
 			log.Warnf("Embedding health check preparation failed for %s: %v", providerIdentifierForLog, err)
@@ -125,10 +134,10 @@ func ExecuteHealthCheckLogic(p *Provider, providerIdentifierForLog string) (isHe
 		// Chat 模式（默认）：使用 chat 接口进行健康检查
 		log.Debugf("Using chat health check for provider: %s", providerIdentifierForLog)
 
-		// Create AI client using the provider's GetAIClient method
-		// GetAIClient is assumed to handle its own HTTP client requirements.
-		client, err := p.GetAIClient(
-			false,
+		// Create AI client with cancellable ctx so the 20s timeout below can
+		// actually cancel the underlying HTTP request (no goroutine leak).
+		client, err := p.GetAIClientForHealthCheck(
+			ctx,
 			func(reader io.Reader) {
 				io.Copy(utils.FirstWriter(func(b []byte) {
 					rspOnce.Do(func() {
@@ -182,6 +191,10 @@ func ExecuteHealthCheckLogic(p *Provider, providerIdentifierForLog string) (isHe
 	case succeeded = <-succeededChan:
 	case <-time.After(20 * time.Second): // 20 seconds timeout
 		succeeded = false
+		// 主动 cancel, 立即取消底层 HTTP 请求, 让内层 Chat/Embedding goroutine 返回,
+		// 不再等待上游慢响应而泄漏.
+		// 关键词: 健康检查超时主动 cancel, 取消底层 HTTP 杜绝 goroutine 泄漏
+		cancel()
 		checkErr = fmt.Errorf("health check timeout after 20 seconds for %s", providerIdentifierForLog)
 		log.Warnf("Health check timed out (20s) for: %s", providerIdentifierForLog)
 	}

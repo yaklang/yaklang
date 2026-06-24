@@ -17,6 +17,13 @@ type LatencyWatcher struct {
 	mutex            sync.RWMutex       // Protect concurrent access
 	problematicIDs   map[uint]time.Time // Track problematic provider IDs and when they were detected
 	running          bool               // Whether the watcher is running
+
+	// inFlightChecks 记录当前正在执行健康检查的 provider, 受 mutex 保护.
+	// 事故里坏 provider 每 10s tick 都会 go triggerHealthCheck, 无去重导致同一
+	// provider 叠加大量在途健康检查 goroutine (每个又因上游卡死 20s 才返回),
+	// 进一步加剧调度器饥饿. 这里做在途去重: 同一 provider 同时只允许一个在途检查.
+	// 关键词: LatencyWatcher inFlightChecks, 健康检查在途去重, 防 goroutine 叠加
+	inFlightChecks map[uint]struct{}
 }
 
 var (
@@ -33,6 +40,7 @@ func NewLatencyWatcher() *LatencyWatcher {
 		latencyThreshold: 10000, // 10 seconds
 		stopChan:         make(chan struct{}),
 		problematicIDs:   make(map[uint]time.Time),
+		inFlightChecks:   make(map[uint]struct{}),
 		running:          false,
 	}
 }
@@ -149,8 +157,16 @@ func (w *LatencyWatcher) checkProviders(isNormalCheck bool) {
 					p.WrapperName, p.ID, p.LastLatency, p.IsHealthy)
 				w.problematicIDs[p.ID] = time.Now()
 			}
-			// Trigger health check for problematic provider (runs in fast mode)
-			go w.triggerHealthCheck(p.ID, p.WrapperName)
+			// 在途去重: 仅当该 provider 没有在途健康检查时才起新检查, 避免多 tick
+			// 叠加大量卡在上游的健康检查 goroutine. 此处已持有 w.mutex, 直接读写
+			// inFlightChecks. 关键词: checkProviders 在途去重, 防健康检查 goroutine 叠加
+			if _, inflight := w.inFlightChecks[p.ID]; !inflight {
+				w.inFlightChecks[p.ID] = struct{}{}
+				go w.triggerHealthCheck(p.ID, p.WrapperName)
+			} else {
+				log.Debugf("LatencyWatcher: provider %s (ID: %d) health check already in flight, skip duplicate",
+					p.WrapperName, p.ID)
+			}
 		} else if wasTracked {
 			// Provider has recovered
 			log.Debugf("LatencyWatcher: provider %s (ID: %d) has recovered, latency: %dms, healthy: %v",
@@ -183,8 +199,35 @@ func (w *LatencyWatcher) isProviderProblematic(p *AiProvider) bool {
 		p.LastLatency >= w.latencyThreshold
 }
 
-// triggerHealthCheck triggers a health check for a specific provider
+// tryStartCheck 原子地尝试为 provider 抢占一个"在途健康检查"名额; 已有在途检查时
+// 返回 false (调用方应跳过), 实现多 tick 去重. 该方法自行加锁, 不可在已持有
+// w.mutex 时调用 (checkProviders 内部直接读写 inFlightChecks).
+//
+// 关键词: tryStartCheck, 健康检查在途名额抢占
+func (w *LatencyWatcher) tryStartCheck(providerID uint) bool {
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+	if _, ok := w.inFlightChecks[providerID]; ok {
+		return false
+	}
+	w.inFlightChecks[providerID] = struct{}{}
+	return true
+}
+
+// finishCheck 清除 provider 的在途健康检查标记.
+//
+// 关键词: finishCheck, 释放在途名额
+func (w *LatencyWatcher) finishCheck(providerID uint) {
+	w.mutex.Lock()
+	delete(w.inFlightChecks, providerID)
+	w.mutex.Unlock()
+}
+
+// triggerHealthCheck triggers a health check for a specific provider.
+// 调用前必须已抢占在途名额 (checkProviders 直接置位 / MarkProviderAsProblematic
+// 用 tryStartCheck), 这里负责在结束时释放, 保证名额与 goroutine 生命周期一致.
 func (w *LatencyWatcher) triggerHealthCheck(providerID uint, providerName string) {
+	defer w.finishCheck(providerID)
 	log.Debugf("LatencyWatcher: triggering health check for provider %s (ID: %d)", providerName, providerID)
 	result, err := RunSingleProviderHealthCheck(providerID)
 	if err != nil {
@@ -208,8 +251,11 @@ func (w *LatencyWatcher) MarkProviderAsProblematic(providerID uint, providerName
 	}
 	w.mutex.Unlock()
 
-	// Trigger immediate health check
-	go w.triggerHealthCheck(providerID, providerName)
+	// 在途去重: 仅当没有在途检查时才起新检查, 避免重复 mark 叠加 goroutine.
+	// 关键词: MarkProviderAsProblematic 在途去重
+	if w.tryStartCheck(providerID) {
+		go w.triggerHealthCheck(providerID, providerName)
+	}
 }
 
 // GetProblematicProviderCount returns the number of currently tracked problematic providers

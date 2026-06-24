@@ -1,6 +1,7 @@
 package aibalance
 
 import (
+	"context"
 	"errors"
 	"io"
 	"os"
@@ -421,6 +422,89 @@ func (p *Provider) GetEmbeddingClient() (aispec.EmbeddingCaller, error) {
 	}
 
 	log.Infof("GetEmbeddingClient: Successfully created embedding client for model: %s", p.ModelName)
+	return client, nil
+}
+
+// GetAIClientForHealthCheck 专为健康检查构造一个带 ctx 的 chat 连通性客户端.
+//
+// 与 GetAIClient 的关键区别: 注入 aispec.WithContext(ctx). 各 gateway 的
+// BuildHTTPOptions 会把 config.Context 接到 poc.WithContext, 因此一旦 ctx 被
+// cancel (健康检查 20s 超时到点), 底层 HTTP 请求随之取消, 内层 client.Chat()
+// goroutine 能及时返回, 杜绝事故里"上游卡死 -> Chat goroutine 永久泄漏"的问题.
+//
+// 仅构造连通性 ping 所需的最小选项 (不带 tools / thinking / images), 避免与
+// 主转发路径的大函数耦合.
+//
+// 关键词: GetAIClientForHealthCheck, 健康检查可取消, ctx 注入杜绝 goroutine 泄漏
+func (p *Provider) GetAIClientForHealthCheck(ctx context.Context, onStream, onReasonStream func(reader io.Reader)) (aispec.AIClient, error) {
+	var opts []aispec.AIConfigOption
+	opts = append(
+		opts,
+		aispec.WithType(p.TypeName),
+		aispec.WithTimeout(10),
+		aispec.WithNoHTTPS(p.NoHTTPS),
+		aispec.WithAPIKey(p.APIKey),
+		aispec.WithModel(p.ModelName),
+		aispec.WithStreamHandler(func(reader io.Reader) {
+			if onStream != nil {
+				onStream(reader)
+			} else {
+				io.Copy(os.Stdout, reader)
+			}
+		}),
+		aispec.WithReasonStreamHandler(func(reader io.Reader) {
+			if onReasonStream != nil {
+				onReasonStream(reader)
+			} else {
+				io.Copy(os.Stdout, reader)
+			}
+		}),
+	)
+	if ctx != nil {
+		opts = append(opts, aispec.WithContext(ctx))
+	}
+	if target := strings.TrimSpace(p.DomainOrURL); target != "" {
+		if utils.IsHttpOrHttpsUrl(target) {
+			opts = append(opts, aispec.WithBaseURL(target))
+		} else {
+			opts = append(opts, aispec.WithDomain(target))
+		}
+	}
+	client := ai.GetAI(p.TypeName, opts...)
+	if utils.IsNil(client) || client == nil {
+		return nil, errors.New("failed to get ai client, no such type: " + p.TypeName)
+	}
+	return client, nil
+}
+
+// GetEmbeddingClientWithContext 与 GetEmbeddingClient 相同, 但注入 ctx 用于取消.
+// 健康检查 embedding 路径用它, 使 20s 超时到点后底层 HTTP 请求被取消, embedding
+// goroutine 不泄漏.
+//
+// 关键词: GetEmbeddingClientWithContext, 健康检查 embedding 可取消
+func (p *Provider) GetEmbeddingClientWithContext(ctx context.Context) (aispec.EmbeddingCaller, error) {
+	var opts []aispec.AIConfigOption
+	opts = append(
+		opts,
+		aispec.WithNoHTTPS(p.NoHTTPS),
+		aispec.WithAPIKey(p.APIKey),
+		aispec.WithModel(p.ModelName),
+		aispec.WithTimeout(30),
+	)
+	if ctx != nil {
+		opts = append(opts, aispec.WithContext(ctx))
+	}
+	if target := strings.TrimSpace(p.DomainOrURL); target != "" {
+		if utils.IsHttpOrHttpsUrl(target) {
+			opts = append(opts, aispec.WithBaseURL(target))
+		} else {
+			opts = append(opts, aispec.WithDomain(target))
+		}
+	}
+	client := embedding.NewOpenaiEmbeddingClient(opts...)
+	if utils.IsNil(client) || client == nil {
+		return nil, errors.New("failed to create embedding client")
+	}
 	return client, nil
 }
 

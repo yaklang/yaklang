@@ -579,6 +579,21 @@ type ServerConfig struct {
 	totalWebSearchCount         int64 // cumulative web-search request count (process lifetime)
 	totalAmapCount              int64 // cumulative amap request count (process lifetime)
 
+	// maxConcurrentChatRequests 是进程级 chat 并发硬上限 (0=不限). 这是本次卡死
+	// 事故的抗坍塌闸门: 超大 prompt 洪峰下若不限并发, 单请求多份复制 + mirror
+	// 扣押会把 heap 打爆触发 GC/调度器饥饿. 达上限的新请求不直接拒绝, 而是先排队
+	// 等待名额释放 (有界等待), 只有等待超时才作最后兜底拒绝, 尽量避免 5xx.
+	// 关键词: maxConcurrentChatRequests, chat 并发闸, 排队等待, 抗拥塞坍塌
+	maxConcurrentChatRequests int64
+
+	// chatQueueWaitTimeout 是达并发上限时单个请求的最长排队等待时长 (<=0 用默认).
+	// 等待期间不占用并发名额, 只占着已读入的 rawPacket; 拿到名额即继续处理.
+	// chatSlotFreed 是名额释放信号 (buffered 1), releaseConcurrent 时非阻塞通知
+	// 排队中的等待者尽快重试抢名额, 配合轮询兜底保证不漏唤醒.
+	// 关键词: chatQueueWaitTimeout 排队上限, chatSlotFreed 名额释放信号
+	chatQueueWaitTimeout time.Duration
+	chatSlotFreed        chan struct{}
+
 	// Rate limiter for free web-search users (Trace-ID based)
 	webSearchRateLimiter *WebSearchRateLimiter
 
@@ -655,6 +670,14 @@ func NewServerConfig() *ServerConfig {
 	config.chatRateLimiter = NewChatRateLimiter()
 	config.freeUserDelayMinSec = 3
 	config.freeUserDelayMaxSec = 0 // 0 触发老语义 N~2N 兜底（即 3~6 秒）
+	// chat 并发硬上限默认 256, 防止超大 prompt 洪峰无限并发把 heap 打爆.
+	// 可被 CLI/env (--max-concurrent-chat / MAX_CONCURRENT_CHAT) 覆盖.
+	// 关键词: NewServerConfig maxConcurrentChatRequests 默认 256
+	config.maxConcurrentChatRequests = 256
+	// 达上限时的排队等待上限默认 30s, 名额释放信号通道 buffered 1.
+	// 关键词: NewServerConfig chatQueueWaitTimeout 默认 30s, chatSlotFreed 初始化
+	config.chatQueueWaitTimeout = defaultChatQueueWaitTimeout
+	config.chatSlotFreed = make(chan struct{}, 1)
 	// Initialize in-flight token tracker (overflow defense for daily token check)
 	// 关键词: NewServerConfig inFlightTokens 初始化
 	config.inFlightTokens = NewInFlightTokenTracker()
@@ -672,6 +695,102 @@ func NewServerConfig() *ServerConfig {
 		}
 	}
 	return config
+}
+
+// SetMaxConcurrentChatRequests 设置进程级 chat 并发硬上限 (<=0 表示不限).
+// 达上限时 serveChatCompletions 直接回 503 (带 Retry-After), 保护整机内存.
+//
+// 关键词: ServerConfig.SetMaxConcurrentChatRequests, chat 并发闸热配
+func (c *ServerConfig) SetMaxConcurrentChatRequests(n int64) {
+	if c == nil {
+		return
+	}
+	if n < 0 {
+		n = 0
+	}
+	atomic.StoreInt64(&c.maxConcurrentChatRequests, n)
+	log.Infof("aibalance: max concurrent chat requests set to %d (0=unlimited)", n)
+}
+
+// MaxConcurrentChatRequests 返回当前 chat 并发硬上限 (0=不限).
+//
+// 关键词: ServerConfig.MaxConcurrentChatRequests
+func (c *ServerConfig) MaxConcurrentChatRequests() int64 {
+	if c == nil {
+		return 0
+	}
+	return atomic.LoadInt64(&c.maxConcurrentChatRequests)
+}
+
+// defaultChatQueueWaitTimeout 是达并发上限时的默认排队等待上限.
+// 关键词: defaultChatQueueWaitTimeout, chat 排队等待默认 30s
+const defaultChatQueueWaitTimeout = 30 * time.Second
+
+// SetChatQueueWaitTimeout 设置达并发上限时单请求的最长排队等待 (<=0 回落默认).
+//
+// 关键词: ServerConfig.SetChatQueueWaitTimeout, chat 排队等待上限热配
+func (c *ServerConfig) SetChatQueueWaitTimeout(d time.Duration) {
+	if c == nil {
+		return
+	}
+	c.chatQueueWaitTimeout = d
+}
+
+// signalChatSlotFreed 在释放并发名额后非阻塞地通知排队中的等待者重试抢名额.
+// 通道 buffered 1, 满了就丢弃 (等待者还有轮询兜底, 不会漏).
+//
+// 关键词: signalChatSlotFreed, 名额释放唤醒
+func (c *ServerConfig) signalChatSlotFreed() {
+	if c == nil || c.chatSlotFreed == nil {
+		return
+	}
+	select {
+	case c.chatSlotFreed <- struct{}{}:
+	default:
+	}
+}
+
+// acquireChatSlotOrQueue 占用一个 chat 并发名额.
+//   - 未配上限 (max<=0) 或未达上限: 立即占位返回 (queued=false, ok=true).
+//   - 达上限: 不直接拒绝, 退还名额后排队等待, 由名额释放信号 + 轮询兜底唤醒,
+//     直到抢到名额 (queued=true, ok=true) 或等待超过 chatQueueWaitTimeout
+//     (queued=true, ok=false, 调用方作最后兜底).
+//
+// 占位成功 (ok=true) 后调用方必须保证最终调用一次 releaseConcurrent.
+//
+// 关键词: acquireChatSlotOrQueue, chat 并发排队等待, 不直接 5xx
+func (c *ServerConfig) acquireChatSlotOrQueue() (queued bool, ok bool) {
+	max := atomic.LoadInt64(&c.maxConcurrentChatRequests)
+	cur := atomic.AddInt64(&c.concurrentChatRequests, 1)
+	if max <= 0 || cur <= max {
+		return false, true
+	}
+	// 超限: 退还名额, 进入排队等待 (等待期间不占名额, 不阻塞他人释放).
+	atomic.AddInt64(&c.concurrentChatRequests, -1)
+
+	waitTimeout := c.chatQueueWaitTimeout
+	if waitTimeout <= 0 {
+		waitTimeout = defaultChatQueueWaitTimeout
+	}
+	deadline := time.NewTimer(waitTimeout)
+	defer deadline.Stop()
+	// 轮询兜底 (50ms): 即便错过 buffered 信号也能及时重试, 保证不饿死.
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-deadline.C:
+			return true, false
+		case <-c.chatSlotFreed:
+		case <-ticker.C:
+		}
+		max = atomic.LoadInt64(&c.maxConcurrentChatRequests)
+		cur = atomic.AddInt64(&c.concurrentChatRequests, 1)
+		if max <= 0 || cur <= max {
+			return true, true
+		}
+		atomic.AddInt64(&c.concurrentChatRequests, -1)
+	}
 }
 
 func (c *ServerConfig) Close() {
@@ -737,15 +856,41 @@ func (c *ServerConfig) getKeyFromRawRequest(req []byte) *Key {
 }
 
 func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
-	atomic.AddInt64(&c.concurrentChatRequests, 1)
+	// 进程级 chat 并发闸: 达上限时不直接 5xx, 而是先排队等待一个名额释放 (有界等待).
+	// 这是抗拥塞坍塌的关键闸门——超大 prompt 洪峰下若任由并发膨胀, 单请求多份复制 +
+	// mirror 扣押会把 heap 打爆触发 GC/调度器饥饿; 但偶发突发更应当排队消化而非粗暴
+	// 拒绝, 故只有排队超过上限仍拿不到名额时才作最后兜底拒绝 (429, 非 5xx).
+	// 关键词: serveChatCompletions 并发闸排队等待, 过载保护, 抗拥塞坍塌, 避免 5xx
+	queueStart := time.Now()
+	queued, ok := c.acquireChatSlotOrQueue()
+	if !ok {
+		// 排队等待超时: 未占用名额, 作最后兜底拒绝 (429 比 5xx 更适合并发限流).
+		waited := time.Since(queueStart)
+		c.logWarn("chat concurrency queue wait timeout after %v (max=%d), rejecting with 429",
+			waited, atomic.LoadInt64(&c.maxConcurrentChatRequests))
+		const body = `{"error":{"message":"server is busy: too many concurrent requests, please retry later","type":"overloaded","code":"concurrency_limit"}}`
+		resp := "HTTP/1.1 429 Too Many Requests\r\n" +
+			"Content-Type: application/json\r\n" +
+			"Retry-After: 1\r\n" +
+			fmt.Sprintf("Content-Length: %d\r\n", len(body)) +
+			"Connection: close\r\n\r\n" + body
+		conn.Write([]byte(resp))
+		return
+	}
 	concurrentReleased := false
 	releaseConcurrent := func() {
 		if !concurrentReleased {
 			concurrentReleased = true
 			atomic.AddInt64(&c.concurrentChatRequests, -1)
+			// 唤醒排队中的等待者尽快补位.
+			c.signalChatSlotFreed()
 		}
 	}
 	defer releaseConcurrent()
+	if queued {
+		c.logInfo("chat request admitted after queueing for %v", time.Since(queueStart))
+	}
+
 	c.logInfo("Starting to handle new chat completion request")
 	// handle ai request
 	auth := ""
