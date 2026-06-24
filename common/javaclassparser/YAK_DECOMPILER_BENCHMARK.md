@@ -40,7 +40,7 @@ authority for automated semantic decisions.
 | Correctness (javac round-trip) | **24/26** eligible corpora recompile cleanly (was 4/13 at start); the classic corpus now emits **zero stubs**; all four inner/nested-class groups recompile; dedicated boundary-condition, numeric-edge, field/array and nested-control-flow corpora gated | `TestRecompileRoundtrip` |
 | Determinism | byte-identical output across repeated decompiles; perf changes proven equivalent by per-class sha256 fingerprints | `TestCorpusDeterminism`, `TestDumpJarFingerprint` |
 | Test suite | green & fast: `./...` ≈ 22s, down from more than 150s (**at least 6.8x**), no machine-specific dependencies | `go test ./common/javaclassparser/...` |
-| Allocation cost | core **≈218 ms** and **≈163 MB cumulative heap allocation** per 106-class jar (down from ≈246 ms / ≈182 MB); the post-decompile ANTLR re-parse adds ≈ +58% runtime and ≈ +42% bytes relative to core-only | `BenchmarkDecompileJar` |
+| Allocation cost | core **≈215 ms** and **≈161 MB cumulative heap allocation** per 106-class jar (down from ≈246 ms / ≈182 MB); the post-decompile ANTLR re-parse adds ≈ +60% runtime and ≈ +42% bytes relative to core-only | `BenchmarkDecompileJar` |
 | Scalability | near-linear to ~8 workers (3.6×), then **GC-bound regression** | `BenchmarkDecompileJarParallel` |
 
 The decompiler's **safety guarantee holds**: for every input in the corpus it
@@ -512,9 +512,9 @@ post-decompile ANTLR re-parse and isolates the **decompiler core** from the
 
 | Configuration | ns/op | B/op | allocs/op |
 |---------------|------:|-----:|----------:|
-| Full pipeline (validation on) | ~344 M | 231 MB | 3.59 M |
-| Core only (validation off) | **218 M** | **163 MB** | 2.33 M |
-| **Validation safety-net share** | **≈ 37%** time | **≈ 29%** bytes | **≈ 35%** allocs |
+| Full pipeline (validation on) | ~343 M | 229 MB | 3.54 M |
+| Core only (validation off) | **215 M** | **161 MB** | 2.28 M |
+| **Validation safety-net share** | **≈ 37%** time | **≈ 30%** bytes | **≈ 36%** allocs |
 
 The safety net is not free, but it is the contract that guarantees no un-parseable
 Java ever leaves `Decompile`; ~36% wall-time is the price of that guarantee (it is an
@@ -604,6 +604,19 @@ regardless), so output is unchanged. Result: **core 222 → 218 ms/op, 167 → 1
 the allocation count flat; **full pipeline 351 → 344 ms/op, 234 → 231 MB/op**. Fingerprint
 diff against the pre-optimization baseline remains byte-for-byte identical.
 
+**Dominator-tree result-build round (still in place).** `GenerateDominatorTree`'s final
+phase was the next-largest allocator: `dominatorMap[idom] = append(...)` grew each idom's
+child slice incrementally (~122 MB), plus a per-idom `sort.Slice` closure (~36 MB). The
+loop is now split into two passes — a counting pass records each node's immediate-dominator
+id and how many children every idom collects, so the second pass allocates each child slice
+at its exact final capacity (and the result map is pre-sized to the distinct-idom count).
+The explicit sort is removed: children are appended in increasing node-id order and
+`nodeToId[nodes[i]] == i` with unique ids, so the in-order fill already produces the exact
+ordering the sort did (the order-sensitive `TestGenerateDominatorTreeEquivalence` over 4000
+random CFGs still passes). Result: **core 218 → 215 ms/op, 163 → 161 MB/op, allocs 2.33 →
+2.28 M**; **full pipeline 344 → 343 ms/op, 231 → 229 MB/op, 3.59 → 3.54 M**. Fingerprint
+remains byte-identical.
+
 **Prior allocation/CPU round (still in place):**
 
 1. **`WalkGraph` visited set — drop interface boxing and the mutex.**
@@ -622,7 +635,7 @@ diff against the pre-optimization baseline remains byte-for-byte identical.
 
 Cumulative for that prior round: **core 315 → 246 ms/op (−22%), 217 → 182 MB/op (−16%)**;
 end-to-end bytes 282 → 248 MB (−12%). The latest rounds (above) carry this further to
-core 218 ms / 163 MB.
+core 215 ms / 161 MB.
 
 Earlier-round optimizations still in place:
 - **`ParseOpcode` pre-sizing** (opcode slice + both offset maps sized from bytecode

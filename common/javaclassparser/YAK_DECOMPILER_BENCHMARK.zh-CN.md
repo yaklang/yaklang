@@ -23,7 +23,7 @@
 | 正确性（javac round-trip） | **24/26** 个可评估语料干净重编译（起始为 4/13）；经典语料现已**零 stub**；四个内部类/嵌套类组全部可重编译；专用边界、数值边界、字段/数组与嵌套控制流语料均已纳入门禁 | `TestRecompileRoundtrip` |
 | 确定性 | 多次反编译逐字节一致；性能改动通过逐类 sha256 指纹证明输出等价 | `TestCorpusDeterminism`、`TestDumpJarFingerprint` |
 | 测试套件 | 绿且快：`./...` ≈ 22s，从 150s 以上降下来（**至少 6.8 倍**），无机器相关依赖 | `go test ./common/javaclassparser/...` |
-| 分配开销 | 核心 **≈222 ms** 且 **≈167 MB 累计堆分配** / 106 类的 jar（自 ≈246 ms / ≈182 MB 降低）；反编译后的 ANTLR 重解析相对 core-only 增加运行时 ≈ +58%、字节 ≈ +40% | `BenchmarkDecompileJar` |
+| 分配开销 | 核心 **≈215 ms** 且 **≈161 MB 累计堆分配** / 106 类的 jar（自 ≈246 ms / ≈182 MB 降低）；反编译后的 ANTLR 重解析相对 core-only 增加运行时 ≈ +60%、字节 ≈ +42% | `BenchmarkDecompileJar` |
 | 可扩展性 | ~8 worker 前近线性（3.6×），之后出现 **GC 瓶颈回退** | `BenchmarkDecompileJarParallel` |
 
 反编译器的**安全保证成立**：对语料中的每一个输入，要么重建出方法，要么把它降级为带标记、仍可解析的 stub（`yak-decompiler:` 标记），绝不输出不可解析的 Java，也绝不从 `Decompile` 中 panic 逃逸。
@@ -242,9 +242,9 @@ BENCH_JAR=<jar> go test -run xxx -bench 'BenchmarkDecompileJar$' -benchmem ./com
 
 | 配置 | ns/op | B/op | allocs/op |
 |------|------:|-----:|----------:|
-| 完整流水线（开启校验） | ~351 M | 234 MB | 3.59 M |
-| 仅核心（关闭校验） | **222 M** | **167 MB** | 2.34 M |
-| **校验安全网占比** | 时间 **≈ 37%** | 字节 **≈ 29%** | 分配 **≈ 35%** |
+| 完整流水线（开启校验） | ~343 M | 229 MB | 3.54 M |
+| 仅核心（关闭校验） | **215 M** | **161 MB** | 2.28 M |
+| **校验安全网占比** | 时间 **≈ 37%** | 字节 **≈ 30%** | 分配 **≈ 36%** |
 
 安全网并非免费，但它是"绝不让不可解析的 Java 离开 `Decompile`"的契约；~36% 的墙钟时间是这一保证的代价（它是对整个类的一次 ANTLR 重解析，其 ATN 模拟分配主导了这部分占比，且为第三方运行时的固有成本）。
 
@@ -298,6 +298,15 @@ runtime.greyobject     13.3% cum
 分配次数持平；**完整流水线 351 → 344 ms/op，234 → 231 MB/op**。与优化前基线的指纹 diff
 仍逐字节一致。
 
+**支配树结果构建一轮（仍在生效）。** 下一个最大的分配点是 `GenerateDominatorTree` 的收尾阶段：
+`dominatorMap[idom] = append(...)` 对每个 idom 的子节点切片逐步扩容（约 122 MB），外加每个 idom
+一次 `sort.Slice` 闭包（约 36 MB）。现在该循环拆成两遍——计数遍记录每个节点的直接支配者 id 以及每个
+idom 收集多少子节点，使第二遍能按确切的最终容量分配每个子切片（结果 map 也按去重后的 idom 数预分配）。
+显式排序被移除：子节点按 node-id 递增顺序追加，而 `nodeToId[nodes[i]] == i` 且 id 唯一，所以这种顺序
+填充已得到与原排序完全一致的顺序（对顺序敏感的 `TestGenerateDominatorTreeEquivalence` 在 4000 个随机
+CFG 上仍全部通过）。结果：**核心 218 → 215 ms/op，163 → 161 MB/op，分配 2.33 → 2.28 M**；
+**完整流水线 344 → 343 ms/op，231 → 229 MB/op，3.59 → 3.54 M**。指纹仍逐字节一致。
+
 **上一轮分配/CPU 优化（仍在生效）：**
 
 1. **`WalkGraph` 的 visited 集合——去掉接口装箱与互斥锁。**
@@ -306,7 +315,7 @@ runtime.greyobject     13.3% cum
 2. **纯 ASCII 字符串字面量跳过 MIME 嗅探。**
    `JavaStringToLiteral` 对*每个*字面量都跑完整的魔数检测（`codec.MatchMIMEType`，会分配 `csv`/`bufio` reader），用于恢复可能被错误解码的中文字符集——对 ASCII 字节不可能命中。用纯 ASCII 检查作为前置守卫（ASCII 本就走相同的加引号路径，行为不变）。**核心：254 → 246 ms/op，193 → 182 MB/op。**
 
-那一轮累计：**核心 315 → 246 ms/op（−22%），217 → 182 MB/op（−16%）**；端到端字节 282 → 248 MB（−12%）。最新几轮（上文）进一步推进到核心 218 ms / 163 MB。
+那一轮累计：**核心 315 → 246 ms/op（−22%），217 → 182 MB/op（−16%）**；端到端字节 282 → 248 MB（−12%）。最新几轮（上文）进一步推进到核心 215 ms / 161 MB。
 
 更早仍在生效的优化：
 - **`ParseOpcode` 预分配**（opcode 切片 + 两个 offset map 都按字节码长度预分配）。
