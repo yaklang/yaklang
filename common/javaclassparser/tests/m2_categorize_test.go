@@ -61,7 +61,7 @@ func normalizeSyntaxErr(s string) string {
 func TestCategorizeDecompileErrors(t *testing.T) {
 	dir := os.Getenv("JDSC_DIR")
 	if dir == "" {
-		dir = "/tmp/error-jdsc"
+		t.Skip("set JDSC_DIR to run this decompile-error categorizer over a jdsc corpus (opt-in)")
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -127,7 +127,7 @@ func TestCategorizeDecompileErrors(t *testing.T) {
 func TestSmallestDecompileErr(t *testing.T) {
 	dir := os.Getenv("JDSC_DIR")
 	if dir == "" {
-		dir = "/tmp/error-jdsc"
+		t.Skip("set JDSC_DIR to run this decompile-error categorizer over a jdsc corpus (opt-in)")
 	}
 	filter := os.Getenv("DEC_ERR_FILTER")
 	if filter == "" {
@@ -212,7 +212,7 @@ func TestRawDecompileErr(t *testing.T) {
 func TestCategorizeSyntaxErrors(t *testing.T) {
 	dir := os.Getenv("JDSC_DIR")
 	if dir == "" {
-		dir = "/tmp/error-jdsc"
+		t.Skip("set JDSC_DIR to run this decompile-error categorizer over a jdsc corpus (opt-in)")
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -261,7 +261,7 @@ func TestCategorizeSyntaxErrors(t *testing.T) {
 func TestVerifyDecompileFix(t *testing.T) {
 	dir := os.Getenv("JDSC_DIR")
 	if dir == "" {
-		dir = "/tmp/error-jdsc"
+		t.Skip("set JDSC_DIR to run this decompile-error categorizer over a jdsc corpus (opt-in)")
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -370,7 +370,7 @@ func TestVerifyDecompileFix(t *testing.T) {
 func TestDiagnoseRemaining(t *testing.T) {
 	dir := os.Getenv("JDSC_DIR")
 	if dir == "" {
-		dir = "/tmp/error-jdsc"
+		t.Skip("set JDSC_DIR to run this decompile-error categorizer over a jdsc corpus (opt-in)")
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -429,7 +429,7 @@ func TestDiagnoseRemaining(t *testing.T) {
 func TestSyntaxErrorSamples(t *testing.T) {
 	dir := os.Getenv("JDSC_DIR")
 	if dir == "" {
-		dir = "/tmp/error-jdsc"
+		t.Skip("set JDSC_DIR to run this decompile-error categorizer over a jdsc corpus (opt-in)")
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {

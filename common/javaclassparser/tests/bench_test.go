@@ -218,7 +218,7 @@ func safeDecompile(raw []byte) (status string, out string) {
 func TestTopSlowClasses(t *testing.T) {
 	jarPath := os.Getenv("BENCH_JAR")
 	if jarPath == "" {
-		jarPath = "/Users/v1ll4n/.m2/repository/com/hazelcast/hazelcast/5.1.7/hazelcast-5.1.7.jar"
+		t.Skip("set BENCH_JAR to profile the slowest classes of a jar (opt-in diagnostic)")
 	}
 	topN := 30
 	if v := os.Getenv("TOPN"); v != "" {
@@ -280,7 +280,7 @@ func TestTopSlowClasses(t *testing.T) {
 func TestDecompileJarTiming(t *testing.T) {
 	jarPath := os.Getenv("BENCH_JAR")
 	if jarPath == "" {
-		jarPath = "/Users/v1ll4n/.m2/repository/commons-codec/commons-codec/1.15/commons-codec-1.15.jar"
+		t.Skip("set BENCH_JAR to time a full jar decompile pass (opt-in diagnostic)")
 	}
 	classes := loadJarClasses(t, jarPath)
 	if len(classes) == 0 {

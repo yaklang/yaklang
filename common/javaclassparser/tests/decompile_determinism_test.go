@@ -63,6 +63,12 @@ func extractClass(jar, entry string) []byte {
 // TestDecompileDeterminism guards against regressions in the decompiler's output determinism: each
 // target class must decompile to a single, byte-identical result across many runs.
 func TestDecompileDeterminism(t *testing.T) {
+	// Opt-in: this scans the developer's ~/.m2 for specific jars and is both slow
+	// and machine-specific. The portable determinism guarantee is covered by
+	// TestCorpusDeterminism (javac-backed corpus, runs by default).
+	if os.Getenv("M2_DETERMINISM") == "" {
+		t.Skip("set M2_DETERMINISM=1 to run the ~/.m2 determinism check (opt-in)")
+	}
 	javaclassparser.EnableDecompileSyntaxValidation = false
 	defer func() { javaclassparser.EnableDecompileSyntaxValidation = true }()
 
