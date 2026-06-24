@@ -136,6 +136,20 @@ func (s *Server) GetHTTPFlowBodyById(r *ypb.GetHTTPFlowBodyByIdRequest, stream y
 	if isRequest {
 		if r.IsRisk {
 			packet = risk.QuotedRequest
+		} else if flow.TooLargeRequestBodyFile != "" {
+			fh, err := os.Open(flow.TooLargeRequestBodyFile)
+			if err != nil {
+				return utils.Wrap(err, "GetHTTPFlowBodyById: open request body file error")
+			}
+			defer fh.Close()
+			reader = fh
+			u := utils.ParseStringToUrl(flow.Url)
+			base := path.Base(u.Path)
+			if base != "" && base != "." && base != "/" {
+				filename = base
+			} else {
+				filename = "request-body.bin"
+			}
 		} else {
 			packet = flow.Request
 		}
@@ -552,6 +566,9 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 				IsReadTooSlowResponse:      data.IsReadTooSlowResponse,
 				TooLargeResponseHeaderFile: data.TooLargeResponseHeaderFile,
 				TooLargeResponseBodyFile:   data.TooLargeResponseBodyFile,
+				IsTooLargeRequest:         data.IsTooLargeRequest,
+				TooLargeRequestHeaderFile: data.TooLargeRequestHeaderFile,
+				TooLargeRequestBodyFile:   data.TooLargeRequestBodyFile,
 			}
 			var httpFlowId int64
 			var httpFlow schema.HTTPFlow
@@ -749,6 +766,9 @@ func (s *Server) HTTPFlowsData(ctx context.Context, httpFlow *schema.HTTPFlow) (
 		IsReadTooSlowResponse:      httpFlow.IsReadTooSlowResponse,
 		TooLargeResponseHeaderFile: httpFlow.TooLargeResponseHeaderFile,
 		TooLargeResponseBodyFile:   httpFlow.TooLargeResponseBodyFile,
+		IsTooLargeRequest:         httpFlow.IsTooLargeRequest,
+		TooLargeRequestHeaderFile: httpFlow.TooLargeRequestHeaderFile,
+		TooLargeRequestBodyFile:   httpFlow.TooLargeRequestBodyFile,
 		Host:                       httpFlow.Host,
 	}
 	projectStoragesWhere := []string{strconv.Quote(strconv.FormatInt(int64(httpFlow.ID), 10) + "_response"), strconv.Quote(strconv.FormatInt(int64(httpFlow.ID), 10) + "_request")}

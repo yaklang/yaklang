@@ -17,7 +17,7 @@ import (
 
 var filterHTTPFlowToolOptions = []mcp.ToolOption{
 	mcp.WithPaging("pagination",
-		[]string{"id", "created_at", "updated_at", "deleted_at", "hidden_index", "no_fix_content_length", "hash", "is_http_s", "url", "path", "method", "body_length", "content_type", "status_code", "source_type", "request", "response", "duration", "get_params_total", "post_params_total", "cookie_params_total", "ip_address", "remote_addr", "ip_integer", "tags", "payload", "is_websocket", "websocket_hash", "runtime_id", "from_plugin", "process_name", "is_too_large_response", "too_large_response_header_file", "too_large_response_body_file", "upload_online"},
+		[]string{"id", "created_at", "updated_at", "deleted_at", "hidden_index", "no_fix_content_length", "hash", "is_http_s", "url", "path", "method", "body_length", "content_type", "status_code", "source_type", "request", "response", "duration", "get_params_total", "post_params_total", "cookie_params_total", "ip_address", "remote_addr", "ip_integer", "tags", "payload", "is_websocket", "websocket_hash", "runtime_id", "from_plugin", "process_name", "is_too_large_response", "too_large_response_header_file", "too_large_response_body_file", "is_too_large_request", "too_large_request_header_file", "too_large_request_body_file", "upload_online"},
 		mcp.Description("Pagination settings for the query"),
 	),
 	mcp.WithString("sourceType",
@@ -250,6 +250,9 @@ func ypbHTTPFlowToFriendlyHTTPFlow(f *ypb.HTTPFlow) *schema.HTTPFlow {
 		IsTooLargeResponse:         f.IsTooLargeResponse,
 		TooLargeResponseBodyFile:   string(f.TooLargeResponseBodyFile),
 		TooLargeResponseHeaderFile: string(f.TooLargeResponseHeaderFile),
+		IsTooLargeRequest:         f.IsTooLargeRequest,
+		TooLargeRequestBodyFile:   string(f.TooLargeRequestBodyFile),
+		TooLargeRequestHeaderFile: string(f.TooLargeRequestHeaderFile),
 	}
 
 	flow.Response = strconv.Quote(string(f.Response))
