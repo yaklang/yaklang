@@ -116,10 +116,14 @@ func TestWritePrunedRuntimeImports_ScriptEngineModuleDependencies(t *testing.T) 
 	assertContains(t, got, `yaklib "github.com/yaklang/yaklang/common/yak/yaklib"`)
 	assertContains(t, got, `filesys "github.com/yaklang/yaklang/common/utils/filesys"`)
 	assertContains(t, got, `ssaapi "github.com/yaklang/yaklang/common/yak/ssaapi"`)
+	assertContains(t, got, `ssaconfig "github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"`)
+	assertContains(t, got, `ssaproject "github.com/yaklang/yaklang/common/yak/ssaproject"`)
 	assertContains(t, got, `runtimeRegisterYaklibModule("json", yaklib.JsonExports)`)
 	assertContains(t, got, `runtimeRegisterYaklibModule("file", yaklib.FileExport)`)
 	assertContains(t, got, `runtimeRegisterYaklibModule("filesys", filesys.Exports)`)
-	assertContains(t, got, `runtimeRegisterYaklibModule("ssa", ssaapi.YakExports)`)
+	assertContains(t, got, `runtimeRegisterYaklibModule("ssa", ssaapi.Exports)`)
+	assertContains(t, got, `runtimeRegisterYaklibModule("ssa", ssaproject.Exports)`)
+	assertContains(t, got, `runtimeRegisterYaklibModule("ssa", ssaconfig.Exports)`)
 }
 
 func TestWritePrunedRuntimeImports_ScriptEngineGlobalDependencies(t *testing.T) {
@@ -148,7 +152,8 @@ func TestWritePrunedRuntimeImports_YakitDependencyUsesRuntimeClient(t *testing.T
 	}
 
 	got := readGeneratedRuntimeImports(t, dir)
-	assertContains(t, got, `runtimeRegisterYaklibModule("yakit", loglite.YakitExports)`)
+	assertContains(t, got, `yakshim "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/shim"`)
+	assertContains(t, got, `runtimeRegisterYaklibModule("yakit", yakshim.YakitExports)`)
 }
 
 func TestUnsupportedPrunedRuntimeDependencies(t *testing.T) {

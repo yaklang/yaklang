@@ -292,7 +292,7 @@ func writePrunedRuntimeImports(runtimeDir string, deps []YaklibDependency) error
 
 func writePrunedRuntimeImportsToFile(outputPath string, deps []YaklibDependency) error {
 	imports := map[string]goImportSpec{}
-	modules := map[string]map[string]string{}
+	modules := map[string][]string{}
 	globals := map[string]string{}
 	globalTables := map[string]ModuleImportSpec{}
 	registeredGlobals := map[string]globalExportRef{}
@@ -336,11 +336,19 @@ func writePrunedRuntimeImportsToFile(outputPath string, deps []YaklibDependency)
 			return formatUnsupportedPrunedRuntimeDependency(module, "")
 		}
 
-		imports[spec.ImportAlias] = goImportSpec{
-			Alias: spec.ImportAlias,
-			Path:  spec.GoImportPath,
+		sources := spec.prunedExportSources()
+		if len(sources) == 0 {
+			return formatUnsupportedPrunedRuntimeDependency(module, "")
 		}
-		modules[module] = setModuleExport(modules[module], "*", spec.ExportExpr)
+		for _, source := range sources {
+			imports[source.ImportAlias] = goImportSpec{
+				Alias: source.ImportAlias,
+				Path:  source.GoImportPath,
+			}
+		}
+		for _, source := range sources {
+			modules[module] = append(modules[module], source.ExportExpr)
+		}
 		_ = methods
 	}
 
@@ -392,20 +400,9 @@ func writePrunedRuntimeImportsToFile(outputPath string, deps []YaklibDependency)
 	sort.Strings(moduleNames)
 	for _, module := range moduleNames {
 		exports := modules[module]
-		if whole, ok := exports["*"]; ok {
-			b.WriteString(fmt.Sprintf("\truntimeRegisterYaklibModule(%q, %s)\n", module, whole))
-			continue
+		for _, exportExpr := range exports {
+			b.WriteString(fmt.Sprintf("\truntimeRegisterYaklibModule(%q, %s)\n", module, exportExpr))
 		}
-		methods := make([]string, 0, len(exports))
-		for method := range exports {
-			methods = append(methods, method)
-		}
-		sort.Strings(methods)
-		b.WriteString(fmt.Sprintf("\truntimeRegisterYaklibModule(%q, map[string]any{\n", module))
-		for _, method := range methods {
-			b.WriteString(fmt.Sprintf("\t\t%q: %s,\n", method, exports[method]))
-		}
-		b.WriteString("\t})\n")
 	}
 	b.WriteString("}\n")
 
@@ -475,14 +472,6 @@ func writeRuntimeLinkArgsFile(buildDir, srcDir, overlayPath string) (string, err
 		return "", fmt.Errorf("build pruned runtime archive failed: write %s: %v", linkFlagsPath, err)
 	}
 	return linkFlagsPath, nil
-}
-
-func setModuleExport(exports map[string]string, name, expr string) map[string]string {
-	if exports == nil {
-		exports = make(map[string]string)
-	}
-	exports[name] = expr
-	return exports
 }
 
 func isPrunedRuntimeDependencySupported(module, method string) bool {

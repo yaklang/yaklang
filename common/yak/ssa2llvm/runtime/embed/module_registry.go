@@ -8,24 +8,49 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 )
 
+// ExportSource is one Go export table wired into a yaklang module.
+type ExportSource struct {
+	GoImportPath string
+	ImportAlias  string
+	ExportExpr   string
+}
+
 // ModuleImportSpec describes how to import a yaklang module's exports
 // into a dynamically generated Go file.
 type ModuleImportSpec struct {
 	// ModuleName is the yaklang module name (e.g., "poc", "ssa", "cli")
 	ModuleName string
 
-	// GoImportPath is the full Go import path (e.g., "github.com/yaklang/yaklang/common/utils/lowhttp/poc")
+	// Single-source shortcut. Ignored when Sources is non-empty.
 	GoImportPath string
+	ImportAlias  string
+	ExportExpr   string
 
-	// ImportAlias is the alias to use in the import statement (e.g., "poc")
-	ImportAlias string
+	// Sources lists multiple export tables merged into one yak module.
+	Sources []ExportSource
 
-	// ExportExpr is the Go expression that returns the exports map
-	// (e.g., "poc.PoCExports", "ssaapi.Exports")
-	ExportExpr string
+	// PrunedShim, when set, replaces Sources for ssa2llvm AOT runtime builds.
+	PrunedShim *ExportSource
 
 	// IsGlobal indicates this is a global export (no module name prefix)
 	IsGlobal bool
+}
+
+func (spec ModuleImportSpec) prunedExportSources() []ExportSource {
+	if spec.PrunedShim != nil {
+		return []ExportSource{*spec.PrunedShim}
+	}
+	if len(spec.Sources) > 0 {
+		return append([]ExportSource(nil), spec.Sources...)
+	}
+	if strings.TrimSpace(spec.ExportExpr) == "" {
+		return nil
+	}
+	return []ExportSource{{
+		GoImportPath: spec.GoImportPath,
+		ImportAlias:  spec.ImportAlias,
+		ExportExpr:   spec.ExportExpr,
+	}}
 }
 
 // moduleRegistry is the static registry of all yaklang modules and their
@@ -57,18 +82,41 @@ var moduleRegistry = map[string]ModuleImportSpec{
 		ExportExpr:   "yaklib.CodecExports",
 	},
 
-	// === SSA/SyntaxFlow modules ===
+	// === SSA/SyntaxFlow modules (composite, matches yak.initIrifyLibs) ===
 	"ssa": {
-		ModuleName:   "ssa",
-		GoImportPath: "github.com/yaklang/yaklang/common/yak/ssaapi",
-		ImportAlias:  "ssaapi",
-		ExportExpr:   "ssaapi.YakExports",
+		ModuleName: "ssa",
+		Sources: []ExportSource{
+			{
+				GoImportPath: "github.com/yaklang/yaklang/common/yak/ssaapi",
+				ImportAlias:  "ssaapi",
+				ExportExpr:   "ssaapi.Exports",
+			},
+			{
+				GoImportPath: "github.com/yaklang/yaklang/common/yak/ssaproject",
+				ImportAlias:  "ssaproject",
+				ExportExpr:   "ssaproject.Exports",
+			},
+			{
+				GoImportPath: "github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig",
+				ImportAlias:  "ssaconfig",
+				ExportExpr:   "ssaconfig.Exports",
+			},
+		},
 	},
 	"syntaxflow": {
-		ModuleName:   "syntaxflow",
-		GoImportPath: "github.com/yaklang/yaklang/common/syntaxflow",
-		ImportAlias:  "syntaxflow",
-		ExportExpr:   "syntaxflow.YakExports",
+		ModuleName: "syntaxflow",
+		Sources: []ExportSource{
+			{
+				GoImportPath: "github.com/yaklang/yaklang/common/syntaxflow",
+				ImportAlias:  "syntaxflow",
+				ExportExpr:   "syntaxflow.Exports",
+			},
+			{
+				GoImportPath: "github.com/yaklang/yaklang/common/yak/syntaxflow_scan",
+				ImportAlias:  "syntaxflow_scan",
+				ExportExpr:   "syntaxflow_scan.Exports",
+			},
+		},
 	},
 	"sfreport": {
 		ModuleName:   "sfreport",
@@ -79,10 +127,12 @@ var moduleRegistry = map[string]ModuleImportSpec{
 
 	// === Other common modules ===
 	"yakit": {
-		ModuleName:   "yakit",
-		GoImportPath: "github.com/yaklang/yaklang/common/yak/yaklib/loglite",
-		ImportAlias:  "loglite",
-		ExportExpr:   "loglite.YakitExports",
+		ModuleName: "yakit",
+		PrunedShim: &ExportSource{
+			GoImportPath: "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/shim",
+			ImportAlias:  "yakshim",
+			ExportExpr:   "yakshim.YakitExports",
+		},
 	},
 	"risk": {
 		ModuleName:   "risk",
