@@ -21,7 +21,7 @@ section.
 |------|--------|--------------------|
 | Coverage (parse-or-degrade) | 23/23 corpus groups produce **valid Java**; 0 syntax errors, 0 hard errors, 0 panics | `TestSyntaxCoverageMatrix` |
 | Coverage (full reconstruction) | 20/23 groups fully reconstructed; 3 groups isolate exactly **2 root-cause gaps** | `TestSyntaxCoverageMatrix` |
-| Correctness (javac round-trip) | **5/13** classic single-class corpora recompile cleanly (was 4/13; **Literals fixed this round**); remaining failures pinpoint concrete gaps | `TestRecompileRoundtrip` |
+| Correctness (javac round-trip) | **8/13** classic single-class corpora recompile cleanly (was 4/13 at start; +Literals, Arrays, Initializers, Concurrency, and Operators 13→1 errors); remaining failures pinpoint concrete gaps | `TestRecompileRoundtrip` |
 | Determinism | byte-identical output across repeated decompiles; perf changes proven equivalent by per-class sha256 fingerprints | `TestCorpusDeterminism`, `TestDumpJarFingerprint` |
 | Test suite | green & fast: `./...` ≈ 22s vs >150s before (8x), no machine-specific dependencies | `go test ./common/javaclassparser/...` |
 | Performance | core **246 ms / 182 MB** per 106-class jar (was 315 ms / 217 MB → **−22% time, −16% bytes** this round); validation safety net ≈ +18% CPU / +23% allocs | `BenchmarkDecompileJar` |
@@ -93,34 +93,69 @@ go test -run TestRecompileRoundtrip -v ./common/javaclassparser/tests/
 
 ### Classic single-class corpora
 ```
-recompile-ok:  5   (CastsInstanceof, ControlFlow, Literals, Strings, Switches)
-recompile-fail: 8
+recompile-ok:  8   (Arrays, CastsInstanceof, Concurrency, ControlFlow, Initializers, Literals, Strings, Switches)
+recompile-fail: 5
 stub:          1   (Exceptions)
 dec-err:       0
 multiclass:    4   (skipped: multi-type compilation units)
 ```
 
-The 8 recompile failures are the actionable correctness frontier. Each root cause
-below was confirmed by reading the **full** `javac` diagnostic (run with
+The 5 remaining recompile failures are the actionable correctness frontier. Each root
+cause below was confirmed by reading the **full** `javac` diagnostic (run with
 `RC_VERBOSE=1` to dump the decompiled source + every error per category), not
 guessed:
 
 | Category | Exact javac error | Confirmed root cause | Difficulty |
 |----------|-------------------|----------------------|-----------|
-| Arrays | `int[][][][] cannot be converted to int[][][][][][][]` | local array-type **dimension** over-counted vs the `multianewarray` it is initialized from | medium (type calc) |
-| Operators | `bad operand types '<<' first:boolean second:int` (×12) + `incompatible types` | **JVM boolean/int ambiguity**: a local that is `int` in source is typed `boolean` because `&`/`|`/`^` on booleans share opcodes with int bitops | hard (type inference) |
 | Loops | `unreachable statement` (the `continue;` after a nested infinite region) | every loop lowered to `do{...}while(true)`; the always-taken inner exit makes the synthesized outer `continue` unreachable | hard (loop idiom recovery) |
-| Initializers | `int[] cannot be converted to int` + `cannot find symbol var1` | array field rendered as element type; a `final` field initialized in `<init>` is hoisted to a field initializer that references the (out-of-scope) constructor parameter | medium–hard |
-| Generics | `cannot find symbol` | erased/elided type arguments on a generic call | medium |
-| Lambdas | `variable v already defined` | synthetic captured-variable naming collision | medium |
-| Concurrency | `cannot find symbol` | references to a synthesized helper/inner that is not emitted | medium |
-| TryWithResources | `variable ...` | try-with-resources `close()` desugaring not re-sugared | medium |
+| Operators | `missing return statement` (1 error, down from 13) | `(a && b) \|\| (c)` short-circuit `\|\|` lowered to an `if/else` whose true-branch dropped its `return true`; a boolean-expression/`\|\|` reconstruction gap | hard (control-flow recovery) |
+| Generics | `cannot find symbol var4` | one JVM local slot reused across nested scopes is mis-split into two SSA variables; the later one is block-scoped but read after the block | medium–hard (var scoping) |
+| Lambdas | `variable v already defined` + erased generics | lambda parameter names collide with the enclosing slot names, and raw functional-interface targets reject the explicit `Integer` param types (generic signatures not recovered) | hard (var naming + generics erasure) |
+| TryWithResources | `variable var4 is already defined` | nested try-with-resources `close()` desugaring reuses the slot name `var4` for two catch variables in overlapping source scopes | medium (var naming) |
 
-Passing categories are pinned by `recompileGateBaseline`, so a regression that
-breaks `CastsInstanceof`, `ControlFlow`, `Literals`, `Strings`, or `Switches` fails
-CI; the rest are tracked as the backlog.
+Passing categories are pinned by `recompileGateBaseline`, so a regression that breaks
+any of the 8 green categories fails CI; the rest are tracked as the backlog.
 
-### Correctness fixes landed in this evaluation
+### Correctness fixes landed in this evaluation — round 2 (accuracy push)
+Five further defects were diagnosed from the round-trip oracle and fixed, flipping
+**Arrays, Initializers, and Concurrency** to clean recompiles and collapsing
+**Operators from 13 javac errors to 1**. All are verified non-regressing by the golden
+suite, `TestCorpusDeterminism`, and a stub/error/panic-count diff on real jars
+(commons-codec, gson: identical `ok`/`stub` counts before vs after — output content
+changed correctly, no new failures):
+
+1. **`multianewarray` rank doubling** (`code_analyser.go`). The constant-pool entry is
+   already the full array type (`[[I` = `int[][]`), but the handler re-wrapped it once
+   per popped length, so `int[][] a = new int[3][4]` decompiled to a 7-dimensional
+   `int[][][][][][][] a = new int[3][4][][]`. Now the CP type is used as-is and exactly
+   the `dimensions` operand byte worth of lengths are popped. → **Arrays green.**
+2. **Parameter-dependent field-initializer hoisting** (`dumper.go`). Any `final` field
+   assigned in `<init>`/`<clinit>` had its RHS lifted into a field initializer; for the
+   ubiquitous `final X x; Ctor(X x){ this.x = x; }` this emitted the illegal
+   `final X x = var1;` (a constructor parameter, out of scope). Now only
+   parameter-independent values are hoisted; otherwise the assignment stays in the
+   constructor. Erring toward not-hoisting is always safe.
+3. **Forced `= 0` on blank finals** (`dumper.go`). A `final` field with no hoistable
+   initializer was emitted as `Type f = 0;`, illegal for reference types. Now a bare
+   `final Type f;` (definite assignment in `<init>`/`<clinit>` keeps it valid).
+4. **Array field type rendering** (`dumper.go`). Array-typed fields rendered the element
+   type, so `int[] TABLE` became `int TABLE`. Now the full array type is rendered.
+   (2–4 together → **Initializers green.**)
+5. **boolean vs integer for `&` `|` `^`** (`expression.go`, `constant.go`). The JVM
+   shares `IAND`/`IOR`/`IXOR` between boolean logic and integer bitwise arithmetic; the
+   code unconditionally reset both operands (and, via the aliased result type, the
+   assignment target) to boolean, mistyping every integer bitwise expression
+   (`int r = a & b; r = r << 2;` → `boolean r = ...`). Now the boolean reset only fires
+   for strictly-boolean operators (`&&`, `||`, `!`); for `&`/`|`/`^` the decision is
+   operand-driven (align to boolean only when an operand is already boolean). →
+   **Operators 13 errors → 1.**
+6. **Dead synthetic temp in `synchronized(field)`** (`dumper.go`). Locking a field
+   compiles to `getfield; dup; astore tmp; monitorenter`; after the synchronized
+   rewriter removes the implicit finally's `monitorexit`, the now-dead temp survived as
+   an inline `synchronized(var2 = this.lock)` referencing an undeclared variable. The
+   dead `tmp =` prefix is stripped back to the lock expression. → **Concurrency green.**
+
+### Correctness fixes landed in this evaluation — round 1
 Four defects were diagnosed from the round-trip oracle and fixed; **Literals now
 recompiles cleanly** as a result, and all are verified non-regressing by the golden
 suite + `TestCorpusDeterminism`:
@@ -326,17 +361,26 @@ recorded as future work.
 ## 6. Backlog (prioritized by impact, from the data above)
 
 **Correctness (semantic fidelity):**
-1. **`try/catch/finally` "multiple next" CFG** — the only classic-corpus stub and
-   the most common stub cause observed in real jars.
-2. **JVM boolean/int disambiguation** (Operators) — infer `boolean` vs `int` for
-   locals from usage/`Z` descriptors instead of the shared int opcodes; the single
-   biggest recompile-frontier blocker.
+1. **Scope-aware local renaming** — one JVM slot reused across non-overlapping
+   bytecode ranges but **overlapping source scopes** is named purely by slot, producing
+   `variable var4 is already defined` (TryWithResources) and `cannot find symbol var4`
+   (Generics, a block-scoped store read after its block). A renaming/scoping pass that
+   guarantees unique names per lexical scope flips two corpus categories and is the
+   single most common remaining defect class in real jars.
+2. **`try/catch/finally` "multiple next" CFG** — the only classic-corpus stub and the
+   most common *stub* cause observed in real jars.
 3. **Loop idiom recovery** — reconstruct `for`/`while` instead of universal
-   `do{...}while(true)`, which also removes the *unreachable statement* failures.
-4. **Array dimension typing** (Arrays) and **field-initializer hoisting**
-   (Initializers) — both are localized type/scope calc bugs.
-5. **Record / sealed `invokedynamic ObjectMethods` bootstrap** — unblocks modern
+   `do{...}while(true)`, which also removes the *unreachable statement* failures (Loops).
+4. **Short-circuit `||`/`&&` boolean-expression recovery** (Operators) — fold the
+   `if(a&&b){return true}else{...}` control flow back into `return (a&&b)||(...)`.
+5. **Generic signature recovery** (Generics, Lambdas) — parse the `Signature` attribute
+   so erased call sites and lambda targets keep their type arguments.
+6. **Record / sealed `invokedynamic ObjectMethods` bootstrap** — unblocks modern
    (Java 17+) value types end-to-end.
+
+*Landed this round (was items 2/4 of the previous backlog):* JVM boolean/int
+disambiguation, array dimension typing, field-initializer hoisting, and the
+`synchronized(field)` dead-temp — see §3 round 2.
 
 **Performance (all in service of the GC-bound profile in §5.2):**
 6. **Dominator-tree allocations** (193 MB, 10%) and **stack/`Set[*OpCode]`
