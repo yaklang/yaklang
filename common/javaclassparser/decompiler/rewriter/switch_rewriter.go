@@ -1,7 +1,6 @@
 package rewriter
 
 import (
-	"fmt"
 	"math"
 	"slices"
 	"sort"
@@ -74,13 +73,10 @@ func SwitchRewriter1(manager *RewriteManager, node *core.Node) error {
 	//node.RemoveAllNext()
 	endNodes = utils2.NewSet[*core.Node](endNodes).List()
 	if len(endNodes) > 1 {
-		// A switch with multiple merge targets (e.g. case bodies jumping to different
-		// loop continue/break targets) is a known structuring limitation. Rather than
-		// panicking, pick the first end node as the merge point so the method doesn't
-		// force a full stub. Additional end nodes will surface as "multiple next" in the
-		// downstream linearizer, which degrades gracefully.
-		// Return an error so the caller can decide to fall back to a stub if needed.
-		return fmt.Errorf("switch with %d merge targets (max 1 supported)", len(endNodes))
+		// A switch with multiple merge targets is a known structuring limitation.
+		// Instead of failing, pick the first end node as the merge point. Extra end
+		// nodes become break targets. This avoids forcing the method into a stub.
+		endNodes = endNodes[:1]
 	}
 	var mergeNode *core.Node
 	if len(endNodes) == 1 {
