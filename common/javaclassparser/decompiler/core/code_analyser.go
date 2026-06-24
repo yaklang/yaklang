@@ -55,6 +55,7 @@ type Decompiler struct {
 	ExceptionTable                []*ExceptionTableEntry
 	BootstrapMethods              []*BootstrapMethod
 	DumpClassLambdaMethod         func(name, desc string, id *utils2.VariableId, capturedCount int) (string, error)
+	InvokeDynamicName             string
 	CurrentId                     int
 	BodyStartId                   int
 	BaseVarId                     *utils2.VariableId
@@ -702,6 +703,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		}
 		refMethod := d.BootstrapMethods[index]
 		memberInfo := refMethod.Ref.(*values.JavaClassMember)
+		d.InvokeDynamicName = name
 		var callResult values.JavaValue
 		if f := buildinBootstrapMethods[fmt.Sprintf("%s.%s", memberInfo.Name, memberInfo.Member)]; f != nil {
 			callResult, err = f(refMethod.Arguments...)(d, runtimeStackSimulation, callSiteReturnType.FunctionType().ReturnType, args...)
@@ -710,7 +712,9 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 			}
 		} else {
 			callResult, err = buildinBootstrapMethods["defaultBootstrapMethod"]()(d, runtimeStackSimulation, callSiteReturnType.FunctionType().ReturnType, args...)
-			return fmt.Errorf("call bootstrap method error: %v", err)
+			if err != nil {
+				return fmt.Errorf("call bootstrap method error: %v", err)
+			}
 		}
 		if callResult.String(funcCtx) != types.NewJavaPrimer(types.JavaVoid).String(funcCtx) {
 			runtimeStackSimulation.Push(callResult)

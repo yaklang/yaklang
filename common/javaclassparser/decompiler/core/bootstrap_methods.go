@@ -138,3 +138,122 @@ var buildinBootstrapMethods = map[string]func(args ...values.JavaValue) BuildinB
 func init() {
 	buildinBootstrapMethods["java.lang.invoke.LambdaMetafactory.altMetafactory"] = buildinBootstrapMethods["java.lang.invoke.LambdaMetafactory.metafactory"]
 }
+
+func init() {
+	buildinBootstrapMethods["java.lang.runtime.ObjectMethods.bootstrap"] = func(args1 ...values.JavaValue) BuildinBootstrapMethod {
+		return func(d *Decompiler, sim StackSimulation, typ types.JavaType, args ...values.JavaValue) (values.JavaValue, error) {
+			// ObjectMethods.bootstrap args:
+			//   args1[0] = recordClass (JavaClassValue)
+			//   args1[1] = names ("field1;field2;..." as a JavaLiteral)
+			//   args1[2+] = MethodHandles for field getters (resolved to JavaClassMember)
+			// Dynamic args: args[0] = receiver (this), [args[1] = other for equals]
+			invokedName := d.InvokeDynamicName
+
+			// Extract record class name and simple name
+			recordClassName := ""
+			if len(args1) > 0 {
+				if cv, ok := args1[0].(*values.JavaClassValue); ok {
+					recordClassName = cv.String(d.FunctionContext)
+				}
+			}
+			simpleName := recordClassName
+			if idx := strings.LastIndex(simpleName, "."); idx >= 0 {
+				simpleName = simpleName[idx+1:]
+			}
+			if idx := strings.LastIndex(simpleName, "$"); idx >= 0 {
+				simpleName = simpleName[idx+1:]
+			}
+
+			// Extract field names from the "name1;name2;..." literal
+			var fieldNames []string
+			if len(args1) > 1 {
+				if lit, ok := args1[1].(*values.JavaLiteral); ok {
+					raw := lit.String(d.FunctionContext)
+					// The literal renders with quotes; strip them
+					raw = strings.Trim(raw, `"`)
+					for _, fn := range strings.Split(raw, ";") {
+						fn = strings.TrimSpace(fn)
+						if fn != "" {
+							fieldNames = append(fieldNames, fn)
+						}
+					}
+				}
+			}
+			// Fall back to extracting field names from the getter method handles
+			if len(fieldNames) == 0 {
+				for _, arg := range args1[2:] {
+					if cm, ok := arg.(*values.JavaClassMember); ok {
+						fieldNames = append(fieldNames, cm.Member)
+					}
+				}
+			}
+
+			// The receiver is args[0] (popped last from stack, so it's the first dynamic arg)
+			var receiver values.JavaValue
+			if len(args) > 0 {
+				receiver = args[0]
+			}
+			receiverStr := "this"
+			if receiver != nil {
+				receiverStr = receiver.String(d.FunctionContext)
+			}
+
+			var result string
+			switch invokedName {
+			case "toString":
+				parts := []string{}
+				for _, fn := range fieldNames {
+					parts = append(parts, fn+`=" + `+receiverStr+`.`+fn)
+				}
+				if len(parts) > 0 {
+					result = `"` + simpleName + `[` + strings.Join(parts, ` + ", `) + ` + "]"`
+				} else {
+					result = `"` + simpleName + `[]"`
+				}
+
+			case "hashCode":
+				if len(fieldNames) == 0 {
+					result = "0"
+				} else {
+					// java.util.Objects.hash(field1, field2, ...)
+					fieldRefs := make([]string, len(fieldNames))
+					for i, fn := range fieldNames {
+						fieldRefs[i] = receiverStr + "." + fn
+					}
+					result = "java.util.Objects.hash(" + strings.Join(fieldRefs, ", ") + ")"
+					d.FunctionContext.Import("java.util.Objects")
+				}
+
+			case "equals":
+				if len(args) > 1 {
+					other := args[1].String(d.FunctionContext)
+					if len(fieldNames) == 0 {
+						result = receiverStr + " == " + other
+					} else {
+						// this.field1 == other.field1 && this.field2 == other.field2 ...
+						parts := []string{}
+						for _, fn := range fieldNames {
+							parts = append(parts, receiverStr+"."+fn+" == "+other+"."+fn)
+						}
+						result = receiverStr + " == " + other + " || (" + receiverStr + " != null && " + other + " != null && " + strings.Join(parts, " && ") + ")"
+					}
+				} else {
+					result = "false"
+				}
+
+			default:
+				return values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+					return "ObjectMethods(" + invokedName + ")"
+				}, func() types.JavaType {
+					return typ
+				}), nil
+			}
+
+			return values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+				return result
+			}, func() types.JavaType {
+				return typ
+			}), nil
+		}
+	}
+}
