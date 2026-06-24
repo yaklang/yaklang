@@ -18,9 +18,9 @@
 
 | 维度 | 结果 | 度量方式 |
 |------|------|----------|
-| 语法安全（解析或降级） | 28/28 语料组产出**语法可解析的 Java**；0 语法错误、0 硬错误、0 panic | `TestSyntaxCoverageMatrix` |
-| 重建覆盖率（无 stub） | 26/28 组产出**未降级输出**（无 stub）；2 组隔离出具体缺口 | `TestSyntaxCoverageMatrix` |
-| 正确性（javac round-trip） | **21/23** 个可评估语料干净重编译（起始为 4/13）；经典语料现已**零 stub**；四个内部类/嵌套类组全部可重编译；专用边界语料与复杂形态语料均已纳入门禁 | `TestRecompileRoundtrip` |
+| 语法安全（解析或降级） | 31/31 语料组产出**语法可解析的 Java**；0 语法错误、0 硬错误、0 panic | `TestSyntaxCoverageMatrix` |
+| 重建覆盖率（无 stub） | 29/31 组产出**未降级输出**（无 stub）；2 个预览组（Records、SealedVar）隔离出具体缺口 | `TestSyntaxCoverageMatrix` |
+| 正确性（javac round-trip） | **24/26** 个可评估语料干净重编译（起始为 4/13）；经典语料现已**零 stub**；四个内部类/嵌套类组全部可重编译；专用边界、数值边界、字段/数组与嵌套控制流语料均已纳入门禁 | `TestRecompileRoundtrip` |
 | 确定性 | 多次反编译逐字节一致；性能改动通过逐类 sha256 指纹证明输出等价 | `TestCorpusDeterminism`、`TestDumpJarFingerprint` |
 | 测试套件 | 绿且快：`./...` ≈ 22s，从 150s 以上降下来（**至少 6.8 倍**），无机器相关依赖 | `go test ./common/javaclassparser/...` |
 | 分配开销 | 核心 **≈246 ms** 且 **≈182 MB 累计堆分配** / 106 类的 jar；校验相对 core-only 增加运行时 ≈ +18%、累计分配 ≈ +23% | `BenchmarkDecompileJar` |
@@ -30,9 +30,9 @@
 
 ### Round-trip 正确性细节
 
-在 23 个可进入严格 `javac` round-trip 验证的经典语料组中（19 个单类组 + 4 个多类内部/嵌套类组）：
+在 26 个可进入严格 `javac` round-trip 验证的经典语料组中（22 个单类组 + 4 个多类内部/嵌套类组）：
 
-- **21 个成功重编译**：Annotations、Arrays、Boundary、CastsInstanceof、ComplexExpressions、ComplexMisc、Concurrency、ControlFlow、ControlFlowEdge、Enums、Exceptions、ExceptionsComplex、Generics、Inheritance、Initializers、InnerClasses、Literals、Loops、Strings、Switches、TryWithResources。
+- **24 个成功重编译**：Annotations、Arrays、Boundary、CastsInstanceof、ComplexExpressions、ComplexMisc、Concurrency、ControlFlow、ControlFlowEdge、Enums、Exceptions、ExceptionsComplex、FieldsAndArrays、Generics、Inheritance、Initializers、InnerClasses、Literals、Loops、NestedControlFlow、NumericEdge、Strings、Switches、TryWithResources。
 - **2 个暴露具体的语义/类型缺陷**：Lambdas（lambda 形参作用域冲突 + 泛型擦除）、Operators（短路布尔 `||` 返回值恢复）。
 - **经典语料 0 stub**：每个方法都结构化为真实 Java。
 
@@ -54,13 +54,14 @@ go test -run TestSyntaxCoverageMatrix -v ./common/javaclassparser/tests/
 
 每组的结果分类：`OK`（完整重建且合法）、`STUB`（某成员降级为 stub 但类仍合法）、`SYNTAX`（输出了非法 Java——真实缺陷）、`ERROR`（反编译返回错误）、`PANIC`。
 
-### 经典语料（Java 8 字节码）——23 组
+### 经典语料（Java 8 字节码）——26 组
 ```
-ok=23  stub=0  syntax=0  error=0  panic=0
+ok=26  stub=0  syntax=0  error=0  panic=0
 ```
 - 原先的 `STUB`（**Exceptions** → `tryCatchFinally(int[],int)` 失败于 `ParseBytesCode failed: multiple next`）已修复；见第 3 节第 5 轮。
 - 第 7 轮新增两个边界条件组（**Boundary**、**ControlFlowEdge**）以加固门禁；二者均完整重建（见第 3 节第 7 轮）。
-- 本轮新增三个复杂形态组（**ComplexExpressions**、**ComplexMisc**、**ExceptionsComplex**）；三者均完整重建，并为此修复了两个正确性缺陷（见第 3 节第 8 轮）。
+- 第 8 轮新增三个复杂形态组（**ComplexExpressions**、**ComplexMisc**、**ExceptionsComplex**）；三者均完整重建，并为此修复了两个正确性缺陷（见第 3 节第 8 轮）。
+- 本轮（第 9 轮）新增三个组（**NumericEdge**、**FieldsAndArrays**、**NestedControlFlow**）；三者均完整重建，并为此修复了一个正确性缺陷（见第 3 节第 9 轮）。
 
 ### 现代语料（Java 17 字节码）——5 组
 ```
@@ -117,8 +118,19 @@ multiclass:    0   (现已一起编译，不再跳过)
 > 循环语义 round-trip 电池（`TestLoopSemanticsRoundTrip`，执行并比对指纹）覆盖所有非 labeled
 > 形态且全部通过。
 
+### 本轮落地的正确性修复 + 语料扩充——第 9 轮（数值/字段/嵌套）
+再新增三个语料并**纳入门禁**，使严格 round-trip 达到 **24/26**、经典覆盖率矩阵达到 **26/26（零 stub）**。新语料暴露的一个真实正确性缺陷被修复；另有两个更深层的结构化缺口被隔离并显式跟踪。
+
+- **NumericEdge**——整型溢出环绕、达到与超过类型位宽的移位计数（`<<32`、`>>>33`）、`int/long/byte/short/char` 混合提升、带隐式窄化的复合赋值、十六/二/八进制与下划线字面量、`char` 算术，以及 `float`/`double` 特殊值（`NaN`、`+/-Infinity`）。一次性重编译通过。
+- **FieldsAndArrays**——实例/静态字段、对**字段数组元素**的复合赋值与前后自增（`this.buf[i] *= 2`）、多维与交错数组、数组初始化器。暴露了下述修复 1。
+- **NestedControlFlow**——三层循环嵌套、跨两层以上的带标签 `break`/`continue`、`while` 内嵌 `switch`（派发 + `break`/`return` 臂）、深层 `if/else-if` 链、`break`/`continue` 混合。
+
+**修复 1——`dup2` 的 ref-fold 回调在两个被复制槽位间被共享（`core/code_analyser.go`）。** 对字段数组元素的复合赋值（`this.buf[i] *= 2`）编译为 `getfield;iload;dup2;iaload;…;iastore`：`dup2` 复制 `(arrayref, index)` 这一对，使同一数组槽位既读又写。反编译器会把非平凡的数组引用折叠进临时变量（`var t = this.buf; t[i] = t[i] * 2`），但 `dup2` 处理器为整对只保留了**一个** ref-fold 回调，且被覆盖为最后一次转换的值。于是较深值的折叠规则（把*数组引用*折进临时变量）也作用到了较浅的*索引*上，错误地产出 `int t = i; t[i] = t[i] * 2`（把 `int` 当数组下标——`javac` 拒绝）。修复：每个被复制的槽位现在各自携带**自己的**回调（`dup2Item{val, addUser}`），并把 `checkAndConvertRef` 实际转换出的值按 opcode 记录（`dupConvertedRefValue`），使临时变量赋值处理器把临时变量绑定到真实的数组引用，而非 `stackConsumed[i]`（对 `dup2` 而言因索引先于数组引用出栈而错位）。已由完整 `./common/javaclassparser/...` 套件加 `TestCorpusDeterminism`/`TestDecompileDeterminism` 验证。
+
+**已跟踪（尚未纳入门禁）。** 构建本轮语料时隔离出两个更深层的结构化缺口，作为显式 backlog 项而非静默规避：（1）从 `switch` case 内部跳向**外层循环**的 `continue`/`break` 会产生第二个 switch 出口边，`SwitchRewriter1` 目前不建模（它断言只有单个 end 节点）；（2）**3 维及以上数组形参**的类型推断会给声明形参类型多加一维（`int[][][] cube` 渲染为 `int[][][][]`），导致其元素与 `int` 比较时类型不匹配。本轮 `NestedControlFlow` 改用 2 维数组与"循环内嵌、非 `continue`"的 switch，以保持在当前正确性边界内。
+
 ### 本轮落地的正确性修复 + 语料扩充——第 8 轮（复杂形态）
-新增三个复杂形态语料并**纳入门禁**，使严格 round-trip 达到 **21/23**、经典覆盖率矩阵达到 **23/23（零 stub）**。新语料暴露的两个真实正确性缺陷被修复（二者在真实代码中都很常见，因此收益远超语料本身）：
+第 8 轮新增三个复杂形态语料并**纳入门禁**，使严格 round-trip 达到 **21/23**、经典覆盖率矩阵达到 **23/23（零 stub）**。新语料暴露的两个真实正确性缺陷被修复（二者在真实代码中都很常见，因此收益远超语料本身）：
 
 - **ComplexExpressions**——1 维/2 维数组初始化、`int/long/float/double` 混合提升、`StringBuilder` 与 `+` 字符串拼接、递归（阶乘/斐波那契）、可变参数、增强 `for`，以及**深层右倾链式三元**（`a?:b?:c?:...`）。
 - **ExceptionsComplex**——嵌套 `try/catch/finally`、单资源与多资源 try-with-resources、重抛、`return` 后的 `finally`、带 `finally` 的多 catch 链。一次性重编译通过。

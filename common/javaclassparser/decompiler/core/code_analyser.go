@@ -30,11 +30,19 @@ type ExceptionTableEntry struct {
 }
 
 type Decompiler struct {
-	FunctionType                  *types.JavaFuncType
-	opcodeToSimulateStack         map[*OpCode]*StackSimulationImpl
-	FunctionContext               *class_context.ClassContext
-	varTable                      map[int]*values.JavaRef
-	opcodeIdToRef                 map[*OpCode][][2]any
+	FunctionType          *types.JavaFuncType
+	opcodeToSimulateStack map[*OpCode]*StackSimulationImpl
+	FunctionContext       *class_context.ClassContext
+	varTable              map[int]*values.JavaRef
+	opcodeIdToRef         map[*OpCode][][2]any
+	// dupConvertedRefValue records, per dup-family opcode and in the SAME order as the
+	// opcodeIdToRef entries appended by checkAndConvertRef, the actual value each synthesized
+	// temp was created from. The dup statement-parse handler must use this instead of
+	// stackConsumed[i]: when checkAndConvertRef converts a value that is NOT on top of the
+	// consume order (e.g. the array reference under the index in `this.f[i] op= v`, whose
+	// dup2 pops index first), stackConsumed[i] points at the wrong operand and would emit a
+	// bogus assignment like `int t = i; t[i] = ...`.
+	dupConvertedRefValue          map[*OpCode][]values.JavaValue
 	bytecodes                     []byte
 	opCodes                       []*OpCode
 	RootOpCode                    *OpCode
@@ -72,16 +80,17 @@ type VarFoldRule struct {
 
 func NewDecompiler(bytecodes []byte, constantPoolGetter func(id int) values.JavaValue) *Decompiler {
 	return &Decompiler{
-		FunctionContext:     &class_context.ClassContext{},
-		bytecodes:           bytecodes,
-		constantPoolGetter:  constantPoolGetter,
-		offsetToOpcodeIndex: map[uint16]int{},
-		opcodeIndexToOffset: map[int]uint16{},
-		varTable:            map[int]*values.JavaRef{},
-		opcodeIdToRef:       map[*OpCode][][2]any{},
-		varUserMap:          omap.NewEmptyOrderedMap[*values.JavaRef, []*VarFoldRule](),
-		delRefUserAttr:      map[string][3]int{},
-		selfOpFoldedRefs:    map[string]bool{},
+		FunctionContext:      &class_context.ClassContext{},
+		bytecodes:            bytecodes,
+		constantPoolGetter:   constantPoolGetter,
+		offsetToOpcodeIndex:  map[uint16]int{},
+		opcodeIndexToOffset:  map[int]uint16{},
+		varTable:             map[int]*values.JavaRef{},
+		opcodeIdToRef:        map[*OpCode][][2]any{},
+		dupConvertedRefValue: map[*OpCode][]values.JavaValue{},
+		varUserMap:           omap.NewEmptyOrderedMap[*values.JavaRef, []*VarFoldRule](),
+		delRefUserAttr:       map[string][3]int{},
+		selfOpFoldedRefs:     map[string]bool{},
 	}
 }
 
@@ -376,6 +385,9 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 			val := runtimeStackSimulation.Pop().(values.JavaValue)
 			ref := runtimeStackSimulation.NewVar(val)
 			d.opcodeIdToRef[opcode] = append(d.opcodeIdToRef[opcode], [2]any{ref, true})
+			// Record the real source value so the dup statement-parse handler does not rely on
+			// stackConsumed[i] (which is mis-indexed when this is not the top-of-consume operand).
+			d.dupConvertedRefValue[opcode] = append(d.dupConvertedRefValue[opcode], val)
 			attr := d.delRefUserAttr[ref.VarUid]
 			attr[2] = 1
 			d.delRefUserAttr[ref.VarUid] = attr
@@ -858,30 +870,37 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		runtimeStackSimulation.Push(v1)
 		adduser(1)
 	case OP_DUP2:
-		var addUser func(int2 int)
-		runtimeStackSimulationPopN := func(n int) []values.JavaValue {
-			datas := []values.JavaValue{}
+		// dup2 duplicates the top two category-1 slots (or one category-2 value). Each duplicated
+		// value must carry its OWN ref-fold callback. The previous code kept a single shared addUser
+		// (overwritten to the LAST converted value), so when both pushes reused it, the deeper value's
+		// fold rule fired on the shallower value too. For a compound array store on a field array
+		// (`this.f[i] op= v`, bytecode getfield;iload;dup2;iaload;...;iastore) that folded the index
+		// into the arrayref temp, emitting `int t = i; t[i] = t[i] op v` (an int indexed as an array).
+		// Tracking addUser per element keeps each duplicated value's fold rule bound to that value.
+		type dup2Item struct {
+			val     values.JavaValue
+			addUser func(int)
+		}
+		popItems := func(n int) []dup2Item {
+			items := []dup2Item{}
 			current := 0
-			for {
-				if current >= n {
-					break
-				}
-				addUser = checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
+			for current < n {
+				au := checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
 				v := runtimeStackSimulation.Pop()
 				current += GetTypeSize(v.(values.JavaValue).Type())
-				datas = append(datas, v)
+				items = append(items, dup2Item{val: v, addUser: au})
 			}
-			return datas
+			return items
 		}
-		runtimeStackSimulationPushReverse := func(datas []values.JavaValue) {
-			for i := len(datas) - 1; i >= 0; i-- {
-				runtimeStackSimulation.Push(datas[i])
-				addUser(1)
+		pushReverse := func(items []dup2Item) {
+			for i := len(items) - 1; i >= 0; i-- {
+				runtimeStackSimulation.Push(items[i].val)
+				items[i].addUser(1)
 			}
 		}
-		datas := runtimeStackSimulationPopN(2)
-		runtimeStackSimulationPushReverse(datas)
-		runtimeStackSimulationPushReverse(datas)
+		items := popItems(2)
+		pushReverse(items)
+		pushReverse(items)
 	case OP_DUP2_X1:
 		var addUser func(int)
 		runtimeStackSimulationPopN := func(n int) []values.JavaValue {
@@ -1952,8 +1971,19 @@ func (d *Decompiler) ParseStatement() error {
 			}
 		case OP_DUP, OP_DUP_X1, OP_DUP_X2, OP_DUP2, OP_DUP2_X1, OP_DUP2_X2:
 			refInfos := d.opcodeIdToRef[opcode]
+			convertedVals := d.dupConvertedRefValue[opcode]
 			for i, refInfo := range refInfos {
-				value := opcode.stackConsumed[i]
+				// Prefer the value checkAndConvertRef actually converted; stackConsumed[i] is only
+				// aligned when the converted operand sat on top of the consume order. For a compound
+				// store on a FIELD array (`this.f[i] op= v`) the dup2 pops the index before the
+				// array reference, so stackConsumed[0] is the index and using it would emit
+				// `int t = i; t[i] = ...`. The recorded value is the true array reference.
+				var value values.JavaValue
+				if i < len(convertedVals) {
+					value = convertedVals[i]
+				} else {
+					value = opcode.stackConsumed[i]
+				}
 				ref := refInfo[0].(*values.JavaRef)
 				// This temporary only carried the old value of a folded field/static
 				// post-increment/decrement; its `x++` / `x--` expression already embeds the

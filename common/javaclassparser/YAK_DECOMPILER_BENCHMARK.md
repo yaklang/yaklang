@@ -35,9 +35,9 @@ authority for automated semantic decisions.
 
 | Axis | Result | How it is measured |
 |------|--------|--------------------|
-| Syntax safety (parse-or-degrade) | 28/28 corpus groups produce **syntax-parseable Java**; 0 syntax errors, 0 hard errors, 0 panics | `TestSyntaxCoverageMatrix` |
-| Reconstruction coverage (no stub) | 26/28 groups emit **non-degraded output** (no stub); 2 groups isolate concrete gaps | `TestSyntaxCoverageMatrix` |
-| Correctness (javac round-trip) | **21/23** eligible corpora recompile cleanly (was 4/13 at start); the classic corpus now emits **zero stubs**; all four inner/nested-class groups recompile; dedicated boundary-condition and complex-shape corpora gated | `TestRecompileRoundtrip` |
+| Syntax safety (parse-or-degrade) | 31/31 corpus groups produce **syntax-parseable Java**; 0 syntax errors, 0 hard errors, 0 panics | `TestSyntaxCoverageMatrix` |
+| Reconstruction coverage (no stub) | 29/31 groups emit **non-degraded output** (no stub); 2 preview groups (Records, SealedVar) isolate concrete gaps | `TestSyntaxCoverageMatrix` |
+| Correctness (javac round-trip) | **24/26** eligible corpora recompile cleanly (was 4/13 at start); the classic corpus now emits **zero stubs**; all four inner/nested-class groups recompile; dedicated boundary-condition, numeric-edge, field/array and nested-control-flow corpora gated | `TestRecompileRoundtrip` |
 | Determinism | byte-identical output across repeated decompiles; perf changes proven equivalent by per-class sha256 fingerprints | `TestCorpusDeterminism`, `TestDumpJarFingerprint` |
 | Test suite | green & fast: `./...` ≈ 22s, down from more than 150s (**at least 6.8x**), no machine-specific dependencies | `go test ./common/javaclassparser/...` |
 | Allocation cost | core **≈246 ms** and **≈182 MB cumulative heap allocation** per 106-class jar; validation increases runtime ≈ +18% and cumulative allocation ≈ +23% relative to core-only | `BenchmarkDecompileJar` |
@@ -50,13 +50,14 @@ out of `Decompile`.
 
 ### Round-trip correctness detail
 
-Of the 23 classic corpus groups eligible for strict `javac` round-trip validation
-(19 single-class groups plus 4 multi-class inner/nested-class groups):
+Of the 26 classic corpus groups eligible for strict `javac` round-trip validation
+(22 single-class groups plus 4 multi-class inner/nested-class groups):
 
-- **21 recompile successfully**: Annotations, Arrays, Boundary, CastsInstanceof,
+- **24 recompile successfully**: Annotations, Arrays, Boundary, CastsInstanceof,
   ComplexExpressions, ComplexMisc, Concurrency, ControlFlow, ControlFlowEdge, Enums,
-  Exceptions, ExceptionsComplex, Generics, Inheritance, Initializers, InnerClasses,
-  Literals, Loops, Strings, Switches, TryWithResources.
+  Exceptions, ExceptionsComplex, FieldsAndArrays, Generics, Inheritance, Initializers,
+  InnerClasses, Literals, Loops, NestedControlFlow, NumericEdge, Strings, Switches,
+  TryWithResources.
 - **2 expose concrete semantic/typing defects**: Lambdas (lambda-param scope
   collision + erased generics) and Operators (short-circuit boolean `||` return
   recovery).
@@ -183,6 +184,46 @@ any of the 18 green categories fails CI; the rest are tracked as the backlog.
 > Tracked under "loop idiom recovery" in the backlog; the loop-semantics
 > round-trip battery (`TestLoopSemanticsRoundTrip`, which executes and compares
 > fingerprints) covers every non-labeled shape and passes.
+
+### Correctness fixes + corpus expansion landed in this evaluation — round 9 (numeric/field/nested)
+Three more corpora were added and **gated**, taking the strict round-trip to **24/26** and
+the classic coverage matrix to **26/26 (zero stubs)**. One real correctness bug surfaced by
+the new corpora was fixed; two deeper structuring gaps were isolated and explicitly tracked.
+
+- **NumericEdge** — integer overflow wrap-around, shift counts at and beyond the type width
+  (`<<32`, `>>>33`), mixed `int/long/byte/short/char` promotion, compound assignment with
+  implicit narrowing, hex/binary/octal/underscore literals, `char` arithmetic, and
+  `float`/`double` special values (`NaN`, `+/-Infinity`). Recompiled on the first attempt.
+- **FieldsAndArrays** — instance/static fields, compound assignment and pre/post increment
+  on **field array elements** (`this.buf[i] *= 2`), multi-dimensional and jagged arrays,
+  and array initializers. Exposed Fix 1 below.
+- **NestedControlFlow** — three-level loop nesting, labeled `break`/`continue` across more
+  than two levels, a `while` with an inner `switch` (dispatch + `break`/`return` arms),
+  deep `if/else-if` chains, and a `break`/`continue` mix.
+
+**Fix 1 — `dup2` ref-fold callback shared across both duplicated slots
+(`core/code_analyser.go`).** A compound assignment to a field array element
+(`this.buf[i] *= 2`) compiles to `getfield;iload;dup2;iaload;…;iastore`: `dup2` duplicates
+the `(arrayref, index)` pair so the same array slot is read and written. The decompiler
+folds a non-trivial array reference into a temp (`var t = this.buf; t[i] = t[i] * 2`), but
+the `dup2` handler kept **one** ref-fold callback for the whole pair, overwritten to the
+last converted value. So the deeper value's fold rule (fold the *array ref* into a temp)
+also fired on the shallower *index*, emitting the nonsense `int t = i; t[i] = t[i] * 2` (an
+`int` indexed as an array — `javac` rejects it). Fix: each duplicated slot now carries its
+**own** callback (`dup2Item{val, addUser}`), and the value `checkAndConvertRef` actually
+converted is recorded per-opcode (`dupConvertedRefValue`) so the temp-assign handler binds
+the temp to the real array reference instead of `stackConsumed[i]` (which is mis-indexed for
+`dup2` because the index is popped before the array ref). Validated by the full
+`./common/javaclassparser/...` suite plus `TestCorpusDeterminism`/`TestDecompileDeterminism`.
+
+**Tracked (not yet gated).** Two deeper structuring gaps were isolated while building this
+round's corpus and are left as explicit backlog items rather than silently worked around:
+(1) a `continue`/`break` that targets the **enclosing loop from inside a `switch` case**
+produces a second switch exit edge that `SwitchRewriter1` does not yet model (it asserts a
+single end node); (2) **3-D+ array parameter** type inference adds one dimension to the
+declared parameter type (`int[][][] cube` renders as `int[][][][]`), so an element compared
+against an `int` mismatches. The round's `NestedControlFlow` corpus uses 2-D arrays and a
+loop-embedded (non-`continue`) switch to stay within today's correctness envelope.
 
 ### Correctness fixes + corpus expansion landed in this evaluation — round 8 (complex shapes)
 Three complex-shape corpora were added and **gated**, taking the strict round-trip to
@@ -615,8 +656,22 @@ recorded as future work.
    `catch (Throwable)` rethrow, exactly as the bytecode runs). A future pass can
    collapse this into a single idiomatic `finally {}` block for readability.
 
-*Landed this round (round 8):* complex-shape corpora (ComplexExpressions, ComplexMisc,
-ExceptionsComplex) added and gated — strict round-trip now **21/23**, classic coverage
+*Landed this round (round 9):* numeric-edge, field/array and nested-control-flow corpora
+(NumericEdge, FieldsAndArrays, NestedControlFlow) added and gated — strict round-trip now
+**24/26**, classic coverage **26/26** with zero stubs. One real correctness bug fixed:
+compound assignment / pre-post increment on a **field array element** (`this.f[i] op= v`,
+bytecode `getfield;iload;dup2;iaload;…;iastore`) mis-emitted `int t = i; t[i] = t[i] op v`
+because the `dup2` handler shared a single ref-fold callback across both duplicated stack
+slots, so the deeper value's fold rule (fold the array-ref into a temp) also fired on the
+shallower index. Each duplicated slot now carries its own callback, and the converted
+array-ref value is recorded per-opcode (`dupConvertedRefValue`) so the temp binds to the
+array reference rather than `stackConsumed[i]` (mis-indexed for `dup2`). Two deeper
+structuring gaps were isolated and tracked (not yet gated): a `continue`/`break` that
+targets the enclosing loop from inside a switch case (creates a second switch exit the
+switch rewriter does not yet model), and 3-D+ array **parameter** type inference (adds one
+dimension to the declared parameter type).
+*Round 8:* complex-shape corpora (ComplexExpressions, ComplexMisc,
+ExceptionsComplex) added and gated — strict round-trip **21/23**, classic coverage
 **23/23** with zero stubs. Two real correctness bugs fixed: (1) deep chained ternaries
 no longer have their per-arm conditions mis-folded into a short-circuit `||` (no more
 empty-slot stub), via a `TernaryChainArm` tag that `MergeIf` honours; (2) locals
