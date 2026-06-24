@@ -19,7 +19,7 @@ import (
 func TestJavaSyntaxNoDriftFromFrontend(t *testing.T) {
 	dir := os.Getenv("JDSC_DIR")
 	if dir == "" {
-		dir = "/tmp/jdsc-final"
+		t.Skip("set JDSC_DIR to run this diagnostic over a jdsc corpus (opt-in)")
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -53,7 +53,7 @@ func TestJavaSyntaxNoDriftFromFrontend(t *testing.T) {
 func TestSuspectDeterminism(t *testing.T) {
 	dir := os.Getenv("JDSC_DIR")
 	if dir == "" {
-		dir = "/tmp/jdsc-final"
+		t.Skip("set JDSC_DIR to run this diagnostic over a jdsc corpus (opt-in)")
 	}
 	suspects := []string{
 		"partial-decompile-5e9da855ea25409c87f1d598.class",

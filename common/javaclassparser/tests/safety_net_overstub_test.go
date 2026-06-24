@@ -18,7 +18,7 @@ import (
 func TestSafetyNetNoOverStub(t *testing.T) {
 	dir := os.Getenv("JDSC_DIR")
 	if dir == "" {
-		dir = "/tmp/jdsc-final"
+		t.Skip("set JDSC_DIR to run this diagnostic over a jdsc corpus (opt-in)")
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -91,7 +91,7 @@ func TestSafetyNetNoOverStub(t *testing.T) {
 func TestSafetyNetIsolated(t *testing.T) {
 	dir := os.Getenv("JDSC_DIR")
 	if dir == "" {
-		dir = "/tmp/jdsc-final"
+		t.Skip("set JDSC_DIR to run this diagnostic over a jdsc corpus (opt-in)")
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {

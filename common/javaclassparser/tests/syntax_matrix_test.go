@@ -180,6 +180,50 @@ func renderMatrix(title string, groups map[string]*groupResult) (string, map[str
 	return sb.String(), counts
 }
 
+// TestCorpusDeterminism is the portable determinism guard: every class compiled
+// from the corpus must decompile to byte-identical output across repeated runs.
+// It replaces the machine-specific ~/.m2 determinism scan in normal runs.
+func TestCorpusDeterminism(t *testing.T) {
+	javac, err := exec.LookPath("javac")
+	if err != nil {
+		t.Skip("javac not found; skipping corpus determinism check")
+	}
+	dir := compileCorpus(t, javac, "corpus/classic", "8")
+	const N = 6
+	var checked int
+	_ = filepath.Walk(dir, func(p string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() || !strings.HasSuffix(p, ".class") {
+			return nil
+		}
+		raw, rErr := os.ReadFile(p)
+		if rErr != nil {
+			return nil
+		}
+		first, dErr := safeDecompileHarness(raw)
+		if dErr != nil {
+			return nil
+		}
+		checked++
+		for i := 1; i < N; i++ {
+			out, e := safeDecompileHarness(raw)
+			if e != nil {
+				t.Errorf("%s: run %d errored after a clean run 0: %v", filepath.Base(p), i, e)
+				break
+			}
+			if out != first {
+				t.Errorf("%s: non-deterministic decompile output on run %d (len %d vs %d)",
+					filepath.Base(p), i, len(out), len(first))
+				break
+			}
+		}
+		return nil
+	})
+	if checked == 0 {
+		t.Skip("no corpus classes available")
+	}
+	t.Logf("corpus determinism: %d classes byte-identical across %d runs each", checked, N)
+}
+
 // TestSyntaxCoverageMatrix is the Phase-1 coverage probe: it compiles the corpus,
 // decompiles every class and prints a per-category status matrix. It gates on the
 // hard-failure classes (panic / decompile-error / invalid-syntax output) for the
