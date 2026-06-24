@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// Benchmark 证明: 25 条高危超级正则一次编译、一次扫描, 纯净流量与命中流量都极快,
+// Benchmark 证明: 内置超级正则组一次编译、一次扫描, 纯净流量与命中流量都极快,
 // 满足 MITM 实时热路径(目标: 普通 HTTP 事务扫描 P95 <= 2ms)。
 
 func benchScanner() *Scanner {
@@ -74,7 +74,7 @@ func BenchmarkScanHTTPFlowReq32K(b *testing.B) {
 	b.SetBytes(int64(len(req) + len(rsp)))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = s.ScanHTTPFlow(req, rsp)
+		_ = s.ScanHTTPFlow("api.example.com", req, rsp)
 	}
 }
 

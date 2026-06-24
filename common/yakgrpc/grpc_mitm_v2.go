@@ -1496,13 +1496,12 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			}
 		}
 
-		// 内置高危凭证检测(TrafficGuard): 在过滤判定之前无条件扫描(不受任何过滤策略影响)。
-		// 命中敏感凭证的流量, 即使命中静态资源/大 JS 等过滤规则, 也强制取消过滤、保留并保存,
-		// 让用户一定能看到红色高危流量与对应的 Risk。一次扫描, 复用结果, 不二次开销。
-		tgFindings := trafficguard.ScanFindings(plainRequest, plainResponse)
-		if len(tgFindings) > 0 {
-			isFiltered = false
-		}
+		// 内置敏感信息检测(TrafficGuard): 在过滤判定之前无条件扫描(不受任何过滤策略影响)。
+		// 命中敏感信息、且本应被过滤的流量, 改以"插件流量"(source_type=scan + FromPlugin)形式保存到插件输出,
+		// 既留存证据, 又不污染 MITM History TAB。一次扫描, 复用结果, 不二次开销。
+		tgFindings := trafficguard.ScanFindings(reqUrl, plainRequest, plainResponse)
+		// tgSaveAsPlugin: 本应被过滤、但命中了敏感信息 -> 以插件流量形式保留(不进 MITM TAB)。
+		tgSaveAsPlugin := isFiltered && len(tgFindings) > 0
 
 		shouldBeHijacked := !isFiltered
 
@@ -1510,8 +1509,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		go func() {
 			hotPatchPipeline.MirrorHTTPFlowWithCtx(pluginCtx, isHttps, reqUrl, plainRequest, plainResponse, body, shouldBeHijacked)
 		}()
-		// 劫持过滤
-		if isFiltered {
+		// 劫持过滤: 被过滤且未命中敏感信息的流量直接丢弃; 命中敏感信息的过滤流量继续走保存(以插件流量形式)。
+		if isFiltered && !tgSaveAsPlugin {
 			return
 		}
 		saveBarePacketHandler := func(id uint) {
@@ -1564,6 +1563,13 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				String: filepath.Base(name),
 				Valid:  true,
 			}
+		}
+
+		// 被 MITM 过滤、但命中内置敏感信息检测的流量: 改以"插件流量"形式保存(source_type=scan + FromPlugin),
+		// 不进 MITM History(source_type=mitm) TAB, 而是进入"插件输出"。必须在 CalcHash 之前设置。
+		if tgSaveAsPlugin {
+			flow.SourceType = schema.HTTPFlow_SourceType_SCAN
+			flow.FromPlugin = trafficguard.PluginName
 		}
 
 		flow.Hash = flow.CalcHash()

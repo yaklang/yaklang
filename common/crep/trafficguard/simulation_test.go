@@ -101,14 +101,15 @@ func TestSimulationMergedRiskAggregates(t *testing.T) {
 	if r == nil {
 		t.Fatal("expected merged risk for multi-hit flow")
 	}
-	if !strings.Contains(r.Title, "敏感凭证泄漏") {
+	if !strings.Contains(r.Title, "敏感信息泄漏") {
 		t.Errorf("title missing keyphrase: %q", r.Title)
 	}
 	if !strings.Contains(r.Title, "api.example.com") {
 		t.Errorf("title missing host: %q", r.Title)
 	}
-	if severityForSchema(r.Severity) != "critical" {
-		t.Errorf("merged severity should be critical, got %q", r.Severity)
+	// 严重度受上限约束: 一律最高中危(warning)。
+	if r.Severity != "warning" {
+		t.Errorf("merged severity should be capped to warning, got %q", r.Severity)
 	}
 }
 

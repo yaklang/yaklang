@@ -10,10 +10,19 @@ package trafficguard
 //     并以字符集 + 定长约束把误报压到极低;
 //  3. 低开销: 全部 RE2 兼容(无 backreference / lookaround / 无界 .* 跨行),可被 minirehs
 //     MVS 后端编译为位并行 NFA 一次扫描全部规则,避免逐条正则的 O(N x L) 开销;
-//  4. 危险度可衡量: 每条规则显式标注 Severity(critical/high/warning) 与类别,命中后直接
-//     生成对应级别的 Risk,让用户立刻感知"发生了什么"。
+//  4. 危险度可衡量: 每条规则显式标注 Severity(critical/high/warning) 与类别; 但落库 Risk 的
+//     严重度统一受 SeverityCeiling 上限约束(最高中危), 因为本组定位是"辅助人工判真假的线索"。
 //
 // 该规则组默认随 MITM 开启,当前不提供关闭开关(见 scanner.go 的 DefaultScanner)。
+//
+// 误报治理(见 validators.go validateFinding 第三阶段校验): PCRE2 精确提取后, 还会按 host/方向/值形态
+// 做上下文校验, 剔除明显误报:
+//   - 厂商自有域的第一方自用流量: Google/Chrome 自有域(content-autofill.googleapis.com 的
+//     x-goog-api-key、搜索建议、gstatic、Firebase 遥测等)上的 key/token/通用 api-key 凭证字段与鉴权头
+//     (规则 4/5/19/23/24/25)一律抑制 —— 浏览器自带流量并非泄漏;
+//   - 非真 JWT 的 eyJ base64 块(首段无 alg);
+//   - JS 源码里 password:function(...) 之类的源码型口令字段(值形态收紧)。
+// JS 仍会被完整扫描(JS 硬编码与注释里可能藏真实凭证), 残留疑似项交由 Risk 上下文供人工判真假。
 
 // Severity 取值对齐 yaklib risk 体系:
 //   "critical" -> 严重 / "high" -> 高危 / "warning" -> 中危 / "low" -> 低危
@@ -22,6 +31,16 @@ const (
 	severityHigh     = "high"
 	severityMedium   = "warning" // 中危
 )
+
+// PluginName 是被 MITM 过滤掉、但命中内置敏感信息检测的流量的"来源插件名"。
+// 这类流量不进 MITM History(source_type=mitm), 而是以"插件流量"(source_type=scan + FromPlugin)
+// 的形式保存, 既不污染 MITM TAB, 又能在"插件输出"中留存证据。见 grpc_mitm.go 的集成点。
+const PluginName = "内置敏感信息检测"
+
+// SeverityCeiling 是 trafficguard 生成 Risk 的严重度上限: 一律不超过"中危"(warning)。
+// 内置敏感信息检测以"提示线索、辅助人工判真假"为定位, 故即便命中私钥等本应严重的特征,
+// 落库 Risk 也最高只给中危, 避免在被动扫描里制造高危告警噪声。
+const SeverityCeiling = severityMedium
 
 // rule 是超级正则组中的一条规则。
 type rule struct {
@@ -281,36 +300,20 @@ var builtinRules = []rule{
 		Category:   "authorization-token",
 		Severity:   severityHigh,
 		// 三段 base64url 用 . 分隔,首段以 eyJ 开头(JSON "{" 的 base64url)。
+		// 仅在响应方向 + 首段为含 alg 的真实 JWT header 时才算命中(见 scanner.go validateFinding):
+		// 请求方向的 JWT 多为第一方会话凭证(等同 Authorization 头), 抑制以降噪;
+		// 响应/JS 源码中出现的 JWT 更可能是硬编码或泄漏, 予以保留。
 		Regex: `eyJ[A-Za-z0-9_-]{8,512}\.eyJ[A-Za-z0-9_-]{8,512}\.[A-Za-z0-9_-]{8,512}`,
-		Description: "流量中出现 JWT(JSON Web Token)。JWT 常承载用户身份,泄漏后在有效期内可冒充该身份访问服务。",
-		Solution:   "缩短 JWT 有效期、服务端吊销会话、避免将 JWT 写入 URL 或前端持久存储,排查泄漏来源。",
+		Description: "响应/脚本中出现 JWT(JSON Web Token)。若为硬编码或被接口返回, 泄漏后在有效期内可冒充该身份访问服务。",
+		Solution:   "缩短 JWT 有效期、服务端吊销会话、避免将 JWT 写入 URL、前端持久存储或脚本源码,排查泄漏来源。",
 		RedactHead: 3,
 		RedactTail: 3,
 	},
-	{
-		ID:         20,
-		Name:       "HTTP Bearer Token 泄漏",
-		Category:   "authorization-token",
-		Severity:   severityMedium,
-		// Authorization: Bearer <token>,token 长度 >=16。
-		Regex: `(?i)bearer\s+[A-Za-z0-9._~+/=-]{16,512}`,
-		Description: "请求中出现 Bearer Token(Authorization: Bearer)。该 Token 即用户身份凭证,泄漏可被重放冒充。",
-		Solution:   "确认该 Token 来源与有效期,必要时吊销并重新签发,避免明文出现在前端或日志。",
-		RedactHead: 7,
-		RedactTail: 3,
-	},
-	{
-		ID:         21,
-		Name:       "HTTP Basic 认证凭证泄漏",
-		Category:   "authorization-token",
-		Severity:   severityHigh,
-		// Authorization: Basic <base64>。
-		Regex: `(?i)authorization:\s*basic\s+[A-Za-z0-9+/=]{8,256}`,
-		Description: "请求头使用 HTTP Basic 认证,其值为 username:password 的 Base64。泄漏后可直接解码出账号口令。",
-		Solution:   "改用更安全的认证(Bearer/OAuth),确认该账号口令是否仍有效,必要时立即修改密码。",
-		RedactHead: 0,
-		RedactTail: 0,
-	},
+	// 注: Authorization: Bearer / Basic 头(原规则 20/21)已移除。
+	// 原因: 在正常带鉴权浏览中, 几乎每个请求都携带 Authorization 头, 命中率极高且全是
+	// 用户自己对目标站点的"第一方会话凭证", 并非泄漏, 只会产生大量噪声。X-API-Key 等
+	// 自定义鉴权头(规则 25)相对更有意义, 予以保留。JWT(规则 19)仅在响应方向保留(见 scanner.go
+	// 的 validateFinding: 请求方向的 JWT 同样视为第一方会话凭证而抑制)。
 
 	// ---------------- 数据库 / 中间件连接串 ----------------
 	{
