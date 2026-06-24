@@ -105,6 +105,10 @@ func FromHTTPFlowGRPCModel(f *ypb.HTTPFlow) (*schema.HTTPFlow, error) {
 		IsReadTooSlowResponse:      f.IsReadTooSlowResponse,
 		TooLargeResponseBodyFile:   string(f.TooLargeResponseBodyFile),
 		TooLargeResponseHeaderFile: string(f.TooLargeResponseHeaderFile),
+		IsTooLargeRequest:         f.IsTooLargeRequest,
+		TooLargeRequestBodyFile:   string(f.TooLargeRequestBodyFile),
+		TooLargeRequestHeaderFile: string(f.TooLargeRequestHeaderFile),
+		IsRequestOversize:         f.IsRequestOversize || f.IsTooLargeRequest,
 	}
 
 	flow.Response = strconv.Quote(string(f.Response))
@@ -152,6 +156,10 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 		IsReadTooSlowResponse:      f.IsReadTooSlowResponse,
 		TooLargeResponseBodyFile:   utf8safe(f.TooLargeResponseBodyFile),
 		TooLargeResponseHeaderFile: utf8safe(f.TooLargeResponseHeaderFile),
+		IsTooLargeRequest:         f.IsTooLargeRequest,
+		TooLargeRequestBodyFile:   utf8safe(f.TooLargeRequestBodyFile),
+		TooLargeRequestHeaderFile: utf8safe(f.TooLargeRequestHeaderFile),
+		IsRequestOversize:         f.IsRequestOversize || f.IsTooLargeRequest,
 		DurationMs:                 f.Duration / int64(time.Millisecond),
 		PathSuffix:                 utf8safe(f.PathSuffix),
 		Payloads: lo.Map(strings.Split(f.Payload, ","), func(i string, _ int) string {
@@ -208,7 +216,7 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 	// RequestSizeVerbose 使用 RequestLength 计算，与 BodySizeVerbose 风格统一
 	flow.RequestSizeVerbose = utf8safe(utils.ByteSize(uint64(flow.RequestLength)))
 
-	requireRequest := full || !f.IsRequestOversize
+	requireRequest := full || (!f.IsRequestOversize && !f.IsTooLargeRequest)
 	requireResponse := full || !f.IsResponseOversize
 	isStandardRequest := !flow.NoFixContentLength
 

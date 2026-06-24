@@ -142,6 +142,8 @@ type CreateHTTPFlowConfig struct {
 	tags               string
 	tooLargeHeaderFile string
 	tooLargeBodyFile   string
+	tooLargeRequestHeaderFile string
+	tooLargeRequestBodyFile   string
 	fromPlugin         string
 	afterSaveHandlers  []func(*schema.HTTPFlow)
 }
@@ -343,14 +345,45 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		duration           = int64(c.duration)
 		tooLargeHeaderFile = c.tooLargeHeaderFile
 		tooLargeBodyFile   = c.tooLargeBodyFile
+		tooLargeRequestHeaderFile = c.tooLargeRequestHeaderFile
+		tooLargeRequestBodyFile   = c.tooLargeRequestBodyFile
 		fromPlugin         = c.fromPlugin
 	)
 
 	var (
-		method     string
-		requestUri string
-		fReq       *mutate.FuzzHTTPRequest
+		method              string
+		requestUri           string
+		fReq                 *mutate.FuzzHTTPRequest
+		isTooLargeRequest      bool
+		tooLargeReqHeaderFile string
+		tooLargeReqBodyFile   string
+		requestBodyLen        int
 	)
+
+	spillRes, err := spillLargeHTTPFlowRequestIfNeeded(reqRaw)
+	if err != nil {
+		return nil, utils.Errorf("spill large request failed: %s", err)
+	}
+	reqRaw = spillRes.StoredPacket
+	isTooLargeRequest = spillRes.IsTooLarge
+	tooLargeReqHeaderFile = spillRes.HeaderFile
+	tooLargeReqBodyFile = spillRes.BodyFile
+	requestBodyLen = spillRes.OriginalBodyLen
+
+	if tooLargeRequestHeaderFile != "" {
+		tooLargeReqHeaderFile = tooLargeRequestHeaderFile
+	}
+	if tooLargeRequestBodyFile != "" {
+		tooLargeReqBodyFile = tooLargeRequestBodyFile
+	}
+	if tooLargeReqHeaderFile != "" || tooLargeReqBodyFile != "" {
+		isTooLargeRequest = true
+	}
+
+	if !isTooLargeRequest {
+		reqRaw = truncateHTTPPacketBodyForStorage(reqRaw, maxStoredHTTPFlowRequestBodyBytes)
+		requestBodyLen = requestBodyLengthFromPacket(reqRaw)
+	}
 
 	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacketEx(reqRaw, func(m string, r string, proto string) error {
 		method = m
@@ -359,7 +392,7 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 	})
 
 	_ = header
-	reqRaw = truncateHTTPPacketBodyForStorage(reqRaw, maxStoredHTTPFlowRequestBodyBytes)
+	_ = body
 	requestRaw := strconv.Quote(string(reqRaw))
 	if strings.HasPrefix(requestRaw, `"HTTP/1.`) {
 		log.Errorf("[BUG] requestRaw is invalid: %s", requestRaw)
@@ -397,7 +430,7 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		PathSuffix:                 lowhttp.GetPathSuffix(requestUri),
 		Method:                     method,
 		BodyLength:                 int64(len(body)),
-		RequestLength:              int64(len(requestRaw)),
+		RequestLength:              int64(requestBodyLen),
 		ContentType:                rspContentType,
 		StatusCode:                 int64(lowhttp.ExtractStatusCodeFromResponse(rspRaw)),
 		SourceType:                 source,
@@ -410,6 +443,9 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		Duration:                   duration,
 		TooLargeResponseBodyFile:   tooLargeBodyFile,
 		TooLargeResponseHeaderFile: tooLargeHeaderFile,
+		IsTooLargeRequest:         isTooLargeRequest,
+		TooLargeRequestBodyFile:   tooLargeReqBodyFile,
+		TooLargeRequestHeaderFile: tooLargeReqHeaderFile,
 		FromPlugin:                 fromPlugin,
 	}
 	if storeBareWire {
@@ -428,6 +464,18 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 			flow.TooLargeResponseHeaderFile = httpctx.GetResponseTooLargeHeaderFile(reqIns)
 			flow.TooLargeResponseBodyFile = httpctx.GetResponseTooLargeBodyFile(reqIns)
 			flow.BodyLength = httpctx.GetResponseTooLargeSize(reqIns)
+		}
+		if httpctx.GetRequestTooLarge(reqIns) {
+			flow.IsTooLargeRequest = true
+			if fp := httpctx.GetRequestTooLargeHeaderFile(reqIns); fp != "" {
+				flow.TooLargeRequestHeaderFile = fp
+			}
+			if fp := httpctx.GetRequestTooLargeBodyFile(reqIns); fp != "" {
+				flow.TooLargeRequestBodyFile = fp
+			}
+			if sz := httpctx.GetRequestTooLargeSize(reqIns); sz > 0 {
+				flow.RequestLength = sz
+			}
 		}
 	} else {
 		fReq, _ = mutate.NewFuzzHTTPRequest(reqRaw)
@@ -1156,9 +1204,13 @@ tags, is_websocket, websocket_hash, runtime_id, from_plugin,
 process_name,
 is_read_too_slow_response,
 
--- request is larger than 200K, return empty string
-LENGTH(request) > 204800 as is_request_oversize,
-CASE WHEN LENGTH(request) > 204800 THEN '' ELSE request END as request,
+-- request is larger than 200K or marked too-large, return empty string
+(is_too_large_request OR LENGTH(request) > 204800) as is_request_oversize,
+CASE WHEN (is_too_large_request OR LENGTH(request) > 204800) THEN '' ELSE request END as request,
+
+-- is request too large (body spilled to file)
+is_too_large_request,
+too_large_request_header_file, too_large_request_body_file,
 
 -- response is larger than 500K, return empty string
 LENGTH(response) > 512000 as is_response_oversize,

@@ -35937,13 +35937,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -45558,8 +45558,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -50388,14 +50388,20 @@ type HTTPFlow struct {
 	TooLargeResponseBodyFile   string   `protobuf:"bytes,45,opt,name=TooLargeResponseBodyFile,proto3" json:"TooLargeResponseBodyFile,omitempty"`
 	DisableRenderStyles        bool     `protobuf:"varint,46,opt,name=DisableRenderStyles,proto3" json:"DisableRenderStyles,omitempty"`
 	// payloads (web fuzzer)
-	Payloads      []string `protobuf:"bytes,47,rep,name=Payloads,proto3" json:"Payloads,omitempty"`
-	DurationMs    int64    `protobuf:"varint,48,opt,name=DurationMs,proto3" json:"DurationMs,omitempty"`
-	HiddenIndex   string   `protobuf:"bytes,49,opt,name=HiddenIndex,proto3" json:"HiddenIndex,omitempty"`
-	FromPlugin    string   `protobuf:"bytes,50,opt,name=FromPlugin,proto3" json:"FromPlugin,omitempty"`
-	Host          string   `protobuf:"bytes,52,opt,name=Host,proto3" json:"Host,omitempty"`
-	PathSuffix    string   `protobuf:"bytes,53,opt,name=PathSuffix,proto3" json:"PathSuffix,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Payloads    []string `protobuf:"bytes,47,rep,name=Payloads,proto3" json:"Payloads,omitempty"`
+	DurationMs  int64    `protobuf:"varint,48,opt,name=DurationMs,proto3" json:"DurationMs,omitempty"`
+	HiddenIndex string   `protobuf:"bytes,49,opt,name=HiddenIndex,proto3" json:"HiddenIndex,omitempty"`
+	FromPlugin  string   `protobuf:"bytes,50,opt,name=FromPlugin,proto3" json:"FromPlugin,omitempty"`
+	Host        string   `protobuf:"bytes,52,opt,name=Host,proto3" json:"Host,omitempty"`
+	PathSuffix  string   `protobuf:"bytes,53,opt,name=PathSuffix,proto3" json:"PathSuffix,omitempty"`
+	// 超大请求：body 落盘，DB 仅保留 header + 占位（与 IsTooLargeResponse 对称）
+	IsTooLargeRequest         bool   `protobuf:"varint,54,opt,name=IsTooLargeRequest,proto3" json:"IsTooLargeRequest,omitempty"`
+	TooLargeRequestHeaderFile string `protobuf:"bytes,55,opt,name=TooLargeRequestHeaderFile,proto3" json:"TooLargeRequestHeaderFile,omitempty"`
+	TooLargeRequestBodyFile   string `protobuf:"bytes,56,opt,name=TooLargeRequestBodyFile,proto3" json:"TooLargeRequestBodyFile,omitempty"`
+	// 列表查询时由 SQL 计算：request 过大或 DB 中 request 过长
+	IsRequestOversize bool `protobuf:"varint,57,opt,name=IsRequestOversize,proto3" json:"IsRequestOversize,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *HTTPFlow) Reset() {
@@ -50783,6 +50789,34 @@ func (x *HTTPFlow) GetPathSuffix() string {
 		return x.PathSuffix
 	}
 	return ""
+}
+
+func (x *HTTPFlow) GetIsTooLargeRequest() bool {
+	if x != nil {
+		return x.IsTooLargeRequest
+	}
+	return false
+}
+
+func (x *HTTPFlow) GetTooLargeRequestHeaderFile() string {
+	if x != nil {
+		return x.TooLargeRequestHeaderFile
+	}
+	return ""
+}
+
+func (x *HTTPFlow) GetTooLargeRequestBodyFile() string {
+	if x != nil {
+		return x.TooLargeRequestBodyFile
+	}
+	return ""
+}
+
+func (x *HTTPFlow) GetIsRequestOversize() bool {
+	if x != nil {
+		return x.IsRequestOversize
+	}
+	return false
 }
 
 type FuzzableParam struct {
@@ -74710,7 +74744,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06Header\x18\x01 \x01(\tR\x06Header\x12\x14\n" +
 	"\x05Value\x18\x02 \x01(\tR\x05Value\".\n" +
 	"\tHTTPFlows\x12!\n" +
-	"\x04Data\x18\x01 \x03(\v2\r.ypb.HTTPFlowR\x04Data\"\x92\x0f\n" +
+	"\x04Data\x18\x01 \x03(\v2\r.ypb.HTTPFlowR\x04Data\"\xe6\x10\n" +
 	"\bHTTPFlow\x12\x18\n" +
 	"\aIsHTTPS\x18\x02 \x01(\bR\aIsHTTPS\x12\x10\n" +
 	"\x03Url\x18\x03 \x01(\tR\x03Url\x125\n" +
@@ -74777,7 +74811,11 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x04Host\x184 \x01(\tR\x04Host\x12\x1e\n" +
 	"\n" +
 	"PathSuffix\x185 \x01(\tR\n" +
-	"PathSuffix\"\xa9\x01\n" +
+	"PathSuffix\x12,\n" +
+	"\x11IsTooLargeRequest\x186 \x01(\bR\x11IsTooLargeRequest\x12<\n" +
+	"\x19TooLargeRequestHeaderFile\x187 \x01(\tR\x19TooLargeRequestHeaderFile\x128\n" +
+	"\x17TooLargeRequestBodyFile\x188 \x01(\tR\x17TooLargeRequestBodyFile\x12,\n" +
+	"\x11IsRequestOversize\x189 \x01(\bR\x11IsRequestOversize\"\xa9\x01\n" +
 	"\rFuzzableParam\x12\x1a\n" +
 	"\bPosition\x18\x01 \x01(\tR\bPosition\x12\x1c\n" +
 	"\tParamName\x18\x02 \x01(\tR\tParamName\x12 \n" +

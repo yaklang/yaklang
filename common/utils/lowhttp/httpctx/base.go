@@ -339,6 +339,9 @@ const (
 	REQUEST_CONTEXT_KEY_ResponseTooLarge             = "responseTooLarge"
 	REQUEST_CONTEXT_KEY_ResponseTooSlow              = "responseReadTimeTooSlow"
 	REQUEST_CONTEXT_KEY_RequestTooLarge              = "requestTooLarge"
+	REQUEST_CONTEXT_KEY_RequestTooLargeHeaderFile   = "RequestTooLargeHeaderFile"
+	REQUEST_CONTEXT_KEY_RequestTooLargeBodyFile     = "RequestTooLargeBodyFile"
+	REQUEST_CONTEXT_KEY_RequestTooLargeSize         = "RequestTooLargeSize"
 	REQUEST_CONTEXT_KEY_ResponseHeaderParsed         = "responseHeaderParsed"
 	REQUEST_CONTEXT_KEY_ResponseContentTypeFiltered  = "ResponseContentTypeFiltered"
 	REQUEST_CONTEXT_KEY_MitmFrontendReadWriter       = "mitmFrontendReadWriter"
@@ -515,6 +518,30 @@ func GetRequestTooLarge(req *http.Request) bool {
 
 func SetRequestTooLarge(req *http.Request, b bool) {
 	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestTooLarge, b)
+}
+
+func SetRequestTooLargeHeaderFile(req *http.Request, fp string) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestTooLargeHeaderFile, fp)
+}
+
+func GetRequestTooLargeHeaderFile(req *http.Request) string {
+	return GetContextStringInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestTooLargeHeaderFile)
+}
+
+func SetRequestTooLargeBodyFile(req *http.Request, fp string) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestTooLargeBodyFile, fp)
+}
+
+func GetRequestTooLargeBodyFile(req *http.Request) string {
+	return GetContextStringInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestTooLargeBodyFile)
+}
+
+func SetRequestTooLargeSize(req *http.Request, size int64) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestTooLargeSize, size)
+}
+
+func GetRequestTooLargeSize(req *http.Request) int64 {
+	return int64(GetContextIntInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestTooLargeSize))
 }
 
 func GetResponseMaxContentLength(req *http.Request) int {
