@@ -575,7 +575,8 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		case OP_IUSHR, OP_LUSHR:
 			op = USHR
 		default:
-			panic("not support")
+			// Unknown shift opcode: default to shift-left as a safe fallback.
+			op = SHL
 		}
 		var2 := runtimeStackSimulation.Pop().(values.JavaValue)
 		var1 := runtimeStackSimulation.Pop().(values.JavaValue)

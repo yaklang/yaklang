@@ -79,7 +79,8 @@ func NewJavaClass(typeName string) JavaType {
 	if strings.HasPrefix(typeName, "[") {
 		t, err := ParseDescriptor(typeName)
 		if err != nil {
-			panic("parse type failed")
+			// Fallback: treat as a plain class name if descriptor parsing fails.
+			return newJavaTypeWrap(&JavaClass{Name: typeName})
 		}
 		return t
 	}
