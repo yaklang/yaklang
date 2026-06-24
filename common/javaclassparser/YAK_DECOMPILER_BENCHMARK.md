@@ -160,8 +160,8 @@ guessed:
 
 | Category | Exact javac error | Confirmed root cause | Difficulty |
 |----------|-------------------|----------------------|-----------|
-| Operators | `missing return statement` (1 error, down from 13) | `(a && b) \|\| (c)` short-circuit `\|\|` returned as a value: the `x&&y` arm folds into an `if` condition but the merge's `iconst_1` (`return true`) arm is dropped, leaving an empty then-branch and no trailing return; a boolean-OR-merge value-recovery gap | hard (value/CFG recovery) |
-| Lambdas | `variable v already defined` + erased generics | lambda parameter names collide with the enclosing slot names, and raw functional-interface targets reject the explicit `Integer` param types (generic signatures not recovered) | hard (var naming + generics erasure) |
+| Operators | `missing return statement` (1 error, down from 13) | `(a && b) \|\| (c)` returned as a boolean is a **DAG**, not a tree: both true-arms converge at a *shared* `iconst_1` leaf, so `CalcMergeOpcode` attributes the outer `&&` condition to that constant leaf (not to the `ireturn` value-merge). The outer condition is therefore excluded from the value fold and leaks out as a standalone `if (a&&b){}` with an empty then-branch and no trailing return. Confirmed by instrumenting the merge detector (`OPDBG`) | hard (short-circuit-DAG value recovery in `CalcMergeOpcode`/combiner) |
+| Lambdas | `variable v already defined` + incompatible lambda param types + invalid method ref (5 errors) | two independent causes: **(A)** the lambda body is dumped with the *enclosing* method's `VariableId`, so its parameters (`var2,var3`) share the outer namespace and collide with the lambda's own assignment target (`BiFunction var2 = (Integer var2,…)`); **(B)** generics are erased — there is no `LocalVariableTypeTable`, so the target renders as raw `BiFunction`/`List`/`Function`, and the explicit `Integer` lambda params + `Integer::intValue` refs no longer typecheck against the raw type. The type arguments are only recoverable from the synthetic `lambda$…` method's own signature | hard (fresh lambda-param scope + generic `Signature` recovery) |
 
 Passing categories are pinned by `recompileGateBaseline`, so a regression that breaks
 any of the 16 green categories fails CI; the rest are tracked as the backlog.
@@ -515,10 +515,19 @@ recorded as future work.
 ## 6. Backlog (prioritized by impact, from the data above)
 
 **Correctness (semantic fidelity):**
-1. **Short-circuit `||`/`&&` boolean-expression recovery** (Operators) — fold the
-   `if(a&&b){return true}else{...}` control flow back into `return (a&&b)||(...)`.
-2. **Generic signature recovery** (Lambdas) — parse the `Signature` attribute so
-   erased call sites and lambda targets keep their type arguments.
+1. **Short-circuit `||`/`&&` boolean-expression recovery** (Operators) — when a
+   boolean `(a&&b)||(c)` is *returned/stored* (not used as an `if` condition), both
+   true-arms share one `iconst_1` leaf, so `CalcMergeOpcode` mis-attributes the
+   outer condition to the constant leaf and it leaks out as a stray `if`. Teach the
+   merge detector (or `CalcMergeOpcode`) to see through a shared boolean leaf to the
+   downstream value-merge so the whole expression folds into `return (a&&b)||(c)`.
+2. **Generic signature + lambda-scope recovery** (Lambdas) — (a) dump each lambda
+   body in its own fresh `VariableId` namespace so its parameters cannot collide
+   with the enclosing scope or the lambda's own assignment target; (b) recover type
+   arguments from the synthetic `lambda$…` method signature (and the class/field/
+   method `Signature` attribute) so targets render as `BiFunction<Integer,Integer,
+   Integer>` instead of raw `BiFunction`, keeping explicit lambda param types and
+   `Type::method` references type-correct.
 3. **Loop idiom recovery** — reconstruct `for`/`while` instead of universal
    `do{...}while(true)`. The *unreachable statement* failures are already removed by
    the round-6 prune; recovering real `for` loops would additionally fix the

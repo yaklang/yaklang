@@ -101,8 +101,8 @@ multiclass:    0   (现已一起编译，不再跳过)
 
 | 分类 | 确切的 javac 错误 | 已确认根因 | 难度 |
 |------|-------------------|------------|------|
-| Operators | `missing return statement`（1 个错误，原为 13） | `(a && b) \|\| (c)` 短路 `\|\|` 作为值返回：`x&&y` 臂被折进 `if` 条件，但合并点的 `iconst_1`（`return true`）臂被丢弃，留下空的 then 分支且无尾随 return；属布尔 OR 合并的值恢复缺口 | 难（值/CFG 恢复） |
-| Lambdas | `variable v already defined` + 泛型擦除 | lambda 形参名与外层 slot 名冲突；裸函数式接口目标拒绝显式 `Integer` 形参类型（泛型签名未恢复） | 难（变量命名 + 泛型擦除） |
+| Operators | `missing return statement`（1 个错误，原为 13） | `(a && b) \|\| (c)` 作为布尔值返回时是一个 **DAG** 而非树：两个 true 臂汇聚到*同一个* `iconst_1` 叶子，于是 `CalcMergeOpcode` 把外层 `&&` 条件归属到这个常量叶子（而非 `ireturn` 值合并点）。外层条件因而被排除在值折叠之外，泄漏成一个独立的 `if (a&&b){}`——空 then 分支且无尾随 return。已通过对合并检测器插桩（`OPDBG`）确认 | 难（短路-DAG 值恢复，在 `CalcMergeOpcode`/合并器中） |
+| Lambdas | `variable v already defined` + lambda 形参类型不兼容 + 非法方法引用（5 个错误） | 两个独立根因：**(A)** lambda 体用*外层*方法的 `VariableId` 转储，故其形参（`var2,var3`）与外层共享命名空间，并与 lambda 自身的赋值目标冲突（`BiFunction var2 = (Integer var2,…)`）；**(B)** 泛型被擦除——没有 `LocalVariableTypeTable`，目标渲染成裸 `BiFunction`/`List`/`Function`，显式 `Integer` 形参与 `Integer::intValue` 引用便无法对裸类型通过类型检查。类型实参只能从合成 `lambda$…` 方法自身的签名中恢复 | 难（独立 lambda 形参作用域 + 泛型 `Signature` 恢复） |
 
 通过的分类由 `recompileGateBaseline` 钉死，因此任何破坏 16 个绿色分类的回退都会让 CI 失败；其余作为 backlog 跟踪。
 
@@ -289,8 +289,8 @@ runtime.greyobject     13.3% cum
 ## 6. Backlog（按影响排序，源自上文数据）
 
 **正确性（语义保真度）：**
-1. **短路 `||`/`&&` 布尔表达式恢复**（Operators）——把 `if(a&&b){return true}else{...}` 控制流折回 `return (a&&b)||(...)`。
-2. **泛型签名恢复**（Lambdas）——解析 `Signature` 属性，使被擦除的调用点与 lambda 目标保留类型参数。
+1. **短路 `||`/`&&` 布尔表达式恢复**（Operators）——当布尔 `(a&&b)||(c)` 被*返回/存储*（而非用作 `if` 条件）时，两个 true 臂共享一个 `iconst_1` 叶子，于是 `CalcMergeOpcode` 把外层条件误归属到该常量叶子，使其泄漏成一个游离 `if`。需让合并检测器（或 `CalcMergeOpcode`）透过共享的布尔叶子看到下游值合并点，从而把整个表达式折叠为 `return (a&&b)||(c)`。
+2. **泛型签名 + lambda 作用域恢复**（Lambdas）——(a) 在独立的 `VariableId` 命名空间中转储每个 lambda 体，使其形参不会与外层作用域或 lambda 自身赋值目标冲突；(b) 从合成 `lambda$…` 方法签名（以及类/字段/方法的 `Signature` 属性）恢复类型实参，使目标渲染为 `BiFunction<Integer,Integer,Integer>` 而非裸 `BiFunction`，从而保持显式 lambda 形参类型与 `Type::method` 引用的类型正确性。
 3. **循环惯用法恢复**——重建 `for`/`while` 而非一律 `do{...}while(true)`。*unreachable statement* 失败已被第 6 轮裁剪消除；恢复真正的 `for` 循环还能额外修复 `labeled` 的 `continue <外层自增>` 语义限制（do-while 模型只能把共享自增节点放在一条后继上）。
 4. **Record / sealed 的 `invokedynamic ObjectMethods` bootstrap**——端到端解锁现代（Java 17+）值类型。
 5. **idiomatic `finally` 折叠**——`try/catch/finally` 的 round-trip 当前已正确（采用忠实的脱糖形式：finally 体重复 + `catch (Throwable)` 重抛，与字节码运行完全一致）。未来可加一个 pass 把它折叠为单个 idiomatic 的 `finally {}` 块以提升可读性。
