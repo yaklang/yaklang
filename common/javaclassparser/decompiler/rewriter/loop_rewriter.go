@@ -258,7 +258,8 @@ func LoopRewriter(manager *RewriteManager, node *core.Node) error {
 		}
 		err := manager.CheckVisitedNode(node)
 		if err != nil {
-			return nil, err
+			// Node was already visited (shared merge point). Skip instead of failing.
+			return nil, nil
 		}
 		body = append(body, node.Statement)
 		var next []*core.Node
