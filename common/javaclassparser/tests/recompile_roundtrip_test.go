@@ -223,11 +223,12 @@ func firstJavacError(stderr string) string {
 // (Inheritance), @interface annotation types (Annotations), and enum synthetic suppression
 // with constant arguments (Enums).
 //
-// Categories still failing the roundtrip and tracked for follow-up: Generics (slot split by
-// type widening leaves a block-scoped var read out of scope), Lambdas (captured-variable
-// naming), Loops (do/while lowering emits javac-unreachable code), Operators (short-circuit
-// boolean recovery). Exceptions remains a stub (try/catch/finally CFG with multiple
-// successors).
+// Generics joined the gate once null-initialized slots stopped being split by type widening
+// (a null slot now adopts the later concrete reference type instead of creating a second,
+// block-scoped variable read out of scope). Categories still failing the roundtrip and
+// tracked for follow-up: Lambdas (captured-variable naming), Loops (do/while lowering emits
+// javac-unreachable code), Operators (short-circuit boolean recovery). Exceptions remains a
+// stub (try/catch/finally CFG with multiple successors).
 func recompileGateBaseline() []string {
 	return []string{
 		"Annotations",
@@ -236,6 +237,7 @@ func recompileGateBaseline() []string {
 		"Concurrency",
 		"ControlFlow",
 		"Enums",
+		"Generics",
 		"Inheritance",
 		"Initializers",
 		"InnerClasses",
