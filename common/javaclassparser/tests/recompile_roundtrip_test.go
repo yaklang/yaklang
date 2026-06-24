@@ -215,18 +215,33 @@ func firstJavacError(stderr string) string {
 // roundtrip and therefore act as hard regression gates. Populated empirically; this
 // list grows as decompiler correctness bugs are fixed.
 //
-// CastsInstanceof joined the gate once the checkcast precedence bug was fixed
-// (((T)x).m() instead of (T)(x).m()). Categories still failing the roundtrip and
-// tracked for follow-up: Arrays (multi-dim allocation), Concurrency (synchronized
-// monitor temp), Generics/Lambdas (loop-var scope, lambda param naming), Initializers
-// (field type inference), Literals (long/boolean boxing literal suffix), Loops
-// (do/while lowering emits javac-unreachable code), Operators (boolean-on-int ops),
-// TryWithResources (resource var scope).
+// The gate has grown as correctness bugs were fixed: multianewarray dimensions (Arrays),
+// synchronized monitor temp (Concurrency), field-init type inference (Initializers),
+// boolean-on-int operators and literal suffixes (Literals), scope-aware local renaming for
+// nested catch parameters (TryWithResources), and full inner/nested-class reconstruction:
+// synthetic accessors and this$0/val$ captures (InnerClasses), interface default methods
+// (Inheritance), @interface annotation types (Annotations), and enum synthetic suppression
+// with constant arguments (Enums).
+//
+// Categories still failing the roundtrip and tracked for follow-up: Generics (slot split by
+// type widening leaves a block-scoped var read out of scope), Lambdas (captured-variable
+// naming), Loops (do/while lowering emits javac-unreachable code), Operators (short-circuit
+// boolean recovery). Exceptions remains a stub (try/catch/finally CFG with multiple
+// successors).
 func recompileGateBaseline() []string {
 	return []string{
+		"Annotations",
+		"Arrays",
 		"CastsInstanceof",
+		"Concurrency",
 		"ControlFlow",
+		"Enums",
+		"Inheritance",
+		"Initializers",
+		"InnerClasses",
+		"Literals",
 		"Strings",
 		"Switches",
+		"TryWithResources",
 	}
 }

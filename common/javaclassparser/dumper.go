@@ -257,7 +257,11 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 				ordinaryFields = append(ordinaryFields, field.code)
 			}
 			for idx, enumSimple := range enumFields {
-				attrs += fmt.Sprintf("\t%s", enumSimple.fieldName)
+				constStr := enumSimple.fieldName
+				if args := c.enumConstantArgs(enumSimple.fieldName); args != "" {
+					constStr += "(" + args + ")"
+				}
+				attrs += fmt.Sprintf("\t%s", constStr)
 				if idx == len(enumFields)-1 {
 					attrs += ";\n"
 				} else {
@@ -317,6 +321,7 @@ type dumpedFields struct {
 }
 
 func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
+	genuineEnum := c.isGenuineEnum()
 	fields := make([]dumpedFields, 0, len(c.obj.Fields))
 	for _, field := range c.obj.Fields {
 		accessFlagsVerbose, accessCode := getFieldAccessFlagsVerbose(field.AccessFlags)
@@ -328,6 +333,10 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 		name, err := c.obj.getUtf8(field.NameIndex)
 		if err != nil {
 			return nil, err
+		}
+		// $VALUES is the synthetic array backing values(); javac re-synthesizes it.
+		if genuineEnum && name == "$VALUES" {
+			continue
 		}
 		descriptor, err := c.obj.getUtf8(field.DescriptorIndex)
 		if err != nil {
@@ -817,6 +826,14 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 					}
 				}
 			}
+			// A genuine enum constructor carries two synthetic leading parameters (String
+			// name, int ordinal) that javac injects and forbids in source. Drop them from the
+			// rendered signature; the synthetic super(name, ordinal) call is stripped from the
+			// body below.
+			isEnumCtor := name == "<init>" && c.isGenuineEnum()
+			if isEnumCtor && len(samParams) >= 2 {
+				samParams = samParams[2:]
+			}
 			paramsNewStrList := []string{}
 			for i, val := range samParams {
 				if i == len(samParams)-1 && isVarArgs {
@@ -1005,6 +1022,11 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				statementCodes = append(statementCodes, fmt.Sprintf("%s\n", statementStr))
 			}
 
+			if isEnumCtor {
+				// The only super() call in an enum constructor is the synthetic
+				// super(name, ordinal); enum constructors cannot call super explicitly.
+				supperInvokeStr = ""
+			}
 			sourceCode += supperInvokeStr + strings.Join(statementCodes, "")
 			code = sourceCode
 		}
@@ -1377,9 +1399,94 @@ func (c *ClassObjectDumper) dumpStubMethod(method *MemberInfo, name, descriptor,
 	return &dumpedMethods{methodName: name, code: src, bodyCode: "stub"}
 }
 
+// isGenuineEnum reports whether this class is a real `enum` declaration (ACC_ENUM and a
+// direct java.lang.Enum supertype), as opposed to a synthetic enum-constant subclass.
+func (c *ClassObjectDumper) isGenuineEnum() bool {
+	if !slices.Contains(c.obj.AccessFlagsVerbose, "enum") {
+		return false
+	}
+	sup := strings.Replace(c.obj.GetSupperClassName(), "/", ".", -1)
+	return sup == "java.lang.Enum"
+}
+
+// isSyntheticEnumMethod reports whether a method is one javac auto-generates for every enum
+// (values(), valueOf(String), $values()). These must not be emitted: javac re-synthesizes
+// them, and emitting them yields "method X is already defined".
+func (c *ClassObjectDumper) isSyntheticEnumMethod(name, descriptor string) bool {
+	if name == "$values" {
+		return true
+	}
+	selfDesc := "L" + c.obj.GetClassName() + ";"
+	if name == "values" && descriptor == "()["+selfDesc {
+		return true
+	}
+	if name == "valueOf" && descriptor == "(Ljava/lang/String;)"+selfDesc {
+		return true
+	}
+	return false
+}
+
+// enumConstantArgs derives the explicit constructor arguments for an enum constant from the
+// `new <EnumType>(name, ordinal, args...)` expression captured in <clinit>. The first two
+// arguments are the synthetic name/ordinal javac injects; the remainder are the source-level
+// arguments (e.g. PLANET(mass, radius)). Returns "" for a plain constant with no extra args.
+func (c *ClassObjectDumper) enumConstantArgs(name string) string {
+	raw := strings.TrimSpace(c.fieldDefaultValue[name])
+	if !strings.HasPrefix(raw, "new ") || !strings.HasSuffix(raw, ")") {
+		return ""
+	}
+	open := strings.Index(raw, "(")
+	if open < 0 {
+		return ""
+	}
+	parts := splitTopLevelArgs(raw[open+1 : len(raw)-1])
+	if len(parts) <= 2 {
+		return ""
+	}
+	return strings.Join(parts[2:], ", ")
+}
+
+// splitTopLevelArgs splits a comma-separated argument list, ignoring commas nested inside
+// (), [], {} or string/char literals.
+func splitTopLevelArgs(s string) []string {
+	var parts []string
+	depth := 0
+	start := 0
+	var quote byte
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		if quote != 0 {
+			if ch == '\\' {
+				i++
+			} else if ch == quote {
+				quote = 0
+			}
+			continue
+		}
+		switch ch {
+		case '"', '\'':
+			quote = ch
+		case '(', '[', '{':
+			depth++
+		case ')', ']', '}':
+			depth--
+		case ',':
+			if depth == 0 {
+				parts = append(parts, strings.TrimSpace(s[start:i]))
+				start = i + 1
+			}
+		}
+	}
+	if tail := strings.TrimSpace(s[start:]); tail != "" || len(parts) > 0 {
+		parts = append(parts, tail)
+	}
+	return parts
+}
+
 func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 	c.Tab()
 	defer c.UnTab()
+	genuineEnum := c.isGenuineEnum()
 	var result []*dumpedMethods
 	for _, method := range c.obj.Methods {
 		name, err := c.obj.getUtf8(method.NameIndex)
@@ -1389,6 +1496,9 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 		descriptor, err := c.obj.getUtf8(method.DescriptorIndex)
 		if err != nil {
 			return nil, utils.Wrapf(err, "getUtf8(%v) failed", method.DescriptorIndex)
+		}
+		if genuineEnum && c.isSyntheticEnumMethod(name, descriptor) {
+			continue
 		}
 		if v := c.lambdaMethods[name]; slices.Contains(v, descriptor) {
 			continue
