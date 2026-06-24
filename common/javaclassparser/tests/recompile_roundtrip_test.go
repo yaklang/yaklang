@@ -23,11 +23,12 @@ import (
 // lenient decompiler grammar happily accepts. A category that survives the
 // roundtrip is strong evidence the decompiled source is correct Java.
 //
-// Only single-class groups are eligible: the decompiler does not inline nested
-// classes (it emits `new Outer$Inner(...)` references), so multi-class groups
-// cannot be recompiled in isolation. Those remain covered by the parse-based
-// coverage matrix. Stubbed outputs are reported as skipped (a stub throws by
-// design and is not meant to recompile).
+// Multi-class groups (nested/inner/anonymous/local classes) are decompiled per
+// `.class` into separate `$`-named compilation units and recompiled together, so
+// inner-class reconstruction (synthetic access$NNN bridges, this$0 captures, val$
+// fields, `new Outer$Inner(...)` references) is exercised by the same oracle.
+// Stubbed outputs are reported as skipped (a stub throws by design and is not
+// meant to recompile).
 
 const (
 	rcOK      = "recompile-ok"
@@ -57,20 +58,26 @@ func listClassGroups(dir string) map[string][]string {
 	return groups
 }
 
-// recompileDecompiled writes src to <name>.java in a fresh dir and runs javac on it,
-// returning the javac stderr (empty on success) and whether compilation succeeded.
-func recompileDecompiled(t *testing.T, javac, className, src string) (string, bool) {
+// recompileUnits writes each decompiled compilation unit to <base>.java in a fresh dir and
+// compiles them together, returning javac stderr (empty on success) and whether it compiled.
+// Compiling the whole group together is required for inner/nested classes, which reference
+// each other (Outer$Inner, synthetic access$NNN bridges, this$0 captures).
+func recompileUnits(t *testing.T, javac string, units map[string]string) (string, bool) {
 	t.Helper()
 	dir := t.TempDir()
-	// javac requires the file name to match the public top-level class name.
-	javaFile := filepath.Join(dir, className+".java")
-	if err := os.WriteFile(javaFile, []byte(src), 0o644); err != nil {
-		t.Fatalf("write decompiled java: %v", err)
+	files := make([]string, 0, len(units))
+	for base, src := range units {
+		jf := filepath.Join(dir, base+".java")
+		if err := os.WriteFile(jf, []byte(src), 0o644); err != nil {
+			t.Fatalf("write decompiled java: %v", err)
+		}
+		files = append(files, jf)
 	}
 	outDir := filepath.Join(dir, "out")
 	_ = os.MkdirAll(outDir, 0o755)
-	cmd := exec.Command(javac, "-J-Duser.language=en", "-J-Duser.country=US",
-		"-nowarn", "-Xlint:none", "--release", rcRelease, "-d", outDir, javaFile)
+	args := append([]string{"-J-Duser.language=en", "-J-Duser.country=US",
+		"-nowarn", "-Xlint:none", "--release", rcRelease, "-d", outDir}, files...)
+	cmd := exec.Command(javac, args...)
 	cmd.Env = append(os.Environ(), "LANG=en_US.UTF-8", "LC_ALL=en_US.UTF-8")
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
@@ -106,30 +113,53 @@ func TestRecompileRoundtrip(t *testing.T) {
 	var results []rcResult
 	for _, name := range names {
 		files := groups[name]
-		if len(files) != 1 {
-			results = append(results, rcResult{name, rcMulti, fmt.Sprintf("%d classes", len(files))})
+		// Decompile every class of the group. Nested/inner/anonymous/local classes are
+		// emitted as separate `$`-named compilation units; compiling them together is the
+		// real round-trip oracle for inner-class reconstruction (synthetic accessors,
+		// this$0 captures, val$ fields, etc.). Single-class groups have exactly one unit.
+		units := map[string]string{}
+		var decErr error
+		var stubbed bool
+		var stubDetail string
+		var combined strings.Builder
+		for _, f := range files {
+			raw, rErr := os.ReadFile(f)
+			if rErr != nil {
+				decErr = rErr
+				break
+			}
+			out, dErr := safeDecompileHarness(raw)
+			if dErr != nil {
+				decErr = dErr
+				break
+			}
+			if strings.Contains(out, javaclassparser.DecompileStubMarker) {
+				stubbed = true
+				stubDetail = stubReason(out)
+			}
+			base := strings.TrimSuffix(filepath.Base(f), ".class")
+			units[base] = out
+			combined.WriteString("\n// ===== " + base + " =====\n" + out + "\n")
+		}
+		if decErr != nil {
+			results = append(results, rcResult{name, rcDecErr, firstLine(decErr.Error())})
 			continue
 		}
-		raw, rErr := os.ReadFile(files[0])
-		if rErr != nil {
+		if stubbed {
+			results = append(results, rcResult{name, rcStub, stubDetail})
 			continue
 		}
-		out, dErr := safeDecompileHarness(raw)
-		if dErr != nil {
-			results = append(results, rcResult{name, rcDecErr, firstLine(dErr.Error())})
-			continue
+		detail := ""
+		if len(files) > 1 {
+			detail = fmt.Sprintf("%d classes", len(files))
 		}
-		if strings.Contains(out, javaclassparser.DecompileStubMarker) {
-			results = append(results, rcResult{name, rcStub, stubReason(out)})
-			continue
-		}
-		stderr, ok := recompileDecompiled(t, javac, name, out)
+		stderr, ok := recompileUnits(t, javac, units)
 		if ok {
-			results = append(results, rcResult{name, rcOK, ""})
+			results = append(results, rcResult{name, rcOK, detail})
 		} else {
 			results = append(results, rcResult{name, rcFail, firstJavacError(stderr)})
 			if os.Getenv("RC_VERBOSE") != "" {
-				t.Logf("\n######## RECOMPILE FAIL: %s\n--- decompiled ---\n%s\n--- javac ---\n%s", name, out, stderr)
+				t.Logf("\n######## RECOMPILE FAIL: %s\n--- decompiled ---\n%s\n--- javac ---\n%s", name, combined.String(), stderr)
 			}
 		}
 	}
