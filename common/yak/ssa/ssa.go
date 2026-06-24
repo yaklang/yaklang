@@ -279,8 +279,7 @@ type Program struct {
 	Cache *ProgramCache
 
 	finished           bool
-	deferredBuildSeq   []*deferredBuildTask
-	deferredBuildByID  map[string]*deferredBuildTask
+	deferredBuilds     *omap.OrderedMap[string, *deferredBuildTask]
 	deferredBuildTotal int
 
 	//consts

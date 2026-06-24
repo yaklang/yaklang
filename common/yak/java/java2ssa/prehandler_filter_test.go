@@ -1,12 +1,13 @@
-package ssaconfig
+package java2ssa
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-func TestMatchJavaPreHandlerFile(t *testing.T) {
+func TestMatchPreHandlerFile(t *testing.T) {
 	for _, path := range []string{
 		"src/main/java/App.java",
 		"B.class",
@@ -14,7 +15,7 @@ func TestMatchJavaPreHandlerFile(t *testing.T) {
 		"pom.xml",
 		"module/pom.xml",
 	} {
-		require.True(t, MatchJavaPreHandlerFile(path), path)
+		require.True(t, MatchPreHandlerFile(path), path)
 	}
 
 	for _, path := range []string{
@@ -23,12 +24,12 @@ func TestMatchJavaPreHandlerFile(t *testing.T) {
 		"target/classes/com/example/App.class",
 		".gitignore",
 	} {
-		require.False(t, MatchJavaPreHandlerFile(path), path)
+		require.False(t, MatchPreHandlerFile(path), path)
 	}
 }
 
 func TestDefaultCompileExcludeJavaDirs(t *testing.T) {
-	exclude := BuildCompileExcludeFunc(nil, "")
+	exclude := ssaconfig.BuildCompileExcludeFunc(nil, "")
 	for _, path := range []string{
 		".github/workflows/maven.yml",
 		".mvn/jvm.config",

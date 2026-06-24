@@ -79,15 +79,6 @@ func antlrCacheResetEveryBytes() int64 {
 	return antlrCacheResetEveryBytesCached
 }
 
-func languagePreHandlerBuildsFiles(language ssaconfig.Language) bool {
-	switch language {
-	case ssaconfig.C, ssaconfig.GO, ssaconfig.JAVA, ssaconfig.PHP, ssaconfig.JS, ssaconfig.TS, ssaconfig.PYTHON:
-		return true
-	default:
-		return false
-	}
-}
-
 type astBuildWindowDecision struct {
 	window           int
 	budgetBytes      int64
@@ -231,7 +222,11 @@ func (c *Config) resolveLargeProjectGCPercent() largeProjectGCDecision {
 	decision := largeProjectGCDecision{
 		largeProject: c != nil && c.GetCompileProjectBytes() >= largeProjectByteCap,
 	}
-	if !decision.largeProject || c == nil || !languagePreHandlerBuildsFiles(c.GetLanguage()) {
+	if !decision.largeProject || c == nil {
+		return decision
+	}
+	create, ok := LanguageBuilderCreater[c.GetLanguage()]
+	if !ok || !create().UsesDeferredFileBuild() {
 		return decision
 	}
 	if raw := strings.TrimSpace(os.Getenv("GOGC")); raw != "" {
@@ -475,6 +470,7 @@ func Size(size int) string {
 
 type ScanResult struct {
 	HandlerFiles    []string
+	HandlerFileSet  map[string]struct{}
 	PreHandlerFiles []string
 	HandlerFilesMap map[string]struct{}
 	Folders         [][]string
@@ -500,6 +496,7 @@ type ScanConfig struct {
 func ScanProjectFiles(cfg ScanConfig) (*ScanResult, error) {
 	result := &ScanResult{
 		HandlerFiles:    make([]string, 0),
+		HandlerFileSet:  make(map[string]struct{}),
 		PreHandlerFiles: make([]string, 0),
 		HandlerFilesMap: make(map[string]struct{}),
 		Folders:         make([][]string, 0),
@@ -537,6 +534,7 @@ func ScanProjectFiles(cfg ScanConfig) (*ScanResult, error) {
 				result.HandlerTotal++
 				result.HandlerBytes += fi.Size()
 				result.HandlerFiles = append(result.HandlerFiles, path)
+				result.HandlerFileSet[path] = struct{}{}
 			}
 			if cfg.CheckPreHandler != nil && cfg.CheckPreHandler(path) == nil {
 				result.PreHandlerTotal++

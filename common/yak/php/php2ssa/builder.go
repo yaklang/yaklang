@@ -275,6 +275,10 @@ func (*SSABuilder) GetLanguage() ssaconfig.Language {
 	return ssaconfig.PHP
 }
 
+func (*SSABuilder) UsesDeferredFileBuild() bool {
+	return true
+}
+
 type builder struct {
 	*ssa.FunctionBuilder
 	constMap       map[string]ssa.Value

@@ -200,6 +200,10 @@ func (*SSABuilder) GetLanguage() ssaconfig.Language {
 	return ssaconfig.GO
 }
 
+func (*SSABuilder) UsesDeferredFileBuild() bool {
+	return true
+}
+
 func (b *astbuilder) AddResultDefault(name string) {
 	result := b.result[b.Function.GetName()]
 	if result == nil {

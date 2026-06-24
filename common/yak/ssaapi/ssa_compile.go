@@ -164,7 +164,7 @@ func (c *Config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 	if !c.ignoreSyntaxErr && err != nil {
 		return nil, utils.Errorf("parse file error: %v", err)
 	}
-	preHandlerBuildsFiles := languagePreHandlerBuildsFiles(c.GetLanguage())
+	preHandlerBuildsFiles := c.LanguageBuilder != nil && c.LanguageBuilder.UsesDeferredFileBuild()
 	c.LanguageBuilder.PreHandlerFile(ast, r, builder)
 	if preHandlerBuildsFiles {
 		ssa.ReleaseASTRoot(ast)

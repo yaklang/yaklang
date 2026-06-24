@@ -56,8 +56,7 @@ func NewProgram(
 		config:                  NewLanguageConfig(),
 		NameCache:               ssadb.NewNameCache(programName),
 		compileConfig:           cfg,
-		deferredBuildSeq:        make([]*deferredBuildTask, 0),
-		deferredBuildByID:       make(map[string]*deferredBuildTask),
+		deferredBuilds:          omap.NewEmptyOrderedMap[string, *deferredBuildTask](),
 	}
 
 	prog.GlobalVariablesBlueprint = NewBlueprint("__GlobalVariables__")
@@ -105,8 +104,7 @@ func NewTmpProgram(ProgramName string) *Program {
 		CurrentIncludingStack:   utils.NewStack[string](),
 		config:                  NewLanguageConfig(),
 		NameCache:               ssadb.NewNameCache(ProgramName),
-		deferredBuildSeq:        make([]*deferredBuildTask, 0),
-		deferredBuildByID:       make(map[string]*deferredBuildTask),
+		deferredBuilds:          omap.NewEmptyOrderedMap[string, *deferredBuildTask](),
 	}
 	prog.Application = prog
 	prog.DatabaseKind = ProgramCacheMemory
@@ -368,122 +366,6 @@ func (prog *Program) Finish() {
 	for _, child := range children {
 		child.Finish()
 	}
-}
-
-type DeferredBuildKind string
-
-const (
-	DeferredBuildKindFunction  DeferredBuildKind = "function"
-	DeferredBuildKindBlueprint DeferredBuildKind = "blueprint"
-	DeferredBuildKindFile      DeferredBuildKind = "file"
-	DeferredBuildKindHelper    DeferredBuildKind = "helper"
-)
-
-func (prog *Program) registerDeferredBuildTask(task *deferredBuildTask) *deferredBuildTask {
-	if prog == nil || task == nil {
-		return nil
-	}
-	app := prog.GetApplication()
-	if app == nil {
-		app = prog
-	}
-	if app.deferredBuildByID == nil {
-		app.deferredBuildByID = make(map[string]*deferredBuildTask)
-	}
-	if existing, ok := app.deferredBuildByID[task.id]; ok {
-		return existing
-	}
-	app.deferredBuildByID[task.id] = task
-	app.deferredBuildSeq = append(app.deferredBuildSeq, task)
-	app.deferredBuildTotal++
-	return task
-}
-
-func (prog *Program) RegisterDeferredBuild(kind DeferredBuildKind, name string, work func()) {
-	prog.registerDeferredBuildTask(newDeferredBuildTask(kind, name, work))
-}
-
-func (prog *Program) RegisterDeferredFunction(name string, fun *Function) {
-	if fun == nil {
-		return
-	}
-	prog.RegisterDeferredBuild(DeferredBuildKindFunction, name, func() {
-		fun.Build()
-	})
-}
-
-func (prog *Program) RegisterDeferredBlueprint(name string, blueprint *Blueprint) {
-	if blueprint == nil {
-		return
-	}
-	prog.RegisterDeferredBuild(DeferredBuildKindBlueprint, name, func() {
-		blueprint.Build()
-	})
-}
-
-func (prog *Program) RegisterFileBuild(name string, editor *memedit.MemEditor, builder *FunctionBuilder, work func(*FunctionBuilder)) {
-	if builder == nil {
-		return
-	}
-	prog.RegisterDeferredBuild(DeferredBuildKindFile, name, func() {
-		buildWithEditor(prog, editor, builder, work)
-	})
-}
-
-func (prog *Program) RunDeferredBuilds() {
-	_ = prog.RunDeferredBuildsWithCallback(nil)
-}
-
-func (prog *Program) DeferredBuildCount() int {
-	if prog == nil {
-		return 0
-	}
-	app := prog.GetApplication()
-	if app == nil {
-		app = prog
-	}
-	return app.deferredBuildTotal
-}
-
-func (prog *Program) RunDeferredBuildsWithCallback(afterEach func(index int, total int) bool) bool {
-	if prog == nil {
-		return true
-	}
-	app := prog.GetApplication()
-	if app == nil {
-		app = prog
-	}
-	total := len(app.deferredBuildSeq)
-	for index := 0; index < len(app.deferredBuildSeq); index++ {
-		task := app.deferredBuildSeq[index]
-		if task == nil {
-			continue
-		}
-		task.Build()
-		task.release()
-		if afterEach != nil {
-			if len(app.deferredBuildSeq) > total {
-				total = len(app.deferredBuildSeq)
-			}
-			if !afterEach(index+1, total) {
-				return false
-			}
-		}
-	}
-	app.releaseDeferredBuildTasks()
-	return true
-}
-
-func (prog *Program) releaseDeferredBuildTasks() {
-	if prog == nil {
-		return
-	}
-	app := prog.GetApplication()
-	if app == nil {
-		app = prog
-	}
-	app.deferredBuildSeq = nil
-	app.deferredBuildByID = nil
 }
 
 func (prog *Program) SearchIndexAndOffsetByOffset(searchOffset int) (index int, offset int) {

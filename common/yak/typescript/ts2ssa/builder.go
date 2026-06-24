@@ -90,6 +90,10 @@ func (*SSABuilder) GetLanguage() ssaconfig.Language {
 	return ssaconfig.TS
 }
 
+func (*SSABuilder) UsesDeferredFileBuild() bool {
+	return true
+}
+
 func (s *SSABuilder) GetAntlrCache() *ssa.AntlrCache {
 	return nil
 }

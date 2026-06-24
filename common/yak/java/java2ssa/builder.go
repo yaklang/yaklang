@@ -99,6 +99,10 @@ func (*SSABuilder) GetLanguage() ssaconfig.Language {
 	return ssaconfig.JAVA
 }
 
+func (*SSABuilder) UsesDeferredFileBuild() bool {
+	return true
+}
+
 // ========================================== Build Front End ==========================================
 
 type singleFileBuilder struct {
