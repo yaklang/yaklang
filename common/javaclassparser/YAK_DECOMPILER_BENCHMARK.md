@@ -37,7 +37,7 @@ authority for automated semantic decisions.
 |------|--------|--------------------|
 | Syntax safety (parse-or-degrade) | 23/23 corpus groups produce **syntax-parseable Java**; 0 syntax errors, 0 hard errors, 0 panics | `TestSyntaxCoverageMatrix` |
 | Reconstruction coverage (no stub) | 20/23 groups emit **non-degraded output** (no stub); 3 groups isolate concrete gaps | `TestSyntaxCoverageMatrix` |
-| Correctness (javac round-trip) | **15/18** eligible corpora recompile cleanly (was 4/13 at start); the classic corpus now emits **zero stubs**; all four inner/nested-class groups recompile | `TestRecompileRoundtrip` |
+| Correctness (javac round-trip) | **16/18** eligible corpora recompile cleanly (was 4/13 at start); the classic corpus now emits **zero stubs**; all four inner/nested-class groups recompile | `TestRecompileRoundtrip` |
 | Determinism | byte-identical output across repeated decompiles; perf changes proven equivalent by per-class sha256 fingerprints | `TestCorpusDeterminism`, `TestDumpJarFingerprint` |
 | Test suite | green & fast: `./...` ≈ 22s, down from more than 150s (**at least 6.8x**), no machine-specific dependencies | `go test ./common/javaclassparser/...` |
 | Allocation cost | core **≈246 ms** and **≈182 MB cumulative heap allocation** per 106-class jar; validation increases runtime ≈ +18% and cumulative allocation ≈ +23% relative to core-only | `BenchmarkDecompileJar` |
@@ -53,12 +53,12 @@ out of `Decompile`.
 Of the 18 classic corpus groups eligible for strict `javac` round-trip validation
 (14 single-class groups plus 4 multi-class inner/nested-class groups):
 
-- **15 recompile successfully**: Annotations, Arrays, CastsInstanceof,
+- **16 recompile successfully**: Annotations, Arrays, CastsInstanceof,
   Concurrency, ControlFlow, Enums, Exceptions, Generics, Inheritance,
-  Initializers, InnerClasses, Literals, Strings, Switches, TryWithResources.
-- **3 expose concrete semantic/typing defects**: Lambdas (captured-variable
-  naming), Loops (`do{...}while(true)` lowering emits javac-unreachable code),
-  Operators (short-circuit boolean recovery).
+  Initializers, InnerClasses, Literals, Loops, Strings, Switches,
+  TryWithResources.
+- **2 expose concrete semantic/typing defects**: Lambdas (captured-variable
+  naming) and Operators (short-circuit boolean `||` return recovery).
 - **0 stubs** in the classic corpus: every method now structures to real Java.
 
 All four multi-class groups now recompile, exercising inner-class reconstruction
@@ -144,28 +144,57 @@ The oracle decompiles **every** class of a group (including inner, nested,
 anonymous and local classes) and recompiles the units together, so inner-class
 reconstruction is exercised end to end rather than skipped.
 ```
-recompile-ok:  15  (Annotations, Arrays, CastsInstanceof, Concurrency, ControlFlow,
+recompile-ok:  16  (Annotations, Arrays, CastsInstanceof, Concurrency, ControlFlow,
                     Enums, Exceptions, Generics, Inheritance, Initializers,
-                    InnerClasses, Literals, Strings, Switches, TryWithResources)
-recompile-fail: 3  (Lambdas, Loops, Operators)
+                    InnerClasses, Literals, Loops, Strings, Switches, TryWithResources)
+recompile-fail: 2  (Lambdas, Operators)
 stub:          0
 dec-err:       0
 multiclass:    0   (now compiled together, no longer skipped)
 ```
 
-The 3 remaining recompile failures are the actionable correctness frontier. Each
+The 2 remaining recompile failures are the actionable correctness frontier. Each
 root cause below was confirmed by reading the **full** `javac` diagnostic (run
 with `RC_VERBOSE=1` to dump the decompiled source + every error per category), not
 guessed:
 
 | Category | Exact javac error | Confirmed root cause | Difficulty |
 |----------|-------------------|----------------------|-----------|
-| Loops | `unreachable statement` (the `continue;` after a nested infinite region) | every loop lowered to `do{...}while(true)`; the always-taken inner exit makes the synthesized outer `continue` unreachable | hard (loop idiom recovery) |
-| Operators | `missing return statement` (1 error, down from 13) | `(a && b) \|\| (c)` short-circuit `\|\|` lowered to an `if/else` whose true-branch dropped its `return true`; a boolean-expression/`\|\|` reconstruction gap | hard (control-flow recovery) |
+| Operators | `missing return statement` (1 error, down from 13) | `(a && b) \|\| (c)` short-circuit `\|\|` returned as a value: the `x&&y` arm folds into an `if` condition but the merge's `iconst_1` (`return true`) arm is dropped, leaving an empty then-branch and no trailing return; a boolean-OR-merge value-recovery gap | hard (value/CFG recovery) |
 | Lambdas | `variable v already defined` + erased generics | lambda parameter names collide with the enclosing slot names, and raw functional-interface targets reject the explicit `Integer` param types (generic signatures not recovered) | hard (var naming + generics erasure) |
 
 Passing categories are pinned by `recompileGateBaseline`, so a regression that breaks
-any of the 15 green categories fails CI; the rest are tracked as the backlog.
+any of the 16 green categories fails CI; the rest are tracked as the backlog.
+
+> **Known semantic limitation (not a recompile failure).** `Loops.labeled`
+> recompiles cleanly, but a `continue <label>` whose target is an outer `for`
+> loop's *increment* is currently dropped when that increment node is shared with
+> the loop's natural exit edge: a do{...}while(true) model can place the shared
+> increment statement (`i++`) on only one successor path, so the other path (the
+> `continue outer` branch) renders as an empty `if` body. This is faithful enough
+> to compile but can diverge at runtime for that specific labeled-continue idiom.
+> Tracked under "loop idiom recovery" in the backlog; the loop-semantics
+> round-trip battery (`TestLoopSemanticsRoundTrip`, which executes and compares
+> fingerprints) covers every non-labeled shape and passes.
+
+### Correctness fix landed in this evaluation — round 6 (unreachable-statement prune)
+**Loops** flipped to a clean recompile, taking the round-trip to **16/18**. Because
+the structuring pass lowers every loop to `do{...}while(true)`, a back-edge
+`continue;` can be emitted *after* an inner region that never falls through (an
+inner infinite loop that only exits via `return` or a labelled `continue` to an
+outer loop). `javac` rejects that trailing `continue;` as an *unreachable
+statement*. A new post-structuring pass (`rewriter/PruneUnreachableStatements`,
+wired in `parser.go` after `RewriteVar`) deletes statements that follow a
+*terminal* statement within the same block. The terminal classification is a
+deliberately **strict subset** of the JLS "cannot complete normally" rules
+(`return`/`throw`/`break`/`continue`, an `if/else` whose branches are *both*
+terminal, and an infinite `while(true)`/`do{...}while(true)` with no escaping
+`break`); because it is a subset it only ever removes code `javac` also rejects, so
+any class that already recompiled is left byte-for-byte identical and no reachable
+code is dropped. The `subtreeHasBreak` helper over-approximates "this loop can fall
+through" (any break-like marker suppresses pruning), which can only *under*-delete,
+never over-delete. Verified non-regressing by the golden suite,
+`TestCorpusDeterminism`, `TestLoopSemanticsRoundTrip`, and the full package suite.
 
 ### Correctness fix landed in this evaluation — round 5 (try/catch/finally grouping)
 **Exceptions** flipped from the corpus's last stub to a clean recompile, and the
@@ -486,12 +515,15 @@ recorded as future work.
 ## 6. Backlog (prioritized by impact, from the data above)
 
 **Correctness (semantic fidelity):**
-1. **Loop idiom recovery** — reconstruct `for`/`while` instead of universal
-   `do{...}while(true)`, which also removes the *unreachable statement* failures (Loops).
-2. **Short-circuit `||`/`&&` boolean-expression recovery** (Operators) — fold the
+1. **Short-circuit `||`/`&&` boolean-expression recovery** (Operators) — fold the
    `if(a&&b){return true}else{...}` control flow back into `return (a&&b)||(...)`.
-3. **Generic signature recovery** (Lambdas) — parse the `Signature` attribute so
+2. **Generic signature recovery** (Lambdas) — parse the `Signature` attribute so
    erased call sites and lambda targets keep their type arguments.
+3. **Loop idiom recovery** — reconstruct `for`/`while` instead of universal
+   `do{...}while(true)`. The *unreachable statement* failures are already removed by
+   the round-6 prune; recovering real `for` loops would additionally fix the
+   `labeled` `continue <outer-increment>` semantic limitation (a shared increment
+   node the do-while model can place on only one successor).
 4. **Record / sealed `invokedynamic ObjectMethods` bootstrap** — unblocks modern
    (Java 17+) value types end-to-end.
 5. **Idiomatic `finally` folding** — the `try/catch/finally` round-trip is correct
@@ -499,7 +531,10 @@ recorded as future work.
    `catch (Throwable)` rethrow, exactly as the bytecode runs). A future pass can
    collapse this into a single idiomatic `finally {}` block for readability.
 
-*Landed this round (round 5):* try/catch/finally handler grouping (Exceptions) —
+*Landed this round (round 6):* unreachable-statement prune (Loops) — a back-edge
+`continue;` emitted after a non-falling-through inner region is deleted using a
+strict subset of the JLS reachability rules; round-trip is now 16/18.
+*Round 5:* try/catch/finally handler grouping (Exceptions) —
 the classic corpus now emits zero stubs; real-jar stub markers fell sharply
 (gson 38 → 18).
 *Round 4:* null-initialized slot type widening (Generics) — a null slot adopts the
