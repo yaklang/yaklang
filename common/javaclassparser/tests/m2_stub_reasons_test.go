@@ -23,6 +23,15 @@ func TestM2StubReasons(t *testing.T) {
 	}
 	maxJars := envInt("M2_MAX_JARS", 120)
 	maxClasses := envInt("M2_MAX_CLASSES", 12000)
+	// Stop-on-first (STOP_ON_FIRST=1): the harness is meant to drive a fix loop one class at a time
+	// (HARNESS_WORKFLOW §0). When set, the scan ABORTS as soon as it has captured the very first
+	// failing class (a partial/err/panic, in that severity order) under PROBLEM_DIR, instead of
+	// grinding through the whole corpus. This keeps every iteration a few seconds rather than
+	// minutes, and makes "the first problem class" a stable, reproducible target. The bucket files
+	// it writes (raw .class + decompiled .java/.err.txt) are consumed unchanged by DIAG_FILE.
+	// STOP_ON_FIRST_FIRST_OK (default 0): if set, treat an already-clear corpus (0 failures) as a
+	// success and exit normally; otherwise the run keeps scanning to confirm the zero.
+	stopOnFirst := os.Getenv("STOP_ON_FIRST") != ""
 	// Industry mode (M2_INDUSTRY=1): scan EVERY jar in ~/.m2 (covers spring/tomcat/netty/... not just
 	// the a-c alpha prefix), capping classes per jar (M2_MAX_PER_JAR, default 200) so a few giant jars
 	// cannot eat the whole budget. Mirrors TestM2RegressionHarness so both report the same GA sample.
@@ -63,14 +72,15 @@ func TestM2StubReasons(t *testing.T) {
 		return slugRe.ReplaceAllString(name, "_")
 	}
 	// saveProblem writes the raw class plus a sibling artifact (decompiled java or error text) into the
-	// reason bucket folder, capped per bucket. kind is "partial" or "err".
-	saveProblem := func(kind, reason, name string, raw []byte, artifactExt, artifact string) {
+	// reason bucket folder, capped per bucket. kind is "partial" or "err". Returns the bucket
+	// directory it wrote to (or "" if it did not write), so stop-on-first can point the user at it.
+	saveProblem := func(kind, reason, name string, raw []byte, artifactExt, artifact string) string {
 		if problemDir == "" {
-			return
+			return ""
 		}
 		bucket := kind + "__" + bucketSlug(reason)
 		if savedPerBucket[bucket] >= maxSavePerBucket {
-			return
+			return ""
 		}
 		savedPerBucket[bucket]++
 		dir := filepath.Join(problemDir, bucket)
@@ -83,6 +93,7 @@ func TestM2StubReasons(t *testing.T) {
 		if artifact != "" {
 			_ = os.WriteFile(filepath.Join(dir, stem+artifactExt), []byte(name+"\n\n"+artifact), 0644)
 		}
+		return dir
 	}
 
 	home, _ := os.UserHomeDir()
@@ -125,6 +136,11 @@ func TestM2StubReasons(t *testing.T) {
 	var errClasses []errRec
 	errReasonCounts := map[string]int{}
 
+	// firstFailure holds the name + bucket path of the first captured failing class, for the
+	// stop-on-first summary. Empty until a partial/err is seen.
+	var firstFailureName, firstFailureBucket string
+
+jarLoop:
 	for ji, jp := range jars {
 		zr, err := zip.OpenReader(jp)
 		if err != nil {
@@ -167,8 +183,12 @@ func TestM2StubReasons(t *testing.T) {
 				}
 				errClasses = append(errClasses, errRec{name, msg})
 				errReasonCounts[normalize(msg)]++
-				saveProblem("err", normalize(msg), name, raw, ".err.txt", derr.Error())
+				dir := saveProblem("err", normalize(msg), name, raw, ".err.txt", derr.Error())
 				fmt.Fprintf(os.Stderr, "[stub-reasons] ERR %s :: %s\n", name, strings.ReplaceAll(msg, "\n", " "))
+				if stopOnFirst {
+					firstFailureName, firstFailureBucket = name, dir
+					break jarLoop
+				}
 			} else if !strings.Contains(out, javaclassparser.DecompileStubMarker) {
 				nOK++
 			} else {
@@ -191,7 +211,11 @@ func TestM2StubReasons(t *testing.T) {
 				}
 				// Save the failing class under its dominant reason bucket so it can be reproduced
 				// directly: `DIAG_FILE=<path> go test -run TestDiagDecompileClass ...`.
-				saveProblem("partial", primaryReason, name, raw, ".java", out)
+				dir := saveProblem("partial", primaryReason, name, raw, ".java", out)
+				if stopOnFirst {
+					firstFailureName, firstFailureBucket = name, dir
+					break jarLoop
+				}
 			}
 			if progressEvery > 0 && nClasses%progressEvery == 0 {
 				fmt.Fprintf(os.Stderr, "[stub-reasons] progress: jar %d/%d  scanned=%d  ok=%d  partial=%d  err=%d\n",
@@ -205,6 +229,14 @@ func TestM2StubReasons(t *testing.T) {
 	}
 	fmt.Fprintf(os.Stderr, "[stub-reasons] DONE: scanned=%d  ok=%d  partial=%d  err=%d  stubs=%d\n",
 		nClasses, nOK, nPartial, nErr, nStubs)
+	if stopOnFirst && firstFailureName != "" {
+		fmt.Fprintf(os.Stderr, "[stub-reasons] STOP_ON_FIRST: aborted after first failure at class %d\n", nClasses)
+		fmt.Fprintf(os.Stderr, "[stub-reasons]   class: %s\n", firstFailureName)
+		fmt.Fprintf(os.Stderr, "[stub-reasons]   bucket dir: %s\n", firstFailureBucket)
+		fmt.Fprintf(os.Stderr, "[stub-reasons]   reproduce: DIAG_FILE=%s/*.class go test -run TestDiagDecompileClass -v ./common/javaclassparser/tests/\n", firstFailureBucket)
+	} else if stopOnFirst {
+		fmt.Fprintf(os.Stderr, "[stub-reasons] STOP_ON_FIRST: no failure found in scanned range (scanned=%d ok=%d)\n", nClasses, nOK)
+	}
 	if problemDir != "" {
 		nSaved := 0
 		for _, c := range savedPerBucket {
