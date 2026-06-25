@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"io"
 	"sort"
 	"strings"
@@ -139,7 +140,9 @@ func runForkedSubReactAgentJob(
 
 	subTask := aicommon.NewSubTaskBase(parentTask, subTaskID, buildSubAgentUserInput(job), true)
 	childInvoker.SetCurrentTask(subTask)
-
+	subTask.SetEmitter(aicommon.NewEmitter(uuid.NewString(), func(event *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		return event, nil
+	}))
 	branchMarker := fmt.Sprintf("sub-react-branch-marker-%s", subTaskID)
 	fork.Branch.PushText(parentCfg.AcquireId(), branchMarker)
 
@@ -149,6 +152,7 @@ func runForkedSubReactAgentJob(
 		return result, nil
 	}
 
+	reactloops.EmitActionLog(parentLoop, loopInfraNodeDispatchSubReact, job.Goal)
 	execErr := subLoop.ExecuteWithExistedTask(subTask)
 	result, _ := buildSubReactJobResult(job, startedAt, subTask, subLoop, fork, execErr)
 	return result, nil
@@ -165,6 +169,9 @@ func buildForkedSubReactInvoker(
 		aicommon.WithContext(jobCtx),
 		aicommon.WithEnablePlanAndExec(false),
 		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithEmitter(aicommon.NewEmitter(uuid.NewString(), func(event *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+			return event, nil
+		})),
 	)
 
 	childInvoker, err := aicommon.AIRuntimeInvokerGetter(jobCtx, baseOpts...)
@@ -491,7 +498,7 @@ func handleDispatchSubReactAgents(
 		concurrency = parseDispatchConcurrency(action, len(jobs))
 	}
 
-	loopInfraActionStart(loop, loopInfraNodeDispatchSubReact, fmt.Sprintf("下发 %d 个子 ReAct agent / Dispatching %d sub agents", len(jobs), len(jobs)), "启动子 Agent / Dispatching Sub Agents...")
+	loopInfraStatus(loop, "子 Agent 执行中/ Sub Agents Running...")
 
 	results := runDispatchSubReactJobsConcurrently(invoker, loop, parentTask, jobs, concurrency)
 
