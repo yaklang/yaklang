@@ -705,6 +705,10 @@ func TeeAIResponse(
 	first.getErrorFunc = src.getErrorFunc
 	second.setErrorFunc = src.setErrorFunc
 	second.getErrorFunc = src.getErrorFunc
+	if src.asyncState != nil {
+		first.asyncState = src.asyncState
+		second.asyncState = src.asyncState
+	}
 
 	refreshFromSrc := func() {
 		first.SetModelInfo(src.GetProviderName(), src.GetModelName())
