@@ -100,6 +100,7 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 				namedTypeExports:  make(map[string]ssa.Type),
 				reExports:         make(map[string]map[string]string),
 				importTbl:         make(map[string]map[string]string),
+				forInKeySources:   make(map[string]string),
 			}
 			nb.VisitSourceFile(capturedSF)
 		})
