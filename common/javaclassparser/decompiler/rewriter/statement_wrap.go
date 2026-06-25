@@ -382,6 +382,14 @@ func (s *RewriteManager) mergeIf() bool {
 		for _, n := range node.Source {
 			mergeCondition := func(parentNode, childNode *core.Node) {
 				result = true
+				// Guard against nil TrueNode/FalseNode: when the variable-fold nil-key error is
+				// suppressed (parser.go), a ConditionStatement whose node has fewer than 2 Next edges
+				// can reach here with nil branch functions. Skip the merge instead of panicking.
+				if parentNode == nil || childNode == nil ||
+					parentNode.TrueNode == nil || childNode.TrueNode == nil ||
+					parentNode.TrueNode() == nil || childNode.TrueNode() == nil {
+					return
+				}
 				if parentNode.TrueNode() != childNode { // or logic
 					if parentNode.TrueNode() == childNode.TrueNode() { // same direction
 						ifStat1 := parentNode.Statement.(*statements.ConditionStatement)
