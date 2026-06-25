@@ -489,6 +489,16 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			mustNotContain: []string{"import Map<", "import Set<", "yak-decompiler"},
 		},
 		{
+			file: "merge_condition_in_try.class",
+			desc: "a try body that begins with a merge-condition (an if whose head is also a control-flow " +
+				"join, dominated by a pre-try join rather than the try marker) is structured into a real " +
+				"if/else before the try is built, instead of leaking a bare `if(cond);` (Family B). " +
+				"Mirrors Hutool ImgUtil.write / Ant Exec.",
+			// the in-try condition reconstructs as a real if/else and the method does not stub
+			mustContain:    []string{"try{", "if ((var3) != (null))", "sink(var3)", "sink(var1)"},
+			mustNotContain: []string{"yak-decompiler", "if (var3) != (null);"},
+		},
+		{
 			file: "multi_catch.class",
 			desc: "multi-catch (A | B): exception-table entries sharing one handler PC reconstruct the full union clause",
 			// both the 2-type and 3-type unions must be reconstructed in handler order

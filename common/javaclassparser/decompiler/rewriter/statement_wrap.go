@@ -815,6 +815,15 @@ func (s *RewriteManager) ScanCoreInfo() error {
 		}
 	}
 
+	// Family B (merge-condition leak): the route-based DFS above marks any node reached by more than
+	// one route as a merge and excludes it from ifNodes. A ConditionStatement that is also such a
+	// control-flow join therefore never becomes an IfStatement and leaks into the output as a bare
+	// `if (cond);`. When such a condition heads a clean single-entry-single-exit region -- both arms
+	// reconverge at its immediate post-dominator -- and it is not a loop head or switch/try head, it
+	// is a perfectly ordinary if and must be structured. The post-dominator gives a sound region exit
+	// even though the head is itself a join (the forward dominator tree alone could not bound it).
+	collectSESEMergeConditions(s, &ifNodes, mergeNodesSet, circleNodes)
+
 	s.CircleEntryPoint = circleNodes
 	s.IfNodes = ifNodes
 	//for _, node := range circleNodes {
@@ -826,6 +835,69 @@ func (s *RewriteManager) ScanCoreInfo() error {
 	//}
 	return nil
 }
+// collectSESEMergeConditions augments ifNodes with merge-conditions (ConditionStatement nodes that
+// the route-based scan flagged as control-flow joins) that head a clean single-entry-single-exit
+// region. See the call site in ScanCoreInfo for the rationale. The trigger is deliberately
+// conservative -- a clear post-dominator reconvergence and no loop/switch involvement -- so already
+// well-structured methods are untouched and only the previously-leaking bare conditions are promoted.
+func collectSESEMergeConditions(s *RewriteManager, ifNodes *[]*core.Node, mergeNodesSet *utils.Set[*core.Node], circleNodes []*core.Node) {
+	merges := mergeNodesSet.List()
+	if len(merges) == 0 {
+		return
+	}
+	ifNodeSet := utils.NewSet[*core.Node]()
+	ifNodeSet.AddList(*ifNodes)
+	circleSet := utils.NewSet[*core.Node]()
+	circleSet.AddList(circleNodes)
+
+	postDom := GeneratePostDominatorMap(s.RootNode)
+
+	for _, current := range sortNodesByID(merges) {
+		if ifNodeSet.Has(current) {
+			continue
+		}
+		if _, ok := current.Statement.(*statements.ConditionStatement); !ok {
+			continue
+		}
+		// Skip anything tangled with a loop: loop heads and any node inside a detected circle are
+		// handled by the loop rewriter, and treating a back-edge join as a plain if would be wrong.
+		if circleSet.Has(current) {
+			continue
+		}
+		inCircle := false
+		for _, c := range circleNodes {
+			if c.CircleNodesSet != nil && c.CircleNodesSet.Has(current) {
+				inCircle = true
+				break
+			}
+		}
+		if inCircle {
+			continue
+		}
+		if current.TrueNode == nil || current.FalseNode == nil {
+			continue
+		}
+		tn := current.TrueNode()
+		fn := current.FalseNode()
+		if tn == nil || fn == nil {
+			continue
+		}
+		// A clean reconvergence point (immediate post-dominator) is required: it is the region exit
+		// that bounds the if body. Without it the region is not a simple if and is left alone.
+		exit := postDom[current]
+		if exit == nil || exit == current {
+			continue
+		}
+		// Degenerate condition whose both arms jump to the same node is not a real two-armed if.
+		if tn == fn {
+			continue
+		}
+		current.IsIf = true
+		*ifNodes = append(*ifNodes, current)
+		ifNodeSet.Add(current)
+	}
+}
+
 func (s *RewriteManager) Rewrite() error {
 	err := s.ScanCoreInfo()
 	if err != nil {
@@ -872,9 +944,37 @@ func (s *RewriteManager) Rewrite() error {
 	}
 	order := s.TopologicalSortReverse(keyNodes)
 	loopJmpRewriterRecoed := map[*core.Node]struct{}{}
+	processed := map[*core.Node]struct{}{}
 	for i := 0; i < len(order); i++ {
 		s.DominatorMap = GenerateDominatorTree(s.RootNode)
 		node := order[i]
+		if _, done := processed[node]; done {
+			continue
+		}
+
+		// Family B (merge-condition inside try): TryRewriter collects its body's statements linearly
+		// (it does not recursively structure them), so any if-node that lives in the try body must be
+		// turned into an IfStatement BEFORE the try runs. The reverse-topo order normally guarantees
+		// inner-first, but a try-body entry that is also a control-flow join (a merge-condition) is
+		// dominated by a pre-try node, not by the try marker, so it sorts AFTER the try and would be
+		// grabbed raw -> leaked as a bare `if(cond);`. Pre-structure those pending inner if-nodes here.
+		if slices.Contains(s.TryNodes, node) {
+			body := s.tryBodyNodeSet(node)
+			for _, cand := range order[i+1:] {
+				if _, done := processed[cand]; done {
+					continue
+				}
+				if !body[cand] || !slices.Contains(s.IfNodes, cand) {
+					continue
+				}
+				s.DominatorMap = GenerateDominatorTree(s.RootNode)
+				if err := IfRewriter(s, cand); err != nil {
+					return err
+				}
+				processed[cand] = struct{}{}
+			}
+			s.DominatorMap = GenerateDominatorTree(s.RootNode)
+		}
 
 		if slices.Contains(s.IfNodes, node) {
 			for j := i; j < len(order); j++ {
@@ -897,8 +997,30 @@ func (s *RewriteManager) Rewrite() error {
 		if err != nil {
 			return err
 		}
+		processed[node] = struct{}{}
 	}
 	return nil
+}
+
+// tryBodyNodeSet returns the set of nodes that TryRewriter will collect as this try node's body
+// (and catch handlers): each successor plus the nodes reachable from it through dominator edges,
+// exactly mirroring TryRewriter.getBody's traversal. It is used to find if-nodes that must be
+// structured before the try is rewritten.
+func (s *RewriteManager) tryBodyNodeSet(tryNode *core.Node) map[*core.Node]bool {
+	set := map[*core.Node]bool{}
+	for _, start := range tryNode.Next {
+		core.WalkGraph[*core.Node](start, func(n *core.Node) ([]*core.Node, error) {
+			set[n] = true
+			var next []*core.Node
+			for _, c := range n.Next {
+				if slices.Contains(s.DominatorMap[n], c) {
+					next = append(next, c)
+				}
+			}
+			return next, nil
+		})
+	}
+	return set
 }
 
 func (s *RewriteManager) TopologicalSortReverse(nodes []*core.Node) []*core.Node {
