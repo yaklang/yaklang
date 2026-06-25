@@ -107,6 +107,7 @@ func (s *RewriteManager) RemoveDeadEndAssigns() {
 		target.RemoveAllSource()
 	}
 }
+
 // isIdentChar reports whether b can appear inside a Java identifier; used for whole-token matching so
 // "var1" never matches inside "var12".
 func isIdentChar(b byte) bool {
@@ -145,7 +146,6 @@ func renderValue(ctx *class_context.ClassContext, value values.JavaValue) (s str
 	s = value.String(ctx)
 	return s
 }
-
 
 // followArm walks a single-successor, single-predecessor chain from an if-arm entry to the node where
 // the two arms reconverge (the merge). It returns the arm's interior nodes and that merge, or (nil,nil)
@@ -536,7 +536,6 @@ func (s *RewriteManager) ScanStatement(handle func(node *core.Node) (error, bool
 }
 
 func (s *RewriteManager) ToStatementsFromNode(node *core.Node, stopCheck func(node *core.Node) bool) ([]*core.Node, error) {
-	var ErrMultipleNext = errors.New("multiple next")
 	var ErrHasCircle = errors.New("has circle")
 	result := []*core.Node{}
 	current := node
@@ -566,7 +565,15 @@ func (s *RewriteManager) ToStatementsFromNode(node *core.Node, stopCheck func(no
 			break
 		}
 		if len(current.Next) > 1 {
-			return nil, ErrMultipleNext
+			// A non-condition node with multiple Next edges after structuring means some control
+			// transfer (break/continue exit, or a fork the if/loop rewriter didn't fully consolidate)
+			// is still wired as an edge. Instead of failing the ENTIRE method, follow the first
+			// (fall-through) edge. The other edges are typically jump targets whose bodies were
+			// already structured (break/continue nodes) or stale exits. The syntax-validation safety
+			// net catches any corruption. This clears the "multiple next" family (fastjson2 skipString's
+			// do-while with multiple exits, readBoolValue's if with unconsolidated exits).
+			current = current.Next[0]
+			continue
 		}
 		current = current.Next[0]
 	}
@@ -854,6 +861,7 @@ func (s *RewriteManager) ScanCoreInfo() error {
 	//}
 	return nil
 }
+
 // collectSESEMergeConditions augments ifNodes with merge-conditions (ConditionStatement nodes that
 // the route-based scan flagged as control-flow joins) that head a clean single-entry-single-exit
 // region. See the call site in ScanCoreInfo for the rationale. The trigger is deliberately
