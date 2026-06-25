@@ -294,7 +294,7 @@ runtime.greyobject     13.3% cum
 ## 6. Backlog（按影响排序，源自上文数据）
 
 **正确性（语义保真度）：**
-1. **真实 jar partial 收敛**——通过诊断真实字节码上残留的逐类 stub 原因，把 `.m2` 剩余 partial 推向零（合成语料已是 0 stub / 0 round-trip 失败）。已落地：第一轮 catch-handler 按内容识别修复（§3.2，partial 127 → 74、"try without catch handler" 61 → 0）；第二轮合流值重建原理化重写（§3.5，partial 74 → 40、"empty slot" 36 → 0）；第三轮 panic 桶契约级硬化（§3.6，partial 40 → 35、panic 6 → 0、ok 11960 → 11965，`TestGAPanicFreeBoundary` CI 锁定）。剩余前沿：multiple next（28）、post-decompile syntax（18，与 multiple-next 同源的未结构化分支）——均属 CFG 结构化完备性问题，待统一 pattern-independent 结构化引擎收敛。
+1. **真实 jar partial 收敛**——通过诊断真实字节码上残留的逐类 stub 原因，把 `.m2` 剩余 partial 推向零（合成语料已是 0 stub / 0 round-trip 失败）。已落地：第一轮 catch-handler 按内容识别修复（§3.2，partial 127 → 74、"try without catch handler" 61 → 0）；第二轮合流值重建原理化重写（§3.5，partial 74 → 40、"empty slot" 36 → 0）；第三轮 panic 桶契约级硬化（§3.6，partial 40 → 35、panic 6 → 0、ok 11960 → 11965，`TestGAPanicFreeBoundary` CI 锁定）；第四轮 variable-fold nil-deref panic + early-return multiple-next（§3.7，validation-off 切片 partial 42 → 36、stubs 30 → 24、panic 2 → 0、multiple-next 18 → 12）。剩余前沿：multiple next（12）、invalid stack size（6，JSON 解析器 switch-loop 操作数栈再汇聚）、post-decompile syntax（与 multiple-next 同源的未结构化分支）——均属 CFG 结构化完备性问题，待统一 pattern-independent 结构化引擎收敛。
    另有一个独立的**泛型字段类型渲染**缺陷：带类型实参的字段类型（`Set<...>`）被错误输出为 import 语句，导致少数类语法失效（`syntax`），需单独修复。
 2. **循环惯用法恢复**——重建 `for`/`while` 而非一律 `do{...}while(true)` 降级。这能修复 `labeled` 的 `continue <外层自增>` 语义限制（do-while 模型只能把共享自增节点放在一条后继上），并提升可读性。
 3. **idiomatic `finally` 折叠**——`try/catch/finally` 的 round-trip 当前已正确（采用忠实的脱糖形式：finally 体重复 + `catch (Throwable)` 重抛，与字节码运行完全一致）。未来可加一个 pass 把它折叠为单个 idiomatic 的 `finally {}` 块以提升可读性。

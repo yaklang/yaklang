@@ -404,6 +404,53 @@ A degraded member is never silently replaced with plausible-but-wrong code:
 for a security tool, a clearly-marked stub is strictly better than a
 compilable-but-incorrect reconstruction.
 
+### 3.7 Variable-fold nil-deref panic + early-return "multiple next" (real-jar partial reduction)
+
+A fourth round removed two residual defect families surfaced by
+`TestM2StubReasons` on a 120-jar / 24491-class `.m2` slice (validation off, so
+method-dump failures are attributed directly rather than collapsed into a
+post-syntax bucket):
+
+1. **Variable-fold nil-pointer panic.** A typed-nil `*JavaRef` entered
+   `varUserMap` as a key when `loadVarBySlot` loaded an uninitialized local slot
+   (`GetVar` returns nil); the variable-fold walker then dereferenced
+   `ref.VarUid`/`ref.Val` and panicked, crashing the whole decompile through the
+   recover net. The fold entry now surfaces this as an ordinary error so the
+   method degrades to a tagged stub instead of a Go panic, and the INVOKESPECIAL
+   `<init>` arm-store path is hardened against the same typed-nil ref plus a nil
+   `VarFoldRule`. Hits beetl `FloatingIOWriter.<init>` and fastjson2
+   `TypeUtils.doubleValue`.
+
+2. **Early-return "multiple next".** `IfRewriter` wired both an arm's early
+   `return`/`throw` exit *and* the genuine fall-through continuation as `Next` of
+   the structured if node, giving it two `Next` edges; the linear statement
+   collector then aborted with `"multiple next"` and degraded the whole method.
+   The rewriter now drops a method-exit terminator (return/throw — never
+   break/continue, which are loop-control jumps with a real successor) from the
+   if's endNodes when a real fall-through remains, so the if keeps a single
+   linear successor. Reconstructs Jackson's `PropertyDeserializer.deserializeAndSet`
+   (a core deserialization path) across all five `jackson-databind` versions, plus
+   druid `OracleStatementParser`.
+
+Same-config (120 jars / 24491 classes, validation off) before/after:
+
+```
+before: partial=42  stubs=30  (multiple-next 18 + invalid-stack-size 6 + empty-slot 2 + panic 2 + other 4)
+after:  partial=36  stubs=24  (multiple-next 12 + invalid-stack-size 6 + empty-slot 2 + variable-fold(clean err) 2 + other 4)
+```
+
+The **panic bucket goes 2 → 0** on this slice (those two classes now degrade to
+clean tagged stubs via the ordinary-error path instead of a Go panic), the
+**multiple-next bucket goes 18 → 12** (`-6`), `syntax`/`err` stay 0, and the full
+suite + `recompile_roundtrip` stay green. Locked in CI by `TestGAPanicFreeBoundary`
+(`panic_nilref_*`) and `TestDecompileSyntaxRegression`
+(`multiple_next_early_return`).
+
+The residual `invalid-stack-size` family (6, all in fastjson2 `TypeUtils`/
+`JSONPathSingleName` JSON-parser switch loops where reconverging arms carry
+different operand-stack depths) is a deeper stack-simulation completeness problem;
+it degrades cleanly to a tagged stub and is tracked in the backlog.
+
 ---
 
 ## 4. Test-hygiene benchmark
@@ -551,8 +598,11 @@ recorded as future work.
    127 → 74, "try without catch handler" 61 → 0); round 2 principled merge-value
    reconstruction rewrite (§3.5, partials 74 → 40, "empty slot" 36 → 0); round 3
    panic-bucket contract hardening (§3.6, partials 40 → 35, panic 6 → 0, ok 11960 →
-   11965, locked by `TestGAPanicFreeBoundary`). Remaining frontier: multiple next
-   (28), post-decompile syntax (18, same unstructured-branch family as
+   11965, locked by `TestGAPanicFreeBoundary`); round 4 variable-fold nil-deref
+   panic + early-return multiple-next (§3.7, validation-off slice partials 42 → 36,
+   stubs 30 → 24, panic 2 → 0, multiple-next 18 → 12). Remaining frontier:
+   multiple next (12), invalid stack size (6, JSON-parser switch-loop operand-stack
+   reconvergence), post-decompile syntax (same unstructured-branch family as
    multiple-next) — CFG-structuring completeness problems awaiting a unified
    pattern-independent structuring engine. A separate
    **generic field-type rendering** defect (field types like `Set<...>` emitted as
