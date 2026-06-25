@@ -478,6 +478,35 @@ past it to `logback NestingType` (class #1194, a different family), i.e. the
 assert-corrupted classes in the leading range now fully reconstruct. Locked in CI
 by `TestDecompileSyntaxRegression` (`assert_guard_cyclic`).
 
+### 3.9 Switch-case operand-stack rebuild from the switch StackEntry (post-syntax partial → 0)
+
+A sixth round cleared the next failing family: a switch whose case/default bodies
+build on top of an operand stack that is **not** empty after the selector pop.
+(Groovy-compiled enums do this routinely — `$INIT` lowers to
+`selectConstructorAndTransformArguments` and threads a freshly-allocated object +
+an args array through every switch arm via `dup_x1`/`dup2_x1` on top of
+`[objarr, newexpr]`.) The bytecode simulator shared a **single** post-switch
+operand-stack snapshot across all arms via `preRuntimeStackSimulation`, which a
+single shared variable updated after *every* node. As soon as an earlier arm ended
+with an empty stack (an `athrow`/`return`), that snapshot was clobbered, so later
+case bodies started from a stale/empty stack, underflowed on the dup ops, and
+leaked `empty slot value` placeholders that degraded the whole method to a stub.
+
+`calcOpcodeStackInfo` (`code_analyser.go`) now rebuilds each case/default body's
+operand-stack simulation from the switch instruction's **post-selector** `StackEntry`
+(`code.Source[0].StackEntry`) instead of the shared variable. That snapshot is exactly
+the state after the selector `Pop`, so it is correct for every arm independently and
+immune to earlier arms clobbering it. The shared variable is removed. A
+`DEBUG_EMPTYSLOT` env hook (mirrors `DEBUG_TRYNOCATCH`) prints the corrupted body
+instead of stubbing, for faster triage.
+
+Effect (STOP_ON_FIRST probe of the 120-jar a-c slice): the first failing class moves
+from `logback NestingType` (class #1194, `incomplete stack simulation: empty stack
+slot leaked into method body`) past it to `druid SchemaResolveVisitorFactory`
+(class #3923, a different family), i.e. the Groovy switch family in the leading
+range now fully reconstructs. Locked in CI by `TestDecompileSyntaxRegression`
+(`groovy_constructor_switch`).
+
 ---
 
 ## 4. Test-hygiene benchmark
