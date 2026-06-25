@@ -44,6 +44,9 @@ type RewriteManager struct {
 	DominatorMap     map[*core.Node][]*core.Node
 	LabelId          int
 	visitedNodeSet   *utils.Set[*core.Node]
+	// Aggressive enables higher-risk structuring paths that only run as a second attempt for a
+	// method whose conservative decompilation already failed. See core.Decompiler.Aggressive.
+	Aggressive bool
 }
 
 func NewRootStatementManager(node *core.Node) *RewriteManager {

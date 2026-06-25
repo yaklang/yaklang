@@ -169,6 +169,7 @@ func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute, id *util
 		return dumped.code, nil
 	}
 	parser.BaseVarId = id
+	parser.Aggressive = dumper.aggressive
 	parser.FunctionContext = dumper.FuncCtx
 	parser.FunctionType = dumper.MethodType
 	//parser.FunctionContext.FunctionName

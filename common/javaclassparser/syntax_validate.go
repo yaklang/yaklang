@@ -108,6 +108,21 @@ func (c *ClassObjectDumper) degradeInvalidMethods(header string, methods []*dump
 		if debugInvalidMethods {
 			log.Errorf("DEBUG_INVALID method %s%s:\n%s", m.methodName, m.descriptor, m.code)
 		}
+		// Gated aggressive retry: this method produced invalid Java. Re-decompile ONLY this method
+		// in aggressive mode and adopt it only if it now parses cleanly in the real class header.
+		// Passing methods never reach here, so this cannot regress them; an aggressive result that
+		// still fails validation falls through to the stub degradation below.
+		if m.member != nil {
+			if retry := c.aggressiveRedumpMethod(m.methodName, m.descriptor); retry != nil {
+				if validateMemberInHeader(header, retry.code) == nil {
+					traitId := fmt.Sprintf("name:%s,desc:%s", m.methodName, m.descriptor)
+					c.dumpedMethodsSet[traitId] = retry
+					out = append(out, retry)
+					log.Infof("aggressive retry recovered method %s%s (post-syntax)", m.methodName, m.descriptor)
+					continue
+				}
+			}
+		}
 		// Try degrading to a stub (only possible when we kept the member metadata).
 		if m.bodyCode != "stub" && m.member != nil {
 			if stub := c.dumpStubMethod(m.member, m.methodName, m.descriptor, "post-decompile syntax validation failed"); stub != nil {

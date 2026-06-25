@@ -28,6 +28,9 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 
 	statementManager := rewriter.NewRootStatementManager(decompiler.RootNode)
 	statementManager.SetId(decompiler.CurrentId)
+	// Propagate the aggressive (second-attempt) flag so relaxed structuring paths can opt in only
+	// when re-decompiling a method that already failed conservatively.
+	statementManager.Aggressive = decompiler.Aggressive
 	statementManager.MergeIf()
 	// Tail-duplicate `return cond ? A : B` whose arm computes its value through intermediate local
 	// stores (ECJ pre-sized StringBuilder, lazy field init, ...). Those stores cannot be inlined into a

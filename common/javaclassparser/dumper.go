@@ -42,6 +42,16 @@ type ClassObjectDumper struct {
 	lambdaCaptureCount map[string]int
 	fieldDefaultValue  map[string]string
 	dumpedMethodsSet   map[string]*dumpedMethods
+	// aggressive marks that the CURRENT method dump is a second attempt for a method whose
+	// conservative decompilation already failed. While set, the decompiler enables higher-risk
+	// reconstruction paths (relaxed structuring, node-duplication, synthetic rebuilds). It is
+	// toggled per-method by aggressiveRedumpMethod and is otherwise always false, so methods that
+	// decompile cleanly on the first pass are never affected (zero regression by construction).
+	aggressive bool
+	// aggressiveRetried records methods (name+desc) already attempted in aggressive mode, so a
+	// method that reaches both degradation points (DumpMethods and degradeInvalidMethods) is
+	// re-decompiled at most once; the aggressive path is deterministic, so repeating is pointless.
+	aggressiveRetried map[string]bool
 }
 
 func (c *ClassObjectDumper) GetConstructorMethodName() string {
@@ -64,6 +74,7 @@ func NewClassObjectDumper(obj *ClassObject) *ClassObjectDumper {
 		lambdaCaptureCount: map[string]int{},
 		fieldDefaultValue:  map[string]string{},
 		dumpedMethodsSet:   map[string]*dumpedMethods{},
+		aggressiveRetried:  map[string]bool{},
 	}
 }
 func (c *ClassObjectDumper) TabNumber() int {
@@ -1422,6 +1433,46 @@ func (c *ClassObjectDumper) safeDumpMethod(name, descriptor string) (res *dumped
 	return c.DumpMethod(name, descriptor)
 }
 
+// aggressiveRedumpMethod re-decompiles a SINGLE method in aggressive mode. It is the gated retry at
+// the heart of the longtail strategy: it is only ever called after the conservative dump already
+// failed/degraded for this method, so methods that decompile cleanly never reach it (zero regression
+// by construction). It toggles the per-dumper aggressive flag for the duration, evicts the method's
+// cache entry so the re-dump actually re-runs, and returns the fresh result only if it is "clean"
+// (no error, no leaked internal placeholder / malformed-try marker). On any failure it restores the
+// pre-retry cache entry and returns nil, so the caller falls back to its normal stub degradation.
+//
+// A method is retried at most once (aggressiveRetried guard): it may reach both degradation points
+// (DumpMethods and degradeInvalidMethods), but the aggressive path is deterministic so repeating it
+// would only waste work and produce the same outcome.
+func (c *ClassObjectDumper) aggressiveRedumpMethod(name, descriptor string) *dumpedMethods {
+	traitId := fmt.Sprintf("name:%s,desc:%s", name, descriptor)
+	if c.aggressiveRetried[traitId] {
+		return nil
+	}
+	c.aggressiveRetried[traitId] = true
+
+	savedAggressive := c.aggressive
+	savedEntry, hadEntry := c.dumpedMethodsSet[traitId]
+	c.aggressive = true
+	delete(c.dumpedMethodsSet, traitId)
+	defer func() { c.aggressive = savedAggressive }()
+
+	res, err := c.safeDumpMethod(name, descriptor)
+	clean := err == nil && res != nil &&
+		!strings.Contains(res.code, values.EmptySlotValuePlaceholder) &&
+		!strings.Contains(res.code, malformedTryNoCatchMarker)
+	if !clean {
+		// Restore the exact pre-retry cache state so downstream rendering is unchanged.
+		if hadEntry {
+			c.dumpedMethodsSet[traitId] = savedEntry
+		} else {
+			delete(c.dumpedMethodsSet, traitId)
+		}
+		return nil
+	}
+	return res
+}
+
 // dumpStubMethod builds a syntactically-valid placeholder for a method whose body could
 // not be decompiled. It reconstructs the signature purely from the access flags and the
 // method descriptor (independent of the bytecode), so a single un-decompilable method
@@ -1618,6 +1669,18 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 				log.Errorf("DEBUG_TRYNOCATCH method %s%s:\n%s", name, descriptor, res.code)
 			}
 			err = utils.Errorf("try-region structuring failed: try without catch handler")
+		}
+		if err != nil {
+			// Gated aggressive retry: this method failed conservative decompilation (error, leaked
+			// empty slot, or malformed try). Re-decompile ONLY this method in aggressive mode and
+			// adopt the result if it now produces a clean body. Whole-class syntax validation still
+			// runs afterwards, so an aggressive result that is clean-looking but invalid Java is
+			// caught and re-degraded at the degradeInvalidMethods stage.
+			if retry := c.aggressiveRedumpMethod(name, descriptor); retry != nil {
+				log.Infof("aggressive retry recovered method %s%s", name, descriptor)
+				res = retry
+				err = nil
+			}
 		}
 		if err != nil {
 			// Graceful degradation: an un-decompilable method body must not fail the whole

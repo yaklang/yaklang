@@ -75,6 +75,13 @@ type Decompiler struct {
 	// assignment statement must not be emitted, otherwise it would leave a side-effect statement
 	// in a ternary/expression branch and break structuring (multiple next).
 	selfOpFoldedRefs map[string]bool
+
+	// Aggressive enables higher-risk reconstruction paths (relaxed merge-condition structuring,
+	// bounded node-duplication, synthetic-method rebuilds) that are only used as a SECOND attempt
+	// for a method whose conservative decompilation already failed/degraded. It is never set on the
+	// first pass, so methods that decompile cleanly are completely unaffected (zero regression by
+	// construction). Threaded from ClassObjectDumper.aggressive via the rewriter.
+	Aggressive bool
 }
 type VarFoldRule struct {
 	Replace          func(v values.JavaValue)
