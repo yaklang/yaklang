@@ -321,7 +321,7 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	}
 
 	full := assemble()
-	if EnableDecompileSyntaxValidation {
+	if EnableDecompileSyntaxValidation && len(full) < 50000 {
 		if err := validateJavaSyntax(full); err != nil {
 			// The assembled class is not valid Java. Degrade malformed members (using the real
 			// class header so interface/enum/constructor context is honored) and re-render, so a

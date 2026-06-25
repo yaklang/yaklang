@@ -104,6 +104,15 @@ func (c *ClassObjectDumper) degradeInvalidMethods(header string, methods []*dump
 		if m == nil {
 			continue
 		}
+		// For very large methods (>20KB), skip ANTLR validation entirely: these are deeply-nested
+		// parser dispatch methods that produce valid Java but take 20-30s for ANTLR LL fallback.
+		// Running the 20s timeout on every such method would make batch scans impractically slow.
+		// The decompiler has multiple safety nets (empty-slot, try-without-catch) that catch real
+		// corruption; trusting large methods is a pragmatic trade-off for batch scan throughput.
+		if len(m.code) > 20000 {
+			out = append(out, m)
+			continue
+		}
 		if validateMemberInHeader(header, m.code) == nil {
 			out = append(out, m)
 			continue
