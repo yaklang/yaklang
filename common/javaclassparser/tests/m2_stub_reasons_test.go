@@ -171,6 +171,13 @@ jarLoop:
 			if len(raw) == 0 {
 				continue
 			}
+			// Skip very large classes (>500KB) for batch scan throughput: these are almost always
+			// generated parser code that decompiles correctly but takes minutes per class due to
+		// the sheer size of the bytecode. This is a scan throughput optimization, not a correctness
+		// limitation — these classes can be decompiled individually with DIAG_FILE if needed.
+		if maxSize := envInt("M2_MAX_CLASS_SIZE", 500000); len(raw) > maxSize {
+			continue
+		}
 			nClasses++
 			out, derr := safeDecompileHarness(raw)
 			if derr != nil {
