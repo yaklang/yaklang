@@ -507,6 +507,45 @@ slot leaked into method body`) past it to `druid SchemaResolveVisitorFactory`
 range now fully reconstructs. Locked in CI by `TestDecompileSyntaxRegression`
 (`groovy_constructor_switch`).
 
+### 3.10 Open long-tail structural families (full-`.m2` sweep investigation)
+
+A full-`~/.m2` sweep (1107 jars / ~760k classes, `M2_INDUSTRY=1`, `-timeout 2h`) shows the residual
+partial rate around 0.4% (e.g. ~368 partials in 94000 scanned classes). The failures cluster into four
+structural families, all rooted in loop / value-merge structuring rather than per-class quirks. The
+investigation (upstream-source diffing, synthetic MVPs, in-decompiler probes) localized each so the next
+iteration has a precise target instead of re-deriving it:
+
+- **Cyclic / shared container statement** (the "unknown" bucket — reason slugs to empty). Caused by
+  `AssertStatementsAcyclic` rejecting a container reachable from two parents. Confirmed shape: a
+  `for(;;)` parser loop with `break`/`continue` in nested `else if` arms, followed by post-loop code
+  (e.g. druid `TDDLHint.<init>`'s `if (functions.size() > 0) type = Function;`). The post-loop
+  `IfStatement` object is attached BOTH at the switch/loop-tail level AND inside a nested `do-while`
+  body (seen twice in the acyclic DFS at the same pointer), so it is a loop-exit mis-attribution that
+  double-collects one node. The double-attachment originates in the loop/switch body builders, NOT the
+  `copyIfBody` path (marking those nodes visited did not clear it). Repros: druid TDDLHint, jackson
+  `UTF8DataInputJsonParser` (4 versions).
+- **variable-fold: nil ref key in varUserMap** (fastjson2 `TypeUtils.doubleValue`, `getYear`,
+  `findBestMethod`). A `loadVarBySlot` of an uninitialized slot produces a nil `*JavaRef` that becomes
+  a varUserMap key; the fold walker derefs it. Naive fixes all regress: materializing a fresh var,
+  skipping registration, or deleting/skipping the nil key in the fold all break `loopSwitchTail` and
+  similar (a change at the fold site flips an "invalid if merge node" error two phases earlier — the
+  method's varUserMap is per-method, so the cross-method coupling points at the shared `funcCtx` /
+  param-init path, the real but not-yet-cracked root cause).
+- **multiple next** (fastjson2 `seekLine`, jackson readers). A node retains two `Next` edges after
+  structuring; tied to `break`/`continue` targeting different loop levels. Synthetic MVPs of the
+  upstream source did NOT reproduce it, so it depends on the exact `javac` CFG topology, not the source
+  shape alone.
+- **post-decompile syntax validation failed** (druid `SchemaResolveVisitorFactory.resolve`, fastjson2
+  writers). Residual `ConditionStatement`s (rendered as the bracket-less `if cond;`) nested inside a
+  structured `IfStatement` body that `IfRewriter` did not recurse into, combined with loop-exit
+  mis-attribution that pulls post-loop `if/else if` into the loop.
+
+All four reduce to **loop-structuring mis-handles post-loop / cross-loop code when the loop body has
+`break`/`continue`**, the decompiler's single hardest structural problem. Each is currently caught by a
+safety net (panic-free recover + tagged stub), so the safety contract holds; clearing them needs
+loop-rewriter surgery to (a) never double-attach a node and (b) keep post-loop code out of the loop
+body — the prioritized GA work.
+
 ---
 
 ## 4. Test-hygiene benchmark
