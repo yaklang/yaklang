@@ -138,20 +138,9 @@ func (cs *codeSource) exportZipEntryPath(absOrRelativePath string) (string, erro
 }
 
 func (cs *codeSource) readFileForExport(path string) ([]byte, error) {
-	if cs.isDirectory {
-		return cs.expandedFS.ReadFile(path)
-	}
-	return cs.jarParser.GetJarFS().ReadFile(path)
+	return cs.expandedFS.ReadFile(cs.resolveFSPath(path))
 }
 
 func (cs *codeSource) readRawForExport(path string) ([]byte, error) {
-	if cs.isDirectory {
-		return cs.expandedFS.ReadFile(path)
-	}
-	jarFS := cs.jarParser.GetJarFS()
-	data, err := jarFS.ZipFS.ReadFile(path)
-	if err == nil {
-		return data, nil
-	}
-	return jarFS.ReadFile(path)
+	return cs.readFileForExport(path)
 }

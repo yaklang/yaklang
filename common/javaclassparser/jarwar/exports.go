@@ -25,14 +25,16 @@ import (
 // err = java.Decompile("a.class", "a.java"); die(err)   // 反编译单个 class 到文件
 // ```
 func AutoDecompile(from, to string) error {
-	// check from suffix
-	if strings.HasSuffix(from, ".jar") || strings.HasSuffix(from, ".war") {
+	fromLower := strings.ToLower(from)
+	switch {
+	case strings.HasSuffix(fromLower, ".jar"), strings.HasSuffix(fromLower, ".war"),
+		strings.HasSuffix(fromLower, ".ear"), strings.HasSuffix(fromLower, ".zip"):
 		jar, err := New(from)
 		if err != nil {
-			return utils.Errorf("create jar/war failed: %v", err)
+			return utils.Errorf("create archive failed: %v", err)
 		}
 		return jar.DumpToLocalFileSystem(to)
-	} else if strings.HasSuffix(from, ".class") {
+	case strings.HasSuffix(fromLower, ".class"):
 		raw, err := os.ReadFile(from)
 		if err != nil {
 			return utils.Errorf("read class file failed: %v", err)

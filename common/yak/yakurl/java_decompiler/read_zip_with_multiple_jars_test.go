@@ -200,6 +200,29 @@ func TestReadZipWithMultipleJars(t *testing.T) {
 	require.True(t, libsFound, "Should find libs directory in ZIP")
 }
 
+func TestReadZipWithJarRoute(t *testing.T) {
+	tempZipPath, _, cleanup := createTestZipWithMultipleJars(t)
+	defer cleanup()
+
+	rootURL, err := CreateUrlFromString("javadec:///jar?jar=" + tempZipPath + "&dir=.")
+	require.NoError(t, err)
+
+	rootResp, err := NewJavaDecompilerAction().Get(&ypb.RequestYakURLParams{
+		Url:    rootURL,
+		Method: "GET",
+	})
+	require.NoError(t, err)
+
+	jar1Found := false
+	for _, res := range rootResp.Resources {
+		if strings.Contains(res.Path, "app1.jar") {
+			jar1Found = true
+			require.True(t, res.HaveChildrenNodes, "nested jar entry should be navigable")
+		}
+	}
+	require.True(t, jar1Found, "GET /jar should list archives inside a .zip root")
+}
+
 func TestAccessJarInZip(t *testing.T) {
 	// Create a temporary ZIP file with multiple JARs for testing
 	tempZipPath, _, cleanup := createTestZipWithMultipleJars(t)

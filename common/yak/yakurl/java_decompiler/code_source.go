@@ -7,17 +7,15 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/javaclassparser"
-	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/jar"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// codeSource is a single JAR/WAR/EAR archive or a local directory containing archives.
+// codeSource is a single JAR/WAR/EAR/ZIP archive or a local directory containing archives.
 type codeSource struct {
 	rootPath    string
 	isDirectory bool
 	expandedFS  fi.FileSystem
-	jarParser   *jar.JarParser
 }
 
 func newCodeSource(rootPath string) (*codeSource, error) {
@@ -33,14 +31,14 @@ func newCodeSource(rootPath string) (*codeSource, error) {
 			expandedFS:  javaclassparser.NewExpandedLocalFileSystem(),
 		}, nil
 	}
-	jp, err := jar.NewJarParser(rootPath)
+	expandedFS, err := javaclassparser.NewExpandedArchiveFileSystemFromLocal(rootPath)
 	if err != nil {
 		return nil, err
 	}
 	return &codeSource{
 		rootPath:    rootPath,
 		isDirectory: false,
-		jarParser:   jp,
+		expandedFS:  expandedFS,
 	}, nil
 }
 
@@ -51,54 +49,37 @@ func (a *Action) resolveCodeSource(rootPath string) (*codeSource, error) {
 	})
 }
 
-func (cs *codeSource) toAbsPath(relativePath string) string {
-	relativePath = normalizeJarInternalPath(relativePath)
-	if !cs.isDirectory {
-		return relativePath
+func (cs *codeSource) resolveFSPath(p string) string {
+	if cs.isDirectory {
+		clean := filepath.Clean(p)
+		if filepath.IsAbs(clean) {
+			return clean
+		}
 	}
-	if relativePath == "." {
-		return cs.rootPath
+	p = normalizeJarInternalPath(p)
+	if cs.isDirectory {
+		if p == "." {
+			return cs.rootPath
+		}
+		return filepath.Join(cs.rootPath, filepath.FromSlash(p))
 	}
-	return filepath.Join(cs.rootPath, filepath.FromSlash(relativePath))
+	return p
 }
 
 func (cs *codeSource) listDirectory(relativeDir string) ([]fs.DirEntry, error) {
-	relativeDir = normalizeJarInternalPath(relativeDir)
-	if cs.isDirectory {
-		return cs.expandedFS.ReadDir(cs.toAbsPath(relativeDir))
-	}
-	return cs.jarParser.ListDirectory(relativeDir)
+	return cs.expandedFS.ReadDir(cs.resolveFSPath(relativeDir))
 }
 
 func (cs *codeSource) readFile(relativePath string) ([]byte, error) {
-	relativePath = normalizeJarInternalPath(relativePath)
-	if cs.isDirectory {
-		return cs.expandedFS.ReadFile(cs.toAbsPath(relativePath))
-	}
-	if strings.HasSuffix(strings.ToLower(relativePath), ".class") {
-		return cs.jarParser.DecompileClass(relativePath)
-	}
-	jarFS := cs.jarParser.GetJarFS()
-	data, err := jarFS.ReadFile(relativePath)
-	if err != nil {
-		return jarFS.ZipFS.ReadFile(relativePath)
-	}
-	return data, nil
+	return cs.expandedFS.ReadFile(cs.resolveFSPath(relativePath))
 }
 
 func (cs *codeSource) stat(relativePath string) (fs.FileInfo, error) {
-	relativePath = normalizeJarInternalPath(relativePath)
-	if cs.isDirectory {
-		return cs.expandedFS.Stat(cs.toAbsPath(relativePath))
-	}
-	return cs.jarParser.GetJarFS().Stat(relativePath)
+	return cs.expandedFS.Stat(cs.resolveFSPath(relativePath))
 }
 
 func (cs *codeSource) walkFS() fi.FileSystem {
-	if cs.isDirectory {
-		return cs.expandedFS
-	}
-	return cs.jarParser.GetJarFS()
+	return cs.expandedFS
 }
 
 func (cs *codeSource) walkRoot() string {
@@ -117,13 +98,7 @@ func (cs *codeSource) exportBaseName() string {
 }
 
 func isSupportedArchiveRoot(path string) bool {
-	lower := strings.ToLower(path)
-	for _, ext := range []string{".jar", ".war", ".ear", ".zip"} {
-		if strings.HasSuffix(lower, ext) {
-			return true
-		}
-	}
-	return false
+	return javaclassparserIsArchiveLeaf(path)
 }
 
 func validateCodeSourceRoot(rootPath string) error {

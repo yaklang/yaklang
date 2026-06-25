@@ -1,106 +1,24 @@
 package java_decompiler
 
 import (
-	"bytes"
 	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
-// getJarFS gets or creates a javaclassparser.JarFS for the given jar path
+// getJarFS gets or creates a javaclassparser.JarFS for the given jar path.
+// Kept for tests that exercise JarFS directly.
 func (a *Action) getJarFS(jarPath string) (*javaclassparser.JarFS, error) {
 	return a.jarFS.GetOrLoad(jarPath, func() (*javaclassparser.JarFS, error) {
 		fs, err := javaclassparser.NewJarFSFromLocal(jarPath)
 		if err != nil {
 			return nil, utils.Wrapf(err, "failed to open jar file: %s", jarPath)
-
 		}
 		return fs, nil
 	})
-}
-func (a *Action) getNestedJarFs(jarPath string, dirPath string) (*javaclassparser.JarFS, string, string, error) {
-	currentDirPath := normalizeJarInternalPath(dirPath)
-	currentJarPath := jarPath
-
-	ext := strings.ToLower(filepath.Ext(jarPath))
-	var jarFs *javaclassparser.JarFS
-	var err error
-
-	if ext == ".zip" {
-		zipFS, err := filesys.NewZipFSFromLocal(jarPath)
-		if err != nil {
-			return nil, "", "", utils.Wrapf(err, "failed to open zip file: %s", jarPath)
-		}
-
-		physicalJarPath, internalPath, err := a.parseNestedJarPath(dirPath)
-		if err == nil {
-			jarContent, err := zipFS.ReadFile(physicalJarPath)
-			if err != nil {
-				return nil, "", "", utils.Wrapf(err, "failed to read jar from zip: %s", physicalJarPath)
-			}
-			innerZipFS, err := filesys.NewZipFSRaw(bytes.NewReader(jarContent), int64(len(jarContent)))
-			if err != nil {
-				return nil, "", "", err
-			}
-			jarFs = javaclassparser.NewJarFS(innerZipFS)
-			currentDirPath = internalPath
-			currentJarPath = physicalJarPath
-		} else {
-			return nil, "", "", utils.Errorf("zip file does not contain jar path: %s", dirPath)
-		}
-	} else {
-		jarFs, err = a.getJarFS(currentJarPath)
-		if err != nil {
-			return nil, "", "", err
-		}
-	}
-
-	for {
-		physicalJarPath, internalPath, err := a.parseNestedJarPath(currentDirPath)
-		if err == nil {
-			currentDirPath = internalPath
-			currentJarPath = physicalJarPath
-			content, err := jarFs.ZipFS.ReadFile(physicalJarPath)
-			if err != nil {
-				return nil, "", "", err
-			}
-			zipFs, err := filesys.NewZipFSRaw(bytes.NewReader(content), int64(len(content)))
-			if err != nil {
-				return nil, "", "", err
-			}
-			jarFs = javaclassparser.NewJarFS(zipFs)
-		} else {
-			break
-		}
-	}
-
-	return jarFs, currentJarPath, currentDirPath, nil
-}
-
-// parseNestedJarPath parses a path that may contain nested JAR files
-// Returns the physical jar path, the internal path within the jar, and any error
-func (a *Action) parseNestedJarPath(fullPath string) (string, string, error) {
-	fullPath = normalizeJarInternalPath(fullPath)
-
-	// Check if path contains .jar/
-	jarSeparatorIndex := strings.Index(fullPath, ".jar/")
-	if jarSeparatorIndex == -1 {
-		// Not a nested path, check if it's a jar file itself
-		if strings.HasSuffix(fullPath, ".jar") {
-			return fullPath, "", nil
-		}
-		return "", "", utils.Errorf("path does not contain a jar file: %s", fullPath)
-	}
-
-	// Extract the JAR file path and the internal path
-	jarPath := fullPath[:jarSeparatorIndex+4]      // include the .jar part
-	internalPath := fullPath[jarSeparatorIndex+5:] // skip the .jar/ part
-
-	return jarPath, internalPath, nil
 }
 
 func normalizeJarInternalPath(p string) string {
