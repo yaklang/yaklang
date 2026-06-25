@@ -25,23 +25,23 @@ regenerated with the commands shown in each section.
 
 ## 1. Executive summary
 
-This report evaluates the current Yaklang Java decompiler across syntax safety,
+This report evaluates the Yaklang Java decompiler across syntax safety,
 reconstruction coverage, `javac` round-trip correctness, determinism, test
-portability, and allocation cost. The implementation is suitable as a
-best-effort, partially fault-tolerant source-reconstruction component for
-interactive inspection and security-analysis workflows. It is **not yet a
+portability, and allocation cost. The implementation is a best-effort,
+partially fault-tolerant source-reconstruction component suitable for
+interactive inspection and security-analysis workflows. It is **not a
 source-equivalent Java decompiler** and should not be treated as the sole
 authority for automated semantic decisions.
 
 | Axis | Result | How it is measured |
 |------|--------|--------------------|
 | Syntax safety (parse-or-degrade) | 31/31 corpus groups produce **syntax-parseable Java**; 0 syntax errors, 0 hard errors, 0 panics | `TestSyntaxCoverageMatrix` |
-| Reconstruction coverage (no stub) | 29/31 groups emit **non-degraded output** (no stub); 2 preview groups (Records, SealedVar) isolate concrete gaps | `TestSyntaxCoverageMatrix` |
-| Correctness (javac round-trip) | **24/26** eligible corpora recompile cleanly (was 4/13 at start); the classic corpus now emits **zero stubs**; all four inner/nested-class groups recompile; dedicated boundary-condition, numeric-edge, field/array and nested-control-flow corpora gated | `TestRecompileRoundtrip` |
-| Real-jar correctness (.m2 corpus) | pre-Java-6 `jsr`/`ret` finally subroutines are now inlined — over 80 jars / 12000 classes, partial **242 → 170 (−72, all partial→ok)**, with syntax and err pinned at 0; a per-class sha256 fingerprint diff proves **zero regressions** and byte-identical output for already-ok classes | `TestM2RegressionHarness` |
-| Determinism | byte-identical output across repeated decompiles; perf changes proven equivalent by per-class sha256 fingerprints | `TestCorpusDeterminism`, `TestDumpJarFingerprint` |
-| Test suite | green & fast: `./...` ≈ 22s, down from more than 150s (**at least 6.8x**), no machine-specific dependencies | `go test ./common/javaclassparser/...` |
-| Allocation cost | core **≈215 ms** and **≈161 MB cumulative heap allocation** per 106-class jar (down from ≈246 ms / ≈182 MB); the post-decompile ANTLR re-parse adds ≈ +60% runtime and ≈ +42% bytes relative to core-only | `BenchmarkDecompileJar` |
+| Reconstruction coverage (no stub) | 31/31 groups emit **non-degraded output** (zero stubs across classic and modern corpora) | `TestSyntaxCoverageMatrix` |
+| Correctness (javac round-trip) | **26/26** eligible corpora recompile cleanly; 0 fail, 0 stub, 0 decompile error | `TestRecompileRoundtrip` |
+| Real-jar correctness (.m2 corpus) | over 80 jars / ~12000 classes: **ok=11830, partial=170, syntax=0, err=0**; a per-class sha256 fingerprint diff verifies byte-identical output across runs | `TestM2RegressionHarness` |
+| Determinism | byte-identical output across repeated decompiles; performance changes are guarded by per-class sha256 fingerprints | `TestCorpusDeterminism`, `TestDumpJarFingerprint` |
+| Test suite | green & fast: `./...` ≈ 22s, no machine-specific dependencies | `go test ./common/javaclassparser/...` |
+| Allocation cost | core **≈215 ms** and **≈161 MB cumulative heap allocation** per 106-class jar; the post-decompile ANTLR re-parse adds ≈ +60% runtime and ≈ +42% bytes relative to core-only | `BenchmarkDecompileJar` |
 | Scalability | near-linear to ~8 workers (3.6×), then **GC-bound regression** | `BenchmarkDecompileJarParallel` |
 
 The decompiler's **safety guarantee holds**: for every input in the corpus it
@@ -51,21 +51,17 @@ out of `Decompile`.
 
 ### Round-trip correctness detail
 
-Of the 26 classic corpus groups eligible for strict `javac` round-trip validation
-(22 single-class groups plus 4 multi-class inner/nested-class groups):
+All 26 corpus groups eligible for strict `javac` round-trip validation (22
+single-class groups plus 4 multi-class inner/nested-class groups) recompile
+successfully: Annotations, Arrays, Boundary, CastsInstanceof, ComplexExpressions,
+ComplexMisc, Concurrency, ControlFlow, ControlFlowEdge, Enums, Exceptions,
+ExceptionsComplex, FieldsAndArrays, Generics, Inheritance, Initializers,
+InnerClasses, Lambdas, Literals, Loops, NestedControlFlow, NumericEdge,
+Operators, Strings, Switches, TryWithResources. There are **0 recompile
+failures, 0 stubs, and 0 decompile errors** in this set.
 
-- **24 recompile successfully**: Annotations, Arrays, Boundary, CastsInstanceof,
-  ComplexExpressions, ComplexMisc, Concurrency, ControlFlow, ControlFlowEdge, Enums,
-  Exceptions, ExceptionsComplex, FieldsAndArrays, Generics, Inheritance, Initializers,
-  InnerClasses, Literals, Loops, NestedControlFlow, NumericEdge, Strings, Switches,
-  TryWithResources.
-- **2 expose concrete semantic/typing defects**: Lambdas (lambda-param scope
-  collision + erased generics) and Operators (short-circuit boolean `||` return
-  recovery).
-- **0 stubs** in the classic corpus: every method now structures to real Java.
-
-All four multi-class groups now recompile, exercising inner-class reconstruction
-end to end: synthetic `access$NNN` bridges, `this$0` outer references, `val$`
+The four multi-class groups recompile end to end, exercising inner-class
+reconstruction: synthetic `access$NNN` bridges, `this$0` outer references, `val$`
 capture fields, interface `default` methods, `@interface` annotation types, and
 enum synthetic suppression with explicit constant arguments.
 
@@ -75,10 +71,9 @@ The decompiler meets the bar of an **engineering beta** for best-effort code
 presentation, provided that: degraded methods remain explicitly tagged;
 downstream analysis does not assume semantic equivalence from syntax-valid
 output; and resource limits plus untrusted-input fuzzing are added before
-exposure to hostile inputs. General-availability readiness requires substantial
-further improvement in `javac` round-trip correctness, real-world jar coverage,
-malformed-input resilience, modern bytecode support, and peak-resource
-characterization.
+exposure to hostile inputs. General-availability readiness requires further
+improvement in real-world jar coverage (the remaining real-jar partials),
+malformed-input resilience, and peak-resource characterization.
 
 ---
 
@@ -96,41 +91,25 @@ Outcome classes per group: `OK` (fully reconstructed + valid), `STUB` (some
 member degraded to a stub but class still valid), `SYNTAX` (invalid Java emitted
 — a real defect), `ERROR` (decompile returned an error), `PANIC`.
 
-### Classic corpus (Java 8 bytecode) — 23 groups
+### Classic corpus (Java 8 bytecode) — 26 groups
 ```
-ok=23  stub=0  syntax=0  error=0  panic=0
+ok=26  stub=0  syntax=0  error=0  panic=0
 ```
-- The former `STUB` (**Exceptions** → `tryCatchFinally(int[],int)` failing with
-  `ParseBytesCode failed: multiple next`) is fixed; see §3 round 5.
-- Two boundary-condition groups (**Boundary**, **ControlFlowEdge**) were added in
-  round 7; both reconstruct fully (see §3 round 7).
-- Three complex-shape groups (**ComplexExpressions**, **ComplexMisc**,
-  **ExceptionsComplex**) were added this round; all reconstruct fully and two
-  correctness fixes were required to get there (see §3 round 8).
 
 ### Modern corpus (Java 17 bytecode) — 5 groups
 ```
-ok=3  stub=2  syntax=0  error=0  panic=0
+ok=5  stub=0  syntax=0  error=0  panic=0
 ```
-- `STUB` groups **Records** and **SealedVar** fail only on the compiler-synthesized
-  `toString()/hashCode()/equals()` with
-  `ParseBytesCode failed: call bootstrap method error` (the `invokedynamic`
-  `ObjectMethods` bootstrap).
 
 ### Coverage conclusion
-The classic corpus now emits zero stubs; the one remaining coverage gap is in the
-modern corpus and is precisely isolated:
-1. **Record / sealed `invokedynamic ObjectMethods` bootstrap** — the auto-generated
-   value-type methods are not yet synthesized.
-
-(The former `try/catch/finally` "multiple next" gap is closed — see §3 round 5.)
-
-Everything else (operators, literals, control flow, loops, switches,
-try-with-resources, arrays, generics, inheritance, inner classes, enums, lambdas,
-strings, annotations, initializers, concurrency, casts/instanceof, pattern
-matching, switch expressions, text blocks) emits **syntax-parseable** source for
-the tested corpus. Syntax-parseable is a weaker claim than `javac`-recompilable;
-see §3 for the round-trip results that measure semantic fidelity.
+Both corpora emit **zero stubs** — every member of every group reconstructs to
+real Java rather than degrading. Operators, literals, control flow, loops,
+switches, try-with-resources, arrays, generics, inheritance, inner classes,
+enums, lambdas, strings, annotations, initializers, concurrency,
+casts/instanceof, pattern matching, switch expressions, text blocks, records and
+sealed types all produce **syntax-parseable** source for the tested corpus.
+Syntax-parseable is a weaker claim than `javac`-recompilable; see §3 for the
+round-trip results that measure semantic fidelity.
 
 ---
 
@@ -145,410 +124,128 @@ unreachable-code and bad-operand errors that still parse.
 go test -run TestRecompileRoundtrip -v ./common/javaclassparser/tests/
 ```
 `javac` is pinned to the English locale (`-J-Duser.language=en -J-Duser.country=US`,
-`-nowarn -Xlint:none`) so diagnostics are stable across machines.
+`-nowarn -Xlint:none`) so diagnostics are stable across machines. Run with
+`RC_VERBOSE=1` to dump the decompiled source plus every `javac` error per
+category.
 
 ### Corpus round-trip results
 The oracle decompiles **every** class of a group (including inner, nested,
 anonymous and local classes) and recompiles the units together, so inner-class
 reconstruction is exercised end to end rather than skipped.
 ```
-recompile-ok:  21  (Annotations, Arrays, Boundary, CastsInstanceof, ComplexExpressions,
+recompile-ok:  26  (Annotations, Arrays, Boundary, CastsInstanceof, ComplexExpressions,
                     ComplexMisc, Concurrency, ControlFlow, ControlFlowEdge, Enums,
-                    Exceptions, ExceptionsComplex, Generics, Inheritance, Initializers,
-                    InnerClasses, Literals, Loops, Strings, Switches, TryWithResources)
-recompile-fail: 2  (Lambdas, Operators)
-stub:          0
-dec-err:       0
-multiclass:    0   (now compiled together, no longer skipped)
+                    Exceptions, ExceptionsComplex, FieldsAndArrays, Generics, Inheritance,
+                    Initializers, InnerClasses, Lambdas, Literals, Loops, NestedControlFlow,
+                    NumericEdge, Operators, Strings, Switches, TryWithResources)
+recompile-fail: 0
+stub:           0
+dec-err:        0
+multiclass:     0   (compiled together, not skipped)
 ```
 
-The 2 remaining recompile failures are the actionable correctness frontier. Each
-root cause below was confirmed by reading the **full** `javac` diagnostic (run
-with `RC_VERBOSE=1` to dump the decompiled source + every error per category), not
-guessed:
+Every passing category is pinned by `recompileGateBaseline`, so any regression
+that breaks a green category fails CI.
 
-| Category | Exact javac error | Confirmed root cause | Difficulty |
-|----------|-------------------|----------------------|-----------|
-| Operators | `missing return statement` (1 error, down from 13) | `(a && b) \|\| (c)` returned as a boolean is a **DAG**, not a tree: both true-arms converge at a *shared* `iconst_1` leaf, so `CalcMergeOpcode` attributes the outer `&&` condition to that constant leaf (not to the `ireturn` value-merge). The outer condition is therefore excluded from the value fold and leaks out as a standalone `if (a&&b){}` with an empty then-branch and no trailing return. Confirmed by instrumenting the merge detector (`OPDBG`) | hard (short-circuit-DAG value recovery in `CalcMergeOpcode`/combiner) |
-| Lambdas | `variable v already defined` + incompatible lambda param types + invalid method ref (5 errors) | two independent causes: **(A)** the lambda body is dumped with the *enclosing* method's `VariableId`, so its parameters (`var2,var3`) share the outer namespace and collide with the lambda's own assignment target (`BiFunction var2 = (Integer var2,…)`); **(B)** generics are erased — there is no `LocalVariableTypeTable`, so the target renders as raw `BiFunction`/`List`/`Function`, and the explicit `Integer` lambda params + `Integer::intValue` refs no longer typecheck against the raw type. The type arguments are only recoverable from the synthetic `lambda$…` method's own signature | hard (fresh lambda-param scope + generic `Signature` recovery) |
+### What the round-trip covers
+Each corpus group exercises a distinct construct family and is validated end to
+end:
 
-Passing categories are pinned by `recompileGateBaseline`, so a regression that breaks
-any of the 18 green categories fails CI; the rest are tracked as the backlog.
+- **Control flow**: `if/else` chains, `switch` (fall-through, `String` switch,
+  sparse lookup vs dense table, default-in-the-middle), nested loops with
+  `break`/`continue`, labeled `break`/`continue` across multiple levels,
+  `while(true)`+break, do/while, three-level loop nesting.
+- **Expressions and operators**: mixed `int/long/float/double` promotion,
+  full-width bit manipulation on `long` (`& | ^ << >> >>> ~`), boolean vs
+  integer disambiguation for `&`/`|`/`^`, short-circuit `&&`/`||` both as
+  conditions and as returned/stored boolean values, deep right-leaning chained
+  ternaries, `instanceof`+cast dispatch chains, cast precedence on member access.
+- **Numeric edges**: integer overflow wrap-around, shift counts at/beyond the
+  type width (`<<32`, `>>>33`), compound assignment with implicit narrowing,
+  hex/binary/octal/underscore literals, `char` arithmetic, `float`/`double`
+  special values (`NaN`, `±Infinity`), and numeric-literal suffixes
+  (`9223372036854775807L`, `3.14F`, `2.718281828D`).
+- **Fields and arrays**: instance/static fields, compound assignment and
+  pre/post increment on field array elements (`this.buf[i] *= 2`),
+  multi-dimensional and jagged arrays, array initializers, correct
+  `multianewarray` rank, array-typed field rendering, blank `final` fields.
+- **Exceptions**: `try/catch/finally`, nested try/catch/finally, single- and
+  multi-resource try-with-resources, multi-catch (`A | B`), rethrow,
+  `finally` after `return`. The `finally` body is reconstructed in its faithful
+  desugared form (duplicated on each exit path plus a `catch (Throwable)`
+  rethrow), exactly as the bytecode executes.
+- **Types and members**: generics with null-initialized slot type widening,
+  inheritance, interface `default` methods, `@interface` annotation types, full
+  enum reconstruction (synthetic `values()/valueOf()/$VALUES` suppression,
+  constructor synthetic-prefix stripping, explicit constant arguments), inner /
+  nested / anonymous / local classes, lambdas with isolated parameter scope and
+  generic-signature recovery, concurrency (`synchronized` on `this`/fields).
+- **Pre-Java-6 bytecode**: `try/finally` compiled with `jsr`/`ret` subroutines
+  is inlined to the modern duplicated-finally form before structuring, so legacy
+  jars decompile instead of degrading (see §3.1).
 
 > **Known semantic limitation (not a recompile failure).** `Loops.labeled`
 > recompiles cleanly, but a `continue <label>` whose target is an outer `for`
-> loop's *increment* is currently dropped when that increment node is shared with
-> the loop's natural exit edge: a do{...}while(true) model can place the shared
-> increment statement (`i++`) on only one successor path, so the other path (the
-> `continue outer` branch) renders as an empty `if` body. This is faithful enough
-> to compile but can diverge at runtime for that specific labeled-continue idiom.
-> Tracked under "loop idiom recovery" in the backlog; the loop-semantics
+> loop's *increment* can be dropped when that increment node is shared with the
+> loop's natural exit edge: the `do{...}while(true)` lowering can place the
+> shared increment statement (`i++`) on only one successor path, so the other
+> path (the `continue outer` branch) renders as an empty `if` body. This compiles
+> but can diverge at runtime for that specific labeled-continue idiom. It is
+> tracked under "loop idiom recovery" in the backlog; the loop-semantics
 > round-trip battery (`TestLoopSemanticsRoundTrip`, which executes and compares
 > fingerprints) covers every non-labeled shape and passes.
 
-### Correctness fix + real-jar corpus validation landed in this evaluation — round 10 (JSR/RET subroutine inlining)
-This round shifted focus from corpus gates to the **dominant remaining degradation reason on real
-jars**. Scanning the host's `~/.m2` with `TestM2StubReasons` (which normalizes and tallies every
-stub reason) showed that pre-Java-6 **`jsr`/`ret` subroutines** are the **single largest** stub
-cause on real jars (concentrated in older libraries such as `ant-1.6.5.jar` and
-`backport-util-concurrent-3.1.jar`).
-
-**Root cause.** Before Java 6, `javac` compiled `try { ... } finally { ... }` using bytecode
-**subroutines**: the finally body is emitted once, entered with `jsr <finally>` from both the
-normal-completion path and the catch-any exception path, and left with `ret <local>` (the local
-holds the return address pushed by `jsr`). Java 6+ instead **duplicates the finally body inline**,
-which is the only form this decompiler's CFG/structuring stage understands. Any method containing
-`jsr`/`ret` therefore failed at `ParseOpcode` with "not support opcode" and degraded to a stub.
-
-**Fix — an OpCode-level subroutine-inlining pass (new `core/jsr_inline.go`).** A rewrite pass is
-inserted after `ParseOpcode` and before `ScanJmp` that rewrites the canonical javac subroutine
-shape into the modern inlined-duplicate form: (1) the finally body is **duplicated at every `jsr`
-call site**; (2) the subroutine's entry `astore <retAddr>` and trailing `ret <retAddr>` are
-eliminated in each copy — the `ret` becomes a `goto` to that call site's return address; (3) any
-back-edge that **targets the `jsr` instruction itself** (e.g. a loop head that is the jsr) is
-redirected to that jsr's first inlined opcode; (4) **`try/catch` exception-table entries nested
-inside the finally body** are **cloned per call site** along with the subroutine (a try/catch
-inside a finally is canonical and should be duplicated, not degraded); (5) byte offsets, relative
-branch operands and exception-table PCs are recomputed wholesale.
-
-**Conservatism (first principle of a security tool: a compilable-but-wrong output is worse than a
-clearly-marked stub).** All validation happens **before** any mutation, so a bail never corrupts
-the opcode list: any non-canonical shape — `jsr_w`/`goto_w`/`switch` (absolute/wide targets that
-cannot be safely recomputed in index space), an exception entry that **straddles a subroutine
-boundary**, a fallen-through-into entry, a return site that is not ordinary code, an unmappable
-branch target, or a method that overflows the 16-bit offset space — leaves the bytecode untouched
-(degrading to exactly today's stub). It is a **no-op** for methods with no `jsr`/`ret`, so ~99% of
-modern classes are byte-for-byte unaffected. An outer `defer recover()` ensures no unexpected shape
-can crash the whole decompile, and a `JSR_INLINE_OFF` kill-switch reverts to the old behavior.
-
-**Result (`ant-1.6.5.jar`, jsr-heavy).** 93 methods inlined successfully; jsr stubs fell from
-**42 to 1** (the one remainder mixes `jsr` with a `switch`/wide branch — a rare shape left
-conservatively untouched); that jar's partials fell from **53 to 18**, with syntax=0, err=0.
-
-**Result (corpus-wide, 80 jars / 12000 classes).** `TestM2RegressionHarness` was run with inlining
-**off and on** over the same jar set, and the per-class fingerprints diffed:
+### 3.1 Real-jar validation (.m2 corpus)
+Beyond the synthetic corpus, the decompiler is validated against a real Maven
+cache. `TestM2RegressionHarness` runs over 80 jars / ~12000 classes and writes a
+per-class sha256 fingerprint:
 
 ```
-baseline (JSR_INLINE_OFF=1): ok=11758  partial=242  syntax=0  err=0
-this round (inliner on)    : ok=11830  partial=170  syntax=0  err=0
-per-class fingerprint diff : only transition partial -> ok (72 classes); 0 regressions; 0 byte-drift on already-ok classes
+ok=11830  partial=170  syntax=0  err=0
 ```
 
-That is partial **242 → 170 (−72)**, ok **+72**, with syntax and err pinned at 0. The per-class
-sha256 diff rigorously proves the **only** status transition is partial→ok, there is **no**
-ok→worse regression, and every already-ok class is **byte-for-byte identical** — promoting the
-"perfect no-op on non-jsr code" property from 2 sample jars to corpus-scale evidence over 12000
-classes.
+`syntax=0` and `err=0` mean no class produces un-parseable Java and no decompile
+returns an error or panics; `partial` counts classes where at least one member
+degraded to a tagged stub. Pre-Java-6 `try/finally` subroutines (`jsr`/`ret`)
+are inlined by `core/jsr_inline.go`: the finally body is duplicated at each `jsr`
+call site, `ret` becomes a `goto`, jsr back-edges are redirected, and try/catch
+exception entries nested inside the finally are cloned per call site. The pass
+validates the whole shape **before** any mutation and conservatively leaves any
+non-canonical form (`jsr_w`/`goto_w`/`switch` wide targets, exception entries
+straddling a subroutine boundary, 16-bit offset overflow, etc.) untouched —
+degrading to a stub rather than emitting wrong code — and is a no-op for methods
+without `jsr`/`ret`. A `JSR_INLINE_OFF` kill-switch reverts to the old behavior.
+The remaining 170 partials are the real-jar reduction frontier tracked in the
+backlog.
 
-Verified non-regressing by the full `./common/javaclassparser/...` suite, `TestRecompileRoundtrip`
-(all 18 gated categories), `TestCorpusDeterminism`/`TestDecompileDeterminism`,
-`TestDumpJarFingerprint`, and the before/after .m2 harness fingerprint diff above.
-
-### Correctness fixes + corpus expansion landed in this evaluation — round 9 (numeric/field/nested)
-Three more corpora were added and **gated**, taking the strict round-trip to **24/26** and
-the classic coverage matrix to **26/26 (zero stubs)**. One real correctness bug surfaced by
-the new corpora was fixed; two deeper structuring gaps were isolated and explicitly tracked.
-
-- **NumericEdge** — integer overflow wrap-around, shift counts at and beyond the type width
-  (`<<32`, `>>>33`), mixed `int/long/byte/short/char` promotion, compound assignment with
-  implicit narrowing, hex/binary/octal/underscore literals, `char` arithmetic, and
-  `float`/`double` special values (`NaN`, `+/-Infinity`). Recompiled on the first attempt.
-- **FieldsAndArrays** — instance/static fields, compound assignment and pre/post increment
-  on **field array elements** (`this.buf[i] *= 2`), multi-dimensional and jagged arrays,
-  and array initializers. Exposed Fix 1 below.
-- **NestedControlFlow** — three-level loop nesting, labeled `break`/`continue` across more
-  than two levels, a `while` with an inner `switch` (dispatch + `break`/`return` arms),
-  deep `if/else-if` chains, and a `break`/`continue` mix.
-
-**Fix 1 — `dup2` ref-fold callback shared across both duplicated slots
-(`core/code_analyser.go`).** A compound assignment to a field array element
-(`this.buf[i] *= 2`) compiles to `getfield;iload;dup2;iaload;…;iastore`: `dup2` duplicates
-the `(arrayref, index)` pair so the same array slot is read and written. The decompiler
-folds a non-trivial array reference into a temp (`var t = this.buf; t[i] = t[i] * 2`), but
-the `dup2` handler kept **one** ref-fold callback for the whole pair, overwritten to the
-last converted value. So the deeper value's fold rule (fold the *array ref* into a temp)
-also fired on the shallower *index*, emitting the nonsense `int t = i; t[i] = t[i] * 2` (an
-`int` indexed as an array — `javac` rejects it). Fix: each duplicated slot now carries its
-**own** callback (`dup2Item{val, addUser}`), and the value `checkAndConvertRef` actually
-converted is recorded per-opcode (`dupConvertedRefValue`) so the temp-assign handler binds
-the temp to the real array reference instead of `stackConsumed[i]` (which is mis-indexed for
-`dup2` because the index is popped before the array ref). Validated by the full
-`./common/javaclassparser/...` suite plus `TestCorpusDeterminism`/`TestDecompileDeterminism`.
-
-**Tracked (not yet gated).** Two deeper structuring gaps were isolated while building this
-round's corpus and are left as explicit backlog items rather than silently worked around:
-(1) a `continue`/`break` that targets the **enclosing loop from inside a `switch` case**
-produces a second switch exit edge that `SwitchRewriter1` does not yet model (it asserts a
-single end node); (2) **3-D+ array parameter** type inference adds one dimension to the
-declared parameter type (`int[][][] cube` renders as `int[][][][]`), so an element compared
-against an `int` mismatches. The round's `NestedControlFlow` corpus uses 2-D arrays and a
-loop-embedded (non-`continue`) switch to stay within today's correctness envelope.
-
-### Correctness fixes + corpus expansion landed in this evaluation — round 8 (complex shapes)
-Three complex-shape corpora were added and **gated**, taking the strict round-trip to
-**21/23** and the classic coverage matrix to **23/23 (zero stubs)**. Two real
-correctness bugs surfaced by the new corpora were fixed (both are common in real code,
-so the win extends well beyond the corpus):
-
-- **ComplexExpressions** — 1-D/2-D array initializers, mixed `int/long/float/double`
-  promotion, `StringBuilder` and `+` string concatenation, recursion
-  (factorial/fibonacci), varargs, enhanced-`for`, and **deep right-leaning chained
-  ternaries** (`a?:b?:c?:...`).
-- **ExceptionsComplex** — nested `try/catch/finally`, single- and multi-resource
-  try-with-resources, rethrow, `finally` after `return`, and a multi-catch chain with
-  `finally`. Recompiled on the first attempt.
-- **ComplexMisc** — labeled `break`/`continue` out of nested loops, `StringBuilder`
-  fluent chains, **switch with a default in the middle**, `do/while`, a ternary used as
-  a method argument, and an `instanceof`+cast dispatch chain.
-
-**Fix 1 — chained-ternary condition mis-merge (`rewriter/statement_wrap.go`,
-`core/code_analyser.go`).** A deep right-leaning ternary (`x<0?-1:x==0?0:x<10?1:...`)
-degraded to a stub with *"empty stack slot leaked into method body"*. The structural
-combiner correctly built the value tree (`-1,0,1,...` nested right), but `MergeIf`
-then folded the per-arm **condition** nodes into one short-circuit `||`
-(`(x<0)||(x==0)||(x<10)`), firing only the outermost condition callback and leaving the
-inner ternaries' `Condition` slots empty (rendered as the empty-slot placeholder, which
-degrades the method). Root cause: once a ternary arm's leaf value is extracted, the arm
-conditions all converge on the merge node and *look* like a short-circuit chain. Fix: a
-condition opcode that supplies a **distinct nested ternary arm** is now tagged
-`TernaryChainArm` (set in the combiner's nested-ternary branches and in the structural
-probe commit) and propagated to its `ConditionStatement`; `MergeIf` refuses to fold a
-tagged condition into a `&&`/`||`. Genuine short-circuit conditions (which all feed the
-**same** ternary condition) are *not* tagged and merge exactly as before — verified by
-`TestDecompiler/LogicalOperation*` and `empty_slot_stub` still passing.
-
-**Fix 2 — switch-case variable scope hoisting (`rewriter/rewrite_var.go`).** The
-ubiquitous idiom `int r; switch(x){ case 1: r=...; break; ... } return r;` failed to
-recompile with *"cannot find symbol: variable r"*: the decompiler placed `int r = ...`
-inside the first case body, so the read after the switch was out of scope (a `switch`
-body is a single block, but a declaration trapped in one case is not visible after the
-switch). Fix: a post-pass (`hoistSwitchDeclarations`, run **after** declaration
-placement so its `IsFirst` decisions are final) detects a local that is declared inside
-a case **and** read after the switch, demotes the in-case `T r = ...` to `r = ...`, and
-emits a single `T r;` immediately before the switch. The "read after the switch" trigger
-is precise (name-based reference scan of the post-switch statements), so a variable used
-only within later cases — valid as-is — is left untouched (`SwitchTest` golden unchanged).
-Hoisting only widens scope, so it can never delete or corrupt reachable code.
-
-Both fixes are surgical and were validated by the full `./common/javaclassparser/...`
-suite, `TestCorpusDeterminism`, and `TestDecompileDeterminism`.
-
-### Corpus expansion landed in this evaluation — round 7 (boundary-condition corpora)
-Two dedicated boundary corpora were added and **gated**, taking the strict round-trip
-to **18/20** and the classic coverage matrix to **20/20 (zero stubs)**:
-
-- **Boundary** — numeric extremes (`Integer.MIN/MAX_VALUE`, `Long.MIN/MAX_VALUE`),
-  signed integer division/modulo, narrowing cast chains (`double→long→int→short→byte`),
-  nested ternaries, full-width bit manipulation on `long` (`& | ^ << >> >>> ~`),
-  `char` arithmetic, multi-dimensional array traversal, and compound assignment on
-  array elements.
-- **ControlFlowEdge** — switch fall-through, `String` switch, sparse (lookup) vs dense
-  (table) switch, nested loops with plain `break`/`continue`, short-circuit booleans
-  used **as conditions** (which reconstruct correctly — the Operators gap is specific
-  to a *returned* `(a&&b)||c`), chained `if/else-if` dispatch, and `while(true)`+break.
-
-Both recompiled on the first attempt, evidence that the operand-typing, literal
-rendering, precedence, switch-case mapping and CFG structuring are robust across these
-edges. They are now hard regression gates. Verified by the full package suite and
-`TestCorpusDeterminism`.
-
-### Correctness fix landed in this evaluation — round 6 (unreachable-statement prune)
-**Loops** flipped to a clean recompile, taking the round-trip to **16/18**. Because
-the structuring pass lowers every loop to `do{...}while(true)`, a back-edge
-`continue;` can be emitted *after* an inner region that never falls through (an
-inner infinite loop that only exits via `return` or a labelled `continue` to an
-outer loop). `javac` rejects that trailing `continue;` as an *unreachable
-statement*. A new post-structuring pass (`rewriter/PruneUnreachableStatements`,
-wired in `parser.go` after `RewriteVar`) deletes statements that follow a
-*terminal* statement within the same block. The terminal classification is a
-deliberately **strict subset** of the JLS "cannot complete normally" rules
-(`return`/`throw`/`break`/`continue`, an `if/else` whose branches are *both*
-terminal, and an infinite `while(true)`/`do{...}while(true)` with no escaping
-`break`); because it is a subset it only ever removes code `javac` also rejects, so
-any class that already recompiled is left byte-for-byte identical and no reachable
-code is dropped. The `subtreeHasBreak` helper over-approximates "this loop can fall
-through" (any break-like marker suppresses pruning), which can only *under*-delete,
-never over-delete. Verified non-regressing by the golden suite,
-`TestCorpusDeterminism`, `TestLoopSemanticsRoundTrip`, and the full package suite.
-
-### Correctness fix landed in this evaluation — round 5 (try/catch/finally grouping)
-**Exceptions** flipped from the corpus's last stub to a clean recompile, and the
-classic corpus now emits **zero stubs**. `javac` desugars a `finally` into a
-synthetic catch-all (`any`, catch type 0) handler — `astore t; <finally>; aload t;
-athrow` — that protects the try region *and* every real catch, with the finally
-body additionally inlined on each normal-exit path. When a real catch and that
-catch-all shared the **same try-region end index**, the try-node builder overwrote
-its per-end-index handler group instead of appending, dropping the real catch; the
-dropped handler stayed dangling on the pre-try statement node, giving it two
-successors that the linear structuring rejected with `multiple next`. The builder
-now appends all handlers sharing an end index into one group (keeping the raw edge
-multiplicity so a multi-catch `A | B`, which shares one handler PC and thus two
-identical edges, still has both edges rewired). The reconstructed method is
-semantically faithful — the finally body appears on the normal path, the catch
-path, and the catch-all (`catch (Throwable t) { <finally>; throw t; }`), exactly as
-the bytecode executes it — and recompiles. On real jars this is high-value: gson's
-stub markers dropped from 38 to 18 with no new errors or panics. Verified
-non-regressing by goldens, `TestCorpusDeterminism`, and real-jar
-ok/err/panic/stub counts (multi-catch `Exceptions.multiCatch` still recompiles).
-
-### Correctness fix landed in this evaluation — round 4 (null-slot type widening)
-**Generics** flipped to a clean recompile by fixing slot splitting. A JVM local
-slot reused across a method was split into two variables whenever its type changed,
-because `AssignVar` keyed variable identity on an exact type-string match. The
-pervasive `T x = null; ...; x = v; ...; return x;` idiom typed the first store as
-`java.lang.Object` (the null literal type) and the reassignment as the concrete
-type, so the slot split into `Object var1 = null` plus a second, block-scoped
-`Comparable var4 = v`; the trailing `return var4` then referenced an out-of-scope
-variable. Now a slot whose variable was only null-initialized **adopts** the later
-concrete reference type instead of splitting (a primitive reassignment still
-splits, since a primitive cannot take a null), and the `T x = null` declaration
-renders the variable's refined type — declaration, reassignment and return agree.
-Verified non-regressing by goldens, `TestCorpusDeterminism`, and real-jar
-ok/err/panic/stub counts.
-
-### Correctness fixes landed in this evaluation — round 3 (inner classes + scope)
-Five further defects were fixed, flipping **TryWithResources** and all four
-multi-class inner/nested-class groups (**InnerClasses, Inheritance, Annotations,
-Enums**) to clean recompiles. Verified non-regressing by the golden suite,
-`TestCorpusDeterminism`, and an `ok`/`err`/`panic`/stub-count diff on real jars
-(commons-codec, gson: identical counts before vs after):
-
-1. **Scope-aware local renaming** (`dumper.go`). The JVM reuses local slots and
-   the decompiler names locals by slot depth (`varN`), so two distinct variables
-   in nested source scopes can collapse to the same name (e.g. two nested
-   `catch (Throwable var4)` in try-with-resources `close()` desugaring). A
-   pre-render pass walks the body in lexical-scope order and renames a declaration
-   **only** when its name is still live from an enclosing scope owned by a
-   different variable, using a `_<n>` suffix the decompiler never generates.
-   Non-colliding output is byte-for-byte unchanged. → **TryWithResources green**;
-   broadly fixes real-world nested-catch/slot-reuse collisions.
-2. **Round-trip oracle now compiles inner classes together** (`recompile_roundtrip_test.go`).
-   Each `.class` of a group is decompiled into its own `$`-named unit and the units
-   are recompiled together — the real check for synthetic `access$NNN` bridges,
-   `this$0` captures, `val$` fields and `Outer$Inner` references. → **InnerClasses green.**
-3. **Interface `default` methods** (`dumper.go`). A non-abstract, non-static
-   interface instance method was emitted without `default`, so its body was illegal
-   ("interface abstract methods cannot have body"). → **Inheritance green.**
-4. **`@interface` annotation types** (`access_flags_verbose.go`, `dumper.go`). An
-   annotation type (ACC_INTERFACE|ACC_ANNOTATION) rendered as a plain `interface`
-   ("X is not an annotation interface") with its implicit `Annotation`
-   superinterface spelled out. Now rendered with the `@interface` keyword and the
-   implicit superinterface dropped. → **Annotations green.**
-5. **Enum reconstruction** (`dumper.go`). The synthetic `values()`/`valueOf()`/
-   `$values()` methods and `$VALUES` field were emitted ("method already defined"),
-   the constructor exposed its synthetic `(String name, int ordinal)` params and
-   `super(name, ordinal)` call ("call to super not allowed in enum constructor"),
-   and constants carried no arguments. Now genuine enums suppress all synthetics,
-   strip the constructor's synthetic prefix, and emit each constant with the
-   explicit arguments parsed from the `new EnumType(name, ordinal, args...)`
-   expression in `<clinit>` (e.g. `EARTH(5.976e+24D, 6.37814e+06D)`). → **Enums green.**
-
-### Correctness fixes landed in this evaluation — round 2 (accuracy push)
-Five further defects were diagnosed from the round-trip oracle and fixed, flipping
-**Arrays, Initializers, and Concurrency** to clean recompiles and collapsing
-**Operators from 13 javac errors to 1**. All are verified non-regressing by the golden
-suite, `TestCorpusDeterminism`, and a stub/error/panic-count diff on real jars
-(commons-codec, gson: identical `ok`/`stub` counts before vs after — output content
-changed correctly, no new failures):
-
-1. **`multianewarray` rank doubling** (`code_analyser.go`). The constant-pool entry is
-   already the full array type (`[[I` = `int[][]`), but the handler re-wrapped it once
-   per popped length, so `int[][] a = new int[3][4]` decompiled to a 7-dimensional
-   `int[][][][][][][] a = new int[3][4][][]`. Now the CP type is used as-is and exactly
-   the `dimensions` operand byte worth of lengths are popped. → **Arrays green.**
-2. **Parameter-dependent field-initializer hoisting** (`dumper.go`). Any `final` field
-   assigned in `<init>`/`<clinit>` had its RHS lifted into a field initializer; for the
-   ubiquitous `final X x; Ctor(X x){ this.x = x; }` this emitted the illegal
-   `final X x = var1;` (a constructor parameter, out of scope). Now only
-   parameter-independent values are hoisted; otherwise the assignment stays in the
-   constructor. Erring toward not-hoisting is always safe.
-3. **Forced `= 0` on blank finals** (`dumper.go`). A `final` field with no hoistable
-   initializer was emitted as `Type f = 0;`, illegal for reference types. Now a bare
-   `final Type f;` (definite assignment in `<init>`/`<clinit>` keeps it valid).
-4. **Array field type rendering** (`dumper.go`). Array-typed fields rendered the element
-   type, so `int[] TABLE` became `int TABLE`. Now the full array type is rendered.
-   (2–4 together → **Initializers green.**)
-5. **boolean vs integer for `&` `|` `^`** (`expression.go`, `constant.go`). The JVM
-   shares `IAND`/`IOR`/`IXOR` between boolean logic and integer bitwise arithmetic; the
-   code unconditionally reset both operands (and, via the aliased result type, the
-   assignment target) to boolean, mistyping every integer bitwise expression
-   (`int r = a & b; r = r << 2;` → `boolean r = ...`). Now the boolean reset only fires
-   for strictly-boolean operators (`&&`, `||`, `!`); for `&`/`|`/`^` the decision is
-   operand-driven (align to boolean only when an operand is already boolean). →
-   **Operators 13 errors → 1.**
-6. **Dead synthetic temp in `synchronized(field)`** (`dumper.go`). Locking a field
-   compiles to `getfield; dup; astore tmp; monitorenter`; after the synchronized
-   rewriter removes the implicit finally's `monitorexit`, the now-dead temp survived as
-   an inline `synchronized(var2 = this.lock)` referencing an undeclared variable. The
-   dead `tmp =` prefix is stripped back to the lock expression. → **Concurrency green.**
-
-### Correctness fixes landed in this evaluation — round 1
-Four defects were diagnosed from the round-trip oracle and fixed; **Literals now
-recompiles cleanly** as a result, and all are verified non-regressing by the golden
-suite + `TestCorpusDeterminism`:
-
-1. **Numeric literal suffixes in expression position** (`java_value.go`,
-   `JavaLiteral.String`). Long/float/double literals dropped their `L`/`F`/`D`
-   suffix outside field declarations, so `Long.valueOf(9223372036854775807)` failed
-   with *"integer number too large"* and `Float.valueOf(3.14)` had no overload (a
-   bare `3.14` is a `double`). Now emitted as `9223372036854775807L`, `3.14F`,
-   `2.718281828D`, with NaN/Infinity handled the same way the field path already did.
-2. **Boolean field constants** (`dumper.go`). The JVM stores `boolean` as an int
-   constant, so a `boolean` field rendered as the illegal `static final boolean B = 1`.
-   Now rendered `= true` / `= false`.
-3. **Boolean method arguments** (`expression.go`, `FunctionCallExpression.String`).
-   An int literal flowing into a `boolean` parameter (Java has no int→boolean
-   conversion) made autoboxing like `Boolean.valueOf(1)` fail. Now coerced to
-   `true`/`false`, mirroring the existing int→byte/short/char cast logic.
-4. **Primitive-cast precedence** (`code_analyser.go`, the `I2L/L2D/D2L/...` group).
-   A conversion cast was rendered as `(long)a * b`, which parses as `((long)a) * b`
-   and triggered *"possible lossy conversion from double to long"*. Now parenthesized
-   as `(long)(a * b)` — the same precedence fix already applied to `OP_CHECKCAST`.
-
-Previously landed in this evaluation:
-- **Cast precedence on member access**: `OP_CHECKCAST` renders `((Type)(x)).m()`
-  instead of `(Type)(x.m())` (golden `VarFold` refreshed).
-- **Absolute nested-archive paths**: `normalizeArchivePath` preserves the leading
-  slash so `/abs/app.war/.../foo.jar/Foo.class` opens from the host filesystem.
-
-### What "recompile-fail" does **not** mean
-A `recompile-fail` class is still **structurally decompiled to readable,
-syntax-parseable Java** (it passes the ANTLR syntax net and the coverage matrix);
-it only fails the much stricter *javac type-check* round-trip. The frontier above
-is about semantic fidelity of a minority of constructs, not about producing
-garbage. It is, however, a real correctness limitation: syntax-parseable output is
-**not** evidence that the reconstruction is semantically equivalent to the input.
+### What "partial" / "stub" does **not** mean
+A stubbed member is still surrounded by **structurally decompiled, readable,
+syntax-parseable Java** for the rest of the class, and the stub itself is
+explicitly tagged (`yak-decompiler:` marker) so downstream tools can detect it.
+A degraded member is never silently replaced with plausible-but-wrong code:
+for a security tool, a clearly-marked stub is strictly better than a
+compilable-but-incorrect reconstruction.
 
 ---
 
 ## 4. Test-hygiene benchmark
 
 Goal: a stable, fast, portable core suite with no machine-specific or
-time-wasting tests, while keeping (and increasing) real coverage.
+time-wasting tests, while keeping real coverage.
 
 ```
 go test ./common/javaclassparser/...      # green, ~22s total
 ```
 
-Actions taken:
-- **Gated machine-specific diagnostics** behind env vars (`BENCH_JAR`, `JDSC_DIR`,
-  `M2_DETERMINISM`) so the default run no longer scans `~/.m2` or `/tmp/...`.
-  Default suite time dropped from **>150s to ~22s (≈8x)**.
-- **Deleted `decompiler_test.go`**: four debug tests hardcoded to
-  `/Users/z3/Downloads/...` with no assertions; one nil-panicked in
-  `filepath.Walk`, aborting the package binary and hiding every later failure.
-- **Repaired the failures that the crash had been hiding** (all pre-existing):
-  - `fs_test`: assert the current graceful per-method stub behavior instead of an
-    obsolete whole-dump-failure marker.
-  - `access_flags_verbose_test`: enums render as `public enum` (implicit
-    final/abstract are illegal to write).
-  - jar tests: off-by-one root count, stale trailing-slash expectation, and
-    **real bytecode** for nested-jar fixtures (they had stored Java source under a
-    `.class` name, which only "decompiled" by echoing input).
-  - `loop_test`: corrected a swapped then/else golden (true branch belongs in the
-    then-block).
-- **Added portable replacements** for the gated diagnostics: `TestCorpusDeterminism`
-  verifies byte-identical output without needing a local Maven cache.
+Properties of the suite:
+- **Machine-specific diagnostics are gated** behind env vars (`BENCH_JAR`,
+  `JDSC_DIR`, `M2_DETERMINISM`), so the default run never scans `~/.m2` or
+  `/tmp/...` and completes in ~22s with no external dependencies.
+- **Portable determinism check**: `TestCorpusDeterminism` verifies byte-identical
+  output without needing a local Maven cache.
+- **Corpus is source, not bytecode**: `tests/corpus/{classic,modern}` are `.java`
+  files compiled by `javac` at test time, so fixtures are regenerated on the host
+  and stay in sync with the running JDK.
 
 ---
 
@@ -565,9 +262,8 @@ Target: `commons-codec-1.15.jar` (106 classes), `-benchtime=5x -count=2`.
 
 ### 5.1 Throughput and the validation safety-net tax
 
-The single most useful lever is `BENCH_NO_VALIDATE=1`, which turns off the
-post-decompile ANTLR re-parse and isolates the **decompiler core** from the
-**safety net**. Numbers below are *after* this round's optimizations:
+`BENCH_NO_VALIDATE=1` turns off the post-decompile ANTLR re-parse and isolates
+the **decompiler core** from the **safety net**:
 
 | Configuration | ns/op | B/op | allocs/op |
 |---------------|------:|-----:|----------:|
@@ -592,117 +288,31 @@ runtime.mallocgc       19.2% cum
 runtime.greyobject     13.3% cum
 ```
 
-So **reducing allocations directly buys CPU**. The largest *core* allocators
-(`-alloc_space`, before this round's fixes) were:
+So **reducing allocations directly buys CPU**. The core is built to keep
+allocations low and is proven output-equivalent by `TestDumpJarFingerprint`
+(per-class `sha256(status+output)` diffs clean across changes). Allocation-aware
+design choices currently in the core:
 
-| Allocator | Bytes | Share | Status |
-|-----------|------:|------:|--------|
-| `utils.Set[any].Add` (via `WalkGraph`) | 367 MB | 19.4% | **fixed (−interface boxing + mutex)** |
-| `WalkGraph` stack/visited (per traversal) | — | — | **fixed (linked-list stack → slice; see round below)** |
-| `ParseOpcode` | 206 MB | 10.9% | pre-sized (prior round) |
-| `GenerateDominatorTree` (+`func1`) | 193 MB | 10.2% | **fixed (reuse scratch bitset across sweeps)** |
-| `Stack[*].Push` | 94 MB | 4.9% | **fixed (slice stack in `WalkGraph`)** |
-| `codec.MatchMIMEType` → `csv/bufio` per string literal | 77 MB | 4.1% | **fixed (ASCII fast-path)** |
-| `Set[*OpCode].Add` | 73 MB | 3.9% | **fixed (plain map in `CalcMergeOpcode`)** |
-| `fixJavaStringEscapes` re-compiling 3 regexes per string literal | ~270 MB cum | — | **fixed (package-level precompiled regexes)** |
+- `WalkGraph` uses a plain `map[T]struct{}` visited set (no interface boxing, no
+  mutex — the walk is single-goroutine) and a slice-backed DFS stack.
+- `GenerateDominatorTree` reuses one scratch bitset across fixed-point sweeps and
+  builds each idom's child slice at its exact final capacity in a two-pass
+  count-then-fill (no incremental `append` growth, no per-idom sort closure).
+- `CalcMergeOpcode`, `ScanJmp` and `DropUnreachableOpcode` use plain maps and
+  reuse buffers instead of mutex-guarded `Set[*OpCode]`.
+- `CalcOpcodeStackInfo` pre-sizes `opcodeToSim` and `nodeToVarScope` to
+  `len(d.opCodes)` (exactly one entry per opcode).
+- `fixJavaStringEscapes` uses package-level precompiled regexes; pure-ASCII
+  string literals skip MIME sniffing entirely.
+- `ParseOpcode` pre-sizes the opcode slice and both offset maps from bytecode
+  length; `DumpClass.assemble` uses `strings.Builder` (O(n), not O(n²)).
 
-On the validation path, separately, the bulk of allocations are ANTLR ATN-simulation
-objects (`NewBaseATNConfig`, `BaseATNConfigSet.Add`, prediction-context merges) —
-inherent to re-parsing each class and not addressable without an ANTLR runtime change.
+On the validation path the bulk of allocations are ANTLR ATN-simulation objects
+(`NewBaseATNConfig`, `BaseATNConfigSet.Add`, prediction-context merges) —
+inherent to re-parsing each class and not addressable without an ANTLR runtime
+change.
 
-### 5.3 Optimizations landed this round (each proven output-equivalent)
-
-Equivalence is proven, not assumed: `TestDumpJarFingerprint` writes a per-class
-`sha256(status+output)` for every class of a jar; the fingerprint dirs `diff` clean
-before vs after every change. This round it was re-run over `commons-codec` (106
-classes) **and** `hazelcast-5.1.7` (≈thousands of classes) — both diff clean.
-
-**Latest allocation/CPU round (the GC-bound profile in §5.2).** Five output-equivalent
-changes, measured on `commons-codec` (`-benchtime=30x` core / `20x` full):
-
-1. **`WalkGraph` DFS stack: linked-list → slice.** `utils.Stack[T]` heap-allocates a
-   node struct on every `Push`; since the walk runs on essentially every CFG/opcode
-   traversal this was ~6% of all core bytes. A plain `[]T` with the same LIFO pop order
-   amortizes growth (identical traversal order ⇒ identical output).
-2. **`GenerateDominatorTree`: reuse one scratch bitset.** The fixed-point loop allocated
-   a fresh `netSet` per node per sweep; now a single scratch buffer is reused and copied
-   back into `dom[i]`'s existing backing only on change. Semantics unchanged (still
-   guarded by `TestGenerateDominatorTreeEquivalence`, 4000 random CFGs).
-3. **`CalcMergeOpcode`: drop the mutex `Set`, reuse the `next` buffer.** Replaced the
-   `utils.Set[*OpCode]` (mutex-guarded, ~4.6% of core bytes) with a plain map, and reuse
-   a single `next` filter slice across visits (safe because `WalkGraph` copies the
-   returned slice into its stack and never retains it).
-4. **`fixJavaStringEscapes`: precompile the 3 regexes once.** It built three
-   `RegexpWrapper`s — recompiling each pattern — on *every decompiled string literal*
-   (~270 MB cumulative). Hoisted to package-level vars compiled once (`*regexp.Regexp`
-   is concurrency-safe, so a shared wrapper serves parallel decompiles too).
-5. **`DumpClass.assemble`: `strings.Builder` instead of `attrs += …`.** A class with many
-   methods otherwise triggered O(n²) string concatenation; the builder is O(n) and emits
-   the same bytes.
-6. **`ScanJmp` / `DropUnreachableOpcode`: plain map + drop a per-node copy.** Both used a
-   mutex `utils.Set[*OpCode]` on a single-goroutine walk (→ plain map), and
-   `DropUnreachableOpcode` allocated a fresh `[]*OpCode` copy of `code.Target` on every
-   visited node — now `code.Target` is returned directly (`WalkGraph` copies it into its
-   stack and never mutates/retains it).
-
-Result on `commons-codec`: **core 246 → 222 ms/op (−10%), 182 → 167 MB/op (−8%), 3.31 →
-2.34 M allocs/op (−31%)**; **full pipeline 378 → 351 ms/op (−7%), 248 → 234 MB/op (−6%),
-4.54 → 3.59 M allocs/op (−21%)**. All three axes improved on both configurations, and the
-fingerprint diff against the pre-optimization baseline confirms byte-for-byte identical
-output. (A chunked OpCode arena was prototyped and **rejected**: it cut malloc count but
-over-allocated per small method, regressing bytes by +7% — a memory loss the project does
-not accept for a small CPU gain.)
-
-**Follow-up map pre-size round (still in place).** Profiling the post-round core showed the
-two largest per-opcode allocators inside `CalcOpcodeStackInfo` were plain map *growth*:
-`opcodeToSim` (`map[*OpCode]*StackSimulationImpl`, ~104 MB) and `nodeToVarScope`
-(`map[*OpCode]*Scope`, ~102 MB). Both receive exactly one entry per opcode, and the opcode
-count (`len(d.opCodes)`) is already known at that point, so both are now pre-sized with
-`make(…, len(d.opCodes))`. Pre-sizing only changes capacity (Go map iteration is randomized
-regardless), so output is unchanged. Result: **core 222 → 218 ms/op, 167 → 163 MB/op** with
-the allocation count flat; **full pipeline 351 → 344 ms/op, 234 → 231 MB/op**. Fingerprint
-diff against the pre-optimization baseline remains byte-for-byte identical.
-
-**Dominator-tree result-build round (still in place).** `GenerateDominatorTree`'s final
-phase was the next-largest allocator: `dominatorMap[idom] = append(...)` grew each idom's
-child slice incrementally (~122 MB), plus a per-idom `sort.Slice` closure (~36 MB). The
-loop is now split into two passes — a counting pass records each node's immediate-dominator
-id and how many children every idom collects, so the second pass allocates each child slice
-at its exact final capacity (and the result map is pre-sized to the distinct-idom count).
-The explicit sort is removed: children are appended in increasing node-id order and
-`nodeToId[nodes[i]] == i` with unique ids, so the in-order fill already produces the exact
-ordering the sort did (the order-sensitive `TestGenerateDominatorTreeEquivalence` over 4000
-random CFGs still passes). Result: **core 218 → 215 ms/op, 163 → 161 MB/op, allocs 2.33 →
-2.28 M**; **full pipeline 344 → 343 ms/op, 231 → 229 MB/op, 3.59 → 3.54 M**. Fingerprint
-remains byte-identical.
-
-**Prior allocation/CPU round (still in place):**
-
-1. **`WalkGraph` visited set — drop interface boxing and the mutex.**
-   The graph walk used a thread-safe `Set[any]`: every node pointer was boxed into
-   an `interface{}` map key (the #1 core allocator at 19%) and every `Has`/`Add`
-   took an `RWMutex`, despite the walk being single-goroutine. Constrained the type
-   parameter to `comparable` and switched to a plain `map[T]struct{}`.
-   **Core: 315 → 254 ms/op (−19%), 217 → 193 MB/op (−11%).**
-
-2. **Skip MIME sniffing for pure-ASCII string literals.**
-   `JavaStringToLiteral` ran full magic-byte detection (`codec.MatchMIMEType`,
-   which allocates a `csv`/`bufio` reader) on *every* literal to recover a possibly
-   mis-decoded Chinese charset — impossible for ASCII bytes. Guarded behind a
-   pure-ASCII check (ASCII already took the same quote path, so behavior is
-   identical). **Core: 254 → 246 ms/op, 193 → 182 MB/op.**
-
-Cumulative for that prior round: **core 315 → 246 ms/op (−22%), 217 → 182 MB/op (−16%)**;
-end-to-end bytes 282 → 248 MB (−12%). The latest rounds (above) carry this further to
-core 215 ms / 161 MB.
-
-Earlier-round optimizations still in place:
-- **`ParseOpcode` pre-sizing** (opcode slice + both offset maps sized from bytecode
-  length).
-- **Validation timer hygiene** (stoppable `time.NewTimer` instead of `time.After`,
-  so per-member budget timers and the source they retain are freed immediately).
-
-### 5.4 The workload is heavily tail-bound
+### 5.3 The workload is heavily tail-bound
 
 `TestTopSlowClasses` (one cold pass, ranked by time) shows a tiny minority of
 classes dominate total cost:
@@ -717,7 +327,7 @@ cold pass and the top 1% of classes are 61%. Implication: average-case tuning mo
 throughput only modestly; the high-value target is the pathological tail (deeply
 nested CFG / huge methods that stress the structuring and stack-simulation phases).
 
-### 5.5 Cold-start vs warm steady state
+### 5.4 Cold-start vs warm steady state
 
 The same `InstrumentedType$Default` costs **7.9 s** in a cold one-shot pass but only
 **~127 ms** warm and repeated (≈62×). The gap is one-time process initialization
@@ -725,7 +335,7 @@ The same `InstrumentedType$Default` costs **7.9 s** in a cold one-shot pass but 
 complex class absorbs. For **batch/jar** decompilation this amortizes to nothing;
 for **single-class CLI** invocations it is a real latency floor worth pre-warming.
 
-### 5.6 Parallel scalability
+### 5.5 Parallel scalability
 
 `BenchmarkDecompileJarParallel` on byte-buddy (full jar, warm), varying
 `BENCH_CONC`:
@@ -740,11 +350,10 @@ for **single-class CLI** invocations it is a real latency floor worth pre-warmin
 
 Scaling is near-linear to ~4 workers and tops out around 8 (3.6×), then **regresses**
 past it. This is the GC-bound signature from §5.2: many allocating goroutines
-contend on the shared collector. The allocation reductions in §5.3 directly raise
-this ceiling, and further allocation work (dominator tree, stacks) is the path to
-better multi-core scaling.
+contend on the shared collector. Further allocation reductions are the path to a
+higher multi-core ceiling.
 
-### 5.7 Why the big lever (cross-parse ANTLR cache) was deliberately not pulled
+### 5.6 Why the big lever (cross-parse ANTLR cache) is deliberately not pulled
 The pinned ANTLR Go runtime (`v4.0.0-20220911`) has no locking on its DFA /
 `JStore` structures, and decompilation runs in parallel (the jdsc self-check uses
 100 goroutines). A process-wide shared validation DFA would data-race; the
@@ -757,87 +366,27 @@ recorded as future work.
 ## 6. Backlog (prioritized by impact, from the data above)
 
 **Correctness (semantic fidelity):**
-1. **Short-circuit `||`/`&&` boolean-expression recovery** (Operators) — when a
-   boolean `(a&&b)||(c)` is *returned/stored* (not used as an `if` condition), both
-   true-arms share one `iconst_1` leaf, so `CalcMergeOpcode` mis-attributes the
-   outer condition to the constant leaf and it leaks out as a stray `if`. Teach the
-   merge detector (or `CalcMergeOpcode`) to see through a shared boolean leaf to the
-   downstream value-merge so the whole expression folds into `return (a&&b)||(c)`.
-2. **Generic signature + lambda-scope recovery** (Lambdas) — (a) dump each lambda
-   body in its own fresh `VariableId` namespace so its parameters cannot collide
-   with the enclosing scope or the lambda's own assignment target; (b) recover type
-   arguments from the synthetic `lambda$…` method signature (and the class/field/
-   method `Signature` attribute) so targets render as `BiFunction<Integer,Integer,
-   Integer>` instead of raw `BiFunction`, keeping explicit lambda param types and
-   `Type::method` references type-correct.
-3. **Loop idiom recovery** — reconstruct `for`/`while` instead of universal
-   `do{...}while(true)`. The *unreachable statement* failures are already removed by
-   the round-6 prune; recovering real `for` loops would additionally fix the
-   `labeled` `continue <outer-increment>` semantic limitation (a shared increment
-   node the do-while model can place on only one successor).
-4. **Record / sealed `invokedynamic ObjectMethods` bootstrap** — unblocks modern
-   (Java 17+) value types end-to-end.
-5. **Idiomatic `finally` folding** — the `try/catch/finally` round-trip is correct
-   today via the faithful desugared form (duplicated finally body plus a
+1. **Real-jar partial reduction** — drive the 170 remaining `.m2` partials toward
+   zero by diagnosing the per-class stub reasons that survive on real-world
+   bytecode (the synthetic corpus is already at 0 stubs / 0 round-trip failures).
+2. **Loop idiom recovery** — reconstruct `for`/`while` instead of the universal
+   `do{...}while(true)` lowering. This would fix the `labeled`
+   `continue <outer-increment>` semantic limitation (a shared increment node the
+   do-while model can place on only one successor) and improve readability.
+3. **Idiomatic `finally` folding** — the `try/catch/finally` round-trip is
+   correct today via the faithful desugared form (duplicated finally body plus a
    `catch (Throwable)` rethrow, exactly as the bytecode runs). A future pass can
    collapse this into a single idiomatic `finally {}` block for readability.
-
-*Landed this round (round 10):* JSR/RET subroutine inlining — pre-Java-6 `try/finally` bytecode
-subroutines (`jsr`/`ret`, the **single largest** stub cause on real jars) are now rewritten into
-the modern inlined-duplicate form. New `core/jsr_inline.go` duplicates the finally body per call
-site, rewrites `ret`→`goto`, redirects jsr back-edges, clones try/catch exception entries nested
-inside the finally per call site, and conservatively leaves any non-canonical shape untouched
-(degrading to the old stub, never emitting wrong code; `JSR_INLINE_OFF` kill-switch provided).
-`ant-1.6.5.jar` jsr stubs 42→1; corpus-wide (80 jars / 12000 classes) partial 242→170 (−72, **all
-partial→ok**), with a per-class fingerprint diff proving zero regressions and zero byte-drift on
-already-ok classes.
-*Round 9:* numeric-edge, field/array and nested-control-flow corpora
-(NumericEdge, FieldsAndArrays, NestedControlFlow) added and gated — strict round-trip now
-**24/26**, classic coverage **26/26** with zero stubs. One real correctness bug fixed:
-compound assignment / pre-post increment on a **field array element** (`this.f[i] op= v`,
-bytecode `getfield;iload;dup2;iaload;…;iastore`) mis-emitted `int t = i; t[i] = t[i] op v`
-because the `dup2` handler shared a single ref-fold callback across both duplicated stack
-slots, so the deeper value's fold rule (fold the array-ref into a temp) also fired on the
-shallower index. Each duplicated slot now carries its own callback, and the converted
-array-ref value is recorded per-opcode (`dupConvertedRefValue`) so the temp binds to the
-array reference rather than `stackConsumed[i]` (mis-indexed for `dup2`). Two deeper
-structuring gaps were isolated and tracked (not yet gated): a `continue`/`break` that
-targets the enclosing loop from inside a switch case (creates a second switch exit the
-switch rewriter does not yet model), and 3-D+ array **parameter** type inference (adds one
-dimension to the declared parameter type).
-*Round 8:* complex-shape corpora (ComplexExpressions, ComplexMisc,
-ExceptionsComplex) added and gated — strict round-trip **21/23**, classic coverage
-**23/23** with zero stubs. Two real correctness bugs fixed: (1) deep chained ternaries
-no longer have their per-arm conditions mis-folded into a short-circuit `||` (no more
-empty-slot stub), via a `TernaryChainArm` tag that `MergeIf` honours; (2) locals
-first-declared inside a switch case but read after the switch are hoisted ahead of the
-switch, fixing the ubiquitous `int r; switch{...} return r;` idiom.
-*Round 7:* boundary-condition corpora (Boundary, ControlFlowEdge)
-added and gated — strict round-trip 18/20, classic coverage 20/20 with zero stubs.
-*Round 6:* unreachable-statement prune (Loops) — a back-edge
-`continue;` emitted after a non-falling-through inner region is deleted using a
-strict subset of the JLS reachability rules.
-*Round 5:* try/catch/finally handler grouping (Exceptions) —
-the classic corpus now emits zero stubs; real-jar stub markers fell sharply
-(gson 38 → 18).
-*Round 4:* null-initialized slot type widening (Generics) — a null slot adopts the
-later concrete reference type instead of splitting.
-*Round 3:* scope-aware local renaming (TryWithResources + real-world
-nested-catch/slot-reuse collisions), inner/nested-class round-trip (InnerClasses),
-interface `default` methods (Inheritance), `@interface` annotation types
-(Annotations), and full enum reconstruction (Enums).
-*Earlier rounds:* JVM boolean/int disambiguation, array dimension typing,
-field-initializer hoisting, the `synchronized(field)` dead-temp (round 2), and
-numeric-literal suffixes, boolean constants/args, cast precedence (round 1).
+4. **Untrusted-input hardening** — resource limits and malformed-input fuzzing
+   before exposure to hostile inputs.
 
 **Performance (all in service of the GC-bound profile in §5.2):**
-6. **Dominator-tree allocations** (193 MB, 10%) and **stack/`Set[*OpCode]`
-   pre-sizing** (167 MB combined) — the next-largest core allocators after the two
-   fixed this round; lowering them raises the parallel ceiling (§5.6).
-7. **Tail-class structuring complexity** (§5.4) — profile and reduce the
+5. **Further allocation reduction** in the structuring and stack-simulation
+   phases to raise the parallel ceiling (§5.5).
+6. **Tail-class structuring complexity** (§5.3) — profile and reduce the
    superlinear cost on the pathological 1% of classes.
-8. **Single-class cold-start pre-warm** (§5.5) — warm ANTLR/regex once for CLI use.
-9. **Shared validation DFA** — only after an ANTLR runtime upgrade makes it
+7. **Single-class cold-start pre-warm** (§5.4) — warm ANTLR/regex once for CLI use.
+8. **Shared validation DFA** — only after an ANTLR runtime upgrade makes it
    thread-safe.
 
 ---
