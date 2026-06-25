@@ -26,8 +26,8 @@ func (a *Action) listJarAifix(rootPath, dirPath string) (*ypb.RequestYakURLRespo
 
 	innerClassesByOuter := make(map[string][]string)
 	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".class") {
-			className := entry.Name()
+		className := displayEntryName(entry)
+		if !entry.IsDir() && strings.HasSuffix(className, ".class") {
 			dollarIndex := strings.Index(className, "$")
 			if dollarIndex > 0 {
 				outerClassName := className[:dollarIndex] + ".class"
@@ -55,18 +55,19 @@ func (a *Action) listJarAifix(rootPath, dirPath string) (*ypb.RequestYakURLRespo
 				{Key: "dir", Value: dirPath},
 			},
 		}
-		entryPath := path.Join(dirPath, entry.Name())
+		entryName := displayEntryName(entry)
+		entryPath := path.Join(dirPath, entryName)
 		fileInfo, err := entry.Info()
 		if err != nil {
 			return nil, err
 		}
 
-		if entry.IsDir() || javaclassparserIsArchiveLeaf(entry.Name()) {
+		if entry.IsDir() || javaclassparserIsArchiveLeaf(entryName) {
 			resourceURL.Query = []*ypb.KVPair{
 				{Key: "jar", Value: rootPath},
 				{Key: "dir", Value: entryPath},
 			}
-		} else if strings.HasSuffix(entry.Name(), ".class") {
+		} else if strings.HasSuffix(entryName, ".class") {
 			resourceURL.Path = "/class-aifix"
 			resourceURL.Query = []*ypb.KVPair{
 				{Key: "jar", Value: rootPath},
@@ -81,17 +82,17 @@ func (a *Action) listJarAifix(rootPath, dirPath string) (*ypb.RequestYakURLRespo
 
 		resource := a.createResourceFromFileInfo(resourceURL, fileInfo, entryPath)
 
-		if entry.IsDir() || javaclassparserIsArchiveLeaf(entry.Name()) {
+		if entry.IsDir() || javaclassparserIsArchiveLeaf(entryName) {
 			resource.ResourceType = "dir"
 			resource.VerboseType = "java-directory"
-			resource.VerboseName = entry.Name()
+			resource.VerboseName = entryName
 			resource.HaveChildrenNodes = true
 		} else {
 			resource.ResourceType = "file"
 			resource.VerboseType = "java-file"
-			resource.VerboseName = entry.Name()
+			resource.VerboseName = entryName
 
-			if strings.HasSuffix(entry.Name(), ".class") {
+			if strings.HasSuffix(entryName, ".class") {
 				if innerClasses, hasInnerClasses := innerClassesByOuter[entryPath]; hasInnerClasses {
 					for _, innerClassPath := range innerClasses {
 						resource.Extra = append(resource.Extra, &ypb.KVPair{
@@ -113,7 +114,7 @@ func (a *Action) listJarAifix(rootPath, dirPath string) (*ypb.RequestYakURLRespo
 			}
 		}
 
-		if entry.IsDir() || javaclassparserIsArchiveLeaf(entry.Name()) {
+		if entry.IsDir() || javaclassparserIsArchiveLeaf(entryName) {
 			subEntries, err := cs.listDirectory(entryPath)
 			if err == nil {
 				resource.HaveChildrenNodes = len(subEntries) > 0
@@ -135,10 +136,12 @@ func (a *Action) listJarAifix(rootPath, dirPath string) (*ypb.RequestYakURLRespo
 
 func javaclassparserIsArchiveLeaf(name string) bool {
 	lower := strings.ToLower(name)
-	for _, ext := range []string{".jar", ".war", ".ear", ".zip"} {
+	for _, ext := range javaArchiveExtensions {
 		if strings.HasSuffix(lower, ext) {
 			return true
 		}
 	}
 	return false
 }
+
+var javaArchiveExtensions = []string{".jar", ".war", ".ear", ".zip", ".par"}

@@ -36,6 +36,17 @@ func IsArchiveFile(path string) bool {
 	return isArchiveFile(path)
 }
 
+// NewExpandedArchiveFileSystemFromLocal opens a local archive (.jar/.war/.ear/.zip)
+// and returns an ExpandedZipFS that treats nested archives as directories and
+// decompiles .class files on read.
+func NewExpandedArchiveFileSystemFromLocal(path string) (fi.FileSystem, error) {
+	zipFS, err := filesys.NewZipFSFromLocal(path)
+	if err != nil {
+		return nil, err
+	}
+	return NewExpandedZipFS(zipFS, zipFS), nil
+}
+
 // NewExpandedLocalFileSystem wraps the OS local filesystem so archive files
 // (.jar/.war/.ear/.par/.zip) behave as directories and .class entries are
 // served as decompiled Java source.

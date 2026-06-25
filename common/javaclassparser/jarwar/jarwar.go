@@ -47,11 +47,11 @@ func NewFromJarFS(fs *javaclassparser.JarFS) (*JarWar, error) {
 			return result, nil
 		}
 	}
-	var msg string
-	if !utils.IsNil(fs) {
-		msg = "\n" + filesys.DumpTreeView(fs)
-	}
-	return nil, fmt.Errorf("unknown file type: (struct)%v", msg)
+	// Plain ZIP/JAR/WAR/EAR without standard manifest metadata — still allow decompilation.
+	return &JarWar{
+		fs:                    fs,
+		failedDecompiledFiles: make(map[string]struct{}),
+	}, nil
 }
 
 func New(compressedFile string) (*JarWar, error) {

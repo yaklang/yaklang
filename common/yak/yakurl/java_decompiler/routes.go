@@ -30,16 +30,7 @@ func (a *Action) registerJarRoutes() {
 		if err != nil {
 			return nil, err
 		}
-		if cs.isDirectory {
-			return a.listCodeSourceDirectory(jarPath, dirPath, dirPath, cs, false)
-		}
-
-		jarFS, err := a.getJarFS(jarPath)
-		if err != nil {
-			return nil, err
-		}
-
-		return a.listJarDirectory(jarPath, dirPath, dirPath, jarFS, false)
+		return a.listCodeSourceDirectory(jarPath, dirPath, dirPath, cs, false)
 	})
 
 	// Handle AI-enhanced JAR directory listing
@@ -80,43 +71,24 @@ func (a *Action) registerClassRoutes() {
 		}
 
 		var (
-			data          []byte
-			actualJarPath = jarPath
-			classPath     = className
-			fileInfo      fs.FileInfo
+			data     []byte
+			fileInfo fs.FileInfo
 		)
-		if cs.isDirectory {
-			data, err = cs.readFile(className)
-			if err != nil {
-				return nil, utils.Wrapf(err, "failed to read class: %s from code source: %s", className, jarPath)
-			}
-			fileInfo, err = cs.stat(className)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			jarFs, nestedJarPath, nestedClassPath, err := a.getNestedJarFs(jarPath, className)
-			if err != nil {
-				return nil, err
-			}
-			data, err = jarFs.ReadFile(nestedClassPath)
-			if err != nil {
-				return nil, utils.Wrapf(err, "failed to read class: %s from jar: %s", nestedClassPath, jarPath)
-			}
-			actualJarPath = nestedJarPath
-			classPath = className
-			fileInfo, err = jarFs.Stat(nestedClassPath)
-			if err != nil {
-				return nil, err
-			}
+		data, err = cs.readFile(className)
+		if err != nil {
+			return nil, utils.Wrapf(err, "failed to read class: %s from code source: %s", className, jarPath)
+		}
+		fileInfo, err = cs.stat(className)
+		if err != nil {
+			return nil, err
 		}
 
 		resourceURL := &ypb.YakURL{
 			Schema: "javaDec",
 			Path:   "/class",
 			Query: []*ypb.KVPair{
-				{Key: "jar", Value: actualJarPath},
-				{Key: "class", Value: classPath},
+				{Key: "jar", Value: jarPath},
+				{Key: "class", Value: className},
 			},
 		}
 
@@ -165,35 +137,16 @@ func (a *Action) registerClassRoutes() {
 
 		var (
 			outerClassData []byte
-			actualJarPath  = jarPath
-			classPath      = className
 			fileInfo       fs.FileInfo
 		)
 
-		if cs.isDirectory {
-			outerClassData, err = cs.readFile(className)
-			if err != nil {
-				return nil, utils.Wrapf(err, "failed to read class: %s from code source: %s", className, jarPath)
-			}
-			fileInfo, err = cs.stat(className)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			jarFs, nestedJarPath, nestedClassPath, err := a.getNestedJarFs(jarPath, className)
-			if err != nil {
-				return nil, err
-			}
-			outerClassData, err = jarFs.ReadFile(nestedClassPath)
-			if err != nil {
-				return nil, utils.Wrapf(err, "failed to read class: %s from jar: %s", nestedClassPath, jarPath)
-			}
-			actualJarPath = nestedJarPath
-			classPath = className
-			fileInfo, err = jarFs.Stat(nestedClassPath)
-			if err != nil {
-				return nil, err
-			}
+		outerClassData, err = cs.readFile(className)
+		if err != nil {
+			return nil, utils.Wrapf(err, "failed to read class: %s from code source: %s", className, jarPath)
+		}
+		fileInfo, err = cs.stat(className)
+		if err != nil {
+			return nil, err
 		}
 
 		innerClassesParam, _ := getParam("innerClasses")
@@ -203,22 +156,7 @@ func (a *Action) registerClassRoutes() {
 			innerClassPaths := strings.Split(innerClassesParam, ",")
 			for _, innerClassPath := range innerClassPaths {
 				innerClassPath = normalizeJarInternalPath(innerClassPath)
-				var innerClassData []byte
-				if cs.isDirectory {
-					innerClassData, err = cs.readFile(innerClassPath)
-				} else {
-					innerJarFs, _, innerClassPathParsed, err := a.getNestedJarFs(jarPath, innerClassPath)
-					if err != nil {
-						log.Warnf("Failed to parse inner class path: %s from jar: %s: %v", innerClassPath, jarPath, err)
-						continue
-					}
-					innerClassData, err = innerJarFs.ReadFile(innerClassPathParsed)
-					if err != nil {
-						log.Warnf("Failed to read inner class: %s from jar: %s: %v", innerClassPath, jarPath, err)
-						continue
-					}
-					innerClassPath = innerClassPathParsed
-				}
+				innerClassData, err := cs.readFile(innerClassPath)
 				if err != nil {
 					log.Warnf("Failed to read inner class: %s from code source: %s: %v", innerClassPath, jarPath, err)
 					continue
@@ -238,8 +176,8 @@ func (a *Action) registerClassRoutes() {
 			Schema: "javaDec",
 			Path:   "/class-aifix",
 			Query: []*ypb.KVPair{
-				{Key: "jar", Value: actualJarPath},
-				{Key: "class", Value: classPath},
+				{Key: "jar", Value: jarPath},
+				{Key: "class", Value: className},
 			},
 		}
 

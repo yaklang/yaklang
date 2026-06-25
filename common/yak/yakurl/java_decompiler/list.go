@@ -1,14 +1,30 @@
 package java_decompiler
 
 import (
+	"io/fs"
 	"path"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+// displayEntryName returns the entry name shown in YakURL listings.
+// ExpandedZipFS may expose decompiled classes as .java via UnifiedFS; the UI
+// should still present .class paths for navigation and decompilation routes.
+func displayEntryName(entry fs.DirEntry) string {
+	if ude, ok := entry.(*filesys.UnifiedDirEntry); ok {
+		orig := ude.DirEntry.Name()
+		if strings.HasSuffix(strings.ToLower(orig), ".class") {
+			return orig
+		}
+	}
+	return entry.Name()
+}
+
 
 // listJarDirectory lists the contents of a directory in a JAR file
 // If hideInnerClasses is true, it will add hide=true and outerClass attributes to inner class resources
@@ -57,7 +73,8 @@ func (a *Action) listJarDirectory(jarPath, dirPath string, currentDirPath string
 			continue
 		}
 
-		entryPath := path.Join(dirPath, entry.Name())
+		entryName := displayEntryName(entry)
+		entryPath := path.Join(dirPath, entryName)
 
 		// Create a new URL for this resource
 		resourceURL := &ypb.YakURL{
@@ -160,8 +177,8 @@ func (a *Action) listCodeSourceDirectory(jarPath, dirPath string, currentDirPath
 	innerClassesByOuter := make(map[string][]string)
 	if hideInnerClasses {
 		for _, entry := range entries {
-			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".class") {
-				className := entry.Name()
+			className := displayEntryName(entry)
+			if !entry.IsDir() && strings.HasSuffix(className, ".class") {
 				dollarIndex := strings.Index(className, "$")
 				if dollarIndex > 0 {
 					outerClassName := className[:dollarIndex] + ".class"
@@ -186,8 +203,9 @@ func (a *Action) listCodeSourceDirectory(jarPath, dirPath string, currentDirPath
 			continue
 		}
 
-		entryPath := path.Join(dirPath, entry.Name())
-		isDirLike := entry.IsDir() || javaclassparserIsArchiveLeaf(entry.Name())
+		entryName := displayEntryName(entry)
+		entryPath := path.Join(dirPath, entryName)
+		isDirLike := entry.IsDir() || javaclassparserIsArchiveLeaf(entryName)
 
 		resourceURL := &ypb.YakURL{
 			Schema: "javaDec",
@@ -202,7 +220,7 @@ func (a *Action) listCodeSourceDirectory(jarPath, dirPath string, currentDirPath
 				Key:   "dir",
 				Value: entryPath,
 			})
-		} else if strings.HasSuffix(entry.Name(), ".class") {
+		} else if strings.HasSuffix(entryName, ".class") {
 			resourceURL.Path = "/class"
 			resourceURL.Query = append(resourceURL.Query, &ypb.KVPair{
 				Key:   "jar",
@@ -230,7 +248,7 @@ func (a *Action) listCodeSourceDirectory(jarPath, dirPath string, currentDirPath
 			}
 		}
 
-		if hideInnerClasses && !entry.IsDir() && strings.HasSuffix(entry.Name(), ".class") {
+		if hideInnerClasses && !entry.IsDir() && strings.HasSuffix(entryName, ".class") {
 			if innerClasses, hasInnerClasses := innerClassesByOuter[entryPath]; hasInnerClasses {
 				for _, innerClassPath := range innerClasses {
 					resource.Extra = append(resource.Extra, &ypb.KVPair{

@@ -16,6 +16,28 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
+var archiveExtensions = []string{".jar", ".war", ".ear", ".zip", ".par"}
+
+func containsNestedArchivePath(path string) bool {
+	lower := strings.ToLower(path)
+	for _, ext := range archiveExtensions {
+		if strings.Contains(lower, ext+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+func isArchiveFilePath(path string) bool {
+	lower := strings.ToLower(path)
+	for _, ext := range archiveExtensions {
+		if strings.HasSuffix(lower, ext) {
+			return true
+		}
+	}
+	return false
+}
+
 // JarParser is a utility for parsing and analyzing JAR files
 type JarParser struct {
 	// jarPath is the path to the JAR file
@@ -131,8 +153,8 @@ func (j *JarParser) GetDirectoryContents(dirPath string) ([]map[string]interface
 
 	result := make([]map[string]interface{}, 0, len(entries))
 
-	// Check if this is a nested JAR path
-	isNestedPath := strings.Index(dirPath, ".jar/") > 0
+	// Check if this is a nested archive path
+	isNestedPath := containsNestedArchivePath(dirPath)
 
 	// If dirPath is empty or ".", normalize it to avoid filepath.Join issues
 	normalizedDirPath := dirPath
@@ -286,26 +308,34 @@ func (j *JarParser) parseMultiLevelJarPath(fullPath string) ([]string, string, e
 	remainingPath := fullPath
 
 	for {
-		jarSeparatorIndex := strings.Index(remainingPath, ".jar/")
-		if jarSeparatorIndex == -1 {
-			// No more .jar/ patterns, check if it ends with .jar
-			if strings.HasSuffix(remainingPath, ".jar") && len(jarPaths) == 0 {
-				jarPaths = append(jarPaths, remainingPath)
-				remainingPath = ""
+		found := false
+		bestIdx := -1
+		bestExtLen := 0
+		lowerRemaining := strings.ToLower(remainingPath)
+		for _, ext := range archiveExtensions {
+			marker := ext + "/"
+			if idx := strings.Index(lowerRemaining, marker); idx != -1 {
+				if bestIdx == -1 || idx < bestIdx {
+					bestIdx = idx
+					bestExtLen = len(ext)
+					found = true
+				}
 			}
-			break
 		}
-
-		// Extract the JAR file path and update remaining path
-		jarPath := remainingPath[:jarSeparatorIndex+4] // include the .jar part
-		jarPaths = append(jarPaths, jarPath)
-
-		// Move past the jar part
-		remainingPath = remainingPath[jarSeparatorIndex+5:] // skip the .jar/ part
+		if found {
+			jarPaths = append(jarPaths, remainingPath[:bestIdx+bestExtLen])
+			remainingPath = remainingPath[bestIdx+bestExtLen+1:]
+			continue
+		}
+		if len(jarPaths) == 0 && isArchiveFilePath(remainingPath) {
+			jarPaths = append(jarPaths, remainingPath)
+			remainingPath = ""
+		}
+		break
 	}
 
 	if len(jarPaths) == 0 {
-		return nil, fullPath, utils.Errorf("path does not contain a jar file: %s", fullPath)
+		return nil, fullPath, utils.Errorf("path does not contain an archive file: %s", fullPath)
 	}
 
 	return jarPaths, remainingPath, nil
@@ -340,22 +370,20 @@ func (j *JarParser) GetNestedJarFS(nestedJarPath string) (*javaclassparser.JarFS
 // which treats everything after the first .jar/ as a single path
 func (j *JarParser) ParseNestedJarPath(fullPath string) (string, string, error) {
 	fullPath = normalizeJarInternalPath(fullPath)
+	lower := strings.ToLower(fullPath)
 
-	// Check if path contains .jar/
-	jarSeparatorIndex := strings.Index(fullPath, ".jar/")
-	if jarSeparatorIndex == -1 {
-		// Not a nested path, check if it's a jar file itself
-		if strings.HasSuffix(fullPath, ".jar") {
-			return fullPath, "", nil
+	for _, ext := range archiveExtensions {
+		marker := ext + "/"
+		if idx := strings.Index(lower, marker); idx != -1 {
+			archivePath := fullPath[:idx+len(ext)]
+			internalPath := fullPath[idx+len(marker):]
+			return archivePath, internalPath, nil
 		}
-		return "", "", utils.Errorf("path does not contain a jar file: %s", fullPath)
 	}
-
-	// Extract the JAR file path and the internal path
-	jarPath := fullPath[:jarSeparatorIndex+4]      // include the .jar part
-	internalPath := fullPath[jarSeparatorIndex+5:] // skip the .jar/ part
-
-	return jarPath, internalPath, nil
+	if isArchiveFilePath(fullPath) {
+		return fullPath, "", nil
+	}
+	return "", "", utils.Errorf("path does not contain an archive file: %s", fullPath)
 }
 
 // FindJavaClasses finds all Java class files in the JAR recursively
@@ -381,7 +409,7 @@ func (j *JarParser) FindJavaClasses(includeNestedJars ...bool) ([]string, error)
 
 			if strings.HasSuffix(path, ".class") {
 				classes = append(classes, path)
-			} else if checkNested && strings.HasSuffix(path, ".jar") {
+			} else if checkNested && isArchiveFilePath(path) {
 				nestedJars = append(nestedJars, path)
 			}
 			return nil
@@ -445,8 +473,8 @@ func (j *JarParser) findNestedJarClasses(jarPath, prefix string, classes *[]stri
 			if strings.HasSuffix(path, ".class") {
 				// Add this class to the results with full path
 				*classes = append(*classes, fullJarPath+"/"+path)
-			} else if strings.HasSuffix(path, ".jar") {
-				// Found a deeper nested JAR
+			} else if isArchiveFilePath(path) {
+				// Found a deeper nested archive
 				deeperNestedJars = append(deeperNestedJars, path)
 			}
 			return nil

@@ -335,11 +335,8 @@ func NewExpandedZipFSWithOptions(underlying fi.FileSystem, zipFS *filesys.ZipFS,
 }
 
 func (e *ExpandedZipFS) getArchiveFS(archivePath string) (fi.FileSystem, error) {
-	if isJarLikeArchivePath(archivePath) {
+	if isArchiveFile(archivePath) {
 		return e.GetJarFS(archivePath)
-	}
-	if strings.HasSuffix(strings.ToLower(normalizeArchivePath(archivePath)), ".zip") {
-		return e.getZipFS(archivePath)
 	}
 	return nil, os.ErrNotExist
 }
