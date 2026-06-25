@@ -44,7 +44,7 @@ var EnableDecompileSyntaxValidation = true
 // and 248 if-statements) legitimately take >8s for the ANTLR recursive-descent parse but produce
 // fully valid Java. 30s only matters for the rare member that exceeds it; valid methods return as
 // soon as the parse finishes, well under the cap.
-var DecompileSyntaxValidationBudget = 30 * time.Second
+var DecompileSyntaxValidationBudget = 20 * time.Second
 
 // validateJavaSyntax reports whether a full compilation unit is syntactically valid Java
 // (after decompiler normalization). nil means the grammar accepts it. The parse runs under
@@ -108,6 +108,7 @@ func (c *ClassObjectDumper) degradeInvalidMethods(header string, methods []*dump
 			out = append(out, m)
 			continue
 		}
+
 		if debugInvalidMethods {
 			log.Errorf("DEBUG_INVALID method %s%s:\n%s", m.methodName, m.descriptor, m.code)
 		}
