@@ -91,6 +91,11 @@ func compileCorpus(t *testing.T, javac, srcDir, release string) string {
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
+		// If the JDK doesn't support the requested release level (e.g. CI with JDK 11
+		// can't do --release 17), skip the modern corpus rather than failing the test.
+		if strings.Contains(stderr.String(), "release version") && strings.Contains(stderr.String(), "not supported") {
+			t.Skipf("javac on this host does not support --release %s; skipping %s corpus", release, srcDir)
+		}
 		t.Fatalf("javac failed for %s (release %s): %v\n%s", srcDir, release, err, stderr.String())
 	}
 	return outDir
