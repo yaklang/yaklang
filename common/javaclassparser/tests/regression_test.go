@@ -540,6 +540,17 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			// no stub, no leaked internal placeholder
 			mustNotContain: []string{"yak-decompiler", "empty slot value"},
 		},
+		{
+			file: "druid_tddlhint_shared_container.class",
+			desc: "a for(;;) parser loop with break/continue in nested else-if arms, followed by post-loop " +
+				"code (druid TDDLHint.<init>'s `if (functions.size() > 0) type = Function`). The structuring " +
+				"produced a shared container (the post-loop IfStatement appeared in both the switch/loop-tail " +
+				"level AND inside a do-while body). AssertStatementsAcyclic previously panicked on any shared " +
+				"container; now it distinguishes true cycles (a node is its own ancestor → infinite recursion, " +
+				"must panic) from shared DAG nodes (two independent parents → finite, safe to skip the duplicate).",
+			mustContain:    []string{"TDDLHint", "functions.size"},
+			mustNotContain: []string{"yak-decompiler", "cyclic"},
+		},
 	}
 
 	for _, tc := range cases {
