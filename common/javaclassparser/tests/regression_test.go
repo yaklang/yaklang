@@ -392,6 +392,16 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 		mustNotContain []string
 	}{
 		{
+			file: "ternary_return_split.class",
+			desc: "value-ternary return whose false arm computes its value through local stores " +
+				"(ECJ pre-sized StringBuilder); the shared return is tail-duplicated into a real if/else " +
+				"instead of stubbing with 'multiple next'. Guava CaseFormat.firstCharOnlyToUpper.",
+			// the empty-string guard becomes a real if returning the input, and the arm stores survive
+			mustContain: []string{"firstCharOnlyToUpper", "isEmpty()", "Ascii.toUpperCase", "Ascii.toLowerCase"},
+			// must fully decompile (no stub) and not leak a bare ternary-condition fork
+			mustNotContain: []string{"yak-decompiler"},
+		},
+		{
 			file: "lambda_methodref.class",
 			desc: "invokedynamic lambda metafactory: method references and lambda expressions",
 			// constructor reference must use ::new, static method reference must be Class::method

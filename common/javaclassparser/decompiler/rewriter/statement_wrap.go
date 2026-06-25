@@ -107,6 +107,240 @@ func (s *RewriteManager) RemoveDeadEndAssigns() {
 		target.RemoveAllSource()
 	}
 }
+// isIdentChar reports whether b can appear inside a Java identifier; used for whole-token matching so
+// "var1" never matches inside "var12".
+func isIdentChar(b byte) bool {
+	return b == '_' || b == '$' || (b >= '0' && b <= '9') || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+}
+
+// containsToken reports whether tok appears in s delimited by non-identifier characters (a real
+// reference to the local named tok, not an accidental substring of a longer name).
+func containsToken(s, tok string) bool {
+	if tok == "" {
+		return false
+	}
+	for idx := 0; idx <= len(s)-len(tok); {
+		i := strings.Index(s[idx:], tok)
+		if i < 0 {
+			return false
+		}
+		i += idx
+		before := i == 0 || !isIdentChar(s[i-1])
+		after := i+len(tok) >= len(s) || !isIdentChar(s[i+len(tok)])
+		if before && after {
+			return true
+		}
+		idx = i + 1
+	}
+	return false
+}
+
+// renderValue renders a JavaValue to source text, swallowing any panic from a value type that needs ctx
+// fields unavailable at this stage (returns "" so the caller treats it as "no reference" and declines).
+func renderValue(ctx *class_context.ClassContext, value values.JavaValue) (s string) {
+	if value == nil {
+		return ""
+	}
+	defer func() { _ = recover() }()
+	s = value.String(ctx)
+	return s
+}
+
+
+// followArm walks a single-successor, single-predecessor chain from an if-arm entry to the node where
+// the two arms reconverge (the merge). It returns the arm's interior nodes and that merge, or (nil,nil)
+// if the arm forks, dead-ends, or is joined by an unexpected predecessor before reconverging. If start
+// is itself the merge (an arm that flows directly into it) it returns (nil, start).
+func followArm(start *core.Node) ([]*core.Node, *core.Node) {
+	if len(start.Source) >= 2 {
+		return nil, start
+	}
+	if len(start.Source) != 1 {
+		return nil, nil
+	}
+	path := []*core.Node{}
+	cur := start
+	for i := 0; i < (1 << 16); i++ {
+		path = append(path, cur)
+		if len(cur.Next) != 1 {
+			return nil, nil
+		}
+		nxt := cur.Next[0]
+		if len(nxt.Source) >= 2 {
+			return path, nxt
+		}
+		if len(nxt.Source) != 1 {
+			return nil, nil
+		}
+		cur = nxt
+	}
+	return nil, nil
+}
+
+// definedLocals collects the rendered names of locals assigned by the AssignStatement nodes on an arm
+// path. These anchor the true/false mapping in SplitTernaryReturnArms: a value that uses an arm's locals
+// must belong to that arm.
+func definedLocals(ctx *class_context.ClassContext, path []*core.Node) []string {
+	var out []string
+	for _, n := range path {
+		if as, ok := n.Statement.(*statements.AssignStatement); ok {
+			if ref, ok := as.LeftValue.(*values.JavaRef); ok && ref.Id != nil {
+				if name := renderValue(ctx, ref); name != "" {
+					out = append(out, name)
+				}
+			}
+		}
+	}
+	return out
+}
+
+// SplitTernaryReturnArms undoes a value-ternary reconstruction that cannot be linearized: a
+// `return cond ? A : B` whose arm computes its value through intermediate local stores (e.g. ECJ's
+// pre-sized `new StringBuilder(len)` idiom, or a lazy `field = compute()`). Those stores remain as
+// statement nodes on the arm; once the condition node is spliced out (its callback folds the boolean
+// into the ternary) the arm statements dangle on a fork that ToStatements rejects with "multiple next".
+//
+// This pass instead keeps the condition as a real if and tail-duplicates the shared terminal return
+// into each arm, so each arm runs only its own stores and returns its own value:
+// `if (cond) return A; <B-stores>; return B;`. It fires only when the arm-to-value mapping is provably
+// correct - verified by which arm's locals each value references, with cross-checks that catch an
+// inverted (negated) condition - and declines otherwise, so an ambiguous shape degrades to the prior
+// stub rather than risking a silently branch-swapped result. ctx is needed only to render values during
+// the reference probe.
+func (s *RewriteManager) SplitTernaryReturnArms(ctx *class_context.ClassContext) {
+	handled := map[*core.Node]bool{}
+	for i := 0; i < (1 << 16); i++ {
+		var cond *core.Node
+		core.WalkGraph[*core.Node](s.RootNode, func(n *core.Node) ([]*core.Node, error) {
+			if cond == nil && !handled[n] {
+				if st, ok := n.Statement.(*statements.ConditionStatement); ok && st.Callback != nil && st.Condition != nil && len(n.Next) == 2 && n.TrueNode != nil && n.FalseNode != nil {
+					cond = n
+				}
+			}
+			return n.Next, nil
+		})
+		if cond == nil {
+			return
+		}
+		handled[cond] = true
+		s.trySplitTernaryReturn(ctx, cond)
+	}
+}
+
+func (s *RewriteManager) trySplitTernaryReturn(ctx *class_context.ClassContext, cond *core.Node) bool {
+	trueB := cond.TrueNode()
+	falseB := cond.FalseNode()
+	if trueB == nil || falseB == nil || trueB == falseB {
+		return false
+	}
+	truePath, tMerge := followArm(trueB)
+	falsePath, fMerge := followArm(falseB)
+	if tMerge == nil || tMerge != fMerge || tMerge == cond {
+		return false
+	}
+	merge := tMerge
+	// Duplicating the merge is only safe when the two arms are its only predecessors; a third source
+	// would lose its edge to the removed merge.
+	if len(merge.Source) != 2 {
+		return false
+	}
+	ret, ok := merge.Statement.(*statements.ReturnStatement)
+	if !ok {
+		return false
+	}
+	// The merge's return value is the reconstructed ternary, usually wrapped in one or more SlotValue
+	// indirections (the stack slot the merge consumed). Unwrap to the underlying ternary.
+	rv := ret.JavaValue
+	for {
+		sv, ok := rv.(*values.SlotValue)
+		if !ok || sv.GetValue() == nil {
+			break
+		}
+		rv = sv.GetValue()
+	}
+	tern, ok := rv.(*values.TernaryExpression)
+	if !ok || tern.TrueValue == nil || tern.FalseValue == nil {
+		return false
+	}
+	trueVars := definedLocals(ctx, truePath)
+	falseVars := definedLocals(ctx, falsePath)
+	trueValStr := renderValue(ctx, tern.TrueValue)
+	falseValStr := renderValue(ctx, tern.FalseValue)
+	// Need at least one arm-local to anchor the mapping; a pure value ternary (no arm stores) is left to
+	// the normal callback collapse.
+	if len(trueVars) == 0 && len(falseVars) == 0 {
+		return false
+	}
+	// Cross-contamination check (catches an inverted/negated condition): the value paired with one arm by
+	// the if's true/false convention must NOT reference the OTHER arm's locals.
+	for _, d := range trueVars {
+		if containsToken(falseValStr, d) {
+			return false
+		}
+	}
+	for _, d := range falseVars {
+		if containsToken(trueValStr, d) {
+			return false
+		}
+	}
+	// Own-reference check: a non-empty arm's value must actually use that arm's locals (otherwise the
+	// stores would be orphaned by the split).
+	if len(trueVars) > 0 {
+		used := false
+		for _, d := range trueVars {
+			if containsToken(trueValStr, d) {
+				used = true
+				break
+			}
+		}
+		if !used {
+			return false
+		}
+	}
+	if len(falseVars) > 0 {
+		used := false
+		for _, d := range falseVars {
+			if containsToken(falseValStr, d) {
+				used = true
+				break
+			}
+		}
+		if !used {
+			return false
+		}
+	}
+	var end *core.Node
+	if len(merge.Next) == 1 {
+		end = merge.Next[0]
+	}
+	rt := s.NewNode(&statements.ReturnStatement{JavaValue: tern.TrueValue})
+	rf := s.NewNode(&statements.ReturnStatement{JavaValue: tern.FalseValue})
+	trueLast := cond
+	if len(truePath) > 0 {
+		trueLast = truePath[len(truePath)-1]
+	}
+	falseLast := cond
+	if len(falsePath) > 0 {
+		falseLast = falsePath[len(falsePath)-1]
+	}
+	trueLast.ReplaceNext(merge, rt)
+	rt.AddSource(trueLast)
+	falseLast.ReplaceNext(merge, rf)
+	rf.AddSource(falseLast)
+	if end != nil {
+		rt.AddNext(end)
+		rf.AddNext(end)
+	}
+	merge.RemoveAllSource()
+	merge.RemoveAllNext()
+	// Keep the condition as a real if so the if-rewriter structures it; clearing the callback prevents
+	// the downstream collapse from splicing it out into the (now discarded) ternary.
+	if st, ok := cond.Statement.(*statements.ConditionStatement); ok {
+		st.Callback = nil
+	}
+	return true
+}
+
 func (s *RewriteManager) mergeIf() bool {
 	ifNodes := utils2.NodeFilter(WalkNodeToList(s.RootNode), func(node *core.Node) bool {
 		_, ok := node.Statement.(*statements.ConditionStatement)
