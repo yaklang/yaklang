@@ -664,6 +664,11 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 			if names := realConfig.GetEnabledForgeNames(); len(names) > 0 {
 				LoadEnabledForges(realConfig, r, names)
 			}
+			if realConfig.EnableDispatchSubReactAgents {
+				if dispatchSubReactAgents, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_DISPATCH_SUB_REACT_AGENTS); ok {
+					r.actions.Set(dispatchSubReactAgents.ActionType, dispatchSubReactAgents)
+				}
+			}
 		}
 	}
 
@@ -708,12 +713,6 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_ADJUST_TODOLIST); !ok {
 		if adjustTodolist, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_ADJUST_TODOLIST); ok {
 			r.actions.Set(adjustTodolist.ActionType, adjustTodolist)
-		}
-	}
-
-	if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_DISPATCH_SUB_REACT_AGENTS); !ok {
-		if dispatchSubReactAgents, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_DISPATCH_SUB_REACT_AGENTS); ok {
-			r.actions.Set(dispatchSubReactAgents.ActionType, dispatchSubReactAgents)
 		}
 	}
 

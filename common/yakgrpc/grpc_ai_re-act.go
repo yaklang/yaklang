@@ -285,6 +285,7 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		aicommon.WithEnableSelfReflection(true),
 		aicommon.WithHotPatchOptionChan(hotpatchChan),
 		aicommon.WithEnablePETaskAnalyze(true),
+		aicommon.WithEnableDispatchSubReactAgent(true), // 仅仅允许顶层 ReAct 分发子 ReAct Agent，子 Agent 仍然可以使用原始的 AI 回调。
 	}
 	// optsFromStartParams (containing WithAICallback) must be applied BEFORE
 	// tiered overrides, otherwise WithAICallback overwrites all three callbacks

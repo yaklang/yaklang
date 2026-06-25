@@ -141,7 +141,7 @@ func runForkedSubReactAgentJob(
 	subTask := aicommon.NewSubTaskBase(parentTask, subTaskID, buildSubAgentUserInput(job), true)
 	childInvoker.SetCurrentTask(subTask)
 	subTask.SetEmitter(aicommon.NewEmitter(uuid.NewString(), func(event *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
-		return event, nil
+		return event, nil // temporary discard emitter
 	}))
 	branchMarker := fmt.Sprintf("sub-react-branch-marker-%s", subTaskID)
 	fork.Branch.PushText(parentCfg.AcquireId(), branchMarker)
@@ -168,7 +168,6 @@ func buildForkedSubReactInvoker(
 		aicommon.WithTimeline(fork.Branch),
 		aicommon.WithContext(jobCtx),
 		aicommon.WithEnablePlanAndExec(false),
-		aicommon.WithDisableIntentRecognition(true),
 		aicommon.WithEmitter(aicommon.NewEmitter(uuid.NewString(), func(event *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
 			return event, nil
 		})),
