@@ -4,6 +4,10 @@
 > 配套基准: [`YAK_DECOMPILER_BENCHMARK.md`](./YAK_DECOMPILER_BENCHMARK.md)
 >
 > 适用任意承载这项工作的分支；本文不绑定具体分支名。
+>
+> **终极目标 = 整个 `~/.m2` 全部清零**（不止前 120 个 jar / a-c 前缀）。默认 `M2_MAX_JARS=120`
+> 只扫字典序前 120 个 jar（约 a–flexmark 前缀），覆盖 spring/tomcat/netty/... 等需用全量扫描
+> （见 §1 全量命令）。每轮推进记下当前最前失败点（`class N @ <jar>`），下一轮从同一处继续。
 
 本文件约束后续 harness（无论人工还是自动 agent）的工作方式。**这是清零长尾问题的唯一推荐路径：一次只盯一个 class，修一个、锁一个、再扫下一个。** 严禁批量乱改、严禁跳过验证、严禁在没有定位到具体失败 class 前先动核心代码。
 
@@ -172,9 +176,42 @@ diff <(head -1 /tmp/m2-before.txt) <(head -1 /tmp/m2-after.txt)
 | 单类复现（文件） | `DIAG_FILE=<path>.class go test -run TestDiagDecompileClass -v ./common/javaclassparser/tests/` |
 | 单类复现（jar+子串） | `DIAG_JAR=<jar> DIAG_CLASS=<substr> go test -run TestDiagDecompileClass -v ./common/javaclassparser/tests/` |
 | 覆盖全语料（含 spring 等） | 上述命令追加 `M2_INDUSTRY=1`（每 jar 上限 `M2_MAX_PER_JAR`，默认 200） |
+| **全 `~/.m2` 清零扫描（所有 jar）** | `STUB_REASONS=1 M2_INDUSTRY=1 M2_MAX_CLASSES=1000000 M2_MAX_PER_JAR=1000000 PROBLEM_DIR=/tmp/jdec-all PROGRESS_EVERY=1000 go test -run TestM2StubReasons -v ./common/javaclassparser/tests/`（`M2_INDUSTRY=1` 不再截断到前 120 jar；放开两个上限扫全部 ~76 万 class） |
 | 本地快回归（≤30s，主闸门） | `go test ./common/javaclassparser/...` |
 | 回归数据集目录 | `common/javaclassparser/tests/testdata/regression/*.class` |
 | 回归用例落点 | `tests/regression_test.go`（语法/完整）、`tests/ga_panic_free_test.go`（panic） |
+
+## 后台扫描 + 前台并行修复（加速长尾清零）
+
+全量 `.m2` 扫描是分钟级、且串行的，等它结束再修会大量浪费时间。推荐的工作方式是**后台跑全量收集、前台并行逐个修**，互不阻塞：
+
+- **后台启动全量收集**（一次性把所有失败 class 落盘分桶，前台立刻继续干活）：
+  ```bash
+  nohup env STUB_REASONS=1 M2_MAX_JARS=120 M2_MAX_CLASSES=24491 PROBLEM_DIR=/tmp/jdec-all-problems PROGRESS_EVERY=1000 \
+    go test -run TestM2StubReasons -v ./common/javaclassparser/tests/ > /tmp/scan-all.log 2>&1 &
+  # 随时查看进度：  tail -f /tmp/scan-all.log
+  # 看已落盘的失败类：  ls /tmp/jdec-all-problems/
+  ```
+  - 后台扫描把每个失败 class 原始 `.class` + 当前 `.java`/`.err.txt` 写进 `/tmp/jdec-all-problems/<bucket>/`，**前台直接拿这些已落盘的 class 逐个复现修复，不必等扫描跑完**。
+  - 不要因为扫描慢就卡住：扫描只是"仓库"，修复节奏完全由前台驱动。
+
+- **记进度、快速复定位**：harness 按 jar 名字典序确定性扫描，"第一个出问题的 class 编号 / jar"是稳定可复现的。每轮结束后把当前最前失败点（如 `class 3923 @ druid-1.2.23.jar`）记下来，下一轮 STOP_ON_FIRST 会从同一个点继续；这样不必每次从头扫。修好一个 case 后，下一个失败点必然**向后**推进（编号变大），可据此判断是否真有进展。
+
+- **单 jar 单独测**（确认本 jar 内修复没把邻居改坏、或专攻某个 jar）：
+  ```bash
+  STUB_REASONS=1 M2_INDUSTRY=1 M2_MAX_PER_JAR=100000 DIAG_JAR=<相对 ~/.m2 或绝对路径>.jar \
+    go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
+  ```
+
+## 遇到难 case 的通用解题法
+
+长尾里有些 class 是反编译器最难的结构化问题（do-while(true)+continue、switch 里跨分支共享操作数栈、值合并的极端形状等）。碰到"看上去无路可走"的 case 时，不要死磕单条路径，综合用下面这些方法：
+
+- **找上游源码对照（先拿到"正确答案"）**：失败 class 通常来自知名开源库（druid、logback、spring、guava…）。从失败 class 的 jar 名 + 类全限定名，去该库的 GitHub 仓库（优先用对应版本 tag，如 `alibaba/druid` 的 `druid-1.2.23`；找不到精确 tag 就退 `master`/`main`）拉原始 `.java` 源，定位到出错方法的**原始写法**。有了"教科书正确输出"，再对照反编译器当前产物，一眼就能看出是哪个结构（for+break、if-else-if、instanceof 链、值-merge）没结构化对——比对着乱码猜根因可靠一个数量级。拉取可直接 `curl https://raw.githubusercontent.com/<owner>/<repo>/<tag>/<path>`，或用 node/fetch。
+- **合成数据构造**：从失败 class 的字节码里提取出最小的失败模式（一段 `dup_x1/dup2_x1/swap`、一个带 `continue` 的 `do-while(true)`、一个跨 if-merge 的值），手写一个等价的最小 Java 源，`javac` 编译成 `.class` 当回归种子。最小可复现样本能把"500 字节码大方法"压缩成几十字节，根因一眼可见，回归也更快。
+- **搜索论文与各类知识**：操作数栈合并 / 值-merge 三元树 / switch 分发结构化 / `continue`-`break` 反循环展开，都有成熟研究（CFE/ASTRÉ、Procyon、CFR、Vine、Soot 的 `Body` 重构）。先弄清楚这类模式的"教科书正确输出"长什么样，再对照反编译器当前产物找偏差，比盲改可靠得多。
+- **构建 MVP**：对拿不准的结构化改动，先在一个最小合成样本上验证"这样改能不能产出语法正确、语义贴近的结果"，确认无误再往核心代码里落。MVP 能把高风险重构的爆炸半径锁死在一个文件里。
+- **诚实取舍**：某些编译器合成的"反人类"模式（Groovy 的 `selectConstructorAndTransformArguments`、Kotlin 的协程状态机）确实极难干净结构化；如果根因证实是这类、且安全契约（不 panic、不出无法解析的 Java、退化必带 `yak-decompiler:` 标记）已经满足，则一次干净 stub 是可接受交付，记录根因后跳到下一个 case，不要无限堆砌补丁。
 
 ## 红线
 

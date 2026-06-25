@@ -108,6 +108,9 @@ func (c *ClassObjectDumper) degradeInvalidMethods(header string, methods []*dump
 		if debugInvalidMethods {
 			log.Errorf("DEBUG_INVALID method %s%s:\n%s", m.methodName, m.descriptor, m.code)
 		}
+		if p := os.Getenv("DUMP_INVALID"); p != "" {
+			_ = os.WriteFile(p, []byte(fmt.Sprintf("method %s%s:\n%s\n", m.methodName, m.descriptor, m.code)), 0644)
+		}
 		// Try degrading to a stub (only possible when we kept the member metadata).
 		if m.bodyCode != "stub" && m.member != nil {
 			if stub := c.dumpStubMethod(m.member, m.methodName, m.descriptor, "post-decompile syntax validation failed"); stub != nil {
