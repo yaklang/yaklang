@@ -2,6 +2,7 @@ package decompiler
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
@@ -19,7 +20,15 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 	}()
 	err = decompiler.ParseSourceCode()
 	if err != nil {
-		return nil, err
+		// The variable-fold nil-key error ("variable-fold: nil ref key in varUserMap")
+		// fires at the END of ParseStatement, after CalcOpcodeStackInfo and statement-node
+		// building have already succeeded. The opcode graph and statement nodes are valid;
+		// only the variable-fold pass failed because a nil ref leaked into varUserMap.
+		// Suppressing this error lets the rest of the pipeline (rewriting, statement collection)
+		// proceed with unfolded variables, producing valid Java instead of a full-method stub.
+		if !strings.Contains(err.Error(), "nil ref key in varUserMap") {
+			return nil, err
+		}
 	}
 	err = rewriter.CheckNodesIsValid(decompiler.RootNode)
 	if err != nil {
