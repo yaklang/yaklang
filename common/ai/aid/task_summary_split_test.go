@@ -55,7 +55,6 @@ func renderTaskSummaryFixture(t *testing.T, fixture taskSummaryFixture) string {
 		cfg,
 		fixture.Schema,
 		fixture.CurrentTaskInfo,
-		"",
 	)
 	require.NoError(t, err)
 	return prompt

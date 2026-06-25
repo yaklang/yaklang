@@ -1,8 +1,2 @@
-{{ if .CurrentTaskTimeline }}
-## 当前任务的历史时间线
-<summary>
-{{ .CurrentTaskTimeline }}
-</summary>
-{{ end }}
 ## 任务状态
 {{ .CurrentTaskInfo }}
