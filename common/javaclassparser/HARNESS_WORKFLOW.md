@@ -24,7 +24,29 @@
 
 ## 1. 定位：找到可疑 jar，定位无法编译的 class
 
-用带问题落盘的扫描器跑一遍。它会把每个失败 class 的原始 `.class` 与反编译产物按 reason 分桶写到 `PROBLEM_DIR`（默认 `/tmp/jdec-problems`），并每 500 个 class 打印一次进度到 stderr。
+### 1a. 快速定位第一个失败 class（迭代首选，秒级）
+
+逐个清零时，**绝大多数迭代用这一条**：扫到第一个失败 class 就立即停手并落盘，并打印一条可直接复制的 `DIAG_FILE` 复现命令。这把每轮从"分钟级全量扫"压成"秒级定位"。
+
+```bash
+STUB_REASONS=1 STOP_ON_FIRST=1 \
+M2_MAX_JARS=120 M2_MAX_CLASSES=24491 \
+PROBLEM_DIR=/tmp/jdec-problems PROGRESS_EVERY=0 \
+go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
+# stderr 末尾会给出:
+#   [stub-reasons] STOP_ON_FIRST: aborted after first failure at class <N>
+#   [stub-reasons]   class: <jar>!<class>
+#   [stub-reasons]   bucket dir: /tmp/jdec-problems/<bucket>
+#   [stub-reasons]   reproduce: DIAG_FILE=<bucket>/*.class go test -run TestDiagDecompileClass ...
+```
+
+- `STOP_ON_FIRST=1`：遇到第一个 `partial`/`err`/`panic` 立即保存并退出（按 §0 原则）。语料全清时会扫完整段范围并打印 `no failure found`，所以它也是"是否清零"的探针。
+- 语料已清零想确认时：重跑同一条，看到 `no failure found in scanned range` 即代表本范围 0 失败。
+- 想覆盖 spring/tomcat/netty 等非 a-c 前缀 jar：追加 `M2_INDUSTRY=1`（每 jar 上限 `M2_MAX_PER_JAR`，默认 200）。
+
+### 1b. 全量分桶 + 计数（阶段性盘点，分钟级）
+
+需要看全部失败按 reason 如何分布、或前后对比 partial 是否下降时，跑一次完整扫描（**不要**在迭代中频繁用，太慢）：
 
 ```bash
 # 在仓库根目录执行
@@ -144,7 +166,8 @@ diff <(head -1 /tmp/m2-before.txt) <(head -1 /tmp/m2-after.txt)
 
 | 目的 | 命令 |
 |------|------|
-| 大扫描 + 失败类落盘分桶 | `STUB_REASONS=1 M2_MAX_JARS=120 M2_MAX_CLASSES=24491 PROBLEM_DIR=/tmp/jdec-problems go test -run TestM2StubReasons -v ./common/javaclassparser/tests/` |
+| **迭代首选：秒级定位第一个失败类** | `STUB_REASONS=1 STOP_ON_FIRST=1 M2_MAX_JARS=120 M2_MAX_CLASSES=24491 PROBLEM_DIR=/tmp/jdec-problems PROGRESS_EVERY=0 go test -run TestM2StubReasons -v ./common/javaclassparser/tests/` |
+| 大扫描 + 失败类落盘分桶（阶段性盘点） | `STUB_REASONS=1 M2_MAX_JARS=120 M2_MAX_CLASSES=24491 PROBLEM_DIR=/tmp/jdec-problems go test -run TestM2StubReasons -v ./common/javaclassparser/tests/` |
 | 计数 + 每类指纹（前后对比） | `M2_OUT=/tmp/m2.txt M2_MAX_JARS=120 M2_MAX_CLASSES=12000 go test -run TestM2RegressionHarness -v ./common/javaclassparser/tests/` |
 | 单类复现（文件） | `DIAG_FILE=<path>.class go test -run TestDiagDecompileClass -v ./common/javaclassparser/tests/` |
 | 单类复现（jar+子串） | `DIAG_JAR=<jar> DIAG_CLASS=<substr> go test -run TestDiagDecompileClass -v ./common/javaclassparser/tests/` |
