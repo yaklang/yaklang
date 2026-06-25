@@ -518,6 +518,14 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			mustContain:    []string{"deserializeAndSet", "_skipNulls"},
 			mustNotContain: []string{"yak-decompiler", "multiple next"},
 		},
+		{
+			file: "assert_guard_cyclic.class",
+			desc: "a method with several `assert`s whose shared/overlapping throw targets make the value-merge structuring leave an orphaned $assertionsDisabled guard + its `throw new AssertionError()` (rendering the fatal `if (cond);`) must fold the throw into a real if-body instead of stubbing the whole method",
+			// backport ArrayDeque.checkInvariants fully reconstructs: the AssertionError throws survive
+			// and no method is stubbed. The corruption marker must never reach output.
+			mustContain:    []string{"checkInvariants", "AssertionError"},
+			mustNotContain: []string{"yak-decompiler", "post-decompile syntax"},
+		},
 	}
 
 	for _, tc := range cases {

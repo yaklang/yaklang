@@ -451,6 +451,33 @@ The residual `invalid-stack-size` family (6, all in fastjson2 `TypeUtils`/
 different operand-stack depths) is a deeper stack-simulation completeness problem;
 it degrades cleanly to a tagged stub and is tracked in the backlog.
 
+### 3.8 javac `assert`-guard corruption fold (post-syntax partial reduction)
+
+A fifth round fixed the `assert`-heavy class family (e.g. backport-util-concurrent
+`ArrayDeque.checkInvariants`, with three `assert`s). javac lowers `assert <c>;`
+into a `$assertionsDisabled` guard + `throw new AssertionError()`. A single assert
+reconstructs fine, but when several asserts share/overlap the same throw target
+the value-merge structuring can leave an **orphaned `ConditionStatement(mentions
+$assertionsDisabled)` immediately followed by its `throw new AssertionError()`**,
+which renders as the fatal `if (<cond>);` (a bare condition as a top-level
+statement) and stubs the whole method via post-decompile syntax validation.
+
+`FoldAssertionGuards` (`rewriter/assert_fold.go`, run after the acyclic check in
+`ParseBytesCode`) detects that exact orphaned pair — a `ConditionStatement` whose
+condition renders with `$assertionsDisabled`, followed by a `throw AssertionError`
+— and folds the throw into a real `if (<cond>) { throw ... }` body. It only acts
+on that corrupted shape (it requires both the `$assertionsDisabled` mention and the
+AssertionError throw), so already-correctly-structured asserts and ordinary code
+are untouched. It runs *after* `AssertStatementsAcyclic` so a pathologically
+deep/cyclic tree still degrades cleanly instead of blowing the fold's recursive
+walk. Kill-switch: `ASSERT_FOLD_OFF=1`.
+
+Effect (STOP_ON_FIRST probe of the 120-jar a-c slice): the first failing class
+moves from `ArrayDeque` (class #239, `post-decompile syntax validation failed`)
+past it to `logback NestingType` (class #1194, a different family), i.e. the
+assert-corrupted classes in the leading range now fully reconstruct. Locked in CI
+by `TestDecompileSyntaxRegression` (`assert_guard_cyclic`).
+
 ---
 
 ## 4. Test-hygiene benchmark

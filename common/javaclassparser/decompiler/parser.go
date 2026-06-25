@@ -83,6 +83,13 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 	// would otherwise drive them into Go's unrecoverable `fatal error: stack overflow`, crashing the
 	// whole process; raising an ordinary panic instead lets the recover above degrade the method to a stub.
 	rewriter.AssertStatementsAcyclic(sts)
+	// Fold the javac `assert` guard corruption: when several asserts share/overlap throw targets,
+	// the value-merge structuring can leave an orphaned `ConditionStatement(mentions
+	// $assertionsDisabled)` immediately followed by its `throw new AssertionError()`, which renders
+	// as the fatal `if (cond);` and stubs the whole method. Fold that pair into a real if-body so the
+	// method survives post-decompile syntax validation. Runs AFTER the acyclic check so its recursive
+	// walk cannot blow the stack on a pathologically deep/cyclic tree. Kill-switch: ASSERT_FOLD_OFF=1.
+	sts = rewriter.FoldAssertionGuards(sts)
 	params := []*values.JavaRef{}
 	for _, v := range decompiler.Params {
 		if ref, ok := v.(*values.JavaRef); ok {
