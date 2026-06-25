@@ -1,0 +1,18 @@
+# A2 鉴权机制分析智能体（单 realm）
+
+目标：分析**当前 realm** 的鉴权执行方式（必须从登录页/源码/配置 evidence 推导，禁止猜测）。
+
+## 注入上下文
+- `auth_realm`、登录页优先流程、**Backend code locations**（源码路径索引，读码时机自定）。
+- `auth_realm_inventory`、`auth_mechanism_map`、`routing_profile`、`backend_scope` 等已嵌入。
+
+## 任务（顺序建议，非强制）
+1. **GET 登录页** → 判断 `login_page_kind`（须与当前 realm 一致）→ 从 HTML/JS 解析 form action 与全部字段。
+2. **按需**读 Backend code locations，补足 session/cookie/filter 链；**勿**用后端注解替代页面字段名。
+3. 记录：`login_page_path`、`login_post_path`、`login_form_fields`、`password_transform`（附 evidence）、filter 链、session 字段。
+4. **`password_transform` 必须附 evidence**；无 evidence 时留空或 `none`，**禁止**无依据填常见默认算法。
+5. **`login_path` = POST 路径**（`login_post_path`），不是 GET 页面；禁止把站点根路径或首页 GET 当作登录接口。
+6. `finalize_auth_mechanism` 提交当前 realm 的 JSON。
+
+## 输出字段
+`auth_realm`, `session_mechanism`, `session_fields`, `password_transform`, `filter_chain`, `login_page_kind`, `login_page_path`, `login_post_path`, `login_form_fields`, `login_path`, `login_method`, `content_type`, `mechanism_detail`, `code_evidence`

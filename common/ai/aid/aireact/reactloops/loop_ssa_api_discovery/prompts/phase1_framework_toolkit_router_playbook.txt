@@ -1,0 +1,37 @@
+# Framework Toolkit Router
+
+Goal: choose **one** pre-built framework toolkit ID, or **`other`** to fall back to generic extract + full AI pipeline.
+
+## Available toolkit IDs (v1)
+- `publiccms` — PublicCMS Java multi-servlet CMS (Admin/Web/Api Initializers, `com.publiccms` packages)
+- `mcms`, `ofbiz` — planned (do not select unless explicit code evidence)
+
+## Inputs (already injected)
+- `project_profile.json`, `java_business_scope_inventory.json`, `backend_scope.json`
+
+## Task
+1. Read injected artifacts and optionally `read_file` root `pom.xml` / `README*`.
+2. Match code evidence to a toolkit ID from the list above.
+3. If no dedicated toolkit matches with strong evidence → set `framework_id` to **`other`**.
+4. Call **`finalize_framework_toolkit_selection`** with JSON and exit.
+
+## Rules
+- Do **not** guess CMS names absent from repository evidence.
+- `confidence` is 0–1 (high only when multiple independent signals agree).
+- `evidence` must cite concrete paths or artifact fields.
+- Never use `finish` or `directly_answer`; only `finalize_framework_toolkit_selection`.
+
+## Output schema
+```json
+{
+  "framework_id": "publiccms",
+  "confidence": 0.95,
+  "rationale": "short reason",
+  "evidence": ["pom.xml groupId com.publiccms", "AdminInitializer.java"]
+}
+```
+
+Use `other` when uncertain:
+```json
+{"framework_id":"other","confidence":0.3,"rationale":"no dedicated toolkit match","evidence":[]}
+```

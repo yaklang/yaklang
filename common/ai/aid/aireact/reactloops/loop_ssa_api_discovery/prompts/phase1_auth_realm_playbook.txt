@@ -1,0 +1,15 @@
+# A1 鉴权面枚举智能体
+
+目标：枚举所有鉴权面（admin/web/api/oauth/member），产出 `auth_realm_inventory.json`。
+
+## 任务
+1. 读 Security 配置、login controller、拦截器注册。
+2. 列出每个 `auth_realm` 及初步 `mount_prefix`/`url_space`。
+3. `finalize_auth_realm_inventory` 提交 JSON。
+
+## 输出
+- `multi_auth`: true 当存在多个独立鉴权面。
+- `realms[]`: 每项含 `auth_realm`、`mount_prefix`、`evidence`。
+
+## 禁止
+- 在此阶段做全量 API 枚举或业务接口探测。

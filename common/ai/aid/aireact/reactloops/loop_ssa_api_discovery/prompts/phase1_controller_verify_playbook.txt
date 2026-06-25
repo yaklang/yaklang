@@ -1,0 +1,61 @@
+# HTTP API Unit 代码阅读 + 在线验证（单 ReAct 智能体）
+
+目标：仅负责 **一个** `entry_file`：读码 → 梳理该文件的 HTTP API → **逐条 HTTP 探测** → 落库 → `finalize_http_api_unit`（或 legacy `finalize_controller_verification`）。
+
+## 任务边界
+- 主文件：`controller_task.entry_file`（必须先 `read_file` 或 `extract_spring_routes`）。
+- 静态 hint 表已注入；可据此直接 `do_http_request`，不必先读完全部项目。
+- 需要父类映射、Security 配置、DTO 时，可用 `code_root` 读**其他**文件（glob/grep/read_file）。
+- `discovery_read_session_data` 已按 **当前 controller** 过滤，不会返回无关 Controller 路由。
+
+## API 鉴权分类（每条 API 必填 `auth_access`）
+| 值 | 含义 |
+|----|------|
+| `public` | 无凭证也可访问（须经过下方「公开性复测」确认） |
+| `protected` | 须带匹配 realm 的凭证 |
+| `unknown` | 尚未完成两步探测 |
+
+## 推荐流程（每条 API）
+1. `read_file(file=<controller_file>)` 或 `extract_spring_routes(file=<controller_file>)` 确认路由。
+2. 对 **每条** hint/API（**须先带凭证，再测公开性**）：
+   - **第一步（功能性）**：若 `auth_selection_json` 有匹配 realm 的 `verified` 凭证 → `discovery_select_auth_credential` → `do_http_request` **仅带 `auth_credential_id`**（禁止手填 Cookie）。
+   - **第二步（公开性/未授权）**：对同一路由 **不带** `auth_credential_id` 再请求一次；若仍 200/业务成功 → `auth_access=public`（潜在未授权）；若 401/403 → `auth_access=protected`。
+   - 代码明确 `@PermitAll` / `permitAll()` 且第二步也为 public → 可直接标 `public`。
+   - 失败则结合 `failure_semantics` 修正 URL/method/body 后重试（同路由最多 3 轮）。
+   - `discovery_upsert_verified_http_api` 或 `discovery_mark_api_rejected`
+3. 全部路由处理完后 `finalize_http_api_unit` 提交 `result_json`。
+
+## result_json schema
+```json
+{
+  "entry_file": "publiccms-core/src/main/java/.../FooController.java",
+  "controller_file": "publiccms-core/src/main/java/.../FooController.java",
+  "feature_id": "admin_cms_content",
+  "feature_label": "...",
+  "apis": [
+    {
+      "method": "POST",
+      "path_pattern": "/admin/foo/save",
+      "handler_file": "...",
+      "handler_class": "FooController",
+      "handler_symbol": "save",
+      "auth_access": "protected",
+      "verified": true,
+      "full_sample_url": "http://host:port/admin/foo/save",
+      "verdict_reason": "HTTP 200 with credential; 401 without credential"
+    }
+  ],
+  "no_api_reason": ""
+}
+```
+
+## 判定规则
+- **verified=true** 必须：靶机可达 + 真实 HTTP 响应 + `discovery_upsert_verified_http_api` 已写入 probe 证据。
+- 禁止未发包标 verified；禁止仅用代码推断。
+- `apis` 为空时须填写 `no_api_reason`。
+
+## 禁止
+- 反复 `discovery_read_session_data` 空转（>2 次无发包）。
+- 跳过 hint 列表中的路由（须 upsert 或 reject）。
+- 有可用凭证时 **先无凭证探测**（旧流程已废弃）。
+- 使用 `finish`；须 `finalize_controller_verification`。

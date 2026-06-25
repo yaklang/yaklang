@@ -1,0 +1,18 @@
+## Yak 内置文件浏览工具参数（ssa_api_discovery — 参数名必须与 Schema 一致）
+
+### read_file
+- **路径参数名必须是 `file`**（完整绝对路径，或相对 `code_root` 的相对路径）。
+- **禁止**使用 `path`、`filepath`、`filename` 等别名；否则会报 `missing property 'file'` 并触发无效重试。
+- 可选：`offset`（起始行，从 1 起）、`lines` 或 `chunk_size`（读取行数）。
+- 示例（正确）：
+  ```
+  read_file(file="/abs/project/src/main/java/com/example/FooController.java")
+  read_file(file="publiccms-core/src/main/resources/application.yml", offset=1, lines=80)
+  ```
+- 示例（错误，勿用）：
+  ```
+  read_file(path="...")   # 参数名错误
+  ```
+
+### grep / glob / tree
+- 优先用 **glob** 缩小目录，再用 **read_file(file=...)** 精读；大目录 **tree** 可能较慢，须等待返回后再继续。

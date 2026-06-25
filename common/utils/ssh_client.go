@@ -163,6 +163,14 @@ func (c *SSHClient) CopyLocalFileToRemote(srcFilePath string, dstFilePath string
 	return err
 }
 
+// NewSFTPClient opens an SFTP session on the underlying SSH connection.
+func (c *SSHClient) NewSFTPClient() (*sftp.Client, error) {
+	if c == nil || c.client == nil {
+		return nil, errors.New("ssh client is nil")
+	}
+	return sftp.NewClient(c.client)
+}
+
 // Copy remote file to local
 func (c *SSHClient) CopyRemoteFileToLocal(dstFilePath string, srcFilePath string) error {
 	sftpClient, err := sftp.NewClient(c.client)

