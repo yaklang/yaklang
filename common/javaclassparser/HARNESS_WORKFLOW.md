@@ -1,8 +1,9 @@
-# Java 反编译长尾清零工作流 (WORKFLOW)
+# Java 反编译长尾清零工作流 (HARNESS_WORKFLOW)
 
-> 分支: `feature/java-decompile-clear-partial-compiling`
 > 目标: 把 `.m2` 真实 jar 语料上的 `partial` / `syntax` / `err` / `panic` 逐个清零。
 > 配套基准: [`YAK_DECOMPILER_BENCHMARK.md`](./YAK_DECOMPILER_BENCHMARK.md)
+>
+> 适用任意承载这项工作的分支；本文不绑定具体分支名。
 
 本文件约束后续 harness（无论人工还是自动 agent）的工作方式。**这是清零长尾问题的唯一推荐路径：一次只盯一个 class，修一个、锁一个、再扫下一个。** 严禁批量乱改、严禁跳过验证、严禁在没有定位到具体失败 class 前先动核心代码。
 
