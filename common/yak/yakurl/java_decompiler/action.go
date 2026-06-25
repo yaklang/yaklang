@@ -12,12 +12,15 @@ type Action struct {
 
 	// jarFS maps JAR paths to their filesystem handlers
 	jarFS *utils.SafeMap[*javaclassparser.JarFS]
+	// codeSources caches directory or archive code sources keyed by root path
+	codeSources *utils.SafeMap[*codeSource]
 }
 
 // NewJavaDecompilerAction creates and initializes a new Java decompiler action
 func NewJavaDecompilerAction() *Action {
 	action := &Action{
-		jarFS: utils.NewSafeMap[*javaclassparser.JarFS](),
+		jarFS:       utils.NewSafeMap[*javaclassparser.JarFS](),
+		codeSources: utils.NewSafeMap[*codeSource](),
 	}
 
 	// Register route handlers
@@ -31,4 +34,5 @@ func NewJavaDecompilerAction() *Action {
 // This is useful for testing to release file handles on Windows
 func (a *Action) ClearCache() {
 	a.jarFS.Clear()
+	a.codeSources.Clear()
 }
