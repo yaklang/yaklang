@@ -10,15 +10,17 @@ import (
 )
 
 const (
-	loopInfraNodeToolCompose        = "tool_compose_progress"
-	loopInfraNodeLoadCapability     = "load_capability"
-	loopInfraNodeLoadSkillResources = "load_skill_resources_path"
-	loopInfraNodeSingleFileWrite    = "infra-file-write"
-	loopInfraNodeSingleFileModify   = "infra-file-modify"
-	loopInfraNodeSingleFileInsert   = "infra-file-insert"
-	loopInfraNodeSingleFileDelete   = "infra-file-delete"
-	loopInfraNodeQueryMCPServers    = "query_mcp_servers"
-	loopInfraNodeQueryMCPTools      = "query_mcp_tools"
+	loopInfraNodeToolCompose         = "tool_compose_progress"
+	loopInfraNodeLoadCapability      = "load_capability"
+	loopInfraNodeLoadSkillResources  = "load_skill_resources_path"
+	loopInfraNodeSingleFileWrite     = "infra-file-write"
+	loopInfraNodeSingleFileModify    = "infra-file-modify"
+	loopInfraNodeSingleFileInsert    = "infra-file-insert"
+	loopInfraNodeSingleFileDelete    = "infra-file-delete"
+	loopInfraNodeQueryMCPServers     = "query_mcp_servers"
+	loopInfraNodeQueryMCPTools       = "query_mcp_tools"
+	loopInfraNodeDispatchSubReact    = "dispatch_sub_react_agents"
+	loopInfraNodeDispatchConcurrency = "dispatch_sub_react_concurrency"
 )
 
 func loopInfraStatus(loop *reactloops.ReActLoop, message string) {
