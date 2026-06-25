@@ -35,6 +35,12 @@ func (j *JavaRef) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
 }
 
 func (j *JavaRef) Type() types.JavaType {
+	if j.typ == nil {
+		// Fallback for refs created without a proper type (e.g. from the
+		// getVarScope fallback in complex CFG paths). Return Object to
+		// avoid nil pointer dereference downstream.
+		return types.NewJavaClass("java.lang.Object")
+	}
 	return j.typ
 }
 
