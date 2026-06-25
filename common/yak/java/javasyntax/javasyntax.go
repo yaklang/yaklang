@@ -16,11 +16,17 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 )
+
+// parseMu serializes ANTLR parses. NewJavaParser/NewJavaLexer share package-level
+// static ATN/DFA/PredictionContextCache that are not safe for concurrent use; parallel
+// jar decompilation + syntax validation otherwise triggers concurrent map read/write.
+var parseMu sync.Mutex
 
 // ---- normalization of known decompiler-output quirks -------------------------------------
 //
@@ -145,6 +151,8 @@ func Preprocess(src string) string {
 // compilation-unit AST and any syntax error. It is the cache-less twin of java2ssa.Frontend.
 func Parse(src string) (javaparser.ICompilationUnitContext, error) {
 	src = Preprocess(src)
+	parseMu.Lock()
+	defer parseMu.Unlock()
 	return antlr4util.ParseASTWithSLLFirst(
 		src,
 		javaparser.NewJavaLexer,
