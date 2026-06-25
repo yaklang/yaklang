@@ -288,7 +288,7 @@ func TestRuntimeStageTimelineForkIsolation(t *testing.T) {
 	require.Contains(t, mainDump, "task-B-marker")
 }
 
-func TestRuntimeStageTimelineForkMergeOrderStable(t *testing.T) {
+func TestRuntimeStageTimelineForkMergePreservesGlobalIDOrder(t *testing.T) {
 	coordinator := newTestCoordinator(t)
 	coordinator.Config = aicommon.NewConfig(context.Background(), aicommon.WithPlanExecTaskConcurrency(2), aicommon.WithDisableAutoSkills(true))
 
@@ -319,5 +319,7 @@ func TestRuntimeStageTimelineForkMergeOrderStable(t *testing.T) {
 	mainDump := coordinator.Timeline.Dump()
 	require.Contains(t, mainDump, "task-A-order-marker")
 	require.Contains(t, mainDump, "task-B-order-marker")
-	require.Less(t, strings.Index(mainDump, "task-A-order-marker"), strings.Index(mainDump, "task-B-order-marker"))
+	// IDs come from the shared SeqIdProvider; B finishes first so it gets the lower ID
+	// and appears before A in Dump, regardless of DAG order.
+	require.Less(t, strings.Index(mainDump, "task-B-order-marker"), strings.Index(mainDump, "task-A-order-marker"))
 }
