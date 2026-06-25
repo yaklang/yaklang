@@ -60,7 +60,7 @@ func (c *Coordinator) getPlanReviewSuggestion() []*PlanReviewSuggestion {
 		},
 		{
 			Value:         "continue",
-			Prompt:        "计划合理，继续执行",
+			Prompt:        "继续执行",
 			PromptEnglish: "The plan is reasonable, continue execution",
 		},
 	}

@@ -131,7 +131,7 @@ func detachedPlanSelectors(coordinatorID string) []map[string]any {
 		},
 		{
 			"id":                 fmt.Sprintf("detached-plan-execute-%s", coordinatorID),
-			"value":              "execute",
+			"value":              "continue",
 			"prompt":             "允许执行",
 			"prompt_english":     "Allow plan execution",
 			"allow_extra_prompt": false,
