@@ -391,7 +391,15 @@ func newAttributeInfo(attrName string, attrLen uint32) AttributeInfo {
 	case "Signature":
 		return &SignatureAttribute{AttrLen: attrLen}
 	case "RuntimeVisibleTypeAnnotations":
-		return &RuntimeVisibleTypeAnnotationsAttribute{}
+		// JSR 308 type_annotation has a different binary layout than a plain annotation: each entry is
+		// prefixed by target_type (u1) + target_info (variable) + type_path (variable) before the
+		// regular type_index/element_value_pairs body. Reusing RuntimeVisibleAnnotationsAttribute's
+		// readInfo (which expects plain annotations) consumed the wrong number of bytes and desynced the
+		// reader, corrupting every subsequent attribute-name index ("Invalid constant pool index!").
+		// The decompiler never renders type-use annotations, and RuntimeInvisibleTypeAnnotations already
+		// falls through to UnparsedAttribute, so treat the visible variant identically: keep the raw
+		// bytes (byte-exact round-trip) and skip exactly attrLen bytes so parsing never desyncs.
+		return &UnparsedAttribute{Name: attrName, Length: attrLen, Info: nil}
 	default:
 		return &UnparsedAttribute{Name: attrName, Length: attrLen, Info: nil}
 

@@ -151,7 +151,85 @@ func (s *Scope) SubScope(sts *[]statements.Statement) *Scope {
 	s.varMap = append(s.varMap, newScope)
 	return newScope
 }
+// maxStructuredContainers bounds how many nested-block container statements a single method's
+// structured tree may contain. It backstops AssertStatementsAcyclic's traversal against a degenerate
+// (but technically acyclic) explosion of nested blocks.
+const maxStructuredContainers = 1_000_000
+
+// AssertStatementsAcyclic verifies that the structured statement tree produced for one method is a
+// proper tree of nested-block containers (if/for/while/do-while/switch/try) - i.e. no container is its
+// own ancestor or otherwise reachable twice. A structuring defect on certain real-world classes emitted
+// a self-referential container (an IfStatement whose own body contained itself), which sent the many
+// recursive tree walkers (rewriteVar, Statement.ReplaceVar, Statement.String, ...) into unbounded
+// recursion. Because that surfaces as Go's UNRECOVERABLE `fatal error: stack overflow`, the per-method
+// recover nets could not contain it and a single class crashed the whole host process. This check runs
+// ITERATIVELY (its own explicit stack, so it cannot itself overflow) once before any recursive pass; on
+// a cycle or pathological size it raises an ordinary panic, which ParseBytesCode's recover converts into
+// a returned error so the method degrades to a clean stub. Container nodes are never legitimately shared
+// in a well-formed tree, so a repeat visit is always a defect; leaf statements are not tracked, so
+// shared leaf singletons (break/continue/...) never trigger a false positive.
+func AssertStatementsAcyclic(roots []statements.Statement) {
+	visited := make(map[statements.Statement]struct{})
+	stack := append([]statements.Statement{}, roots...)
+	count := 0
+	for len(stack) > 0 {
+		st := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if st == nil {
+			continue
+		}
+		var children [][]statements.Statement
+		switch s := st.(type) {
+		case *statements.IfStatement:
+			children = append(children, s.IfBody, s.ElseBody)
+		case *statements.ForStatement:
+			children = append(children, s.SubStatements)
+		case *statements.WhileStatement:
+			children = append(children, s.Body)
+		case *statements.DoWhileStatement:
+			children = append(children, s.Body)
+		case *statements.SwitchStatement:
+			for _, c := range s.Cases {
+				if c != nil {
+					children = append(children, c.Body)
+				}
+			}
+		case *statements.TryCatchStatement:
+			children = append(children, s.TryBody)
+			children = append(children, s.CatchBodies...)
+		default:
+			// Leaf / non-container statement: nothing to descend into.
+			continue
+		}
+		if _, ok := visited[st]; ok {
+			panic(fmt.Errorf("cyclic or shared container statement (%T) in structured tree; rejecting to avoid unbounded recursion", st))
+		}
+		visited[st] = struct{}{}
+		count++
+		if count > maxStructuredContainers {
+			panic(fmt.Errorf("structured statement tree has more than %d container nodes; rejecting as pathological", maxStructuredContainers))
+		}
+		for _, body := range children {
+			stack = append(stack, body...)
+		}
+	}
+}
+
+// maxRewriteVarDepth bounds the structural recursion of rewriteVar. The walker descends one frame per
+// nested block (if/for/while/do-while/switch/try); a pathological or cyclic statement tree (observed on
+// machine-generated parsers, and on degenerate structuring output) can drive this past the goroutine
+// stack limit, which manifests as Go's UNRECOVERABLE `fatal error: stack overflow` and crashes the whole
+// host process - the recover nets cannot catch it. No hand-written or normally-generated Java nests
+// thousands of blocks deep, so once depth crosses this threshold we raise an ordinary (recoverable)
+// panic instead; ParseBytesCode's recover turns it into a returned error and the method degrades to a
+// clean stub rather than taking the process down. The limit sits far above any legitimate nesting yet
+// far below the ~250k frames it takes to overflow a 1GB stack.
+const maxRewriteVarDepth = 5000
+
 func rewriteVar(scope *Scope) int {
+	if scope.deep > maxRewriteVarDepth {
+		panic(fmt.Errorf("rewriteVar: block nesting depth %d exceeds limit %d (pathological or cyclic statement tree)", scope.deep, maxRewriteVarDepth))
+	}
 	idReplaceMap := map[*utils.VariableId]*utils.VariableId{}
 	defer func() {
 		for oldId, newId := range idReplaceMap {

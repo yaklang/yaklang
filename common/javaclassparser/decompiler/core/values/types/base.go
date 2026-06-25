@@ -67,6 +67,9 @@ func (j *JavaTypeWrap) GetJavaTypeRef() *javaTypeRef {
 	return j.javaTypeRef
 }
 func (j *JavaTypeWrap) ResetTypeRef(t JavaType) {
+	if t == nil {
+		return
+	}
 	j.javaTypeRef = t.GetJavaTypeRef()
 }
 func (j *JavaTypeWrap) ResetType(t JavaType) {
@@ -89,6 +92,16 @@ type javaType interface {
 }
 
 func MergeTypes(types ...JavaType) JavaType {
+	// Incomplete stack simulation can hand MergeTypes a nil arm type (e.g. a TernaryExpression
+	// whose one branch value lost its type). Drop nil entries up front so we never call String()
+	// on a nil JavaType and panic the whole method into a stub.
+	nonNil := make([]JavaType, 0, len(types))
+	for _, j := range types {
+		if j != nil {
+			nonNil = append(nonNil, j)
+		}
+	}
+	types = nonNil
 	typesMap := map[string][]JavaType{}
 	for _, j := range types {
 		typesMap[j.String(&class_context.ClassContext{})] = append(typesMap[j.String(&class_context.ClassContext{})], j)

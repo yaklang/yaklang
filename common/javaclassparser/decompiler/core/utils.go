@@ -361,9 +361,25 @@ func UnpackSoltValue(value values.JavaValue) values.JavaValue {
 }
 func GetRealValue(value values.JavaValue) values.JavaValue {
 	if ref, ok := value.(*values.JavaRef); ok {
+		// A ref with no backing value (e.g. a method parameter, which has no assigned source
+		// value) IS its own real value. Recursing into a nil Val returned nil, so folding a
+		// single-use temp that copies a parameter (`var2 = param; this.f = var2;`, the
+		// `aload; astore; aload; putfield` idiom) replaced the use with nil and rendered an
+		// empty right-hand side: `this.f = ;` (invalid Java -> whole method degraded to a stub).
+		if ref.Val == nil {
+			return ref
+		}
+		// Parameters are seeded with an empty-string placeholder value. Unwrapping a parameter
+		// ref into that placeholder loses the variable name and renders empty, so stop at the ref.
+		if cv, ok := ref.Val.(*values.CustomValue); ok && cv.Flag == "param_placeholder" {
+			return ref
+		}
 		return GetRealValue(ref.Val)
 	}
 	if ref, ok := value.(*values.SlotValue); ok {
+		if ref.GetValue() == nil {
+			return ref
+		}
 		return GetRealValue(ref.GetValue())
 	}
 	return value

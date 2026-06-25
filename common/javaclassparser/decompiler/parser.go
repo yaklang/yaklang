@@ -68,6 +68,11 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 		return nil, err
 	}
 	sts := core.NodesToStatements(nodes)
+	// Reject a structurally-broken (cyclic / pathologically huge) statement tree here, before any of the
+	// recursive tree walkers (RewriteVar, Statement.ReplaceVar/String, ...) descend it. A cyclic tree
+	// would otherwise drive them into Go's unrecoverable `fatal error: stack overflow`, crashing the
+	// whole process; raising an ordinary panic instead lets the recover above degrade the method to a stub.
+	rewriter.AssertStatementsAcyclic(sts)
 	params := []*values.JavaRef{}
 	for _, v := range decompiler.Params {
 		if ref, ok := v.(*values.JavaRef); ok {
