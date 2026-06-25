@@ -576,6 +576,25 @@ func (s *RewriteManager) ToStatements(stopCheck func(node *core.Node) bool) ([]*
 	return s.ToStatementsFromNode(s.RootNode, stopCheck)
 }
 
+// isMethodExitTerminator reports whether node is an unconditional method exit (return / throw)
+// that has no fall-through successor. It is deliberately narrower than statementIsTerminal:
+// break/continue are loop-control jumps that DO have a successor (their loop target), so they
+// are not treated as exits here. Used by IfRewriter to drop early-return/throw exits from a
+// structured if's linear Next edges (keeping only the genuine fall-through continuation).
+func isMethodExitTerminator(node *core.Node) bool {
+	if node == nil || node.Statement == nil {
+		return false
+	}
+	switch s := node.Statement.(type) {
+	case *statements.ReturnStatement:
+		return true
+	case *statements.CustomStatement:
+		txt := strings.TrimSpace(s.String(pruneCtx))
+		return strings.HasPrefix(txt, "throw ")
+	}
+	return false
+}
+
 type NodeExtInfo struct {
 	PreNodeRoute    *NodeRoute
 	AllPreNodeRoute []*NodeRoute

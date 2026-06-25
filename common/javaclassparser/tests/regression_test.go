@@ -510,6 +510,14 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			// a single catch must not gain a spurious union separator, and nothing is stubbed
 			mustNotContain: []string{"catch(ArithmeticException |", "yak-decompiler"},
 		},
+		{
+			file: "multiple_next_early_return.class",
+			desc: "an if whose arm can early-return while the other arm falls through to a shared continuation must not abort structuring with 'multiple next'",
+			// deserializeAndSet must fully reconstruct (no stub); the early-return arm and the
+			// fall-through try/catch both survive into the output (Jackson PropertyDeserializer).
+			mustContain:    []string{"deserializeAndSet", "_skipNulls"},
+			mustNotContain: []string{"yak-decompiler", "multiple next"},
+		},
 	}
 
 	for _, tc := range cases {

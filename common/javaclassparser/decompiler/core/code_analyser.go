@@ -2202,12 +2202,12 @@ func (d *Decompiler) ParseStatement() error {
 					val := UnpackSoltValue(funcCallValue.Object)
 					// println(val.String(funcCtx))
 					// println(funcCallValue.String(funcCtx))
-					if v, ok := val.(*values.JavaRef); ok {
+					if v, ok := val.(*values.JavaRef); ok && v != nil {
 						attr := d.delRefUserAttr[v.VarUid]
 						attr[0]++
 						d.delRefUserAttr[v.VarUid] = attr
 					}
-					if val, ok := val.(*values.JavaRef); ok {
+					if val, ok := val.(*values.JavaRef); ok && val != nil {
 						assignNode := refToNewExpressionAssignNode[val.Id]
 						if assignNode != nil {
 							assignSt := assignNode.Statement
@@ -2215,6 +2215,9 @@ func (d *Decompiler) ParseStatement() error {
 
 							users := d.varUserMap.GetMust(val)
 							for _, user := range users {
+								if user == nil {
+									continue
+								}
 								user.CurrentOpcode = opcode
 							}
 							appendNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
@@ -2551,6 +2554,15 @@ func (d *Decompiler) ParseStatement() error {
 	sort.Slice(nodes, func(i, j int) bool {
 		return nodes[i].Id < nodes[j].Id
 	})
+	// A typed-nil *JavaRef can end up as a varUserMap key when loadVarBySlot loads an
+	// uninitialized local slot (GetVar returns nil). The variable-fold walker below
+	// dereferences ref.VarUid / ref.Val, which would panic and crash the whole decompile.
+	// This indicates an upstream stack-simulation gap on a malformed/complex CFG; surface it as an
+	// ordinary error so the method degrades to a tagged stub (the same end state as the old panic,
+	// but reached cleanly without a Go panic that the recover net has to catch).
+	if _, hasNil := d.varUserMap.Get(nil); hasNil {
+		return errors.New("variable-fold: nil ref key in varUserMap (uninitialized local slot)")
+	}
 	d.varUserMap.ForEach(func(ref *values.JavaRef, pairs []*VarFoldRule) bool {
 		uidToPairs.Set(ref.VarUid, append(uidToPairs.GetMust(ref.VarUid), pairs...))
 		uidToRef[ref.VarUid] = ref
