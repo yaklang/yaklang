@@ -526,6 +526,20 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			mustContain:    []string{"checkInvariants", "AssertionError"},
 			mustNotContain: []string{"yak-decompiler", "post-decompile syntax"},
 		},
+		{
+			file: "groovy_constructor_switch.class",
+			desc: "a Groovy selectConstructorAndTransformArguments switch (logback gaffer NestingType.$INIT) " +
+				"threads a freshly-allocated object across switch arms via dup_x1/dup2_x1 on top of an " +
+				"operand stack of depth 2. The fix rebuilds each case/default body's operand stack from " +
+				"the switch instruction's post-selector StackEntry instead of a shared mutable variable " +
+				"that earlier arms (an athrow/return ending with an empty stack) clobbered, which left " +
+				"later case bodies underflowing and leaking empty-slot placeholders.",
+			// $INIT fully reconstructs: a switch over selectConstructorAndTransformArguments whose
+			// arms build new NestingType(...) constructor calls
+			mustContain:    []string{"selectConstructorAndTransformArguments", "new NestingType(", "$INIT"},
+			// no stub, no leaked internal placeholder
+			mustNotContain: []string{"yak-decompiler", "empty slot value"},
+		},
 	}
 
 	for _, tc := range cases {

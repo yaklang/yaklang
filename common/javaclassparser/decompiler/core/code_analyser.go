@@ -1165,7 +1165,6 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		nodeToVarScope[code] = scope
 	}
 	ifNodeToConditionCallback := map[*OpCode]func(values.JavaValue){}
-	var preRuntimeStackSimulation *StackSimulationImpl
 	varTable := map[int]*values.JavaRef{}
 	err := WalkGraph[*OpCode](d.RootOpCode, func(code *OpCode) ([]*OpCode, error) {
 		// NOTE: do not sort code.Target for switch opcodes. The previous sort.Slice used an
@@ -1187,7 +1186,23 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			}
 		} else if len(code.Source) == 1 {
 			if IsSwitchOpcode(code.Source[0].Instr.OpCode) {
-				runtimeStackSimulation = preRuntimeStackSimulation
+				// A switch's case/default targets must inherit the operand-stack state that held
+				// AFTER the switch instruction consumed its selector. The selector Pop happens in
+				// calcOpcodeStackInfo, so code.Source[0].StackEntry is exactly that post-switch
+				// stack. Rebuilding from it (instead of a shared preRuntimeStackSimulation) is
+				// correct for EVERY branch independently: previously a single shared variable was
+				// clobbered as soon as an earlier branch ended (e.g. an athrow/return that left an
+				// empty stack), so later case bodies started with a stale/empty operand stack and
+				// underflowed (the Groovy selectConstructorAndTransformArguments switch, whose
+				// first case builds args via dup_x1/dup2_x1 on top of [objarr,newexpr], leaked
+				// empty-slot placeholders). Falling back to an empty entry keeps the panic-free
+				// contract if the switch's own stack entry was never set.
+				entry := code.Source[0].StackEntry
+				if entry == nil {
+					entry = NewEmptyStackEntry()
+				}
+				scope := getVarScope(code.Source[0])
+				runtimeStackSimulation = NewStackSimulation(entry, scope.VarTable, scope.VarId)
 			} else {
 				entry := code.Source[0].StackEntry
 				if entry == nil {
@@ -1383,7 +1398,6 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		scope.VarId = runtimeStackSimulation.currentVarId
 		scope.VarTable = varTable
 		setVarScope(code, scope)
-		preRuntimeStackSimulation = runtimeStackSimulation
 		return code.Target, nil
 	})
 	if err != nil {
