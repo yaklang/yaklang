@@ -38,7 +38,7 @@ authority for automated semantic decisions.
 | Syntax safety (parse-or-degrade) | 31/31 corpus groups produce **syntax-parseable Java**; 0 syntax errors, 0 hard errors, 0 panics | `TestSyntaxCoverageMatrix` |
 | Reconstruction coverage (no stub) | 31/31 groups emit **non-degraded output** (zero stubs across classic and modern corpora) | `TestSyntaxCoverageMatrix` |
 | Correctness (javac round-trip) | **26/26** eligible corpora recompile cleanly; 0 fail, 0 stub, 0 decompile error | `TestRecompileRoundtrip` |
-| Real-jar correctness (.m2 corpus) | over 80 jars / ~12000 classes: **ok=11830, partial=170, syntax=0, err=0**; a per-class sha256 fingerprint diff verifies byte-identical output across runs | `TestM2RegressionHarness` |
+| Real-jar correctness (.m2 corpus) | 120 jars / 12000 classes: **ok=11965, partial=35, syntax=0, err=0, panic=0**; a per-class sha256 fingerprint diff verifies byte-identical output across runs | `TestM2RegressionHarness` |
 | Determinism | byte-identical output across repeated decompiles; performance changes are guarded by per-class sha256 fingerprints | `TestCorpusDeterminism`, `TestDumpJarFingerprint` |
 | Test suite | green & fast: `./...` ≈ 22s, no machine-specific dependencies | `go test ./common/javaclassparser/...` |
 | Allocation cost | core **≈215 ms** and **≈161 MB cumulative heap allocation** per 106-class jar; the post-decompile ANTLR re-parse adds ≈ +60% runtime and ≈ +42% bytes relative to core-only | `BenchmarkDecompileJar` |
@@ -197,16 +197,16 @@ end:
 
 ### 3.1 Real-jar validation (.m2 corpus)
 Beyond the synthetic corpus, the decompiler is validated against a real Maven
-cache. `TestM2RegressionHarness` runs over 80 jars / ~12000 classes and writes a
+cache. `TestM2RegressionHarness` runs over 120 jars / 12000 classes and writes a
 per-class sha256 fingerprint:
 
 ```
-ok=11830  partial=170  syntax=0  err=0
+ok=11965  partial=35  syntax=0  err=0  panic=0
 ```
 
-`syntax=0` and `err=0` mean no class produces un-parseable Java and no decompile
-returns an error or panics; `partial` counts classes where at least one member
-degraded to a tagged stub. Pre-Java-6 `try/finally` subroutines (`jsr`/`ret`)
+`syntax=0`, `err=0` and `panic=0` mean no class produces un-parseable Java and no
+decompile returns an error or lets a panic escape; `partial` counts classes where
+at least one member degraded to a tagged stub. Pre-Java-6 `try/finally` subroutines (`jsr`/`ret`)
 are inlined by `core/jsr_inline.go`: the finally body is duplicated at each `jsr`
 call site, `ret` becomes a `goto`, jsr back-edges are redirected, and try/catch
 exception entries nested inside the finally are cloned per call site. The pass
@@ -215,8 +215,186 @@ non-canonical form (`jsr_w`/`goto_w`/`switch` wide targets, exception entries
 straddling a subroutine boundary, 16-bit offset overflow, etc.) untouched —
 degrading to a stub rather than emitting wrong code — and is a no-op for methods
 without `jsr`/`ret`. A `JSR_INLINE_OFF` kill-switch reverts to the old behavior.
-The remaining 170 partials are the real-jar reduction frontier tracked in the
+The remaining 40 partials are the real-jar reduction frontier tracked in the
 backlog.
+
+### 3.2 Catch-handler structuring fix (real-jar partial reduction)
+
+A first round of diagnosis and fixing landed against backlog #1 (real-jar partial
+convergence). `TestM2StubReasons` (`STUB_REASONS=1 M2_MAX_JARS=120
+M2_MAX_CLASSES=12000`) attributes each residual stub to a CFG family; the largest
+bucket was **"try-region structuring failed: try without catch handler"** (61
+stubs, ~39% of all stubs at the time).
+
+Root cause: `rewriter.TryRewriter` distinguished the try body from catch handlers
+by the **position** in the try node's successor list (assuming `node.Next[0]` is
+the try body and `Next[1..]` are catch handlers). But later CFG passes
+(`RemoveGotoStatement`, loop/if structuring, node-id regeneration) can reorder
+the successor list. When the order was reversed (catch handler before the try
+body), the real try body was fed into the catch slot, where its first statement
+was not the caught-exception store and so got dropped, leaving a try with zero
+catch handlers — flagged as a corrupted body and degraded to a stub.
+
+Fix: identify catch handlers **by content** rather than position. Every catch
+handler's structured body opens with the synthetic caught-exception store (`<var>
+= <exception placeholder>`, the `Flag=="exception"` CustomValue pushed at the
+handler PC by the stack simulation). The single non-handler successor is the try
+body; the rest are catches. The new classification only activates when there is
+exactly one try-body candidate, otherwise it falls back to the original
+positional scheme to minimize regression risk.
+
+Same-config before/after (120 jars / 12000 classes; `STUB_REASONS` and
+`TestM2RegressionHarness` count `partial` identically):
+
+```
+before: classes=12000  partial=127  stubs=157
+after:  classes=12000  partial=74   stubs=91
+```
+
+The "try without catch handler" bucket dropped **61 → 0**, and
+"post-decompile syntax validation failed" dropped 22 → 18 as a side effect. The
+synthetic corpora remain 0-stub / 0 round-trip failures (full suite green), and
+the regression case `ternary_in_try.class` — previously degraded to a stub by
+this exact defect — now decompiles fully and correctly (its regression guard was
+updated to lock in the correct behavior).
+
+### 3.3 Generic field-type rendering fix (syntax → 0)
+
+After the first round `TestM2RegressionHarness` (120 jars / 12000 classes) still
+reported `syntax=5` — a few classes emitting **non-stub but syntactically invalid**
+Java (worse than a stub, since it produces un-parseable code). Root cause:
+`DumpFields` rendered the field type with `fieldType.String(c.FuncCtx)` (which
+already registers imports and performs short-name / FQN disambiguation through
+`ShortTypeName` internally) and then **redundantly** re-ran `Import` /
+`ShortTypeName` on that whole rendered string. When a type argument is forced to
+FQN disambiguation (e.g. field `Set<java.util.logging.Logger>`, with `Logger`
+kept fully qualified to avoid clashing with an imported `ch.qos...Logger`), the
+rendered string contains dots: `SplitPackageClassName` split it on `.` into a
+bogus package `Set<java.util.logging` + class `Logger>`, emitting
+`import Set<...Logger>;` and collapsing the field type to `Logger>` —
+un-parseable, so the field was dropped and the bad import leaked.
+
+Fix: for non-array fields use the `fieldType.String(c.FuncCtx)` result directly,
+dropping the redundant `Import`/`ShortTypeName` second pass. Result:
+
+```
+syntax: 5 → 0
+```
+
+Guarded by the `generic_field_type.class` regression case (field
+`Map<java.util.Date, java.sql.Date>`, second `Date` forced to FQN).
+
+### 3.4 Crash hardening for incomplete stack simulation
+
+The panic bucket (`ParseBytesCode panic: nil pointer`, ~8) came from incomplete
+stack simulation producing **nil-typed** values that were dereferenced at several
+sites: `StackSimulationImpl.AssignVar` (comparing `ref.Type()` vs `val.Type()`),
+`SlotValue.ResetValue` (`val.Type().ResetTypeRef`), and `AssignStatement.String`
+declaration rendering (`declType.String`). Nil guards were added at each: a
+missing type falls back to the other side, and if still missing the member
+degrades cleanly through the safety net instead of crashing the whole method.
+This removes the panics (more robust, concurrency-safe) but methods that are
+genuinely under-simulated (e.g. `matchPath`) still degrade to a stub (the panic
+bucket merges into the empty-slot bucket), so the total partial count does not
+drop from this change alone.
+
+### 3.5 Principled merge-value reconstruction rewrite (empty-slot bucket → 0)
+
+A second round targeted the then-largest residual bucket, **"incomplete stack
+simulation (empty slot)" (36)**, with a principled rewrite.
+
+Root cause: in javac bytecode, a value that survives on the operand stack across
+a control-flow merge ⇔ a ternary `?:` or short-circuit `&&`/`||` (and nested
+binary trees thereof) in source. The old implementation, in a single `WalkGraph`
+pass, first `Push`ed a placeholder `SlotValue` at nodes judged to be if-merges,
+then tried to back-fill via two fragile back-end paths (a structural probe + a
+legacy chain walk); if neither filled the slot, the empty slot leaked as an
+`EmptySlotValuePlaceholder`, was detected by the dumper, and degraded the whole
+method to a stub. Its "push placeholder first, try to reconstruct, leak on
+failure" shape lacked the "only build a tree when it is reconstructible"
+invariant.
+
+Fix: a new `buildSharedLeafTernary` recursively builds the ternary tree rooted at
+the merge node via the dominator relation ("both branches ultimately reach the
+merge"). `firstReconverge` (bidirectional BFS minimizing summed distance) locates
+the nearest reconvergence of a condition's two arms, and `isInnerValueTernary`
+(reconvergence point is itself a `valueMergeSet` member) distinguishes an *inner
+value ternary* from a *true outer condition*, so inner sub-expressions are not
+mistaken for independent conditions. Boolean-valued ternary trees are then
+rewritten by `boolReduce` into idiomatic `&&`/`||`/`!`: algebraic simplification
+of literal arms (`c ? true : false ⇒ c`, `c ? true : B ⇒ c || B`, …) and
+shared-leaf factoring (`c ? (A || S) : S ⇒ (c && A) || S`). `boolReduce` uses
+structural literal detection plus pointer-identity comparison (not `String()`
+comparison) for linear complexity.
+
+To stop the new builder from duplicating a large shared *value* subtree into
+ternary arms on complex type-dispatch chains (e.g. `deepEquals`'s big `instanceof`
+dispatch) — which would explode output size and trip post-syntax — the builder
+**adopts only boolean-literal shared leaves** (`iconst_0`/`iconst_1`); a
+non-literal shared leaf is declined and falls back to the legacy path, which keeps
+it as control flow. The legacy implementation is retained behind
+`EnableLegacyMergeReconstruction` (default false) for one-switch rollback.
+
+Same-config (120 jars / 12000 classes) before/after:
+
+```
+before: partial=74  (empty-slot 36 + multiple-next 28 + post-syntax 18 + panic, etc.)
+after:  partial=40  (empty-slot 0  + multiple-next 29 + post-syntax 18 + panic 6 + other 3)
+```
+
+The "empty slot value" bucket goes **36 → 0**, `syntax`/`err` stay 0, `ok` rises
+to 11960, the full suite and `recompile_roundtrip` stay green, and performance
+returns to baseline (~160s for the full 120-jar config). Locked by the
+`empty_slot_stub.class` regression test (asserting the reconstructed boolean
+short-circuit expressions and the absence of stub markers).
+
+### 3.6 Panic bucket → 0 (stack-simulation nil-type / stack-underflow hardening)
+
+A third round hardened the **panic bucket** (stack simulation emitting a
+value with a nil type that is dereferenced during rendering/construction, or an
+operand-stack underflow) into a contract across the whole corpus. Each real panic
+site was located with an env-gated native-stack capture (`DEC_PANIC_STACK`, off by
+default) and given a nil/underflow guard:
+
+- `FunctionCallExpression.String` argument-cast logic: a nil `arg.Type()` skips the
+  cast (comma-ok assertions are nil-safe), rendering the argument as-is (ant
+  `SelectorUtils.matchPath`).
+- `NewBinaryExpression` / `NewUnaryExpression`: a nil result type falls back via
+  `nonNilType` to an operand type then int; `ResetType` runs only on non-nil types
+  via `resetTypeSafe` (ant `CBZip2InputStream`).
+- `NewConditionStatement` boolean-compare folding guarded by `isBoolPrimer` (ant
+  `FileUtils`).
+- `MergeTypes` drops nil arm types instead of calling `String()` on a nil
+  `JavaType` (bndlib `HeaderReader`).
+- `NewJavaArrayMember` / `JavaArrayMember.Type()`: a nil base type degrades to a
+  plain member access (ant `CBZip2OutputStream`).
+- `StackSimulationImpl.Peek/Pop`: an underflow returns an empty-slot `SlotValue`
+  placeholder (cleanly degraded by the safety net) instead of `panic("Stack is
+  empty")` (Groovy-exotic bytecode such as logback `NestingType.$INIT`).
+
+Same-config (120 jars / 12000 classes) before/after:
+
+```
+before: ok=11960  partial=40  (multiple-next 29 + post-syntax 18 + panic 6 + other)
+after:  ok=11965  partial=35  (multiple-next 28 + post-syntax 18 + other; panic 0)
+```
+
+The panic bucket goes **6 → 0**: for every input in the corpus, `Decompile`
+neither returns an error nor lets a panic escape (more robust, more concurrency-
+safe) — one of the GA safety floors. Five previously-panicking classes now fully
+decompile (`ok` +5); one (`$INIT`) becomes a clean empty-slot stub. Locked in CI by
+`TestGAPanicFreeBoundary` (six embedded real boundary classes asserting no panic,
+valid syntax, and no stub for the fixed ones).
+
+> Current state (120 jars / 12000 classes): **`ok=11965`, `partial=35`,
+> `syntax=0`, `err=0`, `panic=0`**. The remaining partials are dominated by
+> ParseBytesCode "multiple next" (28) and post-decompile syntax validation (18,
+> mostly unstructured branches leaking a bare `ConditionStatement` — same family as
+> multiple-next). Both are deeper **CFG-structuring completeness** problems whose
+> canonical shapes are now diagnosed: a try with multiple catches inside a loop
+> body where the catches break out of the loop (logback `SocketNode.run`), and
+> nested conditions sharing merge targets (ant `Exec.run`). They form the work
+> surface for a unified, pattern-independent structuring engine.
 
 ### What "partial" / "stub" does **not** mean
 A stubbed member is still surrounded by **structurally decompiled, readable,
@@ -366,9 +544,19 @@ recorded as future work.
 ## 6. Backlog (prioritized by impact, from the data above)
 
 **Correctness (semantic fidelity):**
-1. **Real-jar partial reduction** — drive the 170 remaining `.m2` partials toward
+1. **Real-jar partial reduction** — drive the remaining `.m2` partials toward
    zero by diagnosing the per-class stub reasons that survive on real-world
    bytecode (the synthetic corpus is already at 0 stubs / 0 round-trip failures).
+   Landed so far: round 1 catch-handler classification by content (§3.2, partials
+   127 → 74, "try without catch handler" 61 → 0); round 2 principled merge-value
+   reconstruction rewrite (§3.5, partials 74 → 40, "empty slot" 36 → 0); round 3
+   panic-bucket contract hardening (§3.6, partials 40 → 35, panic 6 → 0, ok 11960 →
+   11965, locked by `TestGAPanicFreeBoundary`). Remaining frontier: multiple next
+   (28), post-decompile syntax (18, same unstructured-branch family as
+   multiple-next) — CFG-structuring completeness problems awaiting a unified
+   pattern-independent structuring engine. A separate
+   **generic field-type rendering** defect (field types like `Set<...>` emitted as
+   `import` statements) breaks a few classes' syntax and needs its own fix.
 2. **Loop idiom recovery** — reconstruct `for`/`while` instead of the universal
    `do{...}while(true)` lowering. This would fix the `labeled`
    `continue <outer-increment>` semantic limitation (a shared increment node the

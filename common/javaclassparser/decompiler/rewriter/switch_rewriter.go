@@ -30,6 +30,12 @@ func SwitchRewriter1(manager *RewriteManager, node *core.Node) error {
 	// dominator-based merge detection, producing "multiple next"). Keep the original order.
 	nexts := slices.Clone(node.Next)
 	caseToIndexMap.ForEach(func(k int, v int) bool {
+		// Defensive bounds check: the case-to-index map is captured at parse time; if an
+		// earlier pass shrank node.Next the index could be stale. Skip the unmappable case
+		// instead of panicking the whole method into a stub.
+		if v < 0 || v >= len(nexts) {
+			return true
+		}
 		caseMap.Set(k, nexts[v])
 		return true
 	})
@@ -113,6 +119,12 @@ func SwitchRewriter(manager *RewriteManager, node *core.Node) error {
 	// dominator-based merge detection, producing "multiple next"). Keep the original order.
 	nexts := slices.Clone(node.Next)
 	caseToIndexMap.ForEach(func(k int, v int) bool {
+		// Defensive bounds check: the case-to-index map is captured at parse time; if an
+		// earlier pass shrank node.Next the index could be stale. Skip the unmappable case
+		// instead of panicking the whole method into a stub.
+		if v < 0 || v >= len(nexts) {
+			return true
+		}
 		caseMap.Set(k, nexts[v])
 		return true
 	})

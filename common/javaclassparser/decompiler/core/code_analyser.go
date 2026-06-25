@@ -3,10 +3,13 @@ package core
 import (
 	"errors"
 	"fmt"
+	"os"
+	"runtime/debug"
 	"sort"
 	"strings"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
@@ -105,7 +108,11 @@ func (d *Decompiler) GetMethodFromPool(index int) *values.JavaClassMember {
 func (d *Decompiler) ParseOpcode() (err error) {
 	defer func() {
 		if e := recover(); e != nil {
-			err = errors.New(fmt.Sprintf("%v", e))
+			if os.Getenv("DEC_PANIC_STACK") != "" {
+				err = fmt.Errorf("%v\n%s", e, debug.Stack())
+			} else {
+				err = fmt.Errorf("%v", e)
+			}
 		}
 	}()
 	defer func() {
@@ -252,8 +259,13 @@ func (d *Decompiler) ScanJmp() error {
 			case OP_LOOKUPSWITCH, OP_TABLESWITCH:
 				opcode.SwitchJmpCase.ForEach(func(v int, target int32) bool {
 					gotoOp := d.offsetToOpcodeIndex[uint16(target)]
-					if slices.Contains(opcode.Target, d.opCodes[gotoOp]) {
-						opcode.SwitchJmpCase1.Set(v, len(opcode.Target)-1)
+					// Several case values can share one handler (`case 1: case 2: ...`). When the
+					// target is already linked, map this case to the EXISTING target's index, not
+					// len-1: len-1 is whatever was appended last, so it pointed at an unrelated body
+					// (a correctness bug) and, once later passes shrink node.Next, could exceed it
+					// and panic the switch rewriter with index-out-of-range.
+					if idx := slices.Index(opcode.Target, d.opCodes[gotoOp]); idx >= 0 {
+						opcode.SwitchJmpCase1.Set(v, idx)
 						return true
 					}
 					LinkOpcode(opcode, d.opCodes[gotoOp])
@@ -1029,6 +1041,14 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 	}
 	return nil
 }
+// EnableLegacyMergeReconstruction selects the original heuristic if-merge / ternary value
+// reconstruction (the dual structural-probe + chain combiner). When false (default), value merges
+// whose conditions converge on shared leaf values (short-circuit &&/|| predicates) are rebuilt by a
+// principled recursive ternary-tree builder that allows shared leaves, so the operand-stack value
+// at the merge is always reconstructed instead of leaking an "empty slot value" placeholder. The
+// flag exists so the old path can be restored for A/B comparison if a regression surfaces.
+var EnableLegacyMergeReconstruction = false
+
 func (d *Decompiler) CalcOpcodeStackInfo() error {
 	// Pre-sized to the opcode count: this map gets one entry per opcode, so sizing it up
 	// front avoids the incremental rehash-growth garbage (it was a top per-opcode allocator).
@@ -1081,11 +1101,17 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			if v, ok := paramType.RawType().(*types.JavaPrimer); ok {
 				isDouble = v.Name == types.JavaDouble || v.Name == types.JavaLong
 			}
-			runtimeSim.AssignVar(slotIndex, values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+			paramPlaceholder := values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
 				return ""
 			}, func() types.JavaType {
 				return paramType
-			}))
+			})
+			// Tag the seed value so GetRealValue stops at the parameter ref (rendered by name)
+			// instead of unwrapping into this empty placeholder. Without the tag, folding a temp
+			// that copies a parameter (`var2 = param; this.f = var2;`) inlined the empty string
+			// and produced `this.f = ;` (invalid Java -> stub).
+			paramPlaceholder.Flag = "param_placeholder"
+			runtimeSim.AssignVar(slotIndex, paramPlaceholder)
 			val := runtimeSim.GetVar(slotIndex)
 			params = append(params, val)
 			if isDouble {
@@ -1370,11 +1396,329 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		return ternaryExpMergeNode[i].Id > ternaryExpMergeNode[j].Id
 	})
 	d.ifNodeConditionCallback = ifNodeToConditionCallback
+	// isTernaryArmStore reports whether an opcode writes a local/field/array element. A store on an
+	// arm path means the "merge" is statement dispatch (e.g. a lexer assigning a token in each branch
+	// then converging), not a value ternary, so the principled builder declines it.
+	isTernaryArmStore := func(op int) bool {
+		switch op {
+		case OP_ISTORE, OP_ASTORE, OP_LSTORE, OP_DSTORE, OP_FSTORE,
+			OP_ISTORE_0, OP_ASTORE_0, OP_LSTORE_0, OP_DSTORE_0, OP_FSTORE_0,
+			OP_ISTORE_1, OP_ASTORE_1, OP_LSTORE_1, OP_DSTORE_1, OP_FSTORE_1,
+			OP_ISTORE_2, OP_ASTORE_2, OP_LSTORE_2, OP_DSTORE_2, OP_FSTORE_2,
+			OP_ISTORE_3, OP_ASTORE_3, OP_LSTORE_3, OP_DSTORE_3, OP_FSTORE_3,
+			OP_IINC, OP_PUTFIELD, OP_PUTSTATIC,
+			OP_AASTORE, OP_IASTORE, OP_BASTORE, OP_CASTORE, OP_FASTORE, OP_LASTORE, OP_DASTORE, OP_SASTORE:
+			return true
+		default:
+			return false
+		}
+	}
+	// buildSharedLeafTernary rebuilds the value left on the operand stack at mergeNode as a nested
+	// ternary tree. It is the principled replacement for the legacy chain combiner on short-circuit
+	// shapes: each conditional arm is walked straight-line; an if-node whose BOTH branches converge on
+	// mergeNode becomes a nested ternary condition (discovered dynamically, so chains the bottom-up
+	// merge detection under-reports are still picked up), and a node flowing into mergeNode is a leaf
+	// whose produced stack value is the arm value. Unlike the legacy structural probe it ALLOWS shared
+	// leaves (the canonical short-circuit shape where many conditions converge on the same iconst_0 /
+	// iconst_1) - a ternary only evaluates its chosen arm, so textually reusing the shared leaf object
+	// is semantically exact.
+	//
+	// detectedIfNodes seeds the root search. Returns (root, builtConditions, sharedLeaf, ok). ok=false
+	// means the shape is irreducible (a store on an arm, a non-conditional fork, a cycle, or an
+	// unresolved leaf) and the caller falls back to the legacy path unchanged. sharedLeaf=false means
+	// it is a plain tree the legacy probe already handles, so the caller also defers to avoid churn.
+	buildSharedLeafTernary := func(mergeNode *OpCode, detectedIfNodes []*OpCode) (root *values.TernaryExpression, built map[*OpCode]*values.TernaryExpression, sharedLeaf bool, hasMiddleCond bool, ok bool) {
+		// valueMergeSet is every node the merge detection registered as carrying a value across control
+		// flow (a ternary / short-circuit result on the operand stack). It is the principled signal for
+		// an INNER value computation: if two branches of a condition reconverge on such a node (other
+		// than our own mergeNode), that condition produces a sub-value consumed downstream and is opaque
+		// to this merge. A plain control reconvergence (e.g. the next range check in an ||-chain) is NOT
+		// in this set, so the condition is correctly recognised as a real arm of this ternary.
+		valueMergeSet := map[*OpCode]bool{}
+		for _, m := range ternaryExpMergeNode {
+			valueMergeSet[m] = true
+		}
+		// canReachMerge reports whether EVERY forward path from node (under the straight-line / nested-
+		// condition discipline, no stores) reaches mergeNode. It identifies value-ternary conditions:
+		// a fork qualifies only if both its arms post-converge on mergeNode. Memoized; a node currently
+		// on the DFS stack (a cycle / loop back-edge) is treated as not-reaching, so loops are declined.
+		const (
+			reachUnknown = iota
+			reachTrue
+			reachFalse
+			reachVisiting
+		)
+		reachMemo := map[*OpCode]int{}
+		var canReachMerge func(n *OpCode) bool
+		canReachMerge = func(n *OpCode) bool {
+			cur := n
+			for step := 0; cur != nil && step < (1 << 16); step++ {
+				if cur == mergeNode || slices.Contains(cur.Target, mergeNode) {
+					return true
+				}
+				switch reachMemo[cur] {
+				case reachTrue:
+					return true
+				case reachFalse, reachVisiting:
+					return false
+				}
+				if isTernaryArmStore(cur.Instr.OpCode) {
+					reachMemo[cur] = reachFalse
+					return false
+				}
+				if isIfNode(cur) && len(cur.Target) >= 2 {
+					reachMemo[cur] = reachVisiting
+					res := canReachMerge(cur.Target[0]) && canReachMerge(cur.Target[1])
+					if res {
+						reachMemo[cur] = reachTrue
+					} else {
+						reachMemo[cur] = reachFalse
+					}
+					return res
+				}
+				if len(cur.Target) != 1 {
+					reachMemo[cur] = reachFalse
+					return false
+				}
+				cur = cur.Target[0]
+			}
+			return false
+		}
+		// bfsDist returns BFS hop distances from start to every forward-reachable node (start excluded
+		// from the result unless it is on a cycle). Used to find the NEAREST common reconvergence of a
+		// condition's two branches by minimising the summed distance, which is robust to target ordering
+		// (a plain reachability probe can return a farther shared node first when a branch forks).
+		bfsDist := func(start *OpCode) map[*OpCode]int {
+			dist := map[*OpCode]int{}
+			queue := []*OpCode{start}
+			d := map[*OpCode]int{start: 0}
+			for i := 0; i < len(queue) && i < (1<<16); i++ {
+				n := queue[i]
+				cd := d[n]
+				if _, ok := dist[n]; !ok {
+					dist[n] = cd
+				}
+				for _, t := range n.Target {
+					if _, seen := d[t]; !seen {
+						d[t] = cd + 1
+						queue = append(queue, t)
+					}
+				}
+			}
+			return dist
+		}
+		// firstReconverge finds the NEAREST node reachable from BOTH of c's branches (the common node
+		// minimising branch0-distance + branch1-distance). It distinguishes two shapes:
+		//   - a real condition of THIS value-merge: its branches stay disjoint until mergeNode, or one
+		//     branch flows into the other (short-circuit &&/|| chain), so the reconvergence is mergeNode,
+		//     one of c's targets, or a plain control node (the next chained condition / range check);
+		//   - an inner value ternary (a diamond): both branches meet at a value-merge node whose result
+		//     is then consumed (e.g. `!x` feeding an ixor). isInnerValueTernary keys off that.
+		firstReconvMemo := map[*OpCode]*OpCode{}
+		firstReconverge := func(c *OpCode) *OpCode {
+			if len(c.Target) < 2 {
+				return nil
+			}
+			if m, found := firstReconvMemo[c]; found {
+				return m
+			}
+			d0 := bfsDist(c.Target[0])
+			d1 := bfsDist(c.Target[1])
+			var res *OpCode
+			best := 1 << 30
+			for n, a := range d0 {
+				if n == c {
+					continue
+				}
+				if b, ok := d1[n]; ok {
+					if a+b < best {
+						best = a + b
+						res = n
+					}
+				}
+			}
+			firstReconvMemo[c] = res
+			return res
+		}
+		// isInnerValueTernary reports a diamond whose merged VALUE is consumed before mergeNode: the two
+		// branches reconverge on a registered value-merge node other than our own mergeNode. A control
+		// reconvergence (next ||-chain condition / range check, not a value merge) is NOT inner, so the
+		// short-circuit condition is kept as a genuine arm of this ternary.
+		isInnerValueTernary := func(n *OpCode) bool {
+			if !isIfNode(n) || len(n.Target) < 2 {
+				return false
+			}
+			fr := firstReconverge(n)
+			if fr == nil || fr == mergeNode {
+				return false
+			}
+			return valueMergeSet[fr]
+		}
+		isTernaryCondition := func(n *OpCode) bool {
+			return isIfNode(n) && len(n.Target) >= 2 && !isInnerValueTernary(n) &&
+				canReachMerge(n.Target[0]) && canReachMerge(n.Target[1])
+		}
+
+		built = map[*OpCode]*values.TernaryExpression{}
+		usedLeaf := map[*OpCode]bool{}
+		failed := false
+		var arm func(entry *OpCode) values.JavaValue
+		var probe func(ifNode *OpCode) *values.TernaryExpression
+		arm = func(entry *OpCode) values.JavaValue {
+			cur := entry
+			for step := 0; cur != nil && step < (1 << 16); step++ {
+				if failed {
+					return nil
+				}
+				// A node flowing straight into mergeNode is a leaf; its produced stack value is the
+				// arm value. Checked first so a leaf that also happens to be a store target is still
+				// taken as the (already side-effect-accounted) stack value.
+				if slices.Contains(cur.Target, mergeNode) {
+					if cur.StackEntry == nil {
+						failed = true
+						return nil
+					}
+					if usedLeaf[cur] {
+						// A ternary only evaluates its chosen arm, so textually reusing a shared leaf is
+						// semantically exact - BUT a ternary tree cannot share nodes, so a shared leaf is
+						// duplicated once per arm that reaches it at render time. That is harmless for the
+						// canonical short-circuit shape (the shared leaf is a single iconst_0 / iconst_1
+						// literal), but a shared leaf that is a large value subtree (e.g. a method-call
+						// fall-through in a giant instanceof type-dispatch) would expand combinatorially
+						// into megabytes of duplicated source. Only adopt literal shared leaves; decline
+						// any non-literal shared leaf so the legacy path (which keeps it as control flow)
+						// handles it unchanged.
+						if _, isLit := UnpackSoltValue(cur.StackEntry.value).(*values.JavaLiteral); !isLit {
+							failed = true
+							return nil
+						}
+						sharedLeaf = true
+					}
+					usedLeaf[cur] = true
+					return cur.StackEntry.value
+				}
+				if isTernaryCondition(cur) {
+					return probe(cur)
+				}
+				// An inner value ternary (diamond) computes a value that is consumed downstream (it is
+				// reconstructed by its OWN merge pass); skip the whole sub-region to its reconvergence
+				// point and keep walking toward this merge's conditions/leaves.
+				if isInnerValueTernary(cur) {
+					cur = firstReconverge(cur)
+					continue
+				}
+				if isTernaryArmStore(cur.Instr.OpCode) {
+					failed = true
+					return nil
+				}
+				if len(cur.Target) != 1 {
+					failed = true
+					return nil
+				}
+				cur = cur.Target[0]
+			}
+			failed = true
+			return nil
+		}
+		probe = func(ifNode *OpCode) *values.TernaryExpression {
+			if t, found := built[ifNode]; found {
+				return t // condition reached twice: reuse the same sub-expression (still a correct value)
+			}
+			if len(ifNode.Target) < 2 {
+				failed = true
+				return nil
+			}
+			t := values.NewTernaryExpression(values.NewSlotValue(nil, types.NewJavaPrimer(types.JavaBoolean)), nil, nil)
+			built[ifNode] = t
+			t.TrueValue = arm(ifNode.Target[1])
+			t.FalseValue = arm(ifNode.Target[0])
+			// A "middle" condition has BOTH arms leading to further conditions (no direct leaf arm).
+			// The legacy chain combiner only attaches a callback to conditions with a direct leaf route,
+			// so a middle condition that becomes the MergeIf survivor leaks an empty slot. Its presence
+			// is exactly the signal that the legacy path fails and the principled rebuild is needed.
+			if _, t1 := t.TrueValue.(*values.TernaryExpression); t1 {
+				if _, t0 := t.FalseValue.(*values.TernaryExpression); t0 {
+					hasMiddleCond = true
+				}
+			}
+			return t
+		}
+		// nearestIfAncestor walks back through single-source straight-line predecessors to the closest
+		// dominating condition (nil if the chain forks / merges before reaching one).
+		nearestIfAncestor := func(n *OpCode) *OpCode {
+			cur := n
+			for step := 0; cur != nil && step < (1 << 16); step++ {
+				if len(cur.Source) != 1 {
+					return nil
+				}
+				p := cur.Source[0]
+				if isIfNode(p) {
+					return p
+				}
+				cur = p
+			}
+			return nil
+		}
+		// Seed the root with the lowest-id detected condition, then climb to the outermost enclosing
+		// ternary condition (both arms still converge on mergeNode). probe(root) then discovers the
+		// entire condition set top-down, including chain links the bottom-up detection missed.
+		var rootNode *OpCode
+		for _, n := range detectedIfNodes {
+			if rootNode == nil || n.Id < rootNode.Id {
+				rootNode = n
+			}
+		}
+		if rootNode == nil || !isTernaryCondition(rootNode) {
+			return nil, nil, false, false, false
+		}
+		for {
+			anc := nearestIfAncestor(rootNode)
+			if anc == nil || !isTernaryCondition(anc) {
+				break
+			}
+			rootNode = anc
+		}
+		root = probe(rootNode)
+		if failed || root == nil {
+			return nil, nil, false, false, false
+		}
+		return root, built, sharedLeaf, hasMiddleCond, true
+	}
 	for _, code := range ternaryExpMergeNode {
 		mergeNode := code
 		ifNodes := mergeToIfNode[code]
 		if len(ifNodes) == 0 {
 			continue
+		}
+		if !EnableLegacyMergeReconstruction {
+			rootTern, built, sharedLeaf, hasMiddleCond, ok := buildSharedLeafTernary(mergeNode, ifNodes)
+			if os.Getenv("DEBUG_TERNARY") != "" {
+				log.Errorf("TERNARY merge=%d ifNodes=%d ok=%v sharedLeaf=%v middle=%v built=%d", mergeNode.Id, len(ifNodes), ok, sharedLeaf, hasMiddleCond, len(built))
+			}
+			// Intercept every shared-leaf short-circuit/ternary the principled builder can fully rebuild.
+			// The legacy chain combiner only attaches a condition callback to if-nodes with a direct leaf
+			// arm; any chain whose detection under-reports an interior condition leaks an empty slot
+			// (CronPattern.match etc.). The rebuilt nested tree wires a callback to EVERY adopted
+			// condition, and TernaryExpression.String folds the shared-leaf shape back into idiomatic
+			// &&/|| at render time, so this is both more complete and equally readable.
+			if ok && sharedLeaf {
+				// Wire every condition: its statement's Callback fills its own nested ternary's
+				// Condition (post-MergeIf). Marking TernaryChainArm keeps MergeIf from folding the
+				// condition NODES (which would unfire some callbacks and leak), so each condition is
+				// dissolved individually into its ternary arm. The &&/|| rendering is recovered purely
+				// at the value level by TernaryExpression.String's short-circuit fold.
+				for ifNode, t := range built {
+					tt := t
+					t.ConditionFromOp = ifNode.Id
+					ifNode.TernaryChainArm = true
+					ifNodeToConditionCallback[ifNode] = func(value values.JavaValue) {
+						tt.Condition = value
+					}
+				}
+				ternaryExpMergeNodeSlot[code].ResetValue(rootTern)
+				code.conditionOpId = 0
+				continue
+			}
 		}
 		// A conditional (?:) converges all of its arms at a single mergeNode; the if-nodes feeding it
 		// form a binary tree (outer condition = root, a ternary nested in an arm = subtree). The legacy
@@ -2431,6 +2775,10 @@ func (d *Decompiler) ParseStatement() error {
 				tryNode.AddNext(currentTryNode)
 				statementsIndex++
 				for _, catchNode := range catchNodes {
+					// Mark the handler entry so TryRewriter can identify it structurally even when the
+					// handler body has no leading exception-store (e.g. an empty `catch` that discards
+					// the unused exception with `pop`).
+					catchNode.IsCatchStart = true
 					tryNode.AddNext(catchNode)
 					node.RemoveNext(catchNode)
 				}

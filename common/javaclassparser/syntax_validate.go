@@ -2,6 +2,7 @@ package javaclassparser
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -9,6 +10,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/java/javasyntax"
 )
+
+// debugInvalidMethods, when set via DEBUG_INVALID, logs the raw (pre-degradation) source of any
+// method that fails post-decompile syntax validation, to aid diagnosing the post-syntax bucket.
+var debugInvalidMethods = os.Getenv("DEBUG_INVALID") != ""
 
 // EnableDecompileSyntaxValidation controls the post-decompile syntax safety net. When enabled
 // (default), the fully assembled class is parsed with the same grammar + normalization the SSA
@@ -99,6 +104,9 @@ func (c *ClassObjectDumper) degradeInvalidMethods(header string, methods []*dump
 		if validateMemberInHeader(header, m.code) == nil {
 			out = append(out, m)
 			continue
+		}
+		if debugInvalidMethods {
+			log.Errorf("DEBUG_INVALID method %s%s:\n%s", m.methodName, m.descriptor, m.code)
 		}
 		// Try degrading to a stub (only possible when we kept the member metadata).
 		if m.bodyCode != "stub" && m.member != nil {

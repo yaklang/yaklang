@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"os"
 	"regexp"
+	"runtime/debug"
 	"slices"
 	"strconv"
 	"strings"
@@ -396,9 +398,15 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 			lastPacket = javaTyp.String(c.FuncCtx)
 			javaTyp.JavaType = originalType
 		} else {
-			fieldTypeStr := fieldType.String(c.FuncCtx)
-			c.FuncCtx.Import(fieldTypeStr)
-			lastPacket = c.FuncCtx.ShortTypeName(fieldTypeStr)
+			// fieldType.String already registers the needed imports and shortens (or
+			// FQN-disambiguates) every class component via ShortTypeName, so the rendered
+			// string is the final field type. Re-running Import/ShortTypeName on that whole
+			// string corrupts parameterized or disambiguated types: e.g. a field typed
+			// `Set<java.util.logging.Logger>` (Logger kept fully-qualified to avoid clashing
+			// with an imported ch.qos...Logger) would be split on '.' into a bogus package
+			// `Set<java.util.logging` + class `Logger>`, emitting `import Set<...Logger>;` and
+			// collapsing the field type to `Logger>` -> un-parseable, so the field gets dropped.
+			lastPacket = fieldType.String(c.FuncCtx)
 		}
 		valueLiteral := ""
 		for _, attr := range field.Attributes {
@@ -1401,7 +1409,11 @@ func (c *ClassObjectDumper) safeDumpMethod(name, descriptor string) (res *dumped
 	tabSaved := c.deepStack.Len()
 	defer func() {
 		if rec := recover(); rec != nil {
-			err = utils.Errorf("panic: %v", rec)
+			if os.Getenv("DEC_PANIC_STACK") != "" {
+				err = utils.Errorf("panic: %v\n%s", rec, debug.Stack())
+			} else {
+				err = utils.Errorf("panic: %v", rec)
+			}
 		}
 		for c.deepStack.Len() > tabSaved {
 			c.deepStack.Pop()
@@ -1602,6 +1614,9 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 			// The try-region structuring failed and produced a try with no catch handler,
 			// which means the body is semantically corrupted (e.g. the caught-exception
 			// placeholder leaked into the try). Degrade to a stub.
+			if os.Getenv("DEBUG_TRYNOCATCH") != "" {
+				log.Errorf("DEBUG_TRYNOCATCH method %s%s:\n%s", name, descriptor, res.code)
+			}
 			err = utils.Errorf("try-region structuring failed: try without catch handler")
 		}
 		if err != nil {

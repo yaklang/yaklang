@@ -406,17 +406,24 @@ func (j *JavaArrayMember) ReplaceVar(oldId *utils.VariableId, newId *utils.Varia
 }
 
 func (j *JavaArrayMember) Type() types.JavaType {
-	return j.Object.Type().ElementType()
+	ot := j.Object.Type()
+	if ot == nil {
+		return nil
+	}
+	return ot.ElementType()
 }
 func (j *JavaArrayMember) String(funcCtx *class_context.ClassContext) string {
 	return fmt.Sprintf("%s[%v]", j.Object.String(funcCtx), j.Index.String(funcCtx))
 }
 
 func NewJavaArrayMember(object JavaValue, index JavaValue) *JavaArrayMember {
-	if !object.Type().IsArray() {
-		if object.Type().String(&class_context.ClassContext{}) == "java.lang.Object" {
+	// object.Type() can be nil under incomplete stack simulation; guard before the IsArray/String
+	// inspection so a typeless array base degrades to a plain member access instead of panicking
+	// the whole method into a stub.
+	if ot := object.Type(); ot != nil && !ot.IsArray() {
+		if ot.String(&class_context.ClassContext{}) == "java.lang.Object" {
 			rawObject := object
-			newType := types.NewJavaArrayType(object.Type())
+			newType := types.NewJavaArrayType(ot)
 			object = NewCustomValue(func(funcCtx *class_context.ClassContext) string {
 				return fmt.Sprintf("(%s)(%s)", newType.String(funcCtx), rawObject.String(funcCtx))
 			}, func() types.JavaType {
@@ -474,19 +481,109 @@ func (j *TernaryExpression) ReplaceVar(oldId *utils.VariableId, newId *utils.Var
 func (j *TernaryExpression) Type() types.JavaType {
 	return types.MergeTypes(j.TrueValue.Type(), j.FalseValue.Type())
 }
-func (j *TernaryExpression) String(funcCtx *class_context.ClassContext) string {
-	condition := SimplifyConditionValue(j.Condition)
-	truePrimer, ok1 := j.TrueValue.Type().RawType().(*types.JavaPrimer)
-	falsePrimer, ok2 := j.FalseValue.Type().RawType().(*types.JavaPrimer)
-	if ok1 && ok2 && truePrimer.Name == types.JavaBoolean && falsePrimer.Name == types.JavaBoolean {
-		if j.TrueValue.String(funcCtx) == "true" && j.FalseValue.String(funcCtx) == "false" {
-			return condition.String(funcCtx)
+// boolLiteralValue reports a boolean literal's value (unwrapping SlotValue). A boolean literal is a
+// JavaLiteral of boolean type with integer data (0=false, non-zero=true). Used to classify ternary
+// arms structurally - without rendering them to strings - so boolReduce stays linear.
+func boolLiteralValue(v JavaValue) (val bool, ok bool) {
+	u := UnpackSoltValue(v)
+	lit, isLit := u.(*JavaLiteral)
+	if !isLit || lit.JavaType == nil {
+		return false, false
+	}
+	p, isP := lit.JavaType.RawType().(*types.JavaPrimer)
+	if !isP || p.Name != types.JavaBoolean {
+		return false, false
+	}
+	if d, isInt := lit.Data.(int); isInt {
+		return d != 0, true
+	}
+	return false, false
+}
+
+// boolReduce rewrites a boolean-valued ternary tree into an idiomatic &&/||/! connective, recursively.
+// javac compiles short-circuit predicates into nested `cond ? T : F` diamonds whose leaves are the
+// boolean literals true/false (often shared across arms). Reconstructing the raw tree and then
+// reducing it bottom-up - flipping a comparison operator in place instead of stacking textual ! -
+// recovers the original flat `a && b || c` form. Arms that are not boolean-typed (a genuine value
+// ternary) are returned untouched so only boolean logic is collapsed.
+//
+// Arms are classified structurally (boolLiteralValue / pointer identity), never by rendering them to
+// strings, so the pass is linear in the tree size rather than quadratic.
+func boolReduce(v JavaValue, funcCtx *class_context.ClassContext) JavaValue {
+	t, ok := v.(*TernaryExpression)
+	if !ok || t.Condition == nil || t.TrueValue == nil || t.FalseValue == nil {
+		return v
+	}
+	if !isBooleanTyped(t.TrueValue) || !isBooleanTyped(t.FalseValue) {
+		return v // a value ternary, not a boolean connective
+	}
+	boolType := types.NewJavaPrimer(types.JavaBoolean)
+	notCond := func(c JavaValue) JavaValue {
+		return SimplifyConditionValue(NewUnaryExpression(c, Not, boolType))
+	}
+	and := func(a, b JavaValue) JavaValue { return NewBinaryExpression(a, b, LOGICAL_AND, boolType) }
+	or := func(a, b JavaValue) JavaValue { return NewBinaryExpression(a, b, LOGICAL_OR, boolType) }
+	c := SimplifyConditionValue(t.Condition)
+	tv := boolReduce(t.TrueValue, funcCtx)
+	fv := boolReduce(t.FalseValue, funcCtx)
+	tval, tLit := boolLiteralValue(tv)
+	fval, fLit := boolLiteralValue(fv)
+	switch {
+	case tLit && fLit && tval && !fval: // c ? true : false  =>  c
+		return c
+	case tLit && fLit && !tval && fval: // c ? false : true  =>  !c
+		return notCond(c)
+	case tLit && tval: // c ? true : B  =>  c || B
+		return or(c, fv)
+	case fLit && !fval: // c ? B : false  =>  c && B
+		return and(c, tv)
+	case tLit && !tval: // c ? false : B  =>  !c && B
+		return and(notCond(c), fv)
+	case fLit && fval: // c ? B : true  =>  !c || B
+		return or(notCond(c), tv)
+	}
+	// Shared-leaf factoring: both arms are boolean non-literals, but a short-circuit predicate often
+	// shares a leaf between the taken arm and the fall-through (the same value appears once as a whole
+	// arm and once as a disjunct/conjunct of the other), e.g. `c ? (A || S) : S` is exactly
+	// `(c && A) || S`. The leaf is matched by pointer identity first (one DAG node) and, since
+	// SimplifyConditionValue may have rebuilt an equivalent value, by rendered equality as a fallback.
+	// This branch is only reached when neither arm is a boolean literal (the common short-circuit
+	// shape hits the literal switch above), so its rendering is not on the hot path.
+	eq := func(a, b JavaValue) bool {
+		if a == nil || b == nil {
+			return false
 		}
-		if j.TrueValue.String(funcCtx) == "false" && j.FalseValue.String(funcCtx) == "true" {
-			return NewUnaryExpression(condition, Not, types.NewJavaPrimer(types.JavaBoolean)).String(funcCtx)
+		if UnpackSoltValue(a) == UnpackSoltValue(b) {
+			return true
+		}
+		return a.String(funcCtx) == b.String(funcCtx)
+	}
+	if orE, isOr := tv.(*JavaExpression); isOr && orE.Op == LOGICAL_OR && len(orE.Values) == 2 {
+		if eq(orE.Values[0], fv) { // c ? (S || A) : S  =>  S || (c && A)
+			return or(fv, and(c, orE.Values[1]))
+		}
+		if eq(orE.Values[1], fv) { // c ? (A || S) : S  =>  (c && A) || S
+			return or(and(c, orE.Values[0]), fv)
 		}
 	}
-	return fmt.Sprintf("(%s) ? (%s) : (%s)", condition.String(funcCtx), j.TrueValue.String(funcCtx), j.FalseValue.String(funcCtx))
+	if andE, isAnd := fv.(*JavaExpression); isAnd && andE.Op == LOGICAL_AND && len(andE.Values) == 2 {
+		if eq(andE.Values[0], tv) { // c ? T : (T && A)  =>  T && (c || A)
+			return and(tv, or(c, andE.Values[1]))
+		}
+		if eq(andE.Values[1], tv) { // c ? T : (A && T)  =>  (c || A) && T
+			return and(or(c, andE.Values[0]), tv)
+		}
+	}
+	return NewTernaryExpression(c, tv, fv) // irreducible: keep a ternary over the reduced arms
+}
+
+func (j *TernaryExpression) String(funcCtx *class_context.ClassContext) string {
+	reduced := boolReduce(j, funcCtx)
+	if rt, ok := reduced.(*TernaryExpression); ok {
+		condition := SimplifyConditionValue(rt.Condition)
+		return fmt.Sprintf("(%s) ? (%s) : (%s)", condition.String(funcCtx), rt.TrueValue.String(funcCtx), rt.FalseValue.String(funcCtx))
+	}
+	return reduced.String(funcCtx)
 }
 
 func NewTernaryExpression(condition, v1, v2 JavaValue) *TernaryExpression {
@@ -535,7 +632,18 @@ func (s *SlotValue) GetValue() JavaValue {
 }
 func (s *SlotValue) ResetValue(val JavaValue) {
 	s.val = val
-	s.val.Type().ResetTypeRef(s.TmpType)
+	// val (or its type) can be nil under incomplete stack simulation; guard before
+	// propagating the slot's temp type so a typeless value degrades gracefully
+	// instead of panicking the whole method into a stub.
+	if val == nil {
+		return
+	}
+	// Both the value's type and the slot's temp type can be nil under incomplete stack
+	// simulation (e.g. a reused slot whose type was never committed). ResetTypeRef
+	// dereferences its argument, so skip the propagation when either side is nil.
+	if t := val.Type(); t != nil && s.TmpType != nil {
+		t.ResetTypeRef(s.TmpType)
+	}
 }
 func NewSlotValue(val JavaValue, typ types.JavaType) *SlotValue {
 	return &SlotValue{

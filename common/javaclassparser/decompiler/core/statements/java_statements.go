@@ -29,12 +29,29 @@ func (r *ConditionStatement) String(funcCtx *class_context.ClassContext) string 
 	return fmt.Sprintf("if %s", r.Condition.String(funcCtx))
 }
 
+// isBoolPrimer reports whether v carries a non-nil boolean primitive type. It guards against the
+// nil Type() that incomplete stack simulation can produce, so the boolean-comparison folding below
+// never nil-dereferences (which would panic the whole method into a stub).
+func isBoolPrimer(v values.JavaValue) bool {
+	if v == nil {
+		return false
+	}
+	t := v.Type()
+	if t == nil {
+		return false
+	}
+	p, ok := t.RawType().(*types.JavaPrimer)
+	return ok && p.Name == types.JavaBoolean
+}
+
 func NewConditionStatement(cmp values.JavaValue, op string) *ConditionStatement {
-	cmp.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
+	if t := cmp.Type(); t != nil {
+		t.ResetType(types.NewJavaPrimer(types.JavaBoolean))
+	}
 	if v, ok := cmp.(*values.JavaCompare); ok {
 		if op == values.NEQ {
 			if literal, ok := v.JavaValue2.(*values.JavaLiteral); ok {
-				if v1, ok := v.JavaValue1.Type().RawType().(*types.JavaPrimer); ok && v1.Name == types.JavaBoolean {
+				if isBoolPrimer(v.JavaValue1) {
 					if literal.Data == 0 {
 						return &ConditionStatement{
 							Condition: v.JavaValue1,
@@ -50,7 +67,7 @@ func NewConditionStatement(cmp values.JavaValue, op string) *ConditionStatement 
 		}
 		if op == values.EQ {
 			if literal, ok := v.JavaValue2.(*values.JavaLiteral); ok {
-				if v1, ok := v.JavaValue1.Type().RawType().(*types.JavaPrimer); ok && v1.Name == types.JavaBoolean {
+				if isBoolPrimer(v.JavaValue1) {
 					if literal.Data == 0 {
 						return &ConditionStatement{
 							Condition: values.NewUnaryExpression(v.JavaValue1, values.Not, types.NewJavaPrimer(types.JavaBoolean)),
@@ -157,6 +174,19 @@ func (a *AssignStatement) String(funcCtx *class_context.ClassContext) string {
 		declType := a.JavaValue.Type()
 		if lit, ok := a.JavaValue.(*values.JavaLiteral); ok && fmt.Sprint(lit.Data) == "null" {
 			declType = a.LeftValue.Type()
+		}
+		// Either side's type can be nil under incomplete simulation; fall back to the other
+		// side rather than dereferencing nil (which panicked the whole method into a stub).
+		if declType == nil {
+			declType = a.LeftValue.Type()
+		}
+		if declType == nil {
+			declType = a.JavaValue.Type()
+		}
+		if declType == nil {
+			// No recoverable declared type. Emit the placeholder so the dumper's safety net
+			// degrades this method cleanly instead of crashing.
+			return values.EmptySlotValuePlaceholder + " " + assign
 		}
 		return declType.String(funcCtx) + " " + assign
 	} else {

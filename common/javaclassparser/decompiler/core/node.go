@@ -23,6 +23,13 @@ type Node struct {
 	IsMerge             bool
 	IsIf                bool
 	IsTryCatch          bool
+	// IsCatchStart marks a node that is the entry of an exception handler (catch / finally-desugar)
+	// block, set when the try node is built from the exception table. TryRewriter uses it to classify
+	// a try node's successors structurally instead of inferring the handler from its body's first
+	// statement: an empty catch whose unused exception is discarded with `pop` (the ECJ idiom) has no
+	// leading exception-store assignment, so the body-content heuristic alone mis-classified it as the
+	// try body and produced a malformed try with no catch handler.
+	IsCatchStart        bool
 	TryNodeId           int
 	CatchNodeInfo       []*CatchNode
 	IsDoWhile           bool
