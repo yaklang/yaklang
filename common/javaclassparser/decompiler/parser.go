@@ -29,6 +29,12 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 	statementManager := rewriter.NewRootStatementManager(decompiler.RootNode)
 	statementManager.SetId(decompiler.CurrentId)
 	statementManager.MergeIf()
+	// Tail-duplicate `return cond ? A : B` whose arm computes its value through intermediate local
+	// stores (ECJ pre-sized StringBuilder, lazy field init, ...). Those stores cannot be inlined into a
+	// ternary arm and would dangle on a fork after the condition collapses ("multiple next"); splitting
+	// the shared return into per-arm returns keeps the condition as a real if. Runs before the callback
+	// collapse so split conditions keep their structure instead of being spliced into the ternary.
+	statementManager.SplitTernaryReturnArms(decompiler.FunctionContext)
 	allNodes := []*core.Node{}
 	core.WalkGraph[*core.Node](decompiler.RootNode, func(node *core.Node) ([]*core.Node, error) {
 		allNodes = append(allNodes, node)
