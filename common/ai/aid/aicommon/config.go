@@ -233,11 +233,12 @@ type Config struct {
 	browserSessionTracker BrowserSessionTracker
 
 	// tool config
-	DisableToolUse      bool
-	AiToolManagerOption []buildinaitools.ToolManagerOption
-	EnableAISearch      bool
-	DisableWebSearch    bool // disable enhanced web search tool, default false (enabled)
-	DisallowMCPServers  bool // 禁用 MCP Servers，默认为 false（即默认启用）
+	DisableToolUse               bool
+	AiToolManagerOption          []buildinaitools.ToolManagerOption
+	EnableAISearch               bool
+	DisableWebSearch             bool // disable enhanced web search tool, default false (enabled)
+	DisallowMCPServers           bool // 禁用 MCP Servers，默认为 false（即默认启用）
+	EnableDispatchSubReactAgents bool // Enable dispatching sub ReAct agents for parallel execution of subtasks (default: false, disabled)
 
 	// ExtraMCPServers 会话级显式挂载的 MCP server（不读 profile DB、不进全局列表）。
 	// 仅在本字段非空时激活，默认 nil，对现有流程零影响。
@@ -1673,6 +1674,18 @@ func WithDisallowMCPServers(disallow bool) ConfigOption {
 			c.AiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
 		}
 		c.AiToolManagerOption = append(c.AiToolManagerOption, buildinaitools.WithDisallowMCPServers(disallow))
+		return nil
+	}
+}
+
+func WithEnableDispatchSubReactAgent(enable bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		defer c.m.Unlock()
+		c.EnableDispatchSubReactAgents = enable
 		return nil
 	}
 }
@@ -3883,6 +3896,8 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	opts = append(opts, WithEnablePlanAndExec(i.EnablePlanAndExec))
 	opts = append(opts, WithEnableDetachedPlan(i.EnableDetachedPlan))
 	opts = append(opts, WithGenerateReport(i.GenerateReport))
+	// EnableDispatchSubReactAgents is intentionally omitted: only the top-level
+	// ReAct agent may dispatch sub ReAct agents; forked child configs must not inherit it.
 
 	// Retry / limits
 	if i.AiTransactionAutoRetry > 0 {

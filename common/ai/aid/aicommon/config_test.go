@@ -101,6 +101,15 @@ func TestConfig_PlanExecTaskConcurrencyPropagation(t *testing.T) {
 	require.Equal(t, 3, child.PlanExecTaskConcurrency)
 }
 
+func TestConfig_EnableDispatchSubReactAgentsNotPropagated(t *testing.T) {
+	parent := NewConfig(context.Background(), WithEnableDispatchSubReactAgent(true))
+	require.True(t, parent.EnableDispatchSubReactAgents)
+
+	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
+	require.False(t, child.EnableDispatchSubReactAgents,
+		"EnableDispatchSubReactAgents must not propagate via ConvertConfigToOptions; only top-level ReAct may dispatch sub-agents")
+}
+
 func TestConfig_IntervalReviewConfigPropagation(t *testing.T) {
 	parent := NewConfig(
 		context.Background(),

@@ -236,13 +236,40 @@ func TestRunDispatchSubReactJobsConcurrently_PreservesInputOrderInResults(t *tes
 }
 
 func TestNewReActLoop_InjectsDispatchSubReactAgents(t *testing.T) {
-	invoker := newDispatchSubReactTestInvoker(context.Background())
+	// Dispatch sub react agents is gated by EnableDispatchSubReactAgents on the
+	// real *aicommon.Config; NewReActLoop only injects the action when the flag is on.
+	cfg := aicommon.NewConfig(
+		context.Background(),
+		aicommon.WithEnableDispatchSubReactAgent(true),
+		aicommon.WithDisableAutoSkills(true),
+	)
+	invoker := &configBackedDispatchInvoker{
+		dispatchSubReactTestInvoker: newDispatchSubReactTestInvoker(context.Background()),
+		cfg:                         cfg,
+	}
 	loop, err := reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, invoker)
 	require.NoError(t, err)
 
 	action, err := loop.GetActionHandler(schema.AI_REACT_LOOP_ACTION_DISPATCH_SUB_REACT_AGENTS)
 	require.NoError(t, err)
 	require.NotNil(t, action)
+}
+
+func TestNewReActLoop_OmitsDispatchSubReactAgentsWhenDisabled(t *testing.T) {
+	cfg := aicommon.NewConfig(
+		context.Background(),
+		aicommon.WithDisableAutoSkills(true),
+	)
+	require.False(t, cfg.EnableDispatchSubReactAgents)
+	invoker := &configBackedDispatchInvoker{
+		dispatchSubReactTestInvoker: newDispatchSubReactTestInvoker(context.Background()),
+		cfg:                         cfg,
+	}
+	loop, err := reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, invoker)
+	require.NoError(t, err)
+
+	_, err = loop.GetActionHandler(schema.AI_REACT_LOOP_ACTION_DISPATCH_SUB_REACT_AGENTS)
+	require.Error(t, err)
 }
 
 func TestBuildSubReactLoopOptions_FiltersDispatchAction(t *testing.T) {
