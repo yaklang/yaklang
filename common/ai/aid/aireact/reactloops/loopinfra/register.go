@@ -25,4 +25,5 @@ func init() {
 	// 关键词: adjust_todolist 全局注册, 默认所有 loop 可见
 	reactloops.RegisterAction(loopAction_AdjustTodolist)
 	reactloops.RegisterAction(loopAction_ListAsyncTasks)
+	reactloops.RegisterAction(loopAction_DispatchSubReactAgents)
 }
