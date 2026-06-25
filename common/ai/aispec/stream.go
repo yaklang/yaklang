@@ -542,7 +542,6 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 			}
 		}
 	}
-	return nil
 }
 
 func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte, *ChatUsage), usageCallback func(*ChatUsage)) (io.Reader, io.Reader, []poc.PocConfigOption, func(), streamReadErrGetter) {
@@ -801,7 +800,6 @@ func handleResponsesSSEStream(reader io.Reader, outWriter io.Writer, reasonWrite
 			handleResponsesSSEEvent(eventMap, outWriter, reasonWriter, toolCallCallback, toolState)
 		}
 	}
-	return nil
 }
 
 func readResponsesPrefix(reader *bufio.Reader) ([]byte, byte, error) {

@@ -1224,27 +1224,35 @@ func executeChatBaseRequest(
 		}
 	}()
 
-	_, _, err = poc.DoPOST(url, opts...)
+	_, _, postErr := poc.DoPOST(url, opts...)
+	if postErr != nil {
+		if ctx.ErrHandler != nil {
+			ctx.ErrHandler(postErr)
+		}
+		if !utils.IsNil(cancel) {
+			cancel()
+		}
+	}
 
 	wg.Wait()
 
 	var finalErr error
-	if err != nil {
-		finalErr = err
+	if postErr != nil {
+		finalErr = postErr
 	}
 	if getStreamReadErr != nil {
-		if streamErr := getStreamReadErr(); streamErr != nil {
-			if finalErr == nil {
-				finalErr = streamErr
-			}
+		if streamErr := getStreamReadErr(); streamErr != nil && finalErr == nil {
+			finalErr = streamErr
 		}
 	}
 	if finalErr != nil {
-		if ctx.ErrHandler != nil {
-			ctx.ErrHandler(finalErr)
-		}
-		if !utils.IsNil(cancel) {
-			cancel()
+		if postErr == nil {
+			if ctx.ErrHandler != nil {
+				ctx.ErrHandler(finalErr)
+			}
+			if !utils.IsNil(cancel) {
+				cancel()
+			}
 		}
 		return body.String(), utils.Errorf("request post to %v：%v", url, finalErr)
 	}

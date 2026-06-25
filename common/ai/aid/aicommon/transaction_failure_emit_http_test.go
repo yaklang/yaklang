@@ -178,7 +178,7 @@ func assertSingleStructuredFailure(t *testing.T, events []*schema.AiOutputEvent)
 }
 
 func TestCallAITransaction_FailureEmit_ConnectionRefused(t *testing.T) {
-	invalidPort := utils.GetRandomAvailableTCPPort() + 10000
+	invalidPort := utils.GetRandomAvailableTCPPort()
 	callAI := newChatBaseHTTPCallAI("127.0.0.1", invalidPort, true, func() []poc.PocConfigOption {
 		return []poc.PocConfigOption{
 			poc.WithConnectTimeout(1),
