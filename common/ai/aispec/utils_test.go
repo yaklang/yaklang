@@ -254,6 +254,26 @@ func TestNewDefaultAIConfig_TieredFallbackOnlyWhenTypeAlone(t *testing.T) {
 		assert.Equal(t, "gpt-4o-mini", resolved.Model)
 		assert.Empty(t, resolved.Proxy)
 	})
+
+	t.Run("type with custom domain still loads stored api key", func(t *testing.T) {
+		originalThirdParty := consts.AllThirdPartyApplicationConfig()
+		t.Cleanup(func() {
+			consts.ClearThirdPartyApplicationConfig()
+			for _, cfg := range originalThirdParty {
+				consts.UpdateThirdPartyApplicationConfig(cfg)
+			}
+		})
+		consts.ClearThirdPartyApplicationConfig()
+		consts.UpdateThirdPartyApplicationConfig(&ypb.ThirdPartyApplicationConfig{
+			Type:   "chatglm",
+			APIKey: "id.secret",
+		})
+
+		resolved := NewDefaultAIConfig(WithType("chatglm"), WithDomain("127.0.0.1:8080"))
+		assert.Equal(t, "id.secret", resolved.APIKey)
+		assert.Equal(t, "127.0.0.1:8080", resolved.Domain)
+		assert.Empty(t, resolved.Proxy)
+	})
 }
 
 func TestOptsOnlySetType(t *testing.T) {
