@@ -77,6 +77,36 @@ func (s *RewriteManager) MergeIf() {
 
 	}
 }
+
+// RemoveDeadEndAssigns detaches assignment nodes that have no successor. An AssignStatement is never
+// a legal terminal: a method body always ends in a return/throw, so a `var = expr` node with an empty
+// Next set is unreachable-forward dead code. These appear when a value-ternary stored to a local
+// (`local = a||b ? X : Y; use(local)`) has its single-use local inlined into the consumer but leaves
+// the now-dead store node dangling on a fork (entry -> {dead store, consumer}); the dead branch then
+// makes the entry a non-condition node with two successors and ToStatementsFromNode aborts with
+// "multiple next". Removing the dead store collapses the fork into the straight-line consumer path.
+// Detaching is safe: nothing is reachable FROM the node, so its assigned ref cannot reach any use on
+// this path, and any genuine use elsewhere is fed by a different definition.
+func (s *RewriteManager) RemoveDeadEndAssigns() {
+	for i := 0; i < (1 << 16); i++ {
+		var target *core.Node
+		core.WalkGraph[*core.Node](s.RootNode, func(n *core.Node) ([]*core.Node, error) {
+			if target == nil && n != s.RootNode && len(n.Next) == 0 && len(n.Source) > 0 {
+				if _, ok := n.Statement.(*statements.AssignStatement); ok {
+					target = n
+				}
+			}
+			return n.Next, nil
+		})
+		if target == nil {
+			return
+		}
+		for _, src := range slices.Clone(target.Source) {
+			src.RemoveNext(target)
+		}
+		target.RemoveAllSource()
+	}
+}
 func (s *RewriteManager) mergeIf() bool {
 	ifNodes := utils2.NodeFilter(WalkNodeToList(s.RootNode), func(node *core.Node) bool {
 		_, ok := node.Statement.(*statements.ConditionStatement)

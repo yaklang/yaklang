@@ -188,6 +188,32 @@ func TestDecompileParamCopyFold(t *testing.T) {
 	}
 }
 
+// TestDecompileTernaryValueStoreFold guards the dead-end store collapse. A value-ternary whose
+// condition is a compound short-circuit and whose result is stored to a single-use local that is then
+// consumed (`local = (a || b) ? X : Y; return use(local)`) left the now-dead store node dangling on a
+// fork (entry -> {dead store, consumer}) after the local was inlined into the consumer, so the entry
+// became a non-condition node with two successors and the method aborted with "multiple next". The
+// method must now decompile fully with the full short-circuit ternary preserved and parse cleanly.
+func TestDecompileTernaryValueStoreFold(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/ternary_value_store_fold.class")
+	if err != nil {
+		t.Fatalf("read embedded class failed: %v", err)
+	}
+	source, derr := javaclassparser.Decompile(raw)
+	if derr != nil {
+		t.Fatalf("decompile failed: %v", derr)
+	}
+	if strings.Contains(source, "yak-decompiler") {
+		t.Fatalf("expected full decompilation (ternary value store fold), got a stub\n----- source -----\n%s", source)
+	}
+	if !strings.Contains(source, "isEmpty()") || !strings.Contains(source, "?") {
+		t.Fatalf("expected the full short-circuit ternary preserved, got:\n----- source -----\n%s", source)
+	}
+	if _, ferr := java2ssa.Frontend(source); ferr != nil {
+		t.Fatalf("frontend parse failed: %v\n----- source -----\n%s", ferr, source)
+	}
+}
+
 // TestDecompileNoUnreachableJump guards the unreachable-code fix: a conditional return/throw
 // inside a loop used to make the decompiler append a structural `break;`/`continue;` right after
 // the `return`/`throw`, which the ANTLR syntax net accepts but javac rejects as an "unreachable
