@@ -13,9 +13,13 @@ import (
 const SessionSnapshotNodeID = "session_snapshot"
 
 const (
-	SessionSnapshotSectionExecution    = "execution"
-	SessionSnapshotSectionPerception   = "perception"
-	SessionSnapshotSectionCapabilities = "capabilities"
+	SessionSnapshotSectionExecution           = "execution"
+	SessionSnapshotSectionPerception          = "perception"
+	SessionSnapshotSectionCapabilities        = "capabilities"
+	SessionSnapshotSectionBackgroundProcesses = "background_processes"
+
+	SessionSnapshotProcessTypeBrowser = "browser"
+	SessionSnapshotProcessStatusRunning = "running"
 )
 
 type sessionSnapshotEmitHandler func()
@@ -23,11 +27,21 @@ type sessionSnapshotEmitHandler func()
 // SessionSnapshot is the unified real-time sidebar payload for frontend consumption.
 // TaskId / TaskIndex are carried on the outer AIOutputEvent envelope, not duplicated here.
 type SessionSnapshot struct {
-	Revision     int64                    `json:"revision"`
-	UpdatedAt    int64                    `json:"updated_at"`
-	Execution    *SessionSnapshotExecution  `json:"execution"`
-	Perception   *SessionSnapshotPerception `json:"perception"`
-	Capabilities []CapabilityInventoryItem  `json:"capabilities"`
+	Revision            int64                             `json:"revision"`
+	UpdatedAt           int64                             `json:"updated_at"`
+	Execution           *SessionSnapshotExecution         `json:"execution"`
+	Perception          *SessionSnapshotPerception        `json:"perception"`
+	Capabilities        []CapabilityInventoryItem         `json:"capabilities"`
+	BackgroundProcesses []SessionSnapshotBackgroundProcess `json:"background_processes"`
+}
+
+// SessionSnapshotBackgroundProcess describes a long-lived background resource owned by the session.
+// Process types are extensible; only "browser" is supported today.
+type SessionSnapshotBackgroundProcess struct {
+	Type      string `json:"type"`
+	ProcessID string `json:"process_id"`
+	Status    string `json:"status"`
+	StartedAt int64  `json:"started_at"`
 }
 
 type SessionSnapshotExecution struct {
@@ -99,6 +113,7 @@ type sessionSnapshotState struct {
 	mu                       sync.Mutex
 	revision                 int64
 	perceptionExtras         sessionSnapshotPerceptionExtras
+	backgroundProcesses      map[string]SessionSnapshotBackgroundProcess
 	execution                sessionExecutionTracker
 	emitHandler              sessionSnapshotEmitHandler
 	debounceTimer            *time.Timer
@@ -117,6 +132,7 @@ func (c *Config) ensureSessionSnapshotState() *sessionSnapshotState {
 	if c.sessionSnapshot == nil {
 		c.sessionSnapshot = &sessionSnapshotState{
 			legacySeparateEvents: true,
+			backgroundProcesses:  make(map[string]SessionSnapshotBackgroundProcess),
 			execution: sessionExecutionTracker{
 				callToolIDs: make(map[string]struct{}),
 			},
@@ -259,6 +275,66 @@ func (c *Config) SetSessionSnapshotPerceptionCapabilityMatches(matches *SessionS
 	state.perceptionExtras.CapabilityMatches = &copied
 }
 
+func (c *Config) AddSessionSnapshotBackgroundProcess(processType, processID string) {
+	processType = strings.TrimSpace(processType)
+	processID = strings.TrimSpace(processID)
+	if c == nil || processType == "" || processID == "" {
+		return
+	}
+	state := c.ensureSessionSnapshotState()
+	if state == nil {
+		return
+	}
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if state.backgroundProcesses == nil {
+		state.backgroundProcesses = make(map[string]SessionSnapshotBackgroundProcess)
+	}
+	state.backgroundProcesses[processID] = SessionSnapshotBackgroundProcess{
+		Type:      processType,
+		ProcessID: processID,
+		Status:    SessionSnapshotProcessStatusRunning,
+		StartedAt: time.Now().Unix(),
+	}
+}
+
+func (c *Config) RemoveSessionSnapshotBackgroundProcess(processID string) {
+	processID = strings.TrimSpace(processID)
+	if c == nil || processID == "" {
+		return
+	}
+	state := c.ensureSessionSnapshotState()
+	if state == nil {
+		return
+	}
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if state.backgroundProcesses == nil {
+		return
+	}
+	delete(state.backgroundProcesses, processID)
+}
+
+func (c *Config) BuildSessionSnapshotBackgroundProcesses() []SessionSnapshotBackgroundProcess {
+	if c == nil {
+		return []SessionSnapshotBackgroundProcess{}
+	}
+	state := c.ensureSessionSnapshotState()
+	if state == nil {
+		return []SessionSnapshotBackgroundProcess{}
+	}
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if len(state.backgroundProcesses) == 0 {
+		return []SessionSnapshotBackgroundProcess{}
+	}
+	out := make([]SessionSnapshotBackgroundProcess, 0, len(state.backgroundProcesses))
+	for _, proc := range state.backgroundProcesses {
+		out = append(out, proc)
+	}
+	return out
+}
+
 func (c *Config) SetSessionSnapshotPerceptionKnowledge(knowledge *SessionSnapshotPerceptionKnowledge) {
 	if c == nil {
 		return
@@ -397,6 +473,9 @@ func NormalizeSessionSnapshot(snapshot *SessionSnapshot) {
 	}
 	if snapshot.Capabilities == nil {
 		snapshot.Capabilities = []CapabilityInventoryItem{}
+	}
+	if snapshot.BackgroundProcesses == nil {
+		snapshot.BackgroundProcesses = []SessionSnapshotBackgroundProcess{}
 	}
 }
 
@@ -561,6 +640,20 @@ func NotifySessionSnapshotFileWrite(cfg AICallerConfigIf, path string) {
 func NotifySessionSnapshotEmit(cfg AICallerConfigIf, immediate ...bool) {
 	if c := ConfigFromAICaller(cfg); c != nil {
 		c.NotifySessionSnapshotEmit(immediate...)
+	}
+}
+
+func NotifySessionSnapshotBrowserOpened(cfg AICallerConfigIf, browserID string) {
+	if c := ConfigFromAICaller(cfg); c != nil {
+		c.AddSessionSnapshotBackgroundProcess(SessionSnapshotProcessTypeBrowser, browserID)
+		c.NotifySessionSnapshotEmit(true)
+	}
+}
+
+func NotifySessionSnapshotBrowserClosed(cfg AICallerConfigIf, browserID string) {
+	if c := ConfigFromAICaller(cfg); c != nil {
+		c.RemoveSessionSnapshotBackgroundProcess(browserID)
+		c.NotifySessionSnapshotEmit(true)
 	}
 }
 

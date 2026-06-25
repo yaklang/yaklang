@@ -283,7 +283,10 @@ func (a *ToolCaller) invoke(
 		NotifySessionSnapshotRuntimeRefresh(a.config, a.callToolId)
 	}()
 
-	var browserTracker interface{ TrackBrowserSession(id string) }
+	var browserTracker interface {
+		TrackBrowserSession(id string)
+		UntrackBrowserSession(id string)
+	}
 	if c != nil {
 		browserTracker = c.GetBrowserSessionTracker()
 	}

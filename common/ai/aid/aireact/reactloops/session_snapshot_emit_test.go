@@ -24,6 +24,7 @@ func TestBuildSessionSnapshot_AlwaysEmitsFullPayload(t *testing.T) {
 	require.Contains(t, payload, "execution")
 	require.Contains(t, payload, "perception")
 	require.Contains(t, payload, "capabilities")
+	require.Contains(t, payload, "background_processes")
 
 	var execution map[string]any
 	require.NoError(t, json.Unmarshal(payload["execution"], &execution))

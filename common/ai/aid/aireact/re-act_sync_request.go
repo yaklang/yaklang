@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -42,6 +43,8 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 		return r.HandleSyncTypePerceptionEvent(event)
 	case aicommon.SYNC_TYPE_SESSION_SNAPSHOT:
 		return r.HandleSyncTypeSessionSnapshotEvent(event)
+	case aicommon.SYNC_TYPE_CLOSE_BROWSER:
+		return r.HandleSyncTypeCloseBrowserEvent(event)
 	default:
 		return fmt.Errorf("unsupported sync type: %s", event.SyncType)
 	}
@@ -60,6 +63,7 @@ func (r *ReAct) RegisterReActSyncEvent() {
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_CAPABILITY_INVENTORY, r.HandleSyncTypeCapabilityInventoryEvent)
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_PERCEPTION, r.HandleSyncTypePerceptionEvent)
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_SESSION_SNAPSHOT, r.HandleSyncTypeSessionSnapshotEvent)
+	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_CLOSE_BROWSER, r.HandleSyncTypeCloseBrowserEvent)
 }
 
 func (r *ReAct) UnRegisterReActSyncEvent() {
@@ -75,6 +79,7 @@ func (r *ReAct) UnRegisterReActSyncEvent() {
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_CAPABILITY_INVENTORY)
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_PERCEPTION)
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_SESSION_SNAPSHOT)
+	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_CLOSE_BROWSER)
 }
 
 func (r *ReAct) HandleSyncTypeQueueInfoEvent(event *ypb.AIInputEvent) error {
@@ -387,6 +392,59 @@ func (r *ReAct) HandleSyncTypeSessionSnapshotEvent(event *ypb.AIInputEvent) erro
 	taskIndex := aicommon.BuildVerificationTodoScope(r.GetCurrentTask()).TaskIndex
 	_, _ = r.EmitSyncJSONWithTaskIndex(schema.EVENT_TYPE_STRUCTURED, aicommon.SessionSnapshotNodeID, snapshot, event.SyncID, taskIndex)
 	return nil
+}
+
+func (r *ReAct) HandleSyncTypeCloseBrowserEvent(event *ypb.AIInputEvent) error {
+	browserID := parseCloseBrowserSyncID(event)
+	closed := make([]string, 0)
+	var firstErr error
+
+	if browserID != "" {
+		if err := r.CloseBrowserSession(browserID); err != nil {
+			firstErr = err
+		} else {
+			closed = append(closed, browserID)
+		}
+	} else {
+		for _, id := range r.ListTrackedBrowserSessionIDs() {
+			if err := r.CloseBrowserSession(id); err != nil {
+				if firstErr == nil {
+					firstErr = err
+				}
+				log.Warnf("close browser session %q via sync request failed: %v", id, err)
+				continue
+			}
+			closed = append(closed, id)
+		}
+	}
+
+	response := map[string]interface{}{
+		"closed_browser_ids":   closed,
+		"background_processes": r.config.BuildSessionSnapshotBackgroundProcesses(),
+	}
+	if firstErr != nil {
+		response["error"] = firstErr.Error()
+	}
+	_, _ = r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "close_browser", response, event.SyncID)
+	return nil
+}
+
+func parseCloseBrowserSyncID(event *ypb.AIInputEvent) string {
+	if event == nil || event.SyncJsonInput == "" {
+		return ""
+	}
+	var params map[string]interface{}
+	if err := json.Unmarshal([]byte(event.SyncJsonInput), &params); err != nil {
+		return ""
+	}
+	for _, key := range []string{"browser_id", "process_id", "id"} {
+		if raw, ok := params[key]; ok {
+			if id := strings.TrimSpace(fmt.Sprint(raw)); id != "" && id != "<nil>" {
+				return id
+			}
+		}
+	}
+	return ""
 }
 
 func perceptionStateToSyncPayload(state *reactloops.PerceptionState) map[string]any {

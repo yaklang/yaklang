@@ -18,6 +18,18 @@ func (s *stubSessionTracker) TrackBrowserSession(id string) {
 	s.ids = append(s.ids, id)
 }
 
+func (s *stubSessionTracker) UntrackBrowserSession(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	next := s.ids[:0]
+	for _, existing := range s.ids {
+		if existing != id {
+			next = append(next, existing)
+		}
+	}
+	s.ids = next
+}
+
 func TestWrapBrowserOpen_TracksInstanceID(t *testing.T) {
 	defer CloseAll()
 

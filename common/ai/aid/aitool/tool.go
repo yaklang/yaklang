@@ -20,9 +20,10 @@ import (
 type ToolRuntimeConfig struct {
 	FeedBacker func(result *ypb.ExecResult) error
 	RuntimeID  string
-	// BrowserSessionTracker is set for AI ReAct tool runs to hook browser.Open ids.
+	// BrowserSessionTracker is set for AI ReAct tool runs to hook browser.Open/Close ids.
 	BrowserSessionTracker interface {
 		TrackBrowserSession(id string)
+		UntrackBrowserSession(id string)
 	}
 }
 

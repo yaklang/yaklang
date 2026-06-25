@@ -64,7 +64,24 @@ func TestNormalizeSessionSnapshot_FullPayload(t *testing.T) {
 	require.NotNil(t, snapshot.Execution)
 	require.NotNil(t, snapshot.Perception)
 	require.NotNil(t, snapshot.Capabilities)
+	require.NotNil(t, snapshot.BackgroundProcesses)
 	require.Equal(t, "processing", snapshot.Execution.Status)
+}
+
+func TestSessionSnapshot_BackgroundProcesses(t *testing.T) {
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	cfg.AddSessionSnapshotBackgroundProcess(SessionSnapshotProcessTypeBrowser, "scanner")
+	cfg.AddSessionSnapshotBackgroundProcess(SessionSnapshotProcessTypeBrowser, "crawler")
+
+	procs := cfg.BuildSessionSnapshotBackgroundProcesses()
+	require.Len(t, procs, 2)
+
+	cfg.RemoveSessionSnapshotBackgroundProcess("scanner")
+	procs = cfg.BuildSessionSnapshotBackgroundProcesses()
+	require.Len(t, procs, 1)
+	require.Equal(t, "crawler", procs[0].ProcessID)
+	require.Equal(t, SessionSnapshotProcessTypeBrowser, procs[0].Type)
+	require.Equal(t, SessionSnapshotProcessStatusRunning, procs[0].Status)
 }
 
 func TestBuildSessionSnapshotExecution_NilTaskReturnsNonNil(t *testing.T) {
