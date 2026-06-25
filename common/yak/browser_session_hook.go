@@ -7,6 +7,7 @@ import (
 
 type browserSessionTracker interface {
 	TrackBrowserSession(id string)
+	UntrackBrowserSession(id string)
 }
 
 func registerBrowserSessionHooks(engine *ScriptEngine, tracker browserSessionTracker) {

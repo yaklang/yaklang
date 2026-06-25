@@ -4,4 +4,5 @@ package aicommon
 // (typically a ReAct invoker) so they can be closed when the session ends.
 type BrowserSessionTracker interface {
 	TrackBrowserSession(id string)
+	UntrackBrowserSession(id string)
 }

@@ -5,9 +5,10 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 )
 
-// AISessionTracker receives browser instance ids when yak scripts call browser.Open.
+// AISessionTracker receives browser instance ids when yak scripts call browser.Open/Close.
 type AISessionTracker interface {
 	TrackBrowserSession(id string)
+	UntrackBrowserSession(id string)
 }
 
 // RegisterAISessionTrackerHooks wraps browser.Open / browser.Close in the yak VM so
@@ -23,7 +24,7 @@ func RegisterAISessionTrackerHooks(engine *antlr4yak.Engine, tracker AISessionTr
 	}
 
 	vm.RegisterMapMemberCallHandler("browser", "Open", wrapBrowserOpen(tracker))
-	vm.RegisterMapMemberCallHandler("browser", "Close", wrapBrowserClose())
+	vm.RegisterMapMemberCallHandler("browser", "Close", wrapBrowserClose(tracker))
 	return nil
 }
 
@@ -51,7 +52,7 @@ func wrapBrowserOpen(tracker AISessionTracker) func(any) any {
 	}
 }
 
-func wrapBrowserClose() func(any) any {
+func wrapBrowserClose(tracker AISessionTracker) func(any) any {
 	return func(origin any) any {
 		closeFn, ok := origin.(func(...BrowserOption) error)
 		if !ok {
@@ -59,7 +60,12 @@ func wrapBrowserClose() func(any) any {
 			return origin
 		}
 		return func(opts ...BrowserOption) error {
-			return closeFn(opts...)
+			id := ConfigIDFromOptions(opts...)
+			err := closeFn(opts...)
+			if tracker != nil && id != "" {
+				tracker.UntrackBrowserSession(id)
+			}
+			return err
 		}
 	}
 }

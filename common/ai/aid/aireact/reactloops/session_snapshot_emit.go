@@ -12,11 +12,12 @@ func BuildSessionSnapshot(cfg *aicommon.Config, loop *ReActLoop, task aicommon.A
 		return nil
 	}
 	snapshot := &aicommon.SessionSnapshot{
-		Revision:     cfg.NextSessionSnapshotRevision(),
-		UpdatedAt:    time.Now().Unix(),
-		Capabilities: aicommon.BuildCapabilityInventoryItems(cfg, loopCapabilityContext(loop)),
-		Perception:   buildSessionSnapshotPerception(loop, cfg),
-		Execution:    cfg.BuildSessionSnapshotExecution(task),
+		Revision:            cfg.NextSessionSnapshotRevision(),
+		UpdatedAt:           time.Now().Unix(),
+		Capabilities:        aicommon.BuildCapabilityInventoryItems(cfg, loopCapabilityContext(loop)),
+		Perception:          buildSessionSnapshotPerception(loop, cfg),
+		Execution:           cfg.BuildSessionSnapshotExecution(task),
+		BackgroundProcesses: cfg.BuildSessionSnapshotBackgroundProcesses(),
 	}
 	aicommon.NormalizeSessionSnapshot(snapshot)
 	return snapshot
