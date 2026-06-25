@@ -448,7 +448,7 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 					log.Errorf("when handling for fields unknown constant type: %T", constVal)
 				}
 			case *SyntheticAttribute:
-				log.Infof("field %s is synthetic", name)
+			// synthetic (compiler-generated) field marker; no diagnostic needed
 			case *DeprecatedAttribute:
 			// log.Infof("field %s is deprecated", name)
 			case *SignatureAttribute:

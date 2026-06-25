@@ -57,6 +57,10 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 	if err != nil {
 		return nil, err
 	}
+	// Collapse dead-end store nodes left by a value-ternary stored to a single-use local that was
+	// then inlined into its consumer (`local = a||b ? X : Y; use(local)`): the dangling store forks
+	// the entry into {dead store, consumer} and would otherwise abort ToStatements with "multiple next".
+	statementManager.RemoveDeadEndAssigns()
 	nodes, err := statementManager.ToStatements(func(node *core.Node) bool {
 		return true
 	})
