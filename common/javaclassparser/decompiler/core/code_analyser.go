@@ -2402,10 +2402,7 @@ func (d *Decompiler) ParseStatement() error {
 						}
 						if v, ok := value.(*values.NewExpression); ok {
 							v.ArgumentsGetter = func() string {
-								sts := funk.Map(funcCallValue.Arguments, func(arg values.JavaValue) string {
-									return arg.String(funcCtx)
-								}).([]string)
-								return strings.Join(sts, ",")
+								return funcCallValue.ArgumentString(funcCtx)
 							}
 							skip = true
 						}
@@ -2907,18 +2904,16 @@ func (d *Decompiler) ParseStatement() error {
 				}
 			}
 			rewriteIsOk := false
-			if sourceNode != nil {
+			if sourceNode != nil && node != nil {
 				assignNode := sourceNode
 				beforeNodes := slices.Clone(assignNode.Source)
 				assignNode.RemoveAllNext()
 				for _, beforeNode := range beforeNodes {
-					for i, n := range beforeNode.Next {
-						if n == assignNode {
-							beforeNode.Next[i] = node
-							node.Source = append(node.Source, beforeNode)
-							assignNode.RemoveSource(beforeNode)
-						}
+					if beforeNode == nil {
+						continue
 					}
+					beforeNode.RemoveNext(assignNode)
+					beforeNode.AddNext(node)
 				}
 				ref.Id.Delete()
 				pair.Replace(val)
@@ -2927,7 +2922,7 @@ func (d *Decompiler) ParseStatement() error {
 				d.tracef("var-fold", "single-use-fold ref=%s useOffset=%d sourceNode=%d targetNode=%d val=%s",
 					traceRef(ref, d.FunctionContext), pair.CurrentOpcode.CurrentOffset, assignNode.Id, node.Id, traceValue(val, d.FunctionContext))
 			}
-			if !rewriteIsOk && attr[2] == 1 {
+			if !rewriteIsOk && node != nil && attr[2] == 1 {
 				source := slices.Clone(node.Source)
 				node.RemoveAllSource()
 				next := slices.Clone(node.Next)

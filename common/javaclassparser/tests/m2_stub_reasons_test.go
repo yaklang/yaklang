@@ -342,6 +342,10 @@ func TestM2StubReasons(t *testing.T) {
 			name:      filepath.Base(task.path),
 			startedAt: startedAt,
 		}
+		if concurrentJars > 1 {
+			fmt.Fprintf(os.Stderr, "[stub-reasons] worker-start ts=%s jar=%d/%d name=%s path=%s\n",
+				startedAt.Format(time.RFC3339), task.index, len(jars), res.name, task.path)
+		}
 		zr, err := zip.OpenReader(task.path)
 		if err != nil {
 			res.openErr = err
@@ -350,6 +354,7 @@ func TestM2StubReasons(t *testing.T) {
 		}
 		defer zr.Close()
 		perJar := 0
+		localOK, localPartial, localErr := 0, 0, 0
 		for _, f := range zr.File {
 			select {
 			case <-stop:
@@ -402,6 +407,17 @@ func TestM2StubReasons(t *testing.T) {
 				}
 			}
 			res.classes = append(res.classes, classRes)
+			if classRes.errMsg != "" {
+				localErr++
+			} else if classRes.partial {
+				localPartial++
+			} else {
+				localOK++
+			}
+			if concurrentJars > 1 && progressEvery > 0 && perJar%progressEvery == 0 {
+				fmt.Fprintf(os.Stderr, "[stub-reasons] worker-progress ts=%s jar=%d/%d name=%s jarClasses=%d ok=%d partial=%d err=%d\n",
+					nowStamp(), task.index, len(jars), res.name, perJar, localOK, localPartial, localErr)
+			}
 			if stopOnFirst && (classRes.errMsg != "" || classRes.partial) {
 				break
 			}

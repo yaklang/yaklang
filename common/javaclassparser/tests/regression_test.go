@@ -665,7 +665,7 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 				"columnsToString(boolean",
 				"CollectionsKt.joinToString$default",
 				"var6.add(var17)",
-				"if (!((var10) < (var11)))",
+				"if ((var10) < (var11))",
 			},
 			mustNotContain: []string{
 				"yak-decompiler",
@@ -827,7 +827,7 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 				"public final Headers of(Map<String, String> var1)",
 				"Iterator var6 = var4.entrySet().iterator()",
 				"String var10 = ((String)(var8.getKey()))",
-				"return new Headers(var2,null)",
+				"return new Headers(var2,(DefaultConstructorMarker)(null))",
 			},
 			mustNotContain: []string{
 				"yak-decompiler",
@@ -965,6 +965,61 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 				"panic: runtime error",
 				"yak-decompiler",
 				"post-decompile syntax",
+				"undecompilable method body",
+			},
+		},
+		{
+			file: "jtidy_tidyutils_large_boolean_ternary.class",
+			desc: "JTidy TidyUtils encodes XML character tables as very large boolean condition chains. " +
+				"Ternary type and boolean reduction must be memoized so rendering does not expand shared DAGs exponentially.",
+			mustContain: []string{
+				"public final class TidyUtils",
+				"static boolean isXMLLetter(char var0)",
+				"static boolean isXMLNamechar(char var0)",
+				"public static boolean isCharEncodingSupported(String var0)",
+			},
+			mustNotContain: []string{
+				"yak-decompiler",
+				"empty slot value",
+				"panic: test timed out",
+				"undecompilable method body",
+			},
+		},
+		{
+			file: "saxon_builtin_type_single_use_fold.class",
+			desc: "Saxon BuiltInType folds a single-use temporary after class initialization guards. " +
+				"The CFG edge rewrite must not mutate predecessor edge slices while iterating them.",
+			mustContain: []string{
+				"abstract class BuiltInType",
+				"public static SchemaType getSchemaType(int var0)",
+				"public static SchemaType getSchemaTypeByLocalName(String var0)",
+				"lookup.get(var0)",
+				"lookupByLocalName.get(var0)",
+			},
+			mustNotContain: []string{
+				"yak-decompiler",
+				"panic: runtime error",
+				"index out of range",
+				"undecompilable method body",
+			},
+		},
+		{
+			file: "openrewrite_find_indent_yaml_boolean_ctor.class",
+			desc: "OpenRewrite FindIndentYamlVisitor uses boolean constructor arguments and lambda boolean setters. " +
+				"Boolean invocation contexts must render bytecode 0/1 values and ternaries as Java booleans.",
+			mustContain: []string{
+				"public class FindIndentYamlVisitor<",
+				"AtomicBoolean var4 = new AtomicBoolean(true)",
+				"AtomicBoolean var9 = new AtomicBoolean(false)",
+				"var4.set((var4.get()) &&",
+				"return Boolean.valueOf((l0) == (32))",
+			},
+			mustNotContain: []string{
+				"new AtomicBoolean(1)",
+				"new AtomicBoolean(0)",
+				"? (1) : (0)",
+				"yak-decompiler",
+				"panic: runtime error",
 				"undecompilable method body",
 			},
 		},

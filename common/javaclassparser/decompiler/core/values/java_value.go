@@ -477,22 +477,50 @@ type TernaryExpression struct {
 	ConditionFromOp int
 	TrueValue       JavaValue
 	FalseValue      JavaValue
+	cachedType      types.JavaType
+	computingType   bool
 }
 
 // ReplaceVar implements JavaValue.
 func (j *TernaryExpression) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
-	j.Condition.ReplaceVar(oldId, newId)
-	j.TrueValue.ReplaceVar(oldId, newId)
-	j.FalseValue.ReplaceVar(oldId, newId)
+	if j.Condition != nil {
+		j.Condition.ReplaceVar(oldId, newId)
+	}
+	if j.TrueValue != nil {
+		j.TrueValue.ReplaceVar(oldId, newId)
+	}
+	if j.FalseValue != nil {
+		j.FalseValue.ReplaceVar(oldId, newId)
+	}
 }
 
-func (j *TernaryExpression) Type() types.JavaType {
-	return types.MergeTypes(j.TrueValue.Type(), j.FalseValue.Type())
+func (j *TernaryExpression) Type() (typ types.JavaType) {
+	if j == nil || j.TrueValue == nil || j.FalseValue == nil {
+		return nil
+	}
+	if j.cachedType != nil {
+		return j.cachedType
+	}
+	if j.computingType {
+		return nil
+	}
+	j.computingType = true
+	defer func() {
+		j.computingType = false
+		if recover() != nil {
+			typ = nil
+		}
+		if typ != nil {
+			j.cachedType = typ
+		}
+	}()
+	typ = types.MergeTypes(j.TrueValue.Type(), j.FalseValue.Type())
+	return typ
 }
 
-// boolLiteralValue reports a boolean literal's value (unwrapping SlotValue). A boolean literal is a
-// JavaLiteral of boolean type with integer data (0=false, non-zero=true). Used to classify ternary
-// arms structurally - without rendering them to strings - so boolReduce stays linear.
+// boolLiteralValue reports a boolean literal's value (unwrapping SlotValue). Java bytecode also uses
+// integer 0/1 constants for boolean leaves; boolReduce only consumes those in a proven boolean arm
+// pair, so ordinary value ternaries like `c ? 1 : 0` are left alone.
 func boolLiteralValue(v JavaValue) (val bool, ok bool) {
 	u := UnpackSoltValue(v)
 	lit, isLit := u.(*JavaLiteral)
@@ -500,10 +528,16 @@ func boolLiteralValue(v JavaValue) (val bool, ok bool) {
 		return false, false
 	}
 	p, isP := lit.JavaType.RawType().(*types.JavaPrimer)
-	if !isP || p.Name != types.JavaBoolean {
+	if !isP {
 		return false, false
 	}
 	if d, isInt := lit.Data.(int); isInt {
+		if p.Name == types.JavaInteger && d != 0 && d != 1 {
+			return false, false
+		}
+		if p.Name != types.JavaBoolean && p.Name != types.JavaInteger {
+			return false, false
+		}
 		return d != 0, true
 	}
 	return false, false
@@ -519,11 +553,25 @@ func boolLiteralValue(v JavaValue) (val bool, ok bool) {
 // Arms are classified structurally (boolLiteralValue / pointer identity), never by rendering them to
 // strings, so the pass is linear in the tree size rather than quadratic.
 func boolReduce(v JavaValue, funcCtx *class_context.ClassContext) JavaValue {
+	return boolReduceMemo(v, funcCtx, map[*TernaryExpression]JavaValue{})
+}
+
+func boolReduceMemo(v JavaValue, funcCtx *class_context.ClassContext, memo map[*TernaryExpression]JavaValue) JavaValue {
 	t, ok := v.(*TernaryExpression)
 	if !ok || t.Condition == nil || t.TrueValue == nil || t.FalseValue == nil {
 		return v
 	}
-	if !isBooleanTyped(t.TrueValue) || !isBooleanTyped(t.FalseValue) {
+	if reduced, ok := memo[t]; ok {
+		return reduced
+	}
+	memo[t] = v
+	tv := boolReduceMemo(t.TrueValue, funcCtx, memo)
+	fv := boolReduceMemo(t.FalseValue, funcCtx, memo)
+	trueTyped := isBooleanTyped(tv)
+	falseTyped := isBooleanTyped(fv)
+	tval, tLit := boolLiteralValue(tv)
+	fval, fLit := boolLiteralValue(fv)
+	if !(trueTyped || falseTyped) || !(trueTyped || tLit) || !(falseTyped || fLit) {
 		return v // a value ternary, not a boolean connective
 	}
 	boolType := types.NewJavaPrimer(types.JavaBoolean)
@@ -533,23 +581,31 @@ func boolReduce(v JavaValue, funcCtx *class_context.ClassContext) JavaValue {
 	and := func(a, b JavaValue) JavaValue { return NewBinaryExpression(a, b, LOGICAL_AND, boolType) }
 	or := func(a, b JavaValue) JavaValue { return NewBinaryExpression(a, b, LOGICAL_OR, boolType) }
 	c := SimplifyConditionValue(t.Condition)
-	tv := boolReduce(t.TrueValue, funcCtx)
-	fv := boolReduce(t.FalseValue, funcCtx)
-	tval, tLit := boolLiteralValue(tv)
-	fval, fLit := boolLiteralValue(fv)
+	var reduced JavaValue
+	defer func() {
+		if reduced != nil {
+			memo[t] = reduced
+		}
+	}()
 	switch {
 	case tLit && fLit && tval && !fval: // c ? true : false  =>  c
-		return c
+		reduced = c
+		return reduced
 	case tLit && fLit && !tval && fval: // c ? false : true  =>  !c
-		return notCond(c)
+		reduced = notCond(c)
+		return reduced
 	case tLit && tval: // c ? true : B  =>  c || B
-		return or(c, fv)
+		reduced = or(c, fv)
+		return reduced
 	case fLit && !fval: // c ? B : false  =>  c && B
-		return and(c, tv)
+		reduced = and(c, tv)
+		return reduced
 	case tLit && !tval: // c ? false : B  =>  !c && B
-		return and(notCond(c), fv)
+		reduced = and(notCond(c), fv)
+		return reduced
 	case fLit && fval: // c ? B : true  =>  !c || B
-		return or(notCond(c), tv)
+		reduced = or(notCond(c), tv)
+		return reduced
 	}
 	// Shared-leaf factoring: both arms are boolean non-literals, but a short-circuit predicate often
 	// shares a leaf between the taken arm and the fall-through (the same value appears once as a whole
@@ -562,28 +618,43 @@ func boolReduce(v JavaValue, funcCtx *class_context.ClassContext) JavaValue {
 		if a == nil || b == nil {
 			return false
 		}
-		if UnpackSoltValue(a) == UnpackSoltValue(b) {
+		ua := UnpackSoltValue(a)
+		ub := UnpackSoltValue(b)
+		if ua == ub {
 			return true
+		}
+		switch ua.(type) {
+		case *JavaExpression, *TernaryExpression:
+			return false
+		}
+		switch ub.(type) {
+		case *JavaExpression, *TernaryExpression:
+			return false
 		}
 		return a.String(funcCtx) == b.String(funcCtx)
 	}
 	if orE, isOr := tv.(*JavaExpression); isOr && orE.Op == LOGICAL_OR && len(orE.Values) == 2 {
 		if eq(orE.Values[0], fv) { // c ? (S || A) : S  =>  S || (c && A)
-			return or(fv, and(c, orE.Values[1]))
+			reduced = or(fv, and(c, orE.Values[1]))
+			return reduced
 		}
 		if eq(orE.Values[1], fv) { // c ? (A || S) : S  =>  (c && A) || S
-			return or(and(c, orE.Values[0]), fv)
+			reduced = or(and(c, orE.Values[0]), fv)
+			return reduced
 		}
 	}
 	if andE, isAnd := fv.(*JavaExpression); isAnd && andE.Op == LOGICAL_AND && len(andE.Values) == 2 {
 		if eq(andE.Values[0], tv) { // c ? T : (T && A)  =>  T && (c || A)
-			return and(tv, or(c, andE.Values[1]))
+			reduced = and(tv, or(c, andE.Values[1]))
+			return reduced
 		}
 		if eq(andE.Values[1], tv) { // c ? T : (A && T)  =>  (c || A) && T
-			return and(or(c, andE.Values[0]), tv)
+			reduced = and(or(c, andE.Values[0]), tv)
+			return reduced
 		}
 	}
-	return NewTernaryExpression(c, tv, fv) // irreducible: keep a ternary over the reduced arms
+	reduced = NewTernaryExpression(c, tv, fv) // irreducible: keep a ternary over the reduced arms
+	return reduced
 }
 
 func (j *TernaryExpression) String(funcCtx *class_context.ClassContext) string {
@@ -593,6 +664,45 @@ func (j *TernaryExpression) String(funcCtx *class_context.ClassContext) string {
 		return fmt.Sprintf("(%s) ? (%s) : (%s)", condition.String(funcCtx), rt.TrueValue.String(funcCtx), rt.FalseValue.String(funcCtx))
 	}
 	return reduced.String(funcCtx)
+}
+
+func ternaryTooLarge(v JavaValue, limit int) bool {
+	count := 0
+	var walk func(JavaValue) bool
+	walk = func(value JavaValue) bool {
+		t, ok := UnpackSoltValue(value).(*TernaryExpression)
+		if !ok || t == nil {
+			return false
+		}
+		count++
+		if count > limit {
+			return true
+		}
+		return walk(t.TrueValue) || walk(t.FalseValue)
+	}
+	return walk(v)
+}
+
+func ternaryRawString(t *TernaryExpression, funcCtx *class_context.ClassContext) string {
+	if t == nil {
+		return EmptySlotValuePlaceholder
+	}
+	condition := SimplifyConditionValue(t.Condition)
+	return fmt.Sprintf("(%s) ? (%s) : (%s)",
+		javaValueRawString(condition, funcCtx),
+		javaValueRawString(t.TrueValue, funcCtx),
+		javaValueRawString(t.FalseValue, funcCtx),
+	)
+}
+
+func javaValueRawString(value JavaValue, funcCtx *class_context.ClassContext) string {
+	if value == nil {
+		return EmptySlotValuePlaceholder
+	}
+	if t, ok := UnpackSoltValue(value).(*TernaryExpression); ok {
+		return ternaryRawString(t, funcCtx)
+	}
+	return value.String(funcCtx)
 }
 
 func NewTernaryExpression(condition, v1, v2 JavaValue) *TernaryExpression {

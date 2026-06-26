@@ -224,6 +224,11 @@ diff <(head -1 /tmp/m2-before.txt) <(head -1 /tmp/m2-after.txt)
   M2_START_JAR_INDEX=10 M2_START_JAR_END=20 STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-10-20 M2_PROGRESS_FILE=/tmp/jdec-progress/10-20.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
   M2_START_JAR_INDEX=100 M2_START_JAR_END=110 STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-100-110 M2_PROGRESS_FILE=/tmp/jdec-progress/100-110.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
   ```
+  如果同时启动多个独立窗口，建议把单进程内部并发降到 `M2_CONCURRENT_JARS=1`，并按机器余量设置 `GOMAXPROCS=2` 或 `GOMAXPROCS=3`。原因是 `Decompile` 的语法安全网会调用 ANTLR 解析，超时后也只能放弃等待，底层解析 goroutine 仍会继续跑完；外层多进程再叠加内部 jar 并发，容易出现 CPU/内存过度抢占，日志还会因为有序聚合等待窗口首个慢 jar 而看起来“不动”。遇到 Saxon 这类大 jar 时，优先把它拆成单 jar 小窗口，例如：
+  ```bash
+  GOMAXPROCS=2 M2_START_JAR_INDEX=876 M2_START_JAR_END=876 M2_CONCURRENT_JARS=1 STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-876 M2_PROGRESS_FILE=/tmp/jdec-progress/876.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
+  GOMAXPROCS=2 M2_START_JAR_INDEX=877 M2_START_JAR_END=1200 M2_CONCURRENT_JARS=1 STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-877-1200 M2_PROGRESS_FILE=/tmp/jdec-progress/877-1200.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
+  ```
 
 - **单 jar 单独测**（确认本 jar 内修复没把邻居改坏、或专攻某个 jar）：
   ```bash

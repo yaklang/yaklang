@@ -225,7 +225,11 @@ func (f *FunctionCallExpression) IsSupperConstructorInvoke(funcCtx *class_contex
 	}
 	return false
 }
-func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) string {
+func (f *FunctionCallExpression) ArgumentString(funcCtx *class_context.ClassContext) string {
+	return strings.Join(f.ArgumentStrings(funcCtx), ",")
+}
+
+func (f *FunctionCallExpression) ArgumentStrings(funcCtx *class_context.ClassContext) []string {
 	paramStrs := []string{}
 	for i, arg := range f.Arguments {
 		argType := f.FuncType.ParamTypes[i]
@@ -269,20 +273,19 @@ func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) str
 				}
 			} else if expectPrim.Name == types.JavaBoolean {
 				// The JVM has no boolean opcodes: a boolean argument is pushed as an int
-				// constant (iconst_0/iconst_1). Java forbids int->boolean conversion, so an
-				// int literal flowing into a boolean parameter must be rendered as a boolean
-				// literal or the call fails to recompile (e.g. Boolean.valueOf(1)).
-				if lit, okl := UnpackSoltValue(arg).(*JavaLiteral); okl {
-					if actualPrim, oka := lit.Type().RawType().(*types.JavaPrimer); oka && actualPrim.Name == types.JavaInteger {
-						if iv, oki := lit.Data.(int); oki {
-							arg = NewJavaLiteral(iv, types.NewJavaPrimer(types.JavaBoolean))
-						}
-					}
-				}
+				// constant (iconst_0/iconst_1). Java forbids int->boolean conversion, so values
+				// flowing into a boolean parameter must render with boolean literals, including
+				// ternary trees like `cond ? 1 : 0`.
+				arg = coerceBooleanArgument(arg)
 			}
 		}
 		paramStrs = append(paramStrs, arg.String(funcCtx))
 	}
+	return paramStrs
+}
+
+func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) string {
+	paramStrs := f.ArgumentStrings(funcCtx)
 	if f.FunctionName == "<init>" {
 		if f.ClassName == funcCtx.ClassName {
 			return fmt.Sprintf("%s(%s)", f.Object.String(funcCtx), strings.Join(paramStrs, ","))
@@ -310,6 +313,25 @@ func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) str
 	default:
 		return fmt.Sprintf("%s.%s(%s)", f.Object.String(funcCtx), functionName, strings.Join(paramStrs, ","))
 	}
+}
+
+func coerceBooleanArgument(arg JavaValue) JavaValue {
+	switch v := UnpackSoltValue(arg).(type) {
+	case *JavaLiteral:
+		if prim, ok := primerRawType(v.Type()); ok && prim.Name == types.JavaInteger {
+			if iv, ok := v.Data.(int); ok && (iv == 0 || iv == 1) {
+				return NewJavaLiteral(iv, types.NewJavaPrimer(types.JavaBoolean))
+			}
+		}
+	case *TernaryExpression:
+		if v == nil {
+			return arg
+		}
+		coerced := NewTernaryExpression(v.Condition, coerceBooleanArgument(v.TrueValue), coerceBooleanArgument(v.FalseValue))
+		coerced.ConditionFromOp = v.ConditionFromOp
+		return coerced
+	}
+	return arg
 }
 
 func NewFunctionCallExpression(object JavaValue, methodMember *JavaClassMember, funcType *types.JavaFuncType) *FunctionCallExpression {
