@@ -949,6 +949,25 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 				"undecompilable method body",
 			},
 		},
+		{
+			file: "jasperreports_excel_abstract_exporter_switch_slot_hoist.class",
+			desc: "JasperReports ExcelAbstractExporter.getTextAlignHolder assigns shared alignment locals inside nested switch cases. " +
+				"Switch-local declarations must be hoisted recursively and internal empty-slot placeholder assignments must not leak into source.",
+			mustContain: []string{
+				"abstract class ExcelAbstractExporter<",
+				"public static ExcelAbstractExporter$TextAlignHolder getTextAlignHolder(JRPrintText var0)",
+				"HorizontalTextAlignEnum var2;",
+				"VerticalTextAlignEnum var2_1;",
+				"return new ExcelAbstractExporter$TextAlignHolder(var2,var2_1,var1)",
+			},
+			mustNotContain: []string{
+				"empty slot value",
+				"panic: runtime error",
+				"yak-decompiler",
+				"post-decompile syntax",
+				"undecompilable method body",
+			},
+		},
 	}
 
 	for _, tc := range cases {

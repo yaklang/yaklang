@@ -165,10 +165,27 @@ func (a *AssignStatement) ReplaceVar(oldId *utils.VariableId, newId *utils.Varia
 
 func (a *AssignStatement) String(funcCtx *class_context.ClassContext) string {
 	if a.IsDeclare {
+		if a.LeftValue == nil {
+			return values.EmptySlotValuePlaceholder
+		}
 		return fmt.Sprintf("%s %s", a.LeftValue.Type().String(funcCtx), a.LeftValue.String(funcCtx))
 	}
 	if a.ArrayMember != nil {
+		if a.JavaValue == nil {
+			return fmt.Sprintf("%s = %s", a.ArrayMember.String(funcCtx), values.EmptySlotValuePlaceholder)
+		}
 		return fmt.Sprintf("%s = %s", a.ArrayMember.String(funcCtx), a.JavaValue.String(funcCtx))
+	}
+	if a.LeftValue == nil || a.JavaValue == nil {
+		left := values.EmptySlotValuePlaceholder
+		right := values.EmptySlotValuePlaceholder
+		if a.LeftValue != nil {
+			left = a.LeftValue.String(funcCtx)
+		}
+		if a.JavaValue != nil {
+			right = a.JavaValue.String(funcCtx)
+		}
+		return fmt.Sprintf("%s = %s", left, right)
 	}
 	assign := fmt.Sprintf("%s = %s", a.LeftValue.String(funcCtx), a.JavaValue.String(funcCtx))
 	if a.IsFirst {

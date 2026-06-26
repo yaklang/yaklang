@@ -6,6 +6,7 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 
@@ -129,6 +130,7 @@ func RewriteVar(sts *[]statements.Statement, startVarId int, params []*values.Ja
 	// Lift cross-case switch-local declarations out of their case bodies. Runs last so the
 	// IsFirst decisions above are final and this pass's demotions are not subsequently undone.
 	hoistSwitchDeclarations(sts)
+	dropEmptySlotAssignments(sts)
 }
 
 type Scope struct {
@@ -507,49 +509,149 @@ var hoistProbeCtx = &class_context.ClassContext{}
 // block; reference detection is by final variable NAME, which is consistent across the rendered
 // output. See hoistSwitchDeclarations for why this is always safe.
 func switchHoistDeclarations(sw *statements.SwitchStatement, afterSts []statements.Statement) []statements.Statement {
-	declaredInside := map[*utils.VariableId]bool{}
-	assignsByUid := map[*utils.VariableId][]*statements.AssignStatement{}
-	refByUid := map[*utils.VariableId]values.JavaValue{}
-	for _, c := range sw.Cases {
-		for _, st := range c.Body {
-			as, ok := st.(*statements.AssignStatement)
-			if !ok || as.ArrayMember != nil {
-				continue
-			}
-			ref, ok := as.LeftValue.(*values.JavaRef)
-			if !ok {
-				continue
-			}
-			assignsByUid[ref.Id] = append(assignsByUid[ref.Id], as)
-			refByUid[ref.Id] = as.LeftValue
-			if as.IsFirst || as.IsDeclare {
-				declaredInside[ref.Id] = true
+	declaredInside := map[string]bool{}
+	assignsByUid := map[string][]*statements.AssignStatement{}
+	refByUid := map[string]values.JavaValue{}
+	var collect func([]statements.Statement)
+	collect = func(sts []statements.Statement) {
+		for _, st := range sts {
+			switch s := st.(type) {
+			case *statements.AssignStatement:
+				if s.ArrayMember != nil {
+					continue
+				}
+				ref, ok := core.UnpackSoltValue(s.LeftValue).(*values.JavaRef)
+				if !ok || ref == nil || ref.Id == nil {
+					continue
+				}
+				assignsByUid[ref.VarUid] = append(assignsByUid[ref.VarUid], s)
+				refByUid[ref.VarUid] = s.LeftValue
+				if s.IsFirst || s.IsDeclare {
+					declaredInside[ref.VarUid] = true
+				}
+			case *statements.IfStatement:
+				collect(s.IfBody)
+				collect(s.ElseBody)
+			case *statements.ForStatement:
+				collect(s.SubStatements)
+			case *statements.WhileStatement:
+				collect(s.Body)
+			case *statements.DoWhileStatement:
+				collect(s.Body)
+			case *statements.SynchronizedStatement:
+				collect(s.Body)
+			case *statements.TryCatchStatement:
+				collect(s.TryBody)
+				for i := range s.CatchBodies {
+					collect(s.CatchBodies[i])
+				}
+			case *statements.SwitchStatement:
+				for _, c := range s.Cases {
+					collect(c.Body)
+				}
 			}
 		}
 	}
-	uids := make([]*utils.VariableId, 0, len(assignsByUid))
+	for _, c := range sw.Cases {
+		collect(c.Body)
+	}
+	uids := make([]string, 0, len(assignsByUid))
 	for uid := range assignsByUid {
 		uids = append(uids, uid)
 	}
 	sort.SliceStable(uids, func(i, j int) bool {
-		return uids[i].String() < uids[j].String()
+		return uids[i] < uids[j]
 	})
 	var declares []statements.Statement
 	for _, uid := range uids {
 		if !declaredInside[uid] {
 			continue
 		}
-		name := refByUid[uid].String(hoistProbeCtx)
+		if len(assignsByUid[uid]) < 2 {
+			continue
+		}
+		targetRef := refByUid[uid]
+		name := targetRef.String(hoistProbeCtx)
+		for _, as := range assignsByUid[uid] {
+			ref, ok := core.UnpackSoltValue(as.LeftValue).(*values.JavaRef)
+			if !ok || ref == nil || ref.Id == nil {
+				continue
+			}
+			candidateName := ref.String(hoistProbeCtx)
+			if candidateName != "" && statementsReadName(afterSts, candidateName) {
+				targetRef = as.LeftValue
+				name = candidateName
+				break
+			}
+		}
 		if name == "" || !statementsReadName(afterSts, name) {
 			continue
 		}
+		targetJavaRef, ok := core.UnpackSoltValue(targetRef).(*values.JavaRef)
+		if !ok || targetJavaRef == nil || targetJavaRef.Id == nil {
+			continue
+		}
+		targetID := targetJavaRef.Id
 		for _, as := range assignsByUid[uid] {
+			if ref, ok := core.UnpackSoltValue(as.LeftValue).(*values.JavaRef); ok && ref != nil && ref.Id != targetID {
+				ref.Id = targetID
+			}
 			as.IsFirst = false
 			as.IsDeclare = false
 		}
-		declares = append(declares, statements.NewDeclareStatement(refByUid[uid]))
+		declares = append(declares, statements.NewDeclareStatement(targetRef))
 	}
 	return declares
+}
+
+func dropEmptySlotAssignments(sts *[]statements.Statement) {
+	if sts == nil {
+		return
+	}
+	list := *sts
+	out := make([]statements.Statement, 0, len(list))
+	for _, st := range list {
+		switch s := st.(type) {
+		case *statements.AssignStatement:
+			if !s.IsDeclare && s.ArrayMember == nil && assignmentValueIsEmptySlot(s.JavaValue) {
+				continue
+			}
+		case *statements.IfStatement:
+			dropEmptySlotAssignments(&s.IfBody)
+			dropEmptySlotAssignments(&s.ElseBody)
+		case *statements.ForStatement:
+			dropEmptySlotAssignments(&s.SubStatements)
+		case *statements.WhileStatement:
+			dropEmptySlotAssignments(&s.Body)
+		case *statements.DoWhileStatement:
+			dropEmptySlotAssignments(&s.Body)
+		case *statements.SynchronizedStatement:
+			dropEmptySlotAssignments(&s.Body)
+		case *statements.TryCatchStatement:
+			dropEmptySlotAssignments(&s.TryBody)
+			for i := range s.CatchBodies {
+				dropEmptySlotAssignments(&s.CatchBodies[i])
+			}
+		case *statements.SwitchStatement:
+			for i := range s.Cases {
+				dropEmptySlotAssignments(&s.Cases[i].Body)
+			}
+		}
+		out = append(out, st)
+	}
+	*sts = out
+}
+
+func assignmentValueIsEmptySlot(value values.JavaValue) (ok bool) {
+	if value == nil {
+		return true
+	}
+	defer func() {
+		if recover() != nil {
+			ok = true
+		}
+	}()
+	return strings.Contains(value.String(hoistProbeCtx), values.EmptySlotValuePlaceholder)
 }
 
 // ifHoistDeclarations demotes declarations inside an if/else tree when the local is read after the
