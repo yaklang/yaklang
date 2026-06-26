@@ -1713,7 +1713,18 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 		accessFlagsVerbose, _ := getMethodAccessFlagsVerbose(method.AccessFlags)
 		if strings.TrimSpace(res.bodyCode) == "" {
 			if !slices.Contains(accessFlagsVerbose, "abstract") && !slices.Contains(accessFlagsVerbose, "annotation") && !slices.Contains(accessFlagsVerbose, "interface") && !slices.Contains(accessFlagsVerbose, "enum") {
-				continue
+				methodType, perr := types.ParseMethodDescriptor(descriptor)
+				if perr != nil || methodType == nil || methodType.FunctionType() == nil ||
+					methodType.FunctionType().ReturnType.String(c.FuncCtx) == "void" {
+					continue
+				}
+				stub := c.dumpStubMethod(method, name, descriptor, "empty method body after decompilation")
+				if stub == nil {
+					continue
+				}
+				traitId := fmt.Sprintf("name:%s,desc:%s", name, descriptor)
+				c.dumpedMethodsSet[traitId] = stub
+				res = stub
 			}
 		}
 		// retain identity so the syntax safety net can re-derive a stub if needed

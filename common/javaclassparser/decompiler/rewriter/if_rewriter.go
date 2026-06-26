@@ -11,13 +11,31 @@ import (
 
 type rewriterFunc func(statementManager *RewriteManager, node *core.Node) error
 
+func ifBranchNodes(ifNode *core.Node) (trueNode, falseNode *core.Node) {
+	if ifNode == nil {
+		return nil, nil
+	}
+	if ifNode.TrueNode != nil {
+		trueNode = ifNode.TrueNode()
+	}
+	if ifNode.FalseNode != nil {
+		falseNode = ifNode.FalseNode()
+	}
+	if trueNode == nil && len(ifNode.Next) > 0 {
+		trueNode = ifNode.Next[0]
+	}
+	if falseNode == nil && len(ifNode.Next) > 1 {
+		falseNode = ifNode.Next[1]
+	}
+	return trueNode, falseNode
+}
+
 func IfRewriter(manager *RewriteManager, ifNode *core.Node) error {
 	err := CalcEnd(manager.DominatorMap, ifNode)
 	if err != nil {
 		return err
 	}
-	trueNode := ifNode.TrueNode()
-	falseNode := ifNode.FalseNode()
+	trueNode, falseNode := ifBranchNodes(ifNode)
 	//ifNode.RemoveAllNext()
 	if trueNode == falseNode {
 		trueNode = nil
@@ -298,9 +316,14 @@ func __CalcEnd(domTree map[*core.Node][]*core.Node, ifNode *core.Node) error {
 	return nil
 }
 func CalcEnd(domTree map[*core.Node][]*core.Node, ifNode *core.Node) error {
+	if ifNode == nil {
+		return nil
+	}
 	ifNode.MergeNode = nil
-	trueNode := ifNode.TrueNode()
-	falseNode := ifNode.FalseNode()
+	trueNode, falseNode := ifBranchNodes(ifNode)
+	if trueNode == nil || falseNode == nil {
+		return nil
+	}
 
 	domTree = GenerateDominatorTree(ifNode)
 	doms := domTree[ifNode]
@@ -378,9 +401,12 @@ func CalcEnd(domTree map[*core.Node][]*core.Node, ifNode *core.Node) error {
 			}
 		}
 	case 3:
-		ifNode.MergeNode = utils2.NodeFilter(doms, func(node *core.Node) bool {
+		candidates := utils2.NodeFilter(doms, func(node *core.Node) bool {
 			return node != trueNode && node != falseNode
-		})[0]
+		})
+		if len(candidates) > 0 {
+			ifNode.MergeNode = candidates[0]
+		}
 	}
 	return nil
 }

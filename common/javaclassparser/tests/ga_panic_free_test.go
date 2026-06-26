@@ -56,7 +56,7 @@ func TestGAPanicFreeBoundary(t *testing.T) {
 		},
 		{
 			file:     "panic_nilref_typeutils.class",
-			desc:     "fastjson2 TypeUtils.doubleValue: same typed-nil-ref-in-varUserMap nil-deref; must degrade cleanly to a marked stub, never panic",
+			desc:     "fastjson2 TypeUtils.doubleValue: incomplete if-route metadata exposed nil TrueNode/FalseNode callbacks during merge inference and if rewriting; must degrade cleanly, never panic",
 			wantFull: false,
 		},
 	}

@@ -120,6 +120,9 @@ func CheckIsPreNode(infoGetter func(node *core.Node) *NodeExtInfo, node, pre *co
 	return _CheckIsPreNode(utils.NewSet[*core.Node](), infoGetter, node, pre)
 }
 func _CheckIsPreNode(checked *utils.Set[*core.Node], infoGetter func(node *core.Node) *NodeExtInfo, node, pre *core.Node) bool {
+	if node == nil || pre == nil {
+		return false
+	}
 	if checked.Has(node) {
 		return false
 	}
@@ -127,12 +130,22 @@ func _CheckIsPreNode(checked *utils.Set[*core.Node], infoGetter func(node *core.
 	if pre == node {
 		return true
 	}
-	for _, nodeMap := range infoGetter(node).AllPreNodeRoute {
+	info := infoGetter(node)
+	if info == nil {
+		return false
+	}
+	for _, nodeMap := range info.AllPreNodeRoute {
+		if nodeMap == nil {
+			continue
+		}
 		if _, ok := nodeMap.Has(pre); ok {
 			return true
 		}
 	}
-	for _, nodeMap := range infoGetter(node).AllPreNodeRoute {
+	for _, nodeMap := range info.AllPreNodeRoute {
+		if nodeMap == nil {
+			continue
+		}
 		if _CheckIsPreNode(checked, infoGetter, nodeMap.ConditionNode, pre) {
 			return true
 		}

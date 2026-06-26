@@ -1392,7 +1392,10 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 					isIfMergeNode = ifSize < size
 				}
 			}
-			if isIfMergeNode {
+			if len(validSources) == 0 {
+				// Keep the conservative empty-stack simulation created above. This path can appear
+				// in hard switch/loop CFGs where all incoming sources were not stack-simulated yet.
+			} else if isIfMergeNode {
 				validSource := validSources[0]
 				scope := getVarScope(validSource)
 				preSim := NewStackSimulation(validSource.StackEntry, scope.VarTable, scope.VarId)

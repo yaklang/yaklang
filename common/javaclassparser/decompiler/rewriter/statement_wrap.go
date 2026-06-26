@@ -750,9 +750,14 @@ func (s *RewriteManager) ScanCoreInfo() error {
 			if nodeMap.ConditionNode.MergeNode != nil {
 				continue
 			}
-			checkNode := []*core.Node{nodeMap.ConditionNode.TrueNode(), nodeMap.ConditionNode.FalseNode()}
+			trueNode, falseNode := ifBranchNodes(nodeMap.ConditionNode)
+			checkNode := []*core.Node{trueNode, falseNode}
 			isPreNode := true
 			for _, node := range checkNode {
+				if node == nil {
+					isPreNode = false
+					break
+				}
 				isPreNode = CheckIsPreNode(getNodeInfo, current, node) && isPreNode
 			}
 			if isPreNode {
