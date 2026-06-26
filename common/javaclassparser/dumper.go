@@ -378,6 +378,7 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 		if err != nil {
 			return nil, err
 		}
+		renderName := class_context.SafeIdentifier(name)
 		// $VALUES is the synthetic array backing values(); javac re-synthesizes it.
 		if genuineEnum && name == "$VALUES" {
 			continue
@@ -483,8 +484,8 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 
 		if valueLiteral != "" {
 			fields = append(fields, dumpedFields{
-				code:      fmt.Sprintf("%s %s %s = %s;", accessFlags, lastPacket, name, valueLiteral),
-				fieldName: name,
+				code:      fmt.Sprintf("%s %s %s = %s;", accessFlags, lastPacket, renderName, valueLiteral),
+				fieldName: renderName,
 				modifier:  accessFlags,
 				typeName:  lastPacket,
 			})
@@ -492,8 +493,8 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 			// A final field with a captured, hoistable initializer (constant-folded value
 			// or a parameter-independent <init>/<clinit> assignment). Emit it inline.
 			dumped := dumpedFields{
-				code:      fmt.Sprintf("%s %s %s = %s;", accessFlags, lastPacket, name, c.fieldDefaultValue[name]),
-				fieldName: name,
+				code:      fmt.Sprintf("%s %s %s = %s;", accessFlags, lastPacket, renderName, c.fieldDefaultValue[name]),
+				fieldName: renderName,
 				modifier:  accessFlags,
 				typeName:  lastPacket,
 			}
@@ -504,8 +505,8 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 			// static block). A bogus `= 0` here would be illegal for reference types and is
 			// unnecessary: definite assignment in <init>/<clinit> keeps blank finals valid.
 			fields = append(fields, dumpedFields{
-				code:      fmt.Sprintf("%s %s %s;", accessFlags, lastPacket, name),
-				fieldName: name,
+				code:      fmt.Sprintf("%s %s %s;", accessFlags, lastPacket, renderName),
+				fieldName: renderName,
 				modifier:  accessFlags,
 				typeName:  lastPacket,
 			})
@@ -1058,9 +1059,10 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 						"%s\n"+
 						c.GetTabString()+"}", values.SimplifyConditionValue(ret.ConditionValue).String(funcCtx), statementListToString(ret.Body))
 				case *statements.DoWhileStatement:
+					body := normalizeDoWhileBreakGuardSource(statementListToString(ret.Body))
 					statementStr = fmt.Sprintf(c.GetTabString()+"do{\n"+
 						"%s\n"+
-						c.GetTabString()+"} while (%s);", statementListToString(ret.Body), values.SimplifyConditionValue(ret.ConditionValue).String(funcCtx))
+						c.GetTabString()+"} while (%s);", body, values.SimplifyConditionValue(ret.ConditionValue).String(funcCtx))
 					if ret.Label != "" {
 						statementStr = fmt.Sprintf("%s%s:\n%s", c.GetTabString(), ret.Label, statementStr)
 					}
@@ -1377,6 +1379,7 @@ var localSlotRefRe = regexp.MustCompile(`\bvar\d+\b`)
 // monitorTempAssignRe matches a dead synthetic monitor temp left in the synchronized()
 // argument position, e.g. `var2 = this.lock`, capturing the lock expression itself.
 var monitorTempAssignRe = regexp.MustCompile(`^var\d+ = (.+)$`)
+var doWhileBreakGuardRe = regexp.MustCompile(`^(\s*)if \(([^\n{}]*)\)\{\n\s*break;\n\s*\}else\{`)
 
 // canHoistFieldInitializer reports whether a `final`-field assignment found inside <init>/
 // <clinit> may be lifted into a field initializer. A real field initializer cannot reference
@@ -1429,6 +1432,19 @@ const DecompileStubMarker = "yak-decompiler:"
 // the marker degrades the whole method to an honest stub instead of emitting silently-wrong code.
 // It never survives into final output because the offending method is re-rendered as a stub.
 const malformedTryNoCatchMarker = "yak-decompiler-internal: try without catch handler"
+
+func normalizeDoWhileBreakGuardSource(body string) string {
+	match := doWhileBreakGuardRe.FindStringSubmatchIndex(body)
+	if match == nil || len(match) < 6 {
+		return body
+	}
+	conditionStart, conditionEnd := match[4], match[5]
+	condition := strings.TrimSpace(body[conditionStart:conditionEnd])
+	if condition == "" || strings.HasPrefix(condition, "!") {
+		return body
+	}
+	return body[:conditionStart] + "!(" + condition + ")" + body[conditionEnd:]
+}
 
 func canFlattenNoCatchTry(body string) bool {
 	body = strings.TrimSpace(body)

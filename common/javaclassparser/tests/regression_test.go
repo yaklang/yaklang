@@ -656,6 +656,52 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			mustContain:    []string{"TDDLHint", "functions.size"},
 			mustNotContain: []string{"yak-decompiler", "cyclic"},
 		},
+		{
+			file: "mybatis_plus_abstract_kt_wrapper.class",
+			desc: "Kotlin vararg mapNotNull loop in MyBatis-Plus AbstractKtWrapper.columnsToString has a " +
+				"nop between two checkcast instructions after the loop. Removing nop must preserve the successor " +
+				"source stack, and the do-while(true) break guard must remain semantically aligned with CFR/Vineflower.",
+			mustContain: []string{
+				"columnsToString(boolean",
+				"CollectionsKt.joinToString$default",
+				"var6.add(var17)",
+				"if (!((var10) < (var11)))",
+			},
+			mustNotContain: []string{
+				"yak-decompiler",
+				"empty slot value",
+			},
+		},
+		{
+			file: "transmittable_threadlocal_ctbehavior.class",
+			desc: "Javassist CtBehavior.insertAfter contains nested do-while/if break guards. The do-while " +
+				"break-guard normalization must stay local to a direct break body and never consume an outer if body.",
+			mustContain: []string{
+				"insertAfter(String var1, boolean var2, boolean var3)",
+				"var7.hasNext()",
+				"insertAfterAdvice",
+			},
+			mustNotContain: []string{
+				"yak-decompiler",
+				"if (!(var7.hasNext()){",
+				") >= (var14)))",
+			},
+		},
+		{
+			file: "dmjdbc_keyword_field.class",
+			desc: "Obfuscated DmJdbc class contains a field literally named `do`; field declarations and " +
+				"member accesses must be rendered with a safe Java identifier instead of dropping the field and stubbing methods.",
+			mustContain: []string{
+				"private short do_;",
+				"this.do_ = var3",
+				"setShort(20,this.do_)",
+			},
+			mustNotContain: []string{
+				"yak-decompiler",
+				"this.do;",
+				" short do;",
+			},
+		},
 	}
 
 	for _, tc := range cases {

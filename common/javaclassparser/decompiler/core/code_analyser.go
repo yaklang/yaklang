@@ -320,7 +320,17 @@ func (d *Decompiler) DropUnreachableOpcode() error {
 				source.Target = funk.Filter(source.Target, func(opCode *OpCode) bool {
 					return opCode != code
 				}).([]*OpCode)
-				source.Target = append(source.Target, code.Target...)
+				for _, target := range code.Target {
+					if !slices.Contains(source.Target, target) {
+						source.Target = append(source.Target, target)
+					}
+					target.Source = funk.Filter(target.Source, func(opCode *OpCode) bool {
+						return opCode != code
+					}).([]*OpCode)
+					if !slices.Contains(target.Source, source) {
+						target.Source = append(target.Source, source)
+					}
+				}
 			}
 		} else {
 			newOpcodes = append(newOpcodes, code)

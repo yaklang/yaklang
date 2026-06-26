@@ -353,11 +353,11 @@ func (j *JavaClassMember) Type() types.JavaType {
 
 func (j *JavaClassMember) String(funcCtx *class_context.ClassContext) string {
 	if j.Name == funcCtx.ClassName {
-		return j.Member
+		return class_context.SafeIdentifier(j.Member)
 	}
 	//name := funcCtx.ShortTypeName(j.Name)
 	name := funcCtx.ShortTypeName(j.Name)
-	return fmt.Sprintf("%s.%s", name, j.Member)
+	return fmt.Sprintf("%s.%s", name, class_context.SafeIdentifier(j.Member))
 }
 func NewJavaClassMember(typeName, member string, desc string, typ types.JavaType) *JavaClassMember {
 	return &JavaClassMember{
@@ -449,7 +449,7 @@ func (j *RefMember) String(funcCtx *class_context.ClassContext) string {
 	//if j.Id == 0 {
 	//	return j.Member
 	//}
-	return fmt.Sprintf("%s.%s", j.Object.String(funcCtx), j.Member)
+	return fmt.Sprintf("%s.%s", j.Object.String(funcCtx), class_context.SafeIdentifier(j.Member))
 }
 
 type javaNull struct {

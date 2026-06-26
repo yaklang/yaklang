@@ -2,10 +2,12 @@ package statements
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 )
 
 type DoWhileStatement struct {
@@ -29,11 +31,51 @@ func NewDoWhileStatement(condition values.JavaValue, body []Statement) *DoWhileS
 	}
 }
 func (w *DoWhileStatement) String(funcCtx *class_context.ClassContext) string {
-	s := fmt.Sprintf("do{\n%s\n}while(%s)", StatementsString(w.Body, funcCtx), w.ConditionValue.String(funcCtx))
+	body := normalizeDoWhileBreakGuard(doWhileBodyString(w.Body, funcCtx))
+	s := fmt.Sprintf("do{\n%s\n}while(%s)", body, w.ConditionValue.String(funcCtx))
 	if w.Label != "" {
 		return fmt.Sprintf("%s: %s", w.Label, s)
 	}
 	return s
+}
+
+func doWhileBodyString(body []Statement, funcCtx *class_context.ClassContext) string {
+	res := make([]string, 0, len(body))
+	for _, st := range body {
+		if ifs, ok := st.(*IfStatement); ok && len(ifs.IfBody) == 1 && len(ifs.ElseBody) > 0 && isPlainBreakStatement(ifs.IfBody[0], funcCtx) && ifs.Condition != nil {
+			condition := values.SimplifyConditionValue(values.NewUnaryExpression(
+				ifs.Condition,
+				values.Not,
+				types.NewJavaPrimer(types.JavaBoolean),
+			))
+			res = append(res, fmt.Sprintf("if (%s){\n%s\n}else{\n%s\n}", condition.String(funcCtx), StatementsString(ifs.IfBody, funcCtx), StatementsString(ifs.ElseBody, funcCtx)))
+			continue
+		}
+		res = append(res, st.String(funcCtx))
+	}
+	return strings.Join(res, "\n")
+}
+
+func isPlainBreakStatement(st Statement, funcCtx *class_context.ClassContext) bool {
+	_, ok := st.(*CustomStatement)
+	return ok && strings.TrimSpace(st.String(funcCtx)) == "break"
+}
+
+func normalizeDoWhileBreakGuard(body string) string {
+	const prefix = "if ("
+	const marker = "){\nbreak\n}else{"
+	if !strings.HasPrefix(body, prefix) {
+		return body
+	}
+	idx := strings.Index(body, marker)
+	if idx <= len(prefix) {
+		return body
+	}
+	condition := body[len(prefix):idx]
+	if strings.ContainsAny(condition, "\n{}") || strings.HasPrefix(strings.TrimSpace(condition), "!") {
+		return body
+	}
+	return prefix + "!(" + condition + ")" + body[idx:]
 }
 
 type WhileStatement struct {

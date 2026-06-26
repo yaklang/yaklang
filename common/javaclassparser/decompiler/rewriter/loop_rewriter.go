@@ -36,6 +36,7 @@ func RebuildLoopNode(manager *RewriteManager) error {
 	}
 	return nil
 }
+
 // replaceNextInPlace rewires the edge node->oldNext to node->newNext while keeping the edge at
 // its original index inside node.Next. Position matters: a ConditionStatement's TrueNode()/
 // FalseNode() are bound to fixed Next indices computed during graph construction, so appending a
@@ -53,6 +54,21 @@ func replaceNextInPlace(node, oldNext, newNext *core.Node) {
 	node.Next = slices.Insert(node.Next, idx, newNext)
 	// newNext is already spliced into node.Next; AddNext only fixes the reverse Source link here.
 	node.AddNext(newNext)
+}
+
+func restoreJumpBreakCondition(node, breakTarget *core.Node) {
+	if node == nil || breakTarget == nil || node.JmpNode != breakTarget {
+		return
+	}
+	condition, ok := node.Statement.(*statements.ConditionStatement)
+	if !ok || condition.Condition == nil {
+		return
+	}
+	condition.Condition = values.SimplifyConditionValue(values.NewUnaryExpression(
+		condition.Condition,
+		values.Not,
+		types.NewJavaPrimer(types.JavaBoolean),
+	))
 }
 
 func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
@@ -159,6 +175,7 @@ func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 					return "break"
 				}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
 				}))
+				restoreJumpBreakCondition(node, next)
 				replaceNextInPlace(node, next, breakNode)
 				breakNode.AddNext(circleNode)
 				circleNode.AddNext(next)
