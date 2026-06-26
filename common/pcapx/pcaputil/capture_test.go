@@ -1,6 +1,7 @@
 package pcaputil
 
 import (
+	"context"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gopacket/gopacket"
@@ -8,6 +9,7 @@ import (
 	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/utils"
 	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -84,6 +86,31 @@ func TestBackgroundHandler(t *testing.T) {
 	if count1-count < 10 {
 		t.Fatal("count1-count < 10")
 	}
+}
+
+func TestStartEnableCacheNotifiesInterfaceCreatedBeforeCaptureStarted(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var interfaceCreated atomic.Bool
+	err := Start(
+		WithEmptyDeviceStop(true),
+		WithDevice("cache-created-order-test"),
+		WithContext(ctx),
+		WithEnableCache(true),
+		WithMockPcapOperation(&MockPcapOperation{}),
+		WithNetInterfaceCreated(func(handle *PcapHandleWrapper) {
+			interfaceCreated.Store(true)
+		}),
+		WithCaptureStartedCallback(func() {
+			if !interfaceCreated.Load() {
+				t.Error("capture started before net interface created callback ran")
+			}
+			cancel()
+		}),
+	)
+	require.NoError(t, err)
+	require.True(t, interfaceCreated.Load(), "net interface created callback was not called")
 }
 
 func TestWindowsToPcapGuid(t *testing.T) {
