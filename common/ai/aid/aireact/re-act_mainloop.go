@@ -623,6 +623,12 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 		wg:                   new(sync.WaitGroup),
 		pureInvokerMode:      true,
 	}
+	// Inherit parent tracker when passed via ConvertConfigToOptions; otherwise
+	// register this invoker so standalone child runtimes still hook browser.Open.
+	if cfg.GetBrowserSessionTracker() == nil {
+		invoker.browserSessionIDs = make(map[string]struct{})
+		cfg.SetBrowserSessionTracker(invoker)
+	}
 
 	if cfg.MemoryTriage != nil {
 		invoker.memoryTriage = cfg.MemoryTriage
