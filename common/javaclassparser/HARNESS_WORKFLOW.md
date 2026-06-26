@@ -48,8 +48,8 @@ go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
 - `STOP_ON_FIRST=1`：遇到第一个 `partial`/`err`/`panic` 立即保存并退出（按 §0 原则）。语料全清时会扫完整段范围并打印 `no failure found`，所以它也是"是否清零"的探针。
 - 语料已清零想确认时：重跑同一条，看到 `no failure found in scanned range` 即代表本范围 0 失败。
 - 想覆盖 spring/tomcat/netty 等非 a-c 前缀 jar：追加 `M2_INDUSTRY=1`（每 jar 上限 `M2_MAX_PER_JAR`，默认 200）。
-- `M2_PROGRESS_FILE=/tmp/jdec-progress/state.env`：每轮自动记录当前失败点、bucket、单类复现命令，以及两个续跑命令：`rerun_from_failure` 用于修复后从失败点前一个 class 复核；`continue_after_locked` 用于回归锁定后从下一个未处理 class 继续。
-- 手动续跑也可以用 `M2_RESUME_AFTER_CLASS=<N>` 跳过前 N 个稳定排序后的 class，或用 `M2_RESUME_AFTER=<jar>!<class>` 跳过到某个具体 class 之后。
+- `M2_PROGRESS_FILE=/tmp/jdec-progress/state.env`：每轮自动记录当前失败点、bucket、单类复现命令，以及续跑命令。优先使用 jar 级命令：`rerun_from_failure_jar` 从失败 jar 开头复核；`continue_after_locked_jar` 直接跳过已处理 jar 继续扫。class 级命令 `rerun_from_failure` / `continue_after_locked` 只在需要同 jar 内精确复查时使用。
+- 手动续跑优先用 `M2_START_JAR=<jar>` 从某个 jar 开始（包含该 jar），或 `M2_RESUME_AFTER_JAR=<jar>` 直接跳过某个 jar（不再打开前面的 jar，速度最快）。只有需要定位到同一个 jar 内某个 class 后面时，才用 `M2_RESUME_AFTER_CLASS=<N>` 或 `M2_RESUME_AFTER=<jar>!<class>`。
 
 ### 1b. 全量分桶 + 计数（阶段性盘点，分钟级）
 
@@ -176,6 +176,8 @@ diff <(head -1 /tmp/m2-before.txt) <(head -1 /tmp/m2-after.txt)
 |------|------|
 | **迭代首选：秒级定位第一个失败类** | `STUB_REASONS=1 STOP_ON_FIRST=1 M2_MAX_JARS=120 M2_MAX_CLASSES=24491 PROBLEM_DIR=/tmp/jdec-problems PROGRESS_EVERY=0 M2_PROGRESS_FILE=/tmp/jdec-progress/state.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/` |
 | 续跑到下一个未处理 class | 使用 `/tmp/jdec-progress/state.env` 中的 `continue_after_locked`，或手动加 `M2_RESUME_AFTER_CLASS=<N>` / `M2_RESUME_AFTER=<jar>!<class>` |
+| 续跑到下一个未处理 jar（首选，最快） | 使用 `/tmp/jdec-progress/state.env` 中的 `continue_after_locked_jar`，或手动加 `M2_RESUME_AFTER_JAR=<jar>` |
+| 从某个 jar 开始复核（包含该 jar） | `M2_START_JAR=<jar> STUB_REASONS=1 STOP_ON_FIRST=1 ... go test -run TestM2StubReasons -v ./common/javaclassparser/tests/` |
 | 大扫描 + 失败类落盘分桶（阶段性盘点） | `STUB_REASONS=1 M2_MAX_JARS=120 M2_MAX_CLASSES=24491 PROBLEM_DIR=/tmp/jdec-problems M2_PROGRESS_FILE=/tmp/jdec-progress/state.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/` |
 | 计数 + 每类指纹（前后对比） | `M2_OUT=/tmp/m2.txt M2_MAX_JARS=120 M2_MAX_CLASSES=12000 go test -run TestM2RegressionHarness -v ./common/javaclassparser/tests/` |
 | 单类复现（文件） | `DIAG_FILE=<path>.class go test -run TestDiagDecompileClass -v ./common/javaclassparser/tests/` |
@@ -202,6 +204,17 @@ diff <(head -1 /tmp/m2-before.txt) <(head -1 /tmp/m2-after.txt)
 
 - **记进度、快速复定位**：harness 按 jar 名字典序确定性扫描，"第一个出问题的 class 编号 / jar"是稳定可复现的。设置 `M2_PROGRESS_FILE=/tmp/jdec-progress/state.env` 后，harness 会自动写入当前最前失败点（如 `first_failure_class_index=3923`）、bucket、`DIAG_FILE` 复现命令，以及 `rerun_from_failure` / `continue_after_locked` 两条续跑命令。修好并锁定一个 case 后，使用 `continue_after_locked` 从下一个未处理 class 继续扫；下一个失败点应当**向后**推进（编号变大），可据此判断是否真有进展。
 
+- **优先用 jar 级续跑**：class offset 会先打开 jar、遍历 class，跳过大前缀时仍然慢。进度文件里的 `rerun_from_failure_jar` / `continue_after_locked_jar` 使用 `M2_START_JAR` / `M2_RESUME_AFTER_JAR`，能在打开 zip 前跳过整个 jar，后续长跑默认优先用这两个命令。只有要在同一个 jar 内从某个 class 之后精确继续，才退回 class 级游标。
+
+- **a-z 分片多进程扫描**：需要更快摸底时，不在单个 Go 进程内加并发（反编译器和语法校验有全局状态，进程内并发更容易引入非确定性）；改用多个独立 `go test` 进程按 jar basename 前缀分片。每个进程设置不同 `M2_JAR_PREFIXES`、`PROBLEM_DIR` 和 `M2_PROGRESS_FILE`，互不共享状态。例如：
+  ```bash
+  M2_JAR_PREFIXES=a-f STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-af M2_PROGRESS_FILE=/tmp/jdec-progress/af.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
+  M2_JAR_PREFIXES=g-l STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-gl M2_PROGRESS_FILE=/tmp/jdec-progress/gl.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
+  M2_JAR_PREFIXES=m-r STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-mr M2_PROGRESS_FILE=/tmp/jdec-progress/mr.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
+  M2_JAR_PREFIXES=s-z STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-sz M2_PROGRESS_FILE=/tmp/jdec-progress/sz.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
+  ```
+  为了公平地覆盖字母段，不要总从 `a` 开始。每轮可以随机选一个前缀段先跑，例如 `python3 -c 'import random; print(random.choice(["a-f","g-l","m-r","s-z"]))'` 选出本轮首段；修完首段失败后，再扫下一个随机段。
+
 - **单 jar 单独测**（确认本 jar 内修复没把邻居改坏、或专攻某个 jar）：
   ```bash
   STUB_REASONS=1 M2_INDUSTRY=1 M2_MAX_PER_JAR=100000 DIAG_JAR=<相对 ~/.m2 或绝对路径>.jar \
@@ -214,6 +227,12 @@ diff <(head -1 /tmp/m2-before.txt) <(head -1 /tmp/m2-after.txt)
 
 - **找上游源码对照（先拿到"正确答案"）**：失败 class 通常来自知名开源库（druid、logback、spring、guava…）。从失败 class 的 jar 名 + 类全限定名，去该库的 GitHub 仓库（优先用对应版本 tag，如 `alibaba/druid` 的 `druid-1.2.23`；找不到精确 tag 就退 `master`/`main`）拉原始 `.java` 源，定位到出错方法的**原始写法**。有了"教科书正确输出"，再对照反编译器当前产物，一眼就能看出是哪个结构（for+break、if-else-if、instanceof 链、值-merge）没结构化对——比对着乱码猜根因可靠一个数量级。拉取可直接 `curl https://raw.githubusercontent.com/<owner>/<repo>/<tag>/<path>`，或用 node/fetch。
 - **核心重构回归时反查测试 oracle**：改 `CalcOpcodeStackInfo`、slot/varTable 合流、`rewriteVar`、variable-fold 这类核心算法后，出现回归不能立刻认定"新算法一定错"。旧测试可能只是锁住了历史错误输出，或断言过窄、不符合真实 Java 语义。此时必须求真：先用 `javap -c -v` 看字节码真实控制流和局部变量槽；本机若有 CFR / FernFlower / Vineflower 等成熟反编译器，就对同一个 `.class` 生成第三方 oracle；没有这些工具时，用上游源码 oracle 和最小合成样本补足。只有确认新输出偏离字节码语义、源码 oracle 或成熟反编译器共识时，才回滚核心改动；如果是测试不科学，应修正测试，让测试表达语义不变量，而不是继续固定错误文本。
+- **第三方反编译器必须实际跑一遍**：难 case 不只看我们自己的输出。对落盘的 `DIAG_FILE`，至少用 CFR 和 Vineflower 各跑一次，观察成熟反编译器如何处理同一段控制流、slot 复用、switch/try/loop 结构：
+  ```bash
+  cfr /tmp/jdec-problems/<bucket>/<case>.class --outputdir /tmp/jdec-oracle/cfr
+  vineflower /tmp/jdec-problems/<bucket>/<case>.class /tmp/jdec-oracle/vineflower
+  ```
+  若第三方也退化或输出异常，优先看 `javap -c -v` 和上游源码；若第三方稳定重建，优先对照它的控制结构找我们的 CFG/栈模拟偏差。
 - **合成数据构造**：从失败 class 的字节码里提取出最小的失败模式（一段 `dup_x1/dup2_x1/swap`、一个带 `continue` 的 `do-while(true)`、一个跨 if-merge 的值），手写一个等价的最小 Java 源，`javac` 编译成 `.class` 当回归种子。最小可复现样本能把"500 字节码大方法"压缩成几十字节，根因一眼可见，回归也更快。
 - **搜索论文与各类知识**：操作数栈合并 / 值-merge 三元树 / switch 分发结构化 / `continue`-`break` 反循环展开，都有成熟研究（CFE/ASTRÉ、Procyon、CFR、Vine、Soot 的 `Body` 重构）。先弄清楚这类模式的"教科书正确输出"长什么样，再对照反编译器当前产物找偏差，比盲改可靠得多。
 - **构建 MVP**：对拿不准的结构化改动，先在一个最小合成样本上验证"这样改能不能产出语法正确、语义贴近的结果"，确认无误再往核心代码里落。MVP 能把高风险重构的爆炸半径锁死在一个文件里。
