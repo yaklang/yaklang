@@ -123,13 +123,6 @@ func (r *ReAct) saveDetachedPlanSession(
 func detachedPlanSelectors(coordinatorID string) []map[string]any {
 	return []map[string]any{
 		{
-			"id":                 fmt.Sprintf("detached-plan-freedom-%s", coordinatorID),
-			"value":              "freedom-review",
-			"prompt":             "审阅模式",
-			"prompt_english":     "User freely review the plan, can add more details or modify the plan",
-			"allow_extra_prompt": true,
-		},
-		{
 			"id":                 fmt.Sprintf("detached-plan-execute-%s", coordinatorID),
 			"value":              "continue",
 			"prompt":             "允许执行",
