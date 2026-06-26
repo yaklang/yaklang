@@ -1096,48 +1096,44 @@ func (c *Config) parseProjectWithFSUnits(
 				prog.UpStream.Len(),
 				time.Since(unitBuildStart),
 			)
-		} else if prog.Cache != nil {
-			// Writer cache not enabled, but we still need to clear memory!
-			// This is the fix for non-writer mode memory accumulation
-			preFlushIR := prog.Cache.CountInstruction()
-			preFlushHeap := captureHeapMetrics()
+	} else if prog.Cache != nil {
+		// Writer cache not enabled: do NOT aggressively clear stores or
+		// program-level structures here. Sources/instructions/editors are
+		// still needed for index building, Ref() lookups, GetEditorByHash,
+		// and Show().ForEachAllFile after compile; they persist to DB via
+		// the normal TTL/eviction path and the final SaveToDatabase flush.
+		// Aggressive clearing (incl. AggressiveClearMemory which wipes
+		// editorStack/UpStream/deferredBuilds) drops un-persisted state and
+		// breaks downstream FromDatabase/Ref/Show.
+		preFlushIR := prog.Cache.CountInstruction()
+		preFlushHeap := captureHeapMetrics()
 
-			// Clear all stores even in non-writer mode
-			clearedItems := prog.Cache.AggressiveClearAllStores()
+		clearedItems := 0
+		releasedFuncs := 0
 
-			// Clear Program structures
-			releasedFuncs := prog.ReleaseCompletedUnitMemory(unitKeys)
-			prog.AggressiveClearMemory()
+		postFlushHeap := captureHeapMetrics()
 
-			// Force GC
-			runtime.GC()
-			runtime.GC()
-			runtime.GC()
-			debug.FreeOSMemory()
-
-			postFlushHeap := captureHeapMetrics()
-
-			prog.ProcessInfof(
-				"compile unit batch(%d/%d) non-writer cleared scc=%d-%d units=%s mode=%s writer_enabled=%v cleared=%d released_funcs=%d resident_ir=%d funcs=%d blueprints=%d heap_mb=%.1f→%.1f(Δ%+.1f) upstreams=%d cost=%v",
-				batchIndex+1,
-				len(batches),
-				batch.startSCC+1,
-				batch.endSCC+1,
-				strings.Join(unitKeys, ","),
-				prog.Cache.InstructionCacheMode(),
-				writerCacheEnabled,
-				clearedItems,
-				releasedFuncs,
-				preFlushIR,
-				prog.Funcs.Len(),
-				prog.Blueprint.Len(),
-				preFlushHeap,
-				postFlushHeap,
-				postFlushHeap-preFlushHeap,
-				prog.UpStream.Len(),
-				time.Since(unitBuildStart),
-			)
-		}
+		prog.ProcessInfof(
+			"compile unit batch(%d/%d) non-writer cleared scc=%d-%d units=%s mode=%s writer_enabled=%v cleared=%d released_funcs=%d resident_ir=%d funcs=%d blueprints=%d heap_mb=%.1f→%.1f(Δ%+.1f) upstreams=%d cost=%v",
+			batchIndex+1,
+			len(batches),
+			batch.startSCC+1,
+			batch.endSCC+1,
+			strings.Join(unitKeys, ","),
+			prog.Cache.InstructionCacheMode(),
+			writerCacheEnabled,
+			clearedItems,
+			releasedFuncs,
+			preFlushIR,
+			prog.Funcs.Len(),
+			prog.Blueprint.Len(),
+			preFlushHeap,
+			postFlushHeap,
+			postFlushHeap-preFlushHeap,
+			prog.UpStream.Len(),
+			time.Since(unitBuildStart),
+		)
+	}
 		if compileUnitLogEnabled() {
 			prog.ProcessInfof("compile unit batch(%d/%d) build+flush finished units=%s cost=%v", batchIndex+1, len(batches), strings.Join(unitKeys, ","), time.Since(unitBuildStart))
 		}
