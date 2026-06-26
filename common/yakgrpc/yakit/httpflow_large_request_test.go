@@ -1,12 +1,16 @@
 package yakit
 
 import (
+	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 )
 
 func TestSpillLargeHTTPFlowRequestIfNeeded_Small(t *testing.T) {
@@ -36,6 +40,49 @@ func TestSpillLargeHTTPFlowRequestIfNeeded_Large(t *testing.T) {
 	rawBody, err := os.ReadFile(res.BodyFile)
 	require.NoError(t, err)
 	require.Equal(t, body, string(rawBody))
+}
+
+func TestPrepareLargeHTTPFlowRequest_Idempotent(t *testing.T) {
+	body := strings.Repeat("C", maxHTTPFlowRequestBodyInDBBytes+2048)
+	packet := []byte("POST /upload HTTP/1.1\r\nHost: example.com\r\nContent-Length: " + strconv.Itoa(len(body)) + "\r\n\r\n" + body)
+	req, err := http.NewRequest("POST", "http://example.com/upload", strings.NewReader(body))
+	require.NoError(t, err)
+
+	first := PrepareLargeHTTPFlowRequest(req, packet)
+	second := PrepareLargeHTTPFlowRequest(req, first)
+	require.Equal(t, first, second)
+	require.True(t, httpctx.GetRequestTooLarge(req))
+	require.NotEmpty(t, httpctx.GetRequestTooLargeBodyFile(req))
+	defer os.Remove(httpctx.GetRequestTooLargeHeaderFile(req))
+	defer os.Remove(httpctx.GetRequestTooLargeBodyFile(req))
+
+	flow, err := CreateHTTPFlow(
+		CreateHTTPFlowWithURL("http://example.com/upload"),
+		CreateHTTPFlowWithRequestRaw(packet),
+		CreateHTTPFlowWithRequestIns(req),
+		CreateHTTPFlowWithResponseRaw([]byte("HTTP/1.1 200 OK\r\n\r\nok")),
+	)
+	require.NoError(t, err)
+	require.True(t, flow.IsTooLargeRequest)
+	require.Equal(t, httpctx.GetRequestTooLargeBodyFile(req), flow.TooLargeRequestBodyFile)
+}
+
+func TestSyncLargeHTTPFlowFlagsFromStoredPacket(t *testing.T) {
+	bodyLen := int64(531374322)
+	req := fmt.Sprintf("POST /upload HTTP/1.1\r\nHost: 127.0.0.1:8765\r\nContent-Length: %d\r\n\r\n[[request too large(506.8MB), truncated]] use GetHTTPFlowBodyById(IsRequest=true) for full body", bodyLen)
+	flow := &schema.HTTPFlow{
+		Request: strconv.Quote(req),
+	}
+	SyncLargeHTTPFlowFlagsFromStoredPacket(flow, 0, 0)
+	require.True(t, flow.IsTooLargeRequest)
+	require.Equal(t, bodyLen, flow.RequestLength)
+
+	flow2 := &schema.HTTPFlow{
+		Request: "POST / HTTP/1.1\r\nHost: a\r\nContent-Length: 100\r\n\r\n[[request-too-large(1MB), truncated]]",
+	}
+	SyncLargeHTTPFlowFlagsFromStoredPacket(flow2, 100, 0)
+	require.True(t, flow2.IsTooLargeRequest)
+	require.Equal(t, int64(100), flow2.RequestLength)
 }
 
 func TestCreateHTTPFlow_LargeRequestSpill(t *testing.T) {

@@ -142,8 +142,6 @@ type CreateHTTPFlowConfig struct {
 	tags               string
 	tooLargeHeaderFile string
 	tooLargeBodyFile   string
-	tooLargeRequestHeaderFile string
-	tooLargeRequestBodyFile   string
 	fromPlugin         string
 	afterSaveHandlers  []func(*schema.HTTPFlow)
 }
@@ -345,8 +343,6 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		duration           = int64(c.duration)
 		tooLargeHeaderFile = c.tooLargeHeaderFile
 		tooLargeBodyFile   = c.tooLargeBodyFile
-		tooLargeRequestHeaderFile = c.tooLargeRequestHeaderFile
-		tooLargeRequestBodyFile   = c.tooLargeRequestBodyFile
 		fromPlugin         = c.fromPlugin
 	)
 
@@ -360,24 +356,9 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		requestBodyLen        int
 	)
 
-	spillRes, err := spillLargeHTTPFlowRequestIfNeeded(reqRaw)
+	reqRaw, isTooLargeRequest, tooLargeReqHeaderFile, tooLargeReqBodyFile, requestBodyLen, err := applyPreparedLargeRequestSpill(reqIns, reqRaw)
 	if err != nil {
 		return nil, utils.Errorf("spill large request failed: %s", err)
-	}
-	reqRaw = spillRes.StoredPacket
-	isTooLargeRequest = spillRes.IsTooLarge
-	tooLargeReqHeaderFile = spillRes.HeaderFile
-	tooLargeReqBodyFile = spillRes.BodyFile
-	requestBodyLen = spillRes.OriginalBodyLen
-
-	if tooLargeRequestHeaderFile != "" {
-		tooLargeReqHeaderFile = tooLargeRequestHeaderFile
-	}
-	if tooLargeRequestBodyFile != "" {
-		tooLargeReqBodyFile = tooLargeRequestBodyFile
-	}
-	if tooLargeReqHeaderFile != "" || tooLargeReqBodyFile != "" {
-		isTooLargeRequest = true
 	}
 
 	if !isTooLargeRequest {
@@ -465,18 +446,6 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 			flow.TooLargeResponseBodyFile = httpctx.GetResponseTooLargeBodyFile(reqIns)
 			flow.BodyLength = httpctx.GetResponseTooLargeSize(reqIns)
 		}
-		if httpctx.GetRequestTooLarge(reqIns) {
-			flow.IsTooLargeRequest = true
-			if fp := httpctx.GetRequestTooLargeHeaderFile(reqIns); fp != "" {
-				flow.TooLargeRequestHeaderFile = fp
-			}
-			if fp := httpctx.GetRequestTooLargeBodyFile(reqIns); fp != "" {
-				flow.TooLargeRequestBodyFile = fp
-			}
-			if sz := httpctx.GetRequestTooLargeSize(reqIns); sz > 0 {
-				flow.RequestLength = sz
-			}
-		}
 	} else {
 		fReq, _ = mutate.NewFuzzHTTPRequest(reqRaw)
 	}
@@ -559,6 +528,7 @@ func createHTTPFlowFromHTTP(isHttps bool, req *http.Request, rsp *http.Response,
 			}
 		}
 	}
+	plainRequest = PrepareLargeHTTPFlowRequest(req, plainRequest)
 
 	// 为了此处的响应与mitm的响应保持一致，需要重新从httpctx中获取
 	if rsp != nil {

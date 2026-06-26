@@ -784,3 +784,70 @@ func TestHarEntry2HTTPFlow_NilCases(t *testing.T) {
 		require.Equal(t, "example.com", flow.Host)
 	})
 }
+
+func TestHTTPFlowHarRoundTrip_LargeRequestByContent(t *testing.T) {
+	bodyLen := int64(300 * 1024)
+	storedReq := fmt.Sprintf("POST /upload HTTP/1.1\r\nHost: example.com\r\nContent-Length: %d\r\n\r\n[[request too large(300KB), truncated]] use GetHTTPFlowBodyById(IsRequest=true) for full body", bodyLen)
+	flow := &schema.HTTPFlow{
+		Method:            "POST",
+		Url:               "http://example.com/upload",
+		StatusCode:        200,
+		Request:           strconv.Quote(storedReq),
+		Response:          strconv.Quote("HTTP/1.1 200 OK\r\n\r\nok"),
+		IsTooLargeRequest: true,
+		RequestLength:     bodyLen,
+	}
+
+	entry, err := HTTPFlow2HarEntry(flow, &HTTPFlow2HarEntryOptions{
+		SelectedFields: []string{"request", "response", "method", "url", "request_length"},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, entry.Request)
+	require.NotNil(t, entry.Request.PostData)
+	require.Contains(t, entry.Request.PostData.Text, largeRequestTruncatePrefix)
+	require.Equal(t, int(bodyLen), entry.Request.BodySize)
+
+	restored, err := HarEntry2HTTPFlow(entry)
+	require.NoError(t, err)
+	require.True(t, restored.IsTooLargeRequest)
+	require.Equal(t, bodyLen, restored.RequestLength)
+	require.Contains(t, restored.GetRequest(), largeRequestTruncatePrefix)
+}
+
+func TestHTTPFlowHarRoundTrip_LargeResponseByContent(t *testing.T) {
+	bodyLen := int64(15_000_000)
+	storedRsp := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length: %d\r\n\r\n[[response too large(8MB), truncated]] find more in web fuzzer history!", bodyLen)
+	flow := &schema.HTTPFlow{
+		Method:             "GET",
+		Url:                "http://127.0.0.1:8788/misc/response/content_length",
+		StatusCode:         200,
+		Request:            strconv.Quote("GET /misc/response/content_length HTTP/1.1\r\nHost: 127.0.0.1:8788\r\n\r\n"),
+		Response:           strconv.Quote(storedRsp),
+		IsTooLargeResponse: true,
+		BodyLength:         bodyLen,
+	}
+
+	entry, err := HTTPFlow2HarEntry(flow, &HTTPFlow2HarEntryOptions{
+		SelectedFields: []string{"request", "response", "body_length"},
+	})
+	require.NoError(t, err)
+	require.Contains(t, entry.Response.Content.Text, largeResponseTruncatePrefix)
+	require.Equal(t, int(bodyLen), entry.Response.BodySize)
+
+	restored, err := HarEntry2HTTPFlow(entry)
+	require.NoError(t, err)
+	require.True(t, restored.IsTooLargeResponse)
+	require.Equal(t, bodyLen, restored.BodyLength)
+}
+
+func TestApplyImportedLargeHTTPFlowFlags(t *testing.T) {
+	flow := &schema.HTTPFlow{
+		Request:  strconv.Quote("POST / HTTP/1.1\r\nHost: a\r\nContent-Length: 999\r\n\r\n" + largeRequestTruncatePrefix + "]]"),
+		Response: strconv.Quote("HTTP/1.1 200 OK\r\nContent-Length: 888\r\n\r\n" + largeResponseTruncatePrefix + "]]"),
+	}
+	applyImportedLargeHTTPFlowFlags(flow, 999, 888)
+	require.True(t, flow.IsTooLargeRequest)
+	require.True(t, flow.IsTooLargeResponse)
+	require.Equal(t, int64(999), flow.RequestLength)
+	require.Equal(t, int64(888), flow.BodyLength)
+}

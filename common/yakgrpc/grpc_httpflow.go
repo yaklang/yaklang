@@ -569,7 +569,9 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 				IsTooLargeRequest:         data.IsTooLargeRequest,
 				TooLargeRequestHeaderFile: data.TooLargeRequestHeaderFile,
 				TooLargeRequestBodyFile:   data.TooLargeRequestBodyFile,
+				Host:                       data.Host,
 			}
+			yakit.SyncLargeHTTPFlowFlagsFromStoredPacket(shareHttpFlow, shareHttpFlow.RequestLength, shareHttpFlow.BodyLength)
 			var httpFlowId int64
 			var httpFlow schema.HTTPFlow
 
@@ -628,6 +630,9 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 		return nil
 	})
 
+	if err != nil {
+		return nil, err
+	}
 	return &ypb.Empty{}, nil
 }
 
