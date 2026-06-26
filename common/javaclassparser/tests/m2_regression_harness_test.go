@@ -152,6 +152,13 @@ func safeDecompileHarness(raw []byte) (out string, err error) {
 			err = fmt.Errorf("panic: %v", r)
 		}
 	}()
+	if os.Getenv("DIAG_RAW") != "" {
+		prev := javaclassparser.EnableDecompileSyntaxValidation
+		javaclassparser.EnableDecompileSyntaxValidation = false
+		defer func() {
+			javaclassparser.EnableDecompileSyntaxValidation = prev
+		}()
+	}
 	return javaclassparser.Decompile(raw)
 }
 

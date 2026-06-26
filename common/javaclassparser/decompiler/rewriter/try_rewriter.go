@@ -221,7 +221,7 @@ func TryRewriter(manager *RewriteManager, node *core.Node) error {
 	tryCatchSt.TryBody = append(tryCatchSt.TryBody, tryBody...)
 	tryCatchSt.CatchBodies = append(tryCatchSt.CatchBodies, catchBodies...)
 	endNodes = lo.Filter(endNodes, func(item *core.Node, index int) bool {
-		return !IsEndNode(item)
+		return item != tryNode && !IsEndNode(item)
 	})
 	for _, c := range NodeDeduplication(endNodes) {
 		tryNode.AddNext(c)

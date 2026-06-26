@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"runtime/debug"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -138,23 +139,28 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	splits := strings.Split(name, "/")
 	packageName := strings.Join(splits[:len(splits)-1], ".")
 	c.PackageName = packageName
-	className := splits[len(splits)-1]
+	rawClassName := splits[len(splits)-1]
+	className := class_context.SafeIdentifier(rawClassName)
 	// module-info / package-info are synthetic descriptor pseudo-classes; their internal
 	// name ("module-info" / "package-info") is not a legal Java identifier, so emitting
 	// `class module-info {}` yields un-parseable source. Render a valid minimal compilation
 	// unit instead. (Full JPMS module / package-info annotation reconstruction is a
 	// separate feature.)
-	if className == "module-info" || className == "package-info" {
+	if rawClassName == "module-info" || rawClassName == "package-info" {
 		var sb strings.Builder
-		if className == "package-info" && packageName != "" {
+		if rawClassName == "package-info" && packageName != "" {
 			sb.WriteString(fmt.Sprintf("package %s;\n\n", packageName))
 		}
-		sb.WriteString(fmt.Sprintf("// decompiled from a synthetic %s descriptor\n", className))
+		sb.WriteString(fmt.Sprintf("// decompiled from a synthetic %s descriptor\n", rawClassName))
 		return sb.String(), nil
 	}
 	supperClassName := c.obj.GetSupperClassName()
 	supperClassName = strings.Replace(supperClassName, "/", ".", -1)
-	c.ClassName = strings.Replace(name, "/", ".", -1)
+	if packageName == "" {
+		c.ClassName = className
+	} else {
+		c.ClassName = packageName + "." + className
+	}
 	funcCtx := &class_context.ClassContext{
 		ClassName:       c.ClassName,
 		SupperClassName: supperClassName,
@@ -405,29 +411,11 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 			}
 		}
 
-		lastPacket := ""
-		if fieldType.IsArray() {
-			javaTyp := fieldType.RawType().(*types.JavaArrayType)
-			fieldTypeStr := javaTyp.JavaType.String(c.FuncCtx)
-			c.FuncCtx.Import(fieldTypeStr)
-			shortName := c.FuncCtx.ShortTypeName(fieldTypeStr)
-			originalType := javaTyp.JavaType
-			javaTyp.JavaType = types.NewJavaClass(shortName)
-			// Render the array type itself (element + "[]" per dimension); rendering
-			// javaTyp.JavaType here dropped the brackets, typing `int[] TABLE` as `int`.
-			lastPacket = javaTyp.String(c.FuncCtx)
-			javaTyp.JavaType = originalType
-		} else {
-			// fieldType.String already registers the needed imports and shortens (or
-			// FQN-disambiguates) every class component via ShortTypeName, so the rendered
-			// string is the final field type. Re-running Import/ShortTypeName on that whole
-			// string corrupts parameterized or disambiguated types: e.g. a field typed
-			// `Set<java.util.logging.Logger>` (Logger kept fully-qualified to avoid clashing
-			// with an imported ch.qos...Logger) would be split on '.' into a bogus package
-			// `Set<java.util.logging` + class `Logger>`, emitting `import Set<...Logger>;` and
-			// collapsing the field type to `Logger>` -> un-parseable, so the field gets dropped.
-			lastPacket = fieldType.String(c.FuncCtx)
-		}
+		// fieldType.String already registers the needed imports and shortens (or
+		// FQN-disambiguates) every class component via ShortTypeName, so the rendered
+		// string is the final field type. Re-running Import/ShortTypeName on that whole
+		// string corrupts parameterized, array, or primitive-array types.
+		lastPacket := fieldType.String(c.FuncCtx)
 		valueLiteral := ""
 		for _, attr := range field.Attributes {
 			switch ret := attr.(type) {
@@ -500,6 +488,13 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 			}
 
 			fields = append(fields, dumped)
+		} else if c.isInterfaceLike() && slices.Contains(accessFlagsVerbose, "static") && slices.Contains(accessFlagsVerbose, "final") {
+			fields = append(fields, dumpedFields{
+				code:      fmt.Sprintf("%s %s %s = %s;", accessFlags, lastPacket, renderName, defaultInitializerForFieldType(lastPacket)),
+				fieldName: renderName,
+				modifier:  accessFlags,
+				typeName:  lastPacket,
+			})
 		} else {
 			// No initializer to emit (incl. blank finals assigned in the constructor /
 			// static block). A bogus `= 0` here would be illegal for reference types and is
@@ -513,6 +508,29 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 		}
 	}
 	return fields, nil
+}
+
+func defaultInitializerForFieldType(typeName string) string {
+	switch strings.TrimSpace(typeName) {
+	case "boolean":
+		return "false"
+	case "byte":
+		return "(byte)0"
+	case "char":
+		return "(char)0"
+	case "short":
+		return "(short)0"
+	case "int":
+		return "0"
+	case "long":
+		return "0L"
+	case "float":
+		return "0.0F"
+	case "double":
+		return "0.0D"
+	default:
+		return "null"
+	}
 }
 
 func (c *ClassObjectDumper) DumpAnnotation(anno *AnnotationAttribute) (string, error) {
@@ -663,6 +681,30 @@ func isUnconditionalTerminalStatement(st statements.Statement, funcCtx *class_co
 		if loopConditionIsConstTrue(s.ConditionValue, funcCtx) &&
 			!loopBodyHasEscapingBreak(s.Body, "", true, funcCtx) {
 			return true
+		}
+	}
+	return false
+}
+
+func needsTrailingIncompleteControlFlowThrow(statementList []statements.Statement, returnType types.JavaType, funcCtx *class_context.ClassContext) bool {
+	if returnType == nil || returnType.String(funcCtx) == "void" {
+		return false
+	}
+	for i := len(statementList) - 1; i >= 0; i-- {
+		st := statementList[i]
+		switch st.(type) {
+		case *statements.MiddleStatement, *statements.StackAssignStatement:
+			continue
+		}
+		switch s := st.(type) {
+		case *statements.DoWhileStatement:
+			return loopConditionIsConstTrue(s.ConditionValue, funcCtx) &&
+				loopBodyHasEscapingBreak(s.Body, s.Label, true, funcCtx)
+		case *statements.WhileStatement:
+			return loopConditionIsConstTrue(s.ConditionValue, funcCtx) &&
+				loopBodyHasEscapingBreak(s.Body, "", true, funcCtx)
+		default:
+			return false
 		}
 	}
 	return false
@@ -832,10 +874,14 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	//}
 	//println(name)
 	finalFieldMap := map[string]struct{}{}
+	finalFieldRenderNameToRaw := map[string]string{}
+	classStaticInitializersMustHoist := slices.Contains(c.obj.AccessFlagsVerbose, "interface") || slices.Contains(c.obj.AccessFlagsVerbose, "annotation")
 	for _, field := range c.obj.Fields {
 		var finalFalg uint16 = 0x0010
 		if field.AccessFlags&finalFalg == finalFalg {
-			finalFieldMap[c.obj.ConstantPoolManager.GetUtf8(int(field.NameIndex)).Value] = struct{}{}
+			rawName := c.obj.ConstantPoolManager.GetUtf8(int(field.NameIndex)).Value
+			finalFieldMap[rawName] = struct{}{}
+			finalFieldRenderNameToRaw[class_context.SafeIdentifier(rawName)] = rawName
 		}
 	}
 	annoStrs := []string{}
@@ -932,6 +978,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 					}
 				}
 			}
+			ensureUniqueParameterNames(samParams, funcCtx)
 			paramsNewStrList := []string{}
 			if !isLambda && name != "<init>" && name != "<clinit>" && len(samParams) != descriptorParamCount {
 				paramSlotOffset := 0
@@ -948,10 +995,15 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				}
 			} else {
 				for i, val := range samParams {
-					if i == len(samParams)-1 && isVarArgs {
-						paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s... %s", val.Type().ElementType().String(c.FuncCtx), val.String(c.FuncCtx)))
+					typ := val.Type()
+					if i == len(samParams)-1 && isVarArgs && typ != nil && typ.IsArray() {
+						paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s... %s", typ.ElementType().String(c.FuncCtx), val.String(c.FuncCtx)))
 					} else {
-						paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s %s", val.Type().String(c.FuncCtx), val.String(c.FuncCtx)))
+						typName := "java.lang.Object"
+						if typ != nil {
+							typName = typ.String(c.FuncCtx)
+						}
+						paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s %s", typName, val.String(c.FuncCtx)))
 					}
 				}
 			}
@@ -963,6 +1015,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 			resolveLocalNameCollisions(params, statementList)
 
 			sourceCode := "\n"
+			hoistableStaticInitLocals := map[string]string{}
 			statementSet := utils.NewSet[statements.Statement]()
 			var statementToString func(statement statements.Statement) string
 			var statementListToString func(statements []statements.Statement) string
@@ -1002,23 +1055,49 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				switch ret := statement.(type) {
 				case *statements.AssignStatement:
 					foundFieldInit := false
-					if v, ok := ret.LeftValue.(*values.RefMember); ok {
+					if ret.LeftValue != nil && ret.JavaValue != nil && funcCtx.FunctionName == "<clinit>" && classStaticInitializersMustHoist {
+						if ref, ok := ret.LeftValue.(*values.JavaRef); ok && !ref.IsThis {
+							if rhs := ret.JavaValue.String(funcCtx); canHoistFieldValueInitializer(ret.JavaValue, rhs) {
+								hoistableStaticInitLocals[strings.TrimSpace(ref.String(funcCtx))] = rhs
+								foundFieldInit = true
+							}
+						}
+					}
+					if v, ok := ret.LeftValue.(*values.RefMember); ok && ret.JavaValue != nil {
 						obj := core.UnpackSoltValue(v.Object)
-						if v1, ok := obj.(*values.JavaRef); ok && v1.IsThis && (funcCtx.FunctionName == "<cinit>" || funcCtx.FunctionName == "<init>" || funcCtx.FunctionName == funcCtx.ClassName) {
+						if v1, ok := obj.(*values.JavaRef); ok && v1.IsThis && (funcCtx.FunctionName == "<init>" || funcCtx.FunctionName == funcCtx.ClassName) {
 							if _, ok := finalFieldMap[v.Member]; ok {
-								if rhs := ret.JavaValue.String(funcCtx); canHoistFieldInitializer(rhs) {
+								if rhs := ret.JavaValue.String(funcCtx); canHoistFieldValueInitializer(ret.JavaValue, rhs) {
 									foundFieldInit = true
 									c.fieldDefaultValue[v.Member] = rhs
 								}
 							}
 						}
-					} else if v, ok := ret.LeftValue.(*values.JavaClassMember); ok {
-						if funcCtx.FunctionName == "<cinit>" || v.Name == funcCtx.ClassName {
+					} else if v, ok := ret.LeftValue.(*values.JavaClassMember); ok && ret.JavaValue != nil {
+						if (funcCtx.FunctionName == "<clinit>" && classStaticInitializersMustHoist) || v.Name == funcCtx.ClassName {
 							if _, ok := finalFieldMap[v.Member]; ok {
-								if rhs := ret.JavaValue.String(funcCtx); canHoistFieldInitializer(rhs) {
+								if rhs := ret.JavaValue.String(funcCtx); canHoistFieldValueInitializer(ret.JavaValue, rhs) {
 									foundFieldInit = true
 									c.fieldDefaultValue[v.Member] = rhs
 								}
+							}
+						}
+					}
+					if !foundFieldInit && ret.LeftValue != nil && ret.JavaValue != nil && funcCtx.FunctionName == "<clinit>" && classStaticInitializersMustHoist {
+						lhs := strings.TrimSpace(ret.LeftValue.String(funcCtx))
+						if strings.HasPrefix(lhs, c.GetConstructorMethodName()+".") {
+							lhs = strings.TrimPrefix(lhs, c.GetConstructorMethodName()+".")
+						}
+						if rawName, ok := finalFieldRenderNameToRaw[lhs]; ok {
+							rhs := ret.JavaValue.String(funcCtx)
+							if ref, ok := values.UnpackSoltValue(ret.JavaValue).(*values.JavaRef); ok {
+								if localInit, ok := hoistableStaticInitLocals[strings.TrimSpace(ref.String(funcCtx))]; ok {
+									rhs = localInit
+								}
+							}
+							if canHoistFieldValueInitializer(ret.JavaValue, rhs) {
+								foundFieldInit = true
+								c.fieldDefaultValue[rawName] = rhs
 							}
 						}
 					}
@@ -1046,6 +1125,13 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 						// When upstream type inference degrades the exception variable to a
 						// primitive (e.g. "boolean" from a reused slot), fall back to Throwable
 						// so the output stays syntactically valid.
+						switch {
+						case strings.HasSuffix(excType, "[]"):
+							excType = "Throwable"
+						case excType == "boolean" || excType == "byte" || excType == "char" || excType == "short" ||
+							excType == "int" || excType == "long" || excType == "float" || excType == "double" || excType == "void":
+							excType = "Throwable"
+						}
 						switch excType {
 						case "boolean", "byte", "char", "short", "int", "long", "float", "double", "void":
 							excType = "Throwable"
@@ -1099,6 +1185,14 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 						"%s\n"+
 						c.GetTabString()+"}", ret.Value.String(funcCtx), getBody(ret.Cases))
 				case *statements.IfStatement:
+					if isEmptyAssertionsDisabledGuard(ret, funcCtx) {
+						statementStr = ""
+						break
+					}
+					if stmt := buildReturnFromEmptyGuardTernary(ret, funcCtx); stmt != "" {
+						statementStr = c.GetTabString() + stmt + ";"
+						break
+					}
 					// Recover short-circuit boolean returns: when a method returns boolean and the
 					// if-then is empty (or only a `return true`) while the else is `return expr`,
 					// rewrite to `return condition || expr`. This is the simplest case of the
@@ -1161,7 +1255,16 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				// super(name, ordinal); enum constructors cannot call super explicitly.
 				supperInvokeStr = ""
 			}
+			if name != "<init>" && name != "<clinit>" &&
+				needsTrailingIncompleteControlFlowThrow(statementList, methodType.FunctionType().ReturnType, funcCtx) {
+				statementCodes = append(statementCodes, fmt.Sprintf("%sthrow new RuntimeException(\"incomplete control flow\");\n", c.GetTabString()))
+			}
 			sourceCode += supperInvokeStr + strings.Join(statementCodes, "")
+			receiverType := ""
+			if !funcCtx.IsStatic && name != "<clinit>" {
+				receiverType = c.GetConstructorMethodName()
+			}
+			sourceCode = addMissingGeneratedLocalDecls(sourceCode, paramsNewStr, receiverType)
 			code = sourceCode
 		}
 	}
@@ -1189,6 +1292,12 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 		dumped.bodyCode = code
 		return dumped, nil
 	}
+	if name == "<clinit>" && strings.TrimSpace(code) == "" {
+		dumped.methodName = name
+		dumped.code = ""
+		dumped.bodyCode = code
+		return dumped, nil
+	}
 	methodSourceBuffer := strings.Builder{}
 	isInterfaceType := slices.Contains(c.obj.AccessFlagsVerbose, "interface")
 	writeAccessFlags := func(buffer io.Writer) {
@@ -1205,7 +1314,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 		if name == "<init>" {
 			methodSourceBuffer.Write([]byte(c.GetConstructorMethodName()))
 		} else {
-			methodSourceBuffer.Write([]byte(name))
+			methodSourceBuffer.Write([]byte(class_context.SafeIdentifier(name)))
 		}
 	}
 	writeArguments := func(buffer io.Writer) {
@@ -1346,6 +1455,35 @@ func resolveLocalNameCollisions(params []values.JavaValue, body []statements.Sta
 	renameStatementsInScope(body, live)
 }
 
+func ensureUniqueParameterNames(params []values.JavaValue, funcCtx *class_context.ClassContext) {
+	seen := map[string]bool{}
+	for i, p := range params {
+		name := ""
+		if p != nil {
+			name = p.String(funcCtx)
+		}
+		if name == "" || seen[name] {
+			id := localDeclVarId(p)
+			if id == nil {
+				continue
+			}
+			base := name
+			if base == "" {
+				base = fmt.Sprintf("var%d", i)
+			}
+			for suffix := 1; ; suffix++ {
+				candidate := fmt.Sprintf("%s_%d", base, suffix)
+				if !seen[candidate] {
+					id.SetName(candidate)
+					name = candidate
+					break
+				}
+			}
+		}
+		seen[name] = true
+	}
+}
+
 func renameStatementsInScope(stmts []statements.Statement, live map[string]*utils2.VariableId) {
 	for _, st := range stmts {
 		switch s := st.(type) {
@@ -1392,11 +1530,76 @@ func renameStatementsInScope(stmts []statements.Statement, live map[string]*util
 // `this`, instance fields (this.x), and static members (Class.x) never render this way, so a
 // match means the expression depends on a method-scoped value.
 var localSlotRefRe = regexp.MustCompile(`\bvar\d+\b`)
+var generatedLocalRefRe = regexp.MustCompile(`\bvar\d+(?:_\d+)?\b`)
+var generatedLocalDeclRe = regexp.MustCompile(`\b(?:boolean|byte|char|short|int|long|float|double|String|[A-Za-z_$][A-Za-z0-9_$.<>?,]*(?:\[\])*)\s+(var\d+(?:_\d+)?)\b`)
+var mismatchedDoWhileIndexDeclRe = regexp.MustCompile(`int\s+(var\d+(?:_\d+)?)\s*=\s*0;\n(\s*)do\{\n(\s*)if \(\((var\d+)\) <`)
 
 // monitorTempAssignRe matches a dead synthetic monitor temp left in the synchronized()
 // argument position, e.g. `var2 = this.lock`, capturing the lock expression itself.
 var monitorTempAssignRe = regexp.MustCompile(`^var\d+ = (.+)$`)
 var doWhileBreakGuardRe = regexp.MustCompile(`^(\s*)if \(([^\n{}]*)\)\{\n\s*break;\n\s*\}else\{`)
+
+func addMissingGeneratedLocalDecls(body, params, receiverType string) string {
+	body = repairMismatchedDoWhileIndexDecls(body)
+	declared := map[string]bool{}
+	for _, match := range generatedLocalDeclRe.FindAllStringSubmatch(params+"\n"+body, -1) {
+		if len(match) > 1 {
+			declared[match[1]] = true
+		}
+	}
+	missing := []string{}
+	seen := map[string]bool{}
+	for _, name := range generatedLocalRefRe.FindAllString(body, -1) {
+		if (name != "var0" || receiverType == "") && declared[name] || seen[name] {
+			continue
+		}
+		seen[name] = true
+		missing = append(missing, name)
+	}
+	if len(missing) == 0 {
+		return body
+	}
+	sort.Slice(missing, func(i, j int) bool {
+		return missing[i] < missing[j]
+	})
+	lines := make([]string, 0, len(missing))
+	for _, name := range missing {
+		typ, zero := "Object", "null"
+		if name == "var0" && receiverType != "" {
+			typ, zero = receiverType, "this"
+		} else if generatedLocalLooksInt(body, name) {
+			typ, zero = "int", "0"
+		}
+		lines = append(lines, fmt.Sprintf("\t%s %s = %s;\n", typ, name, zero))
+	}
+	return "\n" + strings.Join(lines, "") + strings.TrimPrefix(body, "\n")
+}
+
+func repairMismatchedDoWhileIndexDecls(body string) string {
+	return mismatchedDoWhileIndexDeclRe.ReplaceAllStringFunc(body, func(match string) string {
+		parts := mismatchedDoWhileIndexDeclRe.FindStringSubmatch(match)
+		if len(parts) != 5 || parts[1] == parts[4] {
+			return match
+		}
+		return fmt.Sprintf("int %s = 0;\n%sdo{\n%sif ((%s) <", parts[4], parts[2], parts[3], parts[4])
+	})
+}
+
+func generatedLocalLooksInt(body, name string) bool {
+	quoted := regexp.QuoteMeta(name)
+	patterns := []string{
+		`\b` + quoted + `\s*(?:\+\+|--)`,
+		`(?:\+\+|--)\s*` + quoted + `\b`,
+		`\(` + quoted + `\)\s*(?:<|>|<=|>=|==|!=)`,
+		`\[\s*` + quoted + `\s*\]`,
+	}
+	for _, pattern := range patterns {
+		if regexp.MustCompile(pattern).MatchString(body) {
+			return true
+		}
+	}
+	return false
+}
 
 // canHoistFieldInitializer reports whether a `final`-field assignment found inside <init>/
 // <clinit> may be lifted into a field initializer. A real field initializer cannot reference
@@ -1408,6 +1611,16 @@ var doWhileBreakGuardRe = regexp.MustCompile(`^(\s*)if \(([^\n{}]*)\)\{\n\s*brea
 // initializer.
 func canHoistFieldInitializer(rhs string) bool {
 	return !localSlotRefRe.MatchString(rhs)
+}
+
+func canHoistFieldValueInitializer(value values.JavaValue, rhs string) bool {
+	if canHoistFieldInitializer(rhs) {
+		return true
+	}
+	if cv, ok := values.UnpackSoltValue(value).(*values.CustomValue); ok && cv.Flag == "lambda" && cv.NoOuterCapture {
+		return true
+	}
+	return false
 }
 
 func javaFloatLiteral(f float32) string {
@@ -1452,15 +1665,30 @@ const malformedTryNoCatchMarker = "yak-decompiler-internal: try without catch ha
 
 func normalizeDoWhileBreakGuardSource(body string) string {
 	match := doWhileBreakGuardRe.FindStringSubmatchIndex(body)
-	if match == nil || len(match) < 6 {
+	if len(match) < 6 {
 		return body
 	}
 	conditionStart, conditionEnd := match[4], match[5]
 	condition := strings.TrimSpace(body[conditionStart:conditionEnd])
-	if condition == "" || strings.HasPrefix(condition, "!") || !strings.Contains(condition, "<") {
+	if !shouldInvertDoWhileBreakGuard(condition) {
 		return body
 	}
 	return body[:conditionStart] + "!(" + condition + ")" + body[conditionEnd:]
+}
+
+func shouldInvertDoWhileBreakGuard(condition string) bool {
+	condition = strings.TrimSpace(condition)
+	if condition == "" || strings.HasPrefix(condition, "!") {
+		return false
+	}
+	// Only invert the common structured-loop shape where the positive loop/body
+	// condition (`i < n` / `i <= n`) was attached to the synthetic break arm.
+	// Already-negative break guards such as `i >= n` are semantically correct as-is.
+	if strings.Contains(condition, ">=") || strings.Contains(condition, ">") ||
+		strings.Contains(condition, "==") || strings.Contains(condition, "!=") {
+		return false
+	}
+	return strings.Contains(condition, "<")
 }
 
 func canFlattenNoCatchTry(body string) bool {
@@ -1729,6 +1957,9 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 		// 	continue
 		// }
 		res, err := c.safeDumpMethod(name, descriptor)
+		if err == nil && res != nil && name == "<clinit>" && c.isInterfaceLike() && isIgnorableAssertionOnlyClinit(res.code) {
+			continue
+		}
 		if err == nil && res != nil && strings.Contains(res.code, values.EmptySlotValuePlaceholder) {
 			// The decompiled body leaked an internal placeholder ("empty slot value"),
 			// which means the stack simulation was incomplete and the emitted source is
@@ -1759,6 +1990,13 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 				res = retry
 				err = nil
 			}
+		}
+		if name == "<clinit>" && c.isInterfaceLike() {
+			// Interfaces and annotations cannot declare a source-level static initializer.
+			// DumpMethodWithInitialId has already hoisted any representable final-field
+			// assignments into field initializers; leftover helper-array stores have no legal
+			// method form and must not be emitted only to be dropped by the syntax safety net.
+			continue
 		}
 		if err != nil {
 			// Graceful degradation: an un-decompilable method body must not fail the whole
@@ -1802,6 +2040,29 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 		result = append(result, res)
 	}
 	return result, nil
+}
+
+func (c *ClassObjectDumper) isInterfaceLike() bool {
+	return slices.Contains(c.obj.AccessFlagsVerbose, "interface") || slices.Contains(c.obj.AccessFlagsVerbose, "annotation")
+}
+
+func isIgnorableAssertionOnlyClinit(code string) bool {
+	body := strings.TrimSpace(code)
+	if !strings.Contains(body, "$assertionsDisabled") {
+		return false
+	}
+	body = strings.TrimPrefix(body, "static")
+	body = strings.TrimSpace(body)
+	body = strings.TrimPrefix(body, "{")
+	body = strings.TrimSuffix(body, "}")
+	body = strings.TrimSpace(body)
+	body = strings.ReplaceAll(body, "\n", "")
+	body = strings.ReplaceAll(body, "\t", "")
+	body = strings.ReplaceAll(body, " ", "")
+	return body == "" ||
+		body == "if(Record$1.$assertionsDisabled){}else{return;}" ||
+		strings.HasPrefix(body, "if(") && strings.Contains(body, "$assertionsDisabled)") &&
+			strings.HasSuffix(body, "{}else{return;}")
 }
 
 func (c *ClassObjectDumper) dumpConstantPool() ([]string, error) {
@@ -1867,6 +2128,71 @@ func isBoolReturnIfElse(ifSt *statements.IfStatement, funcCtx *class_context.Cla
 		return false
 	}
 	return true
+}
+
+func buildReturnFromEmptyGuardTernary(ifSt *statements.IfStatement, funcCtx *class_context.ClassContext) string {
+	if !isEffectivelyEmptyBody(ifSt.IfBody) || ifSt.Condition == nil {
+		return ""
+	}
+	meaningfulElse := meaningfulStatements(ifSt.ElseBody)
+	if len(meaningfulElse) != 1 {
+		return ""
+	}
+	ret, ok := meaningfulElse[0].(*statements.ReturnStatement)
+	if !ok || ret.JavaValue == nil {
+		return ""
+	}
+	tern, ok := values.UnpackSoltValue(ret.JavaValue).(*values.TernaryExpression)
+	if !ok || tern.Condition == nil || tern.TrueValue == nil || tern.FalseValue == nil {
+		return ""
+	}
+	slot, ok := tern.Condition.(*values.SlotValue)
+	if !ok || slot.GetValue() != nil {
+		return ""
+	}
+	guard := values.SimplifyConditionValue(values.NewUnaryExpression(
+		ifSt.Condition,
+		values.Not,
+		types.NewJavaPrimer(types.JavaBoolean),
+	))
+	return fmt.Sprintf("return (%s) ? (%s) : (%s)", guard.String(funcCtx), tern.TrueValue.String(funcCtx), tern.FalseValue.String(funcCtx))
+}
+
+func isEffectivelyEmptyBody(body []statements.Statement) bool {
+	return len(meaningfulStatements(body)) == 0
+}
+
+func isEmptyAssertionsDisabledGuard(ifSt *statements.IfStatement, funcCtx *class_context.ClassContext) bool {
+	if ifSt == nil || ifSt.Condition == nil {
+		return false
+	}
+	if !isEffectivelyNoOpBody(ifSt.IfBody) || !isEffectivelyNoOpBody(ifSt.ElseBody) {
+		return false
+	}
+	return strings.Contains(ifSt.Condition.String(funcCtx), "$assertionsDisabled")
+}
+
+func isEffectivelyNoOpBody(body []statements.Statement) bool {
+	for _, st := range meaningfulStatements(body) {
+		ret, ok := st.(*statements.ReturnStatement)
+		if !ok || ret.JavaValue != nil {
+			return false
+		}
+	}
+	return true
+}
+
+func meaningfulStatements(body []statements.Statement) []statements.Statement {
+	var out []statements.Statement
+	for _, st := range body {
+		switch st.(type) {
+		case *statements.MiddleStatement, *statements.StackAssignStatement:
+			continue
+		default:
+			out = append(out, st)
+		}
+	}
+	return out
 }
 
 // buildBoolReturnFromIfElse emits `return cond || elseExpr` from the detected if-else pattern.

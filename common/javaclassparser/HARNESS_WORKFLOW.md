@@ -1,7 +1,7 @@
 # Java 反编译长尾清零工作流 (HARNESS_WORKFLOW)
 
 > 目标: 把 `.m2` 真实 jar 语料上的 `partial` / `syntax` / `err` / `panic` 逐个清零。
-> 配套基准: [`YAK_DECOMPILER_BENCHMARK.md`](./YAK_DECOMPILER_BENCHMARK.md)
+> 配套基准（中/英）: [`JAVA_DECOMPILER.zh-CN.md`](./JAVA_DECOMPILER.zh-CN.md) / [`JAVA_DECOMPILER.md`](./JAVA_DECOMPILER.md)
 >
 > 适用任意承载这项工作的分支；本文不绑定具体分支名。
 >
@@ -49,7 +49,7 @@ go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
 - 语料已清零想确认时：重跑同一条，看到 `no failure found in scanned range` 即代表本范围 0 失败。
 - 想覆盖 spring/tomcat/netty 等非 a-c 前缀 jar：追加 `M2_INDUSTRY=1`（每 jar 上限 `M2_MAX_PER_JAR`，默认 200）。
 - `M2_PROGRESS_FILE=/tmp/jdec-progress/state.env`：每轮自动记录当前失败点、bucket、单类复现命令，以及续跑命令。优先使用 jar 级命令：`rerun_from_failure_jar` 从失败 jar 开头复核；`continue_after_locked_jar` 直接跳过已处理 jar 继续扫。class 级命令 `rerun_from_failure` / `continue_after_locked` 只在需要同 jar 内精确复查时使用。
-- 手动续跑优先用 `M2_START_JAR=<jar>` 从某个 jar 开始（包含该 jar），或 `M2_RESUME_AFTER_JAR=<jar>` 直接跳过某个 jar（不再打开前面的 jar，速度最快）。只有需要定位到同一个 jar 内某个 class 后面时，才用 `M2_RESUME_AFTER_CLASS=<N>` 或 `M2_RESUME_AFTER=<jar>!<class>`。
+- 手动续跑优先用 `M2_START_JAR=<jar>` 从某个 jar 开始（包含该 jar），或 `M2_RESUME_AFTER_JAR=<jar>` 直接跳过某个 jar（不再打开前面的 jar，速度最快）。也可以用 `M2_START_JAR_INDEX=<N>` + `M2_START_JAR_END=<M>` 限定 jar 字典序下标闭区间（1 基，包含两端），便于多进程分片扫描。只有需要定位到同一个 jar 内某个 class 后面时，才用 `M2_RESUME_AFTER_CLASS=<N>` 或 `M2_RESUME_AFTER=<jar>!<class>`。
 
 ### 1b. 全量分桶 + 计数（阶段性盘点，分钟级）
 
@@ -150,7 +150,7 @@ go test -run 'TestDecompileSyntaxRegression|TestGAPanicFreeBoundary|TestSyntaxCo
    - 新增回归用例通过；
    - `TestSyntaxCoverageMatrix` / `TestRecompileRoundtrip` 合成语料仍 0 stub / 0 round-trip 失败；
    - 整包 `go test ./common/javaclassparser/...` 全绿且 ≤ 30s；
-   - 在 [`YAK_DECOMPILER_BENCHMARK.md`](./YAK_DECOMPILER_BENCHMARK.md) 追加一节，记录本轮根因、修复点、同配置 before/after 的 `partial`/`stubs`/`panic` 计数（用真实数据，禁止编造）。
+   - 在 [`JAVA_DECOMPILER.md`](./JAVA_DECOMPILER.md) 追加一节，记录本轮根因、修复点、同配置 before/after 的 `partial`/`stubs`/`panic` 计数（用真实数据，禁止编造）。
 
 ---
 
@@ -168,12 +168,6 @@ go test -run TestM2RegressionHarness -v ./common/javaclassparser/tests/
 diff <(head -1 /tmp/m2-before.txt) <(head -1 /tmp/m2-after.txt)
 ```
 
-### 4a. 2026-06-26 本轮续跑记录
-
-- `xom-1.2.10.jar!nu/xom/UnicodeUtil.class` 的 `try without catch handler`：根因是内部 try handler 丢失后渲染成裸 try。修复原则不是盲目生成 catch，而是只在 try body 非空且没有内部占位符/错误哨兵时透明展开；否则继续用 `yak-decompiler-internal: try without catch handler` 触发诚实 stub。
-- `jakarta.mail-1.6.5.jar!com/sun/mail/pop3/Protocol.class` 的 `retr(II)`：残留 `ConditionStatement` 可能带多个结构化出口，最终 checker 不能仅因后继数不是 2 就直接失败；后续线性收集和 post-decompile 语法验证会继续兜底。
-- 验证数据：`go test -count=1 ./common/javaclassparser/...` 全绿；`M2_JAR_PREFIXES=q,z,x,j,k,u,v,w M2_RESUME_AFTER_CLASS=14161 ... M2_MAX_CLASSES=18000` 补扫 `3839` 个 class，`ok=3839 partial=0 err=0 stubs=0`；`M2_JAR_PREFIXES=a,b,c,d,e,f,g,h,i,l,m,n,o,p,r,s,t,y ... M2_MAX_CLASSES=12000` 新窗口扫描 `12000` 个 class，`ok=12000 partial=0 err=0 stubs=0`。
-
 ---
 
 ## 速查表
@@ -184,6 +178,8 @@ diff <(head -1 /tmp/m2-before.txt) <(head -1 /tmp/m2-after.txt)
 | 续跑到下一个未处理 class | 使用 `/tmp/jdec-progress/state.env` 中的 `continue_after_locked`，或手动加 `M2_RESUME_AFTER_CLASS=<N>` / `M2_RESUME_AFTER=<jar>!<class>` |
 | 续跑到下一个未处理 jar（首选，最快） | 使用 `/tmp/jdec-progress/state.env` 中的 `continue_after_locked_jar`，或手动加 `M2_RESUME_AFTER_JAR=<jar>` |
 | 从某个 jar 开始复核（包含该 jar） | `M2_START_JAR=<jar> STUB_REASONS=1 STOP_ON_FIRST=1 ... go test -run TestM2StubReasons -v ./common/javaclassparser/tests/` |
+| 扫描 jar 下标闭区间（多进程分片） | `M2_START_JAR_INDEX=50 M2_START_JAR_END=200 STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-50-200 M2_PROGRESS_FILE=/tmp/jdec-progress/50-200.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/` |
+| 调整单进程 jar 并行数 | 默认 `M2_CONCURRENT_JARS=4`；需要降噪/排查时设 `M2_CONCURRENT_JARS=1`，CPU 余量足时可试 `M2_CONCURRENT_JARS=8` |
 | 大扫描 + 失败类落盘分桶（阶段性盘点） | `STUB_REASONS=1 M2_MAX_JARS=120 M2_MAX_CLASSES=24491 PROBLEM_DIR=/tmp/jdec-problems M2_PROGRESS_FILE=/tmp/jdec-progress/state.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/` |
 | 计数 + 每类指纹（前后对比） | `M2_OUT=/tmp/m2.txt M2_MAX_JARS=120 M2_MAX_CLASSES=12000 go test -run TestM2RegressionHarness -v ./common/javaclassparser/tests/` |
 | 单类复现（文件） | `DIAG_FILE=<path>.class go test -run TestDiagDecompileClass -v ./common/javaclassparser/tests/` |
@@ -196,7 +192,7 @@ diff <(head -1 /tmp/m2-before.txt) <(head -1 /tmp/m2-after.txt)
 
 ## 后台扫描 + 前台并行修复（加速长尾清零）
 
-全量 `.m2` 扫描是分钟级、且串行的，等它结束再修会大量浪费时间。推荐的工作方式是**后台跑全量收集、前台并行逐个修**，互不阻塞：
+全量 `.m2` 扫描是分钟级任务，等它结束再修会大量浪费时间。推荐的工作方式是**后台跑全量收集、前台并行逐个修**，互不阻塞：
 
 - **后台启动全量收集**（一次性把所有失败 class 落盘分桶，前台立刻继续干活）：
   ```bash
@@ -212,7 +208,9 @@ diff <(head -1 /tmp/m2-before.txt) <(head -1 /tmp/m2-after.txt)
 
 - **优先用 jar 级续跑**：class offset 会先打开 jar、遍历 class，跳过大前缀时仍然慢。进度文件里的 `rerun_from_failure_jar` / `continue_after_locked_jar` 使用 `M2_START_JAR` / `M2_RESUME_AFTER_JAR`，能在打开 zip 前跳过整个 jar，后续长跑默认优先用这两个命令。只有要在同一个 jar 内从某个 class 之后精确继续，才退回 class 级游标。
 
-- **a-z 分片多进程扫描**：需要更快摸底时，不在单个 Go 进程内加并发（反编译器和语法校验有全局状态，进程内并发更容易引入非确定性）；改用多个独立 `go test` 进程按 jar basename 前缀分片。每个进程设置不同 `M2_JAR_PREFIXES`、`PROBLEM_DIR` 和 `M2_PROGRESS_FILE`，互不共享状态。例如：
+- **单进程 jar 并行**：`TestM2StubReasons` 默认 `M2_CONCURRENT_JARS=4`，即同一个 `go test` 进程内最多同时扫描 4 个 jar；worker 只做 jar/class 反编译，主 goroutine 仍按 jar 字典序聚合计数、落盘和 `STOP_ON_FIRST`，所以“第一个失败”仍按扫描顺序决定。调参时在本机 `100-160` 窗口、400 个 class 上对比过 `1/2/4/8`，`4` 略优且不会过度抢 CPU；需要排查并发相关问题时设置 `M2_CONCURRENT_JARS=1` 可回到串行。
+
+- **a-z 分片多进程扫描**：需要更快摸底时，可以继续改用多个独立 `go test` 进程按 jar basename 前缀分片。每个进程设置不同 `M2_JAR_PREFIXES`、`PROBLEM_DIR` 和 `M2_PROGRESS_FILE`，互不共享状态。例如：
   ```bash
   M2_JAR_PREFIXES=a-f STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-af M2_PROGRESS_FILE=/tmp/jdec-progress/af.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
   M2_JAR_PREFIXES=g-l STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-gl M2_PROGRESS_FILE=/tmp/jdec-progress/gl.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
@@ -221,11 +219,24 @@ diff <(head -1 /tmp/m2-before.txt) <(head -1 /tmp/m2-after.txt)
   ```
   为了公平地覆盖字母段，不要总从 `a` 开始。每轮可以随机选一个前缀段先跑，例如 `python3 -c 'import random; print(random.choice(["a-f","g-l","m-r","s-z"]))'` 选出本轮首段；修完首段失败后，再扫下一个随机段。
 
+- **jar 下标窗口分片**：当字母前缀分布不均、或想精确切连续范围时，使用 `M2_START_JAR_INDEX` / `M2_START_JAR_END`。下标基于排序后的 jar 列表，先应用 `M2_JAR_PREFIXES` 过滤，再按 1 基闭区间扫描；显式设置窗口后不会再受默认 `M2_MAX_JARS=120` 截断影响。多个进程要使用不同的 `PROBLEM_DIR` 和 `M2_PROGRESS_FILE`；每个进程内部仍默认最多 4 个 jar 并行：
+  ```bash
+  M2_START_JAR_INDEX=10 M2_START_JAR_END=20 STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-10-20 M2_PROGRESS_FILE=/tmp/jdec-progress/10-20.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
+  M2_START_JAR_INDEX=100 M2_START_JAR_END=110 STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-100-110 M2_PROGRESS_FILE=/tmp/jdec-progress/100-110.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
+  ```
+  如果同时启动多个独立窗口，建议把单进程内部并发降到 `M2_CONCURRENT_JARS=1`，并按机器余量设置 `GOMAXPROCS=2` 或 `GOMAXPROCS=3`。原因是 `Decompile` 的语法安全网会调用 ANTLR 解析，超时后也只能放弃等待，底层解析 goroutine 仍会继续跑完；外层多进程再叠加内部 jar 并发，容易出现 CPU/内存过度抢占，日志还会因为有序聚合等待窗口首个慢 jar 而看起来“不动”。遇到 Saxon 这类大 jar 时，优先把它拆成单 jar 小窗口，例如：
+  ```bash
+  GOMAXPROCS=2 M2_START_JAR_INDEX=876 M2_START_JAR_END=876 M2_CONCURRENT_JARS=1 STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-876 M2_PROGRESS_FILE=/tmp/jdec-progress/876.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
+  GOMAXPROCS=2 M2_START_JAR_INDEX=877 M2_START_JAR_END=1200 M2_CONCURRENT_JARS=1 STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-877-1200 M2_PROGRESS_FILE=/tmp/jdec-progress/877-1200.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
+  ```
+
 - **单 jar 单独测**（确认本 jar 内修复没把邻居改坏、或专攻某个 jar）：
   ```bash
   STUB_REASONS=1 M2_INDUSTRY=1 M2_MAX_PER_JAR=100000 DIAG_JAR=<相对 ~/.m2 或绝对路径>.jar \
     go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
   ```
+
+## 进度信息不在这里保存
 
 ## 遇到难 case 的通用解题法
 

@@ -6,6 +6,7 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 
@@ -129,6 +130,7 @@ func RewriteVar(sts *[]statements.Statement, startVarId int, params []*values.Ja
 	// Lift cross-case switch-local declarations out of their case bodies. Runs last so the
 	// IsFirst decisions above are final and this pass's demotions are not subsequently undone.
 	hoistSwitchDeclarations(sts)
+	dropEmptySlotAssignments(sts)
 }
 
 type Scope struct {
@@ -167,6 +169,90 @@ func (s *Scope) SubScope(sts *[]statements.Statement) *Scope {
 // structured tree may contain. It backstops AssertStatementsAcyclic's traversal against a degenerate
 // (but technically acyclic) explosion of nested blocks.
 const maxStructuredContainers = 1_000_000
+
+// PruneCyclicContainerReferences removes structurally-impossible backlinks where a container
+// statement appears inside its own descendant body. Such links are artifacts of CFG structuring,
+// not Java source structure, and must be removed before recursive tree walkers run.
+func PruneCyclicContainerReferences(roots []statements.Statement) []statements.Statement {
+	ancestors := make(map[statements.Statement]struct{})
+	visited := make(map[statements.Statement]struct{})
+	var pruneList func([]statements.Statement) []statements.Statement
+	var pruneStatement func(statements.Statement)
+
+	pruneList = func(list []statements.Statement) []statements.Statement {
+		if len(list) == 0 {
+			return list
+		}
+		out := list[:0]
+		for _, child := range list {
+			if child == nil {
+				continue
+			}
+			if _, ok := ancestors[child]; ok {
+				continue
+			}
+			pruneStatement(child)
+			out = append(out, child)
+		}
+		return out
+	}
+
+	pruneStatement = func(st statements.Statement) {
+		if st == nil {
+			return
+		}
+		if _, ok := visited[st]; ok {
+			return
+		}
+		switch s := st.(type) {
+		case *statements.IfStatement:
+			visited[st] = struct{}{}
+			ancestors[st] = struct{}{}
+			s.IfBody = pruneList(s.IfBody)
+			s.ElseBody = pruneList(s.ElseBody)
+			delete(ancestors, st)
+		case *statements.ForStatement:
+			visited[st] = struct{}{}
+			ancestors[st] = struct{}{}
+			s.SubStatements = pruneList(s.SubStatements)
+			delete(ancestors, st)
+		case *statements.WhileStatement:
+			visited[st] = struct{}{}
+			ancestors[st] = struct{}{}
+			s.Body = pruneList(s.Body)
+			delete(ancestors, st)
+		case *statements.DoWhileStatement:
+			visited[st] = struct{}{}
+			ancestors[st] = struct{}{}
+			s.Body = pruneList(s.Body)
+			delete(ancestors, st)
+		case *statements.SwitchStatement:
+			visited[st] = struct{}{}
+			ancestors[st] = struct{}{}
+			for _, c := range s.Cases {
+				if c != nil {
+					c.Body = pruneList(c.Body)
+				}
+			}
+			delete(ancestors, st)
+		case *statements.TryCatchStatement:
+			visited[st] = struct{}{}
+			ancestors[st] = struct{}{}
+			s.TryBody = pruneList(s.TryBody)
+			for i := range s.CatchBodies {
+				s.CatchBodies[i] = pruneList(s.CatchBodies[i])
+			}
+			delete(ancestors, st)
+		case *statements.SynchronizedStatement:
+			visited[st] = struct{}{}
+			ancestors[st] = struct{}{}
+			s.Body = pruneList(s.Body)
+			delete(ancestors, st)
+		}
+	}
+
+	return pruneList(roots)
+}
 
 // AssertStatementsAcyclic verifies that the structured statement tree produced for one method is a
 // proper tree of nested-block containers (if/for/while/do-while/switch/try) - i.e. no container is its
@@ -423,49 +509,149 @@ var hoistProbeCtx = &class_context.ClassContext{}
 // block; reference detection is by final variable NAME, which is consistent across the rendered
 // output. See hoistSwitchDeclarations for why this is always safe.
 func switchHoistDeclarations(sw *statements.SwitchStatement, afterSts []statements.Statement) []statements.Statement {
-	declaredInside := map[*utils.VariableId]bool{}
-	assignsByUid := map[*utils.VariableId][]*statements.AssignStatement{}
-	refByUid := map[*utils.VariableId]values.JavaValue{}
-	for _, c := range sw.Cases {
-		for _, st := range c.Body {
-			as, ok := st.(*statements.AssignStatement)
-			if !ok || as.ArrayMember != nil {
-				continue
-			}
-			ref, ok := as.LeftValue.(*values.JavaRef)
-			if !ok {
-				continue
-			}
-			assignsByUid[ref.Id] = append(assignsByUid[ref.Id], as)
-			refByUid[ref.Id] = as.LeftValue
-			if as.IsFirst || as.IsDeclare {
-				declaredInside[ref.Id] = true
+	declaredInside := map[string]bool{}
+	assignsByUid := map[string][]*statements.AssignStatement{}
+	refByUid := map[string]values.JavaValue{}
+	var collect func([]statements.Statement)
+	collect = func(sts []statements.Statement) {
+		for _, st := range sts {
+			switch s := st.(type) {
+			case *statements.AssignStatement:
+				if s.ArrayMember != nil {
+					continue
+				}
+				ref, ok := core.UnpackSoltValue(s.LeftValue).(*values.JavaRef)
+				if !ok || ref == nil || ref.Id == nil {
+					continue
+				}
+				assignsByUid[ref.VarUid] = append(assignsByUid[ref.VarUid], s)
+				refByUid[ref.VarUid] = s.LeftValue
+				if s.IsFirst || s.IsDeclare {
+					declaredInside[ref.VarUid] = true
+				}
+			case *statements.IfStatement:
+				collect(s.IfBody)
+				collect(s.ElseBody)
+			case *statements.ForStatement:
+				collect(s.SubStatements)
+			case *statements.WhileStatement:
+				collect(s.Body)
+			case *statements.DoWhileStatement:
+				collect(s.Body)
+			case *statements.SynchronizedStatement:
+				collect(s.Body)
+			case *statements.TryCatchStatement:
+				collect(s.TryBody)
+				for i := range s.CatchBodies {
+					collect(s.CatchBodies[i])
+				}
+			case *statements.SwitchStatement:
+				for _, c := range s.Cases {
+					collect(c.Body)
+				}
 			}
 		}
 	}
-	uids := make([]*utils.VariableId, 0, len(assignsByUid))
+	for _, c := range sw.Cases {
+		collect(c.Body)
+	}
+	uids := make([]string, 0, len(assignsByUid))
 	for uid := range assignsByUid {
 		uids = append(uids, uid)
 	}
 	sort.SliceStable(uids, func(i, j int) bool {
-		return uids[i].String() < uids[j].String()
+		return uids[i] < uids[j]
 	})
 	var declares []statements.Statement
 	for _, uid := range uids {
 		if !declaredInside[uid] {
 			continue
 		}
-		name := refByUid[uid].String(hoistProbeCtx)
+		if len(assignsByUid[uid]) < 2 {
+			continue
+		}
+		targetRef := refByUid[uid]
+		name := targetRef.String(hoistProbeCtx)
+		for _, as := range assignsByUid[uid] {
+			ref, ok := core.UnpackSoltValue(as.LeftValue).(*values.JavaRef)
+			if !ok || ref == nil || ref.Id == nil {
+				continue
+			}
+			candidateName := ref.String(hoistProbeCtx)
+			if candidateName != "" && statementsReadName(afterSts, candidateName) {
+				targetRef = as.LeftValue
+				name = candidateName
+				break
+			}
+		}
 		if name == "" || !statementsReadName(afterSts, name) {
 			continue
 		}
+		targetJavaRef, ok := core.UnpackSoltValue(targetRef).(*values.JavaRef)
+		if !ok || targetJavaRef == nil || targetJavaRef.Id == nil {
+			continue
+		}
+		targetID := targetJavaRef.Id
 		for _, as := range assignsByUid[uid] {
+			if ref, ok := core.UnpackSoltValue(as.LeftValue).(*values.JavaRef); ok && ref != nil && ref.Id != targetID {
+				ref.Id = targetID
+			}
 			as.IsFirst = false
 			as.IsDeclare = false
 		}
-		declares = append(declares, statements.NewDeclareStatement(refByUid[uid]))
+		declares = append(declares, statements.NewDeclareStatement(targetRef))
 	}
 	return declares
+}
+
+func dropEmptySlotAssignments(sts *[]statements.Statement) {
+	if sts == nil {
+		return
+	}
+	list := *sts
+	out := make([]statements.Statement, 0, len(list))
+	for _, st := range list {
+		switch s := st.(type) {
+		case *statements.AssignStatement:
+			if !s.IsDeclare && s.ArrayMember == nil && assignmentValueIsEmptySlot(s.JavaValue) {
+				continue
+			}
+		case *statements.IfStatement:
+			dropEmptySlotAssignments(&s.IfBody)
+			dropEmptySlotAssignments(&s.ElseBody)
+		case *statements.ForStatement:
+			dropEmptySlotAssignments(&s.SubStatements)
+		case *statements.WhileStatement:
+			dropEmptySlotAssignments(&s.Body)
+		case *statements.DoWhileStatement:
+			dropEmptySlotAssignments(&s.Body)
+		case *statements.SynchronizedStatement:
+			dropEmptySlotAssignments(&s.Body)
+		case *statements.TryCatchStatement:
+			dropEmptySlotAssignments(&s.TryBody)
+			for i := range s.CatchBodies {
+				dropEmptySlotAssignments(&s.CatchBodies[i])
+			}
+		case *statements.SwitchStatement:
+			for i := range s.Cases {
+				dropEmptySlotAssignments(&s.Cases[i].Body)
+			}
+		}
+		out = append(out, st)
+	}
+	*sts = out
+}
+
+func assignmentValueIsEmptySlot(value values.JavaValue) (ok bool) {
+	if value == nil {
+		return true
+	}
+	defer func() {
+		if recover() != nil {
+			ok = true
+		}
+	}()
+	return strings.Contains(value.String(hoistProbeCtx), values.EmptySlotValuePlaceholder)
 }
 
 // ifHoistDeclarations demotes declarations inside an if/else tree when the local is read after the
