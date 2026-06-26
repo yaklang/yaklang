@@ -49,7 +49,7 @@ go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
 - 语料已清零想确认时：重跑同一条，看到 `no failure found in scanned range` 即代表本范围 0 失败。
 - 想覆盖 spring/tomcat/netty 等非 a-c 前缀 jar：追加 `M2_INDUSTRY=1`（每 jar 上限 `M2_MAX_PER_JAR`，默认 200）。
 - `M2_PROGRESS_FILE=/tmp/jdec-progress/state.env`：每轮自动记录当前失败点、bucket、单类复现命令，以及续跑命令。优先使用 jar 级命令：`rerun_from_failure_jar` 从失败 jar 开头复核；`continue_after_locked_jar` 直接跳过已处理 jar 继续扫。class 级命令 `rerun_from_failure` / `continue_after_locked` 只在需要同 jar 内精确复查时使用。
-- 手动续跑优先用 `M2_START_JAR=<jar>` 从某个 jar 开始（包含该 jar），或 `M2_RESUME_AFTER_JAR=<jar>` 直接跳过某个 jar（不再打开前面的 jar，速度最快）。只有需要定位到同一个 jar 内某个 class 后面时，才用 `M2_RESUME_AFTER_CLASS=<N>` 或 `M2_RESUME_AFTER=<jar>!<class>`。
+- 手动续跑优先用 `M2_START_JAR=<jar>` 从某个 jar 开始（包含该 jar），或 `M2_RESUME_AFTER_JAR=<jar>` 直接跳过某个 jar（不再打开前面的 jar，速度最快）。也可以用 `M2_START_JAR_INDEX=<N>` + `M2_START_JAR_END=<M>` 限定 jar 字典序下标闭区间（1 基，包含两端），便于多进程分片扫描。只有需要定位到同一个 jar 内某个 class 后面时，才用 `M2_RESUME_AFTER_CLASS=<N>` 或 `M2_RESUME_AFTER=<jar>!<class>`。
 
 ### 1b. 全量分桶 + 计数（阶段性盘点，分钟级）
 
@@ -178,6 +178,7 @@ diff <(head -1 /tmp/m2-before.txt) <(head -1 /tmp/m2-after.txt)
 | 续跑到下一个未处理 class | 使用 `/tmp/jdec-progress/state.env` 中的 `continue_after_locked`，或手动加 `M2_RESUME_AFTER_CLASS=<N>` / `M2_RESUME_AFTER=<jar>!<class>` |
 | 续跑到下一个未处理 jar（首选，最快） | 使用 `/tmp/jdec-progress/state.env` 中的 `continue_after_locked_jar`，或手动加 `M2_RESUME_AFTER_JAR=<jar>` |
 | 从某个 jar 开始复核（包含该 jar） | `M2_START_JAR=<jar> STUB_REASONS=1 STOP_ON_FIRST=1 ... go test -run TestM2StubReasons -v ./common/javaclassparser/tests/` |
+| 扫描 jar 下标闭区间（多进程分片） | `M2_START_JAR_INDEX=50 M2_START_JAR_END=200 STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-50-200 M2_PROGRESS_FILE=/tmp/jdec-progress/50-200.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/` |
 | 大扫描 + 失败类落盘分桶（阶段性盘点） | `STUB_REASONS=1 M2_MAX_JARS=120 M2_MAX_CLASSES=24491 PROBLEM_DIR=/tmp/jdec-problems M2_PROGRESS_FILE=/tmp/jdec-progress/state.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/` |
 | 计数 + 每类指纹（前后对比） | `M2_OUT=/tmp/m2.txt M2_MAX_JARS=120 M2_MAX_CLASSES=12000 go test -run TestM2RegressionHarness -v ./common/javaclassparser/tests/` |
 | 单类复现（文件） | `DIAG_FILE=<path>.class go test -run TestDiagDecompileClass -v ./common/javaclassparser/tests/` |
@@ -214,6 +215,12 @@ diff <(head -1 /tmp/m2-before.txt) <(head -1 /tmp/m2-after.txt)
   M2_JAR_PREFIXES=s-z STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-sz M2_PROGRESS_FILE=/tmp/jdec-progress/sz.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
   ```
   为了公平地覆盖字母段，不要总从 `a` 开始。每轮可以随机选一个前缀段先跑，例如 `python3 -c 'import random; print(random.choice(["a-f","g-l","m-r","s-z"]))'` 选出本轮首段；修完首段失败后，再扫下一个随机段。
+
+- **jar 下标窗口分片**：当字母前缀分布不均、或想精确切连续范围时，使用 `M2_START_JAR_INDEX` / `M2_START_JAR_END`。下标基于排序后的 jar 列表，先应用 `M2_JAR_PREFIXES` 过滤，再按 1 基闭区间扫描；显式设置窗口后不会再受默认 `M2_MAX_JARS=120` 截断影响。多个进程要使用不同的 `PROBLEM_DIR` 和 `M2_PROGRESS_FILE`：
+  ```bash
+  M2_START_JAR_INDEX=10 M2_START_JAR_END=20 STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-10-20 M2_PROGRESS_FILE=/tmp/jdec-progress/10-20.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
+  M2_START_JAR_INDEX=100 M2_START_JAR_END=110 STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-100-110 M2_PROGRESS_FILE=/tmp/jdec-progress/100-110.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
+  ```
 
 - **单 jar 单独测**（确认本 jar 内修复没把邻居改坏、或专攻某个 jar）：
   ```bash

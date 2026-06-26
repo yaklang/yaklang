@@ -88,11 +88,16 @@ func TestM2StubReasons(t *testing.T) {
 	// Resume controls for huge ~/.m2 runs. Prefer jar-level cursors when the next iteration should
 	// skip a large already-cleared prefix: M2_START_JAR starts at a matching jar (inclusive), and
 	// M2_RESUME_AFTER_JAR starts after it (exclusive). M2_RESUME_AFTER_CLASS and M2_RESUME_AFTER remain
-	// available for class-exact replay inside one jar.
+	// available for class-exact replay inside one jar. M2_START_JAR_INDEX and M2_START_JAR_END define
+	// a 1-based inclusive jar-index window over the sorted, prefix-filtered jar list; this is intended
+	// for running multiple independent go test processes over disjoint ~/.m2 shards.
 	resumeAfterClass := envInt("M2_RESUME_AFTER_CLASS", 0)
 	resumeAfterName := os.Getenv("M2_RESUME_AFTER")
 	startJarName := os.Getenv("M2_START_JAR")
 	resumeAfterJarName := os.Getenv("M2_RESUME_AFTER_JAR")
+	startJarIndex := envInt("M2_START_JAR_INDEX", 0)
+	endJarIndex := envInt("M2_START_JAR_END", 0)
+	hasJarIndexWindow := startJarIndex > 0 || endJarIndex > 0
 	progressFile := os.Getenv("M2_PROGRESS_FILE")
 	seenResumeName := resumeAfterName == ""
 	// Industry mode (M2_INDUSTRY=1): scan EVERY jar in ~/.m2 (covers spring/tomcat/netty/... not just
@@ -180,10 +185,21 @@ func TestM2StubReasons(t *testing.T) {
 		allow := parseJarPrefixFilter(jarPrefixes)
 		jars = filterJarsByPrefix(jars, allow)
 	}
-	if !industry && len(jars) > maxJars {
+	if !industry && !hasJarIndexWindow && len(jars) > maxJars {
 		jars = jars[:maxJars]
 	}
-	fmt.Fprintf(os.Stderr, "[stub-reasons] start: jars=%d industry=%v maxClasses=%d maxPerJar=%d prefixes=%q\n", len(jars), industry, maxClasses, maxPerJar, jarPrefixes)
+	effectiveStartJarIndex, effectiveEndJarIndex := 1, len(jars)
+	if startJarIndex > 0 {
+		effectiveStartJarIndex = startJarIndex
+	}
+	if endJarIndex > 0 {
+		effectiveEndJarIndex = endJarIndex
+	}
+	if len(jars) == 0 {
+		effectiveStartJarIndex, effectiveEndJarIndex = 0, 0
+	}
+	fmt.Fprintf(os.Stderr, "[stub-reasons] start: jars=%d industry=%v maxClasses=%d maxPerJar=%d prefixes=%q jarIndexStart=%d jarIndexEnd=%d\n",
+		len(jars), industry, maxClasses, maxPerJar, jarPrefixes, effectiveStartJarIndex, effectiveEndJarIndex)
 
 	reasonRe := regexp.MustCompile(`/\* yak-decompiler:([^*]*)\*/`)
 	digitsRe := regexp.MustCompile(`\d+`)
@@ -229,6 +245,10 @@ func TestM2StubReasons(t *testing.T) {
 		fmt.Fprintf(&b, "max_jars=%d\n", maxJars)
 		fmt.Fprintf(&b, "max_classes=%d\n", maxClasses)
 		fmt.Fprintf(&b, "max_per_jar=%d\n", maxPerJar)
+		if hasJarIndexWindow {
+			fmt.Fprintf(&b, "jar_index_start=%d\n", effectiveStartJarIndex)
+			fmt.Fprintf(&b, "jar_index_end=%d\n", effectiveEndJarIndex)
+		}
 		fmt.Fprintf(&b, "absolute_scanned=%d\n", absClasses)
 		fmt.Fprintf(&b, "window_scanned=%d\n", nClasses)
 		fmt.Fprintf(&b, "ok=%d\npartial=%d\nerr=%d\nstubs=%d\n", nOK, nPartial, nErr, nStubs)
@@ -247,6 +267,12 @@ func TestM2StubReasons(t *testing.T) {
 			}
 			if strings.TrimSpace(jarPrefixes) != "" {
 				prefixEnv += fmt.Sprintf("M2_JAR_PREFIXES=%s ", jarPrefixes)
+			}
+			if startJarIndex > 0 {
+				prefixEnv += fmt.Sprintf("M2_START_JAR_INDEX=%d ", startJarIndex)
+			}
+			if endJarIndex > 0 {
+				prefixEnv += fmt.Sprintf("M2_START_JAR_END=%d ", endJarIndex)
 			}
 			fmt.Fprintf(&b, "first_failure_class_index=%d\n", firstFailureAbsClass)
 			fmt.Fprintf(&b, "first_failure_class=%s\n", firstFailureName)
@@ -270,6 +296,15 @@ func TestM2StubReasons(t *testing.T) {
 
 jarLoop:
 	for ji, jp := range jars {
+		jarIndex := ji + 1
+		if hasJarIndexWindow {
+			if startJarIndex > 0 && jarIndex < startJarIndex {
+				continue
+			}
+			if endJarIndex > 0 && jarIndex > endJarIndex {
+				break
+			}
+		}
 		if !seenResumeAfterJar {
 			if jarCursorMatches(resumeAfterJarName, jp) {
 				seenResumeAfterJar = true
@@ -283,7 +318,7 @@ jarLoop:
 				continue
 			}
 		}
-		currentJarIndex = ji + 1
+		currentJarIndex = jarIndex
 		currentJarName = filepath.Base(jp)
 		currentJarPath = jp
 		currentJarWindowClasses = 0
