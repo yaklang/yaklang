@@ -147,6 +147,7 @@ func (d *Decompiler) ParseOpcode() (err error) {
 	reader := NewJavaByteCodeReader(d.bytecodes)
 	id := 1
 	isWide := false
+	var wideOffset uint16
 	for {
 		b, err := reader.ReadByte()
 		if err != nil {
@@ -159,11 +160,13 @@ func (d *Decompiler) ParseOpcode() (err error) {
 		}
 		if instr.OpCode == OP_WIDE {
 			isWide = true
+			wideOffset = uint16(current)
 			continue
 		}
 		opcode := &OpCode{Instr: instr, Id: id, CurrentOffset: uint16(current)}
 		if isWide {
 			opcode.IsWide = true
+			opcode.CurrentOffset = wideOffset
 			isWide = false
 		}
 		var factory = DefaultFactory
@@ -175,8 +178,8 @@ func (d *Decompiler) ParseOpcode() (err error) {
 			return err
 		}
 		opcodes = append(opcodes, opcode)
-		offsetToIndex[uint16(current)] = len(opcodes) - 1
-		indexToOffset[len(opcodes)-1] = uint16(current)
+		offsetToIndex[opcode.CurrentOffset] = len(opcodes) - 1
+		indexToOffset[len(opcodes)-1] = opcode.CurrentOffset
 		id++
 	}
 	d.offsetToOpcodeIndex = offsetToIndex
@@ -1191,6 +1194,38 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			return false
 		}
 	}
+	conditionSlotForIfNode := func(ifNode *OpCode) values.JavaValue {
+		var condition values.JavaValue
+		if ifNode != nil {
+			switch ifNode.Instr.OpCode {
+			case OP_IF_ACMPEQ, OP_IF_ACMPNE, OP_IF_ICMPLT, OP_IF_ICMPGE, OP_IF_ICMPGT, OP_IF_ICMPNE, OP_IF_ICMPEQ, OP_IF_ICMPLE:
+				if len(ifNode.stackConsumed) == 2 {
+					rv := ifNode.stackConsumed[0]
+					lv := ifNode.stackConsumed[1]
+					condition = statements.NewConditionStatement(values.NewJavaCompare(lv, rv), GetNotOp(ifNode)).Condition
+				}
+			case OP_IFNONNULL:
+				if len(ifNode.stackConsumed) == 1 {
+					condition = statements.NewConditionStatement(values.NewJavaCompare(ifNode.stackConsumed[0], values.JavaNull), EQ).Condition
+				}
+			case OP_IFNULL:
+				if len(ifNode.stackConsumed) == 1 {
+					condition = statements.NewConditionStatement(values.NewJavaCompare(ifNode.stackConsumed[0], values.JavaNull), NEQ).Condition
+				}
+			case OP_IFEQ, OP_IFNE, OP_IFLE, OP_IFLT, OP_IFGT, OP_IFGE:
+				if len(ifNode.stackConsumed) == 1 {
+					op := GetReverseOp(GetOp(ifNode))
+					v := ifNode.stackConsumed[0]
+					if cmp, ok := v.(*values.JavaCompare); ok {
+						condition = statements.NewConditionStatement(cmp, op).Condition
+					} else {
+						condition = statements.NewConditionStatement(values.NewJavaCompare(v, values.NewJavaLiteral(0, types.NewJavaPrimer(types.JavaInteger))), op).Condition
+					}
+				}
+			}
+		}
+		return values.NewSlotValue(condition, types.NewJavaPrimer(types.JavaBoolean))
+	}
 	opcodes := GraphToList(d.RootOpCode)
 	ifOpcodes := lo.Filter(opcodes, func(code *OpCode, index int) bool {
 		return isIfNode(code)
@@ -1252,18 +1287,20 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		// (which must stay aligned with SwitchJmpCase1's case-value -> index mapping). That made
 		// every case map to the wrong body. Target is already in the correct case-index order.
 		var runtimeStackSimulation *StackSimulationImpl
-		if len(code.Source) == 0 {
-			if code.Instr.OpCode == OP_START {
-				emptySim := NewEmptyStackEntry()
-				varId := d.BaseVarId
-				if varId == nil {
-					varId = utils2.NewRootVariableId()
-				}
-				runtimeStackSimulation = NewStackSimulation(emptySim, varTable, varId)
-				initMethodVar(runtimeStackSimulation)
-			} else {
-				return nil, fmt.Errorf("opcode %d has no source", code.Id)
+		if code.Instr.OpCode == OP_START {
+			// OP_START is the synthetic method entry and must seed the local-variable table from
+			// the descriptor. Some irreducible/loop CFGs can leave a backlink to the synthetic
+			// entry; inheriting stack state from that source drops method parameters and creates
+			// nil-id locals (for example ICU4J CollationData.getScriptIndex).
+			emptySim := NewEmptyStackEntry()
+			varId := d.BaseVarId
+			if varId == nil {
+				varId = utils2.NewRootVariableId()
 			}
+			runtimeStackSimulation = NewStackSimulation(emptySim, varTable, varId)
+			initMethodVar(runtimeStackSimulation)
+		} else if len(code.Source) == 0 {
+			return nil, fmt.Errorf("opcode %d has no source", code.Id)
 		} else if len(code.Source) == 1 {
 			if IsSwitchOpcode(code.Source[0].Instr.OpCode) {
 				// A switch's case/default targets must inherit the operand-stack state that held
@@ -1384,6 +1421,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			var isIfMergeNode bool
 			if len(ifNodes) > 0 {
 				ifSize := -1
+				ifSizeMismatch := false
 				for _, ifNode := range ifNodes {
 					if ifNode.StackEntry == nil {
 						continue
@@ -1394,11 +1432,16 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 						ifSize = stackSize
 					} else {
 						if ifSize != stackSize {
-							return nil, fmt.Errorf("invalid stack size %d for opcode %d", stackSize, code.Id)
+							// Mismatched candidate if-stack sizes mean this merge is not a pure value
+							// merge (for example Kotlin null-check code where the throw arm keeps a
+							// duplicated value on a terminal path). Fall back to ordinary merge handling
+							// instead of stubbing the whole method.
+							ifSizeMismatch = true
+							break
 						}
 					}
 				}
-				if ifSize != -1 {
+				if ifSize != -1 && !ifSizeMismatch {
 					isIfMergeNode = ifSize < size
 				}
 			}
@@ -1411,7 +1454,11 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 				preSim := NewStackSimulation(validSource.StackEntry, scope.VarTable, scope.VarId)
 				preSim.Pop()
 				runtimeStackSimulation = NewStackSimulation(preSim.stackEntry, preferConcreteMergeVars(scope.VarTable, validSources), scope.VarId)
-				slotVal := values.NewSlotValue(nil, validSource.StackEntry.value.Type())
+				// Seed the merge slot with a concrete arm value as a conservative fallback. The
+				// ternary reconstruction below will replace it when it can prove the full value tree;
+				// if reconstruction declines, this avoids leaking the internal empty-slot marker into
+				// terminal consumers such as ireturn.
+				slotVal := values.NewSlotValue(validSource.StackEntry.value, validSource.StackEntry.value.Type())
 				runtimeStackSimulation.Push(slotVal)
 				ternaryExpMergeNodeSlot[code] = slotVal
 				ternaryExpMergeNode = append(ternaryExpMergeNode, code)
@@ -1774,7 +1821,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 				failed = true
 				return nil
 			}
-			t := values.NewTernaryExpression(values.NewSlotValue(nil, types.NewJavaPrimer(types.JavaBoolean)), nil, nil)
+			t := values.NewTernaryExpression(conditionSlotForIfNode(ifNode), nil, nil)
 			built[ifNode] = t
 			t.TrueValue = arm(ifNode.Target[1])
 			t.FalseValue = arm(ifNode.Target[0])
@@ -2039,7 +2086,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 					return nil
 				}
 				visited[ifNode] = true
-				tern := values.NewTernaryExpression(values.NewSlotValue(nil, types.NewJavaPrimer(types.JavaBoolean)), nil, nil)
+				tern := values.NewTernaryExpression(conditionSlotForIfNode(ifNode), nil, nil)
 				built[ifNode] = tern
 				tern.TrueValue = arm(ifNode.Target[1])
 				tern.FalseValue = arm(ifNode.Target[0])
@@ -2110,7 +2157,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 					}
 				}
 				if !isTernaryExp {
-					return errors.New("found invalid ternary expression")
+					continue
 				}
 			}
 			var defaultTarnaryValue *values.TernaryExpression
@@ -2125,7 +2172,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 						trueRouteEnd = source[0]
 					}
 					trueFalseValuePair = []values.JavaValue{falseRouteEnd.StackEntry.value, trueRouteEnd.StackEntry.value}
-					ternaryValue := values.NewTernaryExpression(values.NewSlotValue(nil, types.NewJavaPrimer(types.JavaBoolean)), trueRouteEnd.StackEntry.value, falseRouteEnd.StackEntry.value)
+					ternaryValue := values.NewTernaryExpression(conditionSlotForIfNode(opCode), trueRouteEnd.StackEntry.value, falseRouteEnd.StackEntry.value)
 					code.conditionOpId = opCode.Id
 					ternaryExpMergeNodeSlot[code].ResetValue(ternaryValue)
 					ifNodeToConditionCallback[opCode] = func(value values.JavaValue) {
@@ -2160,7 +2207,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 								defaultTarnaryValue.Condition = value
 							}
 						} else {
-							newValue := values.NewTernaryExpression(values.NewSlotValue(nil, types.NewJavaPrimer(types.JavaBoolean)), ternaryExpMergeNodeSlot[code].GetValue(), target.StackEntry.value)
+							newValue := values.NewTernaryExpression(conditionSlotForIfNode(opCode), ternaryExpMergeNodeSlot[code].GetValue(), target.StackEntry.value)
 							newValue.Type().ResetType(ternaryExpMergeNodeSlot[code].TmpType)
 							newValue.ConditionFromOp = opCode.Id
 							opCode.TernaryChainArm = true
@@ -2196,7 +2243,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 								defaultTarnaryValue.Condition = value
 							}
 						} else {
-							newValue := values.NewTernaryExpression(values.NewSlotValue(nil, types.NewJavaPrimer(types.JavaBoolean)), target.StackEntry.value, ternaryExpMergeNodeSlot[code].GetValue())
+							newValue := values.NewTernaryExpression(conditionSlotForIfNode(opCode), target.StackEntry.value, ternaryExpMergeNodeSlot[code].GetValue())
 							newValue.Type().ResetType(ternaryExpMergeNodeSlot[code].TmpType)
 							newValue.ConditionFromOp = opCode.Id
 							opCode.TernaryChainArm = true
@@ -2213,7 +2260,10 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		}
 	}
 	for _, slotVal := range ternaryExpMergeNodeSlot {
-		ternaryExp := slotVal.GetValue().(*values.TernaryExpression)
+		ternaryExp, ok := slotVal.GetValue().(*values.TernaryExpression)
+		if !ok {
+			continue
+		}
 		types.MergeTypes(ternaryExp.TrueValue.Type(), ternaryExp.FalseValue.Type())
 	}
 	return nil
@@ -2309,7 +2359,10 @@ func (d *Decompiler) ParseStatement() error {
 			slotVal := opcode.stackProduced[0]
 			leftRef := UnpackSoltValue(slotVal).(*values.JavaRef)
 			val := GetRealValue(leftRef.Val)
-			appendNode(statements.NewAssignStatement(slotVal, val, true))
+			// The produced SlotValue is also the target of the checkcast single-use fold. If the
+			// assignment keeps that slot as its left side, folding rewrites the declaration name into
+			// the cast expression itself (`String ((String) x) = ...`). Use the stable ref as LHS.
+			appendNode(statements.NewAssignStatement(leftRef, val, true))
 		case OP_INVOKESTATIC:
 			if len(opcode.stackProduced) == 0 {
 				classInfo := d.GetMethodFromPool(int(Convert2bytesToInt(opcode.Data)))

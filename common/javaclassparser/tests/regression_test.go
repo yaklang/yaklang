@@ -702,6 +702,253 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 				" short do;",
 			},
 		},
+		{
+			file: "mybatis_plus_ktupdatewrapper_lambda_name.class",
+			desc: "Kotlin synthetic lambda method names may contain JVM-only characters such as '-' " +
+				"(set$lambda-0). Method declarations and method references must be rendered with a safe Java identifier instead of dropping the method.",
+			mustContain: []string{
+				"var2::set$lambda_0",
+				"private static final void set$lambda_0",
+				"formatParam(var1,var2)",
+			},
+			mustNotContain: []string{
+				"yak-decompiler",
+				"set$lambda-0",
+			},
+		},
+		{
+			file: "pagehelper_sqlparser_default_lambda.class",
+			desc: "Interface static final field DEFAULT is initialized from <clinit> with a no-capture " +
+				"lambda. The assignment must be hoisted into the field initializer because Java source interfaces cannot contain static initializer blocks.",
+			mustContain: []string{
+				"public static final SqlParser DEFAULT = (String l0) ->",
+				"CCJSqlParser var1 = CCJSqlParserUtil.newParser(l0)",
+				"return var1.Statement()",
+			},
+			mustNotContain: []string{
+				"yak-decompiler",
+				"static  {",
+				"public static final SqlParser DEFAULT;",
+			},
+		},
+		{
+			file: "zxing_encoder_cyclic_container.class",
+			desc: "ZXing Aztec Encoder.encode produced a self-referential IfStatement after CFG structuring. " +
+				"The impossible container backlink must be pruned before recursive passes so the method is not stubbed.",
+			mustContain: []string{
+				"public static AztecCode encode(byte[] var0, int var1, int var2)",
+				"new HighLevelEncoder(var0).encode()",
+				"drawModeMessage(",
+			},
+			mustNotContain: []string{
+				"yak-decompiler",
+				"cyclic container statement",
+			},
+		},
+		{
+			file: "hazelcast_annotation_parameter_value_compareto.class",
+			desc: "Hazelcast shaded ClassGraph AnnotationParameterValue.compareTo has an outer value ternary " +
+				"whose condition was lost after nested null-check ternaries, leaking an empty stack slot. The renderer should recover the enclosing guard and keep the method.",
+			mustContain: []string{
+				"public int compareTo(AnnotationParameterValue var1)",
+				"Object var3 = this.getValue()",
+				"Object var4 = var1.getValue()",
+				"toStringParamValueOnly().compareTo",
+			},
+			mustNotContain: []string{
+				"yak-decompiler",
+				"empty slot value",
+			},
+		},
+		{
+			file: "hazelcast_record_assertion_clinit.class",
+			desc: "Hazelcast Record is an interface whose <clinit> only leaves an assertion-disabled no-op guard after static field initializer hoisting. " +
+				"The no-op guard should be skipped instead of logging an un-representable static initializer warning.",
+			mustContain: []string{
+				"public interface Record",
+				"public static final long EPOCH_TIME = TimeUtil.zeroOutMs(1514764800000L)",
+				"public static final Object NOT_CACHED = new Object()",
+			},
+			mustNotContain: []string{
+				"static  {",
+				"yak-decompiler",
+			},
+		},
+		{
+			file: "hazelcast_row_assertion_clinit.class",
+			desc: "Hazelcast Row is an interface with an assertion-only <clinit>. The initializer is a source-level no-op and should be skipped.",
+			mustContain: []string{
+				"public interface Row extends RowBatch",
+				"public default Row getRow(int var1)",
+			},
+			mustNotContain: []string{
+				"static  {",
+				"yak-decompiler",
+			},
+		},
+		{
+			file: "icu4j_collation_data_wide_iinc.class",
+			desc: "ICU4J CollationData.getScriptIndex branches to a wide iinc instruction. " +
+				"The WIDE prefix offset must be used for jump target mapping; otherwise the branch is miswired to OP_START and assertion folding sees nil refs.",
+			mustContain: []string{
+				"private int getScriptIndex(int var1)",
+				"if ((var1) < (0))",
+				"return this.scriptsIndex[var1]",
+				"var1 = (var1) - (4096)",
+				"return this.scriptsIndex[(this.numScripts) + (var1)]",
+			},
+			mustNotContain: []string{
+				"yak-decompiler",
+				"nil pointer dereference",
+				"do{\n\n\t\t} while (true)",
+			},
+		},
+		{
+			file: "okhttp_framed_connection_varargs_ctor.class",
+			desc: "OkHttp anonymous NamedRunnable constructor is flagged varargs, but its final descriptor parameter is ErrorCode rather than an array. " +
+				"The dumper must only render varargs syntax when the final parameter type is actually an array.",
+			mustContain: []string{
+				"class FramedConnection$1 extends NamedRunnable",
+				"FramedConnection$1(FramedConnection var1, String var2, Object[] var3, int var4, ErrorCode var5)",
+				"super(var2,var3)",
+				"this.val$errorCode = var5",
+			},
+			mustNotContain: []string{
+				"yak-decompiler",
+				"nil pointer dereference",
+				"ErrorCode...",
+			},
+		},
+		{
+			file: "okhttp_headers_companion_map_of.class",
+			desc: "OkHttp Kotlin Headers.Companion.of(Map) has a null-check throw arm that leaves a duplicated value on a terminal athrow path. " +
+				"Mismatched candidate if-merge stack sizes must fall back to ordinary merge handling instead of stubbing the method.",
+			mustContain: []string{
+				"public final Headers of(Map<String, String> var1)",
+				"Iterator var6 = var4.entrySet().iterator()",
+				"String var10 = ((String)(var8.getKey()))",
+				"return new Headers(var2,null)",
+			},
+			mustNotContain: []string{
+				"yak-decompiler",
+				"invalid stack size",
+				"undecompilable method body",
+			},
+		},
+		{
+			file: "okhttp_real_connection_pool_idle_count.class",
+			desc: "OkHttp Kotlin RealConnectionPool.idleConnectionCount has a return merge fed by a fast-path return value and a loop result. " +
+				"The ternary merge condition must be seeded from the consumed if condition so a synthetic empty condition does not leak.",
+			mustContain: []string{
+				"public final int idleConnectionCount()",
+				"if ((var1 instanceof Collection) && (((Collection)(var1)).isEmpty()))",
+				"var5.getCalls().isEmpty()",
+			},
+			mustNotContain: []string{
+				"yak-decompiler",
+				"empty slot value",
+				"undecompilable method body",
+			},
+		},
+		{
+			file: "okio_deprecated_utf8_safe_class_name.class",
+			desc: "Kotlin file facade/object classes may have internal simple names beginning with '-' (for example okio/-DeprecatedUtf8). " +
+				"Class declarations, static member references, constructor calls, and field types must use sanitized identifiers consistently.",
+			mustContain: []string{
+				"public final class _DeprecatedUtf8",
+				"public static final _DeprecatedUtf8 INSTANCE",
+				"_DeprecatedUtf8.INSTANCE = new _DeprecatedUtf8()",
+			},
+			mustNotContain: []string{
+				"public final class -DeprecatedUtf8",
+				"new -DeprecatedUtf8",
+				"yak-decompiler",
+			},
+		},
+		{
+			file: "okio_utf8kt_slot_reuse_ternary_condition.class",
+			desc: "Okio's Kotlin UTF-8 helper reuses local slots across disjoint loop-exit and loop-body paths, then builds nested ternary " +
+				"conditions from if_icmp* nodes. Per-opcode local scopes must not be polluted by another path, and ternary condition slots " +
+				"must be seeded from the consumed comparison operands.",
+			mustContain: []string{
+				"public final class _Utf8Kt",
+				"public static final String commonToUtf8String(byte[] var0, int var1, int var2)",
+				"return new String(var3,var8,var6)",
+			},
+			mustNotContain: []string{
+				"yak-decompiler",
+				"empty slot value",
+			},
+		},
+		{
+			file: "okio_real_buffered_source_invalid_ternary.class",
+			desc: "Okio RealBufferedSource has control-flow merges that the legacy ternary combiner cannot prove as a two-leaf expression. " +
+				"Those merges should be skipped instead of failing bytecode parsing or panicking during ternary type merging.",
+			mustContain: []string{
+				"public final class RealBufferedSource implements BufferedSource",
+				"public long indexOf(byte var1, long var2, long var3)",
+				"public boolean rangeEquals(long var1, ByteString var2, int var3, int var4)",
+			},
+			mustNotContain: []string{
+				"yak-decompiler",
+				"invalid ternary expression",
+				"interface conversion",
+			},
+		},
+		{
+			file: "sparsebitset_triple_long_array_dup2.class",
+			desc: "SparseBitSet stores its bitmap as a three-dimensional long array. Descriptor parsing must keep [[[J as long[][][] so " +
+				"laload produces a long value; otherwise dup2/lstore/lcmp treat the value as an array/reference pair and leak an empty slot.",
+			mustContain: []string{
+				"public class SparseBitSet implements Cloneable, Serializable",
+				"protected transient long[][][] bits",
+				"public int nextClearBit(int var1)",
+				"public int nextSetBit(int var1)",
+				"public int previousClearBit(int var1)",
+				"public int previousSetBit(int var1)",
+				"private void writeObject(ObjectOutputStream var1) throws IOException, InternalError",
+			},
+			mustNotContain: []string{
+				"protected transient long[][][][] bits",
+				"yak-decompiler",
+				"empty slot value",
+				"undecompilable method body",
+			},
+		},
+		{
+			file: "commons_collections_extended_properties_try_loop.class",
+			desc: "Commons Collections ExtendedProperties.load has a property-reading loop wrapped by a finally-style catch-all region. " +
+				"The try container must not retain a self edge when loop back-edges are folded into the try body.",
+			mustContain: []string{
+				"public class ExtendedProperties extends Hashtable",
+				"public synchronized void load(InputStream var1, String var2) throws IOException",
+				"ExtendedProperties$PropertiesReader var3 = null",
+				"this.isInitialized = true",
+			},
+			mustNotContain: []string{
+				"yak-decompiler",
+				"ParseBytesCode failed: has circle",
+				"undecompilable method body",
+			},
+		},
+		{
+			file: "reactor_abstract_http_server_metrics_handler_checkcast_fold.class",
+			desc: "Reactor Netty AbstractHttpServerMetricsHandler passes checkcast results directly into metric recording calls. " +
+				"When a checkcast temp is single-use folded, its declaration left-hand side must remain a stable local name, not the cast expression.",
+			mustContain: []string{
+				"abstract class AbstractHttpServerMetricsHandler extends ChannelDuplexHandler",
+				"public void write(ChannelHandlerContext var1, Object var2, ChannelPromise var3)",
+				"public void channelRead(ChannelHandlerContext var1, Object var2)",
+				"this.recordRead(var4",
+				"this.recordWrite(var4",
+			},
+			mustNotContain: []string{
+				"String ((String)",
+				"yak-decompiler",
+				"post-decompile syntax",
+				"undecompilable method body",
+			},
+		},
 	}
 
 	for _, tc := range cases {

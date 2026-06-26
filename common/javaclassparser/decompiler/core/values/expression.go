@@ -290,10 +290,11 @@ func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) str
 			return fmt.Sprintf("super(%s)", strings.Join(paramStrs, ","))
 		}
 	}
+	functionName := class_context.SafeIdentifier(f.FunctionName)
 
 	if v, ok := f.Object.(*JavaClassValue); ok {
 		if classType, ok2 := v.Type().RawType().(*types.JavaClass); ok2 && classType.Name == funcCtx.ClassName {
-			return fmt.Sprintf("%s(%s)", f.FunctionName, strings.Join(paramStrs, ","))
+			return fmt.Sprintf("%s(%s)", functionName, strings.Join(paramStrs, ","))
 		}
 	}
 	obj := UnpackSoltValue(f.Object)
@@ -301,13 +302,13 @@ func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) str
 		// A lambda / method reference inlined directly as a call receiver has no target type of
 		// its own - `(() -> x).get()` does not compile. Supply one by casting to the functional
 		// interface the value carries: `((Supplier)(() -> x)).get()`.
-		return fmt.Sprintf("((%s)(%s)).%s(%s)", cv.Type().String(funcCtx), cv.String(funcCtx), f.FunctionName, strings.Join(paramStrs, ","))
+		return fmt.Sprintf("((%s)(%s)).%s(%s)", cv.Type().String(funcCtx), cv.String(funcCtx), functionName, strings.Join(paramStrs, ","))
 	}
 	switch obj.(type) {
 	case *JavaExpression, *TernaryExpression, *SlotValue:
-		return fmt.Sprintf("(%s).%s(%s)", f.Object.String(funcCtx), f.FunctionName, strings.Join(paramStrs, ","))
+		return fmt.Sprintf("(%s).%s(%s)", f.Object.String(funcCtx), functionName, strings.Join(paramStrs, ","))
 	default:
-		return fmt.Sprintf("%s.%s(%s)", f.Object.String(funcCtx), f.FunctionName, strings.Join(paramStrs, ","))
+		return fmt.Sprintf("%s.%s(%s)", f.Object.String(funcCtx), functionName, strings.Join(paramStrs, ","))
 	}
 }
 

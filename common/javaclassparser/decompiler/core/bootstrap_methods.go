@@ -100,6 +100,7 @@ var buildinBootstrapMethods = map[string]func(args ...values.JavaValue) BuildinB
 				// Mark as a lambda so a call on the lambda itself (the inlined `s.get()` shape) renders
 				// with the functional-interface cast it needs to compile, e.g. ((Supplier)(() -> ...)).get().
 				cv.Flag = "lambda"
+				cv.NoOuterCapture = len(captured) == 0
 
 				// Upgrade the lambda's type from the erased descriptor type to a parameterized
 				// type using the instantiatedMethodType (3rd bootstrap arg). This only changes
@@ -112,6 +113,7 @@ var buildinBootstrapMethods = map[string]func(args ...values.JavaValue) BuildinB
 							return lambdaType
 						})
 						cv.Flag = "lambda"
+						cv.NoOuterCapture = len(captured) == 0
 					}
 				}
 				return cv, nil
@@ -126,15 +128,16 @@ var buildinBootstrapMethods = map[string]func(args ...values.JavaValue) BuildinB
 					refMember = "new"
 				} else if len(capturedArgs) > 0 {
 					// bound instance method reference: receiver::method
-					return capturedArgs[0].String(funcCtx) + "::" + refMember
+					return capturedArgs[0].String(funcCtx) + "::" + class_context.SafeIdentifier(refMember)
 				}
-				return funcCtx.ShortTypeName(implClassName) + "::" + refMember
+				return funcCtx.ShortTypeName(implClassName) + "::" + class_context.SafeIdentifier(refMember)
 			}, func() types.JavaType {
 				return typ
 			})
 			// A method reference, like a lambda, has no target type when used directly as a call
 			// receiver (`(C::m).apply(x)` does not compile); flag it so the call site adds the cast.
 			refVal.Flag = "lambda"
+			refVal.NoOuterCapture = len(capturedArgs) == 0
 			return refVal, nil
 		}
 	},

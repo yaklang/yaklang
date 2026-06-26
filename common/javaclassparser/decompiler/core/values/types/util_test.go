@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 )
 
 // TestSlashToDot verifies the fast '/'->'.' conversion against a table of edge cases.
@@ -170,6 +172,19 @@ func TestParseJavaDescriptionArray(t *testing.T) {
 	}
 	if !t2.IsArray() || t2.ArrayDim() != 2 {
 		t.Errorf("[[L...: IsArray=%v dim=%d, want true/2", t2.IsArray(), t2.ArrayDim())
+	}
+	t3, _, err := ParseJavaDescription("[[[J")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !t3.IsArray() || t3.ArrayDim() != 3 {
+		t.Errorf("[[[J: IsArray=%v dim=%d, want true/3", t3.IsArray(), t3.ArrayDim())
+	}
+	if got := t3.String(&class_context.ClassContext{}); got != "long[][][]" {
+		t.Errorf("[[[J string = %q, want long[][][]", got)
+	}
+	if got := t3.ElementType().String(&class_context.ClassContext{}); got != "long[][]" {
+		t.Errorf("[[[J element string = %q, want long[][]", got)
 	}
 }
 

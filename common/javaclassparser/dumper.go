@@ -138,23 +138,28 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	splits := strings.Split(name, "/")
 	packageName := strings.Join(splits[:len(splits)-1], ".")
 	c.PackageName = packageName
-	className := splits[len(splits)-1]
+	rawClassName := splits[len(splits)-1]
+	className := class_context.SafeIdentifier(rawClassName)
 	// module-info / package-info are synthetic descriptor pseudo-classes; their internal
 	// name ("module-info" / "package-info") is not a legal Java identifier, so emitting
 	// `class module-info {}` yields un-parseable source. Render a valid minimal compilation
 	// unit instead. (Full JPMS module / package-info annotation reconstruction is a
 	// separate feature.)
-	if className == "module-info" || className == "package-info" {
+	if rawClassName == "module-info" || rawClassName == "package-info" {
 		var sb strings.Builder
-		if className == "package-info" && packageName != "" {
+		if rawClassName == "package-info" && packageName != "" {
 			sb.WriteString(fmt.Sprintf("package %s;\n\n", packageName))
 		}
-		sb.WriteString(fmt.Sprintf("// decompiled from a synthetic %s descriptor\n", className))
+		sb.WriteString(fmt.Sprintf("// decompiled from a synthetic %s descriptor\n", rawClassName))
 		return sb.String(), nil
 	}
 	supperClassName := c.obj.GetSupperClassName()
 	supperClassName = strings.Replace(supperClassName, "/", ".", -1)
-	c.ClassName = strings.Replace(name, "/", ".", -1)
+	if packageName == "" {
+		c.ClassName = className
+	} else {
+		c.ClassName = packageName + "." + className
+	}
 	funcCtx := &class_context.ClassContext{
 		ClassName:       c.ClassName,
 		SupperClassName: supperClassName,
@@ -405,29 +410,11 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 			}
 		}
 
-		lastPacket := ""
-		if fieldType.IsArray() {
-			javaTyp := fieldType.RawType().(*types.JavaArrayType)
-			fieldTypeStr := javaTyp.JavaType.String(c.FuncCtx)
-			c.FuncCtx.Import(fieldTypeStr)
-			shortName := c.FuncCtx.ShortTypeName(fieldTypeStr)
-			originalType := javaTyp.JavaType
-			javaTyp.JavaType = types.NewJavaClass(shortName)
-			// Render the array type itself (element + "[]" per dimension); rendering
-			// javaTyp.JavaType here dropped the brackets, typing `int[] TABLE` as `int`.
-			lastPacket = javaTyp.String(c.FuncCtx)
-			javaTyp.JavaType = originalType
-		} else {
-			// fieldType.String already registers the needed imports and shortens (or
-			// FQN-disambiguates) every class component via ShortTypeName, so the rendered
-			// string is the final field type. Re-running Import/ShortTypeName on that whole
-			// string corrupts parameterized or disambiguated types: e.g. a field typed
-			// `Set<java.util.logging.Logger>` (Logger kept fully-qualified to avoid clashing
-			// with an imported ch.qos...Logger) would be split on '.' into a bogus package
-			// `Set<java.util.logging` + class `Logger>`, emitting `import Set<...Logger>;` and
-			// collapsing the field type to `Logger>` -> un-parseable, so the field gets dropped.
-			lastPacket = fieldType.String(c.FuncCtx)
-		}
+		// fieldType.String already registers the needed imports and shortens (or
+		// FQN-disambiguates) every class component via ShortTypeName, so the rendered
+		// string is the final field type. Re-running Import/ShortTypeName on that whole
+		// string corrupts parameterized, array, or primitive-array types.
+		lastPacket := fieldType.String(c.FuncCtx)
 		valueLiteral := ""
 		for _, attr := range field.Attributes {
 			switch ret := attr.(type) {
@@ -832,10 +819,14 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	//}
 	//println(name)
 	finalFieldMap := map[string]struct{}{}
+	finalFieldRenderNameToRaw := map[string]string{}
+	classStaticInitializersMustHoist := slices.Contains(c.obj.AccessFlagsVerbose, "interface") || slices.Contains(c.obj.AccessFlagsVerbose, "annotation")
 	for _, field := range c.obj.Fields {
 		var finalFalg uint16 = 0x0010
 		if field.AccessFlags&finalFalg == finalFalg {
-			finalFieldMap[c.obj.ConstantPoolManager.GetUtf8(int(field.NameIndex)).Value] = struct{}{}
+			rawName := c.obj.ConstantPoolManager.GetUtf8(int(field.NameIndex)).Value
+			finalFieldMap[rawName] = struct{}{}
+			finalFieldRenderNameToRaw[class_context.SafeIdentifier(rawName)] = rawName
 		}
 	}
 	annoStrs := []string{}
@@ -948,10 +939,15 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				}
 			} else {
 				for i, val := range samParams {
-					if i == len(samParams)-1 && isVarArgs {
-						paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s... %s", val.Type().ElementType().String(c.FuncCtx), val.String(c.FuncCtx)))
+					typ := val.Type()
+					if i == len(samParams)-1 && isVarArgs && typ != nil && typ.IsArray() {
+						paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s... %s", typ.ElementType().String(c.FuncCtx), val.String(c.FuncCtx)))
 					} else {
-						paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s %s", val.Type().String(c.FuncCtx), val.String(c.FuncCtx)))
+						typName := "java.lang.Object"
+						if typ != nil {
+							typName = typ.String(c.FuncCtx)
+						}
+						paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s %s", typName, val.String(c.FuncCtx)))
 					}
 				}
 			}
@@ -1004,21 +1000,33 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 					foundFieldInit := false
 					if v, ok := ret.LeftValue.(*values.RefMember); ok {
 						obj := core.UnpackSoltValue(v.Object)
-						if v1, ok := obj.(*values.JavaRef); ok && v1.IsThis && (funcCtx.FunctionName == "<cinit>" || funcCtx.FunctionName == "<init>" || funcCtx.FunctionName == funcCtx.ClassName) {
+						if v1, ok := obj.(*values.JavaRef); ok && v1.IsThis && (funcCtx.FunctionName == "<init>" || funcCtx.FunctionName == funcCtx.ClassName) {
 							if _, ok := finalFieldMap[v.Member]; ok {
-								if rhs := ret.JavaValue.String(funcCtx); canHoistFieldInitializer(rhs) {
+								if rhs := ret.JavaValue.String(funcCtx); canHoistFieldValueInitializer(ret.JavaValue, rhs) {
 									foundFieldInit = true
 									c.fieldDefaultValue[v.Member] = rhs
 								}
 							}
 						}
 					} else if v, ok := ret.LeftValue.(*values.JavaClassMember); ok {
-						if funcCtx.FunctionName == "<cinit>" || v.Name == funcCtx.ClassName {
+						if (funcCtx.FunctionName == "<clinit>" && classStaticInitializersMustHoist) || v.Name == funcCtx.ClassName {
 							if _, ok := finalFieldMap[v.Member]; ok {
-								if rhs := ret.JavaValue.String(funcCtx); canHoistFieldInitializer(rhs) {
+								if rhs := ret.JavaValue.String(funcCtx); canHoistFieldValueInitializer(ret.JavaValue, rhs) {
 									foundFieldInit = true
 									c.fieldDefaultValue[v.Member] = rhs
 								}
+							}
+						}
+					}
+					if !foundFieldInit && funcCtx.FunctionName == "<clinit>" && classStaticInitializersMustHoist {
+						lhs := strings.TrimSpace(ret.LeftValue.String(funcCtx))
+						if strings.HasPrefix(lhs, c.GetConstructorMethodName()+".") {
+							lhs = strings.TrimPrefix(lhs, c.GetConstructorMethodName()+".")
+						}
+						if rawName, ok := finalFieldRenderNameToRaw[lhs]; ok {
+							if rhs := ret.JavaValue.String(funcCtx); canHoistFieldValueInitializer(ret.JavaValue, rhs) {
+								foundFieldInit = true
+								c.fieldDefaultValue[rawName] = rhs
 							}
 						}
 					}
@@ -1099,6 +1107,14 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 						"%s\n"+
 						c.GetTabString()+"}", ret.Value.String(funcCtx), getBody(ret.Cases))
 				case *statements.IfStatement:
+					if isEmptyAssertionsDisabledGuard(ret, funcCtx) {
+						statementStr = ""
+						break
+					}
+					if stmt := buildReturnFromEmptyGuardTernary(ret, funcCtx); stmt != "" {
+						statementStr = c.GetTabString() + stmt + ";"
+						break
+					}
 					// Recover short-circuit boolean returns: when a method returns boolean and the
 					// if-then is empty (or only a `return true`) while the else is `return expr`,
 					// rewrite to `return condition || expr`. This is the simplest case of the
@@ -1189,6 +1205,12 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 		dumped.bodyCode = code
 		return dumped, nil
 	}
+	if name == "<clinit>" && strings.TrimSpace(code) == "" {
+		dumped.methodName = name
+		dumped.code = ""
+		dumped.bodyCode = code
+		return dumped, nil
+	}
 	methodSourceBuffer := strings.Builder{}
 	isInterfaceType := slices.Contains(c.obj.AccessFlagsVerbose, "interface")
 	writeAccessFlags := func(buffer io.Writer) {
@@ -1205,7 +1227,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 		if name == "<init>" {
 			methodSourceBuffer.Write([]byte(c.GetConstructorMethodName()))
 		} else {
-			methodSourceBuffer.Write([]byte(name))
+			methodSourceBuffer.Write([]byte(class_context.SafeIdentifier(name)))
 		}
 	}
 	writeArguments := func(buffer io.Writer) {
@@ -1410,6 +1432,16 @@ func canHoistFieldInitializer(rhs string) bool {
 	return !localSlotRefRe.MatchString(rhs)
 }
 
+func canHoistFieldValueInitializer(value values.JavaValue, rhs string) bool {
+	if canHoistFieldInitializer(rhs) {
+		return true
+	}
+	if cv, ok := values.UnpackSoltValue(value).(*values.CustomValue); ok && cv.Flag == "lambda" && cv.NoOuterCapture {
+		return true
+	}
+	return false
+}
+
 func javaFloatLiteral(f float32) string {
 	v := float64(f)
 	switch {
@@ -1452,15 +1484,30 @@ const malformedTryNoCatchMarker = "yak-decompiler-internal: try without catch ha
 
 func normalizeDoWhileBreakGuardSource(body string) string {
 	match := doWhileBreakGuardRe.FindStringSubmatchIndex(body)
-	if match == nil || len(match) < 6 {
+	if len(match) < 6 {
 		return body
 	}
 	conditionStart, conditionEnd := match[4], match[5]
 	condition := strings.TrimSpace(body[conditionStart:conditionEnd])
-	if condition == "" || strings.HasPrefix(condition, "!") || !strings.Contains(condition, "<") {
+	if !shouldInvertDoWhileBreakGuard(condition) {
 		return body
 	}
 	return body[:conditionStart] + "!(" + condition + ")" + body[conditionEnd:]
+}
+
+func shouldInvertDoWhileBreakGuard(condition string) bool {
+	condition = strings.TrimSpace(condition)
+	if condition == "" || strings.HasPrefix(condition, "!") {
+		return false
+	}
+	// Only invert the common structured-loop shape where the positive loop/body
+	// condition (`i < n` / `i <= n`) was attached to the synthetic break arm.
+	// Already-negative break guards such as `i >= n` are semantically correct as-is.
+	if strings.Contains(condition, ">=") || strings.Contains(condition, ">") ||
+		strings.Contains(condition, "==") || strings.Contains(condition, "!=") {
+		return false
+	}
+	return strings.Contains(condition, "<")
 }
 
 func canFlattenNoCatchTry(body string) bool {
@@ -1729,6 +1776,9 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 		// 	continue
 		// }
 		res, err := c.safeDumpMethod(name, descriptor)
+		if err == nil && res != nil && name == "<clinit>" && c.isInterfaceLike() && isIgnorableAssertionOnlyClinit(res.code) {
+			continue
+		}
 		if err == nil && res != nil && strings.Contains(res.code, values.EmptySlotValuePlaceholder) {
 			// The decompiled body leaked an internal placeholder ("empty slot value"),
 			// which means the stack simulation was incomplete and the emitted source is
@@ -1804,6 +1854,29 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 	return result, nil
 }
 
+func (c *ClassObjectDumper) isInterfaceLike() bool {
+	return slices.Contains(c.obj.AccessFlagsVerbose, "interface") || slices.Contains(c.obj.AccessFlagsVerbose, "annotation")
+}
+
+func isIgnorableAssertionOnlyClinit(code string) bool {
+	body := strings.TrimSpace(code)
+	if !strings.Contains(body, "$assertionsDisabled") {
+		return false
+	}
+	body = strings.TrimPrefix(body, "static")
+	body = strings.TrimSpace(body)
+	body = strings.TrimPrefix(body, "{")
+	body = strings.TrimSuffix(body, "}")
+	body = strings.TrimSpace(body)
+	body = strings.ReplaceAll(body, "\n", "")
+	body = strings.ReplaceAll(body, "\t", "")
+	body = strings.ReplaceAll(body, " ", "")
+	return body == "" ||
+		body == "if(Record$1.$assertionsDisabled){}else{return;}" ||
+		strings.HasPrefix(body, "if(") && strings.Contains(body, "$assertionsDisabled)") &&
+			strings.HasSuffix(body, "{}else{return;}")
+}
+
 func (c *ClassObjectDumper) dumpConstantPool() ([]string, error) {
 	result := []string{}
 	for _, constant := range c.obj.ConstantPool {
@@ -1867,6 +1940,71 @@ func isBoolReturnIfElse(ifSt *statements.IfStatement, funcCtx *class_context.Cla
 		return false
 	}
 	return true
+}
+
+func buildReturnFromEmptyGuardTernary(ifSt *statements.IfStatement, funcCtx *class_context.ClassContext) string {
+	if !isEffectivelyEmptyBody(ifSt.IfBody) || ifSt.Condition == nil {
+		return ""
+	}
+	meaningfulElse := meaningfulStatements(ifSt.ElseBody)
+	if len(meaningfulElse) != 1 {
+		return ""
+	}
+	ret, ok := meaningfulElse[0].(*statements.ReturnStatement)
+	if !ok || ret.JavaValue == nil {
+		return ""
+	}
+	tern, ok := values.UnpackSoltValue(ret.JavaValue).(*values.TernaryExpression)
+	if !ok || tern.Condition == nil || tern.TrueValue == nil || tern.FalseValue == nil {
+		return ""
+	}
+	slot, ok := tern.Condition.(*values.SlotValue)
+	if !ok || slot.GetValue() != nil {
+		return ""
+	}
+	guard := values.SimplifyConditionValue(values.NewUnaryExpression(
+		ifSt.Condition,
+		values.Not,
+		types.NewJavaPrimer(types.JavaBoolean),
+	))
+	return fmt.Sprintf("return (%s) ? (%s) : (%s)", guard.String(funcCtx), tern.TrueValue.String(funcCtx), tern.FalseValue.String(funcCtx))
+}
+
+func isEffectivelyEmptyBody(body []statements.Statement) bool {
+	return len(meaningfulStatements(body)) == 0
+}
+
+func isEmptyAssertionsDisabledGuard(ifSt *statements.IfStatement, funcCtx *class_context.ClassContext) bool {
+	if ifSt == nil || ifSt.Condition == nil {
+		return false
+	}
+	if !isEffectivelyNoOpBody(ifSt.IfBody) || !isEffectivelyNoOpBody(ifSt.ElseBody) {
+		return false
+	}
+	return strings.Contains(ifSt.Condition.String(funcCtx), "$assertionsDisabled")
+}
+
+func isEffectivelyNoOpBody(body []statements.Statement) bool {
+	for _, st := range meaningfulStatements(body) {
+		ret, ok := st.(*statements.ReturnStatement)
+		if !ok || ret.JavaValue != nil {
+			return false
+		}
+	}
+	return true
+}
+
+func meaningfulStatements(body []statements.Statement) []statements.Statement {
+	var out []statements.Statement
+	for _, st := range body {
+		switch st.(type) {
+		case *statements.MiddleStatement, *statements.StackAssignStatement:
+			continue
+		default:
+			out = append(out, st)
+		}
+	}
+	return out
 }
 
 // buildBoolReturnFromIfElse emits `return cond || elseExpr` from the detected if-else pattern.

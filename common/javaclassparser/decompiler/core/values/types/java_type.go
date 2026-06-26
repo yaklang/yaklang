@@ -44,6 +44,13 @@ func (j *JavaArrayType) IsJavaType() {
 
 func NewJavaArrayType(typ JavaType) JavaType {
 	if typ.IsArray() {
+		arrayType, ok := typ.RawType().(*JavaArrayType)
+		if ok {
+			return newJavaTypeWrap(&JavaArrayType{
+				JavaType:  arrayType.JavaType,
+				Dimension: arrayType.Dimension + 1,
+			})
+		}
 		return newJavaTypeWrap(&JavaArrayType{
 			JavaType:  typ.ElementType(),
 			Dimension: typ.ArrayDim() + 1,

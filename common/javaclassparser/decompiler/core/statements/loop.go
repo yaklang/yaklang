@@ -43,13 +43,16 @@ func doWhileBodyString(body []Statement, funcCtx *class_context.ClassContext) st
 	res := make([]string, 0, len(body))
 	for _, st := range body {
 		if ifs, ok := st.(*IfStatement); ok && len(ifs.IfBody) == 1 && len(ifs.ElseBody) > 0 && isPlainBreakStatement(ifs.IfBody[0], funcCtx) && ifs.Condition != nil {
-			condition := values.SimplifyConditionValue(values.NewUnaryExpression(
-				ifs.Condition,
-				values.Not,
-				types.NewJavaPrimer(types.JavaBoolean),
-			))
-			res = append(res, fmt.Sprintf("if (%s){\n%s\n}else{\n%s\n}", condition.String(funcCtx), StatementsString(ifs.IfBody, funcCtx), StatementsString(ifs.ElseBody, funcCtx)))
-			continue
+			conditionText := strings.TrimSpace(ifs.Condition.String(funcCtx))
+			if shouldInvertDoWhileBreakGuard(conditionText) {
+				condition := values.SimplifyConditionValue(values.NewUnaryExpression(
+					ifs.Condition,
+					values.Not,
+					types.NewJavaPrimer(types.JavaBoolean),
+				))
+				res = append(res, fmt.Sprintf("if (%s){\n%s\n}else{\n%s\n}", condition.String(funcCtx), StatementsString(ifs.IfBody, funcCtx), StatementsString(ifs.ElseBody, funcCtx)))
+				continue
+			}
 		}
 		res = append(res, st.String(funcCtx))
 	}
@@ -72,10 +75,22 @@ func normalizeDoWhileBreakGuard(body string) string {
 		return body
 	}
 	condition := body[len(prefix):idx]
-	if strings.ContainsAny(condition, "\n{}") || strings.HasPrefix(strings.TrimSpace(condition), "!") {
+	if !shouldInvertDoWhileBreakGuard(condition) {
 		return body
 	}
 	return prefix + "!(" + condition + ")" + body[idx:]
+}
+
+func shouldInvertDoWhileBreakGuard(condition string) bool {
+	condition = strings.TrimSpace(condition)
+	if condition == "" || strings.HasPrefix(condition, "!") {
+		return false
+	}
+	if strings.Contains(condition, ">=") || strings.Contains(condition, ">") ||
+		strings.Contains(condition, "==") || strings.Contains(condition, "!=") {
+		return false
+	}
+	return strings.Contains(condition, "<")
 }
 
 type WhileStatement struct {

@@ -168,6 +168,90 @@ func (s *Scope) SubScope(sts *[]statements.Statement) *Scope {
 // (but technically acyclic) explosion of nested blocks.
 const maxStructuredContainers = 1_000_000
 
+// PruneCyclicContainerReferences removes structurally-impossible backlinks where a container
+// statement appears inside its own descendant body. Such links are artifacts of CFG structuring,
+// not Java source structure, and must be removed before recursive tree walkers run.
+func PruneCyclicContainerReferences(roots []statements.Statement) []statements.Statement {
+	ancestors := make(map[statements.Statement]struct{})
+	visited := make(map[statements.Statement]struct{})
+	var pruneList func([]statements.Statement) []statements.Statement
+	var pruneStatement func(statements.Statement)
+
+	pruneList = func(list []statements.Statement) []statements.Statement {
+		if len(list) == 0 {
+			return list
+		}
+		out := list[:0]
+		for _, child := range list {
+			if child == nil {
+				continue
+			}
+			if _, ok := ancestors[child]; ok {
+				continue
+			}
+			pruneStatement(child)
+			out = append(out, child)
+		}
+		return out
+	}
+
+	pruneStatement = func(st statements.Statement) {
+		if st == nil {
+			return
+		}
+		if _, ok := visited[st]; ok {
+			return
+		}
+		switch s := st.(type) {
+		case *statements.IfStatement:
+			visited[st] = struct{}{}
+			ancestors[st] = struct{}{}
+			s.IfBody = pruneList(s.IfBody)
+			s.ElseBody = pruneList(s.ElseBody)
+			delete(ancestors, st)
+		case *statements.ForStatement:
+			visited[st] = struct{}{}
+			ancestors[st] = struct{}{}
+			s.SubStatements = pruneList(s.SubStatements)
+			delete(ancestors, st)
+		case *statements.WhileStatement:
+			visited[st] = struct{}{}
+			ancestors[st] = struct{}{}
+			s.Body = pruneList(s.Body)
+			delete(ancestors, st)
+		case *statements.DoWhileStatement:
+			visited[st] = struct{}{}
+			ancestors[st] = struct{}{}
+			s.Body = pruneList(s.Body)
+			delete(ancestors, st)
+		case *statements.SwitchStatement:
+			visited[st] = struct{}{}
+			ancestors[st] = struct{}{}
+			for _, c := range s.Cases {
+				if c != nil {
+					c.Body = pruneList(c.Body)
+				}
+			}
+			delete(ancestors, st)
+		case *statements.TryCatchStatement:
+			visited[st] = struct{}{}
+			ancestors[st] = struct{}{}
+			s.TryBody = pruneList(s.TryBody)
+			for i := range s.CatchBodies {
+				s.CatchBodies[i] = pruneList(s.CatchBodies[i])
+			}
+			delete(ancestors, st)
+		case *statements.SynchronizedStatement:
+			visited[st] = struct{}{}
+			ancestors[st] = struct{}{}
+			s.Body = pruneList(s.Body)
+			delete(ancestors, st)
+		}
+	}
+
+	return pruneList(roots)
+}
+
 // AssertStatementsAcyclic verifies that the structured statement tree produced for one method is a
 // proper tree of nested-block containers (if/for/while/do-while/switch/try) - i.e. no container is its
 // own ancestor or otherwise reachable twice. A structuring defect on certain real-world classes emitted

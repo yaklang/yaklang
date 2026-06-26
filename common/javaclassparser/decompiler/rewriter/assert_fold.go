@@ -109,8 +109,8 @@ func foldAssertionGuardPairs(sts []statements.Statement) []statements.Statement 
 }
 
 // mentionsAssertionsDisabled reports whether the rendered form of v contains the synthetic
-// $assertionsDisabled identifier. Rendering is cheap (a single value) and is the only reliable way
-// to spot the field reference regardless of how the stack simulation wrapped it.
+// $assertionsDisabled identifier. Some partially-structured values still carry unnamed temporary
+// refs; rendering those can panic, so fail closed and leave the statement untouched.
 func mentionsAssertionsDisabled(v values.JavaValue) bool {
 	if v == nil {
 		return false

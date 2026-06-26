@@ -113,6 +113,7 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 	// recursive tree walkers (RewriteVar, Statement.ReplaceVar/String, ...) descend it. A cyclic tree
 	// would otherwise drive them into Go's unrecoverable `fatal error: stack overflow`, crashing the
 	// whole process; raising an ordinary panic instead lets the recover above degrade the method to a stub.
+	sts = rewriter.PruneCyclicContainerReferences(sts)
 	rewriter.AssertStatementsAcyclic(sts)
 	// Fold the javac `assert` guard corruption: when several asserts share/overlap throw targets,
 	// the value-merge structuring can leave an orphaned `ConditionStatement(mentions

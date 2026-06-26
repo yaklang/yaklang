@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/javaclassparser"
 )
@@ -211,6 +212,12 @@ func TestM2StubReasons(t *testing.T) {
 	var firstFailureName, firstFailureBucket, firstFailureJar string
 	var firstFailureAbsClass int
 	var absClasses int
+	var currentJarIndex int
+	var currentJarName, currentJarPath string
+	var currentJarWindowClasses int
+	nowStamp := func() string {
+		return time.Now().Format(time.RFC3339)
+	}
 
 	writeProgress := func(status string) {
 		if progressFile == "" {
@@ -225,6 +232,14 @@ func TestM2StubReasons(t *testing.T) {
 		fmt.Fprintf(&b, "absolute_scanned=%d\n", absClasses)
 		fmt.Fprintf(&b, "window_scanned=%d\n", nClasses)
 		fmt.Fprintf(&b, "ok=%d\npartial=%d\nerr=%d\nstubs=%d\n", nOK, nPartial, nErr, nStubs)
+		fmt.Fprintf(&b, "updated_at=%s\n", nowStamp())
+		if currentJarName != "" {
+			fmt.Fprintf(&b, "current_jar_index=%d\n", currentJarIndex)
+			fmt.Fprintf(&b, "current_jar_total=%d\n", len(jars))
+			fmt.Fprintf(&b, "current_jar_name=%s\n", currentJarName)
+			fmt.Fprintf(&b, "current_jar_path=%s\n", currentJarPath)
+			fmt.Fprintf(&b, "current_jar_window_classes=%d\n", currentJarWindowClasses)
+		}
 		if firstFailureName != "" {
 			prefixEnv := ""
 			if industry {
@@ -268,8 +283,18 @@ jarLoop:
 				continue
 			}
 		}
+		currentJarIndex = ji + 1
+		currentJarName = filepath.Base(jp)
+		currentJarPath = jp
+		currentJarWindowClasses = 0
+		jarStartedAt := time.Now()
+		fmt.Fprintf(os.Stderr, "[stub-reasons] jar-start ts=%s jar=%d/%d name=%s path=%s scanned=%d ok=%d partial=%d err=%d\n",
+			jarStartedAt.Format(time.RFC3339), currentJarIndex, len(jars), currentJarName, currentJarPath, nClasses, nOK, nPartial, nErr)
+		writeProgress("running")
 		zr, err := zip.OpenReader(jp)
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "[stub-reasons] jar-skip ts=%s jar=%d/%d name=%s reason=%s\n",
+				nowStamp(), currentJarIndex, len(jars), currentJarName, strings.ReplaceAll(err.Error(), "\n", " "))
 			continue
 		}
 		perJar := 0
@@ -288,6 +313,7 @@ jarLoop:
 				break
 			}
 			perJar++
+			currentJarWindowClasses = perJar
 			rc, err := f.Open()
 			if err != nil {
 				continue
@@ -364,17 +390,21 @@ jarLoop:
 				}
 			}
 			if progressEvery > 0 && nClasses%progressEvery == 0 {
-				fmt.Fprintf(os.Stderr, "[stub-reasons] progress: jar %d/%d  scanned=%d  ok=%d  partial=%d  err=%d\n",
-					ji+1, len(jars), nClasses, nOK, nPartial, nErr)
+				fmt.Fprintf(os.Stderr, "[stub-reasons] progress ts=%s jar=%d/%d name=%s jarClasses=%d scanned=%d ok=%d partial=%d err=%d\n",
+					nowStamp(), ji+1, len(jars), currentJarName, currentJarWindowClasses, nClasses, nOK, nPartial, nErr)
+				writeProgress("running")
 			}
 		}
 		zr.Close()
+		fmt.Fprintf(os.Stderr, "[stub-reasons] jar-done ts=%s jar=%d/%d name=%s jarClasses=%d elapsed=%s scanned=%d ok=%d partial=%d err=%d\n",
+			nowStamp(), currentJarIndex, len(jars), currentJarName, currentJarWindowClasses, time.Since(jarStartedAt).Round(time.Millisecond), nClasses, nOK, nPartial, nErr)
+		writeProgress("running")
 		if absClasses >= maxClasses {
 			break
 		}
 	}
-	fmt.Fprintf(os.Stderr, "[stub-reasons] DONE: scanned=%d  ok=%d  partial=%d  err=%d  stubs=%d\n",
-		nClasses, nOK, nPartial, nErr, nStubs)
+	fmt.Fprintf(os.Stderr, "[stub-reasons] DONE ts=%s scanned=%d ok=%d partial=%d err=%d stubs=%d\n",
+		nowStamp(), nClasses, nOK, nPartial, nErr, nStubs)
 	if stopOnFirst && firstFailureName != "" {
 		fmt.Fprintf(os.Stderr, "[stub-reasons] STOP_ON_FIRST: aborted after first failure at class %d (window class %d)\n", firstFailureAbsClass, nClasses)
 		fmt.Fprintf(os.Stderr, "[stub-reasons]   class: %s\n", firstFailureName)

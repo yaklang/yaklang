@@ -56,21 +56,6 @@ func replaceNextInPlace(node, oldNext, newNext *core.Node) {
 	node.AddNext(newNext)
 }
 
-func restoreJumpBreakCondition(node, breakTarget *core.Node) {
-	if node == nil || breakTarget == nil || node.JmpNode != breakTarget {
-		return
-	}
-	condition, ok := node.Statement.(*statements.ConditionStatement)
-	if !ok || condition.Condition == nil {
-		return
-	}
-	condition.Condition = values.SimplifyConditionValue(values.NewUnaryExpression(
-		condition.Condition,
-		values.Not,
-		types.NewJavaPrimer(types.JavaBoolean),
-	))
-}
-
 func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 	loopEnd := searchCircleEndNode(circleNode, circleNode.Next[0])
 	preWhileNodes := utils.NodeFilter(manager.WhileNode, func(node *core.Node) bool {
@@ -175,7 +160,6 @@ func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 					return "break"
 				}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
 				}))
-				restoreJumpBreakCondition(node, next)
 				replaceNextInPlace(node, next, breakNode)
 				breakNode.AddNext(circleNode)
 				circleNode.AddNext(next)

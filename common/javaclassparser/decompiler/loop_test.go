@@ -151,7 +151,8 @@ func TestLoopDoWhile(t *testing.T) {
 	assert.Equal(t, `start
 if ("if other"){
 do{
-loop startif ("while condition"){
+loop start
+if ("while condition"){
 if ("if1"){
 if ("if2"){
 if ("if4"){

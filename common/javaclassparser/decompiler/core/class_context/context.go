@@ -35,6 +35,24 @@ var javaKeywords = map[string]struct{}{
 }
 
 func SafeIdentifier(name string) string {
+	if name == "" {
+		return "_"
+	}
+	var b strings.Builder
+	for i, r := range name {
+		valid := r == '_' || r == '$' || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (i > 0 && r >= '0' && r <= '9')
+		if valid {
+			b.WriteRune(r)
+			continue
+		}
+		if i == 0 && r >= '0' && r <= '9' {
+			b.WriteByte('_')
+			b.WriteRune(r)
+			continue
+		}
+		b.WriteByte('_')
+	}
+	name = b.String()
 	if _, ok := javaKeywords[name]; ok {
 		return name + "_"
 	}
@@ -44,7 +62,7 @@ func SafeIdentifier(name string) string {
 func (f *ClassContext) GetAllImported() []string {
 	imports := []string{}
 	f.BuildInLibsMap.ForEach(func(pkg string, classes []string) bool {
-		if pkg == f.PackageName {
+		if pkg == f.PackageName || pkg == "java.lang" {
 			return true
 		}
 		for _, className := range classes {
@@ -62,10 +80,13 @@ func (f *ClassContext) Import(name string) {
 		f.BuildInLibsMap = omap.NewEmptyOrderedMap[string, []string]()
 	}
 	pkg, className := SplitPackageClassName(name)
-	if f.KeySet.Has(className) {
+	if pkg == "" || pkg == "java.lang" {
 		return
 	}
-	if pkg == "" {
+	if className != "*" {
+		className = SafeIdentifier(className)
+	}
+	if f.KeySet.Has(className) {
 		return
 	}
 	key, ok := f.BuildInLibsMap.Get(pkg)
@@ -78,14 +99,15 @@ func (f *ClassContext) Import(name string) {
 	f.KeySet.Add(className)
 }
 func (f *ClassContext) ShortTypeName(name string) string {
-	f.Import(name)
 	pkg, className := SplitPackageClassName(name)
+	className = SafeIdentifier(className)
 	if pkg == "" {
 		return className
 	}
-	if pkg == f.PackageName {
+	if pkg == f.PackageName || pkg == "java.lang" {
 		return className
 	}
+	f.Import(name)
 	if f.BuildInLibsMap == nil {
 		f.BuildInLibsMap = omap.NewEmptyOrderedMap[string, []string]()
 	}
@@ -94,7 +116,7 @@ func (f *ClassContext) ShortTypeName(name string) string {
 		return className
 	}
 	//f.BuildInLibsMap.Set(pkg, append(f.BuildInLibsMap.GetMust(pkg), className))
-	return name
+	return pkg + "." + className
 }
 
 func SplitPackageClassName(s string) (string, string) {
