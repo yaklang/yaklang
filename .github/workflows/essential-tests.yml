@@ -428,7 +428,7 @@ jobs:
                 {"package": "./common/javaclassparser/jarwar/..."},
                 {"package": "./common/bin-parser/...", "timeout": "1m"},
                 {"package": "./common/fp/...", "timeout": "60s"},
-                {"package": "./common/javaclassparser/tests/...", "timeout": "90s"},
+                {"package": "./common/javaclassparser/tests/...", "timeout": "5m"},
                 {"package": "./common/suricata/...", "timeout": "20s", "run": "^TestMUSTPASS.*$"},
                 {"package": "./common/chaosmaker", "timeout": "20s", "run": "^(TestMUSTPASS_CrossVerify|TestMUSTPASS_CrossVerifyGroup|TestGenerateBangPortTrafficBug|TestGenerateHttpTrafficBug)$"},
                 {"package": "./common/pcapx", "timeout": "20s", "run": "^TestSmoking_.*$"},

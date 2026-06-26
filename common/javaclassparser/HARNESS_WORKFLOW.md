@@ -1,7 +1,7 @@
 # Java 反编译长尾清零工作流 (HARNESS_WORKFLOW)
 
 > 目标: 把 `.m2` 真实 jar 语料上的 `partial` / `syntax` / `err` / `panic` 逐个清零。
-> 配套基准: [`YAK_DECOMPILER_BENCHMARK.md`](./YAK_DECOMPILER_BENCHMARK.md)
+> 配套基准（中/英）: [`JAVA_DECOMPILER.zh-CN.md`](./JAVA_DECOMPILER.zh-CN.md) / [`JAVA_DECOMPILER.md`](./JAVA_DECOMPILER.md)
 >
 > 适用任意承载这项工作的分支；本文不绑定具体分支名。
 >
@@ -150,7 +150,7 @@ go test -run 'TestDecompileSyntaxRegression|TestGAPanicFreeBoundary|TestSyntaxCo
    - 新增回归用例通过；
    - `TestSyntaxCoverageMatrix` / `TestRecompileRoundtrip` 合成语料仍 0 stub / 0 round-trip 失败；
    - 整包 `go test ./common/javaclassparser/...` 全绿且 ≤ 30s；
-   - 在 [`YAK_DECOMPILER_BENCHMARK.md`](./YAK_DECOMPILER_BENCHMARK.md) 追加一节，记录本轮根因、修复点、同配置 before/after 的 `partial`/`stubs`/`panic` 计数（用真实数据，禁止编造）。
+   - 在 [`JAVA_DECOMPILER.md`](./JAVA_DECOMPILER.md) 追加一节，记录本轮根因、修复点、同配置 before/after 的 `partial`/`stubs`/`panic` 计数（用真实数据，禁止编造）。
 
 ---
 
