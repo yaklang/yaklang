@@ -21,8 +21,7 @@ func yakdocActions(r aicommon.AIInvokeRuntime) []reactloops.ReActLoopOption {
 	}
 }
 
-func yakdocEmitStart(loop *reactloops.ReActLoop, detail string) {
-	reactloops.EmitActionLog(loop, "query_yaklang_document", detail)
+func yakdocEmitStart(loop *reactloops.ReActLoop) {
 	reactloops.EmitStatus(loop, "查询 Yaklang 文档中 / Querying Yaklang Document...")
 }
 
@@ -34,7 +33,6 @@ func yakdocHandleSuccess(
 	invoker := loop.GetInvoker()
 	summary, reference := reactloops.SpillLongContent(loop, "yakdoc_"+actionName, result)
 	finishLine := fmt.Sprintf("完成: %s", actionName)
-	reactloops.EmitStatus(loop, "完成 / Complete")
 	reactloops.EmitActionLog(loop, "query_yaklang_document", finishLine, reference)
 	invoker.AddToTimeline(timelineKey, fmt.Sprintf("%s\n%s", finishLine, summary))
 	log.Infof("%s: query completed", actionName)
@@ -122,7 +120,7 @@ yakdoc_search(query="Split", library="str")`,
 			}
 			loop.Set(queryKey, currentQuery)
 
-			yakdocEmitStart(loop, fmt.Sprintf("查询: query=%s, library=%s", query, library))
+			yakdocEmitStart(loop)
 			hits, err := SearchYakDocument(query, limit, library)
 			if err != nil {
 				yakdocHandleError(loop, op, "yakdoc_search", queryKey, err)
@@ -154,7 +152,7 @@ yakdoc_get_all_library_names()`,
 			}
 			loop.Set(queryKey, "all_libraries")
 
-			yakdocEmitStart(loop, "查询: 全部标准库名称")
+			yakdocEmitStart(loop)
 			names, err := QueryAllLibraryNames()
 			if err != nil {
 				yakdocHandleError(loop, op, "yakdoc_get_all_library_names", queryKey, err)
@@ -197,7 +195,7 @@ yakdoc_library_details(library=["str", "file"])`,
 			}
 			loop.Set(queryKey, currentQuery)
 
-			yakdocEmitStart(loop, fmt.Sprintf("查询: library=%s", strings.Join(libNames, ",")))
+			yakdocEmitStart(loop)
 			details, err := QueryLibraryDetails(libNames)
 			if err != nil {
 				yakdocHandleError(loop, op, "yakdoc_library_details", queryKey, err)
@@ -252,7 +250,7 @@ yakdoc_function_details(library="str", function=["Split", "Contains"])`,
 			}
 			loop.Set(queryKey, currentQuery)
 
-			yakdocEmitStart(loop, fmt.Sprintf("查询: library=%s, function=%s", libName, strings.Join(funcNames, ",")))
+			yakdocEmitStart(loop)
 			results, err := QueryFunctionDetails(libName, funcNames)
 			if err != nil {
 				yakdocHandleError(loop, op, "yakdoc_function_details", queryKey, err)
@@ -305,7 +303,7 @@ yakdoc_variable_details(library="yakit", variable=["Status"])`,
 			}
 			loop.Set(queryKey, currentQuery)
 
-			yakdocEmitStart(loop, fmt.Sprintf("查询: library=%s, variable=%s", libName, strings.Join(varNames, ",")))
+			yakdocEmitStart(loop)
 			results, err := QueryVariableDetails(libName, varNames)
 			if err != nil {
 				yakdocHandleError(loop, op, "yakdoc_variable_details", queryKey, err)

@@ -350,7 +350,6 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 
 			nodeID := "grep_yaklang_samples"
 			startLine := fmt.Sprintf("Grep 搜索: pattern=%s, case_sensitive=%v, context=%d", pattern, caseSensitive, contextLines)
-			reactloops.EmitActionLog(loop, nodeID, startLine)
 			reactloops.EmitStatus(loop, "Grep 搜索中 / Grep searching...")
 
 			invoker.AddToTimeline("start_grep_yaklang_samples", startLine)
@@ -512,7 +511,6 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 
 			summary, reference := reactloops.SpillLongContent(loop, "grep_search", resultStr)
 			finishLine := fmt.Sprintf("完成: 找到 %d 个匹配, pattern=%s", len(results), pattern)
-			reactloops.EmitStatus(loop, "完成 / Complete")
 			reactloops.EmitActionLog(loop, nodeID, finishLine, reference)
 			invoker.AddToTimeline("grep_search_results", fmt.Sprintf(
 				"Grep 搜索完成: %d 个匹配, pattern=%s\n%s",
