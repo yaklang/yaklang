@@ -92,25 +92,45 @@ func _scanxFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...sy
 	for _, opt := range opts {
 		opt(config)
 	}
+	if config.Ctx == nil {
+		config.Ctx = context.Background()
+	}
 
-	return doFromPingUtils(_pingutilsToChan(res), ports, config)
+	return doFromPingUtils(_pingutilsToChan(config.Ctx, res), ports, config)
 
 }
 
-func _pingutilsToChan(res chan *pingutil.PingResult) chan string {
+func _pingutilsToChan(ctx context.Context, res chan *pingutil.PingResult) chan string {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	c := make(chan string)
 	go func() {
 		defer close(c)
 		hasValidResult := false
-		for result := range res {
-			if result.Ok {
-				hasValidResult = true
-				c <- result.IP
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case result, ok := <-res:
+				if !ok {
+					if !hasValidResult {
+						select {
+						case <-ctx.Done():
+						case c <- "":
+						}
+					}
+					return
+				}
+				if result.Ok {
+					hasValidResult = true
+					select {
+					case <-ctx.Done():
+						return
+					case c <- result.IP:
+					}
+				}
 			}
-		}
-		// 如果没有任何有效结果
-		if !hasValidResult {
-			c <- ""
 		}
 	}()
 	return c
@@ -123,8 +143,20 @@ func doFromPingUtils(res chan string, ports string, config *synscanx.SynxConfig)
 	ctx := config.Ctx
 
 	// 先获取第一个有效的目标
-	firstTarget, ok := <-res
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	var firstTarget string
+	var ok bool
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case firstTarget, ok = <-res:
+	}
 	if !ok || firstTarget == "" {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		return nil, utils.Errorf("no valid ping results found")
 	}
 
@@ -145,11 +177,19 @@ func doFromPingUtils(res chan string, ports string, config *synscanx.SynxConfig)
 		case inputCh <- firstTarget:
 		}
 		// 转发剩余的有效目标
-		for target := range res {
+		for {
 			select {
 			case <-ctx.Done():
 				return
-			case inputCh <- target:
+			case target, ok := <-res:
+				if !ok {
+					return
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case inputCh <- target:
+				}
 			}
 		}
 	}()
@@ -171,7 +211,10 @@ func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynSc
 	ctx := config.Ctx
 
 	log.Debugf("targets: %s", targets)
-	sample := utils.ParseStringToHosts(targets)[0]
+	sample := chooseScanxRouteSample(targets)
+	if sample == "" {
+		return nil, utils.Errorf("empty target")
+	}
 	scanner, err := synscanx.NewScannerx(ctx, sample, config)
 	if err != nil {
 		return nil, err
@@ -193,6 +236,19 @@ func do(targets, ports string, config *synscanx.SynxConfig) (chan *synscan.SynSc
 	}
 	return resultCh, nil
 
+}
+
+func chooseScanxRouteSample(targets string) string {
+	targetList := utils.ParseStringToHosts(targets)
+	if len(targetList) == 0 {
+		return ""
+	}
+	for _, target := range targetList {
+		if !utils.IsLoopback(target) {
+			return target
+		}
+	}
+	return targetList[0]
 }
 
 var SynxPortScanExports = map[string]interface{}{
