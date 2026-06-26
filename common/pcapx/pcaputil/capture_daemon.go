@@ -60,6 +60,14 @@ func keepDaemonCache(ctx context.Context, key string) context.CancelFunc {
 	}
 }
 
+func notifyNetInterfaceCreated(conf *CaptureConfig, operation PcapHandleOperation) {
+	if conf == nil || conf.onNetInterfaceCreated == nil {
+		return
+	}
+	handle, _ := operation.(*PcapHandleWrapper)
+	conf.onNetInterfaceCreated(handle)
+}
+
 var getInterfaceHandlerMutex = new(sync.Mutex)
 
 func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (string, PcapHandleOperation, error) {
@@ -103,11 +111,7 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 		// debug
 		//cacheId := hashRaw.String()
 		if daemon, ok := getDaemonCache(cacheId); ok {
-			if conf.onNetInterfaceCreated != nil { // 取缓存时 检测是否有新的 onNetInterfaceCreated 回调
-				if oldHandle, ok := daemon.handler.(*PcapHandleWrapper); ok {
-					conf.onNetInterfaceCreated(oldHandle)
-				}
-			}
+			notifyNetInterfaceCreated(conf, daemon.handler)
 			return cacheId, daemon.handler, nil
 		}
 
@@ -136,6 +140,7 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 			registeredHandlers: omap.NewOrderedMap(make(map[string]*pcapPacketHandlerContext)),
 			startOnce:          new(sync.Once),
 		}
+		notifyNetInterfaceCreated(conf, operation)
 
 		if conf.mock == nil {
 			daemon.startOnce.Do(func() {
@@ -151,19 +156,11 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 				packetSource.DecodeStreamsAsDatagrams = true
 				//source := packetSource.PacketsCtx(conf.Context)
 				source := packetSource.Packets()
-				onceFirstPacket := new(sync.Once)
 
 				go func() {
 					defer func() {
 						log.Infof("background iface: %v is stop...", ifaceName)
 					}()
-
-					onceFirstPacket.Do(func() {
-						// first packet
-						if conf.onNetInterfaceCreated != nil {
-							conf.onNetInterfaceCreated(handler)
-						}
-					})
 
 					for {
 						select {
