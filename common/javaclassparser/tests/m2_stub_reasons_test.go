@@ -6,8 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -106,6 +108,17 @@ func TestM2StubReasons(t *testing.T) {
 	industry := os.Getenv("M2_INDUSTRY") != ""
 	maxPerJar := envInt("M2_MAX_PER_JAR", 200)
 	jarPrefixes := os.Getenv("M2_JAR_PREFIXES")
+	defaultConcurrentJars := 4
+	if nCPU := runtime.NumCPU(); nCPU > 0 && nCPU < defaultConcurrentJars {
+		defaultConcurrentJars = nCPU
+	}
+	concurrentJarsExplicit := strings.TrimSpace(os.Getenv("M2_CONCURRENT_JARS")) != ""
+	concurrentJars := envInt("M2_CONCURRENT_JARS", defaultConcurrentJars)
+	if (resumeAfterClass > 0 || strings.TrimSpace(resumeAfterName) != "") && !concurrentJarsExplicit {
+		// Class-level cursors intentionally stay serial unless explicitly overridden: otherwise the
+		// workers would decompile the skipped prefix before the ordered aggregator can discard it.
+		concurrentJars = 1
+	}
 	// Progress cadence: every PROGRESS_EVERY classes, stream a live tally to stderr so the run is not
 	// a black box (set PROGRESS_EVERY=0 to silence). Default 500 so a stuck/regressing run surfaces
 	// quickly during fix iterations.
@@ -198,11 +211,12 @@ func TestM2StubReasons(t *testing.T) {
 	if len(jars) == 0 {
 		effectiveStartJarIndex, effectiveEndJarIndex = 0, 0
 	}
-	fmt.Fprintf(os.Stderr, "[stub-reasons] start: jars=%d industry=%v maxClasses=%d maxPerJar=%d prefixes=%q jarIndexStart=%d jarIndexEnd=%d\n",
-		len(jars), industry, maxClasses, maxPerJar, jarPrefixes, effectiveStartJarIndex, effectiveEndJarIndex)
+	fmt.Fprintf(os.Stderr, "[stub-reasons] start: jars=%d industry=%v maxClasses=%d maxPerJar=%d prefixes=%q jarIndexStart=%d jarIndexEnd=%d concurrentJars=%d\n",
+		len(jars), industry, maxClasses, maxPerJar, jarPrefixes, effectiveStartJarIndex, effectiveEndJarIndex, concurrentJars)
 
 	reasonRe := regexp.MustCompile(`/\* yak-decompiler:([^*]*)\*/`)
 	digitsRe := regexp.MustCompile(`\d+`)
+	maxClassSize := envInt("M2_MAX_CLASS_SIZE", 500000)
 	normalize := func(s string) string {
 		s = strings.TrimSpace(s)
 		s = strings.TrimPrefix(s, "undecompilable method body")
@@ -245,6 +259,7 @@ func TestM2StubReasons(t *testing.T) {
 		fmt.Fprintf(&b, "max_jars=%d\n", maxJars)
 		fmt.Fprintf(&b, "max_classes=%d\n", maxClasses)
 		fmt.Fprintf(&b, "max_per_jar=%d\n", maxPerJar)
+		fmt.Fprintf(&b, "concurrent_jars=%d\n", concurrentJars)
 		if hasJarIndexWindow {
 			fmt.Fprintf(&b, "jar_index_start=%d\n", effectiveStartJarIndex)
 			fmt.Fprintf(&b, "jar_index_end=%d\n", effectiveEndJarIndex)
@@ -274,6 +289,9 @@ func TestM2StubReasons(t *testing.T) {
 			if endJarIndex > 0 {
 				prefixEnv += fmt.Sprintf("M2_START_JAR_END=%d ", endJarIndex)
 			}
+			if concurrentJarsExplicit {
+				prefixEnv += fmt.Sprintf("M2_CONCURRENT_JARS=%d ", concurrentJars)
+			}
 			fmt.Fprintf(&b, "first_failure_class_index=%d\n", firstFailureAbsClass)
 			fmt.Fprintf(&b, "first_failure_class=%s\n", firstFailureName)
 			fmt.Fprintf(&b, "first_failure_jar=%s\n", firstFailureJar)
@@ -293,6 +311,289 @@ func TestM2StubReasons(t *testing.T) {
 
 	seenStartJar := startJarName == ""
 	seenResumeAfterJar := resumeAfterJarName == ""
+
+	type m2JarTask struct {
+		index int
+		path  string
+	}
+	type m2ClassScanResult struct {
+		jarClassOrdinal int
+		name            string
+		raw             []byte
+		out             string
+		errMsg          string
+		partial         bool
+		primaryReason   string
+		reasons         []string
+	}
+	type m2JarScanResult struct {
+		task       m2JarTask
+		name       string
+		startedAt  time.Time
+		elapsed    time.Duration
+		jarClasses int
+		openErr    error
+		classes    []m2ClassScanResult
+	}
+	scanJar := func(task m2JarTask, stop <-chan struct{}) m2JarScanResult {
+		startedAt := time.Now()
+		res := m2JarScanResult{
+			task:      task,
+			name:      filepath.Base(task.path),
+			startedAt: startedAt,
+		}
+		zr, err := zip.OpenReader(task.path)
+		if err != nil {
+			res.openErr = err
+			res.elapsed = time.Since(startedAt)
+			return res
+		}
+		defer zr.Close()
+		perJar := 0
+		for _, f := range zr.File {
+			select {
+			case <-stop:
+				res.elapsed = time.Since(startedAt)
+				return res
+			default:
+			}
+			if !strings.HasSuffix(f.Name, ".class") {
+				continue
+			}
+			base := filepath.Base(f.Name)
+			if base == "module-info.class" || base == "package-info.class" {
+				continue
+			}
+			if industry && maxPerJar > 0 && perJar >= maxPerJar {
+				break
+			}
+			perJar++
+			res.jarClasses = perJar
+			rc, err := f.Open()
+			if err != nil {
+				continue
+			}
+			raw := readAll(rc)
+			rc.Close()
+			if len(raw) == 0 || len(raw) > maxClassSize {
+				continue
+			}
+			classRes := m2ClassScanResult{
+				jarClassOrdinal: perJar,
+				name:            filepath.Base(task.path) + "!" + f.Name,
+			}
+			out, derr := safeDecompileHarness(raw)
+			if derr != nil {
+				classRes.errMsg = derr.Error()
+				classRes.raw = raw
+			} else if strings.Contains(out, javaclassparser.DecompileStubMarker) {
+				classRes.partial = true
+				classRes.raw = raw
+				classRes.out = out
+				for _, m := range reasonRe.FindAllStringSubmatch(out, -1) {
+					reason := normalize(m[1])
+					if reason == "" {
+						continue
+					}
+					if classRes.primaryReason == "" {
+						classRes.primaryReason = reason
+					}
+					classRes.reasons = append(classRes.reasons, reason)
+				}
+			}
+			res.classes = append(res.classes, classRes)
+			if stopOnFirst && (classRes.errMsg != "" || classRes.partial) {
+				break
+			}
+		}
+		res.elapsed = time.Since(startedAt)
+		return res
+	}
+	aggregateJarResult := func(res m2JarScanResult) bool {
+		currentJarIndex = res.task.index
+		currentJarName = res.name
+		currentJarPath = res.task.path
+		currentJarWindowClasses = 0
+		fmt.Fprintf(os.Stderr, "[stub-reasons] jar-start ts=%s jar=%d/%d name=%s path=%s scanned=%d ok=%d partial=%d err=%d\n",
+			res.startedAt.Format(time.RFC3339), currentJarIndex, len(jars), currentJarName, currentJarPath, nClasses, nOK, nPartial, nErr)
+		writeProgress("running")
+		if res.openErr != nil {
+			fmt.Fprintf(os.Stderr, "[stub-reasons] jar-skip ts=%s jar=%d/%d name=%s reason=%s\n",
+				nowStamp(), currentJarIndex, len(jars), currentJarName, strings.ReplaceAll(res.openErr.Error(), "\n", " "))
+			return false
+		}
+		shouldStop := false
+		for _, classRes := range res.classes {
+			if absClasses >= maxClasses {
+				shouldStop = true
+				break
+			}
+			absClasses++
+			currentJarWindowClasses = classRes.jarClassOrdinal
+			if resumeAfterClass > 0 && absClasses <= resumeAfterClass {
+				continue
+			}
+			if !seenResumeName {
+				if classRes.name == resumeAfterName {
+					seenResumeName = true
+				}
+				continue
+			}
+			nClasses++
+			if classRes.errMsg != "" {
+				// A hard decompile error or escaped panic (the harness recovers panics into derr).
+				nErr++
+				msg := classRes.errMsg
+				if len(msg) > 200 {
+					msg = msg[:200]
+				}
+				errClasses = append(errClasses, errRec{name: classRes.name, msg: msg})
+				errReasonCounts[normalize(msg)]++
+				dir := saveProblem("err", normalize(msg), classRes.name, classRes.raw, ".err.txt", classRes.errMsg)
+				fmt.Fprintf(os.Stderr, "[stub-reasons] ERR %s :: %s\n", classRes.name, strings.ReplaceAll(msg, "\n", " "))
+				if stopOnFirst {
+					firstFailureName, firstFailureBucket = classRes.name, dir
+					firstFailureJar = filepath.Base(res.task.path)
+					firstFailureAbsClass = absClasses
+					shouldStop = true
+					break
+				}
+			} else if !classRes.partial {
+				nOK++
+			} else {
+				nPartial++
+				for _, reason := range classRes.reasons {
+					nStubs++
+					counts[reason]++
+					if len(examples[reason]) < 4 {
+						examples[reason] = append(examples[reason], classRes.name)
+					}
+				}
+				// Save the failing class under its dominant reason bucket so it can be reproduced
+				// directly: `DIAG_FILE=<path> go test -run TestDiagDecompileClass ...`.
+				dir := saveProblem("partial", classRes.primaryReason, classRes.name, classRes.raw, ".java", classRes.out)
+				if stopOnFirst {
+					firstFailureName, firstFailureBucket = classRes.name, dir
+					firstFailureJar = filepath.Base(res.task.path)
+					firstFailureAbsClass = absClasses
+					shouldStop = true
+					break
+				}
+			}
+			if progressEvery > 0 && nClasses%progressEvery == 0 {
+				fmt.Fprintf(os.Stderr, "[stub-reasons] progress ts=%s jar=%d/%d name=%s jarClasses=%d scanned=%d ok=%d partial=%d err=%d\n",
+					nowStamp(), currentJarIndex, len(jars), currentJarName, currentJarWindowClasses, nClasses, nOK, nPartial, nErr)
+				writeProgress("running")
+			}
+		}
+		jarClassesForLog := currentJarWindowClasses
+		if jarClassesForLog == 0 {
+			jarClassesForLog = res.jarClasses
+		}
+		fmt.Fprintf(os.Stderr, "[stub-reasons] jar-done ts=%s jar=%d/%d name=%s jarClasses=%d elapsed=%s scanned=%d ok=%d partial=%d err=%d\n",
+			nowStamp(), currentJarIndex, len(jars), currentJarName, jarClassesForLog, res.elapsed.Round(time.Millisecond), nClasses, nOK, nPartial, nErr)
+		writeProgress("running")
+		return shouldStop || absClasses >= maxClasses
+	}
+
+	if concurrentJars > 1 {
+		var tasks []m2JarTask
+		for ji, jp := range jars {
+			jarIndex := ji + 1
+			if hasJarIndexWindow {
+				if startJarIndex > 0 && jarIndex < startJarIndex {
+					continue
+				}
+				if endJarIndex > 0 && jarIndex > endJarIndex {
+					break
+				}
+			}
+			if !seenResumeAfterJar {
+				if jarCursorMatches(resumeAfterJarName, jp) {
+					seenResumeAfterJar = true
+				}
+				continue
+			}
+			if !seenStartJar {
+				if jarCursorMatches(startJarName, jp) {
+					seenStartJar = true
+				} else {
+					continue
+				}
+			}
+			tasks = append(tasks, m2JarTask{index: jarIndex, path: jp})
+		}
+		if len(tasks) == 0 {
+			goto scanDone
+		}
+		workerCount := concurrentJars
+		if workerCount > len(tasks) {
+			workerCount = len(tasks)
+		}
+		jobs := make(chan m2JarTask)
+		results := make(chan m2JarScanResult, len(tasks))
+		stopWorkers := make(chan struct{})
+		var stopOnce sync.Once
+		var wg sync.WaitGroup
+		for i := 0; i < workerCount; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for {
+					select {
+					case <-stopWorkers:
+						return
+					case task, ok := <-jobs:
+						if !ok {
+							return
+						}
+						results <- scanJar(task, stopWorkers)
+					}
+				}
+			}()
+		}
+		go func() {
+			defer close(jobs)
+			for _, task := range tasks {
+				select {
+				case <-stopWorkers:
+					return
+				case jobs <- task:
+				}
+			}
+		}()
+		go func() {
+			wg.Wait()
+			close(results)
+		}()
+		pending := map[int]m2JarScanResult{}
+		nextTask := 0
+		for nextTask < len(tasks) {
+			res, ok := <-results
+			if !ok {
+				break
+			}
+			pending[res.task.index] = res
+			for nextTask < len(tasks) {
+				want := tasks[nextTask].index
+				res, ok := pending[want]
+				if !ok {
+					break
+				}
+				delete(pending, want)
+				nextTask++
+				if aggregateJarResult(res) {
+					stopOnce.Do(func() { close(stopWorkers) })
+					nextTask = len(tasks)
+					break
+				}
+			}
+		}
+		stopOnce.Do(func() { close(stopWorkers) })
+		for range results {
+		}
+		goto scanDone
+	}
 
 jarLoop:
 	for ji, jp := range jars {
@@ -362,7 +663,7 @@ jarLoop:
 			// generated parser code that decompiles correctly but takes minutes per class due to
 			// the sheer size of the bytecode. This is a scan throughput optimization, not a correctness
 			// limitation — these classes can be decompiled individually with DIAG_FILE if needed.
-			if maxSize := envInt("M2_MAX_CLASS_SIZE", 500000); len(raw) > maxSize {
+			if len(raw) > maxClassSize {
 				continue
 			}
 			absClasses++
@@ -438,6 +739,8 @@ jarLoop:
 			break
 		}
 	}
+
+scanDone:
 	fmt.Fprintf(os.Stderr, "[stub-reasons] DONE ts=%s scanned=%d ok=%d partial=%d err=%d stubs=%d\n",
 		nowStamp(), nClasses, nOK, nPartial, nErr, nStubs)
 	if stopOnFirst && firstFailureName != "" {

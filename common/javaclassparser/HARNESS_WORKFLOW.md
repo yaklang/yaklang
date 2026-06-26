@@ -179,6 +179,7 @@ diff <(head -1 /tmp/m2-before.txt) <(head -1 /tmp/m2-after.txt)
 | 续跑到下一个未处理 jar（首选，最快） | 使用 `/tmp/jdec-progress/state.env` 中的 `continue_after_locked_jar`，或手动加 `M2_RESUME_AFTER_JAR=<jar>` |
 | 从某个 jar 开始复核（包含该 jar） | `M2_START_JAR=<jar> STUB_REASONS=1 STOP_ON_FIRST=1 ... go test -run TestM2StubReasons -v ./common/javaclassparser/tests/` |
 | 扫描 jar 下标闭区间（多进程分片） | `M2_START_JAR_INDEX=50 M2_START_JAR_END=200 STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-50-200 M2_PROGRESS_FILE=/tmp/jdec-progress/50-200.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/` |
+| 调整单进程 jar 并行数 | 默认 `M2_CONCURRENT_JARS=4`；需要降噪/排查时设 `M2_CONCURRENT_JARS=1`，CPU 余量足时可试 `M2_CONCURRENT_JARS=8` |
 | 大扫描 + 失败类落盘分桶（阶段性盘点） | `STUB_REASONS=1 M2_MAX_JARS=120 M2_MAX_CLASSES=24491 PROBLEM_DIR=/tmp/jdec-problems M2_PROGRESS_FILE=/tmp/jdec-progress/state.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/` |
 | 计数 + 每类指纹（前后对比） | `M2_OUT=/tmp/m2.txt M2_MAX_JARS=120 M2_MAX_CLASSES=12000 go test -run TestM2RegressionHarness -v ./common/javaclassparser/tests/` |
 | 单类复现（文件） | `DIAG_FILE=<path>.class go test -run TestDiagDecompileClass -v ./common/javaclassparser/tests/` |
@@ -191,7 +192,7 @@ diff <(head -1 /tmp/m2-before.txt) <(head -1 /tmp/m2-after.txt)
 
 ## 后台扫描 + 前台并行修复（加速长尾清零）
 
-全量 `.m2` 扫描是分钟级、且串行的，等它结束再修会大量浪费时间。推荐的工作方式是**后台跑全量收集、前台并行逐个修**，互不阻塞：
+全量 `.m2` 扫描是分钟级任务，等它结束再修会大量浪费时间。推荐的工作方式是**后台跑全量收集、前台并行逐个修**，互不阻塞：
 
 - **后台启动全量收集**（一次性把所有失败 class 落盘分桶，前台立刻继续干活）：
   ```bash
@@ -207,7 +208,9 @@ diff <(head -1 /tmp/m2-before.txt) <(head -1 /tmp/m2-after.txt)
 
 - **优先用 jar 级续跑**：class offset 会先打开 jar、遍历 class，跳过大前缀时仍然慢。进度文件里的 `rerun_from_failure_jar` / `continue_after_locked_jar` 使用 `M2_START_JAR` / `M2_RESUME_AFTER_JAR`，能在打开 zip 前跳过整个 jar，后续长跑默认优先用这两个命令。只有要在同一个 jar 内从某个 class 之后精确继续，才退回 class 级游标。
 
-- **a-z 分片多进程扫描**：需要更快摸底时，不在单个 Go 进程内加并发（反编译器和语法校验有全局状态，进程内并发更容易引入非确定性）；改用多个独立 `go test` 进程按 jar basename 前缀分片。每个进程设置不同 `M2_JAR_PREFIXES`、`PROBLEM_DIR` 和 `M2_PROGRESS_FILE`，互不共享状态。例如：
+- **单进程 jar 并行**：`TestM2StubReasons` 默认 `M2_CONCURRENT_JARS=4`，即同一个 `go test` 进程内最多同时扫描 4 个 jar；worker 只做 jar/class 反编译，主 goroutine 仍按 jar 字典序聚合计数、落盘和 `STOP_ON_FIRST`，所以“第一个失败”仍按扫描顺序决定。调参时在本机 `100-160` 窗口、400 个 class 上对比过 `1/2/4/8`，`4` 略优且不会过度抢 CPU；需要排查并发相关问题时设置 `M2_CONCURRENT_JARS=1` 可回到串行。
+
+- **a-z 分片多进程扫描**：需要更快摸底时，可以继续改用多个独立 `go test` 进程按 jar basename 前缀分片。每个进程设置不同 `M2_JAR_PREFIXES`、`PROBLEM_DIR` 和 `M2_PROGRESS_FILE`，互不共享状态。例如：
   ```bash
   M2_JAR_PREFIXES=a-f STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-af M2_PROGRESS_FILE=/tmp/jdec-progress/af.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
   M2_JAR_PREFIXES=g-l STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-gl M2_PROGRESS_FILE=/tmp/jdec-progress/gl.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
@@ -216,7 +219,7 @@ diff <(head -1 /tmp/m2-before.txt) <(head -1 /tmp/m2-after.txt)
   ```
   为了公平地覆盖字母段，不要总从 `a` 开始。每轮可以随机选一个前缀段先跑，例如 `python3 -c 'import random; print(random.choice(["a-f","g-l","m-r","s-z"]))'` 选出本轮首段；修完首段失败后，再扫下一个随机段。
 
-- **jar 下标窗口分片**：当字母前缀分布不均、或想精确切连续范围时，使用 `M2_START_JAR_INDEX` / `M2_START_JAR_END`。下标基于排序后的 jar 列表，先应用 `M2_JAR_PREFIXES` 过滤，再按 1 基闭区间扫描；显式设置窗口后不会再受默认 `M2_MAX_JARS=120` 截断影响。多个进程要使用不同的 `PROBLEM_DIR` 和 `M2_PROGRESS_FILE`：
+- **jar 下标窗口分片**：当字母前缀分布不均、或想精确切连续范围时，使用 `M2_START_JAR_INDEX` / `M2_START_JAR_END`。下标基于排序后的 jar 列表，先应用 `M2_JAR_PREFIXES` 过滤，再按 1 基闭区间扫描；显式设置窗口后不会再受默认 `M2_MAX_JARS=120` 截断影响。多个进程要使用不同的 `PROBLEM_DIR` 和 `M2_PROGRESS_FILE`；每个进程内部仍默认最多 4 个 jar 并行：
   ```bash
   M2_START_JAR_INDEX=10 M2_START_JAR_END=20 STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-10-20 M2_PROGRESS_FILE=/tmp/jdec-progress/10-20.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
   M2_START_JAR_INDEX=100 M2_START_JAR_END=110 STUB_REASONS=1 STOP_ON_FIRST=1 M2_INDUSTRY=1 PROBLEM_DIR=/tmp/jdec-100-110 M2_PROGRESS_FILE=/tmp/jdec-progress/100-110.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
