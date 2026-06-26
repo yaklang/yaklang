@@ -194,6 +194,12 @@ func (a *AssignStatement) String(funcCtx *class_context.ClassContext) string {
 			// degrades this method cleanly instead of crashing.
 			return values.EmptySlotValuePlaceholder + " " + assign
 		}
+		if _, ok := declType.RawType().(*types.JavaMultiCatchType); ok {
+			// A multi-catch union type is legal only inside `catch (A | B e)`. If the exception
+			// value is hoisted into an ordinary local (`cause = e` after the catch), render it as
+			// a common Throwable subtype so the declaration remains valid Java.
+			declType = types.NewJavaClass("java.lang.Exception")
+		}
 		return declType.String(funcCtx) + " " + assign
 	} else {
 		return assign

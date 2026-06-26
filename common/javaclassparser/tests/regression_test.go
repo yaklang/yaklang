@@ -550,6 +550,21 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			mustNotContain: []string{"catch(ArithmeticException |", "yak-decompiler"},
 		},
 		{
+			file: "jackson_from_string_deserializer_multicatch.class",
+			desc: "a multi-catch exception value stored into a normal local after the catch must not render " +
+				"the ordinary local declaration as `A | B x = null`; the union type is legal only in the catch parameter.",
+			mustContain: []string{
+				"Exception var4 = null;",
+				"catch(IllegalArgumentException | MalformedURLException",
+				"withCause(var4)",
+			},
+			mustNotContain: []string{
+				"IllegalArgumentException | MalformedURLException var4 = null",
+				"yak-decompiler",
+				"post-decompile syntax",
+			},
+		},
+		{
 			file: "multiple_next_early_return.class",
 			desc: "an if whose arm can early-return while the other arm falls through to a shared continuation must not abort structuring with 'multiple next'",
 			// deserializeAndSet must fully reconstruct (no stub); the early-return arm and the
