@@ -26,14 +26,20 @@ const (
 	loopHTTPFuzzReportSummaryMaxBytes = 5 * 1024
 	loopHTTPFuzzTimelinePreviewSize   = 8 * 1024
 	loopHTTPFuzzDetailedResultLimit   = 12
-	loopHTTPFuzzFrontendDetailLimit   = 6
-	loopHTTPFuzzInterestingTopN       = 6
-	loopHTTPFuzzProgressEmitInterval  = 2 * time.Second
-	modifiedPacketContentField        = "modified_packet_content"
-	loopHTTPFuzzStatusEventNode       = "http_flow_fuzz_status"
-	loopHTTPFuzzStatusStart           = "start"
-	loopHTTPFuzzStatusWorking         = "working"
-	loopHTTPFuzzStatusFinish          = "finish"
+	// 写入 prompt 的代表性请求/响应最大字节数。大响应体若不收敛会直接撑爆 LLM 请求上限，
+	// 这里保留首尾以维持 HTTP 结构与可读性。详细包渲染中每条结果的单包上限更小，
+	// 避免多条原始包累加后让“压缩前”的 payload 自身就超出模型限制。
+	loopHTTPFuzzPromptResponseMaxBytes = 8 * 1024
+	loopHTTPFuzzPromptRequestMaxBytes  = 8 * 1024
+	loopHTTPFuzzDetailedPacketMaxBytes = 4 * 1024
+	loopHTTPFuzzFrontendDetailLimit    = 6
+	loopHTTPFuzzInterestingTopN        = 6
+	loopHTTPFuzzProgressEmitInterval   = 2 * time.Second
+	modifiedPacketContentField         = "modified_packet_content"
+	loopHTTPFuzzStatusEventNode        = "http_flow_fuzz_status"
+	loopHTTPFuzzStatusStart            = "start"
+	loopHTTPFuzzStatusWorking          = "working"
+	loopHTTPFuzzStatusFinish           = "finish"
 
 	// EmitActionLog nodeId：同类动作共用，具体手段差异写在日志正文里。
 	loopHTTPFuzzActionLogNodeSetRequest    = "set-http-request"
@@ -451,9 +457,9 @@ func appendLoopHTTPFuzzRenderedDetailedResult(out *strings.Builder, resultIndex 
 	out.WriteString(fmt.Sprintf("Request Changes:\n%s\n", processed.RequestDiff))
 	out.WriteString(fmt.Sprintf("Response Summary:\n%s\n", processed.ResponsePreview))
 	out.WriteString("Request Packet:\n")
-	out.WriteString(sanitizeRequestTextForPrompt(processed.RequestRaw))
+	out.WriteString(utils.ShrinkTextBlock(sanitizeRequestTextForPrompt(processed.RequestRaw), loopHTTPFuzzDetailedPacketMaxBytes))
 	out.WriteString("\nResponse Packet:\n")
-	out.WriteString(processed.ResponseRaw)
+	out.WriteString(utils.ShrinkTextBlock(sanitizeResponseTextForPrompt(processed.ResponseRaw), loopHTTPFuzzDetailedPacketMaxBytes))
 	out.WriteRune('\n')
 }
 
@@ -1086,6 +1092,7 @@ func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTT
 		loop.Set("representative_response", representativeResponse)
 		loop.Set("representative_httpflow_hidden_index", representativeHiddenIndex)
 		loop.Set(loopHTTPUploadRepresentativeSafeKey, sanitizeRequestTextForPrompt(representativeRequest))
+		loop.Set(loopHTTPUploadRepresentativeResponseSafeKey, sanitizeResponseTextForPrompt(representativeResponse))
 	}
 
 	overviewReport := buildLoopHTTPFuzzOverviewReport(actionName, paramSummary, overview)
@@ -1191,7 +1198,7 @@ func buildCompressedAnalysisSection(compressed, representativeRequest, represent
 		}
 		if representativeResponse != "" {
 			out.WriteString("Response:\n")
-			out.WriteString(representativeResponse)
+			out.WriteString(sanitizeResponseTextForPrompt(representativeResponse))
 		}
 	}
 	return out.String()

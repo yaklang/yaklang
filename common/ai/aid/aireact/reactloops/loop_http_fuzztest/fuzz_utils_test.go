@@ -2,6 +2,7 @@ package loop_http_fuzztest
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -69,6 +70,35 @@ func TestBuildCompressedAnalysisSection_RendersRepresentativePacket(t *testing.T
 	require.Contains(t, report, "=== Compressed Fuzz Analysis ===")
 	require.Contains(t, report, "compressed body")
 	require.Contains(t, report, "Representative Packet For Follow-Up Testing")
+}
+
+// TestBuildCompressedAnalysisSection_ShrinksLargeResponse 锁定大响应收敛行为：
+// 代表性响应若不收敛会直接撑爆 LLM 请求上限，必须截断到 prompt 安全体积。
+func TestBuildCompressedAnalysisSection_ShrinksLargeResponse(t *testing.T) {
+	hugeBody := strings.Repeat("A", 64*1024)
+	largeResponse := "HTTP/1.1 200 OK\r\nContent-Length: " + fmt.Sprint(len(hugeBody)) + "\r\n\r\n" + hugeBody
+	require.Greater(t, len(largeResponse), loopHTTPFuzzPromptResponseMaxBytes*2)
+
+	report := buildCompressedAnalysisSection("compressed body", "", largeResponse, "flow-9")
+
+	require.Contains(t, report, "Response:")
+	// 收敛后必须显著小于原始大响应，且不超过安全上限的合理倍数（保留首尾+省略号）。
+	require.Less(t, len(report), len(largeResponse)/2)
+	require.Less(t, len(report), loopHTTPFuzzPromptResponseMaxBytes*2)
+	require.Contains(t, report, "...")
+}
+
+// TestSanitizeResponseTextForPrompt_BoundsLargeResponse 验证响应收敛工具自身的行为。
+func TestSanitizeResponseTextForPrompt_BoundsLargeResponse(t *testing.T) {
+	require.Equal(t, "", sanitizeResponseTextForPrompt("  "))
+	small := "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello"
+	require.Equal(t, small, sanitizeResponseTextForPrompt(small))
+
+	huge := "HTTP/1.1 200 OK\r\nContent-Length: 65536\r\n\r\n" + strings.Repeat("B", 65536)
+	bounded := sanitizeResponseTextForPrompt(huge)
+	require.Less(t, len(bounded), len(huge)/2)
+	require.Less(t, len(bounded), loopHTTPFuzzPromptResponseMaxBytes*2)
+	require.Contains(t, bounded, "...")
 }
 
 func TestBuildLoopHTTPFuzzVerificationPayload_DoesNotDuplicateAggregateOverview(t *testing.T) {
