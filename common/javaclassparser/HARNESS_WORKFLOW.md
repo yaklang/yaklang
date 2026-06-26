@@ -36,6 +36,7 @@
 STUB_REASONS=1 STOP_ON_FIRST=1 \
 M2_MAX_JARS=120 M2_MAX_CLASSES=24491 \
 PROBLEM_DIR=/tmp/jdec-problems PROGRESS_EVERY=0 \
+M2_PROGRESS_FILE=/tmp/jdec-progress/state.env \
 go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
 # stderr 末尾会给出:
 #   [stub-reasons] STOP_ON_FIRST: aborted after first failure at class <N>
@@ -47,6 +48,8 @@ go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
 - `STOP_ON_FIRST=1`：遇到第一个 `partial`/`err`/`panic` 立即保存并退出（按 §0 原则）。语料全清时会扫完整段范围并打印 `no failure found`，所以它也是"是否清零"的探针。
 - 语料已清零想确认时：重跑同一条，看到 `no failure found in scanned range` 即代表本范围 0 失败。
 - 想覆盖 spring/tomcat/netty 等非 a-c 前缀 jar：追加 `M2_INDUSTRY=1`（每 jar 上限 `M2_MAX_PER_JAR`，默认 200）。
+- `M2_PROGRESS_FILE=/tmp/jdec-progress/state.env`：每轮自动记录当前失败点、bucket、单类复现命令，以及两个续跑命令：`rerun_from_failure` 用于修复后从失败点前一个 class 复核；`continue_after_locked` 用于回归锁定后从下一个未处理 class 继续。
+- 手动续跑也可以用 `M2_RESUME_AFTER_CLASS=<N>` 跳过前 N 个稳定排序后的 class，或用 `M2_RESUME_AFTER=<jar>!<class>` 跳过到某个具体 class 之后。
 
 ### 1b. 全量分桶 + 计数（阶段性盘点，分钟级）
 
@@ -57,6 +60,7 @@ go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
 STUB_REASONS=1 \
 M2_MAX_JARS=120 M2_MAX_CLASSES=24491 \
 PROBLEM_DIR=/tmp/jdec-problems \
+M2_PROGRESS_FILE=/tmp/jdec-progress/state.env \
 go test -run TestM2StubReasons -v ./common/javaclassparser/tests/
 ```
 
@@ -170,8 +174,9 @@ diff <(head -1 /tmp/m2-before.txt) <(head -1 /tmp/m2-after.txt)
 
 | 目的 | 命令 |
 |------|------|
-| **迭代首选：秒级定位第一个失败类** | `STUB_REASONS=1 STOP_ON_FIRST=1 M2_MAX_JARS=120 M2_MAX_CLASSES=24491 PROBLEM_DIR=/tmp/jdec-problems PROGRESS_EVERY=0 go test -run TestM2StubReasons -v ./common/javaclassparser/tests/` |
-| 大扫描 + 失败类落盘分桶（阶段性盘点） | `STUB_REASONS=1 M2_MAX_JARS=120 M2_MAX_CLASSES=24491 PROBLEM_DIR=/tmp/jdec-problems go test -run TestM2StubReasons -v ./common/javaclassparser/tests/` |
+| **迭代首选：秒级定位第一个失败类** | `STUB_REASONS=1 STOP_ON_FIRST=1 M2_MAX_JARS=120 M2_MAX_CLASSES=24491 PROBLEM_DIR=/tmp/jdec-problems PROGRESS_EVERY=0 M2_PROGRESS_FILE=/tmp/jdec-progress/state.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/` |
+| 续跑到下一个未处理 class | 使用 `/tmp/jdec-progress/state.env` 中的 `continue_after_locked`，或手动加 `M2_RESUME_AFTER_CLASS=<N>` / `M2_RESUME_AFTER=<jar>!<class>` |
+| 大扫描 + 失败类落盘分桶（阶段性盘点） | `STUB_REASONS=1 M2_MAX_JARS=120 M2_MAX_CLASSES=24491 PROBLEM_DIR=/tmp/jdec-problems M2_PROGRESS_FILE=/tmp/jdec-progress/state.env go test -run TestM2StubReasons -v ./common/javaclassparser/tests/` |
 | 计数 + 每类指纹（前后对比） | `M2_OUT=/tmp/m2.txt M2_MAX_JARS=120 M2_MAX_CLASSES=12000 go test -run TestM2RegressionHarness -v ./common/javaclassparser/tests/` |
 | 单类复现（文件） | `DIAG_FILE=<path>.class go test -run TestDiagDecompileClass -v ./common/javaclassparser/tests/` |
 | 单类复现（jar+子串） | `DIAG_JAR=<jar> DIAG_CLASS=<substr> go test -run TestDiagDecompileClass -v ./common/javaclassparser/tests/` |
@@ -195,7 +200,7 @@ diff <(head -1 /tmp/m2-before.txt) <(head -1 /tmp/m2-after.txt)
   - 后台扫描把每个失败 class 原始 `.class` + 当前 `.java`/`.err.txt` 写进 `/tmp/jdec-all-problems/<bucket>/`，**前台直接拿这些已落盘的 class 逐个复现修复，不必等扫描跑完**。
   - 不要因为扫描慢就卡住：扫描只是"仓库"，修复节奏完全由前台驱动。
 
-- **记进度、快速复定位**：harness 按 jar 名字典序确定性扫描，"第一个出问题的 class 编号 / jar"是稳定可复现的。每轮结束后把当前最前失败点（如 `class 3923 @ druid-1.2.23.jar`）记下来，下一轮 STOP_ON_FIRST 会从同一个点继续；这样不必每次从头扫。修好一个 case 后，下一个失败点必然**向后**推进（编号变大），可据此判断是否真有进展。
+- **记进度、快速复定位**：harness 按 jar 名字典序确定性扫描，"第一个出问题的 class 编号 / jar"是稳定可复现的。设置 `M2_PROGRESS_FILE=/tmp/jdec-progress/state.env` 后，harness 会自动写入当前最前失败点（如 `first_failure_class_index=3923`）、bucket、`DIAG_FILE` 复现命令，以及 `rerun_from_failure` / `continue_after_locked` 两条续跑命令。修好并锁定一个 case 后，使用 `continue_after_locked` 从下一个未处理 class 继续扫；下一个失败点应当**向后**推进（编号变大），可据此判断是否真有进展。
 
 - **单 jar 单独测**（确认本 jar 内修复没把邻居改坏、或专攻某个 jar）：
   ```bash

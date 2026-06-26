@@ -44,6 +44,9 @@ type RewriteManager struct {
 	DominatorMap     map[*core.Node][]*core.Node
 	LabelId          int
 	visitedNodeSet   *utils.Set[*core.Node]
+	// Aggressive enables higher-risk structuring paths that only run during the
+	// gated second pass for methods that already failed conservative decompilation.
+	Aggressive bool
 }
 
 func NewRootStatementManager(node *core.Node) *RewriteManager {
@@ -921,10 +924,17 @@ func collectSESEMergeConditions(s *RewriteManager, ifNodes *[]*core.Node, mergeN
 		if tn == nil || fn == nil {
 			continue
 		}
-		// A clean reconvergence point (immediate post-dominator) is required: it is the region exit
-		// that bounds the if body. Without it the region is not a simple if and is left alone.
+		// A self-referential post-dominator means a loop-like shape we must not treat as a plain if.
 		exit := postDom[current]
-		if exit == nil || exit == current {
+		if exit == current {
+			continue
+		}
+		// A nil post-dominator means one arm exits the method (return/throw) without reconverging.
+		// That is still an ordinary if (the `if (!$assertionsDisabled && cond) throw ...` assert idiom
+		// is the canonical case), handled fine by IfRewriter's end-node logic. But promoting it
+		// unconditionally exposes order-sensitive structuring that regresses passing methods, so it is
+		// gated behind aggressive mode: only a method that already failed conservatively takes this path.
+		if exit == nil && !s.Aggressive {
 			continue
 		}
 		// Degenerate condition whose both arms jump to the same node is not a real two-armed if.
@@ -991,19 +1001,27 @@ func (s *RewriteManager) Rewrite() error {
 			continue
 		}
 
-		// Family B (merge-condition inside try): TryRewriter collects its body's statements linearly
-		// (it does not recursively structure them), so any if-node that lives in the try body must be
-		// turned into an IfStatement BEFORE the try runs. The reverse-topo order normally guarantees
-		// inner-first, but a try-body entry that is also a control-flow join (a merge-condition) is
-		// dominated by a pre-try node, not by the try marker, so it sorts AFTER the try and would be
-		// grabbed raw -> leaked as a bare `if(cond);`. Pre-structure those pending inner if-nodes here.
-		if slices.Contains(s.TryNodes, node) {
-			body := s.tryBodyNodeSet(node)
+		// Family B (merge-condition inside a container body): TryRewriter (and, in aggressive mode,
+		// IfRewriter) collects its body's statements via a dominator walk WITHOUT recursively
+		// structuring them, so any if-node that lives in the body must be turned into an IfStatement
+		// BEFORE the container runs. The reverse-topo order normally guarantees inner-first, but a
+		// body entry that is also a control-flow join (a merge-condition) is dominated by a node
+		// OUTSIDE the container, so it sorts AFTER the container and would be grabbed raw -> leaked as
+		// a bare `if(cond);`. Pre-structure those pending inner if-nodes here.
+		//
+		// For try containers this runs unconditionally (the try body's linear collection genuinely
+		// needs it and it is zero-regression). Extending it to if containers regressed passing
+		// methods catastrophically when applied globally (5->318), so it is gated behind aggressive
+		// mode: only a method that already failed conservatively takes the if-container path.
+		isTry := slices.Contains(s.TryNodes, node)
+		isAggrIf := s.Aggressive && slices.Contains(s.IfNodes, node)
+		if isTry || isAggrIf {
+			body := s.containerBodyNodeSet(node)
 			for _, cand := range order[i+1:] {
 				if _, done := processed[cand]; done {
 					continue
 				}
-				if !body[cand] || !slices.Contains(s.IfNodes, cand) {
+				if cand == node || !body[cand] || !slices.Contains(s.IfNodes, cand) {
 					continue
 				}
 				s.DominatorMap = GenerateDominatorTree(s.RootNode)
@@ -1041,13 +1059,13 @@ func (s *RewriteManager) Rewrite() error {
 	return nil
 }
 
-// tryBodyNodeSet returns the set of nodes that TryRewriter will collect as this try node's body
-// (and catch handlers): each successor plus the nodes reachable from it through dominator edges,
-// exactly mirroring TryRewriter.getBody's traversal. It is used to find if-nodes that must be
-// structured before the try is rewritten.
-func (s *RewriteManager) tryBodyNodeSet(tryNode *core.Node) map[*core.Node]bool {
+// containerBodyNodeSet returns the set of nodes a container node (try / if) collects as its body via
+// the dominator walk used by TryRewriter.getBody and IfRewriter.getBody: each successor plus the
+// nodes reachable from it through dominator edges. It is used to find inner if-nodes that must be
+// structured before the container is rewritten.
+func (s *RewriteManager) containerBodyNodeSet(containerNode *core.Node) map[*core.Node]bool {
 	set := map[*core.Node]bool{}
-	for _, start := range tryNode.Next {
+	for _, start := range containerNode.Next {
 		core.WalkGraph[*core.Node](start, func(n *core.Node) ([]*core.Node, error) {
 			set[n] = true
 			var next []*core.Node

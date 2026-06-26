@@ -3,6 +3,7 @@ package javaclassparser
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -14,6 +15,117 @@ import (
 // debugInvalidMethods, when set via DEBUG_INVALID, logs the raw (pre-degradation) source of any
 // method that fails post-decompile syntax validation, to aid diagnosing the post-syntax bucket.
 var debugInvalidMethods = os.Getenv("DEBUG_INVALID") != ""
+
+// localVarTokenRe matches the decompiler's slot-named locals (var0, var1, ...). The decompiler names
+// every local by its bytecode slot index, so this reliably identifies local references in rendered
+// output (it never collides with field/parameter names, which carry their real identifiers).
+var localVarTokenRe = regexp.MustCompile(`var\d+`)
+
+// isJavaIdentByte reports whether b can appear inside a Java identifier; used for whole-token matching
+// so "var1" is never recognized inside "var12" or "myvar1".
+func isJavaIdentByte(b byte) bool {
+	return b == '_' || b == '$' || (b >= '0' && b <= '9') || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+}
+
+// usesLocalBeforeDeclaration reports whether the rendered method references a slot-named local (varN)
+// before that local is declared. The decompiler names locals by bytecode slot; when javac reuses one
+// slot for two differently-typed locals, a renaming/scope bug can leave a reference to the FIRST local
+// still pointing at the SECOND local's name, yielding Java that uses a variable before it is declared.
+// Such output parses (the grammar enforces no definite-assignment / declaration-before-use) but is
+// semantically broken, so the gated aggressive retry must reject it and keep the honest stub rather
+// than emit silently-wrong code.
+//
+// Detection is purely structural: scanning left to right, the first textual occurrence of each varN
+// must be its declaration site (a type token -- identifier, array `]`, or generic `>` -- immediately
+// precedes it). If a varN is first seen as a use (preceded by `(`, `=`, `.`, an operator, or a
+// keyword such as return/throw), the local is used before declaration.
+func usesLocalBeforeDeclaration(code string) bool {
+	declared := map[string]bool{}
+	for _, loc := range localVarTokenRe.FindAllStringIndex(code, -1) {
+		start, end := loc[0], loc[1]
+		// Whole-token only: skip matches that are a suffix/prefix of a longer identifier.
+		if start > 0 && isJavaIdentByte(code[start-1]) {
+			continue
+		}
+		if end < len(code) && isJavaIdentByte(code[end]) {
+			continue
+		}
+		name := code[start:end]
+		if declared[name] {
+			continue
+		}
+		if isLocalDeclarationSite(code, start) {
+			declared[name] = true
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+// containsEmptyControlBlock reports whether the rendered method contains an empty `{ }` block (only
+// whitespace between the braces). In aggressive structuring this is the fingerprint of a DROPPED
+// statement: when a merge-condition is promoted to an if but its "fall-through / skip" arm is the
+// real body and the throw/return leaks out as a sibling (the assert-ternary idiom `assert a ? b : c`
+// is the canonical case), the arm collapses to `if (cond){ }` and the trailing `throw` becomes
+// unconditional -- valid Java that is semantically wrong (e.g. always throws). The gated aggressive
+// retry must reject such a result and keep the honest stub. Rejecting the rare legitimate empty block
+// only costs a missed recovery (the method stays a stub); it never adopts broken code, and it only
+// ever runs on already-failing methods, so it cannot regress anything that decompiles cleanly.
+func containsEmptyControlBlock(code string) bool {
+	for i := 0; i < len(code); i++ {
+		if code[i] != '{' {
+			continue
+		}
+		j := i + 1
+		for j < len(code) && (code[j] == ' ' || code[j] == '\t' || code[j] == '\n' || code[j] == '\r') {
+			j++
+		}
+		if j < len(code) && code[j] == '}' {
+			return true
+		}
+	}
+	return false
+}
+
+// isLocalDeclarationSite reports whether the varN token starting at varStart is a declaration, i.e. a
+// type token immediately precedes it (`SQLExpr var4`, `int[] var5`, `Map<String,Object> var6`, or a
+// method/lambda parameter `(Foo var0`). A preceding `(`, operator, `.`, or statement keyword means it
+// is a use.
+func isLocalDeclarationSite(code string, varStart int) bool {
+	j := varStart - 1
+	for j >= 0 && (code[j] == ' ' || code[j] == '\t' || code[j] == '\n' || code[j] == '\r') {
+		j--
+	}
+	if j < 0 {
+		return false
+	}
+	c := code[j]
+	// Array or generic type immediately before the name: `int[] var5`, `List<Foo> var5`.
+	if c == ']' || c == '>' {
+		return true
+	}
+	if !isJavaIdentByte(c) {
+		return false
+	}
+	// Extract the identifier immediately preceding the name.
+	wstart := j
+	for wstart >= 0 && isJavaIdentByte(code[wstart]) {
+		wstart--
+	}
+	word := code[wstart+1 : j+1]
+	// A statement keyword before a bare local is a use (`return var5`, `throw var5`); `new`/`instanceof`
+	// precede a type, never this local in a declaring position. A preceding local (varM) would be
+	// invalid Java, so treat defensively as a use. Anything else is a type name -> declaration.
+	switch word {
+	case "return", "throw", "yield", "instanceof", "new", "else", "case", "assert", "do", "synchronized", "default":
+		return false
+	}
+	if localVarTokenRe.MatchString(word) {
+		return false
+	}
+	return true
+}
 
 // EnableDecompileSyntaxValidation controls the post-decompile syntax safety net. When enabled
 // (default), the fully assembled class is parsed with the same grammar + normalization the SSA

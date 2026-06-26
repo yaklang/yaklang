@@ -50,21 +50,6 @@ func isBoolPrimer(v values.JavaValue) bool {
 	return ok && p.Name == types.JavaBoolean
 }
 
-// isBoolPrimer reports whether v carries a non-nil boolean primitive type. It guards against the
-// nil Type() that incomplete stack simulation can produce, so the boolean-comparison folding below
-// never nil-dereferences (which would panic the whole method into a stub).
-func isBoolPrimer(v values.JavaValue) bool {
-	if v == nil {
-		return false
-	}
-	t := v.Type()
-	if t == nil {
-		return false
-	}
-	p, ok := t.RawType().(*types.JavaPrimer)
-	return ok && p.Name == types.JavaBoolean
-}
-
 func NewConditionStatement(cmp values.JavaValue, op string) *ConditionStatement {
 	if t := cmp.Type(); t != nil {
 		t.ResetType(types.NewJavaPrimer(types.JavaBoolean))

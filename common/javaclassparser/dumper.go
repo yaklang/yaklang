@@ -1460,7 +1460,16 @@ func (c *ClassObjectDumper) aggressiveRedumpMethod(name, descriptor string) *dum
 	res, err := c.safeDumpMethod(name, descriptor)
 	clean := err == nil && res != nil &&
 		!strings.Contains(res.code, values.EmptySlotValuePlaceholder) &&
-		!strings.Contains(res.code, malformedTryNoCatchMarker)
+		!strings.Contains(res.code, malformedTryNoCatchMarker) &&
+		// Reject results that are syntactically valid but reference a local before its declaration
+		// (a slot-reuse renaming bug). Adopting such a result would replace an honest stub with
+		// silently-wrong code; keeping the stub upholds the never-emit-broken-code contract until the
+		// underlying data-flow bug is fixed.
+		!usesLocalBeforeDeclaration(res.code) &&
+		// Reject results containing an empty `{ }` block: in aggressive structuring this is the
+		// fingerprint of a dropped statement (the assert-ternary idiom collapsing into an empty if
+		// body with a leaked unconditional throw). Such output is valid Java but semantically wrong.
+		!containsEmptyControlBlock(res.bodyCode)
 	if !clean {
 		// Restore the exact pre-retry cache state so downstream rendering is unchanged.
 		if hadEntry {
