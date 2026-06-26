@@ -87,9 +87,11 @@ func shouldDelayInstructionEviction(inst Instruction) bool {
 			return !fn.IsFinished()
 		}
 	}
-	// If we can't get the function pointer without cache access, assume not finished
-	// (conservative: delay eviction to be safe)
-	return true
+	// No cached function pointer available without re-entering the cache mutex.
+	// Evict rather than pin: instructions without a resolvable owning function
+	// (e.g. reloaded lazy instructions whose owning function already finished)
+	// should be eligible for eviction so dirty state writes back to the DB.
+	return false
 }
 
 func useAdaptiveInstructionFastPath(cfg *ssaconfig.Config) bool {
