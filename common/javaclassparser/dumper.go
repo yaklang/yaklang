@@ -798,6 +798,8 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	if err != nil {
 		return dumped, utils.Wrapf(err, "ParseMethodDescriptor(%v) failed", descriptor)
 	}
+	descriptorParamTypes := slices.Clone(methodType.FunctionType().ParamTypes)
+	descriptorParamCount := len(descriptorParamTypes)
 	// Override the descriptor-derived method type with generic information from the
 	// Signature attribute, if present and parseable. This recovers erased generics on
 	// method parameters and return types (e.g. BiFunction<Integer,Integer,Integer> vs raw
@@ -931,11 +933,26 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				}
 			}
 			paramsNewStrList := []string{}
-			for i, val := range samParams {
-				if i == len(samParams)-1 && isVarArgs {
-					paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s... %s", val.Type().ElementType().String(c.FuncCtx), val.String(c.FuncCtx)))
-				} else {
-					paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s %s", val.Type().String(c.FuncCtx), val.String(c.FuncCtx)))
+			if !isLambda && name != "<init>" && name != "<clinit>" && len(samParams) != descriptorParamCount {
+				paramSlotOffset := 0
+				if !funcCtx.IsStatic {
+					paramSlotOffset = 1
+				}
+				for i, pt := range descriptorParamTypes {
+					paramName := fmt.Sprintf("var%d", i+paramSlotOffset)
+					if i == len(descriptorParamTypes)-1 && isVarArgs && pt.IsArray() {
+						paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s... %s", pt.ElementType().String(c.FuncCtx), paramName))
+					} else {
+						paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s %s", pt.String(c.FuncCtx), paramName))
+					}
+				}
+			} else {
+				for i, val := range samParams {
+					if i == len(samParams)-1 && isVarArgs {
+						paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s... %s", val.Type().ElementType().String(c.FuncCtx), val.String(c.FuncCtx)))
+					} else {
+						paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s %s", val.Type().String(c.FuncCtx), val.String(c.FuncCtx)))
+					}
 				}
 			}
 			c.MethodType = methodType.FunctionType()
@@ -1440,7 +1457,7 @@ func normalizeDoWhileBreakGuardSource(body string) string {
 	}
 	conditionStart, conditionEnd := match[4], match[5]
 	condition := strings.TrimSpace(body[conditionStart:conditionEnd])
-	if condition == "" || strings.HasPrefix(condition, "!") {
+	if condition == "" || strings.HasPrefix(condition, "!") || !strings.Contains(condition, "<") {
 		return body
 	}
 	return body[:conditionStart] + "!(" + condition + ")" + body[conditionEnd:]

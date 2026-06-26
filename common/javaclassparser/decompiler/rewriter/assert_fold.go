@@ -115,7 +115,7 @@ func mentionsAssertionsDisabled(v values.JavaValue) bool {
 	if v == nil {
 		return false
 	}
-	return strings.Contains(v.String(&class_context.ClassContext{}), "$assertionsDisabled")
+	return strings.Contains(renderValue(&class_context.ClassContext{}, v), "$assertionsDisabled")
 }
 
 // isThrowAssertionError reports whether st is a `throw new AssertionError(...)` statement. The
