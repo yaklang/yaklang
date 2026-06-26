@@ -565,6 +565,57 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			},
 		},
 		{
+			file: "jackson_cbor_empty_enum_feature.class",
+			desc: "an enum with no constants but normal fields/methods (CBORParser.Feature) needs the empty " +
+				"enum body separator before declarations, and member validation must wrap enum members with that separator.",
+			mustContain: []string{
+				"public enum CBORParser$Feature implements FormatFeature",
+				";\n\tfinal boolean _defaultState;",
+				"public static int collectDefaults()",
+				"public boolean enabledByDefault()",
+				"public int getMask()",
+				"public boolean enabledIn(int var1)",
+			},
+			mustNotContain: []string{
+				"yak-decompiler",
+				"post-decompile syntax",
+			},
+		},
+		{
+			file: "xom_unicodeutil_load_compositions.class",
+			desc: "a nested no-catch try marker inside the XOM composition loading loop should flatten " +
+				"when the body is safe; the surrounding IOException/Throwable handlers preserve the bytecode semantics.",
+			mustContain: []string{
+				"private static void loadCompositions(ClassLoader var0)",
+				"compositions.put(var1.readUTF(),var1.readUTF())",
+				"catch(IOException var2)",
+				"catch(Throwable var2)",
+				"throw var2;",
+			},
+			mustNotContain: []string{
+				"yak-decompiler",
+				"try without catch handler",
+				"catch(Exception e) { throw e;",
+			},
+		},
+		{
+			file: "jakarta_mail_protocol_retr.class",
+			desc: "jakarta.mail Protocol.retr(int,int) contains multi-exit conditions around LIST/RETR " +
+				"response parsing; residual condition nodes with extra exits should not be rejected by the final checker.",
+			mustContain: []string{
+				"batchCommandStart",
+				"batchCommandContinue",
+				"multilineCommandStart",
+				"readMultilineResponse",
+				"catch(RuntimeException",
+			},
+			mustNotContain: []string{
+				"yak-decompiler",
+				"if statement must have",
+				"try without catch handler",
+			},
+		},
+		{
 			file: "multiple_next_early_return.class",
 			desc: "an if whose arm can early-return while the other arm falls through to a shared continuation must not abort structuring with 'multiple next'",
 			// deserializeAndSet must fully reconstruct (no stub); the early-return arm and the

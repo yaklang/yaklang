@@ -299,11 +299,19 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 					attrsB.WriteString(",\n")
 				}
 			}
+			if isEnum && len(enumFields) == 0 && (len(ordinaryFields) > 0 || len(methods) > 0) {
+				// Java requires a separator before enum body declarations when the constant list is empty:
+				// `enum E { ; int x; }`.
+				attrsB.WriteString("\t;\n")
+			}
 			for _, ordinaryField := range ordinaryFields {
 				attrsB.WriteString("\t")
 				attrsB.WriteString(ordinaryField)
 				attrsB.WriteString("\n")
 			}
+		}
+		if isEnum && len(fields) == 0 && len(methods) > 0 {
+			attrsB.WriteString("\n\t;\n")
 		}
 		if len(methods) > 0 {
 			attrsB.WriteString("\n")
@@ -1030,10 +1038,20 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 					}
 					haveCatch := len(ret.CatchBodies) > 0
 					if !haveCatch {
-						// A try with no catch/finally is malformed (structuring failed). Emit the
-						// internal marker so the method degrades to a stub rather than leaking the
-						// broken body that produced this bare try.
-						statementStr += "catch(Exception e) { throw e; /* " + malformedTryNoCatchMarker + " */ }"
+						body := statementListToString(ret.TryBody)
+						if canFlattenNoCatchTry(body) {
+							// A try without catch/finally has no Java-level effect. Some legacy bytecode
+							// patterns (for example an EOFException edge inside a loop with an enclosing
+							// IOException handler) can lose the inner handler during CFG structuring while
+							// the body itself is still sound. Preserve the executable statements instead of
+							// stubbing the method.
+							statementStr = body
+						} else {
+							// A try with no catch/finally is malformed (structuring failed). Emit the
+							// internal marker so the method degrades to a stub rather than leaking the
+							// broken body that produced this bare try.
+							statementStr += "catch(Exception e) { throw e; /* " + malformedTryNoCatchMarker + " */ }"
+						}
 					}
 				case *statements.WhileStatement:
 					statementStr = fmt.Sprintf(c.GetTabString()+"while (%s){\n"+
@@ -1411,6 +1429,20 @@ const DecompileStubMarker = "yak-decompiler:"
 // the marker degrades the whole method to an honest stub instead of emitting silently-wrong code.
 // It never survives into final output because the offending method is re-rendered as a stub.
 const malformedTryNoCatchMarker = "yak-decompiler-internal: try without catch handler"
+
+func canFlattenNoCatchTry(body string) bool {
+	body = strings.TrimSpace(body)
+	if body == "" {
+		return false
+	}
+	if strings.Contains(body, malformedTryNoCatchMarker) ||
+		strings.Contains(body, values.EmptySlotValuePlaceholder) ||
+		strings.Contains(body, "= Exception;") ||
+		strings.Contains(body, "= Exception\n") {
+		return false
+	}
+	return true
+}
 
 // safeDumpMethod wraps DumpMethod with panic recovery and tab-state restoration so a
 // single broken method cannot abort the whole class. DumpMethod uses a non-deferred

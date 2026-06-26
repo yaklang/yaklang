@@ -204,6 +204,9 @@ func validateJavaSyntaxWithBudget(src string, budget time.Duration) error {
 // a constructor body only parses when the enclosing type name matches, so a generic `class X`
 // wrapper would give wrong answers.
 func validateMemberInHeader(header, memberCode string) error {
+	if strings.Contains(header, " enum ") || strings.HasPrefix(strings.TrimSpace(header), "enum ") {
+		return validateJavaSyntaxWithBudget(header+" {\n;\n"+memberCode+"\n}", DecompileSyntaxValidationBudget)
+	}
 	return validateJavaSyntaxWithBudget(header+" {\n"+memberCode+"\n}", DecompileSyntaxValidationBudget)
 }
 
@@ -233,10 +236,10 @@ func (c *ClassObjectDumper) degradeInvalidMethods(header string, methods []*dump
 		}
 
 		if debugInvalidMethods {
-			log.Errorf("DEBUG_INVALID method %s%s validation error: %v\n%s", m.methodName, m.descriptor, validateErr, m.code)
+			log.Errorf("DEBUG_INVALID method %s.%s%s validation error: %v\n%s", c.ClassName, m.methodName, m.descriptor, validateErr, m.code)
 		}
 		if p := os.Getenv("DUMP_INVALID"); p != "" {
-			_ = os.WriteFile(p, []byte(fmt.Sprintf("method %s%s:\n%s\n", m.methodName, m.descriptor, m.code)), 0644)
+			_ = os.WriteFile(p, []byte(fmt.Sprintf("method %s.%s%s:\n%s\n", c.ClassName, m.methodName, m.descriptor, m.code)), 0644)
 		}
 		// Try degrading to a stub (only possible when we kept the member metadata).
 		if m.bodyCode != "stub" && m.member != nil {
@@ -245,13 +248,13 @@ func (c *ClassObjectDumper) degradeInvalidMethods(header string, methods []*dump
 					traitId := fmt.Sprintf("name:%s,desc:%s", m.methodName, m.descriptor)
 					c.dumpedMethodsSet[traitId] = stub
 					out = append(out, stub)
-					log.Warnf("decompiled method %s%s produced invalid Java, replaced with stub", m.methodName, m.descriptor)
+					log.Warnf("decompiled method %s.%s%s produced invalid Java, replaced with stub", c.ClassName, m.methodName, m.descriptor)
 					continue
 				}
 			}
 		}
 		// Even a stub will not parse (signature itself is un-representable); drop the method.
-		log.Warnf("decompiled method %s%s is un-representable as valid Java, dropping it", m.methodName, m.descriptor)
+		log.Warnf("decompiled method %s.%s%s is un-representable as valid Java, dropping it", c.ClassName, m.methodName, m.descriptor)
 	}
 	return out
 }
@@ -285,10 +288,10 @@ func (c *ClassObjectDumper) degradeInvalidFields(header, className string, isEnu
 		if validateMemberInHeader(header, bare) == nil {
 			f.code = bare
 			out = append(out, f)
-			log.Warnf("decompiled field %s produced invalid Java, reduced to bare declaration", f.fieldName)
+			log.Warnf("decompiled field %s.%s produced invalid Java, reduced to bare declaration", c.ClassName, f.fieldName)
 			continue
 		}
-		log.Warnf("decompiled field %s is un-representable as valid Java, dropping it", f.fieldName)
+		log.Warnf("decompiled field %s.%s is un-representable as valid Java, dropping it", c.ClassName, f.fieldName)
 	}
 	return out
 }
