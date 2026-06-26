@@ -1554,7 +1554,9 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		canReachMerge = func(n *OpCode) bool {
 			cur := n
 			for step := 0; cur != nil && step < (1<<16); step++ {
-				if cur == mergeNode || slices.Contains(cur.Target, mergeNode) {
+				if cur == mergeNode || slices.Contains(cur.Target, mergeNode) ||
+					(cur.Instr.OpCode == OP_PUTFIELD && len(cur.Target) == 1 &&
+						cur.Target[0].Instr.OpCode == OP_GOTO && slices.Contains(cur.Target[0].Target, mergeNode)) {
 					return true
 				}
 				switch reachMemo[cur] {
@@ -1663,6 +1665,31 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		built = map[*OpCode]*values.TernaryExpression{}
 		usedLeaf := map[*OpCode]bool{}
 		failed := false
+		putFieldLeafValue := func(cur *OpCode) values.JavaValue {
+			if cur == nil || cur.Instr.OpCode != OP_PUTFIELD || len(cur.stackConsumed) < 2 || cur.StackEntry == nil {
+				return nil
+			}
+			stackValue := cur.stackConsumed[0]
+			if UnpackSoltValue(cur.StackEntry.value) != UnpackSoltValue(stackValue) {
+				return nil
+			}
+			storedValue := GetRealValue(stackValue)
+			index := Convert2bytesToInt(cur.Data)
+			staticVal, ok := d.constantPoolGetter(int(index)).(*values.JavaClassMember)
+			if !ok {
+				return nil
+			}
+			field := values.NewRefMember(cur.stackConsumed[1], staticVal.Member, staticVal.JavaType)
+			cur.SelfOpFolded = true
+			return values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+				return fmt.Sprintf("(%s = %s)", field.String(funcCtx), storedValue.String(funcCtx))
+			}, func() types.JavaType {
+				return storedValue.Type()
+			}, func(oldId *utils2.VariableId, newId *utils2.VariableId) {
+				field.ReplaceVar(oldId, newId)
+				storedValue.ReplaceVar(oldId, newId)
+			})
+		}
 		var arm func(entry *OpCode) values.JavaValue
 		var probe func(ifNode *OpCode) *values.TernaryExpression
 		arm = func(entry *OpCode) values.JavaValue {
@@ -1671,10 +1698,15 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 				if failed {
 					return nil
 				}
+				reachesMerge := slices.Contains(cur.Target, mergeNode)
+				if !reachesMerge && cur.Instr.OpCode == OP_PUTFIELD && len(cur.Target) == 1 &&
+					cur.Target[0].Instr.OpCode == OP_GOTO && slices.Contains(cur.Target[0].Target, mergeNode) {
+					reachesMerge = true
+				}
 				// A node flowing straight into mergeNode is a leaf; its produced stack value is the
 				// arm value. Checked first so a leaf that also happens to be a store target is still
 				// taken as the (already side-effect-accounted) stack value.
-				if slices.Contains(cur.Target, mergeNode) {
+				if reachesMerge {
 					if cur.StackEntry == nil {
 						failed = true
 						return nil
@@ -1696,6 +1728,9 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 						sharedLeaf = true
 					}
 					usedLeaf[cur] = true
+					if putfieldValue := putFieldLeafValue(cur); putfieldValue != nil {
+						return putfieldValue
+					}
 					return cur.StackEntry.value
 				}
 				if isTernaryCondition(cur) {
@@ -1769,7 +1804,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 				rootNode = n
 			}
 		}
-		if rootNode == nil || !isTernaryCondition(rootNode) {
+		if rootNode == nil {
 			return nil, nil, false, false, false
 		}
 		for {
@@ -1778,6 +1813,27 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 				break
 			}
 			rootNode = anc
+		}
+		if !isTernaryCondition(rootNode) {
+			seenAnc := utils.NewSet[*OpCode]()
+			for _, start := range detectedIfNodes {
+				WalkGraph[*OpCode](start, func(n *OpCode) ([]*OpCode, error) {
+					if seenAnc.Has(n) {
+						return nil, nil
+					}
+					seenAnc.Add(n)
+					if isTernaryCondition(n) {
+						if rootNode == nil || n.Id < rootNode.Id {
+							rootNode = n
+						}
+						return nil, nil
+					}
+					return n.Source, nil
+				})
+			}
+		}
+		if !isTernaryCondition(rootNode) {
+			return nil, nil, false, false, false
 		}
 		root = probe(rootNode)
 		if failed || root == nil {
@@ -1794,15 +1850,20 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		if !EnableLegacyMergeReconstruction {
 			rootTern, built, sharedLeaf, hasMiddleCond, ok := buildSharedLeafTernary(mergeNode, ifNodes)
 			if os.Getenv("DEBUG_TERNARY") != "" {
-				log.Errorf("TERNARY merge=%d ifNodes=%d ok=%v sharedLeaf=%v middle=%v built=%d", mergeNode.Id, len(ifNodes), ok, sharedLeaf, hasMiddleCond, len(built))
+				log.Errorf("TERNARY %s.%s %v merge=%d offset=%d ifNodes=%d ok=%v sharedLeaf=%v middle=%v built=%d",
+					d.FunctionContext.ClassName, d.FunctionContext.FunctionName, d.FunctionContext.FunctionType,
+					mergeNode.Id, mergeNode.CurrentOffset, len(ifNodes), ok, sharedLeaf, hasMiddleCond, len(built))
 			}
-			// Intercept every shared-leaf short-circuit/ternary the principled builder can fully rebuild.
+			// Intercept every value ternary the principled builder can fully rebuild. The builder already
+			// rejects statement-dispatch paths (stores), cycles, unresolved arms, and non-literal shared
+			// leaves, so an ok result is a self-contained expression tree with callbacks for every adopted
+			// condition. The legacy combiner is kept only for shapes the probe cannot prove.
 			// The legacy chain combiner only attaches a condition callback to if-nodes with a direct leaf
 			// arm; any chain whose detection under-reports an interior condition leaks an empty slot
 			// (CronPattern.match etc.). The rebuilt nested tree wires a callback to EVERY adopted
 			// condition, and TernaryExpression.String folds the shared-leaf shape back into idiomatic
 			// &&/|| at render time, so this is both more complete and equally readable.
-			if ok && sharedLeaf {
+			if ok {
 				// Wire every condition: its statement's Callback fills its own nested ternary's
 				// Condition (post-MergeIf). Marking TernaryChainArm keeps MergeIf from folding the
 				// condition NODES (which would unfire some callbacks and leak), so each condition is

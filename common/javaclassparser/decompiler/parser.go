@@ -1,6 +1,7 @@
 package decompiler
 
 import (
+	"os"
 	"slices"
 	"strings"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/rewriter"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -80,6 +82,21 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 	nodes, err := statementManager.ToStatements(func(node *core.Node) bool {
 		return true
 	})
+	if os.Getenv("JDEC_TRACE_SUMMARY") != "" {
+		log.Infof("[jdec-trace][summary] %s.%s graph-nodes=%d root=%T root-next=%d to-statements=%d err=%v",
+			decompiler.FunctionContext.ClassName, decompiler.FunctionContext.FunctionName, len(allNodes),
+			statementManager.RootNode.Statement, len(statementManager.RootNode.Next), len(nodes), err)
+		current := statementManager.RootNode
+		for i := 0; i < 12 && current != nil; i++ {
+			log.Infof("[jdec-trace][summary] %s.%s path[%d] node=%d stmt=%T next=%d source=%d",
+				decompiler.FunctionContext.ClassName, decompiler.FunctionContext.FunctionName, i,
+				current.Id, current.Statement, len(current.Next), len(current.Source))
+			if len(current.Next) != 1 {
+				break
+			}
+			current = current.Next[0]
+		}
+	}
 	nodes = funk.Filter(nodes, func(item *core.Node) bool {
 		_, ok := item.Statement.(*statements.StackAssignStatement)
 		return !ok
@@ -88,6 +105,10 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 		return nil, err
 	}
 	sts := core.NodesToStatements(nodes)
+	if os.Getenv("JDEC_TRACE_SUMMARY") != "" {
+		log.Infof("[jdec-trace][summary] %s.%s filtered-nodes=%d statements=%d",
+			decompiler.FunctionContext.ClassName, decompiler.FunctionContext.FunctionName, len(nodes), len(sts))
+	}
 	// Reject a structurally-broken (cyclic / pathologically huge) statement tree here, before any of the
 	// recursive tree walkers (RewriteVar, Statement.ReplaceVar/String, ...) descend it. A cyclic tree
 	// would otherwise drive them into Go's unrecoverable `fatal error: stack overflow`, crashing the

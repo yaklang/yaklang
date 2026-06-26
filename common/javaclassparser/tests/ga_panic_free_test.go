@@ -56,8 +56,8 @@ func TestGAPanicFreeBoundary(t *testing.T) {
 		},
 		{
 			file:     "panic_nilref_typeutils.class",
-			desc:     "fastjson2 TypeUtils.doubleValue: incomplete if-route metadata exposed nil TrueNode/FalseNode callbacks during merge inference and if rewriting; must degrade cleanly, never panic",
-			wantFull: false,
+			desc:     "fastjson2 TypeUtils.doubleValue: visited-state leakage during final statement collection and typed-nil JavaRef.ReplaceVar used to erase or panic the method body; must fully decompile",
+			wantFull: true,
 		},
 	}
 

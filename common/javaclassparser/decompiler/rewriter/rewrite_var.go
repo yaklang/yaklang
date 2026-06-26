@@ -3,6 +3,7 @@ package rewriter
 import (
 	"fmt"
 	"maps"
+	"os"
 	"regexp"
 	"sort"
 
@@ -379,6 +380,11 @@ func hoistSwitchDeclarations(sts *[]statements.Statement) {
 		case *statements.IfStatement:
 			hoistSwitchDeclarations(&s.IfBody)
 			hoistSwitchDeclarations(&s.ElseBody)
+			if os.Getenv("JDEC_IF_HOIST_OFF") == "" {
+				for _, decl := range ifHoistDeclarations(s, list[i+1:]) {
+					out = append(out, decl)
+				}
+			}
 		case *statements.ForStatement:
 			hoistSwitchDeclarations(&s.SubStatements)
 		case *statements.WhileStatement:
@@ -450,7 +456,7 @@ func switchHoistDeclarations(sw *statements.SwitchStatement, afterSts []statemen
 			continue
 		}
 		name := refByUid[uid].String(hoistProbeCtx)
-		if name == "" || !statementsReferenceName(afterSts, name) {
+		if name == "" || !statementsReadName(afterSts, name) {
 			continue
 		}
 		for _, as := range assignsByUid[uid] {
@@ -460,6 +466,170 @@ func switchHoistDeclarations(sw *statements.SwitchStatement, afterSts []statemen
 		declares = append(declares, statements.NewDeclareStatement(refByUid[uid]))
 	}
 	return declares
+}
+
+// ifHoistDeclarations demotes declarations inside an if/else tree when the local is read after the
+// if in the containing block. A branch-local declaration cannot be referenced after the if; bytecode
+// patterns like `if (...) x = A; else x = B; return x;` therefore need a single `T x;` before the if.
+func ifHoistDeclarations(ifst *statements.IfStatement, afterSts []statements.Statement) []statements.Statement {
+	declaredInside := map[string]bool{}
+	assignsByUid := map[string][]*statements.AssignStatement{}
+	refByUid := map[string]values.JavaValue{}
+	var collect func([]statements.Statement)
+	collect = func(sts []statements.Statement) {
+		for _, st := range sts {
+			switch s := st.(type) {
+			case *statements.AssignStatement:
+				if s.ArrayMember != nil {
+					continue
+				}
+				ref, ok := core.UnpackSoltValue(s.LeftValue).(*values.JavaRef)
+				if !ok || ref == nil || ref.Id == nil {
+					continue
+				}
+				assignsByUid[ref.VarUid] = append(assignsByUid[ref.VarUid], s)
+				refByUid[ref.VarUid] = s.LeftValue
+				if s.IsFirst || s.IsDeclare {
+					declaredInside[ref.VarUid] = true
+				}
+			case *statements.IfStatement:
+				collect(s.IfBody)
+				collect(s.ElseBody)
+			case *statements.ForStatement:
+				collect(s.SubStatements)
+			case *statements.WhileStatement:
+				collect(s.Body)
+			case *statements.DoWhileStatement:
+				collect(s.Body)
+			case *statements.SynchronizedStatement:
+				collect(s.Body)
+			case *statements.TryCatchStatement:
+				collect(s.TryBody)
+				for i := range s.CatchBodies {
+					collect(s.CatchBodies[i])
+				}
+			case *statements.SwitchStatement:
+				for _, c := range s.Cases {
+					collect(c.Body)
+				}
+			}
+		}
+	}
+	collect(ifst.IfBody)
+	collect(ifst.ElseBody)
+
+	uids := make([]string, 0, len(assignsByUid))
+	for uid := range assignsByUid {
+		uids = append(uids, uid)
+	}
+	sort.SliceStable(uids, func(i, j int) bool {
+		return uids[i] < uids[j]
+	})
+	var declares []statements.Statement
+	for _, uid := range uids {
+		if !declaredInside[uid] {
+			continue
+		}
+		if len(assignsByUid[uid]) < 2 {
+			continue
+		}
+		canDemote := true
+		for _, as := range assignsByUid[uid] {
+			if !assignRendersAsPlain(as) {
+				canDemote = false
+				break
+			}
+		}
+		if !canDemote {
+			continue
+		}
+		targetRef := refByUid[uid]
+		name := targetRef.String(hoistProbeCtx)
+		for _, as := range assignsByUid[uid] {
+			ref, ok := core.UnpackSoltValue(as.LeftValue).(*values.JavaRef)
+			if !ok || ref == nil || ref.Id == nil {
+				continue
+			}
+			candidateName := ref.String(hoistProbeCtx)
+			if candidateName != "" && statementsReadName(afterSts, candidateName) {
+				targetRef = as.LeftValue
+				name = candidateName
+				break
+			}
+		}
+		if name == "" || !statementsReadName(afterSts, name) {
+			continue
+		}
+		targetJavaRef, ok := core.UnpackSoltValue(targetRef).(*values.JavaRef)
+		if !ok || targetJavaRef == nil || targetJavaRef.Id == nil {
+			continue
+		}
+		targetID := targetJavaRef.Id
+		for _, as := range assignsByUid[uid] {
+			if ref, ok := core.UnpackSoltValue(as.LeftValue).(*values.JavaRef); ok && ref != nil && ref.Id != targetID {
+				ref.Id = targetID
+			}
+			as.IsFirst = false
+			as.IsDeclare = false
+		}
+		declares = append(declares, statements.NewDeclareStatement(targetRef))
+	}
+	return declares
+}
+
+func assignRendersAsPlain(as *statements.AssignStatement) (ok bool) {
+	if as == nil {
+		return false
+	}
+	oldFirst, oldDeclare := as.IsFirst, as.IsDeclare
+	defer func() {
+		as.IsFirst, as.IsDeclare = oldFirst, oldDeclare
+		if recover() != nil {
+			ok = false
+		}
+	}()
+	as.IsFirst, as.IsDeclare = false, false
+	_ = as.String(hoistProbeCtx)
+	return true
+}
+
+// statementsReadName is the if-hoist trigger: unlike switch hoisting, a later assignment target
+// `x = ...` should not force an unrelated branch-local `x` declaration outward. Only reads in the
+// statements after the if make the branch declaration unsafe.
+func statementsReadName(sts []statements.Statement, name string) (res bool) {
+	defer func() {
+		if recover() != nil {
+			res = true
+		}
+	}()
+	re := regexp.MustCompile(`\b` + regexp.QuoteMeta(name) + `\b`)
+	for _, st := range sts {
+		if as, ok := st.(*statements.AssignStatement); ok {
+			if as.JavaValue != nil && re.MatchString(as.JavaValue.String(hoistProbeCtx)) {
+				return true
+			}
+			if as.ArrayMember != nil && re.MatchString(as.ArrayMember.String(hoistProbeCtx)) {
+				return true
+			}
+			if ref, ok := core.UnpackSoltValue(as.LeftValue).(*values.JavaRef); ok && ref.String(hoistProbeCtx) == name && (as.IsFirst || as.IsDeclare) {
+				return false
+			}
+			continue
+		}
+		if statementReadTextMatches(st, re) {
+			return true
+		}
+	}
+	return false
+}
+
+func statementReadTextMatches(st statements.Statement, re *regexp.Regexp) (res bool) {
+	defer func() {
+		if recover() != nil {
+			res = true
+		}
+	}()
+	return re.MatchString(st.String(hoistProbeCtx))
 }
 
 // statementsReferenceName reports whether any of the statements textually reference the variable

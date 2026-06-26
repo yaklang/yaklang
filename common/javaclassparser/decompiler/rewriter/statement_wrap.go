@@ -595,6 +595,7 @@ func (s *RewriteManager) ToStatementsFromNode(node *core.Node, stopCheck func(no
 	return result, nil
 }
 func (s *RewriteManager) ToStatements(stopCheck func(node *core.Node) bool) ([]*core.Node, error) {
+	s.visitedNodeSet = utils.NewSet[*core.Node]()
 	return s.ToStatementsFromNode(s.RootNode, stopCheck)
 }
 

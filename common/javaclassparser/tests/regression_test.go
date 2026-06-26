@@ -376,6 +376,45 @@ func TestDecompileBalancedTernary(t *testing.T) {
 	}
 }
 
+// TestDecompileFastjsonJSONWriterSetPathCrossChecked locks in the fastjson2 JSONWriter.setPath
+// behavior that was cross-checked against javap plus CFR/Vineflower. The regression was not just
+// whether the class fully decompiled: setPath(int,Object) must preserve the `dup_x1/putfield` child
+// path assignments inside the value ternary, and all setPath overloads must hoist the shared
+// `previous` local declaration so branch assignments are visible at the final `return previous`.
+func TestDecompileFastjsonJSONWriterSetPathCrossChecked(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/fastjson2_jsonwriter_setpath.class")
+	if err != nil {
+		t.Fatalf("read embedded class failed: %v", err)
+	}
+	source, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile failed: %v", err)
+	}
+	if _, ferr := java2ssa.Frontend(source); ferr != nil {
+		t.Fatalf("frontend parse failed: %v\n----- source -----\n%s", ferr, source)
+	}
+	if strings.Contains(source, "yak-decompiler") {
+		t.Fatalf("JSONWriter degraded to a stub\n----- source -----\n%s", source)
+	}
+	compact := strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(source)
+	mustContain := []string{
+		"this.path=((var1)==(0))?",
+		"this.path.child0=newJSONWriter$Path(this.path,var1)",
+		"this.path.child1=newJSONWriter$Path(this.path,var1)",
+		"JSONWriter$Pathvar3;if((var2)==(this.rootObject)){var3=JSONWriter$Path.ROOT;",
+		"this.refs.put(var2,this.path);returnnull;",
+		"returnvar3.toString();",
+	}
+	for _, want := range mustContain {
+		if !strings.Contains(compact, want) {
+			t.Fatalf("expected cross-checked JSONWriter setPath fragment %q\n----- source -----\n%s", want, source)
+		}
+	}
+	if strings.Contains(compact, "JSONWriter$Pathvar3_1") {
+		t.Fatalf("setPath previous local was split across branches (var3_1 leaked)\n----- source -----\n%s", source)
+	}
+}
+
 //go:embed testdata/regression/*.class
 var regressionFS embed.FS
 
@@ -436,9 +475,9 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			mustNotContain: []string{`\v`},
 		},
 		{
-			file:           "array_classliteral.class",
-			desc:           "array class literal rendered as T[].class",
-			mustContain:    []string{"[].class"},
+			file:        "array_classliteral.class",
+			desc:        "array class literal rendered as T[].class",
+			mustContain: []string{"[].class"},
 		},
 		{
 			file:           "catch_primitive_type.class",
@@ -469,9 +508,9 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			mustNotContain: []string{"class module-info"},
 		},
 		{
-			file:           "float_double_consts.class",
-			desc:           "float/double constant fields render as valid Java literals with F/D suffix",
-			mustContain:    []string{"3.14F", "2.718281828D", "-1.5F"},
+			file:        "float_double_consts.class",
+			desc:        "float/double constant fields render as valid Java literals with F/D suffix",
+			mustContain: []string{"3.14F", "2.718281828D", "-1.5F"},
 		},
 		{
 			file: "ternary_in_try.class",
@@ -536,7 +575,7 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 				"later case bodies underflowing and leaking empty-slot placeholders.",
 			// $INIT fully reconstructs: a switch over selectConstructorAndTransformArguments whose
 			// arms build new NestingType(...) constructor calls
-			mustContain:    []string{"selectConstructorAndTransformArguments", "new NestingType(", "$INIT"},
+			mustContain: []string{"selectConstructorAndTransformArguments", "new NestingType(", "$INIT"},
 			// no stub, no leaked internal placeholder
 			mustNotContain: []string{"yak-decompiler", "empty slot value"},
 		},

@@ -26,6 +26,9 @@ type JavaRef struct {
 
 // ReplaceVar implements JavaValue.
 func (j *JavaRef) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	if j == nil {
+		return
+	}
 	if j.Id == oldId {
 		j.Id = newId
 	}
