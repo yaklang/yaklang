@@ -42,8 +42,15 @@ func TestReAct_SyncPlanExecTasks(t *testing.T) {
 		TaskTree:      `{"root":"t2"}`,
 		TaskProgress:  `{"phase":"paused"}`,
 	}
+	pendingDetached := &schema.AISessionPlanAndExec{
+		SessionID:     sessionID,
+		CoordinatorID: uuid.NewString(),
+		TaskTree:      `{"root":"pending"}`,
+		TaskProgress:  `{"phase":"plan_pending_approval","react_task_id":"react-1"}`,
+	}
 	require.NoError(t, yakit.CreateOrUpdateAISessionPlanAndExec(db, record1))
 	require.NoError(t, yakit.CreateOrUpdateAISessionPlanAndExec(db, record2))
+	require.NoError(t, yakit.CreateOrUpdateAISessionPlanAndExec(db, pendingDetached))
 
 	_, err := NewTestReAct(
 		aicommon.WithContext(ctx),
@@ -102,4 +109,5 @@ LOOP:
 	}
 	require.True(t, got[record1.CoordinatorID])
 	require.True(t, got[record2.CoordinatorID])
+	require.False(t, got[pendingDetached.CoordinatorID])
 }

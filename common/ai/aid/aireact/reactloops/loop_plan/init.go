@@ -15,21 +15,20 @@ func buildPlanInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLo
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 		config := r.GetConfig()
 
-		if config.GetConfigBool("DisableIntentRecognition") {
-			log.Infof("plan: intent recognition disabled via config, skipping")
-			return
-		}
+		if !config.GetConfigBool("DisableIntentRecognition") {
+			reactloops.EmitStatus(loop, "深度意图识别中 / Deep intent recognition...")
+			log.Infof("plan: invoking deep intent recognition directly")
 
-		reactloops.EmitStatus(loop, "深度意图识别中 / Deep intent recognition...")
-		log.Infof("plan: invoking deep intent recognition directly")
-
-		capabilityNameMatches := reactloops.MatchCapabilitiesByTextWithConfig(r.GetConfig(), task.GetUserInput())
-		deepResult := reactloops.ExecuteDeepIntentRecognition(r, loop, task)
-		if deepResult != nil {
-			reactloops.ApplyCapabilityMatchesToDeepIntentResult(deepResult, capabilityNameMatches)
-			reactloops.ApplyDeepIntentResult(r, loop, deepResult)
+			capabilityNameMatches := reactloops.MatchCapabilitiesByTextWithConfig(r.GetConfig(), task.GetUserInput())
+			deepResult := reactloops.ExecuteDeepIntentRecognition(r, loop, task)
+			if deepResult != nil {
+				reactloops.ApplyCapabilityMatchesToDeepIntentResult(deepResult, capabilityNameMatches)
+				reactloops.ApplyDeepIntentResult(r, loop, deepResult)
+			} else {
+				log.Infof("plan: deep intent recognition returned no result, proceeding normally")
+			}
 		} else {
-			log.Infof("plan: deep intent recognition returned no result, proceeding normally")
+			log.Infof("plan: intent recognition disabled via config, skipping")
 		}
 	}
 }
@@ -69,6 +68,9 @@ var guidanceDocumentPrompt string
 //go:embed prompts/plan_from_document.txt
 var planFromDocumentPrompt string
 
+//go:embed prompts/plan_direct.txt
+var planDirectPrompt string
+
 func init() {
 	err := reactloops.RegisterLoopFactory(
 		schema.AI_REACT_LOOP_NAME_PLAN,
@@ -76,7 +78,8 @@ func init() {
 			help := r.GetConfig().GetConfigString(PLAN_HELP_KEY)
 			planPrompt := r.GetConfig().GetConfigString(PLAN_PROMPT_KEY)
 			allowedActions := []string{
-				"finish_exploration", "search_knowledge",
+				"finish_exploration", "generate_direct_plan", "begin_deep_planning",
+				"search_knowledge",
 				"read_file", "find_files", "grep_text",
 				"web_search", "scan_port", "simple_crawler",
 				"output_facts",
@@ -106,9 +109,11 @@ func init() {
 				}),
 				reactloops.WithPersistentContextProvider(func(loop *reactloops.ReActLoop, nonce string) (string, error) {
 					return utils.RenderTemplate(persistentInstruction, map[string]any{
-						"Nonce":      nonce,
-						"UserInput":  loop.GetCurrentTask().GetUserInput(),
-						"PlanPrompt": planPrompt,
+						"Nonce":          nonce,
+						"UserInput":      loop.GetCurrentTask().GetUserInput(),
+						"PlanPrompt":     planPrompt,
+						"PlanMode":       loop.Get(PLAN_MODE_KEY),
+						"PlanModeReason": loop.Get(PLAN_MODE_REASON_KEY),
 					})
 				}),
 				reactloops.WithReflectionOutputExample(outputExample),
@@ -120,11 +125,15 @@ func init() {
 					currentIter := loop.GetCurrentIterationIndex()
 					maxIter := loop.GetMaxIterations()
 					isLastIteration := currentIter+1 >= maxIter
-					if isLastIteration {
+					if isLastIteration && isDeepPlanMode(loop) {
 						for _, name := range infoGatheringActions {
 							loop.RemoveAction(name)
 						}
 						log.Infof("plan loop: last iteration (%d/%d), removed all info-gathering actions, forcing finish_exploration", currentIter+1, maxIter)
+					}
+					if isLastIteration && isSimplePlanMode(loop) {
+						loop.RemoveAction("begin_deep_planning")
+						log.Infof("plan loop: last iteration (%d/%d) in simple mode, forcing generate_direct_plan", currentIter+1, maxIter)
 					}
 					renderMap := map[string]any{
 						"Help":            help,
@@ -135,10 +144,14 @@ func init() {
 						"ReconResults":    reconResults,
 						"Facts":           loop.Get(PLAN_FACTS_KEY),
 						"IsLastIteration": isLastIteration,
+						"PlanMode":        loop.Get(PLAN_MODE_KEY),
+						"PlanModeReason":  loop.Get(PLAN_MODE_REASON_KEY),
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
 				buildPlanPostIterationHook(r),
+				generateDirectPlan(r),
+				beginDeepPlanning(r),
 				finishExploration(r),
 				outputFactsAction(r),
 				searchKnowledge(r),
@@ -156,6 +169,10 @@ func init() {
 		reactloops.WithLoopDescriptionZh("任务规划模式：围绕用户目标生成和细化执行计划，结合知识库、文件系统和互联网信息完成规划。"),
 		reactloops.WithLoopUsagePrompt("when user needs to create or refine a plan for a specific task. Supports searching knowledge, reading local files, grepping code, internet search, port scanning, web crawling, and loading skills to produce comprehensive plans."),
 		reactloops.WithLoopOutputExample(`
+* When the goal is clear and you should generate a plan directly without exploration:
+  {"@action": "generate_direct_plan", "human_readable_thought": "The user request is specific and the workflow is obvious, generating a direct plan"}
+* When direct planning was chosen but you realize more exploration is needed:
+  {"@action": "begin_deep_planning", "human_readable_thought": "The target environment is unknown and requires information gathering before planning"}
 * When you have gathered enough information and are ready to finalize:
   {"@action": "finish_exploration", "human_readable_thought": "I have collected sufficient facts and evidence to generate a comprehensive guidance document and plan"}
 * When needing to understand project structure before planning:

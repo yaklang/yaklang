@@ -43,7 +43,9 @@
 - 当当前任务或用户目标包含“执行、验证、复现、发包、探测、确认、利用、漏洞验证、可利用性、回显差异”等语义时，默认这是**执行型任务**，不是文档任务。
 - 对执行型任务，`loading_skills` 和 `load_skill_resources` 只能算准备动作，绝不算完成证据。加载完技能后，下一步应进入 `require_tool`、`require_ai_blueprint` 或 `request_plan`，而不是直接 `directly_answer` 结束。
 - 对执行型 Web 安全任务，如果目标是 SQL 注入、XSS、命令注入、SSTI、SSRF、认证绕过等，应优先使用真实请求或浏览器工具获取证据；只输出 payload、测试思路、任务清单，不算完成。
-- 只有当任务目标明确要求“计划、任务清单、优先级、方案文档、总结报告”时，才允许在没有外部证据的情况下使用 `directly_answer` 作为最终交付。
+- 只有当任务目标明确要求“方案文档、总结报告、概念解释”等**纯文本交付**时，才允许在没有外部证据的情况下使用 `directly_answer` 作为最终交付。
+- **禁止**用 `directly_answer` 代替 `request_plan` 来“生成可执行计划”。若用户要求**规划 plan / 制定多步执行计划 / 产出待用户审查的任务计划**，必须调用 `request_plan`（或 `request_plan_and_execution`）并填写 `plan_request_payload`。`directly_answer` 只会把文字流式展示给用户，**不会**产出可供用户审查的 plan。
+- **修改已有 plan**：当用户要求调整、替换或增删已生成 plan 中的步骤时，**再次调用 `request_plan`** 即可；系统会重新生成 plan 替代旧 plan。**你只负责生成 plan，是否执行由用户审查后决定**。**`plan_request_payload` 只写新的 plan 需求**（与首次规划相同写法），**不要**写「修订」「覆盖原 plan」「把 X 改为 Y」等修改说明。**禁止**用多轮 `directly_answer` 反复确认「已收到变更」却不重新 request_plan。
 - 如果同一任务同时覆盖多个端点、多个上下文或多个漏洞子类型，不要把它压成一次 `directly_answer`。优先 `request_plan` 或拆成更小的执行步骤。
 - 对 SQL 注入和 XSS，优先考虑 `do_http_request`、`send_http_request_packet`、浏览器相关能力或专门工具；不要因为技能已经加载就停止在方法论层面。
 
