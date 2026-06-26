@@ -381,15 +381,19 @@ func (s *RewriteManager) mergeIf() bool {
 
 		for _, n := range node.Source {
 			mergeCondition := func(parentNode, childNode *core.Node) {
-				result = true
 				// Guard against nil TrueNode/FalseNode: when the variable-fold nil-key error is
-				// suppressed (parser.go), a ConditionStatement whose node has fewer than 2 Next edges
-				// can reach here with nil branch functions. Skip the merge instead of panicking.
+				// suppressed (parser.go) or empty if-merge sources are tolerated (code_analyser.go),
+				// a ConditionStatement whose node has fewer than 2 Next edges can reach here with nil
+				// branch functions. Skip the merge instead of panicking. The guard must run BEFORE
+				// result is set: setting result=true and then returning without mutating the graph
+				// makes MergeIf()'s fixpoint loop re-discover the same unmergeable pair forever (the
+				// graph never changes yet mergeIf keeps reporting progress), so it never converges.
 				if parentNode == nil || childNode == nil ||
 					parentNode.TrueNode == nil || childNode.TrueNode == nil ||
 					parentNode.TrueNode() == nil || childNode.TrueNode() == nil {
 					return
 				}
+				result = true
 				if parentNode.TrueNode() != childNode { // or logic
 					if parentNode.TrueNode() == childNode.TrueNode() { // same direction
 						ifStat1 := parentNode.Statement.(*statements.ConditionStatement)
