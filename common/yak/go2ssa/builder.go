@@ -113,10 +113,10 @@ func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, builder *ssa.FunctionBuilder
 		"error":      ssa.CreateErrorType(),
 	}
 	SpecialValue := map[string]interface{}{
-		"nil":        nil,
+		"nil":      nil,
 		goIotaName: goIotaName,
-		"true":       true,
-		"false":      false,
+		"true":     true,
+		"false":    false,
 	}
 
 	builder.SupportClosure = false
@@ -198,6 +198,10 @@ func (b *astbuilder) OutCmapLevel() {
 
 func (*SSABuilder) GetLanguage() ssaconfig.Language {
 	return ssaconfig.GO
+}
+
+func (*SSABuilder) UsesDeferredFileBuild() bool {
+	return true
 }
 
 func (b *astbuilder) AddResultDefault(name string) {
@@ -349,5 +353,5 @@ func (b *astbuilder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() 
 
 func (b *astbuilder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
 	b.FunctionBuilder = s.Current
-	b.LoadFunctionBuilder(s.Store)
+	b.LoadFunctionBuilder(s)
 }

@@ -19,7 +19,8 @@ import (
 //
 // Example:
 // ```
-// // 比较两个 ZIP 包（示意性示例，需替换为真实路径）
+// // 无法本地验证: 需要磁盘上真实存在的两个 ZIP 包(请替换为真实路径)
+// // 比较两个 ZIP 包内容，输出 git 风格 diff 文本
 // result, err = diff.DiffZIPFile("/tmp/old.zip", "/tmp/new.zip")
 // if err != nil { die(err) }
 // println(result)

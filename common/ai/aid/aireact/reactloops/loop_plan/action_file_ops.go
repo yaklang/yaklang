@@ -29,7 +29,8 @@ func makeToolForwardAction(
 					ctx = task.GetContext()
 				}
 
-				loop.LoadingStatus(fmt.Sprintf("calling tool: %s", targetToolName))
+				reactloops.EmitActionLog(loop, planFileOpsNodeID, fmt.Sprintf("开始: %s / Start: %s", actionName, targetToolName))
+				reactloops.EmitStatus(loop, "文件检索中 / Running file operation...")
 
 				params := action.GetParams()
 				result, _, err := invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, targetToolName, params)
@@ -54,6 +55,8 @@ func makeToolForwardAction(
 				)
 
 				op.Feedback(fmt.Sprintf("%s completed (%d bytes)", targetToolName, len(content)))
+				reactloops.EmitStatus(loop, "完成 / Complete")
+				reactloops.EmitActionLog(loop, planFileOpsNodeID, fmt.Sprintf("完成: %s (%d bytes) / Done: %s (%d bytes)", actionName, len(content), targetToolName, len(content)))
 				op.Continue()
 			},
 		)

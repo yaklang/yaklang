@@ -52,31 +52,36 @@ var JavaDecompilerSelfChecking = &cli.Command{
 		swg := utils.NewSizedWaitGroup(100)
 
 		var visitedCompiledError sync.Map
+		var visitedPartial sync.Map
 
 		var decompilerFinishedCount *int64 = new(int64)
 		var decompilerFailedCount *int64 = new(int64)
 		var decompilerSyntaxErrorCount *int64 = new(int64)
+		var decompilerPartialCount *int64 = new(int64)
 
 		go func() {
-			var lastFinished, lastFailed, lastSyntax int64
+			var lastFinished, lastFailed, lastSyntax, lastPartial int64
 			for {
 				time.Sleep(time.Second)
 				finished := atomic.LoadInt64(decompilerFinishedCount)
 				failed := atomic.LoadInt64(decompilerFailedCount)
 				syntax := atomic.LoadInt64(decompilerSyntaxErrorCount)
+				partial := atomic.LoadInt64(decompilerPartialCount)
 
-				if finished != lastFinished || failed != lastFailed || syntax != lastSyntax {
+				if finished != lastFinished || failed != lastFailed || syntax != lastSyntax || partial != lastPartial {
 					total := finished + failed + syntax
-					var failedPercent, syntaxPercent float64
+					var failedPercent, syntaxPercent, partialPercent float64
 					if total > 0 {
 						failedPercent = float64(failed) / float64(total) * 100
 						syntaxPercent = float64(syntax) / (float64(total) - float64(failed)) * 100
+						partialPercent = float64(partial) / float64(total) * 100
 					}
-					log.Infof("Decompiler Status - Total: %v, Success: %v, Failed: %v (%.1f%%), Syntax Errors: %v (%.1f%%)",
-						total, finished, failed, failedPercent, syntax, syntaxPercent)
+					log.Infof("Decompiler Status - Total: %v, Success: %v, Failed: %v (%.1f%%), Syntax Errors: %v (%.1f%%), Partial(stub): %v (%.1f%%)",
+						total, finished, failed, failedPercent, syntax, syntaxPercent, partial, partialPercent)
 					lastFinished = finished
 					lastFailed = failed
 					lastSyntax = syntax
+					lastPartial = partial
 				}
 			}
 		}()
@@ -107,6 +112,20 @@ var JavaDecompilerSelfChecking = &cli.Command{
 				return nil
 			}
 			atomic.AddInt64(decompilerFinishedCount, 1)
+
+			// Graceful degradation: a class may decompile "successfully" but contain stub
+			// method bodies for methods we could not reconstruct. Surface these as partial
+			// results so the self-check keeps tracking method-level decompiler bugs.
+			if strings.Contains(results, javaclassparser.DecompileStubMarker) {
+				atomic.AddInt64(decompilerPartialCount, 1)
+				errHash := codec.Sha256(raw)
+				if _, ok := visitedPartial.Load(errHash); !ok {
+					visitedPartial.Store(errHash, struct{}{})
+					fileName := "partial-decompile-" + hash
+					os.WriteFile(filepath.Join(outputDir, fileName+".class"), raw, 0755)
+					os.WriteFile(filepath.Join(outputDir, fileName+".java"), []byte(results), 0755)
+				}
+			}
 
 			//vfs := filesys.NewVirtualFs()
 			//vfs.AddFile("origin.java", results)
@@ -143,7 +162,8 @@ var JavaDecompilerSelfChecking = &cli.Command{
 					return nil
 				}
 
-				if strings.Contains(filepath.Base(s), "package-info.class") {
+				base := filepath.Base(s)
+				if strings.Contains(base, "package-info.class") || strings.Contains(base, "module-info.class") {
 					return nil
 				}
 

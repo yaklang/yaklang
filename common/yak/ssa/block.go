@@ -2,9 +2,31 @@ package ssa
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+// isStructuralCFGBlockName reports SSA CFG scaffolding blocks that do not map to
+// a single source span. They are often created before the enclosing function has
+// a file range (e.g. @main during early PHP compile); missing range here is normal.
+func isStructuralCFGBlockName(name string) bool {
+	if name == "" || name == "entry" || name == "defer" {
+		return true
+	}
+	for _, prefix := range []string{
+		LoopHeader, LoopCondition, LoopBody, LoopExit, LoopLatch,
+		IfCondition, IfDone, IfTrue, IfFalse, IfElif,
+		TryStart, TryCatch, TryFinally, TryDone,
+		SwitchDone, SwitchDefault, SwitchHandler, SwitchBlock,
+		LabelBlock, LabelDone,
+	} {
+		if name == prefix || strings.HasPrefix(name, prefix+"-") {
+			return true
+		}
+	}
+	return false
+}
 
 func (f *Function) GetDeferBlock() *BasicBlock {
 	newDefer := func() *BasicBlock {
@@ -57,8 +79,8 @@ func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bo
 	}
 	if functionRange := f.GetRange(); functionRange != nil {
 		b.SetRange(functionRange)
-	} else if name == "entry" {
-		log.Debugf("func$%v entry 's range is nil, set entry block range to empty in first building", f.name)
+	} else if isStructuralCFGBlockName(name) {
+		log.Debugf("func$%v structural block %q has no function range yet", f.name, name)
 	} else {
 		log.Warnf("function$%v 's range is nil, missed block range (%v)", f.name, name)
 	}

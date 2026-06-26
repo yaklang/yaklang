@@ -48,18 +48,25 @@ func (n *NewExpression) String(funcCtx *class_context.ClassContext) string {
 			base = base.ElementType()
 		}
 		s := fmt.Sprintf("new %s", base.String(funcCtx))
-		for _, l := range n.Length {
-			s += fmt.Sprintf("[%v]", l.(JavaValue).String(funcCtx))
-		}
-		for i := len(n.Length); i < n.JavaType.ArrayDim(); i++ {
-			s += "[]"
-		}
+		// An explicit initializer (new T[]{...}) is incompatible with a sized dimension
+		// (new T[3]{...} is a javac error); the literal supplies the length, so drop the
+		// first numeric dimension and emit empty brackets per array dimension instead.
 		if len(n.Initializer) != 0 {
+			for i := 0; i < n.JavaType.ArrayDim(); i++ {
+				s += "[]"
+			}
 			vsStr := []string{}
 			for _, v := range n.Initializer {
 				vsStr = append(vsStr, v.String(funcCtx))
 			}
 			s += fmt.Sprintf("{%s}", strings.Join(vsStr, ","))
+			return s
+		}
+		for _, l := range n.Length {
+			s += fmt.Sprintf("[%v]", l.(JavaValue).String(funcCtx))
+		}
+		for i := len(n.Length); i < n.JavaType.ArrayDim(); i++ {
+			s += "[]"
 		}
 		return s
 	}
@@ -100,6 +107,8 @@ func (j *JavaExpression) String(funcCtx *class_context.ClassContext) string {
 		return fmt.Sprintf("(%s) + (%s)", vs[0], vs[1])
 	case INC:
 		return fmt.Sprintf("%s++", vs[0])
+	case DEC:
+		return fmt.Sprintf("%s--", vs[0])
 	case GT, SUB:
 		return fmt.Sprintf("(%s) %s (%s)", vs[0], j.Op, vs[1])
 	default:
@@ -107,8 +116,24 @@ func (j *JavaExpression) String(funcCtx *class_context.ClassContext) string {
 	}
 }
 
+func isBooleanTyped(v JavaValue) bool {
+	if v == nil {
+		return false
+	}
+	uv := UnpackSoltValue(v)
+	if uv == nil {
+		return false
+	}
+	t := uv.Type()
+	if t == nil {
+		return false
+	}
+	prim, ok := t.RawType().(*types.JavaPrimer)
+	return ok && prim.Name == types.JavaBoolean
+}
+
 func NewUnaryExpression(value1 JavaValue, op string, typ types.JavaType) *JavaExpression {
-	if IsLogicalOperator(op) {
+	if IsStrictBooleanOperator(op) {
 		value1.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
 	}
 	return &JavaExpression{
@@ -118,9 +143,17 @@ func NewUnaryExpression(value1 JavaValue, op string, typ types.JavaType) *JavaEx
 	}
 }
 func NewBinaryExpression(value1, value2 JavaValue, op string, typ types.JavaType) *JavaExpression {
-	if IsLogicalOperator(op) {
+	if IsStrictBooleanOperator(op) {
 		value1.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
 		value2.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
+	} else if (op == AND || op == OR || op == XOR) && (isBooleanTyped(value1) || isBooleanTyped(value2)) {
+		// &, |, ^ are shared between boolean logic and integer bitwise arithmetic. Decide by
+		// the operands: if either side is already boolean (e.g. descriptor-typed parameters or
+		// a negation), this is boolean logic, so align both sides to boolean. Otherwise leave
+		// the operands as their inferred integer type.
+		value1.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
+		value2.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
+		typ = types.NewJavaPrimer(types.JavaBoolean)
 	}
 	return &JavaExpression{
 		Values: []JavaValue{value1, value2},
@@ -171,6 +204,34 @@ func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) str
 					return argType
 				})
 			}
+		} else if expectPrim, okp := argType.RawType().(*types.JavaPrimer); okp {
+			// Method-invocation context (JLS 5.3) forbids implicit narrowing, even for constant
+			// expressions, but the JVM stack collapses byte/short/char to int (iconst/bipush/sipush),
+			// so an int-typed value flowing into a byte/short/char parameter must be cast explicitly or
+			// the decompiled call fails to recompile ("possible lossy conversion from int to char").
+			if expectPrim.Name == types.JavaByte || expectPrim.Name == types.JavaShort || expectPrim.Name == types.JavaChar {
+				if actualPrim, oka := arg.Type().RawType().(*types.JavaPrimer); oka && actualPrim.Name == types.JavaInteger {
+					argStr := arg.String(funcCtx)
+					argTypeStr := expectPrim.Name
+					arg = NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+						return fmt.Sprintf("(%s)(%s)", argTypeStr, argStr)
+					}, func() types.JavaType {
+						return argType
+					})
+				}
+			} else if expectPrim.Name == types.JavaBoolean {
+				// The JVM has no boolean opcodes: a boolean argument is pushed as an int
+				// constant (iconst_0/iconst_1). Java forbids int->boolean conversion, so an
+				// int literal flowing into a boolean parameter must be rendered as a boolean
+				// literal or the call fails to recompile (e.g. Boolean.valueOf(1)).
+				if lit, okl := UnpackSoltValue(arg).(*JavaLiteral); okl {
+					if actualPrim, oka := lit.Type().RawType().(*types.JavaPrimer); oka && actualPrim.Name == types.JavaInteger {
+						if iv, oki := lit.Data.(int); oki {
+							arg = NewJavaLiteral(iv, types.NewJavaPrimer(types.JavaBoolean))
+						}
+					}
+				}
+			}
 		}
 		paramStrs = append(paramStrs, arg.String(funcCtx))
 	}
@@ -183,11 +244,17 @@ func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) str
 	}
 
 	if v, ok := f.Object.(*JavaClassValue); ok {
-		if v.Type().RawType().(*types.JavaClass).Name == funcCtx.ClassName {
+		if classType, ok2 := v.Type().RawType().(*types.JavaClass); ok2 && classType.Name == funcCtx.ClassName {
 			return fmt.Sprintf("%s(%s)", f.FunctionName, strings.Join(paramStrs, ","))
 		}
 	}
 	obj := UnpackSoltValue(f.Object)
+	if cv, ok := obj.(*CustomValue); ok && cv.Flag == "lambda" {
+		// A lambda / method reference inlined directly as a call receiver has no target type of
+		// its own - `(() -> x).get()` does not compile. Supply one by casting to the functional
+		// interface the value carries: `((Supplier)(() -> x)).get()`.
+		return fmt.Sprintf("((%s)(%s)).%s(%s)", cv.Type().String(funcCtx), cv.String(funcCtx), f.FunctionName, strings.Join(paramStrs, ","))
+	}
 	switch obj.(type) {
 	case *JavaExpression, *TernaryExpression, *SlotValue:
 		return fmt.Sprintf("(%s).%s(%s)", f.Object.String(funcCtx), f.FunctionName, strings.Join(paramStrs, ","))

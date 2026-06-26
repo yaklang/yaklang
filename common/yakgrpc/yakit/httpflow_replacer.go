@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dlclark/regexp2"
+	regexp2 "github.com/VillanCh/go-pcre2-lite/regexp2"
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
@@ -41,6 +41,7 @@ func NewRuleGroup(r ...*ypb.MITMContentReplacer) Rules {
 	for _, i := range r {
 		ret = append(ret, &MITMReplaceRule{
 			MITMContentReplacer: i,
+			prefilterID:         -1,
 		})
 	}
 	return ret
@@ -117,6 +118,10 @@ func shouldSkipResponseRuleMatch(packet []byte) bool {
 type MITMReplaceRule struct {
 	*ypb.MITMContentReplacer
 	cache *regexp2.Regexp
+	// prefilterID 是该规则在统一预过滤 Group 中的稳定下标: >=0 表示已纳入预过滤(存在性预筛未命中
+	// 即可安全跳过其昂贵的 regexp2); -1 表示 always-candidate (regexp2-only / 无必需字面量 / 不可编译),
+	// 永不跳过以保证绝不漏报。由 LoadRules -> buildMITMRulePrefilter 回填。
+	prefilterID int
 }
 
 func (r *MITMReplaceRule) Compile() (*regexp2.Regexp, error) {
@@ -493,19 +498,35 @@ func (m *MITMReplaceRule) SplitPacket(packet []byte) (*PacketInfo, error) {
 }
 
 func (m *MITMReplaceRule) MatchPacket(packet []byte, isReq bool) (*PacketInfo, []*MatchResult, error) {
+	info, err := splitPacketForMatch(packet, isReq)
+	if err != nil {
+		return info, nil, err
+	}
+	matched, err := m.MatchByPacketInfo(info)
+	return info, matched, err
+}
+
+// splitPacketForMatch 复用 MatchPacket 的"修包(FixPacket)+切包(SplitPacket, 含 dechunk/ungzip)"逻辑,
+// 但与具体规则无关 (SplitPacket 只依赖报文本身), 因此可在同一报文上对所有规则只做一次, 再通过
+// MatchByPacketInfo 复用。旧实现里每条规则的 MatchPacket 都会重新 FixPacket + SplitPacket + 解 chunk/gzip,
+// 是 MITM 染色/提取路径上的主要冗余开销之一; 这里集中化以摊薄成本 (语义与逐条 MatchPacket 完全一致)。
+func splitPacketForMatch(packet []byte, isReq bool) (*PacketInfo, error) {
 	fixed, ok := FixPacket(packet, isReq)
 	if ok {
 		packet = fixed
 	}
-	// parse http packet
-	packetInfo, err := m.SplitPacket(packet)
+	info, err := sharedPacketSplitter.SplitPacket(packet)
 	if err != nil {
-		return packetInfo, nil, err
+		return info, err
 	}
-	packetInfo.IsRequest = isReq
-	matched, err := m.MatchByPacketInfo(packetInfo)
-	return packetInfo, matched, err
+	if info != nil {
+		info.IsRequest = isReq
+	}
+	return info, nil
 }
+
+// sharedPacketSplitter 是一个零值规则, 仅用于调用与规则无关的 SplitPacket (避免每次切包都新建临时对象)。
+var sharedPacketSplitter = &MITMReplaceRule{prefilterID: -1}
 
 // MatchAndReplacePacket match and replace package, return matched result and replaced package
 func (m *MITMReplaceRule) MatchAndReplacePacket(packet []byte, isReq bool) ([]*MatchResult, []byte, error) {
@@ -676,6 +697,10 @@ type MitmReplacer struct {
 
 	_ruleRegexpCache *sync.Map
 
+	// prefilter 是用 minirehs 维护的"统一编译规则 Group", 在染色/提取(只读)路径上做一次扫描的存在性
+	// 预筛, 跳过必需字面量缺席的规则的逐条 regexp2。nil 表示未启用/构建失败, 退化为逐条匹配 (旧行为)。
+	prefilter *mitmRulePrefilter
+
 	wg *sync.WaitGroup
 }
 
@@ -767,8 +792,9 @@ func (m *MitmReplacer) LoadRules(ruleContents []*ypb.MITMContentReplacer) {
 	var rules []*MITMReplaceRule
 	for _, i := range ruleContents {
 		rules = append(rules, &MITMReplaceRule{
-			i,
-			nil,
+			MITMContentReplacer: i,
+			cache:               nil,
+			prefilterID:         -1,
 		})
 	}
 	m._ruleRegexpCache = new(sync.Map)
@@ -807,6 +833,13 @@ func (m *MitmReplacer) LoadRules(ruleContents []*ypb.MITMContentReplacer) {
 	m.rules = SortContentReplacer(enabledRules)
 	m._mirrorRules = SortContentReplacer(m._mirrorRules)
 	m._hijackingRules = SortContentReplacer(m._hijackingRules)
+
+	// 用排序后的已启用规则 (下标即稳定 ID) 重建统一预过滤 Group, 并回填每条规则的 prefilterID。
+	// _mirrorRules / _hijackingRules 与 m.rules 共享同一批 *MITMReplaceRule 指针, 故 prefilterID 一并生效。
+	if m.prefilter != nil {
+		m.prefilter.Close()
+	}
+	m.prefilter = buildMITMRulePrefilter(m.rules)
 }
 
 func (m *MitmReplacer) AutoSaveCallback(f func(...*MITMReplaceRule)) {
@@ -878,17 +911,46 @@ func StringForSettingColor(s []string, flow ColorFlow) {
 	}
 }
 
-// appendHookColorExtractions 对 rules 中每条规则做 MatchPacket，将命中写入 extracted。
+// prepareColorMatch 为染色/提取(只读)路径做"每报文一次"的预处理: 切包(含 dechunk/ungzip) +
+// 统一 Group 预过滤。返回供 appendHookColorExtractions 复用的 reqInfo/rspInfo, 以及候选位图
+// candidateMask (nil 表示未启用预过滤, 全部规则都要跑)。这样同一报文上所有规则共享一次切包与一次
+// 预筛, 取代旧实现里"每条规则各自 FixPacket+SplitPacket+逐条 regexp2"的冗余。
+func (m *MitmReplacer) prepareColorMatch(request, response []byte, skipResponseRuleMatch bool) (reqInfo, rspInfo *PacketInfo, candidateMask []bool) {
+	if len(request) > 0 {
+		if info, err := splitPacketForMatch(request, true); err == nil {
+			reqInfo = info
+		} else {
+			log.Debugf("mitm replacer split request failed: %v", err)
+		}
+	}
+	if !skipResponseRuleMatch && len(response) > 0 {
+		if info, err := splitPacketForMatch(response, false); err == nil {
+			rspInfo = info
+		} else {
+			log.Debugf("mitm replacer split response failed: %v", err)
+		}
+	}
+	if m.prefilter != nil {
+		candidateMask = m.prefilter.newCandidateMask()
+		m.prefilter.fillFromInfo(candidateMask, reqInfo)
+		m.prefilter.fillFromInfo(candidateMask, rspInfo)
+	}
+	return
+}
+
+// appendHookColorExtractions 对 rules 中每条规则在已切分(共享)的报文上做匹配，将命中写入 extracted。
 // applyColorAndTag 为 true 时同步累积颜色与 Tag（用于「仅匹配」镜像规则）；为 false 时只写库数据，
 // 避免与劫持路径 / GetMatchedRule 已处理的着色、标记重复。
+// candidateMask 来自统一预过滤 Group (见 prepareColorMatch): 对已纳入预过滤(prefilterID>=0)且本报文
+// 未命中其必需字面量/骨架的规则, 直接跳过昂贵的 regexp2; always-candidate 规则不受影响, 保证不漏报。
 // ph 用于将 MatchResult 中的 MITM 提取占位符（MITMExtractPlaceholder*）展开为当前流上下文（与 grpc HTTPFlow 分析路径一致）。
 func (m *MitmReplacer) appendHookColorExtractions(
-	request, response []byte,
+	reqInfo, rspInfo *PacketInfo,
 	req *http.Request,
 	hiddenIndex string,
-	skipResponseRuleMatch bool,
 	rules Rules,
 	applyColorAndTag bool,
+	candidateMask []bool,
 	extracted []*schema.ExtractedData,
 	colorName []string,
 	tagNames []string,
@@ -898,10 +960,13 @@ func (m *MitmReplacer) appendHookColorExtractions(
 		if rule == nil {
 			continue
 		}
-		matchResults := make([]*MatchResult, 0)
-		var newMatchResults []*MatchResult
-		var err error
 		if !rule.EnableForRequest && !rule.EnableForResponse {
+			continue
+		}
+
+		// 统一预过滤: 仅对纳入 Group 的规则生效; 本报文一次扫描未命中其必需字面量/骨架即不可能匹配,
+		// 跳过逐条 regexp2。always-candidate 规则 (prefilterID<0) 不受影响, 故绝不漏报。
+		if candidateMask != nil && rule.prefilterID >= 0 && !candidateMask[rule.prefilterID] {
 			continue
 		}
 
@@ -916,16 +981,17 @@ func (m *MitmReplacer) appendHookColorExtractions(
 			continue
 		}
 
-		if rule.EnableForRequest {
-			_, newMatchResults, err = rule.MatchPacket(request, true)
+		matchResults := make([]*MatchResult, 0)
+		if rule.EnableForRequest && reqInfo != nil {
+			newMatchResults, err := rule.MatchByPacketInfo(reqInfo)
 			if err != nil && !IsMatchTimeout(err) {
 				log.Errorf("match package failed: %v", err)
 				continue
 			}
 			matchResults = append(matchResults, newMatchResults...)
 		}
-		if rule.EnableForResponse && !skipResponseRuleMatch {
-			_, newMatchResults, err = rule.MatchPacket(response, false)
+		if rule.EnableForResponse && rspInfo != nil {
+			newMatchResults, err := rule.MatchByPacketInfo(rspInfo)
 			if err != nil && !IsMatchTimeout(err) {
 				log.Errorf("match package failed: %v", err)
 				continue
@@ -975,8 +1041,19 @@ func (m *MitmReplacer) HookColorWs(rawPacket []byte, flow *schema.WebsocketFlow)
 		flow.AddTag(tagNames...)
 	}()
 
+	// WebSocket 整帧匹配 (MatchRawSimple 对整帧做 MatchString), 故对原始字节直接做一次统一预过滤即可,
+	// 字节与匹配路径完全一致, sound。
+	var candidateMask []bool
+	if m.prefilter != nil {
+		candidateMask = m.prefilter.newCandidateMask()
+		m.prefilter.fillFromRaw(candidateMask, rawPacket)
+	}
+
 	for _, rule := range m._mirrorRules {
 		if !rule.EnableForRequest && !rule.EnableForResponse {
+			continue
+		}
+		if candidateMask != nil && rule.prefilterID >= 0 && !candidateMask[rule.prefilterID] {
 			continue
 		}
 		if ruleShouldSkipBySuffix(rule.MITMContentReplacer, "") {
@@ -1026,10 +1103,13 @@ func (m *MitmReplacer) HookColor(request, response []byte, req *http.Request, fl
 
 	ph := BuildMITMExtractPlaceholders(req, flow)
 
+	// 每报文一次: 切包(含解码) + 统一 Group 预过滤, 供下面 mirror/hijack 两轮规则复用。
+	reqInfo, rspInfo, candidateMask := m.prepareColorMatch(request, response, skipResponseRuleMatch)
+
 	extracted, colorName, tagNames = m.appendHookColorExtractions(
-		request, response, req, flow.HiddenIndex, skipResponseRuleMatch, m._mirrorRules, true, extracted, colorName, tagNames, ph)
+		reqInfo, rspInfo, req, flow.HiddenIndex, m._mirrorRules, true, candidateMask, extracted, colorName, tagNames, ph)
 	extracted, colorName, tagNames = m.appendHookColorExtractions(
-		request, response, req, flow.HiddenIndex, skipResponseRuleMatch, m._hijackingRules, false, extracted, colorName, tagNames, ph)
+		reqInfo, rspInfo, req, flow.HiddenIndex, m._hijackingRules, false, candidateMask, extracted, colorName, tagNames, ph)
 	// 将替换的规则提前，因为一般来说比较重要
 	if ret := httpctx.GetMatchedRule(req); len(ret) > 0 {
 		lastRule := ret[len(ret)-1]
@@ -1391,10 +1471,13 @@ func (m *MitmReplacer) HookColorLowhttp(flow *lowhttp.LowhttpResponse) []*schema
 
 	ph := BuildMITMExtractPlaceholdersLowhttp(req, flow.Url)
 
+	// 每报文一次: 切包(含解码) + 统一 Group 预过滤, 供下面 mirror/hijack 两轮规则复用。
+	reqInfo, rspInfo, candidateMask := m.prepareColorMatch(request, response, skipResponseRuleMatch)
+
 	extracted, colorName, tagNames = m.appendHookColorExtractions(
-		request, response, req, flow.HiddenIndex, skipResponseRuleMatch, m._mirrorRules, true, extracted, colorName, tagNames, ph)
+		reqInfo, rspInfo, req, flow.HiddenIndex, m._mirrorRules, true, candidateMask, extracted, colorName, tagNames, ph)
 	extracted, colorName, tagNames = m.appendHookColorExtractions(
-		request, response, req, flow.HiddenIndex, skipResponseRuleMatch, m._hijackingRules, false, extracted, colorName, tagNames, ph)
+		reqInfo, rspInfo, req, flow.HiddenIndex, m._hijackingRules, false, candidateMask, extracted, colorName, tagNames, ph)
 	// 将替换的规则提前，因为一般来说比较重要
 	if ret := httpctx.GetMatchedRule(req); len(ret) > 0 {
 		lastRule := ret[len(ret)-1]

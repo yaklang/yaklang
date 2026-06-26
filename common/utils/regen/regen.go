@@ -104,7 +104,7 @@ func GenerateStream(pattern string, ctxs ...context.Context) (chan string, conte
 // Example:
 // ```
 // regen.GenerateOneStream("[a-z]+") // a-z 中随机一个字母
-// regen.GenerateOneStream("^(13[0-9]|14[57]|15[0-9]|18[0-9])\d{8}$") // 生成一个手机号
+// regen.GenerateOneStream(`^(13[0-9]|14[57]|15[0-9]|18[0-9])\d{8}$`) // 生成一个手机号
 // ```
 func GenerateOneStream(pattern string, ctxs ...context.Context) (string, error) {
 	generator, err := NewGeneratorOne(pattern, &GeneratorArgs{
@@ -143,7 +143,7 @@ func GenerateOneStream(pattern string, ctxs ...context.Context) (string, error) 
 // Example:
 // ```
 // regen.GenerateVisibleOneStream("[a-z]") // a-z 中随机一个字母
-// regen.GenerateVisibleOneStream("^(13[0-9]|14[57]|15[0-9]|18[0-9])\d{8}$") // 生成一个手机号
+// regen.GenerateVisibleOneStream(`^(13[0-9]|14[57]|15[0-9]|18[0-9])\d{8}$`) // 生成一个手机号
 // ```
 func GenerateVisibleOneStream(pattern string, ctxs ...context.Context) (string, error) {
 	generator, err := NewGeneratorVisibleOne(pattern, &GeneratorArgs{

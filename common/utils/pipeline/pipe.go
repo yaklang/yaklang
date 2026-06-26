@@ -11,10 +11,8 @@ import (
 
 type Pipe[T, U any] struct {
 	ctx        context.Context
-	in         *chanx.UnlimitedChan[T]
-	out        *chanx.UnlimitedChan[U]
-	boundedIn  chan T
-	boundedOut chan U
+	in         chanx.PipeIO[T]
+	out        chanx.PipeIO[U]
 	errMu      sync.Mutex
 	err        error
 	swg        *utils.SizedWaitGroup
@@ -23,6 +21,9 @@ type Pipe[T, U any] struct {
 }
 
 func NewSimplePipe[T, U any](ctx context.Context, in <-chan T, handler func(item T) (U, error)) *Pipe[T, U] {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	ret := &Pipe[T, U]{
 		ctx: ctx,
 		out: chanx.NewUnlimitedChan[U](ctx, defaultPipeSize),
@@ -61,16 +62,29 @@ func NewPipe[T, U any](
 	handler func(item T) (U, error),
 	concurrency ...int,
 ) *Pipe[T, U] {
-	// 包装老的 handler，使其兼容新的签名
 	wrappedHandler := func(item T, store *utils.SafeMap[any]) (U, error) {
 		return handler(item)
 	}
-	return NewPipeWithInit(ctx, initBufSize, wrappedHandler, nil, concurrency...)
+	return newPipeWithInit(ctx, initBufSize, false, wrappedHandler, nil, concurrency...)
+}
+
+// NewBoundedPipe creates a Pipe backed by fixed-size channels. It is useful for
+// pipelines that carry large objects and need backpressure instead of the
+// default unbounded buffering behavior. A bufSize of 0 creates unbuffered
+// channels.
+func NewBoundedPipe[T, U any](
+	ctx context.Context,
+	bufSize int,
+	handler func(item T) (U, error),
+	concurrency ...int,
+) *Pipe[T, U] {
+	wrappedHandler := func(item T, store *utils.SafeMap[any]) (U, error) {
+		return handler(item)
+	}
+	return newPipeWithInit(ctx, bufSize, true, wrappedHandler, nil, concurrency...)
 }
 
 // NewPipeWithStore 创建一个带有 worker 初始化函数的 Pipe
-// initWorker 会在每个 worker 协程启动时执行一次，用于初始化协程本地存储
-// handler 的第二个参数会接收到 initWorker 返回的 store
 func NewPipeWithStore[T, U any](
 	ctx context.Context,
 	initBufSize int,
@@ -78,39 +92,59 @@ func NewPipeWithStore[T, U any](
 	initWorker func() *utils.SafeMap[any],
 	concurrency ...int,
 ) *Pipe[T, U] {
-	// 包装 handler，适配可变参数签名
-	return NewPipeWithInit(ctx, initBufSize, handler, initWorker, concurrency...)
+	return newPipeWithInit(ctx, initBufSize, false, handler, initWorker, concurrency...)
 }
 
-// NewPipeWithInit 创建一个带有 worker 初始化函数的 Pipe（内部使用）
-// initWorker 会在每个 worker 协程启动时执行一次，用于初始化协程本地存储
-func NewPipeWithInit[T, U any](
+// NewBoundedPipeWithStore is NewPipeWithStore plus fixed input/output channel
+// capacity. Existing NewPipe* constructors intentionally keep their historical
+// unbounded channel semantics. A bufSize of 0 creates unbuffered channels.
+func NewBoundedPipeWithStore[T, U any](
 	ctx context.Context,
-	initBufSize int,
+	bufSize int,
 	handler func(item T, store *utils.SafeMap[any]) (U, error),
 	initWorker func() *utils.SafeMap[any],
 	concurrency ...int,
 ) *Pipe[T, U] {
-	pipeSize := defaultPipeSize
-	if initBufSize > 0 {
-		pipeSize = initBufSize
+	return newPipeWithInit(ctx, bufSize, true, handler, initWorker, concurrency...)
+}
+
+func newPipeWithInit[T, U any](
+	ctx context.Context,
+	initBufSize int,
+	bounded bool,
+	handler func(item T, store *utils.SafeMap[any]) (U, error),
+	initWorker func() *utils.SafeMap[any],
+	concurrency ...int,
+) *Pipe[T, U] {
+	if ctx == nil {
+		ctx = context.Background()
 	}
+	con := 10
+	if len(concurrency) > 0 && concurrency[0] > 0 {
+		con = concurrency[0]
+	}
+	bufSize := initBufSize
+	if !bounded && bufSize <= 0 {
+		bufSize = defaultPipeSize
+	}
+	if bounded && bufSize < 0 {
+		bufSize = 0
+	}
+
 	ret := &Pipe[T, U]{
 		ctx:        ctx,
-		in:         chanx.NewUnlimitedChan[T](ctx, pipeSize),
-		out:        chanx.NewUnlimitedChan[U](ctx, pipeSize),
 		handler:    handler,
 		initWorker: initWorker,
 	}
-	var con int
-	if len(concurrency) > 0 && concurrency[0] > 0 {
-		con = concurrency[0]
+	if bounded {
+		ret.in = chanx.NewLimitedChan[T](ctx, bufSize)
+		ret.out = chanx.NewLimitedChan[U](ctx, bufSize)
 	} else {
-		con = 10 // 默认并发10
+		ret.in = chanx.NewUnlimitedChan[T](ctx, bufSize)
+		ret.out = chanx.NewUnlimitedChan[U](ctx, bufSize)
 	}
 	ret.swg = utils.NewSizedWaitGroup(con)
 
-	// 启动固定数量的消费者协程
 	for i := 0; i < con; i++ {
 		ret.swg.Add(1)
 		go func() {
@@ -132,7 +166,6 @@ func (p *Pipe[T, U]) IsContextCancel() bool {
 	default:
 		return false
 	}
-	return false
 }
 
 func (p *Pipe[T, U]) FeedSlice(items []T) {
@@ -167,7 +200,6 @@ func (p *Pipe[T, U]) Out() <-chan U {
 	return p.out.OutputChannel()
 }
 
-// worker 是固定的消费者协程，持续从输入通道读取数据并处理
 func (p *Pipe[T, U]) worker() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -176,7 +208,6 @@ func (p *Pipe[T, U]) worker() {
 		}
 	}()
 
-	// 初始化协程本地存储
 	var store *utils.SafeMap[any]
 	if p.initWorker != nil {
 		store = p.initWorker()
@@ -191,11 +222,7 @@ func (p *Pipe[T, U]) worker() {
 				return
 			}
 
-			var result U
-			var err error
-
-			result, err = p.handler(item, store)
-
+			result, err := p.handler(item, store)
 			if err == nil {
 				p.out.SafeFeed(result)
 			} else {
@@ -209,7 +236,7 @@ func (p *Pipe[T, U]) worker() {
 
 func (p *Pipe[T, U]) Close() {
 	p.in.Close()
-	p.swg.Wait() // wait for all processing goroutines to finish
+	p.swg.Wait()
 	p.out.Close()
 }
 

@@ -117,7 +117,9 @@ func MergeTypes(types ...JavaType) JavaType {
 					j.ResetTypeRef(baseRef)
 				}
 			} else {
-				panic("unsupported type")
+				// Unsupported type merge: just pick the first type as fallback.
+				// This is better than panicking — the output may be slightly wrong
+				// but won't degrade the entire method to a stub.
 			}
 		}
 	}

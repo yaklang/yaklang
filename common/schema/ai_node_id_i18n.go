@@ -93,6 +93,18 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "额外加载技能资源",
 		En: "Load Extra SKILL Resource",
 	},
+	"load_skill_resources_type": {
+		Zh: "技能资源类型",
+		En: "Skill Resource Type",
+	},
+	"load_skill_resources_pattern": {
+		Zh: "技能资源搜索模式",
+		En: "Skill Resource Search Pattern",
+	},
+	"load_skill_resources_skill_name": {
+		Zh: "技能资源范围",
+		En: "Skill Resource Scope",
+	},
 	"internet_research": {
 		Zh: "互联网调研",
 		En: "Internet Research",
@@ -109,9 +121,25 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "加载工具",
 		En: "Loading Tools",
 	},
+	"query_mcp_servers": {
+		Zh: "查询 MCP 服务器",
+		En: "Query MCP Servers",
+	},
+	"query_mcp_tools": {
+		Zh: "查询 MCP 工具",
+		En: "Query MCP Tools",
+	},
 	"loading_skills_name": {
 		Zh: "加载技能",
 		En: "Loading Skills",
+	},
+	"change_skill_view_offset_name": {
+		Zh: "技能视图技能名",
+		En: "Skill View Skill Name",
+	},
+	"change_skill_view_offset_value": {
+		Zh: "技能视图偏移",
+		En: "Skill View Offset",
 	},
 	"perception": {
 		Zh: "意图感知",
@@ -197,6 +225,34 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "工具编排",
 		En: "Tool Compose",
 	},
+	"infra-file-write": {
+		Zh: "写入文件",
+		En: "Write File",
+	},
+	"infra-file-modify": {
+		Zh: "修改文件",
+		En: "Modify File",
+	},
+	"infra-file-insert": {
+		Zh: "插入文件内容",
+		En: "Insert File Content",
+	},
+	"infra-file-delete": {
+		Zh: "删除文件内容",
+		En: "Delete File Content",
+	},
+	"code-audit-scan": {
+		Zh: "代码审计扫描",
+		En: "Code Audit Scan",
+	},
+	"code-audit-verify": {
+		Zh: "漏洞验证",
+		En: "Vulnerability Verify",
+	},
+	"code-audit-report": {
+		Zh: "审计报告",
+		En: "Audit Report",
+	},
 	"knowledge-compress": {
 		Zh: "压缩精炼",
 		En: "Knowledge Compress",
@@ -237,6 +293,30 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "证据",
 		En: "Plan Evidence",
 	},
+	"plan-recon": {
+		Zh: "侦察工具执行",
+		En: "Recon Tool Execution",
+	},
+	"plan-web-search": {
+		Zh: "联网搜索",
+		En: "Web Search",
+	},
+	"plan-file-ops": {
+		Zh: "文件检索",
+		En: "File Operations",
+	},
+	"infosec-recon-tool": {
+		Zh: "侦察工具执行",
+		En: "Recon Tool Execution",
+	},
+	"infosec-api-pool": {
+		Zh: "API 池整理",
+		En: "API Pool Collecting",
+	},
+	"infosec-js-crawl": {
+		Zh: "JS 爬取分析",
+		En: "JS Crawl Analysis",
+	},
 	"self-reflection-suggestions": {
 		Zh: "自我反思",
 		En: "Self-Reflection",
@@ -257,6 +337,14 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "初始化代码样本搜索",
 		En: "Initialize Code Sample Search",
 	},
+	"init-search-rule-sample": {
+		Zh: "初始化规则样本搜索",
+		En: "Initialize Rule Sample Search",
+	},
+	"syntaxflow-rule": {
+		Zh: "SyntaxFlow 规则",
+		En: "SyntaxFlow Rule",
+	},
 	"code_sample_title": {
 		Zh: "代码样本",
 		En: "Code Sample",
@@ -268,6 +356,30 @@ var nodeIdMapper = map[string]*I18n{
 	"java_decompiler": {
 		Zh: "Java反编译器",
 		En: "Java Decompiler",
+	},
+	"java-decompile-jar": {
+		Zh: "JAR 反编译",
+		En: "Decompile JAR",
+	},
+	"java-list-files": {
+		Zh: "列出 Java 文件",
+		En: "List Java Files",
+	},
+	"java-read-file": {
+		Zh: "读取 Java 文件",
+		En: "Read Java File",
+	},
+	"java-rewrite-file": {
+		Zh: "重写 Java 文件",
+		En: "Rewrite Java File",
+	},
+	"java-check-syntax": {
+		Zh: "Java 语法检查",
+		En: "Check Java Syntax",
+	},
+	"java-compare-backup": {
+		Zh: "对比备份",
+		En: "Compare with Backup",
 	},
 	"fast-memory-fetch": {
 		Zh: "快速记忆检索",
@@ -288,6 +400,10 @@ var nodeIdMapper = map[string]*I18n{
 	"query_yaklang_document": {
 		Zh: "查询 Yaklang 文档",
 		En: "Query Yaklang Document",
+	},
+	"yaklang-init-search": {
+		Zh: "初始化样例搜索",
+		En: "Init Sample Search",
 	},
 	"batch-compress": {
 		Zh: "记忆压缩",
@@ -739,6 +855,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "验证",
 		En: "Verification",
 	},
+	"verification_payload": {
+		Zh: "验证说明",
+		En: "Verification Payload",
+	},
 	"answer": {
 		Zh: "回答",
 		En: "Answer",
@@ -826,6 +946,30 @@ var nodeIdMapper = map[string]*I18n{
 	"report-finish": {
 		Zh: "报告已完成",
 		En: "Report Finished",
+	},
+	"report-read-reference": {
+		Zh: "读取报告参考",
+		En: "Read Report Reference",
+	},
+	"report-grep-reference": {
+		Zh: "检索报告参考",
+		En: "Grep Report Reference",
+	},
+	"skill-audit-phase1": {
+		Zh: "Skill 审计探索",
+		En: "Skill Audit Explore",
+	},
+	"skill-audit-phase2": {
+		Zh: "Skill 静态分析",
+		En: "Skill Static Analysis",
+	},
+	"skill-audit-findings": {
+		Zh: "Skill 审计发现",
+		En: "Skill Audit Findings",
+	},
+	"skill-audit-report": {
+		Zh: "Skill 审计报告",
+		En: "Skill Audit Report",
 	},
 	"python-script": {
 		Zh: "Python 脚本",

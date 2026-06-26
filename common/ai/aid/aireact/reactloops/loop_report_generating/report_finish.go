@@ -1,6 +1,7 @@
 package loop_report_generating
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -66,6 +67,17 @@ func emitReportFinish(loop *reactloops.ReActLoop) {
 		log.Warnf("report_generating: emit report_finish failed: %v", err)
 		return
 	}
+
+	reactloops.EmitActionLog(loop, reportFinishEventNode,
+		fmt.Sprintf("报告已完成: %s", reportPath), summary)
+
+	if invoker := loop.GetInvoker(); invoker != nil {
+		invoker.AddToTimeline("report_finish", fmt.Sprintf(
+			"Report finished: %s\nTitle: %s\nSummary:\n%s",
+			reportPath, title, summary,
+		))
+	}
+
 	log.Infof("report_generating: emitted report_finish for %s", reportPath)
 }
 

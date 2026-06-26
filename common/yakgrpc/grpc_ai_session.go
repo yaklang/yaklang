@@ -118,8 +118,15 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 		filter = &ypb.DeleteAISessionFilter{}
 	}
 
+	projectDB := s.GetProjectDatabase()
+
 	if req.GetDeleteAll() {
-		deletedSessions, deletedRuntimes, deletedEvents, deletedPlanExec, err := yakit.DeleteAllAISessionData(s.GetProjectDatabase())
+		deletedWorkDirs, err := yakit.CleanupAISpaceWorkDirsForAllSessions(projectDB)
+		if err != nil {
+			return nil, err
+		}
+
+		deletedSessions, deletedRuntimes, deletedEvents, deletedPlanExec, err := yakit.DeleteAllAISessionData(projectDB)
 		if err != nil {
 			return nil, err
 		}
@@ -129,16 +136,17 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 			Operation:  "delete",
 			EffectRows: deletedRuntimes + deletedEvents,
 			ExtraMessage: fmt.Sprintf(
-				"delete_all=true deleted_sessions=%d deleted_runtimes=%d deleted_events=%d deleted_plan_exec=%d",
+				"delete_all=true deleted_sessions=%d deleted_runtimes=%d deleted_events=%d deleted_plan_exec=%d deleted_workdirs=%d",
 				deletedSessions,
 				deletedRuntimes,
 				deletedEvents,
 				deletedPlanExec,
+				deletedWorkDirs,
 			),
 		}, nil
 	}
 
-	targetSessionIDs, err := yakit.QueryAISessionIDsForDelete(s.GetProjectDatabase(), filter, req.GetDeleteAll())
+	targetSessionIDs, err := yakit.QueryAISessionIDsForDelete(projectDB, filter, req.GetDeleteAll())
 	if err != nil {
 		return nil, err
 	}
@@ -151,10 +159,15 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 		}, nil
 	}
 
+	deletedWorkDirs, err := yakit.CleanupAISpaceWorkDirsForSessions(projectDB, targetSessionIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	var deletedRuntimes int64
 	var deletedEvents int64
 	for _, sessionID := range targetSessionIDs {
-		runtimeCount, eventCount, err := yakit.DeleteAISession(s.GetProjectDatabase(), strings.TrimSpace(sessionID))
+		runtimeCount, eventCount, err := yakit.DeleteAISession(projectDB, strings.TrimSpace(sessionID))
 		if err != nil {
 			return nil, err
 		}
@@ -167,10 +180,11 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 		Operation:  "delete",
 		EffectRows: deletedRuntimes + deletedEvents,
 		ExtraMessage: fmt.Sprintf(
-			"deleted_sessions=%d deleted_runtimes=%d deleted_events=%d",
+			"deleted_sessions=%d deleted_runtimes=%d deleted_events=%d deleted_workdirs=%d",
 			len(targetSessionIDs),
 			deletedRuntimes,
 			deletedEvents,
+			deletedWorkDirs,
 		),
 	}, nil
 }

@@ -145,21 +145,22 @@ func TestLoopDoWhile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// ifOther's true branch (Next[0]) is loopStart and its false branch (Next[1])
+	// is ifOtherBody, so the correct structuring keeps the condition un-negated and
+	// places the loop in the then-branch and "if other body" in the else-branch.
 	assert.Equal(t, `start
-if (if other){
-if other body
-}else{
+if ("if other"){
 do{
-loop startif (while condition){
-if (if1){
-if (if2){
-if (if4){
+loop startif ("while condition"){
+if ("if1"){
+if ("if2"){
+if ("if4"){
 break
 }else{
 continue
 }
 }else{
-if (if3){
+if ("if3"){
 if3 body
 break
 }else{
@@ -174,6 +175,8 @@ continue
 break
 }
 }while(true)
+}else{
+if other body
 }
 while end`, sourceCode)
 	//println(strings.Join(statementsStrs, "\n"))
@@ -245,9 +248,9 @@ func TestNestedLoop(t *testing.T) {
 	println(strings.Join(statementsStrs, "\n"))
 	assert.Equal(t, `start
 LOOP_1: do{
-if (loop1 start){
+if ("loop1 start"){
 do{
-if (loop2 start){
+if ("loop2 start"){
 loop2 body
 continue
 }else{
@@ -325,9 +328,9 @@ func TestBreakInLoop(t *testing.T) {
 	println(strings.Join(statementsStrs, "\n"))
 	assert.Equal(t, `start
 do{
-if (loop1 start){
+if ("loop1 start"){
 loop1 body
-if (if1){
+if ("if1"){
 break
 }else{
 continue

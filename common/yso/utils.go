@@ -583,8 +583,8 @@ func _WalkJavaSerializableObject(objSer yserx.JavaSerializable, replace func(new
 //
 // Example:
 // ```
-// classObj := &javaclassparser.ClassObject{...}
-// bcelStr, err := yso.ToBcel(classObj)
+// classObj, _ = yso.GenerateTomcatEchoEvilClassObject(yso.useEchoBody(), yso.useParam("Body Echo Check"))
+// bcelStr, err = yso.ToBcel(classObj)
 // ```
 func ToBcel(i interface{}) (string, error) {
 	switch ret := i.(type) {

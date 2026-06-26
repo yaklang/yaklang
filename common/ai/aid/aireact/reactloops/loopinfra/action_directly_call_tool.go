@@ -273,6 +273,51 @@ func directlyCallParamKeys(params aitool.InvokeParams) []string {
 	return keys
 }
 
+func emitDirectlyCallToolParamsNodeStream(
+	loop *reactloops.ReActLoop,
+	action *aicommon.Action,
+	params aitool.InvokeParams,
+	mergedBlockParams []string,
+) {
+	emitter := loop.GetEmitter()
+	if emitter == nil {
+		return
+	}
+
+	taskIndex := ""
+	if task := loop.GetCurrentTask(); task != nil {
+		taskIndex = task.GetIndex()
+	}
+
+	var buf strings.Builder
+	buf.WriteString("[开始处理参数] → ")
+	emitDirectlyCallParamProgress(func(part string) {
+		buf.WriteString(part)
+		buf.WriteString(" → ")
+	}, params, mergedBlockParams)
+	if ce := action.GetString("directly_call_expectations"); strings.TrimSpace(ce) != "" {
+		buf.WriteString("[note] ")
+		buf.WriteString(ce)
+		buf.WriteString(" → ")
+	}
+	buf.WriteString(" [done]")
+
+	event, _ := emitter.EmitDefaultStreamEvent(directlyCallToolParamsNodeID, strings.NewReader(buf.String()), taskIndex)
+	if event == nil {
+		return
+	}
+	streamID := event.GetStreamEventWriterId()
+	if streamID == "" {
+		return
+	}
+	aicommon.EmitAIRequestAndResponseReferenceMaterials(
+		emitter,
+		streamID,
+		loop.Get(directlyCallToolPromptLoopKey),
+		loop.Get(directlyCallToolResponseLoopKey),
+	)
+}
+
 var loopAction_directlyCallTool = &reactloops.LoopAction{
 	ActionType: schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
 	Description: "directly call a recently used tool (skip require & param-generation phases). " +
@@ -329,40 +374,13 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 				}
 			}
 		}
-		emitProgress := func(string) {}
-		finishProgress := func(string) {}
-		var progressWriter io.Writer
-		var progressEventID string
-		if emitter := loop.GetEmitter(); emitter != nil && operator.GetTask() != nil {
-			pr, pw := utils.NewPipe()
-			progressWriter = pw
-			event, _ := emitter.EmitDefaultStreamEvent(directlyCallToolParamsNodeID, pr, operator.GetTask().GetIndex())
-			if event != nil {
-				progressEventID = event.GetStreamEventWriterId()
-				aicommon.EmitAIRequestAndResponseReferenceMaterials(
-					emitter,
-					progressEventID,
-					loop.Get(directlyCallToolPromptLoopKey),
-					loop.Get(directlyCallToolResponseLoopKey),
-				)
-			}
-			defer pw.Close()
-			emitProgress = func(msg string) {
-				pw.WriteString(msg)
-				pw.WriteString(" -> ")
-			}
-			finishProgress = func(msg string) {
-				pw.WriteString(msg)
-				pw.WriteString("\n")
-			}
-		}
-
 		reportStatus := func(msg string) {
 			invoker.AddToTimeline("[DIRECT_CALL_PARAMS]", msg)
 		}
 
 		toolName := loop.Get("directly_call_tool_name")
 		if toolName == "" {
+			loopInfraStatus(loop, "直接工具调用失败 / Direct Tool Call Failed")
 			reportStatus(strings.TrimSpace(`
 Error: directly_call_tool_name is missing in loop state.
 Fast-path directly_call_tool failed before execution and cannot be recovered in-place because the target tool is unknown.
@@ -374,15 +392,15 @@ Few-shot example 1 (fallback to require_tool):
 Few-shot example 2 (valid directly_call_tool):
 {"@action":"directly_call_tool","directly_call_tool_name":"<tool_name>","directly_call_identifier":"<snake_case_intent>","directly_call_expectations":"~3s, fallback to require_tool if params are uncertain","directly_call_tool_params":{"<param>":"<value>"}}
 `))
-			finishProgress("[failed] missing directly_call_tool_name; use require_tool or provide a complete directly_call_tool payload")
 			operator.Feedback(utils.Error("directly_call_tool requires tool_name; switch to require_tool or provide directly_call_tool_name + directly_call_tool_params"))
 			return
 		}
+		loopInfraStatus(loop, "准备直接工具调用 / Preparing Direct Tool Call...")
 
 		cachedTool, lookupErr := loop.GetConfig().GetAiToolManager().GetToolByName(toolName)
 		if lookupErr != nil {
 			reportStatus(fmt.Sprintf("cached tool lookup failed for '%s': %v", toolName, lookupErr))
-			finishProgress(fmt.Sprintf("[failed] cached tool '%s' is unavailable; switch to @action=require_tool", toolName))
+			loopInfraStatus(loop, "缓存工具不可用 / Cached Tool Unavailable")
 			msg := fmt.Sprintf("directly_call_tool cached tool lookup failed for '%s'; switch to @action=require_tool", toolName)
 			operator.Feedback(utils.Error(msg))
 			invoker.AddToTimeline("[DIRECT_CALL_PARAMS]", msg)
@@ -390,19 +408,12 @@ Few-shot example 2 (valid directly_call_tool):
 			return
 		}
 
-		emitProgress(fmt.Sprintf("[tool:%v]", toolName))
 		ctx := invoker.GetConfig().GetContext()
 		if t := loop.GetCurrentTask(); t != nil {
 			ctx = t.GetContext()
 		}
 
 		reportStatus(fmt.Sprintf("preparing directly_call_tool params for '%s'", toolName))
-		emitProgress("[开始处理参数]")
-		if progressWriter != nil {
-			if err := streamDirectlyCallParamProgressFromRawResponse(ctx, loop.Get(directlyCallToolResponseLoopKey), loop.Get(directlyCallToolNonceLoopKey), getDirectlyCallToolParamNames(loop, toolName), progressWriter); err != nil {
-				reportStatus(fmt.Sprintf("stream directly_call_tool params from raw response failed: %v", err))
-			}
-		}
 		raw, objParams := getDirectlyCallToolParamPayload(action)
 		params, notes := normalizeDirectlyCallToolParams(raw, objParams)
 		if params == nil {
@@ -435,7 +446,7 @@ Few-shot example 2 (valid direct retry):
 {"@action":"directly_call_tool","directly_call_tool_name":"%s","directly_call_identifier":"<snake_case_intent>","directly_call_expectations":"~3s, fallback to require_tool if params are uncertain","directly_call_tool_params":{"<param>":"<value>"}}
 `, toolName, validationSummary, toolName, toolName, toolName)))
 			reportStatus(fmt.Sprintf("auto fallback: switching '%s' from directly_call_tool to @action=require_tool because schema validation failed", toolName))
-			finishProgress(fmt.Sprintf("[fallback] params for '%s' failed schema validation; automatically switching to @action=require_tool", toolName))
+			loopInfraStatus(loop, "参数校验失败，切换常规工具调用 / Params Invalid, Falling Back...")
 			operator.Feedback(fmt.Sprintf("directly_call_tool params invalid for '%s': %s; automatically switching to @action=require_tool", toolName, validationSummary))
 
 			result, directly, callErr := invoker.ExecuteToolRequiredAndCall(ctx, toolName)
@@ -448,6 +459,7 @@ Few-shot example 2 (valid direct retry):
 		feedbackItems := buildDirectlyCallParamFeedbackItems(params, mergedBlockParams)
 		reportStatus(fmt.Sprintf("normalized %d param fields: %s", len(paramKeys), strings.Join(paramKeys, ", ")))
 		operator.Feedback(fmt.Sprintf("Prepared directly_call_tool params for '%s': %d fields [%s]", toolName, len(feedbackItems), strings.Join(feedbackItems, ", ")))
+		emitDirectlyCallToolParamsNodeStream(loop, action, params, mergedBlockParams)
 
 		// 2. inject reserved keys from directly_call_ prefixed fields
 		if id := action.GetString("directly_call_identifier"); id != "" {
@@ -455,10 +467,9 @@ Few-shot example 2 (valid direct retry):
 		}
 		if ce := action.GetString("directly_call_expectations"); ce != "" {
 			params[aicommon.ReservedKeyCallExpectations] = ce
-			emitProgress("[note] " + ce)
 		}
 		reportStatus(fmt.Sprintf("calling cached tool '%s'", toolName))
-		finishProgress(fmt.Sprintf("调用缓存工具 '%s' [done]", toolName))
+		loopInfraStatus(loop, "直接工具调用参数已准备 / Direct Tool Params Ready")
 
 		// 3. execute
 		result, directly, callErr := invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, toolName, params)

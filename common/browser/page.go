@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-rod/rod"
@@ -18,16 +19,21 @@ type BrowserPage struct {
 	refMap  *RefMap
 	timeout time.Duration
 	mouse   *rod.Mouse
+
+	dialogMu      sync.Mutex
+	pendingDialog *JavaScriptDialog
 }
 
 func newBrowserPage(page *rod.Page, browser *BrowserInstance, timeout time.Duration) *BrowserPage {
-	return &BrowserPage{
+	bp := &BrowserPage{
 		page:    page,
 		browser: browser,
 		refMap:  NewRefMap(),
 		timeout: timeout,
 		mouse:   page.Mouse,
 	}
+	enableJavaScriptDialogWatcher(page, bp)
+	return bp
 }
 
 func (p *BrowserPage) Navigate(urlStr string) error {
@@ -38,6 +44,13 @@ func (p *BrowserPage) Navigate(urlStr string) error {
 	}
 	err = timedPage.WaitLoad()
 	if err != nil {
+		if d, ok := p.GetPendingDialog(); ok {
+			if isNonFatalCDPError(err) {
+				log.Debugf("non-fatal WaitLoad with pending dialog: %v", err)
+				return nil
+			}
+			return dialogBlockingError(d, err)
+		}
 		if isNonFatalCDPError(err) {
 			log.Debugf("non-fatal WaitLoad error (page likely loaded): %v", err)
 			return nil
@@ -190,9 +203,15 @@ func (p *BrowserPage) ScreenshotBase64() (string, error) {
 }
 
 func (p *BrowserPage) Evaluate(js string) (interface{}, error) {
+	if err := p.requireNoDialog("evaluate js"); err != nil {
+		return nil, err
+	}
 	wrapped := fmt.Sprintf(`() => { return (%s) }`, js)
-	result, err := p.page.Eval(wrapped)
+	result, err := p.page.Timeout(p.timeout).Eval(wrapped)
 	if err != nil {
+		if d, ok := p.GetPendingDialog(); ok {
+			return nil, dialogBlockingError(d, err)
+		}
 		return nil, fmt.Errorf("evaluate js: %w", err)
 	}
 	return result.Value.Val(), nil

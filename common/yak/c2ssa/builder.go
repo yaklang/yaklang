@@ -110,6 +110,10 @@ func (*SSABuilder) GetLanguage() ssaconfig.Language {
 	return ssaconfig.C
 }
 
+func (*SSABuilder) UsesDeferredFileBuild() bool {
+	return true
+}
+
 func (s *SSABuilder) GetAntlrCache() *ssa.AntlrCache {
 	return s.CreateAntlrCache(cparser.GetLexerSerializedATN(), cparser.GetParserSerializedATN())
 }
@@ -167,7 +171,7 @@ func (b *astbuilder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() 
 
 func (b *astbuilder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
 	b.FunctionBuilder = s.Current
-	b.LoadFunctionBuilder(s.Store)
+	b.LoadFunctionBuilder(s)
 }
 
 func (b *astbuilder) GetStructAll() map[string]ssa.Type {

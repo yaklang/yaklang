@@ -4,6 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 )
 
 type StackItem struct {
@@ -95,17 +96,29 @@ func (s *StackSimulationImpl) NewVar(val values.JavaValue) *values.JavaRef {
 func (s *StackSimulationImpl) AssignVar(slot int, val values.JavaValue) (*values.JavaRef, bool) {
 	typ := val.Type()
 	ref, ok := s.varTable[slot]
-	if !ok || ref.Type().String(&class_context.ClassContext{}) != typ.String(&class_context.ClassContext{}) {
-		newRef := s.NewVar(val)
-		s.varTable[slot] = newRef
-		return newRef, true
+	if ok {
+		ctx := &class_context.ClassContext{}
+		if ref.Type().String(ctx) == typ.String(ctx) {
+			return ref, false
+		}
+		// The slot already holds a variable of a different type. If that variable was only
+		// null-initialized (an Object-typed `x = null` with no committed concrete type), reuse
+		// it and adopt the new concrete reference type instead of splitting the slot into a
+		// second, block-scoped variable. This keeps the ubiquitous
+		// `T x = null; ...; x = v; ...; return x;` idiom as a single in-scope variable; the
+		// split form left the reassigned variable block-scoped and read out of scope
+		// ("cannot find symbol"). Only reference types may adopt a null (a primitive cannot),
+		// so a primitive reassignment still falls through to the original split behavior.
+		if ref.IsNullInitialized() {
+			if _, isPrim := typ.RawType().(*types.JavaPrimer); !isPrim {
+				ref.ResetVarType(typ)
+				return ref, false
+			}
+		}
 	}
-	return ref, false
-	// types.MergeTypes(ref.Type(), val.Type())
-	// newRef := *ref
-	// newRef.Id = newRef.Id.Horizontal()
-	// newRef.Val = val
-	// return &newRef, false
+	newRef := s.NewVar(val)
+	s.varTable[slot] = newRef
+	return newRef, true
 }
 
 func NewEmptyStackEntry() *StackItem {

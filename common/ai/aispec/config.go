@@ -324,48 +324,127 @@ func WithNoHTTPS(b bool) AIConfigOption {
 	}
 }
 
-func NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
-	c := &AIConfig{
+func newBaseAIConfig() *AIConfig {
+	return &AIConfig{
 		Timeout:                120,
 		FunctionCallRetryTimes: 5,
 		HTTPErrorHandler: func(err error) {
 			log.Debugf("ai request failed: %s", err)
 		},
 	}
-	// 加载Type参数
+}
+
+func hasExplicitConfigBeyondType(c *AIConfig) bool {
+	if c == nil {
+		return false
+	}
+	if c.APIKey != "" ||
+		c.Model != "" ||
+		c.Domain != "" ||
+		c.BaseURL != "" ||
+		c.Endpoint != "" ||
+		c.Proxy != "" ||
+		c.Host != "" ||
+		c.Port != 0 ||
+		c.NoHttps ||
+		c.EnableEndpoint ||
+		strings.TrimSpace(c.APIType) != "" ||
+		len(c.Headers) > 0 ||
+		c.EnableThinking != nil ||
+		c.MaxTokens != nil ||
+		c.Temperature != nil ||
+		c.TopP != nil ||
+		c.TopK != nil ||
+		c.FrequencyPenalty != nil ||
+		strings.TrimSpace(c.ReasoningEffort) != "" ||
+		c.PreferredTier != "" ||
+		c.DisableProviderFallback ||
+		c.Context != nil ||
+		len(c.Images) > 0 ||
+		len(c.Videos) > 0 {
+		return true
+	}
+	return false
+}
+
+func optsOnlySetType(opts ...AIConfigOption) bool {
+	probe := newBaseAIConfig()
+	for _, p := range opts {
+		p(probe)
+	}
+	if strings.TrimSpace(probe.Type) == "" {
+		return false
+	}
+	return !hasExplicitConfigBeyondType(probe)
+}
+
+// NewDefaultAIConfig builds AIConfig from options.
+// Full tiered / legacy defaults apply when the caller passes Type alone; otherwise only
+// missing credentials such as APIKey and Model are backfilled without overriding explicit options.
+func NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
+	if optsOnlySetType(opts...) {
+		return _NewDefaultAIConfig(opts...)
+	}
+
+	c := newBaseAIConfig()
 	for _, p := range opts {
 		p(c)
 	}
+	mergeMissingAIConfigDefaults(c)
+	return c
+}
 
-	// 加载默认参数
-	if c.Type != "" {
-		loaded := false
-		if tiered := consts.GetTieredAIConfig(); tiered != nil {
-			candidates := append(append([]*ypb.AIModelConfig{}, tiered.IntelligentConfigs...), tiered.LightweightConfigs...)
-			candidates = append(candidates, tiered.VisionConfigs...)
-			for _, modelCfg := range candidates {
-				if modelCfg == nil || modelCfg.GetProvider() == nil {
-					continue
-				}
-				if !strings.EqualFold(strings.TrimSpace(modelCfg.GetProvider().GetType()), strings.TrimSpace(c.Type)) {
-					continue
-				}
-				for _, opt := range BuildOptionsFromConfig(modelCfg) {
-					opt(c)
-				}
-				loaded = true
-				break
+func loadAIConfigDefaults(c *AIConfig) {
+	if c == nil || strings.TrimSpace(c.Type) == "" {
+		return
+	}
+	loaded := false
+	if tiered := consts.GetTieredAIConfig(); tiered != nil {
+		candidates := append(append([]*ypb.AIModelConfig{}, tiered.IntelligentConfigs...), tiered.LightweightConfigs...)
+		candidates = append(candidates, tiered.VisionConfigs...)
+		for _, modelCfg := range candidates {
+			if modelCfg == nil || modelCfg.GetProvider() == nil {
+				continue
 			}
-		}
-		if !loaded {
-			err := consts.GetThirdPartyApplicationConfig(c.Type, c)
-			if err != nil {
-				log.Debug(err)
+			if !strings.EqualFold(strings.TrimSpace(modelCfg.GetProvider().GetType()), strings.TrimSpace(c.Type)) {
+				continue
 			}
+			for _, opt := range BuildOptionsFromConfig(modelCfg) {
+				opt(c)
+			}
+			loaded = true
+			break
 		}
 	}
+	if !loaded {
+		err := consts.GetThirdPartyApplicationConfig(c.Type, c)
+		if err != nil {
+			log.Debug(err)
+		}
+	}
+}
 
-	// 加载用户参数
+func mergeMissingAIConfigDefaults(c *AIConfig) {
+	if c == nil || strings.TrimSpace(c.Type) == "" {
+		return
+	}
+	defaults := newBaseAIConfig()
+	defaults.Type = c.Type
+	loadAIConfigDefaults(defaults)
+	if c.APIKey == "" && defaults.APIKey != "" {
+		c.APIKey = defaults.APIKey
+	}
+	if c.Model == "" && defaults.Model != "" {
+		c.Model = defaults.Model
+	}
+}
+
+func _NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
+	c := newBaseAIConfig()
+	for _, p := range opts {
+		p(c)
+	}
+	loadAIConfigDefaults(c)
 	for _, p := range opts {
 		p(c)
 	}

@@ -19,6 +19,18 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+// sortNodesByID orders nodes by their (unique, deterministic) statement id in place and returns the
+// slice. Set.List() and maps.Keys/Values iterate a Go map, so their order varies run to run; feeding
+// that order into CFG structuring (loop out-points, merge-node selection, rewrite ordering) makes the
+// same class decompile to different output - and occasionally stub with "multiple next" - depending on
+// map randomization. Sorting by node id restores determinism without changing which nodes are present.
+func sortNodesByID(nodes []*core.Node) []*core.Node {
+	sort.SliceStable(nodes, func(i, j int) bool {
+		return nodes[i].Id < nodes[j].Id
+	})
+	return nodes
+}
+
 type RewriteManager struct {
 	currentNodeId    int
 	startVarId       int
@@ -76,8 +88,23 @@ func (s *RewriteManager) mergeIf() bool {
 	})
 	result := false
 	delNodesSet := utils.NewSet[*core.Node]()
+	// isTernaryChainArm reports whether a condition node supplies a DISTINCT nested ternary arm
+	// (a right-leaning chain a?:b?:c?: or a structurally-rebuilt tree). Such a node must NOT be
+	// folded into a short-circuit &&/|| here: its value flows individually into its own ternary
+	// arm, so merging it (the arms converge on the same merge node once their leaf values are
+	// extracted, making them look like a short-circuit) collapses several distinct conditions
+	// into one and leaves the others' callbacks unfired, leaking an empty stack slot. Genuine
+	// short-circuit &&/|| conditions all feed the SAME ternary condition and are NOT marked, so
+	// they continue to merge normally.
+	isTernaryChainArm := func(n *core.Node) bool {
+		cond, ok := n.Statement.(*statements.ConditionStatement)
+		return ok && cond.TernaryChainArm
+	}
 	for _, node := range ifNodes {
 		if delNodesSet.Has(node) {
+			continue
+		}
+		if isTernaryChainArm(node) {
 			continue
 		}
 		var nextStNode *core.Node
@@ -141,7 +168,7 @@ func (s *RewriteManager) mergeIf() bool {
 					}
 				}
 			}
-			if slices.Contains(ifNodes, n) && !delNodesSet.Has(n) {
+			if slices.Contains(ifNodes, n) && !delNodesSet.Has(n) && !isTernaryChainArm(n) {
 				parentNode := n
 				childNode := node
 				if parentNode.Id >= childNode.Id {
@@ -154,13 +181,14 @@ func (s *RewriteManager) mergeIf() bool {
 				if !ok {
 					continue
 				}
-				s.DominatorMap = GenerateDominatorTree(s.RootNode)
-				// CalcEnd(s.DominatorMap, parentNode)
-				// if len(childNode.Next) == 1 {
-				// 	childNode.MergeNode = childNode.Next[0]
-				// } else {
-				// 	CalcEnd(s.DominatorMap, childNode)
-				// }
+				// A whole-function dominator tree used to be rebuilt here, inside this
+				// doubly-nested loop run to a fixpoint, to feed the CalcEnd calls below.
+				// Those calls are disabled, and s.DominatorMap is unconditionally
+				// recomputed in Rewrite()/ScanCoreInfo() before any reader, so this was
+				// dead computation -- yet it dominated decompile CPU for if-heavy classes
+				// (~28% of total on a worst case, e.g. AggregateOperations). The merge
+				// decision below depends only on the local graph shape (CheckCanBeMerge),
+				// not on dominance, so it is correct to drop it entirely.
 				sourceSet := utils.NewSet[*core.Node]()
 				sourceSet.AddList(childNode.Source)
 				if sourceSet.Len() == 1 && CheckCanBeMerge(parentNode, childNode) {
@@ -258,7 +286,10 @@ func (s *RewriteManager) ToStatementsFromNode(node *core.Node, stopCheck func(no
 		}
 		err := s.CheckVisitedNode(current)
 		if err != nil {
-			return nil, err
+			// Node was already visited (shared merge point in a DAG). Instead of
+			// failing the entire method, just stop collecting statements here.
+			// The visited node will appear once (from whichever path reached it first).
+			break
 		}
 		if stopCheck != nil && !stopCheck(current) {
 			break
@@ -373,7 +404,7 @@ func (s *RewriteManager) ScanCoreInfo() error {
 	}
 	subNodeRoute := NewRootNodeRoute()
 	walkIfStatement(s.RootNode, subNodeRoute)
-	circleNodes = utils.NewSet[*core.Node](circleNodes).List()
+	circleNodes = sortNodesByID(utils.NewSet[*core.Node](circleNodes).List())
 	//for _, node := range circleNodes {
 	//	//mergeNode := funk.Filter(node.Next, func(item *core.Node) bool {
 	//	//	return !node.CircleNodesSet.Has(item)
@@ -382,7 +413,7 @@ func (s *RewriteManager) ScanCoreInfo() error {
 	//}
 	switchSet := utils.NewSet[*core.Node]()
 	switchSet.AddList(s.SwitchNode)
-	s.SwitchNode = switchSet.List()
+	s.SwitchNode = sortNodesByID(switchSet.List())
 	//for _, node := range s.SwitchNode {
 	//	caseItemMap := node.Statement.(*statements.MiddleStatement).Data.([]any)[0].(map[int]*core.Node)
 	//	itemMap := map[*core.Node]struct{}{}
@@ -405,8 +436,8 @@ func (s *RewriteManager) ScanCoreInfo() error {
 	//		}
 	//	}
 	//}
-	s.TryNodes = tryNodesSet.List()
-	for _, current := range mergeNodesSet.List() {
+	s.TryNodes = sortNodesByID(tryNodesSet.List())
+	for _, current := range sortNodesByID(mergeNodesSet.List()) {
 		for _, nodeMap := range getNodeInfo(current).AllPreNodeRoute {
 			if nodeMap.ConditionNode == nil {
 				continue
@@ -464,10 +495,17 @@ func (s *RewriteManager) ScanCoreInfo() error {
 		circleNodeEntry.OutNodeMap = outPointMap
 		circleNodeEntryToOutPoint[circleNodeEntry] = outPointMap
 	}
-	for circleNodeEntry, outPointMap := range circleNodeEntryToOutPoint {
+	// Iterate the loop entries (and their out-points / out-edge keys) in a stable id order: both the
+	// entry map and outPointMap are Go maps, so their natural range order varies per run and would make
+	// merge-node selection and ConditionNode ordering non-deterministic.
+	for _, circleNodeEntry := range circleNodes {
+		outPointMap := circleNodeEntryToOutPoint[circleNodeEntry]
+		if outPointMap == nil {
+			continue
+		}
 		var mergeNode *core.Node
 		edgeSet := utils.NewSet[*core.Node]()
-		values := maps.Values(outPointMap)
+		values := sortNodesByID(utils.NewSet[*core.Node](maps.Values(outPointMap)).List())
 		if len(values) == 0 {
 		} else if len(values) == 1 {
 			mergeNode = values[0]
@@ -484,7 +522,7 @@ func (s *RewriteManager) ScanCoreInfo() error {
 				return node.Next, nil
 			})
 		}
-		for c, _ := range outPointMap {
+		for _, c := range sortNodesByID(maps.Keys(outPointMap)) {
 			check := func(node *core.Node) bool {
 				if _, ok := c.Statement.(*statements.ConditionStatement); ok {
 					return true

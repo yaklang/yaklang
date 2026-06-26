@@ -185,10 +185,20 @@ func normalizeArchivePath(name string) string {
 	if name == "" || name == "." {
 		return name
 	}
+	// Preserve absoluteness: the outermost archive of a nested path (e.g.
+	// "/abs/app.war/WEB-INF/lib/foo.jar/Foo.class") is a real on-disk path that
+	// must keep its leading slash so the host filesystem can open it. Archive
+	// internal entries are slash-trimmed separately in parseJarOrZipPath, and
+	// Windows drive paths ("C:/...") have no leading slash, so this only restores
+	// the root slash for genuine Unix-absolute paths.
+	isAbs := strings.HasPrefix(name, "/")
 	name = path.Clean(name)
 	name = strings.TrimLeft(name, "/")
 	if name == "" {
 		return "."
+	}
+	if isAbs {
+		name = "/" + name
 	}
 	return name
 }

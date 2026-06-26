@@ -318,12 +318,20 @@ type PocConfigOption func(c *PocConfig)
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
-// rsp, req, err = poc.HTTP(x`POST /post HTTP/1.1
+// <|EXAMPLE_START|> 示例：用 params 替换报文中的 {{params(key)}} 占位符(本地构建, 不出网)
+// ```
+// // 关键词: poc.params, 占位符替换, 模板变量
+// packet = `POST /post HTTP/1.1
 // Content-Type: application/json
 // Host: pie.dev
 //
-// {"key": "{{params(a)}}"}`, poc.params({"a":"bbb"})) // 实际上发送的POST参数为{"key": "bbb"}
+// {"key": "{{params(a)}}"}`
+// raw = poc.BuildRequest(packet, poc.params({"a": "bbb"})) // 占位符 {{params(a)}} 被替换为 bbb
+// println(string(raw))                                      // body 变成 {"key": "bbb"}
+// assert string(raw).Contains(`"key": "bbb"`), "params placeholder should be replaced"
+// // 真实发包时同样可用: poc.HTTP(packet, poc.params({"a": "bbb"}))
+// ```
+// <|EXAMPLE_END|>
 func WithParams(i interface{}) PocConfigOption {
 	return func(c *PocConfig) {
 		c.FuzzParams = utils.InterfaceToMap(i)
@@ -339,6 +347,7 @@ func WithParams(i interface{}) PocConfigOption {
 //
 // Example:
 // ```
+// // 无法本地验证: 需要可达的真实重定向目标
 // count = 3
 // poc.Get("https://pie.dev/redirect/5", poc.redirectHandler(func(https, req, rsp) {
 // count--
@@ -360,6 +369,7 @@ func WithRedirectHandler(i func(isHttps bool, req, rsp []byte) bool) PocConfigOp
 //
 // Example:
 // ```
+// // 无法本地验证: 需要可达的真实重定向目标
 // poc.HTTP(poc.BasicRequest(), poc.redirect(func(current, vias) {
 // return true
 // })) // 向 example.com 发起请求，使用自定义 redirectHandler 函数，如果该函数返回 true，则会继续重定向，否则不会重定向
@@ -385,6 +395,7 @@ func WithRedirect(i func(current *http.Request, vias []*http.Request) bool) PocC
 //
 // Example:
 // ```
+// // 无法本地验证: 需要可达的真实下载目标
 // // 流式处理响应体，依赖网络，此处仅作示意
 // poc.Get("https://example.com/file", poc.bodyStreamHandler(func(header, body) { io.Copy(os.Stdout, body) }))~
 // ```
@@ -404,6 +415,7 @@ func WithBodyStreamReaderHandler(i func(r []byte, closer io.ReadCloser)) PocConf
 //
 // Example:
 // ```
+// // 无法本地验证: 需要可达的真实大文件下载目标
 // poc.Get("https://example.com/large-file.zip",
 //
 //	poc.noBodyBuffer(true),
@@ -428,6 +440,7 @@ func WithNoBodyBuffer(b bool) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实 HTTP 目标
 // poc.HTTP(poc.BasicRequest(), poc.retryTimes(5), poc.retryInStatusCode(500, 502)) // 向 example.com 发起请求，如果响应状态码500或502则进行重试，最多进行5次重试
 // ```
 func WithRetryTimes(t int) PocConfigOption {
@@ -445,6 +458,7 @@ func WithRetryTimes(t int) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实 HTTP 目标
 // poc.HTTP(poc.BasicRequest(), poc.retryTimes(5), poc.retryInStatusCode(500, 502)) // 向 example.com 发起请求，如果响应状态码500或502则进行重试，最多进行5次重试
 // ```
 func WithRetryInStatusCode(codes ...int) PocConfigOption {
@@ -462,6 +476,7 @@ func WithRetryInStatusCode(codes ...int) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实 HTTP 目标
 // poc.HTTP(poc.BasicRequest(), poc.retryTimes(5), poc.retryNotInStatusCode(200)) // 向 example.com 发起请求，如果响应状态码不等于200则进行重试，最多进行5次重试
 // ```
 func WithRetryNotInStausCode(codes ...int) PocConfigOption {
@@ -479,6 +494,7 @@ func WithRetryNotInStausCode(codes ...int) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实 HTTP 目标
 // poc.HTTP(poc.BasicRequest(), poc.retryTimes(5), poc.retryNotInStatusCode(200), poc.retryWaitTime(0.1)) // 向 example.com 发起请求，如果响应状态码不等于200则进行重试，最多进行5次重试，重试时最小等待0.1秒
 // ```
 func WithRetryWaitTime(f float64) PocConfigOption {
@@ -497,6 +513,7 @@ func WithRetryWaitTime(f float64) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实 HTTP 目标
 // poc.HTTP(poc.BasicRequest(), poc.retryTimes(5), poc.retryNotInStatusCode(200), poc.retryMaxWaitTime(2)) // 向 example.com 发起请求，如果响应状态码不等于200则进行重试，最多进行5次重试，重试时最多等待2秒
 // ```
 func WithRetryMaxWaitTime(f float64) PocConfigOption {
@@ -515,6 +532,7 @@ func WithRetryMaxWaitTime(f float64) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实 HTTP 目标
 // poc.HTTP(poc.BasicRequest(), poc.redirectTimes(5)) // 向 example.com 发起请求，如果响应重定向到其他链接，则会自动跟踪重定向最多5次
 // ```
 func WithRedirectTimes(t int) PocConfigOption {
@@ -532,6 +550,7 @@ func WithRedirectTimes(t int) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实 HTTP 目标
 // poc.HTTP(poc.BasicRequest(), poc.noFixContentLength()) // 向 example.com 发起请求，如果响应报文中的Content-Length字段不正确或不存在	也不会自动修复
 // ```
 func WithNoFixContentLength(b bool) PocConfigOption {
@@ -549,6 +568,7 @@ func WithNoFixContentLength(b bool) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实 HTTP 目标
 // poc.HTTP(poc.BasicRequest(), poc.noRedirect()) // 向 example.com 发起请求，如果响应重定向到其他链接也不会自动跟踪重定向
 // ```
 func WithNoRedirect(b bool) PocConfigOption {
@@ -566,6 +586,7 @@ func WithNoRedirect(b bool) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实 HTTP 目标与代理
 // poc.HTTP(poc.BasicRequest(), poc.proxy("http://127.0.0.1:7890")) // 向 example.com 发起请求，使用 http://127.0.0.1:7890 代理
 // ```
 func WithProxy(proxies ...string) PocConfigOption {
@@ -586,6 +607,7 @@ func WithProxy(proxies ...string) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实 HTTPS 目标
 // poc.HTTP(poc.BasicRequest(), poc.https(true)) // 向 example.com 发起请求，使用 https 协议
 // ```
 func WithForceHTTPS(isHttps bool) PocConfigOption {
@@ -603,6 +625,7 @@ func WithForceHTTPS(isHttps bool) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实 HTTP2 目标
 // poc.Get("https://www.example.com", poc.http2(true), poc.https(true)) // 向 www.example.com 发起请求，使用 http2 协议
 // ```
 func WithForceHTTP2(isHttp2 bool) PocConfigOption {
@@ -620,6 +643,7 @@ func WithForceHTTP2(isHttp2 bool) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实 HTTPS 目标
 // poc.Get("https://www.example.com", poc.sni("google.com"))
 // ```
 func WithSNI(sni string) PocConfigOption {
@@ -637,6 +661,7 @@ func WithSNI(sni string) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实目标
 // poc.Get("https://www.example.com", poc.username("admin"), poc.password("admin"))
 // ```
 func WithUsername(username string) PocConfigOption {
@@ -654,6 +679,7 @@ func WithUsername(username string) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实目标
 // poc.Get("https://www.example.com", poc.username("admin"), poc.password("admin"))
 // ```
 func WithPassword(password string) PocConfigOption {
@@ -671,6 +697,7 @@ func WithPassword(password string) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实目标
 // poc.Get("https://www.example.com", poc.timeout(15)) // 向 www.baidu.com 发起请求，读取超时时间为15秒
 // ```
 func WithTimeout(f float64) PocConfigOption {
@@ -689,6 +716,7 @@ func WithTimeout(f float64) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实目标
 // poc.Get("https://www.example.com", poc.connectTimeout(15)) // 向 www.example.com 发起请求，连接超时时间为15秒
 // ```
 func WithConnectTimeout(f float64) PocConfigOption {
@@ -707,6 +735,7 @@ func WithConnectTimeout(f float64) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实目标
 // poc.HTTP(poc.BasicRequest(), poc.host("yaklang.com")) // 实际上请求 yaklang.com
 // ```
 func WithHost(h string) PocConfigOption {
@@ -725,6 +754,7 @@ func WithHost(h string) PocConfigOption {
 // Example:
 // ```
 // // 指定运行时 ID，依赖网络，此处仅作示意
+// 无法本地验证: 需要可达的真实目标
 // poc.Get("https://example.com", poc.runtimeID("task-001"))~
 // ```
 func WithRuntimeId(r string) PocConfigOption {
@@ -743,6 +773,7 @@ func WithRuntimeId(r string) PocConfigOption {
 // Example:
 // ```
 // // 标记请求来源插件，依赖网络，此处仅作示意
+// 无法本地验证: 需要可达的真实目标
 // poc.Get("https://example.com", poc.fromPlugin("my-plugin"))~
 // ```
 func WithFromPlugin(b string) PocConfigOption {
@@ -758,10 +789,16 @@ func WithFromPlugin(b string) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：用 json 选项设置 JSON 请求体(本地构建可验证)
 // ```
-// poc.Post("https://www.example.com", poc.json({"a": "b"})) // 向 www.example.com 发起请求，请求的 body 为 {"a": "b"} 并自动设置 Content-Type 为 application/json
+// // 关键词: poc.json, JSON请求体, 自动设置Content-Type
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.json({"a": "b"})) // 自动序列化并设置 Content-Type
+// println(string(raw))
+// assert poc.GetHTTPPacketHeader(raw, "Content-Type") == "application/json", "should set json content-type"
+// assert string(poc.GetHTTPPacketBody(raw)) == `{"a":"b"}`, "body should be json"
+// // 真实发包: poc.Post("https://www.example.com", poc.json({"a": "b"}))
 // ```
+// <|EXAMPLE_END|>
 func WithJSON(i any) PocConfigOption {
 	raw, err := json.Marshal(i)
 	if err != nil {
@@ -783,10 +820,15 @@ func WithJSON(i any) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：用 body 选项设置请求体(本地构建可验证)
 // ```
-// poc.Post("https://www.example.com", poc.body("a=b")) // 向 www.example.com 发起请求，请求的 body 为 a=b
+// // 关键词: poc.body, 设置请求体
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.body("a=b&c=d")) // body 接收 string 或 bytes
+// println(string(raw))
+// assert string(poc.GetHTTPPacketBody(raw)) == "a=b&c=d", "body should be set"
+// // 真实发包: poc.Post("https://www.example.com", poc.body("a=b"))
 // ```
+// <|EXAMPLE_END|>
 func WithBody(i any) PocConfigOption {
 	return func(c *PocConfig) {
 		switch i.(type) {
@@ -807,12 +849,16 @@ func WithBody(i any) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：用 query 选项设置 GET 参数(本地构建可验证)
 // ```
-// poc.Get("https://www.example.com", poc.query({"a": "b"})) // 向 www.example.com 发起请求，请求的 query 为 a=b, url 为 https://www.example.com?a=b
-// poc.Get("https://www.example.com", poc.query("a=b")) // 向 www.example.com 发起请求，请求的 query 为 a=b, url 为 https://www.example.com?a=b
-// poc.Get("https://www.example.com", poc.query("abc")) // 向 www.example.com 发起请求，请求的 query 为 a=b, url 为 https://www.example.com?abc
+// // 关键词: poc.query, 设置GET参数, map或原始字符串
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.query({"a": "b", "c": "d"})) // map 形式自动拼接
+// println(string(raw))
+// assert string(raw).Contains("a=b"), "query a=b should be set"
+// // 也可直接传原始 query 字符串: poc.query("a=b")
+// // 真实发包: poc.Get("https://www.example.com", poc.query({"a": "b"}))
 // ```
+// <|EXAMPLE_END|>
 func WithQuery(i any) PocConfigOption {
 	return func(c *PocConfig) {
 		if utils.IsMap(i) {
@@ -839,10 +885,15 @@ func WithQuery(i any) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：用 postData 设置原始 POST body(不改 Content-Type, 本地可验证)
 // ```
-// poc.Post("https://www.example.com", poc.postData("a=b")) // 向 www.example.com 发起请求，请求的 body 为 a=b
+// // 关键词: poc.postData, 原始POST数据
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.postData("a=b&c=d")) // 原样写入 body, 不修改 Content-Type
+// println(string(raw))
+// assert string(poc.GetHTTPPacketBody(raw)) == "a=b&c=d", "post data should be set"
+// // 真实发包: poc.Post("https://www.example.com", poc.postData("a=b"))
 // ```
+// <|EXAMPLE_END|>
 func WithPostData(i string) PocConfigOption {
 	return func(c *PocConfig) {
 		WithReplaceHttpPacketBody([]byte(i), false)(c)
@@ -857,10 +908,16 @@ func WithPostData(i string) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：用 postParams 设置表单 POST 参数(本地构建可验证)
 // ```
-// poc.Post("https://www.example.com", poc.postParams({"a": "b"})) // 向 www.example.com 发起请求，请求的 body 为 a=b 并自动设置 Content-Type 为 application/x-www-form-urlencoded
+// // 关键词: poc.postParams, 表单POST参数, 自动设置Content-Type
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.postParams({"a": "b"})) // map 自动转表单并设置 Content-Type
+// println(string(raw))
+// assert poc.GetHTTPPacketHeader(raw, "Content-Type") == "application/x-www-form-urlencoded", "should set form content-type"
+// assert string(poc.GetHTTPPacketBody(raw)).Contains("a=b"), "form body should contain a=b"
+// // 真实发包: poc.Post("https://www.example.com", poc.postParams({"a": "b"}))
 // ```
+// <|EXAMPLE_END|>
 func WithPostParams(i any) PocConfigOption {
 	return func(c *PocConfig) {
 		if utils.IsMap(i) {
@@ -890,6 +947,7 @@ func WithPostParams(i any) PocConfigOption {
 // Example:
 // ```
 // // 启用随机 JA3 指纹，依赖网络，此处仅作示意
+// 无法本地验证: 需要可达的真实 HTTPS 目标
 // poc.Get("https://example.com", poc.https(true), poc.randomJA3(true))~
 // ```
 func WithRandomJA3(b bool) PocConfigOption {
@@ -1040,6 +1098,7 @@ func WithWebsocketStrictMode(b bool) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实 HTTPS 目标
 // poc.HTTP(poc.BasicRequest(), poc.host("yaklang.com"), poc.port(443), poc.https(true)) // 实际上请求 yaklang.com 的443端口
 // ```
 func WithPort(port int) PocConfigOption {
@@ -1057,6 +1116,7 @@ func WithPort(port int) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实目标
 // poc.HTTP(poc.BasicRequest(), poc.redirectTimes(5), poc.jsRedirect(true)) // 向 www.baidu.com 发起请求，如果响应重定向到其他链接也会自动跟踪JS重定向，最多进行5次重定向
 // ```
 func WithJSRedirect(b bool) PocConfigOption {
@@ -1074,6 +1134,7 @@ func WithJSRedirect(b bool) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实目标
 // poc.Get("https://pie.dev/cookies/set/AAA/BBB", poc.session("test")) // 向 pie.dev 发起第一次请求，这会设置一个名为AAA，值为BBB的cookie
 // rsp, req, err = poc.Get("https://pie.dev/cookies", poc.session("test")) // 向 pie.dev 发起第二次请求，这个请求会输出所有的cookies，可以看到第一次请求设置的cookie已经存在了
 // ```
@@ -1093,6 +1154,7 @@ func WithSession(session string) PocConfigOption {
 // Example:
 // ```
 // // 禁用 session，依赖网络，此处仅作示意
+// 无法本地验证: 需要可达的真实目标
 // poc.Get("https://example.com", poc.disableSession(true))~
 // ```
 func WithDisableSession(b bool) PocConfigOption {
@@ -1110,6 +1172,7 @@ func WithDisableSession(b bool) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实目标
 // poc.Get("https://exmaple.com", poc.save(true)) // 向 example.com 发起请求，会将此次请求保存到数据库中
 // ```
 func WithSave(b bool) PocConfigOption {
@@ -1128,6 +1191,7 @@ func WithSave(b bool) PocConfigOption {
 // Example:
 // ```
 //
+//	// 无法本地验证: 需要可达的真实目标
 //	poc.Get("https://exmaple.com", poc.saveHandler(func(resp){
 //		resp.Tags = append(resp.Tags,"test")
 //	})) // 向 example.com 发起请求，添加test tag
@@ -1152,6 +1216,7 @@ func WithSaveHandler(f ...func(response *lowhttp.LowhttpResponse)) PocConfigOpti
 // Example:
 // ```
 // // 保存后回调，依赖网络，此处仅作示意
+// 无法本地验证: 需要可达的真实目标
 // poc.Get("https://example.com", poc.save(true), poc.afterSaveHandler(func(flow) { println(flow.Url) }))~
 // ```
 func WithAfterSaveHandler(f ...func(flow *schema.HTTPFlow)) PocConfigOption {
@@ -1172,6 +1237,7 @@ func WithAfterSaveHandler(f ...func(flow *schema.HTTPFlow)) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实目标
 // poc.Get("https://exmaple.com", poc.save(true), poc.useMitmRule(true))
 // ```
 func WithMITMRule(b bool) PocConfigOption {
@@ -1189,6 +1255,7 @@ func WithMITMRule(b bool) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实目标
 // poc.Get("https://exmaple.com", poc.save(true), poc.saveSync(true)) // 向 example.com 发起请求，会将此次请求保存到数据库中，且同步保存
 // ```
 func WithSaveSync(b bool) PocConfigOption {
@@ -1206,6 +1273,7 @@ func WithSaveSync(b bool) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实目标
 // poc.Get("https://exmaple.com", poc.save(true), poc.source("test")) // 向 example.com 发起请求，会将此次请求保存到数据库中，指示此次请求的来源为test
 // ```
 func WithSource(i string) PocConfigOption {
@@ -1245,6 +1313,7 @@ func WithConnPool(b bool) PocConfigOption {
 // Example:
 // ```
 // ctx = context.New()
+// 无法本地验证: 需要可达的真实目标
 // poc.Get("https://exmaple.com", poc.context(ctx)) // 向 example.com 发起请求，使用指定的上下文
 // ```
 func WithContext(ctx context.Context) PocConfigOption {
@@ -1263,6 +1332,7 @@ func WithContext(ctx context.Context) PocConfigOption {
 // Example:
 // ```
 // // 向 example.com 发起请求，使用指定的DNS服务器
+// 无法本地验证: 需要可达的真实目标与 DNS
 // poc.Get("https://exmaple.com", poc.dnsServer("8.8.8.8", "1.1.1.1"))
 // ```
 func WithDNSServers(servers ...string) PocConfigOption {
@@ -1281,6 +1351,7 @@ func WithDNSServers(servers ...string) PocConfigOption {
 // Example:
 // ```
 // // 向 example.com 发起请求，不使用DNS缓存
+// 无法本地验证: 需要可达的真实目标
 // poc.Get("https://exmaple.com", poc.dnsNoCache(true))
 // ```
 func WithDNSNoCache(b bool) PocConfigOption {
@@ -1296,10 +1367,14 @@ func WithDNSNoCache(b bool) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：替换请求行(本地构建可验证)
 // ```
-// poc.Get("https://exmaple.com", poc.replaceFirstLine("GET /test HTTP/1.1")) // 向 example.com 发起请求，修改请求报文的第一行，请求/test路径
+// // 关键词: poc.replaceFirstLine, 修改请求行
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.replaceFirstLine("GET /test HTTP/1.1"))
+// println(string(raw))
+// assert string(raw).Contains("GET /test HTTP/1.1"), "first line should be replaced"
 // ```
+// <|EXAMPLE_END|>
 func WithReplaceHttpPacketFirstLine(firstLine string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1316,10 +1391,14 @@ func WithReplaceHttpPacketFirstLine(firstLine string) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：替换请求方法(本地构建可验证)
 // ```
-// poc.Options("https://exmaple.com", poc.replaceMethod("GET")) // 向 example.com 发起请求，修改请求方法为GET
+// // 关键词: poc.replaceMethod, 修改请求方法
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.replaceMethod("POST"))
+// println(string(raw))
+// assert poc.GetHTTPRequestMethod(raw) == "POST", "method should be POST"
 // ```
+// <|EXAMPLE_END|>
 func WithReplaceHttpPacketMethod(method string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1337,10 +1416,14 @@ func WithReplaceHttpPacketMethod(method string) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：修改/新增请求头(本地构建可验证)
 // ```
-// poc.Get("https://pie.dev/get", poc.replaceHeader("AAA", "BBB")) // 向 pie.dev 发起请求，修改AAA请求头的值为BBB，这里没有AAA请求头，所以会增加该请求头
+// // 关键词: poc.replaceHeader, 修改请求头
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.replaceHeader("AAA", "BBB")) // 不存在则新增
+// println(string(raw))
+// assert poc.GetHTTPPacketHeader(raw, "AAA") == "BBB", "header AAA should be BBB"
 // ```
+// <|EXAMPLE_END|>
 func WithReplaceHttpPacketHeader(key, value string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1357,10 +1440,15 @@ func WithReplaceHttpPacketHeader(key, value string) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：整体替换所有请求头(本地构建可验证)
 // ```
-// poc.Get("https://pie.dev/get", poc.replaceAllHeaders({"AAA": "BBB", "CCC": "DDD"})) // 向 pie.dev 发起请求，修改所有请求头
+// // 关键词: poc.replaceAllHeaders, 替换全部请求头
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.replaceAllHeaders({"AAA": "BBB", "CCC": "DDD"}))
+// println(string(raw))
+// assert poc.GetHTTPPacketHeader(raw, "AAA") == "BBB", "header AAA should be set"
+// assert poc.GetHTTPPacketHeader(raw, "CCC") == "DDD", "header CCC should be set"
 // ```
+// <|EXAMPLE_END|>
 func WithReplaceAllHttpPacketHeaders(headers map[string]string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1377,10 +1465,14 @@ func WithReplaceAllHttpPacketHeaders(headers map[string]string) PocConfigOption 
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：替换 Host 请求头(本地构建可验证)
 // ```
-// poc.Get("https://yaklang.com/", poc.replaceHost("www.yaklang.com")) // 向 yaklang.com 发起请求，修改Host请求头的值为 www.yaklang.com
+// // 关键词: poc.replaceHost, 修改Host
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.replaceHost("www.yaklang.com")) // 等价于 replaceHeader("Host", ...)
+// println(string(raw))
+// assert poc.GetHTTPPacketHeader(raw, "Host") == "www.yaklang.com", "host should be replaced"
 // ```
+// <|EXAMPLE_END|>
 func WithReplaceHttpPacketHost(host string) PocConfigOption {
 	return WithReplaceHttpPacketHeader("Host", host)
 }
@@ -1393,10 +1485,15 @@ func WithReplaceHttpPacketHost(host string) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：设置 HTTP 基础认证头(本地构建可验证)
 // ```
-// poc.Get("https://pie.dev/basic-auth/admin/password", poc.replaceBasicAuth("admin", "password")) // 向 pie.dev 发起请求进行基础认证，会得到200响应状态码
+// // 关键词: poc.replaceBasicAuth, 基础认证, Authorization
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.replaceBasicAuth("admin", "password"))
+// println(string(raw))
+// // Authorization: Basic YWRtaW46cGFzc3dvcmQ= (即 base64("admin:password"))
+// assert poc.GetHTTPPacketHeader(raw, "Authorization") == "Basic "+codec.EncodeBase64("admin:password"), "basic auth header should be set"
 // ```
+// <|EXAMPLE_END|>
 func WithReplaceHttpPacketBasicAuth(username, password string) PocConfigOption {
 	return WithReplaceHttpPacketHeader("Authorization", "Basic "+codec.EncodeBase64(username+":"+password))
 }
@@ -1408,10 +1505,14 @@ func WithReplaceHttpPacketBasicAuth(username, password string) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：替换 User-Agent(本地构建可验证)
 // ```
-// poc.Get("https://pie.dev/basic-auth/admin/password", poc.replaceUserAgent("yak-http-client")) // 向 pie.dev 发起请求，修改 User-Agent 请求头为 yak-http-client
+// // 关键词: poc.replaceUserAgent, 修改UA
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.replaceUserAgent("yak-http-client"))
+// println(string(raw))
+// assert poc.GetHTTPPacketHeader(raw, "User-Agent") == "yak-http-client", "ua should be replaced"
 // ```
+// <|EXAMPLE_END|>
 func WithReplaceHttpPacketUserAgent(ua string) PocConfigOption {
 	return WithReplaceHttpPacketHeader("User-Agent", ua)
 }
@@ -1420,10 +1521,14 @@ func WithReplaceHttpPacketUserAgent(ua string) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：替换为随机常见 User-Agent(本地构建可验证)
 // ```
-// poc.Get("https://pie.dev/basic-auth/admin/password", poc.replaceRandomUserAgent()) // 向 pie.dev 发起请求，修改 User-Agent 请求头为随机的常见请求头
+// // 关键词: poc.replaceRandomUserAgent, 随机UA
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.replaceRandomUserAgent())
+// println(string(raw))
+// assert poc.GetHTTPPacketHeader(raw, "User-Agent") != "", "ua should be set to a random one"
 // ```
+// <|EXAMPLE_END|>
 func WithReplaceHttpPacketRandomUserAgent() PocConfigOption {
 	return WithReplaceHttpPacketHeader("User-Agent", uarand.GetRandom())
 }
@@ -1436,10 +1541,14 @@ func WithReplaceHttpPacketRandomUserAgent() PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：设置单个 Cookie(本地构建可验证)
 // ```
-// poc.Get("https://pie.dev/get", poc.replaceCookie("aaa", "bbb")) // 向 pie.dev 发起请求，这里没有aaa的cookie值，所以会增加
+// // 关键词: poc.replaceCookie, 修改Cookie
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.replaceCookie("aaa", "bbb")) // 不存在则新增
+// println(string(raw))
+// assert string(raw).Contains("aaa=bbb"), "cookie aaa=bbb should be set"
 // ```
+// <|EXAMPLE_END|>
 func WithReplaceHttpPacketCookie(key, value string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1456,10 +1565,15 @@ func WithReplaceHttpPacketCookie(key, value string) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：批量设置 Cookie(本地构建可验证)
 // ```
-// poc.Get("https://pie.dev/get", poc.replaceCookies({"aaa":"bbb", "ccc":"ddd"})) // 向 pie.dev 发起请求，修改aaa的cookie值为bbb，修改ccc的cookie值为ddd
+// // 关键词: poc.replaceCookies, 批量Cookie
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.replaceCookies({"aaa":"bbb", "ccc":"ddd"}))
+// println(string(raw))
+// assert string(raw).Contains("aaa=bbb"), "cookie aaa=bbb should be set"
+// assert string(raw).Contains("ccc=ddd"), "cookie ccc=ddd should be set"
 // ```
+// <|EXAMPLE_END|>
 func WithReplaceHttpPacketCookies(cookies any) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1477,10 +1591,14 @@ func WithReplaceHttpPacketCookies(cookies any) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：替换请求体(本地构建可验证)
 // ```
-// poc.Post("https://pie.dev/post", poc.replaceBody("a=b", false)) // 向 pie.dev 发起请求，修改请求体内容为a=b
+// // 关键词: poc.replaceBody, 修改请求体
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.replaceMethod("POST"), poc.replaceBody("a=b", false)) // 第二个参数为是否分块传输
+// println(string(raw))
+// assert string(poc.GetHTTPPacketBody(raw)) == "a=b", "body should be a=b"
 // ```
+// <|EXAMPLE_END|>
 func WithReplaceHttpPacketBody(body []byte, chunk bool) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1497,10 +1615,14 @@ func WithReplaceHttpPacketBody(body []byte, chunk bool) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：替换请求路径(本地构建可验证)
 // ```
-// poc.Get("https://pie.dev/post", poc.replacePath("/get")) // 向 pie.dev 发起请求，实际上请求路径为/get
+// // 关键词: poc.replacePath, 修改请求路径
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.replacePath("/get"))
+// println(string(raw))
+// assert poc.GetHTTPRequestPath(raw) == "/get", "path should be /get"
 // ```
+// <|EXAMPLE_END|>
 func WithReplaceHttpPacketPath(path string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1517,14 +1639,16 @@ func WithReplaceHttpPacketPath(path string) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：用回调函数改写请求路径(本地构建可验证)
 // ```
-//
-//	poc.Get("https://pie.dev/post", poc.replacePath(func(a){
-//		return "/get"
-//	})) // 向 pie.dev 发起请求，实际上请求路径为/get
-//
+// // 关键词: poc.replacePathFunc, 回调改写路径
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.replacePathFunc(func(old){
+//     return old + "/api/poc" // old 是原始路径, 这里在其后追加
+// }))
+// println(string(raw))
+// assert poc.GetHTTPRequestPath(raw).Contains("/api/poc"), "path should be rewritten by callback"
 // ```
+// <|EXAMPLE_END|>
 func WithReplaceHttpPacketPathFunc(handle func(string) string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1551,10 +1675,14 @@ func WithReplaceHttpPacketQueryParamRaw(rawQuery string) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：设置单个 GET 参数(本地构建可验证)
 // ```
-// poc.Get("https://pie.dev/get", poc.replaceQueryParam("a", "b")) // 向 pie.dev 发起请求，添加GET请求参数a，值为b
+// // 关键词: poc.replaceQueryParam, 修改GET参数
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.replaceQueryParam("a", "b")) // 不存在则新增
+// println(string(raw))
+// assert string(raw).Contains("a=b"), "query param a=b should be set"
 // ```
+// <|EXAMPLE_END|>
 func WithReplaceHttpPacketQueryParam(key, value string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1571,10 +1699,14 @@ func WithReplaceHttpPacketQueryParam(key, value string) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：整体替换所有 GET 参数(本地构建可验证)
 // ```
-// poc.Get("https://pie.dev/get", poc.replaceAllQueryParams({"a":"b", "c":"d"})) // 向 pie.dev 发起请求，添加GET请求参数a，值为b，添加GET请求参数c，值为d
+// // 关键词: poc.replaceAllQueryParams, 替换全部GET参数
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.replaceAllQueryParams({"a":"b", "c":"d"}))
+// println(string(raw))
+// assert string(raw).Contains("a=b") && string(raw).Contains("c=d"), "all query params should be set"
 // ```
+// <|EXAMPLE_END|>
 func WithReplaceAllHttpPacketQueryParams(values map[string]string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1592,10 +1724,14 @@ func WithReplaceAllHttpPacketQueryParams(values map[string]string) PocConfigOpti
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：替换所有 GET 参数且不转义(本地构建可验证)
 // ```
-// poc.Get("https://pie.dev/get", poc.replaceAllQueryParamsWithoutEscape({"a":"{{}}", "c":"%%"})) // 向 pie.dev 发起请求，添加GET请求参数a，值为{{}}，添加GET请求参数c，值为%%
+// // 关键词: poc.replaceAllQueryParamsWithoutEscape, GET参数不转义
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.replaceAllQueryParamsWithoutEscape({"a":"{{}}", "c":"%%"})) // 值原样写入
+// println(string(raw))
+// assert string(raw).Contains("a={{}}"), "value should not be url-escaped"
 // ```
+// <|EXAMPLE_END|>
 func WithReplaceAllHttpPacketQueryParamsWithoutEscape(values map[string]string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1622,10 +1758,14 @@ func WithReplaceFullHttpPacketQueryParamsWithoutEscape(values map[string][]strin
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：设置单个 POST 参数(本地构建可验证)
 // ```
-// poc.Post("https://pie.dev/post", poc.replacePostParam("a", "b")) // 向 pie.dev 发起请求，添加POST请求参数a，值为b
+// // 关键词: poc.replacePostParam, 修改POST参数
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.replaceMethod("POST"), poc.replacePostParam("a", "b"))
+// println(string(raw))
+// assert string(poc.GetHTTPPacketBody(raw)).Contains("a=b"), "post param a=b should be set"
 // ```
+// <|EXAMPLE_END|>
 func WithReplaceHttpPacketPostParam(key, value string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1642,10 +1782,15 @@ func WithReplaceHttpPacketPostParam(key, value string) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：整体替换所有 POST 参数(本地构建可验证)
 // ```
-// poc.Post("https://pie.dev/post", poc.replaceAllPostParams({"a":"b", "c":"d"})) // 向 pie.dev 发起请求，添加POST请求参数a，值为b，POST请求参数c，值为d
+// // 关键词: poc.replaceAllPostParams, 替换全部POST参数
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.replaceMethod("POST"), poc.replaceAllPostParams({"a":"b", "c":"d"}))
+// println(string(raw))
+// body = string(poc.GetHTTPPacketBody(raw))
+// assert body.Contains("a=b") && body.Contains("c=d"), "all post params should be set"
 // ```
+// <|EXAMPLE_END|>
 func WithReplaceAllHttpPacketPostParams(values map[string]string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1663,10 +1808,14 @@ func WithReplaceAllHttpPacketPostParams(values map[string]string) PocConfigOptio
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：替换所有 POST 参数且不转义(本地构建可验证)
 // ```
-// poc.Post("https://pie.dev/post", poc.replaceAllPostParamsWithoutEscape({"a":"{{}}", "c":"%%"})) // 向 pie.dev 发起请求，添加POST请求参数a，值为{{}}，POST请求参数c，值为%%
+// // 关键词: poc.replaceAllPostParamsWithoutEscape, POST参数不转义
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.replaceMethod("POST"), poc.replaceAllPostParamsWithoutEscape({"a":"{{}}", "c":"%%"}))
+// println(string(raw))
+// assert string(poc.GetHTTPPacketBody(raw)).Contains("a={{}}"), "value should not be escaped"
 // ```
+// <|EXAMPLE_END|>
 func WithReplaceAllHttpPacketPostParamsWithoutEscape(values map[string]string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1693,10 +1842,15 @@ func WithReplaceFullHttpPacketPostParamsWithoutEscape(values map[string][]string
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：设置 multipart 表单字段(本地构建可验证)
 // ```
-// poc.Post("https://pie.dev/post", poc.replaceFormEncoded("aaa", "bbb")) // 向 pie.dev 发起请求，添加POST请求表单，其中aaa为键，bbb为值
+// // 关键词: poc.replaceFormEncoded, 表单字段
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.replaceMethod("POST"), poc.replaceFormEncoded("aaa", "bbb"))
+// println(string(raw))
+// assert string(raw).Contains("aaa"), "form field aaa should be set"
+// assert poc.GetHTTPPacketHeader(raw, "Content-Type").Contains("multipart/form-data"), "should be multipart form"
 // ```
+// <|EXAMPLE_END|>
 func WithReplaceHttpPacketFormEncoded(key, value string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1716,10 +1870,18 @@ func WithReplaceHttpPacketFormEncoded(key, value string) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：构造文件上传请求(本地构建可验证)
 // ```
-// poc.Post("https://pie.dev/post", poc.replaceUploadFile("file", "phpinfo.php", "<?php phpinfo(); ?>", "application/x-php")) // 向 pie.dev 发起请求，添加POST请求上传文件，其中file为表单名，phpinfo.php为文件名，<?php phpinfo(); ?>为文件内容，application/x-php为文件类型
+// // 关键词: poc.replaceUploadFile, 文件上传, multipart
+// raw = poc.BuildRequest(poc.BasicRequest(),
+//     poc.replaceMethod("POST"),
+//     poc.replaceUploadFile("file", "phpinfo.php", "<?php phpinfo(); ?>", "application/x-php"), // 表单名/文件名/内容/类型
+// )
+// println(string(raw))
+// assert string(raw).Contains("phpinfo.php"), "filename should be in the multipart body"
+// assert string(raw).Contains("phpinfo()"), "file content should be in the multipart body"
 // ```
+// <|EXAMPLE_END|>
 func WithReplaceHttpPacketUploadFile(formName, fileName string, fileContent []byte, contentType ...string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1737,10 +1899,14 @@ func WithReplaceHttpPacketUploadFile(formName, fileName string, fileContent []by
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：追加请求头(本地构建可验证)
 // ```
-// poc.Post("https://pie.dev/post", poc.appendHeader("AAA", "BBB")) // 向 pie.dev 发起请求，添加AAA请求头的值为BBB
+// // 关键词: poc.appendHeader, 追加请求头
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.appendHeader("AAA", "BBB"))
+// println(string(raw))
+// assert poc.GetHTTPPacketHeader(raw, "AAA") == "BBB", "header AAA should be appended"
 // ```
+// <|EXAMPLE_END|>
 func WithAppendHeader(key, value string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1766,10 +1932,15 @@ func WithAppendHeaderIfNotExist(key, value string) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：批量追加请求头(本地构建可验证)
 // ```
-// poc.Post("https://pie.dev/post", poc.appendHeaders({"AAA": "BBB","CCC": "DDD"})) // 向 pie.dev 发起请求，添加AAA请求头的值为BBB
+// // 关键词: poc.appendHeaders, 批量追加请求头
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.appendHeaders({"AAA": "BBB", "CCC": "DDD"}))
+// println(string(raw))
+// assert poc.GetHTTPPacketHeader(raw, "AAA") == "BBB", "header AAA should be appended"
+// assert poc.GetHTTPPacketHeader(raw, "CCC") == "DDD", "header CCC should be appended"
 // ```
+// <|EXAMPLE_END|>
 func WithAppendHeaders(headers map[string]string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1790,10 +1961,14 @@ func WithAppendHeaders(headers map[string]string) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：追加 Cookie(本地构建可验证)
 // ```
-// poc.Get("https://pie.dev/get", poc.appendCookie("aaa", "bbb")) // 向 pie.dev 发起请求，添加cookie键值对aaa:bbb
+// // 关键词: poc.appendCookie, 追加Cookie
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.appendCookie("aaa", "bbb"))
+// println(string(raw))
+// assert string(raw).Contains("aaa=bbb"), "cookie aaa=bbb should be appended"
 // ```
+// <|EXAMPLE_END|>
 func WithAppendCookie(key, value string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1811,10 +1986,14 @@ func WithAppendCookie(key, value string) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：追加 GET 参数(本地构建可验证)
 // ```
-// poc.Get("https://pie.dev/get", poc.appendQueryParam("a", "b")) // 向 pie.dev 发起请求，添加GET请求参数a，值为b
+// // 关键词: poc.appendQueryParam, 追加GET参数
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.appendQueryParam("a", "b"))
+// println(string(raw))
+// assert string(raw).Contains("a=b"), "query param a=b should be appended"
 // ```
+// <|EXAMPLE_END|>
 func WithAppendQueryParam(key, value string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1832,10 +2011,14 @@ func WithAppendQueryParam(key, value string) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：追加 POST 参数(本地构建可验证)
 // ```
-// poc.Post("https://pie.dev/post", poc.appendPostParam("a", "b")) // 向 pie.dev 发起请求，添加POST请求参数a，值为b
+// // 关键词: poc.appendPostParam, 追加POST参数
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.replaceMethod("POST"), poc.appendPostParam("a", "b"))
+// println(string(raw))
+// assert string(poc.GetHTTPPacketBody(raw)).Contains("a=b"), "post param a=b should be appended"
 // ```
+// <|EXAMPLE_END|>
 func WithAppendPostParam(key, value string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1852,10 +2035,15 @@ func WithAppendPostParam(key, value string) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：在现有路径后追加片段(本地构建可验证)
 // ```
-// poc.Get("https://yaklang.com/docs", poc.appendPath("/api/poc")) // 向 yaklang.com 发起请求，实际上请求路径为/docs/api/poc
+// // 关键词: poc.appendPath, 追加路径
+// base = poc.BuildRequest(poc.BasicRequest(), poc.replacePath("/docs")) // 先把路径设为 /docs
+// raw = poc.BuildRequest(base, poc.appendPath("/api/poc"))               // 再追加 /api/poc
+// println(string(raw))
+// assert poc.GetHTTPRequestPath(raw) == "/docs/api/poc", "path should be /docs/api/poc"
 // ```
+// <|EXAMPLE_END|>
 func WithAppendHttpPacketPath(path string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1873,10 +2061,15 @@ func WithAppendHttpPacketPath(path string) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：追加 multipart 表单字段(本地构建可验证)
 // ```
-// poc.Post("https://pie.dev/post", poc.appendFormEncoded("aaa", "bbb")) // 向 pie.dev 发起请求，添加POST请求表单，其中aaa为键，bbb为值
+// // 关键词: poc.appendFormEncoded, 追加表单字段
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.replaceMethod("POST"), poc.appendFormEncoded("aaa", "bbb"))
+// println(string(raw))
+// assert string(raw).Contains("aaa"), "form field aaa should be appended"
+// assert poc.GetHTTPPacketHeader(raw, "Content-Type").Contains("multipart/form-data"), "should be multipart form"
 // ```
+// <|EXAMPLE_END|>
 func WithAppendHttpPacketFormEncoded(key, value string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -1896,10 +2089,17 @@ func WithAppendHttpPacketFormEncoded(key, value string) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：追加上传文件字段(本地构建可验证)
 // ```
-// poc.Post("https://pie.dev/post", poc.appendUploadFile("file", "phpinfo.php", "<?php phpinfo(); ?>", "image/jpeg"))// 向 pie.dev 发起请求，添加POST请求表单，其文件名为phpinfo.php，内容为<?php phpinfo(); ?>，文件类型为image/jpeg
+// // 关键词: poc.appendUploadFile, 追加上传文件
+// raw = poc.BuildRequest(poc.BasicRequest(),
+//     poc.replaceMethod("POST"),
+//     poc.appendUploadFile("file", "phpinfo.php", "<?php phpinfo(); ?>", "image/jpeg"), // 表单名/文件名/内容/类型
+// )
+// println(string(raw))
+// assert string(raw).Contains("phpinfo.php"), "filename should be in the multipart body"
 // ```
+// <|EXAMPLE_END|>
 func WithAppendHttpPacketUploadFile(fieldName, fileName string, fileContent interface{}, contentType ...string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -2402,11 +2602,20 @@ func pochttp(packet []byte, config *PocConfig) (*lowhttp.LowhttpResponse, error)
 //   - 请求结构体 *http.Request
 //   - 错误信息，请求失败时返回非空
 //
-// Example:
+// <|EXAMPLE_START|> 向本地 mock 服务发送请求并读取响应结构体(可本地验证, 不出网)
 // ```
-// rsp, req, err = poc.HTTPEx(`GET / HTTP/1.1\r\nHost: www.yaklang.com\r\n\r\n`, poc.https(true), poc.replaceHeader("AAA", "BBB")) // 向yaklang.com发送一个基于HTTPS协议的GET请求，并且添加一个请求头AAA，它的值为BBB
+// host, port = tcp.MockServe(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok") // 起本地 mock 服务
+// rsp, req = poc.HTTPEx(f"GET / HTTP/1.1\r\nHost: ${host}:${port}\r\n\r\n")~
+// assert rsp.GetStatusCode() == 200, "should get 200 from local mock"
+// ```
+// <|EXAMPLE_END|>
+// <|EXAMPLE_START|> 向真实站点发送 HTTPS 请求并改写请求头
+// ```
+// // 无法本地验证: 需要可达的真实 HTTPS 目标
+// rsp, req = poc.HTTPEx(`GET / HTTP/1.1\r\nHost: www.yaklang.com\r\n\r\n`, poc.https(true), poc.replaceHeader("AAA", "BBB"))~
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
+// <|EXAMPLE_END|>
 func HTTPEx(i interface{}, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
 	packet, config, err := handleRawPacketAndConfig(i, opts...)
 	if err != nil {
@@ -2431,11 +2640,22 @@ func HTTPEx(i interface{}, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpRes
 // 返回值:
 //   - 构建好的请求报文字节数组
 //
-// Example:
+// <|EXAMPLE_START|> 示例：用选项链在本地构建请求报文(不发包, 可本地验证)
 // ```
-// raw = poc.BuildRequest(poc.BasicRequest(), poc.https(true), poc.replaceHost("yaklang.com"), poc.replacePath("/docs/api/poc")) // 构建一个基础GET请求，修改其Host为yaklang.com，访问的URI路径为/docs/api/poc
-// // raw = b"GET /docs/api/poc HTTP/1.1\r\nHost: www.yaklang.com\r\n\r\n"
+// // 关键词: poc.BuildRequest, 本地构建报文, 选项链
+// // BuildRequest 只应用"修改请求报文"的选项并返回报文, 不会真正发请求, 适合本地拼包/调试。
+// raw = poc.BuildRequest(
+//     poc.BasicRequest(),                 // 基础 GET 模板
+//     poc.replaceHost("yaklang.com"),     // 改 Host
+//     poc.replacePath("/docs/api/poc"),   // 改路径
+//     poc.replaceMethod("POST"),          // 改方法
+//     poc.replaceBody("a=b", false),      // 改 body(第二个参数表示是否分块传输)
+// )
+// println(string(raw))                     // 打印拼好的完整请求报文
+// assert string(raw).Contains("POST /docs/api/poc"), "first line should be rebuilt"
+// assert poc.GetHTTPPacketHeader(raw, "Host") == "yaklang.com", "host should be replaced"
 // ```
+// <|EXAMPLE_END|>
 func BuildRequest(i interface{}, opts ...PocConfigOption) []byte {
 	packet, _, err := handleRawPacketAndConfig(i, opts...)
 	if err != nil {
@@ -2454,10 +2674,20 @@ func BuildRequest(i interface{}, opts ...PocConfigOption) []byte {
 //   - 原始请求报文字节数组
 //   - 错误信息，请求失败时返回非空
 //
-// Example:
+// <|EXAMPLE_START|> 向本地 mock 服务发送原始报文请求(可本地验证, 不出网)
 // ```
-// poc.HTTP("GET / HTTP/1.1\r\nHost: www.yaklang.com\r\n\r\n", poc.https(true), poc.replaceHeader("AAA", "BBB")) // yaklang.com发送一个基于HTTPS协议的GET请求，并且添加一个请求头AAA，它的值为BBB
+// host, port = tcp.MockServe(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok") // 起本地 mock 服务
+// rsp, req = poc.HTTP(f"GET / HTTP/1.1\r\nHost: ${host}:${port}\r\n\r\n")~
+// assert str.Contains(string(rsp), "200 OK"), "should receive mock response"
 // ```
+// <|EXAMPLE_END|>
+// <|EXAMPLE_START|> 向真实站点发送 HTTPS 请求并改写请求头
+// ```
+// // 无法本地验证: 需要可达的真实 HTTPS 目标
+// // 向 yaklang.com 发送 HTTPS GET 请求, 并添加请求头 AAA: BBB
+// rsp, req = poc.HTTP("GET / HTTP/1.1\r\nHost: www.yaklang.com\r\n\r\n", poc.https(true), poc.replaceHeader("AAA", "BBB"))~
+// ```
+// <|EXAMPLE_END|>
 func HTTP(i interface{}, opts ...PocConfigOption) (rsp []byte, req []byte, err error) {
 	packet, config, err := handleRawPacketAndConfig(i, opts...)
 	if err != nil {
@@ -2483,11 +2713,20 @@ func HTTP(i interface{}, opts ...PocConfigOption) (rsp []byte, req []byte, err e
 //   - 请求结构体 *http.Request
 //   - 错误信息，请求失败时返回非空
 //
-// Example:
+// <|EXAMPLE_START|> 向本地 mock 服务发送指定方法请求(可本地验证, 不出网)
 // ```
-// poc.Do("GET","https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的GET请求
+// host, port = tcp.MockServe(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok") // 起本地 mock 服务
+// rsp, req = poc.Do("GET", f"http://${host}:${port}/")~
+// assert rsp.GetStatusCode() == 200, "should get 200 from local mock"
+// ```
+// <|EXAMPLE_END|>
+// <|EXAMPLE_START|> 向真实站点发送指定方法的 HTTPS 请求
+// ```
+// // 无法本地验证: 需要可达的真实 HTTPS 目标
+// rsp, req = poc.Do("GET", "https://yaklang.com", poc.https(true))~ // 向 yaklang.com 发送 HTTPS GET 请求
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
+// <|EXAMPLE_END|>
 func Do(method string, urlStr string, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
 	config, err := handleUrlAndConfig(urlStr, opts...)
 	if err != nil {
@@ -2519,11 +2758,20 @@ func Do(method string, urlStr string, opts ...PocConfigOption) (rspInst *lowhttp
 //   - 请求结构体 *http.Request
 //   - 错误信息，请求失败时返回非空
 //
-// Example:
+// <|EXAMPLE_START|> 向本地 mock 服务发送 GET 请求(可本地验证, 不出网)
 // ```
-// rsp,req = poc.Get("https://yaklang.com", poc.https(true))~ // 向yaklang.com发送一个基于HTTPS协议的GET请求
+// host, port = tcp.MockServe(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok") // 起本地 mock 服务
+// rsp, req = poc.Get(f"http://${host}:${port}/")~
+// assert rsp.GetStatusCode() == 200, "should get 200 from local mock"
+// ```
+// <|EXAMPLE_END|>
+// <|EXAMPLE_START|> 向真实站点发送 HTTPS GET 请求
+// ```
+// // 无法本地验证: 需要可达的真实 HTTPS 目标
+// rsp, req = poc.Get("https://yaklang.com", poc.https(true))~ // 向 yaklang.com 发送 HTTPS GET 请求
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
+// <|EXAMPLE_END|>
 func DoGET(urlStr string, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
 	return Do("GET", urlStr, opts...)
 }
@@ -2539,11 +2787,20 @@ func DoGET(urlStr string, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpResp
 //   - 请求结构体 *http.Request
 //   - 错误信息，请求失败时返回非空
 //
-// Example:
+// <|EXAMPLE_START|> 向本地 mock 服务发送 POST 请求(可本地验证, 不出网)
 // ```
-// rsp,req = poc.Post("https://yaklang.com", poc.https(true))~ // 向yaklang.com发送一个基于HTTPS协议的POST请求
+// host, port = tcp.MockServe(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok") // 起本地 mock 服务
+// rsp, req = poc.Post(f"http://${host}:${port}/login", poc.body("user=admin&pass=123"))~
+// assert rsp.GetStatusCode() == 200, "should get 200 from local mock"
+// ```
+// <|EXAMPLE_END|>
+// <|EXAMPLE_START|> 向真实站点发送 HTTPS POST 请求
+// ```
+// // 无法本地验证: 需要可达的真实 HTTPS 目标
+// rsp, req = poc.Post("https://yaklang.com", poc.https(true))~ // 向 yaklang.com 发送 HTTPS POST 请求
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
+// <|EXAMPLE_END|>
 func DoPOST(urlStr string, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
 	return Do("POST", urlStr, opts...)
 }
@@ -2561,6 +2818,7 @@ func DoPOST(urlStr string, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpRes
 //
 // Example:
 // ```
+// // 无法本地验证: 需要可达的真实 HTTPS 目标
 // rsp,req = poc.Head("https://yaklang.com", poc.https(true))~ // 向yaklang.com发送一个基于HTTPS协议的HEAD请求
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
@@ -2581,6 +2839,7 @@ func DoHEAD(urlStr string, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpRes
 //
 // Example:
 // ```
+// // 无法本地验证: 需要可达的真实 HTTPS 目标
 // rsp,req = poc.Delete("https://yaklang.com", poc.https(true))~ // 向yaklang.com发送一个基于HTTPS协议的DELETE请求
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
@@ -2601,6 +2860,7 @@ func DoDELETE(urlStr string, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpR
 //
 // Example:
 // ```
+// // 无法本地验证: 需要可达的真实 HTTPS 目标
 // rsp,req = poc.Options("https://yaklang.com", poc.https(true))~ // 向yaklang.com发送一个基于HTTPS协议的Options请求
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
@@ -2620,6 +2880,7 @@ func DoOPTIONS(urlStr string, opts ...PocConfigOption) (rspInst *lowhttp.Lowhttp
 //
 // Example:
 // ```
+// // 无法本地验证: 需要可达的真实 websocket 服务与本地代理
 // rsp, req, err = poc.Websocket(`GET / HTTP/1.1
 // Connection: Upgrade
 // Upgrade: websocket
@@ -2652,16 +2913,23 @@ func DoWebSocket(raw interface{}, opts ...PocConfigOption) (rsp []byte, req []by
 //   - 报文头部字符串
 //   - 报文体字节数组
 //
-// Example:
+// <|EXAMPLE_START|> 示例：把报文切成 header 和 body 两部分
 // ```
-// poc.Split(`POST / HTTP/1.1
+// // 关键词: poc.Split, 切分报文头与体
+// packet = `POST / HTTP/1.1
 // Content-Type: application/json
 // Host: www.example.com
 //
-// {"key": "value"}`, func(header) {
-// dump(header)
-// })
+// {"key": "value"}`
+// header, body = poc.Split(packet) // 第一个返回值是头部字符串, 第二个是 body 字节
+// println("--- header ---")
+// println(header)
+// println("--- body ---")
+// println(string(body))            // 预期输出: {"key": "value"}
+// assert string(body) == `{"key": "value"}`, "body should be split out correctly"
+// assert header.Contains("Content-Type: application/json"), "header should contain content-type"
 // ```
+// <|EXAMPLE_END|>
 func split(raw []byte, hook ...func(line string)) (headers string, body []byte) {
 	return lowhttp.SplitHTTPHeadersAndBodyFromPacket(raw, hook...)
 }
@@ -2673,10 +2941,16 @@ func split(raw []byte, hook ...func(line string)) (headers string, body []byte) 
 // 返回值:
 //   - 修复后的 HTTP 请求报文字节数组
 //
-// Example:
+// <|EXAMPLE_START|> 示例：修复请求报文(自动补齐 Content-Length 等)
 // ```
-// poc.FixHTTPRequest(b"GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+// // 关键词: poc.FixHTTPRequest, 修复请求报文
+// // 这个请求声明了 Content-Length: 100, 但实际 body 只有 3 字节, FixHTTPRequest 会修正它
+// broken = "POST / HTTP/1.1\r\nHost: example.com\r\nContent-Length: 100\r\n\r\nabc"
+// fixed = poc.FixHTTPRequest(broken)
+// println(string(fixed))
+// assert poc.GetHTTPPacketHeader(fixed, "Content-Length") == "3", "content-length should be fixed to real body length"
 // ```
+// <|EXAMPLE_END|>
 func fixHTTPRequest(raw []byte) []byte {
 	return lowhttp.FixHTTPRequest(raw)
 }
@@ -2688,10 +2962,17 @@ func fixHTTPRequest(raw []byte) []byte {
 // 返回值:
 //   - 修复后的 HTTP 响应报文字节数组
 //
-// Example:
+// <|EXAMPLE_START|> 示例：修复响应报文(规整 CRLF 与 Content-Length)
 // ```
-// poc.FixHTTPResponse(b"HTTP/1.1 200 OK\nContent-Length: 5\n\nhello")
+// // 关键词: poc.FixHTTPResponse, 修复响应报文
+// // 这个响应用了 LF 换行且未声明 Content-Length, FixHTTPResponse 会把它规整为标准报文
+// broken = "HTTP/1.1 200 OK\nContent-Type: text/plain\n\nhello"
+// fixed = poc.FixHTTPResponse(broken)
+// println(string(fixed))
+// assert poc.GetStatusCodeFromResponse(fixed) == 200, "status code should still be 200"
+// assert string(poc.GetHTTPPacketBody(fixed)) == "hello", "body should be preserved"
 // ```
+// <|EXAMPLE_END|>
 func fixHTTPResponse(r []byte) []byte {
 	rsp, _, _ := lowhttp.FixHTTPResponse(r)
 	return rsp
@@ -2704,10 +2985,15 @@ func fixHTTPResponse(r []byte) []byte {
 // 返回值:
 //   - 转换后的 HTTP 请求报文字节数组
 //
-// Example:
+// <|EXAMPLE_START|> 示例：把 curl 命令转成 HTTP 请求报文
 // ```
-// poc.CurlToHTTPRequest("curl -X POST -d 'a=b&c=d' http://example.com")
+// // 关键词: poc.CurlToHTTPRequest, curl转报文
+// req = poc.CurlToHTTPRequest("curl -X POST -d 'a=b&c=d' http://example.com")
+// println(string(req))
+// assert poc.GetHTTPRequestMethod(req) == "POST", "method should be POST"
+// assert string(poc.GetHTTPPacketBody(req)) == "a=b&c=d", "body should come from -d"
 // ```
+// <|EXAMPLE_END|>
 func curlToHTTPRequest(command string) (req []byte) {
 	raw, err := lowhttp.CurlToRawHTTPRequest(command)
 	if err != nil {
@@ -2724,10 +3010,15 @@ func curlToHTTPRequest(command string) (req []byte) {
 // 返回值:
 //   - 转换后的 curl 命令字符串
 //
-// Example:
+// <|EXAMPLE_START|> 示例：把 HTTP 请求报文转成 curl 命令
 // ```
-// poc.HTTPRequestToCurl(true, "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+// // 关键词: poc.HTTPRequestToCurl, 报文转curl
+// cmd = poc.HTTPRequestToCurl(true, "GET /api HTTP/1.1\r\nHost: example.com\r\n\r\n") // 第一个参数表示是否 https
+// println(cmd)
+// assert cmd.Contains("curl"), "should produce a curl command"
+// assert cmd.Contains("https://example.com/api"), "should target the https url"
 // ```
+// <|EXAMPLE_END|>
 func httpRequestToCurl(https bool, raw any) (curlCommand string) {
 	cmd, err := lowhttp.GetCurlCommand(https, utils.InterfaceToBytes(raw))
 	if err != nil {
@@ -2776,10 +3067,14 @@ func ExtractPostParams(raw []byte) (map[string]string, error) {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：设置 User-Agent(本地构建可验证)
 // ```
-// poc.Get("https://pie.dev/get", poc.ua("Mozilla/5.0")) // 向 pie.dev 发起请求，添加User-Agent请求头，其值为Mozilla/5.0
+// // 关键词: poc.ua, 设置UA
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.ua("Mozilla/5.0"))
+// println(string(raw))
+// assert poc.GetHTTPPacketHeader(raw, "User-Agent") == "Mozilla/5.0", "ua should be set"
 // ```
+// <|EXAMPLE_END|>
 func WithUserAgent(ua string) PocConfigOption {
 	return WithReplaceHttpPacketHeader("User-Agent", ua)
 }
@@ -2792,11 +3087,15 @@ func WithUserAgent(ua string) PocConfigOption {
 // 返回值:
 //   - 一个请求选项，作为可变参数传入 poc.HTTP/poc.Get 等
 //
-// Example:
+// <|EXAMPLE_START|> 示例：设置 Cookie 请求头(本地构建可验证)
 // ```
-// poc.Get("https://pie.dev/get", poc.cookie("a=b; c=d")) // 向 pie.dev 发起请求，添加Cookie请求头，其值为a=b; c=d
-// poc.Get("https://pie.dev/get", poc.cookie("a", "b")) // 向 pie.dev 发起请求，添加Cookie请求头，其值为a=b
+// // 关键词: poc.cookie, 设置Cookie
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.cookie("a=b; c=d")) // 直接写整个 Cookie 串
+// println(string(raw))
+// assert poc.GetHTTPPacketHeader(raw, "Cookie") == "a=b; c=d", "cookie header should be set"
+// // 也可用键值形式: poc.cookie("a", "b")
 // ```
+// <|EXAMPLE_END|>
 func WithCookieFull(c string, values ...any) PocConfigOption {
 	if len(values) > 0 {
 		valueStrings := utils.InterfaceToStringSlice(values)
@@ -2812,6 +3111,7 @@ func WithCookieFull(c string, values ...any) PocConfigOption {
 // Example:
 // ```
 // // 启用国密 TLS，依赖网络，此处仅作示意
+// 无法本地验证: 需要可达的真实国密 TLS 目标
 // poc.Get("https://example.com", poc.gmTls(true))~
 // ```
 func WithGmTls() PocConfigOption {
@@ -2828,6 +3128,7 @@ func WithGmTls() PocConfigOption {
 // Example:
 // ```
 // // 仅使用国密 TLS，依赖网络，此处仅作示意
+// 无法本地验证: 需要可达的真实国密 TLS 目标
 // poc.Get("https://example.com", poc.gmTlsOnly(true))~
 // ```
 func WithGmTlsOnly() PocConfigOption {
@@ -2844,6 +3145,7 @@ func WithGmTlsOnly() PocConfigOption {
 // Example:
 // ```
 // // 优先使用国密 TLS，依赖网络，此处仅作示意
+// 无法本地验证: 需要可达的真实国密 TLS 目标
 // poc.Get("https://example.com", poc.gmTLSPrefer(true))~
 // ```
 func WithGmTLSPrefer() PocConfigOption {
@@ -2862,6 +3164,7 @@ func WithGmTLSPrefer() PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实国密 TLS 目标
 // poc.Get("https://example.com", poc.gmTLS(true), poc.gmTLSCipherSuite(tls.GMTLS_ECC_SM4_CBC_SM3))
 // ```
 func WithGmTLSCipherSuite(suites ...int) PocConfigOption {
@@ -2905,6 +3208,7 @@ func WithGmTLSDisableCompatMode(disable ...bool) PocConfigOption {
 //
 // Example:
 // ```
+// 无法本地验证: 需要可达的真实 HTTP 目标
 // poc.HTTP(poc.BasicRequest(), poc.fixQueryEscape(true)) // 向 example.com 发起请求，如果查询参数中的 URL 编码不正确或不存在也不会自动修复URL编码
 // ```
 func WithFixQueryEscape(b bool) PocConfigOption {
@@ -3083,9 +3387,11 @@ func extractContentLength(headerBytes []byte) int64 {
 //
 // Example:
 // ```
-// poc.Get("https://example.com/login", poc.session("user1")) // 使用 session "user1" 登录
-// poc.Get("https://example.com/api", poc.session("user1"))   // 继续使用 session "user1"
-// poc.RemoveSession("user1") // 清除 session "user1"，释放其 cookiejar
+// // 关键词: poc.RemoveSession, 按 session 名清理本地 cookiejar
+// // RemoveSession 只清理本地 session 缓存(cookiejar), 不发起任何网络请求, 可本地验证
+// poc.RemoveSession("user1") // 清除名为 user1 的 session, 释放其 cookiejar
+// println("session user1 removed") // 预期输出: session user1 removed
+// // 真实场景: 先用 poc.Get(url, poc.session("user1")) 登录并积累 cookie, 用完后再 RemoveSession 释放
 // ```
 func RemoveSession(session string) {
 	lowhttp.RemoveCookiejar(session)

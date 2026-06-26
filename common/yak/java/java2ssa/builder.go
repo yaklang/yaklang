@@ -3,10 +3,6 @@ package java2ssa
 import (
 	"fmt"
 	"path/filepath"
-	"regexp"
-	"strconv"
-	"strings"
-	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/log"
@@ -20,7 +16,6 @@ import (
 )
 
 var INNER_CLASS_SPLIT = "$"
-var javaRecordPatternCaseRegexp = regexp.MustCompile(`(?m)(case\s+[A-Za-z_][\w$.<>]*\s*)\(\s*var\s+([A-Za-z_]\w*)(?:\s*,[\s\S]*?)?\)\s*(->)`)
 
 // ========================================== For SSAAPI ==========================================
 
@@ -104,6 +99,10 @@ func (*SSABuilder) GetLanguage() ssaconfig.Language {
 	return ssaconfig.JAVA
 }
 
+func (*SSABuilder) UsesDeferredFileBuild() bool {
+	return true
+}
+
 // ========================================== Build Front End ==========================================
 
 type singleFileBuilder struct {
@@ -142,66 +141,6 @@ func Frontend(src string, caches ...*ssa.AntlrCache) (javaparser.ICompilationUni
 	)
 }
 
-func preprocessJavaRecordPatternSwitchCases(src string) string {
-	if !strings.Contains(src, "case ") || !strings.Contains(src, "->") || !strings.Contains(src, "(var ") {
-		return src
-	}
-	return javaRecordPatternCaseRegexp.ReplaceAllString(src, `$1$2 $3`)
-}
-
-func preprocessJavaUnicodeEscapes(src string) string {
-	if !strings.Contains(src, `\u`) {
-		return src
-	}
-
-	var out strings.Builder
-	out.Grow(len(src))
-	backslashCount := 0
-
-	for i := 0; i < len(src); i++ {
-		if src[i] != '\\' {
-			out.WriteByte(src[i])
-			backslashCount = 0
-			continue
-		}
-
-		if i+1 >= len(src) || src[i+1] != 'u' || backslashCount%2 != 0 {
-			out.WriteByte(src[i])
-			backslashCount++
-			continue
-		}
-
-		j := i + 1
-		for j < len(src) && src[j] == 'u' {
-			j++
-		}
-		if j+4 > len(src) {
-			out.WriteByte(src[i])
-			continue
-		}
-
-		hex := src[j : j+4]
-		code, err := strconv.ParseUint(hex, 16, 32)
-		if err != nil {
-			out.WriteByte(src[i])
-			backslashCount++
-			continue
-		}
-
-		var buf [utf8.UTFMax]byte
-		n := utf8.EncodeRune(buf[:], rune(code))
-		out.Write(buf[:n])
-		if rune(code) == '\\' {
-			backslashCount = 1
-		} else {
-			backslashCount = 0
-		}
-		i = j + 3
-	}
-
-	return out.String()
-}
-
 func (b *singleFileBuilder) AssignConst(name string, value ssa.Value) bool {
 	if ConstValue, ok := b.constMap[name]; ok {
 		log.Warnf("const %v has been defined value is %v", name, ConstValue.String())
@@ -236,7 +175,7 @@ func (b *singleFileBuilder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) 
 
 func (b *singleFileBuilder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
 	b.FunctionBuilder = s.Current
-	b.LoadFunctionBuilder(s.Store)
+	b.LoadFunctionBuilder(s)
 }
 
 func (b *singleFileBuilder) initImport() {

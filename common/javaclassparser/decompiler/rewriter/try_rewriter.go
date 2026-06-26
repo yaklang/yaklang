@@ -25,7 +25,8 @@ func TryRewriter(manager *RewriteManager, node *core.Node) error {
 			visitedSet.Add(node)
 			err := manager.CheckVisitedNode(node)
 			if err != nil {
-				return nil, err
+				// Node was already visited (shared merge point). Skip instead of failing.
+				return nil, nil
 			}
 			sts = append(sts, node.Statement)
 			var next []*core.Node

@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/dlclark/regexp2"
+	regexp2 "github.com/VillanCh/go-pcre2-lite/regexp2"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 )
@@ -57,12 +57,15 @@ func TestYakRegexpUtils_Priority(t *testing.T) {
 		require.True(t, match)
 	})
 
-	t.Run("re2 not support named class", func(t *testing.T) {
+	t.Run("posix class supported by pcre2 backend", func(t *testing.T) {
+		// regexp2 后端已切换为 go-pcre2-lite (PCRE2). PCRE2 支持 POSIX 字符类
+		// [[:alpha:]] (匹配任意字母), 而旧 .NET 系后端不支持 (旧实现按字面集解析, 故 "ccabc"
+		// 不匹配). 切换后 pcre2 与标准库 RE2 行为一致, 二档优先级均匹配 (更符合 POSIX 标准).
 		testRule := "[[:alpha:]]"
 		reUtils := NewYakRegexpUtils(testRule, WithPriorityMode(RegexpMode2))
 		match, err := reUtils.MatchString("ccabc")
 		require.NoError(t, err)
-		require.False(t, match)
+		require.True(t, match)
 
 		reUtils.SetPriority(RegexpMode1)
 		match, err = reUtils.MatchString("ccabc")

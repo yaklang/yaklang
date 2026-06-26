@@ -1,6 +1,7 @@
 package php2ssa
 
 import (
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -19,7 +20,15 @@ func (y *builder) VisitHtmlDocument(raw phpparser.IHtmlDocumentContext) interfac
 		// handle shebang
 	}
 
-	for _, child := range i.GetChildren() {
+	y.VisitHtmlDocumentChildren(i.GetChildren())
+	return nil
+}
+
+func (y *builder) VisitHtmlDocumentChildren(children []antlr.Tree) interface{} {
+	if y == nil || y.IsStop() {
+		return nil
+	}
+	for _, child := range children {
 		switch current := child.(type) {
 		case phpparser.IHtmlDocumentElementContext:
 			y.VisitHtmlDocumentElement(current)

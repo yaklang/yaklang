@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -39,8 +40,11 @@ type runtimeProgressSnapshot struct {
 }
 
 type stageExecutionResult struct {
-	task *AiTask
-	err  error
+	task        *AiTask
+	err         error
+	fork        *aicommon.TimelineFork
+	midtermFork *aimem.MidtermMemoryFork
+	order       int
 }
 
 func isExecutableTaskTerminal(task *AiTask) bool {
@@ -462,8 +466,33 @@ func (r *runtime) executeStageWithHandler(stageIdx int, stageNodes []*executable
 	if concurrency == 1 {
 		var failedTask *AiTask
 		var firstErr error
+		collected := make([]stageExecutionResult, 0, len(stageNodes))
 		for _, node := range stageNodes {
-			result := stageExecutionResult{task: node.task, err: handler(node.task)}
+			var fork *aicommon.TimelineFork
+			var midtermFork *aimem.MidtermMemoryFork
+			if node != nil && node.task != nil {
+				fork, _ = r.createTaskTimelineFork(node.task)
+				midtermFork, _ = r.createTaskMidtermFork(node.task)
+				r.bindTimelineForkMidtermArchive(fork, midtermFork)
+			}
+			var err error
+			if node != nil && node.task != nil {
+				restoreTimeline := node.task.withTimelineFork(fork)
+				restoreMidterm := node.task.withMidtermFork(midtermFork)
+				err = handler(node.task)
+				restoreMidterm()
+				restoreTimeline()
+			} else {
+				err = handler(nil)
+			}
+			result := stageExecutionResult{
+				task:        node.task,
+				err:         err,
+				fork:        fork,
+				midtermFork: midtermFork,
+				order:       node.order,
+			}
+			collected = append(collected, result)
 			if result.task != nil {
 				r.finishActiveTask(result.task.Index)
 			}
@@ -478,6 +507,7 @@ func (r *runtime) executeStageWithHandler(stageIdx int, stageNodes []*executable
 				firstErr = result.err
 			}
 		}
+		r.mergeStageForks(collected, &failedTask, &firstErr)
 		r.clearActiveStage()
 		r.config.savePlanAndExecState(Phase_NotCompleted, nil)
 		return failedTask, firstErr
@@ -494,9 +524,27 @@ func (r *runtime) executeStageWithHandler(stageIdx int, stageNodes []*executable
 				if node == nil {
 					continue
 				}
+				var fork *aicommon.TimelineFork
+				var midtermFork *aimem.MidtermMemoryFork
+				var err error
+				if node.task != nil {
+					fork, _ = r.createTaskTimelineFork(node.task)
+					midtermFork, _ = r.createTaskMidtermFork(node.task)
+					r.bindTimelineForkMidtermArchive(fork, midtermFork)
+					restoreTimeline := node.task.withTimelineFork(fork)
+					restoreMidterm := node.task.withMidtermFork(midtermFork)
+					err = handler(node.task)
+					restoreMidterm()
+					restoreTimeline()
+				} else {
+					err = handler(nil)
+				}
 				results <- stageExecutionResult{
-					task: node.task,
-					err:  handler(node.task),
+					task:        node.task,
+					err:         err,
+					fork:        fork,
+					midtermFork: midtermFork,
+					order:       node.order,
 				}
 			}
 		}()
@@ -508,8 +556,10 @@ func (r *runtime) executeStageWithHandler(stageIdx int, stageNodes []*executable
 
 	var failedTask *AiTask
 	var firstErr error
+	collected := make([]stageExecutionResult, 0, len(stageNodes))
 	for range stageNodes {
 		result := <-results
+		collected = append(collected, result)
 		if result.task != nil {
 			r.finishActiveTask(result.task.Index)
 		}
@@ -525,9 +575,75 @@ func (r *runtime) executeStageWithHandler(stageIdx int, stageNodes []*executable
 		}
 	}
 	workers.Wait()
+	r.mergeStageForks(collected, &failedTask, &firstErr)
 	r.clearActiveStage()
 	r.config.savePlanAndExecState(Phase_NotCompleted, nil)
 	return failedTask, firstErr
+}
+
+func (r *runtime) createTaskTimelineFork(task *AiTask) (*aicommon.TimelineFork, error) {
+	if task == nil {
+		return nil, nil
+	}
+	parent := task.CurrentTimeline()
+	if parent == nil {
+		return nil, nil
+	}
+	var cfg aicommon.AICallerConfigIf
+	if task.Coordinator != nil && task.Coordinator.Config != nil {
+		cfg = task.Coordinator.Config
+	}
+	var ai aicommon.AICaller
+	if task.Coordinator != nil && task.Coordinator.Config != nil {
+		ai = task.Coordinator.Config
+	}
+	return parent.ForkForTask(task.Index, task.Name, cfg, ai)
+}
+
+func (r *runtime) mergeStageForks(results []stageExecutionResult, failedTask **AiTask, firstErr *error) {
+	if len(results) == 0 {
+		return
+	}
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].order < results[j].order
+	})
+	for _, result := range results {
+		if result.fork != nil {
+			if _, err := result.fork.MergeBack(); err != nil && *firstErr == nil {
+				*firstErr = err
+				*failedTask = result.task
+			}
+		}
+		if result.midtermFork != nil {
+			if _, err := result.midtermFork.MergeBack(); err != nil && *firstErr == nil {
+				*firstErr = err
+				*failedTask = result.task
+			}
+		}
+	}
+}
+
+func (r *runtime) createTaskMidtermFork(task *AiTask) (*aimem.MidtermMemoryFork, error) {
+	if task == nil || r == nil || r.config == nil {
+		return nil, nil
+	}
+	parentStore := aimem.EnsureTimelineMidtermArchiveStore(r.config.Config)
+	if parentStore == nil {
+		return nil, nil
+	}
+	return aimem.ForkMidtermArchiveStore(
+		parentStore,
+		task.Index,
+		task.Name,
+		r.config.PersistentSessionId,
+	)
+}
+
+func (r *runtime) bindTimelineForkMidtermArchive(fork *aicommon.TimelineFork, midtermFork *aimem.MidtermMemoryFork) {
+	if fork == nil || fork.Branch == nil || midtermFork == nil || r == nil || r.config == nil {
+		return
+	}
+	fork.Branch.SetBranchArchiveContext(midtermFork, r.config.PersistentSessionId)
 }
 
 func (r *runtime) executeStage(stageIdx int, stageNodes []*executableTaskNode, totalTasks, totalStages int) (*AiTask, error) {

@@ -1,7 +1,6 @@
 package loopinfra
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 
@@ -46,6 +45,9 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 
 			log.Infof("single file modification: start to write code to file %s", filename)
 			invoker := loop.GetInvoker()
+			loopInfraActionStart(loop, loopInfraNodeSingleFileWrite,
+				fmt.Sprintf("写入文件: %s / Write file: %s", filename, filename),
+				"写入文件中 / Writing File...")
 
 			invoker.AddToTimeline("initialize", "AI decided to initialize the code file: "+filename)
 			code := loop.Get(codeVar)
@@ -67,6 +69,13 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 				operator.Fail(err)
 				return
 			}
+
+			loopInfraAddFileOpSuccessTimeline(loop, loopInfraFileOpTimeline{
+				Op:         "write",
+				Filename:   filename,
+				NewSegment: code,
+				Deferred:   f.ShouldDeferDiskWrite(),
+			})
 
 			if !f.ShouldDeferDiskWrite() {
 				// Verify file was written correctly
@@ -93,6 +102,10 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 			runtime.AddToTimeline("lint-message", msg)
 
 			log.Infof("write_code done: hasBlockingErrors=%v", blocking)
+			loopInfraStatus(loop, "文件写入完成 / File Write Complete")
+			loopInfraActionFinish(loop, loopInfraNodeSingleFileWrite,
+				fmt.Sprintf("文件写入完成: %s (%d bytes) / File Written: %s (%d bytes)", filename, len(code), filename, len(code)),
+				msg)
 			loop.GetEmitter().EmitPinFilename(filename)
 			_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
 				Content:      code,
@@ -115,23 +128,15 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 		[]aitool.ToolOption{
 			aitool.WithIntegerParam("modify_start_line"),
 			aitool.WithIntegerParam("modify_end_line"),
-			aitool.WithStringParam("modify_code_reason", aitool.WithParam_Description(`Fix code errors or issues, and summarize the fixing approach and lessons learned, keeping the original code content for future reference value`)),
 		},
-		[]*reactloops.LoopStreamField{
-			{
-				FieldName: "modify_code_reason",
-				AINodeId:  "re-act-loop-thought",
-			},
-		},
+		nil,
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 			start := action.GetInt("modify_start_line")
 			end := action.GetInt("modify_end_line")
 			if start <= 0 || end <= 0 || end < start {
 				return utils.Error("modify_code action must have valid 'modify_start_line' and 'modify_end_line' parameters")
 			}
-			l.GetEmitter().EmitDefaultStreamEvent(
-				"thought",
-				bytes.NewReader([]byte(fmt.Sprintf("Preparing modify line:%v-%v", start, end))), l.GetCurrentTask().GetIndex())
+			loopInfraStatus(l, fmt.Sprintf("准备修改文件行 %d-%d / Preparing File Modify Lines %d-%d", start, end, start, end))
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
@@ -154,20 +159,19 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 
 			invoker := loop.GetInvoker()
 
-		fullCode := loop.Get(fullCodeVar)
-		partialCode := loop.Get(codeVar)
+			fullCode := loop.Get(fullCodeVar)
+			partialCode := loop.Get(codeVar)
 
-		editor := memedit.NewMemEditor(fullCode)
+			editor := memedit.NewMemEditor(fullCode)
 			modifyStartLine := NormalizeActionLineNumber(loop, fullCodeVar, action.GetInt("modify_start_line"))
 			modifyEndLine := NormalizeActionLineNumber(loop, fullCodeVar, action.GetInt("modify_end_line"))
 
 			msg := fmt.Sprintf("decided to modify code file, from start_line[%v] to end_line:[%v]", modifyStartLine, modifyEndLine)
 			invoker.AddToTimeline("modify_code", msg)
-
 			reason := action.GetString("modify_code_reason")
-			if reason != "" {
-				runtime.AddToTimeline("modify_reason", reason)
-			}
+			loopInfraActionStart(loop, loopInfraNodeSingleFileModify,
+				fmt.Sprintf("修改文件行 %d-%d: %s / Modify file lines %d-%d: %s", modifyStartLine, modifyEndLine, filename, modifyStartLine, modifyEndLine, filename),
+				"修改文件中 / Modifying File...")
 
 			// Prettify the code (extract line numbers if present)
 			start, end, codeSegment, fixedCode := f.PrettifyCode(partialCode)
@@ -185,6 +189,7 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 			}
 
 			log.Infof("start to modify code lines %d to %d", modifyStartLine, modifyEndLine)
+			oldSegment := loopInfraExtractLineRange(fullCode, modifyStartLine, modifyEndLine)
 			err := editor.ReplaceLineRange(modifyStartLine, modifyEndLine, partialCode)
 			if err != nil {
 				runtime.AddToTimeline("modify_failed", "Failed to replace line range: "+err.Error())
@@ -203,6 +208,16 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 				op.Fail(fmt.Sprintf("failed to write modified content to file: %v", writeErr))
 				return
 			}
+
+			loopInfraAddFileOpSuccessTimeline(loop, loopInfraFileOpTimeline{
+				Op:         "modify",
+				Filename:   filename,
+				OldSegment: oldSegment,
+				NewSegment: partialCode,
+				StartLine:  modifyStartLine,
+				EndLine:    modifyEndLine,
+				Deferred:   f.ShouldDeferDiskWrite(),
+			})
 
 			// Call file changed callback
 			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
@@ -233,6 +248,10 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 			}
 			runtime.AddToTimeline("code_modified", msg)
 			log.Infof("modify_code done: hasBlockingErrors=%v", hasBlockingErrors)
+			loopInfraStatus(loop, "文件修改完成 / File Modify Complete")
+			loopInfraActionFinish(loop, loopInfraNodeSingleFileModify,
+				fmt.Sprintf("文件修改完成: %s lines %d-%d / File Modified: %s lines %d-%d", filename, modifyStartLine, modifyEndLine, filename, modifyStartLine, modifyEndLine),
+				msg)
 			loop.GetEmitter().EmitPinFilename(filename)
 			_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
 				Content:      fullCode,
@@ -259,22 +278,14 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 		"Insert new lines at the specified line number. Use this action to add new code, comments, or blank lines. The line number is 1-based, meaning the first line of the file is line 1. The lines will be inserted at the beginning of the specified line, pushing existing content down. This is ideal for adding new functionality or fixing missing code.",
 		[]aitool.ToolOption{
 			aitool.WithIntegerParam("insert_line"),
-			aitool.WithStringParam("insert_lines_reason", aitool.WithParam_Description(`Explain why inserting lines at this position, and summarize the insertion approach and lessons learned, keeping the original code content for future reference value`)),
 		},
-		[]*reactloops.LoopStreamField{
-			{
-				FieldName: "insert_lines_reason",
-				AINodeId:  "re-act-loop-thought",
-			},
-		},
+		nil,
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 			line := action.GetInt("insert_line")
 			if line <= 0 {
 				return utils.Error("insert_lines action must have valid 'insert_line' parameter")
 			}
-			l.GetEmitter().EmitDefaultStreamEvent(
-				"thought",
-				bytes.NewReader([]byte(fmt.Sprintf("Preparing insert at line:%v", line))), l.GetCurrentTask().GetIndex())
+			loopInfraStatus(l, fmt.Sprintf("准备插入文件行 %d / Preparing File Insert Line %d", line, line))
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
@@ -299,11 +310,9 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 
 			msg := fmt.Sprintf("decided to insert lines at line[%v]", insertLine)
 			invoker.AddToTimeline("insert_lines", msg)
-
-			reason := action.GetString("insert_lines_reason")
-			if reason != "" {
-				runtime.AddToTimeline("insert_reason", reason)
-			}
+			loopInfraActionStart(loop, loopInfraNodeSingleFileInsert,
+				fmt.Sprintf("插入文件行 %d: %s / Insert file line %d: %s", insertLine, filename, insertLine, filename),
+				"插入文件内容 / Inserting File Content...")
 
 			// Prettify the code
 			start, end, codeSegment, fixedCode := f.PrettifyCode(partialCode)
@@ -332,6 +341,14 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 				return
 			}
 
+			loopInfraAddFileOpSuccessTimeline(loop, loopInfraFileOpTimeline{
+				Op:         "insert",
+				Filename:   filename,
+				NewSegment: partialCode,
+				InsertLine: insertLine,
+				Deferred:   f.ShouldDeferDiskWrite(),
+			})
+
 			// Call file changed callback
 			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
 			f.applySyntaxLintResult(loop, op, hasBlockingErrors, f.ShouldExitWhenSyntaxClean())
@@ -344,12 +361,15 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 			}
 			runtime.AddToTimeline("lines_inserted", msg)
 			log.Infof("insert_lines done: hasBlockingErrors=%v", hasBlockingErrors)
+			loopInfraStatus(loop, "文件插入完成 / File Insert Complete")
+			loopInfraActionFinish(loop, loopInfraNodeSingleFileInsert,
+				fmt.Sprintf("文件插入完成: %s line %d / File Inserted: %s line %d", filename, insertLine, filename, insertLine),
+				msg)
 			loop.GetEmitter().EmitPinFilename(filename)
 			_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
 				Content:      fullCode,
 				Path:         filename,
 				SourceAction: actionName,
-				ChangeReason: reason,
 				EventOp:      loopYaklangCodeEventOpReplace,
 				EmitEvent:    true,
 			})
@@ -371,14 +391,8 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 		[]aitool.ToolOption{
 			aitool.WithIntegerParam("delete_start_line"),
 			aitool.WithIntegerParam("delete_end_line", aitool.WithParam_Required(false)),
-			aitool.WithStringParam("delete_lines_reason", aitool.WithParam_Description(`Explain why deleting these lines, and summarize the deletion approach and lessons learned, keeping the original code content for future reference value`)),
 		},
-		[]*reactloops.LoopStreamField{
-			{
-				FieldName: "delete_lines_reason",
-				AINodeId:  "re-act-loop-thought",
-			},
-		},
+		nil,
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 			startLine := action.GetInt("delete_start_line")
 			endLine := action.GetInt("delete_end_line")
@@ -389,15 +403,11 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 				return utils.Error("delete_lines action: 'delete_end_line' must be greater than or equal to 'delete_start_line'")
 			}
 
-			var msg string
 			if endLine > 0 {
-				msg = fmt.Sprintf("Preparing delete lines:%v-%v", startLine, endLine)
+				loopInfraStatus(l, fmt.Sprintf("准备删除文件行 %d-%d / Preparing File Delete Lines %d-%d", startLine, endLine, startLine, endLine))
 			} else {
-				msg = fmt.Sprintf("Preparing delete line:%v", startLine)
+				loopInfraStatus(l, fmt.Sprintf("准备删除文件行 %d / Preparing File Delete Line %d", startLine, startLine))
 			}
-			l.GetEmitter().EmitDefaultStreamEvent(
-				"thought",
-				bytes.NewReader([]byte(msg)), l.GetCurrentTask().GetIndex())
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
@@ -420,25 +430,27 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 
 			var msg string
 			var err error
+			var deletedStart, deletedEnd int
 
 			if deleteEndLine > 0 {
 				// Delete line range
 				msg = fmt.Sprintf("decided to delete code lines, from start_line[%v] to end_line:[%v]", deleteStartLine, deleteEndLine)
 				log.Infof("start to delete code lines %d to %d", deleteStartLine, deleteEndLine)
+				deletedStart, deletedEnd = deleteStartLine, deleteEndLine
 				err = editor.DeleteLineRange(deleteStartLine, deleteEndLine)
 			} else {
 				// Delete single line
 				msg = fmt.Sprintf("decided to delete code line[%v]", deleteStartLine)
 				log.Infof("start to delete code line %d", deleteStartLine)
+				deletedStart, deletedEnd = deleteStartLine, deleteStartLine
 				err = editor.DeleteLine(deleteStartLine)
 			}
+			oldSegment := loopInfraExtractLineRange(fullCode, deletedStart, deletedEnd)
 
 			invoker.AddToTimeline("delete_lines", msg)
-
-			reason := action.GetString("delete_lines_reason")
-			if reason != "" {
-				runtime.AddToTimeline("delete_reason", reason)
-			}
+			loopInfraActionStart(loop, loopInfraNodeSingleFileDelete,
+				fmt.Sprintf("删除文件行: %s / Delete file lines: %s", filename, filename),
+				"删除文件内容 / Deleting File Content...")
 
 			if err != nil {
 				runtime.AddToTimeline("delete_failed", "Failed to delete lines: "+err.Error())
@@ -464,6 +476,15 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 				return
 			}
 
+			loopInfraAddFileOpSuccessTimeline(loop, loopInfraFileOpTimeline{
+				Op:         "delete",
+				Filename:   filename,
+				OldSegment: oldSegment,
+				StartLine:  deletedStart,
+				EndLine:    deletedEnd,
+				Deferred:   f.ShouldDeferDiskWrite(),
+			})
+
 			// Call file changed callback
 			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
 			f.applySyntaxLintResult(loop, op, hasBlockingErrors, f.ShouldExitWhenSyntaxClean())
@@ -482,12 +503,15 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 			}
 			runtime.AddToTimeline("lines_deleted", msg)
 			log.Infof("delete_lines done: hasBlockingErrors=%v", hasBlockingErrors)
+			loopInfraStatus(loop, "文件删除完成 / File Delete Complete")
+			loopInfraActionFinish(loop, loopInfraNodeSingleFileDelete,
+				fmt.Sprintf("文件删除完成: %s / File Delete Complete: %s", filename, filename),
+				msg)
 			loop.GetEmitter().EmitPinFilename(filename)
 			_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
 				Content:      fullCode,
 				Path:         filename,
 				SourceAction: actionName,
-				ChangeReason: reason,
 				EventOp:      loopYaklangCodeEventOpReplace,
 				EmitEvent:    true,
 			})

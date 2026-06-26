@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
+	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 )
@@ -49,24 +50,92 @@ var buildinBootstrapMethods = map[string]func(args ...values.JavaValue) BuildinB
 	},
 	"java.lang.invoke.LambdaMetafactory.metafactory": func(args1 ...values.JavaValue) BuildinBootstrapMethod {
 		return func(d *Decompiler, sim StackSimulation, typ types.JavaType, args2 ...values.JavaValue) (values.JavaValue, error) {
-			classMember := args1[1].(*values.JavaClassMember)
-			if classMember.Name != d.FunctionContext.ClassName {
-				return values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
-					return d.FunctionContext.ShortTypeName(classMember.Name) + "::" + classMember.Member
+			// args1 are the bootstrap static arguments:
+			//   args1[0] = samMethodType, args1[1] = implMethod(MethodHandle), args1[2] = instantiatedMethodType
+			// args2 are the dynamic captured arguments.
+			if len(args1) < 2 {
+				return nil, fmt.Errorf("lambda metafactory requires at least 2 bootstrap args, got %d", len(args1))
+			}
+			classMember, ok := args1[1].(*values.JavaClassMember)
+			if !ok {
+				return nil, fmt.Errorf("lambda metafactory: unexpected impl method handle type %T", args1[1])
+			}
+			member := classMember.Member
+			implClassName := strings.ReplaceAll(classMember.Name, "/", ".")
+			currentClassName := strings.ReplaceAll(d.FunctionContext.ClassName, "/", ".")
+			// Synthetic lambda bodies are emitted by javac as private methods named "lambda$...".
+			// Only those should be inlined as lambda expressions; everything else is a method reference.
+			isSyntheticLambda := strings.HasPrefix(member, "lambda$")
+			if isSyntheticLambda && implClassName == currentClassName {
+				// javac prepends the captured variables to the impl method's parameter list. They are
+				// not lambda parameters, so DumpClassLambdaMethod drops the leading `len(captured)`
+				// params from the arrow signature and renders each as a placeholder ("\x00LCAPi\x00").
+				// We resolve those placeholders here - lazily, at render time, mirroring how
+				// StringConcatFactory renders args2 - to the captured value's final name (post var
+				// rewrite), so `x -> x + base` reads as the captured `base`, not a spurious parameter.
+				// args2 is popped off the operand stack, so it arrives in reverse capture order; restore
+				// forward order so captured[i] lines up with the i-th leading impl parameter (otherwise
+				// multi-capture lambdas swap their captures, e.g. x*a+y*b becomes x*b+y*a).
+				captured := make([]values.JavaValue, len(args2))
+				for i := range args2 {
+					captured[i] = args2[len(args2)-1-i]
+				}
+				// Each lambda body gets its own fresh variable-id namespace so its formal
+				// parameters (var0, var1, ...) never collide with the enclosing method's locals.
+				// Captured values are resolved via LCAP placeholders, which are independent of
+				// the id chain, so a fresh root is safe.
+				methodStr, err := d.DumpClassLambdaMethod(member, classMember.Description, utils.NewRootVariableId(), len(captured))
+				if err != nil {
+					return nil, fmt.Errorf("dump lambda method `%s.%s` error: %w", classMember.Name, member, err)
+				}
+				cv := values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+					s := methodStr
+					for i, ca := range captured {
+						s = strings.ReplaceAll(s, fmt.Sprintf("\x00LCAP%d\x00", i), ca.String(funcCtx))
+					}
+					return s
 				}, func() types.JavaType {
 					return typ
-				}), nil
-				// return nil, fmt.Errorf("call external lamada: %s.%s", classMember.Name, classMember.Member)
+				})
+				// Mark as a lambda so a call on the lambda itself (the inlined `s.get()` shape) renders
+				// with the functional-interface cast it needs to compile, e.g. ((Supplier)(() -> ...)).get().
+				cv.Flag = "lambda"
+
+				// Upgrade the lambda's type from the erased descriptor type to a parameterized
+				// type using the instantiatedMethodType (3rd bootstrap arg). This only changes
+				// the lambda VALUE's type, not the stack simulation's slot type, so it doesn't
+				// interfere with slot reuse.
+				if len(args1) >= 3 {
+					if upgradedType := inferLambdaTypeFromInstantiated(typ, args1[2]); upgradedType != nil {
+						lambdaType := upgradedType
+						cv = values.NewCustomValue(cv.StringFunc, func() types.JavaType {
+							return lambdaType
+						})
+						cv.Flag = "lambda"
+					}
+				}
+				return cv, nil
 			}
-			methodStr, err := d.DumpClassLambdaMethod(classMember.Member, classMember.Description, sim.GetVarId())
-			if err != nil {
-				return nil, fmt.Errorf("dump lambda method `%s.%s` error: %w", classMember.Name, classMember.Member, err)
-			}
-			return values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
-				return methodStr
+
+			// Method reference: constructor / static / (bound|unbound) instance method.
+			capturedArgs := append([]values.JavaValue{}, args2...)
+			refVal := values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+				refMember := member
+				if member == "<init>" {
+					// constructor method reference: ClassName::new
+					refMember = "new"
+				} else if len(capturedArgs) > 0 {
+					// bound instance method reference: receiver::method
+					return capturedArgs[0].String(funcCtx) + "::" + refMember
+				}
+				return funcCtx.ShortTypeName(implClassName) + "::" + refMember
 			}, func() types.JavaType {
 				return typ
-			}), nil
+			})
+			// A method reference, like a lambda, has no target type when used directly as a call
+			// receiver (`(C::m).apply(x)` does not compile); flag it so the call site adds the cast.
+			refVal.Flag = "lambda"
+			return refVal, nil
 		}
 	},
 	"defaultBootstrapMethod": func(args ...values.JavaValue) BuildinBootstrapMethod {
@@ -82,4 +151,196 @@ var buildinBootstrapMethods = map[string]func(args ...values.JavaValue) BuildinB
 
 func init() {
 	buildinBootstrapMethods["java.lang.invoke.LambdaMetafactory.altMetafactory"] = buildinBootstrapMethods["java.lang.invoke.LambdaMetafactory.metafactory"]
+}
+
+func init() {
+	buildinBootstrapMethods["java.lang.runtime.ObjectMethods.bootstrap"] = func(args1 ...values.JavaValue) BuildinBootstrapMethod {
+		return func(d *Decompiler, sim StackSimulation, typ types.JavaType, args ...values.JavaValue) (values.JavaValue, error) {
+			// ObjectMethods.bootstrap args:
+			//   args1[0] = recordClass (JavaClassValue)
+			//   args1[1] = names ("field1;field2;..." as a JavaLiteral)
+			//   args1[2+] = MethodHandles for field getters (resolved to JavaClassMember)
+			// Dynamic args: args[0] = receiver (this), [args[1] = other for equals]
+			invokedName := d.InvokeDynamicName
+
+			// Extract record class name and simple name
+			recordClassName := ""
+			if len(args1) > 0 {
+				if cv, ok := args1[0].(*values.JavaClassValue); ok {
+					recordClassName = cv.String(d.FunctionContext)
+				}
+			}
+			simpleName := recordClassName
+			if idx := strings.LastIndex(simpleName, "."); idx >= 0 {
+				simpleName = simpleName[idx+1:]
+			}
+			if idx := strings.LastIndex(simpleName, "$"); idx >= 0 {
+				simpleName = simpleName[idx+1:]
+			}
+
+			// Extract field names from the "name1;name2;..." literal
+			var fieldNames []string
+			if len(args1) > 1 {
+				if lit, ok := args1[1].(*values.JavaLiteral); ok {
+					raw := lit.String(d.FunctionContext)
+					// The literal renders with quotes; strip them
+					raw = strings.Trim(raw, `"`)
+					for _, fn := range strings.Split(raw, ";") {
+						fn = strings.TrimSpace(fn)
+						if fn != "" {
+							fieldNames = append(fieldNames, fn)
+						}
+					}
+				}
+			}
+			// Fall back to extracting field names from the getter method handles
+			if len(fieldNames) == 0 {
+				for _, arg := range args1[2:] {
+					if cm, ok := arg.(*values.JavaClassMember); ok {
+						fieldNames = append(fieldNames, cm.Member)
+					}
+				}
+			}
+
+			// The receiver is args[0] (popped last from stack, so it's the first dynamic arg)
+			var receiver values.JavaValue
+			if len(args) > 0 {
+				receiver = args[0]
+			}
+			receiverStr := "this"
+			if receiver != nil {
+				receiverStr = receiver.String(d.FunctionContext)
+			}
+
+			var result string
+			switch invokedName {
+			case "toString":
+				parts := []string{}
+				for _, fn := range fieldNames {
+					parts = append(parts, fn+`=" + `+receiverStr+`.`+fn)
+				}
+				if len(parts) > 0 {
+					result = `"` + simpleName + `[` + strings.Join(parts, ` + ", `) + ` + "]"`
+				} else {
+					result = `"` + simpleName + `[]"`
+				}
+
+			case "hashCode":
+				if len(fieldNames) == 0 {
+					result = "0"
+				} else {
+					// java.util.Objects.hash(field1, field2, ...)
+					fieldRefs := make([]string, len(fieldNames))
+					for i, fn := range fieldNames {
+						fieldRefs[i] = receiverStr + "." + fn
+					}
+					result = "java.util.Objects.hash(" + strings.Join(fieldRefs, ", ") + ")"
+					d.FunctionContext.Import("java.util.Objects")
+				}
+
+			case "equals":
+				if len(args) > 1 {
+					other := args[1].String(d.FunctionContext)
+					if len(fieldNames) == 0 {
+						result = receiverStr + " == " + other
+					} else {
+						// this.field1 == other.field1 && this.field2 == other.field2 ...
+						parts := []string{}
+						for _, fn := range fieldNames {
+							parts = append(parts, receiverStr+"."+fn+" == "+other+"."+fn)
+						}
+						result = receiverStr + " == " + other + " || (" + receiverStr + " != null && " + other + " != null && " + strings.Join(parts, " && ") + ")"
+					}
+				} else {
+					result = "false"
+				}
+
+			default:
+				return values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+					return "ObjectMethods(" + invokedName + ")"
+				}, func() types.JavaType {
+					return typ
+				}), nil
+			}
+
+			return values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+				return result
+			}, func() types.JavaType {
+				return typ
+			}), nil
+		}
+	}
+}
+
+// inferLambdaTypeFromInstantiated upgrades a raw functional-interface type to a
+// parameterized type using the instantiatedMethodType (3rd bootstrap arg).
+// The instantiatedMethodType is a MethodType constant whose String() returns its
+// descriptor (e.g. "(Ljava/lang/Integer;Ljava/lang/Integer;)Ljava/lang/Integer;").
+// Only standard JDK functional interfaces are upgraded (exact FQN match).
+func inferLambdaTypeFromInstantiated(rawType types.JavaType, instantiatedMethodType values.JavaValue) types.JavaType {
+	var desc string
+	if cv, ok := instantiatedMethodType.(*values.CustomValue); ok {
+		s := cv.String(&class_context.ClassContext{})
+		if strings.HasPrefix(s, "(") {
+			desc = s
+		}
+	}
+	if desc == "" {
+		return nil
+	}
+
+	// Get the fully qualified class name from the raw type
+	rawName := ""
+	if jc, ok := rawType.RawType().(*types.JavaClass); ok {
+		rawName = jc.Name
+	}
+	if rawName == "" {
+		return nil
+	}
+
+	mt, err := types.ParseMethodDescriptor(desc)
+	if err != nil {
+		return nil
+	}
+	mtParams := mt.FunctionType().ParamTypes
+	mtRet := mt.FunctionType().ReturnType
+
+	typeArgs := []types.JavaType{}
+	switch rawName {
+	case "java.util.function.BiFunction":
+		if len(mtParams) >= 2 {
+			typeArgs = append(typeArgs, mtParams[0], mtParams[1])
+		}
+		typeArgs = append(typeArgs, mtRet)
+	case "java.util.function.Function":
+		if len(mtParams) >= 1 {
+			typeArgs = append(typeArgs, mtParams[0])
+		}
+		typeArgs = append(typeArgs, mtRet)
+	case "java.util.function.Predicate":
+		if len(mtParams) >= 1 {
+			typeArgs = append(typeArgs, mtParams[0])
+		}
+	case "java.util.function.Consumer":
+		if len(mtParams) >= 1 {
+			typeArgs = append(typeArgs, mtParams[0])
+		}
+	case "java.util.function.Supplier":
+		typeArgs = append(typeArgs, mtRet)
+	case "java.util.function.BiConsumer":
+		if len(mtParams) >= 2 {
+			typeArgs = append(typeArgs, mtParams[0], mtParams[1])
+		}
+	case "java.util.function.BiPredicate":
+		if len(mtParams) >= 2 {
+			typeArgs = append(typeArgs, mtParams[0], mtParams[1])
+		}
+	default:
+		return nil
+	}
+
+	if len(typeArgs) == 0 {
+		return nil
+	}
+	return types.NewParameterizedType(rawName, typeArgs)
 }

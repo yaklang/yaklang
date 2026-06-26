@@ -1,7 +1,6 @@
 package loop_yaklangcode
 
 import (
-	"bytes"
 	"fmt"
 	"strings"
 
@@ -54,13 +53,13 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 		needLiteforge := hasSearcher || !hasAttachedPath
 
 		analyzeOpts := yaklangAnalyzeRequirementOptions{
-			userInput:        task.GetUserInput(),
-			hasAttachedPath:  hasAttachedPath,
-			createMode:       createMode,
-			attachedPath:     attachedPath,
-			workspacePath:    workspacePath,
-			hasGrepSearcher:  hasGrepSearcher,
-			hasRAGSearcher:   hasRAGSearcher,
+			userInput:       task.GetUserInput(),
+			hasAttachedPath: hasAttachedPath,
+			createMode:      createMode,
+			attachedPath:    attachedPath,
+			workspacePath:   workspacePath,
+			hasGrepSearcher: hasGrepSearcher,
+			hasRAGSearcher:  hasRAGSearcher,
 		}
 
 		var (
@@ -79,7 +78,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 				forgeOptions = append(forgeOptions, aicommon.WithGeneralConfigStreamableFieldWithNodeId("init-search-code-sample", "reason"))
 			}
 
-			loop.LoadingStatus("开始分析用户需求... / Analyzing user requirements...")
+			reactloops.EmitStatus(loop, "开始分析用户需求... / Analyzing user requirements...")
 			step1Result, err := r.InvokeSpeedPriorityLiteForge(
 				task.GetContext(),
 				"analyze-requirement-and-search",
@@ -102,13 +101,6 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 		} else {
 			log.Infof("skip liteforge file detection: target path already attached (%s)", attachedPath)
 		}
-		for _, question := range semanticQuestions {
-			emitter.EmitDefaultStreamEvent("thought", bytes.NewBufferString(question), task.GetIndex())
-		}
-		if len(searchPatterns) > 0 {
-			emitter.EmitDefaultStreamEvent("thought", bytes.NewBufferString(strings.Join(searchPatterns, ",")), task.GetIndex())
-		}
-
 		var userRequirements = utils.MustRenderTemplate(`<|USER_REQUIREMENTS_{{.nonce}}|>
 {{.data}}
 ---
@@ -131,10 +123,16 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 		// Step 2.1: 执行 Grep 搜索（如果有 docSearcher）
 		if docSearcher != nil && len(searchPatterns) > 0 {
 			log.Infof("init task step 2.1: grep searching code samples with %d patterns", len(searchPatterns))
-			loop.LoadingStatus("开始搜索相关代码样例... / Searching for relevant code examples...")
+			reactloops.EmitStatus(loop, "开始搜索相关代码样例... / Searching for relevant code examples...")
 
 			var grepResults strings.Builder
 			searchedCount := 0
+			patternTotal := 0
+			for _, pattern := range searchPatterns {
+				if pattern != "" {
+					patternTotal++
+				}
+			}
 			for idx, pattern := range searchPatterns {
 				if pattern == "" {
 					continue
@@ -158,52 +156,33 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 					continue
 				}
 
-				var singleResult bytes.Buffer
-				var singleResultStreamId string
-				pr, pw := utils.NewPipe()
-				if event, _ := emitter.EmitDefaultStreamEvent("thought", pr, task.GetIndex()); event != nil {
-					singleResultStreamId = event.GetStreamEventWriterId()
-				}
-
-				pw.WriteString("[Searching]: ")
-				pw.WriteString(pattern)
-				pw.WriteString("... \n ")
-				pw.WriteString(fmt.Sprintf("结果[%v]条, ", len(results)))
+				searchedCount++
+				reactloops.EmitStatus(loop, fmt.Sprintf(
+					"Grep 搜索 %d/%d / Grep search %d/%d",
+					searchedCount, patternTotal, searchedCount, patternTotal,
+				))
 
 				header := fmt.Sprintf("\n=== Grep Pattern: %s (Found %d matches) ===\n", pattern, len(results))
-				searchedCount++
 				grepResults.WriteString(header)
-				singleResult.WriteString(header)
 
 				for i, result := range results {
 					l := fmt.Sprintf("\n--- [%d] %s:%d ---\n", i+1, result.FileName, result.LineNumber)
 					grepResults.WriteString(l)
-					singleResult.WriteString(l)
 
 					if len(result.ContextBefore) > 0 {
 						for _, line := range result.ContextBefore {
-							text := fmt.Sprintf("  %s\n", line)
-							singleResult.WriteString(text)
-							grepResults.WriteString(text)
+							grepResults.WriteString(fmt.Sprintf("  %s\n", line))
 						}
 					}
 
-					text := fmt.Sprintf(">>> %s\n", result.Line)
-					grepResults.WriteString(text)
-					singleResult.WriteString(text)
+					grepResults.WriteString(fmt.Sprintf(">>> %s\n", result.Line))
 
 					if len(result.ContextAfter) > 0 {
 						for _, line := range result.ContextAfter {
-							text := fmt.Sprintf("  %s\n", line)
-							grepResults.WriteString(text)
-							singleResult.WriteString(text)
+							grepResults.WriteString(fmt.Sprintf("  %s\n", line))
 						}
 					}
 				}
-
-				pw.WriteString(" Size: " + utils.ByteSize(uint64(singleResult.Len())) + "\n")
-				emitter.EmitTextReferenceMaterial(singleResultStreamId, singleResult.String())
-				pw.Close()
 			}
 
 			if searchedCount > 0 {
@@ -224,6 +203,13 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 				DocID string
 			}
 			allResultsMap := make(map[ResultKey]rag.SearchResult)
+			questionTotal := 0
+			for _, q := range semanticQuestions {
+				if q != "" {
+					questionTotal++
+				}
+			}
+			searchedQuestions := 0
 
 			for idx, question := range semanticQuestions {
 				if question == "" {
@@ -231,32 +217,20 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 				}
 
 				log.Infof("semantic searching question %d/%d: %s", idx+1, len(semanticQuestions), question)
+				searchedQuestions++
+				reactloops.EmitStatus(loop, fmt.Sprintf(
+					"语义搜索 %d/%d / Semantic search %d/%d",
+					searchedQuestions, questionTotal, searchedQuestions, questionTotal,
+				))
 
-				pr, pw := utils.NewPipe()
-				var singleResultStreamId string
-				if event, _ := emitter.EmitDefaultStreamEvent("thought", pr, task.GetIndex()); event != nil {
-					singleResultStreamId = event.GetStreamEventWriterId()
-				}
-
-				pw.WriteString("[Searching] 语义搜索: ")
-				pw.WriteString(question)
-				pw.WriteString("... \n ")
-
-				// 执行语义搜索
 				results, err := ragSearcher.QueryTopN(question, topN, scoreThreshold)
 				if err != nil {
-					pw.WriteString("No Results Found.\n")
-					pw.Close()
 					log.Errorf("semantic search failed for question '%s': %v", question, err)
 					continue
 				}
 
-				pw.WriteString(fmt.Sprintf("结果[%v]条; ", len(results)))
-
 				log.Infof("semantic search found %d results for question: %s", len(results), question)
 
-				var singleResult bytes.Buffer
-				// 合并结果，使用文档ID去重，保留最高分数
 				for _, result := range results {
 					var docID string
 					if result.KnowledgeBaseEntry != nil {
@@ -271,11 +245,8 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 					existing, exists := allResultsMap[key]
 					if !exists || result.Score > existing.Score {
 						allResultsMap[key] = *result
-						singleResult.WriteString(result.GetContent())
 					}
 				}
-				emitter.EmitTextReferenceMaterial(singleResultStreamId, singleResult.String())
-				pw.Close()
 			}
 
 			// 将 map 转换为切片并格式化
@@ -349,10 +320,18 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 			}
 
 			if initialSamples != "" {
-				if event, _ := emitter.EmitThoughtStream(task.GetIndex(), "压缩完成，压缩后样本大小为: "+utils.ByteSize(uint64(len(initialSamples)))); event != nil {
-					emitter.EmitTextReferenceMaterial(event.GetStreamEventWriterId(), initialSamples)
-				}
-				r.AddToTimeline("initial_code_samples", initialSamples)
+				reactloops.EmitStatus(loop, "压缩样例中 / Compressing samples...")
+				summary, reference := reactloops.SpillLongContent(loop, "init_code_samples", initialSamples)
+				reactloops.EmitStatus(loop, "样例准备完成 / Samples ready")
+				reactloops.EmitActionLog(loop, "yaklang-init-search",
+					fmt.Sprintf("初始化样例: %s", utils.ByteSize(uint64(len(initialSamples)))),
+					reference,
+				)
+				r.AddToTimeline("initial_code_samples", fmt.Sprintf(
+					"初始化代码样例 (%s)\n%s",
+					utils.ByteSize(uint64(len(initialSamples))),
+					summary,
+				))
 				log.Infof("initial samples collected and compressed successfully, final size: %d bytes", len(initialSamples))
 			}
 		} else {

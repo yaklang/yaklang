@@ -109,8 +109,8 @@ func WithJsonExtractHook(opts ...jsonextractor.CallbackOption) LiteForgeExecOpti
 // example:
 // ```
 // liteforge.Execute(<<<PROMPT
-// SOME_CONTENTN
-// PROMPT, liteforge.output(jsonschema.ActionObject(jsonschema.paramString("value"))),
+// SOME_CONTENT
+// PROMPT, liteforge.output(jsonschema.ActionObject(jsonschema.paramString("value"))))
 // ```
 //
 // 参数:

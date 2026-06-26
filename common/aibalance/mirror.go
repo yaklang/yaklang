@@ -121,6 +121,11 @@ type MirrorSnapshot struct {
 	InputBytes  int64             `json:"input_bytes"`
 	OutputBytes int64             `json:"output_bytes"`
 	Usage       *aispec.ChatUsage `json:"usage"`
+
+	// queuedBytes 是该快照入队时预约的全局字节预算估算值, 仅用于内部
+	// inFlightBytes 记账 (入队 Add / 消费 Sub), 不对脚本层暴露 (json:"-").
+	// 关键词: MirrorSnapshot queuedBytes, 全局字节预算记账
+	queuedBytes int64 `json:"-"`
 }
 
 // ToScriptMap 把 snapshot 序列化为对脚本友好的 map[string]any 形态,
@@ -408,6 +413,127 @@ func (r *mirrorLogRing) snapshot() []MirrorRunLog {
 	return out
 }
 
+// ==================== 队列容量 / 内存治理 ====================
+//
+// 本次卡死事故的主因之一: mirror 队列默认 1024, 单条超大快照 (prompt_len ~80 万)
+// 通过 RequestMessages 引用扣押 ~1MB, 单条规则最坏可扣押 1024×1MB≈1GB 内存,
+// 直接把 heap 打爆触发 GC/调度器饥饿. 这里引入三层治理:
+//   1. 队列容量钳制到 [1, 256], 默认 64, 消除单规则 GB 级扣押上限.
+//   2. 全局在途字节预算 (inFlightBytes / maxInFlightBytes): 无论字段多大,
+//      所有队列扣押的总字节有确定上限, 超额直接 drop.
+//   3. 单字段截断 (mirrorSnapshotFieldCap): 进一步压低单快照体积, 保留尾部
+//      以免破坏嵌入记录的闭合标记.
+//
+// 关键词: mirror 队列钳制, 全局字节预算, 单字段截断, 内存治理止血
+const (
+	// mirrorDefaultQueueSize 是 QueueSize<=0 时的默认队列容量.
+	mirrorDefaultQueueSize = 64
+	// mirrorMinQueueSize / mirrorMaxQueueSize 是队列容量的硬钳制区间.
+	mirrorMinQueueSize = 1
+	mirrorMaxQueueSize = 256
+	// mirrorSnapshotFieldCap 是单个字符串字段 (response_text / message content
+	// 等) 入队前的截断上限, 1MB 足以容纳价值评估嵌入记录.
+	mirrorSnapshotFieldCap = 1 << 20
+	// mirrorDefaultMaxInFlightBytes 是全局在途字节预算的默认上限 (128MB).
+	mirrorDefaultMaxInFlightBytes = 128 << 20
+)
+
+// clampMirrorQueueSize 把用户/DB 配置的队列容量钳制到 [1, 256], 非正值取默认 64.
+//
+// 关键词: clampMirrorQueueSize, 队列容量钳制
+func clampMirrorQueueSize(n int) int {
+	if n <= 0 {
+		n = mirrorDefaultQueueSize
+	}
+	if n < mirrorMinQueueSize {
+		n = mirrorMinQueueSize
+	}
+	if n > mirrorMaxQueueSize {
+		n = mirrorMaxQueueSize
+	}
+	return n
+}
+
+// estimateSnapshotBytes 估算一个快照入队后实际扣押的堆内存 (主要是各字符串字段).
+// 只统计真正占内存的字符串内容, 不含计数器字段, 避免重复计数.
+//
+// 关键词: estimateSnapshotBytes, 快照内存估算, 字节预算
+func estimateSnapshotBytes(snap *MirrorSnapshot) int64 {
+	if snap == nil {
+		return 0
+	}
+	var n int64
+	n += int64(len(snap.ResponseText))
+	n += int64(len(snap.ResponseReason))
+	for _, msg := range snap.RequestMessages {
+		if s, ok := msg.Content.(string); ok {
+			n += int64(len(s))
+		} else if msg.Content != nil {
+			// 非字符串内容 (多模态等) 不便廉价估算, 给一个保守常量占位.
+			n += 256
+		}
+		n += int64(len(msg.ReasoningContent))
+	}
+	return n
+}
+
+// truncateKeepTail 在超过 cap 时截断字符串, 保留尾部 (嵌入记录的闭合标记
+// 如 </aive_record_json> 通常在尾部), 头部用标记替换.
+//
+// 关键词: truncateKeepTail, 单字段截断保留尾部
+func truncateKeepTail(s string, cap int) string {
+	if cap <= 0 || len(s) <= cap {
+		return s
+	}
+	const marker = "...(truncated head by aibalance mirror)..."
+	if cap <= len(marker) {
+		return s[len(s)-cap:]
+	}
+	return marker + s[len(s)-(cap-len(marker)):]
+}
+
+// prepareSnapshotForQueue 对超大字段做截断. 仅当确有字段超限时才做一次浅拷贝,
+// 避免污染调用方持有的原始快照 (server.go 里 RequestMessages 与请求体共享 backing).
+//
+// 关键词: prepareSnapshotForQueue, 入队前截断, 浅拷贝避免污染原始数据
+func prepareSnapshotForQueue(snap *MirrorSnapshot) *MirrorSnapshot {
+	if snap == nil {
+		return nil
+	}
+	needCopy := len(snap.ResponseText) > mirrorSnapshotFieldCap ||
+		len(snap.ResponseReason) > mirrorSnapshotFieldCap
+	if !needCopy {
+		for _, msg := range snap.RequestMessages {
+			if s, ok := msg.Content.(string); ok && len(s) > mirrorSnapshotFieldCap {
+				needCopy = true
+				break
+			}
+			if len(msg.ReasoningContent) > mirrorSnapshotFieldCap {
+				needCopy = true
+				break
+			}
+		}
+	}
+	if !needCopy {
+		return snap
+	}
+	cp := *snap
+	cp.ResponseText = truncateKeepTail(snap.ResponseText, mirrorSnapshotFieldCap)
+	cp.ResponseReason = truncateKeepTail(snap.ResponseReason, mirrorSnapshotFieldCap)
+	if len(snap.RequestMessages) > 0 {
+		msgs := make([]aispec.ChatDetail, len(snap.RequestMessages))
+		copy(msgs, snap.RequestMessages)
+		for i := range msgs {
+			if s, ok := msgs[i].Content.(string); ok {
+				msgs[i].Content = truncateKeepTail(s, mirrorSnapshotFieldCap)
+			}
+			msgs[i].ReasoningContent = truncateKeepTail(msgs[i].ReasoningContent, mirrorSnapshotFieldCap)
+		}
+		cp.RequestMessages = msgs
+	}
+	return &cp
+}
+
 // ==================== Runtime per rule ====================
 
 // mirrorRuleRuntime 单条规则的运行时态.
@@ -434,6 +560,14 @@ type MirrorManager struct {
 	// engineConcurrency 控制 yak.NewScriptEngine 初始化时的 maxConcurrent;
 	// 这里只是 pool 的上限, 实际并发由每条规则各自的 worker 数决定.
 	engineConcurrency int
+
+	// inFlightBytes 是当前所有规则队列中扣押快照的估算总字节 (atomic).
+	// maxInFlightBytes 是全局在途字节预算上限 (<=0 时取默认 128MB).
+	// 这是内存治理的核心安全网: 无论单字段多大 / 队列多深, mirror 占用的总内存
+	// 都被钳制在预算内, 超额的快照直接 drop 记账.
+	// 关键词: MirrorManager inFlightBytes/maxInFlightBytes, 全局字节预算
+	inFlightBytes    int64
+	maxInFlightBytes int64
 }
 
 // NewMirrorManager 仅构造空 manager, 实际加载 DB 规则要显式调用 LoadRules.
@@ -441,7 +575,74 @@ func NewMirrorManager() *MirrorManager {
 	return &MirrorManager{
 		runtime:           make(map[uint]*mirrorRuleRuntime),
 		engineConcurrency: 32,
+		maxInFlightBytes:  mirrorDefaultMaxInFlightBytes,
 	}
+}
+
+// InFlightBytes 返回当前在途 (队列中) 快照的估算总字节.
+//
+// 关键词: MirrorManager.InFlightBytes, 在途字节观测
+func (m *MirrorManager) InFlightBytes() int64 {
+	if m == nil {
+		return 0
+	}
+	return atomic.LoadInt64(&m.inFlightBytes)
+}
+
+// MaxInFlightBytes 返回全局在途字节预算上限 (<=0 时回落到默认 128MB).
+//
+// 关键词: MirrorManager.MaxInFlightBytes, 字节预算上限
+func (m *MirrorManager) MaxInFlightBytes() int64 {
+	if m == nil {
+		return 0
+	}
+	v := atomic.LoadInt64(&m.maxInFlightBytes)
+	if v <= 0 {
+		return mirrorDefaultMaxInFlightBytes
+	}
+	return v
+}
+
+// SetMaxInFlightBytes 调整全局在途字节预算上限 (<=0 表示回落默认).
+//
+// 关键词: MirrorManager.SetMaxInFlightBytes, 字节预算热调
+func (m *MirrorManager) SetMaxInFlightBytes(n int64) {
+	if m == nil {
+		return
+	}
+	atomic.StoreInt64(&m.maxInFlightBytes, n)
+}
+
+// tryReserveBytes 用 CAS 尝试预约 n 字节预算; 超出上限返回 false (调用方应 drop).
+//
+// 关键词: tryReserveBytes, 字节预算 CAS 预约
+func (m *MirrorManager) tryReserveBytes(n int64) bool {
+	if m == nil {
+		return true
+	}
+	if n <= 0 {
+		return true
+	}
+	max := m.MaxInFlightBytes()
+	for {
+		cur := atomic.LoadInt64(&m.inFlightBytes)
+		if cur+n > max {
+			return false
+		}
+		if atomic.CompareAndSwapInt64(&m.inFlightBytes, cur, cur+n) {
+			return true
+		}
+	}
+}
+
+// releaseBytes 归还 n 字节预算 (入队失败回退 / worker 消费完成时调用).
+//
+// 关键词: releaseBytes, 字节预算归还
+func (m *MirrorManager) releaseBytes(n int64) {
+	if m == nil || n <= 0 {
+		return
+	}
+	atomic.AddInt64(&m.inFlightBytes, -n)
 }
 
 // LoadRules 从 DB 加载全部启用规则, 启动各自 worker pool.
@@ -510,10 +711,9 @@ func (m *MirrorManager) startRuleLocked(rule *schema.AiMirrorRule) {
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	queueSize := rule.QueueSize
-	if queueSize <= 0 {
-		queueSize = 1024
-	}
+	// 队列容量钳制到 [1,256], 默认 64, 消除单规则 GB 级内存扣押上限.
+	// 关键词: startRuleLocked queue clamp, 队列降容
+	queueSize := clampMirrorQueueSize(rule.QueueSize)
 	concurrency := rule.Concurrency
 	if concurrency <= 0 {
 		concurrency = 4
@@ -549,6 +749,11 @@ func (m *MirrorManager) workerLoop(ctx context.Context, rt *mirrorRuleRuntime) {
 			atomic.AddInt32(&rt.scriptN, 1)
 			m.runOnce(ctx, rt, snap)
 			atomic.AddInt32(&rt.scriptN, -1)
+			// 消费完成, 归还入队时预约的字节预算.
+			// 关键词: workerLoop releaseBytes, 字节预算归还
+			if snap != nil {
+				m.releaseBytes(snap.queuedBytes)
+			}
 		}
 	}
 }
@@ -757,31 +962,55 @@ func (m *MirrorManager) Trigger(snap *MirrorSnapshot) {
 		runtimes = append(runtimes, rt)
 	}
 	m.mu.RUnlock()
+	if len(runtimes) == 0 {
+		return
+	}
+
+	// 入队前: 超大字段截断 + 估算字节, 用于全局字节预算记账.
+	// 关键词: Trigger 截断 + 字节预算, 内存治理止血
+	snap = prepareSnapshotForQueue(snap)
+	queuedBytes := estimateSnapshotBytes(snap)
+	snap.queuedBytes = queuedBytes
+
 	for _, rt := range runtimes {
 		if !MirrorRuleMatch(rt.rule, snap) {
+			continue
+		}
+		// 全局字节预算: 超额直接 drop, 这是无论字段多大都成立的内存硬上限.
+		if !m.tryReserveBytes(queuedBytes) {
+			m.recordDrop(rt, snap, "in-flight byte budget exceeded")
 			continue
 		}
 		select {
 		case rt.ch <- snap:
 		default:
-			// 队列满, 丢弃并记账
-			rt.logs.push(MirrorRunLog{
-				Timestamp:    time.Now(),
-				ReqID:        snap.ReqID,
-				Success:      false,
-				ErrorMessage: "queue full, dropped",
-			})
-			if err := IncrementMirrorCounters(rt.rule.ID, MirrorCounterDelta{
-				Triggered: 1,
-				Dropped:   1,
-				TouchTime: true,
-			}); err != nil {
-				log.Warnf("mirror: rule id=%d drop counter failed: %v", rt.rule.ID, err)
-			}
-			log.Warnf("mirror: rule id=%d name=%q dropped snapshot req_id=%s (queue full)",
-				rt.rule.ID, rt.rule.Name, snap.ReqID)
+			// 队列满, 退还预约并 drop 记账.
+			m.releaseBytes(queuedBytes)
+			m.recordDrop(rt, snap, "queue full")
 		}
 	}
+}
+
+// recordDrop 统一记录一次快照被丢弃 (队列满 / 超字节预算): 写内存环形日志 +
+// 累加 DB dropped 计数 + 落一条 warn 日志.
+//
+// 关键词: recordDrop, mirror 丢弃记账, queue full / byte budget drop
+func (m *MirrorManager) recordDrop(rt *mirrorRuleRuntime, snap *MirrorSnapshot, reason string) {
+	rt.logs.push(MirrorRunLog{
+		Timestamp:    time.Now(),
+		ReqID:        snap.ReqID,
+		Success:      false,
+		ErrorMessage: reason + ", dropped",
+	})
+	if err := IncrementMirrorCounters(rt.rule.ID, MirrorCounterDelta{
+		Triggered: 1,
+		Dropped:   1,
+		TouchTime: true,
+	}); err != nil {
+		log.Warnf("mirror: rule id=%d drop counter failed: %v", rt.rule.ID, err)
+	}
+	log.Warnf("mirror: rule id=%d name=%q dropped snapshot req_id=%s (%s)",
+		rt.rule.ID, rt.rule.Name, snap.ReqID, reason)
 }
 
 // ==================== Capability Hints (for server.go short-circuit) ====================

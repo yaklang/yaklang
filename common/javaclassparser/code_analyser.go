@@ -11,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"github.com/yaklang/yaklang/common/log"
-	"strings"
 )
 
 func getNameAndType(pool []ConstantInfo, index uint16) (string, string) {
@@ -45,6 +44,7 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 	}
 	convertMemberInfo := func(classMemberInfo *ConstantMemberrefInfo) values.JavaValue {
 		className := getClassName(classMemberInfo.ClassIndex)
+		className = types.SlashToDot(className)
 		name, desc := getNameAndType(pool, classMemberInfo.NameAndTypeIndex)
 		typ, err := types.ParseMethodDescriptor(desc)
 		if err != nil {
@@ -68,7 +68,7 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 		refNameInfo := indexFromPool(int(nameAndType.NameIndex)).(*ConstantUtf8Info)
 		descInfo := indexFromPool(int(nameAndType.DescriptorIndex)).(*ConstantUtf8Info)
 		typeName := nameInfo.Value
-		typeName = strings.Replace(typeName, "/", ".", -1)
+		typeName = types.SlashToDot(typeName)
 		typ, err := types.ParseDescriptor(descInfo.Value)
 		if err != nil {
 			log.Errorf("parse descriptor failed:%s", descInfo.Value)
@@ -83,7 +83,7 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 		refNameInfo := indexFromPool(int(nameAndType.NameIndex)).(*ConstantUtf8Info)
 		descInfo := indexFromPool(int(nameAndType.DescriptorIndex)).(*ConstantUtf8Info)
 		typeName := nameInfo.Value
-		typeName = strings.Replace(typeName, "/", ".", -1)
+		typeName = types.SlashToDot(typeName)
 		typ, err := types.ParseMethodDescriptor(descInfo.Value)
 		if err != nil {
 			log.Errorf("parse descriptor failed:%s", descInfo.Value)
@@ -93,18 +93,18 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 	case *ConstantClassInfo:
 		nameInfo := indexFromPool(int(ret.NameIndex)).(*ConstantUtf8Info)
 		typeName := nameInfo.Value
-		typeName = strings.Replace(typeName, "/", ".", -1)
+		typeName = types.SlashToDot(typeName)
 		return values.NewJavaClassValue(types.NewJavaClass(typeName))
 	case *ConstantModuleInfo:
 		nameInfo := indexFromPool(int(ret.NameIndex)).(*ConstantUtf8Info)
 		typeName := nameInfo.Value
-		typeName = strings.Replace(typeName, "/", ".", -1)
+		typeName = types.SlashToDot(typeName)
 		log.Warn("TODO: the java module should be a new java type")
 		return values.NewJavaClassValue(types.NewJavaClass(typeName))
 	case *ConstantPackageInfo:
 		nameInfo := indexFromPool(int(ret.NameIndex)).(*ConstantUtf8Info)
 		typeName := nameInfo.Value
-		typeName = strings.Replace(typeName, "/", ".", -1)
+		typeName = types.SlashToDot(typeName)
 		log.Warn("TODO: the java module should be a new java type")
 		return values.NewJavaClassValue(types.NewJavaClass(typeName))
 	case *ConstantMethodTypeInfo:
@@ -115,7 +115,9 @@ func GetValueFromCP(pool []ConstantInfo, index int) values.JavaValue {
 		}
 		_ = typ
 		return values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
-			return "<MethodType Class Instance>"
+			// Return the descriptor itself so lambda type inference can read it.
+			// Other consumers (non-lambda bootstraps) ignore the string value.
+			return descInfo.Value
 		}, func() types.JavaType {
 			return types.NewJavaClass("java.lang.invoke.MethodType")
 		})
@@ -157,8 +159,9 @@ func ParseBytesCode(dumper *ClassObjectDumper, codeAttr *CodeAttribute, id *util
 	parser := core.NewDecompiler(codeAttr.Code, func(id int) values.JavaValue {
 		return GetValueFromCP(dumper.ConstantPool, id)
 	})
-	parser.DumpClassLambdaMethod = func(name, desc string, id *utils.VariableId) (string, error) {
+	parser.DumpClassLambdaMethod = func(name, desc string, id *utils.VariableId, capturedCount int) (string, error) {
 		dumper.lambdaMethods[name] = append(dumper.lambdaMethods[name], desc)
+		dumper.lambdaCaptureCount[name+desc] = capturedCount
 		dumped, err := dumper.DumpMethodWithInitialId(name, desc, id)
 		if err != nil {
 			return "", err

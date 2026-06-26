@@ -28,11 +28,10 @@ func (c *Config) parseFSFromInfo() (fi.FileSystem, error) {
 	case ssaconfig.CodeSourceLocal:
 		baseFS = filesys.NewRelLocalFs(c.GetCodeSourceLocalFile())
 	case ssaconfig.CodeSourceCompression:
-		zipfs, err := getZipFile(c)
+		baseFS, err = getZipFile(c)
 		if err != nil {
 			return nil, err
 		}
-		baseFS = zipfs
 	case ssaconfig.CodeSourceJar:
 		zipfs, err := getZipFile(c)
 		if err != nil {
@@ -133,7 +132,7 @@ func parseAuth(auth *ssaconfig.AuthConfigInfo) []yakgit.Option {
 	var opts []yakgit.Option
 
 	switch auth.Kind {
-	case "password":
+	case "password", "token":
 		opts = append(opts, yakgit.WithUsernamePassword(auth.UserName, auth.Password))
 	case "ssh_key":
 		if auth.KeyContent != "" {

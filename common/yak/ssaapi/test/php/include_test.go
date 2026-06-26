@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -86,4 +87,57 @@ shell_exec(* as $target )
 `, map[string][]string{
 		"target": {`"ls -la"`},
 	}, false, ssaapi.WithLanguage(ssaconfig.PHP))
+}
+
+func TestPHPSelfIncludeDoesNotDeadlock(t *testing.T) {
+	tmpDir := t.TempDir()
+	err := os.WriteFile(filepath.Join(tmpDir, "loop.php"), []byte(`<?php
+include 'loop.php';
+$x = 1;
+`), 0644)
+	require.NoError(t, err)
+
+	fs := filesys.NewRelLocalFs(tmpDir)
+	done := make(chan error, 1)
+	go func() {
+		_, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.PHP))
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(30 * time.Second):
+		t.Fatal("self-including PHP file compile deadlocked")
+	}
+}
+
+func TestPHPCircularIncludeDoesNotDeadlock(t *testing.T) {
+	tmpDir := t.TempDir()
+	writeFile := func(name, content string) {
+		fullPath := filepath.Join(tmpDir, name)
+		err := os.WriteFile(fullPath, []byte(content), 0644)
+		require.NoError(t, err)
+	}
+	writeFile("a.php", `<?php
+include 'b.php';
+`)
+	writeFile("b.php", `<?php
+include 'a.php';
+$x = 1;
+`)
+
+	fs := filesys.NewRelLocalFs(tmpDir)
+	done := make(chan error, 1)
+	go func() {
+		_, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.PHP))
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(30 * time.Second):
+		t.Fatal("circular PHP include compile deadlocked")
+	}
 }

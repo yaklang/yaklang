@@ -1096,7 +1096,7 @@ type chatBaseStreamHandlerAppender func(
 	rawResponseHeaderCallback RawHTTPResponseHeaderCallback,
 	rawResponseCallback func([]byte, []byte, *ChatUsage),
 	usageCallback func(*ChatUsage),
-) (io.Reader, io.Reader, []poc.PocConfigOption, func())
+) (io.Reader, io.Reader, []poc.PocConfigOption, func(), streamReadErrGetter)
 
 func executeChatBaseRequest(
 	url string,
@@ -1152,6 +1152,7 @@ func executeChatBaseRequest(
 
 	var pr, reasonPr io.Reader
 	var cancel func()
+	var getStreamReadErr streamReadErrGetter
 	var requestPacket []byte
 	rawResponseCallback := func(headerBytes []byte, bodyPreview []byte, usageInfo *ChatUsage) {
 		if ctx.RawHTTPResponseCallback != nil {
@@ -1164,7 +1165,7 @@ func executeChatBaseRequest(
 			ctx.RawHTTPRequestResponseCallback(requestPacket, headerBytes, bodyPreview, usageInfo)
 		}
 	}
-	pr, reasonPr, opts, cancel = appendHandler(handleStream, opts, ctx.ToolCallCallback, ctx.RawHTTPResponseHeaderCallback, rawResponseCallback, ctx.UsageCallback)
+	pr, reasonPr, opts, cancel, getStreamReadErr = appendHandler(handleStream, opts, ctx.ToolCallCallback, ctx.RawHTTPResponseHeaderCallback, rawResponseCallback, ctx.UsageCallback)
 	requestPacket = poc.BuildRequest(
 		lowhttp.UrlToRequestPacket(
 			"POST",
@@ -1223,20 +1224,38 @@ func executeChatBaseRequest(
 		}
 	}()
 
-	_, _, err = poc.DoPOST(url, opts...)
-	if err != nil {
+	_, _, postErr := poc.DoPOST(url, opts...)
+	if postErr != nil {
 		if ctx.ErrHandler != nil {
-			ctx.ErrHandler(err)
+			ctx.ErrHandler(postErr)
 		}
 		if !utils.IsNil(cancel) {
 			cancel()
 		}
-		wg.Wait() // 确保在错误情况下也等待goroutine完成
-		return body.String(), utils.Errorf("request post to %v：%v", url, err)
 	}
 
-	// 等待所有goroutine完成数据写入，确保body.Buffer中有完整数据
 	wg.Wait()
+
+	var finalErr error
+	if postErr != nil {
+		finalErr = postErr
+	}
+	if getStreamReadErr != nil {
+		if streamErr := getStreamReadErr(); streamErr != nil && finalErr == nil {
+			finalErr = streamErr
+		}
+	}
+	if finalErr != nil {
+		if postErr == nil {
+			if ctx.ErrHandler != nil {
+				ctx.ErrHandler(finalErr)
+			}
+			if !utils.IsNil(cancel) {
+				cancel()
+			}
+		}
+		return body.String(), utils.Errorf("request post to %v：%v", url, finalErr)
+	}
 	return body.String(), nil
 }
 

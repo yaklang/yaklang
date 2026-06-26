@@ -15,6 +15,9 @@ type ConditionStatement struct {
 	Condition values.JavaValue
 	Neg       bool
 	Callback  func(values.JavaValue)
+	// TernaryChainArm mirrors OpCode.TernaryChainArm: this condition supplies a DISTINCT nested
+	// ternary arm and therefore must not be folded into a short-circuit &&/|| by MergeIf.
+	TernaryChainArm bool
 }
 
 // ReplaceVar implements Statement.
@@ -146,7 +149,16 @@ func (a *AssignStatement) String(funcCtx *class_context.ClassContext) string {
 	}
 	assign := fmt.Sprintf("%s = %s", a.LeftValue.String(funcCtx), a.JavaValue.String(funcCtx))
 	if a.IsFirst {
-		return a.JavaValue.Type().String(funcCtx) + " " + assign
+		// For `T x = null`, the initializer's static type is java.lang.Object, but the
+		// variable's declared type is its (possibly refined) ref type — using the initializer
+		// type would emit `Object x = null` even after the slot adopted a concrete type, and
+		// `return x` would then mismatch the method's return type. Prefer the variable type
+		// for a null initializer; for every other case this is identical to the value type.
+		declType := a.JavaValue.Type()
+		if lit, ok := a.JavaValue.(*values.JavaLiteral); ok && fmt.Sprint(lit.Data) == "null" {
+			declType = a.LeftValue.Type()
+		}
+		return declType.String(funcCtx) + " " + assign
 	} else {
 		return assign
 	}
@@ -180,7 +192,7 @@ func NewForStatement(subStatements []Statement) *ForStatement {
 func (f *ForStatement) String(funcCtx *class_context.ClassContext) string {
 	datas := []string{}
 	datas = append(datas, f.InitVar.String(funcCtx))
-	datas = append(datas, fmt.Sprintf("%s %s %s", f.Condition.String(funcCtx)))
+	datas = append(datas, f.Condition.String(funcCtx))
 	datas = append(datas, f.EndExp.String(funcCtx))
 	statementStr := []string{}
 	for _, statement := range f.SubStatements {
@@ -205,11 +217,14 @@ func NewDeclareStatement(leftVal values.JavaValue) *AssignStatement {
 }
 func NewAssignStatement(leftVal, value values.JavaValue, isFirst bool) *AssignStatement {
 	if value == nil || leftVal == nil || value.Type() == nil || leftVal.Type() == nil {
-		value.Type()
-		panic("type is nil")
+		// Guard against nil values/types in malformed bytecode: rather than panicking
+		// (which forces the whole method into a stub), create the assignment as-is.
+		// The type merge is skipped when either side has no type.
 	}
 
-	value.Type().ResetType(leftVal.Type())
+	if value.Type() != nil && leftVal.Type() != nil {
+		value.Type().ResetType(leftVal.Type())
+	}
 	return &AssignStatement{
 		LeftValue: leftVal,
 		JavaValue: value,

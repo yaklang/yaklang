@@ -608,7 +608,7 @@ func TestIrSourceFS_File_URL(t *testing.T) {
 	t.Run("test compile the same content in different project", func(t *testing.T) {
 		compileAndGetSource := func() *ssadb.IrSource {
 			vf := filesys.NewVirtualFs()
-			fileName := "file_name_" + uuid.NewString()
+			fileName := "file_name_" + uuid.NewString() + ".java"
 			programID := "prog_" + uuid.NewString()
 			path := "path_" + uuid.NewString()
 			vf.AddFile(fmt.Sprintf("/%s/%s", path, fileName), content)
@@ -636,8 +636,8 @@ func TestIrSourceFS_File_URL(t *testing.T) {
 	t.Run("test compile the same content in the same project", func(t *testing.T) {
 		compileAndGetSource := func() []*ssadb.IrSource {
 			vf := filesys.NewVirtualFs()
-			fileName1 := "file_name_" + uuid.NewString()
-			fileName2 := "file_name_" + uuid.NewString()
+			fileName1 := "file_name_" + uuid.NewString() + ".java"
+			fileName2 := "file_name_" + uuid.NewString() + ".java"
 
 			programID := "prog_" + uuid.NewString()
 			path := "path_" + uuid.NewString()

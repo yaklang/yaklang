@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/dlclark/regexp2"
+	regexp2 "github.com/VillanCh/go-pcre2-lite/regexp2"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"

@@ -19,10 +19,12 @@ import (
 //
 // Example:
 // ```
-// // 配合 jsonstream 字段流逐块读取中文内容时避免乱码
+// // 包装原始 Reader，逐块读取中文内容时避免把多字节字符从中间截断
+// rawReader = str.NewReader("你好世界")
 // r = str.NewUTF8Reader(rawReader)
 // buf = make([]byte, 4)
 // n, err = r.Read(buf) // buf[:n] 一定是完整的 UTF-8 字符序列
+// assert n > 0, "should read at least one complete UTF-8 character"
 // ```
 func NewUTF8Reader(r io.Reader) io.Reader {
 	return utils.UTF8Reader(r)

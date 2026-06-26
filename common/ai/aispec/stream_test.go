@@ -20,7 +20,10 @@ func TestProcessNonStreamResponse(t *testing.T) {
 	outBuffer := &bytes.Buffer{}
 	reasonBuffer := &bytes.Buffer{}
 
-	processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil)
+	err := processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected stream read error: %v", err)
+	}
 
 	expectedContent := "Hello World"
 	expectedReason := "This is my reasoning process"
@@ -50,7 +53,10 @@ data: [DONE]`
 	outBuffer := &bytes.Buffer{}
 	reasonBuffer := &bytes.Buffer{}
 
-	processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil)
+	err := processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected stream read error: %v", err)
+	}
 
 	t.Logf("流式内容输出: %s", outBuffer.String())
 	t.Logf("流式推理输出: %s", reasonBuffer.String())
@@ -58,7 +64,7 @@ data: [DONE]`
 
 func TestAppendStreamHandlerPoCOptionEx(t *testing.T) {
 	// 测试流式和非流式选项创建
-	outReader, reasonReader, opts, cancel := appendStreamHandlerPoCOptionEx(true, []poc.PocConfigOption{}, nil, nil, nil, nil)
+	outReader, reasonReader, opts, cancel, _ := appendStreamHandlerPoCOptionEx(true, []poc.PocConfigOption{}, nil, nil, nil, nil)
 	defer cancel()
 
 	if outReader == nil || reasonReader == nil {
@@ -70,7 +76,7 @@ func TestAppendStreamHandlerPoCOptionEx(t *testing.T) {
 	}
 
 	// 测试非流式
-	outReader2, reasonReader2, opts2, cancel2 := appendStreamHandlerPoCOptionEx(false, []poc.PocConfigOption{}, nil, nil, nil, nil)
+	outReader2, reasonReader2, opts2, cancel2, _ := appendStreamHandlerPoCOptionEx(false, []poc.PocConfigOption{}, nil, nil, nil, nil)
 	defer cancel2()
 
 	if outReader2 == nil || reasonReader2 == nil {
@@ -198,3 +204,44 @@ func TestProcessAIResponse_HeaderCallbackBeforeBodyRead(t *testing.T) {
 		t.Fatalf("content output mismatch, got %q", outBuffer.String())
 	}
 }
+
+func TestProcessAIResponse_StreamReadErrorReturned(t *testing.T) {
+	streamData := "data: {\"choices\":[{\"delta\":{\"content\":\"PARTIAL\"}}]}\n\n"
+	mockResponse := []byte("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\n\r\n")
+	mockCloser := io.NopCloser(&errAfterReadReader{
+		data: []byte(streamData),
+		err:  io.ErrUnexpectedEOF,
+	})
+
+	outBuffer := &bytes.Buffer{}
+	reasonBuffer := &bytes.Buffer{}
+	err := processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil)
+	if err == nil {
+		t.Fatal("expected stream read error")
+	}
+	if !strings.Contains(err.Error(), "ai stream read failed") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if outBuffer.String() != "PARTIAL" {
+		t.Fatalf("expected partial content before error, got %q", outBuffer.String())
+	}
+}
+
+type errAfterReadReader struct {
+	data []byte
+	err  error
+}
+
+func (r *errAfterReadReader) Read(p []byte) (int, error) {
+	if len(r.data) == 0 {
+		return 0, r.err
+	}
+	n := copy(p, r.data)
+	r.data = r.data[n:]
+	if len(r.data) == 0 {
+		return n, nil
+	}
+	return n, nil
+}
+
+func (r *errAfterReadReader) Close() error { return nil }

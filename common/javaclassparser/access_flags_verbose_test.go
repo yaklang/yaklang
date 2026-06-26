@@ -43,16 +43,19 @@ func TestClassAccessFlags(t *testing.T) {
 			wantStr:  "public interface",
 		},
 		{
+			// Java source enums are implicitly final/abstract; those modifiers are
+			// illegal to write explicitly, so the verbose string drops them while the
+			// raw flag list still reflects the bytecode access flags.
 			name:     "公共final枚举",
 			input:    0x4011,
 			wantFlag: []string{"public", "final", "enum"},
-			wantStr:  "public final enum",
+			wantStr:  "public enum",
 		},
 		{
 			name:     "公共枚举注解",
 			input:    0x6001,
 			wantFlag: []string{"public", "annotation", "enum"},
-			wantStr:  "public annotation enum",
+			wantStr:  "public enum",
 		},
 		{
 			name:     "抽象类",

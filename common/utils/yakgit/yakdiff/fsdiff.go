@@ -138,9 +138,10 @@ func FileSystemDiffToStringContext(ctx context.Context, fs1, fs2 fi.FileSystem) 
 //
 // Example:
 // ```
-// // 比较两个目录（示意性示例，需替换为真实路径）
-// fs1 = filesys.NewRelLocalFs("/tmp/dir-old")
-// fs2 = filesys.NewRelLocalFs("/tmp/dir-new")
+// // 无法本地验证: 需要磁盘上真实存在的两个目录(请替换为真实路径)
+// // 比较两个目录的文件差异，输出 git 风格 diff 文本
+// fs1 = filesys.NewLocalFs() // 旧目录文件系统
+// fs2 = filesys.NewLocalFs() // 新目录文件系统
 // result, err = diff.DiffFromFileSystem(fs1, fs2)
 // if err != nil { die(err) }
 // println(result)

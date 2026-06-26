@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Generate docs and coverage report only, do NOT push to yaklang.github.io"
+        description: "Generate docs and coverage report only, do NOT zip/upload to OSS"
         required: false
         default: false
         type: boolean
@@ -16,12 +16,10 @@ on:
 
 jobs:
   build:
-    # if: ${{ startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/heads/doc/ci/') }}
     runs-on: ubuntu-22.04
     steps:
     - name: Checkout repo
       uses: actions/checkout@v2
-
 
     - name: Set Node.js and yarn
       uses: actions/setup-node@v3
@@ -31,10 +29,13 @@ jobs:
     - name: Generate docs
       run: |
         echo "Generating docs..."
-        # -coverage-report 产出覆盖率底单(写到 docs/api 之外，不参与同步)，
+        # -coverage-report 产出覆盖率底单(写到 web_doc 之外，不参与归档)，
         # 既能在 Actions 日志里看到 doc coverage summary，又能作为 artifact 留档。
+        # -overviews 指定按库的模块总览目录(overviews/<lib>.md)，注入到各库文档标题之后。
         go run -gcflags=all=-l common/yak/yakdoc/generate_web_doc/generate_web_doc.go \
-          -coverage-report web_doc_coverage.md web_doc/
+          -coverage-report web_doc_coverage.md \
+          -overviews common/yak/yakdoc/generate_web_doc/overviews \
+          web_doc/
         echo "Generating docs finished"
 
     - name: Upload coverage report artifact
@@ -44,34 +45,32 @@ jobs:
         path: web_doc_coverage.md
         if-no-files-found: warn
 
-    - name: Checkout yaklang.github.io repo
-      # 手动触发且 dry_run=true 时只生成与留档覆盖率，不检出目标仓库、不推送。
-      if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
-      uses: actions/checkout@v2
-      with:
-        repository: yaklang/yaklang.github.io
-        token: ${{ secrets.GH_TOKEN }}
-        path: websize
-
-    - name: Copy docs
-      if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+    # 仅在 v* tag 触发且非 dry_run 时打包并上传 OSS 归档。
+    # 解耦后本 workflow 不再直接推送 yaklang.github.io：文档站每日定时从 OSS 拉取。
+    - name: Archive docs to OSS
+      if: ${{ startsWith(github.ref, 'refs/tags/v') && !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+      env:
+        OSS_KEY_ID: ${{ secrets.OSS_KEY_ID }}
+        OSS_KEY_SECRET: ${{ secrets.OSS_KEY_SECRET }}
       run: |
-        # Sync generated API docs and remove orphaned docs for libraries that no
-        # longer exist. --delete prunes stale files, but we exclude files that are
-        # NOT produced by generate_web_doc (the Docusaurus category config and the
-        # separately-maintained global manuals) so they are never deleted.
-        rsync -a --delete \
-          --exclude='_category_.json' \
-          --exclude='__global__.md' \
-          --exclude='global_buildin_ops.md' \
-          web_doc/ websize/docs/api/
+        set -e
+        # 计算不带 v 的版本号，与 OSS 上 yak/<version>/ 产物目录命名保持一致
+        VERSION="${GITHUB_REF_NAME#v}"
+        echo "Archiving web docs for version: ${VERSION}"
 
-    - name: Add tag and Push
-      if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
-      continue-on-error: true
-      run: |
-        cd websize
-        git config user.name "GitHub Actions"
-        git config user.email "actions@github.com"
-        yarn --version
-        git add . && (git commit -m "Update api docs" && yarn version --minor && git push && git push --tags)
+        # 在 zip 内置一个版本标记文件，便于解压后追溯文档对应的引擎版本
+        echo "${VERSION}" > web_doc/DOC_VERSION.txt
+
+        ZIP_NAME="yaklang-docs-${VERSION}.zip"
+        ( cd web_doc && zip -r "../${ZIP_NAME}" . >/dev/null )
+        echo "Created archive: ${ZIP_NAME}"
+        ls -lh "${ZIP_NAME}"
+
+        # 使用官方发布的 yak 二进制作为 upload-oss 工具
+        wget -q -O yak https://aliyun-oss.yaklang.com/yak/latest/yak_linux_amd64
+        chmod +x yak
+
+        # 上传到 yak/<version>/yaklang-docs-<version>.zip
+        ./yak upload-oss -b yaklang --ak "${OSS_KEY_ID}" --sk "${OSS_KEY_SECRET}" -t 5 \
+          -f "${ZIP_NAME}:/yak/${VERSION}/${ZIP_NAME}"
+        echo "Uploaded ${ZIP_NAME} to oss path yak/${VERSION}/${ZIP_NAME}"

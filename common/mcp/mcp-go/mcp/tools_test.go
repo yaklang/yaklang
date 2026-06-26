@@ -3,6 +3,7 @@ package mcp
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -18,6 +19,31 @@ func requireSchemaWithoutNullRequired(t *testing.T, schema any) map[string]any {
 	var parsed map[string]any
 	require.NoError(t, json.Unmarshal(raw, &parsed))
 	return parsed
+}
+
+func TestToolInputSchema_FromMap_PropertiesAlwaysOrdered(t *testing.T) {
+	propertyKeys := []string{"zebra", "alpha", "mango", "delta", "charlie"}
+	expectedOrder := make([]string, len(propertyKeys))
+	copy(expectedOrder, propertyKeys)
+	sort.Slice(expectedOrder, func(i, j int) bool {
+		return expectedOrder[i] > expectedOrder[j]
+	})
+
+	// Run many times: Go map iteration order varies, but OrderInsert must yield stable descending keys.
+	for i := 0; i < 100; i++ {
+		properties := make(map[string]any, len(propertyKeys))
+		for _, k := range propertyKeys {
+			properties[k] = map[string]any{"type": "string"}
+		}
+
+		var schema ToolInputSchema
+		err := schema.FromMap(map[string]any{
+			"type":       "object",
+			"properties": properties,
+		})
+		require.NoError(t, err, "iteration %d", i)
+		require.Equal(t, expectedOrder, schema.Properties.Keys(), "iteration %d", i)
+	}
 }
 
 func TestWithOneOf(t *testing.T) {

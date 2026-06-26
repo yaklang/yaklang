@@ -23,7 +23,7 @@ func TestJarRecompile(t *testing.T) {
 	res, err := ssaapi.ParseProject(
 		ssaapi.WithRawLanguage("java"),
 		ssaapi.WithConfigInfo(map[string]any{
-			"kind":       "compression",
+			"kind":       "jar",
 			"local_file": jarPath,
 		}),
 		ssaapi.WithProgramName(progName),

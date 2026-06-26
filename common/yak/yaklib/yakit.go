@@ -1326,14 +1326,18 @@ func (c *YakitClient) YakitError(tmp string, items ...interface{}) {
 // 返回值:
 //   - 无
 //
-// Example:
+// <|EXAMPLE_START|> 基础与格式化输出
 // ```
-// // 普通输出与格式化输出
+// // 第一个参数为格式字符串，其余为对应参数
 // yakit.Info("scanner started")
 // target = "example.com"; port = 443
 // yakit.Info("scanning target: %s:%d", target, port)
+// ```
+// <|EXAMPLE_END|>
 //
-// // 联动：边查询资产边输出进度信息，是插件里最常见的写法
+// <|EXAMPLE_START|> 边遍历资产边输出进度
+// ```
+// // 插件里最常见的写法：一边查询一边汇报
 // total = 0
 // for u in db.QueryUrlsByKeyword("example.com") {
 //     total++
@@ -1341,6 +1345,7 @@ func (c *YakitClient) YakitError(tmp string, items ...interface{}) {
 // }
 // yakit.Info("collected %d urls in total", total)
 // ```
+// <|EXAMPLE_END|>
 func (c *YakitClient) YakitInfo(tmp string, items ...interface{}) {
 	c.YakitLog("info", tmp, items...)
 }

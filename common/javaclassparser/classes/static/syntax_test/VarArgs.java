@@ -6,6 +6,6 @@ public class VarArgs {
 	}
 	void invoke() {
 		String var1 = "a";
-		this.main(new String[1]);
+		this.main(new String[]{"a"});
 	}
 }

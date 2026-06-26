@@ -188,102 +188,11 @@ func (s *aiMemoryVectorSessionSingleton) GetRAGStore(sessionID string) (*vectors
 }
 
 func deleteAIMemoryVectorsBatch(ctx context.Context, singleton *aiMemoryVectorSessionSingleton, entities []schema.AIMemoryEntity) error {
-	if len(entities) == 0 {
-		return nil
+	db := (*gorm.DB)(nil)
+	if singleton != nil {
+		db = singleton.db
 	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
-	uniqueStrings := func(in []string) []string {
-		if len(in) <= 1 {
-			return in
-		}
-		seen := make(map[string]struct{}, len(in))
-		out := make([]string, 0, len(in))
-		for _, v := range in {
-			if v == "" {
-				continue
-			}
-			if _, ok := seen[v]; ok {
-				continue
-			}
-			seen[v] = struct{}{}
-			out = append(out, v)
-		}
-		return out
-	}
-
-	type sessionPayload struct {
-		memoryIDs []string
-		docIDs    []string
-	}
-	bySession := make(map[string]*sessionPayload, 8)
-	for i := range entities {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		sessionID := strings.TrimSpace(entities[i].SessionID)
-		if sessionID == "" {
-			continue
-		}
-		p, ok := bySession[sessionID]
-		if !ok {
-			p = &sessionPayload{}
-			bySession[sessionID] = p
-		}
-		if entities[i].MemoryID != "" {
-			p.memoryIDs = append(p.memoryIDs, entities[i].MemoryID)
-		}
-		if ids := entities[i].DocumentQuestionHashIDs(); len(ids) > 0 {
-			p.docIDs = append(p.docIDs, ids...)
-		}
-	}
-
-	for sessionID, payload := range bySession {
-		payload.memoryIDs = uniqueStrings(payload.memoryIDs)
-		payload.docIDs = uniqueStrings(payload.docIDs)
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		backend, err := singleton.GetHNSWBackend(sessionID)
-		if err == nil {
-			for _, memoryID := range payload.memoryIDs {
-				_ = backend.Delete(memoryID)
-			}
-			if len(payload.memoryIDs) > 0 {
-				if err := backend.SaveGraph(); err != nil {
-					log.Warnf("AIMemory HNSW save skipped: %v", err)
-				}
-			}
-		} else {
-			log.Warnf("AIMemory HNSW delete skipped: %v", err)
-		}
-
-		if len(payload.docIDs) == 0 {
-			continue
-		}
-
-		store, ok, err := singleton.GetRAGStore(sessionID)
-		if err != nil {
-			log.Warnf("AIMemory RAG delete skipped: %v", err)
-			continue
-		}
-		if !ok {
-			continue
-		}
-		if err := store.Delete(payload.docIDs...); err != nil {
-			log.Warnf("AIMemory RAG delete docs skipped: %v", err)
-		}
-	}
-	return nil
+	return aimem.DeleteMemoryVectorArtifacts(ctx, db, entities)
 }
 
 func (s *Server) GetAIMemoryEntity(ctx context.Context, req *ypb.GetAIMemoryEntityRequest) (*ypb.AIMemoryEntity, error) {

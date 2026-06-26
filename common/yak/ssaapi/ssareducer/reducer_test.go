@@ -1,16 +1,21 @@
 package ssareducer
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"io/fs"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 //go:embed testlib/***
@@ -175,22 +180,121 @@ func TestReducerCompiling2_VirtualFile(t *testing.T) {
 }
 
 func TestPipeInitBufSize_capsHugeProjects(t *testing.T) {
-	if g := pipeInitBufSize(100_000, 8); g != 200 {
-		t.Fatalf("100k paths conc=8: want 200, got %d", g)
+	if g := pipeInitBufSize(100_000, 8); g != 16 {
+		t.Fatalf("100k paths conc=8: want 16, got %d", g)
 	}
-	if g := pipeInitBufSize(100_000, 64); g != 512 {
-		t.Fatalf("100k paths conc=64: want 512, got %d", g)
+	if g := pipeInitBufSize(100_000, 64); g != 128 {
+		t.Fatalf("100k paths conc=64: want 128, got %d", g)
 	}
-	if g := pipeInitBufSize(100_000, 2048); g != 8192 {
-		t.Fatalf("100k paths conc=2048: want hard cap 8192, got %d", g)
+	if g := pipeInitBufSize(100_000, 10_000); g != maxSourceQueueSize {
+		t.Fatalf("100k paths conc=10000: want hard cap %d, got %d", maxSourceQueueSize, g)
 	}
 }
 
 func TestPipeInitBufSize_smallProjectUnchanged(t *testing.T) {
-	if g := pipeInitBufSize(50, 8); g != 50 {
-		t.Fatalf("50 paths: want 50, got %d", g)
+	if g := pipeInitBufSize(5, 8); g != 5 {
+		t.Fatalf("5 paths: want 5, got %d", g)
 	}
 	if g := pipeInitBufSize(1, 0); g != 1 {
 		t.Fatalf("1 path conc=0: want 1, got %d", g)
 	}
+}
+
+func TestPipeInitBufSize_envOverride(t *testing.T) {
+	t.Setenv("YAK_SSA_AST_IN_FLIGHT_FILES", "3")
+	require.Equal(t, 3, pipeInitBufSize(100, 8))
+
+	t.Setenv("YAK_SSA_AST_IN_FLIGHT_FILES", "0")
+	require.Equal(t, 1, pipeInitBufSize(100, 8))
+}
+
+func TestEffectiveASTSequence_downgradesLargeOrderedMode(t *testing.T) {
+	t.Setenv("YAK_SSA_ORDERED_AST_MAX_FILES", "2")
+	require.Equal(t, Order, effectiveASTSequence(Order, 2))
+	require.Equal(t, OutOfOrder, effectiveASTSequence(Order, 3))
+	require.Equal(t, ReverseOrder, effectiveASTSequence(ReverseOrder, 2))
+	require.Equal(t, OutOfOrder, effectiveASTSequence(ReverseOrder, 3))
+}
+
+func TestFilesHandler_OutOfOrderBackpressuresParsedAST(t *testing.T) {
+	vfs := filesys.NewVirtualFs()
+	var paths []string
+	for i := 0; i < 20; i++ {
+		path := fmt.Sprintf("src/%02d.go", i)
+		paths = append(paths, path)
+		vfs.AddFile(path, "package main")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var parsed int64
+	out := FilesHandler(
+		ctx,
+		vfs,
+		paths,
+		func(path string, content []byte, store *utils.SafeMap[any]) (ssa.FrontAST, error) {
+			atomic.AddInt64(&parsed, 1)
+			return path, nil
+		},
+		nil,
+		OutOfOrder,
+		2,
+		0,
+	)
+
+	require.Eventually(t, func() bool {
+		return atomic.LoadInt64(&parsed) == 2
+	}, time.Second, time.Millisecond)
+
+	time.Sleep(50 * time.Millisecond)
+	require.Equal(t, int64(2), atomic.LoadInt64(&parsed), "parsed AST should not queue beyond active workers without a consumer")
+
+	cancel()
+	for range out {
+	}
+}
+
+func TestFilesHandler_OutOfOrderWaitsForConsumerBeforeParsingNextAST(t *testing.T) {
+	t.Setenv("YAK_SSA_AST_BUILD_WINDOW_FILES", "1")
+
+	vfs := filesys.NewVirtualFs()
+	var paths []string
+	for i := 0; i < 4; i++ {
+		path := fmt.Sprintf("src/%02d.go", i)
+		paths = append(paths, path)
+		vfs.AddFile(path, "package main")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var parsed int64
+	out := FilesHandler(
+		ctx,
+		vfs,
+		paths,
+		func(path string, content []byte, store *utils.SafeMap[any]) (ssa.FrontAST, error) {
+			atomic.AddInt64(&parsed, 1)
+			return path, nil
+		},
+		nil,
+		OutOfOrder,
+		4,
+		0,
+	)
+
+	require.Eventually(t, func() bool {
+		return atomic.LoadInt64(&parsed) == 1
+	}, time.Second, time.Millisecond, "only one AST should be parsed before consumer reads")
+
+	first := <-out
+	require.NotNil(t, first)
+	require.Equal(t, int64(1), atomic.LoadInt64(&parsed))
+
+	for i := 0; i < 3; i++ {
+		_, ok := <-out
+		require.True(t, ok)
+	}
+	require.Equal(t, int64(4), atomic.LoadInt64(&parsed))
 }

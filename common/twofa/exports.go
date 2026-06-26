@@ -104,9 +104,11 @@ var Exports = map[string]any{
 //
 // Example:
 // ```
-// // 该示例为示意性用法：把 TOTP 验证码自动注入到请求头中
-// raw = "GET /api/profile HTTP/1.1\r\nHost: example.com\r\n\r\n"
+// // 用本地 mock HTTP 服务演示(不出网): twofa.poc 会把 TOTP 验证码写入请求头 Y-T-Verify-Code
+// host, port = tcp.MockServe(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok") // 起本地 mock 服务
+// raw = f"GET /api/profile HTTP/1.1\r\nHost: ${host}:${port}\r\n\r\n"
 // rsp, req = poc.HTTP(raw, twofa.poc("hello-yak-secret"), poc.timeout(5))~
+// assert rsp != nil, "should get response from local mock server"
 // ```
 func WithTwoFa(secret string) poc.PocConfigOption {
 	return poc.WithReplaceHttpPacketHeader("Y-T-Verify-Code", GetUTCCode(secret))

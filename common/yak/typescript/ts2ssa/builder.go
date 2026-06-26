@@ -90,6 +90,10 @@ func (*SSABuilder) GetLanguage() ssaconfig.Language {
 	return ssaconfig.TS
 }
 
+func (*SSABuilder) UsesDeferredFileBuild() bool {
+	return true
+}
+
 func (s *SSABuilder) GetAntlrCache() *ssa.AntlrCache {
 	return nil
 }
@@ -98,7 +102,7 @@ func (*SSABuilder) ParseAST(src string, cache *ssa.AntlrCache) (ssa.FrontAST, er
 	return Frontend(src)
 }
 
-func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error {
+func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error {
 	jsAST, ok := raw.(*ast.SourceFile)
 	if !ok {
 		return utils.Errorf("invalid AST type: expected *ast.SourceFile, got %T", raw)

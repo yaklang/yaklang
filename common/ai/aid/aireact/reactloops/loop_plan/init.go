@@ -20,7 +20,7 @@ func buildPlanInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLo
 			return
 		}
 
-		loop.LoadingStatus("深度意图识别 / Deep intent recognition")
+		reactloops.EmitStatus(loop, "深度意图识别中 / Deep intent recognition...")
 		log.Infof("plan: invoking deep intent recognition directly")
 
 		capabilityNameMatches := reactloops.MatchCapabilitiesByTextWithConfig(r.GetConfig(), task.GetUserInput())

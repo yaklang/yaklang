@@ -501,7 +501,7 @@ func mitmConfigSNI(sni string, overwrite bool) MitmConfigOpt {
 //
 // Example:
 // ```
-// connChan = make(chan net.Conn)
+// connChan = make(chan any) // 元素为 net.Conn
 // mitm.Start(8080, mitm.extraIncomingConn(connChan))
 // ```
 func mitmConfigExtraIncomingConn(ch interface{}) MitmConfigOpt {
@@ -542,7 +542,7 @@ func mitmConfigExtraIncomingConn(ch interface{}) MitmConfigOpt {
 //
 // Example:
 // ```
-// connChan = make(chan net.Conn)
+// connChan = make(chan any) // 元素为 net.Conn
 // mitm.Start(8080, mitm.extraIncomingConnChanWithStrongLocalHost("192.168.1.100", connChan))  // 设置强主机模式本地地址
 // mitm.Start(8080, mitm.extraIncomingConnChanWithStrongLocalHost("192.168.1.100", connChan, {"key": "value"}))  // 设置强主机模式本地地址并设置元数据
 // ```

@@ -36,12 +36,36 @@ func (b *astbuilder) build(ast *cparser.CompilationUnitContext) {
 	}
 
 	if b.PreHandler() {
+		if unit := ast.TranslationUnit(); unit != nil {
+			b.prebuildTranslationUnit(unit.(*cparser.TranslationUnitContext))
+		}
 		exportHandler()
+		ssa.ReleaseASTRoot(ast)
 	} else {
 		if unit := ast.TranslationUnit(); unit != nil {
 			b.buildTranslationUnit(unit.(*cparser.TranslationUnitContext))
 		}
 	}
+}
+
+func (b *astbuilder) prebuildTranslationUnit(ast *cparser.TranslationUnitContext) {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	for _, e := range ast.AllExternalDeclaration() {
+		b.prebuildExternalDeclaration(e.(*cparser.ExternalDeclarationContext))
+	}
+}
+
+func (b *astbuilder) prebuildExternalDeclaration(ast *cparser.ExternalDeclarationContext) {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	if f := ast.FunctionDefinition(); f != nil {
+		b.buildFunctionDefinition(f.(*cparser.FunctionDefinitionContext))
+		return
+	}
+	b.buildExternalDeclaration(ast)
 }
 
 func (b *astbuilder) buildTranslationUnit(ast *cparser.TranslationUnitContext) {
@@ -113,6 +137,7 @@ func (b *astbuilder) buildFunctionDefinition(ast *cparser.FunctionDefinitionCont
 			}
 
 			store := b.StoreFunctionBuilder()
+			capturedDef := ssa.DetachAST(ast)
 			log.Debugf("add function funcName = %s", funcName)
 			newFunc.AddLazyBuilder(func() {
 				log.Debugf("build function funcName = %s", funcName)
@@ -127,7 +152,7 @@ func (b *astbuilder) buildFunctionDefinition(ast *cparser.FunctionDefinitionCont
 				b.FunctionBuilder = b.PushFunction(newFunc)
 				b.SupportClosure = false
 
-				if ds := ast.DeclarationSpecifier(); ds != nil {
+				if ds := capturedDef.DeclarationSpecifier(); ds != nil {
 					retType = b.buildDeclarationSpecifier(ds.(*cparser.DeclarationSpecifierContext))
 				}
 				_, _, paramTypes = b.buildDeclarator(de.(*cparser.DeclaratorContext), FUNC_KIND)
@@ -138,10 +163,10 @@ func (b *astbuilder) buildFunctionDefinition(ast *cparser.FunctionDefinitionCont
 					b.MarkedFunctions = append(b.MarkedFunctions, newFunc)
 				}
 
-				if dl := ast.DeclarationList(); dl != nil {
+				if dl := capturedDef.DeclarationList(); dl != nil {
 					b.buildDeclarationList(dl.(*cparser.DeclarationListContext))
 				}
-				if c := ast.CompoundStatement(); c != nil {
+				if c := capturedDef.CompoundStatement(); c != nil {
 					b.buildCompoundStatement(c.(*cparser.CompoundStatementContext))
 				}
 

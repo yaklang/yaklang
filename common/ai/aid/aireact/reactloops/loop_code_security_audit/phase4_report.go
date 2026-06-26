@@ -128,6 +128,7 @@ func buildPhase4ReportLoop(r aicommon.AIInvokeRuntime, state *AuditState, opts .
 			}
 
 			stats2 := state.GetStats()
+			reactloops.EmitStatus(loop, "报告生成完成 / Report generation complete")
 			r.AddToTimeline("[PHASE4_COMPLETE]", fmt.Sprintf(
 				"Phase 4 报告生成完成。路径: %s\n高危: %d，中危: %d，低危: %d，需人工确认: %d",
 				reportPath, stats2.HighCount, stats2.MediumCount, stats2.LowCount, stats2.UncertainCount))

@@ -75,5 +75,10 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 		}
 	}
 	rewriter.RewriteVar(&sts, decompiler.BodyStartId, params)
+	// Drop statements javac would reject as unreachable (e.g. a back-edge `continue`
+	// emitted after an inner infinite loop that only exits via return / labelled
+	// continue). The pass is a strict subset of the JLS reachability rules, so it
+	// leaves already-correct methods untouched.
+	sts = rewriter.PruneUnreachableStatements(sts)
 	return sts, nil
 }

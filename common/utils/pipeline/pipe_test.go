@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -72,4 +73,38 @@ func TestChainedPipe(t *testing.T) {
 
 	// assert.ElementsMatch(t, []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, results1)
 	assert.ElementsMatch(t, []int{3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, results2)
+}
+
+func TestBoundedPipeBackpressure(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	release := make(chan struct{})
+	var started atomic.Int64
+	p := pipeline.NewBoundedPipe(ctx, 1, func(item int) (int, error) {
+		started.Add(1)
+		<-release
+		return item, nil
+	}, 1)
+
+	p.FeedSlice([]int{1, 2, 3, 4})
+
+	deadline := time.After(time.Second)
+	for started.Load() != 1 {
+		select {
+		case <-deadline:
+			t.Fatalf("first item was not processed")
+		default:
+			time.Sleep(time.Millisecond)
+		}
+	}
+	time.Sleep(50 * time.Millisecond)
+	assert.Equal(t, int64(1), started.Load())
+
+	close(release)
+	var results []int
+	for result := range p.Out() {
+		results = append(results, result)
+	}
+	assert.ElementsMatch(t, []int{1, 2, 3, 4}, results)
 }

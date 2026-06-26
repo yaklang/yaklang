@@ -327,6 +327,7 @@ type SSACompileConfig struct {
 	CompileIrCacheTTL        time.Duration   `json:"compile_ir_cache_ttl"`
 	CompileIrCacheMax        int             `json:"compile_ir_cache_max"`
 	FilePerformanceLog       bool            `json:"file_performance_log"`
+	Diagnostics              bool            `json:"diagnostics"`
 	StopOnCliCheck           bool            `json:"stop_on_cli_check"`
 	EnableIncrementalCompile bool            `json:"enable_incremental_compile"`
 	BaseProgramName          string          `json:"base_program_name"`
@@ -549,6 +550,23 @@ func (c *Config) SetCompileFilePerformanceLog(enable bool) {
 	c.SSACompile.FilePerformanceLog = enable
 }
 
+func (c *Config) GetCompileDiagnostics() bool {
+	if c == nil || c.SSACompile == nil {
+		return false
+	}
+	return c.SSACompile.Diagnostics
+}
+
+func (c *Config) SetCompileDiagnostics(enable bool) {
+	if c == nil {
+		return
+	}
+	if c.SSACompile == nil {
+		c.SSACompile = defaultSSACompileConfig()
+	}
+	c.SSACompile.Diagnostics = enable
+}
+
 // --- 编译配置 Options ---
 
 // WithCompileStrictMode 设置编译严格模式（导出名为 ssa.withStrictMode）
@@ -753,6 +771,17 @@ func WithCompileFilePerformanceLog(enable bool) Option {
 			return err
 		}
 		c.SSACompile.FilePerformanceLog = enable
+		return nil
+	}
+}
+
+// WithCompileDiagnostics enables nested SSA diagnostics TRACE output.
+func WithCompileDiagnostics(enable bool) Option {
+	return func(c *Config) error {
+		if err := c.ensureSSACompile("Compile Diagnostics"); err != nil {
+			return err
+		}
+		c.SSACompile.Diagnostics = enable
 		return nil
 	}
 }

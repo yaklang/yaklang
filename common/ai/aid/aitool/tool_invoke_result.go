@@ -127,20 +127,20 @@ func (t *ToolResult) String() string {
 				// 处理标准输出
 				if stdout := utils.MapGetString(rawMap, "stdout"); stdout != "" {
 					buf.WriteString(fmt.Sprintf("stdout: \n%v\n", stdout))
-					delete(rawMap, "stdout")
 				}
+				delete(rawMap, "stdout")
 
 				// 处理标准错误
 				if stderr := utils.MapGetString(rawMap, "stderr"); stderr != "" {
 					buf.WriteString(fmt.Sprintf("stderr: \n%v\n", stderr))
-					delete(rawMap, "stderr")
 				}
+				delete(rawMap, "stderr")
 
 				// 处理结果
 				if result := utils.MapGetString(rawMap, "result"); result != "" {
 					buf.WriteString(fmt.Sprintf("result: \n%v\n", result))
-					delete(rawMap, "result")
 				}
+				delete(rawMap, "result")
 
 				// 处理额外信息
 				if len(rawMap) > 0 {

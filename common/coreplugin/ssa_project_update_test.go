@@ -15,7 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
-	"github.com/yaklang/yaklang/common/yakgrpc"
+	"github.com/yaklang/yaklang/common/yak/yakscript"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -117,7 +117,7 @@ func TestSSAProjectUpdate(t *testing.T) {
 
 		log.Infof("Calling SSA update script with project_id=%d", schemaProject.ID)
 		var scriptOutput []string
-		err = yakgrpc.ExecScriptWithParam(context.Background(), pluginName, param,
+		err = yakscript.ExecScriptWithParam(context.Background(), pluginName, param,
 			"", func(exec *ypb.ExecResult) error {
 				if exec.IsMessage {
 					log.Infof("[Script] %s", string(exec.Message))

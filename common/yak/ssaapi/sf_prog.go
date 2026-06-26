@@ -507,13 +507,12 @@ func (p *Program) getEditor(filename, hash string) (*memedit.MemEditor, error) {
 		return editor, nil
 	}
 
-	if p.Program.DatabaseKind == ssa.ProgramCacheMemory {
-		return nil, utils.Errorf("get editor by filename %s not found", filename)
-	}
-	// if have database, get source code from database
 	if editor, ok := p.Program.GetEditorByHash(hash); ok {
 		p.Program.SetEditor(filename, editor)
 		return editor, nil
+	}
+	if p.Program.DatabaseKind == ssa.ProgramCacheMemory {
+		return nil, utils.Errorf("get editor by filename %s or hash %s not found", filename, hash)
 	}
 	return nil, utils.Errorf("get ir source from hash error: %s", hash)
 }

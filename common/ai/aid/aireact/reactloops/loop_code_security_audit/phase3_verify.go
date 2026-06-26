@@ -154,6 +154,7 @@ func buildPhase3VerifyLoop(r aicommon.AIInvokeRuntime, state *AuditState, opts .
 			r.AddToTimeline("[VERIFY_INIT]", fmt.Sprintf(
 				"Phase 3 验证开始。共 %d 个 finding 需要依次验证。\n\n完整 Finding 列表：\n```json\n%s\n```",
 				len(findings), string(findingsJSON)))
+			reactloops.EmitStatus(loop, fmt.Sprintf("漏洞验证中 (%d) / Verifying findings (%d)", len(findings), len(findings)))
 			op.Continue()
 		}),
 
@@ -189,6 +190,7 @@ func buildPhase3VerifyLoop(r aicommon.AIInvokeRuntime, state *AuditState, opts .
 				if note != "" {
 					msg += " → " + note
 				}
+				log.Infof("[CodeAudit/Phase3] trace: %s", msg)
 				r.AddToTimeline("trace", msg)
 				op.Feedback(fmt.Sprintf("✓ 数据流节点已记录：%s", msg))
 			},
@@ -222,6 +224,7 @@ func buildPhase3VerifyLoop(r aicommon.AIInvokeRuntime, state *AuditState, opts .
 				if note != "" {
 					msg += " → " + note
 				}
+				log.Infof("[CodeAudit/Phase3] filter: %s", msg)
 				r.AddToTimeline("filter", msg)
 				op.Feedback(fmt.Sprintf("✓ 过滤函数已记录：%s", msg))
 			},
@@ -320,10 +323,13 @@ func buildPhase3VerifyLoop(r aicommon.AIInvokeRuntime, state *AuditState, opts .
 				allFindings := state.GetFindings()
 				verifiedCount := len(state.GetVerifiedVulns())
 				remaining := len(allFindings) - verifiedCount
+				reasonPreview := utils.ShrinkTextBlock(reason, 300)
 				if remaining > 0 {
-					op.Feedback(fmt.Sprintf("Finding %s 验证完成: %s（置信度 %d/10）。\n还有 %d 个 finding 待验证，请继续。", findingID, status, confidence, remaining))
+					op.Feedback(fmt.Sprintf("Finding %s 验证完成: %s（置信度 %d/10）。\n%s\n\n还有 %d 个 finding 待验证，请继续。",
+						findingID, status, confidence, reasonPreview, remaining))
 				} else {
-					op.Feedback(fmt.Sprintf("Finding %s 验证完成: %s（置信度 %d/10）。\n所有 %d 个 finding 已验证完毕，请调用 complete_verify。", findingID, status, confidence, len(allFindings)))
+					op.Feedback(fmt.Sprintf("Finding %s 验证完成: %s（置信度 %d/10）。\n%s\n\n所有 %d 个 finding 已验证完毕，请调用 complete_verify。",
+						findingID, status, confidence, reasonPreview, len(allFindings)))
 				}
 			},
 		),
@@ -339,8 +345,9 @@ func buildPhase3VerifyLoop(r aicommon.AIInvokeRuntime, state *AuditState, opts .
 					op.Feedback(fmt.Sprintf("无法读取项目背景报告: %v\n请直接使用 read_file/grep 查找所需信息。", err))
 					return
 				}
+				summary, _ := reactloops.SpillLongContent(loop, "recon_notes", content)
 				r.AddToTimeline("read_recon_notes", fmt.Sprintf("[Phase3] 读取项目背景报告 (%d 字节)", len(content)))
-				op.Feedback("=== 项目背景报告 ===\n\n" + content)
+				op.Feedback(fmt.Sprintf("=== 项目背景报告 (%d bytes) ===\n\n%s", len(content), summary))
 			},
 		),
 

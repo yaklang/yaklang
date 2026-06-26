@@ -228,7 +228,8 @@ func _libCryptoJSV4() jsRunOpts {
 //
 // Example:
 // ```
-// // 示意性示例，需要有效的 PEM 公钥
+// // 无法本地验证: 需要在 JS 中先定义有效的 PEM 公钥变量 pemPublicKey
+// // 加载 jsrsasign 库后即可在 JS 里用 KEYUTIL 做 RSA 加解密
 // _, value = js.Run(`KEYUTIL.getKey(pemPublicKey).encrypt("yaklang")`, js.libJSRSASign())~
 // println(value.String())
 // ```

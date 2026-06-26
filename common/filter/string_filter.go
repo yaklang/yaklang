@@ -168,7 +168,8 @@ func NewFilterWithSize(entries, total uint) *StringFilter {
 //
 // Example:
 // ```
-// RemoveDuplicatePorts("10086-10088,23333", "10086,10089,23333") // [10086, 10087, 10088, 23333, 10089]
+// ports = str.RemoveDuplicatePorts("10086-10088,23333", "10086,10089,23333") // [10086, 10087, 10088, 23333, 10089]
+// assert len(ports) == 5, "should merge and deduplicate ports"
 // ```
 func RemoveDuplicatePorts(ports1, ports2 string) []int {
 	filter := NewFilter()
@@ -208,7 +209,8 @@ func RemoveDuplicatePorts(ports1, ports2 string) []int {
 //
 // Example:
 // ```
-// FilterPorts("1-10", "2-10") // [1]
+// ports = str.FilterPorts("1-10", "2-10") // [1]
+// assert len(ports) == 1 && ports[0] == 1, "should keep ports not excluded"
 // ```
 func FilterPorts(sourcePorts, excludePorts string) []int {
 	p1 := utils.ParseStringToPorts(sourcePorts)

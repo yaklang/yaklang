@@ -214,22 +214,12 @@ semantic_search_yaklang_samples(questions=["Yaklang中如何处理错误？", "Y
 			// 记录当前查询
 			loop.Set("last_semantic_search_query", currentQuery)
 
-			emitter := loop.GetEmitter()
+			nodeID := "search_yaklang_samples"
+			startLine := fmt.Sprintf("语义搜索: %d 个问题, top_n=%d, threshold=%.2f", len(questions), topN, scoreThreshold)
+			reactloops.EmitActionLog(loop, nodeID, startLine)
+			reactloops.EmitStatus(loop, "语义搜索中 / Semantic searching...")
 
-			// 显示搜索参数
-			searchInfo := fmt.Sprintf("Semantic RAG search - Questions: %d, top_n per question: %d, score_threshold: %.2f\nQuestions:\n%s",
-				len(questions), topN, scoreThreshold, questionsStr)
-			emitter.EmitThoughtStream(op.GetTask().GetId(), searchInfo)
-			loop.GetEmitter().EmitDefaultStreamEvent(
-				"semantic_search_yaklang_samples",
-				bytes.NewReader([]byte(searchInfo)),
-				loop.GetCurrentTask().GetIndex(),
-				func() {
-					log.Infof("semantic search yaklang samples: %s", searchInfo)
-				},
-			)
-
-			invoker.AddToTimeline("start_semantic_search_yaklang_samples", searchInfo)
+			invoker.AddToTimeline("start_semantic_search_yaklang_samples", startLine)
 
 			// 检查 RAG 系统
 			if ragSystem == nil {
@@ -394,8 +384,14 @@ semantic_search_yaklang_samples(questions=["Yaklang中如何处理错误？", "Y
 				}
 			}
 
-			emitter.EmitThoughtStream("semantic_search_samples_result", "Semantic Search Result:\n"+resultStr)
-			invoker.AddToTimeline("semantic_search_results", fmt.Sprintf("Found %d relevant code snippets for %d questions (deduplicated)\nQuestions: %s\n%s", len(results), len(questions), questionsStr, resultStr))
+			summary, reference := reactloops.SpillLongContent(loop, "semantic_search", resultStr)
+			finishLine := fmt.Sprintf("完成: 找到 %d 个相关片段（%d 个问题）", len(results), len(questions))
+			reactloops.EmitStatus(loop, "完成 / Complete")
+			reactloops.EmitActionLog(loop, nodeID, finishLine, reference)
+			invoker.AddToTimeline("semantic_search_results", fmt.Sprintf(
+				"语义搜索完成: %d 个片段，问题数 %d\n%s",
+				len(results), len(questions), summary,
+			))
 
 			// 根据结果数量生成不同的建议，添加到Timeline
 			var suggestionMsg string

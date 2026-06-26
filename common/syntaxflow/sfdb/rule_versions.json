@@ -278,8 +278,8 @@
   {
     "rule_id": "80849d1b-19fd-44ca-91be-9fdbd4af1fe3",
     "rule_name": "检测Golang JSON信息泄露漏洞",
-    "hash": "7d7bf3180e87b3e841f0285f7a47f9420b089dc7c37d4e00b53dbe249ad84957",
-    "version": "20260326.0001"
+    "hash": "045debfe76335f9a21793ed8566f701369c06ee67a85528061943efd6a1da25c",
+    "version": "20260623.0001"
   },
   {
     "rule_id": "a549400b-af87-4955-b792-5dbb1fcce409",
@@ -494,8 +494,8 @@
   {
     "rule_id": "c12cbcab-12de-4e6a-8715-4143224a36ed",
     "rule_name": "检测Golang命令注入漏洞",
-    "hash": "d374728244de001c949486df27d3b58c2d0416f4ead79e7482b15c1721930253",
-    "version": "20260326.0001"
+    "hash": "8f06e118a35d7f7c0d6a571019f781bfc042cbf2347534f1cf4099978a652db8",
+    "version": "20260623.0001"
   },
   {
     "rule_id": "c7872ddf-bab4-4cd5-8e12-d470a889dbd1",
@@ -548,8 +548,8 @@
   {
     "rule_id": "838bdd38-5913-46ed-88f7-8eced02db2bd",
     "rule_name": "检测Golang路径穿越漏洞",
-    "hash": "24c8492c26eb9c483499e2e89db0eb750dd544ffb09b803369bcd5468a294471",
-    "version": "20260402.0001"
+    "hash": "93a165ca6682c796d4511e7c6e778af1d618ca44e8716f8a12f6267e3debcd00",
+    "version": "20260623.0001"
   },
   {
     "rule_id": "137a07c6-00e9-443a-9c2c-f892782d5176",
@@ -1286,14 +1286,14 @@
   {
     "rule_id": "b381b01b-98e3-44f4-b046-7712dcacbe72",
     "rule_name": "检测Java路径遍历漏洞",
-    "hash": "04f32dc0974fe925a666f555fb5c2ef804734a189056f8000fb6fb453873bca9",
-    "version": "20260326.0001"
+    "hash": "7432aa9c552766fb0ee113bbac29c2652f507772eec38f5eaa3f2386d3c38482",
+    "version": "20260623.0001"
   },
   {
     "rule_id": "df1af403-0bc8-4d7e-bcd6-6bb863559f02",
     "rule_name": "审计Java SetHeader中文件下载位置配置点",
-    "hash": "4730e09f5e8b05d45557c56a8b260d35617296c977b357ce3d3317a8ee1a6edc",
-    "version": "20251230.0001"
+    "hash": "302707bf7ca7c86ef694a1dbe3d8dc4a0d6245b8913ca331f6e2f3a27ff8dc8d",
+    "version": "20260623.0001"
   },
   {
     "rule_id": "52765bd8-011f-49f1-a492-c8f172b3acdc",
@@ -1304,14 +1304,14 @@
   {
     "rule_id": "41bfcaa6-f47e-4843-8bf0-9575eea4ee7a",
     "rule_name": "检测Java Springboot文件下载漏洞",
-    "hash": "7b9392a88916feecb077fd98bb7df2277c6ab7dd143a07fc8acca6d2e6123c68",
-    "version": "20260326.0001"
+    "hash": "ff914735c7f5aa477779b81ceac120cb08fdd8c06e3fcbe54b3eeede5e630430",
+    "version": "20260623.0001"
   },
   {
     "rule_id": "15815212-0f58-413f-ad8e-a514778eea85",
     "rule_name": "检测Java MultipartFile路径穿越漏洞",
-    "hash": "59d16dff738315788bcf50bd23f7ce816b1c0b3346e4174c4ce28895045a1c11",
-    "version": "20251230.0001"
+    "hash": "c74210a8a4db84b6edd1bbc8cf5c871737a9083b1c6f015fd8c6ac6b685496cd",
+    "version": "20260623.0001"
   },
   {
     "rule_id": "718cb86d-8629-4382-be43-03ce36c07a3b",
@@ -1382,8 +1382,8 @@
   {
     "rule_id": "91441632-5409-4bfe-8c54-cb49e21c870d",
     "rule_name": "检测Java Servlet XSS漏洞",
-    "hash": "9e4b33e62b1b0807ea90bb1528086e13b7ae3c4afbce51e32249ec71c4e2020e",
-    "version": "20260326.0001"
+    "hash": "e45c7a7d973b384c61433a0ccb9057e645204d918f34d204e7cd027cc14547a5",
+    "version": "20260623.0001"
   },
   {
     "rule_id": "0a730078-cd82-4dc4-8bc9-b19b8a10fee9",
@@ -1460,8 +1460,8 @@
   {
     "rule_id": "44cc5217-5e06-4b5a-b726-d41bc725e934",
     "rule_name": "检测Java CRLF注入漏洞",
-    "hash": "b992b8c733824460364c9b26a92cf8856cb32b7836bee654e41c6fee5af20dbc",
-    "version": "20260513.0001"
+    "hash": "ba1e51c40b02453877bee5550124272858cc773fa022fdf70ab795073ac5d252",
+    "version": "20260623.0001"
   },
   {
     "rule_id": "d45a6fba-7221-4750-8ad5-4566be060827",
@@ -1568,8 +1568,8 @@
   {
     "rule_id": "105b3dd0-6ac1-4e00-a38d-464e17e3e7fc",
     "rule_name": "查找Java转义方法",
-    "hash": "6e1075b4dc244faf8aa0d11d0b13d20ddfeac30fe6d8434836d17423b83c4054",
-    "version": "20251230.0001"
+    "hash": "aede78f55a4905c5ad0da0693c8878395ec8f9cd0d0c925bf9a15a91b7caa4b7",
+    "version": "20260623.0001"
   },
   {
     "rule_id": "43b46725-0b30-4e2f-9559-0d7a30e6b668",
@@ -1772,8 +1772,8 @@
   {
     "rule_id": "13ffa65e-263b-44d1-842c-52419fbea084",
     "rule_name": "SCA: 检测Java XStream反序列化漏洞",
-    "hash": "75f785c5da404b67832db55a66361a2eeb9ee3ac22a2c40c612f488f128b64db",
-    "version": "20260326.0001"
+    "hash": "9a8203e0611e099bacffac1a8c4abdf6e20ed5ef9d2052614f8c2ba6d6ab28bf",
+    "version": "20260623.0001"
   },
   {
     "rule_id": "2161eeef-aab5-486a-a94e-e8750d37f332",
@@ -1910,8 +1910,8 @@
   {
     "rule_id": "43694a01-6ffc-4839-bd32-69d612484ddc",
     "rule_name": "检测PHP Zip文件路径遍历漏洞",
-    "hash": "57afccf485fe8c6250c91b65d2cec4939c0b2f5dbff0cb03d9ad2383fe52492c",
-    "version": "20251230.0001"
+    "hash": "a6c2719ac5860a7b5380df8727d264d04b8f8faa6f908c3f966bf55781785110",
+    "version": "20260623.0001"
   },
   {
     "rule_id": "6b1ca25b-cf9a-456f-b0aa-77b9cfec1b58",
@@ -1994,8 +1994,8 @@
   {
     "rule_id": "7d0ddbae-c283-456e-94d3-2ede4b4865ac",
     "rule_name": "审计PHP文件读取函数",
-    "hash": "6a2bed42bac54abc25de551bf4bda891688af0438d79926b0175196d5e82c954",
-    "version": "20251230.0001"
+    "hash": "3cd6fb48a242692abd58fe037783a3429e945ad108deb27605dcf55763f3890b",
+    "version": "20260623.0001"
   },
   {
     "rule_id": "cdc4481e-2a74-4711-9eb6-cf4d2d1898c0",
@@ -2006,8 +2006,8 @@
   {
     "rule_id": "7fd490e1-ce5a-42f0-8bf6-cb7c2f2cddce",
     "rule_name": "审计PHP文件写入方法",
-    "hash": "c14fa7c3aef7f5ddb2b6de49dc03a2479ea7a48c0c62a04a966af4d6af46ffa1",
-    "version": "20251230.0001"
+    "hash": "8928758c59f097f7a8600141c000f4d579e8a2a42d05a99198453dca9fe61a84",
+    "version": "20260623.0001"
   },
   {
     "rule_id": "ce83fe54-a8de-4794-abf7-f3476892bdec",

@@ -131,7 +131,7 @@ func detachedPlanSelectors(coordinatorID string) []map[string]any {
 		},
 		{
 			"id":                 fmt.Sprintf("detached-plan-execute-%s", coordinatorID),
-			"value":              "execute",
+			"value":              "continue",
 			"prompt":             "允许执行",
 			"prompt_english":     "Allow plan execution",
 			"allow_extra_prompt": false,
@@ -159,10 +159,6 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 		r.EmitSyncEventError("execute_detached_plan", errors.New("coordinator_id is empty"), event.SyncID)
 		return nil
 	}
-	if input == nil || strings.TrimSpace(input.PlanData) == "" {
-		r.EmitSyncEventError("execute_detached_plan", errors.New("plan_data is empty"), event.SyncID)
-		return nil
-	}
 	db := r.config.GetDB()
 	if db == nil {
 		r.EmitSyncEventError("execute_detached_plan", errors.New("db is nil"), event.SyncID)
@@ -182,18 +178,9 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 		return nil
 	}
 
-	planPayload := strings.TrimSpace(input.PlanPayload)
-	rootTask, err := r.buildRootTaskForDetachedPlan(r.config.Ctx, planPayload, input)
-	if err != nil {
-		r.EmitSyncEventError("execute_detached_plan", err, event.SyncID)
-		return nil
-	}
+	var detectPlan detachedPlanProgress
+	json.Unmarshal([]byte(record.TaskProgress), &detectPlan)
 
-	record.TaskTree = string(utils.Jsonify(rootTask))
-	record.TaskProgress = string(utils.Jsonify(&aid.PlanAndExecProgress{
-		Phase:     aid.Phase_PlanReady,
-		UpdatedAt: time.Now().Unix(),
-	}))
 	if sessionID != "" {
 		record.SessionID = sessionID
 	}
@@ -202,8 +189,21 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 		return nil
 	}
 
+	if input.PlanPayload == "" {
+		input.PlanPayload = detectPlan.PlanPayload
+	}
+	if input.PlanFacts == "" {
+		input.PlanFacts = detectPlan.PlanFacts
+	}
+	if input.PlanDocument == "" {
+		input.PlanDocument = detectPlan.PlanDocument
+	}
+	if input.PlanData == "" {
+		input.PlanData = record.TaskTree
+	}
+
 	approvedInput := &aicommon.ExecutePlanInput{
-		PlanPayload:  planPayload,
+		PlanPayload:  input.PlanPayload,
 		PlanData:     input.PlanData,
 		PlanFacts:    input.PlanFacts,
 		PlanDocument: input.PlanDocument,
@@ -221,7 +221,7 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 			log.Errorf("execute detached plan via recovery failed: coordinator=%s err=%v", coordinatorID, err)
 		}
 	},
-		WithInvokePlanAndExecutePlanPayload(planPayload),
+		WithInvokePlanAndExecutePlanPayload(input.PlanPayload),
 		WithInvokePlanAndExecuteExecutePlanInput(approvedInput),
 	)
 	return nil

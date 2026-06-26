@@ -10,7 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
-	"github.com/yaklang/yaklang/common/yakgrpc"
+	"github.com/yaklang/yaklang/common/yak/yakscript"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -102,7 +102,7 @@ func detectProject(ctx context.Context, target, language string) (*AutoDetectInf
 	}
 
 	var info *AutoDetectInfo
-	err := yakgrpc.ExecScriptWithParam(ctx, pluginName, param,
+	err := yakscript.ExecScriptWithParam(ctx, pluginName, param,
 		"", func(exec *ypb.ExecResult) error {
 			if !exec.IsMessage {
 				return nil
@@ -200,31 +200,71 @@ func compileProjectByPlugin(ctx context.Context, config *ssaconfig.Config, force
 		}
 	}
 
-	var compiledProgramName string
-	err = yakgrpc.ExecScriptWithParam(ctx, compilePluginName, compileParam,
+	var result compilePluginResult
+	err = yakscript.ExecScriptWithParam(ctx, compilePluginName, compileParam,
 		"", func(exec *ypb.ExecResult) error {
-			if !exec.IsMessage {
-				return nil
-			}
-			rawMsg := exec.GetMessage()
-			var msg execMsg
-			json.Unmarshal(rawMsg, &msg)
-			if msg.Type == "log" && msg.Content.Level == "code" {
-				var result struct {
-					ProgramName string `json:"program_name"`
-				}
-				err := json.Unmarshal([]byte(msg.Content.Data), &result)
-				if err == nil && result.ProgramName != "" {
-					compiledProgramName = result.ProgramName
-				}
-			}
-			return nil
+			return result.handle(exec)
 		},
 	)
 	if err != nil {
+		if failure := result.failureText(); failure != "" {
+			return "", utils.Errorf("failed to compile project: %s\n%s", err, failure)
+		}
 		return "", utils.Errorf("failed to compile project: %s", err)
 	}
-	return compiledProgramName, nil
+	if result.programName == "" {
+		if failure := result.failureText(); failure != "" {
+			return "", utils.Errorf("failed to compile project: %s", failure)
+		}
+	}
+	return result.programName, nil
+}
+
+type compilePluginResult struct {
+	programName string
+	failures    []string
+}
+
+func (r *compilePluginResult) handle(exec *ypb.ExecResult) error {
+	if exec == nil || !exec.IsMessage {
+		return nil
+	}
+	var msg execMsg
+	if err := json.Unmarshal(exec.GetMessage(), &msg); err != nil {
+		return err
+	}
+	if msg.Type != "log" {
+		return nil
+	}
+	switch msg.Content.Level {
+	case "code":
+		var result struct {
+			ProgramName string `json:"program_name"`
+		}
+		if err := json.Unmarshal([]byte(msg.Content.Data), &result); err == nil && result.ProgramName != "" {
+			r.programName = result.ProgramName
+		}
+	case "error", "fatal", "text":
+		r.addFailure(msg.Content.Data)
+	}
+	return nil
+}
+
+func (r *compilePluginResult) addFailure(message string) {
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return
+	}
+	for _, existing := range r.failures {
+		if existing == message {
+			return
+		}
+	}
+	r.failures = append(r.failures, message)
+}
+
+func (r *compilePluginResult) failureText() string {
+	return strings.Join(r.failures, "\n")
 }
 
 func loadProgramWithRetry(programName string) (*ssaapi.Program, error) {

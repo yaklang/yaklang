@@ -362,22 +362,12 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 			// 记录当前查询
 			loop.Set("last_grep_query", currentQuery)
 
-			emitter := loop.GetEmitter()
+			nodeID := "grep_yaklang_samples"
+			startLine := fmt.Sprintf("Grep 搜索: pattern=%s, case_sensitive=%v, context=%d", pattern, caseSensitive, contextLines)
+			reactloops.EmitActionLog(loop, nodeID, startLine)
+			reactloops.EmitStatus(loop, "Grep 搜索中 / Grep searching...")
 
-			// 显示搜索参数
-			searchInfo := fmt.Sprintf("Grep pattern: %s, case_sensitive: %v, context: %d lines",
-				pattern, caseSensitive, contextLines)
-			emitter.EmitThoughtStream(op.GetTask().GetId(), searchInfo)
-			loop.GetEmitter().EmitDefaultStreamEvent(
-				"grep_yaklang_samples",
-				bytes.NewReader([]byte(searchInfo)),
-				loop.GetCurrentTask().GetIndex(),
-				func() {
-					log.Infof("grep yaklang samples: %s", searchInfo)
-				},
-			)
-
-			invoker.AddToTimeline("start_grep_yaklang_samples", searchInfo)
+			invoker.AddToTimeline("start_grep_yaklang_samples", startLine)
 
 			// 检查 docSearcher
 			if docSearcher == nil {
@@ -531,8 +521,14 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 				}
 			}
 
-			emitter.EmitThoughtStream("grep_samples_result", "Search Result:\n"+resultStr)
-			invoker.AddToTimeline("grep_search_results", fmt.Sprintf("Found %d matches for pattern: %s\n%s", len(results), pattern, resultStr))
+			summary, reference := reactloops.SpillLongContent(loop, "grep_search", resultStr)
+			finishLine := fmt.Sprintf("完成: 找到 %d 个匹配, pattern=%s", len(results), pattern)
+			reactloops.EmitStatus(loop, "完成 / Complete")
+			reactloops.EmitActionLog(loop, nodeID, finishLine, reference)
+			invoker.AddToTimeline("grep_search_results", fmt.Sprintf(
+				"Grep 搜索完成: %d 个匹配, pattern=%s\n%s",
+				len(results), pattern, summary,
+			))
 
 			// 根据结果数量生成不同的建议，添加到Timeline
 			var suggestionMsg string

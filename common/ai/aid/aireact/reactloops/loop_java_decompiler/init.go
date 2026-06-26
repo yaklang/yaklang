@@ -78,10 +78,10 @@ func init() {
 		reactloops.WithLoopUsagePrompt(`当用户输入一般为 JAR 文件修复导出需求，如：
 - "请帮我反编译 /tmp/xxx.jar 并输出至 ./xxx"
 - "请检查导出的 Java 文件，并一并修复编译错误"
-调用本流程，将启用如下专用工具：decompile_jar（反编译 JAR）、list_files（枚举文件）、read_java_file（查看源码）、rewrite_java_file（修正/重写源码）、check_syntax（检测语法错误）、compare_with_backup（对比备份版本）。human_readable_thought 字段会详细描述用户意图与 jar 路径，辅助 AI 做出针对性决策。`),
+调用本流程，将启用如下专用工具：decompile_jar（反编译 JAR）、list_files（枚举文件）、read_java_file（查看源码）、rewrite_java_file（修正/重写源码）、check_syntax（检测语法错误）、compare_with_backup（对比备份版本）。`),
 		reactloops.WithLoopOutputExample(`
 * 用户请求反编译 jar 并自动修复导出的 Java 代码。例如：
-  {"@action": "java_decompiler", "human_readable_thought": "请将 /tmp/xxx.jar 反编译输出到 ./xxx，并修复所有导出的 Java 文件中的语法和常见反编译问题"}
+  {"@action": "decompile_jar", "jar_path": "/tmp/xxx.jar", "output_dir": "./xxx"}
 `),
 
 		reactloops.WithVerboseName("Java Decompiler"),
@@ -95,18 +95,16 @@ func init() {
 // buildInitTask creates the initial task for the Java decompiler loop
 func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
-		// Get user input from task
 		userQuery := task.GetUserInput()
 
-		// Initialize loop context
 		loop.Set("current_task", userQuery)
 		loop.Set("total_files", 0)
 		loop.Set("files_with_issues", 0)
-		loop.Set("fixed_files", 0)     // Legacy counter
-		loop.Set("rewritten_files", 0) // New counter for rewrite action
+		loop.Set("fixed_files", 0)
+		loop.Set("rewritten_files", 0)
 
-		r.AddToTimeline("task_initialized", "Java decompiler task initialized: "+userQuery)
-		// Default: Continue with normal loop execution
+		reactloops.EmitStatus(loop, "初始化 Java 反编译任务 / Initializing Java Decompiler Task")
+		r.AddToTimeline("task_initialized", utils.ShrinkString(userQuery, 200))
 		operator.Continue()
 	}
 }

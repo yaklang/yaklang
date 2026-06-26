@@ -878,10 +878,17 @@ func normalizeHostOnly(host string) string {
 // 返回值:
 //   - 是否为 HTTP 响应报文
 //
-// Example:
+// <|EXAMPLE_START|> 示例：判断一段数据是否为 HTTP 响应报文
 // ```
-// poc.IsResp(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok") // true
+// // 关键词: poc.IsResponse, 判断响应报文
+// // 注意: 在 yak 中该函数导出名为 poc.IsResponse
+// isResp = poc.IsResponse(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
+// println("is response =", isResp)              // 预期输出: is response = true
+// assert isResp, "should be recognized as response"
+// isReq = poc.IsResponse(b"GET / HTTP/1.1\r\nHost: a.com\r\n\r\n")
+// assert !isReq, "request packet should not be a response"
 // ```
+// <|EXAMPLE_END|>
 func IsResp(raw any) (isHTTPResponse bool) {
 	switch data := raw.(type) {
 	case []byte:

@@ -406,10 +406,10 @@ type Config struct {
 	forgeHotloadHandler            forgeHotloadHandler
 	skillUnloadHandler             skillUnloadHandler
 	forgeUnloadHandler             forgeUnloadHandler
-	capabilityInventoryEmitHandler   capabilityInventoryEmitHandler
-	sessionSnapshot                  *sessionSnapshotState
-	hotpatchCurrentTaskIdResolver    func() string
-	capabilityHotpatchHandler        func(enable bool, caps []EnabledCapability)
+	capabilityInventoryEmitHandler capabilityInventoryEmitHandler
+	sessionSnapshot                *sessionSnapshotState
+	hotpatchCurrentTaskIdResolver  func() string
+	capabilityHotpatchHandler      func(enable bool, caps []EnabledCapability)
 
 	/*
 		Lazy WorkDir for semantic artifact directory naming

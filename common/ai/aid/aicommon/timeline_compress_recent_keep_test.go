@@ -115,6 +115,28 @@ func TestFindCompressSplit_AllFitInKeep(t *testing.T) {
 	require.Equal(t, 0, splitIdx, "when all items fit in keep budget, split must be 0 (no compress)")
 }
 
+func TestDumpSizeCheck_BatchCompressDoesNotReenterTimelineLock(t *testing.T) {
+	tl := NewTimeline(&mockedAI{}, nil)
+	baseTs := time.Date(2024, 6, 1, 10, 0, 0, 0, time.UTC)
+	for i := int64(1); i <= 20; i++ {
+		injectTimelineItem(tl, i, baseTs.Add(time.Duration(i)*time.Second),
+			makeToolResult(i, "tool", true, makeBigToolResultPayload(int(i), 20)))
+	}
+	tl.SetTimelineContentLimit(1)
+
+	done := make(chan struct{})
+	go func() {
+		tl.dumpSizeCheck()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("dumpSizeCheck deadlocked while entering batch compression")
+	}
+}
+
 // TestRenderBatchCompressPrompt_ContainsBothSections 双段都应出现在 prompt 中
 // 关键词: renderBatchCompressPrompt RECENT_KEEP ITEMS_TO_COMPRESS
 func TestRenderBatchCompressPrompt_ContainsBothSections(t *testing.T) {

@@ -21,15 +21,22 @@ func yakdocActions(r aicommon.AIInvokeRuntime) []reactloops.ReActLoopOption {
 	}
 }
 
+func yakdocEmitStart(loop *reactloops.ReActLoop, detail string) {
+	reactloops.EmitActionLog(loop, "query_yaklang_document", detail)
+	reactloops.EmitStatus(loop, "查询 Yaklang 文档中 / Querying Yaklang Document...")
+}
+
 func yakdocHandleSuccess(
 	loop *reactloops.ReActLoop,
 	op *reactloops.LoopActionHandlerOperator,
-	actionName, timelineKey, streamKey, result string,
+	actionName, timelineKey, result string,
 ) {
 	invoker := loop.GetInvoker()
-	emitter := loop.GetEmitter()
-	emitter.EmitThoughtStream(streamKey, result)
-	invoker.AddToTimeline(timelineKey, result)
+	summary, reference := reactloops.SpillLongContent(loop, "yakdoc_"+actionName, result)
+	finishLine := fmt.Sprintf("完成: %s", actionName)
+	reactloops.EmitStatus(loop, "完成 / Complete")
+	reactloops.EmitActionLog(loop, "query_yaklang_document", finishLine, reference)
+	invoker.AddToTimeline(timelineKey, fmt.Sprintf("%s\n%s", finishLine, summary))
 	log.Infof("%s: query completed", actionName)
 	op.Continue()
 }
@@ -122,12 +129,13 @@ yakdoc_search(query="Split", library="str")`,
 			}
 			loop.Set(queryKey, currentQuery)
 
+			yakdocEmitStart(loop, fmt.Sprintf("查询: query=%s, library=%s", query, library))
 			hits, err := SearchYakDocument(query, limit, library)
 			if err != nil {
 				yakdocHandleError(loop, op, "yakdoc_search", queryKey, err)
 				return
 			}
-			yakdocHandleSuccess(loop, op, "yakdoc_search", "yakdoc_search", "yakdoc_search_result", FormatSearchResults(query, hits))
+			yakdocHandleSuccess(loop, op, "yakdoc_search", "yakdoc_search", FormatSearchResults(query, hits))
 		},
 	)
 }
@@ -153,12 +161,13 @@ yakdoc_get_all_library_names()`,
 			}
 			loop.Set(queryKey, "all_libraries")
 
+			yakdocEmitStart(loop, "查询: 全部标准库名称")
 			names, err := QueryAllLibraryNames()
 			if err != nil {
 				yakdocHandleError(loop, op, "yakdoc_get_all_library_names", queryKey, err)
 				return
 			}
-			yakdocHandleSuccess(loop, op, "yakdoc_get_all_library_names", "yakdoc_all_libraries", "yakdoc_all_libraries_result", FormatAllLibraryNames(names))
+			yakdocHandleSuccess(loop, op, "yakdoc_get_all_library_names", "yakdoc_all_libraries", FormatAllLibraryNames(names))
 		},
 	)
 }
@@ -195,12 +204,13 @@ yakdoc_library_details(library=["str", "file"])`,
 			}
 			loop.Set(queryKey, currentQuery)
 
+			yakdocEmitStart(loop, fmt.Sprintf("查询: library=%s", strings.Join(libNames, ",")))
 			details, err := QueryLibraryDetails(libNames)
 			if err != nil {
 				yakdocHandleError(loop, op, "yakdoc_library_details", queryKey, err)
 				return
 			}
-			yakdocHandleSuccess(loop, op, "yakdoc_library_details", "yakdoc_library_details", "yakdoc_library_details_result", FormatLibraryDetails(details))
+			yakdocHandleSuccess(loop, op, "yakdoc_library_details", "yakdoc_library_details", FormatLibraryDetails(details))
 		},
 	)
 }
@@ -249,12 +259,13 @@ yakdoc_function_details(library="str", function=["Split", "Contains"])`,
 			}
 			loop.Set(queryKey, currentQuery)
 
+			yakdocEmitStart(loop, fmt.Sprintf("查询: library=%s, function=%s", libName, strings.Join(funcNames, ",")))
 			results, err := QueryFunctionDetails(libName, funcNames)
 			if err != nil {
 				yakdocHandleError(loop, op, "yakdoc_function_details", queryKey, err)
 				return
 			}
-			yakdocHandleSuccess(loop, op, "yakdoc_function_details", "yakdoc_function_details", "yakdoc_function_details_result", FormatFunctionDetails(results))
+			yakdocHandleSuccess(loop, op, "yakdoc_function_details", "yakdoc_function_details", FormatFunctionDetails(results))
 		},
 	)
 }
@@ -301,12 +312,13 @@ yakdoc_variable_details(library="yakit", variable=["Status"])`,
 			}
 			loop.Set(queryKey, currentQuery)
 
+			yakdocEmitStart(loop, fmt.Sprintf("查询: library=%s, variable=%s", libName, strings.Join(varNames, ",")))
 			results, err := QueryVariableDetails(libName, varNames)
 			if err != nil {
 				yakdocHandleError(loop, op, "yakdoc_variable_details", queryKey, err)
 				return
 			}
-			yakdocHandleSuccess(loop, op, "yakdoc_variable_details", "yakdoc_variable_details", "yakdoc_variable_details_result", FormatVariableDetails(results))
+			yakdocHandleSuccess(loop, op, "yakdoc_variable_details", "yakdoc_variable_details", FormatVariableDetails(results))
 		},
 	)
 }

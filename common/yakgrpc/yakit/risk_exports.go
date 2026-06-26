@@ -589,7 +589,8 @@ func WithRiskParam_YakScriptUUID(i string) RiskParamsOpt {
 //
 // Example:
 // ```
-// risk.NewRisk(target, risk.fromScript("plugin_name"))
+// // 记录一条风险到数据库, 并标注来源插件名(便于在风险管理中追溯是哪个插件发现的)
+// risk.NewRisk("http://example.com/vuln", risk.fromYakScript("my-plugin"), risk.severity("high"))
 // ```
 func WithRiskParam_FromScript(i string) RiskParamsOpt {
 	return func(r *schema.Risk) {
@@ -661,8 +662,22 @@ func WithRiskParam_Tags(i string) RiskParamsOpt {
 //
 // Example:
 // ```
-// r = risk.CreateRisk("http://example.com", risk.title("SQL注入漏洞"), risk.type("sqli"), risk.severity("high"), risk.description(""), risk.solution(""))
-// risk.Save(r)
+// // 关键词: risk.CreateRisk, 结构化记录漏洞
+// // CreateRisk 只构造风险结构体, 不入库; 配合 risk.Save 才写入数据库(Yakit 漏洞列表可见)
+// r = risk.CreateRisk("http://example.com",
+//
+//	risk.title("SQL Injection in id param"), // 漏洞标题
+//	risk.type("sqli"),                        // 漏洞类型
+//	risk.severity("high"),                    // 等级: info/low/middle/high/critical
+//	risk.payload("id=1' or '1'='1"),          // 触发用 payload
+//	risk.description("user-controlled id concatenated into SQL"),
+//	risk.solution("use parameterized queries"),
+//
+// )
+// println("title:", r.Title, "severity:", r.Severity) // 预期: title: SQL Injection in id param severity: high
+// assert r.Title == "SQL Injection in id param", "title should be set"
+// assert r.Severity == "high", "severity should be set"
+// risk.Save(r) // 保存到数据库; 也可用 risk.NewRisk(target, ...) 一步创建并保存
 // ```
 func CreateRisk(u string, opts ...RiskParamsOpt) *schema.Risk {
 	return _createRisk(u, opts...)
@@ -1101,8 +1116,9 @@ func CheckHTTPLogByToken(token string, pluginContext YakitPluginInfo, timeout ..
 //
 // Example:
 // ```
+// // 无法本地验证: 依赖带外(HTTPLog)平台与公网 Bridge
 // domain, token = risk.NewHTTPLog()~
-// // 触发目标访问 domain 后查询（需要网络与带外平台，示意性示例）
+// // 触发目标访问 domain 后查询是否收到带外回连记录
 // notifications = risk.CheckHTTPLogByToken(token, 5)~
 // for n in notifications { println(n.Url) }
 // ```
@@ -1176,7 +1192,8 @@ func YakitNewCheckDNSLogByToken(pluginContext YakitPluginInfo) func(token string
 //
 // Example:
 // ```
-// token, addr = risk.NewRandomPortTrigger()~
+// // 无法本地验证: 依赖公网 Bridge 反连服务(需配置 yak bridge 地址)
+// token, addr = risk.NewRandomPortTrigger()~ // 申请一个随机端口反连检测地址
 // ```
 func NewRandomPortTrigger(opt ...RiskParamsOpt) (token string, addr string, _ error) {
 	token = utils.RandStringBytes(8)
@@ -1211,7 +1228,8 @@ func NewRandomPortTrigger(opt ...RiskParamsOpt) (token string, addr string, _ er
 //
 // Example:
 // ```
-// // 该示例为示意性用法：通过长度检查 ICMP 反连
+// // 无法本地验证: 依赖公网 Bridge 反连服务(需配置 yak bridge 地址)
+// // 通过特定 ICMP 包长度查询是否收到 ICMP 反连
 // event = risk.CheckICMPTriggerByLength(1111)~
 // println(event.CurrentRemoteAddr)
 // ```
@@ -1262,8 +1280,9 @@ func CheckICMPTriggerByLength(i int, pluginContext YakitPluginInfo) (*tpb.ICMPTr
 //
 // Example:
 // ```
+// // 无法本地验证: 依赖公网 Bridge 反连服务(需配置 yak bridge 地址)
 // token, addr = risk.NewRandomPortTrigger()~
-// // 触发目标连接 addr 后查询（需要网络与 Bridge 反连服务，示意性示例）
+// // 触发目标连接 addr 后查询是否收到反连事件
 // event = risk.CheckRandomTriggerByToken(token)~
 // println(event.RemoteAddr)
 // ```

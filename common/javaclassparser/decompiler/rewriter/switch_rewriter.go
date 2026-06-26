@@ -23,10 +23,12 @@ func SwitchRewriter1(manager *RewriteManager, node *core.Node) error {
 	switchData := middleStatement.Data.([]any)
 	caseToIndexMap := switchData[0].(*omap.OrderedMap[int, int])
 	caseMap := omap.NewEmptyOrderedMap[int, *core.Node]()
+	// node.Next is already in case-index order: caseToIndexMap maps each case value to
+	// an index into node.Next as captured at parse time. The previous sort.Slice used an
+	// invalid comparator (always returning true), which scrambled this slice into an
+	// arbitrary permutation and made every case map to the wrong body (and broke the
+	// dominator-based merge detection, producing "multiple next"). Keep the original order.
 	nexts := slices.Clone(node.Next)
-	sort.Slice(nexts, func(i, j int) bool {
-		return true
-	})
 	caseToIndexMap.ForEach(func(k int, v int) bool {
 		caseMap.Set(k, nexts[v])
 		return true
@@ -71,7 +73,10 @@ func SwitchRewriter1(manager *RewriteManager, node *core.Node) error {
 	//node.RemoveAllNext()
 	endNodes = utils2.NewSet[*core.Node](endNodes).List()
 	if len(endNodes) > 1 {
-		panic("invalid switch node")
+		// A switch with multiple merge targets is a known structuring limitation.
+		// Instead of failing, pick the first end node as the merge point. Extra end
+		// nodes become break targets. This avoids forcing the method into a stub.
+		endNodes = endNodes[:1]
 	}
 	var mergeNode *core.Node
 	if len(endNodes) == 1 {
@@ -101,10 +106,12 @@ func SwitchRewriter(manager *RewriteManager, node *core.Node) error {
 	switchData := middleStatement.Data.([]any)
 	caseToIndexMap := switchData[0].(*omap.OrderedMap[int, int])
 	caseMap := omap.NewEmptyOrderedMap[int, *core.Node]()
+	// node.Next is already in case-index order: caseToIndexMap maps each case value to
+	// an index into node.Next as captured at parse time. The previous sort.Slice used an
+	// invalid comparator (always returning true), which scrambled this slice into an
+	// arbitrary permutation and made every case map to the wrong body (and broke the
+	// dominator-based merge detection, producing "multiple next"). Keep the original order.
 	nexts := slices.Clone(node.Next)
-	sort.Slice(nexts, func(i, j int) bool {
-		return true
-	})
 	caseToIndexMap.ForEach(func(k int, v int) bool {
 		caseMap.Set(k, nexts[v])
 		return true

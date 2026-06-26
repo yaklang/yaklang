@@ -27,6 +27,7 @@ func handleToolCallResult(
 	if err != nil {
 		errMsg := fmt.Sprintf("Tool '%s' execution failed: %v.", toolPayload, err)
 		invoker.AddToTimeline("[TOOL_EXECUTION_ERROR]", errMsg)
+		loopInfraStatus(loop, "工具调用失败 / Tool Call Failed")
 
 		resolved := loop.ResolveIdentifier(toolPayload)
 		if buildinaitools.IsMCPToolName(toolPayload) && buildinaitools.IsMCPInitializingError(err) {
@@ -65,16 +66,19 @@ func handleToolCallResult(
 	if result == nil {
 		msg := fmt.Sprintf("tool call [%v] returned nil result", toolPayload)
 		invoker.AddToTimeline("error", msg)
+		loopInfraStatus(loop, "工具无结果 / Tool Returned No Result")
 		operator.Continue()
 		return
 	}
 
 	if result.Success {
 		reactloops.MarkEditBeforeExecutionCompleted(loop, toolPayload)
+		loopInfraStatus(loop, "工具调用完成 / Tool Call Complete")
 	}
 
 	if result.Error != "" {
 		invoker.AddToTimeline("call["+toolPayload+"] error", result.Error)
+		loopInfraStatus(loop, "工具返回错误 / Tool Returned Error")
 		if buildinaitools.IsMCPToolName(toolPayload) && buildinaitools.IsMCPInitializingMessage(result.Error) {
 			operator.Feedback(
 				"[MCP] Tool '" + toolPayload + "' is still initializing. " +

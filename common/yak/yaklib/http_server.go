@@ -125,7 +125,7 @@ func _httpServerOptLocalFileSystemHandler(prefix, dir string) HttpServerConfigOp
 // Example:
 // ```
 //
-//	err = httpserver.Serve("127.0.0.1", 8888, httpserver.routeHandler("/", func(w http.ResponseWriter, r *http.Request) {
+//	err = httpserver.Serve("127.0.0.1", 8888, httpserver.routeHandler("/", func(w, r) {
 //		w.Write([]byte("Hello world"))
 //	}))
 //
@@ -212,7 +212,7 @@ func _httpServerOptWsRouteHandler(route string, handler WebSocketHandler) HttpSe
 // Example:
 // ```
 //
-//	err = httpserver.Serve("127.0.0.1", 8888, httpserver.captchaRouteHandler("/captcha", 30, func(w http.ResponseWriter, r *http.Request) {
+//	err = httpserver.Serve("127.0.0.1", 8888, httpserver.captchaRouteHandler("/captcha", 30, func(w, r) {
 //		w.Write([]byte("Hello world"))
 //	}))
 //

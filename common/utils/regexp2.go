@@ -3,7 +3,7 @@ package utils
 import (
 	"strings"
 
-	"github.com/dlclark/regexp2"
+	regexp2 "github.com/VillanCh/go-pcre2-lite/regexp2"
 )
 
 func Regexp2Compile(rawRule string, opts ...int) (string, regexp2.RegexOptions, *regexp2.Regexp, error) {

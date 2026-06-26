@@ -4,7 +4,26 @@ desc(
 	type: config
 	level: low
 	desc: <<<DESC
-### 风险描述\n1. **风险原理**\n该规则用于审计Java代码中通过设置`Content-Disposition` HTTP头部来配置文件下载功能的位置点。攻击者如果能够控制或影响该头部中的文件名参数，可能结合其他漏洞（如路径穿越）进行敏感文件下载或枚举服务器文件结构。即使文件名本身经过编码，如果处理不当或存在其他漏洞，暴露配置点本身也增加了攻击面。\n2. **触发场景**\n当Java应用程序使用`HttpServletResponse.setHeader(\"Content-disposition\", ...)`方法，并且该头部的值（特别是`filename`或`filename*`参数）是基于用户输入或与用户输入有关的数据构造时，可能触发该规则。\n例如，以下代码片段虽然对文件名进行了URL编码，但如果`realFileName`来源于外部不可信源且未进行严格校验，则仍构成一个配置点，需要关注其后续的安全性。\n```java\nStringBuilder contentDispositionValue = new StringBuilder();\ncontentDispositionValue.append(\"attachment; filename=\")\n.append(percentEncodedFileName)\n.append(\"\;\")\n.append(\"filename*=\")\n.append(\"utf-8''\")\n.append(percentEncodedFileName);\nresponse.setHeader(\"Content-disposition\", contentDispositionValue.toString());\n```\n3. **潜在影响**\n- 攻击者可能通过路径穿越攻击下载任意文件（如果文件名参数未经验证或编码不当）。\n- 即使不存在路径穿越，暴露文件下载的实现方式和文件名构造逻辑也有助于攻击者理解应用结构。\n- 结合其他漏洞，可能导致更严重的攻击。
+### 风险描述
+1. **风险原理**
+该规则用于审计Java代码中通过设置`Content-Disposition` HTTP头部来配置文件下载功能的位置点。攻击者如果能够控制或影响该头部中的文件名参数，可能结合其他漏洞（如路径穿越）进行敏感文件下载或枚举服务器文件结构。即使文件名本身经过编码，如果处理不当或存在其他漏洞，暴露配置点本身也增加了攻击面。
+2. **触发场景**
+当Java应用程序使用`HttpServletResponse.setHeader("Content-disposition", ...)`方法，并且该头部的值（特别是`filename`或`filename*`参数）是基于用户输入或与用户输入有关的数据构造时，可能触发该规则。
+例如，以下代码片段虽然对文件名进行了URL编码，但如果`realFileName`来源于外部不可信源且未进行严格校验，则仍构成一个配置点，需要关注其后续的安全性。
+```java
+StringBuilder contentDispositionValue = new StringBuilder();
+contentDispositionValue.append("attachment; filename=")
+    .append(percentEncodedFileName)
+    .append(";")
+    .append("filename*=")
+    .append("utf-8''")
+    .append(percentEncodedFileName);
+response.setHeader("Content-disposition", contentDispositionValue.toString());
+```
+3. **潜在影响**
+- 攻击者可能通过路径穿越攻击下载任意文件（如果文件名参数未经验证或编码不当）。
+- 即使不存在路径穿越，暴露文件下载的实现方式和文件名构造逻辑也有助于攻击者理解应用结构。
+- 结合其他漏洞，可能导致更严重的攻击。
 DESC
 	rule_id: "df1af403-0bc8-4d7e-bcd6-6bb863559f02"
 	solution: <<<SOLUTION

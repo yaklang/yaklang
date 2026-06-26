@@ -127,6 +127,7 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *AuditState) fu
 
 		// 审计已完成：同一 session 内前端仍保持 code_security_audit 专注模式时，走追问子 loop。
 		if state.GetPhase() == AuditPhaseDone {
+			reactloops.EmitStatus(loop, "审计追问模式 / Audit follow-up mode")
 			r.AddToTimeline("[AUDIT_FOLLOWUP]", "审计已完成，进入追问模式。用户输入: "+utils.ShrinkTextBlock(userInput, 300))
 			followLoop, err := buildFollowUpLoop(r, state)
 			if err != nil {
@@ -141,6 +142,7 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *AuditState) fu
 			return
 		}
 
+		reactloops.EmitStatus(loop, "代码安全审计启动 / Starting code security audit")
 		r.AddToTimeline("[AUDIT_START]", "代码安全审计开始，用户输入: "+utils.ShrinkTextBlock(userInput, 300))
 
 		// 提前创建 audit 输出目录
@@ -156,6 +158,7 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *AuditState) fu
 
 		// ── Phase 1: 项目探索（委托给 dir_explore loop）──
 		log.Infof("[CodeAudit] Starting Phase 1 (Recon via dir_explore)")
+		reactloops.EmitStatus(loop, "Phase 1：项目探索中 / Phase 1: Project exploration...")
 		r.AddToTimeline("[PHASE1_START]", "开始 Phase 1：项目探索（使用 dir_explore loop）")
 
 		reconFilePath := filepath.Join(auditDirPath, "recon_notes.md")
@@ -229,9 +232,12 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *AuditState) fu
 		} else {
 			log.Infof("[CodeAudit] Phase 1 complete. tech=%s recon_file=%s", state.TechStack, state.GetReconFilePath())
 		}
+		reactloops.EmitStatus(loop, "Phase 1 完成 / Phase 1 complete")
 
 		// ── Phase 2: 按漏洞类别串行扫描 ──
 		log.Infof("[CodeAudit] Starting Phase 2 (Serial category scan, %d categories)", len(DefaultVulnCategories))
+		reactloops.EmitActionLog(loop, codeAuditScanNodeID, "Phase 2：代码审计扫描 / Phase 2: Code audit scan")
+		reactloops.EmitStatus(loop, "Phase 2：漏洞扫描中 / Phase 2: Vulnerability scanning...")
 		scanLoop, err := buildPhase2AllCategoriesLoop(r, state, nil)
 		if err != nil {
 			log.Errorf("[CodeAudit] Failed to build Phase 2 loop: %v", err)
@@ -270,6 +276,10 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *AuditState) fu
 			log.Infof("[CodeAudit] Scan observations persisted to: %s", obsFile)
 		}
 
+		reactloops.EmitStatus(loop, "Phase 2 完成 / Phase 2 complete")
+		reactloops.EmitActionLog(loop, codeAuditScanNodeID,
+			fmt.Sprintf("完成: %d findings, %d categories", len(state.GetFindings()), len(state.GetScanObservations())))
+
 		// ── Phase 3: 逐 Finding 验证 ──
 		findings := state.GetFindings()
 		if len(findings) == 0 {
@@ -277,6 +287,8 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *AuditState) fu
 			log.Infof("[CodeAudit] No findings, skipping Phase 3")
 		} else {
 			log.Infof("[CodeAudit] Starting Phase 3 (Verify), %d findings", len(findings))
+			reactloops.EmitActionLog(loop, codeAuditVerifyNodeID, "Phase 3：漏洞验证 / Phase 3: Vulnerability verification")
+			reactloops.EmitStatus(loop, "Phase 3：漏洞验证中 / Phase 3: Verifying findings...")
 			r.AddToTimeline("[PHASE3_START]", "开始 Phase 3：逐 Finding 验证")
 			verifyLoop, err := buildPhase3VerifyLoop(r, state)
 			if err != nil {
@@ -300,10 +312,15 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *AuditState) fu
 					log.Infof("[CodeAudit] VerifiedVulns persisted to: %s", verifiedFile)
 				}
 			}
+			reactloops.EmitStatus(loop, "Phase 3 完成 / Phase 3 complete")
+			reactloops.EmitActionLog(loop, codeAuditVerifyNodeID,
+				fmt.Sprintf("完成: %d verified", len(state.GetVerifiedVulns())))
 		}
 
 		// ── Phase 4: 报告生成 ──
 		log.Infof("[CodeAudit] Starting Phase 4 (Report)")
+		reactloops.EmitActionLog(loop, codeAuditReportNodeID, "Phase 4：审计报告 / Phase 4: Audit report")
+		reactloops.EmitStatus(loop, "Phase 4：报告生成中 / Phase 4: Generating report...")
 		r.AddToTimeline("[PHASE4_START]", "开始 Phase 4：报告生成")
 		reportLoop, err := buildPhase4ReportLoop(r, state)
 		if err != nil {
@@ -321,16 +338,25 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *AuditState) fu
 			fallbackReport := generateFallbackReport(state)
 			state.SetFinalReport(fallbackReport)
 			savePath := filepath.Join(auditDirPath, "security_audit_report.md")
-			if err := os.WriteFile(savePath, []byte(fallbackReport), 0o644); err != nil {
+			if err := reactloops.SaveAndPinFile(loop, savePath, []byte(fallbackReport)); err != nil {
 				log.Warnf("[CodeAudit] Failed to write fallback report: %v", err)
 			} else {
 				state.SetFinalReportPath(savePath)
 				log.Infof("[CodeAudit] Fallback report saved to: %s", savePath)
+				r.AddToTimeline("[REPORT_FALLBACK]", "已自动生成基础审计报告: "+savePath)
 			}
-			r.AddToTimeline("[REPORT_FALLBACK]", "已自动生成基础审计报告: "+savePath)
 		}
 
+		reportPath := state.GetFinalReportPath()
+		if reportPath == "" {
+			reportPath = filepath.Join(auditDirPath, "security_audit_report.md")
+		}
 		finalReport := state.GetFinalReport()
+		reportPreview := utils.ShrinkTextBlock(finalReport, 300)
+		reactloops.EmitStatus(loop, "审计完成 / Audit complete")
+		reactloops.EmitActionLog(loop, codeAuditReportNodeID,
+			fmt.Sprintf("完成: report=%s (%d bytes)", reportPath, len(finalReport)), reportPreview)
+
 		r.AddToTimeline("[AUDIT_DONE]", "代码安全审计全部完成。报告预览:\n"+utils.ShrinkTextBlock(finalReport, 200))
 		log.Infof("[CodeAudit] All phases complete. Report length: %d bytes", len(finalReport))
 

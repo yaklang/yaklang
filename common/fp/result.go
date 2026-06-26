@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dlclark/regexp2"
+	regexp2 "github.com/VillanCh/go-pcre2-lite/regexp2"
 	tablewriter "github.com/olekukonko/tablewriter"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/log"

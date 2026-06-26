@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -200,4 +201,90 @@ func TestGetBaseURLFromConfig_PreservesExplicitChatCompletionsBaseURL(t *testing
 			GetBaseURLFromConfigEx(config, "https://api.openai.com", "/v1/responses", true),
 		)
 	})
+}
+
+func TestNewDefaultAIConfig_TieredFallbackOnlyWhenTypeAlone(t *testing.T) {
+	original := consts.GetTieredAIConfig()
+	t.Cleanup(func() {
+		consts.SetTieredAIConfig(original)
+	})
+
+	consts.SetTieredAIConfig(&consts.TieredAIConfig{
+		Enabled: true,
+		IntelligentConfigs: []*ypb.AIModelConfig{
+			{
+				ModelName: "gpt-4o",
+				Provider: &ypb.ThirdPartyApplicationConfig{
+					Type:   "openai",
+					APIKey: "intelligent-key",
+					Domain: "api.openai.com",
+					Proxy:  "http://127.0.0.1:8080",
+				},
+			},
+		},
+		LightweightConfigs: []*ypb.AIModelConfig{
+			{
+				ModelName: "gpt-4o-mini",
+				Provider: &ypb.ThirdPartyApplicationConfig{
+					Type:   "openai",
+					APIKey: "lightweight-key",
+					Domain: "api.openai.com",
+				},
+			},
+		},
+	})
+
+	t.Run("type alone loads tiered defaults", func(t *testing.T) {
+		resolved := NewDefaultAIConfig(WithType("openai"))
+		assert.Equal(t, "intelligent-key", resolved.APIKey)
+		assert.Equal(t, "http://127.0.0.1:8080", resolved.Proxy)
+	})
+
+	t.Run("explicit model config skips tiered defaults", func(t *testing.T) {
+		lightweight := &ypb.AIModelConfig{
+			ModelName: "gpt-4o-mini",
+			Provider: &ypb.ThirdPartyApplicationConfig{
+				Type:   "openai",
+				APIKey: "lightweight-key",
+				Domain: "api.openai.com",
+			},
+		}
+		resolved := NewDefaultAIConfig(BuildOptionsFromConfig(lightweight)...)
+		assert.Equal(t, "lightweight-key", resolved.APIKey)
+		assert.Equal(t, "gpt-4o-mini", resolved.Model)
+		assert.Empty(t, resolved.Proxy)
+	})
+
+	t.Run("type with custom domain still loads stored api key", func(t *testing.T) {
+		originalThirdParty := consts.AllThirdPartyApplicationConfig()
+		t.Cleanup(func() {
+			consts.ClearThirdPartyApplicationConfig()
+			for _, cfg := range originalThirdParty {
+				consts.UpdateThirdPartyApplicationConfig(cfg)
+			}
+		})
+		consts.ClearThirdPartyApplicationConfig()
+		consts.UpdateThirdPartyApplicationConfig(&ypb.ThirdPartyApplicationConfig{
+			Type:   "chatglm",
+			APIKey: "id.secret",
+		})
+
+		resolved := NewDefaultAIConfig(WithType("chatglm"), WithDomain("127.0.0.1:8080"))
+		assert.Equal(t, "id.secret", resolved.APIKey)
+		assert.Equal(t, "127.0.0.1:8080", resolved.Domain)
+		assert.Empty(t, resolved.Proxy)
+	})
+}
+
+func TestOptsOnlySetType(t *testing.T) {
+	assert.True(t, optsOnlySetType(WithType("openai")))
+	assert.False(t, optsOnlySetType(WithType("openai"), WithAPIKey("k")))
+	assert.False(t, optsOnlySetType(WithType("openai"), WithAPIType("responses")))
+	assert.False(t, optsOnlySetType(BuildOptionsFromConfig(&ypb.AIModelConfig{
+		ModelName: "m",
+		Provider: &ypb.ThirdPartyApplicationConfig{
+			Type:   "openai",
+			APIKey: "k",
+		},
+	})...))
 }

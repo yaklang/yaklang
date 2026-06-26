@@ -29,10 +29,9 @@ var decompileJarAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 				return utils.Error("jar_path parameter is required")
 			}
 
-			// Check if JAR file exists
 			if utils.GetFirstExistedFile(jarPath) == "" {
-				invoker := l.GetInvoker()
-				errorMsg := fmt.Sprintf(`【JAR文件未找到】无法找到指定的JAR文件：%s
+				log.Warnf("[decompile_jar] JAR file not found: %s", jarPath)
+				l.GetInvoker().AddToTimeline("decompile_jar_not_found", fmt.Sprintf(`【JAR文件未找到】无法找到指定的JAR文件：%s
 
 【可能原因】：
 1. 文件路径拼写错误或格式不正确
@@ -51,29 +50,29 @@ var decompileJarAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 - 确保路径中没有拼写错误
 - 如果是用户提供的路径，请再次确认
 
-【警告】：必须提供有效的JAR文件路径才能继续反编译操作！`, jarPath)
-				invoker.AddToTimeline("decompile_jar_not_found", errorMsg)
+【警告】：必须提供有效的JAR文件路径才能继续反编译操作！`, jarPath))
 				return utils.Errorf("JAR file not found: %s", jarPath)
 			}
 
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+			const nodeID = "java-decompile-jar"
+
 			jarPath := action.GetString("jar_path")
 			outputDir := action.GetString("output_dir")
 
-			// If no output directory specified, create one based on JAR name
 			if outputDir == "" {
 				jarName := filepath.Base(jarPath)
 				jarName = jarName[:len(jarName)-len(filepath.Ext(jarName))]
 				outputDir = filepath.Join(filepath.Dir(jarPath), jarName+"_decompiled")
 			}
 
-			// Make output directory absolute
 			outputDir, err := filepath.Abs(outputDir)
 			if err != nil {
-				invoker := loop.GetInvoker()
-				errorMsg := fmt.Sprintf(`【路径解析失败】无法获取输出目录的绝对路径
+				log.Errorf("[decompile_jar] failed to resolve output path: %v", err)
+				reactloops.EmitStatus(loop, "路径解析失败 / Path Resolution Failed")
+				loop.GetInvoker().AddToTimeline("decompile_path_error", fmt.Sprintf(`【路径解析失败】无法获取输出目录的绝对路径
 
 【错误详情】：%v
 
@@ -93,19 +92,21 @@ var decompileJarAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 - 避免过长的路径嵌套
 - 可以不指定output_dir参数，让系统自动生成
 
-【警告】：路径解析失败将无法创建输出目录！`, err)
-				invoker.AddToTimeline("decompile_path_error", errorMsg)
+【警告】：路径解析失败将无法创建输出目录！`, err))
 				op.Fail("failed to get absolute path: " + err.Error())
 				return
 			}
 
 			invoker := loop.GetInvoker()
-			invoker.AddToTimeline("decompile_start", fmt.Sprintf("Starting decompilation of JAR file: %s to %s", jarPath, outputDir))
+			startLine := fmt.Sprintf("反编译 JAR: %s -> %s", jarPath, outputDir)
+			reactloops.EmitActionLog(loop, nodeID, startLine)
+			reactloops.EmitStatus(loop, "反编译中 / Decompiling...")
 
-			// Create output directory
 			err = os.MkdirAll(outputDir, 0755)
 			if err != nil {
-				errorMsg := fmt.Sprintf(`【目录创建失败】无法创建输出目录：%s
+				log.Errorf("[decompile_jar] failed to create output directory %s: %v", outputDir, err)
+				reactloops.EmitStatus(loop, "目录创建失败 / Failed to Create Output Directory")
+				invoker.AddToTimeline("decompile_mkdir_error", fmt.Sprintf(`【目录创建失败】无法创建输出目录：%s
 
 【错误详情】：%v
 
@@ -127,19 +128,19 @@ var decompileJarAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 - 使用用户主目录下的路径
 - 检查并清理已存在的同名文件或目录
 
-【警告】：无法创建输出目录将导致反编译失败！`, outputDir, err)
-				invoker.AddToTimeline("decompile_mkdir_error", errorMsg)
+【警告】：无法创建输出目录将导致反编译失败！`, outputDir, err))
 				op.Fail("failed to create output directory: " + err.Error())
 				return
 			}
 
-			// Decompile JAR file
-			log.Infof("decompiling JAR file: %s to %s", jarPath, outputDir)
+			log.Infof("[decompile_jar] decompiling %s to %s", jarPath, outputDir)
 			decompileStartTime := time.Now()
 			err = jarwar.AutoDecompile(jarPath, outputDir)
 			decompileDuration := time.Since(decompileStartTime)
 			if err != nil {
-				errorMsg := fmt.Sprintf(`【反编译失败】JAR文件反编译过程中遇到错误
+				log.Errorf("[decompile_jar] decompilation failed: %v", err)
+				reactloops.EmitStatus(loop, "反编译失败 / Decompilation Failed")
+				invoker.AddToTimeline("decompile_execution_error", fmt.Sprintf(`【反编译失败】JAR文件反编译过程中遇到错误
 
 【错误详情】：%v
 
@@ -164,21 +165,19 @@ var decompileJarAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 - 检查是否有其他进程占用该文件
 - 对于超大JAR文件，确保有足够的内存和磁盘空间
 
-【警告】：反编译失败意味着无法提取Java源代码！`, err)
-				invoker.AddToTimeline("decompile_execution_error", errorMsg)
+【警告】：反编译失败意味着无法提取Java源代码！`, err))
 				op.Fail(fmt.Sprintf("failed to decompile JAR file: %v", err))
 				return
 			}
 
-			// Create backup copies of all decompiled files (*.java -> *.java.bak)
-			log.Infof("creating backup copies of decompiled files")
+			reactloops.EmitStatus(loop, "创建备份中 / Creating Backups...")
 			backupCount := 0
 			filepath.Walk(outputDir, func(path string, info os.FileInfo, err error) error {
 				if err == nil && !info.IsDir() && filepath.Ext(path) == ".java" {
 					backupPath := path + ".bak"
-					content, err := os.ReadFile(path)
-					if err == nil {
-						if err := os.WriteFile(backupPath, content, 0644); err == nil {
+					content, readErr := os.ReadFile(path)
+					if readErr == nil {
+						if writeErr := os.WriteFile(backupPath, content, 0644); writeErr == nil {
 							backupCount++
 						}
 					}
@@ -186,8 +185,7 @@ var decompileJarAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 				return nil
 			})
 
-			// Check for compilation errors and count files
-			log.Infof("checking for compilation errors in decompiled files")
+			reactloops.EmitStatus(loop, "检查语法中 / Checking Syntax...")
 			checkStartTime := time.Now()
 			totalFiles := 0
 			filesWithIssues := 0
@@ -197,10 +195,16 @@ var decompileJarAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 			filepath.Walk(outputDir, func(path string, info os.FileInfo, err error) error {
 				if err == nil && !info.IsDir() && filepath.Ext(path) == ".java" {
 					totalFiles++
+					if totalFiles%100 == 0 {
+						reactloops.EmitStatus(loop, fmt.Sprintf(
+							"已扫描 %d 个 Java 文件 / Scanned %d Java Files",
+							totalFiles, totalFiles,
+						))
+					}
+
 					relPath, _ := filepath.Rel(outputDir, path)
 					filesList = append(filesList, relPath)
 
-					// Quick syntax check on decompiled files
 					content, readErr := os.ReadFile(path)
 					if readErr == nil {
 						issues := checkBasicJavaSyntax(string(content))
@@ -216,7 +220,6 @@ var decompileJarAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 			})
 			checkDuration := time.Since(checkStartTime)
 
-			// Generate README.md with decompilation report
 			readmePath := filepath.Join(outputDir, "README.md")
 			readme := generateDecompilationReport(
 				jarPath,
@@ -229,53 +232,44 @@ var decompileJarAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 				compilationErrors,
 				filesList,
 			)
-
-			if err := os.WriteFile(readmePath, []byte(readme), 0644); err != nil {
-				log.Warnf("failed to write README.md: %v", err)
-			} else {
-				log.Infof("generated decompilation report: %s", readmePath)
+			if err := reactloops.SaveAndPinFile(loop, readmePath, []byte(readme)); err != nil {
+				log.Warnf("[decompile_jar] failed to write README.md: %v", err)
 			}
 
-			// Save compilation errors to a separate file if any exist
+			errorsPath := ""
 			if len(compilationErrors) > 0 {
-				errorsPath := filepath.Join(outputDir, "COMPILATION_ERRORS.txt")
+				errorsPath = filepath.Join(outputDir, "COMPILATION_ERRORS.txt")
 				errorsContent := strings.Join(compilationErrors, "\n")
-				if err := os.WriteFile(errorsPath, []byte(errorsContent), 0644); err != nil {
-					log.Warnf("failed to write COMPILATION_ERRORS.txt: %v", err)
-				} else {
-					log.Infof("saved compilation errors to: %s", errorsPath)
+				if err := reactloops.SaveAndPinFile(loop, errorsPath, []byte(errorsContent)); err != nil {
+					log.Warnf("[decompile_jar] failed to write COMPILATION_ERRORS.txt: %v", err)
 				}
 			}
 
-			// Store context
 			loop.Set("working_directory", outputDir)
 			loop.Set("jar_path", jarPath)
 			loop.Set("total_files", totalFiles)
 			loop.Set("files_with_issues", filesWithIssues)
 			loop.Set("compilation_errors_count", len(compilationErrors))
 
-			// Prepare feedback message
-			msg := fmt.Sprintf("Successfully decompiled JAR file.\n\n"+
-				"Summary:\n"+
-				"- Total Java files: %d\n"+
-				"- Backup files created: %d\n"+
-				"- Files with potential issues: %d\n"+
-				"- Output directory: %s\n\n"+
-				"Reports generated:\n"+
-				"- README.md: Full decompilation report\n",
-				totalFiles, backupCount, filesWithIssues, outputDir)
+			finishLine := fmt.Sprintf("完成: %d 个 Java 文件, %d 个潜在问题, 输出目录 %s",
+				totalFiles, filesWithIssues, outputDir)
+			reactloops.EmitStatus(loop, fmt.Sprintf(
+				"反编译完成 (%d 个文件) / Decompile Complete (%d files)",
+				totalFiles, totalFiles,
+			))
 
+			var reference string
 			if len(compilationErrors) > 0 {
-				msg += "- COMPILATION_ERRORS.txt: List of detected issues\n\n"
-				msg += fmt.Sprintf("Found %d potential compilation issues. Review COMPILATION_ERRORS.txt for details.\n", len(compilationErrors))
-
-				// Add detailed suggestions to Timeline for handling compilation errors
-				timelineMsg := fmt.Sprintf(`【反编译完成但存在编译问题】成功反编译但检测到 %d 个潜在编译问题
+				preview := utils.ShrinkTextBlock(strings.Join(compilationErrors[:min(5, len(compilationErrors))], "\n"), 500)
+				reference = fmt.Sprintf("问题数: %d\nREADME: %s\n错误列表: %s\n\n预览:\n%s",
+					len(compilationErrors), readmePath, errorsPath, preview)
+				invoker.AddToTimeline("decompile_success_with_issues", fmt.Sprintf(`【反编译完成但存在编译问题】成功反编译但检测到 %d 个潜在编译问题
 
 【当前状态】：
 - 总文件数：%d
 - 存在问题的文件：%d
-- 问题详情已保存到：COMPILATION_ERRORS.txt
+- 问题详情已保存到：%s
+- 反编译报告：%s
 
 【常见问题类型】：
 1. 反编译器局限性导致的语法错误
@@ -303,22 +297,35 @@ var decompileJarAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 - 可以随时使用 compare_with_backup 查看改动
 - 建议批量处理相同类型的错误
 
-【下一步行动】：使用 read_java_file 或 list_files 开始检查问题文件`, len(compilationErrors), totalFiles, filesWithIssues)
-				invoker.AddToTimeline("decompile_success_with_issues", timelineMsg)
-
-				// Disallow loop exit since there are compilation errors that need fixing
-				// Similar to yaklang code loop's behavior: prevent finishing until errors are resolved
+【下一步行动】：使用 read_java_file 或 list_files 开始检查问题文件`, len(compilationErrors), totalFiles, filesWithIssues, errorsPath, readmePath))
 				op.DisallowNextLoopExit()
 			} else {
-				msg += "\nNo obvious compilation issues detected.\n"
+				reference = fmt.Sprintf("README: %s", readmePath)
 				invoker.AddToTimeline("decompile_success", fmt.Sprintf("成功反编译 %d 个文件，未检测到明显编译问题。工作目录：%s", totalFiles, outputDir))
 			}
+			reactloops.EmitActionLog(loop, nodeID, finishLine, reference)
 
-			msg += "\nNote: Original decompiled files have been backed up with .bak extension (e.g., MyClass.java.bak). You can use compare_with_backup action to see changes."
-			op.Feedback(msg)
+			feedbackMsg := fmt.Sprintf(
+				"Decompiled JAR to %s: %d Java files, %d backups, %d files with potential issues. README: %s",
+				outputDir, totalFiles, backupCount, filesWithIssues, readmePath,
+			)
+			if errorsPath != "" {
+				feedbackMsg += fmt.Sprintf("; issues: %s (%d items)", errorsPath, len(compilationErrors))
+			}
+
+			log.Infof("[decompile_jar] completed: files=%d issues=%d output=%s", totalFiles, filesWithIssues, outputDir)
+
+			op.Feedback(feedbackMsg)
 			op.Continue()
 		},
 	)
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // generateDecompilationReport creates a detailed README.md for the decompiled output
@@ -361,16 +368,16 @@ func generateDecompilationReport(
 		sb.WriteString("### Issue Summary\n\n")
 		if len(compilationErrors) > 20 {
 			sb.WriteString("```\n")
-			for i, err := range compilationErrors[:20] {
-				sb.WriteString(fmt.Sprintf("%d. %s\n", i+1, err))
+			for i, errLine := range compilationErrors[:20] {
+				sb.WriteString(fmt.Sprintf("%d. %s\n", i+1, errLine))
 			}
 			sb.WriteString(fmt.Sprintf("... and %d more issues\n", len(compilationErrors)-20))
 			sb.WriteString("```\n\n")
 			sb.WriteString(fmt.Sprintf("See `COMPILATION_ERRORS.txt` for the complete list of all %d issues.\n\n", len(compilationErrors)))
 		} else {
 			sb.WriteString("```\n")
-			for i, err := range compilationErrors {
-				sb.WriteString(fmt.Sprintf("%d. %s\n", i+1, err))
+			for i, errLine := range compilationErrors {
+				sb.WriteString(fmt.Sprintf("%d. %s\n", i+1, errLine))
 			}
 			sb.WriteString("```\n\n")
 		}

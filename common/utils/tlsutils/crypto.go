@@ -168,15 +168,11 @@ func PemPkcs1v15Encrypt(pemBytes []byte, data interface{}) ([]byte, error) {
 //
 // Example:
 // ```
-//
-//		raw := `
-//		-----BEGIN PUBLIC KEY-----
-//		MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAn...（略）
-//		-----END PUBLIC KEY-----
-//		`
-//		ciphertext, err := EncryptWithPkcs1v15(raw, "hello world")
-//	 ciphertext, err := RSAEncryptWithPKCS1v15(raw, "hello world")
-//
+// // 生成一对 RSA 密钥(第一个返回值是公钥, 第二个是私钥)，用公钥加密，再用私钥解密验证往返一致
+// pub, pri = tls.GenerateRSA2048KeyPair()~
+// ciphertext = codec.RSAEncryptWithPKCS1v15(pub, "hello world")~
+// plaintext = codec.RSADecryptWithPKCS1v15(pri, ciphertext)~
+// assert string(plaintext) == "hello world", "RSA PKCS1v15 encrypt/decrypt round-trip should match"
 // ```
 func Pkcs1v15Encrypt(raw []byte, data interface{}) ([]byte, error) {
 	dataBytes := utils.InterfaceToBytes(data)
@@ -452,15 +448,11 @@ func PemPkcs1v15Decrypt(pemPriBytes []byte, data interface{}) ([]byte, error) {
 //
 // Example:
 // ```
-//
-//		raw := `
-//		-----BEGIN PRIVATE KEY-----
-//		MIIEvQIBADANBgkqhkiG9w0BAQEFAASC...（略）
-//		-----END PRIVATE KEY-----
-//		`
-//		plaintext, err := DecryptWithPkcs1v15(raw, encryptedData)
-//	 	plaintext, err := RSADecryptWithPKCS1v15(raw, encryptedData)
-//
+// // 生成一对 RSA 密钥(第一个返回值是公钥, 第二个是私钥)，用公钥加密后再用私钥解密验证往返一致
+// pub, pri = tls.GenerateRSA2048KeyPair()~
+// ciphertext = codec.RSAEncryptWithPKCS1v15(pub, "hello world")~
+// plaintext = codec.RSADecryptWithPKCS1v15(pri, ciphertext)~
+// assert string(plaintext) == "hello world", "RSA PKCS1v15 decrypt should recover the plaintext"
 // ```
 func Pkcs1v15Decrypt(raw []byte, data interface{}) ([]byte, error) {
 	dataBytes := utils.InterfaceToBytes(data)
