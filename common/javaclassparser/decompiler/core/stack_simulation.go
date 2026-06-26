@@ -96,7 +96,11 @@ func (s *StackSimulationImpl) NewVar(val values.JavaValue) *values.JavaRef {
 func (s *StackSimulationImpl) AssignVar(slot int, val values.JavaValue) (*values.JavaRef, bool) {
 	typ := val.Type()
 	ref, ok := s.varTable[slot]
-	if ok {
+	// Both the incoming value's type and the slot's current ref type must be present to compare
+	// them; an upstream value occasionally carries a nil type (incomplete simulation), and
+	// dereferencing it here panicked the whole method into a stub. Treat a missing type as
+	// "different" so we fall through to allocating a fresh variable instead of crashing.
+	if ok && typ != nil && ref.Type() != nil {
 		ctx := &class_context.ClassContext{}
 		if ref.Type().String(ctx) == typ.String(ctx) {
 			return ref, false
@@ -147,13 +151,18 @@ func (s *StackSimulationImpl) Push(value values.JavaValue) {
 
 func (s *StackSimulationImpl) Peek() values.JavaValue {
 	if s.stackEntry.parent == nil {
-		panic("Stack is empty")
+		// Stack underflow: an incomplete simulation reached an opcode that expects an operand
+		// that was never pushed. Return an empty-slot placeholder instead of panicking, so the
+		// method degrades cleanly to a marked stub (the dumper detects the placeholder) and the
+		// decompiler keeps its panic-free contract over the whole class.
+		return values.NewSlotValue(nil, nil)
 	}
 	return s.stackEntry.value
 }
 func (s *StackSimulationImpl) Pop() values.JavaValue {
 	if s.stackEntry.parent == nil {
-		panic("Stack is empty")
+		// Stack underflow (see Peek): hand back an empty-slot placeholder rather than panicking.
+		return values.NewSlotValue(nil, nil)
 	}
 	val := s.stackEntry.value
 	s.stackEntry = s.stackEntry.GetParent()

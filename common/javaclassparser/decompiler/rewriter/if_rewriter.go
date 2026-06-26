@@ -11,13 +11,31 @@ import (
 
 type rewriterFunc func(statementManager *RewriteManager, node *core.Node) error
 
+func ifBranchNodes(ifNode *core.Node) (trueNode, falseNode *core.Node) {
+	if ifNode == nil {
+		return nil, nil
+	}
+	if ifNode.TrueNode != nil {
+		trueNode = ifNode.TrueNode()
+	}
+	if ifNode.FalseNode != nil {
+		falseNode = ifNode.FalseNode()
+	}
+	if trueNode == nil && len(ifNode.Next) > 0 {
+		trueNode = ifNode.Next[0]
+	}
+	if falseNode == nil && len(ifNode.Next) > 1 {
+		falseNode = ifNode.Next[1]
+	}
+	return trueNode, falseNode
+}
+
 func IfRewriter(manager *RewriteManager, ifNode *core.Node) error {
 	err := CalcEnd(manager.DominatorMap, ifNode)
 	if err != nil {
 		return err
 	}
-	trueNode := ifNode.TrueNode()
-	falseNode := ifNode.FalseNode()
+	trueNode, falseNode := ifBranchNodes(ifNode)
 	//ifNode.RemoveAllNext()
 	if trueNode == falseNode {
 		trueNode = nil
@@ -137,6 +155,25 @@ func IfRewriter(manager *RewriteManager, ifNode *core.Node) error {
 		}
 		return !IsEndNode(node)
 	})
+	// An if whose arm can `return`/`throw` (e.g. Jackson's deserializeAndSet, where the true arm
+	// has `if (skipNulls) return;`) ends up with the early-exit terminator AND the real fall-through
+	// continuation both wired as Next of the structured if node. That gives the if two Next edges,
+	// and the linear statement collector aborts with "multiple next", degrading the whole method to
+	// a stub. The early-exit terminator is not a real continuation (it ends its path), so drop it -
+	// but only when at least one genuine fall-through remains, so an if that fully terminates the
+	// method (every exit is a return) is left with its terminal Next rather than no successor at all.
+	hasFallThrough := false
+	for _, n := range endNodes {
+		if !isMethodExitTerminator(n) {
+			hasFallThrough = true
+			break
+		}
+	}
+	if hasFallThrough {
+		endNodes = utils2.NodeFilter(endNodes, func(node *core.Node) bool {
+			return !isMethodExitTerminator(node)
+		})
+	}
 	for _, node := range NodeDeduplication(endNodes) {
 		ifStatementNode.AddNext(node)
 	}
@@ -279,9 +316,14 @@ func __CalcEnd(domTree map[*core.Node][]*core.Node, ifNode *core.Node) error {
 	return nil
 }
 func CalcEnd(domTree map[*core.Node][]*core.Node, ifNode *core.Node) error {
+	if ifNode == nil {
+		return nil
+	}
 	ifNode.MergeNode = nil
-	trueNode := ifNode.TrueNode()
-	falseNode := ifNode.FalseNode()
+	trueNode, falseNode := ifBranchNodes(ifNode)
+	if trueNode == nil || falseNode == nil {
+		return nil
+	}
 
 	domTree = GenerateDominatorTree(ifNode)
 	doms := domTree[ifNode]
@@ -359,9 +401,12 @@ func CalcEnd(domTree map[*core.Node][]*core.Node, ifNode *core.Node) error {
 			}
 		}
 	case 3:
-		ifNode.MergeNode = utils2.NodeFilter(doms, func(node *core.Node) bool {
+		candidates := utils2.NodeFilter(doms, func(node *core.Node) bool {
 			return node != trueNode && node != falseNode
-		})[0]
+		})
+		if len(candidates) > 0 {
+			ifNode.MergeNode = candidates[0]
+		}
 	}
 	return nil
 }

@@ -10,7 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/utils"
 	utils2 "github.com/yaklang/yaklang/common/utils"
-	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 )
 
@@ -37,6 +36,7 @@ func RebuildLoopNode(manager *RewriteManager) error {
 	}
 	return nil
 }
+
 // replaceNextInPlace rewires the edge node->oldNext to node->newNext while keeping the edge at
 // its original index inside node.Next. Position matters: a ConditionStatement's TrueNode()/
 // FalseNode() are bound to fixed Next indices computed during graph construction, so appending a
@@ -296,52 +296,56 @@ func LoopRewriter(manager *RewriteManager, node *core.Node) error {
 	return nil
 }
 func getCircleElementSet(circleNode *core.Node, loopStart *core.Node) *utils2.Set[*core.Node] {
+	// Standard natural-loop algorithm: a node belongs to the loop body iff it can reach the back-edge
+	// target (circleNode) via a forward path that does NOT pass through circleNode. This is computed by
+	// reverse BFS from the back-edge sources (nodes whose Next includes circleNode), stopping at
+	// circleNode. Post-loop code CANNOT reach circleNode, so it is correctly excluded — unlike the old
+	// forward-DFS + haltRoutes-fixpoint which followed ALL edges (including loop-exit/break edges) and
+	// could sweep post-loop code into the loop body via merge-point halt routes.
 	finalSet := utils2.NewSet[*core.Node]()
-	walkedNodes := utils2.NewSet[*core.Node]()
-	haltRoutes := map[*core.Node][][]*core.Node{}
-	var walkNodes func(start *core.Node, route []*core.Node)
-	walkNodes = func(start *core.Node, route []*core.Node) {
-		route = slices.Clone(route)
-		if walkedNodes.Has(start) {
-			haltRoutes[start] = append(haltRoutes[start], route)
-			return
-		}
-		walkedNodes.Add(start)
-		if slices.Contains(route, start) {
-			haltRoutes[start] = append(haltRoutes[start], route)
-			return
-		}
-		if start == circleNode {
-			finalSet.AddList(route)
-			return
-		}
-		route = append(route, start)
-		for _, n := range start.Next {
-			walkNodes(n, route)
-		}
-		return
-	}
-	walkNodes(loopStart, []*core.Node{})
-	finalSet.Add(circleNode)
-	for {
-		var hasNew bool
-		newM := map[*core.Node][][]*core.Node{}
-		maps.Copy(newM, haltRoutes)
-		for k, v := range newM {
-			if finalSet.Has(k) {
-				hasNew = true
-				for _, nodes := range v {
-					finalSet.AddList(nodes)
+	// Step 1: collect all nodes reachable from loopStart and build reverse adjacency.
+	reverseAdj := map[*core.Node][]*core.Node{}
+	allNodes := utils2.NewSet[*core.Node]()
+	{
+		stk := []*core.Node{loopStart}
+		for len(stk) > 0 {
+			n := stk[len(stk)-1]
+			stk = stk[:len(stk)-1]
+			if allNodes.Has(n) {
+				continue
+			}
+			allNodes.Add(n)
+			for _, next := range n.Next {
+				reverseAdj[next] = append(reverseAdj[next], n)
+				if !allNodes.Has(next) {
+					stk = append(stk, next)
 				}
-				delete(haltRoutes, k)
 			}
 		}
-		if !hasNew {
-			break
+	}
+	// Step 2: find back-edge sources — nodes whose Next includes circleNode.
+	finalSet.Add(circleNode)
+	bfsQueue := []*core.Node{}
+	for _, n := range allNodes.List() {
+		if slices.Contains(n.Next, circleNode) {
+			finalSet.Add(n)
+			bfsQueue = append(bfsQueue, n)
+		}
+	}
+	// Step 3: reverse BFS from back-edge sources, stopping at circleNode.
+	for len(bfsQueue) > 0 {
+		n := bfsQueue[0]
+		bfsQueue = bfsQueue[1:]
+		for _, pred := range reverseAdj[n] {
+			if pred != circleNode && !finalSet.Has(pred) {
+				finalSet.Add(pred)
+				bfsQueue = append(bfsQueue, pred)
+			}
 		}
 	}
 	return finalSet
 }
+
 func searchCircleEndNode(circleNode *core.Node, loopStart *core.Node) *core.Node {
 	elementSet := getCircleElementSet(circleNode, loopStart)
 	outNodes := []*core.Node{}

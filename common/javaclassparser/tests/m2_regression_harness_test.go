@@ -33,6 +33,12 @@ func TestM2RegressionHarness(t *testing.T) {
 	}
 	maxJars := envInt("M2_MAX_JARS", 60)
 	maxClasses := envInt("M2_MAX_CLASSES", 8000)
+	// Industry mode (M2_INDUSTRY=1): scan EVERY jar in ~/.m2 instead of the first maxJars in
+	// alpha order (which only covers a-c prefixes and misses spring/tomcat/netty/...), but cap the
+	// number of classes taken per jar (M2_MAX_PER_JAR, default 200) so a few giant jars cannot eat
+	// the whole class budget. This gives a broad, bounded GA-representative sample across the corpus.
+	industry := os.Getenv("M2_INDUSTRY") != ""
+	maxPerJar := envInt("M2_MAX_PER_JAR", 200)
 
 	home, _ := os.UserHomeDir()
 	m2 := filepath.Join(home, ".m2")
@@ -48,7 +54,7 @@ func TestM2RegressionHarness(t *testing.T) {
 		return nil
 	})
 	sort.Strings(jars)
-	if len(jars) > maxJars {
+	if !industry && len(jars) > maxJars {
 		jars = jars[:maxJars]
 	}
 
@@ -64,6 +70,7 @@ func TestM2RegressionHarness(t *testing.T) {
 		if err != nil {
 			continue
 		}
+		perJar := 0
 		for _, f := range zr.File {
 			if !strings.HasSuffix(f.Name, ".class") {
 				continue
@@ -75,6 +82,10 @@ func TestM2RegressionHarness(t *testing.T) {
 			if nClasses >= maxClasses {
 				break
 			}
+			if industry && maxPerJar > 0 && perJar >= maxPerJar {
+				break
+			}
+			perJar++
 			rc, err := f.Open()
 			if err != nil {
 				continue

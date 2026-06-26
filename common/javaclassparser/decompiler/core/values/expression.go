@@ -116,6 +116,16 @@ func (j *JavaExpression) String(funcCtx *class_context.ClassContext) string {
 	}
 }
 
+// primerRawType returns the *types.JavaPrimer raw type of t, guarding against a nil JavaType
+// (which incomplete stack simulation can produce) so callers never nil-dereference RawType().
+func primerRawType(t types.JavaType) (*types.JavaPrimer, bool) {
+	if t == nil {
+		return nil, false
+	}
+	p, ok := t.RawType().(*types.JavaPrimer)
+	return p, ok
+}
+
 func isBooleanTyped(v JavaValue) bool {
 	if v == nil {
 		return false
@@ -132,33 +142,57 @@ func isBooleanTyped(v JavaValue) bool {
 	return ok && prim.Name == types.JavaBoolean
 }
 
+// resetTypeSafe resets v's type to t, but only when v already carries a non-nil JavaType.
+// Incomplete stack simulation can leave a value with a nil Type(); skipping the reset there
+// avoids a nil-dereference while leaving correctly-typed values unchanged.
+func resetTypeSafe(v JavaValue, t types.JavaType) {
+	if v == nil {
+		return
+	}
+	if vt := v.Type(); vt != nil {
+		vt.ResetType(t)
+	}
+}
+
+// nonNilType returns the first non-nil candidate, falling back to int. Expression constructors use
+// it so a nil result type (which incomplete stack simulation can yield for an operand) degrades to
+// a sensible default instead of panicking at typ.Copy().
+func nonNilType(candidates ...types.JavaType) types.JavaType {
+	for _, c := range candidates {
+		if c != nil {
+			return c
+		}
+	}
+	return types.NewJavaPrimer(types.JavaInteger)
+}
+
 func NewUnaryExpression(value1 JavaValue, op string, typ types.JavaType) *JavaExpression {
 	if IsStrictBooleanOperator(op) {
-		value1.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
+		resetTypeSafe(value1, types.NewJavaPrimer(types.JavaBoolean))
 	}
 	return &JavaExpression{
 		Values: []JavaValue{value1},
 		Op:     op,
-		Typ:    typ.Copy(),
+		Typ:    nonNilType(typ, value1.Type()).Copy(),
 	}
 }
 func NewBinaryExpression(value1, value2 JavaValue, op string, typ types.JavaType) *JavaExpression {
 	if IsStrictBooleanOperator(op) {
-		value1.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
-		value2.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
+		resetTypeSafe(value1, types.NewJavaPrimer(types.JavaBoolean))
+		resetTypeSafe(value2, types.NewJavaPrimer(types.JavaBoolean))
 	} else if (op == AND || op == OR || op == XOR) && (isBooleanTyped(value1) || isBooleanTyped(value2)) {
 		// &, |, ^ are shared between boolean logic and integer bitwise arithmetic. Decide by
 		// the operands: if either side is already boolean (e.g. descriptor-typed parameters or
 		// a negation), this is boolean logic, so align both sides to boolean. Otherwise leave
 		// the operands as their inferred integer type.
-		value1.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
-		value2.Type().ResetType(types.NewJavaPrimer(types.JavaBoolean))
+		resetTypeSafe(value1, types.NewJavaPrimer(types.JavaBoolean))
+		resetTypeSafe(value2, types.NewJavaPrimer(types.JavaBoolean))
 		typ = types.NewJavaPrimer(types.JavaBoolean)
 	}
 	return &JavaExpression{
 		Values: []JavaValue{value1, value2},
 		Op:     op,
-		Typ:    typ.Copy(),
+		Typ:    nonNilType(typ, value1.Type(), value2.Type()).Copy(),
 	}
 }
 
@@ -173,6 +207,9 @@ type FunctionCallExpression struct {
 
 // ReplaceVar implements JavaValue.
 func (f *FunctionCallExpression) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	if f.Object != nil {
+		f.Object.ReplaceVar(oldId, newId)
+	}
 	for _, arg := range f.Arguments {
 		arg.ReplaceVar(oldId, newId)
 	}
@@ -192,8 +229,19 @@ func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) str
 	paramStrs := []string{}
 	for i, arg := range f.Arguments {
 		argType := f.FuncType.ParamTypes[i]
-		expectClassType, ok1 := argType.RawType().(*types.JavaClass)
-		atcClassType, ok2 := arg.Type().RawType().(*types.JavaClass)
+		// Incomplete stack simulation can leave an argument with a nil Type(); a parameter type
+		// can likewise be nil for a malformed descriptor. Guard each RawType() behind a nil check
+		// so a missing type degrades the per-argument cast logic to a no-op (rendering the argument
+		// as-is) instead of nil-dereferencing and panicking the whole method into a stub.
+		var expectClassType *types.JavaClass
+		var atcClassType *types.JavaClass
+		var ok1, ok2 bool
+		if argType != nil {
+			expectClassType, ok1 = argType.RawType().(*types.JavaClass)
+		}
+		if at := arg.Type(); at != nil {
+			atcClassType, ok2 = at.RawType().(*types.JavaClass)
+		}
 		if ok1 && ok2 && expectClassType.Name != atcClassType.Name {
 			if expectClassType.Name != "java.lang.Object" {
 				argStr := arg.String(funcCtx)
@@ -204,13 +252,13 @@ func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) str
 					return argType
 				})
 			}
-		} else if expectPrim, okp := argType.RawType().(*types.JavaPrimer); okp {
+		} else if expectPrim, okp := primerRawType(argType); okp {
 			// Method-invocation context (JLS 5.3) forbids implicit narrowing, even for constant
 			// expressions, but the JVM stack collapses byte/short/char to int (iconst/bipush/sipush),
 			// so an int-typed value flowing into a byte/short/char parameter must be cast explicitly or
 			// the decompiled call fails to recompile ("possible lossy conversion from int to char").
 			if expectPrim.Name == types.JavaByte || expectPrim.Name == types.JavaShort || expectPrim.Name == types.JavaChar {
-				if actualPrim, oka := arg.Type().RawType().(*types.JavaPrimer); oka && actualPrim.Name == types.JavaInteger {
+				if actualPrim, oka := primerRawType(arg.Type()); oka && actualPrim.Name == types.JavaInteger {
 					argStr := arg.String(funcCtx)
 					argTypeStr := expectPrim.Name
 					arg = NewCustomValue(func(funcCtx *class_context.ClassContext) string {

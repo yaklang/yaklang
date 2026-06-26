@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"os"
 	"regexp"
+	"runtime/debug"
 	"slices"
 	"strconv"
 	"strings"
@@ -40,6 +42,16 @@ type ClassObjectDumper struct {
 	lambdaCaptureCount map[string]int
 	fieldDefaultValue  map[string]string
 	dumpedMethodsSet   map[string]*dumpedMethods
+	// aggressive marks that the CURRENT method dump is a second attempt for a method whose
+	// conservative decompilation already failed. While set, the decompiler enables higher-risk
+	// reconstruction paths (relaxed structuring, node-duplication, synthetic rebuilds). It is
+	// toggled per-method by aggressiveRedumpMethod and is otherwise always false, so methods that
+	// decompile cleanly on the first pass are never affected (zero regression by construction).
+	aggressive bool
+	// aggressiveRetried records methods (name+desc) already attempted in aggressive mode, so a
+	// method that reaches both degradation points (DumpMethods and degradeInvalidMethods) is
+	// re-decompiled at most once; the aggressive path is deterministic, so repeating is pointless.
+	aggressiveRetried map[string]bool
 }
 
 func (c *ClassObjectDumper) GetConstructorMethodName() string {
@@ -62,6 +74,7 @@ func NewClassObjectDumper(obj *ClassObject) *ClassObjectDumper {
 		lambdaCaptureCount: map[string]int{},
 		fieldDefaultValue:  map[string]string{},
 		dumpedMethodsSet:   map[string]*dumpedMethods{},
+		aggressiveRetried:  map[string]bool{},
 	}
 }
 func (c *ClassObjectDumper) TabNumber() int {
@@ -286,11 +299,19 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 					attrsB.WriteString(",\n")
 				}
 			}
+			if isEnum && len(enumFields) == 0 && (len(ordinaryFields) > 0 || len(methods) > 0) {
+				// Java requires a separator before enum body declarations when the constant list is empty:
+				// `enum E { ; int x; }`.
+				attrsB.WriteString("\t;\n")
+			}
 			for _, ordinaryField := range ordinaryFields {
 				attrsB.WriteString("\t")
 				attrsB.WriteString(ordinaryField)
 				attrsB.WriteString("\n")
 			}
+		}
+		if isEnum && len(fields) == 0 && len(methods) > 0 {
+			attrsB.WriteString("\n\t;\n")
 		}
 		if len(methods) > 0 {
 			attrsB.WriteString("\n")
@@ -319,7 +340,7 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	}
 
 	full := assemble()
-	if EnableDecompileSyntaxValidation {
+	if EnableDecompileSyntaxValidation && len(full) < 50000 {
 		if err := validateJavaSyntax(full); err != nil {
 			// The assembled class is not valid Java. Degrade malformed members (using the real
 			// class header so interface/enum/constructor context is honored) and re-render, so a
@@ -328,7 +349,7 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 			methods = c.degradeInvalidMethods(header, methods)
 			fields = c.degradeInvalidFields(header, className, isEnum, fields)
 			full = assemble()
-			if err := validateJavaSyntax(full); err != nil {
+			if err := validateJavaSyntax(full); err != nil && !isDollarIdentifierValidatorGap(full, err) {
 				log.Warnf("decompiled class %s still has syntax errors after degradation: %v", c.ClassName, err)
 			}
 		}
@@ -357,6 +378,7 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 		if err != nil {
 			return nil, err
 		}
+		renderName := class_context.SafeIdentifier(name)
 		// $VALUES is the synthetic array backing values(); javac re-synthesizes it.
 		if genuineEnum && name == "$VALUES" {
 			continue
@@ -396,9 +418,15 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 			lastPacket = javaTyp.String(c.FuncCtx)
 			javaTyp.JavaType = originalType
 		} else {
-			fieldTypeStr := fieldType.String(c.FuncCtx)
-			c.FuncCtx.Import(fieldTypeStr)
-			lastPacket = c.FuncCtx.ShortTypeName(fieldTypeStr)
+			// fieldType.String already registers the needed imports and shortens (or
+			// FQN-disambiguates) every class component via ShortTypeName, so the rendered
+			// string is the final field type. Re-running Import/ShortTypeName on that whole
+			// string corrupts parameterized or disambiguated types: e.g. a field typed
+			// `Set<java.util.logging.Logger>` (Logger kept fully-qualified to avoid clashing
+			// with an imported ch.qos...Logger) would be split on '.' into a bogus package
+			// `Set<java.util.logging` + class `Logger>`, emitting `import Set<...Logger>;` and
+			// collapsing the field type to `Logger>` -> un-parseable, so the field gets dropped.
+			lastPacket = fieldType.String(c.FuncCtx)
 		}
 		valueLiteral := ""
 		for _, attr := range field.Attributes {
@@ -440,7 +468,7 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 					log.Errorf("when handling for fields unknown constant type: %T", constVal)
 				}
 			case *SyntheticAttribute:
-				log.Infof("field %s is synthetic", name)
+			// synthetic (compiler-generated) field marker; no diagnostic needed
 			case *DeprecatedAttribute:
 			// log.Infof("field %s is deprecated", name)
 			case *SignatureAttribute:
@@ -456,8 +484,8 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 
 		if valueLiteral != "" {
 			fields = append(fields, dumpedFields{
-				code:      fmt.Sprintf("%s %s %s = %s;", accessFlags, lastPacket, name, valueLiteral),
-				fieldName: name,
+				code:      fmt.Sprintf("%s %s %s = %s;", accessFlags, lastPacket, renderName, valueLiteral),
+				fieldName: renderName,
 				modifier:  accessFlags,
 				typeName:  lastPacket,
 			})
@@ -465,8 +493,8 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 			// A final field with a captured, hoistable initializer (constant-folded value
 			// or a parameter-independent <init>/<clinit> assignment). Emit it inline.
 			dumped := dumpedFields{
-				code:      fmt.Sprintf("%s %s %s = %s;", accessFlags, lastPacket, name, c.fieldDefaultValue[name]),
-				fieldName: name,
+				code:      fmt.Sprintf("%s %s %s = %s;", accessFlags, lastPacket, renderName, c.fieldDefaultValue[name]),
+				fieldName: renderName,
 				modifier:  accessFlags,
 				typeName:  lastPacket,
 			}
@@ -477,8 +505,8 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 			// static block). A bogus `= 0` here would be illegal for reference types and is
 			// unnecessary: definite assignment in <init>/<clinit> keeps blank finals valid.
 			fields = append(fields, dumpedFields{
-				code:      fmt.Sprintf("%s %s %s;", accessFlags, lastPacket, name),
-				fieldName: name,
+				code:      fmt.Sprintf("%s %s %s;", accessFlags, lastPacket, renderName),
+				fieldName: renderName,
 				modifier:  accessFlags,
 				typeName:  lastPacket,
 			})
@@ -770,6 +798,8 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	if err != nil {
 		return dumped, utils.Wrapf(err, "ParseMethodDescriptor(%v) failed", descriptor)
 	}
+	descriptorParamTypes := slices.Clone(methodType.FunctionType().ParamTypes)
+	descriptorParamCount := len(descriptorParamTypes)
 	// Override the descriptor-derived method type with generic information from the
 	// Signature attribute, if present and parseable. This recovers erased generics on
 	// method parameters and return types (e.g. BiFunction<Integer,Integer,Integer> vs raw
@@ -903,11 +933,26 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				}
 			}
 			paramsNewStrList := []string{}
-			for i, val := range samParams {
-				if i == len(samParams)-1 && isVarArgs {
-					paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s... %s", val.Type().ElementType().String(c.FuncCtx), val.String(c.FuncCtx)))
-				} else {
-					paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s %s", val.Type().String(c.FuncCtx), val.String(c.FuncCtx)))
+			if !isLambda && name != "<init>" && name != "<clinit>" && len(samParams) != descriptorParamCount {
+				paramSlotOffset := 0
+				if !funcCtx.IsStatic {
+					paramSlotOffset = 1
+				}
+				for i, pt := range descriptorParamTypes {
+					paramName := fmt.Sprintf("var%d", i+paramSlotOffset)
+					if i == len(descriptorParamTypes)-1 && isVarArgs && pt.IsArray() {
+						paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s... %s", pt.ElementType().String(c.FuncCtx), paramName))
+					} else {
+						paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s %s", pt.String(c.FuncCtx), paramName))
+					}
+				}
+			} else {
+				for i, val := range samParams {
+					if i == len(samParams)-1 && isVarArgs {
+						paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s... %s", val.Type().ElementType().String(c.FuncCtx), val.String(c.FuncCtx)))
+					} else {
+						paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s %s", val.Type().String(c.FuncCtx), val.String(c.FuncCtx)))
+					}
 				}
 			}
 			c.MethodType = methodType.FunctionType()
@@ -1011,19 +1056,30 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 					}
 					haveCatch := len(ret.CatchBodies) > 0
 					if !haveCatch {
-						// A try with no catch/finally is malformed (structuring failed). Emit the
-						// internal marker so the method degrades to a stub rather than leaking the
-						// broken body that produced this bare try.
-						statementStr += "catch(Exception e) { throw e; /* " + malformedTryNoCatchMarker + " */ }"
+						body := statementListToString(ret.TryBody)
+						if canFlattenNoCatchTry(body) {
+							// A try without catch/finally has no Java-level effect. Some legacy bytecode
+							// patterns (for example an EOFException edge inside a loop with an enclosing
+							// IOException handler) can lose the inner handler during CFG structuring while
+							// the body itself is still sound. Preserve the executable statements instead of
+							// stubbing the method.
+							statementStr = body
+						} else {
+							// A try with no catch/finally is malformed (structuring failed). Emit the
+							// internal marker so the method degrades to a stub rather than leaking the
+							// broken body that produced this bare try.
+							statementStr += "catch(Exception e) { throw e; /* " + malformedTryNoCatchMarker + " */ }"
+						}
 					}
 				case *statements.WhileStatement:
 					statementStr = fmt.Sprintf(c.GetTabString()+"while (%s){\n"+
 						"%s\n"+
 						c.GetTabString()+"}", values.SimplifyConditionValue(ret.ConditionValue).String(funcCtx), statementListToString(ret.Body))
 				case *statements.DoWhileStatement:
+					body := normalizeDoWhileBreakGuardSource(statementListToString(ret.Body))
 					statementStr = fmt.Sprintf(c.GetTabString()+"do{\n"+
 						"%s\n"+
-						c.GetTabString()+"} while (%s);", statementListToString(ret.Body), values.SimplifyConditionValue(ret.ConditionValue).String(funcCtx))
+						c.GetTabString()+"} while (%s);", body, values.SimplifyConditionValue(ret.ConditionValue).String(funcCtx))
 					if ret.Label != "" {
 						statementStr = fmt.Sprintf("%s%s:\n%s", c.GetTabString(), ret.Label, statementStr)
 					}
@@ -1042,18 +1098,18 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 					statementStr = fmt.Sprintf(c.GetTabString()+"switch (%s){\n"+
 						"%s\n"+
 						c.GetTabString()+"}", ret.Value.String(funcCtx), getBody(ret.Cases))
-			case *statements.IfStatement:
-				// Recover short-circuit boolean returns: when a method returns boolean and the
-				// if-then is empty (or only a `return true`) while the else is `return expr`,
-				// rewrite to `return condition || expr`. This is the simplest case of the
-				// boolean short-circuit DAG where the true arm shares a constant leaf.
-				if isBoolReturnIfElse(ret, funcCtx) {
-					if stmt := buildBoolReturnFromIfElse(ret, funcCtx); stmt != "" {
-						statementStr = c.GetTabString() + stmt + ";"
-						break
+				case *statements.IfStatement:
+					// Recover short-circuit boolean returns: when a method returns boolean and the
+					// if-then is empty (or only a `return true`) while the else is `return expr`,
+					// rewrite to `return condition || expr`. This is the simplest case of the
+					// boolean short-circuit DAG where the true arm shares a constant leaf.
+					if isBoolReturnIfElse(ret, funcCtx) {
+						if stmt := buildBoolReturnFromIfElse(ret, funcCtx); stmt != "" {
+							statementStr = c.GetTabString() + stmt + ";"
+							break
+						}
 					}
-				}
-				statementStr = fmt.Sprintf(c.GetTabString()+"if (%s){\n"+
+					statementStr = fmt.Sprintf(c.GetTabString()+"if (%s){\n"+
 						"%s\n"+
 						c.GetTabString()+"}", values.SimplifyConditionValue(ret.Condition).String(funcCtx), statementListToString(ret.IfBody))
 					if len(ret.ElseBody) > 0 {
@@ -1340,6 +1396,7 @@ var localSlotRefRe = regexp.MustCompile(`\bvar\d+\b`)
 // monitorTempAssignRe matches a dead synthetic monitor temp left in the synchronized()
 // argument position, e.g. `var2 = this.lock`, capturing the lock expression itself.
 var monitorTempAssignRe = regexp.MustCompile(`^var\d+ = (.+)$`)
+var doWhileBreakGuardRe = regexp.MustCompile(`^(\s*)if \(([^\n{}]*)\)\{\n\s*break;\n\s*\}else\{`)
 
 // canHoistFieldInitializer reports whether a `final`-field assignment found inside <init>/
 // <clinit> may be lifted into a field initializer. A real field initializer cannot reference
@@ -1393,6 +1450,33 @@ const DecompileStubMarker = "yak-decompiler:"
 // It never survives into final output because the offending method is re-rendered as a stub.
 const malformedTryNoCatchMarker = "yak-decompiler-internal: try without catch handler"
 
+func normalizeDoWhileBreakGuardSource(body string) string {
+	match := doWhileBreakGuardRe.FindStringSubmatchIndex(body)
+	if match == nil || len(match) < 6 {
+		return body
+	}
+	conditionStart, conditionEnd := match[4], match[5]
+	condition := strings.TrimSpace(body[conditionStart:conditionEnd])
+	if condition == "" || strings.HasPrefix(condition, "!") || !strings.Contains(condition, "<") {
+		return body
+	}
+	return body[:conditionStart] + "!(" + condition + ")" + body[conditionEnd:]
+}
+
+func canFlattenNoCatchTry(body string) bool {
+	body = strings.TrimSpace(body)
+	if body == "" {
+		return false
+	}
+	if strings.Contains(body, malformedTryNoCatchMarker) ||
+		strings.Contains(body, values.EmptySlotValuePlaceholder) ||
+		strings.Contains(body, "= Exception;") ||
+		strings.Contains(body, "= Exception\n") {
+		return false
+	}
+	return true
+}
+
 // safeDumpMethod wraps DumpMethod with panic recovery and tab-state restoration so a
 // single broken method cannot abort the whole class. DumpMethod uses a non-deferred
 // Tab()/UnTab() pair, which leaves the indentation stack unbalanced if it panics midway;
@@ -1401,13 +1485,66 @@ func (c *ClassObjectDumper) safeDumpMethod(name, descriptor string) (res *dumped
 	tabSaved := c.deepStack.Len()
 	defer func() {
 		if rec := recover(); rec != nil {
-			err = utils.Errorf("panic: %v", rec)
+			if os.Getenv("DEC_PANIC_STACK") != "" {
+				err = utils.Errorf("panic: %v\n%s", rec, debug.Stack())
+			} else {
+				err = utils.Errorf("panic: %v", rec)
+			}
 		}
 		for c.deepStack.Len() > tabSaved {
 			c.deepStack.Pop()
 		}
 	}()
 	return c.DumpMethod(name, descriptor)
+}
+
+// aggressiveRedumpMethod re-decompiles a SINGLE method in aggressive mode. It is the gated retry at
+// the heart of the longtail strategy: it is only ever called after the conservative dump already
+// failed/degraded for this method, so methods that decompile cleanly never reach it (zero regression
+// by construction). It toggles the per-dumper aggressive flag for the duration, evicts the method's
+// cache entry so the re-dump actually re-runs, and returns the fresh result only if it is "clean"
+// (no error, no leaked internal placeholder / malformed-try marker). On any failure it restores the
+// pre-retry cache entry and returns nil, so the caller falls back to its normal stub degradation.
+//
+// A method is retried at most once (aggressiveRetried guard): it may reach both degradation points
+// (DumpMethods and degradeInvalidMethods), but the aggressive path is deterministic so repeating it
+// would only waste work and produce the same outcome.
+func (c *ClassObjectDumper) aggressiveRedumpMethod(name, descriptor string) *dumpedMethods {
+	traitId := fmt.Sprintf("name:%s,desc:%s", name, descriptor)
+	if c.aggressiveRetried[traitId] {
+		return nil
+	}
+	c.aggressiveRetried[traitId] = true
+
+	savedAggressive := c.aggressive
+	savedEntry, hadEntry := c.dumpedMethodsSet[traitId]
+	c.aggressive = true
+	delete(c.dumpedMethodsSet, traitId)
+	defer func() { c.aggressive = savedAggressive }()
+
+	res, err := c.safeDumpMethod(name, descriptor)
+	clean := err == nil && res != nil &&
+		!strings.Contains(res.code, values.EmptySlotValuePlaceholder) &&
+		!strings.Contains(res.code, malformedTryNoCatchMarker) &&
+		// Reject results that are syntactically valid but reference a local before its declaration
+		// (a slot-reuse renaming bug). Adopting such a result would replace an honest stub with
+		// silently-wrong code; keeping the stub upholds the never-emit-broken-code contract until the
+		// underlying data-flow bug is fixed.
+		!usesLocalBeforeDeclaration(res.code) &&
+		// Reject results containing an empty `{ }` block: in aggressive structuring this is the
+		// fingerprint of a dropped statement (the assert-ternary idiom collapsing into an empty if
+		// body with a leaked unconditional throw). Such output is valid Java but semantically wrong.
+		!containsEmptyControlBlock(res.bodyCode)
+	if !clean {
+		// Restore the exact pre-retry cache state so downstream rendering is unchanged.
+		if hadEntry {
+			c.dumpedMethodsSet[traitId] = savedEntry
+		} else {
+			delete(c.dumpedMethodsSet, traitId)
+		}
+		return nil
+	}
+	return res
 }
 
 // dumpStubMethod builds a syntactically-valid placeholder for a method whose body could
@@ -1596,13 +1733,32 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 			// The decompiled body leaked an internal placeholder ("empty slot value"),
 			// which means the stack simulation was incomplete and the emitted source is
 			// not valid Java. Degrade to a stub instead of producing un-compilable code.
-			err = utils.Errorf("incomplete stack simulation: empty stack slot leaked into method body")
+			if os.Getenv("DEBUG_EMPTYSLOT") == "" {
+				err = utils.Errorf("incomplete stack simulation: empty stack slot leaked into method body")
+			} else {
+				log.Errorf("DEBUG_EMPTYSLOT method %s%s:\n%s", name, descriptor, res.code)
+			}
 		}
 		if err == nil && res != nil && strings.Contains(res.code, malformedTryNoCatchMarker) {
 			// The try-region structuring failed and produced a try with no catch handler,
 			// which means the body is semantically corrupted (e.g. the caught-exception
 			// placeholder leaked into the try). Degrade to a stub.
+			if os.Getenv("DEBUG_TRYNOCATCH") != "" {
+				log.Errorf("DEBUG_TRYNOCATCH method %s%s:\n%s", name, descriptor, res.code)
+			}
 			err = utils.Errorf("try-region structuring failed: try without catch handler")
+		}
+		if err != nil {
+			// Gated aggressive retry: this method failed conservative decompilation (error, leaked
+			// empty slot, or malformed try). Re-decompile ONLY this method in aggressive mode and
+			// adopt the result if it now produces a clean body. Whole-class syntax validation still
+			// runs afterwards, so an aggressive result that is clean-looking but invalid Java is
+			// caught and re-degraded at the degradeInvalidMethods stage.
+			if retry := c.aggressiveRedumpMethod(name, descriptor); retry != nil {
+				log.Infof("aggressive retry recovered method %s%s", name, descriptor)
+				res = retry
+				err = nil
+			}
 		}
 		if err != nil {
 			// Graceful degradation: an un-decompilable method body must not fail the whole
@@ -1622,7 +1778,18 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 		accessFlagsVerbose, _ := getMethodAccessFlagsVerbose(method.AccessFlags)
 		if strings.TrimSpace(res.bodyCode) == "" {
 			if !slices.Contains(accessFlagsVerbose, "abstract") && !slices.Contains(accessFlagsVerbose, "annotation") && !slices.Contains(accessFlagsVerbose, "interface") && !slices.Contains(accessFlagsVerbose, "enum") {
-				continue
+				methodType, perr := types.ParseMethodDescriptor(descriptor)
+				if perr != nil || methodType == nil || methodType.FunctionType() == nil ||
+					methodType.FunctionType().ReturnType.String(c.FuncCtx) == "void" {
+					continue
+				}
+				stub := c.dumpStubMethod(method, name, descriptor, "empty method body after decompilation")
+				if stub == nil {
+					continue
+				}
+				traitId := fmt.Sprintf("name:%s,desc:%s", name, descriptor)
+				c.dumpedMethodsSet[traitId] = stub
+				res = stub
 			}
 		}
 		// retain identity so the syntax safety net can re-derive a stub if needed

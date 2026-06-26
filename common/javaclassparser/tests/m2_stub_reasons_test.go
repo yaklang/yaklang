@@ -13,6 +13,58 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser"
 )
 
+func parseJarPrefixFilter(spec string) map[rune]bool {
+	allow := map[rune]bool{}
+	for _, part := range strings.Split(spec, ",") {
+		part = strings.ToLower(strings.TrimSpace(part))
+		if part == "" {
+			continue
+		}
+		if len(part) == 3 && part[1] == '-' {
+			start, end := rune(part[0]), rune(part[2])
+			if start > end {
+				start, end = end, start
+			}
+			for r := start; r <= end; r++ {
+				allow[r] = true
+			}
+			continue
+		}
+		for _, r := range part {
+			allow[r] = true
+			break
+		}
+	}
+	return allow
+}
+
+func filterJarsByPrefix(jars []string, allow map[rune]bool) []string {
+	if len(allow) == 0 {
+		return jars
+	}
+	filtered := make([]string, 0, len(jars))
+	for _, jp := range jars {
+		base := strings.ToLower(filepath.Base(jp))
+		if base == "" {
+			continue
+		}
+		if allow[rune(base[0])] {
+			filtered = append(filtered, jp)
+		}
+	}
+	return filtered
+}
+
+func jarCursorMatches(cursor, jarPath string) bool {
+	if cursor == "" {
+		return false
+	}
+	cursor = filepath.ToSlash(strings.TrimSpace(cursor))
+	jarPath = filepath.ToSlash(jarPath)
+	base := filepath.Base(jarPath)
+	return cursor == base || cursor == jarPath || strings.HasSuffix(jarPath, "/"+cursor)
+}
+
 // TestM2StubReasons scans up to M2_MAX_JARS jars under ~/.m2, decompiles each class, and for every
 // partial (stub-bearing) output extracts the embedded stub reasons (/* yak-decompiler: <reason> */),
 // normalizes them (digits -> N) and tallies the buckets so we can see which CFG family dominates the
@@ -23,6 +75,92 @@ func TestM2StubReasons(t *testing.T) {
 	}
 	maxJars := envInt("M2_MAX_JARS", 120)
 	maxClasses := envInt("M2_MAX_CLASSES", 12000)
+	// Stop-on-first (STOP_ON_FIRST=1): the harness is meant to drive a fix loop one class at a time
+	// (HARNESS_WORKFLOW §0). When set, the scan ABORTS as soon as it has captured the very first
+	// failing class (a partial/err/panic, in that severity order) under PROBLEM_DIR, instead of
+	// grinding through the whole corpus. This keeps every iteration a few seconds rather than
+	// minutes, and makes "the first problem class" a stable, reproducible target. The bucket files
+	// it writes (raw .class + decompiled .java/.err.txt) are consumed unchanged by DIAG_FILE.
+	// STOP_ON_FIRST_FIRST_OK (default 0): if set, treat an already-clear corpus (0 failures) as a
+	// success and exit normally; otherwise the run keeps scanning to confirm the zero.
+	stopOnFirst := os.Getenv("STOP_ON_FIRST") != ""
+	// Resume controls for huge ~/.m2 runs. Prefer jar-level cursors when the next iteration should
+	// skip a large already-cleared prefix: M2_START_JAR starts at a matching jar (inclusive), and
+	// M2_RESUME_AFTER_JAR starts after it (exclusive). M2_RESUME_AFTER_CLASS and M2_RESUME_AFTER remain
+	// available for class-exact replay inside one jar.
+	resumeAfterClass := envInt("M2_RESUME_AFTER_CLASS", 0)
+	resumeAfterName := os.Getenv("M2_RESUME_AFTER")
+	startJarName := os.Getenv("M2_START_JAR")
+	resumeAfterJarName := os.Getenv("M2_RESUME_AFTER_JAR")
+	progressFile := os.Getenv("M2_PROGRESS_FILE")
+	seenResumeName := resumeAfterName == ""
+	// Industry mode (M2_INDUSTRY=1): scan EVERY jar in ~/.m2 (covers spring/tomcat/netty/... not just
+	// the a-c alpha prefix), capping classes per jar (M2_MAX_PER_JAR, default 200) so a few giant jars
+	// cannot eat the whole budget. Mirrors TestM2RegressionHarness so both report the same GA sample.
+	industry := os.Getenv("M2_INDUSTRY") != ""
+	maxPerJar := envInt("M2_MAX_PER_JAR", 200)
+	jarPrefixes := os.Getenv("M2_JAR_PREFIXES")
+	// Progress cadence: every PROGRESS_EVERY classes, stream a live tally to stderr so the run is not
+	// a black box (set PROGRESS_EVERY=0 to silence). Default 500 so a stuck/regressing run surfaces
+	// quickly during fix iterations.
+	progressEvery := envInt("PROGRESS_EVERY", 500)
+	if v, ok := os.LookupEnv("PROGRESS_EVERY"); ok && strings.TrimSpace(v) == "0" {
+		progressEvery = 0
+	}
+
+	// Problem capture: every partial/err class is saved under PROBLEM_DIR (default /tmp/jdec-problems),
+	// bucketed by reason, with BOTH the raw .class (re-run directly via DIAG_FILE) and the decompiled
+	// .java / .err.txt. This turns "scan -> pick a failing class -> reproduce -> fix" into a one-liner.
+	// Set PROBLEM_DIR= (empty) to disable. MAX_SAVE_PER_BUCKET caps files per bucket (default 30).
+	problemDir := "/tmp/jdec-problems"
+	if v, ok := os.LookupEnv("PROBLEM_DIR"); ok {
+		problemDir = v
+	}
+	maxSavePerBucket := envInt("MAX_SAVE_PER_BUCKET", 30)
+	if problemDir != "" {
+		_ = os.RemoveAll(problemDir)
+		_ = os.MkdirAll(problemDir, 0755)
+	}
+	savedPerBucket := map[string]int{}
+	slugRe := regexp.MustCompile(`[^a-zA-Z0-9]+`)
+	bucketSlug := func(reason string) string {
+		s := slugRe.ReplaceAllString(reason, "_")
+		s = strings.Trim(s, "_")
+		if len(s) > 48 {
+			s = s[:48]
+		}
+		if s == "" {
+			s = "unknown"
+		}
+		return s
+	}
+	sanitizeName := func(name string) string {
+		return slugRe.ReplaceAllString(name, "_")
+	}
+	// saveProblem writes the raw class plus a sibling artifact (decompiled java or error text) into the
+	// reason bucket folder, capped per bucket. kind is "partial" or "err". Returns the bucket
+	// directory it wrote to (or "" if it did not write), so stop-on-first can point the user at it.
+	saveProblem := func(kind, reason, name string, raw []byte, artifactExt, artifact string) string {
+		if problemDir == "" {
+			return ""
+		}
+		bucket := kind + "__" + bucketSlug(reason)
+		if savedPerBucket[bucket] >= maxSavePerBucket {
+			return ""
+		}
+		savedPerBucket[bucket]++
+		dir := filepath.Join(problemDir, bucket)
+		_ = os.MkdirAll(dir, 0755)
+		stem := sanitizeName(name)
+		if len(stem) > 150 {
+			stem = stem[len(stem)-150:]
+		}
+		_ = os.WriteFile(filepath.Join(dir, stem+".class"), raw, 0644)
+		if artifact != "" {
+			_ = os.WriteFile(filepath.Join(dir, stem+artifactExt), []byte(name+"\n\n"+artifact), 0644)
+		}
+		return dir
+	}
 
 	home, _ := os.UserHomeDir()
 	m2 := filepath.Join(home, ".m2")
@@ -37,9 +175,14 @@ func TestM2StubReasons(t *testing.T) {
 		return nil
 	})
 	sort.Strings(jars)
-	if len(jars) > maxJars {
+	if strings.TrimSpace(jarPrefixes) != "" {
+		allow := parseJarPrefixFilter(jarPrefixes)
+		jars = filterJarsByPrefix(jars, allow)
+	}
+	if !industry && len(jars) > maxJars {
 		jars = jars[:maxJars]
 	}
+	fmt.Fprintf(os.Stderr, "[stub-reasons] start: jars=%d industry=%v maxClasses=%d maxPerJar=%d prefixes=%q\n", len(jars), industry, maxClasses, maxPerJar, jarPrefixes)
 
 	reasonRe := regexp.MustCompile(`/\* yak-decompiler:([^*]*)\*/`)
 	digitsRe := regexp.MustCompile(`\d+`)
@@ -55,13 +198,81 @@ func TestM2StubReasons(t *testing.T) {
 
 	counts := map[string]int{}
 	examples := map[string][]string{}
-	var nClasses, nPartial, nStubs int
+	var nClasses, nPartial, nStubs, nOK, nErr int
+	// errClasses records every class whose decompile returned an error or escaped a panic (the harness
+	// recovers panics into derr with a "panic:" prefix). These are the most severe boundary cases — a
+	// hard failure rather than a graceful stub — so we capture the class name and message for triage.
+	type errRec struct{ name, msg string }
+	var errClasses []errRec
+	errReasonCounts := map[string]int{}
 
-	for _, jp := range jars {
+	// firstFailure holds the name + bucket path of the first captured failing class, for the
+	// stop-on-first summary. Empty until a partial/err is seen.
+	var firstFailureName, firstFailureBucket, firstFailureJar string
+	var firstFailureAbsClass int
+	var absClasses int
+
+	writeProgress := func(status string) {
+		if progressFile == "" {
+			return
+		}
+		var b strings.Builder
+		fmt.Fprintf(&b, "status=%s\n", status)
+		fmt.Fprintf(&b, "industry=%v\n", industry)
+		fmt.Fprintf(&b, "max_jars=%d\n", maxJars)
+		fmt.Fprintf(&b, "max_classes=%d\n", maxClasses)
+		fmt.Fprintf(&b, "max_per_jar=%d\n", maxPerJar)
+		fmt.Fprintf(&b, "absolute_scanned=%d\n", absClasses)
+		fmt.Fprintf(&b, "window_scanned=%d\n", nClasses)
+		fmt.Fprintf(&b, "ok=%d\npartial=%d\nerr=%d\nstubs=%d\n", nOK, nPartial, nErr, nStubs)
+		if firstFailureName != "" {
+			prefixEnv := ""
+			if industry {
+				prefixEnv += "M2_INDUSTRY=1 "
+			}
+			if strings.TrimSpace(jarPrefixes) != "" {
+				prefixEnv += fmt.Sprintf("M2_JAR_PREFIXES=%s ", jarPrefixes)
+			}
+			fmt.Fprintf(&b, "first_failure_class_index=%d\n", firstFailureAbsClass)
+			fmt.Fprintf(&b, "first_failure_class=%s\n", firstFailureName)
+			fmt.Fprintf(&b, "first_failure_jar=%s\n", firstFailureJar)
+			fmt.Fprintf(&b, "first_failure_bucket=%s\n", firstFailureBucket)
+			fmt.Fprintf(&b, "reproduce=DIAG_FILE=%s/*.class go test -run TestDiagDecompileClass -v ./common/javaclassparser/tests/\n", firstFailureBucket)
+			fmt.Fprintf(&b, "rerun_from_failure=%sM2_RESUME_AFTER_CLASS=%d STUB_REASONS=1 STOP_ON_FIRST=1 PROBLEM_DIR=%s M2_PROGRESS_FILE=%s go test -run TestM2StubReasons -v ./common/javaclassparser/tests/\n", prefixEnv, firstFailureAbsClass-1, problemDir, progressFile)
+			fmt.Fprintf(&b, "continue_after_locked=%sM2_RESUME_AFTER_CLASS=%d STUB_REASONS=1 STOP_ON_FIRST=1 PROBLEM_DIR=%s M2_PROGRESS_FILE=%s go test -run TestM2StubReasons -v ./common/javaclassparser/tests/\n", prefixEnv, firstFailureAbsClass, problemDir, progressFile)
+			fmt.Fprintf(&b, "rerun_from_failure_jar=%sM2_START_JAR=%s STUB_REASONS=1 STOP_ON_FIRST=1 PROBLEM_DIR=%s M2_PROGRESS_FILE=%s go test -run TestM2StubReasons -v ./common/javaclassparser/tests/\n", prefixEnv, firstFailureJar, problemDir, progressFile)
+			fmt.Fprintf(&b, "continue_after_locked_jar=%sM2_RESUME_AFTER_JAR=%s STUB_REASONS=1 STOP_ON_FIRST=1 PROBLEM_DIR=%s M2_PROGRESS_FILE=%s go test -run TestM2StubReasons -v ./common/javaclassparser/tests/\n", prefixEnv, firstFailureJar, problemDir, progressFile)
+		}
+		dir := filepath.Dir(progressFile)
+		if dir != "." && dir != "" {
+			_ = os.MkdirAll(dir, 0755)
+		}
+		_ = os.WriteFile(progressFile, []byte(b.String()), 0644)
+	}
+
+	seenStartJar := startJarName == ""
+	seenResumeAfterJar := resumeAfterJarName == ""
+
+jarLoop:
+	for ji, jp := range jars {
+		if !seenResumeAfterJar {
+			if jarCursorMatches(resumeAfterJarName, jp) {
+				seenResumeAfterJar = true
+			}
+			continue
+		}
+		if !seenStartJar {
+			if jarCursorMatches(startJarName, jp) {
+				seenStartJar = true
+			} else {
+				continue
+			}
+		}
 		zr, err := zip.OpenReader(jp)
 		if err != nil {
 			continue
 		}
+		perJar := 0
 		for _, f := range zr.File {
 			if !strings.HasSuffix(f.Name, ".class") {
 				continue
@@ -70,9 +281,13 @@ func TestM2StubReasons(t *testing.T) {
 			if base == "module-info.class" || base == "package-info.class" {
 				continue
 			}
-			if nClasses >= maxClasses {
+			if absClasses >= maxClasses {
 				break
 			}
+			if industry && maxPerJar > 0 && perJar >= maxPerJar {
+				break
+			}
+			perJar++
 			rc, err := f.Open()
 			if err != nil {
 				continue
@@ -82,28 +297,102 @@ func TestM2StubReasons(t *testing.T) {
 			if len(raw) == 0 {
 				continue
 			}
-			nClasses++
-			out, derr := safeDecompileHarness(raw)
-			if derr != nil || !strings.Contains(out, javaclassparser.DecompileStubMarker) {
+			// Skip very large classes (>500KB) for batch scan throughput: these are almost always
+			// generated parser code that decompiles correctly but takes minutes per class due to
+			// the sheer size of the bytecode. This is a scan throughput optimization, not a correctness
+			// limitation — these classes can be decompiled individually with DIAG_FILE if needed.
+			if maxSize := envInt("M2_MAX_CLASS_SIZE", 500000); len(raw) > maxSize {
 				continue
 			}
-			nPartial++
-			for _, m := range reasonRe.FindAllStringSubmatch(out, -1) {
-				reason := normalize(m[1])
-				if reason == "" {
-					continue
+			absClasses++
+			name := filepath.Base(jp) + "!" + f.Name
+			if resumeAfterClass > 0 && absClasses <= resumeAfterClass {
+				continue
+			}
+			if !seenResumeName {
+				if name == resumeAfterName {
+					seenResumeName = true
 				}
-				nStubs++
-				counts[reason]++
-				if len(examples[reason]) < 4 {
-					examples[reason] = append(examples[reason], filepath.Base(jp)+"!"+f.Name)
+				continue
+			}
+			nClasses++
+			out, derr := safeDecompileHarness(raw)
+			if derr != nil {
+				// A hard decompile error or escaped panic (the harness recovers panics into derr).
+				nErr++
+				msg := derr.Error()
+				if len(msg) > 200 {
+					msg = msg[:200]
 				}
+				errClasses = append(errClasses, errRec{name, msg})
+				errReasonCounts[normalize(msg)]++
+				dir := saveProblem("err", normalize(msg), name, raw, ".err.txt", derr.Error())
+				fmt.Fprintf(os.Stderr, "[stub-reasons] ERR %s :: %s\n", name, strings.ReplaceAll(msg, "\n", " "))
+				if stopOnFirst {
+					firstFailureName, firstFailureBucket = name, dir
+					firstFailureJar = filepath.Base(jp)
+					firstFailureAbsClass = absClasses
+					break jarLoop
+				}
+			} else if !strings.Contains(out, javaclassparser.DecompileStubMarker) {
+				nOK++
+			} else {
+				nPartial++
+				var primaryReason string
+				for _, m := range reasonRe.FindAllStringSubmatch(out, -1) {
+					reason := normalize(m[1])
+					if reason == "" {
+						continue
+					}
+					if primaryReason == "" {
+						primaryReason = reason
+					}
+					nStubs++
+					counts[reason]++
+					if len(examples[reason]) < 4 {
+						examples[reason] = append(examples[reason], name)
+					}
+				}
+				// Save the failing class under its dominant reason bucket so it can be reproduced
+				// directly: `DIAG_FILE=<path> go test -run TestDiagDecompileClass ...`.
+				dir := saveProblem("partial", primaryReason, name, raw, ".java", out)
+				if stopOnFirst {
+					firstFailureName, firstFailureBucket = name, dir
+					firstFailureJar = filepath.Base(jp)
+					firstFailureAbsClass = absClasses
+					break jarLoop
+				}
+			}
+			if progressEvery > 0 && nClasses%progressEvery == 0 {
+				fmt.Fprintf(os.Stderr, "[stub-reasons] progress: jar %d/%d  scanned=%d  ok=%d  partial=%d  err=%d\n",
+					ji+1, len(jars), nClasses, nOK, nPartial, nErr)
 			}
 		}
 		zr.Close()
-		if nClasses >= maxClasses {
+		if absClasses >= maxClasses {
 			break
 		}
+	}
+	fmt.Fprintf(os.Stderr, "[stub-reasons] DONE: scanned=%d  ok=%d  partial=%d  err=%d  stubs=%d\n",
+		nClasses, nOK, nPartial, nErr, nStubs)
+	if stopOnFirst && firstFailureName != "" {
+		fmt.Fprintf(os.Stderr, "[stub-reasons] STOP_ON_FIRST: aborted after first failure at class %d (window class %d)\n", firstFailureAbsClass, nClasses)
+		fmt.Fprintf(os.Stderr, "[stub-reasons]   class: %s\n", firstFailureName)
+		fmt.Fprintf(os.Stderr, "[stub-reasons]   bucket dir: %s\n", firstFailureBucket)
+		fmt.Fprintf(os.Stderr, "[stub-reasons]   reproduce: DIAG_FILE=%s/*.class go test -run TestDiagDecompileClass -v ./common/javaclassparser/tests/\n", firstFailureBucket)
+		writeProgress("failure")
+	} else if stopOnFirst {
+		fmt.Fprintf(os.Stderr, "[stub-reasons] STOP_ON_FIRST: no failure found in scanned range (scanned=%d ok=%d)\n", nClasses, nOK)
+		writeProgress("clear")
+	} else {
+		writeProgress("complete")
+	}
+	if problemDir != "" {
+		nSaved := 0
+		for _, c := range savedPerBucket {
+			nSaved += c
+		}
+		fmt.Fprintf(os.Stderr, "[stub-reasons] saved %d problem classes (capped %d/bucket) under %s\n", nSaved, maxSavePerBucket, problemDir)
 	}
 
 	type kv struct {
@@ -117,11 +406,31 @@ func TestM2StubReasons(t *testing.T) {
 	sort.Slice(list, func(i, j int) bool { return list[i].v > list[j].v })
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("classes=%d partial=%d stubs=%d distinct_reasons=%d\n", nClasses, nPartial, nStubs, len(list)))
+	sb.WriteString(fmt.Sprintf("classes=%d ok=%d partial=%d err=%d stubs=%d distinct_reasons=%d\n", nClasses, nOK, nPartial, nErr, nStubs, len(list)))
+	if nErr > 0 {
+		sb.WriteString(fmt.Sprintf("\n==== ERR classes (hard failure / escaped panic): %d ====\n", nErr))
+		type ekv struct {
+			k string
+			v int
+		}
+		var elist []ekv
+		for k, v := range errReasonCounts {
+			elist = append(elist, ekv{k, v})
+		}
+		sort.Slice(elist, func(i, j int) bool { return elist[i].v > elist[j].v })
+		for _, e := range elist {
+			sb.WriteString(fmt.Sprintf("%6d  %s\n", e.v, e.k))
+		}
+		sb.WriteString("---- per-class ----\n")
+		for _, e := range errClasses {
+			fmt.Fprintf(&sb, "  %s :: %s\n", e.name, strings.ReplaceAll(e.msg, "\n", " "))
+		}
+		sb.WriteString("\n==== PARTIAL stub reason buckets ====\n")
+	}
 	for _, e := range list {
 		sb.WriteString(fmt.Sprintf("%6d  %s\n", e.v, e.k))
 		for _, ex := range examples[e.k] {
-			sb.WriteString("          e.g. " + ex + "\n")
+			fmt.Fprintf(&sb, "          e.g. %s\n", ex)
 		}
 	}
 	out := sb.String()

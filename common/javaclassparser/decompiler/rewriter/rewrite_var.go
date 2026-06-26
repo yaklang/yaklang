@@ -3,6 +3,7 @@ package rewriter
 import (
 	"fmt"
 	"maps"
+	"os"
 	"regexp"
 	"sort"
 
@@ -14,12 +15,22 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 )
 
-func RewriteVar(sts *[]statements.Statement, startVarId int, params []*values.JavaRef) {
+func RewriteVar(sts *[]statements.Statement, startVarId int, params []*values.JavaRef, traceCtx ...*class_context.ClassContext) {
+	var ctx *class_context.ClassContext
+	if len(traceCtx) > 0 {
+		ctx = traceCtx[0]
+	}
+	className, methodName := "", ""
+	if ctx != nil {
+		className = ctx.ClassName
+		methodName = ctx.FunctionName
+	}
 	scope := NewScope(startVarId, sts)
 	for _, v := range params {
 		scope.assignedMap[v.VarUid] = v.Id
+		core.TraceRewriteVar(className, methodName, "param uid=%s id=%s", v.VarUid, v.Id.String())
 	}
-	rewriteVar(scope)
+	rewriteVar(scope, className, methodName)
 	var checkUndefinedVar func(scope *Scope, parentAssigned map[*utils.VariableId]struct{})
 	undefined := make(map[values.JavaValue]int)
 	varAssignMap := map[*utils.VariableId][]*statements.AssignStatement{}
@@ -151,7 +162,124 @@ func (s *Scope) SubScope(sts *[]statements.Statement) *Scope {
 	s.varMap = append(s.varMap, newScope)
 	return newScope
 }
-func rewriteVar(scope *Scope) int {
+
+// maxStructuredContainers bounds how many nested-block container statements a single method's
+// structured tree may contain. It backstops AssertStatementsAcyclic's traversal against a degenerate
+// (but technically acyclic) explosion of nested blocks.
+const maxStructuredContainers = 1_000_000
+
+// AssertStatementsAcyclic verifies that the structured statement tree produced for one method is a
+// proper tree of nested-block containers (if/for/while/do-while/switch/try) - i.e. no container is its
+// own ancestor or otherwise reachable twice. A structuring defect on certain real-world classes emitted
+// a self-referential container (an IfStatement whose own body contained itself), which sent the many
+// recursive tree walkers (rewriteVar, Statement.ReplaceVar, Statement.String, ...) into unbounded
+// recursion. Because that surfaces as Go's UNRECOVERABLE `fatal error: stack overflow`, the per-method
+// recover nets could not contain it and a single class crashed the whole host process. This check runs
+// ITERATIVELY (its own explicit stack, so it cannot itself overflow) once before any recursive pass; on
+// a cycle or pathological size it raises an ordinary panic, which ParseBytesCode's recover converts into
+// a returned error so the method degrades to a clean stub. Container nodes are never legitimately shared
+// in a well-formed tree, so a repeat visit is always a defect; leaf statements are not tracked, so
+// shared leaf singletons (break/continue/...) never trigger a false positive.
+func AssertStatementsAcyclic(roots []statements.Statement) {
+	visited := make(map[statements.Statement]struct{})
+	count := 0
+	// ancestors tracks container nodes on the CURRENT DFS path; visited tracks ALL expanded
+	// containers. A node revisited via ancestors is a TRUE cycle (A contains A transitively) which
+	// would drive recursive walkers (Statement.String, rewriteVar, ...) into unbounded recursion →
+	// must panic. A node revisited but NOT on the current path is merely SHARED (two independent
+	// parents reference the same Statement, a finite DAG): safe to skip its children (already
+	// expanded by the first visit) and continue, letting the method decompile instead of stubbing
+	// the whole body (druid TDDLHint.<init>, jackson UTF8DataInputJsonParser).
+	type stackEntry struct {
+		st    statements.Statement
+		leave bool
+	}
+	ancestors := make(map[statements.Statement]struct{})
+	stack := make([]stackEntry, 0, len(roots))
+	for _, r := range roots {
+		stack = append(stack, stackEntry{st: r, leave: false})
+	}
+	for len(stack) > 0 {
+		entry := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if entry.leave {
+			delete(ancestors, entry.st)
+			continue
+		}
+		st := entry.st
+		if st == nil {
+			continue
+		}
+		var children [][]statements.Statement
+		switch s := st.(type) {
+		case *statements.IfStatement:
+			children = append(children, s.IfBody, s.ElseBody)
+		case *statements.ForStatement:
+			children = append(children, s.SubStatements)
+		case *statements.WhileStatement:
+			children = append(children, s.Body)
+		case *statements.DoWhileStatement:
+			children = append(children, s.Body)
+		case *statements.SwitchStatement:
+			for _, c := range s.Cases {
+				if c != nil {
+					children = append(children, c.Body)
+				}
+			}
+		case *statements.TryCatchStatement:
+			children = append(children, s.TryBody)
+			children = append(children, s.CatchBodies...)
+		default:
+			// Leaf / non-container statement: nothing to descend into.
+			continue
+		}
+		// ancestors MUST be checked before visited: a node on the current DFS path is a TRUE cycle
+		// (st is its own transitive ancestor) and drives recursive walkers into unbounded recursion,
+		// so it must panic. Since a node is added to BOTH visited and ancestors on first expansion,
+		// checking visited first would short-circuit a self-cycle (A whose body contains A: the child
+		// A is already in visited) and misclassify it as a harmless shared DAG, letting the cycle
+		// through to FoldAssertionGuards/rewriteVar and a fatal stack overflow.
+		if _, ok := ancestors[st]; ok {
+			panic(fmt.Errorf("cyclic container statement (%T) in structured tree; rejecting to avoid unbounded recursion", st))
+		}
+		if _, ok := visited[st]; ok {
+			// Visited but NOT on the current path: two independent parents reference the same
+			// Statement object - a finite DAG, not a cycle. Skip expanding its children (already
+			// done on the first visit) and continue, so the method decompiles instead of stubbing.
+			continue
+		}
+		visited[st] = struct{}{}
+		ancestors[st] = struct{}{}
+		count++
+		if count > maxStructuredContainers {
+			panic(fmt.Errorf("structured statement tree has more than %d container nodes; rejecting as pathological", maxStructuredContainers))
+		}
+		// Push a leave marker so ancestors is cleaned up after all children are processed,
+		// then push the children. LIFO → children are processed first, leave marker last.
+		stack = append(stack, stackEntry{st: st, leave: true})
+		for _, body := range children {
+			for _, child := range body {
+				stack = append(stack, stackEntry{st: child, leave: false})
+			}
+		}
+	}
+}
+
+// maxRewriteVarDepth bounds the structural recursion of rewriteVar. The walker descends one frame per
+// nested block (if/for/while/do-while/switch/try); a pathological or cyclic statement tree (observed on
+// machine-generated parsers, and on degenerate structuring output) can drive this past the goroutine
+// stack limit, which manifests as Go's UNRECOVERABLE `fatal error: stack overflow` and crashes the whole
+// host process - the recover nets cannot catch it. No hand-written or normally-generated Java nests
+// thousands of blocks deep, so once depth crosses this threshold we raise an ordinary (recoverable)
+// panic instead; ParseBytesCode's recover turns it into a returned error and the method degrades to a
+// clean stub rather than taking the process down. The limit sits far above any legitimate nesting yet
+// far below the ~250k frames it takes to overflow a 1GB stack.
+const maxRewriteVarDepth = 5000
+
+func rewriteVar(scope *Scope, className, methodName string) int {
+	if scope.deep > maxRewriteVarDepth {
+		panic(fmt.Errorf("rewriteVar: block nesting depth %d exceeds limit %d (pathological or cyclic statement tree)", scope.deep, maxRewriteVarDepth))
+	}
 	idReplaceMap := map[*utils.VariableId]*utils.VariableId{}
 	defer func() {
 		for oldId, newId := range idReplaceMap {
@@ -180,6 +308,8 @@ func rewriteVar(scope *Scope) int {
 					scope.varMap = append(scope.varMap, statement)
 					scope.nowId++
 					scope.assignedMap[v.VarUid] = newId
+					core.TraceRewriteVar(className, methodName, "bind depth=%d uid=%s old=%s new=%s type=%s",
+						scope.deep, v.VarUid, oldId.String(), newId.String(), v.Type().String(&class_context.ClassContext{}))
 				}
 			}
 			if hasNamed {
@@ -187,33 +317,42 @@ func rewriteVar(scope *Scope) int {
 				id, _ := scope.assignedMap[ref.VarUid]
 				ref.Id = id
 				scope.varMap = append(scope.varMap, statement)
+				core.TraceRewriteVar(className, methodName, "reuse depth=%d uid=%s id=%s", scope.deep, ref.VarUid, id.String())
 			}
 		case *statements.IfStatement:
 			subScope := scope.SubScope(&statement.IfBody)
-			rewriteVar(subScope)
+			core.TraceRewriteVar(className, methodName, "enter if depth=%d body=%d", subScope.deep, len(statement.IfBody))
+			rewriteVar(subScope, className, methodName)
 			subScope = scope.SubScope(&statement.ElseBody)
-			rewriteVar(subScope)
+			core.TraceRewriteVar(className, methodName, "enter else depth=%d body=%d", subScope.deep, len(statement.ElseBody))
+			rewriteVar(subScope, className, methodName)
 		case *statements.ForStatement:
 			subScope := scope.SubScope(&statement.SubStatements)
-			rewriteVar(subScope)
+			core.TraceRewriteVar(className, methodName, "enter for depth=%d body=%d", subScope.deep, len(statement.SubStatements))
+			rewriteVar(subScope, className, methodName)
 		case *statements.WhileStatement:
 			subScope := scope.SubScope(&statement.Body)
-			rewriteVar(subScope)
+			core.TraceRewriteVar(className, methodName, "enter while depth=%d body=%d", subScope.deep, len(statement.Body))
+			rewriteVar(subScope, className, methodName)
 		case *statements.DoWhileStatement:
 			subScope := scope.SubScope(&statement.Body)
-			rewriteVar(subScope)
+			core.TraceRewriteVar(className, methodName, "enter do-while depth=%d body=%d", subScope.deep, len(statement.Body))
+			rewriteVar(subScope, className, methodName)
 		case *statements.SwitchStatement:
 			subScope := scope.SubScope(nil)
 			for _, c := range statement.Cases {
 				subScope.sts = &c.Body
-				rewriteVar(subScope)
+				core.TraceRewriteVar(className, methodName, "enter switch-case depth=%d body=%d", subScope.deep, len(c.Body))
+				rewriteVar(subScope, className, methodName)
 			}
 		case *statements.TryCatchStatement:
 			subScope := scope.SubScope(&statement.TryBody)
-			rewriteVar(subScope)
+			core.TraceRewriteVar(className, methodName, "enter try depth=%d body=%d", subScope.deep, len(statement.TryBody))
+			rewriteVar(subScope, className, methodName)
 			for _, c := range statement.CatchBodies {
 				subScope = scope.SubScope(&c)
-				rewriteVar(subScope)
+				core.TraceRewriteVar(className, methodName, "enter catch depth=%d body=%d", subScope.deep, len(c))
+				rewriteVar(subScope, className, methodName)
 			}
 		}
 	}
@@ -241,6 +380,11 @@ func hoistSwitchDeclarations(sts *[]statements.Statement) {
 		case *statements.IfStatement:
 			hoistSwitchDeclarations(&s.IfBody)
 			hoistSwitchDeclarations(&s.ElseBody)
+			if os.Getenv("JDEC_IF_HOIST_OFF") == "" {
+				for _, decl := range ifHoistDeclarations(s, list[i+1:]) {
+					out = append(out, decl)
+				}
+			}
 		case *statements.ForStatement:
 			hoistSwitchDeclarations(&s.SubStatements)
 		case *statements.WhileStatement:
@@ -312,7 +456,7 @@ func switchHoistDeclarations(sw *statements.SwitchStatement, afterSts []statemen
 			continue
 		}
 		name := refByUid[uid].String(hoistProbeCtx)
-		if name == "" || !statementsReferenceName(afterSts, name) {
+		if name == "" || !statementsReadName(afterSts, name) {
 			continue
 		}
 		for _, as := range assignsByUid[uid] {
@@ -322,6 +466,170 @@ func switchHoistDeclarations(sw *statements.SwitchStatement, afterSts []statemen
 		declares = append(declares, statements.NewDeclareStatement(refByUid[uid]))
 	}
 	return declares
+}
+
+// ifHoistDeclarations demotes declarations inside an if/else tree when the local is read after the
+// if in the containing block. A branch-local declaration cannot be referenced after the if; bytecode
+// patterns like `if (...) x = A; else x = B; return x;` therefore need a single `T x;` before the if.
+func ifHoistDeclarations(ifst *statements.IfStatement, afterSts []statements.Statement) []statements.Statement {
+	declaredInside := map[string]bool{}
+	assignsByUid := map[string][]*statements.AssignStatement{}
+	refByUid := map[string]values.JavaValue{}
+	var collect func([]statements.Statement)
+	collect = func(sts []statements.Statement) {
+		for _, st := range sts {
+			switch s := st.(type) {
+			case *statements.AssignStatement:
+				if s.ArrayMember != nil {
+					continue
+				}
+				ref, ok := core.UnpackSoltValue(s.LeftValue).(*values.JavaRef)
+				if !ok || ref == nil || ref.Id == nil {
+					continue
+				}
+				assignsByUid[ref.VarUid] = append(assignsByUid[ref.VarUid], s)
+				refByUid[ref.VarUid] = s.LeftValue
+				if s.IsFirst || s.IsDeclare {
+					declaredInside[ref.VarUid] = true
+				}
+			case *statements.IfStatement:
+				collect(s.IfBody)
+				collect(s.ElseBody)
+			case *statements.ForStatement:
+				collect(s.SubStatements)
+			case *statements.WhileStatement:
+				collect(s.Body)
+			case *statements.DoWhileStatement:
+				collect(s.Body)
+			case *statements.SynchronizedStatement:
+				collect(s.Body)
+			case *statements.TryCatchStatement:
+				collect(s.TryBody)
+				for i := range s.CatchBodies {
+					collect(s.CatchBodies[i])
+				}
+			case *statements.SwitchStatement:
+				for _, c := range s.Cases {
+					collect(c.Body)
+				}
+			}
+		}
+	}
+	collect(ifst.IfBody)
+	collect(ifst.ElseBody)
+
+	uids := make([]string, 0, len(assignsByUid))
+	for uid := range assignsByUid {
+		uids = append(uids, uid)
+	}
+	sort.SliceStable(uids, func(i, j int) bool {
+		return uids[i] < uids[j]
+	})
+	var declares []statements.Statement
+	for _, uid := range uids {
+		if !declaredInside[uid] {
+			continue
+		}
+		if len(assignsByUid[uid]) < 2 {
+			continue
+		}
+		canDemote := true
+		for _, as := range assignsByUid[uid] {
+			if !assignRendersAsPlain(as) {
+				canDemote = false
+				break
+			}
+		}
+		if !canDemote {
+			continue
+		}
+		targetRef := refByUid[uid]
+		name := targetRef.String(hoistProbeCtx)
+		for _, as := range assignsByUid[uid] {
+			ref, ok := core.UnpackSoltValue(as.LeftValue).(*values.JavaRef)
+			if !ok || ref == nil || ref.Id == nil {
+				continue
+			}
+			candidateName := ref.String(hoistProbeCtx)
+			if candidateName != "" && statementsReadName(afterSts, candidateName) {
+				targetRef = as.LeftValue
+				name = candidateName
+				break
+			}
+		}
+		if name == "" || !statementsReadName(afterSts, name) {
+			continue
+		}
+		targetJavaRef, ok := core.UnpackSoltValue(targetRef).(*values.JavaRef)
+		if !ok || targetJavaRef == nil || targetJavaRef.Id == nil {
+			continue
+		}
+		targetID := targetJavaRef.Id
+		for _, as := range assignsByUid[uid] {
+			if ref, ok := core.UnpackSoltValue(as.LeftValue).(*values.JavaRef); ok && ref != nil && ref.Id != targetID {
+				ref.Id = targetID
+			}
+			as.IsFirst = false
+			as.IsDeclare = false
+		}
+		declares = append(declares, statements.NewDeclareStatement(targetRef))
+	}
+	return declares
+}
+
+func assignRendersAsPlain(as *statements.AssignStatement) (ok bool) {
+	if as == nil {
+		return false
+	}
+	oldFirst, oldDeclare := as.IsFirst, as.IsDeclare
+	defer func() {
+		as.IsFirst, as.IsDeclare = oldFirst, oldDeclare
+		if recover() != nil {
+			ok = false
+		}
+	}()
+	as.IsFirst, as.IsDeclare = false, false
+	_ = as.String(hoistProbeCtx)
+	return true
+}
+
+// statementsReadName is the if-hoist trigger: unlike switch hoisting, a later assignment target
+// `x = ...` should not force an unrelated branch-local `x` declaration outward. Only reads in the
+// statements after the if make the branch declaration unsafe.
+func statementsReadName(sts []statements.Statement, name string) (res bool) {
+	defer func() {
+		if recover() != nil {
+			res = true
+		}
+	}()
+	re := regexp.MustCompile(`\b` + regexp.QuoteMeta(name) + `\b`)
+	for _, st := range sts {
+		if as, ok := st.(*statements.AssignStatement); ok {
+			if as.JavaValue != nil && re.MatchString(as.JavaValue.String(hoistProbeCtx)) {
+				return true
+			}
+			if as.ArrayMember != nil && re.MatchString(as.ArrayMember.String(hoistProbeCtx)) {
+				return true
+			}
+			if ref, ok := core.UnpackSoltValue(as.LeftValue).(*values.JavaRef); ok && ref.String(hoistProbeCtx) == name && (as.IsFirst || as.IsDeclare) {
+				return false
+			}
+			continue
+		}
+		if statementReadTextMatches(st, re) {
+			return true
+		}
+	}
+	return false
+}
+
+func statementReadTextMatches(st statements.Statement, re *regexp.Regexp) (res bool) {
+	defer func() {
+		if recover() != nil {
+			res = true
+		}
+	}()
+	return re.MatchString(st.String(hoistProbeCtx))
 }
 
 // statementsReferenceName reports whether any of the statements textually reference the variable
