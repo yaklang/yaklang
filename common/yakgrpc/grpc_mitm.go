@@ -157,7 +157,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				plainRequest = decoded
 			}
 		}
-		return plainRequest
+		return yakit.PrepareLargeHTTPFlowRequest(req, plainRequest)
 	}
 	getPlainResponseBytes := func(req *http.Request) []byte {
 		var plainResponse []byte
@@ -1246,11 +1246,15 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		fixReqIns, _ := lowhttp.ParseBytesToHttpRequest(fixReq)
 		method := originReqIns.Method
 
-		// make it plain
+		// make it plain (hash uses full wire packet; display paths use truncated packet via getPlainRequestBytes)
+		hashSource := httpctx.GetBareRequestBytes(originReqIns)
+		if len(hashSource) == 0 {
+			hashSource = fixReq
+		} else {
+			hashSource = lowhttp.DeletePacketEncoding(hashSource)
+		}
+		originRequestHash := codec.Sha256(hashSource)
 		plainRequest := getPlainRequestBytes(originReqIns)
-
-		// handle rules
-		originRequestHash := codec.Sha256(plainRequest)
 
 		// modified ?
 		handleRequestModified := func(newReqBytes []byte) bool {
@@ -1435,8 +1439,12 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			for {
 				// IsHttps: 前端配置国密时强制 HTTPS，否则从 httpctx/TLS/ConnectToHTTPS 获取
 				isHttpsVal := httpctx.GetRequestHTTPSWithFallback(originReqIns) || enableGMTLS
+				displayReq := plainRequest
+				if len(displayReq) == 0 {
+					displayReq = getPlainRequestBytes(originReqIns)
+				}
 				feedbackOrigin := &ypb.MITMResponse{
-					Request:             req,
+					Request:             displayReq,
 					Refresh:             false,
 					IsHttps:             isHttpsVal,
 					Url:                 urlStr,
@@ -1447,8 +1455,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					RemoteAddr:          httpctx.GetRemoteAddr(originReqIns),
 				}
 
-				if lowhttp.IsMultipartFormDataRequest(fixReq) || !utf8.Valid(fixReq) {
-					feedbackOrigin.Request = lowhttp.ConvertHTTPRequestToFuzzTag(fixReq)
+				if lowhttp.IsMultipartFormDataRequest(displayReq) || !utf8.Valid(displayReq) {
+					feedbackOrigin.Request = lowhttp.ConvertHTTPRequestToFuzzTag(displayReq)
 				}
 
 				err = mitmSendResp(feedbackOrigin)
@@ -1830,17 +1838,25 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			})
 			if err != nil {
 				log.Errorf("create / save httpflow from mirror error: %s", err)
-			} else if needUpdate {
-				go func() {
-					<-colorCh
-					<-pluginCh
-					if tags != flow.Tags {
-						err := yakit.UpdateHTTPFlowTagsEx(flow)
-						if err != nil {
-							log.Errorf("update http flow tags error: %s", err)
+			} else {
+				if flow.IsTooLargeRequest && yakit.ShouldNotifyLargeHTTPFlowRequest() {
+					mitmSendRespLogged(&ypb.MITMResponse{
+						HaveNotification:    true,
+						NotificationContent: []byte(yakit.LargeHTTPFlowRequestUserNotice(flow)),
+					})
+				}
+				if needUpdate {
+					go func() {
+						<-colorCh
+						<-pluginCh
+						if tags != flow.Tags {
+							err := yakit.UpdateHTTPFlowTagsEx(flow)
+							if err != nil {
+								log.Errorf("update http flow tags error: %s", err)
+							}
 						}
-					}
-				}()
+					}()
+				}
 			}
 
 			log.Debugf("insert http flow %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))

@@ -85,7 +85,7 @@ type HTTPFlow struct {
 func (f *HTTPFlow) GetRequest() string {
 	unquoted, err := strconv.Unquote(f.Request)
 	if err != nil {
-		return ""
+		return f.Request
 	}
 	return unquoted
 }
@@ -93,7 +93,7 @@ func (f *HTTPFlow) GetRequest() string {
 func (f *HTTPFlow) GetResponse() string {
 	unquoted, err := strconv.Unquote(f.Response)
 	if err != nil {
-		return ""
+		return f.Response
 	}
 	return unquoted
 }

@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 
@@ -27,6 +26,7 @@ type HTTPFlow2HarEntryOptions struct {
 // HTTPFlow2HarEntry 将 HTTPFlow 转换为 HAREntry
 // 如果提供了 options，则根据字段选择来决定包含哪些内容
 func HTTPFlow2HarEntry(flow *schema.HTTPFlow, options ...*HTTPFlow2HarEntryOptions) (*HAREntry, error) {
+	var err error
 	var opts *HTTPFlow2HarEntryOptions
 	if len(options) > 0 {
 		opts = options[0]
@@ -95,11 +95,10 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow, options ...*HTTPFlow2HarEntryOptio
 		needParseRequestPacket := includeHeaders || includeBody || (includeURL && hasRequestParent) || includeHost
 		var reqByte []byte
 		if needParseRequestPacket {
-			reqRaw, err := strconv.Unquote(flow.Request)
+			reqByte, err = loadHTTPFlowRequestPacket(flow)
 			if err != nil {
 				return nil, err
 			}
-			reqByte = []byte(reqRaw)
 
 			// 如果需要解析HTTP版本（需要headers或body或父级字段）
 			if includeHeaders || includeBody || hasRequestParent {
@@ -200,8 +199,9 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow, options ...*HTTPFlow2HarEntryOptio
 		// body_length 是响应大小，不应该在这里处理
 		includeRequestBodySize := hasRequestParent || hasField("request_length")
 		if includeRequestBodySize {
-			// 如果已经解析了请求体，使用实际解析的长度；否则使用 flow.RequestLength
-			if includeBody && request.PostData != nil {
+			if flow.IsTooLargeRequest && flow.RequestLength > 0 {
+				request.BodySize = int(flow.RequestLength)
+			} else if includeBody && request.PostData != nil {
 				request.BodySize = len(request.PostData.Text)
 			} else {
 				request.BodySize = int(flow.RequestLength)
@@ -236,96 +236,84 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow, options ...*HTTPFlow2HarEntryOptio
 			response.StatusText = http.StatusText(int(flow.StatusCode))
 		}
 
-		var r io.Reader
-		if flow.Response != "" {
-			respRaw, err := strconv.Unquote(flow.Response)
-			if err != nil {
-				return nil, err
-			}
-			r = bytes.NewBufferString(respRaw)
-		} else {
-			f, err := os.Open(flow.TooLargeResponseHeaderFile)
-			if err != nil {
-				return nil, err
-			}
-			defer f.Close()
-			f2, err := os.Open(flow.TooLargeResponseBodyFile)
-			if err != nil {
-				return nil, err
-			}
-			defer f2.Close()
-
-			r = io.MultiReader(f, f2)
-		}
-
-		resp, err := utils.ReadHTTPResponseFromBufioReader(r, nil)
+		var respRaw []byte
+		respRaw, err = loadHTTPFlowResponsePacket(flow)
 		if err != nil {
 			return nil, err
 		}
+		includeBodySize := hasResponseParent || hasField("body_length")
+		if len(respRaw) > 0 {
+			resp, err := utils.ReadHTTPResponseFromBufioReader(bytes.NewReader(respRaw), nil)
+			if err != nil {
+				return nil, err
+			}
 
-		// 获取content-type（在解析body之前）
-		if ct := resp.Header.Get("Content-Type"); ct != "" {
-			ResponseContentType = ct
-		}
+			// 获取content-type（在解析body之前）
+			if ct := resp.Header.Get("Content-Type"); ct != "" {
+				ResponseContentType = ct
+			}
 
-		// 如果需要解析HTTP版本和headers（需要status_code或父级字段）
-		if includeStatusCode {
-			// get http version
-			response.HTTPVersion = resp.Proto
-			isResponseHTTP2 := strings.Contains(strings.ToLower(response.HTTPVersion), "http/2")
+			// 如果需要解析HTTP版本和headers（需要status_code或父级字段）
+			if includeStatusCode {
+				// get http version
+				response.HTTPVersion = resp.Proto
+				isResponseHTTP2 := strings.Contains(strings.ToLower(response.HTTPVersion), "http/2")
 
-			// get headers - 如果勾选了headers或父级字段response
-			if includeHeaders {
-				var responseHeaders []*HARKVPair
-				for key, headers := range resp.Header {
-					if isResponseHTTP2 {
-						key = strings.ToLower(key)
+				// get headers - 如果勾选了headers或父级字段response
+				if includeHeaders {
+					var responseHeaders []*HARKVPair
+					for key, headers := range resp.Header {
+						if isResponseHTTP2 {
+							key = strings.ToLower(key)
+						}
+						if strings.ToLower(key) == "content-type" {
+							ResponseContentType = headers[0]
+						}
+						for _, header := range headers {
+							responseHeaders = append(responseHeaders, &HARKVPair{
+								Name:  key,
+								Value: header,
+							})
+						}
 					}
-					if strings.ToLower(key) == "content-type" {
-						ResponseContentType = headers[0]
-					}
-					for _, header := range headers {
-						responseHeaders = append(responseHeaders, &HARKVPair{
-							Name:  key,
-							Value: header,
-						})
+					response.Headers = responseHeaders
+					response.HeadersSize = len(responseHeaders)
+				}
+			}
+
+			// 如果勾选了response字段或父级字段response，就解析并包含 body
+			if includeBody {
+				body, err := io.ReadAll(resp.Body)
+				if err != nil {
+					return nil, err
+				}
+				bodySize := len(body)
+
+				response.Content = &HARHTTPContent{
+					Size:     bodySize,
+					MimeType: ResponseContentType,
+					Text:     string(body),
+				}
+				if includeBodySize {
+					if flow.IsTooLargeResponse && flow.BodyLength > 0 {
+						response.BodySize = int(flow.BodyLength)
+					} else {
+						response.BodySize = bodySize
 					}
 				}
-				response.Headers = responseHeaders
-				response.HeadersSize = len(responseHeaders)
+			} else if includeBodySize {
+				body, err := io.ReadAll(resp.Body)
+				if err != nil {
+					return nil, err
+				}
+				if flow.IsTooLargeResponse && flow.BodyLength > 0 {
+					response.BodySize = int(flow.BodyLength)
+				} else {
+					response.BodySize = len(body)
+				}
 			}
-		}
-
-		// 检查是否勾选了body_length字段（响应大小）
-		// request_length 是请求大小，不应该在这里处理
-		includeBodySize := hasResponseParent || hasField("body_length")
-
-		// 如果勾选了response字段或父级字段response，就解析并包含 body
-		if includeBody {
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return nil, err
-			}
-			bodySize := len(body)
-
-			response.Content = &HARHTTPContent{
-				Size:     bodySize,
-				MimeType: ResponseContentType,
-				Text:     string(body),
-			}
-			// 只有勾选了bodySize或父级字段response时才设置BodySize
-			if includeBodySize {
-				response.BodySize = bodySize
-			}
-		} else if includeBodySize {
-			// 如果只勾选了bodySize，需要读取body以获取大小，但不包含内容
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return nil, err
-			}
-			bodySize := len(body)
-			response.BodySize = bodySize
-			// 不创建Content对象，因为只勾选了bodySize
+		} else if includeBodySize && flow.BodyLength > 0 {
+			response.BodySize = int(flow.BodyLength)
 		}
 	} else if hasField("body_length") {
 		// 如果只勾选了body_length但没有勾选其他response字段，使用flow.BodyLength
@@ -636,5 +624,17 @@ func HarEntry2HTTPFlow(entry *HAREntry) (*schema.HTTPFlow, error) {
 			flow.UpdatedAt = metadata.UpdatedAt
 		}
 	}
+
+	reqBodySize, rspBodySize := 0, 0
+	if entry.Request != nil {
+		reqBodySize = entry.Request.BodySize
+	}
+	if entry.Response != nil {
+		rspBodySize = entry.Response.BodySize
+		if rspBodySize <= 0 && entry.Response.Content != nil {
+			rspBodySize = entry.Response.Content.Size
+		}
+	}
+	applyImportedLargeHTTPFlowFlags(flow, reqBodySize, rspBodySize)
 	return flow, nil
 }

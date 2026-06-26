@@ -120,7 +120,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				plainRequest = decoded
 			}
 		}
-		return plainRequest
+		return yakit.PrepareLargeHTTPFlowRequest(req, plainRequest)
 	}
 	getPlainResponseBytes := func(req *http.Request) []byte {
 		var plainResponse []byte
@@ -1300,12 +1300,17 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 		// IsHttps: 配置国密时强制视为 HTTPS（不再依赖 rsp.TLS）
 		isHttpsVal := httpctx.GetRequestHTTPSWithFallback(originReqIns) || enableGMTLS
+		wireReq := req
+		displayReq := getPlainRequestBytes(originReqIns)
+		if len(displayReq) == 0 {
+			displayReq = yakit.PrepareLargeHTTPFlowRequest(originReqIns, lowhttp.DeletePacketEncoding(wireReq))
+		}
 		feedbackOrigin := &ypb.SingleManualHijackInfoMessage{
-			Request:    req,
+			Request:    displayReq,
 			IsHttps:    isHttpsVal,
 			URL:        urlStr,
 			RemoteAddr: httpctx.GetRemoteAddr(originReqIns),
-			Method:     lowhttp.GetHTTPRequestMethod(req),
+			Method:     lowhttp.GetHTTPRequestMethod(displayReq),
 			Status:     Hijack_Status_Request,
 		}
 
@@ -1316,9 +1321,14 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 		taskInfo := task.infoMessage
 
-		if viewReq, st, ok := lowhttp.AutoUnzipPacketEncoding(taskInfo.Request); ok && st != nil {
-			taskInfo.Request = viewReq
+		// Capture encoding from wire packet; UI shows plain (or truncated plain for oversized bodies).
+		if viewReq, st, ok := lowhttp.AutoUnzipPacketEncoding(wireReq); ok && st != nil {
 			hijackManger.autoUnzipRequest.Set(taskInfo.TaskID, st)
+			if httpctx.GetRequestTooLarge(originReqIns) && len(displayReq) > 0 {
+				taskInfo.Request = displayReq
+			} else {
+				taskInfo.Request = viewReq
+			}
 		}
 
 		httpctx.SetResponseContentTypeFiltered(originReqIns, func(t string) bool { // update callback set resp filter feedback
@@ -1695,17 +1705,25 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			})
 			if err != nil {
 				log.Errorf("create / save httpflow from mirror error: %s", err)
-			} else if needUpdate {
-				go func() {
-					<-colorCh
-					<-pluginCh
-					if tags != flow.Tags {
-						err := yakit.UpdateHTTPFlowTagsEx(flow)
-						if err != nil {
-							log.Errorf("update http flow tags error: %s", err)
+			} else {
+				if flow.IsTooLargeRequest && yakit.ShouldNotifyLargeHTTPFlowRequest() {
+					sendLogged(&ypb.MITMV2Response{
+						HaveNotification:    true,
+						NotificationContent: []byte(yakit.LargeHTTPFlowRequestUserNotice(flow)),
+					})
+				}
+				if needUpdate {
+					go func() {
+						<-colorCh
+						<-pluginCh
+						if tags != flow.Tags {
+							err := yakit.UpdateHTTPFlowTagsEx(flow)
+							if err != nil {
+								log.Errorf("update http flow tags error: %s", err)
+							}
 						}
-					}
-				}()
+					}()
+				}
 			}
 
 			log.Debugf("insert http flow %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
