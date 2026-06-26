@@ -1074,6 +1074,78 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 				"undecompilable method body",
 			},
 		},
+		{
+			file: "xmlbeans_qnamehelper.class",
+			desc: "XMLBeans QNameHelper.hexsafe reuses local slots between byte arrays, loop indexes, and catch parameters. " +
+				"Catch variables whose inferred type is polluted by a reused array slot must still render as catchable types, and loop index declarations must match their uses.",
+			mustContain: []string{
+				"public class QNameHelper",
+				"public static String hexsafe(String var0)",
+				"int var6 = 0",
+				"var5[var6]",
+				"catch(UnsupportedEncodingException var5_1)",
+			},
+			mustNotContain: []string{
+				"catch(byte[]",
+				"int var5_1 = 0",
+				"yak-decompiler",
+				"post-decompile syntax",
+				"undecompilable method body",
+			},
+		},
+		{
+			file: "elasticsearch_copy_on_write_hash_map_inner_node.class",
+			desc: "Elasticsearch CopyOnWriteHashMap.InnerNode.put reuses generic/object slots next to primitive parameters. " +
+				"Parameter rendering must keep generated names unique, and argument folding must not inline the empty parameter placeholder into method calls.",
+			mustContain: []string{
+				"class CopyOnWriteHashMap$InnerNode",
+				"CopyOnWriteHashMap$InnerNode<K, V> put(K var1, int var2, int var3, V var3_1, MutableValueInt var4)",
+				"return this.putExisting(var1,var2,var3,var7,var3_1,var4)",
+				"return this.putNew(var1,var6,var7,var3_1)",
+			},
+			mustNotContain: []string{
+				"int var3, V var3, MutableValueInt",
+				",,",
+				"yak-decompiler",
+				"post-decompile syntax",
+				"undecompilable method body",
+			},
+		},
+		{
+			file: "elasticsearch_client_interface_field.class",
+			desc: "Elasticsearch Client is an interface with a static final Setting field initialized in <clinit>. " +
+				"If the initializer cannot be hoisted, the field must still render as valid Java instead of being dropped.",
+			mustContain: []string{
+				"public interface Client",
+				"public static final Setting<String> CLIENT_TYPE_SETTING_S = null",
+				"public default Client getRemoteClusterClient(String var1)",
+			},
+			mustNotContain: []string{
+				"public static final Setting<String> CLIENT_TYPE_SETTING_S;",
+				"decompiled field org.elasticsearch.client.Client.CLIENT_TYPE_SETTING_S",
+				"yak-decompiler",
+				"post-decompile syntax",
+				"undecompilable method body",
+			},
+		},
+		{
+			file: "liquibase_co_this_slot_reuse.class",
+			desc: "Liquibase JsonNode-style at(ax) reuses local slot 0 as a loop cursor. " +
+				"Stores into slot 0 must render as a generated local instead of illegal assignment to this.",
+			mustContain: []string{
+				"public abstract class co",
+				"public final co at(ax var1)",
+				"co var0 = this",
+				"var0 = var3",
+				"return var0",
+			},
+			mustNotContain: []string{
+				"this =",
+				"yak-decompiler",
+				"post-decompile syntax",
+				"undecompilable method body",
+			},
+		},
 	}
 
 	for _, tc := range cases {

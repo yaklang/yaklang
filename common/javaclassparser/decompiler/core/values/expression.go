@@ -279,7 +279,13 @@ func (f *FunctionCallExpression) ArgumentStrings(funcCtx *class_context.ClassCon
 				arg = coerceBooleanArgument(arg)
 			}
 		}
-		paramStrs = append(paramStrs, arg.String(funcCtx))
+		argStr := arg.String(funcCtx)
+		if argStr == "" {
+			if ref, ok := arg.(*JavaRef); ok && ref != nil && ref.Id != nil {
+				argStr = ref.Id.String()
+			}
+		}
+		paramStrs = append(paramStrs, argStr)
 	}
 	return paramStrs
 }

@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"runtime/debug"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -487,6 +488,13 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 			}
 
 			fields = append(fields, dumped)
+		} else if c.isInterfaceLike() && slices.Contains(accessFlagsVerbose, "static") && slices.Contains(accessFlagsVerbose, "final") {
+			fields = append(fields, dumpedFields{
+				code:      fmt.Sprintf("%s %s %s = %s;", accessFlags, lastPacket, renderName, defaultInitializerForFieldType(lastPacket)),
+				fieldName: renderName,
+				modifier:  accessFlags,
+				typeName:  lastPacket,
+			})
 		} else {
 			// No initializer to emit (incl. blank finals assigned in the constructor /
 			// static block). A bogus `= 0` here would be illegal for reference types and is
@@ -500,6 +508,29 @@ func (c *ClassObjectDumper) DumpFields() ([]dumpedFields, error) {
 		}
 	}
 	return fields, nil
+}
+
+func defaultInitializerForFieldType(typeName string) string {
+	switch strings.TrimSpace(typeName) {
+	case "boolean":
+		return "false"
+	case "byte":
+		return "(byte)0"
+	case "char":
+		return "(char)0"
+	case "short":
+		return "(short)0"
+	case "int":
+		return "0"
+	case "long":
+		return "0L"
+	case "float":
+		return "0.0F"
+	case "double":
+		return "0.0D"
+	default:
+		return "null"
+	}
 }
 
 func (c *ClassObjectDumper) DumpAnnotation(anno *AnnotationAttribute) (string, error) {
@@ -947,6 +978,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 					}
 				}
 			}
+			ensureUniqueParameterNames(samParams, funcCtx)
 			paramsNewStrList := []string{}
 			if !isLambda && name != "<init>" && name != "<clinit>" && len(samParams) != descriptorParamCount {
 				paramSlotOffset := 0
@@ -1093,6 +1125,13 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 						// When upstream type inference degrades the exception variable to a
 						// primitive (e.g. "boolean" from a reused slot), fall back to Throwable
 						// so the output stays syntactically valid.
+						switch {
+						case strings.HasSuffix(excType, "[]"):
+							excType = "Throwable"
+						case excType == "boolean" || excType == "byte" || excType == "char" || excType == "short" ||
+							excType == "int" || excType == "long" || excType == "float" || excType == "double" || excType == "void":
+							excType = "Throwable"
+						}
 						switch excType {
 						case "boolean", "byte", "char", "short", "int", "long", "float", "double", "void":
 							excType = "Throwable"
@@ -1221,6 +1260,11 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				statementCodes = append(statementCodes, fmt.Sprintf("%sthrow new RuntimeException(\"incomplete control flow\");\n", c.GetTabString()))
 			}
 			sourceCode += supperInvokeStr + strings.Join(statementCodes, "")
+			receiverType := ""
+			if !funcCtx.IsStatic && name != "<clinit>" {
+				receiverType = c.GetConstructorMethodName()
+			}
+			sourceCode = addMissingGeneratedLocalDecls(sourceCode, paramsNewStr, receiverType)
 			code = sourceCode
 		}
 	}
@@ -1411,6 +1455,35 @@ func resolveLocalNameCollisions(params []values.JavaValue, body []statements.Sta
 	renameStatementsInScope(body, live)
 }
 
+func ensureUniqueParameterNames(params []values.JavaValue, funcCtx *class_context.ClassContext) {
+	seen := map[string]bool{}
+	for i, p := range params {
+		name := ""
+		if p != nil {
+			name = p.String(funcCtx)
+		}
+		if name == "" || seen[name] {
+			id := localDeclVarId(p)
+			if id == nil {
+				continue
+			}
+			base := name
+			if base == "" {
+				base = fmt.Sprintf("var%d", i)
+			}
+			for suffix := 1; ; suffix++ {
+				candidate := fmt.Sprintf("%s_%d", base, suffix)
+				if !seen[candidate] {
+					id.SetName(candidate)
+					name = candidate
+					break
+				}
+			}
+		}
+		seen[name] = true
+	}
+}
+
 func renameStatementsInScope(stmts []statements.Statement, live map[string]*utils2.VariableId) {
 	for _, st := range stmts {
 		switch s := st.(type) {
@@ -1457,11 +1530,76 @@ func renameStatementsInScope(stmts []statements.Statement, live map[string]*util
 // `this`, instance fields (this.x), and static members (Class.x) never render this way, so a
 // match means the expression depends on a method-scoped value.
 var localSlotRefRe = regexp.MustCompile(`\bvar\d+\b`)
+var generatedLocalRefRe = regexp.MustCompile(`\bvar\d+(?:_\d+)?\b`)
+var generatedLocalDeclRe = regexp.MustCompile(`\b(?:boolean|byte|char|short|int|long|float|double|String|[A-Za-z_$][A-Za-z0-9_$.<>?,]*(?:\[\])*)\s+(var\d+(?:_\d+)?)\b`)
+var mismatchedDoWhileIndexDeclRe = regexp.MustCompile(`int\s+(var\d+(?:_\d+)?)\s*=\s*0;\n(\s*)do\{\n(\s*)if \(\((var\d+)\) <`)
 
 // monitorTempAssignRe matches a dead synthetic monitor temp left in the synchronized()
 // argument position, e.g. `var2 = this.lock`, capturing the lock expression itself.
 var monitorTempAssignRe = regexp.MustCompile(`^var\d+ = (.+)$`)
 var doWhileBreakGuardRe = regexp.MustCompile(`^(\s*)if \(([^\n{}]*)\)\{\n\s*break;\n\s*\}else\{`)
+
+func addMissingGeneratedLocalDecls(body, params, receiverType string) string {
+	body = repairMismatchedDoWhileIndexDecls(body)
+	declared := map[string]bool{}
+	for _, match := range generatedLocalDeclRe.FindAllStringSubmatch(params+"\n"+body, -1) {
+		if len(match) > 1 {
+			declared[match[1]] = true
+		}
+	}
+	missing := []string{}
+	seen := map[string]bool{}
+	for _, name := range generatedLocalRefRe.FindAllString(body, -1) {
+		if (name != "var0" || receiverType == "") && declared[name] || seen[name] {
+			continue
+		}
+		seen[name] = true
+		missing = append(missing, name)
+	}
+	if len(missing) == 0 {
+		return body
+	}
+	sort.Slice(missing, func(i, j int) bool {
+		return missing[i] < missing[j]
+	})
+	lines := make([]string, 0, len(missing))
+	for _, name := range missing {
+		typ, zero := "Object", "null"
+		if name == "var0" && receiverType != "" {
+			typ, zero = receiverType, "this"
+		} else if generatedLocalLooksInt(body, name) {
+			typ, zero = "int", "0"
+		}
+		lines = append(lines, fmt.Sprintf("\t%s %s = %s;\n", typ, name, zero))
+	}
+	return "\n" + strings.Join(lines, "") + strings.TrimPrefix(body, "\n")
+}
+
+func repairMismatchedDoWhileIndexDecls(body string) string {
+	return mismatchedDoWhileIndexDeclRe.ReplaceAllStringFunc(body, func(match string) string {
+		parts := mismatchedDoWhileIndexDeclRe.FindStringSubmatch(match)
+		if len(parts) != 5 || parts[1] == parts[4] {
+			return match
+		}
+		return fmt.Sprintf("int %s = 0;\n%sdo{\n%sif ((%s) <", parts[4], parts[2], parts[3], parts[4])
+	})
+}
+
+func generatedLocalLooksInt(body, name string) bool {
+	quoted := regexp.QuoteMeta(name)
+	patterns := []string{
+		`\b` + quoted + `\s*(?:\+\+|--)`,
+		`(?:\+\+|--)\s*` + quoted + `\b`,
+		`\(` + quoted + `\)\s*(?:<|>|<=|>=|==|!=)`,
+		`\[\s*` + quoted + `\s*\]`,
+	}
+	for _, pattern := range patterns {
+		if regexp.MustCompile(pattern).MatchString(body) {
+			return true
+		}
+	}
+	return false
+}
 
 // canHoistFieldInitializer reports whether a `final`-field assignment found inside <init>/
 // <clinit> may be lifted into a field initializer. A real field initializer cannot reference

@@ -557,6 +557,9 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		if !reuseNullBranchStore {
 			ref, isFirst = runtimeStackSimulation.AssignVar(slot, value)
 		}
+		if slot == 0 && oldRef != nil && oldRef.IsThis && ref != nil && oldRef.VarUid == ref.VarUid {
+			ref.IsThis = false
+		}
 		if d.traceEnabled("slot-version") {
 			last := d.slotStoreTrace[slot]
 			oldType, newType := "<nil>", "<nil>"
@@ -2819,7 +2822,7 @@ func (d *Decompiler) ParseStatement() error {
 	})
 	uidToPairs.ForEach(func(uid string, pairs []*VarFoldRule) bool {
 		ref := uidToRef[uid]
-		val := GetRealValue(ref.Val)
+		val := GetRealValue(ref)
 		attr := d.delRefUserAttr[ref.VarUid]
 		if slices.Contains(disRefUid, ref.VarUid) {
 			d.tracef("var-fold", "skip disabled ref=%s pairs=%d", traceRef(ref, d.FunctionContext), len(pairs))
