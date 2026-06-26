@@ -59,12 +59,24 @@ type Scannerx struct {
 	FromPing             bool
 }
 
-var routeCache struct {
+type routeCacheEntry struct {
 	iface     *net.Interface
 	gatewayIP net.IP
 	srcIP     net.IP
 	err       error
-	once      sync.Once
+}
+
+var routeCache struct {
+	sync.Mutex
+	entries map[string]routeCacheEntry
+}
+
+var routeLookup = netutil.Route
+
+func resetRouteCache() {
+	routeCache.Lock()
+	defer routeCache.Unlock()
+	routeCache.entries = make(map[string]routeCacheEntry)
 }
 
 // toUint16 safely converts any numeric interface{} value to uint16.
@@ -102,10 +114,32 @@ func toUint16(v interface{}) uint16 {
 }
 
 func getRoute(sampleIP string) (*net.Interface, net.IP, net.IP, error) {
-	routeCache.once.Do(func() {
-		routeCache.iface, routeCache.gatewayIP, routeCache.srcIP, routeCache.err = netutil.Route(time.Second*2, sampleIP)
-	})
-	return routeCache.iface, routeCache.gatewayIP, routeCache.srcIP, routeCache.err
+	routeCache.Lock()
+	if routeCache.entries == nil {
+		routeCache.entries = make(map[string]routeCacheEntry)
+	}
+	entry, ok := routeCache.entries[sampleIP]
+	routeCache.Unlock()
+	if ok {
+		return entry.iface, entry.gatewayIP, entry.srcIP, entry.err
+	}
+
+	iface, gatewayIP, srcIP, err := routeLookup(time.Second*2, sampleIP)
+	entry = routeCacheEntry{
+		iface:     iface,
+		gatewayIP: gatewayIP,
+		srcIP:     srcIP,
+		err:       err,
+	}
+
+	routeCache.Lock()
+	if existing, ok := routeCache.entries[sampleIP]; ok {
+		routeCache.Unlock()
+		return existing.iface, existing.gatewayIP, existing.srcIP, existing.err
+	}
+	routeCache.entries[sampleIP] = entry
+	routeCache.Unlock()
+	return iface, gatewayIP, srcIP, err
 }
 
 func NewScannerx(ctx context.Context, sample string, config *SynxConfig) (*Scannerx, error) {
@@ -193,17 +227,24 @@ func (s *Scannerx) initEssentialInfo() error {
 	return nil
 }
 
-func (s *Scannerx) rateLimit() {
-	s.limiter.Wait(s.ctx)
+func (s *Scannerx) rateLimit() bool {
+	if err := s.limiter.Wait(s.ctx); err != nil {
+		return false
+	}
+	return true
 }
 
-func generateHostPort(nonExcludedHosts []string, nonExcludedPorts []int) <-chan *SynxTarget {
+func generateHostPort(ctx context.Context, nonExcludedHosts []string, nonExcludedPorts []int) <-chan *SynxTarget {
 	out := make(chan *SynxTarget)
 	go func() {
 		defer close(out)
 		for _, host := range nonExcludedHosts {
 			for _, port := range nonExcludedPorts {
-				out <- &SynxTarget{Host: host, Port: port}
+				select {
+				case <-ctx.Done():
+					return
+				case out <- &SynxTarget{Host: host, Port: port}:
+				}
 			}
 		}
 	}()
@@ -224,11 +265,13 @@ func (s *Scannerx) SubmitTarget(targets, ports string) (<-chan *SynxTarget, erro
 	tgCh := make(chan *SynxTarget)
 	go func() {
 		defer close(tgCh)
-		for hp := range generateHostPort(nonExcludedHosts, nonExcludedPorts) {
+		for hp := range generateHostPort(s.ctx, nonExcludedHosts, nonExcludedPorts) {
 			host := hp.Host
 			port := hp.Port
 
-			s.rateLimit()
+			if !s.rateLimit() {
+				return
+			}
 			if s.config.maxOpenPorts > 0 {
 				v, ok := s.ipOpenPortMap.Load(host)
 				if ok && toUint16(v) >= s.config.maxOpenPorts {
@@ -295,13 +338,15 @@ func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string) <-chan *S
 					s.arp(host)
 				}
 				for _, port := range nonExcludedPorts {
-					s.rateLimit()
-				if s.config.maxOpenPorts > 0 {
-					v, ok := s.ipOpenPortMap.Load(host)
-					if ok && toUint16(v) >= s.config.maxOpenPorts {
-						break
+					if !s.rateLimit() {
+						return
 					}
-				}
+					if s.config.maxOpenPorts > 0 {
+						v, ok := s.ipOpenPortMap.Load(host)
+						if ok && toUint16(v) >= s.config.maxOpenPorts {
+							break
+						}
+					}
 					s.callOnSubmitTask(host, port)
 					proto, p := utils.ParsePortToProtoPort(port)
 					target := &SynxTarget{
@@ -429,10 +474,9 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 		}
 	}
 
-	wCtx, wCancel := context.WithCancel(context.Background())
+	wCtx, wCancel := context.WithCancel(s.ctx)
 	// 异步执行扫描流程
 	go func() {
-		s.initHandlerStart(wCtx)
 		defer func() {
 			if err := recover(); err != nil {
 				utils.PrintCurrentGoroutineRuntimeStack()
@@ -445,12 +489,21 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 			close(s.LoopPacket)
 		}()
 
+		if err := s.initHandlerStart(wCtx); err != nil {
+			log.Debugf("synscanx handler start stopped: %v", err)
+			return
+		}
+
 		if !s.FromPing {
 			s.arpScan()
-			time.Sleep(1 * time.Second)
+			if !s.waitOrCanceled(time.Second) {
+				return
+			}
 		}
 		s.sendPacket(targetCh)
-		time.Sleep(s.config.waiting)
+		if !s.waitOrCanceled(s.config.waiting) {
+			return
+		}
 		log.Debugf("waiting for all packet in %0.2fs", s.config.waiting.Seconds())
 		countOnce.Do(func() {
 			log.Infof("alive host count: %d open port count: %d cost: %v", len(ipCountMap), openPortCount, time.Since(s.startTime))
@@ -477,10 +530,8 @@ func (s *Scannerx) sendPacket(targetCh <-chan *SynxTarget) {
 				log.Debugf("assemble packet failed: %v", err)
 				continue
 			}
-			if utils.IsLoopback(host) {
-				s.LoopPacket <- packet
-			} else {
-				s.PacketChan <- packet
+			if !s.enqueuePacket(host, packet) {
+				return
 			}
 			//err = s.Handle.WritePacketData(packet)
 			//if err != nil {
@@ -488,6 +539,35 @@ func (s *Scannerx) sendPacket(targetCh <-chan *SynxTarget) {
 			//	continue
 			//}
 		}
+	}
+}
+
+func (s *Scannerx) enqueuePacket(host string, packet []byte) bool {
+	out := s.PacketChan
+	if utils.IsLoopback(host) {
+		out = s.LoopPacket
+	}
+
+	select {
+	case <-s.ctx.Done():
+		return false
+	case out <- packet:
+		return true
+	}
+}
+
+func (s *Scannerx) waitOrCanceled(d time.Duration) bool {
+	if d <= 0 {
+		return true
+	}
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+
+	select {
+	case <-s.ctx.Done():
+		return false
+	case <-timer.C:
+		return true
 	}
 }
 
