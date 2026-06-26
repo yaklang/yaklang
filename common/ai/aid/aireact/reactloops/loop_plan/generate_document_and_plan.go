@@ -198,14 +198,20 @@ func generatePlanFromDocument(loop *reactloops.ReActLoop, task aicommon.AIStatef
 		return ""
 	}
 
+	return buildPlanDataFromLiteForgeAction(action, "plan from document")
+}
+
+func buildPlanDataFromLiteForgeAction(action *aicommon.Action, source string) string {
+	if action == nil {
+		return ""
+	}
 	tasks := action.GetInvokeParamsArray("tasks")
 	if action.GetString("main_task") == "" || action.GetString("main_task_goal") == "" || len(tasks) == 0 {
-		log.Warnf("plan loop: plan from document has missing required fields")
+		log.Warnf("plan loop: %s has missing required fields", source)
 		return ""
 	}
 
 	taskPayload := serializeTaskParams(tasks)
-
 	payload := map[string]any{
 		"@action":        "plan",
 		"main_task":      action.GetString("main_task"),
@@ -215,8 +221,86 @@ func generatePlanFromDocument(loop *reactloops.ReActLoop, task aicommon.AIStatef
 	if identifier := action.GetString("main_task_identifier"); identifier != "" {
 		payload["main_task_identifier"] = identifier
 	}
-	log.Infof("plan loop: plan generated from document successfully (%d subtasks)", len(taskPayload))
+	log.Infof("plan loop: %s generated successfully (%d subtasks)", source, len(taskPayload))
 	return string(utils.Jsonify(payload))
+}
+
+func generateDirectPlanFromUserInput(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) string {
+	invoker := loop.GetInvoker()
+	ctx := invoker.GetConfig().GetContext()
+	if task != nil && !utils.IsNil(task.GetContext()) {
+		ctx = task.GetContext()
+	}
+
+	userInput := ""
+	if task != nil {
+		userInput = task.GetUserInput()
+	}
+
+	templateData := loop.GetBaseFrameContext()
+	templateData["UserInput"] = userInput
+	templateData["Facts"] = loop.Get(PLAN_FACTS_KEY)
+	templateData["Context"] = getLoopTaskContext(loop)
+
+	prompt, err := utils.RenderTemplate(planDirectPrompt, templateData)
+	if err != nil {
+		log.Warnf("plan loop: render plan_direct prompt failed: %v", err)
+		return ""
+	}
+
+	taskIndex := ""
+	if task != nil {
+		taskIndex = task.GetId()
+	}
+
+	action, err := invoker.InvokeSpeedPriorityLiteForge(
+		ctx,
+		"plan_direct",
+		prompt,
+		[]aitool.ToolOption{
+			aitool.WithStringParam("main_task", aitool.WithParam_Required(true)),
+			aitool.WithStringParam("main_task_identifier"),
+			aitool.WithStringParam("main_task_goal", aitool.WithParam_Required(true)),
+			aitool.WithStructArrayParam(
+				"tasks",
+				nil,
+				nil,
+				aitool.WithStringParam("subtask_name", aitool.WithParam_Required(true)),
+				aitool.WithStringParam("subtask_identifier"),
+				aitool.WithStringParam("subtask_goal", aitool.WithParam_Required(true)),
+				aitool.WithStringArrayParam("depends_on"),
+				aitool.WithStructArrayParam(
+					"sub_subtasks",
+					nil,
+					nil,
+					aitool.WithStringParam("subtask_name", aitool.WithParam_Required(true)),
+					aitool.WithStringParam("subtask_identifier"),
+					aitool.WithStringParam("subtask_goal", aitool.WithParam_Required(true)),
+					aitool.WithStringArrayParam("depends_on"),
+				),
+			),
+		},
+		aicommon.WithGeneralConfigStreamableFieldEmitterCallback(
+			[]string{"tasks"},
+			func(key string, r io.Reader, emitter *aicommon.Emitter) {
+				if emitter == nil {
+					io.Copy(io.Discard, r)
+					return
+				}
+				pr, pw := io.Pipe()
+				go func() {
+					defer pw.Close()
+					planTasksStreamHandler(r, pw)
+				}()
+				emitter.EmitTextMarkdownStreamEvent(PlanTasksAINodeID, pr, taskIndex)
+			},
+		),
+	)
+	if err != nil {
+		log.Warnf("plan loop: generate direct plan failed: %v", err)
+		return ""
+	}
+	return buildPlanDataFromLiteForgeAction(action, "direct plan")
 }
 
 func serializeTaskParams(tasks []aitool.InvokeParams) []map[string]any {

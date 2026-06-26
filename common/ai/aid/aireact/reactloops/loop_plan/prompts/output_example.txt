@@ -1,3 +1,27 @@
+#### **0. 当目标明确、流程清晰时，使用 `generate_direct_plan`**
+
+**使用场景:**
+用户目标明确、执行路径可从诉求直接推导，且无需先探索未知环境。结合时间线、记忆与意图识别结果自行判断后，直接调用此 action 生成简洁计划。
+
+```json
+{
+    "@action": "generate_direct_plan",
+    "human_readable_thought": "用户目标明确，步骤可从诉求直接推导，直接生成计划"
+}
+```
+
+#### **0b. 当需要先探索再规划时，使用信息收集工具或 `begin_deep_planning`**
+
+**使用场景:**
+若发现目标环境未知、需要先收集事实，调用信息收集工具进入深度探索；若已尝试直接规划路径但判断有误，可调用 `begin_deep_planning` 显式切换。
+
+```json
+{
+    "@action": "begin_deep_planning",
+    "human_readable_thought": "需要先了解项目结构/目标环境，切换到深度规划"
+}
+```
+
 #### **1. 当你需要了解项目结构来辅助规划时，使用 `find_files`**
 
 **使用场景:**

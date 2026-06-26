@@ -1,4 +1,21 @@
-{{ if not .FileResults }}{{ if not .WebResults }}{{ if not .Enhance }}{{ if not .ReconResults }}## 探索优先提示
+{{ if eq .PlanMode "simple" }}## 直接规划模式
+
+你已选择直接规划。请调用 `generate_direct_plan` 完成规划，无需信息收集或 `finish_exploration`。
+{{ if .PlanModeReason }}
+选择理由：{{ .PlanModeReason }}
+{{ end }}
+{{ if .IsLastIteration }}
+## **重要：最后一轮迭代（直接规划模式）**
+
+这是规划循环的最后一轮。你**必须**在本轮调用 `generate_direct_plan` 生成计划。
+{{ end }}
+{{ else }}{{ if eq .PlanMode "" }}
+## 规划路径待选择
+
+请结合时间线、记忆与意图识别结果，在本轮选择一条路径：
+- 目标清晰、步骤可推导 → `generate_direct_plan`
+- 需先摸底、侦查或收集事实 → 调用信息收集工具（进入深度探索规划）
+{{ end }}{{ if eq .PlanMode "deep" }}{{ if not .FileResults }}{{ if not .WebResults }}{{ if not .Enhance }}{{ if not .ReconResults }}## 探索优先提示
 
 当前尚未收集到任何事实数据（无文件信息、无搜索结果、无补充知识、无网络侦查结果）。**禁止**在此阶段直接调用 `finish_exploration`——没有事实数据支撑的计划只会是空泛的模板。
 
@@ -18,7 +35,7 @@
 - **`simple_crawler`** — 爬取目标 Web 应用，获取真实的 URL 结构、页面和入口点
 
 这些工具的执行结果将作为后续自动生成计划的事实依据。
-{{ end }}{{ end }}{{ end }}{{ end }}{{/*
+{{ end }}{{ end }}{{ end }}{{ end }}{{ end }}{{/*
 
 */}}{{if .Facts}}## 规划事实库（FACTS）
 
@@ -78,10 +95,14 @@ EVIDENCE 多处重复出现。
 {{ .ReconResults }}
 <|RECON_RESULTS_END_{{ .Nonce }}|>{{end}}{{/*
 
-*/}}{{ if .IsLastIteration }}
-## **重要：最后一轮迭代**
+*/}}{{ if and .IsLastIteration (eq .PlanMode "deep") }}
+## **重要：最后一轮迭代（深度探索模式）**
 
 这是规划循环的最后一轮迭代。你**必须**在本轮调用 `finish_exploration` 结束探索阶段，不可以再执行任何信息收集操作（search_knowledge、read_file、find_files、grep_text、web_search、scan_port、simple_crawler、loading_skills 均已移除）。
 系统将在探索结束后基于当前已有的所有信息自动生成指导性文档和执行计划。
 即使信息收集不够完整，系统也会尽最大努力基于已有 FACTS 生成可执行的计划。
-{{ end }}
+{{ end }}{{ if and .IsLastIteration (eq .PlanMode "") }}
+## **重要：最后一轮迭代（待选择路径）**
+
+这是规划循环的最后一轮。你**必须**在本轮产出 plan：若目标已清晰则 `generate_direct_plan`；若已收集事实则 `finish_exploration`。
+{{ end }}{{ end }}

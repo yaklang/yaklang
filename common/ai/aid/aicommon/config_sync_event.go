@@ -244,6 +244,9 @@ func (c *Config) HandleSyncPlanExecTasksEvent(event *ypb.AIInputEvent) error {
 
 	items := make([]map[string]interface{}, 0, len(records))
 	for _, r := range records {
+		if !ShouldExposePlanExecTaskRecord(r.TaskProgress) {
+			continue
+		}
 		items = append(items, map[string]interface{}{
 			"session_id":      r.SessionID,
 			"coordinator_id":  r.CoordinatorID,

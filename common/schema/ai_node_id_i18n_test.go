@@ -16,6 +16,7 @@ func TestNodeIdI18n_RequiredNodeIds(t *testing.T) {
 		{"ai-error", "AI 调用错误", "AI Invocation Error"},
 		{"rate-limit", "请求限频", "Rate Limited"},
 		{"notify", "系统通知", "System Notification"},
+		{"plan-mode", "规划模式", "Plan Mode"},
 	}
 
 	for _, tc := range requiredNodeIds {

@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	detachedPlanPhasePendingApproval = "plan_pending_approval"
+	detachedPlanPhasePendingApproval = aicommon.PlanExecPhaseDetachedPendingApproval
 )
 
 type detachedPlanProgress struct {
@@ -80,8 +80,86 @@ func (r *ReAct) PublishDetachedPlan(ctx context.Context, input *aicommon.Execute
 		"plans_id":       uuid.New().String(),
 	}
 	r.EmitJSON(schema.EVENT_TYPE_DETACHED_PLAN_REQUIRE, "detached-plan", reqs)
+	r.AddToTimeline("DETACHED_PLAN", formatDetachedPlanTimelineContent(
+		coordinatorID,
+		r.config.PersistentSessionId,
+		reactTaskID,
+		rootTask,
+		input,
+	))
 	log.Infof("detached plan published: coordinator=%s session=%s react_task=%s", coordinatorID, r.config.PersistentSessionId, reactTaskID)
 	return coordinatorID, nil
+}
+
+func formatDetachedPlanTimelineContent(
+	coordinatorID, sessionID, reactTaskID string,
+	rootTask *aid.AiTask,
+	input *aicommon.ExecutePlanInput,
+) string {
+	var sb strings.Builder
+	sb.WriteString("detached plan published (pending user approval)\n")
+	sb.WriteString(fmt.Sprintf("coordinator_id: %s\n", coordinatorID))
+	if sessionID != "" {
+		sb.WriteString(fmt.Sprintf("session_id: %s\n", sessionID))
+	}
+	if reactTaskID != "" {
+		sb.WriteString(fmt.Sprintf("react_task_id: %s\n", reactTaskID))
+	}
+	if input != nil && strings.TrimSpace(input.PlanPayload) != "" {
+		sb.WriteString(fmt.Sprintf("plan_request_payload: %s\n", strings.TrimSpace(input.PlanPayload)))
+	}
+
+	if rootTask != nil {
+		if name := strings.TrimSpace(rootTask.Name); name != "" {
+			sb.WriteString(fmt.Sprintf("\n# %s\n", name))
+		}
+		if goal := strings.TrimSpace(rootTask.Goal); goal != "" {
+			sb.WriteString(fmt.Sprintf("main_task_goal: %s\n", goal))
+		}
+		if subs := rootTask.Subtasks; len(subs) > 0 {
+			sb.WriteString("\n## plan_tasks\n")
+			appendDetachedPlanTaskLines(&sb, subs, 0)
+		}
+	}
+
+	if input != nil {
+		if facts := strings.TrimSpace(input.PlanFacts); facts != "" {
+			sb.WriteString("\n## plan_facts\n")
+			sb.WriteString(facts)
+			sb.WriteRune('\n')
+		}
+		if document := strings.TrimSpace(input.PlanDocument); document != "" {
+			sb.WriteString("\n## plan_document\n")
+			sb.WriteString(document)
+			sb.WriteRune('\n')
+		}
+		if planData := strings.TrimSpace(input.PlanData); planData != "" {
+			sb.WriteString("\n## plan_data\n")
+			sb.WriteString(planData)
+			sb.WriteRune('\n')
+		}
+	}
+	return strings.TrimSpace(sb.String())
+}
+
+func appendDetachedPlanTaskLines(sb *strings.Builder, tasks []*aid.AiTask, depth int) {
+	indent := strings.Repeat("  ", depth)
+	for i, task := range tasks {
+		if task == nil {
+			continue
+		}
+		name := strings.TrimSpace(task.Name)
+		if name == "" {
+			name = fmt.Sprintf("subtask-%d", i+1)
+		}
+		sb.WriteString(fmt.Sprintf("%s- %s\n", indent, name))
+		if goal := strings.TrimSpace(task.Goal); goal != "" {
+			sb.WriteString(fmt.Sprintf("%s  goal: %s\n", indent, goal))
+		}
+		if len(task.Subtasks) > 0 {
+			appendDetachedPlanTaskLines(sb, task.Subtasks, depth+1)
+		}
+	}
 }
 
 func (r *ReAct) buildRootTaskForDetachedPlan(ctx context.Context, planPayload string, input *aicommon.ExecutePlanInput) (*aid.AiTask, error) {
@@ -177,6 +255,10 @@ func (r *ReAct) HandleSyncTypeExecuteDetachedPlanEvent(event *ypb.AIInputEvent) 
 	if sessionID != "" {
 		record.SessionID = sessionID
 	}
+	record.TaskProgress = string(utils.Jsonify(&aid.PlanAndExecProgress{
+		Phase:     aid.Phase_NotCompleted,
+		UpdatedAt: time.Now().Unix(),
+	}))
 	if err := yakit.CreateOrUpdateAISessionPlanAndExec(db, record); err != nil {
 		r.EmitSyncEventError("execute_detached_plan", err, event.SyncID)
 		return nil
