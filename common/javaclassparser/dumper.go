@@ -655,6 +655,30 @@ func isUnconditionalTerminalStatement(st statements.Statement, funcCtx *class_co
 	return false
 }
 
+func needsTrailingIncompleteControlFlowThrow(statementList []statements.Statement, returnType types.JavaType, funcCtx *class_context.ClassContext) bool {
+	if returnType == nil || returnType.String(funcCtx) == "void" {
+		return false
+	}
+	for i := len(statementList) - 1; i >= 0; i-- {
+		st := statementList[i]
+		switch st.(type) {
+		case *statements.MiddleStatement, *statements.StackAssignStatement:
+			continue
+		}
+		switch s := st.(type) {
+		case *statements.DoWhileStatement:
+			return loopConditionIsConstTrue(s.ConditionValue, funcCtx) &&
+				loopBodyHasEscapingBreak(s.Body, s.Label, true, funcCtx)
+		case *statements.WhileStatement:
+			return loopConditionIsConstTrue(s.ConditionValue, funcCtx) &&
+				loopBodyHasEscapingBreak(s.Body, "", true, funcCtx)
+		default:
+			return false
+		}
+	}
+	return false
+}
+
 // loopConditionIsConstTrue reports whether a loop condition is the literal true (an infinite loop).
 func loopConditionIsConstTrue(cond values.JavaValue, funcCtx *class_context.ClassContext) bool {
 	return cond != nil && strings.TrimSpace(cond.String(funcCtx)) == "true"
@@ -959,6 +983,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 			resolveLocalNameCollisions(params, statementList)
 
 			sourceCode := "\n"
+			hoistableStaticInitLocals := map[string]string{}
 			statementSet := utils.NewSet[statements.Statement]()
 			var statementToString func(statement statements.Statement) string
 			var statementListToString func(statements []statements.Statement) string
@@ -998,7 +1023,15 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				switch ret := statement.(type) {
 				case *statements.AssignStatement:
 					foundFieldInit := false
-					if v, ok := ret.LeftValue.(*values.RefMember); ok {
+					if ret.LeftValue != nil && ret.JavaValue != nil && funcCtx.FunctionName == "<clinit>" && classStaticInitializersMustHoist {
+						if ref, ok := ret.LeftValue.(*values.JavaRef); ok && !ref.IsThis {
+							if rhs := ret.JavaValue.String(funcCtx); canHoistFieldValueInitializer(ret.JavaValue, rhs) {
+								hoistableStaticInitLocals[strings.TrimSpace(ref.String(funcCtx))] = rhs
+								foundFieldInit = true
+							}
+						}
+					}
+					if v, ok := ret.LeftValue.(*values.RefMember); ok && ret.JavaValue != nil {
 						obj := core.UnpackSoltValue(v.Object)
 						if v1, ok := obj.(*values.JavaRef); ok && v1.IsThis && (funcCtx.FunctionName == "<init>" || funcCtx.FunctionName == funcCtx.ClassName) {
 							if _, ok := finalFieldMap[v.Member]; ok {
@@ -1008,7 +1041,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 								}
 							}
 						}
-					} else if v, ok := ret.LeftValue.(*values.JavaClassMember); ok {
+					} else if v, ok := ret.LeftValue.(*values.JavaClassMember); ok && ret.JavaValue != nil {
 						if (funcCtx.FunctionName == "<clinit>" && classStaticInitializersMustHoist) || v.Name == funcCtx.ClassName {
 							if _, ok := finalFieldMap[v.Member]; ok {
 								if rhs := ret.JavaValue.String(funcCtx); canHoistFieldValueInitializer(ret.JavaValue, rhs) {
@@ -1018,13 +1051,19 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 							}
 						}
 					}
-					if !foundFieldInit && funcCtx.FunctionName == "<clinit>" && classStaticInitializersMustHoist {
+					if !foundFieldInit && ret.LeftValue != nil && ret.JavaValue != nil && funcCtx.FunctionName == "<clinit>" && classStaticInitializersMustHoist {
 						lhs := strings.TrimSpace(ret.LeftValue.String(funcCtx))
 						if strings.HasPrefix(lhs, c.GetConstructorMethodName()+".") {
 							lhs = strings.TrimPrefix(lhs, c.GetConstructorMethodName()+".")
 						}
 						if rawName, ok := finalFieldRenderNameToRaw[lhs]; ok {
-							if rhs := ret.JavaValue.String(funcCtx); canHoistFieldValueInitializer(ret.JavaValue, rhs) {
+							rhs := ret.JavaValue.String(funcCtx)
+							if ref, ok := values.UnpackSoltValue(ret.JavaValue).(*values.JavaRef); ok {
+								if localInit, ok := hoistableStaticInitLocals[strings.TrimSpace(ref.String(funcCtx))]; ok {
+									rhs = localInit
+								}
+							}
+							if canHoistFieldValueInitializer(ret.JavaValue, rhs) {
 								foundFieldInit = true
 								c.fieldDefaultValue[rawName] = rhs
 							}
@@ -1176,6 +1215,10 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				// The only super() call in an enum constructor is the synthetic
 				// super(name, ordinal); enum constructors cannot call super explicitly.
 				supperInvokeStr = ""
+			}
+			if name != "<init>" && name != "<clinit>" &&
+				needsTrailingIncompleteControlFlowThrow(statementList, methodType.FunctionType().ReturnType, funcCtx) {
+				statementCodes = append(statementCodes, fmt.Sprintf("%sthrow new RuntimeException(\"incomplete control flow\");\n", c.GetTabString()))
 			}
 			sourceCode += supperInvokeStr + strings.Join(statementCodes, "")
 			code = sourceCode
@@ -1809,6 +1852,13 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 				res = retry
 				err = nil
 			}
+		}
+		if name == "<clinit>" && c.isInterfaceLike() {
+			// Interfaces and annotations cannot declare a source-level static initializer.
+			// DumpMethodWithInitialId has already hoisted any representable final-field
+			// assignments into field initializers; leftover helper-array stores have no legal
+			// method form and must not be emitted only to be dropped by the syntax safety net.
+			continue
 		}
 		if err != nil {
 			// Graceful degradation: an un-decompilable method body must not fail the whole

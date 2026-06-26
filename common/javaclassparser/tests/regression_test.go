@@ -1023,6 +1023,57 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 				"undecompilable method body",
 			},
 		},
+		{
+			file: "ecj_scope_return_nil_type.class",
+			desc: "Eclipse ECJ Scope.findMethod can return a value whose inferred JavaValue.Type is nil on one reconstructed path. " +
+				"Return type alignment must skip nil value types instead of panicking.",
+			mustContain: []string{
+				"public abstract class Scope",
+				"public MethodBinding findMethod(ReferenceBinding var1, char[] var2, TypeBinding[] var3, InvocationSite var4)",
+				"public MethodBinding findMethod(ReferenceBinding var1, char[] var2, TypeBinding[] var3, InvocationSite var4, boolean var5)",
+				"MethodVerifier var14 = this.environment().methodVerifier()",
+			},
+			mustNotContain: []string{
+				"yak-decompiler",
+				"panic: runtime error",
+				"nil pointer dereference",
+				"undecompilable method body",
+			},
+		},
+		{
+			file: "ecj_type_constants_interface_clinit.class",
+			desc: "ECJ TypeConstants is an interface whose <clinit> initializes final fields through a temporary local. " +
+				"The temporary must be hoisted into field initializers because interface static blocks are invalid Java.",
+			mustContain: []string{
+				"public interface TypeConstants",
+				"public static final char[][][] OTHER_WRAPPER_CLOSEABLES = new char[5][][]",
+				"public static final char[][] JAVA_IO_RESOURCE_FREE_CLOSEABLES = new char[][]",
+				"public static final char[] PACKAGE_INFO_NAME = \"package-info\".toCharArray()",
+			},
+			mustNotContain: []string{
+				"static  {",
+				"yak-decompiler",
+				"panic: runtime error",
+				"undecompilable method body",
+			},
+		},
+		{
+			file: "ecj_javadoc_tag_constants_interface_clinit.class",
+			desc: "ECJ JavadocTagConstants uses interface <clinit> locals for multi-dimensional char array constants. " +
+				"The decompiler must emit legal field initializers rather than an invalid static block.",
+			mustContain: []string{
+				"public interface JavadocTagConstants",
+				"public static final char[][][] BLOCK_TAGS = new char[8][][]",
+				"public static final char[][][] INLINE_TAGS = new char[8][][]",
+				"public static final int ALL_TAGS_LENGTH = (BLOCK_TAGS_LENGTH) + (INLINE_TAGS_LENGTH)",
+			},
+			mustNotContain: []string{
+				"static  {",
+				"yak-decompiler",
+				"panic: runtime error",
+				"undecompilable method body",
+			},
+		},
 	}
 
 	for _, tc := range cases {

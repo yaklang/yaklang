@@ -84,6 +84,30 @@ type Decompiler struct {
 	// construction). Threaded from ClassObjectDumper.aggressive via the rewriter.
 	Aggressive bool
 }
+
+func resetJavaValueTypeSafe(v values.JavaValue, target types.JavaType) {
+	if v == nil || target == nil {
+		return
+	}
+	defer func() {
+		_ = recover()
+	}()
+	if typ := v.Type(); typ != nil {
+		typ.ResetType(target)
+	}
+}
+
+func resetReturnValueTypeSafe(v values.JavaValue, funcCtx *class_context.ClassContext) {
+	if funcCtx == nil {
+		return
+	}
+	funcType, ok := funcCtx.FunctionType.(*types.JavaFuncType)
+	if !ok || funcType == nil {
+		return
+	}
+	resetJavaValueTypeSafe(v, funcType.ReturnType)
+}
+
 type VarFoldRule struct {
 	Replace          func(v values.JavaValue)
 	CurrentOpcode    *OpCode
@@ -865,11 +889,11 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		runtimeStackSimulation.Pop()
 	case OP_IRETURN:
 		v := runtimeStackSimulation.Pop().(values.JavaValue)
-		v.Type().ResetType(funcCtx.FunctionType.(*types.JavaFuncType).ReturnType)
+		resetReturnValueTypeSafe(v, funcCtx)
 		statements.NewReturnStatement(v)
 	case OP_ARETURN, OP_LRETURN, OP_DRETURN, OP_FRETURN:
 		v := runtimeStackSimulation.Pop().(values.JavaValue)
-		v.Type().ResetType(funcCtx.FunctionType.(*types.JavaFuncType).ReturnType)
+		resetReturnValueTypeSafe(v, funcCtx)
 		statements.NewReturnStatement(v)
 	case OP_GETFIELD:
 		index := Convert2bytesToInt(opcode.Data)
@@ -2208,7 +2232,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 							}
 						} else {
 							newValue := values.NewTernaryExpression(conditionSlotForIfNode(opCode), ternaryExpMergeNodeSlot[code].GetValue(), target.StackEntry.value)
-							newValue.Type().ResetType(ternaryExpMergeNodeSlot[code].TmpType)
+							resetJavaValueTypeSafe(newValue, ternaryExpMergeNodeSlot[code].TmpType)
 							newValue.ConditionFromOp = opCode.Id
 							opCode.TernaryChainArm = true
 							ifNodeToConditionCallback[opCode] = func(value values.JavaValue) {
@@ -2244,7 +2268,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 							}
 						} else {
 							newValue := values.NewTernaryExpression(conditionSlotForIfNode(opCode), target.StackEntry.value, ternaryExpMergeNodeSlot[code].GetValue())
-							newValue.Type().ResetType(ternaryExpMergeNodeSlot[code].TmpType)
+							resetJavaValueTypeSafe(newValue, ternaryExpMergeNodeSlot[code].TmpType)
 							newValue.ConditionFromOp = opCode.Id
 							opCode.TernaryChainArm = true
 							ifNodeToConditionCallback[opCode] = func(value values.JavaValue) {
@@ -2547,11 +2571,11 @@ func (d *Decompiler) ParseStatement() error {
 			}))
 		case OP_IRETURN:
 			v := opcode.stackConsumed[0]
-			v.Type().ResetType(funcCtx.FunctionType.(*types.JavaFuncType).ReturnType)
+			resetReturnValueTypeSafe(v, funcCtx)
 			appendNode(statements.NewReturnStatement(v))
 		case OP_ARETURN, OP_LRETURN, OP_DRETURN, OP_FRETURN:
 			v := opcode.stackConsumed[0]
-			v.Type().ResetType(funcCtx.FunctionType.(*types.JavaFuncType).ReturnType)
+			resetReturnValueTypeSafe(v, funcCtx)
 			appendNode(statements.NewReturnStatement(v))
 		case OP_GETFIELD:
 		case OP_GETSTATIC:
