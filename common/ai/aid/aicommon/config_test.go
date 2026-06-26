@@ -224,6 +224,21 @@ func TestConfig_ConvertConfigToOptions_PropagatesTimelineArchiveStore(t *testing
 	require.True(t, got == store)
 }
 
+type stubBrowserSessionTracker struct{}
+
+func (stubBrowserSessionTracker) TrackBrowserSession(id string)   {}
+func (stubBrowserSessionTracker) UntrackBrowserSession(id string) {}
+
+func TestConfig_ConvertConfigToOptions_PropagatesBrowserSessionTracker(t *testing.T) {
+	parent := NewConfig(context.Background())
+	tracker := stubBrowserSessionTracker{}
+	parent.SetBrowserSessionTracker(tracker)
+
+	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
+
+	require.Equal(t, tracker, child.GetBrowserSessionTracker())
+}
+
 func TestConfig_CreateOrUpdateRuntimeRecord(t *testing.T) {
 	runtimeUUID := uuid.NewString()
 	config := NewConfig(context.Background(), WithID(runtimeUUID))

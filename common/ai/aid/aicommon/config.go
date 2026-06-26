@@ -4068,6 +4068,16 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 
 	opts = append(opts, WithContext(i.Ctx))
 
+	// Propagate browser session tracker so child invokers (P&E, focus loops)
+	// record browser.Open ids on the parent ReAct session for cleanup.
+	if i.browserSessionTracker != nil {
+		tracker := i.browserSessionTracker
+		opts = append(opts, func(c *Config) error {
+			c.browserSessionTracker = tracker
+			return nil
+		})
+	}
+
 	return opts
 }
 
