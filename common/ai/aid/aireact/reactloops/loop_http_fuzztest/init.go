@@ -60,7 +60,7 @@ func init() {
 					requestReviewDecision := loop.Get("request_review_decision")
 					representativeRequest := getLoopRepresentativeRequestForPrompt(loop)
 					uploadRequestSummary := loop.Get(loopHTTPUploadRequestSummaryKey)
-					representativeResponse := loop.Get("representative_response")
+					representativeResponse := getLoopRepresentativeResponseForPrompt(loop)
 					representativeHiddenIndex := loop.Get("representative_httpflow_hidden_index")
 					diffResult := loop.Get("diff_result")
 					verificationResult := loop.Get("verification_result")

@@ -213,6 +213,9 @@ func applyLoopHTTPFuzzSessionContext(loop *reactloops.ReActLoop, runtime aicommo
 	loop.Set("representative_request", ctx.RepresentativeRequest)
 	loop.Set("representative_response", ctx.RepresentativeResponse)
 	loop.Set("representative_httpflow_hidden_index", ctx.RepresentativeHiddenIndex)
+	// 恢复会话时同样收敛代表性请求/响应的 prompt 安全版本，避免大原始包重新注入 LLM 上下文。
+	loop.Set(loopHTTPUploadRepresentativeSafeKey, sanitizeRequestTextForPrompt(ctx.RepresentativeRequest))
+	loop.Set(loopHTTPUploadRepresentativeResponseSafeKey, sanitizeResponseTextForPrompt(ctx.RepresentativeResponse))
 	loop.Set("diff_result", ctx.AnalysisSummary)
 	loop.Set("diff_result_analysis", ctx.AnalysisSummary)
 	loop.Set("diff_result_compressed", "")
