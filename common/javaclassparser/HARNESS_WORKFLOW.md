@@ -168,6 +168,12 @@ go test -run TestM2RegressionHarness -v ./common/javaclassparser/tests/
 diff <(head -1 /tmp/m2-before.txt) <(head -1 /tmp/m2-after.txt)
 ```
 
+### 4a. 2026-06-26 本轮续跑记录
+
+- `xom-1.2.10.jar!nu/xom/UnicodeUtil.class` 的 `try without catch handler`：根因是内部 try handler 丢失后渲染成裸 try。修复原则不是盲目生成 catch，而是只在 try body 非空且没有内部占位符/错误哨兵时透明展开；否则继续用 `yak-decompiler-internal: try without catch handler` 触发诚实 stub。
+- `jakarta.mail-1.6.5.jar!com/sun/mail/pop3/Protocol.class` 的 `retr(II)`：残留 `ConditionStatement` 可能带多个结构化出口，最终 checker 不能仅因后继数不是 2 就直接失败；后续线性收集和 post-decompile 语法验证会继续兜底。
+- 验证数据：`go test -count=1 ./common/javaclassparser/...` 全绿；`M2_JAR_PREFIXES=q,z,x,j,k,u,v,w M2_RESUME_AFTER_CLASS=14161 ... M2_MAX_CLASSES=18000` 补扫 `3839` 个 class，`ok=3839 partial=0 err=0 stubs=0`；`M2_JAR_PREFIXES=a,b,c,d,e,f,g,h,i,l,m,n,o,p,r,s,t,y ... M2_MAX_CLASSES=12000` 新窗口扫描 `12000` 个 class，`ok=12000 partial=0 err=0 stubs=0`。
+
 ---
 
 ## 速查表
