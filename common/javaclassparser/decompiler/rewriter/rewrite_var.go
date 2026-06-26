@@ -14,12 +14,22 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 )
 
-func RewriteVar(sts *[]statements.Statement, startVarId int, params []*values.JavaRef) {
+func RewriteVar(sts *[]statements.Statement, startVarId int, params []*values.JavaRef, traceCtx ...*class_context.ClassContext) {
+	var ctx *class_context.ClassContext
+	if len(traceCtx) > 0 {
+		ctx = traceCtx[0]
+	}
+	className, methodName := "", ""
+	if ctx != nil {
+		className = ctx.ClassName
+		methodName = ctx.FunctionName
+	}
 	scope := NewScope(startVarId, sts)
 	for _, v := range params {
 		scope.assignedMap[v.VarUid] = v.Id
+		core.TraceRewriteVar(className, methodName, "param uid=%s id=%s", v.VarUid, v.Id.String())
 	}
-	rewriteVar(scope)
+	rewriteVar(scope, className, methodName)
 	var checkUndefinedVar func(scope *Scope, parentAssigned map[*utils.VariableId]struct{})
 	undefined := make(map[values.JavaValue]int)
 	varAssignMap := map[*utils.VariableId][]*statements.AssignStatement{}
@@ -151,6 +161,7 @@ func (s *Scope) SubScope(sts *[]statements.Statement) *Scope {
 	s.varMap = append(s.varMap, newScope)
 	return newScope
 }
+
 // maxStructuredContainers bounds how many nested-block container statements a single method's
 // structured tree may contain. It backstops AssertStatementsAcyclic's traversal against a degenerate
 // (but technically acyclic) explosion of nested blocks.
@@ -264,7 +275,7 @@ func AssertStatementsAcyclic(roots []statements.Statement) {
 // far below the ~250k frames it takes to overflow a 1GB stack.
 const maxRewriteVarDepth = 5000
 
-func rewriteVar(scope *Scope) int {
+func rewriteVar(scope *Scope, className, methodName string) int {
 	if scope.deep > maxRewriteVarDepth {
 		panic(fmt.Errorf("rewriteVar: block nesting depth %d exceeds limit %d (pathological or cyclic statement tree)", scope.deep, maxRewriteVarDepth))
 	}
@@ -296,6 +307,8 @@ func rewriteVar(scope *Scope) int {
 					scope.varMap = append(scope.varMap, statement)
 					scope.nowId++
 					scope.assignedMap[v.VarUid] = newId
+					core.TraceRewriteVar(className, methodName, "bind depth=%d uid=%s old=%s new=%s type=%s",
+						scope.deep, v.VarUid, oldId.String(), newId.String(), v.Type().String(&class_context.ClassContext{}))
 				}
 			}
 			if hasNamed {
@@ -303,33 +316,42 @@ func rewriteVar(scope *Scope) int {
 				id, _ := scope.assignedMap[ref.VarUid]
 				ref.Id = id
 				scope.varMap = append(scope.varMap, statement)
+				core.TraceRewriteVar(className, methodName, "reuse depth=%d uid=%s id=%s", scope.deep, ref.VarUid, id.String())
 			}
 		case *statements.IfStatement:
 			subScope := scope.SubScope(&statement.IfBody)
-			rewriteVar(subScope)
+			core.TraceRewriteVar(className, methodName, "enter if depth=%d body=%d", subScope.deep, len(statement.IfBody))
+			rewriteVar(subScope, className, methodName)
 			subScope = scope.SubScope(&statement.ElseBody)
-			rewriteVar(subScope)
+			core.TraceRewriteVar(className, methodName, "enter else depth=%d body=%d", subScope.deep, len(statement.ElseBody))
+			rewriteVar(subScope, className, methodName)
 		case *statements.ForStatement:
 			subScope := scope.SubScope(&statement.SubStatements)
-			rewriteVar(subScope)
+			core.TraceRewriteVar(className, methodName, "enter for depth=%d body=%d", subScope.deep, len(statement.SubStatements))
+			rewriteVar(subScope, className, methodName)
 		case *statements.WhileStatement:
 			subScope := scope.SubScope(&statement.Body)
-			rewriteVar(subScope)
+			core.TraceRewriteVar(className, methodName, "enter while depth=%d body=%d", subScope.deep, len(statement.Body))
+			rewriteVar(subScope, className, methodName)
 		case *statements.DoWhileStatement:
 			subScope := scope.SubScope(&statement.Body)
-			rewriteVar(subScope)
+			core.TraceRewriteVar(className, methodName, "enter do-while depth=%d body=%d", subScope.deep, len(statement.Body))
+			rewriteVar(subScope, className, methodName)
 		case *statements.SwitchStatement:
 			subScope := scope.SubScope(nil)
 			for _, c := range statement.Cases {
 				subScope.sts = &c.Body
-				rewriteVar(subScope)
+				core.TraceRewriteVar(className, methodName, "enter switch-case depth=%d body=%d", subScope.deep, len(c.Body))
+				rewriteVar(subScope, className, methodName)
 			}
 		case *statements.TryCatchStatement:
 			subScope := scope.SubScope(&statement.TryBody)
-			rewriteVar(subScope)
+			core.TraceRewriteVar(className, methodName, "enter try depth=%d body=%d", subScope.deep, len(statement.TryBody))
+			rewriteVar(subScope, className, methodName)
 			for _, c := range statement.CatchBodies {
 				subScope = scope.SubScope(&c)
-				rewriteVar(subScope)
+				core.TraceRewriteVar(className, methodName, "enter catch depth=%d body=%d", subScope.deep, len(c))
+				rewriteVar(subScope, className, methodName)
 			}
 		}
 	}

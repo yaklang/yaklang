@@ -9,13 +9,13 @@ import (
 	"strings"
 
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/statements"
 	utils2 "github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values/types"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"golang.org/x/exp/slices"
@@ -75,6 +75,7 @@ type Decompiler struct {
 	// assignment statement must not be emitted, otherwise it would leave a side-effect statement
 	// in a ternary/expression branch and break structuring (multiple next).
 	selfOpFoldedRefs map[string]bool
+	slotStoreTrace   map[int]slotStoreTraceInfo
 
 	// Aggressive enables higher-risk reconstruction paths (relaxed merge-condition structuring,
 	// bounded node-duplication, synthetic-method rebuilds) that are only used as a SECOND attempt
@@ -87,6 +88,11 @@ type VarFoldRule struct {
 	Replace          func(v values.JavaValue)
 	CurrentOpcode    *OpCode
 	UserIsNextOpcode bool
+}
+
+type slotStoreTraceInfo struct {
+	offset uint16
+	ref    *values.JavaRef
 }
 
 func NewDecompiler(bytecodes []byte, constantPoolGetter func(id int) values.JavaValue) *Decompiler {
@@ -102,6 +108,7 @@ func NewDecompiler(bytecodes []byte, constantPoolGetter func(id int) values.Java
 		varUserMap:           omap.NewEmptyOrderedMap[*values.JavaRef, []*VarFoldRule](),
 		delRefUserAttr:       map[string][3]int{},
 		selfOpFoldedRefs:     map[string]bool{},
+		slotStoreTrace:       map[int]slotStoreTraceInfo{},
 	}
 }
 
@@ -502,7 +509,37 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 	case OP_ISTORE, OP_ASTORE, OP_LSTORE, OP_DSTORE, OP_FSTORE, OP_ISTORE_0, OP_ASTORE_0, OP_LSTORE_0, OP_DSTORE_0, OP_FSTORE_0, OP_ISTORE_1, OP_ASTORE_1, OP_LSTORE_1, OP_DSTORE_1, OP_FSTORE_1, OP_ISTORE_2, OP_ASTORE_2, OP_LSTORE_2, OP_DSTORE_2, OP_FSTORE_2, OP_ISTORE_3, OP_ASTORE_3, OP_LSTORE_3, OP_DSTORE_3, OP_FSTORE_3:
 		slot := GetStoreIdx(opcode)
 		value := runtimeStackSimulation.Pop().(values.JavaValue)
-		ref, isFirst := runtimeStackSimulation.AssignVar(slot, value)
+		oldRef := runtimeStackSimulation.GetVar(slot)
+		ref, isFirst := oldRef, false
+		reuseNullBranchStore := false
+		if values.IsNullLiteral(value) && oldRef != nil && len(opcode.Target) == 1 && opcode.Target[0].Instr.OpCode == OP_GOTO {
+			if _, isPrim := oldRef.Type().RawType().(*types.JavaPrimer); !isPrim {
+				reuseNullBranchStore = true
+			}
+		}
+		if !reuseNullBranchStore {
+			ref, isFirst = runtimeStackSimulation.AssignVar(slot, value)
+		}
+		if d.traceEnabled("slot-version") {
+			last := d.slotStoreTrace[slot]
+			oldType, newType := "<nil>", "<nil>"
+			if oldRef != nil && oldRef.Type() != nil {
+				oldType = oldRef.Type().String(d.FunctionContext)
+			}
+			if value != nil && value.Type() != nil {
+				newType = value.Type().String(d.FunctionContext)
+			}
+			reused := oldRef != nil && ref != nil && oldRef.VarUid == ref.VarUid
+			sameType := oldType == newType
+			d.tracef("slot-version", "store offset=%d slot=%d reused=%v sameType=%v isFirst=%v lastOffset=%d old=%s new=%s value=%s",
+				opcode.CurrentOffset, slot, reused, sameType, isFirst, last.offset, traceRef(oldRef, d.FunctionContext),
+				traceRef(ref, d.FunctionContext), traceValue(value, d.FunctionContext))
+			if reused && sameType && last.ref != nil {
+				d.tracef("slot-version", "shadow-split-candidate slot=%d previousOffset=%d currentOffset=%d ref=%s",
+					slot, last.offset, opcode.CurrentOffset, traceRef(ref, d.FunctionContext))
+			}
+		}
+		d.slotStoreTrace[slot] = slotStoreTraceInfo{offset: opcode.CurrentOffset, ref: ref}
 		statements.NewAssignStatement(ref, value, isFirst)
 		d.opcodeIdToRef[opcode] = append(d.opcodeIdToRef[opcode], [2]any{ref, isFirst})
 		attr := d.delRefUserAttr[ref.VarUid]
@@ -680,6 +717,8 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 			return fmt.Sprintf("((%s)(%s))", classInfo.String(funcCtx), arg.String(funcCtx))
 		}, func() types.JavaType {
 			return classInfo
+		}, func(oldId *utils2.VariableId, newId *utils2.VariableId) {
+			arg.ReplaceVar(oldId, newId)
 		})
 		ref := runtimeStackSimulation.NewVar(value)
 		slotvalue := values.NewSlotValue(ref, ref.Type())
@@ -1048,6 +1087,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 	}
 	return nil
 }
+
 // EnableLegacyMergeReconstruction selects the original heuristic if-merge / ternary value
 // reconstruction (the dual structural-probe + chain combiner). When false (default), value merges
 // whose conditions converge on shared leaf values (short-circuit &&/|| predicates) are rebuilt by a
@@ -1171,6 +1211,29 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 	setVarScope := func(code *OpCode, scope *Scope) {
 		nodeToVarScope[code] = scope
 	}
+	preferConcreteMergeVars := func(base map[int]*values.JavaRef, sources []*OpCode) map[int]*values.JavaRef {
+		merged := make(map[int]*values.JavaRef, len(base))
+		for slot, ref := range base {
+			merged[slot] = ref
+		}
+		for slot, ref := range merged {
+			if ref == nil || !ref.IsNullInitialized() {
+				continue
+			}
+			for _, source := range sources {
+				candidate := getVarScope(source).VarTable[slot]
+				if candidate == nil || candidate.IsNullInitialized() {
+					continue
+				}
+				if _, isPrim := candidate.Type().RawType().(*types.JavaPrimer); isPrim {
+					continue
+				}
+				merged[slot] = candidate
+				break
+			}
+		}
+		return merged
+	}
 	ifNodeToConditionCallback := map[*OpCode]func(values.JavaValue){}
 	varTable := map[int]*values.JavaRef{}
 	err := WalkGraph[*OpCode](d.RootOpCode, func(code *OpCode) ([]*OpCode, error) {
@@ -1244,10 +1307,10 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			})
 			validSources := []*OpCode{}
 			for _, source := range sources {
-					entry := source.StackEntry
-					if entry == nil {
-						entry = NewEmptyStackEntry()
-					}
+				entry := source.StackEntry
+				if entry == nil {
+					entry = NewEmptyStackEntry()
+				}
 				validSources = append(validSources, source)
 			}
 			//sourceIfCodes := []*OpCode{}
@@ -1289,7 +1352,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			} else {
 				validSource := validSources[0]
 				vscope := getVarScope(validSource)
-				runtimeStackSimulation = NewStackSimulation(validSource.StackEntry, vscope.VarTable, vscope.VarId)
+				runtimeStackSimulation = NewStackSimulation(validSource.StackEntry, preferConcreteMergeVars(vscope.VarTable, validSources), vscope.VarId)
 			}
 			ifNodes := []*OpCode{}
 			for _, opCode := range code.Source {
@@ -1334,7 +1397,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 				scope := getVarScope(validSource)
 				preSim := NewStackSimulation(validSource.StackEntry, scope.VarTable, scope.VarId)
 				preSim.Pop()
-				runtimeStackSimulation = NewStackSimulation(preSim.stackEntry, scope.VarTable, scope.VarId)
+				runtimeStackSimulation = NewStackSimulation(preSim.stackEntry, preferConcreteMergeVars(scope.VarTable, validSources), scope.VarId)
 				slotVal := values.NewSlotValue(nil, validSource.StackEntry.value.Type())
 				runtimeStackSimulation.Push(slotVal)
 				ternaryExpMergeNodeSlot[code] = slotVal
@@ -1343,7 +1406,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			} else {
 				validSource := validSources[0]
 				scope := getVarScope(validSource)
-				runtimeStackSimulation = NewStackSimulation(validSource.StackEntry, scope.VarTable, scope.VarId)
+				runtimeStackSimulation = NewStackSimulation(validSource.StackEntry, preferConcreteMergeVars(scope.VarTable, validSources), scope.VarId)
 			}
 		} else {
 			for _, opCode := range code.Source {
@@ -1391,10 +1454,28 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			exceptionValue.Flag = "exception"
 			runtimeStackSimulation.Push(exceptionValue)
 		}
+		if d.traceEnabled("var-table") {
+			d.tracef("var-table", "before offset=%d opcode=%s sources=%d targets=%d stackSize=%d vars=%s",
+				code.CurrentOffset, code.Instr.Name, len(code.Source), len(code.Target), runtimeStackSimulation.Size(),
+				traceVarTable(runtimeStackSimulation.varTable, d.FunctionContext))
+		}
 		runtimeStackSimulation.varTable = varTable
 		err := d.calcOpcodeStackInfo(sim, code)
 		if err != nil {
 			return nil, err
+		}
+		if d.traceEnabled("var-table") {
+			produced := make([]string, 0, len(code.stackProduced))
+			for _, v := range code.stackProduced {
+				produced = append(produced, traceValue(v, d.FunctionContext))
+			}
+			consumed := make([]string, 0, len(code.stackConsumed))
+			for _, v := range code.stackConsumed {
+				consumed = append(consumed, traceValue(v, d.FunctionContext))
+			}
+			d.tracef("var-table", "after offset=%d opcode=%s stackSize=%d produced=[%s] consumed=[%s] vars=%s",
+				code.CurrentOffset, code.Instr.Name, runtimeStackSimulation.Size(), strings.Join(produced, ";"),
+				strings.Join(consumed, ";"), traceVarTable(runtimeStackSimulation.varTable, d.FunctionContext))
 		}
 		code.StackEntry = runtimeStackSimulation.stackEntry
 		scope := NewScope()
@@ -1469,7 +1550,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		var canReachMerge func(n *OpCode) bool
 		canReachMerge = func(n *OpCode) bool {
 			cur := n
-			for step := 0; cur != nil && step < (1 << 16); step++ {
+			for step := 0; cur != nil && step < (1<<16); step++ {
 				if cur == mergeNode || slices.Contains(cur.Target, mergeNode) {
 					return true
 				}
@@ -1583,7 +1664,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		var probe func(ifNode *OpCode) *values.TernaryExpression
 		arm = func(entry *OpCode) values.JavaValue {
 			cur := entry
-			for step := 0; cur != nil && step < (1 << 16); step++ {
+			for step := 0; cur != nil && step < (1<<16); step++ {
 				if failed {
 					return nil
 				}
@@ -1664,7 +1745,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		// dominating condition (nil if the chain forks / merges before reaching one).
 		nearestIfAncestor := func(n *OpCode) *OpCode {
 			cur := n
-			for step := 0; cur != nil && step < (1 << 16); step++ {
+			for step := 0; cur != nil && step < (1<<16); step++ {
 				if len(cur.Source) != 1 {
 					return nil
 				}
@@ -2593,7 +2674,24 @@ func (d *Decompiler) ParseStatement() error {
 		val := GetRealValue(ref.Val)
 		attr := d.delRefUserAttr[ref.VarUid]
 		if slices.Contains(disRefUid, ref.VarUid) {
+			d.tracef("var-fold", "skip disabled ref=%s pairs=%d", traceRef(ref, d.FunctionContext), len(pairs))
 			return true
+		}
+		if d.traceEnabled("var-fold") {
+			pairOffsets := make([]string, 0, len(pairs))
+			for _, pair := range pairs {
+				offset := -1
+				opName := "<nil>"
+				userNext := false
+				if pair != nil && pair.CurrentOpcode != nil {
+					offset = int(pair.CurrentOpcode.CurrentOffset)
+					opName = pair.CurrentOpcode.Instr.Name
+					userNext = pair.UserIsNextOpcode
+				}
+				pairOffsets = append(pairOffsets, fmt.Sprintf("%d:%s:next=%v", offset, opName, userNext))
+			}
+			d.tracef("var-fold", "candidate ref=%s val=%s pairs=%d attr=%v pairOffsets=[%s]",
+				traceRef(ref, d.FunctionContext), traceValue(val, d.FunctionContext), len(pairs), attr, strings.Join(pairOffsets, ","))
 		}
 
 		func() {
@@ -2653,6 +2751,7 @@ func (d *Decompiler) ParseStatement() error {
 			currentNodeSource.RemoveNext(currentNode)
 			currentNodeSource.AddNext(nnext)
 
+			d.tracef("var-fold", "dup-collapse ref=%s currentNode=%d nextNode=%d", traceRef(ref, d.FunctionContext), currentNode.Id, nextNode.Id)
 			pairs[1].Replace(values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
 				return statements.NewAssignStatement(nextAssign.LeftValue, val, false).String(funcCtx)
 			}, func() types.JavaType {
@@ -2698,6 +2797,8 @@ func (d *Decompiler) ParseStatement() error {
 				pair.Replace(val)
 				node.SourceConditionNode = assignNode.SourceConditionNode
 				rewriteIsOk = true
+				d.tracef("var-fold", "single-use-fold ref=%s useOffset=%d sourceNode=%d targetNode=%d val=%s",
+					traceRef(ref, d.FunctionContext), pair.CurrentOpcode.CurrentOffset, assignNode.Id, node.Id, traceValue(val, d.FunctionContext))
 			}
 			if !rewriteIsOk && attr[2] == 1 {
 				source := slices.Clone(node.Source)
@@ -2712,6 +2813,8 @@ func (d *Decompiler) ParseStatement() error {
 				ref.Id.Delete()
 				pair.Replace(val)
 				rewriteIsOk = true
+				d.tracef("var-fold", "self-op-fold ref=%s useOffset=%d node=%d val=%s",
+					traceRef(ref, d.FunctionContext), pair.CurrentOpcode.CurrentOffset, node.Id, traceValue(val, d.FunctionContext))
 			}
 			// if !rewriteIsOk {
 			// 	DumpNodesToDotExp(d.RootNode)

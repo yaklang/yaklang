@@ -58,6 +58,11 @@ func (j *JavaRef) IsNullInitialized() bool {
 	return ok && lit != nil && fmt.Sprint(lit.Data) == "null"
 }
 
+func IsNullLiteral(v JavaValue) bool {
+	lit, ok := v.(*JavaLiteral)
+	return ok && lit != nil && fmt.Sprint(lit.Data) == "null"
+}
+
 func (j *JavaRef) String(funcCtx *class_context.ClassContext) string {
 	if j.IsThis {
 		return "this"
@@ -481,6 +486,7 @@ func (j *TernaryExpression) ReplaceVar(oldId *utils.VariableId, newId *utils.Var
 func (j *TernaryExpression) Type() types.JavaType {
 	return types.MergeTypes(j.TrueValue.Type(), j.FalseValue.Type())
 }
+
 // boolLiteralValue reports a boolean literal's value (unwrapping SlotValue). A boolean literal is a
 // JavaLiteral of boolean type with integer data (0=false, non-zero=true). Used to classify ternary
 // arms structurally - without rendering them to strings - so boolReduce stays linear.

@@ -20,6 +20,7 @@ var debugInvalidMethods = os.Getenv("DEBUG_INVALID") != ""
 // every local by its bytecode slot index, so this reliably identifies local references in rendered
 // output (it never collides with field/parameter names, which carry their real identifiers).
 var localVarTokenRe = regexp.MustCompile(`var\d+`)
+var dollarIdentifierBeforeParenRe = regexp.MustCompile(`(?:\.|\s)\$\s*\(`)
 
 // isJavaIdentByte reports whether b can appear inside a Java identifier; used for whole-token matching
 // so "var1" is never recognized inside "var12" or "myvar1".
@@ -225,13 +226,14 @@ func (c *ClassObjectDumper) degradeInvalidMethods(header string, methods []*dump
 			out = append(out, m)
 			continue
 		}
-		if validateMemberInHeader(header, m.code) == nil {
+		validateErr := validateMemberInHeader(header, m.code)
+		if validateErr == nil || isDollarIdentifierValidatorGap(m.code, validateErr) {
 			out = append(out, m)
 			continue
 		}
 
 		if debugInvalidMethods {
-			log.Errorf("DEBUG_INVALID method %s%s:\n%s", m.methodName, m.descriptor, m.code)
+			log.Errorf("DEBUG_INVALID method %s%s validation error: %v\n%s", m.methodName, m.descriptor, validateErr, m.code)
 		}
 		if p := os.Getenv("DUMP_INVALID"); p != "" {
 			_ = os.WriteFile(p, []byte(fmt.Sprintf("method %s%s:\n%s\n", m.methodName, m.descriptor, m.code)), 0644)
@@ -252,6 +254,14 @@ func (c *ClassObjectDumper) degradeInvalidMethods(header string, methods []*dump
 		log.Warnf("decompiled method %s%s is un-representable as valid Java, dropping it", m.methodName, m.descriptor)
 	}
 	return out
+}
+
+func isDollarIdentifierValidatorGap(code string, err error) bool {
+	if err == nil || !dollarIdentifierBeforeParenRe.MatchString(code) {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "symbol:") && strings.Contains(msg, "'$'")
 }
 
 // degradeInvalidFields returns fields whose generated source is valid Java in the header's

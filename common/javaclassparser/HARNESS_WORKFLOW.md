@@ -213,6 +213,7 @@ diff <(head -1 /tmp/m2-before.txt) <(head -1 /tmp/m2-after.txt)
 长尾里有些 class 是反编译器最难的结构化问题（do-while(true)+continue、switch 里跨分支共享操作数栈、值合并的极端形状等）。碰到"看上去无路可走"的 case 时，不要死磕单条路径，综合用下面这些方法：
 
 - **找上游源码对照（先拿到"正确答案"）**：失败 class 通常来自知名开源库（druid、logback、spring、guava…）。从失败 class 的 jar 名 + 类全限定名，去该库的 GitHub 仓库（优先用对应版本 tag，如 `alibaba/druid` 的 `druid-1.2.23`；找不到精确 tag 就退 `master`/`main`）拉原始 `.java` 源，定位到出错方法的**原始写法**。有了"教科书正确输出"，再对照反编译器当前产物，一眼就能看出是哪个结构（for+break、if-else-if、instanceof 链、值-merge）没结构化对——比对着乱码猜根因可靠一个数量级。拉取可直接 `curl https://raw.githubusercontent.com/<owner>/<repo>/<tag>/<path>`，或用 node/fetch。
+- **核心重构回归时反查测试 oracle**：改 `CalcOpcodeStackInfo`、slot/varTable 合流、`rewriteVar`、variable-fold 这类核心算法后，出现回归不能立刻认定"新算法一定错"。旧测试可能只是锁住了历史错误输出，或断言过窄、不符合真实 Java 语义。此时必须求真：先用 `javap -c -v` 看字节码真实控制流和局部变量槽；本机若有 CFR / FernFlower / Vineflower 等成熟反编译器，就对同一个 `.class` 生成第三方 oracle；没有这些工具时，用上游源码 oracle 和最小合成样本补足。只有确认新输出偏离字节码语义、源码 oracle 或成熟反编译器共识时，才回滚核心改动；如果是测试不科学，应修正测试，让测试表达语义不变量，而不是继续固定错误文本。
 - **合成数据构造**：从失败 class 的字节码里提取出最小的失败模式（一段 `dup_x1/dup2_x1/swap`、一个带 `continue` 的 `do-while(true)`、一个跨 if-merge 的值），手写一个等价的最小 Java 源，`javac` 编译成 `.class` 当回归种子。最小可复现样本能把"500 字节码大方法"压缩成几十字节，根因一眼可见，回归也更快。
 - **搜索论文与各类知识**：操作数栈合并 / 值-merge 三元树 / switch 分发结构化 / `continue`-`break` 反循环展开，都有成熟研究（CFE/ASTRÉ、Procyon、CFR、Vine、Soot 的 `Body` 重构）。先弄清楚这类模式的"教科书正确输出"长什么样，再对照反编译器当前产物找偏差，比盲改可靠得多。
 - **构建 MVP**：对拿不准的结构化改动，先在一个最小合成样本上验证"这样改能不能产出语法正确、语义贴近的结果"，确认无误再往核心代码里落。MVP 能把高风险重构的爆炸半径锁死在一个文件里。

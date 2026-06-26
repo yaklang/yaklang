@@ -341,7 +341,7 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 			methods = c.degradeInvalidMethods(header, methods)
 			fields = c.degradeInvalidFields(header, className, isEnum, fields)
 			full = assemble()
-			if err := validateJavaSyntax(full); err != nil {
+			if err := validateJavaSyntax(full); err != nil && !isDollarIdentifierValidatorGap(full, err) {
 				log.Warnf("decompiled class %s still has syntax errors after degradation: %v", c.ClassName, err)
 			}
 		}
@@ -1061,18 +1061,18 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 					statementStr = fmt.Sprintf(c.GetTabString()+"switch (%s){\n"+
 						"%s\n"+
 						c.GetTabString()+"}", ret.Value.String(funcCtx), getBody(ret.Cases))
-			case *statements.IfStatement:
-				// Recover short-circuit boolean returns: when a method returns boolean and the
-				// if-then is empty (or only a `return true`) while the else is `return expr`,
-				// rewrite to `return condition || expr`. This is the simplest case of the
-				// boolean short-circuit DAG where the true arm shares a constant leaf.
-				if isBoolReturnIfElse(ret, funcCtx) {
-					if stmt := buildBoolReturnFromIfElse(ret, funcCtx); stmt != "" {
-						statementStr = c.GetTabString() + stmt + ";"
-						break
+				case *statements.IfStatement:
+					// Recover short-circuit boolean returns: when a method returns boolean and the
+					// if-then is empty (or only a `return true`) while the else is `return expr`,
+					// rewrite to `return condition || expr`. This is the simplest case of the
+					// boolean short-circuit DAG where the true arm shares a constant leaf.
+					if isBoolReturnIfElse(ret, funcCtx) {
+						if stmt := buildBoolReturnFromIfElse(ret, funcCtx); stmt != "" {
+							statementStr = c.GetTabString() + stmt + ";"
+							break
+						}
 					}
-				}
-				statementStr = fmt.Sprintf(c.GetTabString()+"if (%s){\n"+
+					statementStr = fmt.Sprintf(c.GetTabString()+"if (%s){\n"+
 						"%s\n"+
 						c.GetTabString()+"}", values.SimplifyConditionValue(ret.Condition).String(funcCtx), statementListToString(ret.IfBody))
 					if len(ret.ElseBody) > 0 {

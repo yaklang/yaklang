@@ -207,6 +207,9 @@ type FunctionCallExpression struct {
 
 // ReplaceVar implements JavaValue.
 func (f *FunctionCallExpression) ReplaceVar(oldId *utils.VariableId, newId *utils.VariableId) {
+	if f.Object != nil {
+		f.Object.ReplaceVar(oldId, newId)
+	}
 	for _, arg := range f.Arguments {
 		arg.ReplaceVar(oldId, newId)
 	}
