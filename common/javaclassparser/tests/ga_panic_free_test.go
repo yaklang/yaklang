@@ -49,6 +49,16 @@ func TestGAPanicFreeBoundary(t *testing.T) {
 			desc:     "logback NestingType.$INIT: a DUP-family opcode peeked an empty operand stack (underflow); must degrade cleanly to a marked stub, never panic",
 			wantFull: false,
 		},
+		{
+			file:     "panic_nilref_floatingiowriter.class",
+			desc:     "beetl FloatingIOWriter.<init>: a typed-nil *JavaRef reached varUserMap as a key (loadVarBySlot on an uninitialized slot) and the variable-fold walker dereferenced ref.VarUid; must degrade cleanly to a marked stub, never panic",
+			wantFull: false,
+		},
+		{
+			file:     "panic_nilref_typeutils.class",
+			desc:     "fastjson2 TypeUtils.doubleValue: same typed-nil-ref-in-varUserMap nil-deref; must degrade cleanly to a marked stub, never panic",
+			wantFull: false,
+		},
 	}
 
 	for _, tc := range cases {

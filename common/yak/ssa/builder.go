@@ -320,7 +320,11 @@ func (b *FunctionBuilder) ClassConstructorWithoutDeferDestructor(bluePrint *Blue
 }
 
 func (b *FunctionBuilder) GetStaticMember(classname *Blueprint, field string) *Variable {
-	return b.CreateVariable(fmt.Sprintf("%s_%s", classname.Name, strings.TrimPrefix(field, "$")))
+	field = strings.TrimPrefix(field, "$")
+	if classname == nil {
+		return b.CreateVariable(field)
+	}
+	return b.CreateVariable(fmt.Sprintf("%s_%s", classname.Name, field))
 }
 
 func (b *FunctionBuilder) GenerateDependence(pkgs []*dxtypes.Package, filename string) {

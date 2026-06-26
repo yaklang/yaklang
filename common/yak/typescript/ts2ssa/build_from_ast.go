@@ -47,9 +47,6 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 			lib = prog.NewLibrary(fileUrl, []string{fileUrl})
 		}
 
-		defer func() {
-			lib.VisitAst(sourcefile)
-		}()
 		lib.PushEditor(prog.GetCurrentEditor())
 
 		subBuilder := lib.GetAndCreateFunctionBuilder(fileName, string(ssa.MainFunctionName))
@@ -86,6 +83,27 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 			}
 		}
 
+		editor := b.GetEditor()
+		path := fileUrl
+		if editor != nil && editor.GetUrl() != "" {
+			path = editor.GetUrl()
+		}
+		capturedSF := sourcefile
+		capturedBuilder := b.FunctionBuilder
+		prog.RegisterFileBuild(path, editor, capturedBuilder, func(fileBuilder *ssa.FunctionBuilder) {
+			nb := &builder{
+				FunctionBuilder:   fileBuilder,
+				sourceFile:        capturedSF,
+				useStrict:         false,
+				contextLabelStack: make([]string, 0),
+				namedValueExports: make(map[string]ssa.Value),
+				namedTypeExports:  make(map[string]ssa.Type),
+				reExports:         make(map[string]map[string]string),
+				importTbl:         make(map[string]map[string]string),
+			}
+			nb.VisitSourceFile(capturedSF)
+		})
+
 		return nil
 	}
 
@@ -110,10 +128,6 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 			b.FunctionBuilder = currentBuilder
 		}()
 	}
-
-	defer func() {
-		lib.VisitAst(sourcefile)
-	}()
 	if sourcefile.Statements != nil {
 		for _, statement := range sourcefile.Statements.Nodes {
 			if ast.IsPrologueDirective(statement) && statement.AsExpressionStatement().Expression.Text() == "use strict" {
@@ -2211,7 +2225,7 @@ func (b *builder) VisitCallExpression(node *ast.CallExpression) ssa.Value {
 	if node.ArgumentList() != nil && len(node.Arguments.Nodes) > 0 {
 		for _, argNode := range node.Arguments.Nodes {
 			argValue := b.VisitRightValueExpression(argNode)
-			if argValue != nil {
+			if !utils.IsNil(argValue) {
 				args = append(args, argValue)
 			} else {
 				// 如果参数无法解析，使用undefined代替
@@ -2222,6 +2236,11 @@ func (b *builder) VisitCallExpression(node *ast.CallExpression) ssa.Value {
 
 	var callee ssa.Value
 	callee = b.VisitRightValueExpression(node.Expression)
+	if utils.IsNil(callee) {
+		b.NewErrorWithPos(ssa.Error, TAG, b.CurrentRange, InvalidFunctionCallee())
+		return b.EmitUndefined("")
+	}
+
 	// 检查是否是 Promise 的特殊方法调用（then, catch, finally）
 	if ast.IsPropertyAccessExpression(node.Expression) {
 		propAccess := node.Expression.AsPropertyAccessExpression()
@@ -2236,12 +2255,6 @@ func (b *builder) VisitCallExpression(node *ast.CallExpression) ssa.Value {
 				// 如果不是 Promise 类型，按普通方法调用处理
 			}
 		}
-	}
-
-	// 处理callee（被调用函数）
-	if callee == nil {
-		b.NewErrorWithPos(ssa.Error, TAG, b.CurrentRange, InvalidFunctionCallee())
-		return b.EmitUndefined("")
 	}
 
 	// 只有当callee本身是Function类型时，才检查参数数量并填充Undefined

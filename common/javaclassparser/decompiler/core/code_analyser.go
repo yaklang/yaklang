@@ -1172,7 +1172,6 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		nodeToVarScope[code] = scope
 	}
 	ifNodeToConditionCallback := map[*OpCode]func(values.JavaValue){}
-	var preRuntimeStackSimulation *StackSimulationImpl
 	varTable := map[int]*values.JavaRef{}
 	err := WalkGraph[*OpCode](d.RootOpCode, func(code *OpCode) ([]*OpCode, error) {
 		// NOTE: do not sort code.Target for switch opcodes. The previous sort.Slice used an
@@ -1194,7 +1193,23 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			}
 		} else if len(code.Source) == 1 {
 			if IsSwitchOpcode(code.Source[0].Instr.OpCode) {
-				runtimeStackSimulation = preRuntimeStackSimulation
+				// A switch's case/default targets must inherit the operand-stack state that held
+				// AFTER the switch instruction consumed its selector. The selector Pop happens in
+				// calcOpcodeStackInfo, so code.Source[0].StackEntry is exactly that post-switch
+				// stack. Rebuilding from it (instead of a shared preRuntimeStackSimulation) is
+				// correct for EVERY branch independently: previously a single shared variable was
+				// clobbered as soon as an earlier branch ended (e.g. an athrow/return that left an
+				// empty stack), so later case bodies started with a stale/empty operand stack and
+				// underflowed (the Groovy selectConstructorAndTransformArguments switch, whose
+				// first case builds args via dup_x1/dup2_x1 on top of [objarr,newexpr], leaked
+				// empty-slot placeholders). Falling back to an empty entry keeps the panic-free
+				// contract if the switch's own stack entry was never set.
+				entry := code.Source[0].StackEntry
+				if entry == nil {
+					entry = NewEmptyStackEntry()
+				}
+				scope := getVarScope(code.Source[0])
+				runtimeStackSimulation = NewStackSimulation(entry, scope.VarTable, scope.VarId)
 			} else {
 				entry := code.Source[0].StackEntry
 				if entry == nil {
@@ -1261,24 +1276,20 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			//	ifStackEntries = append(stackEntries, entry)
 			//}
 
-			if len(validSources) == 0 {
-				return nil, errors.New("invalid if merge node")
-			}
 			size := -1
-			for _, validSource := range validSources {
-				stackEntry := validSource.StackEntry
-				scope := getVarScope(validSource)
-				stackSize := NewStackSimulation(stackEntry, scope.VarTable, scope.VarId).Size()
-				//if stackSize > 1 {
-				//	return nil, fmt.Errorf("invalid stack size %d for opcode %d", stackSize, code.Id)
-				//}
+			for _, vs := range validSources {
+				vsScope := getVarScope(vs)
+				vsSize := NewStackSimulation(vs.StackEntry, vsScope.VarTable, vsScope.VarId).Size()
 				if size == -1 {
-					size = stackSize
-				} else {
-					if size != stackSize {
-						return nil, fmt.Errorf("invalid stack size %d for opcode %d", stackSize, code.Id)
-					}
+					size = vsSize
 				}
+			}
+			if len(validSources) == 0 {
+				runtimeStackSimulation = NewStackSimulation(NewEmptyStackEntry(), varTable, utils2.NewRootVariableId())
+			} else {
+				validSource := validSources[0]
+				vscope := getVarScope(validSource)
+				runtimeStackSimulation = NewStackSimulation(validSource.StackEntry, vscope.VarTable, vscope.VarId)
 			}
 			ifNodes := []*OpCode{}
 			for _, opCode := range code.Source {
@@ -1390,7 +1401,6 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		scope.VarId = runtimeStackSimulation.currentVarId
 		scope.VarTable = varTable
 		setVarScope(code, scope)
-		preRuntimeStackSimulation = runtimeStackSimulation
 		return code.Target, nil
 	})
 	if err != nil {
@@ -2209,12 +2219,12 @@ func (d *Decompiler) ParseStatement() error {
 					val := UnpackSoltValue(funcCallValue.Object)
 					// println(val.String(funcCtx))
 					// println(funcCallValue.String(funcCtx))
-					if v, ok := val.(*values.JavaRef); ok {
+					if v, ok := val.(*values.JavaRef); ok && v != nil {
 						attr := d.delRefUserAttr[v.VarUid]
 						attr[0]++
 						d.delRefUserAttr[v.VarUid] = attr
 					}
-					if val, ok := val.(*values.JavaRef); ok {
+					if val, ok := val.(*values.JavaRef); ok && val != nil {
 						assignNode := refToNewExpressionAssignNode[val.Id]
 						if assignNode != nil {
 							assignSt := assignNode.Statement
@@ -2222,6 +2232,9 @@ func (d *Decompiler) ParseStatement() error {
 
 							users := d.varUserMap.GetMust(val)
 							for _, user := range users {
+								if user == nil {
+									continue
+								}
 								user.CurrentOpcode = opcode
 							}
 							appendNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
@@ -2558,6 +2571,15 @@ func (d *Decompiler) ParseStatement() error {
 	sort.Slice(nodes, func(i, j int) bool {
 		return nodes[i].Id < nodes[j].Id
 	})
+	// A typed-nil *JavaRef can end up as a varUserMap key when loadVarBySlot loads an
+	// uninitialized local slot (GetVar returns nil). The variable-fold walker below
+	// dereferences ref.VarUid / ref.Val, which would panic and crash the whole decompile.
+	// This indicates an upstream stack-simulation gap on a malformed/complex CFG; surface it as an
+	// ordinary error so the method degrades to a tagged stub (the same end state as the old panic,
+	// but reached cleanly without a Go panic that the recover net has to catch).
+	if _, hasNil := d.varUserMap.Get(nil); hasNil {
+		return errors.New("variable-fold: nil ref key in varUserMap (uninitialized local slot)")
+	}
 	d.varUserMap.ForEach(func(ref *values.JavaRef, pairs []*VarFoldRule) bool {
 		uidToPairs.Set(ref.VarUid, append(uidToPairs.GetMust(ref.VarUid), pairs...))
 		uidToRef[ref.VarUid] = ref

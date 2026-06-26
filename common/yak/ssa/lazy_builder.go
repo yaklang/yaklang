@@ -77,61 +77,6 @@ func (l *LazyBuilder) Build() {
 	}
 }
 
-type ASTIF interface {
-	GetText() string
-}
-
-/*
-LazyBuilder -- Build:
-when build, each program should call visitAST
-  - when preHandler: mark ast hash to prog.astMap
-  - when not preHandler: delete ast hash from prog.astMap
-
-when all ast visit done, build instruction and save to database
-
-note: need defer func\visit stmt finish\...
-*/
-func (p *Program) VisitAst(ast ASTIF) {
-	if p == nil {
-		return
-	}
-	key := ""
-	if editor := p.GetCurrentEditor(); editor != nil {
-		// Prefer the editor URL over AST text:
-		// - it avoids hashing/retaining large AST text blobs on hot paths
-		// - it keeps per-file visit tracking stable across identical file contents
-		// This assumes a compile run does not reuse the same URL for different file contents.
-		key = editor.GetUrl()
-	}
-	if key == "" && ast != nil {
-		key = ast.GetText()
-	}
-	if key == "" {
-		return
-	}
-
-	if p.PreHandler() {
-		p.astMap[key] = struct{}{}
-	} else {
-		if _, ok := p.astMap[key]; !ok {
-			log.Debugf("ast is not found in ast map: program=%s key=%s", p.GetProgramName(), key)
-			return
-		}
-		delete(p.astMap, key)
-
-		if len(p.astMap) == 0 {
-			p.Application.ProcessInfof("program %s all ast visit done", p.Name)
-			p.Application.ProcessInfof("program %s build Instruction", p.Name)
-			p.LazyBuild() // build instruction
-			p.Application.ProcessInfof("program %s build Instruction(%d)", p.Name, p.Cache.CountInstruction())
-			// will cause instruction not save bug
-			// p.Cache.SaveToDatabase() // save instruction
-			builder := p.GetAndCreateFunctionBuilder("", string(MainFunctionName))
-			builder.SyntaxIncludingStack = nil
-		}
-	}
-}
-
 func (p *Program) LazyBuild() {
 	for _, key := range p.Blueprint.Keys() {
 		blueprint, ok := p.Blueprint.Get(key)

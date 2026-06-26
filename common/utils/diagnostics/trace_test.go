@@ -67,6 +67,7 @@ func TestTraceLabRecordsPanicWithoutReraise(t *testing.T) {
 }
 
 func TestTraceCompileLikeFormat(t *testing.T) {
+	withDiagnosticsLevel(t, LevelNormal)
 	// Simulates compile: Track phase → nested TraceLab lazybuild tree → second Track step (leaf).
 	rec, buf := newTraceTestRecorder()
 
@@ -126,6 +127,7 @@ func TestTraceDuplicateNamesUsePath(t *testing.T) {
 }
 
 func TestTraceTrackChildIndent(t *testing.T) {
+	withDiagnosticsLevel(t, LevelNormal)
 	rec, buf := newTraceTestRecorder()
 	require.NoError(t, rec.Track("ParseProjectWithFS", func() error {
 		return rec.Track("ssa.Database.SaveIrIndexBatch", func() error {
@@ -196,6 +198,7 @@ func TestTraceManyWorkersSameDepth(t *testing.T) {
 }
 
 func TestTrackAggregatesSubSteps(t *testing.T) {
+	withDiagnosticsLevel(t, LevelNormal)
 	rec := NewRecorder()
 	steps := []func() error{
 		func() error { time.Sleep(time.Millisecond); return nil },

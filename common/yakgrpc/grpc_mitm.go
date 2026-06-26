@@ -29,6 +29,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/crep"
+	"github.com/yaklang/yaklang/common/crep/trafficguard"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
@@ -1614,14 +1615,22 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 		}
 
+		// 内置敏感信息检测(TrafficGuard): 在过滤判定之前无条件扫描(不受任何过滤策略影响)。
+		// 与早期实现不同: 命中敏感信息的流量"不再"强制取消过滤进入 MITM History(避免污染 MITM TAB),
+		// 而是当它本应被过滤时, 改以"插件流量"(source_type=scan + FromPlugin)形式保存到插件输出,
+		// 既留存证据, 又不混入手动劫持/镜像列表。一次扫描, 复用结果, 不二次开销。
+		tgFindings := trafficguard.ScanFindings(reqUrl, plainRequest, plainResponse)
+		// tgSaveAsPlugin: 本应被过滤、但命中了敏感信息 -> 以插件流量形式保留(不进 MITM TAB)。
+		tgSaveAsPlugin := isFiltered && len(tgFindings) > 0
+
 		shouldBeHijacked := !isFiltered
 
 		pluginCtx := httpctx.GetPluginContext(req)
 		go func() {
 			hotPatchPipeline.MirrorHTTPFlowWithCtx(pluginCtx, isHttps, reqUrl, plainRequest, plainResponse, body, shouldBeHijacked)
 		}()
-		// 劫持过滤
-		if isFiltered {
+		// 劫持过滤: 被过滤且未命中敏感信息的流量直接丢弃; 命中敏感信息的过滤流量继续走保存(以插件流量形式)。
+		if isFiltered && !tgSaveAsPlugin {
 			return
 		}
 		saveBarePacketHandler := func(id uint) {
@@ -1680,6 +1689,14 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				String: filepath.Base(name),
 				Valid:  true,
 			}
+		}
+
+		// 被 MITM 过滤、但命中内置敏感信息检测的流量: 改以"插件流量"形式保存(source_type=scan + FromPlugin),
+		// 这样它不会出现在 MITM History(source_type=mitm) TAB, 而是进入"插件输出", 既留证据又不污染列表。
+		// 必须在 CalcHash 之前设置(SourceType/FromPlugin 参与 Hash 计算)。
+		if tgSaveAsPlugin {
+			flow.SourceType = schema.HTTPFlow_SourceType_SCAN
+			flow.FromPlugin = trafficguard.PluginName
 		}
 
 		flow.Hash = flow.CalcHash()
@@ -1804,6 +1821,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			if len(userTags) > 0 {
 				flow.AddTagToFirst(userTags...)
 			}
+			// 内置高危凭证检测(TrafficGuard): 默认随 MITM 开启, 不可关闭。复用上面过滤前已扫描的
+			// tgFindings(命中即把流量标红并生成"高危/中危" Risk), 避免二次扫描。
+			trafficguard.ApplyToFlow(s.GetProjectDatabase(), flow, tgFindings, plainRequest, plainResponse)
 			tags := flow.Tags
 			err := yakit.InsertHTTPFlowEx(flow, false, func() {
 				saveBarePacketHandler(flow.ID)

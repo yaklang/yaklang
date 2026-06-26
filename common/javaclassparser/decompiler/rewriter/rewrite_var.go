@@ -170,11 +170,31 @@ const maxStructuredContainers = 1_000_000
 // shared leaf singletons (break/continue/...) never trigger a false positive.
 func AssertStatementsAcyclic(roots []statements.Statement) {
 	visited := make(map[statements.Statement]struct{})
-	stack := append([]statements.Statement{}, roots...)
 	count := 0
+	// ancestors tracks container nodes on the CURRENT DFS path; visited tracks ALL expanded
+	// containers. A node revisited via ancestors is a TRUE cycle (A contains A transitively) which
+	// would drive recursive walkers (Statement.String, rewriteVar, ...) into unbounded recursion →
+	// must panic. A node revisited but NOT on the current path is merely SHARED (two independent
+	// parents reference the same Statement, a finite DAG): safe to skip its children (already
+	// expanded by the first visit) and continue, letting the method decompile instead of stubbing
+	// the whole body (druid TDDLHint.<init>, jackson UTF8DataInputJsonParser).
+	type stackEntry struct {
+		st    statements.Statement
+		leave bool
+	}
+	ancestors := make(map[statements.Statement]struct{})
+	stack := make([]stackEntry, 0, len(roots))
+	for _, r := range roots {
+		stack = append(stack, stackEntry{st: r, leave: false})
+	}
 	for len(stack) > 0 {
-		st := stack[len(stack)-1]
+		entry := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
+		if entry.leave {
+			delete(ancestors, entry.st)
+			continue
+		}
+		st := entry.st
 		if st == nil {
 			continue
 		}
@@ -201,16 +221,34 @@ func AssertStatementsAcyclic(roots []statements.Statement) {
 			// Leaf / non-container statement: nothing to descend into.
 			continue
 		}
+		// ancestors MUST be checked before visited: a node on the current DFS path is a TRUE cycle
+		// (st is its own transitive ancestor) and drives recursive walkers into unbounded recursion,
+		// so it must panic. Since a node is added to BOTH visited and ancestors on first expansion,
+		// checking visited first would short-circuit a self-cycle (A whose body contains A: the child
+		// A is already in visited) and misclassify it as a harmless shared DAG, letting the cycle
+		// through to FoldAssertionGuards/rewriteVar and a fatal stack overflow.
+		if _, ok := ancestors[st]; ok {
+			panic(fmt.Errorf("cyclic container statement (%T) in structured tree; rejecting to avoid unbounded recursion", st))
+		}
 		if _, ok := visited[st]; ok {
-			panic(fmt.Errorf("cyclic or shared container statement (%T) in structured tree; rejecting to avoid unbounded recursion", st))
+			// Visited but NOT on the current path: two independent parents reference the same
+			// Statement object - a finite DAG, not a cycle. Skip expanding its children (already
+			// done on the first visit) and continue, so the method decompiles instead of stubbing.
+			continue
 		}
 		visited[st] = struct{}{}
+		ancestors[st] = struct{}{}
 		count++
 		if count > maxStructuredContainers {
 			panic(fmt.Errorf("structured statement tree has more than %d container nodes; rejecting as pathological", maxStructuredContainers))
 		}
+		// Push a leave marker so ancestors is cleaned up after all children are processed,
+		// then push the children. LIFO → children are processed first, leave marker last.
+		stack = append(stack, stackEntry{st: st, leave: true})
 		for _, body := range children {
-			stack = append(stack, body...)
+			for _, child := range body {
+				stack = append(stack, stackEntry{st: child, leave: false})
+			}
 		}
 	}
 }

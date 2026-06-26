@@ -276,6 +276,8 @@ func (b *singleFileBuilder) visitClassMethodWithModifier(funcdef *pythonparser.F
 	}
 
 	store := b.StoreFunctionBuilder()
+	params := ssa.DetachAST(funcdef.Typedargslist())
+	bodySuite := ssa.DetachAST(funcdef.Suite())
 	blueprint.AddLazyBuilder(func() {
 		switchHandler := b.SwitchFunctionBuilder(store)
 		defer switchHandler()
@@ -295,15 +297,15 @@ func (b *singleFileBuilder) visitClassMethodWithModifier(funcdef *pythonparser.F
 			selfVar := b.CreateVariable("self")
 			b.AssignVariable(selfVar, instance)
 
-			if params := funcdef.Typedargslist(); params != nil {
+			if params != nil {
 				b.buildFuncParamsSkipFirst(params)
 			}
 		} else if isStaticMethod {
-			if params := funcdef.Typedargslist(); params != nil {
+			if params != nil {
 				b.buildFuncParams(params)
 			}
 		} else if isClassMethod {
-			if params := funcdef.Typedargslist(); params != nil {
+			if params != nil {
 				b.buildFuncParamsSkipFirst(params)
 			}
 		} else {
@@ -312,13 +314,13 @@ func (b *singleFileBuilder) visitClassMethodWithModifier(funcdef *pythonparser.F
 			selfVar := b.CreateVariable("self")
 			b.AssignVariable(selfVar, selfParam)
 
-			if params := funcdef.Typedargslist(); params != nil {
+			if params != nil {
 				b.buildFuncParamsSkipFirst(params)
 			}
 		}
 
-		if suite := funcdef.Suite(); suite != nil {
-			b.VisitSuite(suite)
+		if bodySuite != nil {
+			b.VisitSuite(bodySuite)
 		}
 
 		if isConstructor {

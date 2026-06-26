@@ -36,7 +36,7 @@ var levelStrings = map[Level]string{
 
 var (
 	levelMu sync.RWMutex
-	level   = LevelNormal
+	level   = LevelOff
 )
 
 func init() {

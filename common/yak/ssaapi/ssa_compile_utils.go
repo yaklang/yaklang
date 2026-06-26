@@ -5,12 +5,14 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -24,18 +26,25 @@ var (
 )
 
 const (
-	antlrWorkerStateKey = "antlr_worker_state"
-	largeProjectByteCap = 16 * 1024 * 1024
+	antlrWorkerStateKey         = "antlr_worker_state"
+	largeProjectByteCap         = 16 * 1024 * 1024
+	defaultASTMemoryBudgetRatio = 60
+	defaultASTMemoryBudgetMax   = int64(16 * 1024 * 1024 * 1024)
+	minAutoASTMemoryBudget      = int64(2 * 1024 * 1024 * 1024)
+	defaultASTSlotCost          = int64(1024 * 1024 * 1024)
+	defaultLargeProjectGC       = 100
 )
 
 var (
 	antlrCacheResetEveryFilesOnce   sync.Once
 	antlrCacheResetEveryFilesCached int
+	antlrCacheResetEveryBytesOnce   sync.Once
+	antlrCacheResetEveryBytesCached int64
 )
 
 func antlrCacheResetEveryFiles() int {
 	antlrCacheResetEveryFilesOnce.Do(func() {
-		antlrCacheResetEveryFilesCached = 100
+		antlrCacheResetEveryFilesCached = 25
 		if raw := strings.TrimSpace(os.Getenv("YAK_ANTLR_CACHE_RESET_FILES")); raw != "" {
 			if v, err := strconv.Atoi(raw); err == nil {
 				antlrCacheResetEveryFilesCached = v
@@ -48,38 +57,258 @@ func antlrCacheResetEveryFiles() int {
 	return antlrCacheResetEveryFilesCached
 }
 
-func largeProjectCompileConcurrency() int {
-	concurrency := 2
-	if raw := strings.TrimSpace(os.Getenv("YAK_SSA_LARGE_PROJECT_CONCURRENCY")); raw != "" {
-		if v, err := strconv.Atoi(raw); err == nil {
-			concurrency = v
+func antlrCacheResetEveryBytes() int64 {
+	antlrCacheResetEveryBytesOnce.Do(func() {
+		antlrCacheResetEveryBytesCached = 8 * 1024 * 1024
+		if raw := strings.TrimSpace(os.Getenv("YAK_ANTLR_CACHE_RESET_BYTES")); raw != "" {
+			switch strings.ToLower(raw) {
+			case "0", "false", "no", "off", "disable", "disabled":
+				antlrCacheResetEveryBytesCached = 0
+			default:
+				if v, err := utils.ToBytes(raw); err == nil {
+					antlrCacheResetEveryBytesCached = int64(v)
+				} else if v, err := strconv.ParseInt(raw, 10, 64); err == nil {
+					antlrCacheResetEveryBytesCached = v
+				}
+			}
+		}
+		if antlrCacheResetEveryBytesCached <= 0 {
+			antlrCacheResetEveryBytesCached = 0
+		}
+	})
+	return antlrCacheResetEveryBytesCached
+}
+
+type astBuildWindowDecision struct {
+	window           int
+	budgetBytes      int64
+	slotCostBytes    int64
+	manualOverride   bool
+	largeProject     bool
+	diagnosticsHeavy bool
+	budgetSource     string
+}
+
+type largeProjectGCDecision struct {
+	percent        int
+	manualOverride bool
+	largeProject   bool
+	source         string
+}
+
+func parseMemoryBudgetEnv(raw string) (int64, bool) {
+	normalized := strings.TrimSpace(strings.ToLower(raw))
+	switch normalized {
+	case "", "auto":
+		return 0, false
+	case "0", "false", "no", "off", "disable", "disabled":
+		return 0, true
+	}
+	if v, err := utils.ToBytes(raw); err == nil {
+		return int64(v), true
+	}
+	if v, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64); err == nil {
+		return v, true
+	}
+	return 0, false
+}
+
+func systemMemoryTotalBytes() int64 {
+	raw, err := os.ReadFile("/proc/meminfo")
+	if err != nil {
+		return 0
+	}
+	for _, line := range strings.Split(string(raw), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 || fields[0] != "MemTotal:" {
+			continue
+		}
+		kb, err := strconv.ParseInt(fields[1], 10, 64)
+		if err != nil {
+			return 0
+		}
+		return kb * 1024
+	}
+	return 0
+}
+
+func autoASTMemoryBudgetBytes() (int64, string) {
+	if raw := strings.TrimSpace(os.Getenv("YAK_SSA_AST_MEMORY_BUDGET")); raw != "" {
+		if budget, ok := parseMemoryBudgetEnv(raw); ok {
+			return budget, "env:YAK_SSA_AST_MEMORY_BUDGET"
+		}
+		log.Warnf("invalid YAK_SSA_AST_MEMORY_BUDGET=%q, falling back to system memory", raw)
+	}
+
+	total := systemMemoryTotalBytes()
+	if total <= 0 {
+		return 0, "unknown"
+	}
+	budget := total * defaultASTMemoryBudgetRatio / 100
+	if budget > defaultASTMemoryBudgetMax {
+		budget = defaultASTMemoryBudgetMax
+	}
+	if budget < minAutoASTMemoryBudget && total >= minAutoASTMemoryBudget {
+		budget = minAutoASTMemoryBudget
+	}
+	return budget, "auto:system-memory"
+}
+
+func astSlotCostBytes(language ssaconfig.Language) int64 {
+	cost := defaultASTSlotCost
+	switch language {
+	case ssaconfig.PHP:
+		cost = 4 * defaultASTSlotCost
+	case ssaconfig.JAVA, ssaconfig.JS, ssaconfig.TS, ssaconfig.PYTHON:
+		cost = 2 * defaultASTSlotCost
+	case ssaconfig.C, ssaconfig.GO:
+		cost = defaultASTSlotCost
+	}
+	if cost < defaultASTSlotCost {
+		return defaultASTSlotCost
+	}
+	return cost
+}
+
+func clampASTBuildWindow(window, concurrency int) int {
+	if window < 1 {
+		window = 1
+	}
+	if concurrency > 0 && window > concurrency {
+		window = concurrency
+	}
+	return window
+}
+
+func (c *Config) resolveASTBuildWindow(concurrency int) astBuildWindowDecision {
+	decision := astBuildWindowDecision{
+		largeProject: c != nil && c.GetCompileProjectBytes() >= largeProjectByteCap,
+	}
+	if !decision.largeProject {
+		return decision
+	}
+	if strings.TrimSpace(os.Getenv("YAK_SSA_AST_BUILD_WINDOW_FILES")) != "" {
+		decision.manualOverride = true
+		return decision
+	}
+
+	decision.diagnosticsHeavy = c != nil && c.DiagnosticsEnabled() && diagnostics.GetLevel() == diagnostics.LevelLow
+	decision.budgetBytes, decision.budgetSource = autoASTMemoryBudgetBytes()
+	if decision.budgetBytes <= 0 {
+		return decision
+	}
+
+	decision.slotCostBytes = astSlotCostBytes(c.GetLanguage())
+	decision.window = clampASTBuildWindow(int(decision.budgetBytes/decision.slotCostBytes), concurrency)
+	return decision
+}
+
+func parseGCPercentEnv(raw string) (int, bool) {
+	normalized := strings.TrimSpace(strings.ToLower(raw))
+	switch normalized {
+	case "", "auto":
+		return 0, false
+	case "0", "false", "no", "off", "disable", "disabled":
+		return -1, true
+	}
+	v, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil {
+		return 0, false
+	}
+	return v, true
+}
+
+func (c *Config) resolveLargeProjectGCPercent() largeProjectGCDecision {
+	decision := largeProjectGCDecision{
+		largeProject: c != nil && c.GetCompileProjectBytes() >= largeProjectByteCap,
+	}
+	if !decision.largeProject || c == nil {
+		return decision
+	}
+	create, ok := LanguageBuilderCreater[c.GetLanguage()]
+	if !ok || !create().UsesDeferredFileBuild() {
+		return decision
+	}
+	if raw := strings.TrimSpace(os.Getenv("GOGC")); raw != "" {
+		decision.manualOverride = true
+		decision.source = "env:GOGC"
+		return decision
+	}
+	if raw := strings.TrimSpace(os.Getenv("YAK_SSA_GC_PERCENT")); raw != "" {
+		percent, ok := parseGCPercentEnv(raw)
+		if !ok {
+			log.Warnf("invalid YAK_SSA_GC_PERCENT=%q, using %d for large SSA project", raw, defaultLargeProjectGC)
+		} else if percent <= 0 {
+			decision.manualOverride = true
+			decision.source = "env:YAK_SSA_GC_PERCENT"
+			return decision
+		} else {
+			decision.percent = percent
+			decision.source = "env:YAK_SSA_GC_PERCENT"
+			return decision
 		}
 	}
-	if concurrency <= 0 {
-		return 1
+	decision.percent = defaultLargeProjectGC
+	decision.source = "auto:large-project"
+	return decision
+}
+
+func (c *Config) applyLargeProjectGCPercent() func() {
+	decision := c.resolveLargeProjectGCPercent()
+	if !decision.largeProject {
+		return nil
 	}
-	return concurrency
+	if decision.manualOverride {
+		log.Infof("[ssa-compile] large project GC percent controlled by %s", decision.source)
+		return nil
+	}
+	if decision.percent <= 0 {
+		return nil
+	}
+	previous := debug.SetGCPercent(decision.percent)
+	log.Infof(
+		"[ssa-compile] large project GC percent=%d (previous=%d source=%s), restore after compile",
+		decision.percent,
+		previous,
+		decision.source,
+	)
+	return func() {
+		debug.SetGCPercent(previous)
+	}
 }
 
 type antlrWorkerState struct {
-	cache       *ssa.AntlrCache
-	filesParsed int
+	cache           *ssa.AntlrCache
+	filesParsed     int
+	bytesSinceReset int64
 }
 
 type antlrASTParseWorker struct {
 	language        ssa.PreHandlerAnalyzer
 	languageName    string
 	resetEveryFiles int
+	resetEveryBytes int64
 }
 
 func newAntlrASTParseWorker(c *Config) *antlrASTParseWorker {
 	if c == nil {
 		return &antlrASTParseWorker{}
 	}
+	resetEveryFiles := antlrCacheResetEveryFiles()
+	resetEveryBytes := antlrCacheResetEveryBytes()
+	if c.GetCompileProjectBytes() >= largeProjectByteCap {
+		if _, ok := os.LookupEnv("YAK_ANTLR_CACHE_RESET_FILES"); !ok {
+			resetEveryFiles = 1
+		}
+		if _, ok := os.LookupEnv("YAK_ANTLR_CACHE_RESET_BYTES"); !ok {
+			resetEveryBytes = 2 * 1024 * 1024
+		}
+	}
 	return &antlrASTParseWorker{
 		language:        c.LanguageBuilder,
 		languageName:    string(c.GetLanguage()),
-		resetEveryFiles: antlrCacheResetEveryFiles(),
+		resetEveryFiles: resetEveryFiles,
+		resetEveryBytes: resetEveryBytes,
 	}
 }
 
@@ -129,12 +358,16 @@ func (p *antlrASTParseWorker) parseFileAST(path string, source string, store *ut
 
 	state := p.workerState(store)
 	ast, err := p.language.ParseAST(source, state.cache)
-	if state.cache == nil || p.resetEveryFiles <= 0 {
+	if state.cache == nil || (p.resetEveryFiles <= 0 && p.resetEveryBytes <= 0) {
 		return ast, err
 	}
 	state.filesParsed++
-	if state.filesParsed%p.resetEveryFiles == 0 {
+	state.bytesSinceReset += int64(len(source))
+	resetByFiles := p.resetEveryFiles > 0 && state.filesParsed%p.resetEveryFiles == 0
+	resetByBytes := p.resetEveryBytes > 0 && state.bytesSinceReset >= p.resetEveryBytes
+	if resetByFiles || resetByBytes {
 		state.cache.ResetRuntimeCaches()
+		state.bytesSinceReset = 0
 	}
 	if err != nil {
 		log.Debugf("parsed file[%s] parse [%s]AST error[%s]", path, p.languageName, err)
@@ -171,21 +404,45 @@ func (c *Config) GetFileHandler(
 		return parser.initWorker()
 	}
 	concurrency := int(c.GetCompileConcurrency())
-	if c.GetCompileProjectBytes() >= largeProjectByteCap && concurrency > largeProjectCompileConcurrency() {
-		capped := largeProjectCompileConcurrency()
-		log.Infof(
-			"[ssa-compile] large project detected (%s), cap AST parse concurrency: %d -> %d",
-			formatFileSize(int(c.GetCompileProjectBytes())),
-			concurrency,
-			capped,
-		)
-		concurrency = capped
+	astBuildWindow := c.resolveASTBuildWindow(concurrency)
+	if astBuildWindow.largeProject {
+		if astBuildWindow.manualOverride {
+			log.Infof(
+				"[ssa-compile] large project detected (%s), AST build window controlled by YAK_SSA_AST_BUILD_WINDOW_FILES and ANTLR cache reset files=%d bytes=%s",
+				formatFileSize(int(c.GetCompileProjectBytes())),
+				parser.resetEveryFiles,
+				formatFileSize(int(parser.resetEveryBytes)),
+			)
+		} else if astBuildWindow.window > 0 {
+			log.Infof(
+				"[ssa-compile] large project detected (%s), auto AST build window=%d (language=%s diagnostics_heavy=%v budget=%s source=%s slot_cost=%s concurrency=%d), ANTLR cache reset files=%d bytes=%s",
+				formatFileSize(int(c.GetCompileProjectBytes())),
+				astBuildWindow.window,
+				c.GetLanguage(),
+				astBuildWindow.diagnosticsHeavy,
+				formatFileSize(int(astBuildWindow.budgetBytes)),
+				astBuildWindow.budgetSource,
+				formatFileSize(int(astBuildWindow.slotCostBytes)),
+				concurrency,
+				parser.resetEveryFiles,
+				formatFileSize(int(parser.resetEveryBytes)),
+			)
+		} else {
+			log.Infof(
+				"[ssa-compile] large project detected (%s), AST build window uses compile concurrency=%d (memory budget unavailable), ANTLR cache reset files=%d bytes=%s",
+				formatFileSize(int(c.GetCompileProjectBytes())),
+				concurrency,
+				parser.resetEveryFiles,
+				formatFileSize(int(parser.resetEveryBytes)),
+			)
+		}
 	}
 	return ssareducer.FilesHandler(
 		c.ctx, filesystem, preHandlerFiles,
 		parse, initWorker,
 		c.GetCompileASTSequence(),
 		concurrency,
+		astBuildWindow.window,
 	)
 }
 
@@ -213,6 +470,7 @@ func Size(size int) string {
 
 type ScanResult struct {
 	HandlerFiles    []string
+	HandlerFileSet  map[string]struct{}
 	PreHandlerFiles []string
 	HandlerFilesMap map[string]struct{}
 	Folders         [][]string
@@ -238,6 +496,7 @@ type ScanConfig struct {
 func ScanProjectFiles(cfg ScanConfig) (*ScanResult, error) {
 	result := &ScanResult{
 		HandlerFiles:    make([]string, 0),
+		HandlerFileSet:  make(map[string]struct{}),
 		PreHandlerFiles: make([]string, 0),
 		HandlerFilesMap: make(map[string]struct{}),
 		Folders:         make([][]string, 0),
@@ -275,6 +534,7 @@ func ScanProjectFiles(cfg ScanConfig) (*ScanResult, error) {
 				result.HandlerTotal++
 				result.HandlerBytes += fi.Size()
 				result.HandlerFiles = append(result.HandlerFiles, path)
+				result.HandlerFileSet[path] = struct{}{}
 			}
 			if cfg.CheckPreHandler != nil && cfg.CheckPreHandler(path) == nil {
 				result.PreHandlerTotal++

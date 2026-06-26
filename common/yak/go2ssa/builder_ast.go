@@ -39,8 +39,13 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 	_ = exportHandler
 
 	if b.PreHandler() {
+		// Stage 1 capture: package library key + import use-names as plain strings,
+		// so the deferred cross-file linking task below holds no AST.
+		var pkgLibName string
+		var importUseNames []string
 		if packag, ok := ast.PackageClause().(*gol.PackageClauseContext); ok {
 			pkgPath := b.buildPackage(packag)
+			pkgLibName = pkgPath[0]
 			if b.GetProgram().ExtraFile["go.mod"] != "" {
 				pkgNameCurrent = b.GetProgram().ExtraFile["go.mod"] + "/" + pkgPath[0]
 			} else {
@@ -75,9 +80,6 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 					lib.GlobalVariablesBlueprint.InitializeWithContainer(pkgScope)
 				}
 			}
-			defer func() {
-				lib.VisitAst(ast)
-			}()
 			lib.PushEditor(prog.GetCurrentEditor())
 			init := lib.GetAndCreateFunction(pkgNameCurrent, string(ssa.MainFunctionName))
 			init.SetType(ssa.NewFunctionType("", []ssa.Type{ssa.CreateAnyType()}, ssa.CreateAnyType(), false))
@@ -114,7 +116,45 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			for i, name := range names {
 				pathl := strings.Split(paths[i], "/")
 				b.SetImportPackage(name, pathl[len(pathl)-1], paths[i], impo.(*gol.ImportDeclContext).ImportSpec(i))
+				importUseNames = append(importUseNames, name)
 			}
+		}
+
+		// Stage 1: the only genuinely-deferred top-level work is cross-file
+		// ImportAll (must run after every package skeleton exists). Register it as
+		// a data-driven deferred task capturing only strings (package + import names),
+		// never the file AST. It runs in pass2 before function
+		// bodies (LazyBuild/Finish), matching the original ordering. This replaces
+		// the pass2 BuildFromAST(whole-ast) top-level closure for Go. In legacy
+		// mode the closure still runs and links imports in the else-branch below,
+		// so skip this task to avoid a redundant (idempotent) ImportAll.
+		if prog := b.GetProgram(); prog != nil && pkgLibName != "" && len(importUseNames) > 0 {
+			app := prog.GetApplication()
+			if app == nil {
+				app = prog
+			}
+			fileEditor := app.GetCurrentEditor()
+			capturedPkg := pkgLibName
+			capturedImports := importUseNames
+			taskKey := capturedPkg
+			if fileEditor != nil {
+				taskKey = fileEditor.GetUrl()
+			}
+			prog.RegisterDeferredBuild(ssa.DeferredBuildKindHelper, "go-import-link:"+taskKey, func() {
+				if fileEditor != nil {
+					app.PushEditor(fileEditor)
+					defer app.PopEditor(true)
+				}
+				lib, _ := app.GetLibrary(capturedPkg)
+				if lib == nil {
+					return
+				}
+				for _, name := range capturedImports {
+					if il, _ := app.GetOrCreateLibrary(name); il != nil {
+						lib.ImportAll(il)
+					}
+				}
+			})
 		}
 
 		// Ensure imported packages are materialized as ExternLib deterministically.
@@ -205,6 +245,8 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			}
 		}
 		exportHandler()
+
+		ssa.ReleaseASTRoot(ast)
 	} else {
 		if packag, ok := ast.PackageClause().(*gol.PackageClauseContext); ok {
 			pkgPath := b.buildPackage(packag)
@@ -214,9 +256,6 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			if lib == nil {
 				b.NewError(ssa.Error, TAG, "no library found for package %s", pkgPath[0])
 			}
-			defer func() {
-				lib.VisitAst(ast)
-			}()
 
 			for _, impo := range ast.AllImportDecl() {
 				names, _ := b.buildImportDecl(impo.(*gol.ImportDeclContext))
@@ -780,6 +819,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 	}
 
 	store := b.StoreFunctionBuilder()
+	capturedFun := ssa.DetachAST(fun)
 	log.Debugf("add function funcName = %s", funcName)
 	newFunc.AddLazyBuilder(func() {
 		log.Debugf("build function funcName = %s", funcName)
@@ -794,11 +834,11 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 		b.FunctionBuilder = b.PushFunction(newFunc)
 		b.SupportClosure = false
 
-		if para, ok := fun.Signature().(*gol.SignatureContext); ok {
+		if para, ok := capturedFun.Signature().(*gol.SignatureContext); ok {
 			params, result = b.buildSignature(para)
 		}
 
-		if typeps := fun.TypeParameters(); typeps != nil {
+		if typeps := capturedFun.TypeParameters(); typeps != nil {
 			b.tpHandler[funcName] = b.buildTypeParameters(typeps.(*gol.TypeParametersContext))
 		}
 
@@ -809,7 +849,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 		}
 
 		b.SetGlobal = false
-		if block, ok := fun.Block().(*gol.BlockContext); ok {
+		if block, ok := capturedFun.Block().(*gol.BlockContext); ok {
 			b.buildBlock(block, true)
 		}
 		b.Finish()
@@ -944,6 +984,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 	}
 
 	store := b.StoreFunctionBuilder()
+	capturedFun := ssa.DetachAST(fun)
 	log.Debugf("add method funcName = %s", funcName)
 	newFunc.AddLazyBuilder(func() {
 		log.Debugf("build method funcName = %s", funcName)
@@ -958,7 +999,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		b.FunctionBuilder = b.PushFunction(newFunc)
 		b.SupportClosure = false
 
-		if para, ok := fun.Signature().(*gol.SignatureContext); ok {
+		if para, ok := capturedFun.Signature().(*gol.SignatureContext); ok {
 			params, result = b.buildSignature(para)
 		}
 
@@ -969,7 +1010,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		}
 
 		b.SetGlobal = false
-		if block, ok := fun.Block().(*gol.BlockContext); ok {
+		if block, ok := capturedFun.Block().(*gol.BlockContext); ok {
 			b.buildBlock(block, true)
 		}
 		b.Finish()

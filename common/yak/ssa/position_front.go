@@ -6,6 +6,7 @@ import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/antlr4util"
 )
 
 func (b *FunctionBuilder) AppendBlockRange() {
@@ -23,6 +24,7 @@ func (b *FunctionBuilder) SetRangeFromTerminalNode(node antlr.TerminalNode) func
 }
 func (b *FunctionBuilder) SetRange(token CanStartStopToken) func() {
 	r := GetRange(b.GetEditor(), token)
+	slimRangeToken(token)
 	if r == nil {
 		return func() {}
 	}
@@ -101,7 +103,25 @@ func (b *FunctionBuilder) GetCurrentRange(fallback CanStartStopToken) *memedit.R
 }
 
 func (b *FunctionBuilder) GetRangeByToken(r CanStartStopToken) *memedit.Range {
-	return GetRange(b.GetEditor(), r)
+	rng := GetRange(b.GetEditor(), r)
+	slimRangeToken(r)
+	return rng
+}
+
+func slimRangeToken(token CanStartStopToken) {
+	SlimRangeToken(token)
+}
+
+func SlimRangeToken(token CanStartStopToken) {
+	if utils.IsNil(token) {
+		return
+	}
+	if tree, ok := token.(antlr.Tree); ok {
+		antlr4util.SlimParserNode(tree)
+		return
+	}
+	antlr4util.SlimToken(token.GetStart())
+	antlr4util.SlimToken(token.GetStop())
 }
 
 // / ============================== Token ==============================
@@ -211,3 +231,44 @@ func (t *Token) GetText() string {
 }
 
 var _ CanStartStopToken = (*Token)(nil)
+
+type TextRangeToken struct {
+	start antlr.Token
+	end   antlr.Token
+	text  string
+}
+
+func NewTextRangeToken(token CanStartStopToken) *TextRangeToken {
+	if utils.IsNil(token) {
+		return nil
+	}
+	text := token.GetText()
+	return &TextRangeToken{
+		start: antlr4util.SlimToken(token.GetStart()),
+		end:   antlr4util.SlimToken(token.GetStop()),
+		text:  text,
+	}
+}
+
+func (t *TextRangeToken) GetStart() antlr.Token {
+	if t == nil {
+		return nil
+	}
+	return t.start
+}
+
+func (t *TextRangeToken) GetStop() antlr.Token {
+	if t == nil {
+		return nil
+	}
+	return t.end
+}
+
+func (t *TextRangeToken) GetText() string {
+	if t == nil {
+		return ""
+	}
+	return t.text
+}
+
+var _ CanStartStopToken = (*TextRangeToken)(nil)

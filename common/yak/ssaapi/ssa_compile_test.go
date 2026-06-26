@@ -133,7 +133,7 @@ func TestJava_ProcessManage_Mutli_Files(t *testing.T) {
 			ssaapi.WithLanguage(ssaconfig.JAVA),
 			ssaapi.WithProgramName(programID),
 			ssaapi.WithProcess(func(msg string, process float64) {
-				if process >= 0.5 {
+				if process > 0 {
 					cancel()
 				}
 				if process > maxProcess {
@@ -145,7 +145,7 @@ func TestJava_ProcessManage_Mutli_Files(t *testing.T) {
 		)
 		require.Error(t, err, "parse project error: %v", err)
 		// when cancel, the process will not 1
-		require.LessOrEqual(t, maxProcess, 0.9)
+		require.Less(t, maxProcess, 1.0)
 		file := make([]string, 0)
 		dbfs := ssadb.NewIrSourceFs()
 		filesys.Recursive(

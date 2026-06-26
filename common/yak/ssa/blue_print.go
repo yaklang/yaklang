@@ -198,6 +198,10 @@ func (c *Blueprint) addParentBlueprintEx(parent *Blueprint, relation BlueprintRe
 			}
 		}
 	}
+	if c == parent || c.Name == parent.Name {
+		log.Debugf("skip self blueprint relation: blueprint name=%v relation=%v", c.Name, relation)
+		return
+	}
 
 	// 使用新的循环依赖检查函数
 	if HasCircularDependency(c, parent) {

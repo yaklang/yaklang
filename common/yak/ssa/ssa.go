@@ -278,14 +278,9 @@ type Program struct {
 
 	Cache *ProgramCache
 
-	/*
-		when build : ref: common/yak/ssa/lazy_builder.go
-			*preHandler: set map hash -> false
-			*build : 	 delete map hash
-			when len(astMap) == 0  this program finish
-	*/
-	astMap   map[string]struct{} // ast hash list
-	finished bool
+	finished           bool
+	deferredBuilds     *omap.OrderedMap[string, *deferredBuildTask]
+	deferredBuildTotal int
 
 	//consts
 	Consts map[string]Value

@@ -46,8 +46,5 @@ func (y *builder) VisitPhpBlock(raw phpparser.IPhpBlockContext) interface{} {
 			y.VisitEnumDeclaration(enum)
 		}
 	}
-	if len(i.AllNamespaceDeclaration()) <= 0 {
-		y.GetProgram().VisitAst(raw)
-	}
 	return nil
 }

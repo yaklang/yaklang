@@ -28,11 +28,10 @@ func (c *Config) parseFSFromInfo() (fi.FileSystem, error) {
 	case ssaconfig.CodeSourceLocal:
 		baseFS = filesys.NewRelLocalFs(c.GetCodeSourceLocalFile())
 	case ssaconfig.CodeSourceCompression:
-		zipfs, err := getZipFile(c)
+		baseFS, err = getZipFile(c)
 		if err != nil {
 			return nil, err
 		}
-		baseFS = zipfs
 	case ssaconfig.CodeSourceJar:
 		zipfs, err := getZipFile(c)
 		if err != nil {

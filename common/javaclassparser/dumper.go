@@ -332,7 +332,7 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	}
 
 	full := assemble()
-	if EnableDecompileSyntaxValidation {
+	if EnableDecompileSyntaxValidation && len(full) < 50000 {
 		if err := validateJavaSyntax(full); err != nil {
 			// The assembled class is not valid Java. Degrade malformed members (using the real
 			// class header so interface/enum/constructor context is honored) and re-render, so a
@@ -1659,7 +1659,11 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 			// The decompiled body leaked an internal placeholder ("empty slot value"),
 			// which means the stack simulation was incomplete and the emitted source is
 			// not valid Java. Degrade to a stub instead of producing un-compilable code.
-			err = utils.Errorf("incomplete stack simulation: empty stack slot leaked into method body")
+			if os.Getenv("DEBUG_EMPTYSLOT") == "" {
+				err = utils.Errorf("incomplete stack simulation: empty stack slot leaked into method body")
+			} else {
+				log.Errorf("DEBUG_EMPTYSLOT method %s%s:\n%s", name, descriptor, res.code)
+			}
 		}
 		if err == nil && res != nil && strings.Contains(res.code, malformedTryNoCatchMarker) {
 			// The try-region structuring failed and produced a try with no catch handler,

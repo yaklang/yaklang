@@ -99,6 +99,10 @@ func (*SSABuilder) GetLanguage() ssaconfig.Language {
 	return ssaconfig.JAVA
 }
 
+func (*SSABuilder) UsesDeferredFileBuild() bool {
+	return true
+}
+
 // ========================================== Build Front End ==========================================
 
 type singleFileBuilder struct {
@@ -171,7 +175,7 @@ func (b *singleFileBuilder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) 
 
 func (b *singleFileBuilder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
 	b.FunctionBuilder = s.Current
-	b.LoadFunctionBuilder(s.Store)
+	b.LoadFunctionBuilder(s)
 }
 
 func (b *singleFileBuilder) initImport() {

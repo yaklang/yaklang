@@ -137,6 +137,25 @@ func IfRewriter(manager *RewriteManager, ifNode *core.Node) error {
 		}
 		return !IsEndNode(node)
 	})
+	// An if whose arm can `return`/`throw` (e.g. Jackson's deserializeAndSet, where the true arm
+	// has `if (skipNulls) return;`) ends up with the early-exit terminator AND the real fall-through
+	// continuation both wired as Next of the structured if node. That gives the if two Next edges,
+	// and the linear statement collector aborts with "multiple next", degrading the whole method to
+	// a stub. The early-exit terminator is not a real continuation (it ends its path), so drop it -
+	// but only when at least one genuine fall-through remains, so an if that fully terminates the
+	// method (every exit is a return) is left with its terminal Next rather than no successor at all.
+	hasFallThrough := false
+	for _, n := range endNodes {
+		if !isMethodExitTerminator(n) {
+			hasFallThrough = true
+			break
+		}
+	}
+	if hasFallThrough {
+		endNodes = utils2.NodeFilter(endNodes, func(node *core.Node) bool {
+			return !isMethodExitTerminator(node)
+		})
+	}
 	for _, node := range NodeDeduplication(endNodes) {
 		ifStatementNode.AddNext(node)
 	}

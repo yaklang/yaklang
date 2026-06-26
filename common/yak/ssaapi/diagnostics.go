@@ -1,18 +1,47 @@
 package ssaapi
 
 import (
+	"os"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-var WithDiagnostics = ssaconfig.SetOption("ssa_compile/diagnostics", func(c *Config, enabled bool) {
+var withRuntimeDiagnostics = ssaconfig.SetOption("ssa_compile/diagnostics", func(c *Config, enabled bool) {
 	c.diagnosticsEnabled = enabled
+	if c.Config != nil {
+		c.Config.SetCompileDiagnostics(enabled)
+	}
 })
 
+func WithDiagnostics(enabled bool) ssaconfig.Option {
+	return func(c *ssaconfig.Config) error {
+		if c == nil {
+			return nil
+		}
+		if enabled {
+			ensureDiagnosticsLevelEnabled()
+		}
+		c.SetCompileDiagnostics(enabled)
+		return withRuntimeDiagnostics(enabled)(c)
+	}
+}
+
+func ensureDiagnosticsLevelEnabled() {
+	if diagnostics.GetLevel() != diagnostics.LevelOff {
+		return
+	}
+	if raw := os.Getenv("YAK_DIAGNOSTICS_LOG_LEVEL"); raw != "" {
+		if err := diagnostics.SetLevelFromString(raw); err == nil {
+			return
+		}
+	}
+	diagnostics.SetLevel(diagnostics.LevelLow)
+}
+
 func (c *Config) DiagnosticsEnabled() bool {
-	return c != nil && c.diagnosticsEnabled
+	return c != nil && (c.diagnosticsEnabled || (c.Config != nil && c.Config.GetCompileDiagnostics()))
 }
 
 func (c *Config) applyNestedSettings(rec *diagnostics.Recorder) {

@@ -99,6 +99,10 @@ func (*SSABuilder) GetLanguage() ssaconfig.Language {
 	return ssaconfig.PYTHON
 }
 
+func (*SSABuilder) UsesDeferredFileBuild() bool {
+	return true
+}
+
 // ========================================== PreHandlerAnalyzer Implementation ==========================================
 
 var _ ssa.PreHandlerAnalyzer = &SSABuilder{}
@@ -119,10 +123,8 @@ func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 }
 
 // PreHandlerFile handles preprocessing of a single file.
-// For Python, we don't need to call Build here as the framework calls it automatically.
-// This is used for any pre-processing before the main build.
 func (s *SSABuilder) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	// Empty - the framework calls Build automatically
+	builder.GetProgram().GetApplication().Build(ast, editor, builder)
 }
 
 // PreHandlerProject handles preprocessing at the project level.
@@ -150,9 +152,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 
 	switch ext {
 	case ".py":
-		// Python files are built by PreHandlerFile, not here
-		// This prevents double compilation
-		return nil
+		return prog.Build(ast, editor, fb)
 	case ".jpg", ".png", ".gif", ".jpeg", ".css", ".js", ".avi", ".mp4", ".mp3", ".pdf", ".doc":
 		// Skip binary/media files
 		return nil
@@ -759,7 +759,7 @@ func (b *singleFileBuilder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) 
 // LoadBuilder restores the FunctionBuilder from a stored state.
 func (b *singleFileBuilder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
 	b.FunctionBuilder = s.Current
-	b.LoadFunctionBuilder(s.Store)
+	b.LoadFunctionBuilder(s)
 }
 
 // FrontendWithCache parses Python source code and returns the root AST node.

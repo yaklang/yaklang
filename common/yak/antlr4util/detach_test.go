@@ -61,6 +61,90 @@ func TestDetachParserATNSimulatorCaches(t *testing.T) {
 	}
 }
 
+func TestSlimParserTree_ClearsParentParserAndTokenInput(t *testing.T) {
+	assertUnexportedFieldExists(t, &antlr.TokenSourceCharStreamPair{}, "charStream")
+	assertUnexportedFieldExists(t, antlr.NewTerminalNodeImpl(nil), "parentCtx")
+	assertUnexportedFieldExists(t, antlr.NewBaseParserRuleContext(nil, -1), "exception")
+
+	lexer := javaparser.NewJavaLexer(antlr.NewInputStream("class A { void run(){ int x = 1 + 2; } }"))
+	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+	parser := javaparser.NewJavaParser(tokenStream)
+	cu := parser.CompilationUnit().(*javaparser.CompilationUnitContext)
+	method := cu.TypeDeclaration(0).(*javaparser.TypeDeclarationContext).ClassDeclaration().(*javaparser.ClassDeclarationContext).ClassBody().(*javaparser.ClassBodyContext).ClassBodyDeclaration(0).(*javaparser.ClassBodyDeclarationContext).MemberDeclaration().(*javaparser.MemberDeclarationContext).MethodDeclaration().(*javaparser.MethodDeclarationContext)
+	body := method.MethodBody().(*javaparser.MethodBodyContext)
+
+	start := body.GetStart()
+	if start == nil || start.GetInputStream() == nil || start.GetTokenSource() == nil {
+		t.Fatalf("expected method body token to retain input/source before slimming")
+	}
+	beforeText := body.GetText()
+	if body.GetParent() == nil {
+		t.Fatalf("expected method body to have parent before slimming")
+	}
+	if body.GetParser() == nil {
+		t.Fatalf("expected generated context parser before slimming")
+	}
+
+	SlimParserTree(body)
+
+	if body.GetParent() != nil {
+		t.Fatalf("expected root parent to be nil after slimming")
+	}
+	if body.GetParser() != nil {
+		t.Fatalf("expected generated context parser to be nil after slimming")
+	}
+	if body.GetText() != beforeText {
+		t.Fatalf("expected text to remain stable after slimming, before=%q after=%q", beforeText, body.GetText())
+	}
+	if got := body.GetStart(); got == nil || got.GetText() == "" || got.GetInputStream() != nil || got.GetTokenSource() != nil {
+		t.Fatalf("expected start token text without input/source after slimming, token=%#v input=%v source=%v", got, got.GetInputStream(), got.GetTokenSource())
+	}
+	block := body.Block().(*javaparser.BlockContext)
+	if block.GetParser() != nil {
+		t.Fatalf("expected child generated context parser to be nil after slimming")
+	}
+	blockStart := block.GetChild(0)
+	if blockStart == nil || blockStart.GetParent() != nil {
+		t.Fatalf("expected terminal child parent to be nil after slimming, child=%#v parent=%v", blockStart, blockStart.GetParent())
+	}
+}
+
+func TestDetachParserTreeChildren_CutsRootChildrenWithoutRecursiveTokenCopy(t *testing.T) {
+	lexer := javaparser.NewJavaLexer(antlr.NewInputStream("class A { void run(){ int x = 1 + 2; } }"))
+	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+	parser := javaparser.NewJavaParser(tokenStream)
+	cu := parser.CompilationUnit().(*javaparser.CompilationUnitContext)
+	typeDecl := cu.TypeDeclaration(0).(*javaparser.TypeDeclarationContext)
+	method := typeDecl.ClassDeclaration().(*javaparser.ClassDeclarationContext).ClassBody().(*javaparser.ClassBodyContext).ClassBodyDeclaration(0).(*javaparser.ClassBodyDeclarationContext).MemberDeclaration().(*javaparser.MemberDeclarationContext).MethodDeclaration().(*javaparser.MethodDeclarationContext)
+	body := method.MethodBody().(*javaparser.MethodBodyContext)
+
+	start := body.GetStart()
+	if start == nil || start.GetInputStream() == nil || start.GetTokenSource() == nil {
+		t.Fatalf("expected descendant token to retain input/source before lightweight detach")
+	}
+	if typeDecl.GetParent() == nil {
+		t.Fatalf("expected direct child to have parent before lightweight detach")
+	}
+	if typeDecl.GetParser() == nil || body.GetParser() == nil {
+		t.Fatalf("expected generated context parsers before lightweight detach")
+	}
+
+	DetachParserTreeChildren(cu)
+
+	if typeDecl.GetParent() != nil {
+		t.Fatalf("expected direct child parent to be nil after lightweight detach")
+	}
+	if typeDecl.GetParser() != nil {
+		t.Fatalf("expected direct child parser to be nil after lightweight detach")
+	}
+	if body.GetParser() == nil {
+		t.Fatalf("expected descendant parser to remain untouched by lightweight detach")
+	}
+	if start.GetInputStream() == nil || start.GetTokenSource() == nil {
+		t.Fatalf("expected descendant token input/source to remain untouched by lightweight detach")
+	}
+}
+
 func assertUnexportedFieldExists(t *testing.T, target any, fieldName string) {
 	t.Helper()
 

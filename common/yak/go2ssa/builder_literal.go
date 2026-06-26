@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/utils"
 	gol "github.com/yaklang/yaklang/common/yak/antlr4go/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -938,7 +939,7 @@ func coverType(ityp, iwantTyp ssa.Type) {
 }
 
 func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
-	if ityp == nil {
+	if utils.IsNil(ityp) {
 		return b.EmitUndefined("default")
 	}
 	switch ityp.GetTypeKind() {

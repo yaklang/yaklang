@@ -170,15 +170,23 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 			}()
 			y.GetProgram().SetExportType(name, blueprint)
 			if i.Extends() != nil {
+				extendRef := ssa.DetachAST(i.QualifiedStaticTypeRef())
 				handlefunc = append(handlefunc, func(b *builder) {
-					b.SetRange(i.QualifiedStaticTypeRef())
-					extendBlueprint := y.VisitQualifiedStaticTypeRef(i.QualifiedStaticTypeRef())
+					recoverRange := b.SetRange(extendRef)
+					defer recoverRange()
+					extendBlueprint := b.VisitQualifiedStaticTypeRef(extendRef)
 					blueprint.AddParentBlueprint(extendBlueprint)
 				})
 			}
 			if i.Implements() != nil {
+				implRefs := make([]phpparser.IQualifiedStaticTypeRefContext, 0)
+				if list, ok := i.InterfaceList().(*phpparser.InterfaceListContext); ok {
+					for _, impl := range list.AllQualifiedStaticTypeRef() {
+						implRefs = append(implRefs, ssa.DetachAST(impl))
+					}
+				}
 				handlefunc = append(handlefunc, func(b *builder) {
-					for _, impl := range i.InterfaceList().(*phpparser.InterfaceListContext).AllQualifiedStaticTypeRef() {
+					for _, impl := range implRefs {
 						ref := impl.(*phpparser.QualifiedStaticTypeRefContext)
 						pkgName, namespaceName := b.VisitQualifiedNamespaceName(ref.QualifiedNamespaceName())
 						app := b.GetProgram().GetApplication()
@@ -216,10 +224,14 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 		y.GetProgram().SetExportType(name, blueprint)
 		if i.Extends() != nil {
 			if i.InterfaceList() != nil {
+				extendRefs := make([]phpparser.IQualifiedStaticTypeRefContext, 0)
 				for _, impl := range i.InterfaceList().(*phpparser.InterfaceListContext).AllQualifiedStaticTypeRef() {
-					handlefunc = append(handlefunc, func(b *builder) {
+					extendRefs = append(extendRefs, ssa.DetachAST(impl))
+				}
+				handlefunc = append(handlefunc, func(b *builder) {
+					for _, impl := range extendRefs {
 						ref := impl.(*phpparser.QualifiedStaticTypeRefContext)
-						pkgName, namespaceName := y.VisitQualifiedNamespaceName(ref.QualifiedNamespaceName())
+						pkgName, namespaceName := b.VisitQualifiedNamespaceName(ref.QualifiedNamespaceName())
 						app := b.GetProgram().GetApplication()
 						var iface *ssa.Blueprint
 						if len(pkgName) <= 1 {
@@ -241,8 +253,8 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 						}
 						iface.SetKind(ssa.BlueprintInterface)
 						blueprint.AddParentBlueprint(iface)
-					})
-				}
+					}
+				})
 			}
 		}
 	}
@@ -271,6 +283,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 	switch ret := raw.(type) {
 	case *phpparser.PropertyModifiersVariableContext:
 		modifiers := y.VisitPropertyModifiers(ret.PropertyModifiers())
+		typeHint := ssa.DetachAST(ret.TypeHint())
 		for _, va := range ret.AllVariableInitializer() {
 			name, value := y.VisitVariableInitializer(va)
 			if strings.HasPrefix(name, "$") {
@@ -294,7 +307,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 				switchHandler := y.SwitchFunctionBuilder(store)
 				defer switchHandler()
 				y.FunctionBuilder = currentBuilder
-				typ := y.VisitTypeHint(ret.TypeHint())
+				typ := y.VisitTypeHint(typeHint)
 				value.SetType(typ)
 			})
 		}
@@ -317,6 +330,8 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		newFunction := y.NewFunc(funcName)
 		newFunction.SetMethodName(methodName)
 		store := y.StoreFunctionBuilder()
+		formalParameterList := ssa.DetachAST(ret.FormalParameterList())
+		methodBody := ssa.DetachAST(ret.MethodBody())
 		newFunction.AddLazyBuilder(func() {
 			switchHandler := y.SwitchFunctionBuilder(store)
 			defer switchHandler()
@@ -332,8 +347,8 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 					param = y.NewParam("$this")
 					param.SetType(class)
 				}
-				y.VisitFormalParameterList(ret.FormalParameterList())
-				y.VisitMethodBody(ret.MethodBody())
+				y.VisitFormalParameterList(formalParameterList)
+				y.VisitMethodBody(methodBody)
 				if methodName == "__construct" {
 					y.EmitReturn([]ssa.Value{param})
 				}

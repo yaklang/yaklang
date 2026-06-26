@@ -3,6 +3,7 @@ package python2ssa
 import (
 	"github.com/yaklang/yaklang/common/log"
 	pythonparser "github.com/yaklang/yaklang/common/yak/python/parser"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 // VisitRoot visits the root node of the Python AST.
@@ -24,6 +25,9 @@ func (b *singleFileBuilder) VisitRoot(raw pythonparser.IRootContext) interface{}
 	// For now, we'll handle file_input which is the most common case
 	if fileInput := root.File_input(); fileInput != nil {
 		b.VisitFileInput(fileInput)
+		if b.PreHandler() {
+			b.registerPythonFileBuild(fileInput)
+		}
 	} else if singleInput := root.Single_input(); singleInput != nil {
 		b.VisitSingleInput(singleInput)
 	} else if evalInput := root.Eval_input(); evalInput != nil {
@@ -48,8 +52,21 @@ func (b *singleFileBuilder) VisitFileInput(raw pythonparser.IFile_inputContext) 
 		return nil
 	}
 
-	// Visit all statements in the file
 	stmts := fileInput.AllStmt()
+	if b.PreHandler() {
+		b.predeclareTopLevelFuncShells(stmts)
+		defer func() {
+			b.topLevelFuncShells = nil
+		}()
+		for _, stmt := range stmts {
+			b.visitFileInputStmtSkeleton(stmt)
+			if b.shouldStopStatementWalk() {
+				break
+			}
+		}
+		return nil
+	}
+
 	b.predeclareTopLevelFuncShells(stmts)
 	defer func() {
 		b.topLevelFuncShells = nil
@@ -62,6 +79,78 @@ func (b *singleFileBuilder) VisitFileInput(raw pythonparser.IFile_inputContext) 
 	}
 
 	return nil
+}
+
+func (b *singleFileBuilder) visitFileInputStmtSkeleton(stmt pythonparser.IStmtContext) {
+	if stmt == nil {
+		return
+	}
+	stmtCtx, ok := stmt.(*pythonparser.StmtContext)
+	if !ok || stmtCtx == nil {
+		return
+	}
+	if compoundStmt := stmtCtx.Compound_stmt(); compoundStmt != nil {
+		if cfdCtx, ok := compoundStmt.(*pythonparser.Class_or_func_def_stmtContext); ok {
+			b.VisitClassOrFuncDefStmt(cfdCtx)
+		}
+	}
+}
+
+func (b *singleFileBuilder) registerPythonFileBuild(fileInput pythonparser.IFile_inputContext) {
+	if b == nil || fileInput == nil {
+		return
+	}
+	fileInputCtx, ok := fileInput.(*pythonparser.File_inputContext)
+	if !ok || fileInputCtx == nil {
+		return
+	}
+	capturedStmts := make([]pythonparser.IStmtContext, 0)
+	for _, stmt := range fileInputCtx.AllStmt() {
+		if isTopLevelClassOrFuncDefStmt(stmt) {
+			continue
+		}
+		capturedStmts = append(capturedStmts, ssa.DetachAST(stmt))
+	}
+	if len(capturedStmts) == 0 {
+		return
+	}
+	prog := b.GetProgram()
+	if prog == nil {
+		return
+	}
+	editor := b.GetEditor()
+	path := "python"
+	if editor != nil && editor.GetUrl() != "" {
+		path = editor.GetUrl()
+	}
+	capturedBuilder := b.FunctionBuilder
+	prog.RegisterFileBuild(path, editor, capturedBuilder, func(fileFb *ssa.FunctionBuilder) {
+		build := &singleFileBuilder{
+			FunctionBuilder: fileFb,
+			constMap:        make(map[string]ssa.Value),
+			globalNames:     make(map[string]bool),
+		}
+		build.SupportClosure = true
+		for _, stmt := range capturedStmts {
+			build.VisitStmt(stmt)
+			if build.shouldStopStatementWalk() {
+				break
+			}
+		}
+	})
+}
+
+func isTopLevelClassOrFuncDefStmt(stmt pythonparser.IStmtContext) bool {
+	stmtCtx, ok := stmt.(*pythonparser.StmtContext)
+	if !ok || stmtCtx == nil {
+		return false
+	}
+	compoundStmt := stmtCtx.Compound_stmt()
+	if compoundStmt == nil {
+		return false
+	}
+	_, ok = compoundStmt.(*pythonparser.Class_or_func_def_stmtContext)
+	return ok
 }
 
 // VisitSingleInput visits a single_input node (a single statement).

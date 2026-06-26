@@ -510,6 +510,47 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			// a single catch must not gain a spurious union separator, and nothing is stubbed
 			mustNotContain: []string{"catch(ArithmeticException |", "yak-decompiler"},
 		},
+		{
+			file: "multiple_next_early_return.class",
+			desc: "an if whose arm can early-return while the other arm falls through to a shared continuation must not abort structuring with 'multiple next'",
+			// deserializeAndSet must fully reconstruct (no stub); the early-return arm and the
+			// fall-through try/catch both survive into the output (Jackson PropertyDeserializer).
+			mustContain:    []string{"deserializeAndSet", "_skipNulls"},
+			mustNotContain: []string{"yak-decompiler", "multiple next"},
+		},
+		{
+			file: "assert_guard_cyclic.class",
+			desc: "a method with several `assert`s whose shared/overlapping throw targets make the value-merge structuring leave an orphaned $assertionsDisabled guard + its `throw new AssertionError()` (rendering the fatal `if (cond);`) must fold the throw into a real if-body instead of stubbing the whole method",
+			// backport ArrayDeque.checkInvariants fully reconstructs: the AssertionError throws survive
+			// and no method is stubbed. The corruption marker must never reach output.
+			mustContain:    []string{"checkInvariants", "AssertionError"},
+			mustNotContain: []string{"yak-decompiler", "post-decompile syntax"},
+		},
+		{
+			file: "groovy_constructor_switch.class",
+			desc: "a Groovy selectConstructorAndTransformArguments switch (logback gaffer NestingType.$INIT) " +
+				"threads a freshly-allocated object across switch arms via dup_x1/dup2_x1 on top of an " +
+				"operand stack of depth 2. The fix rebuilds each case/default body's operand stack from " +
+				"the switch instruction's post-selector StackEntry instead of a shared mutable variable " +
+				"that earlier arms (an athrow/return ending with an empty stack) clobbered, which left " +
+				"later case bodies underflowing and leaking empty-slot placeholders.",
+			// $INIT fully reconstructs: a switch over selectConstructorAndTransformArguments whose
+			// arms build new NestingType(...) constructor calls
+			mustContain:    []string{"selectConstructorAndTransformArguments", "new NestingType(", "$INIT"},
+			// no stub, no leaked internal placeholder
+			mustNotContain: []string{"yak-decompiler", "empty slot value"},
+		},
+		{
+			file: "druid_tddlhint_shared_container.class",
+			desc: "a for(;;) parser loop with break/continue in nested else-if arms, followed by post-loop " +
+				"code (druid TDDLHint.<init>'s `if (functions.size() > 0) type = Function`). The structuring " +
+				"produced a shared container (the post-loop IfStatement appeared in both the switch/loop-tail " +
+				"level AND inside a do-while body). AssertStatementsAcyclic previously panicked on any shared " +
+				"container; now it distinguishes true cycles (a node is its own ancestor → infinite recursion, " +
+				"must panic) from shared DAG nodes (two independent parents → finite, safe to skip the duplicate).",
+			mustContain:    []string{"TDDLHint", "functions.size"},
+			mustNotContain: []string{"yak-decompiler", "cyclic"},
+		},
 	}
 
 	for _, tc := range cases {

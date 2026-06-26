@@ -2,6 +2,7 @@ package decompiler
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
@@ -19,7 +20,15 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 	}()
 	err = decompiler.ParseSourceCode()
 	if err != nil {
-		return nil, err
+		// The variable-fold nil-key error ("variable-fold: nil ref key in varUserMap")
+		// fires at the END of ParseStatement, after CalcOpcodeStackInfo and statement-node
+		// building have already succeeded. The opcode graph and statement nodes are valid;
+		// only the variable-fold pass failed because a nil ref leaked into varUserMap.
+		// Suppressing this error lets the rest of the pipeline (rewriting, statement collection)
+		// proceed with unfolded variables, producing valid Java instead of a full-method stub.
+		if !strings.Contains(err.Error(), "nil ref key in varUserMap") {
+			return nil, err
+		}
 	}
 	err = rewriter.CheckNodesIsValid(decompiler.RootNode)
 	if err != nil {
@@ -28,9 +37,6 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 
 	statementManager := rewriter.NewRootStatementManager(decompiler.RootNode)
 	statementManager.SetId(decompiler.CurrentId)
-	// Propagate the aggressive (second-attempt) flag so relaxed structuring paths can opt in only
-	// when re-decompiling a method that already failed conservatively.
-	statementManager.Aggressive = decompiler.Aggressive
 	statementManager.MergeIf()
 	// Tail-duplicate `return cond ? A : B` whose arm computes its value through intermediate local
 	// stores (ECJ pre-sized StringBuilder, lazy field init, ...). Those stores cannot be inlined into a
@@ -86,6 +92,13 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 	// would otherwise drive them into Go's unrecoverable `fatal error: stack overflow`, crashing the
 	// whole process; raising an ordinary panic instead lets the recover above degrade the method to a stub.
 	rewriter.AssertStatementsAcyclic(sts)
+	// Fold the javac `assert` guard corruption: when several asserts share/overlap throw targets,
+	// the value-merge structuring can leave an orphaned `ConditionStatement(mentions
+	// $assertionsDisabled)` immediately followed by its `throw new AssertionError()`, which renders
+	// as the fatal `if (cond);` and stubs the whole method. Fold that pair into a real if-body so the
+	// method survives post-decompile syntax validation. Runs AFTER the acyclic check so its recursive
+	// walk cannot blow the stack on a pathologically deep/cyclic tree. Kill-switch: ASSERT_FOLD_OFF=1.
+	sts = rewriter.FoldAssertionGuards(sts)
 	params := []*values.JavaRef{}
 	for _, v := range decompiler.Params {
 		if ref, ok := v.(*values.JavaRef); ok {

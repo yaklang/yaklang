@@ -164,13 +164,22 @@ func (c *Config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 	if !c.ignoreSyntaxErr && err != nil {
 		return nil, utils.Errorf("parse file error: %v", err)
 	}
+	preHandlerBuildsFiles := c.LanguageBuilder != nil && c.LanguageBuilder.UsesDeferredFileBuild()
 	c.LanguageBuilder.PreHandlerFile(ast, r, builder)
+	if preHandlerBuildsFiles {
+		ssa.ReleaseASTRoot(ast)
+		ast = nil
+	}
 
 	// Build 阶段
 	prog.SetPreHandler(false)
 	buildStart := time.Now()
-	if err := prog.Build(ast, r, builder); err != nil {
-		return nil, err
+	if preHandlerBuildsFiles {
+		prog.RunDeferredBuilds()
+	} else {
+		if err := prog.Build(ast, r, builder); err != nil {
+			return nil, err
+		}
 	}
 	builder.Finish()
 	ssa4analyze.RunAnalyzer(prog)

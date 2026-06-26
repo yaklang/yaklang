@@ -2,6 +2,11 @@ package ssaapi
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"runtime/pprof"
+	"strings"
 	"sync"
 	"time"
 
@@ -11,6 +16,44 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 )
+
+// heapLogEnabled gates retained-heap phase logging. Set YAK_SSA_HEAP_LOG=1 to print
+// GC'd HeapInuse after each compile phase. Set YAK_SSA_HEAP_PROFILE_DIR=<dir> to write
+// a heap profile (pprof) after each phase (GC first).
+var heapLogEnabled = os.Getenv("YAK_SSA_HEAP_LOG") != ""
+
+func logPhaseHeap(tag string) {
+	if !heapLogEnabled && os.Getenv("YAK_SSA_HEAP_PROFILE_DIR") == "" {
+		return
+	}
+	runtime.GC()
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	if heapLogEnabled {
+		fmt.Fprintf(os.Stderr, "[ssa.heap] %-16s retained_HeapInuse=%7.1fMB HeapObjects=%d\n", tag, float64(m.HeapInuse)/(1024*1024), m.HeapObjects)
+	}
+	if dir := os.Getenv("YAK_SSA_HEAP_PROFILE_DIR"); dir != "" {
+		_ = os.MkdirAll(dir, 0o755)
+		target := filepath.Join(dir, normalizeHeapProfileName(tag)+".heap.pb.gz")
+		f, err := os.Create(target)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[ssa.heap] profile write failed %s: %v\n", target, err)
+			return
+		}
+		if err := pprof.WriteHeapProfile(f); err != nil {
+			fmt.Fprintf(os.Stderr, "[ssa.heap] profile write failed %s: %v\n", target, err)
+		}
+		_ = f.Close()
+		if heapLogEnabled {
+			fmt.Fprintf(os.Stderr, "[ssa.heap] profile saved %s\n", target)
+		}
+	}
+}
+
+func normalizeHeapProfileName(tag string) string {
+	replacer := strings.NewReplacer("/", "_", " ", "_", ".", "_")
+	return replacer.Replace(tag)
+}
 
 type SaveFolder struct {
 	name string
@@ -65,14 +108,9 @@ func buildFileContent(
 func collectCompileTargets(
 	prog *ssa.Program,
 	fileContents []*ssareducer.FileContent,
-	handlerFiles []string,
+	handlerFileSet map[string]struct{},
 ) []*ssareducer.FileContent {
-	handlerFileSet := make(map[string]struct{}, len(handlerFiles))
-	for _, path := range handlerFiles {
-		handlerFileSet[path] = struct{}{}
-	}
-
-	targets := make([]*ssareducer.FileContent, 0, len(handlerFiles))
+	targets := make([]*ssareducer.FileContent, 0, len(handlerFileSet))
 	for _, fileContent := range fileContents {
 		if fileContent == nil {
 			continue
@@ -149,8 +187,7 @@ func (c *Config) parseProjectWithFS(
 	preHandlerFiles := make([]string, 0)
 	handlerFilesMap := make(map[string]struct{})
 	handlerFiles := make([]string, 0)
-
-	var err error
+	handlerFileSet := make(map[string]struct{})
 	start := time.Now()
 
 	log.Debugf("ssa.compile.phase enter %s", compilePhase)
@@ -181,6 +218,7 @@ func (c *Config) parseProjectWithFS(
 	folder2Save = append(folder2Save, scanResult.Folders...)
 	handlerTotal = scanResult.HandlerTotal
 	handlerFiles = scanResult.HandlerFiles
+	handlerFileSet = scanResult.HandlerFileSet
 	preHandlerTotal = scanResult.PreHandlerTotal
 	preHandlerFiles = scanResult.PreHandlerFiles
 	handlerFilesMap = scanResult.HandlerFilesMap
@@ -191,6 +229,9 @@ func (c *Config) parseProjectWithFS(
 	// Feed the total compile-input bytes into the adaptive IR cache policy.
 	// This is runtime tuning input, not persistent project metadata.
 	c.Config.SetCompileProjectBytes(scanResult.HandlerBytes)
+	if restoreGC := c.applyLargeProjectGCPercent(); restoreGC != nil {
+		defer restoreGC()
+	}
 
 	prog, builder, err := c.init(filesystem, handlerTotal)
 	if err != nil {
@@ -238,13 +279,16 @@ func (c *Config) parseProjectWithFS(
 	astParseErrLogged := 0
 	astParseErrSuppressed := false
 	const maxAstParseErrLogs = 20
-	fileContents := make([]*ssareducer.FileContent, 0, preHandlerTotal)
 	enableFilePerfLog := c.Config != nil && c.Config.GetCompileFilePerformanceLog()
 	// 创建文件性能 recorder
 	if enableFilePerfLog && c.filePerformanceRecorder == nil {
 		c.filePerformanceRecorder = diagnostics.NewRecorder()
 	}
 	filePerfRecorder := c.filePerformanceRecorder
+	// When pre-handler already emits file skeletons and schedules remaining file
+	// work, the shared pipeline must not capture the whole file AST in another
+	// closure.
+	preHandlerBuildsFiles := c.LanguageBuilder != nil && c.LanguageBuilder.UsesDeferredFileBuild()
 	// pre handler  0-40%
 	f1 := func() error {
 		if prog.Cache != nil {
@@ -266,59 +310,100 @@ func (c *Config) parseProjectWithFS(
 			filesystem, preHandlerFiles, handlerFilesMap,
 		)
 		for fileContent := range ch {
-			fileASTStart := time.Now()
-			if fileContent.Status == ssareducer.FileStatusFsError {
-				log.Errorf("skip file: %s with fs error: %v", fileContent.Path, fileContent.Err)
-				prog.ProcessInfof("skip  file: %s with fs error: %v", fileContent.Path, fileContent.Err)
+			if fileContent == nil {
 				continue
 			}
-
-			if fileContent.Status == ssareducer.FileParseASTError {
-				if astParseErrLogged < maxAstParseErrLogs {
-					log.Warnf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
-					astParseErrLogged++
-				} else if !astParseErrSuppressed {
-					astParseErrSuppressed = true
-					log.Warnf("too many AST parse errors; suppressing further per-file logs (limit=%d)", maxAstParseErrLogs)
+			func(fileContent *ssareducer.FileContent) {
+				defer fileContent.Release()
+				fileASTStart := time.Now()
+				if fileContent.Status == ssareducer.FileStatusFsError {
+					log.Errorf("skip file: %s with fs error: %v", fileContent.Path, fileContent.Err)
+					prog.ProcessInfof("skip  file: %s with fs error: %v", fileContent.Path, fileContent.Err)
+					return
 				}
-				AstErr = utils.Errorf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
-				// continue
-			}
 
-			editor := prog.CreateEditor(fileContent.Content, fileContent.Path)
-			// editor := prog.CreateEditor([]byte{}, fileContent.Path)
+				if fileContent.Status == ssareducer.FileParseASTError {
+					if astParseErrLogged < maxAstParseErrLogs {
+						log.Warnf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
+						astParseErrLogged++
+					} else if !astParseErrSuppressed {
+						astParseErrSuppressed = true
+						log.Warnf("too many AST parse errors; suppressing further per-file logs (limit=%d)", maxAstParseErrLogs)
+					}
+					AstErr = utils.Errorf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
+					// continue
+				}
 
-			fileContent.Editor = editor
-			fileContent.Content = nil
-			fileContents = append(fileContents, fileContent)
+				editor := prog.CreateEditor(fileContent.Content, fileContent.Path)
+				// editor := prog.CreateEditor([]byte{}, fileContent.Path)
 
-			if fileContent.Err != nil {
-				prog.ProcessInfof("file %s parse ast error: %v", fileContent.Path, fileContent.Err)
-				AstErr = utils.JoinErrors(AstErr,
-					utils.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err),
-				)
-			}
+				fileContent.Editor = editor
+				fileContent.Content = nil
 
-			preHandlerProcess() // notify the process
-			// handler
-			if language := c.LanguageBuilder; language != nil {
-				func() {
-					defer func() {
-						if r := recover(); r != nil {
-							log.Errorf("pre-handler parse [%s] error %v  ", fileContent.Path, r)
-							utils.PrintCurrentGoroutineRuntimeStack()
+				if fileContent.Err != nil {
+					prog.ProcessInfof("file %s parse ast error: %v", fileContent.Path, fileContent.Err)
+					AstErr = utils.JoinErrors(AstErr,
+						utils.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err),
+					)
+				}
+
+				preHandlerProcess() // notify the process
+				// handler
+				if language := c.LanguageBuilder; language != nil {
+					func() {
+						defer func() {
+							if r := recover(); r != nil {
+								log.Errorf("pre-handler parse [%s] error %v  ", fileContent.Path, r)
+								utils.PrintCurrentGoroutineRuntimeStack()
+							}
+						}()
+						language.InitHandler(builder)
+						err = language.PreHandlerProject(filesystem, fileContent.AST, builder, editor)
+						if err != nil {
+							log.Errorf("pre-handler parse [%s] error %v", fileContent.Path, err)
 						}
 					}()
-					language.InitHandler(builder)
-					err = language.PreHandlerProject(filesystem, fileContent.AST, builder, editor)
-					if err != nil {
-						log.Errorf("pre-handler parse [%s] error %v", fileContent.Path, err)
+				}
+				if preHandlerBuildsFiles {
+					ssa.ReleaseASTRoot(fileContent.AST)
+				}
+				if _, needBuild := handlerFilesMap[fileContent.Path]; needBuild {
+					_, needsCompile := handlerFileSet[fileContent.Path]
+					switch {
+					case needsCompile && fileContent.AST != nil && !preHandlerBuildsFiles:
+						ast := fileContent.AST
+						path := fileContent.Path
+						prog.RegisterFileBuild(path, editor, builder, func(fileBuilder *ssa.FunctionBuilder) {
+							fileBuildStart := time.Now()
+							defer func() {
+								if enableFilePerfLog && filePerfRecorder != nil {
+									fileBuildTime := time.Since(fileBuildStart)
+									filePerfRecorder.RecordDuration(fmt.Sprintf("Build[%s]", path), fileBuildTime)
+									if fileBuildTime > 100*time.Millisecond {
+										log.Infof("[File Performance] Build: %s, time: %v", path, fileBuildTime)
+									}
+								}
+							}()
+							if err := c.LanguageBuilder.BuildFromAST(ast, fileBuilder); err != nil {
+								log.Errorf("file build [%s] failed: %v", path, err)
+							}
+						})
+					case !needsCompile && fileContent.Editor != nil:
+						rootEditor := fileContent.Editor
+						prog.RegisterDeferredBuild(ssa.DeferredBuildKindHelper, "extra-file:"+rootEditor.GetUrl(), func() {
+							prog.PushEditor(rootEditor)
+							prog.PopEditor(true)
+						})
 					}
-				}()
-			}
-			if enableFilePerfLog {
-				recordFilePerformance(filePerfRecorder, "AST", "AST parse", fileContent.Path, time.Since(fileASTStart))
-			}
+				}
+				// Once skeleton + deferred tasks are registered (pass1), drop the file
+				// AST root reference. For self-registering languages the body subtrees
+				// are detached, so the rest of the parse tree becomes collectable here.
+				fileContent.AST = nil
+				if enableFilePerfLog {
+					recordFilePerformance(filePerfRecorder, "AST", "AST parse", fileContent.Path, time.Since(fileASTStart))
+				}
+			}(fileContent)
 		}
 		preHandlerTime = time.Since(start)
 		if AstErr != nil && c.GetCompileStrictMode() {
@@ -346,39 +431,29 @@ func (c *Config) parseProjectWithFS(
 			prog.Cache.EnableInstructionSpill()
 		}
 		process = 0.4 // 40%
-		// parse project 40%-90%
-		prog.ProcessInfof("parse project start")
-		handlerNum := 0
-		totalToBuild := len(handlerFiles)
-		if totalToBuild <= 0 {
-			totalToBuild = len(handlerFilesMap)
-		}
-		handlerProcess := func() {
-			handlerNum++
+		prog.ProcessInfof("deferred build start")
+		prog.SetPreHandler(false)
+		start = time.Now()
+		deferredBuildTotal := prog.DeferredBuildCount()
+		completed := prog.RunDeferredBuildsWithCallback(func(index int, total int) bool {
+			if total <= 0 {
+				return !c.isStop()
+			}
 			// Reserve [0.88, 0.90) for program metadata (f4) and [0.90, 1.0] for IR flush (f5).
-			process = 0.4 + (float64(handlerNum)/float64(totalToBuild))*0.48
+			process = 0.4 + (float64(index)/float64(total))*0.48
 			if process > 0.88 {
 				process = 0.88
 			}
+			prog.ProcessInfof("deferred build progress(%d/%d)", index, total)
+			return !c.isStop()
+		})
+		if deferredBuildTotal == 0 {
+			process = 0.88
 		}
-		prog.SetPreHandler(false)
-		start = time.Now()
-
-		compileTargets := collectCompileTargets(prog, fileContents, handlerFiles)
-
-		for _, fileContent := range compileTargets {
-			handlerProcess()
-			if fileContent.Status == ssareducer.FileParseASTError || fileContent.AST == nil {
-				log.Errorf("skip file: %s due to AST parse error or nil AST: %v", fileContent.Path, fileContent.Err)
-				prog.ProcessInfof("skip  file: %s due to AST parse error or nil AST: %v", fileContent.Path, fileContent.Err)
-				continue
-			}
-			ast := fileContent.AST
-			fileContent.AST = nil // clear AST
-			buildFileContent(prog, builder, fileContent, ast, enableFilePerfLog, filePerfRecorder)
+		if !completed {
+			return ErrContextCancel
 		}
-
-		fileContents = make([]*ssareducer.FileContent, 0)
+		process = 0.88
 		parseTime = time.Since(start)
 		if c.isStop() {
 			return ErrContextCancel
@@ -448,7 +523,9 @@ func (c *Config) parseProjectWithFS(
 		return func() error {
 			compilePhase = phase
 			log.Debugf("ssa.compile.phase enter %s", compilePhase)
-			return fn()
+			stepErr := fn()
+			logPhaseHeap(phase)
+			return stepErr
 		}
 	}
 	phaseSteps := []func() error{

@@ -30,15 +30,18 @@ func (y *builder) VisitFunctionDeclaration(raw phpparser.IFunctionDeclarationCon
 	y.AssignVariable(variable, newFunction)
 	y.GetProgram().SetExportValue(funcName, newFunction)
 	store := y.StoreFunctionBuilder()
+	formalParameterList := ssa.DetachAST(i.FormalParameterList())
+	blockStatement := ssa.DetachAST(i.BlockStatement())
+	typeHint := ssa.DetachAST(i.TypeHint())
 	newFunction.AddLazyBuilder(func() {
 		switchHandler := y.SwitchFunctionBuilder(store)
 		defer switchHandler()
 		y.SetMarkedFunction(funcName)
 		y.FunctionBuilder = y.FunctionBuilder.PushFunction(newFunction)
 		{
-			y.VisitFormalParameterList(i.FormalParameterList())
-			y.VisitBlockStatement(i.BlockStatement())
-			y.SetType(y.VisitTypeHint(i.TypeHint()))
+			y.VisitFormalParameterList(formalParameterList)
+			y.VisitBlockStatement(blockStatement)
+			y.SetType(y.VisitTypeHint(typeHint))
 			y.Finish()
 		}
 		y.FunctionBuilder = y.PopFunction()

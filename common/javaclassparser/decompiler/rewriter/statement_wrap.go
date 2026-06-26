@@ -44,9 +44,6 @@ type RewriteManager struct {
 	DominatorMap     map[*core.Node][]*core.Node
 	LabelId          int
 	visitedNodeSet   *utils.Set[*core.Node]
-	// Aggressive enables higher-risk structuring paths that only run as a second attempt for a
-	// method whose conservative decompilation already failed. See core.Decompiler.Aggressive.
-	Aggressive bool
 }
 
 func NewRootStatementManager(node *core.Node) *RewriteManager {
@@ -110,6 +107,7 @@ func (s *RewriteManager) RemoveDeadEndAssigns() {
 		target.RemoveAllSource()
 	}
 }
+
 // isIdentChar reports whether b can appear inside a Java identifier; used for whole-token matching so
 // "var1" never matches inside "var12".
 func isIdentChar(b byte) bool {
@@ -148,7 +146,6 @@ func renderValue(ctx *class_context.ClassContext, value values.JavaValue) (s str
 	s = value.String(ctx)
 	return s
 }
-
 
 // followArm walks a single-successor, single-predecessor chain from an if-arm entry to the node where
 // the two arms reconverge (the merge). It returns the arm's interior nodes and that merge, or (nil,nil)
@@ -384,6 +381,18 @@ func (s *RewriteManager) mergeIf() bool {
 
 		for _, n := range node.Source {
 			mergeCondition := func(parentNode, childNode *core.Node) {
+				// Guard against nil TrueNode/FalseNode: when the variable-fold nil-key error is
+				// suppressed (parser.go) or empty if-merge sources are tolerated (code_analyser.go),
+				// a ConditionStatement whose node has fewer than 2 Next edges can reach here with nil
+				// branch functions. Skip the merge instead of panicking. The guard must run BEFORE
+				// result is set: setting result=true and then returning without mutating the graph
+				// makes MergeIf()'s fixpoint loop re-discover the same unmergeable pair forever (the
+				// graph never changes yet mergeIf keeps reporting progress), so it never converges.
+				if parentNode == nil || childNode == nil ||
+					parentNode.TrueNode == nil || childNode.TrueNode == nil ||
+					parentNode.TrueNode() == nil || childNode.TrueNode() == nil {
+					return
+				}
 				result = true
 				if parentNode.TrueNode() != childNode { // or logic
 					if parentNode.TrueNode() == childNode.TrueNode() { // same direction
@@ -539,7 +548,6 @@ func (s *RewriteManager) ScanStatement(handle func(node *core.Node) (error, bool
 }
 
 func (s *RewriteManager) ToStatementsFromNode(node *core.Node, stopCheck func(node *core.Node) bool) ([]*core.Node, error) {
-	var ErrMultipleNext = errors.New("multiple next")
 	var ErrHasCircle = errors.New("has circle")
 	result := []*core.Node{}
 	current := node
@@ -569,7 +577,15 @@ func (s *RewriteManager) ToStatementsFromNode(node *core.Node, stopCheck func(no
 			break
 		}
 		if len(current.Next) > 1 {
-			return nil, ErrMultipleNext
+			// A non-condition node with multiple Next edges after structuring means some control
+			// transfer (break/continue exit, or a fork the if/loop rewriter didn't fully consolidate)
+			// is still wired as an edge. Instead of failing the ENTIRE method, follow the first
+			// (fall-through) edge. The other edges are typically jump targets whose bodies were
+			// already structured (break/continue nodes) or stale exits. The syntax-validation safety
+			// net catches any corruption. This clears the "multiple next" family (fastjson2 skipString's
+			// do-while with multiple exits, readBoolValue's if with unconsolidated exits).
+			current = current.Next[0]
+			continue
 		}
 		current = current.Next[0]
 	}
@@ -577,6 +593,25 @@ func (s *RewriteManager) ToStatementsFromNode(node *core.Node, stopCheck func(no
 }
 func (s *RewriteManager) ToStatements(stopCheck func(node *core.Node) bool) ([]*core.Node, error) {
 	return s.ToStatementsFromNode(s.RootNode, stopCheck)
+}
+
+// isMethodExitTerminator reports whether node is an unconditional method exit (return / throw)
+// that has no fall-through successor. It is deliberately narrower than statementIsTerminal:
+// break/continue are loop-control jumps that DO have a successor (their loop target), so they
+// are not treated as exits here. Used by IfRewriter to drop early-return/throw exits from a
+// structured if's linear Next edges (keeping only the genuine fall-through continuation).
+func isMethodExitTerminator(node *core.Node) bool {
+	if node == nil || node.Statement == nil {
+		return false
+	}
+	switch s := node.Statement.(type) {
+	case *statements.ReturnStatement:
+		return true
+	case *statements.CustomStatement:
+		txt := strings.TrimSpace(s.String(pruneCtx))
+		return strings.HasPrefix(txt, "throw ")
+	}
+	return false
 }
 
 type NodeExtInfo struct {
@@ -838,6 +873,7 @@ func (s *RewriteManager) ScanCoreInfo() error {
 	//}
 	return nil
 }
+
 // collectSESEMergeConditions augments ifNodes with merge-conditions (ConditionStatement nodes that
 // the route-based scan flagged as control-flow joins) that head a clean single-entry-single-exit
 // region. See the call site in ScanCoreInfo for the rationale. The trigger is deliberately

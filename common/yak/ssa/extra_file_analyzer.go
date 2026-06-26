@@ -26,6 +26,8 @@ type PreHandlerAnalyzer interface {
 
 	AfterPreHandlerProject(builder *FunctionBuilder)
 
+	UsesDeferredFileBuild() bool
+
 	Clearup()
 }
 
@@ -129,6 +131,10 @@ func (d *PreHandlerBase) AfterPreHandlerProject(builder *FunctionBuilder) {
 	d.InitHandler(builder)
 }
 
+func (*PreHandlerBase) UsesDeferredFileBuild() bool {
+	return false
+}
+
 func NewPreHandlerBase(fs ...initHanlderFunc) *PreHandlerBase {
 	builder := &PreHandlerBase{
 		InitHandlerOnce: sync.Once{},
@@ -142,6 +148,7 @@ func (d *PreHandlerBase) WithLanguageConfigOpts(opts ...LanguageConfigOpt) *PreH
 	d.languageConfigOpts = opts
 	return d
 }
+
 func (d *PreHandlerBase) WithPreInitHandler(fs ...initHanlderFunc) *PreHandlerBase {
 	d.beforeInitHandlerFunc = fs
 	return d

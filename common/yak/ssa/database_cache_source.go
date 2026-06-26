@@ -25,7 +25,7 @@ func (p *Program) CreateEditor(raw []byte, filepath string, save ...bool) *memed
 }
 
 func (p *Program) SaveEditor(e *memedit.MemEditor) {
-	if p.DatabaseKind == ProgramCacheMemory || p.Cache == nil {
+	if p.Cache == nil {
 		return
 	}
 	if p.Cache.sources == nil {

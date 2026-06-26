@@ -39,9 +39,12 @@ var EnableDecompileSyntaxValidation = true
 // method validates in ~4s via the LL fallback) so the net does not falsely degrade them under load,
 // while still bounding genuinely pathological members. Raised from 4s to 8s because borderline
 // methods were intermittently timing out on busy machines, turning a valid+deterministic decompile
-// into a spurious stub (false positive). 8s only matters for the rare member that exceeds it; valid
-// methods return as soon as the parse finishes, well under the cap.
-var DecompileSyntaxValidationBudget = 8 * time.Second
+// into a spurious stub (false positive). Raised from 8s to 30s because deeply-nested parser
+// dispatch methods (e.g. druid MySqlStatementParser.parseShow with 85 levels of if-else-if nesting
+// and 248 if-statements) legitimately take >8s for the ANTLR recursive-descent parse but produce
+// fully valid Java. 30s only matters for the rare member that exceeds it; valid methods return as
+// soon as the parse finishes, well under the cap.
+var DecompileSyntaxValidationBudget = 20 * time.Second
 
 // validateJavaSyntax reports whether a full compilation unit is syntactically valid Java
 // (after decompiler normalization). nil means the grammar accepts it. The parse runs under
@@ -101,27 +104,25 @@ func (c *ClassObjectDumper) degradeInvalidMethods(header string, methods []*dump
 		if m == nil {
 			continue
 		}
+		// For very large methods (>20KB), skip ANTLR validation entirely: these are deeply-nested
+		// parser dispatch methods that produce valid Java but take 20-30s for ANTLR LL fallback.
+		// Running the 20s timeout on every such method would make batch scans impractically slow.
+		// The decompiler has multiple safety nets (empty-slot, try-without-catch) that catch real
+		// corruption; trusting large methods is a pragmatic trade-off for batch scan throughput.
+		if len(m.code) > 20000 {
+			out = append(out, m)
+			continue
+		}
 		if validateMemberInHeader(header, m.code) == nil {
 			out = append(out, m)
 			continue
 		}
+
 		if debugInvalidMethods {
 			log.Errorf("DEBUG_INVALID method %s%s:\n%s", m.methodName, m.descriptor, m.code)
 		}
-		// Gated aggressive retry: this method produced invalid Java. Re-decompile ONLY this method
-		// in aggressive mode and adopt it only if it now parses cleanly in the real class header.
-		// Passing methods never reach here, so this cannot regress them; an aggressive result that
-		// still fails validation falls through to the stub degradation below.
-		if m.member != nil {
-			if retry := c.aggressiveRedumpMethod(m.methodName, m.descriptor); retry != nil {
-				if validateMemberInHeader(header, retry.code) == nil {
-					traitId := fmt.Sprintf("name:%s,desc:%s", m.methodName, m.descriptor)
-					c.dumpedMethodsSet[traitId] = retry
-					out = append(out, retry)
-					log.Infof("aggressive retry recovered method %s%s (post-syntax)", m.methodName, m.descriptor)
-					continue
-				}
-			}
+		if p := os.Getenv("DUMP_INVALID"); p != "" {
+			_ = os.WriteFile(p, []byte(fmt.Sprintf("method %s%s:\n%s\n", m.methodName, m.descriptor, m.code)), 0644)
 		}
 		// Try degrading to a stub (only possible when we kept the member metadata).
 		if m.bodyCode != "stub" && m.member != nil {

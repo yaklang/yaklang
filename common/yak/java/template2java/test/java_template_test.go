@@ -30,6 +30,9 @@ func checkJavaFront(t *testing.T, code string, fileNames ...string) {
 		}
 	}
 	virtualFileName := path.Clean(fileName)
+	if strings.Contains(virtualFileName, "/test/") || strings.Contains(virtualFileName, "/testdata/") || strings.HasPrefix(virtualFileName, "test/") || strings.HasPrefix(virtualFileName, "testdata/") {
+		virtualFileName = path.Join("generated-fixtures", path.Base(virtualFileName))
+	}
 	if ext := path.Ext(virtualFileName); ext != "" {
 		virtualFileName = strings.TrimSuffix(virtualFileName, ext) + ".java"
 	} else if !strings.HasSuffix(strings.ToLower(virtualFileName), ".java") {

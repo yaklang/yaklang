@@ -26,7 +26,28 @@ func (r *ConditionStatement) ReplaceVar(oldId *utils.VariableId, newId *utils.Va
 }
 
 func (r *ConditionStatement) String(funcCtx *class_context.ClassContext) string {
-	return fmt.Sprintf("if %s", r.Condition.String(funcCtx))
+	// A ConditionStatement is an intermediate structuring placeholder that should be consumed by
+	// IfRewriter before reaching output. If one leaks (a structuring gap at a complex merge point),
+	// rendering it as bare `if cond` (no brackets, no body) produces INVALID Java that fails syntax
+	// validation and stubs the ENTIRE method. As a last-resort safety net, render it as a valid
+	// `if (cond){}` — syntactically parseable Java with an empty body — so the method degrades
+	// gracefully (one branch is empty) instead of being fully stubbed.
+	return fmt.Sprintf("if (%s){}", r.Condition.String(funcCtx))
+}
+
+// isBoolPrimer reports whether v carries a non-nil boolean primitive type. It guards against the
+// nil Type() that incomplete stack simulation can produce, so the boolean-comparison folding below
+// never nil-dereferences (which would panic the whole method into a stub).
+func isBoolPrimer(v values.JavaValue) bool {
+	if v == nil {
+		return false
+	}
+	t := v.Type()
+	if t == nil {
+		return false
+	}
+	p, ok := t.RawType().(*types.JavaPrimer)
+	return ok && p.Name == types.JavaBoolean
 }
 
 // isBoolPrimer reports whether v carries a non-nil boolean primitive type. It guards against the
