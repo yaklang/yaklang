@@ -1269,24 +1269,20 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			//	ifStackEntries = append(stackEntries, entry)
 			//}
 
-			if len(validSources) == 0 {
-				return nil, errors.New("invalid if merge node")
-			}
 			size := -1
-			for _, validSource := range validSources {
-				stackEntry := validSource.StackEntry
-				scope := getVarScope(validSource)
-				stackSize := NewStackSimulation(stackEntry, scope.VarTable, scope.VarId).Size()
-				//if stackSize > 1 {
-				//	return nil, fmt.Errorf("invalid stack size %d for opcode %d", stackSize, code.Id)
-				//}
+			for _, vs := range validSources {
+				vsScope := getVarScope(vs)
+				vsSize := NewStackSimulation(vs.StackEntry, vsScope.VarTable, vsScope.VarId).Size()
 				if size == -1 {
-					size = stackSize
-				} else {
-					if size != stackSize {
-						return nil, fmt.Errorf("invalid stack size %d for opcode %d", stackSize, code.Id)
-					}
+					size = vsSize
 				}
+			}
+			if len(validSources) == 0 {
+				runtimeStackSimulation = NewStackSimulation(NewEmptyStackEntry(), varTable, utils2.NewRootVariableId())
+			} else {
+				validSource := validSources[0]
+				vscope := getVarScope(validSource)
+				runtimeStackSimulation = NewStackSimulation(validSource.StackEntry, vscope.VarTable, vscope.VarId)
 			}
 			ifNodes := []*OpCode{}
 			for _, opCode := range code.Source {
