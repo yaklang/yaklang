@@ -221,13 +221,20 @@ func AssertStatementsAcyclic(roots []statements.Statement) {
 			// Leaf / non-container statement: nothing to descend into.
 			continue
 		}
-		if _, ok := visited[st]; ok {
-			// Shared (two parents reference the same Statement object): a finite DAG, not a cycle.
-			// Skip expanding its children (already done on the first visit) and continue.
-			continue
-		}
+		// ancestors MUST be checked before visited: a node on the current DFS path is a TRUE cycle
+		// (st is its own transitive ancestor) and drives recursive walkers into unbounded recursion,
+		// so it must panic. Since a node is added to BOTH visited and ancestors on first expansion,
+		// checking visited first would short-circuit a self-cycle (A whose body contains A: the child
+		// A is already in visited) and misclassify it as a harmless shared DAG, letting the cycle
+		// through to FoldAssertionGuards/rewriteVar and a fatal stack overflow.
 		if _, ok := ancestors[st]; ok {
 			panic(fmt.Errorf("cyclic container statement (%T) in structured tree; rejecting to avoid unbounded recursion", st))
+		}
+		if _, ok := visited[st]; ok {
+			// Visited but NOT on the current path: two independent parents reference the same
+			// Statement object - a finite DAG, not a cycle. Skip expanding its children (already
+			// done on the first visit) and continue, so the method decompiles instead of stubbing.
+			continue
 		}
 		visited[st] = struct{}{}
 		ancestors[st] = struct{}{}
