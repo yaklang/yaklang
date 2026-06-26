@@ -138,36 +138,6 @@ javaAuditParseOptionsFromValues = (auditJSON, scopeModulesRaw, scopeExcludeRaw, 
     return javaAuditApplyDetectionModeDefaults(opts)
 }
 
-javaAuditOptionsFromCli = (readProbeFlags) => {
-    auditJSON = cli.String("audit-options", cli.setDefault(""), cli.setHelp("Optional JSON overrides for detection/scope/tool behavior"))
-    scopeModules = cli.String("scope-modules", cli.setDefault(""), cli.setHelp("Comma-separated module subdirs to include, e.g. ruoyi-admin,ruoyi-system"))
-    scopeExclude = cli.String("scope-exclude", cli.setDefault(""), cli.setHelp("Comma-separated path fragments to exclude from scan"))
-    configScope = cli.String("config-scope", cli.setDefault("framework"), cli.setHelp("Config scan scope: framework | all"))
-    riskyMode = cli.String("risky-mode", cli.setDefault("name"), cli.setHelp("Risky dependency matching: name | off"))
-    dedupe = cli.String("dedupe-findings", cli.setDefault("true"), cli.setHelp("Dedupe repeated findings per rule id: true | false"))
-
-    detectionMode = ""
-    minConf = 0.0
-    cmsMinConf = 0.0
-    includeFW = ""
-    excludeFW = ""
-    toolProfile = ""
-    resolveRoot = false
-    cmsProducts = ""
-    if readProbeFlags {
-        detectionMode = cli.String("detection-mode", cli.setDefault("balanced"), cli.setHelp("Framework/CMS detection: permissive | balanced | strict"))
-        minConf = cli.Float("min-confidence", cli.setDefault(0), cli.setHelp("Override framework detection threshold (0 = use detection-mode default)"))
-        cmsMinConf = cli.Float("cms-min-confidence", cli.setDefault(0), cli.setHelp("Override CMS product threshold (0 = use detection-mode default)"))
-        includeFW = cli.String("include-frameworks", cli.setDefault(""), cli.setHelp("Force-include frameworks even below threshold"))
-        excludeFW = cli.String("exclude-frameworks", cli.setDefault(""), cli.setHelp("Force-exclude frameworks even if detected"))
-        toolProfile = cli.String("tool-profile", cli.setDefault("full"), cli.setHelp("Recommended tools: full | minimal | config-only | deps-secrets"))
-        resolveRoot = cli.Bool("resolve-monorepo-root", cli.setDefault(false), cli.setHelp("Walk up to parent Maven/Gradle aggregator when target is a submodule"))
-        cmsProducts = cli.String("cms-products", cli.setDefault(""), cli.setHelp("Force CMS product ids to audit (comma-separated), e.g. ruoyi,mcms"))
-    }
-
-    return javaAuditParseOptionsFromValues(auditJSON, scopeModules, scopeExclude, configScope, riskyMode, dedupe, detectionMode, minConf, cmsMinConf, includeFW, excludeFW, toolProfile, resolveRoot, cmsProducts)
-}
-
 javaAuditPathMatchesScopeExclude = (pathName, opts) => {
     excludes = opts["scope_exclude"]
     if excludes == nil || len(excludes) == 0 {
