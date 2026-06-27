@@ -42,24 +42,19 @@ func compileAndRunJava(t *testing.T, javac, java, dir, mainClass string, srcCont
 // byte-identical. A divergence means the decompiler corrupted a computation (shift/arith promotion,
 // narrowing cast, control-flow inversion, dropped statement) that passes ANTLR syntax validation
 // but changes program behavior. This is the kind of silent bug only behavioral differential testing
-// catches. Gated on javac/java so a JDK-less CI skips cleanly.
+// catches. Gated on javac/java so a JDK-less CI skips cleanly; otherwise it is a HARD correctness
+// gate (no opt-in env var) and a divergence fails the build.
 //
-// STATUS: this test currently surfaces a real decompiler defect and is SKIP-by-default until it is
-// fixed. The defect: local-slot reuse in multi-branch methods (md5, xxHash32) causes a renamed
-// declaration (varN_M) to not propagate to its references, producing illegal
-// `int var17_1 = ...; var17_1 = var17_1 ...` ("variable varN might not have been initialized").
-// The battery isolates each table-init loop in its own method (which fixed CRC32/CRC32C), but md5()
-// and xxHash32() still hit the bug on slot reuse across their if/else arms. Until that defect is
-// fixed, the test only runs (and asserts) under CODEC_STRICT=1, so it documents the regression
-// without blocking `go test ./...`. Once fixed, remove the skip so this is a hard correctness gate.
+// HISTORY: an earlier local-slot-reuse defect made md5()/xxHash32() emit `int var_1 = var_1 + ...`
+// ("variable might not have been initialized") and kept this test behind CODEC_STRICT=1. The root
+// cause (post-branch reassignment `x = f(x)` of a local assigned only inside if/else arms was bound
+// to a fresh self-referencing id) is fixed in redirectPostBlockReassignments (rewriter/rewrite_var.go),
+// so the gate is now always on.
 func TestCodecSemanticsRoundTrip(t *testing.T) {
 	javac, err1 := exec.LookPath("javac")
 	java, err2 := exec.LookPath("java")
 	if err1 != nil || err2 != nil {
 		t.Skip("javac/java not available; skipping codec semantics round-trip")
-	}
-	if os.Getenv("CODEC_STRICT") != "1" {
-		t.Skip("codec round-trip surfaces a known local-slot-reuse decompiler defect (md5/xxHash32); set CODEC_STRICT=1 to run and verify it is fixed. See CODEC_TODO.md")
 	}
 
 	origDir := t.TempDir()

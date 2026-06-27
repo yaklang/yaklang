@@ -28,67 +28,78 @@
 
 - **回归用例**: `testdata/regression/byte_local_narrowing.class` + 更新 `ifnonnull_branch` 断言。
 
-### 2. Codec 算法语义验证 harness (已 commit, 见下)
+### 2. Codec 算法语义验证 harness (已扩展为硬门禁)
 
 - **自包含算法 battery**: `tests/testdata/codec/CodecAlgorithms.java`
-  覆盖: MD5 (RFC 1321), CRC32, CRC32C, MurmurHash2, MurmurHash3 x86_32, XXHash32, Base64,
+  覆盖: MD5 (RFC 1321), SHA-1, SHA-256 (FIPS 180-4), CRC32, CRC32C, Adler-32,
+  MurmurHash2, MurmurHash3 x86_32, XXHash32, Base64 编码 + 解码,
   MD5-crypt ($1$ 密码哈希, 1000 轮混合 + base64 打包)。
-  **全部算法已对照标准库验证正确**: MD5/CRC32 与 Python `hashlib`/`binascii` 一致;
+  **全部算法已对照标准库验证正确**: MD5/SHA-1/SHA-256/CRC32 与 Python `hashlib`/`binascii` 一致;
   md5Crypt 与 commons-codec `Md5Crypt` **12/12 一致**。
 
 - **差分执行测试**: `tests/codec_semantics_test.go` 的 `TestCodecSemanticsRoundTrip`。
   流程: javac 编译 battery → 生成 golden fingerprint → Yak 反编译 → javac 重编译 → 运行比对。
   这是能捕获**语法验证捕获不到的静默计算错误**的最强 oracle。
+  **已去掉 `CODEC_STRICT` skip**: 只要环境里有 `javac/java` 就强制断言, 成为真正的硬门禁。
+
+### 3. slot 复用自引用初始化缺陷 (已修复, 本阶段)
+
+**原症状**: 多分支方法内 local-slot 复用导致声明重命名未传播到引用, 产出非法 Java
+(`int var17_1 = (((var17_1) + ...))` 自引用初始化, javac 报 "variable might not have been
+initialized")。在 md5() / xxHash32() 触发。
+
+**根因**: `rewriteVar` 在分支后对同 slot 变量再赋值 (`h = h + n`) 时会新建一个 `VariableId`,
+但旧 Id 也被一并替换, 导致再赋值语句的 LHS 与 RHS 都指向这个未初始化的新 Id, 同时该再赋值被
+当成新声明 (`int h = ...`)。
+
+**修复** (`rewrite_var.go`): 新增 `redirectPostBlockReassignments()`, 由 `ifHoistDeclarations` /
+`switchHoistDeclarations` 在分支声明 hoist 后调用。它把分支后对同一 `VarUid` 的再赋值语句的
+`VariableId` 统一重定向到 hoist 出来的目标 Id, 并把第一条再赋值从声明降级为普通赋值
+(`IsFirst=false, IsDeclare=false`)。
+
+**回归**: `tests/testdata/regression/post_branch_reassign_slot.class` +
+`TestDecompilePostBranchReassignNoSelfInit` (无需 javac, 断言不出现自引用初始化, 且分支合并变量
+被还原成普通赋值)。该 seed 覆盖 if/else 简单合并 (xxHash32 形) 与嵌套 if-else-if 合并 (md5 round 形)。
 
 ---
 
 ## 当前阻塞缺陷 (下一轮优先)
 
-### BUG: 多分支方法内 local-slot 复用导致声明重命名未传播到引用
+### BUG: 后自增数组下标 `arr[i++] = v` 被错误重排为 `i++; arr[i] = v`
 
-**症状**: 反编译产出非法 Java, javac 报 "variable varN might not have been initialized"。
-具体: 声明点渲染成 `int var17_1 = ...` (重命名加 `_M` 后缀), 但引用点仍用旧名, 形成自引用初始化。
-在 md5() 和 xxHash32() 方法触发。
+**症状**: 反编译产出**语义错误** (而非语法错误) 的 Java: 形如 `out[oi++] = (byte) v` 的后自增数组
+写入, 被反编译成先自增下标再写入, 使用了**错误的下标** (多偏移 1), 运行时数组越界 / 结果不一致。
+本轮在 base64Decode 触发 (`ArrayIndexOutOfBoundsException`)。
 
-**复现**: `CODEC_STRICT=1 go test -run TestCodecSemanticsRoundTrip -count=1 -v ./common/javaclassparser/tests/`
+**根因 (推测)**: javac 把 `arr[i++] = v` 编成
+`aload arr; iload i; iinc i 1; <v>; iastore`。反编译器顺序处理指令: `iload i` 压入对 i 的引用,
+`iinc i 1` 作为独立语句发射 (`i = i + 1`), `iastore` 时弹出的下标引用渲染成 `i` —— 但此时 i 已被
+前一条 iinc 语句改写, 于是用了自增后的值。需要识别「数组下标 load 与 iastore 之间对该下标 slot 的
+iinc」, 还原成 `arr[i++] = v` (捕获自增前的旧值)。
 
-**根因定位**:
-- `dumper.go` 的 `declareLocalInScope()` (~1422 行) 在 slot 名冲突时给声明点的 `VariableId` 调用
-  `SetName("varN_M")`。
-- 但引用点的 `JavaRef` 持有**不同的 `VariableId` 实例**, SetName 不传播。
-- 根源在 `code_analyser.go`: 同一 slot 在不同作用域/分支被合并为同名变量时, 声明点和引用点的
-  `JavaRef.Id` 是独立实例 (`rewrite_var.go` 的 `newRef.Id = newId`)。
-- 最小复现: 同一方法内, 一个 if/else 两个分支各自首次赋值给同一 slot 的变量, 外层循环复用该 slot。
+**规避现状**: 本轮 `base64Decode` 改用**显式下标算术** (`out[o], out[o+1], out[o+2]; o += 3`)
+绕开该 idiom, 因此 base64 解码仍纳入 battery 并通过。该 BUG 不阻塞当前门禁, 但反编译真实库
+(commons-codec `Base64`/`Base32` 大量使用 `buffer[pos++]`) 时会触发。
 
-**已验证的相关逻辑**:
-- `DoWhileStatement.ReplaceVar` / `IfStatement.ReplaceVar` **递归**更新 body, 没问题。
-- 最小单循环复现 (SelfInit) **正常** (slot 只用一次, 无冲突, 不触发重命名)。
-- 把每个表初始化循环抽到独立方法 (本阶段已做) **规避**了 CRC32/CRC32C 的问题。
+**复现方向**: 写最小 seed `arr[i++] = v` (在循环里), 编译后反编译, 对比下标。
 
-**修复方向** (供接力参考):
-1. **方向 A (治本)**: 在 `declareLocalInScope` 重命名后, 把新名字传播到所有引用**同一 slot**
-   的 JavaRef (需要 JavaRef -> slot 的映射, 或在 Id 共享处修复)。
-2. **方向 B (治本, 推荐)**: 修 `code_analyser` 的 slot 合并逻辑, 确保同一 slot 在所有引用点
-   共享**同一个 VariableId 指针**, 这样 SetName 自动传播。
-3. **方向 C (兜底)**: 若治本风险大, 在 dumper 输出阶段扫描自引用初始化
-   (`int x_M = ...; x = x ...`), 把引用重写为重命名后的名字。但这是症状修补, 治本更好。
-
-**验证**: 修好后, `CODEC_STRICT=1 go test -run TestCodecSemanticsRoundTrip` 应通过
-(去掉 test 里的 CODEC_STRICT skip, 变成硬门禁)。
+**修复方向**: 在栈模拟里跟踪 pending 数组下标引用, 当其后、对应 iastore 之前出现对同 slot 的 iinc 时,
+把该次访问折叠为后自增 (`arr[i++]`), 而不是发射独立 iinc 语句。注意与现有 field/static 后自增折叠
+(`selfOpFoldedRefs`, 走 dup/dup_x1) 是不同机制。
 
 ---
 
 ## 待办: 扩展覆盖 (向 GA 推进)
 
-### 算法覆盖扩展 (修好上面的 BUG 后)
-- [ ] SHA-256 (FIPS 180-4) — 加入 battery
-- [ ] SHA-1 — 加入 battery
+### 算法覆盖扩展
+- [x] SHA-256 (FIPS 180-4) — 已加入 battery, byte-for-byte 通过
+- [x] SHA-1 — 已加入 battery, byte-for-byte 通过
+- [x] Base64 解码 — 已加入 (显式下标, 绕开上面的后自增数组下标 BUG)
+- [x] Adler-32 — 已加入 battery, 通过
 - [ ] HMAC-MD5 / HMAC-SHA256 — 加入 battery
 - [ ] Base32 编解码
-- [ ] Base64 解码 (目前只测了编码)
 - [ ] UnixCrypt (DES crypt) — commons-codec 有, 复杂度高
 - [ ] Sha2Crypt (SHA-512 crypt)
-- [ ] Adler-32
 
 ### 真实库 round-trip (用户明确要求: "也可以验证一些其他的库比如 spring")
 - [ ] commons-codec 1.15 整库 round-trip: 反编译 → 重编译成 jar → 用反射差分调用
@@ -106,23 +117,25 @@
 - [ ] `HmacUtils`: try-catch 重建 (`exception Throwable has already been caught`) +
   checked exception 未声明
 - [ ] `UnixCrypt`: 变量重复定义 (`variable var14 is already defined`)
-- [ ] `XXHash32`: `var1_1 might not have been initialized` (同上面的 slot 复用 BUG)
+- [x] `XXHash32`: `var1_1 might not have been initialized` — 已由本阶段 slot 复用修复解决
 
 ---
 
 ## 如何运行
 
 ```bash
-# 本地快回归 (<=30s, 主闸门, CI 也跑这个)
+# 本地快回归 (主闸门, CI 也跑这个)
 go test ./common/javaclassparser/...
 
-# 跑 codec 算法差分 (默认 skip 已知缺陷; CODEC_STRICT=1 强制运行并断言)
-CODEC_STRICT=1 go test -run TestCodecSemanticsRoundTrip -count=1 -v ./common/javaclassparser/tests/
+# 跑 codec 算法差分 (只要有 javac/java 就硬断言, 已不再需要 CODEC_STRICT)
+go test -run TestCodecSemanticsRoundTrip -count=1 -v ./common/javaclassparser/tests/
 
 # 跑大型交叉对比 PK (需要 CFR/Vineflower jar + 语料, 见 YAK_JAVA_DECOMPILER_CROSS_COMPARISON.md §7)
 CROSS_PK=1 CFR_JAR=... VINEFLOWER_JAR=... go test -run TestYakDecompilerCrossComparison ./common/javaclassparser/tests/
 ```
 
 ## 提交节奏 (用户要求: commit + push + 下一轮)
-本阶段: `fbb6cbf36` 已提交 3 个 fix + 回归。codec harness + battery + 本 TODO 待提交 (见 git status)。
-下一轮: 修上面的 slot 复用 BUG -> 去掉 CODEC_STRICT skip -> commit + push -> 扩展算法/库覆盖。
+- `fbb6cbf36`: 3 个 correctness fix + 回归 (byte 收窄 / IFNONNULL 极性)。
+- 本阶段: slot 复用自引用初始化**已治本修复** + 去掉 CODEC_STRICT skip 变硬门禁 +
+  battery 扩展 (SHA-1/SHA-256/Adler-32/Base64 解码), 全部 byte-for-byte 通过, 待提交。
+- 下一轮: 修后自增数组下标 `arr[i++]` BUG -> 扩展 HMAC/Base32 -> 推进真实库 round-trip。

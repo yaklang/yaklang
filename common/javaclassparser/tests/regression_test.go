@@ -2,6 +2,7 @@ package tests
 
 import (
 	"embed"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -412,6 +413,51 @@ func TestDecompileFastjsonJSONWriterSetPathCrossChecked(t *testing.T) {
 	}
 	if strings.Contains(compact, "JSONWriter$Pathvar3_1") {
 		t.Fatalf("setPath previous local was split across branches (var3_1 leaked)\n----- source -----\n%s", source)
+	}
+}
+
+// TestDecompilePostBranchReassignNoSelfInit guards the post-branch reassignment slot fix. When a
+// local is assigned ONLY inside if/else (or switch) arms and is then RE-assigned right after the
+// branch as `x = f(x)`, RewriteVar used to mint a fresh self-referencing id for that reassignment:
+// the dumper renamed the colliding declaration to `x_1` and, because the right-side read shared the
+// same id, emitted `int x_1 = (x_1) + ...`, which javac rejects with "variable x_1 might not have
+// been initialized". This was the blocking defect behind the codec round-trip oracle (md5 / xxHash32).
+// redirectPostBlockReassignments now repoints every post-block reference of the same logical variable
+// onto the hoisted id and demotes the first reassignment to a plain assignment. The seed reproduces
+// both shapes: a simple if/else merge (simpleMerge, xxHash32-shaped) and a nested if-else-if merge
+// (nestedMerge, md5-round-shaped). This is a javac-free structural guard; the executable end-to-end
+// proof lives in TestCodecSemanticsRoundTrip.
+func TestDecompilePostBranchReassignNoSelfInit(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/post_branch_reassign_slot.class")
+	if err != nil {
+		t.Fatalf("read embedded class failed: %v", err)
+	}
+	source, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile failed: %v", err)
+	}
+	if _, ferr := java2ssa.Frontend(source); ferr != nil {
+		t.Fatalf("frontend parse failed: %v\n----- source -----\n%s", ferr, source)
+	}
+	if strings.Contains(source, "yak-decompiler") {
+		t.Fatalf("expected full decompilation, got a stub\n----- source -----\n%s", source)
+	}
+	// A self-referencing initializer `<type> var = (var) ...` (the same name declared and read in its
+	// own initializer) is always illegal Java; assert none of that shape survives. Go's RE2 has no
+	// backreferences, so capture the declared name and the first read and compare them.
+	selfInit := regexp.MustCompile(`\b(?:int|long)\s+(var\d+(?:_\d+)?)\s*=\s*\((var\d+(?:_\d+)?)\)`)
+	for _, m := range selfInit.FindAllStringSubmatch(source, -1) {
+		if m[1] == m[2] {
+			t.Fatalf("self-referencing initialization survived: %q (post-branch reassignment slot regression)\n----- source -----\n%s", m[0], source)
+		}
+	}
+	// The branch-merged locals must be reassigned as plain assignments, not redeclared.
+	compact := strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(source)
+	if !strings.Contains(compact, "var2=(var2)+(var1)") {
+		t.Fatalf("simpleMerge post-branch reassignment not reconstructed as a plain assignment\n----- source -----\n%s", source)
+	}
+	if !strings.Contains(compact, "var4=((var4)+(var1))+(var0)") {
+		t.Fatalf("nestedMerge post-branch reassignment not reconstructed as a plain assignment\n----- source -----\n%s", source)
 	}
 }
 

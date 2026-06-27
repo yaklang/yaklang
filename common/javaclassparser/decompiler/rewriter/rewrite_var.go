@@ -600,8 +600,85 @@ func switchHoistDeclarations(sw *statements.SwitchStatement, afterSts []statemen
 			as.IsDeclare = false
 		}
 		declares = append(declares, statements.NewDeclareStatement(targetRef))
+		redirectPostBlockReassignments(afterSts, uid, targetID)
 	}
 	return declares
+}
+
+// redirectPostBlockReassignments repairs the read-before-write that arises when a local is
+// assigned ONLY inside branch bodies (if/else arms or switch cases) and is then RE-assigned in the
+// enclosing block right after the branch via `x = f(x)`. RewriteVar walks block scopes and never
+// records the slot as defined in the enclosing scope (the branch bindings live in child scopes), so
+// it mints a fresh VariableId for the post-block reassignment and rebinds BOTH its left side and the
+// self-read on its right side onto that new id. The dumper then renames the colliding declaration to
+// `x_1` and, because the right-side read shares the same id, emits `int x_1 = x_1 + ...`, which javac
+// rejects with "variable x_1 might not have been initialized" (observed in md5() / xxHash32()).
+//
+// Once the branch assignments have been unified onto targetID and a single `T x;` declaration is
+// hoisted ahead of the branch, every post-block reference of the SAME logical variable must point at
+// targetID too, and the first post-block reassignment must be demoted from a declaration to a plain
+// assignment so it reuses the hoisted declaration. The match is by VarUid, which is stable per
+// variable across all of its refs, so an unrelated later variable that merely reuses the JVM slot
+// (a different VarUid) is never touched.
+func redirectPostBlockReassignments(afterSts []statements.Statement, uid string, targetID *utils.VariableId) {
+	if targetID == nil || uid == "" || len(afterSts) == 0 {
+		return
+	}
+	oldIds := map[*utils.VariableId]struct{}{}
+	demotedFirst := false
+	var walk func([]statements.Statement)
+	walk = func(sts []statements.Statement) {
+		for _, st := range sts {
+			switch s := st.(type) {
+			case *statements.AssignStatement:
+				if s.ArrayMember != nil {
+					continue
+				}
+				ref, ok := core.UnpackSoltValue(s.LeftValue).(*values.JavaRef)
+				if !ok || ref == nil || ref.Id == nil || ref.VarUid != uid {
+					continue
+				}
+				if ref.Id != targetID {
+					oldIds[ref.Id] = struct{}{}
+				}
+				// Demote only the first declaration-form reassignment: it is the one the dumper
+				// would otherwise emit as `int x = x + ...`; later reassignments are already plain.
+				if !demotedFirst && (s.IsFirst || s.IsDeclare) {
+					s.IsFirst = false
+					s.IsDeclare = false
+					demotedFirst = true
+				}
+			case *statements.IfStatement:
+				walk(s.IfBody)
+				walk(s.ElseBody)
+			case *statements.ForStatement:
+				walk(s.SubStatements)
+			case *statements.WhileStatement:
+				walk(s.Body)
+			case *statements.DoWhileStatement:
+				walk(s.Body)
+			case *statements.SynchronizedStatement:
+				walk(s.Body)
+			case *statements.TryCatchStatement:
+				walk(s.TryBody)
+				for i := range s.CatchBodies {
+					walk(s.CatchBodies[i])
+				}
+			case *statements.SwitchStatement:
+				for _, c := range s.Cases {
+					if c != nil {
+						walk(c.Body)
+					}
+				}
+			}
+		}
+	}
+	walk(afterSts)
+	for oldId := range oldIds {
+		for _, st := range afterSts {
+			st.ReplaceVar(oldId, targetID)
+		}
+	}
 }
 
 func dropEmptySlotAssignments(sts *[]statements.Statement) {
@@ -759,6 +836,7 @@ func ifHoistDeclarations(ifst *statements.IfStatement, afterSts []statements.Sta
 			as.IsDeclare = false
 		}
 		declares = append(declares, statements.NewDeclareStatement(targetRef))
+		redirectPostBlockReassignments(afterSts, uid, targetID)
 	}
 	return declares
 }
