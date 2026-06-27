@@ -1,0 +1,13 @@
+<|REACTIVE_DATA_{{.Nonce}}|>
+
+Session UUID: {{ .SessionUUID }}
+SQLite: {{ .SQLitePath }}（结构化数据真源；不知路径/phase 时先 discovery_get_status）
+Phase: {{ .Phase }}
+Counts: {{ .CountsLine }}
+
+上一轮反馈:
+{{ if .FeedbackMessages }}{{ .FeedbackMessages }}{{ else }}（无）{{ end }}
+
+迭代: {{ .Iteration }}
+
+<|REACTIVE_DATA_END_{{.Nonce}}|>

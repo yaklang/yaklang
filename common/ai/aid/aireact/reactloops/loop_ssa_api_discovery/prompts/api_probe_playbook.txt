@@ -1,0 +1,113 @@
+# API 探测子循环 Playbook
+
+**核心原则：智能体自主推断 + 验证，不依赖预计算的 URL/方法/鉴权答案。**
+
+candidate_ctx 只提供原始线索（代码片段、routing_profile、auth_selection 等），
+所有 URL 路径、HTTP 方法、请求参数、鉴权方式都必须由智能体自己从线索中推断并验证。
+
+## 第一步：从代码片段推断接口信息
+
+读取 `code_snippet` 中的注解，推断以下信息：
+
+### 1. 路径推断
+- 方法级别注解：`@GetMapping`、`@PostMapping`、`@PutMapping`、`@DeleteMapping`、`@PatchMapping`、`@RequestMapping`
+- 类级别注解：`@RequestMapping`（可能包含公共路径前缀）
+- 路径拼接规则：
+  - 类级别路径 + 方法级别路径 = 完整路径
+  - 例如：类 `@RequestMapping("/admin")` + 方法 `@PostMapping("save")` → `/admin/save`
+- 参考 `routing_profile_excerpt` 中的 `url_spaces[].mount_prefix` 确认路径前缀
+
+### 2. 方法推断
+- 从注解直接判断：`@GetMapping` → GET，`@PostMapping` → POST，以此类推
+- 如果没有明确注解：
+  - 方法名包含 `save`、`create`、`add`、`update`、`delete` → POST/PUT/DELETE
+  - 方法名包含 `list`、`get`、`find`、`query` → GET
+  - 参数中有 `@RequestBody` 或复杂对象 → POST/PUT
+  - 默认使用 GET（最安全的首次探测方法）
+
+### 3. 参数推断
+- 查询参数：`@RequestParam` 注解的参数
+- 路径参数：`@PathVariable` 注解的参数
+- 请求体：`@RequestBody` 注解的参数
+- Form 表单：`@ModelAttribute` 或 CSRF 相关注解
+- 根据参数类型推断示例值：
+  - `String` → 示例字符串
+  - `Long`/`Integer` → 示例数字
+  - `boolean` → `true`/`false`
+  - 复杂对象 → 最小化 JSON（仅包含必要字段）
+
+### 4. 鉴权推断
+读取 `auth_selection_json` 和 `auth_evidence`：
+
+- `auth_selection_json.available_credentials` 列出了所有可用凭证，每个凭证包含：
+  - `id`、`auth_type`、`url_space`、`auth_realm`、`mount_prefix`、`verified`
+- 根据以下线索选择匹配的 `auth_credential_id`：
+  - handler 包名中的层级关键词
+  - 推断的路径前缀与 `mount_prefix` 匹配
+  - `url_space` 匹配
+- **禁止**手抄 `headers_json`/Cookie；用 `discovery_select_auth_credential` 选中 id 后 **`auth_credential_id` 唯一注入**。
+
+### 5. 探测顺序（重要：先带凭证，再测公开性）
+当存在匹配 realm 的 **verified** 凭证时：
+
+1. **第一步（功能性验证）**：`do_http_request` **带 `auth_credential_id`**，确认路由、方法、参数正确，记录 probe 证据。
+2. **第二步（公开性/未授权）**：同一路由 **不带** `auth_credential_id` 再请求；401/403 → `auth_access=protected`；仍 200/业务成功 → `auth_access=public`（潜在未授权）。
+3. 代码明确 `@PermitAll` / `permitAll()` 且第二步也为 public → 可直接标 `public`。
+
+仅当 **无任何** verified 凭证时，才先无凭证探测；401/403 则标记需鉴权并跳过或待校准后重试。
+
+## 第二步：构造并验证请求
+
+### URL 构造规则
+1. 从 `effective_bases` 选择一个 base URL
+2. 从代码片段推断完整路径（类级别路径 + 方法级别路径）
+3. 参考 `routing_profile_excerpt` 中的 `mount_prefix` 确认路径前缀
+4. 拼接：`base_url + inferred_path`
+5. **必须验证**：URL 格式正确、路径无重复前缀
+
+### 请求验证清单
+在发送请求前，智能体必须确认：
+- [ ] URL 可达（base_url + path 拼接正确）
+- [ ] HTTP 方法匹配注解类型
+- [ ] 请求参数格式正确（类型、必填项）
+- [ ] Content-Type 匹配（JSON、form-data 等）
+- [ ] 鉴权方式正确（如果有）
+
+### 响应验证规则
+只有同时满足以下条件才能 `verified=true`：
+
+1. **可达性**：请求成功发送，收到响应（非连接错误、非 DNS 错误）
+2. **方法正确**：响应不是 405 Method Not Allowed
+3. **路由正确**：响应不是 404（除非项目确实返回 404 表示无权限访问）
+4. **参数格式正确**：响应不是 400 Bad Request
+5. **业务逻辑触发**：
+   - 返回 200/201 且响应体包含业务数据（JSON、HTML 片段等）
+   - 或返回预期的业务状态码（如 204 No Content 表示删除成功）
+   - 或返回项目特定的成功响应模式（参考 `verified_success_samples`）
+
+### 失败处理
+- 404 → 路径可能错误，检查 mount_prefix 和路径拼接
+- 405 → HTTP 方法错误，重新推断方法
+- 400 → 参数格式错误，检查参数类型和必填项
+- 401/403 → 需要鉴权，从 `auth_selection_json` 选择凭证重试
+- 302 → 可能是登录页，确认是否需要鉴权
+- 500 → 服务器错误，可能是参数值无效，尝试最小化参数
+
+## 第三步：记录结果
+
+调用 `finalize_probe_result` 时必须包含：
+- `verified`：是否验证成功（必须满足上述验证规则）
+- `method`：实际使用的 HTTP 方法
+- `path_pattern`：最终确定的路径
+- `full_sample_url`：完整请求 URL
+- `probe_attempts`：尝试记录（至少包含一次成功或最终失败尝试）
+- `verdict_reason`：详细说明为什么 verified=true/false
+- `auth_access`：`public`、`protected` 或 `unknown`
+- `auth_headers_json`：如果使用了鉴权，记录使用的凭证信息
+
+## 注意事项
+- **禁止**使用 `full_sample_url_hint`、`assembled_path`、`suggested_method` 等预计算字段（这些字段已移除）
+- **禁止**直接使用 `suggested_auth_credential_id`（已移除），必须从 `auth_selection_json.available_credentials` 中选择
+- **禁止** read_file 或 grep 查找代码/路由/鉴权信息（这些已预注入到 candidate_ctx）
+- 如果代码片段不足以推断，参考 `routing_profile_excerpt` 和 `verified_success_samples`
+- 多套鉴权时，禁止混用不同 realm 的凭证

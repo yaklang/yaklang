@@ -1,0 +1,42 @@
+# Feature API Unit — 前缀 / 路径 / 参数 / 验证（单 entry_file）
+
+**Phase Auth 已完成**：登录凭证在 `auth_credentials` 表中。本单元 **禁止 POST 登录**、禁止 `discovery_upsert_auth_credential`、禁止手填 Cookie。
+
+目标：对 **一个** `controller_task.entry_file` 线性完成 S1→S2→S3→S4，然后 `finalize_http_api_unit`。
+
+## S0 引擎上下文（优先阅读）
+1. **servlet_routing_map** — Servlet 级前缀（/admin、/api、/）
+2. **resolved_routes** — 引擎已解析 full path；**勿修改 url_prefix**
+3. **required_auth_realm** — 本 entry 应使用的凭证域
+
+## S1 前缀（Prefix）
+1. 读 `servlet_routing_map`、`prefix_candidates`、`auth_surface_map`。
+2. **routing_profile.url_spaces 仅作参考**；单段 camelCase mount（如 /cmsCategory）是方法路径误识别，**不是** Servlet 前缀。
+3. 必要时 `read_file` `*Initializer.java` / `*Config.java` 确认 `getServletMappings()`。
+4. 确定 `mount_prefix`（admin 包 → `/admin`）；禁止假设 mount=`/`。
+
+## S2 路径（Route）
+1. 优先使用 **resolved_routes**；否则 `read_file(entry_file)` 或 static_hints。
+2. full_path = context_path + **servlet url_prefix** + 类 mapping + 方法 mapping。
+3. 404 → 先检查 servlet prefix；403 → 试 POST + `_csrf`（见 S3）。
+
+## S3 参数（Params）
+1. 优先读 **frontend_api_hints** 中的 params（表单/ajax 字段名）；再读 Java `@RequestParam`。
+2. 见 `@Csrf` → 必须带 `_csrf`；mutation 默认 **POST** + form。
+3. 破坏性端点（logout/clearCache 等）标记 reject，勿探测。
+
+## S4 验证（Verify）— 只消费凭证
+对每条 API（**先带凭证，再测公开性**）：
+1. `discovery_list_auth_credentials` → 选 **required_auth_realm** 对应凭证 → `do_http_request` **仅带 `auth_credential_id`**。
+2. 同路由不带凭证再请求 → 区分 protected / public。
+3. 403(CSRF) ≠ 404：路由存在时 reject_reason 写 csrf_required 或重试 POST。
+4. `discovery_upsert_verified_http_api` 或 `discovery_mark_api_rejected`。
+5. 全部完成后 `finalize_http_api_unit`。
+
+## result_json
+`path_pattern` / `full_sample_url` 必须是 **完整绝对路径**；handler_class 须匹配 entry_file。
+
+## 禁止
+- POST 登录、手填 Cookie、未发包标 verified。
+- 跳过 hint/resolved_routes 中的路由（须 upsert 或 reject）。
+- 把其他 Controller 的路由写入本 entry（handler_class 必须匹配）。

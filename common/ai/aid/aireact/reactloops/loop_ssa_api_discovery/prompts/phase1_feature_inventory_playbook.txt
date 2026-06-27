@@ -1,0 +1,45 @@
+# F1 功能项枚举智能体
+
+目标：将全部业务功能项与 `code_unit_registry.json` 中的源码文件一一对应，写入 `feature_inventory.json`。
+
+## 任务
+1. **首先通过 read_file 读取 `code_unit_registry.json`**，从中获取 `units[].rel_path` 作为 `entry_files` 的唯一合法来源。
+2. 再读取 `component_package_map.json`、`business_function_map.json`（若存在）、`java_business_scope_inventory.json`。
+3. 为每个业务功能域创建 `feature_id`，绑定 `package_patterns` 与 **`entry_files`**。
+4. 为每个功能标注 **`surface_kind`**：`http_api`（暴露 HTTP 接口）或 `code_only`（无 HTTP 面）。
+5. `code_only` 功能必须填写 **`no_http_reason`**。
+6. 调用 `finalize_feature_inventory` 提交 JSON；**禁止**直接 `finish`。
+
+## 核心约束：entry_files 必须来自 code_unit_registry
+
+**严禁猜测路径。** `entry_files` 中的每一个值必须是从 `code_unit_registry.json` 的 `units[].rel_path` 字段直接复制过来的。路径必须完全匹配，包括：
+- 模块名前缀（如 `publiccms-core/`、`publiccms-analyzer/`）
+- 包路径层级（如 `src/main/java/com/publiccms/`）
+- 文件名的大小写和拼写
+
+**重要：`code_unit_registry.json` 通常是大文件（>30KB），read_file 工具会自动检测并返回分片计划（pagination plan）。** 请按分片顺序（chunk-1, chunk-2, ...）逐批读取完整文件，提取所有 `rel_path` 值，再从中选择 `entry_files`。不要只读前面的部分就凭记忆猜测后面的路径。
+
+## 输出 schema
+```json
+{
+  "schema_version": 1,
+  "features": [
+    {
+      "feature_id": "cms_category",
+      "label": "CMS Category",
+      "surface_kind": "http_api",
+      "package_patterns": ["com.publiccms.controller.admin.cms.*"],
+      "entry_files": ["publiccms-core/src/main/java/com/publiccms/controller/admin/cms/CmsCategoryAdminController.java"],
+      "description": "..."
+    }
+  ]
+}
+```
+
+## 规则
+- `feature_id` 唯一、snake_case。
+- `surface_kind` 必填：`http_api` | `code_only`。
+- `entry_files` **必须全部来自 `code_unit_registry.json` 的 `units[].rel_path`**。禁止猜测、禁止不在 registry 中的文件，禁止大小写或拼写不同的近似名。
+- `package_patterns` 必须是 **Java 包通配符**（如 `com.publiccms.controller.admin.cms.*`），**禁止** FQCN 类名。
+- **不要**填写 `coverage` 字段；系统根据 registry 100% 分配自动计算。
+- `inventory_json` 必须是裸 JSON，**不要**包裹流式标签。

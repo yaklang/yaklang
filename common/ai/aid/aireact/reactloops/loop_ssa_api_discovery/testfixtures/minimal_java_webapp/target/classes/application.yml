@@ -1,0 +1,7 @@
+server:
+  address: 0.0.0.0
+  port: 18080
+
+spring:
+  application:
+    name: ssa-discovery-minimal

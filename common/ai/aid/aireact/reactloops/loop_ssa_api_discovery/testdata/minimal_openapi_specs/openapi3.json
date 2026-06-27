@@ -1,0 +1,18 @@
+{
+  "openapi": "3.0.0",
+  "info": {"title": "Test API", "version": "1.0.0"},
+  "servers": [{"url": "http://localhost:8080/api"}],
+  "paths": {
+    "/users": {
+      "get": {"operationId": "listUsers", "summary": "List users"},
+      "post": {"operationId": "createUser", "summary": "Create user"}
+    },
+    "/users/{id}": {
+      "get": {"operationId": "getUser", "summary": "Get user by ID"},
+      "delete": {"operationId": "deleteUser", "summary": "Delete user"}
+    },
+    "/health": {
+      "get": {"operationId": "healthCheck", "summary": "Health check"}
+    }
+  }
+}

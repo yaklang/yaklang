@@ -1,0 +1,33 @@
+# Java 多 Dispatcher / CMS 路由（通用模式）
+
+适用于 PublicCMS 及同类 **多 Servlet** 工程：`AdminInitializer` / `WebInitializer` / `ApiInitializer` 分别注册 `/admin/*`、`/`、`/api/*`。
+
+## 权威来源（按优先级）
+1. **servlet_routing_map.json**（引擎扫描 Initializer/Config）
+2. **resolved_routes**（引擎已拼好 full path，勿改 prefix）
+3. **prefix_candidates** / auth_surface path_prefixes
+4. routing_profile.url_spaces — **仅 Servlet 级**（/admin、/api、/）；**忽略** /cmsCategory、/dict 等方法级误 mount
+
+## 完整 URL
+```
+full_path = context_path + servlet_url_prefix + class@RequestMapping + methodMapping
+```
+示例：`/admin` + `cmsDiy` + `save` → `/admin/cmsDiy/save`
+
+## 探测决策
+| 响应 | 含义 | 动作 |
+|------|------|------|
+| 404 | 路径可能错 | 检查 servlet prefix；勿把 routing_profile 方法路径当 mount |
+| 404 + @Csrf 端点 | **路由存在**，缺 `_csrf` | 加 `_csrf`（cookie 后缀或登录页）后重试；GET 变更用 query，POST save 用 body |
+| 403 + CSRF 文案 | **路由存在** | 加 `_csrf` 后重试 |
+| 302 → login | 未鉴权 | 换 auth_realm 凭证，非 reject |
+| 200 | 可达 | upsert verified（含 /api 空 body） |
+
+## mutation 端点
+- `@RequestMapping("save")` 无 method → 静态 harvest 可能标 GET；**实际多为 POST + form + _csrf**
+- 带 `@Csrf` 的方法：**禁止**因 GET 403/404 直接标「路由不存在」
+
+## 禁止
+- 假设 admin controller mount=`/`（当 servlet_routing_map 有 /admin 时）
+- 从 routing_profile 使用 `/cmsCategory` 等单段 camelCase mount
+- Feature 阶段 POST 登录或手填 Cookie

@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-06-25T03:55:25Z",
+  "language": "java",
+  "layout": "multi_module",
+  "code_root": "/home/murkfox/yaklang-main/common/ai/aid/aireact/reactloops/loop_ssa_api_discovery/testfixtures/multi_module_maven",
+  "modules": [
+    {
+      "module_root": "order-service",
+      "build_file": "order-service/pom.xml",
+      "packaging": "jar",
+      "base_package": "com.acme.order",
+      "scope_units": [
+        {
+          "id": "order-service:maven_module:order-service",
+          "kind": "maven_module",
+          "path": "order-service"
+        },
+        {
+          "id": "order-service:java_package:order-service/src/main/java/com/acme/order",
+          "kind": "java_package",
+          "path": "order-service/src/main/java/com/acme/order",
+          "domain_segment": "order",
+          "java_file_count": 1,
+          "hints": [
+            "OrderController"
+          ]
+        },
+        {
+          "id": "order-service:java_package:order-service/src/main/java/com/acme/order/service",
+          "kind": "java_package",
+          "path": "order-service/src/main/java/com/acme/order/service",
+          "domain_segment": "service",
+          "java_file_count": 1,
+          "hints": [
+            "OrderService"
+          ]
+        }
+      ]
+    },
+    {
+      "module_root": "payment-service",
+      "build_file": "payment-service/pom.xml",
+      "packaging": "jar",
+      "base_package": "com.acme.payment",
+      "scope_units": [
+        {
+          "id": "payment-service:maven_module:payment-service",
+          "kind": "maven_module",
+          "path": "payment-service"
+        },
+        {
+          "id": "payment-service:java_package:payment-service/src/main/java/com/acme/payment",
+          "kind": "java_package",
+          "path": "payment-service/src/main/java/com/acme/payment",
+          "domain_segment": "payment",
+          "java_file_count": 1,
+          "hints": [
+            "PaymentController"
+          ]
+        }
+      ]
+    },
+    {
+      "module_root": "common-lib",
+      "build_file": "common-lib/pom.xml",
+      "packaging": "jar",
+      "base_package": "com.acme.common",
+      "scope_units": [
+        {
+          "id": "common-lib:maven_module:common-lib",
+          "kind": "maven_module",
+          "path": "common-lib"
+        },
+        {
+          "id": "common-lib:java_package:common-lib/src/main/java/com/acme/common",
+          "kind": "java_package",
+          "path": "common-lib/src/main/java/com/acme/common",
+          "domain_segment": "common",
+          "java_file_count": 1
+        }
+      ]
+    }
+  ],
+  "coverage_policy": {
+    "required_kinds": [
+      "java_package"
+    ],
+    "optional_kinds": [
+      "resource_bundle",
+      "webapp_bundle"
+    ],
+    "module_root_covers_children": true
+  },
+  "stats": {
+    "total_units": 7,
+    "java_package_units": 4
+  }
+}

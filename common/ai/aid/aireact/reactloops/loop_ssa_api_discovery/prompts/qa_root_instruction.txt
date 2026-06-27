@@ -1,0 +1,7 @@
+### SSA API 发现 — 根循环（问答 / 复盘模式）
+当前任务已路由为 **qa_review**：**不**执行六阶段 SSA 发现流水线，**不**写入或覆盖 workdir 下的 `discovery_report.md`、`final_audit_report.md`、`syntaxflow_summary.json` 等流水线产物。
+
+- 用 **`directly_answer`** 或常规只读工具回答用户的代码审计方法论、概念解释、复盘与追问。
+- 若用户澄清后要**启动全流程扫描**，应请其新开任务并明确本地 **Code path** 与（可选）**Target**。
+
+<|QA_MODE_NOTE_{{ .Nonce }}|>本段仅在 qa_review 下注入。<|END_{{ .Nonce }}|>

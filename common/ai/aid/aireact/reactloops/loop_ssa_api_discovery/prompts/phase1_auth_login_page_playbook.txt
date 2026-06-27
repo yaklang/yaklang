@@ -1,0 +1,46 @@
+# 登录页优先分析流程（A2/C1 必读）
+
+## 核心原则
+- **先页面后源码**：看到登录相关页面时，先 GET 登录页 HTML/JS，再**按需**读后端代码。
+- **区分前台 vs 后台**：同一站点常有多个独立登录面；必须匹配当前 `auth_realm` 与 `mount_prefix`，禁止混用。
+- **后端路径仅作索引**：「Backend code locations」仅列出源码路径；**何时读、读哪些**由你自行决定。表单字段名、POST 路径、客户端变换均以登录页 evidence 为准，**禁止**套用其他项目或 realm 的字段名。
+
+## 步骤
+1. **候选 URL**：结合 `mount_prefix`、`routing_profile`、A1 inventory，列出本 realm 可能的登录页 GET 路径。
+2. **GET 登录页**：`do_http_request` GET；若重定向到 HTML，记录最终 URL。
+3. **判断 login_page_kind**（必须与当前 `auth_realm` 一致）：
+   - **backend**：URL/文案/package 证据表明属于管理/后台面，且与当前 realm 的 `mount_prefix` 一致。
+   - **frontend**：属于站点前台/会员/用户面，且**不属于**当前 realm 以外的 mount 空间。
+   - 若页面明显属于**另一 realm**，换 URL 重试，勿把 A 面表单用于 B 面 realm。
+4. **解析表单**（HTML/JS 为准，禁止仅凭 Controller 注解猜字段）：
+   - `login_page_path`：GET 的 HTML 页 path
+   - `login_post_path`：`<form action>` 或 JS 提交目标（**可与 page path 不同**）
+   - `login_form_fields`：从页面提取的全部 input/select 字段（name、type、required、默认值）；含 hidden/checkbox 等
+   - `content_type`：`<form enctype>` 或页面/Controller evidence（常见 `application/x-www-form-urlencoded`；JSON API 为 `application/json`）
+   - `password_transform`：若页面 JS 对凭证字段做哈希/编码，算法名须来自 HTML/JS 或源码 evidence
+5. **按需读后端**：filter 链、session cookie 名、Security 配置等；引用具体 path 写入 `code_evidence`。
+6. **C1 验证**：按 `login_form_fields` 组装**完整**请求体 POST 到 `login_post_path`；失败时检查 realm 混用、缺字段、checkbox/radio 提交值是否与页面一致。
+   - **Content-Type**：与 `content_type` evidence 一致；表单登录须 `content-type=application/x-www-form-urlencoded` + `post-params`/`body`（CLI 参数名 **`content-type`**，非 `content_type`）。
+   - **凭证权限**：`login_page_kind=backend` → 仅用 `admin` group；`frontend` → 仅用 `user`/`web` group（见注入「本 realm 凭证轮换与权限」）。
+   - **同组轮换**：当前 username 失败 → 换同 group 下一账号，勿重复同一密码；全部失败再标记 realm 未校准。
+
+## 登录成功与 Cookie 保存（C1）
+- POST 登录响应：**302/301/303/307 + Set-Cookie**（或 redirect follow 请求含 session **Cookie:**）→ 鉴权成功（即使跳转目标页 404 也算成功）。
+- 引擎 **programmatic_auto_save** 落库后：`discovery_list_auth_credentials` → `discovery_select_auth_credential` → probe 仅用 **`auth_credential_id`**。
+- **禁止**手填 `headers` Cookie；**禁止**在 DB 无 verified 行时 finalize。
+- 若 list 仍空（auto-save 失败）：**必须** `discovery_upsert_auth_credential`（verified=true，headers_json 合并全部 session Cookie，`; ` 连接）。
+- 登录 POST 本身 401/405、无 Set-Cookie/Cookie、或登录页错误文案 → 失败。
+- 仅有 `JSESSIONID` 而无 realm 对应 session cookie（如后台 `PUBLICCMS_ADMIN`），且带凭证 GET 仍跳 login → **失败**，换下一账号。
+
+## 登录后相对跳转（302 Location）
+- `Location: index.html` 等相对路径 → **父目录(login_post_path) + Location**（如 POST `/admin/login` → GET `/admin/index.html`）。
+- **错误**：`{login_post_path}/{Location}`（如 `/admin/login/index.html`）常 404，但 Cookie 可能已有效，**不能**据此判登录失败。
+- 自动跟随 404 后：用 **`auth_credential_id`** GET Post-login redirect resolution 中的路径，再选业务 probe。
+
+## 输出字段（A2 mechanism / A3 surface 须继承）
+- `login_page_kind`: `backend` | `frontend` | `unknown`
+- `login_page_path`: GET 登录 HTML path
+- `login_post_path`: POST 目标 path
+- `login_form_fields`: `[{name,type,required,default,evidence}]`（name 必须来自页面）
+- `login_path` = **`login_post_path`**（POST 接口，不是 GET 页面）
+- `login_method` = 页面 form method（常见 POST）

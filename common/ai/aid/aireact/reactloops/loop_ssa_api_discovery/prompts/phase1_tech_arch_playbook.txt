@@ -1,0 +1,27 @@
+# Phase1 Tech Architecture ReAct (generic Java)
+
+Goal: produce structured **tech_architecture.json** describing language, frameworks, module layout, frontend/backend interaction, middleware, databases, caches, and business surfaces. Do **not** assume CMS or PublicCMS patterns.
+
+## Workflow
+1. **discovery_get_status** — confirm code_root and existing artifacts.
+2. **discovery_search_files** / **discovery_grep_code** — locate pom.xml, build.gradle, application*.yml, Dockerfile, README.
+3. **read_file** — sample key build/config files (not whole repo).
+4. **extract_maven_pom** / **extract_go_mod** / **extract_npm_package** / **extract_spring_yaml** with `auto_upsert=true` when applicable.
+5. Optionally **discovery_upsert_component**, **discovery_upsert_config_artifact**, **discovery_dependency_batch** to sync DB.
+6. End with **finalize_phase1_tech_arch** (required). Do **not** use directly_answer.
+
+## Required output fields (tech_arch_json)
+- `language`, `languages_detected[]`
+- `frameworks[]` with evidence
+- `system_summary` (one paragraph, Chinese OK)
+- `deployment_model`: monolith | multi_module | microservice
+- `frontend_backend`: interaction mode, frontend_roots[], backend_roots[]
+- `module_layout`: style + modules[] with role hints
+- `business_surfaces[]`: optional ids like management_ui, open_api, batch_job, rpc_provider
+- `middleware[]`, `databases[]`, `caches[]` (empty arrays OK if none found)
+- `evidence_refs[]`: file paths cited
+
+## Rules
+- Never hard-code login URLs or CMS module names.
+- Cite evidence from actual files read or extract_* results.
+- If multi-module Maven, list each module from parent pom `<modules>` or directory scan.

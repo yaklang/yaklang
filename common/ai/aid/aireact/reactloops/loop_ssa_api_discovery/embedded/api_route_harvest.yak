@@ -1,0 +1,387 @@
+// api_route_harvest：对代码根内候选源码做轻量正则路由抽取（Spring / Go gin 风格 / Express 常见写法），输出 api_route_harvest.json。
+// 与 Go 侧 RunEndpointHarvestForSession 互补，适合大仓文件级并发扫描。
+
+__DESC__ = "SSA API Discovery：并发启发式路由抽取，落盘 api_route_harvest.json。"
+__VERBOSE_NAME__ = "api_route_harvest"
+// 计划对齐：--ai-mode=function_call 时，对正则无命中但疑似含路由框架的少量文件调用 ai.FunctionCall 补抽取（默认关闭；非 liteforge）。
+__KEYWORDS__ = "ssa,discovery,route,harvest,regex,concurrent,ai.FunctionCall"
+__USAGE__ = "--code-root、--workdir；可选 --preanalysis、--file-concurrent、--ai-mode（off|function_call）、--ai-route-sniff-max-files（默认 2）、--ai-concurrent（同时进行 ai.FunctionCall 数，默认 2）、--sqlite-path、--session-uuid。"
+
+codeRoot = cli.String("code-root", cli.setRequired(true))
+workdir = cli.String("workdir", cli.setRequired(true))
+preanalysisPath = cli.String("preanalysis", cli.setDefault(""))
+fileConcurrent = cli.Int("file-concurrent", cli.setDefault(8))
+aiMode = cli.String("ai-mode", cli.setDefault("off"), cli.setHelp("off：仅正则；function_call：正则无命中时对少量文件调用 AI"))
+aiRouteSniffMax = cli.Int("ai-route-sniff-max-files", cli.setDefault(2))
+aiConcurrent = cli.Int("ai-concurrent", cli.setDefault(2), cli.setHelp("同时进行 ai.FunctionCall 的上限（function_call 模式）"))
+sqlitePath = cli.String("sqlite-path", cli.setDefault(""), cli.setHelp("discovery session SQLite 路径；非空时写入 http_endpoints"))
+dbDsn = cli.String("db-dsn", cli.setDefault(""), cli.setHelp("PostgreSQL DSN；优先于 sqlite-path"))
+sessionUUID = cli.String("session-uuid", cli.setDefault(""), cli.setHelp("discovery_sessions.uuid；配合 sqlite-path 或 db-dsn"))
+hintsOnly = cli.Int("hints-only", cli.setDefault(0), cli.setHelp("1=仅落盘 api_route_harvest.json，不写 http_endpoints"))
+cli.check()
+
+aiSniffMu = sync.NewMutex()
+aiSniffCount = 0
+aiRouteFcSuccess = 0
+
+acLim = aiConcurrent
+if acLim < 1 {
+    acLim = 1
+}
+aiSlotWg = sync.NewSizedWaitGroup(acLim)
+
+skipHarvestDir = n => {
+    switch n {
+    case "target", "build", ".git", "node_modules", ".idea", "dist", "out", "vendor":
+        return true
+    }
+    return false
+}
+
+relFromRoot = (root, ap) => {
+    x = str.TrimPrefix(file.Clean(ap), file.Clean(root))
+    x = str.TrimPrefix(x, "/")
+    x = str.TrimPrefix(x, "\\")
+    return str.ReplaceAll(x, "\\", "/")
+}
+
+wantFile = lb => {
+    ll = str.ToLower(lb)
+    return str.HasSuffix(ll, ".java") || str.HasSuffix(ll, ".go") || str.HasSuffix(ll, ".ts") ||
+        str.HasSuffix(ll, ".js") || str.HasSuffix(ll, ".tsx") || str.HasSuffix(ll, ".jsx") ||
+        str.HasSuffix(ll, ".py") || str.HasSuffix(ll, ".php")
+}
+
+// Go：`.Get("` 会误匹配 Query().Get("id")、Header.Get("Authorization") 等，仅保留类似注册路径的模式（必须以 / 开头）。
+looksLikeGoHTTPRoutePath = pp => {
+    pp = str.TrimSpace(pp)
+    if pp == "" {
+        return false
+    }
+    return str.HasPrefix(pp, "/")
+}
+
+harvestFile = (abs, rel) => {
+    eps = []
+    data, err = file.ReadFile(abs)
+    if err != nil || len(data) == 0 {
+        return eps
+    }
+    s = string(data)
+    if len(s) > 512000 {
+        s = s[:512000]
+    }
+    lb = file.GetBase(abs)
+    ll = str.ToLower(lb)
+
+    if str.HasSuffix(ll, ".java") {
+        rg = re.Compile(`@(Get|Post|Put|Delete|Patch)Mapping\s*\(\s*(?:(?:value|path)\s*=\s*)?["']([^"']*)["']`)~
+        ms = rg.FindAllStringSubmatch(s, -1)
+        for i = 0; i < len(ms); i++ {
+            m = ms[i]
+            if len(m) > 2 {
+                eps = append(eps, {"method": str.ToUpper(m[1]), "path_pattern": m[2], "source": "yak_java_mapping", "file_rel_path": rel})
+            }
+        }
+    }
+
+    if str.HasSuffix(ll, ".go") {
+        rg = re.Compile(`\.(Get|Post|Put|Delete|Patch|Head|Options)\(\s*"(.+?)"`)~
+        ms = rg.FindAllStringSubmatch(s, -1)
+        for i = 0; i < len(ms); i++ {
+            m = ms[i]
+            if len(m) <= 2 {
+                continue
+            }
+            pp = str.TrimSpace(m[2])
+            if !looksLikeGoHTTPRoutePath(pp) {
+                continue
+            }
+            eps = append(eps, {"method": str.ToUpper(m[1]), "path_pattern": pp, "source": "yak_go_verb", "file_rel_path": rel})
+        }
+        rgHF = re.Compile(`http\.HandleFunc\s*\(\s*"([^"]+)"`)~
+        msHF = rgHF.FindAllStringSubmatch(s, -1)
+        for i = 0; i < len(msHF); i++ {
+            m = msHF[i]
+            if len(m) <= 1 {
+                continue
+            }
+            pp = str.TrimSpace(m[1])
+            if !looksLikeGoHTTPRoutePath(pp) {
+                continue
+            }
+            eps = append(eps, {"method": "GET", "path_pattern": pp, "source": "yak_go_handlefunc", "file_rel_path": rel})
+        }
+        rgH = re.Compile(`http\.Handle\s*\(\s*"([^"]+)"`)~
+        msH = rgH.FindAllStringSubmatch(s, -1)
+        for i = 0; i < len(msH); i++ {
+            m = msH[i]
+            if len(m) <= 1 {
+                continue
+            }
+            pp = str.TrimSpace(m[1])
+            if !looksLikeGoHTTPRoutePath(pp) {
+                continue
+            }
+            eps = append(eps, {"method": "GET", "path_pattern": pp, "source": "yak_go_handle", "file_rel_path": rel})
+        }
+    }
+
+    if str.HasSuffix(ll, ".js") || str.HasSuffix(ll, ".ts") || str.HasSuffix(ll, ".jsx") || str.HasSuffix(ll, ".tsx") {
+        rg = re.Compile(`\.(get|post|put|delete|patch)\(\s*['"]([^'"]+)['"]`)~
+        ms = rg.FindAllStringSubmatch(s, -1)
+        for i = 0; i < len(ms); i++ {
+            m = ms[i]
+            if len(m) > 2 {
+                eps = append(eps, {"method": str.ToUpper(m[1]), "path_pattern": m[2], "source": "yak_express_like", "file_rel_path": rel})
+            }
+        }
+    }
+
+    if str.TrimSpace(aiMode) == "function_call" && len(eps) == 0 && len(s) > 80 {
+        if str.Contains(s, "Mapping") || str.Contains(s, "Router") || str.Contains(s, "router.") || str.Contains(s, "Route::") || str.Contains(s, "@app.") {
+            aiSniffMu.Lock()
+            overLim = aiSniffCount >= aiRouteSniffMax
+            if !overLim {
+                aiSniffCount++
+            }
+            aiSniffMu.Unlock()
+            if !overLim {
+                routeSniffSchema = {
+                    "routes": "(类型：对象数组) 每项含 method（字符串）、path_pattern（字符串，以 / 开头为佳）",
+                }
+                snip = s
+                if len(snip) > 12000 {
+                    snip = snip[:12000]
+                }
+                prompt = sprintf(`从下列后端源码中提取 HTTP API 路由。仅输出 JSON：routes 为数组，每项含 method（如 GET）、path_pattern（应用内路径）。
+文件: %s
+
+%s`, rel, snip)
+                aiSlotWg.Add()
+                r = nil
+                try {
+                    r = ai.FunctionCall(prompt, routeSniffSchema, [ai.funcCallRetryTimes(2)])~
+                } catch ex {}
+                aiSlotWg.Done()
+                if r != nil && r["routes"] != nil {
+                    rs = r["routes"]
+                    for ri = 0; ri < len(rs); ri++ {
+                        it = rs[ri]
+                        if it == nil {
+                            continue
+                        }
+                        pm = str.TrimSpace(sprint(it["path_pattern"]))
+                        if pm == "" {
+                            continue
+                        }
+                        eps = append(eps, {
+                            "method": str.ToUpper(str.TrimSpace(sprint(it["method"]))),
+                            "path_pattern": pm,
+                            "source": "yak_ai_route_sniff",
+                            "file_rel_path": rel,
+                        })
+                    }
+                    if len(eps) > 0 {
+                        aiSniffMu.Lock()
+                        aiRouteFcSuccess++
+                        aiSniffMu.Unlock()
+                    }
+                }
+            }
+        }
+    }
+
+    return eps
+}
+
+root = file.Clean(codeRoot)
+if !file.IsDir(root) {
+    die("invalid code-root")
+}
+
+fileList = []
+preP = str.TrimSpace(preanalysisPath)
+if preP == "" {
+    preP = file.Join(workdir, "ssa_discovery", "api_preanalysis.json")
+}
+if file.IsExisted(preP) {
+    raw, err = file.ReadFile(preP)
+    if err == nil && len(raw) > 0 {
+        pre = json.loads(string(raw))
+        if pre != nil && pre["route_file_candidates"] != nil {
+            arr = pre["route_file_candidates"]
+            for i = 0; i < len(arr); i++ {
+                row = arr[i]
+                if row == nil {
+                    continue
+                }
+                rp = sprint(row["rel_path"])
+                if rp == "" {
+                    continue
+                }
+                abs = file.Join(root, rp)
+                if file.IsFile(abs) {
+                    fileList = append(fileList, abs)
+                }
+            }
+        }
+    }
+}
+
+if len(fileList) == 0 {
+    q = [root]
+    maxFiles = 800
+    for idx = 0; idx < len(q) && len(fileList) < maxFiles; idx++ {
+        dir = q[idx]
+        ents = file.Ls(dir)
+        if ents == nil {
+            continue
+        }
+        for i = 0; i < len(ents) && len(fileList) < maxFiles; i++ {
+            ent = ents[i]
+            full = file.Join(dir, ent.Name)
+            if ent.IsDir {
+                if skipHarvestDir(ent.Name) {
+                    continue
+                }
+                q = append(q, full)
+                continue
+            }
+            if wantFile(ent.Name) {
+                fileList = append(fileList, full)
+            }
+        }
+    }
+}
+
+allEps = []
+mu = sync.NewMutex()
+w = fileConcurrent
+if w <= 0 {
+    w = 8
+}
+if w > len(fileList) {
+    w = len(fileList)
+}
+if w < 1 {
+    w = 1
+}
+wg = sync.NewSizedWaitGroup(w)
+for fi = 0; fi < len(fileList); fi++ {
+    wg.Add()
+    go func(nidx) {
+        defer wg.Done()
+        absPath = fileList[nidx]
+        rel = relFromRoot(root, absPath)
+        eps = harvestFile(absPath, rel)
+        if len(eps) == 0 {
+            return
+        }
+        mu.Lock()
+        for ei = 0; ei < len(eps); ei++ {
+            allEps = append(allEps, eps[ei])
+        }
+        mu.Unlock()
+    }(fi)
+}
+wg.Wait()
+
+outDir = file.Join(workdir, "ssa_discovery")
+file.MkdirAll(outDir)~
+outPath = file.Join(outDir, "api_route_harvest.json")
+rep = {
+    "generated_at": time.Now().UTC().String(),
+    "code_root": root,
+    "endpoints": allEps,
+    "prefix_candidates": [],
+    "unresolved": [],
+    "files_scanned": len(fileList),
+    "full_report_path": outPath,
+}
+file.Save(outPath, string(json.dumps(rep, json.withIndent("  "))))~
+
+summary = {
+    "tool": "api_route_harvest",
+    "full_report_path": outPath,
+    "endpoints": len(allEps),
+    "files_scanned": len(fileList),
+    "file_concurrent": w,
+    "ai_concurrent": acLim,
+    "ai_mode": str.TrimSpace(aiMode),
+    "ai_route_function_call_success": aiRouteFcSuccess,
+}
+
+sqlitePathVal = str.TrimSpace(sqlitePath)
+dbDsnVal = str.TrimSpace(dbDsn)
+sessionUUIDVal = str.TrimSpace(sessionUUID)
+openDiscoveryDB = () => {
+    if dbDsnVal != "" {
+        return db.OpenDatabase("postgres", dbDsnVal)
+    }
+    if sqlitePathVal != "" {
+        return db.OpenSqliteDatabase(sqlitePathVal)
+    }
+    return nil, "no db configured"
+}
+ensureCoverageWorkItemPending = (gormDB, sessionID, epID) => {
+    existingCov, _ = db.ScanResult(gormDB, "SELECT id FROM coverage_work_items WHERE session_id = ? AND kind = 'http_endpoint' AND ref_id = ?", sessionID, epID)
+    if len(existingCov) > 0 {
+        return
+    }
+    gormDB.Exec("INSERT INTO coverage_work_items (session_id, kind, ref_id, status, created_at, updated_at) VALUES (?, 'http_endpoint', ?, 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", sessionID, epID)
+}
+if hintsOnly == 1 {
+    summary["hints_only"] = true
+} else if (dbDsnVal != "" || sqlitePathVal != "") && sessionUUIDVal != "" {
+    try {
+        gormDB, dbErr = openDiscoveryDB()
+        if dbErr != nil {
+            summary["sqlite_error"] = sprintf("open db: %v", dbErr)
+        } else {
+            sessRows, scanErr = db.ScanResult(gormDB, "SELECT id FROM discovery_sessions WHERE uuid = ?", sessionUUIDVal)
+            if scanErr != nil || len(sessRows) == 0 {
+                summary["sqlite_error"] = sprintf("session lookup: rows=%d err=%v", len(sessRows), scanErr)
+            } else {
+                sessionID = sessRows[0]["id"]
+                insertCount = 0
+                updateCount = 0
+                for ei = 0; ei < len(allEps); ei++ {
+                    ep = allEps[ei]
+                    meth = sprint(ep["method"])
+                    pp = sprint(ep["path_pattern"])
+                    src = sprint(ep["source"])
+                    if meth == "" || pp == "" {
+                        continue
+                    }
+                    existing, _ = db.ScanResult(gormDB, "SELECT id, source FROM http_endpoints WHERE session_id = ? AND method = ? AND path_pattern = ?", sessionID, meth, pp)
+                    if len(existing) > 0 {
+                        oldSrc = str.ToLower(sprint(existing[0]["source"]))
+                        if str.HasPrefix(oldSrc, "ai") {
+                            continue
+                        }
+                        gormDB.Exec("UPDATE http_endpoints SET source = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", src, existing[0]["id"])
+                        updateCount++
+                    } else {
+                        gormDB.Exec("INSERT INTO http_endpoints (session_id, method, path_pattern, source, created_at, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", sessionID, meth, pp, src)
+                        insertCount++
+                        insRows, _ = db.ScanResult(gormDB, "SELECT id FROM http_endpoints WHERE session_id = ? AND method = ? AND path_pattern = ? ORDER BY id DESC LIMIT 1", sessionID, meth, pp)
+                        if len(insRows) > 0 {
+                            epID = insRows[0]["id"]
+                            ensureCoverageWorkItemPending(gormDB, sessionID, epID)
+                        }
+                    }
+                }
+                metaJSON = string(json.dumps(summary))
+                gormDB.Exec("UPDATE discovery_sessions SET endpoint_harvest_meta_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", metaJSON, sessionID)
+                summary["sqlite_written"] = true
+                summary["sqlite_inserted"] = insertCount
+                summary["sqlite_updated"] = updateCount
+            }
+        }
+    } catch ex {
+        summary["sqlite_error"] = sprintf("exception: %v", ex)
+    }
+}
+
+println(string(json.dumps(summary, json.withIndent("  "))))

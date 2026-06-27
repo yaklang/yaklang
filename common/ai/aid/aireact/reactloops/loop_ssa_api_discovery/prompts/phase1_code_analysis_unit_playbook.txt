@@ -1,0 +1,29 @@
+# Code Analysis Unit 智能体
+
+目标：对 `surface_kind=code_only` 的入口文件做基础代码分析，写入 `feature_code_analysis_map.json`。
+
+## 任务
+1. 读取分配的 `entry_file` 源码（`read_file` / `grep`）。
+2. 列出公开/业务方法、调用关系、能力摘要。
+3. 纯配置/空壳文件可填 `no_callable_reason`。
+4. 调用 `finalize_code_analysis_unit` 提交 JSON；**禁止** HTTP 探针 action。
+
+## 输出 schema
+```json
+{
+  "entry_file": "module/src/main/java/com/foo/OrderService.java",
+  "feature_id": "order_domain",
+  "summary": "...",
+  "functions": [
+    {"name":"createOrder","signature":"public Order createOrder(...)","line":42,"role":"business","calls_out":["inventoryService.sync"]}
+  ],
+  "stats": {"java_methods":12,"public_methods":5},
+  "capabilities": ["order lifecycle"],
+  "no_callable_reason": ""
+}
+```
+
+## 规则
+- `entry_file` 必须与任务下发路径一致。
+- `functions` 非空 **或** `no_callable_reason` 非空（二选一）。
+- 禁止 `discovery_probe_api_candidate`、`discovery_upsert_verified_http_api` 等 HTTP 验证 action。

@@ -1,0 +1,35 @@
+## Yak 内置 HTTP 工具参数（ssa_api_discovery 专注模式 — 勿与 discovery 凭证字段混淆）
+
+调用 **do_http_request** / **batch_do_http_request** 时，工具调用参数名**必须**与脚本 CLI 一致。**禁止**使用 **`body_json`**、**`headers_json`**：二者属于 **discovery_upsert_auth_credential** 等 discovery 工具；若错误传给 HTTP 工具会被忽略，易导致 **Content-Length: 0**、请求体未发出、登录失败。
+
+### Content-Type 与请求体（登录/探测必读）
+
+**必须**按目标站点 evidence（`auth_mechanism_map.content_type`、登录页 `<form enctype>`、Controller `@RequestBody` / `@RequestParam`）选择格式：
+
+| 场景 | CLI 参数 | 必填 |
+|------|----------|------|
+| HTML 表单登录（常见） | `content-type=application/x-www-form-urlencoded` + **`post-params`**（推荐）或 `body` | 是 |
+| JSON API 登录 | `content-type=application/json` + **`body`**（JSON 字符串） | 是 |
+| multipart 上传 | `content-type=multipart/form-data` + 按工具能力传参 | 是 |
+
+**常见错误（会导致 200 仍回登录页、无 Set-Cookie）**：
+- 使用 `content_type` / `contentType`（下划线/驼峰）→ **无效**，须用 **`content-type`**（连字符）
+- POST 有 body 但**未设** `content-type` → 服务端可能不解析参数
+- JSON 凭证放在 `post-params` 或 form body 里 → 须改 `application/json` + JSON `body`
+- 表单字段放在 JSON `body` 里 → 须改 `post-params` 或 urlencoded `body`
+
+**自检**：首次登录 POST 加 **`show-request=yes`**，确认 request packet 含：
+- `Content-Type: application/x-www-form-urlencoded`（或 evidence 中的类型）
+- 非空 body / 与 `login_form_fields` 一致的字段
+
+### 其他参数
+
+- **JSON POST**：`method=POST`，`content-type=application/json`，正文放在 **`body`**（多行 JSON 按引擎约定用 AITAG，勿用 `body_json`）。
+- **自定义请求头**：使用 **`headers`**，每行 `Key: Value`（多行用 AITAG）；**不要** `headers_json`。
+- **鉴权探测**：**禁止**在 `headers` 中手填 `Cookie`/`Authorization`；须 `discovery_select_auth_credential` 后 **`auth_credential_id=N`**，由引擎注入 DB 凭证（手填会被剥离）。
+- **CSRF（PublicCMS 等）**：`PUBLICCMS_ADMIN=用户ID_token` cookie 即 CSRF 源；引擎从 cookie 同步 `_csrf` 到 `auth_csrf_tokens.json`。**仅** `combined_api_catalog` 标注 `csrf_token`（源码 `@Csrf`）的接口自动注入 `_csrf`：POST 写入 `post-params`，GET 变更（ajaxTodo）写入 `query-params`；**读接口**（如 `/admin/cmsContent/list`）**不要**带 `_csrf`。403/404 缺 token 时调用 **`discovery_fetch_csrf_token`** 刷新。
+- **登录密码哈希（硬拦截）**：`encoding=sha512`（或 evidence 要求 transform）时，**必须先** `transform_credential`，将返回的 `output` 填入 `password`；手编/错误长度 hash 会被拒绝。
+- **表单 / GET**：优先 **post-params**、**query-params**（形式如 `k=v&k2=v2`）。
+- 别名也会被引擎归一化，但请直接写 CLI 名：`redirect-times`、`show-request`、`post-params`。
+
+向 SQLite 写入鉴权凭证时仍使用 **discovery_upsert_auth_credential** 的 **`headers_json`**（JSON map），与 HTTP 发包工具无关。

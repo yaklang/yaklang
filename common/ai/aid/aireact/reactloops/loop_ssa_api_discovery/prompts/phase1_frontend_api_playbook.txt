@@ -1,0 +1,44 @@
+# Frontend API Inventory — 前端/模板 API 静态提取
+
+目标：产出 **frontend_api_inventory.json**，从 SPA、JS/TS、FTL/JSP/HTML 中提取后端 API 路径、HTTP 方法、参数名。**禁止 HTTP 探测**。
+
+## 输入（已注入）
+- `frontend_api_harvest.json` — 程序化 regex harvest 候选
+- `servlet_routing_map` / `routing_profile` — Servlet 级前缀
+- `backend_scope` — frontend_roots
+
+## 任务
+1. 阅读 harvest 的 `harvest_candidates`，优先深读 API 封装文件（request.js / api.js / common.js）及 hit_count 高的模板。
+2. 追踪 wrapper 调用链：`post(url, data)` → 列出 call sites 的 url 与 data 字段名。
+3. 解析相对路径：结合 servlet map 得到 `path_resolved`（如 `cmsCategory/list` → `/admin/cmsCategory/list`）。
+4. 提取参数：`query`/`post`/`header`；表单 `_csrf` 标 required。
+5. 标注 `auth_realm_hint`：`/admin` → admin；`/api` → api；其余 web。
+6. 调用 `finalize_frontend_api_inventory` 提交 JSON 并 exit。
+
+## 输出 schema
+```json
+{
+  "schema_version": 1,
+  "frontend_roots": ["admin/src/main/resources/templates"],
+  "api_client_modules": [{"file":".../common.js","export":"post","base_path":"/admin"}],
+  "calls": [{
+    "call_id": "fe_0001",
+    "method": "POST",
+    "path_raw": "cmsCategory/list",
+    "path_resolved": "/admin/cmsCategory/list",
+    "source_file": "admin/template/list.ftl",
+    "client_lib": "jquery.ajax",
+    "auth_realm_hint": "admin",
+    "params": [{"name":"pageIndex","location":"post"},{"name":"_csrf","location":"post","required":true}],
+    "linked_handler_hint": "CmsCategoryAdminController",
+    "confidence": "high"
+  }],
+  "stats": {"calls": 10, "files_scanned": 3}
+}
+```
+
+## 规则
+- **hint only**：不得标 verified；不得调用 `do_http_request` / `discovery_upsert_verified_http_api`。
+- `path_resolved` 必须是 servlet 前缀 + 相对路径的完整 path（以 `/` 开头）。
+- 同一 API 去重；保留最高 confidence 条目。
+- 模板变量未替换（含 `${` / `{{`）的路径丢弃。

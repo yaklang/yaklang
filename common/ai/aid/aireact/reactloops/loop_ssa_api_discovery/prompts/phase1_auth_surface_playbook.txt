@@ -1,0 +1,39 @@
+# A3 包->鉴权绑定智能体
+
+目标：合并 A1/A2 结果，产出 `auth_surface_map.json`。
+
+## 任务
+1. 读取 `auth_realm_inventory` 与各 realm 的 **`auth_mechanism_map`** 详情（已注入）。
+2. 读 `component_package_map`，将 `package_patterns` 绑定到 `auth_realm`。
+3. 补充 `path_prefixes`（优先 **servlet_routing_map** / Initializer `getServletMappings()`，其次 mount_prefix / 路由证据）。
+4. **多 Servlet CMS**：须为 admin / web / api 各建 surface（package → servlet prefix）；admin 缺省 path_prefixes=`["/admin"]`。
+4. **surface 各字段须完整继承 A2 mechanism**（含 `login_page_kind`、`login_page_path`、`login_post_path`、`login_form_fields`、`password_transform`、`login_path`、`login_method`、`content_type`、`code_evidence`）；勿覆盖为无证据的默认值。
+5. `finalize_auth_surface_map` 提交完整 map。
+
+## 输出 schema（结构示例；所有 path/字段名/算法须来自 evidence，勿照抄占位符）
+```json
+{
+  "schema_version": 1,
+  "multi_auth": true,
+  "surfaces": [
+    {
+      "auth_realm": "<realm>",
+      "mount_prefix": "<from_inventory>",
+      "package_patterns": ["<from_component_map>"],
+      "path_prefixes": ["<from_mount_or_routing>"],
+      "session_mechanism": "<from_evidence>",
+      "login_page_kind": "backend|frontend|unknown",
+      "login_page_path": "<GET_login_html_path>",
+      "login_post_path": "<form_action_or_js_target>",
+      "login_form_fields": [
+        {"name": "<from_page>", "type": "<from_page>", "required": true, "evidence": "<html_or_js_snippet>"}
+      ],
+      "password_transform": "<algorithm_or_empty>",
+      "login_path": "<same_as_login_post_path>",
+      "login_method": "<from_form>",
+      "content_type": "<from_form_or_probe>",
+      "code_evidence": ["<file_path_or_response_excerpt>"]
+    }
+  ]
+}
+```
