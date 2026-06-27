@@ -1252,16 +1252,20 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 		{
 			file: "xmlbeans_qnamehelper.class",
 			desc: "XMLBeans QNameHelper.hexsafe reuses local slots between byte arrays, loop indexes, and catch parameters. " +
-				"Catch variables whose inferred type is polluted by a reused array slot must still render as catchable types, and loop index declarations must match their uses.",
+				"Catch variables whose inferred type is polluted by a reused array slot must still render as catchable types, the " +
+				"loop index must index the byte array consistently, and a catch parameter that shares a slot with a hoisted local " +
+				"must be split to a fresh name so it does not illegally shadow that enclosing local.",
 			mustContain: []string{
 				"public class QNameHelper",
 				"public static String hexsafe(String var0)",
-				"int var6 = 0",
-				"var5[var6]",
+				"var4[var5]",
 				"catch(UnsupportedEncodingException var5_1)",
+				"catch(Throwable var4_2)",
 			},
 			mustNotContain: []string{
 				"catch(byte[]",
+				// The catch parameter must not reuse the hoisted byte-array name var4 (illegal shadowing).
+				"catch(Throwable var4)",
 				"int var5_1 = 0",
 				"yak-decompiler",
 				"post-decompile syntax",

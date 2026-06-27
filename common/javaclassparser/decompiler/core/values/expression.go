@@ -32,6 +32,7 @@ func NewNewArrayExpression(typ types.JavaType, length ...JavaValue) *NewExpressi
 		Length:   length,
 	}
 }
+
 // coerceInitializerLiteral renders an array-initializer element with the array's
 // element type when that yields more faithful source. Today this only matters for
 // boolean element types: a boolean[] initializer is filled by iconst_0/iconst_1,
@@ -113,10 +114,51 @@ func (j *JavaExpression) ReplaceVar(oldId *utils.VariableId, newId *utils.Variab
 }
 
 func (j *JavaExpression) Type() types.JavaType {
+	// A non-short-circuit boolean connective (& | ^) of two boolean operands is boolean-typed even
+	// when its operands reach it as int-shaped `cond ? 1 : 0` ternaries (built by a later CFG pass,
+	// after NewBinaryExpression already fixed j.Typ to int). Reporting boolean here lets a boolean
+	// context (return/assign/condition) accept it; see String() for the matching rendering.
+	if _, _, ok := j.boolConnectiveConds(); ok {
+		return types.NewJavaPrimer(types.JavaBoolean)
+	}
 	return j.Typ
 }
 
+// boolConnectiveConds reports whether this expression is `a & b`, `a | b` or `a ^ b` where BOTH
+// operands are boolean (either already boolean-typed, or the int `cond ? 1 : 0` shape javac emits
+// for a comparison feeding an integer bitwise op). It returns the two underlying boolean conditions.
+// This recovers the original `cond1 & cond2` boolean connective instead of the int-typed
+// `(c1?1:0) & (c2?1:0)`, which fails to compile where a boolean is required.
+func (j *JavaExpression) boolConnectiveConds() (JavaValue, JavaValue, bool) {
+	if len(j.Values) != 2 || (j.Op != AND && j.Op != OR && j.Op != XOR) {
+		return nil, nil, false
+	}
+	c1, ok1 := boolOperandCondition(j.Values[0])
+	c2, ok2 := boolOperandCondition(j.Values[1])
+	if !ok1 || !ok2 {
+		return nil, nil, false
+	}
+	return c1, c2, true
+}
+
+// boolOperandCondition returns the boolean condition underlying a `cond ? 1 : 0` ternary, or the
+// value itself when it is already boolean-typed (a comparison or a nested boolean connective).
+func boolOperandCondition(v JavaValue) (JavaValue, bool) {
+	u := UnpackSoltValue(v)
+	if cond, ok := BoolTernaryCondition(u); ok {
+		return cond, true
+	}
+	if isBooleanTyped(u) {
+		return u, true
+	}
+	return nil, false
+}
+
 func (j *JavaExpression) String(funcCtx *class_context.ClassContext) string {
+	if c1, c2, ok := j.boolConnectiveConds(); ok {
+		return fmt.Sprintf("(%s) %s (%s)",
+			SimplifyConditionValue(c1).String(funcCtx), j.Op, SimplifyConditionValue(c2).String(funcCtx))
+	}
 	vs := []string{}
 	for _, value := range j.Values {
 		vs = append(vs, value.String(funcCtx))

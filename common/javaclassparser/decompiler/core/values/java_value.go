@@ -713,6 +713,25 @@ func NewTernaryExpression(condition, v1, v2 JavaValue) *TernaryExpression {
 	}
 }
 
+// BoolTernaryCondition reports whether v is a boolean comparison materialized as the int
+// `cond ? 1 : 0` (the shape javac emits when a comparison result feeds an integer bitwise op, i.e.
+// the non-short-circuit `a & b` / `a | b` / `a ^ b` between two boolean expressions). When it is,
+// the underlying boolean condition is returned. This lets the IAND/IOR/IXOR handler rebuild the
+// original boolean connective (`cond1 & cond2`) instead of leaving `(c1?1:0) & (c2?1:0)`, which is
+// int-typed and fails to compile in a boolean context (e.g. `return x > 0 & (x & (x-1)) == 0;`).
+func BoolTernaryCondition(v JavaValue) (JavaValue, bool) {
+	t, ok := UnpackSoltValue(v).(*TernaryExpression)
+	if !ok || t.Condition == nil || t.TrueValue == nil || t.FalseValue == nil {
+		return nil, false
+	}
+	tv, tok := boolLiteralValue(t.TrueValue)
+	fv, fok := boolLiteralValue(t.FalseValue)
+	if !tok || !fok || !tv || fv {
+		return nil, false
+	}
+	return t.Condition, true
+}
+
 // EmptySlotValuePlaceholder is rendered when a SlotValue has no underlying value,
 // which means the stack simulation produced an incomplete result for the method.
 // It is not valid Java; the dumper detects this marker and degrades the affected

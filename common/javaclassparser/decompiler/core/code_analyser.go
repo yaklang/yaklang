@@ -2928,6 +2928,16 @@ func (d *Decompiler) ParseStatement() error {
 
 		}()
 		if len(pairs)-attr[0] == 1 {
+			// A bare array allocation (new T[n], no inline initializer) whose elements are populated
+			// by separate a[i]=... stores must NOT be folded into its single load. Folding splices
+			// only the `new T[n]` expression into the use (e.g. a foreach's `arr$ = dpairs` copy,
+			// bytecode aload;astore), dropping every element store and yielding an empty array - a
+			// silent NPE at run time. An array WITH an inline initializer (new T[]{...}) carries its
+			// elements in the expression itself, so folding it stays correct and is left enabled.
+			if ne, ok := val.(*values.NewExpression); ok && ne.IsArray() && len(ne.Initializer) == 0 {
+				d.tracef("var-fold", "skip bare-array-alloc ref=%s val=%s", traceRef(ref, d.FunctionContext), traceValue(val, d.FunctionContext))
+				return true
+			}
 			pair := pairs[0]
 			var sourceNode, node *Node
 			if pair.UserIsNextOpcode {

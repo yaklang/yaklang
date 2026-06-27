@@ -348,7 +348,13 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 			if utils.StringSliceContain(buildInLib, s) {
 				continue
 			}
-			importsStr += fmt.Sprintf("import %s;\n", s)
+			// A nested type's binary name uses '$' (e.g. java.util.Base64$Encoder), but an import
+			// statement must use the source form with '.' (import java.util.Base64.Encoder;). Emitting
+			// the raw binary name produces "cannot find symbol: class Base64$Encoder". Convert every
+			// '$' separator to '.' for the import line only; the body already renders nested types with
+			// '.'. Anonymous/synthetic names (Outer$1) are filtered out upstream, so this only rewrites
+			// genuine named nested types.
+			importsStr += fmt.Sprintf("import %s;\n", strings.ReplaceAll(s, "$", "."))
 		}
 		if len(importsStr) > 0 {
 			importsStr += "\n"
@@ -1443,6 +1449,54 @@ func declareLocalInScope(id *utils2.VariableId, live map[string]*utils2.Variable
 	live[name] = id
 }
 
+// declareCatchParamInScope registers a catch parameter in its catch-block scope, resolving the two
+// distinct ways its generated name can collide with an enclosing local. Java forbids a catch
+// parameter from shadowing a variable declared in an enclosing block, yet JVM slot reuse routinely
+// gives a catch parameter and an unrelated local the same var<slot> name.
+//
+//   - Distinct ids, same printed name: the catch parameter owns its VariableId and merely renders the
+//     same varN as a still-live enclosing local. declareLocalInScope renames it in place (its own id
+//     gets a `_<n>` suffix). This is the common case and matches the pre-existing behavior.
+//   - Shared id: slot-reuse variable merging unified the catch slot with an enclosing local that
+//     occupies the same JVM slot, so they share ONE VariableId AND, in practice, the same JavaRef
+//     OBJECT (the decompiler reuses one ref per slot, repointed in place by the rewriter). Renaming
+//     the shared id - or mutating that ref's Id - would rename every other use of the enclosing local
+//     too, leaving the clash in place and corrupting unrelated lines. The catch parameter is instead
+//     split off by replacing only the exception SLICE ENTRY with a fresh clone ref that carries a new,
+//     uniquely-named id. The shared object is left untouched, so the enclosing local is unaffected and
+//     only the printed catch-parameter name changes.
+func declareCatchParamInScope(exSlot **values.JavaRef, enclosing, inner map[string]*utils2.VariableId) {
+	ex := *exSlot
+	id := localDeclVarId(ex)
+	if id == nil {
+		return
+	}
+	if existing, ok := enclosing[id.String()]; ok && existing == id {
+		fresh := &utils2.VariableId{}
+		fresh.SetName(freshScopedName(id.String(), enclosing, inner))
+		clone := *ex
+		clone.Id = fresh
+		*exSlot = &clone
+		inner[fresh.String()] = fresh
+		return
+	}
+	declareLocalInScope(id, inner)
+}
+
+// freshScopedName returns base with the first `_<n>` suffix that is unused in both scope maps.
+func freshScopedName(base string, a, b map[string]*utils2.VariableId) string {
+	for i := 1; ; i++ {
+		cand := fmt.Sprintf("%s_%d", base, i)
+		if _, taken := a[cand]; taken {
+			continue
+		}
+		if _, taken := b[cand]; taken {
+			continue
+		}
+		return cand
+	}
+}
+
 func cloneScope(live map[string]*utils2.VariableId) map[string]*utils2.VariableId {
 	out := make(map[string]*utils2.VariableId, len(live)+4)
 	for k, v := range live {
@@ -1529,7 +1583,7 @@ func renameStatementsInScope(stmts []statements.Statement, live map[string]*util
 			for i, body := range s.CatchBodies {
 				inner := cloneScope(live)
 				if i < len(s.Exception) && s.Exception[i] != nil {
-					declareLocalInScope(localDeclVarId(s.Exception[i]), inner)
+					declareCatchParamInScope(&s.Exception[i], live, inner)
 				}
 				renameStatementsInScope(body, inner)
 			}

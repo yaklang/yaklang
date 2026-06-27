@@ -131,6 +131,14 @@ func RewriteVar(sts *[]statements.Statement, startVarId int, params []*values.Ja
 	// IsFirst decisions above are final and this pass's demotions are not subsequently undone.
 	hoistSwitchDeclarations(sts)
 	dropEmptySlotAssignments(sts)
+	// General LCA declaration placement: hoist any generated local whose single (minted-id-reused)
+	// variable is referenced across more than one sibling scope to the block that dominates all of
+	// its uses. Runs last so it sees the final IsFirst/IsDeclare flags and any bare declarations the
+	// if/switch hoisters already inserted (which it treats as authoritative and never duplicates).
+	// Restricted to ids the minted path merged across scopes: only those can now have a declaration
+	// that fails to dominate every use. Everything the decompiler already scoped correctly is left
+	// byte-for-byte as the baseline produced it.
+	placeCrossScopeDeclarations(sts, scope.reused)
 }
 
 type Scope struct {
@@ -139,6 +147,24 @@ type Scope struct {
 	sts         *[]statements.Statement
 	varMap      []any
 	assignedMap map[string]*utils.VariableId
+	// minted is the set of VariableIds this method's rewriteVar has freshly minted. It is shared
+	// (same map pointer) across every scope of one method, unlike assignedMap which is copied into
+	// each SubScope. The slot's JavaRef object can be shared across sibling/disjoint branches and is
+	// rebound in place by ReplaceVar; without this set, a uid first bound inside one branch (recorded
+	// only in that branch's copied assignedMap) is invisible to another branch reusing the same JVM
+	// slot, so that branch re-binds the SAME shared ref to a SECOND id while the ref's reads still
+	// carry the first id. The store and its reads then disagree, producing either an illegal
+	// self-referencing declaration (`long x = x << 8 ...`) or a use of an uninitialized split id
+	// (`variable var4_1 might not have been initialized`). Tracking minted ids lets the second store
+	// detect "this ref already carries an id I minted" and reuse it instead of splitting.
+	minted map[*utils.VariableId]int
+	// reused collects the ids that the minted path above MERGED across scopes (one logical variable
+	// reached by a store in a scope that did not originally declare it). These - and only these - are
+	// the ids whose single declaration may now sit in a scope that does not dominate all uses, so the
+	// cross-scope declaration placement pass is restricted to them. Variables the decompiler already
+	// scoped correctly (catch parameters, switch locals, ordinary locals) are never in this set and
+	// are therefore left exactly as the baseline produced them. Shared method-wide like minted.
+	reused map[*utils.VariableId]struct{}
 }
 
 func NewScope(startId int, sts *[]statements.Statement) *Scope {
@@ -146,6 +172,8 @@ func NewScope(startId int, sts *[]statements.Statement) *Scope {
 		nowId:       startId,
 		sts:         sts,
 		assignedMap: map[string]*utils.VariableId{},
+		minted:      map[*utils.VariableId]int{},
+		reused:      map[*utils.VariableId]struct{}{},
 	}
 }
 func (s *Scope) NextId() int {
@@ -160,6 +188,8 @@ func (s *Scope) SubScope(sts *[]statements.Statement) *Scope {
 		sts:         sts,
 		deep:        s.deep + 1,
 		assignedMap: assignedMap,
+		minted:      s.minted,
+		reused:      s.reused,
 	}
 	s.varMap = append(s.varMap, newScope)
 	return newScope
@@ -383,6 +413,31 @@ func rewriteVar(scope *Scope, className, methodName string) int {
 				_, ok := scope.assignedMap[v.VarUid]
 				if ok {
 					hasNamed = true
+				} else if mintDepth, minted := scope.minted[v.Id]; minted {
+					// v.Id is an id this method already minted for the same logical variable in a
+					// sibling/disjoint scope; that binding never reached THIS scope's copied
+					// assignedMap, but the shared JavaRef object already carries the minted id (an
+					// in-place ReplaceVar rebound it). Re-minting here would split one variable into
+					// two ids and corrupt earlier uses. Reuse the already-minted id: record it for
+					// this scope so later refs resolve, and keep the ref as-is. Crucially still consume
+					// a name slot (nowId++): the reused id's name is var<nowId> (the minting scope
+					// started at this same nowId), so without the bump the NEXT fresh bind in this
+					// scope would mint that very name and collide (var1 / var1_1). Advancing nowId
+					// keeps the merge while preserving clean sequential names for later siblings.
+					//
+					// The merge is gated on assignmentReadsLeftId: ONLY a self-referential store
+					// (`word = (word << 8) | ...`, whose rhs reads the very id being assigned) is
+					// hazardous to split - the split rebinds the rhs read onto a fresh,
+					// never-initialized id and emits illegal `long x = x << 8`. A reuse whose rhs
+					// does NOT read the slot (`b = data[i] & 0xff`, `i = 0`) is safe to bind fresh,
+					// so it falls through to the else and is named exactly as the baseline did. This
+					// keeps genuinely independent slot reuses - e.g. two disjoint loop indexes that
+					// happen to share a JVM slot - as separate variables instead of collapsing them.
+					scope.assignedMap[v.VarUid] = v.Id
+					scope.reused[v.Id] = struct{}{}
+					scope.varMap = append(scope.varMap, statement)
+					scope.nowId++
+					core.TraceRewriteVar(className, methodName, "reuse-minted depth=%d mintDepth=%d uid=%s id=%s", scope.deep, mintDepth, v.VarUid, v.Id.String())
 				} else {
 					oldId := v.Id
 					newId := utils.NewRootVariableId()
@@ -394,6 +449,7 @@ func rewriteVar(scope *Scope, className, methodName string) int {
 					scope.varMap = append(scope.varMap, statement)
 					scope.nowId++
 					scope.assignedMap[v.VarUid] = newId
+					scope.minted[newId] = scope.deep
 					core.TraceRewriteVar(className, methodName, "bind depth=%d uid=%s old=%s new=%s type=%s",
 						scope.deep, v.VarUid, oldId.String(), newId.String(), v.Type().String(&class_context.ClassContext{}))
 				}
@@ -917,4 +973,214 @@ func statementTextMatches(st statements.Statement, re *regexp.Regexp) (res bool)
 		}
 	}()
 	return re.MatchString(st.String(hoistProbeCtx))
+}
+
+// generatedLocalNameRe matches a decompiler-generated local name (var0, var1, var2_1, ...). Only
+// these synthetic locals are candidates for cross-scope declaration hoisting; named parameters,
+// fields and `this` are never moved.
+var generatedLocalNameRe = regexp.MustCompile(`^var\d+(?:_\d+)?$`)
+
+// childStatementLists returns pointers to every nested statement list of a container statement, so a
+// single traversal/mutation routine can recurse into all block kinds. The pointers allow in-place
+// rewriting of the child lists (e.g. stripping a relocated bare declaration).
+func childStatementLists(st statements.Statement) []*[]statements.Statement {
+	switch s := st.(type) {
+	case *statements.IfStatement:
+		return []*[]statements.Statement{&s.IfBody, &s.ElseBody}
+	case *statements.ForStatement:
+		return []*[]statements.Statement{&s.SubStatements}
+	case *statements.WhileStatement:
+		return []*[]statements.Statement{&s.Body}
+	case *statements.DoWhileStatement:
+		return []*[]statements.Statement{&s.Body}
+	case *statements.SynchronizedStatement:
+		return []*[]statements.Statement{&s.Body}
+	case *statements.SwitchStatement:
+		var out []*[]statements.Statement
+		for i := range s.Cases {
+			if s.Cases[i] != nil {
+				out = append(out, &s.Cases[i].Body)
+			}
+		}
+		return out
+	case *statements.TryCatchStatement:
+		out := []*[]statements.Statement{&s.TryBody}
+		for i := range s.CatchBodies {
+			out = append(out, &s.CatchBodies[i])
+		}
+		return out
+	}
+	return nil
+}
+
+func safeRenderStatement(st statements.Statement) (text string, ok bool) {
+	ok = true
+	defer func() {
+		if recover() != nil {
+			ok = false
+		}
+	}()
+	return st.String(hoistProbeCtx), true
+}
+
+// collectGeneratedLocalDeclIDs returns, in deterministic discovery order, the ids of every generated
+// local declared (IsFirst/IsDeclare) anywhere in the subtree whose id is in the `reused` set, plus a
+// representative LeftValue per id (used to synthesize the bare `T x;` declaration with the right
+// type/name). Restricting to `reused` ids keeps the placement pass focused on exactly the variables
+// the minted merge joined across scopes; everything else the decompiler already scoped is untouched.
+func collectGeneratedLocalDeclIDs(list []statements.Statement, reused map[*utils.VariableId]struct{}) ([]*utils.VariableId, map[*utils.VariableId]values.JavaValue) {
+	order := []*utils.VariableId{}
+	refByID := map[*utils.VariableId]values.JavaValue{}
+	var walk func([]statements.Statement)
+	walk = func(sts []statements.Statement) {
+		for _, st := range sts {
+			if as, ok := st.(*statements.AssignStatement); ok && as.ArrayMember == nil && (as.IsFirst || as.IsDeclare) {
+				if ref, ok2 := core.UnpackSoltValue(as.LeftValue).(*values.JavaRef); ok2 && ref != nil && ref.Id != nil && !ref.IsThis {
+					if _, isReused := reused[ref.Id]; isReused {
+						if _, seen := refByID[ref.Id]; !seen {
+							name := ref.String(hoistProbeCtx)
+							if generatedLocalNameRe.MatchString(name) {
+								refByID[ref.Id] = as.LeftValue
+								order = append(order, ref.Id)
+							}
+						}
+					}
+				}
+			}
+			for _, cl := range childStatementLists(st) {
+				walk(*cl)
+			}
+		}
+	}
+	walk(list)
+	return order, refByID
+}
+
+// isDeclaredAtTopLevel reports whether id already has a declaration (a bare `T x;` or an inline
+// `T x = ...`) directly among this block's own statements. If so the declaration already dominates
+// everything in the block, so the placement pass must leave it alone: re-hoisting a correctly-placed
+// inline declaration only churns the tree (bare decl + demoted assignment) and can trip the dumper's
+// collision renamer into renaming the declaration but not its uses. The pass therefore acts only on
+// declarations that are nested BELOW this block, which are the ones that can leave sibling uses out of
+// scope. This also makes the pass idempotent w.r.t. the bare declarations the if/switch hoisters emit.
+func isDeclaredAtTopLevel(list []statements.Statement, id *utils.VariableId) bool {
+	for _, st := range list {
+		if as, ok := st.(*statements.AssignStatement); ok && as.ArrayMember == nil && (as.IsFirst || as.IsDeclare) {
+			if ref, ok2 := core.UnpackSoltValue(as.LeftValue).(*values.JavaRef); ok2 && ref != nil && ref.Id == id {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// relocateDeclarations prepares a block subtree for a hoisted declaration of id: it demotes every
+// in-place declaration (`T x = ...`) of id to a plain assignment (`x = ...`) and drops any bare
+// `T x;` declaration that a deeper hoister had inserted, so exactly one declaration (the one being
+// prepended by the caller) survives.
+func relocateDeclarations(block *[]statements.Statement, id *utils.VariableId) {
+	if block == nil {
+		return
+	}
+	list := *block
+	out := list[:0]
+	for _, st := range list {
+		if as, ok := st.(*statements.AssignStatement); ok && as.ArrayMember == nil {
+			if ref, ok2 := core.UnpackSoltValue(as.LeftValue).(*values.JavaRef); ok2 && ref != nil && ref.Id == id {
+				if as.IsDeclare && as.JavaValue == nil {
+					// A bare declaration of this id inserted by a deeper hoist; drop it because the
+					// caller is about to declare the variable in a dominating block.
+					continue
+				}
+				if as.IsFirst || as.IsDeclare {
+					as.IsFirst = false
+					as.IsDeclare = false
+				}
+			}
+		}
+		for _, cl := range childStatementLists(st) {
+			relocateDeclarations(cl, id)
+		}
+		out = append(out, st)
+	}
+	*block = out
+}
+
+// placeCrossScopeDeclarations hoists each generated local's declaration to the lowest block that
+// dominates all of its references. rewriteVar reuses one *VariableId for a JVM slot shared by several
+// source variables (minted-id reuse), so one variable can be assigned/read across multiple SIBLING
+// scopes - sequential loops that reuse a slot, an if's two arms, a switch's cases, a value declared
+// in a loop and read afterwards. Its declaration stays in whichever sibling rewriteVar processed
+// first, so uses in the other siblings are out of scope ("cannot find symbol"). This is the general
+// lowest-common-ancestor declaration placement: for each block it hoists locals referenced across
+// more than one of the block's child scopes, emitting a single `T x;` at the block top and demoting
+// the in-place declarations to plain assignments. Hoisting only widens scope and is always valid Java.
+func placeCrossScopeDeclarations(block *[]statements.Statement, reused map[*utils.VariableId]struct{}) {
+	if block == nil || len(*block) == 0 || len(reused) == 0 {
+		return
+	}
+	list := *block
+	ids, refByID := collectGeneratedLocalDeclIDs(list, reused)
+	if len(ids) > 0 {
+		texts := make([]string, len(list))
+		allMatch := make([]bool, len(list))
+		for i, st := range list {
+			t, ok := safeRenderStatement(st)
+			texts[i] = t
+			allMatch[i] = !ok
+		}
+		sort.SliceStable(ids, func(i, j int) bool {
+			return refByID[ids[i]].String(hoistProbeCtx) < refByID[ids[j]].String(hoistProbeCtx)
+		})
+		var hoisted []statements.Statement
+		for _, id := range ids {
+			ref := refByID[id]
+			name := ref.String(hoistProbeCtx)
+			if name == "" || !generatedLocalNameRe.MatchString(name) {
+				continue
+			}
+			if isDeclaredAtTopLevel(list, id) {
+				continue
+			}
+			re := regexp.MustCompile(`\b` + regexp.QuoteMeta(name) + `\b`)
+			cnt := 0
+			singleIdx := -1
+			for i := range list {
+				if allMatch[i] || re.MatchString(texts[i]) {
+					cnt++
+					singleIdx = i
+				}
+			}
+			belongs := false
+			if cnt >= 2 {
+				// Referenced from two or more sibling top-level statements of this block: the lowest
+				// common ancestor of all uses is exactly this block.
+				belongs = true
+			} else if cnt == 1 {
+				// Referenced from a single child container: it belongs here only if that container
+				// uses it in two or more of its OWN child scopes (both if-arms, >=2 switch cases,
+				// try+catch); otherwise the true home is deeper and recursion will place it.
+				refChildren := 0
+				for _, cl := range childStatementLists(list[singleIdx]) {
+					if statementsReferenceName(*cl, name) {
+						refChildren++
+					}
+				}
+				belongs = refChildren >= 2
+			}
+			if !belongs {
+				continue
+			}
+			relocateDeclarations(block, id)
+			hoisted = append(hoisted, statements.NewDeclareStatement(ref))
+		}
+		if len(hoisted) > 0 {
+			*block = append(hoisted, (*block)...)
+		}
+	}
+	for _, st := range *block {
+		for _, cl := range childStatementLists(st) {
+			placeCrossScopeDeclarations(cl, reused)
+		}
+	}
 }

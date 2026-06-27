@@ -12,6 +12,23 @@ import (
 
 type BuildinBootstrapMethod func(d *Decompiler, sim StackSimulation, typ types.JavaType, args ...values.JavaValue) (values.JavaValue, error)
 
+// concatArgNeedsParens reports whether a string-concatenation argument must be parenthesized to
+// preserve precedence when spliced into a `"..." + arg + "..."` chain. A binary expression (e.g.
+// `a & b`, `a + b`, `a << b`) renders as `(a) op (b)` WITHOUT wrapping the whole expression, so the
+// surrounding concat `+` would capture only its left operand. A ternary (`c ? a : b`) is likewise
+// lower precedence than `+`. Atomic operands (variables, literals, field/array accesses, method
+// calls, casts, unary ops) need no extra parentheses.
+func concatArgNeedsParens(v values.JavaValue) bool {
+	switch e := values.UnpackSoltValue(v).(type) {
+	case *values.JavaExpression:
+		return len(e.Values) == 2
+	case *values.TernaryExpression:
+		return true
+	default:
+		return false
+	}
+}
+
 var buildinBootstrapMethods = map[string]func(args ...values.JavaValue) BuildinBootstrapMethod{
 	"java.lang.invoke.StringConcatFactory.makeConcatWithConstants": func(args1 ...values.JavaValue) BuildinBootstrapMethod {
 		return func(d *Decompiler, sim StackSimulation, typ types.JavaType, args2 ...values.JavaValue) (values.JavaValue, error) {
@@ -25,6 +42,16 @@ var buildinBootstrapMethods = map[string]func(args ...values.JavaValue) BuildinB
 					}
 					arg := args2[idx]
 					newStr := arg.String(funcCtx)
+					// String concatenation `+` binds tighter than the bitwise/shift/relational/
+					// logical operators, so an interpolated sub-expression such as `n & 0xff`
+					// (which renders as `(n) & (255)`) would reparse as `("prefix" + n) & 255`
+					// once spliced after a `+`, yielding `String & int` - a compile error. Wrap any
+					// binary/ternary concat argument in parentheses so it stays a single operand of
+					// the concatenation. Atomic args (variables, literals, calls, casts) are left
+					// alone to keep the common output unchanged.
+					if concatArgNeedsParens(arg) {
+						newStr = "(" + newStr + ")"
+					}
 					tag := `\u0001`
 					str1 = strings.Replace(str1, tag, `" + `+newStr+` + "`, 1)
 				}

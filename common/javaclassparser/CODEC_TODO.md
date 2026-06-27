@@ -121,6 +121,74 @@ iinc」, 还原成 `arr[i++] = v` (捕获自增前的旧值)。
 
 ---
 
+## 已完成 (本阶段 — OPCODE/算法覆盖再扩展)
+
+### 4. 新增 4 个自托管 battery (全部 round-trip byte-for-byte 通过)
+
+差分门禁 `TestCodecSemanticsRoundTrip` 现在跑 6 个 battery, 全绿:
+
+- **`LongHashAlgorithms.java`**: SHA-512 (FIPS 180-4)、xxHash64、SipHash-2-4、CRC64-ECMA、
+  FNV-1a-64、splitmix64。专门压 long OPCODE (LADD/LMUL/LSHL/LUSHR/LAND/LXOR/LCMP 等) 与
+  64 位旋转/混合。
+- **`OpcodeCoverage.java`**: long/double/float 算术与比较 (DCMPG/FCMPL/LCMP)、`tableswitch`/
+  `lookupswitch`、`instanceof` + checkcast、各类原始类型 cast (i2l/l2d/d2i/i2b...)、
+  多维数组 (`anewarray`/`multianewarray`/`*aload`/`*astore`)、`foreach`。
+- **`GuavaAlgorithms.java`**: Murmur3_32、Fingerprint2011 (FarmHash 前身)、LongMath/IntMath/
+  UnsignedLongs (divideUnsigned/remainderUnsigned/log2/isPowerOfTwo)、BaseEncoding base16/base64、
+  CRC32。**与 JDK `Long.divideUnsigned`/`Base64`/`CRC32` 交叉校验一致**。
+- **`SpringAlgorithms.java`**: AntPathMatcher 风格 glob (`matchStrings` 单段双指针回溯 + `antMatch`
+  多段 `**` 回溯)、`StringUtils.cleanPath` (`.`/`..` 规整)、`MimeType` 解析 (type/subtype/参数
+  归一)、`capitalize`、字符串 hash。压 String/char 相关 OPCODE 与深层控制流。
+
+### 5. 反编译器缺陷修复 (本阶段, 全部带 round-trip 回归)
+
+- **嵌套类 import 语法 (Bug A)**: dumper 之前把内部类 import 写成 JVM 二进制名
+  `import java.util.Base64$Encoder;`, javac 报 "cannot find symbol"。修复 `dumper.go`:
+  import 行把 `$` 替换为 `.` (`import java.util.Base64.Encoder;`)。
+- **`foreach` 遍历裸数组的 var-fold 误内联 (Bug arrays)**: 单次使用折叠 pass 把 `new double[3][]`
+  这类**裸数组分配** (无 initializer) 内联进合成迭代变量, 导致迭代未初始化的新数组 → NPE。
+  修复 `code_analyser.go`: var-fold 跳过 `IsArray() && len(Initializer)==0` 的 `NewExpression`,
+  保持其为变量引用。回归: `ForEachRepro.java` (含 `multiForEachOneMethod`)。
+- **布尔位运算 `& | ^` 渲染为 int (Bug D)**: `(x>0) & (y>0)` 这类布尔域位运算, 每个比较被渲染成
+  整数三元 `cond ? 1 : 0` 再做整型位运算, 在 `boolean` 返回处报 "int cannot be converted to
+  boolean"。修复 `expression.go` + `java_value.go`: 新增 `BoolTernaryCondition` 识别 `cond?1:0`,
+  `JavaExpression` 检测两侧均为布尔形操作数时, `Type()` 返回 `boolean` 且 `String()` 直接渲染
+  `(c1) & (c2)`。验证: Guava `isPowerOfTwoLong` 编译并语义一致。
+
+---
+
+## 已知深层缺陷 (本阶段定位, 暂以源码重构规避; 待治本)
+
+这些是**预先存在**的控制流 / 变量身份重建缺陷, 修复风险高, 本阶段先在 battery 源码里改写算法
+形态规避 (保留等价 OPCODE 覆盖), 并在此登记复现形态供下一轮治本。
+
+- **Bug E/F/I — 守卫子句 `if(!cond) {throw|跳出}; <body>` 分支体交换**:
+  形如 `if (!cond) throw ...;` 后接较大顺序代码, 反编译把 *body* 与 *throw* 相对条件**对调**
+  (cond 为真时反而执行 throw)。Guava `remainderUnsigned` 的 `if(dividend>=0)` 分支体互换、
+  Spring `main` 里的 `if(!antMatch(...)) throw` 自检全部中招。根因疑为 `if(!cond) goto body`
+  (ifne) 的极性 + body/handler 块归属判定。**规避**: 去掉 `if(!cond) throw` 自检 (结果已进
+  fingerprint), `remainderUnsigned` 改用 `divideUnsigned` 直接计算。
+- **Bug H — 尾随 `while(cond){i++}; return i==n` 循环出口反转**:
+  `while (p<len && pat[p]=='*') p++; return p==len;` 被重建成「char 是 `*` 时 return、否则 i++」,
+  即循环体与出口互换 → 无限自增 → 下标溢出到 `INT_MIN` → `charAt(MIN_VALUE)` 越界。Spring
+  `matchStrings`/`antMatch` 尾部触发。**规避**: 改写成 `for(q=p;q<len;q++){ if(pat[q]!='*')
+  return false; } return true;` (带提前 return 的 for) 可正确反编译。
+- **Bug G — fall-through `switch` 被按 label 升序重排**:
+  Murmur3_32 尾块的降序 fall-through `case 3: ...; case 2: ...; case 1: ...` 被反编译器按
+  `1→2→3` 升序重排, fall-through 语义反转 → 数组越界。**规避**: 尾块改写为 `if/else if` 阶梯。
+- **Bug B — slot 跨类型复用合并出错 (long temp 与 int 下标共 slot)**:
+  Murmur3_128 尾块把 `int` 数组下标 (`tail`) 与 `long` 累加器 (`k2`) 合并成同一变量, 导致
+  `long` 当数组下标 → "possible lossy conversion from long to int"。属深层变量身份缺陷。
+  **规避**: 暂从 Guava battery 移除 murmur3_128。
+- **Bug C — 续用循环变量被重复声明 (slot 复用 + 第二个循环)**:
+  `for (int j=0; i<n; i++, j++)` 这种「续用外层 i + 新增 j」的尾循环, 反编译把延续的 `i`
+  误重声明为 `int i = 0`。**规避**: `fullFingerprint` 尾循环改写为单变量遍历只读基址。
+
+> 这些 BUG 与第 66 行的「后自增数组下标 `arr[i++]`」一并构成下一轮治本目标。其中 Bug E/F/H/I
+> 同属**控制流分支极性/块归属**一类, 可能可统一修复; Bug B/C 同属**slot 复用变量身份**一类。
+
+---
+
 ## 如何运行
 
 ```bash
@@ -136,6 +204,10 @@ CROSS_PK=1 CFR_JAR=... VINEFLOWER_JAR=... go test -run TestYakDecompilerCrossCom
 
 ## 提交节奏 (用户要求: commit + push + 下一轮)
 - `fbb6cbf36`: 3 个 correctness fix + 回归 (byte 收窄 / IFNONNULL 极性)。
-- 本阶段: slot 复用自引用初始化**已治本修复** + 去掉 CODEC_STRICT skip 变硬门禁 +
-  battery 扩展 (SHA-1/SHA-256/Adler-32/Base64 解码), 全部 byte-for-byte 通过, 待提交。
-- 下一轮: 修后自增数组下标 `arr[i++]` BUG -> 扩展 HMAC/Base32 -> 推进真实库 round-trip。
+- 上一阶段: slot 复用自引用初始化**已治本修复** + 去掉 CODEC_STRICT skip 变硬门禁 +
+  battery 扩展 (SHA-1/SHA-256/Adler-32/Base64 解码), 全部 byte-for-byte 通过。
+- 本阶段: 3 个反编译器 fix (嵌套 import `$`→`.` / foreach 裸数组 var-fold / 布尔位运算 `&|^`)
+  + 4 个新 battery (LongHashAlgorithms / OpcodeCoverage / GuavaAlgorithms / SpringAlgorithms),
+  差分门禁现跑 6 battery 全绿; 定位并登记 5 类深层控制流/slot 缺陷 (B/C/E/F/G/H/I)。
+- 下一轮: 治本控制流分支极性/块归属一类 (E/F/H/I) 与 slot 复用变量身份一类 (B/C);
+  修后自增数组下标 `arr[i++]` BUG -> 扩展 HMAC/Base32 -> 推进真实库 round-trip。
