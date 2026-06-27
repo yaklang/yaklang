@@ -418,6 +418,30 @@ func TestDecompileFastjsonJSONWriterSetPathCrossChecked(t *testing.T) {
 //go:embed testdata/regression/*.class
 var regressionFS embed.FS
 
+// TestBridgeMethodSuppression is a stricter, semantics-structural guard for the covariant-return
+// bridge-method fix (root cause A in the cross-comparison report). A class implementing a generic
+// interface like Supplier<String> carries a compiler-synthetic ACC_BRIDGE | ACC_SYNTHETIC
+// `Object get()` that delegates to the real `String get()`. Dumping both yields illegal Java
+// (cannot overload by return type alone), so the decompiler must suppress the bridge method and
+// emit exactly one `get()` declaration. This test counts method declarations by name to make any
+// regression (a duplicated get()) fail loudly, independent of the syntax frontend.
+func TestBridgeMethodSuppression(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/bridge_method_covariant.class")
+	if err != nil {
+		t.Fatalf("read embedded class failed: %v", err)
+	}
+	source, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile failed: %v", err)
+	}
+	// Count how many times "get() {" appears as a method declaration header. A declaration line
+	// looks like "String get() {" / "Object get() {"; the buggy output had both.
+	declCount := strings.Count(source, "get() {")
+	if declCount != 1 {
+		t.Errorf("bridge method regression: expected exactly 1 get() declaration, got %d\n----- source -----\n%s", declCount, source)
+	}
+}
+
 // TestDecompileSyntaxRegression decompiles a set of real-world .class files that previously
 // produced syntactically-invalid Java, and asserts the decompiled output now parses cleanly
 // through the java2ssa frontend. Each entry guards a specific decompiler fix.
@@ -483,6 +507,23 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			file:           "catch_primitive_type.class",
 			desc:           "catch clause with degraded primitive type falls back to Throwable",
 			mustNotContain: []string{"catch(boolean", "catch(int", "catch(long", "catch(double"},
+		},
+		{
+			file: "bridge_method_covariant.class",
+			desc: "covariant-return bridge methods (ACC_BRIDGE | ACC_SYNTHETIC) are suppressed. " +
+				"A class implementing Supplier<String> has a real `String get()` plus a compiler-synthetic " +
+				"`Object get()` bridge; dumping both yields illegal Java (two methods differing only by " +
+				"return type). The decompiled output must declare exactly one get() method.",
+			mustContain:    []string{"String get()"},
+			mustNotContain: []string{"Object get()", "yak-decompiler"},
+		},
+		{
+			file: "wildcard_class_param.class",
+			desc: "generic wildcard type arguments (`Class<?>`) render as `?`, not the illegal identifier " +
+				"`__`. The old path routed `?` through SafeIdentifier, which turned it into `__` because `_` " +
+				"is a Java 9+ keyword and got suffixed — producing `Class<__>` that javac rejects.",
+			mustContain:    []string{"Class<?>"},
+			mustNotContain: []string{"<__>", "yak-decompiler"},
 		},
 		{
 			file: "decompile_stub_partial.class",

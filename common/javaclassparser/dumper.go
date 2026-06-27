@@ -1953,6 +1953,14 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 		if strings.HasPrefix(name, "lambda$") && isSyntheticMethod(method.AccessFlags) {
 			continue
 		}
+		// Compiler-generated bridge methods (ACC_BRIDGE, always also ACC_SYNTHETIC) implement
+		// covariant returns and generic erasure. They are not source-level declarations; dumping
+		// them yields illegal Java (two methods differing only by return type, e.g. `String build()`
+		// plus a synthetic `Object build()`). Suppress them so the output mirrors the original
+		// source. CFR and Vineflower suppress bridge methods as well.
+		if isBridgeMethod(method.AccessFlags) {
+			continue
+		}
 		// if name != "isSymlink" {
 		// 	continue
 		// }

@@ -127,3 +127,22 @@ func NewMultiCatchType(alternatives []JavaType) JavaType {
 		return newJavaTypeWrap(&JavaMultiCatchType{Types: alternatives})
 	}
 }
+
+// JavaWildcardType models a generic wildcard type argument: "?", "? extends X", or
+// "? super X". It renders as the literal "?" (with its bound if any) rather than being
+// routed through SafeIdentifier, which would corrupt "?" into an illegal identifier.
+type JavaWildcardType struct {
+	// Variant is "", "extends", or "super".
+	Variant string
+	Bound   JavaType
+	JavaType
+}
+
+func (j *JavaWildcardType) IsJavaType() {}
+
+func (j *JavaWildcardType) String(funcCtx *class_context.ClassContext) string {
+	if j.Bound == nil {
+		return "?"
+	}
+	return fmt.Sprintf("? %s %s", j.Variant, j.Bound.String(funcCtx))
+}

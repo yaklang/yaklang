@@ -174,3 +174,34 @@ The recommended way to drive residual partials to zero is the iterative
 stop-on-first workflow: scan the corpus, capture the first failing class, fix the
 root cause, add a regression `.class`, re-run the portable suite, and resume. It
 is deliberately a one-class-at-a-time loop so fixes never mask each other.
+
+
+---
+
+## 7. Regression log: cross-comparison fixes (2026-06-27)
+
+Driven by the cross-comparison PK against CFR/Vineflower
+([`YAK_JAVA_DECOMPILER_CROSS_COMPARISON.md`](./YAK_JAVA_DECOMPILER_CROSS_COMPARISON.md)),
+two high-impact root causes were fixed and locked into the regression suite. The
+method follows [`HARNESS_WORKFLOW.md`](./HARNESS_WORKFLOW.md) §3: fix the root
+cause, pin the failing class as a permanent `.class` fixture, assert via the
+fast portable suite.
+
+| Root cause | Fix | Regression fixture | Before → After |
+|------------|-----|--------------------|----------------|
+| **(A) Covariant bridge methods not suppressed** — a class implementing `Supplier<String>` carries a synthetic `Object get()` bridge; dumping both yields illegal Java (`method get() is already defined`). CFR/Vineflower suppress bridges. | Filter `ACC_BRIDGE` methods in the method-dump loop (`dumper.go`); added `BridgeFlag`/`isBridgeMethod`. | `testdata/regression/bridge_method_covariant.class` + `TestBridgeMethodSuppression` (asserts exactly one `get()`). | `method X is already defined` on every Builder/Supplier impl → 0 duplicate methods. |
+| **(C) Generic wildcard rendered as illegal `__`** — `Class<?>` became `Class<__>` because `?` was routed through `SafeIdentifier`, and `_` is a Java 9+ keyword that got suffixed to `__`. | Added `JavaWildcardType` (renders `?` / `? extends X` / `? super X`); wildcard args no longer go through `SafeIdentifier`. | `testdata/regression/wildcard_class_param.class` (in `TestDecompileSyntaxRegression`) + `types.TestWildcardTypeRendering`. | `cannot find symbol: class __` (12 occurrences on commons-lang3 alone) → `<?>` renders correctly, 0 `__`. |
+
+**Verified locally:** both fixtures decompile cleanly with no `yak-decompiler`
+stub; `go test ./common/javaclassparser/...` stays green. Root causes (B)
+(nested-type flattening) and (D) (long-tail rendering) remain tracked; (B) is
+the dominant remaining recompile blocker on the largest jars.
+
+The behavioral-equivalence oracle for these (and any future) fixes is the
+differential tester at [`tests/testdata/differential/`](./tests/testdata/differential/):
+for every class that recompiles, it runs the same methods with the same inputs
+on the original and the decompiled-then-recompiled bytecode and compares
+results. On the recompilable classes of commons-lang3 (53 classes / 9392
+invocations), gson (7 / 30), fastjson (11 / 4281) and commons-collections4
+(21 / 655) it reports **0 behavioral divergences** — i.e. the decompiled method
+bodies are semantically equivalent to the originals, not merely present.

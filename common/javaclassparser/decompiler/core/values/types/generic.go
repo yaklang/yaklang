@@ -94,11 +94,25 @@ func parseSigClassType(sig string) (JavaType, string, bool) {
 	if hasTypeArgs {
 		rest = rest[1:]
 		for len(rest) > 0 && rest[0] != '>' {
-			if rest[0] == '+' || rest[0] == '-' || rest[0] == '=' {
+			// Wildcard type arguments: '*' = "?", '+' = "? extends X", '-' = "? super X".
+			// '=' is a CaptureMarker used by javac for capture-of; treat as a plain wildcard.
+			if rest[0] == '*' || rest[0] == '=' {
+				typeArgs = append(typeArgs, &JavaWildcardType{})
 				rest = rest[1:]
-			} else if rest[0] == '*' {
-				typeArgs = append(typeArgs, newJavaTypeWrap(&JavaClass{Name: "?"}))
+				continue
+			}
+			if rest[0] == '+' || rest[0] == '-' {
+				variant := "extends"
+				if rest[0] == '-' {
+					variant = "super"
+				}
 				rest = rest[1:]
+				ta, remaining, ok := parseSigType(rest)
+				if !ok {
+					return nil, "", false
+				}
+				typeArgs = append(typeArgs, &JavaWildcardType{Variant: variant, Bound: ta})
+				rest = remaining
 				continue
 			}
 			ta, remaining, ok := parseSigType(rest)
@@ -124,11 +138,23 @@ func parseSigClassType(sig string) (JavaType, string, bool) {
 			rest = rest[1:]
 			var innerArgs []JavaType
 			for len(rest) > 0 && rest[0] != '>' {
-				if rest[0] == '+' || rest[0] == '-' || rest[0] == '=' {
+				if rest[0] == '*' || rest[0] == '=' {
+					innerArgs = append(innerArgs, &JavaWildcardType{})
 					rest = rest[1:]
-				} else if rest[0] == '*' {
-					innerArgs = append(innerArgs, newJavaTypeWrap(&JavaClass{Name: "?"}))
+					continue
+				}
+				if rest[0] == '+' || rest[0] == '-' {
+					variant := "extends"
+					if rest[0] == '-' {
+						variant = "super"
+					}
 					rest = rest[1:]
+					ta, remaining, ok := parseSigType(rest)
+					if !ok {
+						return nil, "", false
+					}
+					innerArgs = append(innerArgs, &JavaWildcardType{Variant: variant, Bound: ta})
+					rest = remaining
 					continue
 				}
 				ta, remaining, ok := parseSigType(rest)
