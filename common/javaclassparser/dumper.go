@@ -187,6 +187,46 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	for _, s := range buildInLib {
 		funcCtx.Import(s)
 	}
+	// Recover generic supertypes from the class Signature attribute: the raw super_class and
+	// Interfaces constant-pool entries are erased, so a class like `Ints$IntConverter extends
+	// Converter<Integer, Integer>` or `enum LexicographicalComparator implements Comparator<int[]>`
+	// would otherwise render with raw supertypes and fail to override the erased generic methods.
+	// Keyed by the raw dotted class name so it can be matched against each erased supertype below.
+	// Kill-switch: JDEC_GENERIC_SUPERS_OFF=1 restores the erased supertypes.
+	genericSuperByRaw := map[string]string{}
+	if os.Getenv("JDEC_GENERIC_SUPERS_OFF") == "" {
+		for _, attr := range c.obj.Attributes {
+			sigAttr, ok := attr.(*SignatureAttribute)
+			if !ok {
+				continue
+			}
+			sigStr, err := c.obj.getUtf8(sigAttr.SignatureIndex)
+			if err != nil || sigStr == "" {
+				break
+			}
+			sup, sigIfaces := types.ParseClassSignatureSupers(sigStr)
+			recordGeneric := func(t types.JavaType) {
+				raw := genericSupertypeRawName(t)
+				if raw == "" {
+					return
+				}
+				rendered := t.String(funcCtx)
+				// Only override when the recovered type actually carries type arguments; a raw
+				// supertype in the signature adds nothing and must not shadow the erased name.
+				if strings.Contains(rendered, "<") {
+					genericSuperByRaw[raw] = rendered
+				}
+			}
+			if sup != nil {
+				recordGeneric(sup)
+			}
+			for _, it := range sigIfaces {
+				recordGeneric(it)
+			}
+			break
+		}
+	}
+
 	superStr := ""
 	ifaces := c.obj.Interfaces
 	interfaceLists := make([]string, 0, len(ifaces)+1)
@@ -196,7 +236,11 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 			superStr = ""
 		} else {
 			funcCtx.Import(supperClassName)
+			rawSuper := supperClassName
 			supperClassName = funcCtx.ShortTypeName(supperClassName)
+			if generic, ok := genericSuperByRaw[rawSuper]; ok {
+				supperClassName = generic
+			}
 			if supperClassName != "" {
 				if !isEnum {
 					superStr += fmt.Sprintf(" extends %s", supperClassName)
@@ -224,6 +268,9 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 			continue
 		}
 		name = funcCtx.ShortTypeName(rawIfaceName)
+		if generic, ok := genericSuperByRaw[rawIfaceName]; ok {
+			name = generic
+		}
 		if name != "" {
 			interfaceLists = append(interfaceLists, name)
 
@@ -550,6 +597,44 @@ func defaultInitializerForFieldType(typeName string) string {
 	}
 }
 
+// genericSupertypeRawName returns the raw dotted class name of a (possibly generic) supertype type
+// recovered from a class Signature, so it can be matched against the erased super_class / Interfaces
+// names. Returns "" for type variables or anything that is not a class/parameterized type.
+func genericSupertypeRawName(t types.JavaType) string {
+	if t == nil {
+		return ""
+	}
+	switch r := t.RawType().(type) {
+	case *types.JavaParameterizedType:
+		return r.RawClassName
+	case *types.JavaClass:
+		return r.Name
+	}
+	return ""
+}
+
+// javaCharLiteralFromCode renders a char annotation value (stored as an int code point) as a valid
+// Java char literal: printable ASCII becomes 'x' (with the four chars that need escaping handled),
+// everything else becomes a '\uXXXX' escape so the result always compiles.
+func javaCharLiteralFromCode(code int) string {
+	switch code {
+	case '\'':
+		return "'\\''"
+	case '\\':
+		return "'\\\\'"
+	case '\n':
+		return "'\\n'"
+	case '\r':
+		return "'\\r'"
+	case '\t':
+		return "'\\t'"
+	}
+	if code >= 0x20 && code <= 0x7e {
+		return fmt.Sprintf("'%c'", rune(code))
+	}
+	return fmt.Sprintf("'\\u%04x'", code&0xffff)
+}
+
 func (c *ClassObjectDumper) DumpAnnotation(anno *AnnotationAttribute) (string, error) {
 	result := ""
 
@@ -579,7 +664,22 @@ func (c *ClassObjectDumper) DumpAnnotation(anno *AnnotationAttribute) (string, e
 			case *ConstantLongInfo:
 				valStr = fmt.Sprintf("%dL", ret.Value)
 			case *ConstantIntegerInfo:
-				valStr = fmt.Sprintf("%d", ret.Value)
+				// boolean/char/byte/short/int annotation members ALL store a CONSTANT_Integer in the
+				// pool; the element TAG carries the real Java type. Without dispatching on the tag a
+				// boolean member emits `1`/`0` (javac: "int cannot be converted to boolean") and a char
+				// member emits its code point (`59` instead of `';'`), so the decompiled annotation does
+				// not compile. Render by tag. Kill-switch: JDEC_ANNO_LITERAL_OFF=1 restores raw ints.
+				if os.Getenv("JDEC_ANNO_LITERAL_OFF") == "" && element.Tag == 'Z' {
+					if ret.Value == 0 {
+						valStr = "false"
+					} else {
+						valStr = "true"
+					}
+				} else if os.Getenv("JDEC_ANNO_LITERAL_OFF") == "" && element.Tag == 'C' {
+					valStr = javaCharLiteralFromCode(int(ret.Value))
+				} else {
+					valStr = fmt.Sprintf("%d", ret.Value)
+				}
 			case *ConstantDoubleInfo:
 				valStr = fmt.Sprintf("%f", ret.Value)
 			case *ConstantFloatInfo:
@@ -1596,7 +1696,11 @@ func renameStatementsInScope(stmts []statements.Statement, live map[string]*util
 // match means the expression depends on a method-scoped value.
 var localSlotRefRe = regexp.MustCompile(`\bvar\d+\b`)
 var generatedLocalRefRe = regexp.MustCompile(`\bvar\d+(?:_\d+)?\b`)
-var generatedLocalDeclRe = regexp.MustCompile(`\b(?:boolean|byte|char|short|int|long|float|double|String|[A-Za-z_$][A-Za-z0-9_$.<>?,]*(?:\[\])*)\s+(var\d+(?:_\d+)?)\b`)
+// The optional `(?:\s*\.\.\.)?` after the type recognizes a varargs parameter declaration
+// (`int[]... var0`, `String... var1`). Without it the ellipsis broke the `Type varN` match, so a
+// varargs parameter was treated as an UNDECLARED local and addMissingGeneratedLocalDecls injected a
+// bogus `Object varN = null;` that shadowed the real parameter (guava Ints.concat / Longs.concat).
+var generatedLocalDeclRe = regexp.MustCompile(`\b(?:boolean|byte|char|short|int|long|float|double|String|[A-Za-z_$][A-Za-z0-9_$.<>?,]*(?:\[\])*)(?:\s*\.\.\.)?\s+(var\d+(?:_\d+)?)\b`)
 var mismatchedDoWhileIndexDeclRe = regexp.MustCompile(`int\s+(var\d+(?:_\d+)?)\s*=\s*0;\n(\s*)do\{\n(\s*)if \(\((var\d+)\) <`)
 
 // monitorTempAssignRe matches a dead synthetic monitor temp left in the synchronized()
@@ -1640,14 +1744,59 @@ func addMissingGeneratedLocalDecls(body, params, receiverType string) string {
 	return "\n" + strings.Join(lines, "") + strings.TrimPrefix(body, "\n")
 }
 
+// repairMismatchedDoWhileIndexDecls repairs the narrow case where the decompiler mis-named the
+// declaration of a do-while loop index: `int X = 0;\ndo{\n if ((Y) < ...` where the loop body
+// actually iterates on Y, X is a stale name the rest of the body never uses, and Y has no other
+// declaration. There the `int X = 0` is the index initializer wearing the wrong name, so renaming
+// it to `int Y = 0` makes the source compile.
+//
+// It must NOT fire on a continued-variable tail loop, where the declaration immediately before the
+// do-while is a DIFFERENT, legitimate local than the one the condition tests - e.g.
+// `int j = 0; do { if (i < n) { ...; j++; } }` keeps incrementing the outer index `i` while a new
+// `j` is initialized first. There Y (`i`/var1) is already declared above and X (`j`/var3) is used
+// inside the loop body, so the old unconditional rewrite both dropped `j`'s declaration and aliased
+// it onto the already-live `i`, producing a duplicate `int var1 = 0` plus a phantom hoisted
+// `int var3 = 0` (Bug C). The two guards below skip exactly that shape: only a genuinely misnamed,
+// otherwise-unused declaration of an otherwise-undeclared index is rewritten. Kill-switch:
+// JDEC_DOWHILE_INDEX_REPAIR_OFF=1.
 func repairMismatchedDoWhileIndexDecls(body string) string {
+	if os.Getenv("JDEC_DOWHILE_INDEX_REPAIR_OFF") != "" {
+		return body
+	}
 	return mismatchedDoWhileIndexDeclRe.ReplaceAllStringFunc(body, func(match string) string {
 		parts := mismatchedDoWhileIndexDeclRe.FindStringSubmatch(match)
 		if len(parts) != 5 || parts[1] == parts[4] {
 			return match
 		}
-		return fmt.Sprintf("int %s = 0;\n%sdo{\n%sif ((%s) <", parts[4], parts[2], parts[3], parts[4])
+		declaredName, indexName := parts[1], parts[4]
+		// The loop index Y must be otherwise undeclared: if it already has a declaration
+		// (a continued outer index), renaming X to Y would duplicate/alias a live variable.
+		if generatedLocalIsDeclared(body, indexName) {
+			return match
+		}
+		// The declared name X must be a stale name used nowhere else: a single occurrence in
+		// the whole body is the declaration itself. More than one means X is a real, separate
+		// variable (e.g. `j` read/incremented inside the loop) that must keep its declaration.
+		if generatedLocalOccurrences(body, declaredName) > 1 {
+			return match
+		}
+		return fmt.Sprintf("int %s = 0;\n%sdo{\n%sif ((%s) <", indexName, parts[2], parts[3], indexName)
 	})
+}
+
+// generatedLocalIsDeclared reports whether name has any `T name` declaration in body.
+func generatedLocalIsDeclared(body, name string) bool {
+	for _, match := range generatedLocalDeclRe.FindAllStringSubmatch(body, -1) {
+		if len(match) > 1 && match[1] == name {
+			return true
+		}
+	}
+	return false
+}
+
+// generatedLocalOccurrences counts whole-token references to a generated local name in body.
+func generatedLocalOccurrences(body, name string) int {
+	return len(regexp.MustCompile(`\b` + regexp.QuoteMeta(name) + `\b`).FindAllString(body, -1))
 }
 
 func generatedLocalLooksInt(body, name string) bool {

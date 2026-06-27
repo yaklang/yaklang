@@ -81,12 +81,21 @@ public class Base32Codec {
             }
         }
         // each 8 symbols -> 5 bytes; a partial trailing group of `rem` symbols yields rem*5/8 bytes
-        // (rem in {0,2,4,5,7} -> {0,1,2,3,4}). Computed arithmetically rather than via a switch, since
-        // an empty-default lookupswitch currently mis-structures (CODEC_TODO.md "Bug K"); the encode()
-        // path keeps a real (table)switch for switch-statement coverage.
+        // (rem in {0,2,4,5,7} -> {0,1,2,3,4}). Natural empty-`default` switch form: this is the exact
+        // CODEC_TODO.md "Bug K" shape (every case breaks to the same point the empty default falls
+        // through to). Now decompiled correctly (SwitchRewriter1 promotes the convergence node to the
+        // switch merge and drops the empty default), so the idiom is restored rather than worked around.
         int fullGroups = realLen / 8;
         int rem = realLen % 8;
-        int outLen = fullGroups * 5 + (rem * 5) / 8;
+        int partial = 0;
+        switch (rem) {
+            case 2: partial = 1; break;
+            case 4: partial = 2; break;
+            case 5: partial = 3; break;
+            case 7: partial = 4; break;
+            default: break;
+        }
+        int outLen = fullGroups * 5 + partial;
         byte[] out = new byte[outLen];
         long buffer = 0;
         int bits = 0;

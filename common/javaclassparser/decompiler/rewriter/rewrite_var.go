@@ -781,19 +781,18 @@ func switchHoistDeclarations(sw *statements.SwitchStatement, afterSts []statemen
 		}
 		targetRef := refByUid[uid]
 		name := targetRef.String(hoistProbeCtx)
-		for _, as := range assignsByUid[uid] {
-			ref, ok := core.UnpackSoltValue(as.LeftValue).(*values.JavaRef)
-			if !ok || ref == nil || ref.Id == nil {
-				continue
-			}
-			candidateName := ref.String(hoistProbeCtx)
-			if candidateName != "" && statementsReadName(afterSts, candidateName) {
-				targetRef = as.LeftValue
-				name = candidateName
-				break
-			}
+		// Decide "read after the switch" by VARIABLE IDENTITY, not by rendered name. JVM slot reuse
+		// and rewriteVar's per-scope name counter (a switch-case sub-scope consumes a varN that the
+		// parent counter never advances past) can give an UNRELATED later local the same varN. A
+		// name-based test then both (a) falsely sees that later local as a read of this variable and
+		// (b) trips statementsReadName's "redeclared here" short-circuit on the later local's own
+		// declaration, wrongly suppressing this hoist (observed on String-switch temp slots reused
+		// for an int after the switch). assignsReadAfterByIdentity probes by the assignment's own
+		// VariableId, so only genuine references to THIS variable count.
+		if !assignsReadAfterByIdentity(afterSts, assignsByUid[uid]) {
+			continue
 		}
-		if name == "" || !statementsReadName(afterSts, name) {
+		if name == "" {
 			continue
 		}
 		targetJavaRef, ok := core.UnpackSoltValue(targetRef).(*values.JavaRef)
@@ -1071,6 +1070,45 @@ func assignRendersAsPlain(as *statements.AssignStatement) (ok bool) {
 // statementsReadName is the if-hoist trigger: unlike switch hoisting, a later assignment target
 // `x = ...` should not force an unrelated branch-local `x` declaration outward. Only reads in the
 // statements after the if make the branch declaration unsafe.
+// assignsReadAfterByIdentity reports whether any of the given assignment targets (all the same
+// logical variable) is referenced in afterSts, comparing by VariableId IDENTITY rather than the
+// rendered varN name. It temporarily renames each candidate id to a unique sentinel and reuses the
+// normal text-render path: only references that actually carry that id render the sentinel, so a
+// different variable sharing the same depth/scope-derived name is correctly excluded. This is the
+// precise signal switchHoistDeclarations needs - "is THIS variable read after the switch" - free of
+// the name-collision false positives/negatives that statementsReadName suffers. Kill-switch:
+// JDEC_SWITCH_HOIST_IDENTITY_OFF=1 falls back to the legacy name-based test.
+func assignsReadAfterByIdentity(afterSts []statements.Statement, assigns []*statements.AssignStatement) bool {
+	if os.Getenv("JDEC_SWITCH_HOIST_IDENTITY_OFF") == "1" {
+		for _, as := range assigns {
+			if ref, ok := core.UnpackSoltValue(as.LeftValue).(*values.JavaRef); ok && ref != nil && ref.Id != nil {
+				if statementsReadName(afterSts, ref.String(hoistProbeCtx)) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	const probe = "__jdec_hoist_probe__"
+	seen := map[*utils.VariableId]bool{}
+	for _, as := range assigns {
+		ref, ok := core.UnpackSoltValue(as.LeftValue).(*values.JavaRef)
+		if !ok || ref == nil || ref.Id == nil || seen[ref.Id] {
+			continue
+		}
+		seen[ref.Id] = true
+		id := ref.Id
+		saved := id.Name
+		id.SetName(probe)
+		hit := statementsReferenceName(afterSts, probe)
+		id.SetName(saved)
+		if hit {
+			return true
+		}
+	}
+	return false
+}
+
 func statementsReadName(sts []statements.Statement, name string) (res bool) {
 	defer func() {
 		if recover() != nil {

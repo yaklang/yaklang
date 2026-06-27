@@ -12,9 +12,9 @@ package codec;
  *   - 2-D array element compound assignment `m[i][j] op= v;`
  *   - static field compound assignment `F op= v;`
  *
- * NOT covered here on purpose: any compound assignment whose result *value is consumed* (array,
- * field, or chained local: `t = (x ^= v); ... t ...`). That idiom re-evaluates the RHS after the
- * target was already updated (CODEC_TODO.md "Bug J"); it is rare in real codec/spring/guava code.
+ * Compound assignment whose result *value is consumed* (`t = (x ^= v); ... t ...`, the dup_x1/dup_x2/
+ * dup2/dup2_x1/dup2_x2 idioms) was the historical "Bug J" and is now fixed; its dedicated round-trip
+ * coverage lives in ConsumedCompoundAlgorithms (kept separate to isolate the dup-fold path).
  *
  * Single public top-level class, static only, deterministic.
  */

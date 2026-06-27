@@ -39,15 +39,12 @@ public class SpringAlgorithms {
                 return false;
             }
         }
-        // trailing pattern must be all '*' to match the now-exhausted input. (Written as a for-loop
-        // with an early return rather than `while(p<pl && pat[p]=='*') p++; return p==pl;`, whose
-        // loop-exit the decompiler inverts into an infinite loop - see CODEC_TODO.md.)
-        for (int q = p; q < pl; q++) {
-            if (pattern.charAt(q) != '*') {
-                return false;
-            }
+        // trailing pattern must be all '*' to match the now-exhausted input. Natural trailing-while
+        // loop-exit (Bug H fixed): `while(p<pl && pat[p]=='*') p++; return p==pl;` no longer inverts.
+        while (p < pl && pattern.charAt(p) == '*') {
+            p++;
         }
-        return true;
+        return p == pl;
     }
 
     // ===== tokenize a path into '/'-separated, non-empty segments =====
@@ -123,14 +120,11 @@ public class SpringAlgorithms {
                 return false;
             }
         }
-        // any remaining pattern segments must all be '**' (same for-loop form as matchStrings, to
-        // avoid the decompiler's trailing-while loop-exit inversion - see CODEC_TODO.md).
-        for (int k = pi; k < pd.length; k++) {
-            if (!pd[k].equals("**")) {
-                return false;
-            }
+        // any remaining pattern segments must all be '**' (natural trailing-while; Bug H fixed).
+        while (pi < pd.length && pd[pi].equals("**")) {
+            pi++;
         }
-        return true;
+        return pi == pd.length;
     }
 
     // ===== StringUtils.cleanPath: normalize '.' and '..' segments =====

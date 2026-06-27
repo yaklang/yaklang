@@ -442,6 +442,228 @@ func (d *Decompiler) tryFoldPostIncDec(stack StackSimulation, storedValue values
 	return values.NewBinaryExpression(target, expr.Values[1], op, target.Type()), true
 }
 
+// collectAssignedLocalsInText scans rendered Java text for plain assignments to a generated local
+// (`varN = ` / `varN_M = `, excluding `==`, `<=`, `>=`, `!=`, `+=`, ... compound forms) and returns
+// the set of assigned local names. Used to detect a side effect baked into a folded value (the
+// embedded assignment is rendered through an opaque CustomValue, so only its text is inspectable).
+func collectAssignedLocalsInText(s string) map[string]struct{} {
+	out := map[string]struct{}{}
+	n := len(s)
+	for i := 0; i+3 < n; i++ {
+		if s[i] != 'v' || s[i+1] != 'a' || s[i+2] != 'r' {
+			continue
+		}
+		// must start a token
+		if i > 0 && isIdentByte(s[i-1]) {
+			continue
+		}
+		j := i + 3
+		start := j
+		for j < n && s[j] >= '0' && s[j] <= '9' {
+			j++
+		}
+		if j == start {
+			continue
+		}
+		// optional _<digits> collision suffix
+		if j < n && s[j] == '_' {
+			k := j + 1
+			for k < n && s[k] >= '0' && s[k] <= '9' {
+				k++
+			}
+			if k > j+1 {
+				j = k
+			}
+		}
+		name := s[i:j]
+		// skip spaces
+		p := j
+		for p < n && (s[p] == ' ' || s[p] == '\t') {
+			p++
+		}
+		if p >= n || s[p] != '=' {
+			continue
+		}
+		// exclude operators ending in '=' (==, <=, >=, !=, +=, -=, *=, /=, %=, &=, |=, ^=) and the
+		// arrow-ish ">=" already covered: require the char before '=' (after the name) to be space or
+		// the name itself (handled), and the char after '=' must NOT be '='.
+		if p+1 < n && s[p+1] == '=' {
+			continue
+		}
+		out[name] = struct{}{}
+	}
+	return out
+}
+
+func isIdentByte(b byte) bool {
+	return b == '_' || b == '$' || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
+}
+
+// textReferencesLocal reports whether rendered Java text references the given generated local name as
+// a whole token (so var2 does not match var20 or var2_1).
+func textReferencesLocal(s, name string) bool {
+	from := 0
+	for {
+		idx := indexFrom(s, name, from)
+		if idx < 0 {
+			return false
+		}
+		before := idx == 0 || !isIdentByte(s[idx-1])
+		afterPos := idx + len(name)
+		after := afterPos >= len(s) || !isIdentByte(s[afterPos])
+		if before && after {
+			return true
+		}
+		from = idx + 1
+	}
+}
+
+func indexFrom(s, sub string, from int) int {
+	if from >= len(s) {
+		return -1
+	}
+	idx := strings.Index(s[from:], sub)
+	if idx < 0 {
+		return -1
+	}
+	return from + idx
+}
+
+// foldReordersSideEffect reports whether single-use-folding val into the use site at node would
+// reorder an embedded local-assignment side effect relative to a read of that same local already
+// present in the use statement. See the call site (Bug T) for the canonical reorder it prevents.
+// Kill-switch: JDEC_SIDEEFFECT_FOLD_OFF=1.
+func (d *Decompiler) foldReordersSideEffect(val values.JavaValue, node *Node, foldedRef *values.JavaRef) bool {
+	if os.Getenv("JDEC_SIDEEFFECT_FOLD_OFF") == "1" {
+		return false
+	}
+	if val == nil || node == nil || node.Statement == nil {
+		return false
+	}
+	assigned := collectAssignedLocalsInText(val.String(d.FunctionContext))
+	if len(assigned) == 0 {
+		return false
+	}
+	// The folded variable's own name is being replaced by val, so a reference to it is not a hazard.
+	foldedName := ""
+	if foldedRef != nil {
+		foldedName = foldedRef.String(d.FunctionContext)
+	}
+	stmtText := node.Statement.String(d.FunctionContext)
+	for name := range assigned {
+		if name == foldedName {
+			continue
+		}
+		if textReferencesLocal(stmtText, name) {
+			return true
+		}
+	}
+	return false
+}
+
+// isLocalLoadOpcode reports whether op reads a local variable slot onto the operand stack.
+func isLocalLoadOpcode(op int) bool {
+	switch op {
+	case OP_ALOAD, OP_ILOAD, OP_LLOAD, OP_DLOAD, OP_FLOAD,
+		OP_ALOAD_0, OP_ILOAD_0, OP_LLOAD_0, OP_DLOAD_0, OP_FLOAD_0,
+		OP_ALOAD_1, OP_ILOAD_1, OP_LLOAD_1, OP_DLOAD_1, OP_FLOAD_1,
+		OP_ALOAD_2, OP_ILOAD_2, OP_LLOAD_2, OP_DLOAD_2, OP_FLOAD_2,
+		OP_ALOAD_3, OP_ILOAD_3, OP_LLOAD_3, OP_DLOAD_3, OP_FLOAD_3:
+		return true
+	}
+	return false
+}
+
+// isReferenceLoadOpcode reports whether op is an ALOAD-family load (reads a reference, not a
+// primitive). The JVM uses distinct load opcodes per type category, so the opcode alone tells us
+// whether the slot is expected to hold a reference or a primitive at this read.
+func isReferenceLoadOpcode(op int) bool {
+	switch op {
+	case OP_ALOAD, OP_ALOAD_0, OP_ALOAD_1, OP_ALOAD_2, OP_ALOAD_3:
+		return true
+	}
+	return false
+}
+
+// isLocalStoreOpcode reports whether op defines a new value into a local slot (excludes IINC, which
+// updates an existing slot in place and keeps the same logical variable/ref).
+func isLocalStoreOpcode(op int) bool {
+	switch op {
+	case OP_ASTORE, OP_ISTORE, OP_LSTORE, OP_DSTORE, OP_FSTORE,
+		OP_ASTORE_0, OP_ISTORE_0, OP_LSTORE_0, OP_DSTORE_0, OP_FSTORE_0,
+		OP_ASTORE_1, OP_ISTORE_1, OP_LSTORE_1, OP_DSTORE_1, OP_FSTORE_1,
+		OP_ASTORE_2, OP_ISTORE_2, OP_LSTORE_2, OP_DSTORE_2, OP_FSTORE_2,
+		OP_ASTORE_3, OP_ISTORE_3, OP_LSTORE_3, OP_DSTORE_3, OP_FSTORE_3:
+		return true
+	}
+	return false
+}
+
+// refIsPrimitive reports whether ref currently carries a primitive type.
+func refIsPrimitive(ref *values.JavaRef) bool {
+	if ref == nil || ref.Type() == nil {
+		return false
+	}
+	_, isPrim := ref.Type().RawType().(*types.JavaPrimer)
+	return isPrim
+}
+
+// reachingSlotVersionOnMismatch repairs a stale slot read produced by the single global varTable.
+// See the call site in loadVarBySlot for the root cause. We trigger ONLY on the unambiguous
+// corruption signal: the load opcode's category (reference vs primitive) disagrees with the
+// resolved ref's type. In that case the global table holds a later, wrong-path version of the slot,
+// so we recompute the true reaching definition by walking Source edges backward to the nearest
+// version-defining local store of the same slot whose ref category matches the load. Returns nil
+// (caller keeps the original ref) when the categories already agree or no matching definition is
+// found, keeping the blast radius to genuinely corrupted reads only.
+// Kill-switch: JDEC_SLOT_READ_REACHING_OFF=1.
+func (d *Decompiler) reachingSlotVersionOnMismatch(load *OpCode, slot int, current *values.JavaRef) *values.JavaRef {
+	if os.Getenv("JDEC_SLOT_READ_REACHING_OFF") == "1" {
+		return nil
+	}
+	if load == nil || !isLocalLoadOpcode(load.Instr.OpCode) {
+		return nil
+	}
+	if current == nil || current.Type() == nil {
+		return nil
+	}
+	wantRef := isReferenceLoadOpcode(load.Instr.OpCode)
+	if wantRef != refIsPrimitive(current) {
+		// wantRef==true && current primitive  -> mismatch (proceed)
+		// wantRef==false && current reference -> mismatch (proceed)
+		// otherwise the categories already agree, nothing to repair.
+		// Note: the boolean encodes (wantRef) vs (current is primitive); they mismatch exactly when
+		// wantRef == refIsPrimitive(current).
+		return nil
+	}
+	visited := map[*OpCode]bool{load: true}
+	queue := append([]*OpCode{}, load.Source...)
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		if cur == nil || visited[cur] {
+			continue
+		}
+		visited[cur] = true
+		if isLocalStoreOpcode(cur.Instr.OpCode) && GetStoreIdx(cur) == slot {
+			// A version-defining store for this slot shadows anything earlier on this path. Adopt
+			// its ref when the category matches the load; otherwise stop expanding past it (its
+			// own definition dominates this path, so an earlier same-slot store is not reachable
+			// here) and keep searching other paths.
+			if refs, ok := d.opcodeIdToRef[cur]; ok && len(refs) > 0 {
+				if ref, ok2 := refs[len(refs)-1][0].(*values.JavaRef); ok2 && ref != nil && ref.Type() != nil {
+					if wantRef != refIsPrimitive(ref) {
+						return ref
+					}
+				}
+			}
+			continue
+		}
+		queue = append(queue, cur.Source...)
+	}
+	return nil
+}
+
 func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation, opcode *OpCode) error {
 	recordOpcodeHit(opcode.Instr.OpCode)
 	funcCtx := d.FunctionContext
@@ -477,6 +699,15 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 	}
 	loadVarBySlot := func(slot int) values.JavaValue {
 		varRef := runtimeStackSimulation.GetVar(slot)
+		// The forward simulation keeps a single global slot->ref table mutated in DFS traversal
+		// order. When a slot is reused for a different-category value on a branch DFS visits first
+		// (e.g. a String-switch temp slot later reused for an int after the merge), a load on a
+		// not-yet-visited sibling branch can resolve to the wrong (later) version. Repair only the
+		// unambiguous corruption signal (load opcode category disagrees with the resolved ref) by
+		// walking back to the true reaching definition; correct reads are left untouched.
+		if better := d.reachingSlotVersionOnMismatch(opcode, slot, varRef); better != nil {
+			varRef = better
+		}
 		slotvalue := values.NewSlotValue(varRef, varRef.Type())
 		users := d.varUserMap.GetMust(varRef)
 		d.varUserMap.Set(varRef, append(users, &VarFoldRule{
@@ -1072,32 +1303,40 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		//runtimeStackSimulation.Push(v2)
 		//runtimeStackSimulation.Push(v1)
 	case OP_DUP2_X2:
-		var addUser func(int2 int)
-		runtimeStackSimulationPopN := func(n int) []values.JavaValue {
-			datas := []values.JavaValue{}
+		// Each duplicated value must carry its OWN ref-fold callback. The previous code kept a single
+		// shared addUser overwritten by every checkAndConvertRef, so by push time it pointed at the
+		// LAST popped operand (the arrayref) instead of the duplicated value. For a consumed long/double
+		// array compound assignment (`long r = (a[i] += v)`, bytecode dup2_x2) the duplicated value's
+		// two real consumers (lastore + lstore) never registered, so the shared temp folded down to a
+		// single use and the consumer re-evaluated the RHS after the store (`(a[i]+v)*k` instead of
+		// `r*k`), double-applying the operator (Bug J). Tracking addUser per item keeps each value's
+		// fold rule bound to that value, matching the OP_DUP2 fix.
+		type dup2x2Item struct {
+			val     values.JavaValue
+			addUser func(int)
+		}
+		popItems := func(n int) []dup2x2Item {
+			items := []dup2x2Item{}
 			current := 0
-			for {
-				if current >= n {
-					break
-				}
-				addUser = checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
+			for current < n {
+				au := checkAndConvertRef(runtimeStackSimulation.Peek().(values.JavaValue))
 				v := runtimeStackSimulation.Pop()
 				current += GetTypeSize(v.(values.JavaValue).Type())
-				datas = append(datas, v)
+				items = append(items, dup2x2Item{val: v, addUser: au})
 			}
-			return datas
+			return items
 		}
-		runtimeStackSimulationPushReverse := func(datas []values.JavaValue) {
-			for i := len(datas) - 1; i >= 0; i-- {
-				runtimeStackSimulation.Push(datas[i])
-				addUser(1)
+		pushReverse := func(items []dup2x2Item) {
+			for i := len(items) - 1; i >= 0; i-- {
+				runtimeStackSimulation.Push(items[i].val)
+				items[i].addUser(1)
 			}
 		}
-		datas1 := runtimeStackSimulationPopN(2)
-		datas2 := runtimeStackSimulationPopN(2)
-		runtimeStackSimulationPushReverse(datas1)
-		runtimeStackSimulationPushReverse(datas2)
-		runtimeStackSimulationPushReverse(datas1)
+		datas1 := popItems(2)
+		datas2 := popItems(2)
+		pushReverse(datas1)
+		pushReverse(datas2)
+		pushReverse(datas1)
 	case OP_LDC:
 		runtimeStackSimulation.Push(d.ConstantPoolLiteralGetter(int(opcode.Data[0])))
 	case OP_LDC_W:
@@ -1124,13 +1363,37 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		statements.NewMiddleStatement(statements.MiddleSwitch, []any{opcode.SwitchJmpCase1, runtimeStackSimulation.Pop().(values.JavaValue)})
 	case OP_IINC:
 		var index int
+		var inc int
 		if opcode.IsWide {
 			index = int(Convert2bytesToInt(opcode.Data))
+			inc = int(int16(Convert2bytesToInt(opcode.Data[2:])))
 		} else {
 			index = int(opcode.Data[0])
+			inc = int(int8(opcode.Data[1]))
 		}
 		ref := runtimeStackSimulation.GetVar(index)
 		opcode.Ref = ref
+		// Post-increment / decrement used inside an expression. javac compiles `a[i++] = v`,
+		// `int j = i++`, `return i++` as `iload X; iinc X; ...`, so the OLD value of slot X is
+		// still live on the operand stack when this iinc runs. Detect that live load (the stack
+		// top is a load of the SAME slot) and fold the iinc into an `i++` / `i--` expression that
+		// REPLACES the live value, suppressing the standalone statement. Without this the
+		// standalone `i++` is emitted BEFORE the consuming statement and the consumer then reads
+		// the incremented value (`i++; a[i] = v` instead of `a[i++] = v`), silently changing
+		// semantics. Pre-increment compiles to `iinc X; iload X` (no live load at iinc time), so it
+		// is intentionally left alone and correctly stays `i = i + 1; ... use i`.
+		if (inc == 1 || inc == -1) && ref != nil && runtimeStackSimulation.Size() > 0 {
+			if topRef, ok := UnpackSoltValue(runtimeStackSimulation.Peek()).(*values.JavaRef); ok && topRef.VarUid == ref.VarUid {
+				runtimeStackSimulation.Pop()
+				op := INC
+				if inc == -1 {
+					op = values.DEC
+				}
+				postOp := values.NewBinaryExpression(ref, values.NewJavaLiteral(1, types.NewJavaPrimer(types.JavaInteger)), op, ref.Type())
+				runtimeStackSimulation.Push(postOp)
+				opcode.IincFoldedToPostOp = true
+			}
+		}
 	case OP_DNEG, OP_FNEG, OP_LNEG, OP_INEG:
 		v := runtimeStackSimulation.Pop().(values.JavaValue)
 		runtimeStackSimulation.Push(values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
@@ -1218,6 +1481,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			paramPlaceholder.Flag = "param_placeholder"
 			runtimeSim.AssignVar(slotIndex, paramPlaceholder)
 			val := runtimeSim.GetVar(slotIndex)
+			val.IsParam = true
 			params = append(params, val)
 			if isDouble {
 				slotIndex += 2
@@ -1909,12 +2173,63 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 		if rootNode == nil {
 			return nil, nil, false, false, false
 		}
+		// nearestMultiSourceReconverge walks back through single-source predecessors from n (n excluded)
+		// to the FIRST node that has more than one predecessor (a control reconvergence), or nil if the
+		// chain reaches a fork-free entry. The single-source walk is only entered after nearestIfAncestor
+		// already returned nil, so it never steps over an if-node.
+		nearestMultiSourceReconverge := func(n *OpCode) *OpCode {
+			cur := n
+			for step := 0; cur != nil && step < (1<<16); step++ {
+				if len(cur.Source) >= 2 {
+					return cur
+				}
+				if len(cur.Source) != 1 {
+					return nil
+				}
+				cur = cur.Source[0]
+			}
+			return nil
+		}
+		// Climb to the outermost enclosing ternary condition. Two shapes are climbed:
+		//   (1) a single-source straight-line dominating condition (nearestIfAncestor); and
+		//   (2) a multi-source reconvergence whose EVERY predecessor is itself a clean ternary condition
+		//       of THIS merge. Shape (2) is the canonical "||-chain whose leading operand is a compound
+		//       `A && B` / range check": both the A-true jump and the B-false fall-through land on the
+		//       NEXT operand's check (more precisely on the block that loads the operand for that check),
+		//       giving that block two predecessors. The straight-line climb stops there, so without this
+		//       the leading operand is peeled into an outer if-statement with an empty arm and the shared
+		//       post-merge continuation (e.g. a loop increment) is dropped -> infinite loop. The "every
+		//       predecessor is a clean ternary condition" guard is essential: a loop back-edge or a
+		//       statement path has non-condition predecessors, so it is NOT climbed (that prevents
+		//       folding a loop body into the value, which would emit an empty do{}while(true)).
 		for {
 			anc := nearestIfAncestor(rootNode)
-			if anc == nil || !isTernaryCondition(anc) {
+			if anc != nil {
+				if !isTernaryCondition(anc) {
+					break
+				}
+				rootNode = anc
+				continue
+			}
+			recon := nearestMultiSourceReconverge(rootNode)
+			if recon == nil {
 				break
 			}
-			rootNode = anc
+			allClean := true
+			var lowest *OpCode
+			for _, p := range recon.Source {
+				if !isTernaryCondition(p) {
+					allClean = false
+					break
+				}
+				if lowest == nil || p.Id < lowest.Id {
+					lowest = p
+				}
+			}
+			if !allClean || lowest == nil || lowest.Id >= rootNode.Id {
+				break
+			}
+			rootNode = lowest
 		}
 		if !isTernaryCondition(rootNode) {
 			seenAnc := utils.NewSet[*OpCode]()
@@ -2669,6 +2984,13 @@ func (d *Decompiler) ParseStatement() error {
 			switchStatement := statements.NewMiddleStatement(statements.MiddleSwitch, []any{opcode.SwitchJmpCase1, opcode.stackConsumed[0], opcode.SwitchJmpCase})
 			appendNode(switchStatement)
 		case OP_IINC:
+			// Folded into a post-increment/decrement expression left on the operand stack
+			// (`a[i++] = v`, `int j = i++`, `return i++`): the side effect now rides inside the
+			// consuming expression, so emitting the standalone statement here would double-apply
+			// and mis-order the increment (the historical `i++; a[i] = v` semantic bug).
+			if opcode.IincFoldedToPostOp {
+				return nil
+			}
 			// The iinc increment is a SIGNED constant. Reading it unsigned turns `i--`
 			// (iinc i, -1 => byte 0xFF) into `i + 255`, and because the renderer prints any
 			// INC op as `i++` it silently became `i++`, inverting every descending loop.
@@ -2843,9 +3165,63 @@ func (d *Decompiler) ParseStatement() error {
 	disRefUid := lo.Map(d.disFoldRef, func(item *values.JavaRef, index int) string {
 		return item.VarUid
 	})
+	// dupSharedRefUids collects every temporary that dup/dup_x1/dup_x2/dup2/dup2_x2 materialized to
+	// share ONE computed value between two consumers (the canonical shape is a compound assignment
+	// whose result is also consumed: `int r = (a[i] += 3)` compiles to `...iadd; dup_x2; iastore;
+	// istore`). Such a temp stays its own variable. When a SECOND variable (`r`) copies it, resolving
+	// the fold value THROUGH the temp all the way to its defining expression makes the copy
+	// re-evaluate that expression (Bug J: `return a[i] + 3` instead of `return r`, double-applying
+	// the add). resolveFoldValue below stops at these temps so the copy references the temp instead.
+	// Only refs MATERIALIZED by checkAndConvertRef inside a dup-family handler are genuine shared
+	// temps. opcodeIdToRef is also populated by every normal local store (keyed by the store
+	// opcode), so we must filter by the key opcode being a dup; otherwise ordinary copy chains
+	// (`var2 = var1; var3 = var2`) would be treated as shared and stop legitimate constant folding.
+	dupSharedRefUids := map[string]bool{}
+	for op, infos := range d.opcodeIdToRef {
+		if op == nil || op.Instr == nil {
+			continue
+		}
+		switch op.Instr.OpCode {
+		case OP_DUP, OP_DUP_X1, OP_DUP_X2, OP_DUP2, OP_DUP2_X1, OP_DUP2_X2:
+			for _, info := range infos {
+				if r, ok := info[0].(*values.JavaRef); ok && r != nil {
+					dupSharedRefUids[r.VarUid] = true
+				}
+			}
+		}
+	}
+	// resolveFoldValue mirrors GetRealValue (unwrap ref/slot chains) but halts at a dup-shared temp
+	// other than the starting ref, returning that temp so a copy folds into a reference to it rather
+	// than into a re-evaluation of the shared expression.
+	resolveFoldValue := func(start *values.JavaRef) values.JavaValue {
+		var cur values.JavaValue = start
+		for {
+			if r, ok := cur.(*values.JavaRef); ok {
+				if r != start && dupSharedRefUids[r.VarUid] {
+					return r
+				}
+				if r.Val == nil {
+					return r
+				}
+				if cv, ok := r.Val.(*values.CustomValue); ok && cv.Flag == "param_placeholder" {
+					return r
+				}
+				cur = r.Val
+				continue
+			}
+			if s, ok := cur.(*values.SlotValue); ok {
+				if s.GetValue() == nil {
+					return s
+				}
+				cur = s.GetValue()
+				continue
+			}
+			return cur
+		}
+	}
 	uidToPairs.ForEach(func(uid string, pairs []*VarFoldRule) bool {
 		ref := uidToRef[uid]
-		val := GetRealValue(ref)
+		val := resolveFoldValue(ref)
 		attr := d.delRefUserAttr[ref.VarUid]
 		if slices.Contains(disRefUid, ref.VarUid) {
 			d.tracef("var-fold", "skip disabled ref=%s pairs=%d", traceRef(ref, d.FunctionContext), len(pairs))
@@ -2919,6 +3295,36 @@ func (d *Decompiler) ParseStatement() error {
 			}
 			currentNodeSource := currentNode.Source[0]
 			nnext := nextNode.Next[0]
+			// Chained-assignment dup-collapse (`tmp; a = tmp; b = tmp` -> `b = (a = expr)`) is only
+			// safe when the inlined target slot is not read again. It is the correct rendering for a
+			// terminal chain such as `int b = a = 1;` (ContinuousAssign) and for the assignment-in-
+			// ternary idiom `(cond ? (x = a) : (x = b)).foo()`. But for a plain sequential chain whose
+			// values ARE consumed (`a = b = 7; return a*10 + b;`, or any `a = b = c = expr` whose
+			// locals are read), the later single-use fold re-injects the `a = expr` CustomValue into
+			// the use site and the local loses its real declaration, so the dumper synthesizes a bogus
+			// `Object a = null` and emits non-recompilable `(Object a = 7) * 10` (and, for deeper
+			// chains, a phantom loop). Distinguish the buggy case with two signals:
+			//   1. naLeft (nextAssign.LeftValue) appears in uidToRef, i.e. it has fold-eligible
+			//      downstream reads -- this separates `two/three` (reads) from `ContinuousAssign`
+			//      (no reads, naLeft absent).
+			//   2. currentNodeSource is a linear value producer, not a branch. The ternary idiom's
+			//      stores sit under a ConditionStatement; a real sequential chain flows from a plain
+			//      MiddleStatement -- this separates `two/three` from the ternary.
+			// When both hold, skip the collapse and let the normal single-use folds reduce the chain
+			// to the natural, compilable `T t = expr; ... t ... t ...` shape (every chained local
+			// equals the same value, so folding their single-use reads into the shared temp is
+			// value-faithful). Kill-switch: JDEC_CHAINED_ASSIGN_NCHAIN_OFF=1.
+			if os.Getenv("JDEC_CHAINED_ASSIGN_NCHAIN_OFF") == "" {
+				if naLeft, ok := nextAssign.LeftValue.(*values.JavaRef); ok {
+					_, naReadDownstream := uidToRef[naLeft.VarUid]
+					_, srcIsCondition := currentNodeSource.Statement.(*statements.ConditionStatement)
+					if naReadDownstream && !srcIsCondition {
+						d.tracef("var-fold", "skip dup-collapse (sequential chained slot read downstream) ref=%s naLeft=%s",
+							traceRef(ref, d.FunctionContext), naLeft.VarUid)
+						return
+					}
+				}
+			}
 			currentNode.RemoveNext(nextNode)
 			nextNode.RemoveNext(nnext)
 			currentNode.AddNext(nnext)
@@ -2962,6 +3368,20 @@ func (d *Decompiler) ParseStatement() error {
 						sourceNode = node.Source[0]
 					}
 				}
+			}
+			// Bug T (side-effect reorder): val may carry an embedded assignment to a local, e.g. a
+			// ternary whose arms store to a slot (`(cond) ? (x = a) : (x = b)`), baked into a
+			// CustomValue by the dup-collapse above. Folding such a value into a use site that ALSO
+			// references the assigned local reorders the store relative to that read: the canonical
+			// `int y = (cond)?(x=a):(x=b); return x + y;` becomes `return x + ((cond)?(x=a):(x=b))`,
+			// which evaluates the left `x` BEFORE the store and yields the pre-store value. Keep y as
+			// an explicit local in that case so the store still happens first. Conservative (may keep
+			// a temp where the read is actually after the use, which is harmless) and rare (only fires
+			// when a folded value embeds a local assignment). Kill-switch: JDEC_SIDEEFFECT_FOLD_OFF=1.
+			if node != nil && d.foldReordersSideEffect(val, node, ref) {
+				d.tracef("var-fold", "skip single-use-fold (side-effect reorder) ref=%s val=%s",
+					traceRef(ref, d.FunctionContext), traceValue(val, d.FunctionContext))
+				return true
 			}
 			rewriteIsOk := false
 			if sourceNode != nil && node != nil {

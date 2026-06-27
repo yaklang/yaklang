@@ -90,7 +90,11 @@ func TestCov_Loops(t *testing.T) {
 	assert.Contains(t, out, "continue")
 	assert.Contains(t, out, "break")
 	assert.Contains(t, out, "LOOP_1:")
-	assert.Contains(t, out, "continue LOOP_1")
+	// breakWithLabel is a `break outer` 2D search: a match sets the result and escapes BOTH loops.
+	// This used to be mis-structured (the match emitted a plain inner `break`, so the outer loop kept
+	// scanning and overwrote the result, and one branch span an infinite loop). It now correctly emits
+	// `break LOOP_1`. Labeled-continue (`continue LOOP_1`) remains covered by decompiler.TestNestedLoop.
+	assert.Contains(t, out, "break LOOP_1")
 }
 
 func TestCov_ComplexSwitch(t *testing.T) {

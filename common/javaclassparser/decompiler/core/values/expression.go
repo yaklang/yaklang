@@ -420,6 +420,7 @@ func coerceBooleanArgument(arg JavaValue) JavaValue {
 				return NewJavaLiteral(iv, types.NewJavaPrimer(types.JavaBoolean))
 			}
 		}
+		return arg
 	case *TernaryExpression:
 		if v == nil {
 			return arg
@@ -427,6 +428,24 @@ func coerceBooleanArgument(arg JavaValue) JavaValue {
 		coerced := NewTernaryExpression(v.Condition, coerceBooleanArgument(v.TrueValue), coerceBooleanArgument(v.FalseValue))
 		coerced.ConditionFromOp = v.ConditionFromOp
 		return coerced
+	}
+	// Any OTHER int-typed value reaching a boolean parameter is a boolean held as an int (the JVM has
+	// no boolean storage: a boolean local is stored/reloaded with istore/iload, and javac materializes
+	// a boolean value via iconst_0/iconst_1). Java forbids the implicit int->boolean conversion, so a
+	// plain `int` local/expression flowing into a boolean parameter fails to recompile ("incompatible
+	// types: int cannot be converted to boolean"). Render an explicit `(v) != (0)`, which is the exact
+	// boolean meaning of the 0/1 int. Values already typed boolean (comparisons, predicate calls,
+	// boolean refs) keep their boolean type, so they are left untouched and we never emit an illegal
+	// `(a > b) != (0)`.
+	if at := arg.Type(); at != nil {
+		if prim, ok := primerRawType(at); ok && prim.Name == types.JavaInteger {
+			inner := arg
+			return NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+				return fmt.Sprintf("(%s) != (0)", inner.String(funcCtx))
+			}, func() types.JavaType {
+				return types.NewJavaPrimer(types.JavaBoolean)
+			})
+		}
 	}
 	return arg
 }

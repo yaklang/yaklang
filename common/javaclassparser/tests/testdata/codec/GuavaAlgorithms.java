@@ -150,10 +150,21 @@ public class GuavaAlgorithms {
     }
 
     public static long remainderUnsigned(long dividend, long divisor) {
-        // rem = dividend - (dividend / divisor) * divisor, all unsigned; correct in two's complement.
-        // (Expressed via divideUnsigned instead of an inlined `if (x>=0) {simple} ...complex` ladder,
-        // which trips a known decompiler branch-body-swap defect - see CODEC_TODO.md.)
-        return dividend - divideUnsigned(dividend, divisor) * divisor;
+        // Natural inlined `if (x>=0) {simple} ...complex` ladder (Guava UnsignedLongs.remainder).
+        // The branch-body-swap defect (CODEC_TODO.md Bug E/F/I) is fixed, so this no longer inverts.
+        if (divisor < 0) {
+            if (compareUnsigned(dividend, divisor) < 0) {
+                return dividend;
+            } else {
+                return dividend - divisor;
+            }
+        }
+        if (dividend >= 0) {
+            return dividend % divisor;
+        }
+        long quotient = ((dividend >>> 1) / divisor) << 1;
+        long rem = dividend - quotient * divisor;
+        return rem - (compareUnsigned(rem, divisor) >= 0 ? divisor : 0);
     }
 
     // ===== Guava LongMath =====

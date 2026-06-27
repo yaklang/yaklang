@@ -54,6 +54,14 @@ type OpCode struct {
 	// because the side effect is folded into the `x++` / `x--` expression left on the stack,
 	// keeping ternary/expression branches side-effect-free so they can be structured.
 	SelfOpFolded bool
+	// IincFoldedToPostOp marks an `iinc` that has been folded into a post-increment / decrement
+	// expression (`i++` / `i--`) left on the operand stack, because javac emitted `iload X; iinc X`
+	// (the loaded OLD value is still live when the iinc runs -> a post-op used inside an expression
+	// such as `a[i++] = v`, `int j = i++`, `return i++`). When set, statement generation skips the
+	// standalone `i++` statement; emitting it would increment BEFORE the use and change semantics
+	// (the historical `i++; a[i] = v` bug). Pre-increment (`iinc X; iload X`) has no live load at
+	// iinc time, so it is NOT marked and correctly stays `i = i + 1; ... use i`.
+	IincFoldedToPostOp bool
 }
 type CatchNode struct {
 	ExceptionTypeIndex uint16

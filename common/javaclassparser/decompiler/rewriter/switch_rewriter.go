@@ -156,9 +156,54 @@ func SwitchRewriter1(manager *RewriteManager, node *core.Node) error {
 	var mergeNode *core.Node
 	if len(endNodes) == 1 {
 		mergeNode = endNodes[0]
+	}
+	// Bug K: an EMPTY `default` whose target is the switch's natural exit/merge point. When no
+	// dominated non-start node was found as the merge (endNodes empty), the default's target node may
+	// itself BE the post-switch merge: every case body `break`s (goto) to it and the default/no-match
+	// edge falls straight through to it with no default body of its own. Because that node is the
+	// default's "start node" it was excluded from the merge search, so the old fallback treated it as
+	// the default BODY, dropped every case `break` (all cases fell through), and absorbed the
+	// post-switch code into `default:` (Base32 decode length miscomputed). Detect it precisely: the
+	// default target is a CONVERGENCE point reached by TWO OR MORE distinct case bodies inside the
+	// switch region (each case `break`s/`goto`s to it). A real default body, in contrast, is reached
+	// by at most ONE in-switch predecessor (the single case that falls through into it) plus the
+	// switch's own default edge - so requiring >=2 in-switch predecessors avoids misclassifying
+	// fall-through-into-default (case3 -> default body -> end) as the merge. An empty `default: break;`
+	// is equivalent to no default, so we promote that convergence node to the real merge - the unified
+	// break-insertion below then gives every case an explicit `break` and the post-switch code is
+	// emitted after the switch.
+	if mergeNode == nil {
+		if defNode := caseMap.GetMust(-1); defNode != nil {
+			// Count case bodies that UNCONDITIONALLY break (goto) to the default target: an in-switch
+			// predecessor whose ONLY successor is the default target. Requiring an unconditional jump
+			// excludes the String-switch shape (a hashCode lookupswitch whose equals blocks reach the
+			// second dispatch switch via CONDITIONAL `ifeq` nodes that have two successors, and which
+			// must FALL THROUGH into that second switch rather than `break`); promoting/dropping there
+			// would strip the dispatch and make every case return the default.
+			breakingPreds := 0
+			for _, src := range defNode.Source {
+				if src == node || !slices.Contains(manager.DominatorMap[node], src) {
+					continue
+				}
+				if len(src.Next) == 1 && src.Next[0] == defNode {
+					breakingPreds++
+				}
+			}
+			if breakingPreds >= 2 {
+				mergeNode = defNode
+				node.SwitchEmptyDefaultMerge = true
+			}
+		}
+	}
+	if mergeNode != nil {
 		allSources := slices.Clone(mergeNode.Source)
 		mergeNode.RemoveAllSource()
 		for _, source := range allSources {
+			// The switch's own default/no-match edge into the merge needs no `break` leaf; only real
+			// case bodies that fall/jump out of the switch get an explicit break.
+			if source == node {
+				continue
+			}
 			breakNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 				return "break"
 			}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
@@ -283,6 +328,13 @@ func SwitchRewriter(manager *RewriteManager, node *core.Node) error {
 			continue
 		}
 		caseItem.IsDefault = v == math.MaxInt
+		// Bug K: an empty default promoted to the switch merge (SwitchRewriter1). Its start node IS
+		// the post-switch merge, already wired as the switch's successor above. Drop the default case
+		// entirely (`default: break;` is equivalent to no default) so the merge code is emitted AFTER
+		// the switch instead of being walked into the default body.
+		if caseItem.IsDefault && node.SwitchEmptyDefaultMerge && startNode == node.MergeNode {
+			continue
+		}
 		if caseItem.IsDefault {
 			switchNode.RemoveNext(startNode)
 		}

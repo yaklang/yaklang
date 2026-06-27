@@ -32,6 +32,11 @@ const loopBatterySource = `public class LoopBattery {
     static int foreachLike(int n){ int[] a=new int[n]; for(int i=0;i<n;i++){ a[i]=i*3; } int s=0; for(int x:a){ s+=x; } return s; }
     static int triNested(int n){ int s=0; for(int i=0;i<n;i++){ for(int j=0;j<n;j++){ for(int k=0;k<n;k++){ s++; } } } return s; }
     static int mixedContinueBreak(int n){ int s=0,i=0; while(i<n){ i++; if(i%3==0){ continue; } if(i>n-1){ break; } s+=i; } return s; }
+    // loop immediately followed by a ternary return over the loop variable: the loop's exit edge
+    // flows straight into the consumed ternary condition. Folding that condition into the return must
+    // not reorder the loop header's exit/body successors (Bug N: loop polarity inversion).
+    static int gcd(int a,int b){ while(b!=0){ int t=b; b=a%b; a=t; } return a<0?-a:a; }
+    static int loopThenTernary(int n){ int s=0,i=0; while(i<n){ s+=i; i++; } return s>10?s:-s; }
 
     public static void main(String[] a){
         StringBuilder sb=new StringBuilder();
@@ -47,7 +52,11 @@ const loopBatterySource = `public class LoopBattery {
         sb.append(bigSum(10)).append(",");
         sb.append(foreachLike(6)).append(",");
         sb.append(triNested(4)).append(",");
-        sb.append(mixedContinueBreak(10));
+        sb.append(mixedContinueBreak(10)).append(",");
+        sb.append(gcd(48,36)).append(",");
+        sb.append(gcd(-48,36)).append(",");
+        sb.append(loopThenTernary(6)).append(",");
+        sb.append(loopThenTernary(3));
         System.out.println(sb.toString());
     }
 }`

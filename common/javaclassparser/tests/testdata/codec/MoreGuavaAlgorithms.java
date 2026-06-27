@@ -256,12 +256,13 @@ public class MoreGuavaAlgorithms {
         sb.append(',');
         for (int i = 0; i < ul.length; i++) {
             for (int j = 0; j < ul.length; j++) {
-                // Positive guard rather than `if (ul[j] == 0) continue;`. The continue form inverted
-                // here (ran the body when the divisor was 0 -> ArithmeticException) inside the second
-                // of two sibling nested loops over the same array; see CODEC_TODO.md "Bug L".
-                if (ul[j] != 0L) {
-                    sb.append(bit(unsignedLongDivide(ul[i], ul[j]) == Long.divideUnsigned(ul[i], ul[j])));
+                // Natural `if (x == 0) continue;` guard (Bug L fixed, same polarity family as Bug N):
+                // the continue-guard no longer inverts inside the second of two sibling nested loops
+                // over the same array. See CODEC_TODO.md "Bug L".
+                if (ul[j] == 0L) {
+                    continue;
                 }
+                sb.append(bit(unsignedLongDivide(ul[i], ul[j]) == Long.divideUnsigned(ul[i], ul[j])));
             }
         }
         sb.append(',');

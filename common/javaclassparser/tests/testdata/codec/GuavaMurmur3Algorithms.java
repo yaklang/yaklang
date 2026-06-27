@@ -9,8 +9,8 @@ package codec;
  *   - int multiply/xor with NEGATIVE 0x-prefixed constants (c1=0xcc9e2d51, c2=0x1b873593) exercising
  *     iconst/ldc + imul + ixor and two's-complement wraparound,
  *   - rotate-left built from `(x << r) | (x >>> (32 - r))` exercising ishl + iushr (UNSIGNED shift) + ior,
- *   - a `len & 3` tail guard chain (rem >= 3 / >= 2 / >= 1) reproducing Murmur3's descending tail mix
- *     via if-branches (the canonical descending switch fall-through is a known decompiler limitation),
+ *   - the canonical `switch (len & 3)` tail with DESCENDING-value fall-through (case 3 -> 2 -> 1, no
+ *     breaks) and a post-switch finalizer, pinning correct fall-through direction + merge folding,
  *   - the fmix finalizer's `h ^= h >>> 16` chains exercising iushr again, and
  *   - little-endian block assembly from signed bytes via `b & 0xff` (iand) and `<< 8/16/24`.
  *
@@ -21,6 +21,10 @@ public class GuavaMurmur3Algorithms {
 
     private static final int C1 = 0xcc9e2d51;
     private static final int C2 = 0x1b873593;
+
+    // 128-bit (x64) mixing constants; long-typed so the k1/k2 tail accumulators stay long.
+    private static final long C1_128 = 0x87c37b91114253d5L;
+    private static final long C2_128 = 0x4cf5ad432745937fL;
 
     private static int rotl32(int x, int r) {
         return (x << r) | (x >>> (32 - r));
@@ -66,22 +70,20 @@ public class GuavaMurmur3Algorithms {
 
         int tail = nblocks * 4;
         int k1 = 0;
-        int rem = len & 3;
-        // NOTE: the canonical Murmur3 tail is a `switch (len & 3)` with DESCENDING-value fall-through
-        // (case 3 -> case 2 -> case 1). The decompiler currently re-orders switch cases ascending by
-        // value, which inverts fall-through direction (a separate switch-structuring limitation, see
-        // switch_rewriter.go), so the round-trip is expressed here as the semantically identical guard
-        // chain. It still computes the exact same digest and exercises iushr/ishl/iand/imul/ixor.
-        if (rem >= 3) {
-            k1 = k1 ^ ((data[tail + 2] & 0xff) << 16);
-        }
-        if (rem >= 2) {
-            k1 = k1 ^ ((data[tail + 1] & 0xff) << 8);
-        }
-        if (rem >= 1) {
-            k1 = k1 ^ (data[tail] & 0xff);
-            k1 = mixK1(k1);
-            h1 = h1 ^ k1;
+        // The canonical Murmur3 tail: a `switch (len & 3)` with DESCENDING-value fall-through
+        // (case 3 -> case 2 -> case 1, no breaks), with the post-switch finalizer running after the
+        // case-1 fall-out as well as for len&3==0. This is the exact shape that previously forced the
+        // guard-chain workaround; the decompiler now preserves descending fall-through and folds the
+        // post-switch code correctly, so the natural switch is restored as live regression coverage.
+        switch (len & 3) {
+            case 3:
+                k1 = k1 ^ ((data[tail + 2] & 0xff) << 16);
+            case 2:
+                k1 = k1 ^ ((data[tail + 1] & 0xff) << 8);
+            case 1:
+                k1 = k1 ^ (data[tail] & 0xff);
+                k1 = mixK1(k1);
+                h1 = h1 ^ k1;
         }
 
         return fmix32(h1, len);
@@ -104,6 +106,115 @@ public class GuavaMurmur3Algorithms {
         k = k * 0xc4ceb9fe1a85ec53L;
         k = k ^ (k >>> 33);
         return k;
+    }
+
+    private static long rotl64(long x, int r) {
+        return (x << r) | (x >>> (64 - r));
+    }
+
+    private static long getLongLE(byte[] data, int index) {
+        long r = 0;
+        for (int i = 0; i < 8; i++) {
+            r = r | (((long) (data[index + i] & 0xff)) << (8 * i));
+        }
+        return r;
+    }
+
+    // Murmur3 128-bit (x64). The body loop reads two LONG lanes (k1, k2) per 16-byte block via an INT
+    // index, and the tail is a 16-arm `switch (len & 15)` with descending fall-through that mixes the
+    // remaining bytes (indexed by an INT offset `tail`) into the two LONG accumulators. This is the
+    // exact long-accumulator / int-subscript co-residency that previously merged into one cross-typed
+    // variable (a long used as an array subscript -> "possible lossy conversion from long to int").
+    // The differential round-trip over every tail length (len & 15 in 0..15) pins that the int offset
+    // and the long lanes stay distinct, correctly-typed variables.
+    static long murmur3_128(byte[] data, int seed) {
+        int len = data.length;
+        int nblocks = len / 16;
+        long h1 = seed & 0xffffffffL;
+        long h2 = seed & 0xffffffffL;
+
+        for (int i = 0; i < nblocks; i++) {
+            long k1 = getLongLE(data, i * 16);
+            long k2 = getLongLE(data, i * 16 + 8);
+
+            k1 = k1 * C1_128;
+            k1 = rotl64(k1, 31);
+            k1 = k1 * C2_128;
+            h1 = h1 ^ k1;
+            h1 = rotl64(h1, 27);
+            h1 = h1 + h2;
+            h1 = h1 * 5 + 0x52dce729;
+
+            k2 = k2 * C2_128;
+            k2 = rotl64(k2, 33);
+            k2 = k2 * C1_128;
+            h2 = h2 ^ k2;
+            h2 = rotl64(h2, 31);
+            h2 = h2 + h1;
+            h2 = h2 * 5 + 0x38495ab5;
+        }
+
+        long k1 = 0;
+        long k2 = 0;
+        int tail = nblocks * 16;
+        switch (len & 15) {
+            case 15:
+                k2 = k2 ^ (((long) (data[tail + 14] & 0xff)) << 48);
+            case 14:
+                k2 = k2 ^ (((long) (data[tail + 13] & 0xff)) << 40);
+            case 13:
+                k2 = k2 ^ (((long) (data[tail + 12] & 0xff)) << 32);
+            case 12:
+                k2 = k2 ^ (((long) (data[tail + 11] & 0xff)) << 24);
+            case 11:
+                k2 = k2 ^ (((long) (data[tail + 10] & 0xff)) << 16);
+            case 10:
+                k2 = k2 ^ (((long) (data[tail + 9] & 0xff)) << 8);
+            case 9:
+                k2 = k2 ^ ((long) (data[tail + 8] & 0xff));
+                k2 = k2 * C2_128;
+                k2 = rotl64(k2, 33);
+                k2 = k2 * C1_128;
+                h2 = h2 ^ k2;
+            case 8:
+                k1 = k1 ^ (((long) (data[tail + 7] & 0xff)) << 56);
+            case 7:
+                k1 = k1 ^ (((long) (data[tail + 6] & 0xff)) << 48);
+            case 6:
+                k1 = k1 ^ (((long) (data[tail + 5] & 0xff)) << 40);
+            case 5:
+                k1 = k1 ^ (((long) (data[tail + 4] & 0xff)) << 32);
+            case 4:
+                k1 = k1 ^ (((long) (data[tail + 3] & 0xff)) << 24);
+            case 3:
+                k1 = k1 ^ (((long) (data[tail + 2] & 0xff)) << 16);
+            case 2:
+                k1 = k1 ^ (((long) (data[tail + 1] & 0xff)) << 8);
+            case 1:
+                k1 = k1 ^ ((long) (data[tail] & 0xff));
+                k1 = k1 * C1_128;
+                k1 = rotl64(k1, 31);
+                k1 = k1 * C2_128;
+                h1 = h1 ^ k1;
+        }
+
+        h1 = h1 ^ len;
+        h2 = h2 ^ len;
+        h1 = h1 + h2;
+        h2 = h2 + h1;
+        h1 = fmix64(h1);
+        h2 = fmix64(h2);
+        h1 = h1 + h2;
+        h2 = h2 + h1;
+        return h1 ^ h2;
+    }
+
+    static long murmur3_128(String s, int seed) {
+        byte[] data = new byte[s.length()];
+        for (int i = 0; i < s.length(); i++) {
+            data[i] = (byte) s.charAt(i);
+        }
+        return murmur3_128(data, seed);
     }
 
     private static String hex8(int v) {
@@ -141,6 +252,22 @@ public class GuavaMurmur3Algorithms {
         long[] seeds = {0L, 1L, -1L, 0x0123456789abcdefL, 0xdeadbeefcafebabeL};
         for (int i = 0; i < seeds.length; i++) {
             sb.append(hex16(fmix64(seeds[i]))).append(';');
+        }
+        sb.append(',');
+
+        // Cover every tail length (len & 15 in 0..15) so all 16 switch fall-through arms of the
+        // long-accumulator tail run, plus inputs longer than one 16-byte block for the body loop.
+        String[] m128Inputs = {
+                "", "a", "ab", "abc", "abcd", "abcde", "abcdef", "abcdefg",
+                "abcdefgh", "abcdefghi", "0123456789", "0123456789a", "0123456789ab",
+                "0123456789abc", "0123456789abcd", "0123456789abcde", "0123456789abcdef",
+                "the quick brown fox jumps over the lazy dog"
+        };
+        for (int i = 0; i < m128Inputs.length; i++) {
+            sb.append(hex16(murmur3_128(m128Inputs[i], 0)));
+            sb.append('/');
+            sb.append(hex16(murmur3_128(m128Inputs[i], 0x9747b28c)));
+            sb.append(';');
         }
 
         System.out.println(sb);

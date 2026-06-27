@@ -22,7 +22,14 @@ type Node struct {
 	IsCircle            bool
 	IsMerge             bool
 	IsIf                bool
-	IsTryCatch          bool
+	// SwitchEmptyDefaultMerge marks a switch node whose `default` target was found to be the switch's
+	// own post-switch merge point (an EMPTY `default: break;` reached by >=2 case bodies that break to
+	// it). SwitchRewriter uses it to DROP the default case (equivalent to no default) and emit the
+	// merge code after the switch, instead of absorbing it as the default body and dropping the case
+	// `break`s (Bug K). It is NOT set for the ordinary fallback where the default genuinely owns the
+	// body (e.g. fall-through-into-default), so that case is structured unchanged.
+	SwitchEmptyDefaultMerge bool
+	IsTryCatch              bool
 	// IsCatchStart marks a node that is the entry of an exception handler (catch / finally-desugar)
 	// block, set when the try node is built from the exception table. TryRewriter uses it to classify
 	// a try node's successors structurally instead of inferring the handler from its body's first

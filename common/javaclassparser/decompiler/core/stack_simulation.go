@@ -1,6 +1,8 @@
 package core
 
 import (
+	"os"
+
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/values"
@@ -116,6 +118,21 @@ func (s *StackSimulationImpl) AssignVar(slot int, val values.JavaValue) (*values
 		if ref.IsNullInitialized() {
 			if _, isPrim := typ.RawType().(*types.JavaPrimer); !isPrim {
 				ref.ResetVarType(typ)
+				return ref, false
+			}
+		}
+		// A method parameter reassigned with a reference-typed value (`seq = str` where seq is a
+		// CharSequence param and str is a String subtype) is the SAME variable being reassigned, not
+		// a slot reused for a new local. Splitting it minted a fresh block-scoped ref whose
+		// declaration sat inside the conditional that performed the reassignment, so a later read of
+		// the slot referenced an out-of-scope name ("cannot find symbol", guava Ascii.truncate). Keep
+		// the parameter as one variable (its broader declared type still accepts the subtype). Limit
+		// to reference types on both sides: a parameter slot genuinely repurposed for a different
+		// primitive category must still split. Kill-switch: JDEC_PARAM_REASSIGN_SPLIT=1.
+		if ref.IsParam && !ref.IsThis && os.Getenv("JDEC_PARAM_REASSIGN_SPLIT") == "" {
+			_, refPrim := ref.Type().RawType().(*types.JavaPrimer)
+			_, valPrim := typ.RawType().(*types.JavaPrimer)
+			if !refPrim && !valPrim {
 				return ref, false
 			}
 		}

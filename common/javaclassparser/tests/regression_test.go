@@ -312,6 +312,279 @@ func TestDecompileLoopControlFlow(t *testing.T) {
 	}
 }
 
+// TestDecompileLoopThenTernaryReturn guards Bug N: a `while` loop whose exit edge flows directly into
+// a consumed ternary return (`while(b!=0){...} return a<0 ? -a : a`, the classic gcd shape). The
+// ternary condition is collapsed (its value folded into the return) by the callback-collapse pass,
+// which spliced the collapsed node's successors into the predecessor with a remove-then-append
+// rewiring. When the predecessor is the loop header itself, append reordered its [exit, body]
+// successors to [body, exit], inverting the loop polarity: the decompiled output guarded `break` with
+// `b != 0` (so the very first b becomes the divisor of `a % 0` -> ArithmeticException) instead of
+// guarding `continue`. The fix uses ReplaceNextSliceKeepOrder so the splice preserves successor
+// order. This is a javac-free structural guard; the executable round-trip lives in the gcd/
+// loopThenTernary cases of TestLoopSemanticsRoundTrip.
+func TestDecompileLoopThenTernaryReturn(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/loop_then_ternary_return.class")
+	if err != nil {
+		t.Fatalf("read embedded class failed: %v", err)
+	}
+	source, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile failed: %v", err)
+	}
+	if _, ferr := java2ssa.Frontend(source); ferr != nil {
+		t.Fatalf("frontend parse failed: %v\n----- source -----\n%s", ferr, source)
+	}
+	if strings.Contains(source, "yak-decompiler") {
+		t.Fatalf("expected full decompilation, got a stub\n----- source -----\n%s", source)
+	}
+
+	// Whitespace-insensitive view so the assertions do not depend on indentation/formatting.
+	compact := strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(source)
+
+	// The loop condition (b != 0) must guard the loop BODY (the modulo step / continue), not break.
+	// The inverted (buggy) polarity rendered `if((var1)!=(0)){break;`, which is the exact corruption.
+	if strings.Contains(compact, "!=(0)){break;") {
+		t.Fatalf("loop polarity inverted: `b != 0` guards break instead of the loop body (Bug N regression)\n----- source -----\n%s", source)
+	}
+	// The modulo back-edge step must sit on the b!=0 branch (loop body), proving the body is taken
+	// while b is non-zero.
+	if !strings.Contains(compact, "%(var1)") {
+		t.Fatalf("loop body modulo step missing; loop structure corrupted\n----- source -----\n%s", source)
+	}
+	// The ternary return sign must be preserved: `a < 0 ? -a : a`.
+	if !strings.Contains(compact, "?(-var0):(var0)") {
+		t.Fatalf("ternary return arms corrupted (expected `a<0 ? -a : a`)\n----- source -----\n%s", source)
+	}
+}
+
+// TestDecompileGuardTrailingWhileReturn guards Bug H: a `while(cond){i++}` loop immediately followed
+// by `return i==n`. This is the same control-flow-polarity family as Bug N (a loop whose exit edge
+// flows into a consumed condition/return); before the callback-collapse order-preserving splice fix
+// it inverted the loop body and exit, turning `while(p<len && pat[p]=='*') p++;` into an infinite
+// self-increment that overflows the index. The repro is the Spring AntPathMatcher `matchStrings`
+// tail. javac-free structural guard; the executable round-trip lives in SpringAlgorithms.matchStrings.
+func TestDecompileGuardTrailingWhileReturn(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/guard_trailing_while_return.class")
+	if err != nil {
+		t.Fatalf("read embedded class failed: %v", err)
+	}
+	source, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile failed: %v", err)
+	}
+	if _, ferr := java2ssa.Frontend(source); ferr != nil {
+		t.Fatalf("frontend parse failed: %v\n----- source -----\n%s", ferr, source)
+	}
+	if strings.Contains(source, "yak-decompiler") {
+		t.Fatalf("expected full decompilation, got a stub\n----- source -----\n%s", source)
+	}
+	compact := strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(source)
+	// The loop guard (p<len && pat[p]=='*') must guard the loop BODY (var2++ / continue), not break.
+	// The inverted polarity rendered the matching branch as `break`, which the fix forbids.
+	if strings.Contains(compact, "42)){break;") {
+		t.Fatalf("trailing-while loop polarity inverted: match guards break instead of increment (Bug H regression)\n----- source -----\n%s", source)
+	}
+	// The increment must remain inside the loop body.
+	if !strings.Contains(compact, "var2++") {
+		t.Fatalf("loop increment missing from body; loop structure corrupted\n----- source -----\n%s", source)
+	}
+	// The final exit comparison must be preserved.
+	if !strings.Contains(compact, "(var2)==(var1)") {
+		t.Fatalf("loop exit comparison corrupted (expected `p == len`)\n----- source -----\n%s", source)
+	}
+}
+
+// TestDecompileGuardIfNotThrowBody guards Bug E/F/I: an `if (!cond) throw ...;` guard followed by a
+// larger sequential body. Before the polarity fix the decompiler swapped the throw arm and the body
+// relative to the condition (throwing when cond was true). This is the same branch-polarity family as
+// Bug N/H. The throw must stay on the `x < 0` branch and the body on the fall-through branch. The
+// executable round-trip is exercised by GuavaAlgorithms/SpringAlgorithms guard ladders.
+func TestDecompileGuardIfNotThrowBody(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/guard_ifnot_throw_body.class")
+	if err != nil {
+		t.Fatalf("read embedded class failed: %v", err)
+	}
+	source, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile failed: %v", err)
+	}
+	if _, ferr := java2ssa.Frontend(source); ferr != nil {
+		t.Fatalf("frontend parse failed: %v\n----- source -----\n%s", ferr, source)
+	}
+	if strings.Contains(source, "yak-decompiler") {
+		t.Fatalf("expected full decompilation, got a stub\n----- source -----\n%s", source)
+	}
+	// The throw must be guarded by the negative check (x < 0), not by its negation. We locate the
+	// `throw` and verify the nearest enclosing condition mentions `< (0)` (i.e. the guard was not
+	// inverted to throw on the valid x >= 0 path).
+	idxThrow := strings.Index(source, "throw new IllegalArgumentException")
+	if idxThrow < 0 {
+		t.Fatalf("throw statement missing\n----- source -----\n%s", source)
+	}
+	prefix := source[:idxThrow]
+	idxCond := strings.LastIndex(prefix, "if (")
+	if idxCond < 0 {
+		t.Fatalf("no enclosing if for throw\n----- source -----\n%s", source)
+	}
+	guard := source[idxCond:idxThrow]
+	if !strings.Contains(guard, "< (0)") {
+		t.Fatalf("guard polarity inverted: throw is not guarded by `x < 0` (Bug E/F/I regression)\n----- guard -----\n%s\n----- source -----\n%s", guard, source)
+	}
+}
+
+// TestDecompileNestedLoopContinueGuard guards Bug L: an `if (x == 0L) continue;` guard inside the
+// inner of two sibling nested loops over the same array. Before the polarity fix the guard inverted
+// (running the divide body when the divisor was zero -> ArithmeticException). Same control-flow
+// polarity family as Bug N. The zero check must guard an EMPTY (continue) branch and the divide must
+// sit on the else/fall-through branch. The executable round-trip lives in MoreGuavaAlgorithms.
+func TestDecompileNestedLoopContinueGuard(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/nested_loop_continue_guard.class")
+	if err != nil {
+		t.Fatalf("read embedded class failed: %v", err)
+	}
+	source, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile failed: %v", err)
+	}
+	if _, ferr := java2ssa.Frontend(source); ferr != nil {
+		t.Fatalf("frontend parse failed: %v\n----- source -----\n%s", ferr, source)
+	}
+	if strings.Contains(source, "yak-decompiler") {
+		t.Fatalf("expected full decompilation, got a stub\n----- source -----\n%s", source)
+	}
+	compact := strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(source)
+	// The divide must NOT sit directly on the `== 0L` true-branch (that would divide by zero). The
+	// inverted polarity produced `if((var0[..])==(0L)){ ...division... }`; the fix keeps the division
+	// off the zero branch (empty/continue then-body, division in else).
+	if regexp.MustCompile(`==\(0L\)\)\{[^}]*\)/\(`).MatchString(compact) {
+		t.Fatalf("nested-loop continue guard inverted: division on the `== 0` branch (Bug L regression)\n----- source -----\n%s", source)
+	}
+	// The division by the guarded element must still be present (loop body preserved).
+	if !strings.Contains(compact, ")/(var0[var4])") {
+		t.Fatalf("loop body division missing; structure corrupted\n----- source -----\n%s", source)
+	}
+}
+
+// TestDecompileArrayPostIncrementIndex guards the post-increment-in-expression bug ("arr[i++]=v"):
+// javac compiles `a[i++] = v` as `iload X; iinc X; ...`, so the OLD index is still live on the
+// operand stack when the iinc runs. The decompiler used to emit the standalone increment BEFORE the
+// store (`i++; a[i] = v`), shifting every index by one (wrong values / out-of-bounds). The fix folds
+// the iinc into a post-increment expression on the index so the store reads `a[i++] = v`. Executable
+// round-trip coverage lives in PostIncrementAlgorithms; this is the javac-free CI guard.
+func TestDecompileArrayPostIncrementIndex(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/array_post_increment_index.class")
+	if err != nil {
+		t.Fatalf("read embedded class failed: %v", err)
+	}
+	source, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile failed: %v", err)
+	}
+	if _, ferr := java2ssa.Frontend(source); ferr != nil {
+		t.Fatalf("frontend parse failed: %v\n----- source -----\n%s", ferr, source)
+	}
+	if strings.Contains(source, "yak-decompiler") {
+		t.Fatalf("expected full decompilation, got a stub\n----- source -----\n%s", source)
+	}
+	compact := strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(source)
+	// The index must be post-incremented inside the array store: `var0[var1++] = 10`.
+	if !strings.Contains(compact, "var0[var1++]=10") {
+		t.Fatalf("array store did not fold the post-increment index (expected `var0[var1++] = 10`)\n----- source -----\n%s", source)
+	}
+	// The buggy form hoists the increment before the store: `var1++; var0[var1] = 10`. Forbid it.
+	if strings.Contains(compact, "var1++;var0[var1]=10") {
+		t.Fatalf("post-increment hoisted before the array store (arr[i++] regression)\n----- source -----\n%s", source)
+	}
+}
+
+// TestDecompileConsumedCompoundAssign guards Bug J: a compound assignment whose RESULT VALUE IS
+// CONSUMED (`int r = (a[i] += 3)` / `long r = (a[i] += 3L)`). javac duplicates the freshly-computed
+// value with dup_x2 (int element) / dup2_x2 (long element) so it feeds BOTH the array store and the
+// consumer. The decompiler used to let the consumer resolve THROUGH the materialized shared temp down
+// to its defining expression, re-evaluating it AFTER the store and double-applying the operator
+// (`((a[i]+3)) * 1000` instead of `r * 1000`). Two adjacent defects were fixed: var-fold now stops at
+// dup-shared temps (resolveFoldValue), and OP_DUP2_X2 tracks its ref-fold callback per item (so the
+// duplicated category-2 value's two consumers register and the temp is not folded away). Executable
+// round-trip coverage lives in ConsumedCompoundAlgorithms; this is the javac-free CI guard.
+func TestDecompileConsumedCompoundAssign(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/consumed_compound_assign.class")
+	if err != nil {
+		t.Fatalf("read embedded class failed: %v", err)
+	}
+	source, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile failed: %v", err)
+	}
+	if _, ferr := java2ssa.Frontend(source); ferr != nil {
+		t.Fatalf("frontend parse failed: %v\n----- source -----\n%s", ferr, source)
+	}
+	if strings.Contains(source, "yak-decompiler") {
+		t.Fatalf("expected full decompilation, got a stub\n----- source -----\n%s", source)
+	}
+	compact := strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(source)
+	// The freshly computed value must be stored into a temp, the array element written from that temp,
+	// and the consumer must REFERENCE the temp (var2), not recompute the RHS.
+	if !strings.Contains(compact, "var0[var1]=var2") {
+		t.Fatalf("compound result temp not stored into the array element\n----- source -----\n%s", source)
+	}
+	if !strings.Contains(compact, "(var2)*(1000)") {
+		t.Fatalf("int consumer did not reference the shared temp `var2` (dup_x2 Bug J regression)\n----- source -----\n%s", source)
+	}
+	if !strings.Contains(compact, "(var2)*(1000L)") {
+		t.Fatalf("long consumer did not reference the shared temp `var2` (dup2_x2 Bug J regression)\n----- source -----\n%s", source)
+	}
+	// The buggy re-evaluation hoists the RHS into the consumer: `((a[i]+3)) * 1000`. Forbid both the
+	// int and the long shapes (the operator would be applied twice).
+	if strings.Contains(compact, "+(3))*(1000)") {
+		t.Fatalf("int consumer re-evaluated the compound RHS (dup_x2 Bug J regression)\n----- source -----\n%s", source)
+	}
+	if strings.Contains(compact, "+(3L))*(1000L)") {
+		t.Fatalf("long consumer re-evaluated the compound RHS (dup2_x2 Bug J regression)\n----- source -----\n%s", source)
+	}
+}
+
+// TestDecompileEmptyDefaultSwitchMerge guards Bug K: a switch with an EMPTY `default: break;` whose
+// target coincides with the switch's natural post-switch merge point. Every matched case `break`s
+// (goto) to the same node the empty default falls through to, so that node is BOTH the default's
+// "start" and the real merge. The old merge detection excluded it (it is a case start), fell back to
+// treating it as the default BODY, dropped every case `break` (all cases fell through), and absorbed
+// the post-switch code into `default:` (Base32 decode length miscomputed). The fix promotes that
+// convergence node (reached by >=2 case bodies via unconditional break) to the real merge, drops the
+// empty default, and emits the post-switch code after the switch. Covers both tableswitch (dense) and
+// lookupswitch (sparse). Executable round-trip lives in SwitchFallthroughAlgorithms.
+func TestDecompileEmptyDefaultSwitchMerge(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/switch_empty_default_merge.class")
+	if err != nil {
+		t.Fatalf("read embedded class failed: %v", err)
+	}
+	source, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile failed: %v", err)
+	}
+	if _, ferr := java2ssa.Frontend(source); ferr != nil {
+		t.Fatalf("frontend parse failed: %v\n----- source -----\n%s", ferr, source)
+	}
+	if strings.Contains(source, "yak-decompiler") {
+		t.Fatalf("expected full decompilation, got a stub\n----- source -----\n%s", source)
+	}
+	compact := strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(source)
+	// Each case must keep its `break`, and the post-switch code must follow the switch close `}`.
+	if !strings.Contains(compact, "case2:var2++;break;") {
+		t.Fatalf("tableswitch empty-default: case break dropped (Bug K regression)\n----- source -----\n%s", source)
+	}
+	if !strings.Contains(compact, "break;}return((var2)*(10))+(var0);") {
+		t.Fatalf("tableswitch empty-default: post-switch code absorbed into default (Bug K regression)\n----- source -----\n%s", source)
+	}
+	if !strings.Contains(compact, "case5000000:") || !strings.Contains(compact, "break;}return((var2)*(7))+(var0);") {
+		t.Fatalf("lookupswitch empty-default: structure corrupted (Bug K regression)\n----- source -----\n%s", source)
+	}
+	// The empty `default: break;` is equivalent to no default and must be dropped; if it survives it
+	// is absorbing post-switch code (the exact bug).
+	if strings.Contains(compact, "default:") {
+		t.Fatalf("empty default was not dropped (still present, absorbing post-switch code)\n----- source -----\n%s", source)
+	}
+}
+
 // TestDecompileNegativeLiterals guards the bipush/sipush sign fix: the bipush operand is a signed
 // byte and the sipush operand a signed short, but they were read unsigned, so -5 (0xFB) decompiled
 // as 251 and -3000 (0xF448) as 62536. This is silent corruption the syntax net cannot catch (the
@@ -1352,5 +1625,130 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestDecompileBoolChainShortCircuitMerge locks the short-circuit boolean-materialization fix.
+//
+// Root cause: javac compiles `boolean u = (c>=A && c<=Z) || c==X || c==Y; if (u) {..} else {..}` into a
+// short-circuit chain that materializes u via the iconst_1/goto/iconst_0 idiom into a local slot, then
+// `iload; ifeq`. The value-merge ternary rebuilder (buildSharedLeafTernary) only climbed to the root
+// condition through SINGLE-source straight-line predecessors. The leading operand `(c>=A && c<=Z)` is a
+// compound `&&`, so the next ||-operand's load block has TWO predecessors (the &&-true jump and the
+// &&-false fall-through). The climb stopped there and peeled the range check into an OUTER if-statement
+// whose then-arm was EMPTY, burying the body and the shared loop increment in the else-arm. For any char
+// matching the range the loop then spun forever (no increment, empty arm) - a silent infinite loop that
+// ANTLR validation cannot catch.
+//
+// Fix: when the single-source climb stops at a multi-source reconvergence whose EVERY predecessor is a
+// clean ternary condition of this merge (the compound-operand shape), adopt the lowest-id enclosing
+// condition so the whole chain is rebuilt as one expression and the if/else has a single full condition.
+//
+// The structural invariant asserted here is rendering-independent (it holds whether the condition prints
+// as a nested ?: or folds to &&/||): there must be NO empty then-arm immediately followed by else (that
+// is the infinite-loop signature), and both append calls plus the loop increment must be present.
+func TestDecompileBoolChainShortCircuitMerge(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/bool_or_chain_short_circuit.class")
+	if err != nil {
+		t.Fatalf("read embedded class failed: %v", err)
+	}
+	source, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile failed: %v", err)
+	}
+	if strings.Contains(source, "yak-decompiler") {
+		t.Fatalf("expected full decompilation, got a stub\n----- source -----\n%s", source)
+	}
+	if _, ferr := java2ssa.Frontend(source); ferr != nil {
+		t.Fatalf("frontend parse failed: %v\n----- source -----\n%s", ferr, source)
+	}
+	// The bug signature: an if-statement whose then-arm is empty, immediately followed by else. With the
+	// fix the boolean is one condition and the then-arm holds the unreserved-char append, so this never
+	// matches.
+	emptyThenElse := regexp.MustCompile(`\)\s*\{\s*\}\s*else`)
+	if emptyThenElse.MatchString(source) {
+		t.Fatalf("empty then-arm followed by else (short-circuit boolean mis-merged -> infinite loop)\n----- source -----\n%s", source)
+	}
+	// Both branch effects and the loop increment must survive on a reachable path.
+	for _, must := range []string{"append((char)(var3))", "append((char)(37))"} {
+		if !strings.Contains(source, must) {
+			t.Fatalf("expected output to contain %q\n----- source -----\n%s", must, source)
+		}
+	}
+	if !regexp.MustCompile(`var\d+\+\+;`).MatchString(source) {
+		t.Fatalf("expected a loop increment statement to be present\n----- source -----\n%s", source)
+	}
+}
+
+// TestDecompileIntStoredBooleanArgCoercion guards the int->boolean argument coercion. The JVM has no
+// boolean storage: javac stores/reloads a boolean local with istore/iload and materializes its value
+// via iconst_0/iconst_1, so the decompiler types such a local as `int`. Passing it bare to a method
+// whose parameter is declared `boolean` fails to recompile ("incompatible types: int cannot be
+// converted to boolean"). coerceBooleanArgument now wraps a genuinely int-typed value flowing into a
+// boolean parameter as `(v) != (0)` (semantically exact: a boolean is int 0/1 on the stack) while
+// leaving already-boolean values untouched (never emitting the illegal `(a > b) != (0)`). This is a
+// behavior/recompile bug the ANTLR syntax safety net cannot catch, so we assert it structurally.
+func TestDecompileIntStoredBooleanArgCoercion(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/bool_int_to_boolean_arg.class")
+	if err != nil {
+		t.Fatalf("read embedded class failed: %v", err)
+	}
+	source, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile failed: %v", err)
+	}
+	if strings.Contains(source, javaclassparser.DecompileStubMarker) {
+		t.Fatalf("expected full decompilation, got a stub\n----- source -----\n%s", source)
+	}
+	if _, ferr := java2ssa.Frontend(source); ferr != nil {
+		t.Fatalf("frontend parse failed: %v\n----- source -----\n%s", ferr, source)
+	}
+	// The int-typed boolean local (prev) must be coerced at the boolean-parameter sink:
+	// pred(c, prev) -> pred(varX, (varY) != (0)). Without the coercion the bare int arg fails javac.
+	coerced := regexp.MustCompile(`pred\(var\d+,\s*\(var\d+\) != \(0\)\)`)
+	if !coerced.MatchString(source) {
+		t.Fatalf("expected int->boolean argument coercion `(v) != (0)` at the boolean-parameter call site\n----- source -----\n%s", source)
+	}
+	// Over-coercion guard: pred's own boolean parameter (var1) is already boolean and must NOT be
+	// wrapped (that would emit the illegal `boolean != int`). Its use in the short-circuit return
+	// stays bare.
+	if strings.Contains(source, "(var1) != (0)") {
+		t.Fatalf("boolean-typed value was wrongly coerced with `!= (0)` (over-coercion -> illegal boolean!=int)\n----- source -----\n%s", source)
+	}
+}
+
+// TestDecompileSwitchDescendingFallthrough guards descending-value `switch` fall-through (the Murmur3
+// finalization tail: `case 3: ...; case 2: ...; case 1: ...;` with no breaks). The cases intentionally
+// fall through in DESCENDING order; an earlier defect re-sorted switch cases ascending by label, which
+// inverts fall-through direction and silently corrupts the result (e.g. array out-of-bounds / wrong
+// digest) while still parsing as valid Java. We assert the case labels AND their bodies stay in
+// descending order so an ascending re-sort fails the build.
+func TestDecompileSwitchDescendingFallthrough(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/switch_descending_fallthrough.class")
+	if err != nil {
+		t.Fatalf("read embedded class failed: %v", err)
+	}
+	source, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile failed: %v", err)
+	}
+	if strings.Contains(source, javaclassparser.DecompileStubMarker) {
+		t.Fatalf("expected full decompilation, got a stub\n----- source -----\n%s", source)
+	}
+	if _, ferr := java2ssa.Frontend(source); ferr != nil {
+		t.Fatalf("frontend parse failed: %v\n----- source -----\n%s", ferr, source)
+	}
+	// Case labels must appear in descending order: case 3, then case 2, then case 1.
+	for _, seq := range [][2]string{{"case 3:", "case 2:"}, {"case 2:", "case 1:"}} {
+		a, b := strings.Index(source, seq[0]), strings.Index(source, seq[1])
+		if a < 0 || b < 0 || a >= b {
+			t.Fatalf("switch case labels not in descending order (%q before %q expected)\n----- source -----\n%s", seq[0], seq[1], source)
+		}
+	}
+	// Case BODIES must also stay in descending order: data[2] (case 3) before data[1] (case 2) before
+	// data[0] (case 1). An ascending re-sort would emit data[0] first, inverting fall-through.
+	i2, i1, i0 := strings.Index(source, "var0[2]"), strings.Index(source, "var0[1]"), strings.Index(source, "var0[0]")
+	if i2 < 0 || i1 < 0 || i0 < 0 || !(i2 < i1 && i1 < i0) {
+		t.Fatalf("descending fall-through bodies out of order (expected data[2] < data[1] < data[0])\n----- source -----\n%s", source)
 	}
 }

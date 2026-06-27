@@ -43,7 +43,14 @@ type RewriteManager struct {
 	TryNodes         []*core.Node
 	DominatorMap     map[*core.Node][]*core.Node
 	LabelId          int
-	visitedNodeSet   *utils.Set[*core.Node]
+	// LoopRegionReducible records whether the ORIGINAL method CFG (before any loop wrapping) is a
+	// reducible flow graph. It is computed once in Rewrite() because mid-pipeline the graph gains
+	// do-while wrapper nodes and rewrite-inserted break/continue edges that corrupt dominance, making a
+	// live-graph reducibility test unreliable. Pre-header pruning in the loop-exit search is enabled only
+	// for reducible methods; irreducible methods (e.g. ant CBZip2OutputStream.hbMakeCodeLengths) keep the
+	// legacy over-approximated body to avoid collapsing the loop.
+	LoopRegionReducible bool
+	visitedNodeSet      *utils.Set[*core.Node]
 	// Aggressive enables higher-risk structuring paths that only run during the
 	// gated second pass for methods that already failed conservative decompilation.
 	Aggressive bool
@@ -966,6 +973,9 @@ func (s *RewriteManager) Rewrite() error {
 	if err != nil {
 		return err
 	}
+	// Reducibility must be measured on the pristine CFG, before RebuildLoopNode introduces do-while
+	// wrapper nodes (Id 0) and later passes splice in break/continue edges — both distort dominance.
+	s.LoopRegionReducible = isReducibleCFG(s.RootNode, GenerateDominatorTree(s.RootNode))
 	err = RebuildLoopNode(s)
 	if err != nil {
 		return err

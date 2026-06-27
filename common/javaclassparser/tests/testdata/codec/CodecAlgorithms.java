@@ -368,21 +368,19 @@ public class CodecAlgorithms {
         int n = s.length();
         int outLen = n / 4 * 3 - pad;
         byte[] out = new byte[outLen];
-        // NOTE: deliberately uses explicit index arithmetic (out[o], out[o+1], ...) rather than the
-        // out[o++] post-increment idiom. The latter compiles to an `iinc` BETWEEN the array-index load
-        // and the iastore, which the decompiler currently reorders to `o++; out[o] = ...` (wrong
-        // index). That post-increment-array-index defect is tracked in CODEC_TODO.md for a later round;
-        // here we still exercise full base64 decoding without depending on that unfixed idiom.
+        // Natural post-increment array-index idiom (out[o++] = ...), exactly the commons-codec
+        // Base64/Base32 buffer-write style. This compiles to `iload o; iinc o; ...; iastore`, the
+        // very shape that used to be mis-reordered to `o++; out[o] = ...`; restored here as live
+        // coverage now that the decompiler folds it back into a post-increment expression.
         int o = 0;
         for (int i = 0; i < n; i += 4) {
             int c0 = inv[s.charAt(i)], c1 = inv[s.charAt(i+1)];
             int c2 = s.charAt(i+2) == '=' ? 0 : inv[s.charAt(i+2)];
             int c3 = s.charAt(i+3) == '=' ? 0 : inv[s.charAt(i+3)];
             int triple = (c0 << 18) | (c1 << 12) | (c2 << 6) | c3;
-            if (o < outLen) out[o] = (byte)(triple >>> 16);
-            if (o + 1 < outLen) out[o + 1] = (byte)(triple >>> 8);
-            if (o + 2 < outLen) out[o + 2] = (byte)triple;
-            o += 3;
+            out[o++] = (byte)(triple >>> 16);
+            if (o < outLen) out[o++] = (byte)(triple >>> 8);
+            if (o < outLen) out[o++] = (byte)triple;
         }
         return out;
     }

@@ -13,6 +13,9 @@ package codec;
  *   - ASCENDING fall-through with and without break.
  *   - a tableswitch (dense, consecutive cases) and a lookupswitch (sparse cases).
  *   - a `default` in the MIDDLE of the case list.
+ *   - an EMPTY `default: break;` whose target coincides with the switch's post-switch merge point
+ *     (Bug K): every case breaks to it, so the merge must be emitted after the switch and the breaks
+ *     preserved, rather than absorbing the post-switch code into `default:` and dropping the breaks.
  *   - NESTED switches that assign a shared local across sibling arms (the jasperreports slot-hoist /
  *     variable-naming determinism reproducer): the shared local must be declared once and named
  *     deterministically, and the values must survive the round-trip.
@@ -93,6 +96,37 @@ public class SwitchFallthroughAlgorithms {
                 r = -1;
         }
         return r;
+    }
+
+    // Empty `default: break;` whose target IS the switch's post-switch merge point (Bug K). Every
+    // matched case `break`s to the same point the empty default falls through to, so the merge and the
+    // default target coincide. The post-switch code (`return out*10+rem`) must execute AFTER the
+    // switch; the historical bug absorbed it into `default:` and dropped every case break (all cases
+    // fell through), miscomputing the result. Dense values -> tableswitch with gap/default to 64.
+    static int emptyDefaultTable(int rem, int base) {
+        int out = base;
+        switch (rem) {
+            case 2: out += 1; break;
+            case 4: out += 2; break;
+            case 5: out += 3; break;
+            case 7: out += 4; break;
+            default: break;
+        }
+        return out * 10 + rem;
+    }
+
+    // Same empty-default-is-merge shape but with genuinely sparse values -> lookupswitch (the exact
+    // Base32 decode reproducer family).
+    static int emptyDefaultLookup(int sel, int base) {
+        int out = base;
+        switch (sel) {
+            case 5: out += 1; break;
+            case 500: out += 2; break;
+            case 50000: out += 3; break;
+            case 5000000: out += 4; break;
+            default: break;
+        }
+        return out * 7 + (sel & 0xff);
     }
 
     // Nested switches assigning one shared local across sibling arms: the slot-hoist / naming
@@ -227,6 +261,17 @@ public class SwitchFallthroughAlgorithms {
         String[] words = {"alpha", "beta", "gamma", "delta"};
         for (int i = 0; i < words.length; i++) {
             sb.append(classify(words[i]));
+        }
+        sb.append('/');
+
+        for (int rem = 0; rem <= 8; rem++) {
+            sb.append(emptyDefaultTable(rem, 100)).append(',');
+        }
+        sb.append('/');
+
+        int[] selIn = {0, 5, 500, 50000, 5000000, 7};
+        for (int i = 0; i < selIn.length; i++) {
+            sb.append(emptyDefaultLookup(selIn[i], 1000)).append(',');
         }
 
         System.out.println(sb);

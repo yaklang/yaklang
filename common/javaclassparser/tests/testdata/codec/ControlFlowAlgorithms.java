@@ -43,10 +43,10 @@ public class ControlFlowAlgorithms {
             b = a % b;
             a = t;
         }
-        if (a < 0) {
-            a = -a;
-        }
-        return a;
+        // natural ternary return over the loop variable (Bug N fixed): the loop exit edge flows
+        // directly into this consumed ternary condition; the callback-collapse must keep the loop
+        // header's exit/body successor order so the loop polarity stays correct.
+        return a < 0 ? -a : a;
     }
 
     static int binarySearch(int[] sorted, int key) {
@@ -68,25 +68,25 @@ public class ControlFlowAlgorithms {
         return -(lo + 1);
     }
 
+    // Canonical Sieve of Eratosthenes in its NATURAL form: the inner marking loop is GUARDED by the
+    // primality check `if (!composite[i])`, i.e. a nested loop sitting inside an if-branch of the outer
+    // loop. This is the exact "guarded nested loop" shape that used to lose the inner loop's
+    // `else { break }` and degrade into a non-terminating do-while(true) (the nested-loop structuring
+    // bug). The differential-execution round-trip over this method is the permanent regression guard:
+    // a structurer that drops the inner exit hangs here (caught by the test's timeout / wrong count)
+    // instead of silently passing the de-guarded two-phase workaround.
     static int sieveCount(int n) {
         if (n < 2) {
             return 0;
         }
-        // Marking phase: a clean nested for/for over the composite[] sieve (exercises boolean[]
-        // store via bastore). Marking the multiples of EVERY i, not only primes, yields the exact same
-        // composite set (a prime is never a proper multiple of a smaller number), so the prime count is
-        // identical -- while keeping the inner loop OUT of an if/else branch, a nested-loop-in-guard
-        // shape the structurer still mis-handles (tracked as the nested-loop bug in CODEC_TODO.md).
         boolean[] composite = new boolean[n + 1];
-        for (int i = 2; i <= n; i++) {
-            for (int j = i + i; j <= n; j += i) {
-                composite[j] = true;
-            }
-        }
         int count = 0;
         for (int i = 2; i <= n; i++) {
             if (!composite[i]) {
                 count++;
+                for (int j = i + i; j <= n; j += i) {
+                    composite[j] = true;
+                }
             }
         }
         return count;
@@ -110,9 +110,7 @@ public class ControlFlowAlgorithms {
 
     // Full traversal of a ragged 2D grid, accumulating a position-weighted checksum of every cell that
     // is strictly less than `target`. No early exit: a clean nested for/for over int[][] exercising
-    // multi-dimensional array loads (aaload + iaload), arraylength on the inner rows and an `if` body,
-    // all shapes the structurer handles, so it round-trips. (Labeled break/continue across a 2D scan is
-    // a known structuring gap, tracked in CODEC_TODO.md, and deliberately not exercised here.)
+    // multi-dimensional array loads (aaload + iaload), arraylength on the inner rows and an `if` body.
     static int countLess(int[][] grid, int target) {
         int acc = 0;
         for (int i = 0; i < grid.length; i++) {
@@ -124,6 +122,31 @@ public class ControlFlowAlgorithms {
             }
         }
         return acc;
+    }
+
+    // Labeled break/continue across a 2D scan -- the inner loop has THREE exits: its own fall-out (inner
+    // row exhausted), a `continue outer` (skip the rest of the row on a negative cell) and a `break
+    // outer` (match found, escape both loops). The structurer used to collapse those exits into a common
+    // post-dominator, which dropped the `found` assignment and span the inner loop forever; this method
+    // is the permanent round-trip regression guard for that fix.
+    static int labeledScan(int[][] grid, int target) {
+        int found = -1;
+        int scanned = 0;
+        outer:
+        for (int i = 0; i < grid.length; i++) {
+            for (int j = 0; j < grid[i].length; j++) {
+                int v = grid[i][j];
+                if (v < 0) {
+                    continue outer;
+                }
+                scanned++;
+                if (v == target) {
+                    found = i * 1000 + j;
+                    break outer;
+                }
+            }
+        }
+        return found * 31 + scanned;
     }
 
     static int nextPowerOfTwo(int v) {
@@ -172,6 +195,27 @@ public class ControlFlowAlgorithms {
         return a > b
                 ? (b > c ? b : (a > c ? c : a))
                 : (a > c ? a : (b > c ? c : b));
+    }
+
+    // Continued-variable tail loop: a first loop runs the outer index `i`, then a SECOND loop keeps
+    // incrementing that same `i` (never reset) while ALSO introducing a fresh inner index `j`. The
+    // `int j = 0` declaration therefore sits immediately before a `do { if ((i) < n) ... }` whose
+    // condition tests the OTHER variable (`i`), not the just-declared `j`. The text-level do-while
+    // index-decl repair used to assume that pre-loop declaration must be the loop index and rewrote
+    // `int j = 0` into `int i = 0` (Bug C), duplicating `i`'s declaration and hoisting a phantom
+    // `int j = 0` to the method head -- a non-recompilable body. The round-trip over this method is
+    // the permanent regression guard: the repair must only fire on a genuinely misnamed index.
+    static int continuedTailLoop(int n) {
+        int i = 0;
+        int sum = 0;
+        while (i < n && i < 5) {
+            sum += i;
+            i++;
+        }
+        for (int j = 0; i < n; i++, j++) {
+            sum += i * 10 + j;
+        }
+        return sum;
     }
 
     static long powMod(long base, long exp, long mod) {
@@ -228,6 +272,13 @@ public class ControlFlowAlgorithms {
         }
         sb.append(';');
 
+        int[][] labeledGrid = {{1, 2, 3}, {4, -1, 6}, {7, 8, 9}, {-1, 0, 5}};
+        int[] labeledTargets = {6, 8, 100, 1, 5, -1, 9};
+        for (int i = 0; i < labeledTargets.length; i++) {
+            sb.append(labeledScan(labeledGrid, labeledTargets[i])).append(',');
+        }
+        sb.append(';');
+
         int[] powInputs = {1, 5, 16, 17, 1023, 1024};
         for (int i = 0; i < powInputs.length; i++) {
             sb.append(nextPowerOfTwo(powInputs[i])).append(',');
@@ -247,6 +298,12 @@ public class ControlFlowAlgorithms {
         int[][] triples = {{3, 1, 2}, {9, 9, 9}, {1, 2, 3}, {5, 1, 9}, {7, 8, 6}};
         for (int i = 0; i < triples.length; i++) {
             sb.append(medianOfThree(triples[i][0], triples[i][1], triples[i][2])).append(',');
+        }
+        sb.append(';');
+
+        int[] tailInputs = {0, 3, 5, 8, 12, 25};
+        for (int i = 0; i < tailInputs.length; i++) {
+            sb.append(continuedTailLoop(tailInputs[i])).append(',');
         }
         sb.append(';');
 

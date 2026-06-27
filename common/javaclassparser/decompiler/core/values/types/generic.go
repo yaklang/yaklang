@@ -276,6 +276,59 @@ func ParseClassSignature(sig string) string {
 	return "<" + strings.Join(params, ", ") + ">"
 }
 
+// ParseClassSignatureSupers parses a class Signature attribute and returns the (possibly generic)
+// superclass type followed by the (possibly generic) directly-implemented interface types. The raw
+// super_class and Interfaces constant-pool entries are erased; this recovers the type arguments so a
+// generic supertype renders as `extends Converter<Integer, Integer>` / `implements Comparator<int[]>`
+// instead of the raw form (which fails to override the erased generic methods). Returns (nil, nil) on
+// any parse failure so the caller can fall back to the erased names.
+func ParseClassSignatureSupers(sig string) (JavaType, []JavaType) {
+	rest := sig
+	if len(rest) > 0 && rest[0] == '<' {
+		r, ok := skipAngleSection(rest)
+		if !ok {
+			return nil, nil
+		}
+		rest = r
+	}
+	sup, rest, ok := parseSigType(rest)
+	if !ok {
+		return nil, nil
+	}
+	var ifaces []JavaType
+	for len(rest) > 0 {
+		it, remaining, ok := parseSigType(rest)
+		if !ok {
+			return sup, ifaces
+		}
+		ifaces = append(ifaces, it)
+		rest = remaining
+	}
+	return sup, ifaces
+}
+
+// skipAngleSection consumes a leading '<' ... matching '>' run (honoring nested angle brackets) and
+// returns the remainder after the matching '>'. Used to skip a class signature's formal type
+// parameter section, whose ':' bound syntax parseSigType does not handle.
+func skipAngleSection(sig string) (string, bool) {
+	if len(sig) == 0 || sig[0] != '<' {
+		return sig, false
+	}
+	depth := 0
+	for i := 0; i < len(sig); i++ {
+		switch sig[i] {
+		case '<':
+			depth++
+		case '>':
+			depth--
+			if depth == 0 {
+				return sig[i+1:], true
+			}
+		}
+	}
+	return "", false
+}
+
 // ParseMethodSignatureTypeParams extracts formal type parameters from a method
 // signature, e.g. "<E:Ljava/lang/Object;>(LList<TE;>;)TE;" returns "<E>".
 // Returns "" if the method has no type parameters or parsing fails.

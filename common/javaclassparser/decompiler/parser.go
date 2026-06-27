@@ -62,10 +62,15 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 					node.RemoveNext(nextNode)
 				}
 				for _, sourceNode := range slices.Clone(node.Source) {
-					sourceNode.RemoveNext(node)
-					for _, n := range allNext {
-						sourceNode.AddNext(n)
-					}
+					// Splice the collapsed condition's successors into the predecessor at the
+					// collapsed node's ORIGINAL position, preserving Next order. A plain
+					// remove-then-append rewiring silently swaps an if-node's two branches
+					// whenever the predecessor is itself a ConditionStatement: a loop header
+					// whose exit edge flows directly into a consumed ternary condition
+					// (`while(...){...} return cond ? A : B`) would have its [exit, body] Next
+					// reordered to [body, exit], inverting the loop polarity (Bug N). Keep-order
+					// is identical to append for the common single-successor predecessor.
+					sourceNode.ReplaceNextSliceKeepOrder(node, allNext)
 				}
 			}
 		}

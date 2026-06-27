@@ -25,6 +25,10 @@ var codecBatteryFS embed.FS
 var batterySanity = map[string]string{
 	// MD5("") — the canonical empty-string digest; if this is missing the oracle source is broken.
 	"CodecAlgorithms": "d41d8cd98f00b204e9800998ecf8427e",
+	// SHA-256("") — the canonical empty-string digest; guards the from-scratch SHA-256 oracle source.
+	"Sha256Algorithms": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+	// SHA-512("") — the canonical empty-string digest; guards the from-scratch SHA-512 oracle source.
+	"Sha512Algorithms": "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
 }
 
 // compileAndRunJavaBattery writes src as <dir>/<className>.java, compiles it with javac into dir,

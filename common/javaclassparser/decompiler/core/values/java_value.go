@@ -20,8 +20,13 @@ type JavaRef struct {
 	StackVar    JavaValue
 	CustomValue *CustomValue
 	IsThis      bool
-	Val         JavaValue
-	typ         types.JavaType
+	// IsParam marks a ref that was seeded from a method parameter (declared at method scope, live
+	// for the whole body). A parameter reassigned with an assignable reference value (`seq = str`
+	// where seq is a CharSequence param and str a String) must stay the SAME variable; splitting it
+	// into a fresh block-scoped local makes a later read of the slot reference an out-of-scope name.
+	IsParam bool
+	Val     JavaValue
+	typ     types.JavaType
 }
 
 // ReplaceVar implements JavaValue.
