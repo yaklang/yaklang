@@ -1,0 +1,85 @@
+name: CI SSA Base Weekly
+
+on:
+  schedule:
+    # Friday 20:00 UTC
+    - cron: "0 20 * * 5"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-ssa-base-weekly
+  cancel-in-progress: false
+
+jobs:
+  compile-base:
+    runs-on: [self-hosted, linux, ssa-ci]
+    env:
+      SKIP_SYNC_EMBED_RULE_IN_GITHUB: "true"
+      CI_SSA_BASE_PROGRAM: ci-yaklang-base
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Prepare CI scripts
+        run: chmod +x ./scripts/ci-ssa/*.sh
+
+      - name: Export SSA database paths
+        run: |
+          source ./scripts/ci-ssa/export-ssa-db-env.sh
+          echo "SSA_CI_DATA_DIR=$SSA_CI_DATA_DIR" >> $GITHUB_ENV
+          echo "SSA_DATABASE_RAW=$SSA_DATABASE_RAW" >> $GITHUB_ENV
+
+      - name: Install Yak
+        run: bash ./scripts/ci-ssa/install-yak-ci.sh
+
+      - name: Import CI SyntaxFlow rules
+        run: yak sf-import --file common/ssa_bootstrapping/ci_rule/ --format raw
+
+      - name: Full compile yaklang base (golang)
+        run: |
+          yak ssa-compile \
+            --config ./scripts/ci-ssa/ci-yaklang-base-compile.json \
+            --database "$SSA_DATABASE_RAW" \
+            --re-compile
+
+      - name: Verify base program in database
+        run: ./scripts/ci-ssa/ensure-base-program.sh
+
+      - name: Update manifest.json
+        run: |
+          MAIN_SHA=$(git rev-parse HEAD)
+          YAK_VER=$(yak version 2>/dev/null | head -1 || echo "")
+          NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          DB_SIZE=$(stat -c%s "$SSA_DATABASE_RAW" 2>/dev/null || stat -f%z "$SSA_DATABASE_RAW")
+          jq -n \
+            --arg version "1" \
+            --arg base "$CI_SSA_BASE_PROGRAM" \
+            --arg sha "$MAIN_SHA" \
+            --arg yak "$YAK_VER" \
+            --arg path "$SSA_DATABASE_RAW" \
+            --argjson size "$DB_SIZE" \
+            --arg now "$NOW" \
+            '{
+              version: $version,
+              base_program_name: $base,
+              main_sha: $sha,
+              yak_version: $yak,
+              database: {
+                url: ("local://" + $path),
+                sha256: "",
+                size_bytes: $size,
+                compression: "none"
+              },
+              updated_at: $now
+            }' > ./scripts/ci-ssa/manifest.json
+          cat ./scripts/ci-ssa/manifest.json
+
+      - name: Upload manifest artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-ssa-manifest
+          path: scripts/ci-ssa/manifest.json
+          retention-days: 90

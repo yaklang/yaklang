@@ -1,0 +1,13 @@
+{
+  "version": "0",
+  "base_program_name": "ci-yaklang-base",
+  "main_sha": "",
+  "yak_version": "",
+  "database": {
+    "url": "local://PLACEHOLDER/run-ci-ssa-base-weekly-first",
+    "sha256": "",
+    "size_bytes": 0,
+    "compression": "none"
+  },
+  "updated_at": ""
+}
