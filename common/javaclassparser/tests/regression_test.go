@@ -551,6 +551,15 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			mustNotContain: []string{"public class Outer$Inner", "protected class Outer$Inner", "yak-decompiler"},
 		},
 		{
+			file: "ifnonnull_branch.class",
+			desc: "an `ifnonnull` (jump when != null) branch must bind the condition as `!= null` " +
+				"so the IfBody (jump target) matches. Before the fix, the condition was `== null` but " +
+				"the IfBody was the not-null branch, causing swapped bodies in large methods (e.g. " +
+				"MD5-crypt salt parsing ran the random branch for non-null salts, producing wrong hashes).",
+			mustContain:    []string{"!= (null)"},
+			mustNotContain: []string{"yak-decompiler"},
+		},
+		{
 			file: "loop_decrement_guard.class",
 			desc: "a `while (i-- > 0)` loop (javac compiles the test as load-i, iinc -1, check the " +
 				"OLD value) must NOT be reconstructed as `do { i--; if (i > 0) ... }`, which tests the " +

@@ -873,7 +873,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 
 		statements.NewConditionStatement(values.NewJavaCompare(lv, rv), op)
 	case OP_IFNONNULL:
-		statements.NewConditionStatement(values.NewJavaCompare(runtimeStackSimulation.Pop().(values.JavaValue), values.JavaNull), EQ)
+		statements.NewConditionStatement(values.NewJavaCompare(runtimeStackSimulation.Pop().(values.JavaValue), values.JavaNull), NEQ)
 	case OP_IFNULL:
 		statements.NewConditionStatement(values.NewJavaCompare(runtimeStackSimulation.Pop().(values.JavaValue), values.JavaNull), NEQ)
 	case OP_IFEQ, OP_IFNE, OP_IFLE, OP_IFLT, OP_IFGT, OP_IFGE:
@@ -1246,7 +1246,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 				}
 			case OP_IFNONNULL:
 				if len(ifNode.stackConsumed) == 1 {
-					condition = statements.NewConditionStatement(values.NewJavaCompare(ifNode.stackConsumed[0], values.JavaNull), EQ).Condition
+					condition = statements.NewConditionStatement(values.NewJavaCompare(ifNode.stackConsumed[0], values.JavaNull), NEQ).Condition
 				}
 			case OP_IFNULL:
 				if len(ifNode.stackConsumed) == 1 {
@@ -2528,7 +2528,7 @@ func (d *Decompiler) ParseStatement() error {
 			st := statements.NewConditionStatement(values.NewJavaCompare(lv, rv), op)
 			appendNode(st)
 		case OP_IFNONNULL:
-			st := statements.NewConditionStatement(values.NewJavaCompare(opcode.stackConsumed[0], values.JavaNull), EQ)
+			st := statements.NewConditionStatement(values.NewJavaCompare(opcode.stackConsumed[0], values.JavaNull), NEQ)
 			appendNode(st)
 		case OP_IFNULL:
 			st := statements.NewConditionStatement(values.NewJavaCompare(opcode.stackConsumed[0], values.JavaNull), NEQ)
