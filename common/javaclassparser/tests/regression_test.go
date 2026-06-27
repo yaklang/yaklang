@@ -552,12 +552,14 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 		},
 		{
 			file: "ifnonnull_branch.class",
-			desc: "an `ifnonnull` (jump when != null) branch must bind the condition as `!= null` " +
-				"so the IfBody (jump target) matches. Before the fix, the condition was `== null` but " +
-				"the IfBody was the not-null branch, causing swapped bodies in large methods (e.g. " +
-				"MD5-crypt salt parsing ran the random branch for non-null salts, producing wrong hashes).",
-			mustContain:    []string{"!= (null)"},
-			mustNotContain: []string{"yak-decompiler"},
+			desc: "an `ifnonnull` (jump when != null) branch renders the condition as the fall-through " +
+				"condition (`== null`), consistent with IFNULL/numeric-IF. The IfBody (TrueNode) binds to " +
+				"the fall-through branch (the == null arm) and ElseBody to the jump target (the != null arm). " +
+				"This matches the bytecode: ifnonnull jumps to the != null path while fall-through runs the " +
+				"== null body. Rendering `!= null` here would SWAP the bodies and compute wrong results " +
+				"(confirmed: commons-codec Md5Crypt is byte-for-byte correct with `== null`).",
+			mustContain:    []string{"== (null)"},
+			mustNotContain: []string{"!= (null)", "yak-decompiler"},
 		},
 		{
 			file: "loop_decrement_guard.class",
@@ -577,6 +579,15 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 				"B64.b64from24bit). The combined expression must store as int.",
 			mustContain:    []string{"((var0) << (16))"},
 			mustNotContain: []string{"byte v = ", "yak-decompiler"},
+		},
+		{
+			file: "byte_local_narrowing.class",
+			desc: "a byte/char/short local whose initializer is an int-valued arithmetic/bitwise/shift " +
+				"expression (JLS promotes byte to int) must keep its slot type and wrap the initializer in " +
+				"a narrowing cast, otherwise javac rejects it ('possible lossy conversion from int to " +
+				"byte'). Real-world: commons-codec PureJavaCrc32C.update (byte x = (arr[i]^crc)&255).",
+			mustContain:    []string{"byte var3 = (byte)("},
+			mustNotContain: []string{"yak-decompiler"},
 		},
 		{
 			file: "char_return_narrowing.class",

@@ -676,17 +676,21 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		}
 		var2 := runtimeStackSimulation.Pop().(values.JavaValue)
 		var1 := runtimeStackSimulation.Pop().(values.JavaValue)
-		// Per JLS, a shift (<<, >>, >>>) ALWAYS promotes its left operand to int (or long for the
-		// L-prefixed ops) and the result is int/long regardless of the shifted operand's type.
-		// Using var1.Type() directly left a `byte << 16` result typed as byte, which then mis-typed
-		// the local storing it (e.g. `byte x = (b << 16) | ...` in MD5-crypt B64.b64from24bit) and
-		// produced wrong hashes. Arithmetic/bitwise ops keep var1.Type() (the prior behavior) to
-		// avoid re-typing recompilable synthetic-corpus expressions.
+		// Per JLS, integer arithmetic/bitwise/shift ops ALWAYS promote operands to int (or long for
+		// the L-prefixed ops) and yield int/long regardless of the operands' narrower type
+		// (byte/short/char). Typing the result as var1.Type() left e.g.
+		// `byte x = (arr[i] ^ crc) & 255` typed as byte, which compiled wrong: javac promotes the
+		// expression to int and rejects the assignment ('possible lossy conversion from int to
+		// byte'), as seen in commons-codec PureJavaCrc32C. Now the int result is detected by the
+		// assignment narrowing cast (AssignStatement.String), which wraps the initializer in an
+		// explicit (byte) cast. Float/double ops keep var1.Type() (already correct).
 		resultType := var1.Type()
 		switch opcode.Instr.OpCode {
-		case OP_ISHL, OP_ISHR, OP_IUSHR:
+		case OP_IADD, OP_ISUB, OP_IMUL, OP_IDIV, OP_IREM, OP_IAND, OP_IOR, OP_IXOR,
+			OP_ISHL, OP_ISHR, OP_IUSHR:
 			resultType = types.NewJavaPrimer(types.JavaInteger)
-		case OP_LSHL, OP_LSHR, OP_LUSHR:
+		case OP_LADD, OP_LSUB, OP_LMUL, OP_LDIV, OP_LREM, OP_LAND, OP_LOR, OP_LXOR,
+			OP_LSHL, OP_LSHR, OP_LUSHR:
 			resultType = types.NewJavaPrimer(types.JavaLong)
 		}
 		runtimeStackSimulation.Push(values.NewBinaryExpression(var1, var2, op, resultType))
@@ -873,7 +877,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 
 		statements.NewConditionStatement(values.NewJavaCompare(lv, rv), op)
 	case OP_IFNONNULL:
-		statements.NewConditionStatement(values.NewJavaCompare(runtimeStackSimulation.Pop().(values.JavaValue), values.JavaNull), NEQ)
+		statements.NewConditionStatement(values.NewJavaCompare(runtimeStackSimulation.Pop().(values.JavaValue), values.JavaNull), EQ)
 	case OP_IFNULL:
 		statements.NewConditionStatement(values.NewJavaCompare(runtimeStackSimulation.Pop().(values.JavaValue), values.JavaNull), NEQ)
 	case OP_IFEQ, OP_IFNE, OP_IFLE, OP_IFLT, OP_IFGT, OP_IFGE:
@@ -1246,7 +1250,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 				}
 			case OP_IFNONNULL:
 				if len(ifNode.stackConsumed) == 1 {
-					condition = statements.NewConditionStatement(values.NewJavaCompare(ifNode.stackConsumed[0], values.JavaNull), NEQ).Condition
+					condition = statements.NewConditionStatement(values.NewJavaCompare(ifNode.stackConsumed[0], values.JavaNull), EQ).Condition
 				}
 			case OP_IFNULL:
 				if len(ifNode.stackConsumed) == 1 {
@@ -2528,7 +2532,7 @@ func (d *Decompiler) ParseStatement() error {
 			st := statements.NewConditionStatement(values.NewJavaCompare(lv, rv), op)
 			appendNode(st)
 		case OP_IFNONNULL:
-			st := statements.NewConditionStatement(values.NewJavaCompare(opcode.stackConsumed[0], values.JavaNull), NEQ)
+			st := statements.NewConditionStatement(values.NewJavaCompare(opcode.stackConsumed[0], values.JavaNull), EQ)
 			appendNode(st)
 		case OP_IFNULL:
 			st := statements.NewConditionStatement(values.NewJavaCompare(opcode.stackConsumed[0], values.JavaNull), NEQ)

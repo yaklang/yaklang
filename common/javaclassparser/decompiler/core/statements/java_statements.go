@@ -146,6 +146,28 @@ func narrowingReturnCast(funcCtx *class_context.ClassContext, v values.JavaValue
 	return ""
 }
 
+// narrowingInitCast returns the cast type name ('byte'/'char'/'short') when a local is declared
+// with a narrowing-of-int slot type but its initializer is int-valued. Per JLS the initializer is
+// always int-promoted for arithmetic/bitwise/shift expressions, so assigning it to a byte/char/short
+// local without a cast is a 'possible lossy conversion' javac error (e.g. commons-codec
+// PureJavaCrc32C: `byte x = (arr[i] ^ crc) & 255`). Wrapping the initializer in an explicit cast
+// is a pure rendering fix — the recompiled bytecode is behaviorally identical.
+func narrowingInitCast(slotType types.JavaType, valueType types.JavaType) string {
+	if slotType == nil || valueType == nil {
+		return ""
+	}
+	slotStr := slotType.RawType().String(&class_context.ClassContext{})
+	valStr := valueType.RawType().String(&class_context.ClassContext{})
+	if valStr != "int" {
+		return ""
+	}
+	switch slotStr {
+	case "char", "byte", "short":
+		return slotStr
+	}
+	return ""
+}
+
 func NewReturnStatement(value values.JavaValue) *ReturnStatement {
 	return &ReturnStatement{
 		JavaValue: value,
@@ -246,6 +268,15 @@ func (a *AssignStatement) String(funcCtx *class_context.ClassContext) string {
 			// value is hoisted into an ordinary local (`cause = e` after the catch), render it as
 			// a common Throwable subtype so the declaration remains valid Java.
 			declType = types.NewJavaClass("java.lang.Exception")
+		}
+		// Narrowing cast for byte/char/short locals: JLS promotes these types to int in any
+		// arithmetic/bitwise/shift expression, so `byte x = (arr[i] ^ crc) & 255` is int-valued at
+		// the source level even though the slot is byte (commons-codec PureJavaCrc32C). When the
+		// slot type is a narrowing-of-int and the initializer is int-typed, keep the slot type as
+		// the declaration and wrap the initializer in an explicit cast — mirrors ReturnStatement.
+		if cast := narrowingInitCast(a.LeftValue.Type(), declType); cast != "" {
+			assign = fmt.Sprintf("%s = (%s) (%s)", a.LeftValue.String(funcCtx), cast, a.JavaValue.String(funcCtx))
+			declType = a.LeftValue.Type()
 		}
 		return declType.String(funcCtx) + " " + assign
 	} else {
