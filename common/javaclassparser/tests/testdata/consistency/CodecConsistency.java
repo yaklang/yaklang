@@ -14,7 +14,13 @@ import java.nio.charset.Charset;
  * control flow. Zero divergences across many inputs is strong proof of semantic
  * equivalence for these pure-Java algorithm implementations.
  *
+ * Coverage (commons-codec 1.15):
+ *   - PureJavaCrc32, MurmurHash2 : verified 0 divergences (semantically equivalent)
+ *   - B64.b64from24bit, Hex.encodeHex : encoding primitives
+ *   - Md5Crypt : MD5-crypt password hashing (currently divergent: see notes)
+ *
  * Usage: java CodecConsistency <originalJar> <recompiledDir>
+ *        Each algorithm is tested only if its recompiled class is present in <recompiledDir>.
  */
 public class CodecConsistency {
     static int passed = 0, diverged = 0, totalInvocations = 0;
@@ -56,6 +62,34 @@ public class CodecConsistency {
             }
         });
 
+        ifPresent(recompCL, "org.apache.commons.codec.digest.B64", () -> {
+            Class<?> oc = origCL.loadClass("org.apache.commons.codec.digest.B64");
+            Class<?> rc = recompCL.loadClass("org.apache.commons.codec.digest.B64");
+            Method om = oc.getMethod("b64from24bit", byte.class, byte.class, byte.class, int.class, StringBuilder.class);
+            Method rm = rc.getMethod("b64from24bit", byte.class, byte.class, byte.class, int.class, StringBuilder.class);
+            // exercise the shift+loop core of MD5-crypt base64 packing
+            int[][] triples = { {0,0,0}, {1,2,3}, {0xFF,0xAB,0x00}, {0x12,0x34,0x56}, {-1,-1,-1}, {0x41,0x42,0x43} };
+            for (int[] t : triples) for (int n : new int[]{2,4}) {
+                StringBuilder osb = new StringBuilder(), rsb = new StringBuilder();
+                om.invoke(null, (byte)t[0], (byte)t[1], (byte)t[2], n, osb);
+                rm.invoke(null, (byte)t[0], (byte)t[1], (byte)t[2], n, rsb);
+                check("B64.b64from24bit[" + t[0] + "," + t[1] + "," + t[2] + ",n=" + n + "]", osb.toString(), rsb.toString());
+            }
+        });
+
+        ifPresent(recompCL, "org.apache.commons.codec.binary.Hex", () -> {
+            Class<?> oc = origCL.loadClass("org.apache.commons.codec.binary.Hex");
+            Class<?> rc = recompCL.loadClass("org.apache.commons.codec.binary.Hex");
+            byte[][] inputs = { new byte[]{}, new byte[]{0}, new byte[]{1,2,3,(byte)0xff,(byte)0xab},
+                "hello".getBytes(), new byte[64] };
+            randFill(inputs[4], 5);
+            for (byte[] in : inputs) {
+                char[] oenc = (char[]) oc.getMethod("encodeHex", byte[].class).invoke(oc.getDeclaredConstructor().newInstance(), in);
+                char[] renc = (char[]) rc.getMethod("encodeHex", byte[].class).invoke(rc.getDeclaredConstructor().newInstance(), in);
+                check("Hex.encodeHex[len=" + in.length + "]", new String(oenc), new String(renc));
+            }
+        });
+
         ifPresent(recompCL, "org.apache.commons.codec.digest.Md5Crypt", () -> {
             Class<?> oc = origCL.loadClass("org.apache.commons.codec.digest.Md5Crypt");
             Class<?> rc = recompCL.loadClass("org.apache.commons.codec.digest.Md5Crypt");
@@ -70,19 +104,6 @@ public class CodecConsistency {
                 String o = (String)om.invoke(null, in, salt);
                 String r = (String)rm.invoke(null, in, salt);
                 check("Md5Crypt[salt=" + salt + ",len=" + in.length + "]", o, r);
-            }
-        });
-
-        ifPresent(recompCL, "org.apache.commons.codec.binary.Hex", () -> {
-            Class<?> oc = origCL.loadClass("org.apache.commons.codec.binary.Hex");
-            Class<?> rc = recompCL.loadClass("org.apache.commons.codec.binary.Hex");
-            byte[][] inputs = { new byte[]{}, new byte[]{0}, new byte[]{1,2,3,(byte)0xff,(byte)0xab},
-                "hello".getBytes(), new byte[64] };
-            randFill(inputs[4], 5);
-            for (byte[] in : inputs) {
-                char[] oenc = (char[]) oc.getMethod("encodeHex", byte[].class).invoke(oc.getDeclaredConstructor().newInstance(), in);
-                char[] renc = (char[]) rc.getMethod("encodeHex", byte[].class).invoke(rc.getDeclaredConstructor().newInstance(), in);
-                check("Hex.encodeHex[len=" + in.length + "]", new String(oenc), new String(renc));
             }
         });
 
