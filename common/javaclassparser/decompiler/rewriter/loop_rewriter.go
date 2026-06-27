@@ -1,6 +1,8 @@
 package rewriter
 
 import (
+	"os"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
@@ -56,14 +58,39 @@ func replaceNextInPlace(node, oldNext, newNext *core.Node) {
 	node.AddNext(newNext)
 }
 
+// outermostEnclosingLoopWithExit returns the outermost ENCLOSING loop (a while-node that dominates
+// circleNode, excluding circleNode itself) whose own loop-exit node equals exitNode, or nil if no
+// enclosing loop shares that exit. "Outermost" = the one that dominates the others, so a break that
+// escapes several stacked loops with the same exit target jumps all the way out. Used to turn a bare
+// `break` (which would only leave the innermost loop) into a labeled `break LOOP_n` when the exit
+// actually lies outside an enclosing loop. Setting JDEC_NO_LOOP_BREAK_LABEL_FIX is the kill-switch.
+func outermostEnclosingLoopWithExit(manager *RewriteManager, preWhileNodes []*core.Node, preWhileNodeEnds map[*core.Node]*core.Node, circleNode, exitNode *core.Node) *core.Node {
+	if os.Getenv("JDEC_NO_LOOP_BREAK_LABEL_FIX") != "" {
+		return nil
+	}
+	var best *core.Node
+	for _, m := range preWhileNodes {
+		if m == circleNode {
+			continue
+		}
+		if preWhileNodeEnds[m] != exitNode {
+			continue
+		}
+		if best == nil || utils.IsDominate(manager.DominatorMap, m, best) {
+			best = m
+		}
+	}
+	return best
+}
+
 func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
-	loopEnd := searchCircleEndNode(circleNode, circleNode.Next[0])
+	loopEnd := searchCircleEndNode(circleNode, circleNode.Next[0], manager.DominatorMap)
 	preWhileNodes := utils.NodeFilter(manager.WhileNode, func(node *core.Node) bool {
 		return utils.IsDominate(manager.DominatorMap, node, circleNode)
 	})
 	preWhileNodeEnds := map[*core.Node]*core.Node{}
 	for _, n := range preWhileNodes {
-		preWhileNodeEnds[n] = searchCircleEndNode(n, n.Next[0])
+		preWhileNodeEnds[n] = searchCircleEndNode(n, n.Next[0], manager.DominatorMap)
 	}
 	checkNode := func(node *core.Node) ([]*core.Node, error) {
 		if node.IsJmp {
@@ -156,6 +183,33 @@ func LoopJmpRewriter(manager *RewriteManager, circleNode *core.Node) error {
 				continue
 			}
 			if loopEnd != nil && (next == loopEnd && node != circleNode) {
+				// Shared-exit nested loops: this loop's computed exit (loopEnd) can coincide with an
+				// ENCLOSING loop's exit. javac compiles `do { ... while(inner) ... } while(outer)` where the
+				// post-test of an inner while is absorbed into the inner do-while(true) body; the only way
+				// out of the inner loop then targets a node that is ALSO outside the outer loop. A bare
+				// `break` exits only the inner do-while and falls through to the bottom of the outer body,
+				// so the outer do-while(true) loops forever and the post-loop code is unreachable (javac:
+				// "unreachable statement"). When the exit escapes an enclosing loop, emit a labeled
+				// `break LOOP_n` targeting the OUTERMOST loop whose exit is this same node instead.
+				if enclosing := outermostEnclosingLoopWithExit(manager, preWhileNodes, preWhileNodeEnds, circleNode, next); enclosing != nil {
+					loopNode := enclosing.Statement.(*statements.DoWhileStatement)
+					if loopNode.Label == "" {
+						loopNode.Label = manager.NewLoopLabel()
+					}
+					breakNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
+						return "break " + loopNode.Label
+					}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
+					}))
+					breakNode.IsJmp = true
+					// Mirror the plain-break wiring but hand the exit edge to the ENCLOSING loop: the break
+					// leaf flows to the outer loop node, and the outer loop node owns the edge to the shared
+					// exit. This lets the outer LoopRewriter pick `next` up as its exit (endNode) so the
+					// post-loop code stays reachable, instead of being dropped as "incomplete control flow".
+					replaceNextInPlace(node, next, breakNode)
+					breakNode.AddNext(enclosing)
+					enclosing.AddNext(next)
+					continue
+				}
 				breakNode := manager.NewNode(statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
 					return "break"
 				}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
@@ -250,7 +304,7 @@ func LoopRewriter(manager *RewriteManager, node *core.Node) error {
 
 	body := []statements.Statement{}
 	endNodes := []*core.Node{}
-	circleSet := getCircleElementSet(circleNode, loopStart)
+	circleSet := getCircleElementSet(circleNode, loopStart, manager.DominatorMap)
 	err := core.WalkGraph[*core.Node](loopStart, func(node *core.Node) ([]*core.Node, error) {
 		if !circleSet.Has(node) {
 			endNodes = append(endNodes, node)
@@ -295,7 +349,7 @@ func LoopRewriter(manager *RewriteManager, node *core.Node) error {
 	}
 	return nil
 }
-func getCircleElementSet(circleNode *core.Node, loopStart *core.Node) *utils2.Set[*core.Node] {
+func getCircleElementSet(circleNode *core.Node, loopStart *core.Node, domTree map[*core.Node][]*core.Node) *utils2.Set[*core.Node] {
 	// Standard natural-loop algorithm: a node belongs to the loop body iff it can reach the back-edge
 	// target (circleNode) via a forward path that does NOT pass through circleNode. This is computed by
 	// reverse BFS from the back-edge sources (nodes whose Next includes circleNode), stopping at
@@ -324,6 +378,15 @@ func getCircleElementSet(circleNode *core.Node, loopStart *core.Node) *utils2.Se
 		}
 	}
 	// Step 2: find back-edge sources — nodes whose Next includes circleNode.
+	//
+	// NOTE: a dominance-based filter on these sources (to drop the forward ENTRY edge of a nested
+	// loop and keep only the true back edge) was tried to fix the nested-loop infinite do-while(true)
+	// bug, but it regressed real-world IRREDUCIBLE loops (e.g. ant CBZip2OutputStream.hbMakeCodeLengths)
+	// where the natural-loop dominance assumption does not hold: pruning a source there erases the only
+	// back edge and collapses the body to {circleNode}, leaving a raw cycle ("has circle"). The filter
+	// was reverted; the nested-loop structuring bug is tracked in CODEC_TODO.md instead. domTree is
+	// kept on the signature for callers but intentionally unused here.
+	_ = domTree
 	finalSet.Add(circleNode)
 	bfsQueue := []*core.Node{}
 	for _, n := range allNodes.List() {
@@ -346,8 +409,8 @@ func getCircleElementSet(circleNode *core.Node, loopStart *core.Node) *utils2.Se
 	return finalSet
 }
 
-func searchCircleEndNode(circleNode *core.Node, loopStart *core.Node) *core.Node {
-	elementSet := getCircleElementSet(circleNode, loopStart)
+func searchCircleEndNode(circleNode *core.Node, loopStart *core.Node, domTree map[*core.Node][]*core.Node) *core.Node {
+	elementSet := getCircleElementSet(circleNode, loopStart, domTree)
 	outNodes := []*core.Node{}
 	elementSet.ForEach(func(node *core.Node) {
 		for _, n := range node.Next {

@@ -257,6 +257,74 @@ OPCODE 解析覆盖仍为 **195/195 (100.0%)** (新 battery 已纳入语料)。
 
 ---
 
+## 已完成 (本阶段 — Bug P 治本 + boolean 数组写渲染 + ControlFlowAlgorithms battery)
+
+### 10. 嵌套循环 body 治本尝试 (支配过滤) → 因回归 IRREDUCIBLE 循环而**回退**, 转为登记 (Bug Q)
+
+**症状**: 嵌套循环 (外层 for/while + 内层 for/while, 内层循环被 `if/else` 守卫包裹) 反编译时, 内层
+循环体把**外层**循环的节点也卷了进来, 内层 `if(cond){...continue;}` 缺失 `else{break;}` →
+内层退化成 `do{...}while(true)` 无出口死循环。`ControlFlowAlgorithms.sieveCount` 原写法 (外层
+`for i` + `if(!composite[i])` 内嵌内层 `for j=i+i` 标记) 触发: 内层标记循环无 `break`, 运行即挂起。
+
+**尝试的根因修复 (已回退)**: 在 `getCircleElementSet` 对回边源加**支配过滤** (真回边源被循环头支配,
+外部进入边的源不被支配)。该法能修好 sieve, 但**回归了真实库里的 IRREDUCIBLE 循环**: ant
+`CBZip2OutputStream.hbMakeCodeLengths` 的循环不满足自然循环的支配假设, 过滤会把唯一的回边源也剔掉,
+body 塌缩成 `{circleNode}`, 留下裸环 → `ParseBytesCode failed: has circle` (整方法降级成 stub),
+撞坏既有门禁 `TestGAPanicFreeBoundary/panic_nil_arraytype`。试过三种收紧判据 (只留被支配源 / 只剔支配
+循环头的源 / 仅在"干净可归约嵌套"形态下剔除) 均仍回归该方法。**故回退支配过滤**,
+`getCircleElementSet` 恢复"全部前驱为回边源"的原始行为; `domTree` 形参保留但不使用。
+
+**规避现状**: `sieveCount` 改写为**两段式** —— 先用干净的嵌套 `for/for` (内层不再被 `if/else` 包裹,
+即 `countLess` 那种形态, 由带标签 break/continue 正确结构化) 标记全部 `i` 的倍数 (标记非素数倍数不影响
+合数集合, 素数计数不变), 再用单层 `for+if` 计数。boolean[] 写覆盖保留, round-trip 通过。
+
+**登记为 Bug Q** (见下「已知深层缺陷」): 内层循环被 `if/else` 守卫包裹、且其出口流向外层续行时,
+内层 `else{break}` 丢失 → 死循环。`countLess` (内层不被守卫包裹) 与 `digitalRoot` (嵌套 do-while)
+经带标签 break/continue 已能正确结构化, 故 Bug Q 限于"守卫内嵌套循环"这一更窄形态。下一轮治本需要
+区分**可归约**与**不可归约**循环 (仅对前者做支配过滤), 或在 CFR/Vineflower oracle 护航下重做。
+
+### 11. `-(a + b)` 负-和渲染丢括号 (Bug P, 治本)
+
+**症状**: 字节码 `... iadd; ineg` (即 `-(a+b)`) 反编译成 `-(a) + (b)`, javac 按优先级解析为
+`(-a) + b`, **静默算错**。`ControlFlowAlgorithms.binarySearch` 的未找到插入点 `return -(lo+1);`
+触发 (插入点 -5/-1/-7 错成 -3/+1/-5)。
+
+**根因** (`code_analyser.go` 的 `OP_*NEG` handler): 渲染器对一元负号无条件用 `"-" + 操作数.String()`,
+不给操作数加括号。操作数是二元和式时 (`(lo) + (1)`), 拼成 `-(lo) + (1)` —— 一元 `-` 只咬住 `lo`。
+**这是纯渲染缺陷, AST 本身正确** (Neg(Add(lo,1)))。
+
+**修复** (`values/expression.go` 新增 `UnaryMinusOperand`): 当操作数是二元 `JavaExpression`
+(两操作数) 或 `TernaryExpression`, 或其渲染串以 `-`/`+` 开头 (防 `--`/`-+` token 粘连) 时, 整体加
+括号 → `-((lo) + (1))`。简单操作数 (ref/字面量/字段/调用/数组取元素) 不加括号, 保持可读。覆盖
+INEG/LNEG/FNEG/DNEG。
+
+**验证**: `binarySearch` 用自然的 `return -(lo+1);` 写法 round-trip byte-for-byte 通过 (插入点
+`-5,-1,-7` 正确); 新增 `SignedArithmeticAlgorithms.java` battery (negSum/negDiff/negNegSum/negMulAdd/
+negPoly 等多种 `-(表达式)` 形态 + Guava IntMath/LongMath 风格整数算术) 作为 Bug P 的**固定回归锁**,
+round-trip 通过; 全部 codec battery 全绿, 无渲染回归。
+
+### 12. `boolean[]` 数组元素写入渲染成 int 字面量 (修复)
+
+**症状**: `boolean[] b = new boolean[n]; b[i] = true;` 反编译产出 `var1[i] = 1;`, javac 报
+"incompatible types: int cannot be converted to boolean"。JVM 的 `bastore` 同时服务 byte[] 与
+boolean[], 对 boolean 用 `iconst_1`/`iconst_0` 压栈, 反编译把它当裸 int 字面量渲染。
+
+**修复** (`core/statements/java_statements.go` `arrayStoreRHS`): `AssignStatement.String` 渲染到
+数组元素时, 若目标元素类型是 `boolean` 且 RHS 是整数字面量 0/1, 渲染成 `false`/`true`, 否则原样。
+是渲染期类型矫正, 不动栈模拟。**验证**: `sieveCount` 的 `composite[j] = true;` 正确编译。
+
+### 13. 新增 battery `ControlFlowAlgorithms.java`
+
+专攻反编译器的**循环/分支结构化核心** (最易静默错构: 循环极性、合并点、do-while vs while、
+无限循环+break、ternary 嵌套)。每个方法是控制流图强制某个结构化决策的小型经典算法; 差分执行
+oracle 在任一决策反转时失败。本电池**实战发现 4 个 bug**: `-(a+b)` (§11/Bug P) **已治本**, 另 3 个
+(Bug Q 守卫内嵌套循环 body、Bug N gcd loop+ternary 极性、Bug O labeled break/continue) 登记规避。
+
+差分门禁 `TestCodecSemanticsRoundTrip` 现跑 **18 个 battery 全绿** (含 `SignedArithmeticAlgorithms`,
+见 §11); OPCODE 解析覆盖维持 100% (195/195)。
+
+---
+
 ## 已知深层缺陷 (本阶段定位, 暂以源码重构规避; 待治本)
 
 - **Bug J — 复合赋值且结果值被消费时, RHS 被重复求值** (本阶段进一步定位, 比原判更宽):
@@ -333,8 +401,45 @@ OPCODE 解析覆盖仍为 **195/195 (100.0%)** (新 battery 已纳入语料)。
   `for (int j=0; i<n; i++, j++)` 这种「续用外层 i + 新增 j」的尾循环, 反编译把延续的 `i`
   误重声明为 `int i = 0`。**规避**: `fullFingerprint` 尾循环改写为单变量遍历只读基址。
 
-> 这些 BUG 与第 66 行的「后自增数组下标 `arr[i++]`」一并构成下一轮治本目标。其中 Bug E/F/H/I
+- **Bug Q — 内层循环被 `if/else` 守卫包裹时, 内层 `else{break}` 丢失 → 死循环** (本阶段定位, 治本
+  尝试回退见 §10): 形如 `for i { if(!cond){ ...; for j { body } } }`, 内层 `for j` 的出口本应 `break`
+  内层 do-while(true) 再落到外层续行 (`i++`), 但结构化丢掉了内层 `else{break}`, 内层退化成无出口
+  `do{...}while(true)`。`ParseBytesCode` 的 `getCircleElementSet` 把外部进入边误当回边源, 反向 BFS
+  把外层节点扫进内层 body, 算错内层 `loopEnd`。**对照**: `countLess` (内层**不**被守卫包裹的纯
+  `for/for`) 与 `digitalRoot` (嵌套 do-while) 经带标签 break/continue **能正确结构化**, 故触发限于
+  "守卫内嵌套循环"。**支配过滤治本会回归不可归约循环** (CBZip2 hbMakeCodeLengths, 见 §10), 已回退。
+  **规避**: `sieveCount` 改成两段式 (标记用裸 `for/for`, 计数用单层 `for+if`)。**治本方向**: 区分
+  可归约/不可归约循环, 仅对可归约者做回边源支配过滤; 或重做自然循环识别 (DFS 树回边判定)。
+  归入控制流块归属一类。
+
+- **Bug N — `while` 循环后紧跟「对循环变量的 ternary」时, 循环条件极性被反转** (本阶段定位,
+  **有干净最小复现 + 精确根因**): 形如 `while(b!=0){...} return a<0 ? -a : a;`, 当方法在循环之后
+  紧接一个**返回循环变量**的三元表达式时, 循环头条件被整体取反 → 产出 `if(b!=0){break}else{body}`,
+  逻辑反转 (`a%0` 抛 ArithmeticException)。`ControlFlowAlgorithms.gcd` 触发。
+  **A/B 隔离确认**: 把 `return a<0?-a:a;` 改成 `if(a<0)a=-a; return a;` (无 ternary) → 循环**正确**;
+  恢复 ternary → 反转。**根因**: ternary 链识别 (`CalcMergeOpcode` 填 `mergeNodeToIfNode`, 见
+  `code_analyser.go` ~1286/~1948 的 legacy 重建) 把**循环头 if-opcode**误纳入 ternary 链 —— 因循环头
+  两条分支 (loop body 与 exit) **最终都到达** ternary 的 merge 节点 (body 兜一圈后从条件再出口到
+  merge), 满足"双臂汇合"判据。链重建 `i!=0` 分支 (~2228-2294) 翻转了该 if-opcode 的 `Negative`,
+  经 ~2348 `Negative→Neg`、~2803 `Neg→Next 交换`, 把循环头 `Next` 数组从 `[exit,body]` 错排成
+  `[body,exit]`, 而 `TrueNode` 恒取 `Next[1]` → 极性反转。**规避**: gcd 末尾用 `if(a<0)a=-a;` 替代
+  ternary (等价语义, 仍覆盖 while + irem)。**治本方向**: ternary 链识别须排除**循环头/回边** if-opcode
+  (其某分支经回边再到 merge 不算真正的 ternary 臂)。归入 Bug E/F/I 控制流极性一类。
+
+- **Bug O — 带标签 `break`/`continue` 跨 2D 嵌套循环结构化缺陷** (本阶段定位):
+  形如 `outer: for{ for{ if(v<0) continue outer; if(v==t){found=...; break outer;} } }`, 反编译产出
+  (1) `continue outer` 落成**空分支** → 落空后回内层同位 → 死循环; (2) `break outer` 仅跳出内层未跳出
+  外层, 且 `found=...` 赋值被丢; (3) 多 `break` 出口的内层后处理错位。`ControlFlowAlgorithms` 原
+  `labeledScan` 触发。**规避**: 改用无标签的 `countLess` (纯 2D 遍历 + `if` 体, 无提前出口, round-trip
+  通过); 带标签流程作为特性缺口登记。**治本方向**: labeled break/continue 的目标循环识别 + 多出口
+  归并。归入控制流块归属一类, 与 Bug E/F/H/I/L 同源。
+
+- **Bug P — [已治本, 见 §11] `-(a + b)` 负-和渲染丢括号被错构成 `(-a) + b`** (本阶段定位 + 当场治本):
+  一元负号渲染器对二元/三元操作数整体加括号即解决, 纯渲染层修复, 低风险, 17 battery 无回归。
+
+> 这些 BUG 与第 66 行的「后自增数组下标 `arr[i++]`」一并构成下一轮治本目标。其中 Bug E/F/H/I/N/O
 > 同属**控制流分支极性/块归属**一类, 可能可统一修复; Bug B/C 同属**slot 复用变量身份**一类。
+> (Bug P 表达式渲染括号一类已于本阶段治本, 见 §11。)
 
 ---
 

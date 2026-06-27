@@ -180,6 +180,33 @@ func (j *JavaExpression) String(funcCtx *class_context.ClassContext) string {
 	}
 }
 
+// UnaryMinusOperand renders v as the operand of a leading unary minus, wrapping it in parentheses
+// whenever the bare "-"+v form would re-associate or merge tokens. The JVM emits `... ; ineg` for a
+// negated sub-expression, so an arithmetic `-(a + b)` arrives as Neg(Add(a,b)); rendering it as
+// "-" + "(a) + (b)" silently re-parses as "(-a) + b" (wrong value). It also guards "-" + "-x" /
+// "-" + "+x" from fusing into the predecrement/increment tokens "--"/"-+". Simple operands
+// (refs, literals, fields, calls, array loads) are left unparenthesised to keep output readable.
+func UnaryMinusOperand(v JavaValue, funcCtx *class_context.ClassContext) string {
+	s := v.String(funcCtx)
+	needParen := false
+	switch uv := UnpackSoltValue(v).(type) {
+	case *JavaExpression:
+		// A binary expression (two operands) binds looser than unary minus and must be wrapped.
+		if len(uv.Values) >= 2 {
+			needParen = true
+		}
+	case *TernaryExpression:
+		needParen = true
+	}
+	if !needParen && (strings.HasPrefix(s, "-") || strings.HasPrefix(s, "+")) {
+		needParen = true
+	}
+	if needParen {
+		return "(" + s + ")"
+	}
+	return s
+}
+
 // primerRawType returns the *types.JavaPrimer raw type of t, guarding against a nil JavaType
 // (which incomplete stack simulation can produce) so callers never nil-dereference RawType().
 func primerRawType(t types.JavaType) (*types.JavaPrimer, bool) {

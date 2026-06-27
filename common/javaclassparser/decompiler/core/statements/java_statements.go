@@ -215,6 +215,29 @@ func (a *AssignStatement) ReplaceVar(oldId *utils.VariableId, newId *utils.Varia
 	}
 }
 
+// arrayStoreRHS renders the right-hand side of an array-element store. The JVM has no boolean type on
+// the operand stack: `boolean[] a; a[i] = true;` compiles to iconst_1 + bastore, so the stored value
+// reaches the decompiler as an int literal (1) whose static type is int, not boolean. Rendering it
+// verbatim yields `a[i] = 1`, which javac rejects ("int cannot be converted to boolean"). When the
+// array's element type is boolean and the value is an int literal, render it as true/false. bastore is
+// shared with byte[] and the remaining primitive array stores all accept a fitting int constant, so
+// boolean is the only element type that needs this coercion.
+func arrayStoreRHS(member *values.JavaArrayMember, value values.JavaValue, funcCtx *class_context.ClassContext) string {
+	if member != nil && value != nil {
+		if elem := member.Type(); elem != nil && elem.String(funcCtx) == "boolean" {
+			if lit, ok := value.(*values.JavaLiteral); ok {
+				if iv, ok := lit.Data.(int); ok {
+					if iv == 0 {
+						return "false"
+					}
+					return "true"
+				}
+			}
+		}
+	}
+	return value.String(funcCtx)
+}
+
 func (a *AssignStatement) String(funcCtx *class_context.ClassContext) string {
 	if a.IsDeclare {
 		if a.LeftValue == nil {
@@ -226,7 +249,7 @@ func (a *AssignStatement) String(funcCtx *class_context.ClassContext) string {
 		if a.JavaValue == nil {
 			return fmt.Sprintf("%s = %s", a.ArrayMember.String(funcCtx), values.EmptySlotValuePlaceholder)
 		}
-		return fmt.Sprintf("%s = %s", a.ArrayMember.String(funcCtx), a.JavaValue.String(funcCtx))
+		return fmt.Sprintf("%s = %s", a.ArrayMember.String(funcCtx), arrayStoreRHS(a.ArrayMember, a.JavaValue, funcCtx))
 	}
 	if a.LeftValue == nil || a.JavaValue == nil {
 		left := values.EmptySlotValuePlaceholder

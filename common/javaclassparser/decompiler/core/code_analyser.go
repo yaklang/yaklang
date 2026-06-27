@@ -1134,7 +1134,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 	case OP_DNEG, OP_FNEG, OP_LNEG, OP_INEG:
 		v := runtimeStackSimulation.Pop().(values.JavaValue)
 		runtimeStackSimulation.Push(values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
-			return fmt.Sprintf("-%s", v.String(funcCtx))
+			return "-" + values.UnaryMinusOperand(v, funcCtx)
 		}, func() types.JavaType {
 			return v.Type()
 		}))
