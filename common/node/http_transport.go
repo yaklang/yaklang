@@ -33,6 +33,7 @@ type BootstrapRequest struct {
 	AgentInstallationID      string            `json:"agent_installation_id"`
 	HostIdentity             HostIdentity      `json:"host_identity"`
 	NodeType                 string            `json:"node_type"`
+	Kind                     string            `json:"kind"`
 	Version                  string            `json:"version"`
 	Labels                   map[string]string `json:"labels"`
 	CapabilityKeys           []string          `json:"capability_keys"`
