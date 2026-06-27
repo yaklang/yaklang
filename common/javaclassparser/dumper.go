@@ -141,6 +141,17 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	c.PackageName = packageName
 	rawClassName := splits[len(splits)-1]
 	className := class_context.SafeIdentifier(rawClassName)
+	// Nested/local/anonymous classes carry a '$' in their binary name (Outer$Inner).
+	// When such a class is decompiled as a standalone top-level type, a `public`/`protected`
+	// modifier is illegal: Java requires a public type to be declared in a file named exactly
+	// after it (and the file here is named Outer.java, not Outer$Inner.java). Demote its
+	// visibility to package-private so the emitted source is re-compilable. This mirrors how
+	// CFR/Vineflower place nested types as package-private members and does not change the
+	// class's members, inheritance, or observable contract.
+	if strings.Contains(rawClassName, "$") {
+		accessFlags = strings.TrimSpace(strings.ReplaceAll(accessFlags, "public", ""))
+		accessFlags = strings.TrimSpace(strings.ReplaceAll(accessFlags, "protected", ""))
+	}
 	// module-info / package-info are synthetic descriptor pseudo-classes; their internal
 	// name ("module-info" / "package-info") is not a legal Java identifier, so emitting
 	// `class module-info {}` yields un-parseable source. Render a valid minimal compilation

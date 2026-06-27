@@ -418,6 +418,30 @@ func TestDecompileFastjsonJSONWriterSetPathCrossChecked(t *testing.T) {
 //go:embed testdata/regression/*.class
 var regressionFS embed.FS
 
+// TestNestedClassVisibilityDemotion is a stricter guard for the nested-class visibility
+// demotion (root cause B, declaration side). A class whose binary name contains '$' (i.e. a
+// nested/local/anonymous class) is decompiled as a standalone top-level type; emitting it with
+// its original `public`/`protected` modifier yields illegal Java ("X$Y is public, should be
+// declared in a file named X$Y.java"). The fix demotes such classes to package-private. This
+// test asserts the declaration carries no access modifier, independent of the syntax frontend.
+func TestNestedClassVisibilityDemotion(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/nested_class_visibility.class")
+	if err != nil {
+		t.Fatalf("read embedded class failed: %v", err)
+	}
+	source, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile failed: %v", err)
+	}
+	if strings.Contains(source, "public class Outer$Inner") {
+		t.Errorf("nested class regression: Outer$Inner still declared public (visibility not demoted)\n----- source -----\n%s", source)
+	}
+	// It must still be declared (just package-private now).
+	if !strings.Contains(source, "class Outer$Inner") {
+		t.Errorf("nested class regression: Outer$Inner declaration missing\n----- source -----\n%s", source)
+	}
+}
+
 // TestBridgeMethodSuppression is a stricter, semantics-structural guard for the covariant-return
 // bridge-method fix (root cause A in the cross-comparison report). A class implementing a generic
 // interface like Supplier<String> carries a compiler-synthetic ACC_BRIDGE | ACC_SYNTHETIC
@@ -518,6 +542,15 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			mustNotContain: []string{"Object get()", "yak-decompiler"},
 		},
 		{
+			file: "nested_class_visibility.class",
+			desc: "a nested class (binary name Outer$Inner) decompiled as a standalone top-level type " +
+				"must have its public/protected visibility demoted to package-private, because Java " +
+				"forbids a public type in a file not named after it ('X$Y is public, should be declared " +
+				"in a file named X$Y.java'). The class body and members are unaffected.",
+			mustContain:    []string{"class Outer$Inner"},
+			mustNotContain: []string{"public class Outer$Inner", "protected class Outer$Inner", "yak-decompiler"},
+		},
+		{
 			file: "wildcard_class_param.class",
 			desc: "generic wildcard type arguments (`Class<?>`) render as `?`, not the illegal identifier " +
 				"`__`. The old path routed `?` through SafeIdentifier, which turned it into `__` because `_` " +
@@ -610,7 +643,7 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			desc: "an enum with no constants but normal fields/methods (CBORParser.Feature) needs the empty " +
 				"enum body separator before declarations, and member validation must wrap enum members with that separator.",
 			mustContain: []string{
-				"public enum CBORParser$Feature implements FormatFeature",
+				"enum CBORParser$Feature implements FormatFeature",
 				";\n\tfinal boolean _defaultState;",
 				"public static int collectDefaults()",
 				"public boolean enabledByDefault()",
