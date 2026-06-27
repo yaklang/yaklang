@@ -32,6 +32,24 @@ func NewNewArrayExpression(typ types.JavaType, length ...JavaValue) *NewExpressi
 		Length:   length,
 	}
 }
+// coerceInitializerLiteral renders an array-initializer element with the array's
+// element type when that yields more faithful source. Today this only matters for
+// boolean element types: a boolean[] initializer is filled by iconst_0/iconst_1,
+// whose values carry an int type, so they must be rendered as false/true.
+func coerceInitializerLiteral(v JavaValue, elemType types.JavaType, funcCtx *class_context.ClassContext) string {
+	if lit, ok := v.(*JavaLiteral); ok {
+		if elemType.String(funcCtx) == types.NewJavaPrimer(types.JavaBoolean).String(funcCtx) {
+			if n, ok := lit.Data.(int); ok {
+				if n == 0 {
+					return "false"
+				}
+				return "true"
+			}
+		}
+	}
+	return v.String(funcCtx)
+}
+
 func NewNewExpression(typ types.JavaType) *NewExpression {
 	return &NewExpression{
 		JavaType: typ,
@@ -57,7 +75,11 @@ func (n *NewExpression) String(funcCtx *class_context.ClassContext) string {
 			}
 			vsStr := []string{}
 			for _, v := range n.Initializer {
-				vsStr = append(vsStr, v.String(funcCtx))
+				// Coerce int 0/1 literals to boolean false/true when the array element type is
+				// boolean: iconst_0/iconst_1 fill a boolean[] but carry an int type, so without
+				// this coercion the initializer renders `new boolean[]{1,1,1,1}`, which javac
+				// rejects ("int cannot be converted to boolean").
+				vsStr = append(vsStr, coerceInitializerLiteral(v, base, funcCtx))
 			}
 			s += fmt.Sprintf("{%s}", strings.Join(vsStr, ","))
 			return s

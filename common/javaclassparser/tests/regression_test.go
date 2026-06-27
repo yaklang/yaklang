@@ -551,6 +551,14 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			mustNotContain: []string{"public class Outer$Inner", "protected class Outer$Inner", "yak-decompiler"},
 		},
 		{
+			file: "bool_array_initializer.class",
+			desc: "a boolean[] initializer is filled by iconst_0/iconst_1, whose values carry an " +
+				"int type; they must render as true/false, not 1/0, otherwise javac rejects it " +
+				"('int cannot be converted to boolean').",
+			mustContain:    []string{"new boolean[]{true"},
+			mustNotContain: []string{"boolean[]{1", "boolean[]{0", "yak-decompiler"},
+		},
+		{
 			file: "wildcard_class_param.class",
 			desc: "generic wildcard type arguments (`Class<?>`) render as `?`, not the illegal identifier " +
 				"`__`. The old path routed `?` through SafeIdentifier, which turned it into `__` because `_` " +
