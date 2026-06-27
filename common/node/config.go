@@ -68,6 +68,7 @@ type RuntimeStatusProvider interface {
 // BaseConfig defines how NodeBase connects to the platform.
 type BaseConfig struct {
 	NodeType             spec.NodeType
+	Kind                 string
 	NodeID               string
 	DisplayName          string
 	AgentInstallationID  string
@@ -87,6 +88,10 @@ type BaseConfig struct {
 	HostInfoProvider     HostInfoProvider
 	HostIdentityProvider HostIdentityProvider
 	HTTPClient           *http.Client
+	// PostBootstrapHook 在 bootstrap 成功（首次或重连后）调用。
+	// ai_session 容器 runtime 用它回调 sessionmgr 的 register 端点上报 node id。
+	// 可为 nil。
+	PostBootstrapHook func(SessionState)
 }
 
 func normalizeBaseConfig(cfg BaseConfig) (BaseConfig, error) {
