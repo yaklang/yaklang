@@ -110,6 +110,7 @@ type Builder interface {
 	FilterFile(string) bool
 	GetLanguage() ssaconfig.Language
 	PreHandlerAnalyzer
+	UnitPartitioner
 }
 
 type initHanlderFunc func(*FunctionBuilder)
@@ -133,6 +134,20 @@ func (d *PreHandlerBase) AfterPreHandlerProject(builder *FunctionBuilder) {
 
 func (*PreHandlerBase) UsesDeferredFileBuild() bool {
 	return false
+}
+
+// PartitionCompileUnits is the default directory-based partition. Language
+// builders override this when they have a stronger translation-unit notion
+// (e.g. Java package, Go module). The Language field is filled by the engine
+// (ssaapi) after partitioning, so implementations need not set it.
+func (d *PreHandlerBase) PartitionCompileUnits(fs fi.FileSystem, files []string) []*CompileUnit {
+	return defaultPartitionCompileUnits(ssaconfig.Yak, fs, files)
+}
+
+// CompileUnitDependencies defaults to no edges: the engine then falls back to a
+// deterministic directory order. Languages with explicit imports override this.
+func (*PreHandlerBase) CompileUnitDependencies(fs fi.FileSystem, units []*CompileUnit) []UnitRef {
+	return nil
 }
 
 func NewPreHandlerBase(fs ...initHanlderFunc) *PreHandlerBase {

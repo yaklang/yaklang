@@ -35,9 +35,6 @@ func (b *FunctionBuilder) GetBluePrint(name string) *Blueprint {
 
 func (b *FunctionBuilder) SetBlueprint(name string, class *Blueprint) {
 	p := b.prog
-	if p != nil && class != nil {
-		p.BindLazyBuilderUnit(class.LazyBuilder)
-	}
 	_, exit := p.Blueprint.Get(name)
 	if exit {
 		log.Errorf("SetBlueprint: this class redeclare")
@@ -70,7 +67,6 @@ func (b *FunctionBuilder) CreateBlueprintWithPkgName(name string, tokenizers ...
 	}
 
 	blueprint := NewBlueprint(name)
-	prog.BindLazyBuilderUnit(blueprint.LazyBuilder)
 
 	blueprint.Range = codeRange
 

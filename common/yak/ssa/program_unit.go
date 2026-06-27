@@ -6,10 +6,46 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	yaklog "github.com/yaklang/yaklang/common/log"
 )
+
+// BeginCompileUnit marks the start of a compile unit: subsequent lazy/deferred
+// builds capture this unitKey so per-unit runs (RunDeferredBuildsForUnits,
+// LazyBuildForUnits) can scope work to a unit.
+func (prog *Program) BeginCompileUnit(unitKey string) {
+	if prog == nil {
+		return
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	app.currentCompileUnit = unitKey
+}
+
+func (prog *Program) EndCompileUnit() {
+	if prog == nil {
+		return
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	app.currentCompileUnit = ""
+}
+
+func (prog *Program) CurrentCompileUnit() string {
+	if prog == nil {
+		return ""
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	return app.currentCompileUnit
+}
 
 // ReleaseCompletedUnitMemory releases memory for completed compile units after flush.
 func (prog *Program) ReleaseCompletedUnitMemory(unitKeys []string) int {
@@ -222,9 +258,6 @@ func (prog *Program) AggressiveClearMemory() int64 {
 	prog.ExportValue = make(map[string]Value)
 	prog.ExportType = make(map[string]Type)
 
-	// NEW: Clear lazy builder state - these hold scopes/variables/values
-	prog.lazyBuildersByUnit = make(map[string][]*LazyBuilder)
-	prog.lazyBuilderUnitSet = make(map[string]map[*LazyBuilder]struct{})
 	prog.deferredBuilds = omap.NewEmptyOrderedMap[string, *deferredBuildTask]()
 
 	// NEW: Clear editor stack - holds file content
