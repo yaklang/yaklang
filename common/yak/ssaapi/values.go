@@ -833,6 +833,54 @@ func (v *Value) GetObjectKeyPairs() [][]*Value {
 	return ret
 }
 
+// GetAllObjectKeyPairs is the explicit "all parents" alias of GetObjectKeyPairs.
+// Audit rules that want to express "enumerate every parent object/key pair of
+// this member" should prefer this name; GetObjectKeyPairs remains for parity
+// with the ssa-level accessor. Both return the same data.
+func (v *Value) GetAllObjectKeyPairs() [][]*Value {
+	return v.GetObjectKeyPairs()
+}
+
+// GetAllObjects returns every distinct parent object recorded on this member,
+// wrapped as *Value. Use this on audit read paths where a member may belong to
+// multiple objects (e.g. `a.x = m; b.y = m`). GetObject() remains as a
+// latest-only convenience for display/single-parent semantics.
+func (v *Value) GetAllObjects() Values {
+	if v.IsNil() {
+		return nil
+	}
+	all := ssa.GetAllObjects(v.getValue())
+	if len(all) == 0 {
+		return nil
+	}
+	ret := make(Values, 0, len(all))
+	for _, obj := range all {
+		if !utils.IsNil(obj) {
+			ret = append(ret, v.NewValue(obj))
+		}
+	}
+	return ret
+}
+
+// GetAllKeys returns every distinct parent key recorded on this member,
+// wrapped as *Value. Semantics mirror GetAllObjects.
+func (v *Value) GetAllKeys() Values {
+	if v.IsNil() {
+		return nil
+	}
+	all := ssa.GetAllKeys(v.getValue())
+	if len(all) == 0 {
+		return nil
+	}
+	ret := make(Values, 0, len(all))
+	for _, key := range all {
+		if !utils.IsNil(key) {
+			ret = append(ret, v.NewValue(key))
+		}
+	}
+	return ret
+}
+
 // // MemberCall : member
 
 func (v *Value) IsMethod() bool {

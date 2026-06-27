@@ -780,8 +780,15 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 						if !ok {
 							continue
 						}
-						val, ok := ssa.GetLatestMemberByKeyString(traceValue, retIndexRawStr)
-						if ok && val != nil {
+						// Multi-parent case: the same return-index key may resolve
+						// to several members across different parent objects. Trace
+						// every match (not just the latest one) so topdef return
+						// tracking does not drop valid return sources that happen to
+						// live under a non-latest parent.
+						for _, val := range traceValue.GetMembersByKeyString(retIndexRawStr) {
+							if utils.IsNil(val) {
+								continue
+							}
 							topDefValue := i.NewValue(val)
 							if topDefValue != nil {
 								traceRets = append(traceRets, topDefValue)

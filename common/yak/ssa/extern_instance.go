@@ -100,7 +100,18 @@ func (b *FunctionBuilder) externLibFieldWithLazyExports(extern *ExternLib, membe
 		return nil
 	}
 	if g := lib.GetExportValue(memberName); !utils.IsNil(g) {
-		if _, exists := GetLatestMemberByKeyString(extern, memberName); !exists {
+		// Only register the relationship if no member under memberName exists
+		// on extern yet. Check every match (not just the latest one) so a
+		// multi-parent extern that already has the field under a different
+		// parent is not double-registered.
+		exists := false
+		for _, cand := range extern.GetMembersByKeyString(memberName) {
+			if !utils.IsNil(cand) {
+				exists = true
+				break
+			}
+		}
+		if !exists {
 			setMemberCallRelationship(extern, b.EmitConstInstPlaceholder(memberName), g)
 		}
 		return g

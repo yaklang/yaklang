@@ -43,7 +43,16 @@ func (b *FunctionBuilder) AddGlobalVariable(name string, valueFunc func() Value)
 
 		scope := b.CurrentBlock.ScopeTable
 		for _, v := range scope.GetAllVariables() {
-			if object := GetLatestObject(v.GetValue()); object != nil && object.GetId() == value.GetId() {
+			// v may be a member of multiple objects; mark the global container
+			// for every parent whose id matches value (not just the latest one).
+			matched := false
+			for _, object := range GetAllObjects(v.GetValue()) {
+				if !utils.IsNil(object) && object.GetId() == value.GetId() {
+					matched = true
+					break
+				}
+			}
+			if matched {
 				variable := b.CreateMemberCallVariable(globalVarsContainer, b.EmitConstInstPlaceholder(v.GetName()))
 				b.AssignVariable(variable, v.GetValue())
 			}

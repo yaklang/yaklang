@@ -62,6 +62,85 @@ func GetLatestKey(member Value) Value {
 	return pair.Key
 }
 
+// GetAllObjects returns every distinct parent object recorded on member
+// (i.e. every object that holds this member under some key), deduplicated
+// by value id. Order follows ownerPairs append order; callers that need
+// "latest first" semantics should reverse-iterate. Use this on audit read
+// paths where a member may legitimately belong to multiple objects; keep
+// using GetLatestObject for display/debug single-parent convenience.
+func GetAllObjects(member Value) []Value {
+	if utils.IsNil(member) {
+		return nil
+	}
+	pairs := GetObjectKeyPairs(member)
+	if len(pairs) == 0 {
+		return nil
+	}
+	ret := make([]Value, 0, len(pairs))
+	seen := make(map[int64]struct{}, len(pairs))
+	for _, pair := range pairs {
+		if utils.IsNil(pair.Object) {
+			continue
+		}
+		id := pair.Object.GetId()
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		ret = append(ret, pair.Object)
+	}
+	return ret
+}
+
+// GetAllKeys returns every distinct parent key recorded on member,
+// deduplicated by value id. Semantics mirror GetAllObjects.
+func GetAllKeys(member Value) []Value {
+	if utils.IsNil(member) {
+		return nil
+	}
+	pairs := GetObjectKeyPairs(member)
+	if len(pairs) == 0 {
+		return nil
+	}
+	ret := make([]Value, 0, len(pairs))
+	seen := make(map[int64]struct{}, len(pairs))
+	for _, pair := range pairs {
+		if utils.IsNil(pair.Key) {
+			continue
+		}
+		id := pair.Key.GetId()
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		ret = append(ret, pair.Key)
+	}
+	return ret
+}
+
+// GetAllMembersByKey is the explicit "all matches" counterpart to
+// GetLatestMemberByKey. It is a thin alias over GetMembersByKey so call
+// sites can express intent ("I want every member under this key") without
+// the reader having to know GetMembersByKey already returns all matches.
+func GetAllMembersByKey(object, key Value) []Value {
+	return GetMembersByKey(object, key)
+}
+
+// ForEachOwnerPair invokes fn for every (object, key) pair recorded on
+// member. If fn returns false, iteration stops. Use this on hot paths to
+// avoid allocating an intermediate []ObjectKeyPair when only a single
+// matching pair is needed.
+func ForEachOwnerPair(member Value, fn func(ObjectKeyPair) bool) {
+	if utils.IsNil(member) || fn == nil {
+		return
+	}
+	for _, pair := range GetObjectKeyPairs(member) {
+		if !fn(pair) {
+			return
+		}
+	}
+}
+
 func SetObjectKeyPairs(member Value, pairs []ObjectKeyPair) {
 	if utils.IsNil(member) {
 		return

@@ -272,13 +272,42 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 	default:
 	}
 	//保底操作，从val-member中获取
-	if member, exist := GetLatestMemberByKey(value, key); exist {
-		ret.typ = member.GetType()
-		return
+	// Multi-parent case: the same key may resolve to several members with
+	// different types. Collect every match's type and merge with NewOrType
+	// (mirroring the OrType branch above) so the audit-side type inference
+	// does not collapse to the latest member's type and miss other parents.
+	var collectedTypes []Type
+	matched := false
+	for _, member := range GetAllMembersByKey(value, key) {
+		if utils.IsNil(member) {
+			continue
+		}
+		matched = true
+		if typ := member.GetType(); !utils.IsNil(typ) {
+			collectedTypes = append(collectedTypes, typ)
+		}
 	}
-	member, exist := GetLatestMemberByKeyString(value, keyText)
-	if exist {
-		ret.typ = member.GetType()
+	if !matched {
+		for _, member := range value.GetMembersByKeyString(keyText) {
+			if utils.IsNil(member) {
+				continue
+			}
+			matched = true
+			if typ := member.GetType(); !utils.IsNil(typ) {
+				collectedTypes = append(collectedTypes, typ)
+			}
+		}
+	}
+	if matched {
+		ret.exist = true
+		switch len(collectedTypes) {
+		case 0:
+			ret.typ = CreateAnyType()
+		case 1:
+			ret.typ = collectedTypes[0]
+		default:
+			ret.typ = NewOrType(collectedTypes...)
+		}
 		return
 	}
 	ret.exist = false

@@ -135,6 +135,21 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 
 			if toMemberObj := GetLatestObject(toMember); utils.IsNil(toMemberObj) || toMemberObj.GetId() == target.GetId() || toMemberObj.GetId() == holder.GetId() {
 				fixBranch(toMember, replacement, key)
+			} else {
+				// Multi-parent case: toMember may belong to several objects.
+				// Even if the latest parent is none of target/holder, another
+				// parent might be, and that parent still needs fixBranch to
+				// rebind the member onto replacement. Scan all parents so we
+				// do not miss a branch that the latest-only check skipped.
+				for _, obj := range GetAllObjects(toMember) {
+					if utils.IsNil(obj) {
+						continue
+					}
+					if obj.GetId() == target.GetId() || obj.GetId() == holder.GetId() {
+						fixBranch(toMember, replacement, key)
+						break
+					}
+				}
 			}
 
 			// Check if we need to recursively process nested members BEFORE modifying member
@@ -174,32 +189,72 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 
 			// 处理 IsMember 情况：如果 member 是成员访问，需要递归处理其 object
 			if !shouldRecurse && member.IsMember() && !utils.IsNil(toMember) {
-				memberObj := GetLatestObject(member)
-				if !utils.IsNil(memberObj) && memberObj.IsObject() {
+				// member may have multiple parent objects. Iterate every parent
+				// (latest-first via reverse order, to preserve prior behavior
+				// when the latest parent is the recursable one) and trigger the
+				// recursion on the first parent that satisfies the conditions.
+				// Using only GetLatestObject here would silently skip the other
+				// parents when the latest one does not match, dropping nested
+				// member replacements for shared members.
+				memberObjects := GetAllObjects(member)
+				for idx := len(memberObjects) - 1; idx >= 0 && !shouldRecurse; idx-- {
+					memberObj := memberObjects[idx]
+					if utils.IsNil(memberObj) || !memberObj.IsObject() {
+						continue
+					}
 					memberObjID := memberObj.GetId()
 					if memberObjID == target.GetId() {
 						// member 的 object 就是 target，需要替换为 replacement
 						memberForRecursion = memberObj
 						toMemberForRecursion = replacement
 						shouldRecurse = true
-					} else {
-						toMemberObj := GetLatestObject(toMember)
-						if !utils.IsNil(toMemberObj) && toMemberObj.IsObject() && memberObjID != toMemberObj.GetId() {
-							_, memberObjVisited := visited[memberObjID]
-							_, toMemberObjVisited := visited[toMemberObj.GetId()]
+						break
+					}
+					toMemberObj := GetLatestObject(toMember)
+					if utils.IsNil(toMemberObj) || !toMemberObj.IsObject() || memberObjID == toMemberObj.GetId() {
+						// Fall back to scanning toMember's other parents: if any
+						// of them is a fresh, unvisited object distinct from the
+						// member's parent, treat it as the recursion target.
+						matched := false
+						for _, cand := range GetAllObjects(toMember) {
+							if utils.IsNil(cand) || !cand.IsObject() || cand.GetId() == memberObjID {
+								continue
+							}
+							_, mVisited := visited[memberObjID]
+							_, cVisited := visited[cand.GetId()]
 							holderID := holder.GetId()
 							targetID := target.GetId()
 							replacementID := replacement.GetId()
-
-							if !memberObjVisited && !toMemberObjVisited &&
-								memberObjID != holderID && toMemberObj.GetId() != holderID &&
-								memberObjID != targetID && toMemberObj.GetId() != targetID &&
-								memberObjID != replacementID && toMemberObj.GetId() != replacementID {
+							if !mVisited && !cVisited &&
+								memberObjID != holderID && cand.GetId() != holderID &&
+								memberObjID != targetID && cand.GetId() != targetID &&
+								memberObjID != replacementID && cand.GetId() != replacementID {
 								memberForRecursion = memberObj
-								toMemberForRecursion = toMemberObj
+								toMemberForRecursion = cand
 								shouldRecurse = true
+								matched = true
+								break
 							}
 						}
+						if matched {
+							break
+						}
+						continue
+					}
+					_, memberObjVisited := visited[memberObjID]
+					_, toMemberObjVisited := visited[toMemberObj.GetId()]
+					holderID := holder.GetId()
+					targetID := target.GetId()
+					replacementID := replacement.GetId()
+
+					if !memberObjVisited && !toMemberObjVisited &&
+						memberObjID != holderID && toMemberObj.GetId() != holderID &&
+						memberObjID != targetID && toMemberObj.GetId() != targetID &&
+						memberObjID != replacementID && toMemberObj.GetId() != replacementID {
+						memberForRecursion = memberObj
+						toMemberForRecursion = toMemberObj
+						shouldRecurse = true
+						break
 					}
 				}
 			}

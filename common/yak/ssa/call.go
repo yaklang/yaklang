@@ -261,11 +261,24 @@ func (c *Call) handlerObjectMethod() {
 	switch t := target.GetType().(type) {
 	case *FunctionType:
 		if t.IsMethod {
-			if obj := GetLatestObject(target); obj != nil {
-				AddThis(obj)
-			} else {
+			// A method member may belong to multiple parent objects (multi-parent
+			// case, e.g. `a.x = m; b.y = m` where m is a method). The first parent
+			// becomes the `this` argument; every other parent is registered as a
+			// user of this call so use-def chains on the audit side can still
+			// reach them. Using only the latest parent here would drop the other
+			// parents from the data-flow graph and cause this-related taint to
+			// miss valid sources.
+			objects := GetAllObjects(target)
+			if len(objects) == 0 {
 				//  is method but not object
 				log.Errorf("method call, but object is nil")
+				break
+			}
+			AddThis(objects[0])
+			for _, extra := range objects[1:] {
+				if !utils.IsNil(extra) {
+					extra.AddUser(c)
+				}
 			}
 		}
 	default:
