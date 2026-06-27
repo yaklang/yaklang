@@ -205,6 +205,58 @@ iinc」, 还原成 `arr[i++] = v` (捕获自增前的旧值)。
 
 ---
 
+## 已完成 (本阶段 — Bug M 治本 + try/catch 跨臂局部变量治本 + battery 扩展)
+
+### 7. Bug M 治本修复 (终止守卫间夹 store → then/else 交换)
+
+**根因**: if-opcode 从不写 `JmpNode` (`opcode.Jmp` 恒为 0), 故 `ConditionStatement` 的
+TrueNode/FalseNode 完全依赖 `Next` 数组顺序 (`[falseBranch, trueBranch]`)。当被折叠的局部 store
+落在守卫的跳转目标分支、而**兄弟分支是裸 `return`** 时, 旧的 var-fold 改线用 `RemoveNext` +
+`AddNext`(append), 把改线后的后继**推到 Next 末尾**, 反转了 `[false, true]` 顺序 → then/else 体互换。
+
+**修复** (`decompiler/core/node.go` + `code_analyser.go`): 新增 `ReplaceNextSliceKeepOrder` 原位替换
+保序改线; var-fold Path 1 仅在 `isEarlyReturnGuardFold` (前驱是双后继 `ConditionStatement`、兄弟分支为
+`ReturnStatement`、且折叠目标**不会回边到守卫** → 用 `canReachNode` 排除循环头) 时走保序改线, 其余
+保持原 append 行为不动。循环 do-while 规整依赖历史 append 顺序, 故被回边检测排除, 无回归。
+
+**验证**: `MoreSpringAlgorithms` 的 `getFilenameExtension`/`stripFilenameExtension` **已改回自然
+Spring 形态** (中间 `int folderIndex = path.lastIndexOf('/')` 局部 store), round-trip byte-for-byte
+通过。新增 `GuardChainAlgorithms.java` battery 专门锁定守卫链 (含 throw 兄弟、循环出口 return 的对抗
+样本), round-trip 通过。`mybatis_plus_abstract_kt_wrapper` / `ternary_return_split` golden 无回归。
+
+### 8. try/catch 跨臂局部变量未提升 (新发现 + 治本)
+
+**症状**: `int r; try { r = f(); } catch (E e) { r = g(); } return r;` 这类**同一局部在 try 臂与
+catch 臂都赋值、try 后读取**的形态, 反编译产出 `int var1=...`(try 内声明)、`int var1_1=-1`(catch 内
+另一声明)、`return var2`(悬空) —— 三者 id 互不一致, javac 报 "cannot find symbol"。
+
+**根因**: `rewriteVar` 把 try 与各 catch 当**互不相交的子作用域**下降, try 臂的 in-scope
+`ReplaceVar(old→new)` 永远到不了 catch 臂, 于是每个臂各自为共享 slot 重新 mint 一个 id, 而 try 后的
+读取保留 slot 原 id, 三者发散。if/else 同构但因 minted 名恰好等于原名而侥幸正确; try/catch 因 catch
+异常参数占用了中间的命名 slot 打破该巧合。
+
+**修复** (`rewrite_var.go` `prebindSharedTryCatchSlots`): 在下降进 try/catch 各臂**之前**, 把在
+**两个及以上臂**都被赋值的 slot (排除 catch 异常参数) 预绑定到其现有 id, 使各臂走 hasNamed 复用路径
+而不再重新 mint; try 后的读取本就携带该 id, 三者归一。该 id 同时记入 `reused` 集合, 由既有
+`placeCrossScopeDeclarations` 把单条 `T x;` 声明提升到外层块。
+
+**验证**: 新增 `TryCatchLocalAlgorithms.java` battery, 覆盖 基本跨臂 (int/String/引用)、跨臂 +
+finally (javac 把 finally 内联进每条路径)、multi-catch 跨臂、循环内跨臂累加、嵌套 try 跨臂、
+仅 try 臂赋值后读取 (读取合法下沉进 try)。全部 round-trip byte-for-byte 通过。全包 `go test
+./common/javaclassparser/...` 无回归。
+
+### 9. 新增 battery (本阶段, 差分门禁现 15 个 battery 全绿)
+
+- **`GuardChainAlgorithms.java`**: 锁定 Bug M 治本 (见 §7)。
+- **`TryCatchLocalAlgorithms.java`**: 锁定 try/catch 跨臂治本 (见 §8)。
+- **`GuavaMurmur3Algorithms.java`**: Guava `Hashing.murmur3_32` + `fmix64` 自托管移植, 密集压
+  imul/ixor (负 0x 常量两补环绕)、`(x<<r)|(x>>>(32-r))` 旋转 (ishl/iushr/ior)、fmix 雪崩链、
+  小端字节装配 (`b & 0xff`)。**尾块按 Bug G 规避用 `if` 阶梯**而非降序 fall-through `switch`。
+
+OPCODE 解析覆盖仍为 **195/195 (100.0%)** (新 battery 已纳入语料)。
+
+---
+
 ## 已知深层缺陷 (本阶段定位, 暂以源码重构规避; 待治本)
 
 - **Bug J — 复合赋值且结果值被消费时, RHS 被重复求值** (本阶段进一步定位, 比原判更宽):
@@ -241,8 +293,8 @@ iinc」, 还原成 `arr[i++] = v` (捕获自增前的旧值)。
   long 零守卫), 暂未提炼出最小复现。**规避**: 改用正向守卫 `if (a[j]!=0L) {body}` (已实测正确)。
   归入 Bug E/F/I 控制流分支极性一类。
 
-- **Bug M — 两个终止型守卫之间夹一个局部 store 时, 第一个守卫 then/else 被交换** (本阶段定位,
-  **有干净最小复现**): 形如 `if(c1) return X; int t=...; if(c2) return Y; return Z;`, 当两个守卫
+- **Bug M — [已治本, 见 §7] 两个终止型守卫之间夹一个局部 store 时, 第一个守卫 then/else 被交换**
+  (本阶段定位, **有干净最小复现**): 形如 `if(c1) return X; int t=...; if(c2) return Y; return Z;`, 当两个守卫
   之间**夹着一条局部变量声明** (`int t=...` 即 `istore`) 时, if 结构化把第一个守卫的 then/else 分支
   **对调**: 产出 `if(c1){ <c2 守卫+Z> } else { return X; }` —— 等价于条件取反。Spring
   `stripFilenameExtension`/`getFilenameExtension` (`if(ext==-1)return; int sep=lastIndexOf('/');

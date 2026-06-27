@@ -151,16 +151,16 @@ public class MoreSpringAlgorithms {
         return sep != -1 ? path.substring(sep + 1) : path;
     }
 
-    // The second lookup is inlined into the `if` (rather than `int folderIndex = path.lastIndexOf('/')`
-    // on its own line) on purpose: an intervening local store between two terminating guards currently
-    // makes the if-structurer swap the first guard's then/else branches (CODEC_TODO.md "Bug M"). With
-    // the call inlined the guard chain reconstructs correctly.
+    // Natural Spring StringUtils form: an intervening local store (folderIndex) sits between two
+    // terminating guards. This exercises the early-return-guard branch-swap path (Bug M), now fixed
+    // by position-preserving var-fold rewiring for non-loop guards whose sibling branch returns.
     public static String getFilenameExtension(String path) {
         int extIndex = path.lastIndexOf('.');
         if (extIndex == -1) {
             return "";
         }
-        if (path.lastIndexOf('/') > extIndex) {
+        int folderIndex = path.lastIndexOf('/');
+        if (folderIndex > extIndex) {
             return "";
         }
         return path.substring(extIndex + 1);
@@ -171,7 +171,8 @@ public class MoreSpringAlgorithms {
         if (extIndex == -1) {
             return path;
         }
-        if (path.lastIndexOf('/') > extIndex) {
+        int folderIndex = path.lastIndexOf('/');
+        if (folderIndex > extIndex) {
             return path;
         }
         return path.substring(0, extIndex);

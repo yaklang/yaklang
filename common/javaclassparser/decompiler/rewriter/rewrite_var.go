@@ -488,6 +488,20 @@ func rewriteVar(scope *Scope, className, methodName string) int {
 				rewriteVar(subScope, className, methodName)
 			}
 		case *statements.TryCatchStatement:
+			// Bug: a local assigned in BOTH the try arm and a catch arm (and read after the try) was
+			// re-minted INDEPENDENTLY by each arm. rewriteVar descends into the try and each catch as
+			// disjoint sub-scopes; the try arm's deferred ReplaceVar(old->new) rewrites only the try
+			// list, never the catch list, so the catch arm still carries the slot's original id and
+			// mints a SECOND fresh id, while the post-try read keeps the original id entirely. The three
+			// then disagree (`int var1 = ...` in try, `int var1_1 = -1` in catch, `return var2` after),
+			// which javac rejects ("cannot find symbol"). The if/else lowering has the same structure
+			// but happens to survive because the minted name equals the original name; try/catch breaks
+			// that coincidence because the catch exception parameter consumes the intervening name slot.
+			// Pre-bind any slot assigned in two or more arms to its existing id BEFORE descending, so
+			// every arm reuses that id (hasNamed path) instead of re-minting, and the post-try read -
+			// which already carries that same id - stays consistent. Marking the id `reused` lets the
+			// existing cross-scope declaration placement hoist the single `T x;` to the enclosing block.
+			prebindSharedTryCatchSlots(scope, statement, className, methodName)
 			subScope := scope.SubScope(&statement.TryBody)
 			core.TraceRewriteVar(className, methodName, "enter try depth=%d body=%d", subScope.deep, len(statement.TryBody))
 			rewriteVar(subScope, className, methodName)
@@ -499,6 +513,97 @@ func rewriteVar(scope *Scope, className, methodName string) int {
 		}
 	}
 	return scope.nowId
+}
+
+// prebindSharedTryCatchSlots unifies a local that is assigned in two or more arms of a try/catch
+// (the try body and/or any catch body) onto a single VariableId, BEFORE rewriteVar descends into the
+// arms. Without this, each disjoint arm re-mints its own id for the shared slot (the try arm's
+// in-scope ReplaceVar never reaches the catch arm), and the post-try read keeps the slot's original
+// id, so the three references disagree and javac rejects the recompiled source. By recording the
+// slot's existing id in this scope's assignedMap, every arm takes the hasNamed reuse path and keeps
+// that id; the post-try read already carries it, so all uses converge. The id is also added to the
+// `reused` set so placeCrossScopeDeclarations hoists the single declaration to the enclosing block.
+// Catch exception parameters are excluded: each is genuinely scoped to its own catch clause and must
+// never be merged with an ordinary local.
+func prebindSharedTryCatchSlots(scope *Scope, statement *statements.TryCatchStatement, className, methodName string) {
+	exceptionUids := map[string]struct{}{}
+	for _, ex := range statement.Exception {
+		if ex != nil {
+			exceptionUids[ex.VarUid] = struct{}{}
+		}
+	}
+	armCount := map[string]int{}
+	firstId := map[string]*utils.VariableId{}
+	collectArm := func(arm []statements.Statement) {
+		seen := map[string]struct{}{}
+		var walk func([]statements.Statement)
+		walk = func(sts []statements.Statement) {
+			for _, st := range sts {
+				switch s := st.(type) {
+				case *statements.AssignStatement:
+					if s.ArrayMember != nil {
+						continue
+					}
+					ref, ok := core.UnpackSoltValue(s.LeftValue).(*values.JavaRef)
+					if !ok || ref == nil || ref.Id == nil || ref.IsThis {
+						continue
+					}
+					if _, isEx := exceptionUids[ref.VarUid]; isEx {
+						continue
+					}
+					if _, dup := seen[ref.VarUid]; !dup {
+						seen[ref.VarUid] = struct{}{}
+						armCount[ref.VarUid]++
+					}
+					if _, has := firstId[ref.VarUid]; !has {
+						firstId[ref.VarUid] = ref.Id
+					}
+				case *statements.IfStatement:
+					walk(s.IfBody)
+					walk(s.ElseBody)
+				case *statements.ForStatement:
+					walk(s.SubStatements)
+				case *statements.WhileStatement:
+					walk(s.Body)
+				case *statements.DoWhileStatement:
+					walk(s.Body)
+				case *statements.SynchronizedStatement:
+					walk(s.Body)
+				case *statements.SwitchStatement:
+					for _, c := range s.Cases {
+						if c != nil {
+							walk(c.Body)
+						}
+					}
+				case *statements.TryCatchStatement:
+					walk(s.TryBody)
+					for i := range s.CatchBodies {
+						walk(s.CatchBodies[i])
+					}
+				}
+			}
+		}
+		walk(arm)
+	}
+	collectArm(statement.TryBody)
+	for i := range statement.CatchBodies {
+		collectArm(statement.CatchBodies[i])
+	}
+	for uid, cnt := range armCount {
+		if cnt < 2 {
+			continue
+		}
+		if _, already := scope.assignedMap[uid]; already {
+			continue
+		}
+		id := firstId[uid]
+		if id == nil {
+			continue
+		}
+		scope.assignedMap[uid] = id
+		scope.reused[id] = struct{}{}
+		core.TraceRewriteVar(className, methodName, "prebind try/catch shared slot uid=%s id=%s arms=%d", uid, id.String(), cnt)
+	}
 }
 
 // hoistSwitchDeclarations lifts the declaration of any local that is declared inside a switch

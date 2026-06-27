@@ -2967,8 +2967,22 @@ func (d *Decompiler) ParseStatement() error {
 					if beforeNode == nil {
 						continue
 					}
-					beforeNode.RemoveNext(assignNode)
-					beforeNode.AddNext(node)
+					// Bug M (early-return guard branch swap): when the folded local store sits on one
+					// branch of an if-guard whose OTHER branch is a terminal `return`, the old
+					// RemoveNext + AddNext(append) pushed the rewired successor to the end of the
+					// condition's Next, reversing its [falseBranch, trueBranch] order. Because
+					// if-opcodes never populate JmpNode (opcode.Jmp stays 0), the TrueNode/FalseNode
+					// wiring depends purely on that order, so the then/else bodies got swapped
+					// (`if (extIndex == -1) { ...folder logic... } else { return path; }`). We replace
+					// the slot in place to preserve the order. This is scoped to the early-return-guard
+					// shape (sibling branch is a bare `return`) so loop back-edge rewiring, which relies
+					// on the historical append order for do-while normalization, is left untouched.
+					if isEarlyReturnGuardFold(beforeNode, assignNode, node) {
+						beforeNode.ReplaceNextSliceKeepOrder(assignNode, []*Node{node})
+					} else {
+						beforeNode.RemoveNext(assignNode)
+						beforeNode.AddNext(node)
+					}
 				}
 				ref.Id.Delete()
 				pair.Replace(val)
