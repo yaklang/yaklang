@@ -125,7 +125,7 @@ iinc」, 还原成 `arr[i++] = v` (捕获自增前的旧值)。
 
 ### 4. 新增自托管 battery (全部 round-trip byte-for-byte 通过)
 
-差分门禁 `TestCodecSemanticsRoundTrip` 现在跑 8 个 battery, 全绿:
+差分门禁 `TestCodecSemanticsRoundTrip` 现在跑 12 个 battery, 全绿:
 
 - **`LongHashAlgorithms.java`**: SHA-512 (FIPS 180-4)、xxHash64、SipHash-2-4、CRC64-ECMA、
   FNV-1a-64、splitmix64。专门压 long OPCODE (LADD/LMUL/LSHL/LUSHR/LAND/LXOR/LCMP 等) 与
@@ -147,6 +147,25 @@ iinc」, 还原成 `arr[i++] = v` (捕获自增前的旧值)。
   Adler-32、Internet checksum (RFC 1071)、BSD/SysV checksum。**`"123456789"` 标准 check value 锚定
   正确性** (CCITT-FALSE=0x29b1、XMODEM=0x31c3、ARC=0xbb3d、CRC32=0xcbf43926)。压 byte[] 迭代、
   byte<->int 收窄、嵌套移位/异或。
+- **`CompoundAssignAlgorithms.java`** (本阶段新增): 操作数栈 dup 家族 (DUP/DUP_X1/DUP_X2/DUP2/
+  DUP2_X1) —— 即 javac 为复合赋值与自增自减发的指令。覆盖 int/long/double/float/byte/char 数组
+  元素 `a[i] op= v;` **语句形态** (全部算术/位/移位运算符)、`a[i]++/++a[i]/a[i]--/--a[i]`、二维数组
+  `m[i][j] op= v`、静态字段 `F op= v`。7 个方法全部 byte-for-byte round-trip。**有意不含**「复合
+  赋值且值被消费」(Bug J, 见下) —— 真实 codec/spring/guava 几乎不用该形态。
+- **`Base32Codec.java`** (本阶段新增): 自托管 RFC 4648 Base32 / Base32hex 编解码, 每个输入 encode→
+  decode→比对 round-trip。**RFC 4648 标准向量锚定** (空串、f、fo、foo、foob、fooba、foobar →
+  `MZXW6YTBOI======`)。压 5 比特分组 long 累加、`tableswitch` (encode 出符数, 正确反编译)、
+  byte/char/String 迭代、模运算与移位。decode 的长度计算用算术替代 `switch` (规避 Bug K)。
+- **`MoreGuavaAlgorithms.java`** (本阶段新增): 第二个 Guava 风格 battery, 覆盖 primitives
+  (Ints/Longs/Shorts.fromBytes 带符号扩展打包)、Unsigned{Ints,Longs,Bytes} (除法/比较/widening)、
+  base.{Strings,Ascii} (repeat/padStart/padEnd/commonPrefix/commonSuffix/大小写折叠)、IntMath
+  (pow/mean/factorial/saturatedCast)。**无符号除法/比较与 JDK `Integer.toUnsignedLong`/
+  `Long.compareUnsigned`/`Long.divideUnsigned` 逐一交叉校验一致**。
+- **`MoreSpringAlgorithms.java`** (本阶段新增): 第二个 Spring 风格 battery, 覆盖 `StringUtils`
+  trim*/replace/deleteAny/countOccurrencesOf/startsWith|endsWithIgnoreCase/getFilename/
+  getFilenameExtension/stripFilenameExtension/hasText|hasLength/uncapitalize/分隔串拆合。
+  **trimWhitespace 对 `String.trim`、replace 对 `String.replace` 交叉校验**。filename 系方法把第二个
+  `lastIndexOf` 内联进 `if` (规避 Bug M)。
 
 ### 5. 反编译器缺陷修复 (本阶段, 全部带 round-trip 回归)
 
@@ -188,13 +207,54 @@ iinc」, 还原成 `arr[i++] = v` (捕获自增前的旧值)。
 
 ## 已知深层缺陷 (本阶段定位, 暂以源码重构规避; 待治本)
 
-- **Bug J — category-2 数组元素复合赋值且值被使用, RHS 被重复求值**:
-  `double dv = (a[i] += 2.5);` (double[]/long[] 元素) 编译为 `... dup2_x2 ... dastore`, 把存入的
-  category-2 结果复制到栈底返回。反编译器没有把"被复制的存储值"折叠成临时变量, 而是**重新求值
-  RHS**: 产出 `a[i] = a[i] + 2.5; double var3 = a[i] + 2.5;` —— 此时 `a[i]` 已自增, var3 再加一次
-  2.5, 结果错误 (long[] 同理)。属操作数栈 dup 折叠缺陷, 与 field/static 后自增折叠 (`selfOpFoldedRefs`)
-  是不同机制。**规避**: `OpcodeCoverage.dup2x2()` 保留但不调用 (仍覆盖 DUP2_X2 解析), 不并入语义指纹。
-  **复现**: `static long f(double[] a,int i){ double v=(a[i]+=2.5); return Double.doubleToLongBits(v); }`。
+- **Bug J — 复合赋值且结果值被消费时, RHS 被重复求值** (本阶段进一步定位, 比原判更宽):
+  形如 `x = (target op= v); ... 用 x ...`, 当**赋值结果值被后续消费**时, 反编译器把存入目标的值
+  折叠错误 —— 不复用已存入的临时, 而**重新求值 RHS**。已确认覆盖三类:
+  - category-2 数组元素 (double[]/long[]): `double dv=(a[i]+=2.5)` (`dup2_x2`) → `a[i]=a[i]+2.5;
+    var3=a[i]+2.5;` (a[i] 已自增又加一次)。
+  - category-1 数组元素 (int[]): `int r=(a[i]+=3); return r;` (`dup_x2`) → 存储侧已物化 `var2`, 但
+    返回侧仍 `return a[i]+3` (重求值)。
+  - 链式局部变量: `long t=(x^=0x0f0f); return ...t...` 的**最后一个**也会重求值 (`localUsed` 实测;
+    单个 `int r=(x+=5);return r+x;` 反而正确, 触发条件与折叠次数相关)。
+  属操作数栈 dup 折叠 + 单次使用 var-fold 计账缺陷 (存储语句对 dup-临时的引用未计入使用数, 临时被
+  当单次使用内联回定义表达式), 与 field/static 后自增折叠 (`selfOpFoldedRefs`) 是不同机制。
+  **正确分支已锁进 `CompoundAssignAlgorithms.java`** (语句形态 + 自增自减全部 round-trip); 仅"值被
+  消费"形态规避。`OpcodeCoverage.dup2x2()` 保留但不调用 (仍覆盖 DUP2_X2 解析)。
+  **复现**: `static int f(int[] a,int i){ int r=(a[i]+=3); return r; }` → 反编译 `return a[i]+3`。
+
+- **Bug K — 空 `default` 的 `lookupswitch` 丢 break 且吞掉 switch 后续代码**:
+  稀疏 case (lookupswitch) + **空 default (仅 break)** + switch 之后还有代码时, 反编译把每个 case 的
+  `break` 全部丢掉 (变成全 fall-through), 并把 switch **后面**的整段代码搬进 `default:`。Base32
+  `decode` 的长度计算 (`switch(rem){case 2:..case4:..default:break;}` 后接 `new byte[outLen]...`)
+  触发, 结果长度算错。**对照**: 稠密 case (tableswitch) + 非空 default 正确 (Base32 `encode` 的出符
+  数 switch 正常)。**最小复现** (确定性): `int f(int rem,int base){ int out=base; switch(rem){case 2:
+  out+=1;break; case 4: out+=2;break; case 5: out+=3;break; case 7: out+=4;break; default:break;}
+  return out*10+rem; }` → 反编译丢 break、`return ...` 进 default。**规避**: Base32 `decode` 用算术
+  `outLen += rem*5/8` 替代该 switch (encode 保留 tableswitch 维持 switch 覆盖)。与 Bug G (降序
+  fall-through 升序重排) 同属 switch 结构化一类。
+
+- **Bug L — 嵌套循环里 `long`-零 `continue` 守卫被反转** (本阶段观测, 未最小化):
+  `MoreGuavaAlgorithms.main` 第二个 (两个同形兄弟嵌套循环之一) 内层 `if (a[j]==0L) continue; <用
+  a[i]/a[j] 的除法>` 被反编译成 `if (a[j]==0L) { <除法> }` —— 守卫极性反转, 除数为 0 时反而执行除法
+  → `ArithmeticException: / by zero`。**单层** `if(x==0)continue;body` 与**单个**嵌套 `long` 守卫均
+  能正确反编译成 `if(x==0){}else{body}` (已实测), 故触发需更特定上下文 (两个同数组兄弟嵌套循环 +
+  long 零守卫), 暂未提炼出最小复现。**规避**: 改用正向守卫 `if (a[j]!=0L) {body}` (已实测正确)。
+  归入 Bug E/F/I 控制流分支极性一类。
+
+- **Bug M — 两个终止型守卫之间夹一个局部 store 时, 第一个守卫 then/else 被交换** (本阶段定位,
+  **有干净最小复现**): 形如 `if(c1) return X; int t=...; if(c2) return Y; return Z;`, 当两个守卫
+  之间**夹着一条局部变量声明** (`int t=...` 即 `istore`) 时, if 结构化把第一个守卫的 then/else 分支
+  **对调**: 产出 `if(c1){ <c2 守卫+Z> } else { return X; }` —— 等价于条件取反。Spring
+  `stripFilenameExtension`/`getFilenameExtension` (`if(ext==-1)return; int sep=lastIndexOf('/');
+  if(sep>ext)return; return substring(...);`) 触发 `substring(0,-1)` 越界。
+  **A/B/C 隔离确认触发因子就是"中间那条局部 store"**:
+  - A (`int sep=p.lastIndexOf('/'); if(sep>ext)...`): **错** (then/else 交换)。
+  - B (中间 store, 第二守卫不引用 ext): **错**。
+  - C (无中间 store, `lastIndexOf('/')` 内联进 if): **正确**。
+  即第二个 `lastIndexOf` 是否落成独立 `istore` 决定对错; 根因在图构造期 trueNode/falseNode 极性判定
+  (是 then/else 互换, 非仅 MergeNode 误算)。因 if 结构化牵一发动全身且本地缺 CFR/Vineflower oracle 与
+  ~/.m2 语料, 本轮不盲改, 以精确复现登记供下一轮 oracle 护航下治本。**规避**: filename 系方法把第二个
+  `lastIndexOf` 内联进 `if` (C 形态, 已实测正确)。归入 Bug E/F/I 一类, 且为其"统一修复"提供最强线索。
 
 这些是**预先存在**的控制流 / 变量身份重建缺陷, 修复风险高, 本阶段先在 battery 源码里改写算法
 形态规避 (保留等价 OPCODE 覆盖), 并在此登记复现形态供下一轮治本。
@@ -246,5 +306,11 @@ CROSS_PK=1 CFR_JAR=... VINEFLOWER_JAR=... go test -run TestYakDecompilerCrossCom
 - 本阶段: 3 个反编译器 fix (嵌套 import `$`→`.` / foreach 裸数组 var-fold / 布尔位运算 `&|^`)
   + 4 个新 battery (LongHashAlgorithms / OpcodeCoverage / GuavaAlgorithms / SpringAlgorithms),
   差分门禁现跑 6 battery 全绿; 定位并登记 5 类深层控制流/slot 缺陷 (B/C/E/F/G/H/I)。
-- 下一轮: 治本控制流分支极性/块归属一类 (E/F/H/I) 与 slot 复用变量身份一类 (B/C);
-  修后自增数组下标 `arr[i++]` BUG -> 扩展 HMAC/Base32 -> 推进真实库 round-trip。
+- 本阶段(续): OPCODE 解析 100% 覆盖门禁 (195/195) + 4 个新 battery
+  (CompoundAssignAlgorithms / Base32Codec / MoreGuavaAlgorithms / MoreSpringAlgorithms),
+  差分门禁现跑 **12 battery 全绿**; 进一步定位 Bug J (复合赋值值被消费, 比原判更宽) 并新登记
+  Bug K (空 default lookupswitch 丢 break) / Bug L (嵌套 long-零 continue 守卫反转) /
+  Bug M (终止守卫间夹 store → then/else 交换, **带最小复现 A/B/C 隔离**)。
+- 下一轮: 优先治本 Bug M (有干净复现, 是 E/F/I 分支极性一类的最强线索) → 统一修 E/F/H/I/L 控制流
+  极性/块归属 → 修 Bug K/G switch 结构化 → slot 复用变量身份 (B/C) 与 Bug J var-fold 计账;
+  继续扩 HMAC/真实库 round-trip。治本控制流/var-fold 须在 CFR/Vineflower oracle + ~/.m2 语料护航下做。
