@@ -1173,7 +1173,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 						"%s\n"+
 						c.GetTabString()+"}", values.SimplifyConditionValue(ret.ConditionValue).String(funcCtx), statementListToString(ret.Body))
 				case *statements.DoWhileStatement:
-					body := normalizeDoWhileBreakGuardSource(statementListToString(ret.Body))
+					body := normalizeDoWhileBreakGuardSource(statementListToString(statements.NormalizeDoWhileDecrementGuard(ret.Body, funcCtx)))
 					statementStr = fmt.Sprintf(c.GetTabString()+"do{\n"+
 						"%s\n"+
 						c.GetTabString()+"} while (%s);", body, values.SimplifyConditionValue(ret.ConditionValue).String(funcCtx))

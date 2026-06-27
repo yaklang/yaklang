@@ -551,6 +551,16 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			mustNotContain: []string{"public class Outer$Inner", "protected class Outer$Inner", "yak-decompiler"},
 		},
 		{
+			file: "loop_decrement_guard.class",
+			desc: "a `while (i-- > 0)` loop (javac compiles the test as load-i, iinc -1, check the " +
+				"OLD value) must NOT be reconstructed as `do { i--; if (i > 0) ... }`, which tests the " +
+				"decremented value and runs one fewer iteration. The fold into a post-decrement test " +
+				"`if ((i--) > 0)` restores the correct iteration count — critical for algorithms whose " +
+				"loop count is part of the computation (MD5-crypt B64 base64 packing).",
+			mustContain:    []string{"(var2--) > (0)"},
+			mustNotContain: []string{"yak-decompiler"},
+		},
+		{
 			file: "shift_byte_promotion.class",
 			desc: "a shift of a byte/short/char operand must type the result as int (JLS: shift always " +
 				"promotes to int/long). Before the fix a `byte << 16` was typed byte, so the local " +
