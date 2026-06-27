@@ -6,6 +6,7 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
@@ -82,15 +83,24 @@ func RewriteVar(sts *[]statements.Statement, startVarId int, params []*values.Ja
 	}
 	// Sort by (name, deep): several keys can share one uid (same variable, different assignment sites)
 	// but carry different deeps, and each iteration overwrites that uid's IsFirst decision, so the
-	// last-processed key wins. Ordering by deep as a tie-breaker makes "which key wins" deterministic;
-	// keys identical in both fields compute the same decision, so their relative order is irrelevant.
+	// last-processed key wins. Ordering by deep as a tie-breaker makes "which key wins" deterministic.
+	// Keys identical in name AND deep still need a stable final tie-breaker: each such key PREPENDS its
+	// own DeclareStatement below, so their relative order decides which same-named local is declared
+	// first and therefore keeps the bare `var2` name while the other is renamed `var2_1`. Without a
+	// tie-breaker that order came from `for key := range undefined` (Go map iteration), so the two
+	// declarations - and the whole method's variable naming - flipped run to run. VarUid is a stable
+	// per-decompile creation counter; compare it NUMERICALLY (see varUidLess) since its string form is
+	// unstable across runs (global counter magnitude shifts).
 	sort.SliceStable(undefinedKeys, func(i, j int) bool {
 		ni := undefinedKeys[i].(*values.JavaRef).Id.String()
 		nj := undefinedKeys[j].(*values.JavaRef).Id.String()
 		if ni != nj {
 			return ni < nj
 		}
-		return undefined[undefinedKeys[i]] < undefined[undefinedKeys[j]]
+		if undefined[undefinedKeys[i]] != undefined[undefinedKeys[j]] {
+			return undefined[undefinedKeys[i]] < undefined[undefinedKeys[j]]
+		}
+		return varUidLess(undefinedKeys[i].(*values.JavaRef).VarUid, undefinedKeys[j].(*values.JavaRef).VarUid)
 	})
 	for _, key := range undefinedKeys {
 		undefinedVarDeep := undefined[key]
@@ -139,6 +149,42 @@ func RewriteVar(sts *[]statements.Statement, startVarId int, params []*values.Ja
 	// that fails to dominate every use. Everything the decompiler already scoped correctly is left
 	// byte-for-byte as the baseline produced it.
 	placeCrossScopeDeclarations(sts, scope.reused)
+	// switchHoistDeclarations (keyed by VarUid) and placeCrossScopeDeclarations (keyed by
+	// *VariableId) can independently emit a bare `T x;` for the SAME logical local when both
+	// hoisters fire on it (nested switches whose shared slot is also read after the switch). Both
+	// declarations reference the same *VariableId, so the dumper's collision renamer keeps them both
+	// as `var2` and produces a duplicate-variable compile error. Drop the redundant repeats here as
+	// the final step: two bare declarations of the identical *VariableId in one block are never valid
+	// Java, and matching on the id pointer leaves genuinely distinct same-named locals untouched.
+	dropDuplicateDeclarations(sts)
+}
+
+// dropDuplicateDeclarations removes redundant bare `T x;` declarations that name a *VariableId
+// already declared earlier in the SAME block list. Re-declaring the same id in a sibling/nested
+// block is legal Java (and intentional after hoisting), so each block list is scoped with its own
+// seen-set rather than a single global one.
+func dropDuplicateDeclarations(sts *[]statements.Statement) {
+	if sts == nil {
+		return
+	}
+	list := *sts
+	seen := map[*utils.VariableId]struct{}{}
+	out := list[:0]
+	for _, st := range list {
+		if as, ok := st.(*statements.AssignStatement); ok && as.IsDeclare && as.JavaValue == nil && as.ArrayMember == nil {
+			if ref, ok2 := core.UnpackSoltValue(as.LeftValue).(*values.JavaRef); ok2 && ref != nil && ref.Id != nil {
+				if _, dup := seen[ref.Id]; dup {
+					continue
+				}
+				seen[ref.Id] = struct{}{}
+			}
+		}
+		for _, cl := range childStatementLists(st) {
+			dropDuplicateDeclarations(cl)
+		}
+		out = append(out, st)
+	}
+	*sts = out
 }
 
 type Scope struct {
@@ -721,7 +767,9 @@ func switchHoistDeclarations(sw *statements.SwitchStatement, afterSts []statemen
 		uids = append(uids, uid)
 	}
 	sort.SliceStable(uids, func(i, j int) bool {
-		return uids[i] < uids[j]
+		// Numeric (not lexical) VarUid order: the suffix is a process-global counter whose magnitude
+		// shifts every decompile, so a string compare is unstable across runs (see varUidLess).
+		return varUidLess(uids[i], uids[j])
 	})
 	var declares []statements.Statement
 	for _, uid := range uids {
@@ -947,7 +995,9 @@ func ifHoistDeclarations(ifst *statements.IfStatement, afterSts []statements.Sta
 		uids = append(uids, uid)
 	}
 	sort.SliceStable(uids, func(i, j int) bool {
-		return uids[i] < uids[j]
+		// Numeric (not lexical) VarUid order: the suffix is a process-global counter whose magnitude
+		// shifts every decompile, so a string compare is unstable across runs (see varUidLess).
+		return varUidLess(uids[i], uids[j])
 	})
 	var declares []statements.Statement
 	for _, uid := range uids {
@@ -1133,6 +1183,40 @@ func safeRenderStatement(st statements.Statement) (text string, ok bool) {
 // representative LeftValue per id (used to synthesize the bare `T x;` declaration with the right
 // type/name). Restricting to `reused` ids keeps the placement pass focused on exactly the variables
 // the minted merge joined across scopes; everything else the decompiler already scoped is untouched.
+// crossScopeRefUid returns a JavaRef's stable VarUid (a deterministic parse-order counter) for use
+// as a sort tie-breaker; non-ref values fall back to the empty string.
+func crossScopeRefUid(v values.JavaValue) string {
+	if ref, ok := core.UnpackSoltValue(v).(*values.JavaRef); ok && ref != nil {
+		return ref.VarUid
+	}
+	return ""
+}
+
+// varUidNum extracts the numeric suffix of a VarUid ("ref-N"); unparseable uids sort first as -1.
+func varUidNum(u string) int64 {
+	if i := strings.LastIndexByte(u, '-'); i >= 0 {
+		if n, err := strconv.ParseInt(u[i+1:], 10, 64); err == nil {
+			return n
+		}
+	}
+	return -1
+}
+
+// varUidLess orders two VarUids by their NUMERIC suffix, not lexically. VarUid is "ref-N" where N is
+// a process-global monotonic counter, so a lexical compare is both wrong ("ref-9" > "ref-10") and -
+// critically - unstable: because the counter is shared across every decompile, the absolute N values
+// of two refs shift run to run, and a lexical compare flips whenever the counter crosses a digit-width
+// boundary (e.g. 998 vs 1004) between their creation. That flipped which of two same-named locals was
+// declared first and so swapped their var2 / var2_1 names nondeterministically. The numeric suffix is
+// invariant to the base and reflects the stable per-decompile creation order.
+func varUidLess(a, b string) bool {
+	na, nb := varUidNum(a), varUidNum(b)
+	if na != nb {
+		return na < nb
+	}
+	return a < b
+}
+
 func collectGeneratedLocalDeclIDs(list []statements.Statement, reused map[*utils.VariableId]struct{}) ([]*utils.VariableId, map[*utils.VariableId]values.JavaValue) {
 	order := []*utils.VariableId{}
 	refByID := map[*utils.VariableId]values.JavaValue{}
@@ -1235,7 +1319,20 @@ func placeCrossScopeDeclarations(block *[]statements.Statement, reused map[*util
 			allMatch[i] = !ok
 		}
 		sort.SliceStable(ids, func(i, j int) bool {
-			return refByID[ids[i]].String(hoistProbeCtx) < refByID[ids[j]].String(hoistProbeCtx)
+			ni := refByID[ids[i]].String(hoistProbeCtx)
+			nj := refByID[ids[j]].String(hoistProbeCtx)
+			if ni != nj {
+				return ni < nj
+			}
+			// Two distinct reused slots can collapse to the SAME generated name (e.g. both render
+			// `var2` because they occupy the same JVM slot depth in sibling switch cases). The name
+			// tie left the relative order to collectGeneratedLocalDeclIDs's lexical walk, but the
+			// dumper's collision renamer keeps whichever declaration is emitted FIRST as `var2` and
+			// renames the other to `var2_1`. To make WHICH local keeps the bare name deterministic,
+			// break the tie on the stable per-slot VarUid (a parse-order counter) compared NUMERICALLY
+			// (see varUidLess) instead of relying on iteration-sensitive discovery order. Distinct-name
+			// locals never reach this branch, so byte-for-byte output for the common case is unchanged.
+			return varUidLess(crossScopeRefUid(refByID[ids[i]]), crossScopeRefUid(refByID[ids[j]]))
 		})
 		var hoisted []statements.Statement
 		for _, id := range ids {

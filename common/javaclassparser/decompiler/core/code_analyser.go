@@ -2661,7 +2661,12 @@ func (d *Decompiler) ParseStatement() error {
 				appendNode(statements.NewExpressionStatement(value))
 			}
 		case OP_TABLESWITCH, OP_LOOKUPSWITCH:
-			switchStatement := statements.NewMiddleStatement(statements.MiddleSwitch, []any{opcode.SwitchJmpCase1, opcode.stackConsumed[0]})
+			// SwitchJmpCase maps each case value (and -1 for default) to the ABSOLUTE bytecode
+			// offset of its body. javac lays case bodies out in source order at increasing offsets
+			// and fall-through follows that physical layout, so the switch rewriter needs the offset
+			// (not the value, and not the graph-traversal Node.Id which is unreliable) to emit cases
+			// in their true physical order and preserve descending fall-through (Bug G).
+			switchStatement := statements.NewMiddleStatement(statements.MiddleSwitch, []any{opcode.SwitchJmpCase1, opcode.stackConsumed[0], opcode.SwitchJmpCase})
 			appendNode(switchStatement)
 		case OP_IINC:
 			// The iinc increment is a SIGNED constant. Reading it unsigned turns `i--`

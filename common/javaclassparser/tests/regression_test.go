@@ -1131,9 +1131,9 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			mustContain: []string{
 				"abstract class ExcelAbstractExporter<",
 				"public static ExcelAbstractExporter$TextAlignHolder getTextAlignHolder(JRPrintText var0)",
-				"HorizontalTextAlignEnum var2;",
-				"VerticalTextAlignEnum var2_1;",
-				"return new ExcelAbstractExporter$TextAlignHolder(var2,var2_1,var1)",
+				"VerticalTextAlignEnum var2;",
+				"HorizontalTextAlignEnum var2_1;",
+				"return new ExcelAbstractExporter$TextAlignHolder(var2_1,var2,var1)",
 			},
 			mustNotContain: []string{
 				"empty slot value",
