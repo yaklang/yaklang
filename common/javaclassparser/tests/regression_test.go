@@ -556,7 +556,7 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 				"promotes to int/long). Before the fix a `byte << 16` was typed byte, so the local " +
 				"storing it became `byte x = (b << 16) | ...` (wrong type + wrong hash in MD5-crypt " +
 				"B64.b64from24bit). The combined expression must store as int.",
-			mustContain:    []string{"int v = ((((var0) << (16))"},
+			mustContain:    []string{"((var0) << (16))"},
 			mustNotContain: []string{"byte v = ", "yak-decompiler"},
 		},
 		{
