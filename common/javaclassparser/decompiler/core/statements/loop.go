@@ -87,7 +87,7 @@ func NormalizeDoWhileDecrementGuard(body []Statement, funcCtx *class_context.Cla
 	// bytecode.
 	postDec := values.NewBinaryExpression(decRef, values.NewJavaLiteral(1, types.NewJavaPrimer(types.JavaInteger)), values.DEC, decRef.Type())
 	newCond := values.NewBinaryExpression(postDec, cond.Values[1], cond.Op, cond.Typ)
-	newIf := NewIfStatement(newCond, ifs.IfBody, nil)
+	newIf := NewIfStatement(newCond, ifs.IfBody, ifs.ElseBody)
 	out := make([]Statement, 0, len(body))
 	out = append(out, newIf)
 	out = append(out, body[2:]...)
