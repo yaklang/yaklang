@@ -5,15 +5,25 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
+
+// buildPlanForLanguage creates the language's Builder and runs the plan
+// through it, mirroring how the engine drives partition + dependencies.
+func buildPlanForLanguage(t *testing.T, lang ssaconfig.Language, fs filesys_interface.FileSystem, files []string) *UnitPlan {
+	t.Helper()
+	create, ok := LanguageBuilderCreater[lang]
+	require.True(t, ok, "no builder registered for language %v", lang)
+	return buildCompileUnitPlan(create(), lang, fs, files)
+}
 
 func TestCompileUnitPlanJavaTopoOrder(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("src/a/A.java", "package a;\nimport b.B;\nclass A { B b; }\n")
 	vf.AddFile("src/b/B.java", "package b;\nclass B {}\n")
 
-	plan := buildCompileUnitPlan(ssaconfig.JAVA, vf, []string{"src/a/A.java", "src/b/B.java"})
+	plan := buildPlanForLanguage(t, ssaconfig.JAVA, vf, []string{"src/a/A.java", "src/b/B.java"})
 
 	require.Len(t, plan.Units, 2)
 	require.Contains(t, plan.Units, "java:a")
@@ -29,7 +39,7 @@ func TestCompileUnitPlanMergesCycles(t *testing.T) {
 	vf.AddFile("src/a/A.java", "package a;\nimport b.B;\nclass A { B b; }\n")
 	vf.AddFile("src/b/B.java", "package b;\nimport a.A;\nclass B { A a; }\n")
 
-	plan := buildCompileUnitPlan(ssaconfig.JAVA, vf, []string{"src/a/A.java", "src/b/B.java"})
+	plan := buildPlanForLanguage(t, ssaconfig.JAVA, vf, []string{"src/a/A.java", "src/b/B.java"})
 
 	require.Len(t, plan.Order, 1)
 	require.Len(t, plan.Order[0], 2)
@@ -153,7 +163,7 @@ class DemoServlet {
 `)
 	vf.AddFile(`src\main\webapp\WEB-INF\jsp\demo.jsp`, `<html>${userInput}</html>`)
 
-	plan := buildCompileUnitPlan(ssaconfig.JAVA, vf, []string{
+	plan := buildPlanForLanguage(t, ssaconfig.JAVA, vf, []string{
 		"src/main/java/com/example/DemoServlet.java",
 		`src\main\webapp\WEB-INF\jsp\demo.jsp`,
 	})
@@ -176,7 +186,7 @@ func TestCompileUnitPlanJavaDefaultPackageTemplateResourceMergesByBasename(t *te
 `)
 	vf.AddFile("src/main/webapp/jsp/xss-vulnerable.jsp", `<div>${requestScope.userInput}</div>`)
 
-	plan := buildCompileUnitPlan(ssaconfig.JAVA, vf, []string{
+	plan := buildPlanForLanguage(t, ssaconfig.JAVA, vf, []string{
 		"XSSExampleServlet.java",
 		"src/main/webapp/jsp/xss-vulnerable.jsp",
 	})
@@ -204,7 +214,7 @@ public class GreetingController {
 `)
 	vf.AddFile("src/main/resource/greeting.ftl", `<h1>Hello, ${name}!</h1>`)
 
-	plan := buildCompileUnitPlan(ssaconfig.JAVA, vf, []string{
+	plan := buildPlanForLanguage(t, ssaconfig.JAVA, vf, []string{
 		"controller.java",
 		"src/main/resource/greeting.ftl",
 	})
@@ -222,7 +232,7 @@ func TestCompileUnitPlanDynamicLanguageStillBuildsDirectoryUnits(t *testing.T) {
 	vf.AddFile("app/index.php", "<?php require './lib/a.php';")
 	vf.AddFile("app/lib/a.php", "<?php function a() {}")
 
-	plan := buildCompileUnitPlan(ssaconfig.PHP, vf, []string{"app/index.php", "app/lib/a.php"})
+	plan := buildPlanForLanguage(t, ssaconfig.PHP, vf, []string{"app/index.php", "app/lib/a.php"})
 
 	require.Len(t, plan.Units, 2)
 	require.Empty(t, plan.Edges)
@@ -235,7 +245,7 @@ func TestCompileUnitPlanPythonModuleFileImportTopoOrder(t *testing.T) {
 	vf.AddFile("helper/db_manager.py", "class DBManager:\n    pass\n")
 	vf.AddFile("sqli_app.py", "from helper.db_manager import DBManager\nDBManager()\n")
 
-	plan := buildCompileUnitPlan(ssaconfig.PYTHON, vf, []string{
+	plan := buildPlanForLanguage(t, ssaconfig.PYTHON, vf, []string{
 		"helper/__init__.py",
 		"helper/db_manager.py",
 		"sqli_app.py",
@@ -253,7 +263,7 @@ func TestCompileUnitPlanTypeScriptRelativeImportTopoOrder(t *testing.T) {
 	vf.AddFile("src/services/DataService.ts", "import { IService } from '../interfaces/IService';\nexport class DataService implements IService { getData() { return 'ok' } }\n")
 	vf.AddFile("src/main.ts", "import { DataService } from './services/DataService';\nconsole.log(new DataService().getData())\n")
 
-	plan := buildCompileUnitPlan(ssaconfig.TS, vf, []string{
+	plan := buildPlanForLanguage(t, ssaconfig.TS, vf, []string{
 		"src/main.ts",
 		"src/interfaces/IService.ts",
 		"src/services/DataService.ts",
@@ -290,7 +300,7 @@ var PI = B.PI
 var PI = 3.1415926
 `)
 
-	plan := buildCompileUnitPlan(ssaconfig.GO, vf, []string{
+	plan := buildPlanForLanguage(t, ssaconfig.GO, vf, []string{
 		"src/main/go/go.mod",
 		"src/main/go/main.go",
 		"src/main/go/A/test.go",
@@ -323,7 +333,7 @@ var PI = B.PI
 var PI = 3.1415926
 `)
 
-	plan := buildCompileUnitPlan(ssaconfig.GO, vf, []string{
+	plan := buildPlanForLanguage(t, ssaconfig.GO, vf, []string{
 		"src/main/go/go.mod",
 		"src/main/go/main.go",
 		"src/main/go/A/test.go",
