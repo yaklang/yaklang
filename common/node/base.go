@@ -21,6 +21,7 @@ type NodeBase struct {
 
 	identityMu sync.RWMutex
 	NodeType   spec.NodeType
+	kind       string
 	NodeId     string
 
 	legacyNodeID        string
@@ -41,6 +42,7 @@ type NodeBase struct {
 	hostIdentityProvider HostIdentityProvider
 	heartbeatInterval    time.Duration
 	tickerInterval       time.Duration
+	postBootstrapHook    func(SessionState)
 
 	tickerFuncs *sync.Map
 
@@ -75,6 +77,7 @@ func NewNodeBase(cfg BaseConfig) (*NodeBase, error) {
 		rootCtx:              ctx,
 		cancel:               cancel,
 		NodeType:             normalized.NodeType,
+		kind:                 normalized.Kind,
 		NodeId:               bootstrapNodeLogRef(normalized),
 		legacyNodeID:         normalized.NodeID,
 		displayName:          normalized.DisplayName,
@@ -93,6 +96,7 @@ func NewNodeBase(cfg BaseConfig) (*NodeBase, error) {
 		hostIdentityProvider: normalized.HostIdentityProvider,
 		heartbeatInterval:    normalized.HeartbeatInterval,
 		tickerInterval:       normalized.TickerInterval,
+		postBootstrapHook:    normalized.PostBootstrapHook,
 		tickerFuncs:          new(sync.Map),
 		isRegistered:         abool.NewBool(false),
 		instanceLock:         instanceLock,
@@ -212,6 +216,11 @@ func (n *NodeBase) ensureSession() error {
 			log.Errorf("initial heartbeat failed: %v", err)
 		} else {
 			n.isRegistered.Set()
+			if n.postBootstrapHook != nil {
+				if session, ok := n.currentSession(); ok {
+					n.postBootstrapHook(session)
+				}
+			}
 			return nil
 		}
 		if err := n.sleepWithContext(sessionRetryInterval); err != nil {
