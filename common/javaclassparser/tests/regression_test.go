@@ -551,6 +551,14 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			mustNotContain: []string{"public class Outer$Inner", "protected class Outer$Inner", "yak-decompiler"},
 		},
 		{
+			file: "char_return_narrowing.class",
+			desc: "a char-returning method whose body returns int literals (bytecode stores char " +
+				"literals as ints: bipush 102 == 'f') must cast them to char, otherwise javac rejects " +
+				"the return ('possible lossy conversion from int to char').",
+			mustContain:    []string{"return (char) "},
+			mustNotContain: []string{"yak-decompiler"},
+		},
+		{
 			file: "bool_array_initializer.class",
 			desc: "a boolean[] initializer is filled by iconst_0/iconst_1, whose values carry an " +
 				"int type; they must render as true/false, not 1/0, otherwise javac rejects it " +

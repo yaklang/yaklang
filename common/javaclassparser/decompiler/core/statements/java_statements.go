@@ -112,8 +112,38 @@ func (r *ReturnStatement) String(funcCtx *class_context.ClassContext) string {
 	if r.JavaValue == nil {
 		return "return"
 	}
+	expr := r.JavaValue.String(funcCtx)
+	// Narrowing cast for char/byte/short return types: bytecode stores char/byte/short
+	// literals as ints (bipush/sipush/iconst), so a method returning char whose body
+	// returns `cond ? 102 : 101` renders int literals that javac rejects ("possible
+	// lossy conversion from int to char"). When the declared return type is narrower than
+	// int and the returned value is int-typed, wrap it in an explicit cast. This is a
+	// pure rendering fix — the recompiled bytecode is behaviorally identical.
+	if cast := narrowingReturnCast(funcCtx, r.JavaValue); cast != "" {
+		return fmt.Sprintf("return (%s) (%s)", cast, expr)
+	}
+	return fmt.Sprintf("return %s", expr)
+}
 
-	return fmt.Sprintf("return %s", r.JavaValue.String(funcCtx))
+// narrowingReturnCast returns the cast type name ("char"/"byte"/"short") when the enclosing
+// method's declared return type is a narrowing-of-int and the returned value is int-typed,
+// otherwise "". The cast lets the emitted source recompile without "possible lossy
+// conversion from int to char/byte/short" errors.
+func narrowingReturnCast(funcCtx *class_context.ClassContext, v values.JavaValue) string {
+	ft, ok := funcCtx.FunctionType.(*types.JavaFuncType)
+	if !ok || ft == nil || ft.ReturnType == nil {
+		return ""
+	}
+	retStr := ft.ReturnType.String(&class_context.ClassContext{})
+	valStr := v.Type().RawType().String(&class_context.ClassContext{})
+	if valStr != "int" {
+		return ""
+	}
+	switch retStr {
+	case "char", "byte", "short":
+		return retStr
+	}
+	return ""
 }
 
 func NewReturnStatement(value values.JavaValue) *ReturnStatement {
