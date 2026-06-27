@@ -29,6 +29,7 @@ func (n *NodeBase) bootstrapSession() error {
 		AgentInstallationID:      n.AgentInstallationID(),
 		HostIdentity:             n.hostIdentitySnapshot(),
 		NodeType:                 string(n.NodeType),
+		Kind:                     n.kind,
 		Version:                  n.version,
 		Labels:                   cloneStringMap(n.labels),
 		CapabilityKeys:           cloneStringSlice(n.capabilityKeys),
