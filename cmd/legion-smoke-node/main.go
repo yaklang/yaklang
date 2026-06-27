@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"flag"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/yaklang/yaklang/common/node"
 	"github.com/yaklang/yaklang/common/spec"
@@ -54,6 +58,7 @@ func runNode(args []string) error {
 	nodeID := flags.String("id", "", "Legacy node ID fallback; canonical node_id is assigned by platform")
 	displayName := flags.String("name", "smoke-node", "Display name reported to Legion")
 	agentInstallationID := flags.String("agent-installation-id", "", "Override persisted agent installation ID")
+	kind := flags.String("kind", "", "Node kind: empty/host=host node, ai_session=AI session container node")
 	baseDir := flags.String("base-dir", "", "Node local state base directory")
 	version := flags.String("version", "smoke", "Node version")
 	heartbeatInterval := flags.Duration(
@@ -146,8 +151,15 @@ func runNode(args []string) error {
 		}
 	}
 
+	// ai_session 容器 runtime：bootstrap 成功后回调 sessionmgr register 端点上报 node id。
+	var postBootstrapHook func(node.SessionState)
+	if strings.TrimSpace(*kind) == "ai_session" {
+		postBootstrapHook = buildAISessionRegisterHook()
+	}
+
 	scanNode, err := scannode.NewScanNode(node.BaseConfig{
 		NodeType:            spec.NodeType_Scanner,
+		Kind:                strings.TrimSpace(*kind),
 		NodeID:              *nodeID,
 		DisplayName:         *displayName,
 		AgentInstallationID: *agentInstallationID,
@@ -157,6 +169,7 @@ func runNode(args []string) error {
 		Version:             *version,
 		HeartbeatInterval:   *heartbeatInterval,
 		HostIdentityProvider: hostIdentityProvider,
+		PostBootstrapHook:    postBootstrapHook,
 	})
 	if err != nil {
 		return err
@@ -172,4 +185,40 @@ func runNode(args []string) error {
 	scanNode.Shutdown()
 	<-done
 	return nil
+}
+
+// buildAISessionRegisterHook 构造 ai_session 容器 runtime 的 bootstrap 回调：
+// bootstrap 成功后 POST sessionmgr 的 register 端点上报 {node_id, node_session_id}。
+// sessionmgr 地址从 LEGION_SESSIONMGR_URL 环境变量取，sessionID 从 LEGION_AI_SESSION_ID 取
+// （由 sessionmgr 起容器时注入）。
+func buildAISessionRegisterHook() func(node.SessionState) {
+	sessionmgrURL := strings.TrimSpace(os.Getenv("LEGION_SESSIONMGR_URL"))
+	sessionID := strings.TrimSpace(os.Getenv("LEGION_AI_SESSION_ID"))
+	if sessionmgrURL == "" || sessionID == "" {
+		log.Printf("ai_session register hook disabled: LEGION_SESSIONMGR_URL or LEGION_AI_SESSION_ID not set")
+		return nil
+	}
+	client := &http.Client{Timeout: 10 * time.Second}
+	return func(session node.SessionState) {
+		body, err := json.Marshal(map[string]string{
+			"node_id":         session.NodeID,
+			"node_session_id": session.SessionID,
+		})
+		if err != nil {
+			log.Printf("ai_session register marshal: %v", err)
+			return
+		}
+		url := strings.TrimRight(sessionmgrURL, "/") + "/v1/sessionmgr/sessions/" + sessionID + "/register"
+		resp, err := client.Post(url, "application/json", bytes.NewReader(body))
+		if err != nil {
+			log.Printf("ai_session register callback to %s: %v", url, err)
+			return
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusAccepted {
+			log.Printf("ai_session register callback %s returned status %d", url, resp.StatusCode)
+			return
+		}
+		log.Printf("ai_session registered: node_id=%s session_id=%s", session.NodeID, session.SessionID)
+	}
 }
