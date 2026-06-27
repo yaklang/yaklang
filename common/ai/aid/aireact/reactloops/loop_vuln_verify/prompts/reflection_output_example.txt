@@ -1,0 +1,123 @@
+##############################################################
+# 场景 A：SSA Risk 输入 — 阶段 0 源代码检查为强制要求
+##############################################################
+
+* 阶段 0 — 提供了 SSA Risk 数据时，必须先读取源代码。
+  步骤 1：用 ssa-read-file 读取漏洞文件报告行号附近的代码：
+  {"@action": "require_tool", "tool_require_payload": "ssa-read-file", "human_readable_thought": "读取 SSA Risk 指向位置的源代码，在评估可复现性之前先理解实际漏洞"}
+
+  工具加载后，传入以下参数调用：
+  program_name = <Risk 中的 SSA 项目名>
+  file_path    = <Risk 中的文件路径>
+  start_line   = <风险行号 - 20>
+  line_count   = 50
+
+  步骤 2：搜索污染变量 / sink 函数，追踪数据流：
+  {"@action": "require_tool", "tool_require_payload": "ssa-grep", "human_readable_thought": "追踪 SSA Risk 中识别的变量数据流，确认注入路径"}
+
+  传入以下参数调用：
+  program_name  = <SSA 项目名>
+  pattern       = <Risk 中的污染变量名或 sink 函数名>
+  pattern_mode  = "substr"
+  context_lines = 5
+
+* 阶段 1 — 读完代码后，基于代码认知评估可复现性：
+  {"@action": "assess_reproducibility", "category": "reproducible", "finding_type": "sql_injection", "reasoning": "源代码检查确认：ssa-read-file 显示用户提供的参数 `$_GET['id']` 在第 47 行未经任何过滤直接拼入 SQL 查询。ssa-grep 搜索 'mysql_query' 发现该模式出现 3 次。这是典型的运行时可利用注入。", "human_readable_thought": "代码审查确认 SQL 注入路径 — 继续进行环境验证"}
+
+* 阶段 2 — 检查目标可达性：
+  {"@action": "check_target_reachability", "target_url": "http://192.168.1.100/app/search.php", "expected_service": "http", "human_readable_thought": "在发送测试 payload 前验证目标 Web 服务是否可访问"}
+
+* 阶段 3 — 使用源代码中找到的接口和参数执行验证：
+  首次 HTTP 请求：使用 require_tool 加载工具（框架会调用 AI 生成参数并执行）：
+  {"@action": "require_tool", "tool_require_payload": "do_http_request", "human_readable_thought": "发送首次验证请求：GET /app/search.php?id=1' OR 1=1--，确认 SQL 注入"}
+
+  工具加载并执行后，do_http_request 已在 CACHE_TOOL_CALL 中。后续请求使用 directly_call_tool 携带精确参数：
+  {"@action": "directly_call_tool", "directly_call_tool_name": "do_http_request", "directly_call_tool_params": {"url": "http://192.168.1.100/app/search.php", "method": "GET", "query-params": "id=1' AND SLEEP(3)--", "headers": "Cookie: session=abc123", "timeout": 10, "show-request": "yes", "redirect-times": 0}, "directly_call_identifier": "sqli_time_blind", "directly_call_expectations": "预期约 3 秒延迟，确认盲注"}
+
+* 记录每一条有意义的观察：
+  {"@action": "record_evidence", "evidence_type": "http_response", "observation": "在参数 `id` 中发送 payload `' OR 1=1--`，返回 HTTP 500，响应体包含 SQL 报错：'You have an error in your SQL syntax near OR 1=1'", "significance": "high", "raw_data": "HTTP/1.1 500 Internal Server Error\n...You have an error in your SQL syntax...", "human_readable_thought": "SQL 报错确认注入已到达数据库层"}
+
+* 阶段 4 — 输出最终报告：
+  {"@action": "directly_answer", "verdict": "CONFIRMED", "human_readable_thought": "SQL 注入已通过报错证据在 SSA 识别的确切代码路径上得到确认"}
+
+  <|FINAL_REPORT_nonce|>
+  ## 漏洞验证报告
+
+  ### 结论：已确认（CONFIRMED）
+
+  ### 发现内容
+  `search.php` 参数 `id` 存在 SQL 注入（SSA Risk #1234，程序：`my-app`）。
+
+  ### 源代码证据（来自 ssa-read-file）
+  `search.php` 第 47 行：
+  ```php
+  $result = mysql_query("SELECT * FROM users WHERE id = " . $_GET['id']);
+  ```
+  未进行任何过滤。SSA Risk 正确识别了未过滤的 `$_GET['id']` 作为污染输入到达 SQL sink 的数据流。
+
+  ### 运行时证据
+  1. Payload `' OR 1=1--` → HTTP 500，响应体包含 SQL 语法报错。
+  2. Payload `' AND SLEEP(3)--` → 约 3 秒延迟，确认盲注存在。
+
+  ### 复现步骤
+  ```
+  GET /app/search.php?id=' OR 1=1-- HTTP/1.1
+  Host: 192.168.1.100
+  ```
+
+  ### 修复建议
+  使用参数化查询 / 预编译语句，替换原有的字符串拼接方式。
+  <|FINAL_REPORT_END_nonce|>
+
+##############################################################
+# 场景 B：SSA Risk — 通过源代码检查发现误报
+##############################################################
+
+* 阶段 0 — 读取源代码，发现过滤函数：
+  （调用 ssa-read-file 和 ssa-grep 后）
+
+* 阶段 1 — 基于代码认知评估：
+  {"@action": "assess_reproducibility", "category": "not_reproducible", "finding_type": "sql_injection", "reasoning": "ssa-read-file 显示在第 52 行，输入在进入查询前经过了 `intval()` 处理。静态分析可能未追踪到这个过滤器。污染变量被安全地强制转换为整数，该路径上无法进行 SQL 注入。", "human_readable_thought": "源代码显示存在过滤函数 — 这很可能是一个误报"}
+
+  然后调用 directly_answer：
+  {"@action": "directly_answer", "verdict": "NOT_CONFIRMED", "human_readable_thought": "误报：源代码中检测到过滤函数"}
+
+  <|FINAL_REPORT_nonce|>
+  ## 漏洞验证报告
+
+  ### 结论：未确认（NOT CONFIRMED）— 疑似误报
+
+  ### 发现内容
+  SSA Risk 在 `search.php:52` 标记了 SQL 注入 — 但源代码检查发现了 `intval()` 过滤。
+
+  ### 源代码证据
+  ```php
+  $id = intval($_GET['id']);  // 第 50 行：整数强制转换对输入进行了过滤
+  $result = mysql_query("SELECT * FROM users WHERE id = " . $id);
+  ```
+
+  ### 结论
+  静态分析正确识别了数据流模式，但未追踪到 `intval()` 过滤器。输入在到达 SQL 查询前已被安全限制为整数。此发现为误报。
+
+  ### 建议
+  将此 SSA Risk 标记为误报，并更新 SyntaxFlow 规则以识别 `intval()` 过滤。
+  <|FINAL_REPORT_END_nonce|>
+
+##############################################################
+# 场景 C：非 SSA 输入 — 直接 HTTP 验证
+##############################################################
+
+* 阶段 1 — 当发现内容为假设或 PoC（无 SSA 数据，无程序名）时：
+  {"@action": "assess_reproducibility", "category": "reproducible", "finding_type": "auth_bypass", "reasoning": "用户描述了一个潜在的 IDOR：未经认证访问 /api/user/{id} 可能返回其他用户的数据。这是一个可在运行时测试的漏洞。", "human_readable_thought": "评估此权限绕过假设能否在实际环境中进行测试"}
+
+* 阶段 1 — 当发现内容纯粹是代码质量问题时（无需 SSA 工具）：
+  {"@action": "assess_reproducibility", "category": "not_reproducible", "finding_type": "code_quality", "reasoning": "该发现标记了一个未使用的变量声明，不存在运行时安全影响。", "human_readable_thought": "这是一个代码风格问题，无法在运行时利用"}
+
+  然后立即调用：
+  {"@action": "directly_answer", "verdict": "NOT_CONFIRMED", "human_readable_thought": "不适用 — 代码质量问题，无法在实际环境中演示"}
+
+  <|FINAL_REPORT_nonce|>
+  ## 验证结果：不适用
+
+  此发现是**代码质量问题**，无法在实际环境中复现。
+  <|FINAL_REPORT_END_nonce|>
