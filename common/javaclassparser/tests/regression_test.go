@@ -551,6 +551,15 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			mustNotContain: []string{"public class Outer$Inner", "protected class Outer$Inner", "yak-decompiler"},
 		},
 		{
+			file: "shift_byte_promotion.class",
+			desc: "a shift of a byte/short/char operand must type the result as int (JLS: shift always " +
+				"promotes to int/long). Before the fix a `byte << 16` was typed byte, so the local " +
+				"storing it became `byte x = (b << 16) | ...` (wrong type + wrong hash in MD5-crypt " +
+				"B64.b64from24bit). The combined expression must store as int.",
+			mustContain:    []string{"int v = ((((var0) << (16))"},
+			mustNotContain: []string{"byte v = ", "yak-decompiler"},
+		},
+		{
 			file: "char_return_narrowing.class",
 			desc: "a char-returning method whose body returns int literals (bytecode stores char " +
 				"literals as ints: bipush 102 == 'f') must cast them to char, otherwise javac rejects " +

@@ -676,7 +676,20 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		}
 		var2 := runtimeStackSimulation.Pop().(values.JavaValue)
 		var1 := runtimeStackSimulation.Pop().(values.JavaValue)
-		runtimeStackSimulation.Push(values.NewBinaryExpression(var1, var2, op, var1.Type()))
+		// Per JLS, a shift (<<, >>, >>>) ALWAYS promotes its left operand to int (or long for the
+		// L-prefixed ops) and the result is int/long regardless of the shifted operand's type.
+		// Using var1.Type() directly left a `byte << 16` result typed as byte, which then mis-typed
+		// the local storing it (e.g. `byte x = (b << 16) | ...` in MD5-crypt B64.b64from24bit) and
+		// produced wrong hashes. Arithmetic/bitwise ops keep var1.Type() (the prior behavior) to
+		// avoid re-typing recompilable synthetic-corpus expressions.
+		resultType := var1.Type()
+		switch opcode.Instr.OpCode {
+		case OP_ISHL, OP_ISHR, OP_IUSHR:
+			resultType = types.NewJavaPrimer(types.JavaInteger)
+		case OP_LSHL, OP_LSHR, OP_LUSHR:
+			resultType = types.NewJavaPrimer(types.JavaLong)
+		}
+		runtimeStackSimulation.Push(values.NewBinaryExpression(var1, var2, op, resultType))
 	case OP_I2B, OP_I2C, OP_I2D, OP_I2F, OP_I2L, OP_I2S, OP_L2D, OP_L2F, OP_L2I, OP_F2D, OP_F2I, OP_F2L, OP_D2F, OP_D2I, OP_D2L:
 		var fname string
 		var typ types.JavaType
