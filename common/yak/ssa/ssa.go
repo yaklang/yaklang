@@ -2,7 +2,6 @@ package ssa
 
 import (
 	"context"
-	"sync"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
@@ -283,9 +282,6 @@ type Program struct {
 	deferredBuilds     *omap.OrderedMap[string, *deferredBuildTask]
 	deferredBuildTotal int
 	currentCompileUnit string
-	lazyUnitMu         sync.Mutex
-	lazyBuildersByUnit map[string][]*LazyBuilder
-	lazyBuilderUnitSet map[string]map[*LazyBuilder]struct{}
 
 	//consts
 	Consts map[string]Value
