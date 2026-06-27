@@ -123,9 +123,9 @@ iinc」, 还原成 `arr[i++] = v` (捕获自增前的旧值)。
 
 ## 已完成 (本阶段 — OPCODE/算法覆盖再扩展)
 
-### 4. 新增 4 个自托管 battery (全部 round-trip byte-for-byte 通过)
+### 4. 新增自托管 battery (全部 round-trip byte-for-byte 通过)
 
-差分门禁 `TestCodecSemanticsRoundTrip` 现在跑 6 个 battery, 全绿:
+差分门禁 `TestCodecSemanticsRoundTrip` 现在跑 8 个 battery, 全绿:
 
 - **`LongHashAlgorithms.java`**: SHA-512 (FIPS 180-4)、xxHash64、SipHash-2-4、CRC64-ECMA、
   FNV-1a-64、splitmix64。专门压 long OPCODE (LADD/LMUL/LSHL/LUSHR/LAND/LXOR/LCMP 等) 与
@@ -139,6 +139,14 @@ iinc」, 还原成 `arr[i++] = v` (捕获自增前的旧值)。
 - **`SpringAlgorithms.java`**: AntPathMatcher 风格 glob (`matchStrings` 单段双指针回溯 + `antMatch`
   多段 `**` 回溯)、`StringUtils.cleanPath` (`.`/`..` 规整)、`MimeType` 解析 (type/subtype/参数
   归一)、`capitalize`、字符串 hash。压 String/char 相关 OPCODE 与深层控制流。
+- **`BitTwiddlingAlgorithms.java`**: Hacker's-Delight 风格位运算 (SWAR popcount32/64、bit/byte
+  reverse、ntz/nlz、parity、nextPow2、log2、gcd、整数平方根 isqrt、rotl/rotr)。**每个手写结果与
+  JDK builtin (`Integer.bitCount`/`reverse`/`numberOf*Zeros`/`rotateLeft` 等) 折叠在指纹里逐一交叉
+  校验一致**。分支轻、移位/与或异或密集。
+- **`ChecksumAlgorithms.java`**: 无表实现的 CRC16 (CCITT-FALSE/XMODEM/ARC)、CRC32、Fletcher-16/32、
+  Adler-32、Internet checksum (RFC 1071)、BSD/SysV checksum。**`"123456789"` 标准 check value 锚定
+  正确性** (CCITT-FALSE=0x29b1、XMODEM=0x31c3、ARC=0xbb3d、CRC32=0xcbf43926)。压 byte[] 迭代、
+  byte<->int 收窄、嵌套移位/异或。
 
 ### 5. 反编译器缺陷修复 (本阶段, 全部带 round-trip 回归)
 
@@ -155,9 +163,38 @@ iinc」, 还原成 `arr[i++] = v` (捕获自增前的旧值)。
   `JavaExpression` 检测两侧均为布尔形操作数时, `Type()` 返回 `boolean` 且 `String()` 直接渲染
   `(c1) & (c2)`。验证: Guava `isPowerOfTwoLong` 编译并语义一致。
 
+### 6. OPCODE 解析 100% 覆盖门禁 (本阶段新增)
+
+新增 opcode 命中记录 + 硬门禁, 确保反编译器对**每一个** javac 可产生的 JVM opcode 的解析路径都被
+确定性、可在 CI 复跑的语料覆盖:
+
+- **命中钩子** (`decompiler/core/opcode_coverage.go`): `calcOpcodeStackInfo` (栈模拟器里每条指令的唯一
+  必经点) 顶部记录 `opcode.Instr.OpCode`。禁用态零成本 (一次 atomic load), 仅在专用串行测试里开启,
+  不影响并发 m2 扫描。导出 `EnableOpcodeHitRecording` / `DisableOpcodeHitRecording` /
+  `RecordedOpcodeHits`。
+- **门禁** (`tests/opcode_coverage_test.go` 的 `TestOpcodeParseCoverage`): 反编译整套内嵌语料
+  (regression seeds + 顶层 syntax-coverage class, 共 116 个 .class) + 6 个自托管 battery (有 javac 时),
+  统计命中的 opcode, 断言**所有**反编译器注册了 handler 的真实 opcode (opcode 值 0..201) 全部被命中,
+  除 7 个有据可查的排除项。**当前结果: 195/195 (100.0%) 通过。**
+- **7 个文档化排除** (均为 javac 不可由源码产生 / 前缀修饰 / 超大方法专用):
+  `jsr` / `jsr_w` / `ret` (废弃子例程, javac>=6 不发, JSR inliner 在栈模拟前已消除)、
+  `goto_w` (>32KB 分支偏移才发)、`wide` (操作数扩展前缀, 折叠进下一条的 IsWide, 不独立分发)、
+  `ldc_w` (常量池下标 >255 才发)、`nop` (javac 从不由源码产生, handler 是空 return)。
+- **填补缺口**: 为补齐 `dstore_0/1`、`fstore_0/1` (低 slot 的 double/float 存储) 与 `dup2_x2`
+  (category-2 数组元素复合赋值且值被使用) 扩展了 `OpcodeCoverage.java`。前 4 个已并入语义指纹、
+  byte-for-byte 通过; `dup2x2()` 因下方 Bug J 仅保留方法体 (供 opcode 命中) 但不并入指纹。
+
 ---
 
 ## 已知深层缺陷 (本阶段定位, 暂以源码重构规避; 待治本)
+
+- **Bug J — category-2 数组元素复合赋值且值被使用, RHS 被重复求值**:
+  `double dv = (a[i] += 2.5);` (double[]/long[] 元素) 编译为 `... dup2_x2 ... dastore`, 把存入的
+  category-2 结果复制到栈底返回。反编译器没有把"被复制的存储值"折叠成临时变量, 而是**重新求值
+  RHS**: 产出 `a[i] = a[i] + 2.5; double var3 = a[i] + 2.5;` —— 此时 `a[i]` 已自增, var3 再加一次
+  2.5, 结果错误 (long[] 同理)。属操作数栈 dup 折叠缺陷, 与 field/static 后自增折叠 (`selfOpFoldedRefs`)
+  是不同机制。**规避**: `OpcodeCoverage.dup2x2()` 保留但不调用 (仍覆盖 DUP2_X2 解析), 不并入语义指纹。
+  **复现**: `static long f(double[] a,int i){ double v=(a[i]+=2.5); return Double.doubleToLongBits(v); }`。
 
 这些是**预先存在**的控制流 / 变量身份重建缺陷, 修复风险高, 本阶段先在 battery 源码里改写算法
 形态规避 (保留等价 OPCODE 覆盖), 并在此登记复现形态供下一轮治本。

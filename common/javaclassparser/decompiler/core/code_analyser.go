@@ -443,6 +443,7 @@ func (d *Decompiler) tryFoldPostIncDec(stack StackSimulation, storedValue values
 }
 
 func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation, opcode *OpCode) error {
+	recordOpcodeHit(opcode.Instr.OpCode)
 	funcCtx := d.FunctionContext
 	checkAndConvertRef := func(value values.JavaValue) func(int) {
 		if _, ok := UnpackSoltValue(runtimeStackSimulation.Peek()).(*values.JavaRef); !ok {

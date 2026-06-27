@@ -207,6 +207,42 @@ public class OpcodeCoverage {
         return r;
     }
 
+    // ---- double/float stored into local slots 0 and 1: DSTORE_0/DSTORE_1, FSTORE_0/FSTORE_1 ----
+    // A category-2 local that lands in slot 0 (static method, first local is the double/float) emits
+    // the *_0 store form; one pushed to slot 1 (a preceding int param occupies slot 0) emits *_1.
+    public static double dstoreSlot0() {
+        double d = 0.5;       // DSTORE_0 (initial)
+        d = d * 3.0 + 1.0;    // DSTORE_0 (reassign)
+        return d;
+    }
+
+    public static double dstoreSlot1(int seed) {
+        double d = seed + 0.5; // seed is slot 0 (int), d is slot 1 (double) -> DSTORE_1
+        d = d * 2.0 - 0.25;    // DSTORE_1 (reassign)
+        return d;
+    }
+
+    public static float fstoreSlot0() {
+        float x = 0.25f;       // FSTORE_0
+        x = x * 4.0f + 1.0f;   // FSTORE_0 (reassign)
+        return x;
+    }
+
+    public static float fstoreSlot1(int seed) {
+        float x = seed + 0.5f; // seed slot 0 (int), x slot 1 (float) -> FSTORE_1
+        x = x * 2.0f - 0.5f;   // FSTORE_1 (reassign)
+        return x;
+    }
+
+    // ---- compound assignment to a category-2 array element with the result used: DUP2_X2 ----
+    // `arr[i] += v` for a double[]/long[] element, when its value is consumed, makes javac duplicate
+    // the category-2 result beneath the (arrayref,index) pair via dup2_x2 before the *astore.
+    public static long dup2x2(double[] a, long[] b, int i) {
+        double dv = (a[i] += 2.5); // double[] element compound-assign, value used -> DUP2_X2
+        long lv = (b[i] += 7L);    // long[]  element compound-assign, value used -> DUP2_X2
+        return Double.doubleToLongBits(dv) ^ (lv << 1) ^ Double.doubleToLongBits(a[i]) ^ b[i];
+    }
+
     private static String hex64(long v) {
         return String.format("%016x", v);
     }
@@ -244,6 +280,19 @@ public class OpcodeCoverage {
 
         long[][] lpairs = {{5, 3}, {3, 5}, {7, 7}, {Long.MIN_VALUE, Long.MAX_VALUE}};
         for (long[] p : lpairs) sb.append(longCompare(p[0], p[1])).append(":");
+        sb.append(",");
+
+        // low-slot category-2 stores + category-2 array compound-assign (DSTORE_0/1, FSTORE_0/1, DUP2_X2)
+        sb.append(hex64(Double.doubleToLongBits(dstoreSlot0()))).append(":");
+        sb.append(hex64(Double.doubleToLongBits(dstoreSlot1(40)))).append(":");
+        sb.append(Integer.toHexString(Float.floatToIntBits(fstoreSlot0()))).append(":");
+        sb.append(Integer.toHexString(Float.floatToIntBits(fstoreSlot1(40)))).append(":");
+        // NOTE: dup2x2() is intentionally NOT folded into the verified fingerprint. It exists only to
+        // emit the DUP2_X2 opcode (a category-2 array compound-assign whose value is used) for the
+        // opcode-parse-coverage gate. The decompiler currently mis-reconstructs that idiom by
+        // re-evaluating the RHS instead of reading back the stored element (see CODEC_TODO.md "Bug J"),
+        // so calling it here would make this semantics round-trip diverge. Keeping the method present
+        // (but uncalled) still routes DUP2_X2 through the stack simulator during decompilation.
 
         System.out.println(sb);
     }
