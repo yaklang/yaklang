@@ -202,6 +202,246 @@ func TestJumpEnteredTryCatchAnchorIsLoadBearing(t *testing.T) {
 	t.Logf("anchor ON (round-trip preserved) for %s: %s", className, got)
 }
 
+// TestNullInitSlotReuseIsLoadBearing proves the dominance-gated null-init slot adoption
+// (nullInitDefDominates in code_analyser.go) is actually load-bearing. The NullInitSlotReuse
+// battery packs a null-initialized Throwable holder (assigned in a dominated catch on one branch)
+// and an unrelated-typed local on a disjoint branch onto ONE jvm slot. With the gate DISABLED
+// (JDEC_NULLADOPT_REACH_OFF=1) the old unconditional null-init adoption unifies them onto a single
+// mis-typed variable, so the decompiled source no longer recompiles ("Throwable cannot be converted
+// to String" / "cannot find symbol getMessage"). With the gate enabled the two variables split to
+// correctly-typed names and the round-trip is byte-identical. If someone deletes the gate, the
+// "guard off" branch starts round-tripping and this test fails.
+func TestNullInitSlotReuseIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	java, err2 := exec.LookPath("java")
+	if err1 != nil || err2 != nil {
+		t.Skip("javac/java not available; skipping null-init slot-reuse load-bearing test")
+	}
+
+	const className = "NullInitSlotReuse"
+	src, err := codecBatteryFS.ReadFile("testdata/codec/" + className + ".java")
+	if err != nil {
+		t.Fatalf("read battery %s: %v", className, err)
+	}
+
+	origDir := t.TempDir()
+	golden, ok := compileAndRunJavaBattery(t, javac, java, origDir, className, string(src))
+	if !ok {
+		t.Fatalf("failed to compile/run original battery %s:\n%s", className, golden)
+	}
+	raw, err := os.ReadFile(filepath.Join(origDir, "codec", className+".class"))
+	if err != nil {
+		t.Fatalf("read compiled class %s: %v", className, err)
+	}
+
+	roundTrips := func() (string, bool) {
+		decompiled, derr := javaclassparser.Decompile(raw)
+		if derr != nil {
+			return "decompile error: " + derr.Error(), false
+		}
+		got, okRT := compileAndRunJavaBattery(t, javac, java, t.TempDir(), className, decompiled)
+		return got, okRT && got == golden
+	}
+
+	// Gate OFF: unconditional null-init adoption unifies the Throwable holder with the disjoint
+	// branch's local, so the decompiled source must fail to recompile (type conflict).
+	os.Setenv("JDEC_NULLADOPT_REACH_OFF", "1")
+	got, okOff := roundTrips()
+	os.Unsetenv("JDEC_NULLADOPT_REACH_OFF")
+	if okOff {
+		t.Fatalf("expected %s to FAIL the round-trip with the null-init dominance gate disabled, but it succeeded; the gate is not load-bearing", className)
+	}
+	t.Logf("gate OFF (expected failure) for %s: %s", className, got)
+
+	// Gate ON: variables split to correct types; clean behavior-preserving round-trip.
+	got, okOn := roundTrips()
+	if !okOn {
+		t.Fatalf("expected %s to round-trip cleanly with the null-init dominance gate enabled; got: %s", className, got)
+	}
+	t.Logf("gate ON (round-trip preserved) for %s: %s", className, got)
+}
+
+// TestTwrDuplicateCatchMergeIsLoadBearing proves mergeNestedSameTypeCatches (dumper.go) is
+// load-bearing. JDK8 desugars try-with-resources inline: a Throwable primaryExc-capture handler
+// (`catch (Throwable t) { primaryExc = t; throw t; }`) whose region is itself covered by a Throwable
+// cleanup ("any") handler. The decompiler renders both, producing two sibling catch(Throwable)
+// clauses on one try — illegal Java ("exception Throwable already caught"). The embedded class is
+// commons-codec-style twr compiled by JDK8 (system javac is JDK17 and would emit the compact
+// single-handler shape, so the broken shape must come from a pinned JDK8 .class). With the merge
+// DISABLED (JDEC_NO_CATCH_MERGE=1) the decompiled source no longer recompiles; with it enabled the
+// two handlers collapse into one and the round-trip is behavior-identical to the original bytecode.
+func TestTwrDuplicateCatchMergeIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	java, err2 := exec.LookPath("java")
+	if err1 != nil || err2 != nil {
+		t.Skip("javac/java not available; skipping twr duplicate-catch merge test")
+	}
+
+	const className = "TwrSingleResource"
+	raw, err := regressionFS.ReadFile("testdata/regression/twr_jdk8_single_resource.class")
+	if err != nil {
+		t.Fatalf("read embedded twr class: %v", err)
+	}
+
+	// Golden: run the original JDK8 bytecode directly (java can run a JDK8 class).
+	goldDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(goldDir, "codec"), 0755); err != nil {
+		t.Fatalf("mkdir golden: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(goldDir, "codec", className+".class"), raw, 0644); err != nil {
+		t.Fatalf("write golden class: %v", err)
+	}
+	goldOut, err := exec.Command(java, "-cp", goldDir, "codec."+className).CombinedOutput()
+	if err != nil {
+		t.Fatalf("run original twr class: %v\n%s", err, goldOut)
+	}
+	golden := strings.TrimSpace(string(goldOut))
+	t.Logf("golden fingerprint [%s]: %s", className, golden)
+
+	roundTrips := func() (string, bool) {
+		decompiled, derr := javaclassparser.Decompile(raw)
+		if derr != nil {
+			return "decompile error: " + derr.Error(), false
+		}
+		got, ok := compileAndRunJavaBattery(t, javac, java, t.TempDir(), className, decompiled)
+		return got, ok && got == golden
+	}
+
+	// Merge OFF: two sibling catch(Throwable) -> duplicate catch -> recompile fails.
+	os.Setenv("JDEC_NO_CATCH_MERGE", "1")
+	got, okOff := roundTrips()
+	os.Unsetenv("JDEC_NO_CATCH_MERGE")
+	if okOff {
+		t.Fatalf("expected %s to FAIL the round-trip with catch-merge disabled (duplicate catch), but it succeeded; the merge is not load-bearing", className)
+	}
+	t.Logf("merge OFF (expected failure) for %s: %s", className, got)
+
+	// Merge ON: single merged catch -> clean, behavior-preserving round-trip.
+	got, okOn := roundTrips()
+	if !okOn {
+		t.Fatalf("expected %s to round-trip cleanly with catch-merge enabled; got: %s (golden %s)", className, got, golden)
+	}
+	t.Logf("merge ON (round-trip preserved) for %s: %s", className, got)
+}
+
+// TestDollarIdentifierValidationToleranceIsLoadBearing proves the post-decompile syntax safety net's
+// standalone-'$' tolerance (neutralizeStandaloneDollarForValidation in syntax_validate.go) is
+// load-bearing. Obfuscators emit members literally named "$" (a legal JVM AND javac identifier, e.g.
+// asm-6.0_BETA's MethodWriter). yak's Java grammar lexes a lone '$' as the dedicated Dollar token
+// (used for "${...}") rather than IDENTIFIER, so faithfully-decompiled, javac-valid output like
+// `this.$` fails the grammar safety net. Without the tolerance the '$' field is DROPPED and the '$'
+// method is degraded to a throwing stub, so the round-trip crashes; with it the body survives and the
+// round-trip is behavior-identical. The sibling "$$" field (already a valid IDENTIFIER) must keep
+// working in both modes, guarding the tolerance against over-reaching onto multi-'$' names.
+func TestDollarIdentifierValidationToleranceIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	java, err2 := exec.LookPath("java")
+	if err1 != nil || err2 != nil {
+		t.Skip("javac/java not available; skipping dollar-identifier validation tolerance test")
+	}
+
+	const className = "DollarIdentField"
+	src, err := codecBatteryFS.ReadFile("testdata/codec/" + className + ".java")
+	if err != nil {
+		t.Fatalf("read battery %s: %v", className, err)
+	}
+
+	origDir := t.TempDir()
+	golden, ok := compileAndRunJavaBattery(t, javac, java, origDir, className, string(src))
+	if !ok {
+		t.Fatalf("failed to compile/run original battery %s:\n%s", className, golden)
+	}
+	raw, err := os.ReadFile(filepath.Join(origDir, "codec", className+".class"))
+	if err != nil {
+		t.Fatalf("read compiled class %s: %v", className, err)
+	}
+
+	roundTrips := func() (string, bool) {
+		decompiled, derr := javaclassparser.Decompile(raw)
+		if derr != nil {
+			return "decompile error: " + derr.Error(), false
+		}
+		got, ok := compileAndRunJavaBattery(t, javac, java, t.TempDir(), className, decompiled)
+		return got, ok && got == golden
+	}
+
+	// Tolerance OFF: the '$' field is dropped and the '$' method is stubbed -> round-trip diverges.
+	os.Setenv("JDEC_NO_DOLLAR_IDENT_VALIDATE", "1")
+	got, okOff := roundTrips()
+	os.Unsetenv("JDEC_NO_DOLLAR_IDENT_VALIDATE")
+	if okOff {
+		t.Fatalf("expected %s to FAIL the round-trip with '$'-tolerance disabled (dropped field / stubbed method), but it succeeded; the tolerance is not load-bearing", className)
+	}
+	t.Logf("tolerance OFF (expected failure) for %s: %s", className, got)
+
+	// Tolerance ON: standalone '$' neutralized only for validation -> clean, behavior-preserving round-trip.
+	got, okOn := roundTrips()
+	if !okOn {
+		t.Fatalf("expected %s to round-trip cleanly with '$'-tolerance enabled; got: %s (golden %s)", className, got, golden)
+	}
+	t.Logf("tolerance ON (round-trip preserved) for %s: %s", className, got)
+}
+
+// TestCrossScopeDeclDominanceIsLoadBearing proves the cross-scope declaration DOMINANCE check
+// (topLevelDeclDominatesAllUses in rewrite_var.go) is load-bearing. One JVM slot is reused for three
+// independent int locals on disjoint live ranges (an if-arm, the sibling else-arm, and the trailing
+// code), so rewriteVar merges them onto one VariableId. The minted declaration lands in the if-arm and
+// a LATER disjoint re-declaration sits at the block top level; the existence-only skip
+// (isDeclaredAtTopLevel) treated that later declaration as already covering the block and never hoisted
+// the variable, leaving the else-arm use out of scope ("cannot find symbol: var4"). With the dominance
+// check DISABLED (JDEC_NO_CROSS_SCOPE_DOMINATE=1) the decompiled source must fail to recompile; with it
+// enabled a single bare declaration is hoisted to the dominating block and the round-trip is
+// byte-for-byte behavior identical.
+func TestCrossScopeDeclDominanceIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	java, err2 := exec.LookPath("java")
+	if err1 != nil || err2 != nil {
+		t.Skip("javac/java not available; skipping cross-scope declaration dominance test")
+	}
+
+	const className = "SlotReuseDisjointRanges"
+	src, err := codecBatteryFS.ReadFile("testdata/codec/" + className + ".java")
+	if err != nil {
+		t.Fatalf("read battery %s: %v", className, err)
+	}
+
+	origDir := t.TempDir()
+	golden, ok := compileAndRunJavaBattery(t, javac, java, origDir, className, string(src))
+	if !ok {
+		t.Fatalf("failed to compile/run original battery %s:\n%s", className, golden)
+	}
+	raw, err := os.ReadFile(filepath.Join(origDir, "codec", className+".class"))
+	if err != nil {
+		t.Fatalf("read compiled class %s: %v", className, err)
+	}
+
+	roundTrips := func() (string, bool) {
+		decompiled, derr := javaclassparser.Decompile(raw)
+		if derr != nil {
+			return "decompile error: " + derr.Error(), false
+		}
+		got, okRT := compileAndRunJavaBattery(t, javac, java, t.TempDir(), className, decompiled)
+		return got, okRT && got == golden
+	}
+
+	// Dominance check OFF: the later top-level re-declaration masks the un-dominated sibling-arm use,
+	// so the hoist is skipped and the else-arm `var4 = ...` stays out of scope -> recompile fails.
+	os.Setenv("JDEC_NO_CROSS_SCOPE_DOMINATE", "1")
+	got, okOff := roundTrips()
+	os.Unsetenv("JDEC_NO_CROSS_SCOPE_DOMINATE")
+	if okOff {
+		t.Fatalf("expected %s to FAIL the round-trip with the cross-scope dominance check disabled, but it succeeded; the check is not load-bearing", className)
+	}
+	t.Logf("dominance OFF (expected failure) for %s: %s", className, got)
+
+	// Dominance check ON: one bare declaration hoisted to the dominating block; clean round-trip.
+	got, okOn := roundTrips()
+	if !okOn {
+		t.Fatalf("expected %s to round-trip cleanly with the cross-scope dominance check enabled; got: %s (golden %s)", className, got, golden)
+	}
+	t.Logf("dominance ON (round-trip preserved) for %s: %s", className, got)
+}
+
 // TestClinitHoistBarrierIsLoadBearing proves the <clinit> contiguous-prefix hoist barrier actually
 // does work. It decompiles the StaticInitForwardRef battery with the barrier DISABLED
 // (JDEC_NO_CLINIT_HOIST_BARRIER=1) and asserts the result no longer round-trips (lifting
@@ -253,6 +493,66 @@ func TestClinitHoistBarrierIsLoadBearing(t *testing.T) {
 		t.Fatalf("expected %s to round-trip cleanly with the clinit hoist barrier enabled; got: %s", className, got)
 	}
 	t.Logf("barrier ON (round-trip preserved) for %s: %s", className, got)
+}
+
+// TestIfElseEscapingSlotIsLoadBearing proves the if/else escaping-slot prebind (Bug AJ) is doing
+// real work. A primitive local assigned in BOTH arms of an if/else and READ after the if (in a
+// following loop + the return) shares one JVM slot across two live ranges; the loop counter that
+// follows occupies the NEXT slot. Without the prebind each arm minted its own id for the if/else
+// local, the post-if reads kept the slot's original (un-minted) id, and -- because the arm mints
+// never advanced the parent name counter -- the loop counter was handed the SAME varN as the if/else
+// local, so the recompiled source silently read the counter where the if/else local was meant. It
+// still compiles (all the same primitive type), so only differential execution catches it. With the
+// prebind DISABLED (JDEC_IFELSE_PREBIND_OFF=1) the decompiled source must diverge from the golden
+// fingerprint; with it enabled the round-trip is byte-for-byte clean.
+func TestIfElseEscapingSlotIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	java, err2 := exec.LookPath("java")
+	if err1 != nil || err2 != nil {
+		t.Skip("javac/java not available; skipping if/else escaping-slot prebind test")
+	}
+
+	const className = "IfElseEscapingSlot"
+	src, err := codecBatteryFS.ReadFile("testdata/codec/" + className + ".java")
+	if err != nil {
+		t.Fatalf("read battery %s: %v", className, err)
+	}
+
+	origDir := t.TempDir()
+	golden, ok := compileAndRunJavaBattery(t, javac, java, origDir, className, string(src))
+	if !ok {
+		t.Fatalf("failed to compile/run original battery %s:\n%s", className, golden)
+	}
+	raw, err := os.ReadFile(filepath.Join(origDir, "codec", className+".class"))
+	if err != nil {
+		t.Fatalf("read compiled class %s: %v", className, err)
+	}
+
+	roundTrips := func() (string, bool) {
+		decompiled, err := javaclassparser.Decompile(raw)
+		if err != nil {
+			return "decompile error: " + err.Error(), false
+		}
+		got, ok := compileAndRunJavaBattery(t, javac, java, t.TempDir(), className, decompiled)
+		return got, ok && got == golden
+	}
+
+	// Prebind OFF: the if/else local merges with the following loop counter, so the recompiled source
+	// reads the wrong variable and the fingerprint diverges (the source still compiles).
+	os.Setenv("JDEC_IFELSE_PREBIND_OFF", "1")
+	got, okOff := roundTrips()
+	os.Unsetenv("JDEC_IFELSE_PREBIND_OFF")
+	if okOff {
+		t.Fatalf("expected %s to FAIL the round-trip with the if/else escaping-slot prebind disabled, but it succeeded; the prebind is not load-bearing", className)
+	}
+	t.Logf("prebind OFF (expected failure) for %s: %s", className, got)
+
+	// Prebind ON: clean, behavior-preserving round-trip.
+	got, okOn := roundTrips()
+	if !okOn {
+		t.Fatalf("expected %s to round-trip cleanly with the if/else escaping-slot prebind enabled; got: %s", className, got)
+	}
+	t.Logf("prebind ON (round-trip preserved) for %s: %s", className, got)
 }
 
 // TestEmbeddedAssignRefIsLoadBearing proves the embedded-assignment reference-type recovery is load

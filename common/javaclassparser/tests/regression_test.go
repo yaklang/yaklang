@@ -1050,6 +1050,45 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			mustNotContain: []string{"protected class Outer$Inner", "yak-decompiler"},
 		},
 		{
+			file: "strswitch_slot_reuse.class",
+			desc: "a String-switch (`switch(s){...}`) desugars to a hashCode dispatch whose case bodies " +
+				"read the selector slot via `s.equals(\"X\")`; a LATER second switch reuses that same JVM " +
+				"slot for a different reference local. The single global slot table, mutated in DFS order, " +
+				"made the first switch's equals-receiver reads resolve to the LATER variable (rendered " +
+				"`var4.equals(...)` instead of `var2.equals(...)`) - the same-category (reference-vs-" +
+				"reference) reused-slot corruption that the category-mismatch repair cannot detect. The " +
+				"reaching-definition read repair restores the correct receiver. This `varN.equals(\"S\")` " +
+				"phantom was the biggest single fastjson2 recompile blocker (TypeUtils.loadClass, 55 " +
+				"classes). Kill-switch JDEC_SLOT_READ_REACHING_OFF=1 (Bug AI load side).",
+			mustContain:    []string{`var2.equals("O")`, `var2.equals("Object")`},
+			mustNotContain: []string{`var4.equals(`, "yak-decompiler"},
+		},
+		{
+			file: "clinit_twr_return.class",
+			desc: "a class whose static initializer (<clinit>, rendered as a `static {}` block) contains a " +
+				"try-with-resources. JDK8 inlines twr so the clinit's terminal `return` opcode lands as a " +
+				"bare `return;` at the tail of the rendered `try{...}` body. A static (or instance) " +
+				"initializer block cannot contain a return statement (javac: \"return outside of method\"); " +
+				"source can never express an early return in <clinit>, so the void return is purely the " +
+				"flow-exit opcode and must be dropped. The block's effects (the resource decl, the field " +
+				"assignment, the close logic) must survive. Real-world: commons-codec DaitchMokotoffSoundex. " +
+				"Kill-switch JDEC_NO_CLINIT_RETURN_DROP=1 reintroduces the illegal return (Bug AC).",
+			mustContain:    []string{"static  {", "Throwable var1 = null;", "VALUE = var0.nextInt();", "return VALUE;"},
+			mustNotContain: []string{"return;", "yak-decompiler"},
+		},
+		{
+			file: "twr_two_resource_naming.class",
+			desc: "a JDK8 two-resource try-with-resources (nested twr desugaring) with several leading locals " +
+				"so the resource slots are high. Each resource's inlined normal-path close() copy must use " +
+				"the SAME name as that resource's declaration: the inner resource declared `var11` must close " +
+				"as `var11.close()` (not a phantom higher slot colliding with a suppress-catch variable, the " +
+				"old `var10.close()` cannot-find-symbol). The outer catch reusing the inner-resource name in " +
+				"its disjoint sibling scope is legal. The whole method must frontend-parse and the resource " +
+				"declarations and their close receivers must stay name-consistent (Bug AE twr naming).",
+			mustContain:    []string{"ByteArrayInputStream var9 = new ByteArrayInputStream(var0)", "ByteArrayInputStream var11 = new ByteArrayInputStream(var1)", "var11.close()", "var9.close()"},
+			mustNotContain: []string{"yak-decompiler", "var10.close()"},
+		},
+		{
 			file: "ifnonnull_branch.class",
 			desc: "an `ifnonnull` (jump when != null) branch renders the condition as the fall-through " +
 				"condition (`== null`), consistent with IFNULL/numeric-IF. The IfBody (TrueNode) binds to " +
@@ -1705,20 +1744,26 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 		{
 			file: "xmlbeans_qnamehelper.class",
 			desc: "XMLBeans QNameHelper.hexsafe reuses local slots between byte arrays, loop indexes, and catch parameters. " +
-				"Catch variables whose inferred type is polluted by a reused array slot must still render as catchable types, the " +
-				"loop index must index the byte array consistently, and a catch parameter that shares a slot with a hoisted local " +
-				"must be split to a fresh name so it does not illegally shadow that enclosing local.",
+				"Each byte-array local must stay scoped to its own block (no cross-block hoisting), the loop index must index " +
+				"the byte array consistently, the catch parameter must render with its real catchable type instead of a " +
+				"slot-pollution Throwable fallback, and the digest byte array that reuses the catch slot must split to its own " +
+				"variable. Dominance-gated null-init adoption (JDEC_NULLADOPT_REACH_OFF) keeps the two byte arrays from " +
+				"collapsing onto one hoisted name, which previously forced a Throwable catch rename (var4_2).",
 			mustContain: []string{
 				"public class QNameHelper",
 				"public static String hexsafe(String var0)",
 				"var4[var5]",
+				// Catch parameter recovers its real type instead of a polluted Throwable fallback.
 				"catch(UnsupportedEncodingException var5_1)",
-				"catch(Throwable var4_2)",
+				// The digest byte array reuses the catch slot but splits to its own typed variable.
+				"byte[] var5_1 = var3.digest(var4)",
 			},
 			mustNotContain: []string{
 				"catch(byte[]",
-				// The catch parameter must not reuse the hoisted byte-array name var4 (illegal shadowing).
+				// The catch parameter must not reuse a hoisted byte-array name var4 (illegal shadowing).
 				"catch(Throwable var4)",
+				// No slot-pollution Throwable fallback on the UTF-8 decode catch anymore.
+				"catch(Throwable var4_2)",
 				"int var5_1 = 0",
 				"yak-decompiler",
 				"post-decompile syntax",
@@ -1777,6 +1822,17 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 				"post-decompile syntax",
 				"undecompilable method body",
 			},
+		},
+		{
+			file: "strictfp_method.class",
+			desc: "a method carrying ACC_STRICT (compiled --release 8) must render the modifier as the " +
+				"Java keyword `strictfp`, not the bare `strict`. The bare form produced un-parseable source " +
+				"(\"no viable alternative at input 'strict double'\"), which failed syntax validation; even " +
+				"the stub inherited the broken modifier, so the whole method (signature un-representable) was " +
+				"dropped (observed on JDK-derived FloatingDecimal copies, e.g. beetl FloatingIOWriter " +
+				"doubleValue()/floatValue()). strictfp is a valid grammar modifier and round-trips ACC_STRICT.",
+			mustContain:    []string{"strictfp double compute(", "strictfp float half("},
+			mustNotContain: []string{"strict double", "strict float", "yak-decompiler"},
 		},
 	}
 

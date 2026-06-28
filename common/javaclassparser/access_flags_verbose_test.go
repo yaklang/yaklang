@@ -89,3 +89,56 @@ func TestClassAccessFlags(t *testing.T) {
 		})
 	}
 }
+
+// TestMethodAccessFlags locks the ACC_STRICT modifier rendering. The bit must surface as the Java
+// keyword `strictfp`, never the bare `strict`: the latter is not a valid modifier token, so a
+// `public strict double m()` signature failed syntax validation and the whole method (plus its
+// stub) was dropped. Root cause of the FloatingIOWriter doubleValue()/floatValue() drop warnings.
+func TestMethodAccessFlags(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    uint16
+		wantFlag []string
+		wantStr  string
+	}{
+		{
+			name:     "public strictfp",
+			input:    0x0801, // ACC_PUBLIC | ACC_STRICT
+			wantFlag: []string{"public", "strictfp"},
+			wantStr:  "public strictfp",
+		},
+		{
+			name:     "package-private strictfp",
+			input:    0x0800, // ACC_STRICT only
+			wantFlag: []string{"strictfp"},
+			wantStr:  "strictfp",
+		},
+		{
+			name:     "public static final",
+			input:    0x0019, // ACC_PUBLIC | ACC_STATIC | ACC_FINAL
+			wantFlag: []string{"public", "static", "final"},
+			wantStr:  "public static final",
+		},
+		{
+			// native is recorded in the flag list but intentionally omitted from the modifier
+			// string (the dumper renders native methods specially), so only the access modifier
+			// reaches the rendered prefix.
+			name:     "public native",
+			input:    0x0101, // ACC_PUBLIC | ACC_NATIVE
+			wantFlag: []string{"public", "native"},
+			wantStr:  "public",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotFlag, gotStr := getMethodAccessFlagsVerbose(tt.input)
+			if !reflect.DeepEqual(gotFlag, tt.wantFlag) {
+				t.Errorf("getMethodAccessFlagsVerbose() 获取的标志 = %v, 期望标志 = %v", gotFlag, tt.wantFlag)
+			}
+			if gotStr != tt.wantStr {
+				t.Errorf("getMethodAccessFlagsVerbose() 获取的字符串 = %v, 期望字符串 = %v", gotStr, tt.wantStr)
+			}
+		})
+	}
+}

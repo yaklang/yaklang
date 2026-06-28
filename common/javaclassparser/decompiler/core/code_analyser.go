@@ -796,6 +796,187 @@ func (d *Decompiler) reachingSlotVersionByCategory(start *OpCode, slot int, want
 	return nil
 }
 
+// reachingSlotStoreRefs walks Source edges backward from start and collects, per backward path, the
+// ref of the NEAREST version-defining local store of `slot` (the reaching definition on that path).
+// A same-slot store dominates everything earlier on its path, so the search stops expanding past it.
+// The result is keyed by VarUid so distinct logical variables are de-duplicated. Used by the general
+// reaching-definition read repair (reachingSlotVersionGeneral).
+func (d *Decompiler) reachingSlotStoreRefs(start *OpCode, slot int) map[string]*values.JavaRef {
+	out := map[string]*values.JavaRef{}
+	if start == nil {
+		return out
+	}
+	visited := map[*OpCode]bool{start: true}
+	queue := append([]*OpCode{}, start.Source...)
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		if cur == nil || visited[cur] {
+			continue
+		}
+		visited[cur] = true
+		if isLocalStoreOpcode(cur.Instr.OpCode) && GetStoreIdx(cur) == slot {
+			if refs, ok := d.opcodeIdToRef[cur]; ok && len(refs) > 0 {
+				if ref, ok2 := refs[len(refs)-1][0].(*values.JavaRef); ok2 && ref != nil {
+					out[ref.VarUid] = ref
+				}
+			}
+			// This store dominates its path; an earlier same-slot store is not reachable here.
+			continue
+		}
+		queue = append(queue, cur.Source...)
+	}
+	return out
+}
+
+// reachingSlotVersionGeneral repairs a slot read that the single global slot table resolved to a ref
+// whose defining store does NOT reach the load along the CFG — a later/disjoint-branch version that
+// leaked in through DFS traversal order, EVEN WHEN the category (reference vs primitive) agrees so
+// the narrower reachingSlotVersionOnMismatch cannot see it. The canonical case is the String-switch
+// receiver: `switch(s){case "X": ...}` desugars to `aload <s-slot>; equals; ...` inside each case,
+// but a LATER second switch reuses that slot for a different reference, and the first switch's case
+// reads resolve to the later variable (fastjson2 TypeUtils.loadClass `varN.equals(...)`, Bug AI).
+//
+// It only fires on the unambiguous corruption signal: the resolved ref is NOT among the reaching
+// definitions AND there is exactly ONE distinct reaching same-slot definition. When current is
+// itself a reaching def (correct read) or several distinct defs reach (a genuine merge/phi we must
+// not rewrite), it returns nil and the caller keeps the original ref — keeping the blast radius to
+// genuinely corrupted reads. Kill-switch: JDEC_SLOT_READ_REACHING_OFF=1 (shared).
+func (d *Decompiler) reachingSlotVersionGeneral(load *OpCode, slot int, current *values.JavaRef) *values.JavaRef {
+	if os.Getenv("JDEC_SLOT_READ_REACHING_OFF") == "1" {
+		return nil
+	}
+	if load == nil || !isLocalLoadOpcode(load.Instr.OpCode) || current == nil {
+		return nil
+	}
+	reaching := d.reachingSlotStoreRefs(load, slot)
+	if len(reaching) == 0 {
+		return nil
+	}
+	if _, ok := reaching[current.VarUid]; ok {
+		// current is a genuine reaching definition: the read is already correct.
+		return nil
+	}
+	if len(reaching) != 1 {
+		// Multiple distinct reaching definitions = a real merge point; do not override.
+		return nil
+	}
+	for _, ref := range reaching {
+		if ref != nil && ref.VarUid != current.VarUid {
+			return ref
+		}
+	}
+	return nil
+}
+
+// reachingStoreVersion repairs the SAME single-global-slot-table DFS corruption as
+// reachingSlotVersionGeneral, but on the STORE side. When a store would continue the prior value of
+// its slot (the JVM reused the slot for a value of the SAME declared type, e.g. the String-switch
+// index slot `int idx = -1; ...; idx = N;`), the reuse decision in AssignVarGuarded depends on the
+// global slot version matching the stored value's type. If DFS order left a wrong-typed version in
+// the slot, AssignVar mints a fresh phantom local instead (fastjson2 TypeUtils.loadClass renders the
+// case-body `idx = N` as a brand new `int varK = N`, so the following `switch(idx)` always reads the
+// untouched `-1` initializer and falls through to default — compiles but is semantically dead).
+//
+// It fires ONLY on that exact corruption signature: the current global version's type does NOT match
+// the stored value (so AssignVar would mint), while there is a UNIQUE reaching same-slot definition
+// whose type DOES match (so continuing it is correct). Returns that definition to install before
+// AssignVar; nil in every other case (current already continues, no/multiple reaching defs, type
+// still mismatches). Kill-switch: JDEC_SLOT_STORE_REACHING_OFF=1.
+func (d *Decompiler) reachingStoreVersion(store *OpCode, slot int, current *values.JavaRef, val values.JavaValue) *values.JavaRef {
+	if os.Getenv("JDEC_SLOT_STORE_REACHING_OFF") == "1" {
+		return nil
+	}
+	if store == nil || val == nil || val.Type() == nil {
+		return nil
+	}
+	typ := slotDeclType(val)
+	if typ == nil {
+		return nil
+	}
+	ctx := &class_context.ClassContext{}
+	typStr := typ.String(ctx)
+	if current != nil && current.Type() != nil && current.Type().String(ctx) == typStr {
+		// The current global version already continues this store correctly; leave it alone.
+		return nil
+	}
+	reaching := d.reachingSlotStoreRefs(store, slot)
+	if len(reaching) != 1 {
+		return nil
+	}
+	for _, ref := range reaching {
+		if ref == nil || ref.Type() == nil {
+			return nil
+		}
+		if current != nil && ref.VarUid == current.VarUid {
+			return nil
+		}
+		if ref.Type().String(ctx) == typStr {
+			return ref
+		}
+	}
+	return nil
+}
+
+// nullInitDefDominates reports whether the slot's current null-initialized store (the unique
+// same-slot store carrying nullRef, call it D) DOMINATES the store opcode N, i.e. every path from
+// method entry to N passes through D. Dominance is decided by the textbook "remove D and check
+// reachability" test run backward: walk Source edges backward from N treating every same-slot
+// store of nullRef as removed (a wall we never traverse). If method entry becomes reachable, some
+// entry->N path bypasses D, so D does not dominate (the slot value at N leaked from a sibling /
+// disjoint branch through the single global slot table by DFS order — e.g. a try-with-resources
+// synthetic `primaryExc = null` in one branch reusing the slot of an else-branch local). When
+// entry is unreachable without crossing D, D dominates and the `T x = null; ...; x = v` adoption is
+// the genuine single-variable idiom. Plain reachability is insufficient because loop back-edges let
+// a sibling-branch null init reach N across iterations. Kill-switch: JDEC_NULLADOPT_REACH_OFF=1
+// (always reports dominated, i.e. the old unconditional adoption behavior).
+func (d *Decompiler) nullInitDefDominates(store *OpCode, slot int, nullRef *values.JavaRef) bool {
+	if os.Getenv("JDEC_NULLADOPT_REACH_OFF") == "1" {
+		return true
+	}
+	if store == nil || nullRef == nil {
+		return true
+	}
+	var entry *OpCode
+	if len(d.opCodes) > 0 {
+		entry = d.opCodes[0]
+	}
+	isNullDefWall := func(op *OpCode) bool {
+		if !isLocalStoreOpcode(op.Instr.OpCode) || GetStoreIdx(op) != slot {
+			return false
+		}
+		if refs, ok := d.opcodeIdToRef[op]; ok && len(refs) > 0 {
+			if ref, ok2 := refs[len(refs)-1][0].(*values.JavaRef); ok2 && ref != nil {
+				return ref.VarUid == nullRef.VarUid
+			}
+		}
+		return false
+	}
+	visited := map[*OpCode]bool{store: true}
+	queue := append([]*OpCode{}, store.Source...)
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		if cur == nil || visited[cur] {
+			continue
+		}
+		visited[cur] = true
+		if isNullDefWall(cur) {
+			// D is removed from the graph; do not traverse through it.
+			continue
+		}
+		if cur == entry || cur.CurrentOffset == 0 {
+			// Reached the real method entry without crossing D: some entry->N path bypasses D,
+			// so D does not dominate N. Only the genuine entry counts; other source-less nodes
+			// (e.g. exception-handler roots reached via non-Source edges) are dead-ended to avoid
+			// over-splitting legitimate single-variable idioms inside try blocks.
+			return false
+		}
+		queue = append(queue, cur.Source...)
+	}
+	return true
+}
+
 func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation, opcode *OpCode) error {
 	recordOpcodeHit(opcode.Instr.OpCode)
 	funcCtx := d.FunctionContext
@@ -838,6 +1019,10 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		// unambiguous corruption signal (load opcode category disagrees with the resolved ref) by
 		// walking back to the true reaching definition; correct reads are left untouched.
 		if better := d.reachingSlotVersionOnMismatch(opcode, slot, varRef); better != nil {
+			varRef = better
+		} else if better := d.reachingSlotVersionGeneral(opcode, slot, varRef); better != nil {
+			// Same-category (e.g. reference-vs-reference) reused-slot corruption that the
+			// category-mismatch repair cannot detect (String-switch receiver, Bug AI).
 			varRef = better
 		}
 		slotvalue := values.NewSlotValue(varRef, varRef.Type())
@@ -911,6 +1096,13 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		slot := GetStoreIdx(opcode)
 		value := runtimeStackSimulation.Pop().(values.JavaValue)
 		oldRef := runtimeStackSimulation.GetVar(slot)
+		// Store-side reaching-definition repair (Bug AI store side): undo DFS-order corruption of
+		// the global slot table so a same-type continuation reuses the right variable instead of
+		// minting a phantom local (String-switch index slot, fastjson2 TypeUtils.loadClass).
+		if repaired := d.reachingStoreVersion(opcode, slot, oldRef, value); repaired != nil {
+			runtimeStackSimulation.SetVar(slot, repaired)
+			oldRef = repaired
+		}
 		ref, isFirst := oldRef, false
 		reuseNullBranchStore := false
 		if values.IsNullLiteral(value) && oldRef != nil && len(opcode.Target) == 1 && opcode.Target[0].Instr.OpCode == OP_GOTO {
@@ -919,7 +1111,17 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 			}
 		}
 		if !reuseNullBranchStore {
-			ref, isFirst = runtimeStackSimulation.AssignVar(slot, value)
+			// Gate the null-init type adoption: only let a null-initialized slot adopt this
+			// store's concrete reference type when the null initializer actually reaches here.
+			// A try-with-resources synthetic `primaryExc = null` (one branch) reuses the same JVM
+			// slot as an unrelated-typed local on a sibling branch (e.g. an else-branch String);
+			// the single global slot table makes the sibling store see the null init purely from
+			// DFS order, and adopting it unified two distinct variables onto one mis-typed name
+			// (Throwable used as String -> "cannot find symbol addSuppressed"). When the null init
+			// does not reach this store, mint a fresh variable instead.
+			blockNullAdopt := oldRef != nil && oldRef.IsNullInitialized() &&
+				!d.nullInitDefDominates(opcode, slot, oldRef)
+			ref, isFirst = runtimeStackSimulation.AssignVarGuarded(slot, value, blockNullAdopt)
 		}
 		if slot == 0 && oldRef != nil && oldRef.IsThis && ref != nil && oldRef.VarUid == ref.VarUid {
 			ref.IsThis = false

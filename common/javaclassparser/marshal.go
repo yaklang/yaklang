@@ -218,7 +218,14 @@ func writeAttributes(writer *JavaBufferWriter, info []AttributeInfo, classObj *C
 			writer.Write2Byte(n)
 			writer.Write4Byte(info[j].(*SyntheticAttribute).AttrLen)
 		case *RuntimeVisibleAnnotationsAttribute:
-			n := classObj.findUtf8IndexFromPool("RuntimeVisibleAnnotations") + 1
+			// Visible and invisible annotations share this struct; pick the attribute name that
+			// matches the parsed origin so RetentionPolicy.CLASS annotations are not silently
+			// re-emitted as RUNTIME-visible (Bug AF).
+			attrName := "RuntimeVisibleAnnotations"
+			if info[j].(*RuntimeVisibleAnnotationsAttribute).IsInvisible {
+				attrName = "RuntimeInvisibleAnnotations"
+			}
+			n := classObj.findUtf8IndexFromPool(attrName) + 1
 			writer.Write2Byte(n)
 			writer.Write4Byte(info[j].(*RuntimeVisibleAnnotationsAttribute).AttrLen)
 			writer.Write2Byte(len(info[j].(*RuntimeVisibleAnnotationsAttribute).Annotations))

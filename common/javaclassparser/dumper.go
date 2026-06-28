@@ -1034,6 +1034,91 @@ func (c *ClassObjectDumper) DumpAnnotation(anno *AnnotationAttribute) (string, e
 	return result, nil
 }
 
+// normalizeCatchClauseType keeps a catch clause's declared type a legal reference type. A catch
+// type must be a subtype of Throwable; when upstream type inference degrades the exception
+// variable to a primitive (e.g. "boolean" from a reused slot) or an array, fall back to Throwable
+// so the emitted Java stays syntactically valid.
+func normalizeCatchClauseType(excType string) string {
+	if strings.HasSuffix(excType, "[]") {
+		return "Throwable"
+	}
+	switch excType {
+	case "boolean", "byte", "char", "short", "int", "long", "float", "double", "void":
+		return "Throwable"
+	}
+	return excType
+}
+
+// mergeNestedSameTypeCatches collapses the decompiler-synthesized "two catch clauses of the same
+// type" shape. Java forbids a try from declaring two handlers of the same exception type, but it is
+// exactly what javac's try-with-resources / try-catch-finally desugaring produces: an inner handler
+// (e.g. the try-with-resources `catch (Throwable t) { primaryExc = t; throw t; }` that records the
+// primary exception) whose protected region is itself covered by an outer Throwable cleanup ("any")
+// handler. At runtime the inner handler runs first and unconditionally rethrows its caught
+// exception, which the outer handler then catches; so the two handlers are sequential, not
+// alternative. Reconstruct that ordering by concatenating the first handler's body (minus its
+// trailing `throw e`) with the second handler's body, under the first handler's catch variable.
+//
+// The merge only fires on ADJACENT handlers of the same (normalized) type whose first member ends
+// by unconditionally rethrowing its own caught variable. That signature is unique to the synthesized
+// illegal shape, so the pass never reorders or merges distinct user-written handlers (which can
+// never share a type anyway). Chains of three or more (nested try-with-resources) collapse by
+// repeatedly merging the leading pair.
+func mergeNestedSameTypeCatches(funcCtx *class_context.ClassContext, exceptions []*values.JavaRef, bodies [][]statements.Statement) ([]*values.JavaRef, [][]statements.Statement) {
+	if len(bodies) < 2 || len(exceptions) != len(bodies) {
+		return exceptions, bodies
+	}
+	catchTypeKey := func(ref *values.JavaRef) string {
+		if ref == nil {
+			return ""
+		}
+		t := ref.Type()
+		if t == nil {
+			return "Throwable"
+		}
+		return normalizeCatchClauseType(t.String(funcCtx))
+	}
+	// lastMeaningfulStmt returns the rendered text and index of the body's last statement that the
+	// dumper would actually emit (MiddleStatement / StackAssignStatement are dropped at render time).
+	lastMeaningfulStmt := func(body []statements.Statement) (string, int) {
+		for i := len(body) - 1; i >= 0; i-- {
+			switch body[i].(type) {
+			case *statements.MiddleStatement, *statements.StackAssignStatement:
+				continue
+			}
+			return strings.TrimSpace(body[i].String(funcCtx)), i
+		}
+		return "", -1
+	}
+	exc := append([]*values.JavaRef{}, exceptions...)
+	bod := append([][]statements.Statement{}, bodies...)
+	i := 0
+	for i+1 < len(bod) {
+		sameType := catchTypeKey(exc[i]) != "" && catchTypeKey(exc[i]) == catchTypeKey(exc[i+1])
+		rethrows := false
+		var throwIdx int
+		if sameType && exc[i] != nil {
+			varName := strings.TrimSpace(exc[i].String(funcCtx))
+			lastStr, lastIdx := lastMeaningfulStmt(bod[i])
+			if lastIdx >= 0 && varName != "" && lastStr == "throw "+varName {
+				rethrows = true
+				throwIdx = lastIdx
+			}
+		}
+		if sameType && rethrows {
+			merged := append([]statements.Statement{}, bod[i][:throwIdx]...)
+			merged = append(merged, bod[i+1]...)
+			bod[i] = merged
+			exc = append(exc[:i+1], exc[i+2:]...)
+			bod = append(bod[:i+1], bod[i+2:]...)
+			// Do not advance: the merged handler may chain into a further same-type handler.
+			continue
+		}
+		i++
+	}
+	return exc, bod
+}
+
 // isUnconditionalTerminalStatement reports whether st unconditionally transfers control out of
 // the current block: return / throw / break / continue (with or without a label). In valid Java
 // any sibling statement that follows such a statement at the same nesting level is unreachable and
@@ -1502,13 +1587,27 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 				c.Tab()
 				defer c.UnTab()
 				var res []string
-				for _, statement := range statementList {
+				for i, statement := range statementList {
 					if _, ok := statement.(*statements.MiddleStatement); ok {
 						continue
 					}
 					_, ok := statement.(*statements.StackAssignStatement)
 					if ok {
 						continue
+					}
+					// A static initializer block (<clinit> -> `static {}`) cannot contain a `return`
+					// statement (javac: "return outside of method"). Source cannot express an early
+					// return in a <clinit>, so javac never emits one; a void `return;` sitting at the
+					// tail of ANY block (top-level or inside the normal-completion try body) is just
+					// the terminal flow-exit opcode. Dropping it preserves semantics and yields legal
+					// Java (e.g. commons-codec DaitchMokotoffSoundex's twr <clinit> rendered a bare
+					// `return;` inside `try{...}` which javac rejected). Restricting to the block tail
+					// avoids enabling any dead trailing siblings. Kill-switch:
+					// JDEC_NO_CLINIT_RETURN_DROP=1. (Bug AC)
+					if funcCtx.FunctionName == "<clinit>" && os.Getenv("JDEC_NO_CLINIT_RETURN_DROP") == "" {
+						if rs, ok := statement.(*statements.ReturnStatement); ok && rs.JavaValue == nil && i == len(statementList)-1 {
+							break
+						}
 					}
 					res = append(res, statementToString(statement))
 					// Drop unreachable trailing siblings: once an unconditional terminal
@@ -1604,28 +1703,24 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 					statementStr = fmt.Sprintf(c.GetTabString()+"try{\n"+
 						"%s\n"+
 						c.GetTabString()+"}", statementListToString(ret.TryBody))
-					for i, body := range ret.CatchBodies {
-						excType := ret.Exception[i].Type().String(funcCtx)
-						// A catch clause type must be a reference type (subtype of Throwable).
-						// When upstream type inference degrades the exception variable to a
-						// primitive (e.g. "boolean" from a reused slot), fall back to Throwable
-						// so the output stays syntactically valid.
-						switch {
-						case strings.HasSuffix(excType, "[]"):
-							excType = "Throwable"
-						case excType == "boolean" || excType == "byte" || excType == "char" || excType == "short" ||
-							excType == "int" || excType == "long" || excType == "float" || excType == "double" || excType == "void":
-							excType = "Throwable"
-						}
-						switch excType {
-						case "boolean", "byte", "char", "short", "int", "long", "float", "double", "void":
-							excType = "Throwable"
-						}
+					// Two catch handlers of the SAME type are illegal Java (a try may not declare two
+					// handlers of the same exception type), but they are exactly what bytecode emits for
+					// try-with-resources / try-catch-finally: a Throwable primaryExc-capture handler whose
+					// region is nested inside a Throwable cleanup ("any") handler. Collapse such adjacent
+					// pairs back into one handler so the source recompiles. Kill-switch:
+					// JDEC_NO_CATCH_MERGE=1 restores the raw duplicate-catch output.
+					catchExc := ret.Exception
+					catchBodies := ret.CatchBodies
+					if os.Getenv("JDEC_NO_CATCH_MERGE") == "" {
+						catchExc, catchBodies = mergeNestedSameTypeCatches(funcCtx, catchExc, catchBodies)
+					}
+					for i, body := range catchBodies {
+						excType := normalizeCatchClauseType(catchExc[i].Type().String(funcCtx))
 						statementStr += fmt.Sprintf("catch(%s %s){\n"+
 							"%s\n"+
-							c.GetTabString()+"}", excType, ret.Exception[i].String(funcCtx), statementListToString(body))
+							c.GetTabString()+"}", excType, catchExc[i].String(funcCtx), statementListToString(body))
 					}
-					haveCatch := len(ret.CatchBodies) > 0
+					haveCatch := len(catchBodies) > 0
 					if !haveCatch {
 						body := statementListToString(ret.TryBody)
 						if canFlattenNoCatchTry(body) {

@@ -450,7 +450,9 @@ func rewriteVar(scope *Scope, className, methodName string) int {
 			}
 		}
 	}()
-	for _, statement := range *scope.sts {
+	stsSnapshot := *scope.sts
+	for stmtIdx := 0; stmtIdx < len(stsSnapshot); stmtIdx++ {
+		statement := stsSnapshot[stmtIdx]
 		switch statement := statement.(type) {
 		case *statements.AssignStatement:
 			left := core.UnpackSoltValue(statement.LeftValue)
@@ -508,6 +510,9 @@ func rewriteVar(scope *Scope, className, methodName string) int {
 				core.TraceRewriteVar(className, methodName, "reuse depth=%d uid=%s id=%s", scope.deep, ref.VarUid, id.String())
 			}
 		case *statements.IfStatement:
+			if os.Getenv("JDEC_IFELSE_PREBIND_OFF") == "" {
+				prebindEscapingIfElseSlots(scope, statement, stsSnapshot[stmtIdx+1:], idReplaceMap, className, methodName)
+			}
 			subScope := scope.SubScope(&statement.IfBody)
 			core.TraceRewriteVar(className, methodName, "enter if depth=%d body=%d", subScope.deep, len(statement.IfBody))
 			rewriteVar(subScope, className, methodName)
@@ -649,6 +654,124 @@ func prebindSharedTryCatchSlots(scope *Scope, statement *statements.TryCatchStat
 		scope.assignedMap[uid] = id
 		scope.reused[id] = struct{}{}
 		core.TraceRewriteVar(className, methodName, "prebind try/catch shared slot uid=%s id=%s arms=%d", uid, id.String(), cnt)
+	}
+}
+
+// prebindEscapingIfElseSlots unifies a local that is written in BOTH arms of an if/else and then
+// READ in the enclosing block after the if onto a single freshly-minted parent-scope VariableId,
+// BEFORE rewriteVar descends into the arms. Without this each arm mints its OWN id for the shared JVM
+// slot and the post-if reads keep the slot's original (un-minted) id, so one logical variable becomes
+// three ids that happen to render the same varN; worse, because the arm mints run in child scopes that
+// never advance the PARENT name counter, the NEXT sibling local reuses that very varN. The code still
+// compiles (all the same primitive type) but silently reads the wrong variable - the commons-codec
+// Nysiis/Metaphone shape `int kind` written in both branches and read in a following loop+return
+// collapsed into the loop counter `i`, truncating every encode. Minting one parent-scope id here (a)
+// reserves its var<n> name so the next sibling cannot collide, (b) makes both arm writes reuse it via
+// the hasNamed path, and (c) records origId->newId so this scope's deferred ReplaceVar redirects every
+// post-if read onto it. The id is marked `reused` so the declaration hoisters lift the single `T x;`
+// ahead of the if. Strictly gated: both arms must assign the slot with the SAME rendered type, and the
+// slot must actually be read after the if (probed by VariableId identity, not rendered name) - so
+// genuinely independent per-arm slot reuses are left exactly as the baseline produced them.
+// Kill-switch: JDEC_IFELSE_PREBIND_OFF=1.
+func prebindEscapingIfElseSlots(scope *Scope, ifst *statements.IfStatement, afterSts []statements.Statement, idReplaceMap map[*utils.VariableId]*utils.VariableId, className, methodName string) {
+	if ifst == nil || len(afterSts) == 0 || len(ifst.IfBody) == 0 || len(ifst.ElseBody) == 0 {
+		return
+	}
+	armWrites := func(arm []statements.Statement) map[string]*values.JavaRef {
+		res := map[string]*values.JavaRef{}
+		var walk func([]statements.Statement)
+		walk = func(sts []statements.Statement) {
+			for _, st := range sts {
+				switch s := st.(type) {
+				case *statements.AssignStatement:
+					if s.ArrayMember != nil {
+						continue
+					}
+					ref, ok := core.UnpackSoltValue(s.LeftValue).(*values.JavaRef)
+					if !ok || ref == nil || ref.Id == nil || ref.IsThis {
+						continue
+					}
+					if _, dup := res[ref.VarUid]; !dup {
+						res[ref.VarUid] = ref
+					}
+				case *statements.IfStatement:
+					walk(s.IfBody)
+					walk(s.ElseBody)
+				case *statements.ForStatement:
+					walk(s.SubStatements)
+				case *statements.WhileStatement:
+					walk(s.Body)
+				case *statements.DoWhileStatement:
+					walk(s.Body)
+				case *statements.SynchronizedStatement:
+					walk(s.Body)
+				case *statements.SwitchStatement:
+					for _, c := range s.Cases {
+						if c != nil {
+							walk(c.Body)
+						}
+					}
+				case *statements.TryCatchStatement:
+					walk(s.TryBody)
+					for i := range s.CatchBodies {
+						walk(s.CatchBodies[i])
+					}
+				}
+			}
+		}
+		walk(arm)
+		return res
+	}
+	ifWrites := armWrites(ifst.IfBody)
+	if len(ifWrites) == 0 {
+		return
+	}
+	elseWrites := armWrites(ifst.ElseBody)
+	if len(elseWrites) == 0 {
+		return
+	}
+	uids := make([]string, 0, len(ifWrites))
+	for uid := range ifWrites {
+		if _, ok := elseWrites[uid]; ok {
+			uids = append(uids, uid)
+		}
+	}
+	sort.SliceStable(uids, func(i, j int) bool { return varUidLess(uids[i], uids[j]) })
+	for _, uid := range uids {
+		if _, already := scope.assignedMap[uid]; already {
+			continue
+		}
+		ifRef := ifWrites[uid]
+		elseRef := elseWrites[uid]
+		// Same rendered type in both arms: a slot reused across arms for DIFFERENT types must never
+		// be merged into one declaration (that would be an uncompilable type clash); guarding on the
+		// rendered type keeps such genuine slot reuses split.
+		it, et := ifRef.Type(), elseRef.Type()
+		if it == nil || et == nil || it.String(hoistProbeCtx) != et.String(hoistProbeCtx) {
+			continue
+		}
+		origId := ifRef.Id
+		// Must actually be read after the if (escapes the branches). Probe by IDENTITY: temporarily
+		// rename origId to a sentinel and render afterSts; only a genuine reference to this id renders
+		// the sentinel, so an unrelated later local sharing the same varN is excluded.
+		const probe = "__jdec_ifelse_prebind_probe__"
+		saved := origId.Name
+		origId.SetName(probe)
+		escapes := statementsReferenceName(afterSts, probe)
+		origId.SetName(saved)
+		if !escapes {
+			continue
+		}
+		newId := utils.NewRootVariableId()
+		newId.SetName(fmt.Sprintf("var%d", scope.nowId))
+		scope.nowId++
+		scope.assignedMap[uid] = newId
+		scope.reused[newId] = struct{}{}
+		idReplaceMap[origId] = newId
+		if elseRef.Id != nil && elseRef.Id != origId {
+			idReplaceMap[elseRef.Id] = newId
+		}
+		core.TraceRewriteVar(className, methodName, "prebind if/else escaping slot uid=%s old=%s new=%s", uid, origId.String(), newId.String())
 	}
 }
 
@@ -1409,6 +1532,73 @@ func isDeclaredAtTopLevel(list []statements.Statement, id *utils.VariableId) boo
 	return false
 }
 
+// topLevelDeclDominatesAllUses reports whether the CURRENT declaration placement of id keeps every
+// reference to id lexically in scope, i.e. each use is preceded by a declaration of id in its own
+// block or an enclosing one. isDeclaredAtTopLevel only asks whether SOME top-level declaration
+// EXISTS, which is too weak: a reused JVM slot can have one source local declared inside an if's
+// else-arm (range B) and a disjoint later one re-declared `int var4 = ntz;` at the block top level
+// (range C, AFTER the if). The later declaration does not dominate the earlier sibling-arm use, so
+// that use is out of scope ("cannot find symbol") and the variable must still be hoisted. The check
+// must equally NOT hoist the dual shape where each scope already declares id for itself (e.g. VarFold:
+// `if(...){int var1=1; ...} int var1=2; ...` -- two disjoint scopes, both legal Java); a naive "is id
+// referenced before its top-level decl" test wrongly fires there because the if-arm references var1,
+// even though that arm self-declares it. blockHasUncoveredRef threads a scope-aware "declared so far"
+// flag and recurses, so a self-declaring child scope is covered while a bare sibling-arm use is not.
+// References are matched by id IDENTITY (a sentinel rename reusing the normal render path) so a
+// same-named but distinct reused slot can never produce a false positive. Kill-switch:
+// JDEC_NO_CROSS_SCOPE_DOMINATE restores the existence-only test.
+func topLevelDeclDominatesAllUses(list []statements.Statement, id *utils.VariableId) bool {
+	if id == nil {
+		return true
+	}
+	const probe = "__jdec_dom_probe__"
+	saved := id.Name
+	id.SetName(probe)
+	defer id.SetName(saved)
+	return !blockHasUncoveredRef(list, id, probe, false)
+}
+
+// blockHasUncoveredRef reports whether `list` contains a reference to id that is lexically OUT OF
+// SCOPE: not preceded by a declaration of id in this list or an enclosing block. `declaredOut` says
+// id is already declared by an enclosing block before this list begins. The walk threads a per-scope
+// "declared so far" flag: a simple `T id [= ...]` declaration turns it on for the rest of THIS list,
+// and every nested child block inherits the flag value as of the point it appears -- so a sibling-arm
+// use whose only declaration sits in the OTHER arm stays uncovered (must hoist), while a use inside a
+// child that declares id itself is covered (must NOT hoist; the VarFold dual-scope shape). Declaration
+// statements are matched by id identity and never counted as uses. Compound statements are recursed
+// into instead of name-matched whole, so an inner self-declaring scope never makes its enclosing
+// if/loop look like an uncovered use. A compound statement's own head (condition/selector) is not
+// separately inspected here: that conservative miss can only fail to hoist (matching the prior
+// existence-only behaviour, never a new over-hoist), so it cannot regress already-valid output.
+func blockHasUncoveredRef(list []statements.Statement, id *utils.VariableId, name string, declaredOut bool) bool {
+	declared := declaredOut
+	for _, st := range list {
+		decl := false
+		if as, ok := st.(*statements.AssignStatement); ok && as.ArrayMember == nil && (as.IsFirst || as.IsDeclare) {
+			if ref, ok2 := core.UnpackSoltValue(as.LeftValue).(*values.JavaRef); ok2 && ref != nil && ref.Id == id {
+				decl = true
+			}
+		}
+		if decl {
+			declared = true
+			continue
+		}
+		children := childStatementLists(st)
+		if len(children) == 0 {
+			if !declared && statementsReferenceName([]statements.Statement{st}, name) {
+				return true
+			}
+			continue
+		}
+		for _, cl := range children {
+			if blockHasUncoveredRef(*cl, id, name, declared) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // relocateDeclarations prepares a block subtree for a hoisted declaration of id: it demotes every
 // in-place declaration (`T x = ...`) of id to a plain assignment (`x = ...`) and drops any bare
 // `T x;` declaration that a deeper hoister had inserted, so exactly one declaration (the one being
@@ -1488,7 +1678,12 @@ func placeCrossScopeDeclarations(block *[]statements.Statement, reused map[*util
 				continue
 			}
 			if isDeclaredAtTopLevel(list, id) {
-				continue
+				// Only leave it alone when that top-level declaration actually dominates every use;
+				// a later disjoint live-range re-declaration does not, and the earlier sibling use
+				// would otherwise stay out of scope. Kill-switch restores the existence-only skip.
+				if os.Getenv("JDEC_NO_CROSS_SCOPE_DOMINATE") != "" || topLevelDeclDominatesAllUses(list, id) {
+					continue
+				}
 			}
 			re := regexp.MustCompile(`\b` + regexp.QuoteMeta(name) + `\b`)
 			cnt := 0

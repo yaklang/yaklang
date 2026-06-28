@@ -166,11 +166,33 @@ func validateJavaSyntax(src string) error {
 	return validateJavaSyntaxWithBudget(src, DecompileSyntaxValidationBudget)
 }
 
-// validateJavaSyntaxWithBudget runs javasyntax.Validate but abandons the parse once budget
+// validateJavaSyntaxWithBudget runs the grammar validation under the budget and, when the parse
+// fails only because the rendered code uses a standalone '$' identifier (a lexer/grammar gap, see
+// neutralizeStandaloneDollarForValidation), retries on a '$'-neutralized copy and accepts the body
+// when that copy parses. This keeps faithfully-decompiled, javac-valid output (obfuscated members
+// literally named "$") from being false-degraded to stubs. The neutralization is validation-only;
+// the emitted source is never altered. Kill-switch: JDEC_NO_DOLLAR_IDENT_VALIDATE=1.
+func validateJavaSyntaxWithBudget(src string, budget time.Duration) error {
+	err := validateJavaSyntaxOnce(src, budget)
+	if err == nil {
+		return nil
+	}
+	if os.Getenv("JDEC_NO_DOLLAR_IDENT_VALIDATE") != "" {
+		return err
+	}
+	if neutral, changed := neutralizeStandaloneDollarForValidation(src); changed {
+		if validateJavaSyntaxOnce(neutral, budget) == nil {
+			return nil
+		}
+	}
+	return err
+}
+
+// validateJavaSyntaxOnce runs javasyntax.Validate but abandons the parse once budget
 // elapses, returning a sentinel error. A budget <= 0 means "no limit" (validate inline). The
 // abandoned goroutine still finishes on its own (ANTLR has no cancellation hook), but its result
 // is dropped via the buffered channel so nothing blocks or leaks permanently.
-func validateJavaSyntaxWithBudget(src string, budget time.Duration) error {
+func validateJavaSyntaxOnce(src string, budget time.Duration) error {
 	if budget <= 0 {
 		return javasyntax.Validate(src)
 	}
@@ -196,6 +218,140 @@ func validateJavaSyntaxWithBudget(src string, budget time.Duration) error {
 	case <-timer.C:
 		return utils.Errorf("syntax validation exceeded budget %s (treated as invalid for safe degradation)", budget)
 	}
+}
+
+// validatorDollarPlaceholder is a guaranteed-valid Java identifier substituted for a standalone
+// '$' while running the post-decompile syntax safety net. The yak Java grammar lexes a lone '$'
+// (one not glued to other identifier chars) as the dedicated Dollar token used for "${...}"
+// interpolation rather than as an IDENTIFIER, so otherwise-valid Java like `this.$` (an obfuscated
+// field literally named "$") fails to parse. javac accepts a lone '$' as an ordinary identifier
+// (verified), so swapping it for a normal identifier before validation lets the safety net judge
+// the rest of the body honestly instead of false-degrading correct output to a stub.
+const validatorDollarPlaceholder = "_jdecDollarIdent_"
+
+// neutralizeStandaloneDollarForValidation replaces every standalone '$' -- a '$' not adjacent to
+// any other Java identifier byte, so NOT part of a longer identifier such as Outer$Inner, val$x or
+// $$ -- that lies in ordinary code (outside string/char literals and comments) with a normal
+// identifier. Returns the rewritten source and whether any replacement happened. A '$' glued to
+// letters/digits already lexes as IDENTIFIER and parses fine, so it is deliberately left untouched.
+func neutralizeStandaloneDollarForValidation(src string) (string, bool) {
+	if !strings.Contains(src, "$") {
+		return src, false
+	}
+	var b strings.Builder
+	b.Grow(len(src) + 32)
+	changed := false
+	n := len(src)
+	i := 0
+	for i < n {
+		c := src[i]
+		switch c {
+		case '"':
+			// Text block """...""": copy verbatim until the closing triple quote.
+			if i+2 < n && src[i+1] == '"' && src[i+2] == '"' {
+				b.WriteString(src[i : i+3])
+				i += 3
+				for i < n {
+					if src[i] == '\\' && i+1 < n {
+						b.WriteByte(src[i])
+						b.WriteByte(src[i+1])
+						i += 2
+						continue
+					}
+					if i+2 < n && src[i] == '"' && src[i+1] == '"' && src[i+2] == '"' {
+						b.WriteString(src[i : i+3])
+						i += 3
+						break
+					}
+					b.WriteByte(src[i])
+					i++
+				}
+				continue
+			}
+			// Ordinary string literal: copy verbatim, honoring escapes.
+			b.WriteByte(c)
+			i++
+			for i < n {
+				if src[i] == '\\' && i+1 < n {
+					b.WriteByte(src[i])
+					b.WriteByte(src[i+1])
+					i += 2
+					continue
+				}
+				if src[i] == '"' {
+					b.WriteByte(src[i])
+					i++
+					break
+				}
+				b.WriteByte(src[i])
+				i++
+			}
+			continue
+		case '\'':
+			// Char literal: copy verbatim, honoring escapes.
+			b.WriteByte(c)
+			i++
+			for i < n {
+				if src[i] == '\\' && i+1 < n {
+					b.WriteByte(src[i])
+					b.WriteByte(src[i+1])
+					i += 2
+					continue
+				}
+				if src[i] == '\'' {
+					b.WriteByte(src[i])
+					i++
+					break
+				}
+				b.WriteByte(src[i])
+				i++
+			}
+			continue
+		case '/':
+			if i+1 < n && src[i+1] == '/' {
+				for i < n && src[i] != '\n' {
+					b.WriteByte(src[i])
+					i++
+				}
+				continue
+			}
+			if i+1 < n && src[i+1] == '*' {
+				b.WriteByte(src[i])
+				b.WriteByte(src[i+1])
+				i += 2
+				for i < n {
+					if i+1 < n && src[i] == '*' && src[i+1] == '/' {
+						b.WriteByte(src[i])
+						b.WriteByte(src[i+1])
+						i += 2
+						break
+					}
+					b.WriteByte(src[i])
+					i++
+				}
+				continue
+			}
+			b.WriteByte(c)
+			i++
+			continue
+		case '$':
+			prevIdent := i > 0 && isJavaIdentByte(src[i-1])
+			nextIdent := i+1 < n && isJavaIdentByte(src[i+1])
+			if !prevIdent && !nextIdent {
+				b.WriteString(validatorDollarPlaceholder)
+				changed = true
+				i++
+				continue
+			}
+			b.WriteByte(c)
+			i++
+			continue
+		default:
+			b.WriteByte(c)
+			i++
+		}
+	}
+	return b.String(), changed
 }
 
 // validateMemberInHeader reports whether a single member (method or field) is syntactically

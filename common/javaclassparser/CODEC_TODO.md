@@ -22,17 +22,26 @@
   `<Enum>(String,int,<Enum>$N)` (承重测试 `TestEnumMarkerCtorSuppressionIsLoadBearing`, kill-switch
   `JDEC_NO_ENUM_MARKER_CTOR`)。实测 guava `CaseFormat` (release-8, 含 access$N + marker ctor) 折叠成单一合法
   enum 且 round-trip 通过。详见 Bug V。
-- **差分门禁 `TestCodecSemanticsRoundTrip`: 57 个自托管 battery 全绿** (byte-for-byte round-trip), 覆盖
+- **差分门禁 `TestCodecSemanticsRoundTrip`: 61 个自托管 battery 全绿** (byte-for-byte round-trip), 覆盖
   控制流 / 排序 / 链式赋值 / SHA-256 / SHA-512 / TEA-XTEA-RC4 / String-switch / try-with-resources /
   try-finally-loop / 数值转换重命名 / iinc 宽化 / 循环计数器 slot 复用 / 嵌入式赋值 / Class 字面量 /
   int 类别收窄 / guava IntMath(gcd·log2·floor-sqrt·pow·isPrime·checkedAdd) / 严格 Hex 编解码(收窄+校验异常) /
   boolean-int 槽复用形态 / **空前导 case 的 tableswitch (Base32/Base64 EOF 形态)** /
   **对象-null 守卫后接底部测试循环 (Md5Crypt salt 形态)** /
-  **短路 `(A&&B)||C` 中 C 为内联数组可变参调用 (DoubleMetaphone.conditionC0 形态)** 等。已治本 bug 的文字记录
-  按约定删除, 其承重 `Test*` + testdata 种子即永久档案。
+  **短路 `(A&&B)||C` 中 C 为内联数组可变参调用 (DoubleMetaphone.conditionC0 形态)** /
+  **if/else 双臂赋值且循环后读的逃逸槽 (Nysiis/Metaphone transcode 形态)** /
+  **空-init Throwable holder 与异类局部跨支共槽 (twr primaryExc / catch-holder 形态)** /
+  **单字符 `$` 标识符字段 (asm 混淆 MethodWriter 形态, javac 合法但 yak 文法词法器误当 Dollar token)** /
+  **同槽三段不相交活跃区间 (if 臂 / else 臂 / if 后) 的跨作用域声明支配性 (FloatingDecimal / fastjson2 TypeUtils 形态)** 等。已治本 bug 的
+  文字记录按约定删除, 其承重 `Test*` + testdata 种子即永久档案。
 - **OPCODE 解析覆盖门禁 `TestOpcodeParseCoverage`: 195/195 (100.0%)** (语料 126 class + 31 battery,
   命中 198 distinct opcode), 7 个文档化排除
   (jsr / jsr_w / ret / goto_w / wide / ldc_w / nop —— 均为 javac 不由源码产生或前缀修饰)。
+- **全量工业语料健康度 (`TestM2StubReasons` `M2_INDUSTRY=1`, ~/.m2 全部 1107 jar, 每 jar 上限 120 类)**:
+  **扫描 69149 类, ok 69146, 仅 5 处 stub (99.993% 干净)**, 仅剩 2 个失败桶:
+  ① `post-decompile syntax validation failed` 3 处 (全在 asm-6.0_BETA `MethodWriter`, 单字符 `$` 标识符) —— **本轮已治本**;
+  ② `ParseBytesCode failed: has circle` 2 处 (antlr `PredictionContext.toStrings` / commons-compress `TarUtils`) —— Bug AJ, 带标签 continue 跳 for-increment, 仍待重建。
+  即治本 ① 后工业语料只余 Bug AJ 一类失败 (2 处)。
 - **GA 里程碑 — guava `base` 整包「反编译→重编译→打回 jar→外部反射调用」= IDENTICAL (语义, 非仅编译)**:
   经生产 JarFS 路径重生 160 单元后整目录 `javac` (guava + 5 传递依赖上 classpath): **158/160 单元可重编译**
   (残留 2 单元 = Bug AH Group A, 临时手补 cast 后)。重编译产物覆盖回 overlay jar, 外部 `BaseProbe` 反射跑
@@ -42,7 +51,71 @@
   第 4 项)。残留 2 条全部是 Group A「类型变量擦除成 Object 出现在非返回位置」(`PairwiseEquivalence` 的
   `Iterator var=it()` 应为 `Iterator<T>`、`Equivalence$Wrapper` 的 `Wrapper var=(Wrapper)o` 应为 `Wrapper<?>`);
   需把泛型类型沿数据流传播 (方法返回按接收者类型实参实例化), 属大特性, 见 Bug AH。
-- **本轮新增治本 (codec 真实差分新发现, 4 项, 均已锁回归种子, 种子即档案)**:
+- **本轮新增治本 (codec 真实差分 + 工业语料新发现, 10 项, 均已锁回归种子, 种子即档案)**:
+  - **同槽多段不相交活跃区间的跨作用域声明被「存在即跳过」误判而不上提 → 兄弟臂用出作用域 (fastjson2 TypeUtils / JDK FloatingDecimal 形态)**
+    (可用性/重编译, 单类反编译即可见, 重编译报 `cannot find symbol: varN`): 一个 JVM 槽被三个互不重叠活跃区间的源局部
+    复用 (if 臂一个 int、else 臂另一个 int、if 之后第三个 int), minted-id 合并把三段并成同一 `VariableId`; 其声明落在
+    if 臂, 而 if **之后**还有一处不相交的再声明在块顶层。`placeCrossScopeDeclarations` 旧逻辑用 `isDeclaredAtTopLevel`
+    (只问「该 id 在本块顶层是否存在声明」) 判定已被覆盖而跳过上提, 但那处块顶层声明在词法上**位于** else 臂使用之**后**,
+    并不支配它 → else 臂 `var4 = ...` 出作用域。现加 `topLevelDeclDominatesAllUses` + `blockHasUncoveredRef`:
+    **作用域感知**地判定当前声明摆放是否让 id 的每处引用都在词法作用域内 —— 逐语句线程一个「至此已声明」标志, 简单声明
+    `T id [= ...]` 在本块其后置位、每个嵌套子块按其出现点继承该标志; 故「兄弟臂用、声明只在另一臂」判为未覆盖 (上提),
+    而「每个作用域各自声明同名」(VarFold `if(...){int v=1;...} int v=2;...` 双段合法) 判为已覆盖 (**不**上提)。引用按 id
+    **身份**比对 (哨兵改名复用渲染路径, 同名异槽绝不误判)。仅当全部使用已被覆盖才跳过; 否则把一条裸 `T varN;` 上提到
+    支配全部使用的块顶、把各处内联声明降为普通赋值。仅扩大作用域, 永远是合法 Java 且语义不变。种子 battery
+    `SlotReuseDisjointRanges` (do-while 内 if/else 三段同槽复用), 承重测试 `TestCrossScopeDeclDominanceIsLoadBearing`,
+    kill-switch `JDEC_NO_CROSS_SCOPE_DOMINATE` 跑负向 (关闭即 else 臂 `cannot find symbol` → round-trip 失败)。
+    回归保护: `TestDecompiler/VarFold` 黄金用例锁住「双段各自声明不得被上提」这一边界。实测 fastjson2 整 jar 重编译
+    错误 834→794、`varN_N` 类 cannot-find-symbol 72→30。
+  - **单字符 `$` 标识符 (混淆字段/方法名) 被后置语法安全网误降级为 stub (asm-6.0_BETA `MethodWriter` 形态)**
+    (可用性/round-trip, 单类反编译即可见, 重编译/外部调用才暴露「方法体丢失」): 混淆器会把字段/方法重命名成字面
+    `$` (JVM 与 javac 均合法的标识符, 已用 `int $; this.$=...` 实测 javac 通过)。反编译忠实产出 `this.$`,
+    但 yak 自带的 Java 文法词法器把**孤立** `$` (未粘连其它标识符字符) 词法化成专用 `Dollar` token (供 `${...}`
+    插值, 见 `JavaParser.g4`) 而非 `IDENTIFIER`, 致 `this.$` 解析失败 → `degradeInvalidMethods` 把整段合法方法体
+    降级成 `throw new RuntimeException` stub、并把 `$` 字段一并丢弃 → 重编译后外部调用直接抛异常 (语义全失)。
+    旧 `isDollarIdentifierValidatorGap` 仅覆盖 `$` 作**方法调用** (`.$(`) 一种, 不覆盖字段读写/赋值。现于
+    `validateJavaSyntaxWithBudget`: 首次校验失败且源码含孤立 `$` 时, 用 `neutralizeStandaloneDollarForValidation`
+    把**孤立** `$` (前后均非标识符字符, 故 `Outer$Inner` / `val$x` / `$$` 这类已是合法 IDENTIFIER 的一律不动)
+    在**字符串/字符字面量/注释之外**替换成普通标识符后复校; 复校通过才判定为合法 (仅校验用, 产出源码绝不改动)。
+    因只在「主校验已失败 + 仅孤立 `$` 缺陷」时接受, 其它任何真实语法错误都会在中性化副本里幸存 → 仍降级, 故绝不
+    放过真损坏代码。实测 asm `MethodWriter` 3 个被 stub 的方法 (`visitParameter`/`a()`/`a(ByteVector)`) 全部恢复
+    真体、0 stub; asm jar 复扫该桶清零。种子 battery `DollarIdentField` (含 `$` 与 `$$` 双字段, 承重测试
+    `TestDollarIdentifierValidationToleranceIsLoadBearing`, kill-switch `JDEC_NO_DOLLAR_IDENT_VALIDATE` 跑负向:
+    关闭即 `$` 方法被 stub → round-trip 抛 `undecompilable method body`)。
+  - **JDK8 try-with-resources 渲染成同 try 两个 `catch(Throwable)` (非法 Java, 重编译报「已捕获到异常错误 Throwable」)**
+    (语义/编译, 单类反编译即可见但只有重编译暴露非法性): JDK8 内联 twr 脱糖里, `catch(Throwable t){primaryExc=t;throw t}`
+    捕获器的保护区被外层 `Throwable` 清理 (`any`) 捕获器覆盖 (二者在字节码里是嵌套, 运行时先 inner 再 outer),
+    旧 dumper 把两个处理器平铺成同一 try 的两个 `catch(Throwable)` —— Java 禁止一个 try 声明两个同类型处理器。现于
+    dumper 新增 `mergeNestedSameTypeCatches`: 对**相邻同类型**且前者以 `throw <自身catch变量>` 无条件 rethrow 收尾的
+    捕获器对, 按运行时顺序拼接 (前者体去掉尾部 rethrow ++ 后者体), 折成单一捕获器。因「同类型双 catch」只可能由
+    反编译合成 (合法 Java 写不出), 故只会修复、绝不误并用户处理器; 三个以上 (嵌套 twr) 逐对左折。法线路径 close
+    仍留在 try 体 (只跑一次), 异常路径 close 在合并后的 catch 里 —— 语义等价。实测 bm `Rule.parseRules` twr 该 try
+    现可 round-trip。种子 `twr_jdk8_single_resource.class` (JDK8 编译, 承重测试 `TestTwrDuplicateCatchMergeIsLoadBearing`,
+    kill-switch `JDEC_NO_CATCH_MERGE` 跑负向: 关闭即「已捕获到异常错误 Throwable」不可编译)。
+  - **空-init 引用槽被兄弟分支异类局部按 DFS 顺序「收养」, 致 `Throwable` 槽被定型成 `String` (twr primaryExc / catch-holder 形态)**
+    (语义/编译, twr 重编译会报 `Throwable cannot be converted to String` + `cannot find symbol getMessage/addSuppressed`):
+    一支里 `Throwable holder=null` (twr 合成 primaryExc, 或 catch 里赋值的 holder, **空-init 存储支配后续真实赋值**),
+    另一不相交支里异类局部 (如 `String acc`) 被 javac 打进**同一 JVM 槽**。前向模拟的「空-init 收养」(空-init 存储后
+    遇到具体引用赋值就复用同 id, 保「单变量」惯用法) 是**无条件**的, 故 DFS 先走到 `String` 支时, 它收养了 primaryExc
+    的 null 初值 → 两者并成一个 `String` 变量, 之后 primaryExc 的 `addSuppressed`/`= caught Throwable` 在该 String 上
+    不可编译。源码语法在不相交支上不矛盾, 故只有「反编译→重编译」能暴露。现新增 `nullInitDefDominates` (code_analyser.go):
+    对每个 `*STORE`, 仅当其要收养的空-init 定义 D **支配** (反向 CFG BFS, 把 D 当墙, 不穿过 D 能否抵达方法真入口) 当前
+    存储 N 时才允许收养; 不支配 (即在不相交支) 则置 `blockNullAdopt`, 经 `AssignVarGuarded` 改铸新 id、令两变量按各自
+    类型分裂。回环 back-edge / 多入口经「D 为墙」语义正确处理。实测修复 bm `Rule.parseRules` 槽定型 (其 twr 双 catch
+    仍待回糖, 见 Bug AE)。副作用是改善了 `xmlbeans_qnamehelper` (推出更准的 `catch(UnsupportedEncodingException)`)。
+    种子 `NullInitSlotReuse` (承重测试 `TestNullInitSlotReuseIsLoadBearing`, kill-switch `JDEC_NULLADOPT_REACH_OFF`
+    跑负向测试: 关闭即 `Throwable→String` 不可编译)。
+  - **if/else 双臂赋值且分支后被「循环+返回」读的逃逸槽, 被并入紧随其后的循环计数器, 致读错变量 (Nysiis/Metaphone transcode 形态)**
+    (语义正确性, 编译期测不出): 某基本类型局部 (如 `int kind`) 在 if/else **两臂各赋值一次** (占一个 JVM 槽 S、两段活跃区),
+    随后的循环 READ 它并自增**自己**的计数器 (槽 S+1, 活跃区与 S 第二段重叠 → 必为不同槽), return 再读它一次。
+    旧实现里每臂各 mint 一个 id、分支后的读保留槽原始 (未 mint) id, 且因臂内 mint 在子作用域、**从不推进父作用域命名计数器**,
+    导致紧随的循环计数器拿到与该局部**同一个 varN** → 重编译源码把计数器读成了那个局部, 静默算错。源码仍可编译 (同为基本类型),
+    故只有「反编译→重编译→运行对比」能暴露 (commons-codec `Nysiis`/`Metaphone` transcode 每次编码被截断)。现于 rewriteVar
+    处理 IfStatement 前新增 `prebindEscapingIfElseSlots`: 对**两臂都赋值且 if 后被读** (按 VariableId 身份探测, 非渲染名)
+    且两臂类型一致的槽, 提前在父作用域 mint 单一 id (占用一个命名槽 → 后续兄弟局部不再撞名)、令两臂走 hasNamed 复用它、
+    记 origId→newId 让本作用域 deferred ReplaceVar 重定向所有 if 后读, 并标 `reused` 让声明被提升到 if 之前。实测对真实
+    `ColognePhonetic.colognePhonetic` 生效。种子 `IfElseEscapingSlot` (承重测试 `TestIfElseEscapingSlotIsLoadBearing`,
+    kill-switch `JDEC_IFELSE_PREBIND_OFF` 跑负向测试: 关闭即复现指纹分叉)。
   - **布尔合并 (mergeCondition) 重排 `Next` 后未刷新 true/false 闭包, 致条件取反 + then/else 对调 (Nysiis 编码截断)**
     (语义正确性, 编译期测不出): if 分支体 `return new char[]{...}` 这类**多 opcode 数组构建叶**被上游折叠把
     if 节点的 `Next` 重排成 `[true,false]`, 故 `JmpNode` 钉支捕获到 trueIndex=0; 随后短路布尔合并
@@ -83,6 +156,16 @@
     `RemoveGotoStatement` 改用身份匹配 (`Next[0]==JmpNode` 选 0 否则 1) 选支, 顺序保持时为严格 no-op、节点被替换
     (非仅重排) 时优雅退回旧 fallback, 故不会回退既有正确用例。实测修复 Md5Crypt salt 解析。种子
     `NullCheckBranchThenLoop` (kill-switch `JDEC_IFBRANCH_PIN_OFF` 跑负向测试)。
+  - **`ACC_STRICT` 方法被渲染成非法关键字 `strict` 致整方法 (含 stub) 被丢弃 (JDK FloatingDecimal 拷贝形态)**
+    (可用性, 单类反编译即可见, 方法在输出里直接消失): `getMethodAccessFlagsVerbose` 把 `0x0800` 映射成字面
+    `strict`, 产出 `public strict double doubleValue()` —— `strict` 不是合法修饰符 token, 文法报
+    `no viable alternative at input 'strict double'`, `degradeInvalidMethods` 主校验失败后连降级 stub 也继承
+    了这个坏修饰符 (签名本身就不可表示) → 走到「drop」分支整方法被丢 (实测 beetl `FloatingIOWriter.doubleValue()/
+    floatValue()` 的 `[WARN] un-representable as valid Java, dropping it`)。正字是 `strictfp` (文法
+    `classOrInterfaceModifier` 已含, 方法/类通用), 忠实回写 `ACC_STRICT` 位且重编译 round-trip 一致。现把
+    maskMap 该项改成 `strictfp` 并删除遗留的空 `else if verbose == "strict"` 死分支。种子
+    `strictfp_method.class` (`--release 8` 编译以确保 ACC_STRICT 真被置位; Java17+ 默认严格已不再产生该位),
+    承重测试 `TestDecompileSyntaxRegression/strictfp_method.class` + 根因单测 `TestMethodAccessFlags`。
 - **此前本轮新增治本 (4 项, 均已锁回归种子, 种子即档案)**:
   - **invokespecial 超类调用渲染成 `super.m()` 而非 `this.m()`** (语义正确性, 编译期测不出): 非构造器
     invokespecial、接收者为 `this`、目标类 ≠ 当前类时, 是 `super.m(...)` 调用; 旧版一律渲染成 `this.m(...)`,
@@ -160,8 +243,11 @@
   - 类型变量擦除成 `Object`/bound 出现在**非返回位置** (字段读/构造器形参赋值/方法实参):
     `Object→K/E/N/V/T/C/CAP` ≈ 196 + `Comparable→C/Cut<C>` ≈ 33 + `type argument not within bounds` ≈ 80。
     与「泛型返回 (T) 强转」同源, 但在赋值/实参位, 部分需 this$0 参数化即跨类重建。
-  - `return outside method` 7 (见 Bug AC)。
-  - boolean↔int 局部误定型 6 (见 Bug AI, 实际远小于此前抽样的 81)。
+  - `return outside method` 7: **已治本** (本轮) —— `<clinit>` 静态初始化块里 JDK8 twr 脱糖残留的尾部
+    `return;` (静态/实例初始化块禁止 return), 现于 dumper 渲染时丢弃块尾 void return。种子
+    `clinit_twr_return.class` + `TestDecompileSyntaxRegression`, kill-switch `JDEC_NO_CLINIT_RETURN_DROP`。
+  - boolean↔int 局部误定型 6: String-switch 幻影 var (load+store 两侧) 已治本 (见 Bug AI); 残留仅
+    boolean 默认 init (iconst_0) 与同槽 boolean 赋值未合并的形态 (Metaphone.regionMatch), 见 Bug AI 残留。
 
 ---
 
@@ -201,18 +287,47 @@ javac 合成的 `<Enum>(String,int,<Enum>$N)` marker 构造器, 旧版渲染成 
   把「块内声明、块外被读」的局部声明提升到 synchronized 语句之前 (块内降级为纯赋值)。这是 guava base 整个
   cannot-find-symbol 重编译级联的单一根因 (`Enums.getEnumConstants`)。承重种子 `synchronized_return_scope.class`
   (`TestDecompileSyntaxRegression`)。
-- 残留 (纯分支声明): `if(...) v=x; ... use(v);` 中 v 声明被限制在 if 块内 →
-  `cannot find symbol`。这不是嵌入式赋值 (没有 `(v = ...)` 的条件内赋值形态), 而是普通分支内首次赋值后
-  在分支外被读, 声明未提升到支配作用域。需把声明提升到支配作用域 / 跨分支合并同槽局部 (与 Bug W 同源)。
-  (synchronized 变体已如上治本; 此残留专指 if/else 分支形态。)
-- 复现: commons-codec `Metaphone` / `MatchRatingApproachEncoder` / `DaitchMokotoffSoundex` /
-  `bm.Rule`。
+- **多段不相交活跃区间 (多个 store) 的跨作用域支配性已治本** (本轮, 见「本轮新增治本」第 1 项):
+  同槽被 if 臂 / else 臂 / if 后三段各一个源局部复用、且 if 后还有一处块顶层再声明遮蔽时,
+  `placeCrossScopeDeclarations` 旧「存在即跳过」误判。现 `topLevelDeclDominatesAllUses` 仅当顶层声明词法上先于
+  全部使用才跳过, 否则上提裸声明。种子 `SlotReuseDisjointRanges` / `TestCrossScopeDeclDominanceIsLoadBearing` /
+  kill-switch `JDEC_NO_CROSS_SCOPE_DOMINATE`。
+- 残留 A (单 store 分支声明 + 默认 init 被丢): `T v = dflt; if(...){ v = x; } return v;` —— javac 在 if 前有
+  `store v=默认值` (如 `boolean var4=false`), 反编译**丢掉**该默认 init store, 只剩 if 臂内的赋值被当成声明,
+  if 后 `return v` 读不到。此形态 v 只有一处 store (不在 `reused` 集) 且 `ifHoistDeclarations` 要求 ≥2 store, 两套
+  上提器都不接。治本需「带 init 上提」(恢复默认值 store 并提到支配块) 或槽默认 init 不丢, 涉及 definite-assignment,
+  须谨慎 (盲上提无 init 会触发 `variable might not have been initialized`)。复现: commons-codec `Metaphone.regionMatch`
+  (注: 该处实际是**槽误命名**, 见 Bug AI —— boolean 结果 `istore_4` 被渲成 `var5`、`return var4` 渲成 `return var5`)。
+- 残留 B (if/else 分支声明被读出): 与残留 A 同族但双臂均赋值。
+- 复现: commons-codec `Metaphone` / `MatchRatingApproachEncoder` / `DaitchMokotoffSoundex` / `bm.Rule`。
 
-### Bug AC — 控制流结构化产出 'return outside method'
+### Bug AJ (新登记, 工业语料 STOP_ON_FIRST 命中) — 标号 `continue` 跳向 for 自增锁存被误渲成普通 `continue`
 
-- 症状: 某些控制流形态下出现位于方法体外的 `return`, javac 报 "return outside method"。
-- 根因: 控制流结构化在特定 (含 switch/嵌套 try) 形态下越过方法边界生成语句。
-- 复现: commons-codec `DaitchMokotoffSoundex` / `cli.Digest`。
+- 症状 (两形态, 同一根因):
+  - **无限 for (`for(init; ; incr)`) + `continue 外层`**: 反编译报 `ParseBytesCode failed: has circle`, 整方法降级成
+    stub。结构化把自增锁存 (incr, 例 `perm++`) 当成「被多前驱汇聚、不受任一体节点支配」的合并点, 进而把它误判为
+    **循环出口** (endNode): 既丢掉 `continue` 分支 (渲染成空 `if(...){}`), 又把 do-while 的出口边接回锁存, 锁存自身
+    再回边到 header → 2 节点环 (DoWhile -> incr -> DoWhile), `ToStatements` 判定 "has circle"。
+  - **有限 for (`for(i=0;i<n;i++)`) + `continue 外层`**: **能编译但死循环** (编译期测不出、必须运行才暴露的语义 bug)。
+    标号 `continue 外层` 被渲成**普通 `continue`**, 目标变成内层循环 → `i` 不自增、谓词不前进 → 无限循环。
+- 根因: 反编译器循环模型只产 `do{...}while(true)` + break/continue, **从不重建 `for` 自增子句**, 也**不识别「跳向
+  外层循环 latch/自增节点」即标号 continue** (LoopJmpRewriter 的标号-continue 只在 `next` 是外层循环 *header*
+  (WhileNode) 时触发; 跳向 latch 不匹配)。javac 把 `continue` 编成跳到 incr (latch), 故二者皆走不到标号路径。
+- 已验证的尝试 (本轮, 已回退, 不留半成品): 「自增 latch 尾复制」预处理 (按前驱拆分合并锁存, 每条 `continue` 路径
+  各得一份 incr+回边) 能消除 has-circle 且让无限 for 编译通过, **但** dup 落在已被 IfRewriter 结构化的 if 体内,
+  其回边在任何 LoopJmpRewriter 给它打标号前就被 if 结构化丢弃 → 仍渲成无标号 continue → stub 变 hang (更糟)。
+  且该预处理对任意多前驱 latch 生效, 会把现有「有限 for+continue」从静默 hang 一并卷入, 回归面过大。结论: 需先做
+  **标号 continue 正确渲染**(识别 continue→latch、按需给目标循环建 label) 或 **for 自增子句重建**, 再谈 latch 拆分;
+  属较大特性, 须配 kill-switch + 全量(工业)回归(注意 hang 风险, 跑前先确认能编译再运行带 timeout)。
+- 最小复现 (JDK8 编译):
+  - 无限: `static String[] f(int n,int seed,int cur){ List l=new ArrayList(); outer: for(int perm=0;;perm++){ ...
+    while(p>0&&p!=n){ ...; if(idx>=p){continue outer;} ... } ...; if(last)break; } return ...; }` (即 antlr-runtime
+    `org.antlr.v4.runtime.atn.PredictionContext.toStrings(Recognizer,PredictionContext,int)` 的形态)。
+  - 有限: `outer: for(int i=0;i<n;i++){ while(p>0){ ...; if(p>100){continue outer;} ...; if(p==7)break; p--; } sum+=i; }`。
+- 复现命令: `DIAG_FILE=<antlr4-runtime-4.2.jar 解出的 PredictionContext.class> go test -run TestDiagDecompileClass -v
+  ./common/javaclassparser/tests/` (工业扫描 `M2_INDUSTRY=1 STOP_ON_FIRST=1` 在 25071 类中**唯一**命中此条)。
+- 指标背景: a-c 前缀 120 jar 全绿 (24490/24490, 0 partial); 工业语料 25071 类仅此 1 条 partial (graceful stub),
+  其余 25070 全 OK。即除本条外工业面通过率 ~99.996%。
 
 ### Bug AD (残留) — 非标准库外部依赖 / 同 jar 跨包嵌套类型按 `$` 引用
 
@@ -223,66 +338,30 @@ javac 合成的 `<Enum>(String,int,<Enum>$N)` marker 构造器, 旧版渲染成 
     的单元退化 (扁平 `$` 引用在旧外层 import 下本就不可解析), 仅是这类单元仍编不过。
 - 复现: guava 引用 `com.google.errorprone.annotations.*` 嵌套类型的单元。
 
-### Bug AF — RuntimeInvisibleAnnotations 重新 marshal 时被写成 RuntimeVisibleAnnotations (pre-existing, 非反编译路径)
-
-- 症状: 把含 `RuntimeInvisibleAnnotations` 的 class 解析后再 `obj.Bytes()` 序列化, 属性名索引被写成
-  `RuntimeVisibleAnnotations` (#可见) 而非 `RuntimeInvisibleAnnotations`, 注解保留期从 invisible 翻成 visible,
-  字节不一致 (GwtCompatible.class 偏移 0x275 即此)。
-- 根因: `RuntimeInvisibleAnnotations` 复用 `RuntimeVisibleAnnotationsAttribute` 结构体解析 (见 `newAttributeInfo`
-  注释), 但 `marshal.go` 的 `case *RuntimeVisibleAnnotationsAttribute` 硬编码 `findUtf8IndexFromPool(
-  "RuntimeVisibleAnnotations")`, 无法区分可见/不可见。
-- 影响范围: 仅 **重新 marshal Yak 解析后的 class** 路径; 反编译 (生成源码) 与 jar 重打包 (overlay javac 产物)
-  两条用户路径均不经此, 故不影响当前重编译率/差分指标。治本: 解析时把真实属性名记入 struct 的 `Type` 字段,
-  marshal 时据此选 `RuntimeVisibleAnnotations`/`RuntimeInvisibleAnnotations`。
-- 复现: 任意带 `@Retention(CLASS)`/编译期注解的 class (如 guava `GwtCompatible.class`)。
-
-### Bug AI (已定位 + 已取最小复现, 体量小) — 复用槽内局部变量被误定型成 boolean/int
-
-- 症状 (整目录精确计数, 仅 ≈10 条): `int cannot be converted to boolean` 4 + `boolean cannot be converted
-  to int` 6, 集中在 `MapMakerInternalMap$Segment` / `LocalCache$Segment` / `ImmutableSortedMap` /
-  `LongMath` 等少数类。**自托管常见 boolean 形态 (位运算 & | ^、复合赋值 &=、三目、布尔数组、参数/返回) 全部
-  干净 round-trip** (见 battery BooleanEdge / BooleanBitwise / BoolIntSlotReuse), 故本 bug 只在特定数据流出现。
-- **最小复现 (本轮取得, 工作流第一相)**: 方法返回 boolean, 在 `return` 前把布尔结果**存入局部并跨一次方法调用**
-  再读回 (`boolean r = false; this.touch(); return r;`); javac 把这个 boolean 局部复用到前面一个 int 临时量的
-  同一槽 (slot 2)。Yak 输出 `boolean var2;` 后既有 `var2 = this.count - 1;`(int)/`this.count = var2;` 又有
-  `var2 = false; return var2;`(boolean) → 两处类型冲突, 不可重编译。注意同方法的 else 分支 (`boolean var2_1 = true`)
-  已被**名字冲突拆分**正确处理, 仅 if 分支的合并槽未拆。battery `BoolIntSlotReuse` 收录 Yak **能**正确处理的相邻
-  变体 (布尔以字面量直接 return, 不经槽), 失败变体见此处描述。
-- 根因 (已取实证): 同一 JVM 槽在不重叠活跃区间先后存放 int 与 boolean, 槽复用合并把它们并成**同一个**
-  `VariableId` 并按其中一种 (boolean, 多由 ireturn / 返回类型主导) 定型。`dumper.go` 的名字冲突拆分
-  (`declareLocalInScope`/`resolveLocalNameCollisions`) 只在「两个**不同** id 渲染成同名 varN」时触发, 此处是**单个**
-  合并 id 跨两种类型, 故不触发。
-- 治本难点 (为何本轮不强改): 真正治本是「复用槽按活跃区间拆分」, 必须在槽合并层 (`rewriter/rewrite_var.go`) 或
-  dumper 做**基于支配/活跃性**的拆分; 槽合并层有专门的「禁止过度拆分」回归 (`regression_test.go` 的
-  `var3_1 leaked` 等) 把握平衡, 贸然「遇冲突即不合并」会触发它们; 而在 dumper 做线性扫描拆分则在跨分支/循环
-  时可能**静默错拆 (语义错误, 比编译报错更危险)**。故需先建活跃性分析再拆, 属与 Bug W/Y 同族的核心特性。
-  体量小 (≈6-10 条), 优先级低于 enum 簇, 但已具备最小复现, 可作为活跃性拆分特性的首个承重用例。
-
-### Bug AJ (新登记, 已取最小复现) — 两个不同槽的同型 int 局部被并成同一 varN, 致循环/返回引用错变量
-
-- 症状 (语义错误, 编译期测不出 —— 类型一致仍能编过): `int kind` (跨分支两段活跃区, 循环内 + 返回处被读)
-  与紧随其后的循环计数器 `int i` 是**两个不同 JVM 槽** (javac: kind=slot3, i=slot4), 反编译却把二者并成同一个
-  `var3`: 循环体 `acc = acc*31 + kind` 与 `return (acc<<3) + kind` 里的 `kind` 全被渲染成计数器 `var3`(=i),
-  数值算错。最小复现 (已实测): 见下源 (kind 在 if/else 各赋值一次, 循环内既用 kind 又自增 i, 返回再用 kind):
-  ```java
-  static int classify(String ref, int seed) {
-      int acc = seed;
-      int kind;
-      if (ref == null) { kind = 1; acc += 7; }
-      else { kind = 2 + (ref.charAt(0) & 7); acc += ref.length(); }
-      int i = 0;
-      while (i < 4) { acc = (acc * 31) + kind; i++; }   // 这里的 kind 被错成 i
-      return (acc << 3) + kind;                          // 这里的 kind 被错成 i
-  }
-  ```
-  javap 实证: LocalVariableTable 中 kind=slot3 (两段: Start8/Len6 + Start25/Len35), i=slot4, 且 kind[25,60)
-  与 i[35,60) **活跃区重叠** → 必为不同槽, 不该合并。
-- 根因 (待最终定位): 槽合并 / 变量命名层把 slot3(kind, 双活跃段) 与 slot4(i) 误并成单一 `var3`。疑似「kind 的
-  第二活跃段」未被识别为 kind 而与 i 槽混淆, 或命名按声明序而非槽号致冲突未触发拆分。与 Bug AI/W 同属「槽×活跃区
-  ×变量身份」族, 但方向相反 (AI 是单槽双型需拆; 此处是双槽被误并)。
-- 现状: 未治本。该形态因「分支内首次赋值 + 后接循环」在真实算法 (Md5Crypt 已修的是其**分支顺序**, 变量身份仍可能
-  踩此) 中可复发, 故先登记最小复现, 留作活跃性拆分特性的承重用例之一。注: NullCheckBranchThenLoop 种子已绕开此
-  形态 (各局部独占槽), 以隔离已治本的分支顺序回归。
+- **已治本 (本轮, String-switch 幻影 var, load + store 两侧)**: fastjson2 15% 重编译率的最大单一根因 ——
+  `switch(s){case "X":...}` 脱糖成 `String s; int idx=-1; switch(s.hashCode()){case H: if(s.equals("X")) idx=N;} switch(idx){...}`,
+  当第二段 case 体复用 slot1/2/3 作引用槽时, 单一全局 slot 表被 DFS 顺序污染, 致首段 `s.equals("X")` 接收者读成
+  幻影 `var4.equals(...)` (应 `var2.equals`), 写匹配号 `idx=N` 被铸成新 `int varK = N` (应 `var2 = N`, 否则
+  `switch(idx)` 永命中 default、编译过但语义死)。治本: `code_analyser.go` 新增基于到达定义 (reaching definition)
+  的读修复 `reachingSlotVersionGeneral` (load 侧, 当解析到的 ref 非任一到达定义且唯一到达定义存在时改用之) +
+  写修复 `reachingStoreVersion` (store 侧, 当全局版本类型不匹配而唯一到达定义类型匹配时, 经 `StackSimulation.SetVar`
+  先装回正确 ref 再走 `AssignVarGuarded`, 令同型续写复用而非铸幻影)。承重种子 `strswitch_slot_reuse.class`
+  (`TestDecompileSyntaxRegression`, load 侧, kill-switch `JDEC_SLOT_READ_REACHING_OFF`); store 侧承重为真实
+  fastjson2 `TypeUtils.loadClass` (`DIAG_JAR` + kill-switch `JDEC_SLOT_STORE_REACHING_OFF`, 该法难以最小化成合成种子)。
+- **残留 (boolean 默认 init 与同槽 boolean 赋值未合并, commons-codec Metaphone.regionMatch / MatchRatingApproachEncoder)**:
+  `boolean r=false; if(...){ r=sub.equals(t); } return r;` —— slot4=`r`(boolean), 其默认 init `iconst_0; istore_4`
+  在字节码层是 int 0, 被定型成 `int`; if 臂内 `equals` 结果 (boolean) 再 `istore_4`。`AssignVarGuarded` 的整型类别
+  合并**刻意排除 boolean** (Java 禁止 int↔boolean 转换), 故 int-默认 与 boolean-赋值两个同槽 def **不合并** →
+  拆成两变量: 孤立 `int var4 = 0` + if 臂内 `boolean var5 = ...`, 而 `return var5` 落在 if 外 → `cannot find symbol: var5`。
+  最小复现 (JDK8, 已取): `boolean rm(StringBuilder sb,int i,String t){ boolean m=false; if(i>=0&&i+t.length()-1<sb.length()){ String s=sb.substring(i,i+t.length()); m=s.equals(t);} return m; }`
+  反编译即得上述形态 (无需 LVT)。
+- **根因 + 为何不强改**: 根因是 `iconst_0` 默认 init 被定型 int 而非 boolean, 致与同槽 boolean def 分裂。安全治本需
+  **基于 phi/活跃性的合并** —— 仅当 int-0/1 默认 def 与 boolean def 同时到达某下游公共 load (即同一逻辑变量) 时才合并并
+  改型为 boolean (并把字面量 0/1 渲成 false/true, 参 `arrayStoreRHS` 的布尔强制)。**不可用 store 期启发式**: 反例
+  `int a=0; use(a); boolean b=cond; return b;` 里 a/b 是不相交两变量 (无公共 load), store 期无前向信息区分,
+  盲合并会把 `use(a)` 编成 `use(boolean)` → 误编译。槽合并层另有「禁止过度拆分」回归 (`var3_1 leaked` 等) 把握平衡,
+  贸然改触发之, 而 dumper 线性拆分跨分支可**静默错拆 (比编译错更危险)**。故需先建到达定义/活跃性 pass 再做, 与 Bug Y/AH 同族核心特性。
+  影响面小 (整目录 ≈6-10 条 `int↔boolean`), 优先级低于 enum 簇, 已具备最小复现可作首个承重用例。
 
 ### Bug AH (新登记, guava base 唯一残留) — 类型变量擦除成 Object 出现在非返回位置 (需泛型沿数据流传播)
 
@@ -301,13 +380,20 @@ javac 合成的 `<Enum>(String,int,<Enum>$N)` marker 构造器, 旧版渲染成 
   目标同理按目标上下文补实参。须先有承重用例与 kill-switch, 避免误扩到无法静态判定的场景 (那比编译报错更危险)。
 - 复现: guava `PairwiseEquivalence` / `Equivalence$Wrapper` (base 包仅此 2 单元残留)。
 
-### Bug AE — 嵌套 enum 引用 / try-with-resources 抑制变量类型
+### Bug AE — try-with-resources 嵌套双资源命名 / 同包 enum 引用 (本轮复核: 两残留均已不复现, 已加守卫)
 
-- 症状: bm 包 `NameType`/`RuleType` 枚举引用 → `cannot find symbol: variable NameType`;
-  try-with-resources 的抑制变量 `var10` 被误判为 String 致 `addSuppressed(Throwable)` 不可见。
-- 根因: (前者) 同包顶层 enum 的类型引用被当作变量解析 (缺类型可见性/导入); (后者) twr 脱糖里
-  `Throwable primaryExc` 槽类型推断错误。
-- 复现: commons-codec `bm.{Lang,Languages,PhoneticEngine,Rule}` / `bm.Rule` (twr 抑制)。
+- twr 双 `catch(Throwable)` 合并 (`mergeNestedSameTypeCatches`) + twr 槽定型 (`NullInitSlotReuse`/`nullInitDefDominates`)
+  早前已治本, 种子 `twr_jdk8_single_resource.class` / `NullInitSlotReuse` 即档案。
+- **本轮复核 (嵌套双资源命名)**: 重新构造 JDK8 两资源 `ByteArrayInputStream` twr (含高槽位变体, 多前导局部把资源
+  推到 slot9/slot11) 反编译, **每个资源的法线路径内联 close 副本接收者均与其声明同名** (`var11.close()` / `var9.close()`,
+  不再出现历史的 `var10.close()` 幻影撞名)。两个合成输出 (TwrTwoRes / TwrTwoRes2) 经 JDK8 `javac` **均重编译通过**,
+  bm `Rule.parseRules` 整方法的所有 close 接收者亦正确。该残留**已被早前的命名冲突解析 + nullInit 修复连带消除**。
+  已加守卫种子 `twr_two_resource_naming.class` (`TestDecompileSyntaxRegression`, 断言 `var11.close()`/`var9.close()`
+  存在且无 `var10.close()` 幻影)。
+- **本轮复核 (同包 enum 引用)**: bm `Rule` 反编译中 `NameType`/`RuleType` 等同包顶层 enum 均正确按**类型名**引用
+  (`NameType.class` / `NameType.values()` / `RuleType.RULES` / `EnumMap((Class)(NameType.class))`), 无 `cannot find
+  symbol`; 单类残留仅 `Languages$LanguageSet`/`Rule$Phoneme` 这类 `$` 嵌套引用, 属 Bug AD 而非本条。该残留不复现。
+- 备注: 完整 twr **回糖** (折回 `try (R r=..){..}`) 仍是可选大特性; 当前产出合法且语义等价的「手写式 twr」, 满足 round-trip。
 
 ---
 

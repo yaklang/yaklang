@@ -100,7 +100,7 @@ func getMethodAccessFlagsVerbose(u uint16) ([]string, string) {
 		0x0080, // varargs
 		0x0100, // native
 		0x0400, // abstract
-		0x0800, // strict
+		0x0800, // strictfp
 	}
 
 	maskMap := map[uint16]string{
@@ -113,7 +113,13 @@ func getMethodAccessFlagsVerbose(u uint16) ([]string, string) {
 		0x0080: "varargs",      // ACC_VARARGS
 		0x0100: "native",       // ACC_NATIVE
 		0x0400: "abstract",     // ACC_ABSTRACT
-		0x0800: "strict",       // ACC_STRICT
+		// ACC_STRICT must render as the Java keyword `strictfp`, not `strict`. Emitting the bare
+		// `strict` produced un-parseable source ("no viable alternative at input 'strict double'"),
+		// which made the whole method (and even its stub) fail syntax validation and get dropped
+		// (observed on JDK-derived FloatingDecimal copies, e.g. beetl FloatingIOWriter
+		// doubleValue()/floatValue()). strictfp is a valid method/class modifier in the grammar and
+		// round-trips the ACC_STRICT bit on recompile.
+		0x0800: "strictfp", // ACC_STRICT
 	}
 
 	isAbstract := false
@@ -142,7 +148,6 @@ func getMethodAccessFlagsVerbose(u uint16) ([]string, string) {
 				continue
 			} else if verbose == "native" {
 				continue
-			} else if verbose == "strict" {
 			}
 			target.WriteString(verbose)
 			target.WriteByte(' ')

@@ -64,7 +64,9 @@ type StackSimulation interface {
 	GetVarId() *utils.VariableId
 	SetVarId(*utils.VariableId)
 	AssignVar(slot int, val values.JavaValue) (*values.JavaRef, bool)
+	AssignVarGuarded(slot int, val values.JavaValue, blockNullAdopt bool) (*values.JavaRef, bool)
 	GetVar(slot int) *values.JavaRef
+	SetVar(slot int, ref *values.JavaRef)
 }
 
 var _ StackSimulation = &StackSimulationImpl{}
@@ -86,6 +88,13 @@ func (s *StackSimulationImpl) SetVarId(id *utils.VariableId) {
 
 func (s *StackSimulationImpl) GetVar(slot int) *values.JavaRef {
 	return s.varTable[slot]
+}
+
+// SetVar overrides the slot's current variable version in the single global slot table. Used by the
+// store-side reaching-definition repair to install the true dominating definition before AssignVar
+// decides reuse-vs-mint, undoing DFS-order corruption of the slot table (Bug AI store side).
+func (s *StackSimulationImpl) SetVar(slot int, ref *values.JavaRef) {
+	s.varTable[slot] = ref
 }
 
 func (s *StackSimulationImpl) NewVar(val values.JavaValue) *values.JavaRef {
@@ -116,6 +125,16 @@ func slotDeclType(val values.JavaValue) types.JavaType {
 }
 
 func (s *StackSimulationImpl) AssignVar(slot int, val values.JavaValue) (*values.JavaRef, bool) {
+	return s.AssignVarGuarded(slot, val, false)
+}
+
+// AssignVarGuarded is AssignVar with an extra control: when blockNullAdopt is true the
+// "null-initialized slot adopts the new concrete reference type" shortcut is suppressed and the
+// store falls through to minting a fresh, block-scoped variable. The caller sets this when the
+// slot's null initializer does NOT reach this store along the CFG (i.e. the null `T x = null`
+// lives on a sibling/disjoint branch, e.g. a try-with-resources synthetic `primaryExc = null`),
+// so adopting an unrelated type here would wrongly unify two distinct variables onto one slot.
+func (s *StackSimulationImpl) AssignVarGuarded(slot int, val values.JavaValue, blockNullAdopt bool) (*values.JavaRef, bool) {
 	typ := slotDeclType(val)
 	ref, ok := s.varTable[slot]
 	// Both the incoming value's type and the slot's current ref type must be present to compare
@@ -135,7 +154,10 @@ func (s *StackSimulationImpl) AssignVar(slot int, val values.JavaValue) (*values
 		// split form left the reassigned variable block-scoped and read out of scope
 		// ("cannot find symbol"). Only reference types may adopt a null (a primitive cannot),
 		// so a primitive reassignment still falls through to the original split behavior.
-		if ref.IsNullInitialized() {
+		// blockNullAdopt suppresses this when the null initializer does not reach this store
+		// (sibling-branch reuse of one slot for unrelated types, e.g. try-with-resources
+		// primaryExc reusing the slot of an else-branch String).
+		if ref.IsNullInitialized() && !blockNullAdopt {
 			if _, isPrim := typ.RawType().(*types.JavaPrimer); !isPrim {
 				ref.ResetVarType(typ)
 				return ref, false

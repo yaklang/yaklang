@@ -336,8 +336,14 @@ type RuntimeVisibleTypeAnnotationsAttribute struct {
 	RuntimeVisibleAnnotationsAttribute
 }
 type RuntimeVisibleAnnotationsAttribute struct {
-	Type        string
-	AttrLen     uint32
+	Type    string
+	AttrLen uint32
+	// IsInvisible records whether this attribute was actually a RuntimeInvisibleAnnotations
+	// (RetentionPolicy.CLASS) entry. Both visible/invisible share the identical binary layout and
+	// reuse this struct, but they MUST be re-marshalled under their own attribute-name index;
+	// otherwise re-serializing a parsed class flips invisible annotations to visible (retention
+	// silently widened, bytes diverge). See Bug AF.
+	IsInvisible bool
 	Annotations []*AnnotationAttribute
 }
 type EnumConstValue struct {
@@ -400,8 +406,9 @@ func newAttributeInfo(attrName string, attrLen uint32) AttributeInfo {
 	case "RuntimeInvisibleAnnotations":
 		// RuntimeInvisibleAnnotations has the same binary layout as RuntimeVisibleAnnotations;
 		// reuse the same struct so invisible annotations (compiler-only, e.g. @Override, @Lazy)
-		// are parsed without falling through to UnparsedAttribute.
-		return &RuntimeVisibleAnnotationsAttribute{AttrLen: attrLen}
+		// are parsed without falling through to UnparsedAttribute. Flag it so re-marshalling writes
+		// the correct attribute-name index back (see Bug AF).
+		return &RuntimeVisibleAnnotationsAttribute{AttrLen: attrLen, IsInvisible: true}
 	case "AnnotationDefault":
 		// The default value of an annotation element (`boolean serializable() default false;`).
 		// Parsing it lets the dumper re-emit the `default <value>` clause; without it the
