@@ -129,10 +129,53 @@ func (r *ReturnStatement) String(funcCtx *class_context.ClassContext) string {
 	// (null is assignable to any type variable).
 	if expr != "null" {
 		if cast := typeVarReturnCast(funcCtx, r.JavaValue); cast != "" {
+			// When the cast target carries a NESTED parameterized argument (e.g.
+			// `Function<Supplier<T>, T>`) and the returned value is a DIFFERENT class cast to that
+			// interface (e.g. an enum singleton `SupplierFunctionImpl.INSTANCE` that concretely
+			// implements `Function<Supplier<Object>, Object>`), the direct cast is rejected as
+			// inconvertible: javac proves `Supplier<Object>` distinct from `Supplier<T>`. Guava's own
+			// source casts via the directly-implemented intermediate interface; the byte-faithful
+			// decompiler analogue is a raw-erasure bridge cast `(Target<..>) (RawTarget) (value)`,
+			// which is legal (downcast to the raw supertype, then an unchecked widen). Bare type-arg
+			// targets (`Predicate<T>`, `Converter<T, T>`) keep the single direct cast.
+			if bridge := nestedGenericRawBridge(funcCtx, r.JavaValue, cast); bridge != "" {
+				return fmt.Sprintf("return (%s) (%s) (%s)", cast, bridge, expr)
+			}
 			return fmt.Sprintf("return (%s) (%s)", cast, expr)
 		}
 	}
 	return fmt.Sprintf("return %s", expr)
+}
+
+// nestedGenericRawBridge returns the raw-erasure type name to interpose as an intermediate cast
+// (`(retStr) (bridge) (value)`) when a type-variable return cast to a target with NESTED generic
+// arguments would otherwise be rejected as inconvertible. It triggers only when (1) retStr has a
+// nested parameterization (more than one `<`, e.g. `Function<Supplier<T>, T>`) AND (2) the returned
+// value's erased type differs from retStr's erasure (the value is a different class being cast to a
+// parameterized supertype). Otherwise it returns "" and the single direct cast is used.
+func nestedGenericRawBridge(funcCtx *class_context.ClassContext, v values.JavaValue, retStr string) string {
+	if strings.Count(retStr, "<") <= 1 {
+		return ""
+	}
+	if v == nil {
+		return ""
+	}
+	vt := v.Type()
+	if vt == nil {
+		return ""
+	}
+	raw := vt.RawType()
+	if raw == nil {
+		return ""
+	}
+	if _, isPrim := raw.(*types.JavaPrimer); isPrim {
+		return ""
+	}
+	targetErasure := erasureName(retStr)
+	if targetErasure == "" || erasureName(raw.String(funcCtx)) == targetErasure {
+		return ""
+	}
+	return targetErasure
 }
 
 // typeVarReturnCast returns the type-variable name to cast the returned value to when the
@@ -157,7 +200,19 @@ func typeVarReturnCast(funcCtx *class_context.ClassContext, v values.JavaValue) 
 		return ""
 	}
 	retStr := ft.ReturnType.String(funcCtx)
-	if !funcCtx.IsTypeParam(retStr) {
+	// Two distinct triggers:
+	//   - bareTypeVar: the return type IS a type variable (T). Bytecode erases a type-variable return
+	//     to its bound (Object/Comparable), so a value typed as that bound fails "Comparable cannot be
+	//     converted to T"; an unchecked (T) cast fixes it. This is the original behavior.
+	//   - a generic return type that MENTIONS a type variable (Converter<T, T>, Map<K, V>). Here a cast
+	//     is needed ONLY when the returned value is itself PARAMETERIZED with arguments that differ
+	//     from the recovered return type (e.g. `Converter.identity()` returns `IdentityConverter<?>` -
+	//     captured to IdentityConverter<CAP> - into `Converter<T, T>`, a hard "cannot convert" error).
+	//     A RAW or bare value (`new InnerNode()`, `this.putExisting(...)` whose call type is erased to
+	//     the raw class) converts to the parameterized return type by UNCHECKED conversion and needs no
+	//     cast; adding one there is gratuitous and was over-casting plain raw-subtype returns.
+	bareTypeVar := funcCtx.IsTypeParam(retStr)
+	if !bareTypeVar && !mentionsTypeParam(retStr, funcCtx.TypeParams) {
 		return ""
 	}
 	vt := v.Type()
@@ -176,7 +231,82 @@ func typeVarReturnCast(funcCtx *class_context.ClassContext, v values.JavaValue) 
 	if raw.String(funcCtx) == retStr {
 		return ""
 	}
+	if !bareTypeVar {
+		// Parameterized return type (Converter<T, T>): only certain returned-value forms carry a
+		// RECOMPILED static type that CONFLICTS with the recovered return type and thus need a cast:
+		//   - a field-access singleton (`IdentityConverter<?> INSTANCE` captures to
+		//     IdentityConverter<CAP>, not assignable to Converter<T, T>);
+		//   - `return this` when the declared return type is a DIFFERENT (super)type parameterized
+		//     with a type variable -- e.g. enum `ObjectPredicate implements Predicate<Object>` whose
+		//     `<T> Predicate<T> withNarrowedType()` does `return this`: `this` is Predicate<Object>,
+		//     not Predicate<T>, so guava itself writes the unchecked `(Predicate<T>) this` cast.
+		// Every other form is safe without a cast: a method call recompiles to its own recovered
+		// generic signature, `return this` whose return type is the class's OWN type (InnerNode<K,V>
+		// in class InnerNode) converts by unchecked conversion, and `new Raw(...)` / bare values
+		// convert by unchecked conversion. Casting those only adds noise (the InnerNode over-cast
+		// regression), so they are excluded.
+		switch uv := values.UnpackSoltValue(v).(type) {
+		case *values.JavaClassMember, *values.RefMember:
+			// field access (static `Class.INSTANCE` or instance `this.field`) - may need the cast
+		case *values.JavaRef:
+			if !uv.IsThis {
+				return ""
+			}
+			// `return this`: cast only when returning as a DIFFERENT raw type than this's own class
+			// (a supertype/interface), i.e. the erasures differ. Same-erasure (the class's own type)
+			// converts by unchecked conversion and must not be cast.
+			if erasureName(retStr) == erasureName(raw.String(funcCtx)) {
+				return ""
+			}
+		default:
+			return ""
+		}
+	}
 	return retStr
+}
+
+// erasureName strips a generic type string down to its raw/erased name: "Predicate<T>" -> "Predicate",
+// "Map<K, V>" -> "Map", "CopyOnWriteHashMap$InnerNode<K, V>" -> "CopyOnWriteHashMap$InnerNode".
+func erasureName(s string) string {
+	if i := strings.IndexByte(s, '<'); i >= 0 {
+		s = s[:i]
+	}
+	return strings.TrimSpace(s)
+}
+
+// mentionsTypeParam reports whether retStr contains any of the in-scope type-variable names as a
+// whole identifier token (so type param "T" matches "Converter<T, T>" and bare "T" but never the "T"
+// inside "String" or a class named "Tree"). Used to extend the type-variable return cast to generic
+// return types whose type ARGUMENTS are type variables, not just bare-type-variable returns.
+func mentionsTypeParam(retStr string, typeParams []string) bool {
+	if len(typeParams) == 0 || retStr == "" {
+		return false
+	}
+	isIdent := func(b byte) bool {
+		return b == '_' || b == '$' ||
+			(b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
+	}
+	for _, tp := range typeParams {
+		if tp == "" {
+			continue
+		}
+		from := 0
+		for {
+			idx := strings.Index(retStr[from:], tp)
+			if idx < 0 {
+				break
+			}
+			start := from + idx
+			end := start + len(tp)
+			beforeOK := start == 0 || !isIdent(retStr[start-1])
+			afterOK := end == len(retStr) || !isIdent(retStr[end])
+			if beforeOK && afterOK {
+				return true
+			}
+			from = start + 1
+		}
+	}
+	return false
 }
 
 // narrowingReturnCast returns the cast type name ("char"/"byte"/"short") when the enclosing

@@ -112,6 +112,56 @@ func TestEmptySlotInventory(t *testing.T) {
 
 // TestDiagDecompileClass decompiles a single class from a jar (DIAG_JAR + DIAG_CLASS substring) or a
 // raw .class file (DIAG_FILE) and logs the full output, for ad-hoc inspection of merge-value shapes.
+// TestDiagDecompileJarToDir regenerates a (subset of a) jar's decompiled sources into a directory
+// with the CURRENT decompiler, so a round-trip recompile can be re-measured after fixes without
+// re-running the full (CFR/VF) cross-comparison PK. It reuses the exact unit layout the PK harness
+// uses (writeYakUnits: one self-contained `package`-qualified .java per flat $-named class), so the
+// downstream `javac -sourcepath <dir> -implicit:none -cp <jar:deps>` matches the PK round-trip axis.
+//
+//	DIAG_JAR=<abs jar>  DIAG_PKG=<entry substring, e.g. com/google/common/base/>  DIAG_OUT=<dir>
+//	go test -run TestDiagDecompileJarToDir -v ./common/javaclassparser/tests/
+func TestDiagDecompileJarToDir(t *testing.T) {
+	jar := os.Getenv("DIAG_JAR")
+	out := os.Getenv("DIAG_OUT")
+	if jar == "" || out == "" {
+		t.Skip("set DIAG_JAR and DIAG_OUT (optional DIAG_PKG substring) to run")
+	}
+	if !filepath.IsAbs(jar) {
+		home, _ := os.UserHomeDir()
+		jar = filepath.Join(home, ".m2/repository", jar)
+	}
+	pkg := os.Getenv("DIAG_PKG")
+	classes := readJarClassBytes(t, jar)
+	// Read through the production JarFS path (NewExpandedLocalFileSystem): reading a `.class` entry
+	// inside a jar path returns the SAME folded/suppressed source a real `decompile a jar` call
+	// produces (enum constant-body cross-class folding + synthetic `$N` suppression). Per-class
+	// Decompile() would instead emit each `Outer$N extends <final enum>` as a standalone unit that
+	// cannot compile -- a harness artifact, not a real decompiler defect.
+	lfs := javaclassparser.NewExpandedLocalFileSystem()
+	units := map[string]string{}
+	ok, errc := 0, 0
+	for name := range classes {
+		if pkg != "" && !strings.Contains(name, pkg) {
+			continue
+		}
+		raw, rerr := lfs.ReadFile(filepath.Join(jar, filepath.FromSlash(name)))
+		src := string(raw)
+		if rerr != nil || strings.TrimSpace(src) == "" {
+			errc++
+			continue
+		}
+		units[name] = src
+		ok++
+	}
+	_ = os.RemoveAll(out)
+	_ = os.MkdirAll(out, 0o755)
+	n, werr := writeYakUnits(out, units)
+	if werr != nil {
+		t.Fatalf("writeYakUnits: %v", werr)
+	}
+	t.Logf("decompiled %d units (ok=%d err=%d) from %s [pkg=%q] -> %s", n, ok, errc, filepath.Base(jar), pkg, out)
+}
+
 func TestDiagDecompileClass(t *testing.T) {
 	if p := os.Getenv("DIAG_FILE"); p != "" {
 		raw, err := os.ReadFile(p)
@@ -119,6 +169,13 @@ func TestDiagDecompileClass(t *testing.T) {
 			t.Fatal(err)
 		}
 		out, derr := safeDecompileHarness(raw)
+		if outFile := os.Getenv("DIAG_OUT_FILE"); outFile != "" {
+			if werr := os.WriteFile(outFile, []byte(out), 0o644); werr != nil {
+				t.Fatalf("write DIAG_OUT_FILE: %v", werr)
+			}
+			t.Logf("=== %s (err=%v) wrote %d bytes -> %s ===", p, derr, len(out), outFile)
+			return
+		}
 		t.Logf("=== %s (err=%v) ===\n%s", p, derr, out)
 		return
 	}

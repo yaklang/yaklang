@@ -290,3 +290,29 @@ func Decompile(i []byte) (string, error) {
 	}
 	return obj.Dump()
 }
+
+// DumpWithResolver decompiles this class with enum constant-body cross-class folding enabled. When
+// the class is an enum whose constants carry constant-specific bodies, javac compiles each body into
+// a synthetic `Outer$N` subclass; `resolve` maps that subclass's binary internal name (slash form,
+// e.g. "ev/EnumBody$1") to its class bytes so the body can be inlined back into the enum constant.
+// A nil resolve is identical to Dump (folding OFF).
+func (this *ClassObject) DumpWithResolver(resolve func(internalName string) ([]byte, bool)) (result string, err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = utils.ErrorStack(e)
+		}
+	}()
+	d := NewClassObjectDumper(this)
+	d.foldSiblingResolver = resolve
+	return d.DumpClass()
+}
+
+// DecompileWithResolver parses then decompiles `i`, folding enum constant bodies via `resolve` (see
+// ClassObject.DumpWithResolver). With resolve == nil it behaves exactly like Decompile.
+func DecompileWithResolver(i []byte, resolve func(internalName string) ([]byte, bool)) (string, error) {
+	obj, err := Parse(i)
+	if err != nil {
+		return "", err
+	}
+	return obj.DumpWithResolver(resolve)
+}

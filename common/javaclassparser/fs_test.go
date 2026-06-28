@@ -320,7 +320,7 @@ func TestDecompileClassBytes_DumpFailureReturnsStub(t *testing.T) {
 	raw, err := zipFS.ReadFile("org/apache/tomcat/websocket/WsRemoteEndpointImplClient.class")
 	require.NoError(t, err)
 
-	out := decompileClassBytes("org/apache/tomcat/websocket/WsRemoteEndpointImplClient.class", raw)
+	out := NewJarFS(zipFS).decompileClassBytes("org/apache/tomcat/websocket/WsRemoteEndpointImplClient.class", raw)
 	s := string(out)
 	require.NotEqual(t, byte(0xca), out[0], "class should be decompiled, not raw CAFE BABE")
 	// The doWrite method was previously un-decompilable (emitted a tagged stub) but now

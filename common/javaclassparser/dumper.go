@@ -60,6 +60,19 @@ type ClassObjectDumper struct {
 	// which would otherwise emit an illegal double assignment to a final field. A nil map means the
 	// pre-scan has not run yet; an entry of 0 means "not seen", so callers treat <=1 as hoistable.
 	fieldStoreTotals map[string]int
+	// methodReturnTypes maps a same-class method name to its rendered return type, used by the
+	// generated-local safety net to recover the type of a reference local that only receives its
+	// value through an embedded assignment `(v = m(...)) != null`. Names that are overloaded with
+	// DIFFERENT return types are omitted (ambiguous). Built lazily and cached.
+	methodReturnTypes map[string]string
+	// foldSiblingResolver, when non-nil, resolves a sibling class's raw bytes by its binary internal
+	// name (slash form, e.g. "ev/EnumBody$1"). It is the hook that enables enum constant-body
+	// CROSS-CLASS folding: a constant-specific class body is compiled by javac into a synthetic
+	// `Outer$N` subclass, and the only legal Java is to inline that subclass's members back into the
+	// enum constant (`CONST { ...body... }`). The standalone single-class entry (Decompile) leaves
+	// this nil, so folding is OFF and per-class output is byte-for-byte unchanged (zero regression by
+	// construction); only the multi-class entry (DecompileWithResolver / jar path) sets it.
+	foldSiblingResolver func(internalName string) ([]byte, bool)
 }
 
 func (c *ClassObjectDumper) GetConstructorMethodName() string {
@@ -102,6 +115,37 @@ func (c *ClassObjectDumper) Tab() {
 func (c *ClassObjectDumper) UnTab() {
 	c.deepStack.Pop()
 }
+// selfInnerClassAccessFlags returns the inner_class_access_flags this class carries in its own
+// InnerClasses entry (the entry whose inner_class_info refers to this very class), with ok=false when
+// no such entry exists. For a nested type the top-level ClassFile access_flags omit its real
+// visibility (a public nested type's own access_flags lack ACC_PUBLIC); the authoritative visibility
+// is in the InnerClasses attribute. javap reads exactly this to print `public` for a nested type.
+func (c *ClassObjectDumper) selfInnerClassAccessFlags() (uint16, bool) {
+	self := c.obj.GetClassName()
+	if self == "" {
+		return 0, false
+	}
+	for _, attr := range c.obj.Attributes {
+		ic, ok := attr.(*InnerClassesAttribute)
+		if !ok {
+			continue
+		}
+		for _, e := range ic.Classes {
+			if e == nil || e.InnerClassInfoIndex == 0 {
+				continue
+			}
+			name, err := c.obj.getUtf8(e.InnerClassInfoIndex)
+			if err != nil {
+				continue
+			}
+			if name == self {
+				return e.InnerClassAccessFlags, true
+			}
+		}
+	}
+	return 0, false
+}
+
 func (c *ClassObjectDumper) DumpClass() (string, error) {
 	// accessFlagsVerbose := c.obj.AccessFlagsVerbose
 	accessFlagsToCode := c.obj.AccessFlagsToCode
@@ -148,16 +192,35 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	c.PackageName = packageName
 	rawClassName := splits[len(splits)-1]
 	className := class_context.SafeIdentifier(rawClassName)
-	// Nested/local/anonymous classes carry a '$' in their binary name (Outer$Inner).
-	// When such a class is decompiled as a standalone top-level type, a `public`/`protected`
-	// modifier is illegal: Java requires a public type to be declared in a file named exactly
-	// after it (and the file here is named Outer.java, not Outer$Inner.java). Demote its
-	// visibility to package-private so the emitted source is re-compilable. This mirrors how
-	// CFR/Vineflower place nested types as package-private members and does not change the
-	// class's members, inheritance, or observable contract.
+	// Nested/local/anonymous classes carry a '$' in their binary name (Outer$Inner). Yak emits each
+	// such class as a STANDALONE top-level unit literally named `Outer$Inner` and writes it to
+	// `Outer$Inner.java` ('$' is a legal Java identifier char), so a `public` modifier IS legal here
+	// (Java only requires that a file's public top-level class match the file name). `protected` is
+	// illegal at top level and is always dropped (demoted to package-private).
+	//
+	// Crucially, a nested type's REAL visibility lives in the InnerClasses attribute's
+	// inner_class_access_flags, NOT in the (visibility-less) top-level ClassFile access_flags: a public
+	// nested type's own access_flags lack ACC_PUBLIC, so the legacy unconditional public-stripping left
+	// every public nested type package-private. Cross-package use sites then failed to recompile with
+	// `... is defined in an inaccessible class or interface` and `package Outer$Inner does not exist`
+	// (the single biggest fastjson2 blocker: JSONReader$Feature / JSONWriter$Feature / JSONReader$Context).
+	// Recover ACC_PUBLIC from InnerClasses (this is exactly what javap consults) and keep `public` for a
+	// genuinely public nested type. Kill-switch: JDEC_NESTED_PUBLIC_OFF=1 restores legacy stripping.
 	if strings.Contains(rawClassName, "$") {
-		accessFlags = strings.TrimSpace(strings.ReplaceAll(accessFlags, "public", ""))
 		accessFlags = strings.TrimSpace(strings.ReplaceAll(accessFlags, "protected", ""))
+		innerPublic := false
+		if os.Getenv("JDEC_NESTED_PUBLIC_OFF") == "" {
+			if flags, ok := c.selfInnerClassAccessFlags(); ok && flags&0x0001 == 0x0001 {
+				innerPublic = true
+			}
+		}
+		if innerPublic {
+			if !strings.Contains(accessFlags, "public") {
+				accessFlags = strings.TrimSpace("public " + accessFlags)
+			}
+		} else {
+			accessFlags = strings.TrimSpace(strings.ReplaceAll(accessFlags, "public", ""))
+		}
 	}
 	// module-info / package-info are synthetic descriptor pseudo-classes; their internal
 	// name ("module-info" / "package-info") is not a legal Java identifier, so emitting
@@ -402,6 +465,12 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	if err != nil {
 		return "", utils.Wrap(err, "DumpFields failed")
 	}
+	// Enum constant-body cross-class folding: when a multi-class resolver is available, recover each
+	// constant's synthetic `Outer$N` subclass body and inline it as `CONST { ...body... }`. Computed
+	// once (before assemble, which may run twice on the degradation path) so required imports are
+	// merged into funcCtx ahead of the import-assembly step below. Empty (nil) on the single-class
+	// path, leaving the constant render hook untouched.
+	enumConstantBodies := c.foldEnumConstantBodies(isEnum)
 	var classKeyword string
 	if !nonClassKeyword {
 		classKeyword = " class"
@@ -432,6 +501,9 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 				}
 				attrsB.WriteString("\t")
 				attrsB.WriteString(constStr)
+				if body := enumConstantBodies[enumSimple.fieldName]; body != "" {
+					attrsB.WriteString(body)
+				}
 				if idx == len(enumFields)-1 {
 					attrsB.WriteString(";\n")
 				} else {
@@ -470,13 +542,18 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 			if utils.StringSliceContain(buildInLib, s) {
 				continue
 			}
-			// A nested type's binary name uses '$' (e.g. java.util.Base64$Encoder), but an import
-			// statement must use the source form with '.' (import java.util.Base64.Encoder;). Emitting
-			// the raw binary name produces "cannot find symbol: class Base64$Encoder". Convert every
-			// '$' separator to '.' for the import line only; the body already renders nested types with
-			// '.'. Anonymous/synthetic names (Outer$1) are filtered out upstream, so this only rewrites
-			// genuine named nested types.
-			importsStr += fmt.Sprintf("import %s;\n", strings.ReplaceAll(s, "$", "."))
+			// Import spelling is already normalized by GetAllImported per type kind:
+			//   - EXTERNAL stdlib nested type -> reduced to the OUTER class (java.util.Map), no '$';
+			//     the body renders the dotted Outer.Inner source spelling against that import.
+			//   - SAME-JAR Yak flat unit -> kept as the flat `pkg.Outer$Inner` name; the body renders
+			//     the matching flat `Outer$Inner` reference and the import resolves to the sibling
+			//     flat unit `Outer$Inner.java` ('$' is a legal identifier char, so `import a.b.C$D;`
+			//     is valid Java - verified). Rewriting '$'->'.' here (legacy behaviour, on the false
+			//     premise that imports cannot carry '$') turned it into `import pkg.Outer.Inner;`, which
+			//     does NOT resolve because Yak's flat `Outer.java` has no nested `Inner` (it is a
+			//     separate flat unit) - the second-largest fastjson2 cross-package recompile blocker.
+			// So emit the (already correct) import string verbatim.
+			importsStr += fmt.Sprintf("import %s;\n", s)
 		}
 		if len(importsStr) > 0 {
 			importsStr += "\n"
@@ -1154,17 +1231,27 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	// Signature attribute, if present and parseable. This recovers erased generics on
 	// method parameters and return types (e.g. BiFunction<Integer,Integer,Integer> vs raw
 	// BiFunction). Falls back silently to the descriptor if the signature cannot be parsed.
+	//
+	// methodTypeParams is the method's own formal type-parameter section ("<T>", "<K, V>"), rendered
+	// from a signature that BEGINS with "<...>" (a generic method like `<T> T checkNotNull(T)`).
+	// ParseMethodSignatureFull (unlike the old ParseMethodSignature) does not bail on that leading
+	// section, so such a method's params/return are now recovered as the type variables (T) instead of
+	// staying erased to Object - the dominant guava `base` recompile blocker after the synchronized
+	// scope fix (Preconditions.checkNotNull rendered `Object checkNotNull(Object)`, so every
+	// `predicate.apply(checkNotNull(x))` failed "Object cannot be converted to CAP#1"). The header
+	// then emits the `<T>` declaration before the return type. Kill-switch: JDEC_METHOD_TYPEPARAMS_OFF.
+	methodTypeParams := ""
+	var methodTypeParamNames []string
 	for _, attr := range method.Attributes {
 		if sigAttr, ok := attr.(*SignatureAttribute); ok {
 			if sigStr, err := c.obj.getUtf8(sigAttr.SignatureIndex); err == nil && sigStr != "" {
-				sigParams, sigRet := types.ParseMethodSignature(sigStr)
+				tps, sigParams, sigRet := types.ParseMethodSignatureFull(sigStr, c.FuncCtx)
 				// Gate on sigRet (not sigParams): a zero-arg generic method like
 				// `()TK;` (Map.Entry.getKey) parses to (nil params, K return). The old
 				// `sigParams != nil` guard skipped exactly these, leaving the return type
 				// erased to Object so the override of an interface method failed to compile
 				// ("return type Object is not compatible with V"). sigRet==nil still means a
-				// genuine parse failure (or unsupported `<...>` formal-type-param method),
-				// so we fall back to the descriptor as before. Kill-switch
+				// genuine parse failure, so we fall back to the descriptor as before. Kill-switch
 				// JDEC_METHOD_SIG_RET_OFF restores the legacy sigParams!=nil gate.
 				applicable := sigRet != nil
 				if os.Getenv("JDEC_METHOD_SIG_RET_OFF") != "" {
@@ -1181,9 +1268,34 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 						mt.ReturnType = sigRet
 					}
 				}
+				if os.Getenv("JDEC_METHOD_TYPEPARAMS_OFF") == "" {
+					methodTypeParams = tps
+					methodTypeParamNames = types.MethodFormalTypeParamNames(sigStr)
+				}
 			}
 			break
 		}
+	}
+	// A synthetic access-bridge constructor carries NO Signature attribute, so its parameters stay
+	// erased to their descriptor types (Object / raw). Its only body is `this(args...)` forwarding to
+	// the private target ctor, so when that target declares a type variable (e.g. guava
+	// Equivalence.Wrapper(Equivalence, Object, Equivalence$1) -> this(var1, var2) into the private
+	// (Equivalence<? super T>, T) ctor) the bare `Object` arg fails "Object cannot be converted to T".
+	// Lift the target ctor's GENERIC param types onto the bridge: the bridge erases to the same
+	// descriptor (byte-faithful) and its (raw) call sites still type-check. This recurs across every
+	// nested class with a private generic ctor reached from its encloser, so the fix is broad.
+	// Kill-switch: JDEC_NO_SYN_BRIDGE_CTOR_RETYPE=1.
+	if name == "<init>" && os.Getenv("JDEC_NO_SYN_BRIDGE_CTOR_RETYPE") == "" &&
+		c.isSyntheticAccessBridgeCtor(descriptor, method.AccessFlags) {
+		c.reTypeSyntheticBridgeCtorParams(descriptor, methodType.FunctionType())
+	}
+	// Bring the method's own type-variable names into scope for the duration of this method's render
+	// so renderers (e.g. typeVarReturnCast) recognize them like class-level ones, then restore the
+	// class-scope set afterward so they never leak into sibling members.
+	if len(methodTypeParamNames) > 0 && c.FuncCtx != nil {
+		savedTypeParams := c.FuncCtx.TypeParams
+		c.FuncCtx.TypeParams = append(slices.Clone(savedTypeParams), methodTypeParamNames...)
+		defer func() { c.FuncCtx.TypeParams = savedTypeParams }()
 	}
 	c.MethodType = methodType.FunctionType()
 	returnTypeStr := methodType.FunctionType().ReturnType.String(c.FuncCtx)
@@ -1317,6 +1429,10 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 					}
 				}
 			} else {
+				// samParams and descriptorParamTypes share the SAME trailing source parameters; any
+				// synthetic prefix (enum ctor's String,int) lives only at the FRONT of the descriptor
+				// list and was sliced off samParams above, so align them from the tail.
+				descTailOffset := descriptorParamCount - len(samParams)
 				for i, val := range samParams {
 					typ := val.Type()
 					if i == len(samParams)-1 && isVarArgs && typ != nil && typ.IsArray() {
@@ -1325,6 +1441,16 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 						typName := "java.lang.Object"
 						if typ != nil {
 							typName = typ.String(c.FuncCtx)
+						}
+						// A narrow int-category parameter (char/byte/short) whose slot was widened to
+						// int by an in-body int reassignment must still be DECLARED with its authoritative
+						// descriptor type, or assigning it to a same-typed field/return is a "possible
+						// lossy conversion from int to char" javac error (e.g. guava ArrayBasedCharEscaper's
+						// `char safeMin` ctor). The descriptor is the ground truth for primitive params.
+						if !isLambda && descTailOffset >= 0 {
+							if dt := paramDescriptorNarrowType(descriptorParamTypes, descTailOffset+i, typ); dt != nil {
+								typName = dt.String(c.FuncCtx)
+							}
 						}
 						paramsNewStrList = append(paramsNewStrList, fmt.Sprintf("%s %s", typName, val.String(c.FuncCtx)))
 					}
@@ -1640,7 +1766,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 			if !funcCtx.IsStatic && name != "<clinit>" {
 				receiverType = c.GetConstructorMethodName()
 			}
-			sourceCode = addMissingGeneratedLocalDecls(sourceCode, paramsNewStr, receiverType)
+			sourceCode = addMissingGeneratedLocalDecls(sourceCode, paramsNewStr, receiverType, c.methodReturnTypeByName())
 			code = sourceCode
 		}
 	}
@@ -1712,11 +1838,19 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	writeReturnType := func(buffer io.Writer) {
 		methodSourceBuffer.Write([]byte(returnTypeStr + " "))
 	}
+	// writeMethodTypeParams emits a generic method's own formal type-parameter declaration ("<T> ")
+	// after the access flags and before the return type, e.g. `public static <T> T checkNotNull(T x)`.
+	writeMethodTypeParams := func(buffer io.Writer) {
+		if methodTypeParams != "" {
+			methodSourceBuffer.Write([]byte(methodTypeParams + " "))
+		}
+	}
 	var writerSeq []func(io.Writer)
 	switch name {
 	case "<init>":
 		writerSeq = []func(io.Writer){
 			writeAccessFlags,
+			writeMethodTypeParams,
 			writeName,
 			writeArguments,
 			writeBlock,
@@ -1729,6 +1863,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	default:
 		writerSeq = []func(io.Writer){
 			writeAccessFlags,
+			writeMethodTypeParams,
 			writeReturnType,
 			writeName,
 			writeArguments,
@@ -1882,6 +2017,36 @@ func resolveLocalNameCollisions(params []values.JavaValue, body []statements.Sta
 	renameStatementsInScope(body, live)
 }
 
+// paramDescriptorNarrowType returns the parameter's authoritative descriptor type when that type is a
+// narrow integer-category primitive (char/byte/short) but the inferred slot type has been widened to
+// int. It returns nil otherwise. The JVM stores char/byte/short locals in int-sized slots and an
+// in-body reassignment (e.g. `var2 = 65535`) makes the decompiler infer the slot as int; declaring the
+// parameter as int then breaks a same-typed field/return assignment with "possible lossy conversion".
+// The method descriptor is the ground truth for a primitive parameter's declared type, so we trust it.
+// Kill-switch: JDEC_PARAM_DESC_NARROW_OFF.
+func paramDescriptorNarrowType(descTypes []types.JavaType, idx int, inferred types.JavaType) types.JavaType {
+	if os.Getenv("JDEC_PARAM_DESC_NARROW_OFF") != "" {
+		return nil
+	}
+	if idx < 0 || idx >= len(descTypes) || descTypes[idx] == nil || inferred == nil {
+		return nil
+	}
+	dp, ok := descTypes[idx].RawType().(*types.JavaPrimer)
+	if !ok {
+		return nil
+	}
+	switch dp.Name {
+	case types.JavaChar, types.JavaByte, types.JavaShort:
+	default:
+		return nil
+	}
+	ip, ok := inferred.RawType().(*types.JavaPrimer)
+	if !ok || ip.Name != types.JavaInteger {
+		return nil
+	}
+	return descTypes[idx]
+}
+
 func ensureUniqueParameterNames(params []values.JavaValue, funcCtx *class_context.ClassContext) {
 	seen := map[string]bool{}
 	for i, p := range params {
@@ -1970,13 +2135,64 @@ var mismatchedDoWhileIndexDeclRe = regexp.MustCompile(`int\s+(var\d+(?:_\d+)?)\s
 var monitorTempAssignRe = regexp.MustCompile(`^var\d+ = (.+)$`)
 var doWhileBreakGuardRe = regexp.MustCompile(`^(\s*)if \(([^\n{}]*)\)\{\n\s*break;\n\s*\}else\{`)
 
-func addMissingGeneratedLocalDecls(body, params, receiverType string) string {
+// methodReturnTypeByName builds (and caches) a same-class method-name -> rendered-return-type map.
+// Constructors and void methods are skipped; a name overloaded with conflicting return types is
+// dropped so the safety net never guesses wrong. The return types are read from the authoritative
+// method descriptors, not by parsing rendered source.
+func (c *ClassObjectDumper) methodReturnTypeByName() map[string]string {
+	if c.methodReturnTypes != nil {
+		return c.methodReturnTypes
+	}
+	m := map[string]string{}
+	ambiguous := map[string]bool{}
+	for _, info := range c.obj.Methods {
+		name, err := c.obj.getUtf8(info.NameIndex)
+		if err != nil || name == "<init>" || name == "<clinit>" {
+			continue
+		}
+		descriptor, err := c.obj.getUtf8(info.DescriptorIndex)
+		if err != nil {
+			continue
+		}
+		mt, perr := types.ParseMethodDescriptor(descriptor)
+		if perr != nil || mt == nil {
+			continue
+		}
+		ret := mt.FunctionType().ReturnType.String(c.FuncCtx)
+		if ret == "" || ret == "void" {
+			continue
+		}
+		if existing, ok := m[name]; ok && existing != ret {
+			ambiguous[name] = true
+			continue
+		}
+		m[name] = ret
+	}
+	for name := range ambiguous {
+		delete(m, name)
+	}
+	c.methodReturnTypes = m
+	return m
+}
+
+func addMissingGeneratedLocalDecls(body, params, receiverType string, methodReturnTypes map[string]string) string {
 	body = repairMismatchedDoWhileIndexDecls(body)
 	declared := map[string]bool{}
 	for _, match := range generatedLocalDeclRe.FindAllStringSubmatch(params+"\n"+body, -1) {
 		if len(match) > 1 {
 			declared[match[1]] = true
 		}
+	}
+	// Every varN token in the rendered parameter list IS, by construction, a declared parameter
+	// (the param list contains only `Type varN` pairs; a type's generic args never contain a `var<digits>`
+	// token). Relying solely on generatedLocalDeclRe to spot them is brittle: its type prefix cannot match
+	// a parameter whose final type token before the name is a wildcard (`Map<?, ?> var2` -> the token `?>`
+	// has no leading identifier char) or otherwise carries spaces, so such a parameter looked UNDECLARED
+	// and a bogus `Object varN = null;` was injected that shadowed it (guava base Joiner$MapJoiner: every
+	// `appendTo(StringBuilder, Map<?, ?>)` / `join(Iterable<? extends Entry<?, ?>>)` body). Mark all
+	// parameter slot names declared directly so wildcard-typed parameters are never re-declared.
+	for _, name := range generatedLocalRefRe.FindAllString(params, -1) {
+		declared[name] = true
 	}
 	missing := []string{}
 	seen := map[string]bool{}
@@ -2000,6 +2216,11 @@ func addMissingGeneratedLocalDecls(body, params, receiverType string) string {
 			typ, zero = receiverType, "this"
 		} else if generatedLocalLooksInt(body, name) {
 			typ, zero = "int", "0"
+		} else if rt := inferGeneratedLocalRefType(body, params, name, methodReturnTypes); rt != "" {
+			// A REFERENCE-typed local whose value only arrives through an embedded
+			// assignment in a condition ((s = next(...)) != null); without a recovered type the
+			// default `Object` makes every member access (s.length()) fail to recompile.
+			typ, zero = rt, "null"
 		}
 		lines = append(lines, fmt.Sprintf("\t%s %s = %s;\n", typ, name, zero))
 	}
@@ -2092,6 +2313,107 @@ func generatedLocalLooksInt(body, name string) bool {
 		}
 	}
 	return false
+}
+
+// embeddedAssignRHSRe / arrayLoadRHSRe / bareCallRHSRe / typedArrayDeclRe / methodReturnDeclRe back
+// inferGeneratedLocalRefType. They are package-level so the regex compiles once.
+var arrayLoadRHSRe = regexp.MustCompile(`^([A-Za-z_$][A-Za-z0-9_$]*)\[.+\]$`)
+var bareCallRHSRe = regexp.MustCompile(`^([A-Za-z_$][A-Za-z0-9_$]*)\(.*\)$`)
+
+// embeddedAssignRHS returns the right-hand side of the FIRST embedded assignment to name, i.e. the
+// balanced expression X in `(name = X)`. It scans with explicit paren-depth tracking because the RHS
+// itself may contain parentheses (a method call), which a regex cannot balance.
+func embeddedAssignRHS(body, name string) (string, bool) {
+	marker := "(" + name + " = "
+	idx := strings.Index(body, marker)
+	if idx < 0 {
+		return "", false
+	}
+	start := idx + len(marker)
+	depth := 1 // the '(' that opened the embedded-assignment group
+	for i := start; i < len(body); i++ {
+		switch body[i] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				return strings.TrimSpace(body[start:i]), true
+			}
+		}
+	}
+	return "", false
+}
+
+// declaredArrayElementType returns the element type of an array local/param named arr by reading its
+// `T[]... arr` declaration from text, or "" when none is found. For a multi-dimensional array it
+// strips exactly one dimension (String[][] arr -> String[]).
+func declaredArrayElementType(text, arr string) string {
+	re := regexp.MustCompile(`\b([A-Za-z_$][A-Za-z0-9_$.<>?,]*)\s*((?:\[\s*\])+)\s+` + regexp.QuoteMeta(arr) + `\b`)
+	m := re.FindStringSubmatch(text)
+	if m == nil {
+		return ""
+	}
+	base := m[1]
+	dims := strings.Count(m[2], "[")
+	if dims <= 1 {
+		return base
+	}
+	return base + strings.Repeat("[]", dims-1)
+}
+
+// declaredMethodReturnType returns the declared return type of an in-class method named method by
+// matching its `T method(params) {` definition in body, or "" when not found. The trailing `{`
+// requirement distinguishes a method DEFINITION from a call site (`return method(...)` has no brace),
+// and a leading `.` rules out an instance-call spelled `recv.method(`.
+func declaredMethodReturnType(body, method string) string {
+	re := regexp.MustCompile(`(?:^|[^.\w$])([A-Za-z_$][A-Za-z0-9_$.<>?,\[\]]*)\s+` + regexp.QuoteMeta(method) + `\s*\([^;{}]*\)\s*\{`)
+	for _, m := range re.FindAllStringSubmatch(body, -1) {
+		ret := m[1]
+		switch ret {
+		case "return", "new", "throw", "else", "instanceof", "case":
+			continue
+		}
+		return ret
+	}
+	return ""
+}
+
+// inferGeneratedLocalRefType recovers the reference type of an undeclared local that only receives
+// its value through an embedded assignment in a condition, e.g.
+//
+//	if ((var4 = next(a, b)) != null) { var4.length(); }     // -> next()'s return type
+//	while ((var4 = arr[i]) != null) { ... }                 // -> arr's element type
+//
+// The dup-collapse drops the standalone `T var4 = ...` declaration, so the string-level safety net
+// would default it to `Object` and every member access fails to recompile (`cannot find symbol`).
+// The type is recovered using ONLY information already present in the rendered body (the array's own
+// declaration / the in-class method's signature), so it needs no symbol table and stays self
+// contained. Anything it cannot resolve confidently returns "" so the caller keeps the safe `Object`
+// default - so this can only turn a non-compiling unit into a compiling one, never the reverse.
+// Kill-switch: JDEC_NO_EMBED_ASSIGN_REF=1 restores the pre-fix (Object-defaulting) behavior.
+func inferGeneratedLocalRefType(body, params, name string, methodReturnTypes map[string]string) string {
+	if os.Getenv("JDEC_NO_EMBED_ASSIGN_REF") != "" {
+		return ""
+	}
+	rhs, ok := embeddedAssignRHS(body, name)
+	if !ok {
+		return ""
+	}
+	if m := arrayLoadRHSRe.FindStringSubmatch(rhs); m != nil {
+		return declaredArrayElementType(params+"\n"+body, m[1])
+	}
+	if m := bareCallRHSRe.FindStringSubmatch(rhs); m != nil {
+		// Prefer the authoritative class method table; fall back to an in-body declaration scan
+		// (covers methods rendered in the same unit that are not in the descriptor map).
+		if methodReturnTypes != nil {
+			if ret := methodReturnTypes[m[1]]; ret != "" {
+				return ret
+			}
+		}
+		return declaredMethodReturnType(body, m[1])
+	}
+	return ""
 }
 
 // canHoistFieldInitializer reports whether a `final`-field assignment found inside <init>/
@@ -2510,7 +2832,83 @@ func (c *ClassObjectDumper) isSyntheticEnumMethod(name, descriptor string) bool 
 	if name == "valueOf" && descriptor == "(Ljava/lang/String;)"+selfDesc {
 		return true
 	}
+	// Synthetic "marker" constructor javac emits for enums that have constant-specific bodies:
+	// `<init>(String name, int ordinal, <Enum>$N marker)`. Its sole purpose is to give the constant-body
+	// subclasses an accessible super-ctor; its body just forwards to the real `<init>(String,int)`.
+	// Emitting it is ALWAYS wrong (it references a synthetic `$N` type that no longer exists once bodies
+	// are folded, and renders an illegal `this(...)` after local declarations); javac re-synthesizes it
+	// from the folded constant bodies on recompile. Identified by a trailing parameter typed as this
+	// enum's OWN anonymous subclass `L<self>$<digits>;` -- a shape impossible to write in source, so the
+	// match is exact. Kill-switch JDEC_NO_ENUM_MARKER_CTOR restores the raw (broken) emission.
+	if name == "<init>" && os.Getenv("JDEC_NO_ENUM_MARKER_CTOR") == "" && c.isEnumMarkerCtorDescriptor(descriptor) {
+		return true
+	}
 	return false
+}
+
+// isEnumMarkerCtorDescriptor reports whether descriptor's LAST parameter is an anonymous synthetic
+// class `L<binary>$<digits>;` (e.g. "Lcodec/AccEnum$1;" OR "Lcom/google/common/base/Predicates$1;"),
+// the signature of the javac-generated enum marker constructor. The marker's owner is whichever class
+// javac happened to allocate the anonymous slot in: for a TOP-LEVEL enum it is the enum's own
+// `<self>$N`, but for an enum NESTED in another class (e.g. Predicates.ObjectPredicate) javac names it
+// after the ENCLOSING class (`Predicates$1`). So we only require the trailing param to be SOME
+// anonymous class (simple name = all digits) -- a shape impossible to write in source, so the match is
+// unambiguous. This check is reached only for genuine enums (see DumpMethods), so it never affects
+// ordinary classes.
+func (c *ClassObjectDumper) isEnumMarkerCtorDescriptor(descriptor string) bool {
+	params := methodParamFieldDescriptors(descriptor)
+	if len(params) == 0 {
+		return false
+	}
+	last := params[len(params)-1]
+	// Must be a plain (non-array) object type Lxxx; .
+	if !strings.HasPrefix(last, "L") || !strings.HasSuffix(last, ";") {
+		return false
+	}
+	bin := last[1 : len(last)-1]
+	dollar := strings.LastIndexByte(bin, '$')
+	if dollar < 0 || dollar == len(bin)-1 {
+		return false
+	}
+	digits := bin[dollar+1:]
+	for i := 0; i < len(digits); i++ {
+		if digits[i] < '0' || digits[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// methodParamFieldDescriptors splits a method descriptor's parameter list into raw JVM field
+// descriptors (e.g. "(Ljava/lang/String;I[B)V" -> ["Ljava/lang/String;", "I", "[B"]).
+func methodParamFieldDescriptors(descriptor string) []string {
+	open := strings.IndexByte(descriptor, '(')
+	closeIdx := strings.IndexByte(descriptor, ')')
+	if open < 0 || closeIdx < 0 || closeIdx < open {
+		return nil
+	}
+	params := descriptor[open+1 : closeIdx]
+	var out []string
+	for i := 0; i < len(params); {
+		start := i
+		for i < len(params) && params[i] == '[' {
+			i++
+		}
+		if i >= len(params) {
+			break
+		}
+		if params[i] == 'L' {
+			semi := strings.IndexByte(params[i:], ';')
+			if semi < 0 {
+				break
+			}
+			i += semi + 1
+		} else {
+			i++
+		}
+		out = append(out, params[start:i])
+	}
+	return out
 }
 
 // enumConstantArgs derives the explicit constructor arguments for an enum constant from the
@@ -2568,6 +2966,95 @@ func splitTopLevelArgs(s string) []string {
 		parts = append(parts, tail)
 	}
 	return parts
+}
+
+// isSyntheticAccessBridgeCtor reports whether a method is the synthetic access-bridge constructor
+// javac emits (pre-nestmates) so an enclosing class can reach a nested class's PRIVATE constructor: an
+// ACC_SYNTHETIC `<init>` whose LAST parameter is a synthetic anonymous marker class (binary name
+// Outer$N, N all digits). A source-declared constructor can never have an anonymous-class parameter
+// type, so this shape is unambiguous.
+func (c *ClassObjectDumper) isSyntheticAccessBridgeCtor(descriptor string, accessFlags uint16) bool {
+	if !isSyntheticMethod(accessFlags) {
+		return false
+	}
+	mt, err := types.ParseMethodDescriptor(descriptor)
+	if err != nil || mt == nil || mt.FunctionType() == nil {
+		return false
+	}
+	pts := mt.FunctionType().ParamTypes
+	if len(pts) == 0 {
+		return false
+	}
+	cls, ok := pts[len(pts)-1].RawType().(*types.JavaClass)
+	if !ok {
+		return false
+	}
+	name := cls.Name
+	if i := strings.LastIndexAny(name, "./"); i >= 0 {
+		name = name[i+1:]
+	}
+	d := strings.LastIndexByte(name, '$')
+	if d < 0 || d == len(name)-1 {
+		return false
+	}
+	for _, r := range name[d+1:] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// reTypeSyntheticBridgeCtorParams replaces a synthetic access-bridge constructor's erased parameter
+// types with the GENERIC parameter types of the private target constructor it forwards to. The bridge
+// (last param is an anonymous marker class) carries no Signature attribute; its non-marker parameters
+// therefore render as their erased descriptor types. We locate the unique non-synthetic `<init>` whose
+// erased parameter list equals the bridge's leading (marker-stripped) parameters, parse its Signature
+// attribute, and adopt those generic types in-place on ft.ParamTypes. The marker parameter is left
+// untouched. No-op when no matching target or signature is found (output then stays as before).
+func (c *ClassObjectDumper) reTypeSyntheticBridgeCtorParams(bridgeDesc string, ft *types.JavaFuncType) {
+	if ft == nil {
+		return
+	}
+	bridgeParams := methodParamFieldDescriptors(bridgeDesc)
+	targetArity := len(bridgeParams) - 1 // drop the trailing synthetic marker parameter
+	if targetArity <= 0 {
+		return
+	}
+	prefix := bridgeParams[:targetArity]
+	for _, m := range c.obj.Methods {
+		if isSyntheticMethod(m.AccessFlags) {
+			continue
+		}
+		if n, _ := c.obj.getUtf8(m.NameIndex); n != "<init>" {
+			continue
+		}
+		d, _ := c.obj.getUtf8(m.DescriptorIndex)
+		if !slices.Equal(methodParamFieldDescriptors(d), prefix) {
+			continue
+		}
+		for _, attr := range m.Attributes {
+			sigAttr, ok := attr.(*SignatureAttribute)
+			if !ok {
+				continue
+			}
+			sigStr, e := c.obj.getUtf8(sigAttr.SignatureIndex)
+			if e != nil || sigStr == "" {
+				return
+			}
+			_, sigParams, _ := types.ParseMethodSignatureFull(sigStr, c.FuncCtx)
+			if len(sigParams) != targetArity {
+				return
+			}
+			for i := 0; i < targetArity && i < len(ft.ParamTypes); i++ {
+				if sigParams[i] != nil {
+					ft.ParamTypes[i] = sigParams[i]
+				}
+			}
+			return
+		}
+		return
+	}
 }
 
 func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
@@ -2667,7 +3154,31 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 		}
 		accessFlagsVerbose, _ := getMethodAccessFlagsVerbose(method.AccessFlags)
 		if strings.TrimSpace(res.bodyCode) == "" {
-			if !slices.Contains(accessFlagsVerbose, "abstract") && !slices.Contains(accessFlagsVerbose, "annotation") && !slices.Contains(accessFlagsVerbose, "interface") && !slices.Contains(accessFlagsVerbose, "enum") {
+			// A synthetic access-bridge constructor whose body decompiled to empty (its `this()`
+			// delegation to a trivial no-arg ctor was stripped) must be KEPT, not dropped. javac emits
+			// this package-private bridge (pre-nestmates) so an enclosing class can reach a nested
+			// class's PRIVATE no-arg constructor; the call site is `new Outer$Inner((Outer$N)null)`.
+			// Once nested classes are decompiled as flat top-level `Outer$Inner` units, dropping the
+			// bridge leaves that call resolving to no constructor ("constructor cannot be applied to
+			// given types" - the single largest guava `base` recompile blocker via
+			// Platform$JdkPatternCompiler). The empty body implicitly calls super() exactly as the
+			// no-arg target did, so it is semantically faithful. Kill-switch: JDEC_NO_SYN_BRIDGE_CTOR=1.
+			isSynBridgeCtor := name == "<init>" && os.Getenv("JDEC_NO_SYN_BRIDGE_CTOR") == "" &&
+				c.isSyntheticAccessBridgeCtor(descriptor, method.AccessFlags)
+			// A genuinely-declared constructor whose body decompiled to just the implicit super()
+			// must be KEPT unless it is indistinguishable from the constructor javac auto-generates
+			// when a class declares none. Dropping a programmer-declared no-arg ctor while OTHER
+			// ctors exist removes it from the API (e.g. guava `VerifyException()` -> `new
+			// VerifyException()` no longer resolves); dropping a non-public SOLE ctor (singleton
+			// `private Foo(){}`) silently widens accessibility; dropping a PARAMETERIZED empty-body
+			// ctor (`Foo(int){ super(); }`) deletes a real overload. All are semantic regressions
+			// the syntax safety net cannot catch. Kill-switch: JDEC_NO_KEEP_DECLARED_CTOR=1.
+			keepDeclaredCtor := name == "<init>" && !isSynBridgeCtor &&
+				os.Getenv("JDEC_NO_KEEP_DECLARED_CTOR") == "" &&
+				!c.isOmittableDefaultCtor(descriptor, accessFlagsVerbose)
+			if isSynBridgeCtor || keepDeclaredCtor {
+				// keep res as the empty-body constructor (faithful: empty body == implicit super())
+			} else if !slices.Contains(accessFlagsVerbose, "abstract") && !slices.Contains(accessFlagsVerbose, "annotation") && !slices.Contains(accessFlagsVerbose, "interface") && !slices.Contains(accessFlagsVerbose, "enum") {
 				methodType, perr := types.ParseMethodDescriptor(descriptor)
 				if perr != nil || methodType == nil || methodType.FunctionType() == nil ||
 					methodType.FunctionType().ReturnType.String(c.FuncCtx) == "void" {
@@ -2696,6 +3207,36 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 
 func (c *ClassObjectDumper) isInterfaceLike() bool {
 	return slices.Contains(c.obj.AccessFlagsVerbose, "interface") || slices.Contains(c.obj.AccessFlagsVerbose, "annotation")
+}
+
+// isOmittableDefaultCtor reports whether an empty-body constructor (its body decompiled to just the
+// implicit super()) is indistinguishable from the no-arg constructor javac auto-generates when a
+// class declares NONE, so dropping it is loss-less (javac regenerates an identical one). This holds
+// ONLY when all of the following are true:
+//   - it takes no parameters (descriptor "()V") -- javac never auto-generates a parameterized ctor;
+//   - it is the class's SOLE constructor -- if other ctors exist, no default is generated, so this
+//     no-arg ctor was written explicitly and is part of the public API;
+//   - its accessibility matches the implicit default's (public for a public class, package-private
+//     otherwise) -- a non-public sole ctor (singleton pattern) must be kept or accessibility widens.
+//
+// Any empty-body constructor failing these is programmer-declared and MUST be emitted.
+func (c *ClassObjectDumper) isOmittableDefaultCtor(descriptor string, ctorAccessVerbose []string) bool {
+	if descriptor != "()V" {
+		return false
+	}
+	ctorCount := 0
+	for _, m := range c.obj.Methods {
+		if n, _ := c.obj.getUtf8(m.NameIndex); n == "<init>" {
+			ctorCount++
+		}
+	}
+	if ctorCount != 1 {
+		return false
+	}
+	if slices.Contains(ctorAccessVerbose, "protected") || slices.Contains(ctorAccessVerbose, "private") {
+		return false
+	}
+	return slices.Contains(c.obj.AccessFlagsVerbose, "public") == slices.Contains(ctorAccessVerbose, "public")
 }
 
 func isIgnorableAssertionOnlyClinit(code string) bool {

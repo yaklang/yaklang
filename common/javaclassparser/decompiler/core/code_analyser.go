@@ -1210,6 +1210,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 	case OP_INVOKESPECIAL:
 		classInfo := d.GetMethodFromPool(int(Convert2bytesToInt(opcode.Data)))
 		funcCallValue := values.NewFunctionCallExpression(nil, classInfo, classInfo.JavaType.FunctionType()) // 不push到栈中
+		funcCallValue.IsSpecialInvoke = true
 		for i := 0; i < len(funcCallValue.FuncType.ParamTypes); i++ {
 			funcCallValue.Arguments = append(funcCallValue.Arguments, runtimeStackSimulation.Pop().(values.JavaValue))
 		}
@@ -2047,6 +2048,39 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 			return false
 		}
 	}
+	// isInlineArrayInitStore reports whether cur is the javac inline array-literal idiom's element
+	// store (`anewarray; dup; idx; val; Xastore`, repeated per element) building a FRESH array that is
+	// consumed inline as an expression operand (the canonical varargs-call argument). Unlike a store
+	// into an escaping local/field array, this store is part of materializing a single VALUE (the new
+	// array), not statement dispatch, so the ternary arm walk must step over it instead of declining.
+	// Without this, a short-circuit operand whose value is a varargs/array-building call (e.g.
+	// DoubleMetaphone.conditionC0's `... || contains(value, idx, n, "X", "Y")`) forces the principled
+	// shared-leaf builder to bail, dropping into the legacy combiner which mis-wires the leading
+	// condition and emits a missing-return method (Bug AK). Kill-switch: JDEC_ARRAYINIT_TERNARY_OFF=1.
+	isInlineArrayInitStore := func(cur *OpCode) bool {
+		if os.Getenv("JDEC_ARRAYINIT_TERNARY_OFF") != "" {
+			return false
+		}
+		switch cur.Instr.OpCode {
+		case OP_AASTORE, OP_IASTORE, OP_BASTORE, OP_CASTORE, OP_FASTORE, OP_LASTORE, OP_DASTORE, OP_SASTORE:
+		default:
+			return false
+		}
+		if len(cur.stackConsumed) < 3 {
+			return false
+		}
+		ref := cur.stackConsumed[2]
+		if ref == nil {
+			return false
+		}
+		if _, ok := UnpackSoltValue(ref).(*values.NewExpression); ok {
+			return true
+		}
+		if _, ok := GetRealValue(ref).(*values.NewExpression); ok {
+			return true
+		}
+		return false
+	}
 	// buildSharedLeafTernary rebuilds the value left on the operand stack at mergeNode as a nested
 	// ternary tree. It is the principled replacement for the legacy chain combiner on short-circuit
 	// shapes: each conditional arm is walked straight-line; an if-node whose BOTH branches converge on
@@ -2098,7 +2132,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 				case reachFalse, reachVisiting:
 					return false
 				}
-				if isTernaryArmStore(cur.Instr.OpCode) {
+				if isTernaryArmStore(cur.Instr.OpCode) && !isInlineArrayInitStore(cur) {
 					reachMemo[cur] = reachFalse
 					return false
 				}
@@ -2276,7 +2310,7 @@ func (d *Decompiler) CalcOpcodeStackInfo() error {
 					cur = firstReconverge(cur)
 					continue
 				}
-				if isTernaryArmStore(cur.Instr.OpCode) {
+				if isTernaryArmStore(cur.Instr.OpCode) && !isInlineArrayInitStore(cur) {
 					failed = true
 					return nil
 				}
@@ -2910,6 +2944,7 @@ func (d *Decompiler) ParseStatement() error {
 				classInfo := d.GetMethodFromPool(int(Convert2bytesToInt(opcode.Data)))
 				methodName := classInfo.Member
 				funcCallValue := values.NewFunctionCallExpression(nil, classInfo, classInfo.JavaType.FunctionType()) // 不push到栈中
+				funcCallValue.IsSpecialInvoke = true
 				n := 0
 				for i := 0; i < len(funcCallValue.FuncType.ParamTypes); i++ {
 					funcCallValue.Arguments = append(funcCallValue.Arguments, opcode.stackConsumed[n])
@@ -3276,6 +3311,24 @@ func (d *Decompiler) ParseStatement() error {
 			}
 			idToNode[id].Source = append(idToNode[id].Source, node)
 		}
+		// Pin the condition's true-branch by node identity at build time. A two-way conditional jump
+		// builds node.Next as [falseBranch, trueBranch] (opcode.Target order: the FALSE/jump-or-fall
+		// edge first per the javac branch sense already baked into the condition), so Next[1] is the
+		// true branch here. Later passes rebuild/reorder the node graph; when they swap node.Next the
+		// position-based trueIndex in RemoveGotoStatement would silently pick the wrong branch (the
+		// Md5Crypt "salt ignored" / inverted ifnonnull family). Recording JmpNode lets RemoveGoto
+		// recover the true branch by identity. This is a strict no-op when the order is preserved
+		// (Next[0] != JmpNode keeps trueIndex=1) and degrades to the legacy fallback if the captured
+		// node is later replaced rather than merely reordered, so it cannot regress working cases.
+		switch opcode.Instr.OpCode {
+		case OP_IFEQ, OP_IFNE, OP_IFLE, OP_IFLT, OP_IFGT, OP_IFGE,
+			OP_IF_ACMPEQ, OP_IF_ACMPNE, OP_IF_ICMPLT, OP_IF_ICMPGE,
+			OP_IF_ICMPGT, OP_IF_ICMPNE, OP_IF_ICMPEQ, OP_IF_ICMPLE,
+			OP_IFNONNULL, OP_IFNULL:
+			if os.Getenv("JDEC_IFBRANCH_PIN_OFF") == "" && node.JmpNode == nil && len(node.Next) >= 2 {
+				node.JmpNode = node.Next[1]
+			}
+		}
 	}
 
 	for conditionId, toNodeId := range conditionOpToAssignNode {
@@ -3585,10 +3638,31 @@ func (d *Decompiler) ParseStatement() error {
 			}
 			if !rewriteIsOk && node != nil && attr[2] == 1 {
 				source := slices.Clone(node.Source)
-				node.RemoveAllSource()
 				next := slices.Clone(node.Next)
+				// Bug M family (early-return-guard branch swap): splicing `node` out by removing it
+				// from each source and re-APPENDING node's successors reverses a ConditionStatement
+				// source's [falseBranch, trueBranch] Next order. if-opcodes leave JmpNode nil, so
+				// TrueNode/FalseNode are purely index-based, and the reversal silently swaps the
+				// then/else bodies -- e.g. `if (s.length()==0) return s; <loop>` decompiled with the
+				// loop body and the early-return exchanged (commons-codec Soundex: a no-op encoder
+				// that returns its input, plus a StackOverflow/IOOBE on empty input). For the
+				// early-return-guard shape, replace the edge IN PLACE before the generic splice so the
+				// guard keeps its branch polarity (same remedy as the single-use-fold path above).
+				orderPreserved := map[*Node]bool{}
+				if len(next) == 1 {
+					for _, src := range source {
+						if src != nil && isEarlyReturnGuardFold(src, node, next[0]) {
+							src.ReplaceNextSliceKeepOrder(node, next)
+							orderPreserved[src] = true
+						}
+					}
+				}
+				node.RemoveAllSource()
 				node.RemoveAllNext()
 				for _, source := range source {
+					if orderPreserved[source] {
+						continue
+					}
 					for _, n := range next {
 						source.AddNext(n)
 					}

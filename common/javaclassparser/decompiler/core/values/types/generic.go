@@ -492,8 +492,27 @@ func FreeTypeVarRefsInClassSig(sig string) []string {
 // signature, e.g. "<E:Ljava/lang/Object;>(LList<TE;>;)TE;" returns "<E>".
 // Returns "" if the method has no type parameters or parsing fails.
 func ParseMethodSignatureTypeParams(sig string) string {
+	return parseFormalTypeParams(sig, &class_context.ClassContext{})
+}
+
+// ParseMethodSignatureTypeParamsCtx is ParseMethodSignatureTypeParams but renders bound types with
+// the given render context so that bound classes in other packages register an import and resolve at
+// recompile time (the empty-context form only ever produces the bare name).
+func ParseMethodSignatureTypeParamsCtx(sig string, funcCtx *class_context.ClassContext) string {
+	return parseFormalTypeParams(sig, funcCtx)
+}
+
+// parseFormalTypeParams renders a leading formal type-parameter section ("<T:...>") to Java source
+// ("<T>", "<T extends Comparable<T>>", "<K, V>"). A sole `extends Object`/`extends java.lang.Object`
+// bound is dropped because it is always redundant (every type variable implicitly extends Object) and
+// the bare `<T>` form matches what javac and mature decompilers emit. Returns "" when there is no
+// leading section or parsing fails.
+func parseFormalTypeParams(sig string, funcCtx *class_context.ClassContext) string {
 	if len(sig) == 0 || sig[0] != '<' {
 		return ""
+	}
+	if funcCtx == nil {
+		funcCtx = &class_context.ClassContext{}
 	}
 	rest := sig[1:]
 	var params []string
@@ -515,7 +534,12 @@ func ParseMethodSignatureTypeParams(sig string) string {
 				return ""
 			}
 			rest = remaining
-			bounds = append(bounds, boundType.String(&class_context.ClassContext{}))
+			rendered := boundType.String(funcCtx)
+			if rendered == "Object" || rendered == "java.lang.Object" {
+				// A `<T extends Object>` bound is always redundant; drop it for the canonical `<T>`.
+				continue
+			}
+			bounds = append(bounds, rendered)
 		}
 		if len(bounds) > 0 {
 			params = append(params, fmt.Sprintf("%s extends %s", typeParamName, strings.Join(bounds, " & ")))
@@ -527,4 +551,37 @@ func ParseMethodSignatureTypeParams(sig string) string {
 		return ""
 	}
 	return "<" + strings.Join(params, ", ") + ">"
+}
+
+// ParseMethodSignatureFull parses a method Signature attribute that MAY begin with a formal
+// type-parameter section ("<T:...>"), which ParseMethodSignature rejects outright. It returns the
+// rendered type-parameter string (e.g. "<T>", "<K, V>"; "" when there are none), the parameter types
+// and the return type - the latter two with type variables preserved (TT; -> JavaClass{Name:"T"}).
+// Returns ("", nil, nil) on any parse failure. For a signature WITHOUT a leading "<...>" section it is
+// exactly ParseMethodSignature, so non-generic methods are unaffected. Bound types in the type-param
+// string are rendered with funcCtx so other-package bounds register an import.
+func ParseMethodSignatureFull(sig string, funcCtx *class_context.ClassContext) (string, []JavaType, JavaType) {
+	typeParams := ""
+	rest := sig
+	if len(rest) > 0 && rest[0] == '<' {
+		typeParams = parseFormalTypeParams(rest, funcCtx)
+		r, ok := skipAngleSection(rest)
+		if !ok {
+			return "", nil, nil
+		}
+		rest = r
+	}
+	params, ret := ParseMethodSignature(rest)
+	if ret == nil {
+		return "", nil, nil
+	}
+	return typeParams, params, ret
+}
+
+// MethodFormalTypeParamNames returns the bare names declared in a method signature's leading formal
+// type-parameter section, e.g. "<T:Ljava/lang/Object;>(TT;)TT;" -> ["T"]. Returns nil when there is
+// no leading "<...>" section. The grammar of a method's formal type-parameter section is identical to
+// a class's, so this delegates to ClassFormalTypeParamNames.
+func MethodFormalTypeParamNames(sig string) []string {
+	return ClassFormalTypeParamNames(sig)
 }

@@ -87,20 +87,32 @@ func (f *ClassContext) GetAllImported() []string {
 			return true
 		}
 		for _, className := range classes {
-			// A nested type may have been registered under its binary name (Outer$Inner). An import
-			// statement cannot carry '$', so import the OUTER class for named nested types and drop
-			// anonymous/local ones entirely (they are never importable). The reference site already
-			// renders the dotted Outer.Inner source form via ShortTypeName.
+			// A nested type may have been registered under its binary name (Outer$Inner). How to import
+			// it depends on how its REFERENCE site is spelled (see ShortTypeName):
+			//   - EXTERNAL stdlib nested type (java.*/javax.*/...): the reference uses the dotted source
+			//     spelling (Map.Entry), so import the OUTER class (java.util.Map).
+			//   - SAME-JAR Yak-emitted nested type: it is a STANDALONE flat top-level unit literally named
+			//     `Outer$Inner` and the reference uses that exact flat name, so the import MUST carry the
+			//     flat `$` name too (`import pkg.Outer$Inner;` is legal Java - '$' is an identifier char).
+			//     Importing only the OUTER class (legacy behaviour, on the false premise that imports cannot
+			//     contain '$') left `Outer$Inner.X` unresolved at every cross-package use site -> javac read
+			//     it as `package Outer$Inner` (the single biggest fastjson2 cross-package recompile blocker:
+			//     JSONReader$Feature / JSONWriter$Feature). Kill-switch: JDEC_NESTED_FLAT_IMPORT_OFF=1.
+			// Anonymous/local segments ($1) are never importable, so drop them in either branch.
 			if strings.Contains(className, "$") {
-				if src, ok := binaryNestedNameToSource(className); ok {
+				if _, ok := binaryNestedNameToSource(className); !ok {
+					continue
+				}
+				stdlibOrLegacy := isStdlibNestedDottedPackage(pkg) || os.Getenv("JDEC_NESTED_FLAT_IMPORT_OFF") != ""
+				if stdlibOrLegacy {
+					src, _ := binaryNestedNameToSource(className)
 					outer := src
 					if i := strings.IndexByte(src, '.'); i >= 0 {
 						outer = src[:i]
 					}
 					className = outer
-				} else {
-					continue
 				}
+				// else: keep the flat `Outer$Inner` name so the import matches the flat reference.
 			}
 			imp := pkg + "." + className
 			if _, dup := seen[imp]; dup {

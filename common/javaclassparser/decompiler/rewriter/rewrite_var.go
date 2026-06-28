@@ -686,6 +686,11 @@ func hoistSwitchDeclarations(sts *[]statements.Statement) {
 			hoistSwitchDeclarations(&s.Body)
 		case *statements.SynchronizedStatement:
 			hoistSwitchDeclarations(&s.Body)
+			// Statements after the synchronized block in THIS block are where an out-of-scope read
+			// would occur; pass them so only locals actually read after the block are hoisted.
+			for _, decl := range syncHoistDeclarations(s, list[i+1:]) {
+				out = append(out, decl)
+			}
 		case *statements.TryCatchStatement:
 			hoistSwitchDeclarations(&s.TryBody)
 			for i := range s.CatchBodies {
@@ -792,6 +797,109 @@ func switchHoistDeclarations(sw *statements.SwitchStatement, afterSts []statemen
 		if !assignsReadAfterByIdentity(afterSts, assignsByUid[uid]) {
 			continue
 		}
+		if name == "" {
+			continue
+		}
+		targetJavaRef, ok := core.UnpackSoltValue(targetRef).(*values.JavaRef)
+		if !ok || targetJavaRef == nil || targetJavaRef.Id == nil {
+			continue
+		}
+		targetID := targetJavaRef.Id
+		for _, as := range assignsByUid[uid] {
+			if ref, ok := core.UnpackSoltValue(as.LeftValue).(*values.JavaRef); ok && ref != nil && ref.Id != targetID {
+				ref.Id = targetID
+			}
+			as.IsFirst = false
+			as.IsDeclare = false
+		}
+		declares = append(declares, statements.NewDeclareStatement(targetRef))
+		redirectPostBlockReassignments(afterSts, uid, targetID)
+	}
+	return declares
+}
+
+// syncHoistDeclarations lifts the declaration of any local that is DECLARED inside a synchronized
+// block yet READ after the block to the enclosing block. javac compiles
+// `synchronized (lock) { ...; return v; }` as `monitorenter; ...; load v; monitorexit; areturn` -
+// the value is computed inside the protected region, but the load/use sits between monitorexit and
+// areturn, so the structurer correctly emits the trailing use as a sibling statement AFTER the
+// synchronized block (SynchronizeRewriter splits the try body at monitor_exit: everything before is
+// the block body, everything after - the `return v` - follows the block). The local, however, was
+// declared inside the block and is now out of scope at that trailing use ("cannot find symbol").
+// This is the single root cause behind guava `base`'s entire cannot-find-symbol recompile cascade
+// (Enums.getEnumConstants and the ~66 units that transitively depend on it). A local declared inside
+// the block and read after it is by construction one logical variable spanning both, so its `T x;`
+// declaration belongs ahead of the block: the in-block declaration is demoted to a plain assignment
+// and a single bare declaration is inserted before the synchronized statement. Unlike the if/switch
+// hoisters this needs no >=2-assignment guard - a synchronized body is a single linear scope, so even
+// one declaration read afterwards must be hoisted. Widening scope is always valid Java. Kill-switch:
+// JDEC_SYNC_HOIST_OFF=1.
+func syncHoistDeclarations(sync *statements.SynchronizedStatement, afterSts []statements.Statement) []statements.Statement {
+	if os.Getenv("JDEC_SYNC_HOIST_OFF") != "" {
+		return nil
+	}
+	declaredInside := map[string]bool{}
+	assignsByUid := map[string][]*statements.AssignStatement{}
+	refByUid := map[string]values.JavaValue{}
+	var collect func([]statements.Statement)
+	collect = func(sts []statements.Statement) {
+		for _, st := range sts {
+			switch s := st.(type) {
+			case *statements.AssignStatement:
+				if s.ArrayMember != nil {
+					continue
+				}
+				ref, ok := core.UnpackSoltValue(s.LeftValue).(*values.JavaRef)
+				if !ok || ref == nil || ref.Id == nil {
+					continue
+				}
+				assignsByUid[ref.VarUid] = append(assignsByUid[ref.VarUid], s)
+				refByUid[ref.VarUid] = s.LeftValue
+				if s.IsFirst || s.IsDeclare {
+					declaredInside[ref.VarUid] = true
+				}
+			case *statements.IfStatement:
+				collect(s.IfBody)
+				collect(s.ElseBody)
+			case *statements.ForStatement:
+				collect(s.SubStatements)
+			case *statements.WhileStatement:
+				collect(s.Body)
+			case *statements.DoWhileStatement:
+				collect(s.Body)
+			case *statements.SynchronizedStatement:
+				collect(s.Body)
+			case *statements.TryCatchStatement:
+				collect(s.TryBody)
+				for i := range s.CatchBodies {
+					collect(s.CatchBodies[i])
+				}
+			case *statements.SwitchStatement:
+				for _, c := range s.Cases {
+					collect(c.Body)
+				}
+			}
+		}
+	}
+	collect(sync.Body)
+
+	uids := make([]string, 0, len(assignsByUid))
+	for uid := range assignsByUid {
+		uids = append(uids, uid)
+	}
+	sort.SliceStable(uids, func(i, j int) bool {
+		return varUidLess(uids[i], uids[j])
+	})
+	var declares []statements.Statement
+	for _, uid := range uids {
+		if !declaredInside[uid] {
+			continue
+		}
+		if !assignsReadAfterByIdentity(afterSts, assignsByUid[uid]) {
+			continue
+		}
+		targetRef := refByUid[uid]
+		name := targetRef.String(hoistProbeCtx)
 		if name == "" {
 			continue
 		}

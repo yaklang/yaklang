@@ -331,6 +331,12 @@ type FunctionCallExpression struct {
 	ClassName    string
 	Arguments    []JavaValue
 	FuncType     *types.JavaFuncType
+	// IsSpecialInvoke marks a call decoded from invokespecial. For a non-constructor invokespecial
+	// whose receiver is `this` and whose target class is NOT the current class, this is a `super.m()`
+	// call (the only other invokespecial forms are constructors and private same-class calls). It must
+	// render as `super.m()`, never `this.m()` -- the latter re-dispatches virtually to the overriding
+	// method and recurses infinitely (e.g. guava CaseFormat constant-body `convert` -> StackOverflow).
+	IsSpecialInvoke bool
 }
 
 // ReplaceVar implements JavaValue.
@@ -345,6 +351,12 @@ func (f *FunctionCallExpression) ReplaceVar(oldId *utils.VariableId, newId *util
 
 func (f *FunctionCallExpression) Type() types.JavaType {
 	return f.FuncType.ReturnType
+}
+
+// isCurrentClass reports whether the call's target class is the class currently being rendered.
+// Used to tell a private same-class invokespecial (`this.m()`) from a super call (`super.m()`).
+func (f *FunctionCallExpression) isCurrentClass(funcCtx *class_context.ClassContext) bool {
+	return funcCtx != nil && f.ClassName == funcCtx.ClassName
 }
 
 func (f *FunctionCallExpression) IsSupperConstructorInvoke(funcCtx *class_context.ClassContext) bool {
@@ -435,6 +447,16 @@ func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) str
 		}
 	}
 	functionName := class_context.SafeIdentifier(f.FunctionName)
+
+	// A non-constructor invokespecial whose receiver is `this` and whose target is a DIFFERENT class
+	// (the superclass / an ancestor, never the current class which would be a private same-class call)
+	// is a `super.method(...)` call. Rendering it as `this.method(...)` re-dispatches virtually to the
+	// overriding method and recurses forever (guava CaseFormat constant bodies' `super.convert(...)`).
+	if f.IsSpecialInvoke && f.FunctionName != "<init>" && f.ClassName != "" && !f.isCurrentClass(funcCtx) {
+		if ref, ok := UnpackSoltValue(f.Object).(*JavaRef); ok && ref != nil && ref.IsThis {
+			return fmt.Sprintf("super.%s(%s)", functionName, strings.Join(paramStrs, ","))
+		}
+	}
 
 	if v, ok := f.Object.(*JavaClassValue); ok {
 		if classType, ok2 := v.Type().RawType().(*types.JavaClass); ok2 && classType.Name == funcCtx.ClassName && f.IsStatic {

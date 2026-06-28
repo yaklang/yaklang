@@ -1,6 +1,8 @@
 package tests
 
 import (
+	"archive/zip"
+	"bytes"
 	"embed"
 	"os"
 	"os/exec"
@@ -10,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/javaclassparser"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
 // codecBatteryFS holds every self-contained algorithm battery used by the differential-execution
@@ -250,6 +253,387 @@ func TestClinitHoistBarrierIsLoadBearing(t *testing.T) {
 		t.Fatalf("expected %s to round-trip cleanly with the clinit hoist barrier enabled; got: %s", className, got)
 	}
 	t.Logf("barrier ON (round-trip preserved) for %s: %s", className, got)
+}
+
+// TestEmbeddedAssignRefIsLoadBearing proves the embedded-assignment reference-type recovery is load
+// bearing. A reference local that only receives its value through an embedded assignment in a
+// condition ((s = next(...)) != null / (s = arr[i]) != null) has no standalone declaration after
+// the dup-collapse, so the string-level safety net must synthesize one. With the fix DISABLED
+// (JDEC_NO_EMBED_ASSIGN_REF=1) it defaults to `Object s = null`, and every reference member access
+// (s.length()/s.charAt()/s.isEmpty()) fails to recompile ("cannot find symbol"), so the round-trip
+// must fail; with the fix enabled the type is recovered (array element type / in-class method return
+// type) and the round-trip is byte-for-byte clean.
+func TestEmbeddedAssignRefIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	java, err2 := exec.LookPath("java")
+	if err1 != nil || err2 != nil {
+		t.Skip("javac/java not available; skipping embedded-assign ref type test")
+	}
+
+	const className = "EmbeddedAssignRef"
+	src, err := codecBatteryFS.ReadFile("testdata/codec/" + className + ".java")
+	if err != nil {
+		t.Fatalf("read battery %s: %v", className, err)
+	}
+
+	origDir := t.TempDir()
+	golden, ok := compileAndRunJavaBattery(t, javac, java, origDir, className, string(src))
+	if !ok {
+		t.Fatalf("failed to compile/run original battery %s:\n%s", className, golden)
+	}
+	raw, err := os.ReadFile(filepath.Join(origDir, "codec", className+".class"))
+	if err != nil {
+		t.Fatalf("read compiled class %s: %v", className, err)
+	}
+
+	roundTrips := func() (string, bool) {
+		decompiled, err := javaclassparser.Decompile(raw)
+		if err != nil {
+			return "decompile error: " + err.Error(), false
+		}
+		got, ok := compileAndRunJavaBattery(t, javac, java, t.TempDir(), className, decompiled)
+		return got, ok && got == golden
+	}
+
+	os.Setenv("JDEC_NO_EMBED_ASSIGN_REF", "1")
+	got, okOff := roundTrips()
+	os.Unsetenv("JDEC_NO_EMBED_ASSIGN_REF")
+	if okOff {
+		t.Fatalf("expected %s to FAIL the round-trip with embedded-assign ref recovery disabled, but it succeeded; the fix is not load-bearing", className)
+	}
+	t.Logf("ref recovery OFF (expected failure) for %s: %s", className, got)
+
+	got, okOn := roundTrips()
+	if !okOn {
+		t.Fatalf("expected %s to round-trip cleanly with embedded-assign ref recovery enabled; got: %s", className, got)
+	}
+	t.Logf("ref recovery ON (round-trip preserved) for %s: %s", className, got)
+}
+
+// enumConstantBodyFoldSource is an enum with constant-specific bodies (Bug V). javac compiles it into
+// codec.EnumConstantBody plus a synthetic subclass per body (EnumConstantBody$1 / $2, each ACC_ENUM
+// and `extends EnumConstantBody`). Decompiled per class the output is uncompilable: the outer enum's
+// constants do not override the abstract apply(), and each $N renders `class $N extends <enum>` (an
+// enum is not extensible). The fold (DumpWithResolver) inlines each $N's body back into its constant.
+const enumConstantBodyFoldSource = `package codec;
+
+public enum EnumConstantBody {
+    ADD("plus") {
+        public long apply(long a, long b) {
+            return a + b;
+        }
+    },
+    MUL("times") {
+        public long apply(long a, long b) {
+            return a * b;
+        }
+    },
+    MAXX("max") {
+        public long apply(long a, long b) {
+            return a > b ? a : b;
+        }
+    };
+
+    private final String label;
+
+    EnumConstantBody(String label) {
+        this.label = label;
+    }
+
+    public abstract long apply(long a, long b);
+
+    public String label() {
+        return this.label;
+    }
+
+    public static void main(String[] args) {
+        StringBuilder sb = new StringBuilder("EnumConstantBody:");
+        for (EnumConstantBody op : EnumConstantBody.values()) {
+            sb.append(op.name()).append("=").append(op.label()).append(":");
+            sb.append(op.apply(6, 7)).append(";");
+        }
+        System.out.println(sb.toString());
+    }
+}
+`
+
+// TestEnumConstantBodyFoldIsLoadBearing proves the enum constant-body cross-class folding (Bug V) is
+// load bearing. With the fold DISABLED (JDEC_NO_ENUM_FOLD=1) the decompiled outer enum has constants
+// with no body and an unimplemented abstract method, so it fails to recompile; with the fold enabled
+// (the synthetic EnumConstantBody$N bodies inlined via the sibling resolver) the round-trip recompiles
+// to the same multi-class layout and runs to a byte-identical fingerprint.
+func TestEnumConstantBodyFoldIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	java, err2 := exec.LookPath("java")
+	if err1 != nil || err2 != nil {
+		t.Skip("javac/java not available; skipping enum constant-body fold test")
+	}
+
+	const className = "EnumConstantBody"
+	origDir := t.TempDir()
+	golden, ok := compileAndRunJavaBattery(t, javac, java, origDir, className, enumConstantBodyFoldSource)
+	if !ok {
+		t.Fatalf("failed to compile/run original enum %s:\n%s", className, golden)
+	}
+	t.Logf("golden fingerprint [%s]: %s", className, golden)
+
+	// Build a sibling resolver over every compiled codec.* class, keyed by binary internal name
+	// (e.g. "codec/EnumConstantBody$1"), so the fold can pull each constant body's synthetic subclass.
+	pkgDir := filepath.Join(origDir, "codec")
+	classFiles, err := os.ReadDir(pkgDir)
+	if err != nil {
+		t.Fatalf("read compiled package dir: %v", err)
+	}
+	siblings := map[string][]byte{}
+	for _, f := range classFiles {
+		if f.IsDir() || !strings.HasSuffix(f.Name(), ".class") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(pkgDir, f.Name()))
+		if err != nil {
+			t.Fatalf("read sibling class %s: %v", f.Name(), err)
+		}
+		siblings["codec/"+strings.TrimSuffix(f.Name(), ".class")] = data
+	}
+	resolver := func(internalName string) ([]byte, bool) {
+		b, ok := siblings[internalName]
+		return b, ok
+	}
+
+	raw := siblings["codec/"+className]
+	if raw == nil {
+		t.Fatalf("compiled outer enum class %s not found", className)
+	}
+
+	roundTrips := func() (string, bool) {
+		decompiled, err := javaclassparser.DecompileWithResolver(raw, resolver)
+		if err != nil {
+			return "decompile error: " + err.Error(), false
+		}
+		got, ok := compileAndRunJavaBattery(t, javac, java, t.TempDir(), className, decompiled)
+		return got, ok && got == golden
+	}
+
+	os.Setenv("JDEC_NO_ENUM_FOLD", "1")
+	got, okOff := roundTrips()
+	os.Unsetenv("JDEC_NO_ENUM_FOLD")
+	if okOff {
+		t.Fatalf("expected %s to FAIL the round-trip with enum constant-body folding disabled, but it succeeded; the fold is not load-bearing", className)
+	}
+	t.Logf("enum fold OFF (expected failure) for %s: %s", className, got)
+
+	got, okOn := roundTrips()
+	if !okOn {
+		t.Fatalf("expected %s to round-trip cleanly with enum constant-body folding enabled; got: %s", className, got)
+	}
+	t.Logf("enum fold ON (round-trip preserved) for %s: %s", className, got)
+}
+
+// buildJarFromDir packs every file under root (recursively) into an in-memory jar (zip) keyed by the
+// path relative to root (slash form), and returns a JarFS over it. This mirrors the real jar
+// decompilation entry (JarFS.ReadFile) so the enum fold can be exercised through the production path
+// rather than the bare DecompileWithResolver API.
+func buildJarFromDir(t *testing.T, root string) *javaclassparser.JarFS {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	err := filepath.Walk(root, func(p string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(root, p)
+		if err != nil {
+			return err
+		}
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		w, err := zw.Create(filepath.ToSlash(rel))
+		if err != nil {
+			return err
+		}
+		_, err = w.Write(data)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("pack jar from %s: %v", root, err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("close jar writer: %v", err)
+	}
+	zipFS, err := filesys.NewZipFSRaw(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+	if err != nil {
+		t.Fatalf("open in-memory jar: %v", err)
+	}
+	return javaclassparser.NewJarFS(zipFS)
+}
+
+// TestEnumConstantBodyFoldJarPathIsLoadBearing proves the enum constant-body fold is wired into the
+// PRODUCTION jar path (JarFS.ReadFile), not just the bare DecompileWithResolver API. It packs the
+// compiled multi-class enum into an in-memory jar, then asserts: (1) reading the outer enum's .class
+// through JarFS yields a folded source that recompiles to the golden fingerprint; (2) reading each
+// synthetic EnumConstantBody$N.class yields a suppression marker (no illegal `extends <enum>`); and
+// (3) with JDEC_NO_ENUM_FOLD=1 the very same $N read instead yields the uncompilable
+// `class EnumConstantBody$N extends EnumConstantBody`, so the suppression is genuinely load-bearing.
+func TestEnumConstantBodyFoldJarPathIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	java, err2 := exec.LookPath("java")
+	if err1 != nil || err2 != nil {
+		t.Skip("javac/java not available; skipping enum fold jar-path test")
+	}
+
+	const className = "EnumConstantBody"
+	origDir := t.TempDir()
+	golden, ok := compileAndRunJavaBattery(t, javac, java, origDir, className, enumConstantBodyFoldSource)
+	if !ok {
+		t.Fatalf("failed to compile/run original enum %s:\n%s", className, golden)
+	}
+	t.Logf("golden fingerprint [%s]: %s", className, golden)
+
+	jarFS := buildJarFromDir(t, origDir)
+	outerEntry := "codec/" + className + ".class"
+	subEntry := "codec/" + className + "$1.class"
+
+	// (1) outer enum read through the jar path must carry the folded constant bodies and recompile.
+	outerSrc, err := jarFS.ReadFile(outerEntry)
+	if err != nil {
+		t.Fatalf("jar ReadFile(%s): %v", outerEntry, err)
+	}
+	if !strings.Contains(string(outerSrc), "apply") {
+		t.Fatalf("expected folded enum source to inline the constant `apply` bodies; got:\n%s", outerSrc)
+	}
+	got, ok := compileAndRunJavaBattery(t, javac, java, t.TempDir(), className, string(outerSrc))
+	if !ok || got != golden {
+		t.Fatalf("jar-path folded enum failed round-trip (ok=%v): got %q want %q\nsource:\n%s", ok, got, golden, outerSrc)
+	}
+	t.Logf("jar-path fold ON: outer enum round-trips to golden")
+
+	// (2) synthetic subclass read through the jar path must be suppressed (no illegal `extends`).
+	subSrc, err := jarFS.ReadFile(subEntry)
+	if err != nil {
+		t.Fatalf("jar ReadFile(%s): %v", subEntry, err)
+	}
+	if strings.Contains(string(subSrc), "extends "+className) {
+		t.Fatalf("expected synthetic %s$1 to be suppressed, but it rendered an illegal subclass:\n%s", className, subSrc)
+	}
+	if !strings.Contains(string(subSrc), "folded into enum") {
+		t.Fatalf("expected synthetic %s$1 to carry a suppression marker; got:\n%s", className, subSrc)
+	}
+	t.Logf("jar-path fold ON: synthetic %s$1 suppressed", className)
+
+	// (3) kill-switch: the SAME synthetic read must now emit the uncompilable illegal subclass, proving
+	// the suppression in (2) is load-bearing (a fresh JarFS avoids the decompile cache).
+	os.Setenv("JDEC_NO_ENUM_FOLD", "1")
+	defer os.Unsetenv("JDEC_NO_ENUM_FOLD")
+	jarFSOff := buildJarFromDir(t, origDir)
+	subSrcOff, err := jarFSOff.ReadFile(subEntry)
+	if err != nil {
+		t.Fatalf("jar ReadFile(%s) [fold off]: %v", subEntry, err)
+	}
+	if !strings.Contains(string(subSrcOff), "extends "+className) {
+		t.Fatalf("expected %s$1 to render the illegal `extends %s` with folding disabled; got:\n%s", className, className, subSrcOff)
+	}
+	t.Logf("jar-path fold OFF: synthetic %s$1 falls back to illegal subclass (suppression is load-bearing)", className)
+}
+
+// accEnumMarkerCtorSource is an enum with constant-specific bodies that ALSO call a private static
+// member. Compiled with --release 8 (pre-nestmates), javac emits both a synthetic accessor
+// (access$N -> secretBase) AND a synthetic "marker" constructor `AccEnum(String,int,AccEnum$1)` that
+// gives the constant-body subclasses an accessible super-ctor. The marker ctor must be suppressed on
+// decompile (it references the synthetic $N type and renders an illegal `this(...)` after locals);
+// the accessor, by contrast, is legitimately retained.
+const accEnumMarkerCtorSource = `package codec;
+
+public enum AccEnum {
+    ADD {
+        long apply(long a, long b) { return a + secretBase(a) + SCALE; }
+    },
+    MUL {
+        long apply(long a, long b) { return a * b * SCALE - secretBase(b); }
+    };
+
+    private static final long SCALE = 3;
+    private static long secretBase(long x) { return x + 10; }
+    abstract long apply(long a, long b);
+
+    public static void main(String[] args) {
+        StringBuilder sb = new StringBuilder("AccEnum:");
+        for (AccEnum e : values()) sb.append(e.name()).append("=").append(e.apply(6, 7)).append(";");
+        System.out.println(sb.toString());
+    }
+}
+`
+
+// compileRelease8AndRun writes src as <dir>/<className>.java, compiles it with `javac --release 8`
+// (so the pre-nestmates synthetic accessor + marker-ctor shapes are emitted) into dir, then runs
+// codec.<className>. Returns (output, ok). ok=false on either javac or java failure.
+func compileRelease8AndRun(t *testing.T, javac, java, dir, className, src string) (string, bool) {
+	t.Helper()
+	srcPath := filepath.Join(dir, className+".java")
+	if err := os.WriteFile(srcPath, []byte(src), 0644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	out, err := exec.Command(javac, "--release", "8", "-J-Duser.language=en", "-encoding", "UTF-8", "-nowarn", "-d", dir, srcPath).CombinedOutput()
+	if err != nil {
+		t.Logf("javac --release 8 failed in %s: %v\n%s", dir, err, string(out))
+		return string(out), false
+	}
+	out2, err := exec.Command(java, "-cp", dir, "codec."+className).CombinedOutput()
+	if err != nil {
+		t.Logf("java run failed in %s: %v\n%s", dir, err, string(out2))
+		return string(out2), false
+	}
+	return strings.TrimSpace(string(out2)), true
+}
+
+// TestEnumMarkerCtorSuppressionIsLoadBearing proves the synthetic enum marker-constructor suppression
+// is load-bearing. An enum with constant bodies compiled under --release 8 carries a synthetic
+// `AccEnum(String,int,AccEnum$1)` ctor; decompiled through the jar (fold) path it must be suppressed so
+// the enum recompiles. With suppression DISABLED (JDEC_NO_ENUM_MARKER_CTOR=1) the same fold instead
+// emits the garbage ctor (`this(var1,var2)` after local decls, referencing the folded-away $1) and the
+// round-trip must fail; with suppression enabled the round-trip recompiles to the golden fingerprint.
+func TestEnumMarkerCtorSuppressionIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	java, err2 := exec.LookPath("java")
+	if err1 != nil || err2 != nil {
+		t.Skip("javac/java not available; skipping enum marker-ctor suppression test")
+	}
+
+	const className = "AccEnum"
+	origDir := t.TempDir()
+	golden, ok := compileRelease8AndRun(t, javac, java, origDir, className, accEnumMarkerCtorSource)
+	if !ok {
+		t.Skipf("could not compile/run --release 8 original (toolchain may lack release 8); got:\n%s", golden)
+	}
+	t.Logf("golden fingerprint [%s]: %s", className, golden)
+
+	roundTrips := func() (string, bool) {
+		jarFS := buildJarFromDir(t, origDir)
+		src, err := jarFS.ReadFile("codec/" + className + ".class")
+		if err != nil {
+			return "jar ReadFile error: " + err.Error(), false
+		}
+		got, ok := compileRelease8AndRun(t, javac, java, t.TempDir(), className, string(src))
+		return got, ok && got == golden
+	}
+
+	os.Setenv("JDEC_NO_ENUM_MARKER_CTOR", "1")
+	got, okOff := roundTrips()
+	os.Unsetenv("JDEC_NO_ENUM_MARKER_CTOR")
+	if okOff {
+		t.Fatalf("expected %s to FAIL the round-trip with marker-ctor suppression disabled, but it succeeded; the suppression is not load-bearing", className)
+	}
+	t.Logf("marker-ctor suppression OFF (expected failure) for %s: %s", className, got)
+
+	got, okOn := roundTrips()
+	if !okOn {
+		t.Fatalf("expected %s to round-trip cleanly with marker-ctor suppression enabled; got: %s", className, got)
+	}
+	t.Logf("marker-ctor suppression ON (round-trip preserved) for %s: %s", className, got)
 }
 
 // TestClassLiteralSlotTypeIsLoadBearing proves the class-literal slot-typing fix is load-bearing. A
@@ -982,4 +1366,178 @@ func TestTypeVarReturnCastIsLoadBearing(t *testing.T) {
 		t.Fatalf("expected the enabled rendering to emit an explicit `(T)` return cast; got:\n%s", srcOn)
 	}
 	t.Logf("type-var return cast ON (round-trip preserved) for %s: %s", className, got)
+}
+
+// TestNarrowParamFieldIsLoadBearing proves Bug AH's fix (re-declaring a narrow int-category parameter
+// with its authoritative descriptor type) is load-bearing: with the kill-switch the constructor's
+// char/byte/short parameters render as `int`, and storing them into their same-typed fields fails to
+// recompile; with the fix the parameters keep their descriptor types and the battery round-trips with a
+// matching fingerprint.
+func TestNarrowParamFieldIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	java, err2 := exec.LookPath("java")
+	if err1 != nil || err2 != nil {
+		t.Skip("javac/java not available; skipping narrow-param-field test")
+	}
+
+	const className = "NarrowParamField"
+	src, err := codecBatteryFS.ReadFile("testdata/codec/" + className + ".java")
+	if err != nil {
+		t.Fatalf("read battery %s: %v", className, err)
+	}
+
+	origDir := t.TempDir()
+	golden, ok := compileAndRunJavaBattery(t, javac, java, origDir, className, string(src))
+	if !ok {
+		t.Fatalf("failed to compile/run original battery %s:\n%s", className, golden)
+	}
+	raw, err := os.ReadFile(filepath.Join(origDir, "codec", className+".class"))
+	if err != nil {
+		t.Fatalf("read compiled class %s: %v", className, err)
+	}
+
+	roundTrips := func() (string, string, bool) {
+		decompiled, err := javaclassparser.Decompile(raw)
+		if err != nil {
+			return "", "decompile error: " + err.Error(), false
+		}
+		got, ok := compileAndRunJavaBattery(t, javac, java, t.TempDir(), className, decompiled)
+		return decompiled, got, ok && got == golden
+	}
+
+	os.Setenv("JDEC_PARAM_DESC_NARROW_OFF", "1")
+	srcOff, gotOff, okOff := roundTrips()
+	os.Unsetenv("JDEC_PARAM_DESC_NARROW_OFF")
+	if okOff {
+		t.Fatalf("expected %s to FAIL the round-trip with the narrow-param descriptor fix disabled, but it succeeded; the fix is not load-bearing.\n----- src -----\n%s", className, srcOff)
+	}
+	t.Logf("narrow-param descriptor fix OFF (expected failure) for %s: %s", className, gotOff)
+
+	srcOn, gotOn, okOn := roundTrips()
+	if !okOn {
+		t.Fatalf("expected %s to round-trip cleanly with the narrow-param descriptor fix enabled; got: %s\n----- src -----\n%s", className, gotOn, srcOn)
+	}
+	// The fix must actually change the constructor parameter rendering (int -> char/byte/short);
+	// identical output would mean the switch is inert and the proof above is hollow.
+	if srcOn == srcOff {
+		t.Fatalf("expected enabled vs disabled rendering of %s to differ in parameter types; they are identical:\n%s", className, srcOn)
+	}
+	t.Logf("narrow-param descriptor fix ON (round-trip preserved) for %s: %s", className, gotOn)
+}
+
+// TestShortCircuitArrayArgIsLoadBearing proves the inline-array-init step-over in the shared-leaf
+// ternary builder (Bug AK) is load-bearing. A method returning `(a && b) || call(..., new T[]{...})`
+// (commons-codec DoubleMetaphone.conditionC0's shape) builds its varargs argument with the javac
+// `anewarray; dup; idx; ldc; aastore` idiom. The element store made buildSharedLeafTernary decline
+// (it conflated the inline array build with statement dispatch), dropping into the legacy combiner
+// which mis-wired the leading condition and emitted a missing-return method. With the step-over
+// DISABLED (JDEC_ARRAYINIT_TERNARY_OFF=1) the decompiled source must fail to round-trip (missing
+// return / inverted boolean); with it enabled the boolean materializes correctly and the round-trip
+// is byte-for-byte clean.
+func TestShortCircuitArrayArgIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	java, err2 := exec.LookPath("java")
+	if err1 != nil || err2 != nil {
+		t.Skip("javac/java not available; skipping short-circuit array-arg test")
+	}
+
+	const className = "ShortCircuitArrayArg"
+	src, err := codecBatteryFS.ReadFile("testdata/codec/" + className + ".java")
+	if err != nil {
+		t.Fatalf("read battery %s: %v", className, err)
+	}
+
+	origDir := t.TempDir()
+	golden, ok := compileAndRunJavaBattery(t, javac, java, origDir, className, string(src))
+	if !ok {
+		t.Fatalf("failed to compile/run original battery %s:\n%s", className, golden)
+	}
+	raw, err := os.ReadFile(filepath.Join(origDir, "codec", className+".class"))
+	if err != nil {
+		t.Fatalf("read compiled class %s: %v", className, err)
+	}
+
+	roundTrips := func() (string, string, bool) {
+		decompiled, err := javaclassparser.Decompile(raw)
+		if err != nil {
+			return "", "decompile error: " + err.Error(), false
+		}
+		got, ok := compileAndRunJavaBattery(t, javac, java, t.TempDir(), className, decompiled)
+		return decompiled, got, ok && got == golden
+	}
+
+	os.Setenv("JDEC_ARRAYINIT_TERNARY_OFF", "1")
+	srcOff, got, okOff := roundTrips()
+	os.Unsetenv("JDEC_ARRAYINIT_TERNARY_OFF")
+	if okOff {
+		t.Fatalf("expected %s to FAIL the round-trip with the inline-array-init ternary step-over disabled, but it succeeded; the fix is not load-bearing.\n----- src -----\n%s", className, srcOff)
+	}
+	t.Logf("array-init ternary step-over OFF (expected failure) for %s: %s", className, got)
+
+	srcOn, got, okOn := roundTrips()
+	if !okOn {
+		t.Fatalf("expected %s to round-trip cleanly with the inline-array-init ternary step-over enabled; got: %s\n----- src -----\n%s", className, got, srcOn)
+	}
+	// The fix must produce a real short-circuit return, not the broken if-guard the legacy path emits.
+	if !strings.Contains(srcOn, "||") {
+		t.Fatalf("expected the enabled rendering to materialize a `||` short-circuit return; got:\n%s", srcOn)
+	}
+	t.Logf("array-init ternary step-over ON (round-trip preserved) for %s: %s", className, got)
+}
+
+// TestShortCircuitArrayLeafIsLoadBearing proves the merge-time true/false re-pin (Bug AL) is
+// load-bearing. An if/else chain whose arms RETURN inline `new char[]{...}` arrays, guarded by
+// `A && (B || C)` (and its De Morgan `A && !(B && C)`) shape, is the commons-codec Nysiis
+// transcodeRemaining body. The multi-opcode array-construction leaf made an upstream fold reorder the
+// if-node's Next to [true,false], so JmpNode pinning captured trueIndex=0; mergeCondition then rebuilt
+// Next as [false,true] WITHOUT refreshing the stale TrueNode/FalseNode closures, silently inverting
+// the merged condition (dropping the `!`) and swapping the then/else arms. The source still compiled,
+// so only behavioral differential testing catches it. With the re-pin DISABLED
+// (JDEC_MERGEIF_PIN_OFF=1) the decompiled source must diverge from the golden fingerprint; with it
+// enabled the round-trip is byte-for-byte clean.
+func TestShortCircuitArrayLeafIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	java, err2 := exec.LookPath("java")
+	if err1 != nil || err2 != nil {
+		t.Skip("javac/java not available; skipping short-circuit array-leaf test")
+	}
+
+	const className = "ShortCircuitArrayLeaf"
+	src, err := codecBatteryFS.ReadFile("testdata/codec/" + className + ".java")
+	if err != nil {
+		t.Fatalf("read battery %s: %v", className, err)
+	}
+
+	origDir := t.TempDir()
+	golden, ok := compileAndRunJavaBattery(t, javac, java, origDir, className, string(src))
+	if !ok {
+		t.Fatalf("failed to compile/run original battery %s:\n%s", className, golden)
+	}
+	raw, err := os.ReadFile(filepath.Join(origDir, "codec", className+".class"))
+	if err != nil {
+		t.Fatalf("read compiled class %s: %v", className, err)
+	}
+
+	roundTrips := func() (string, string, bool) {
+		decompiled, err := javaclassparser.Decompile(raw)
+		if err != nil {
+			return "", "decompile error: " + err.Error(), false
+		}
+		got, ok := compileAndRunJavaBattery(t, javac, java, t.TempDir(), className, decompiled)
+		return decompiled, got, ok && got == golden
+	}
+
+	os.Setenv("JDEC_MERGEIF_PIN_OFF", "1")
+	srcOff, got, okOff := roundTrips()
+	os.Unsetenv("JDEC_MERGEIF_PIN_OFF")
+	if okOff {
+		t.Fatalf("expected %s to FAIL the round-trip with the merge-time true/false re-pin disabled, but it succeeded; the fix is not load-bearing.\n----- src -----\n%s", className, srcOff)
+	}
+	t.Logf("mergeIf re-pin OFF (expected divergence) for %s: %s", className, got)
+
+	srcOn, got, okOn := roundTrips()
+	if !okOn {
+		t.Fatalf("expected %s to round-trip cleanly with the merge-time true/false re-pin enabled; got: %s\n----- src -----\n%s", className, got, srcOn)
+	}
+	t.Logf("mergeIf re-pin ON (round-trip preserved) for %s: %s", className, got)
 }

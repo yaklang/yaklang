@@ -3,6 +3,7 @@ package rewriter
 import (
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 
@@ -459,6 +460,35 @@ func (s *RewriteManager) mergeIf() bool {
 						parentNode.AddNext(falseNode)
 						parentNode.AddNext(childFalseNode)
 						delNodesSet.Add(childNode)
+					}
+				}
+				// Re-pin parentNode's true/false branches to the order the merge just built. Every
+				// branch above rebuilds parentNode.Next as [falseBranch, trueBranch] (the 2nd AddNext
+				// is always the true branch), i.e. the trueIndex=1 convention. But TrueNode/FalseNode
+				// were captured once in RemoveGotoStatement against a possibly-DIFFERENT order: when an
+				// upstream fold (e.g. inline `new T[]{...}` array-arg construction on a short-circuit
+				// arm) had reordered Next to [true,false], JmpNode pinning captured trueIndex=0. The
+				// stale closure then reads node.Next[0] as "true" after this rebuild flips it to
+				// [false,true], silently inverting the merged condition's polarity and swapping the
+				// then/else arms (commons-codec DoubleMetaphone/Nysiis transcodeRemaining: `A && (B||C)`
+				// guarding `return new char[]{prev}/{curr}` materialized with the `!` dropped and the
+				// leaves swapped, truncating every encode). Reset JmpNode + the closures to the freshly
+				// built order so downstream readers see the correct branches. No-op for the common
+				// trueIndex=1 node (the closures already pointed there). Kill-switch: JDEC_MERGEIF_PIN_OFF=1.
+				if os.Getenv("JDEC_MERGEIF_PIN_OFF") == "" && len(parentNode.Next) >= 2 {
+					pn := parentNode
+					pn.JmpNode = pn.Next[1]
+					pn.TrueNode = func() *core.Node {
+						if len(pn.Next) < 2 {
+							return nil
+						}
+						return pn.Next[1]
+					}
+					pn.FalseNode = func() *core.Node {
+						if len(pn.Next) < 1 {
+							return nil
+						}
+						return pn.Next[0]
 					}
 				}
 			}

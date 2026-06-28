@@ -85,6 +85,56 @@ func switchCompletesNormally(sw *statements.SwitchStatement) bool {
 	return false
 }
 
+// caseBodyExitNodes collects the EXIT targets of the case body rooted at startNode, using the same
+// idom-child walk SwitchRewriter itself uses to delimit a case body: a successor that is an immediate
+// dominator child of the current node belongs to the body, any other successor is an EXIT (a break /
+// goto out of the case). The returned set is the nodes this case "breaks to". startSwitchNode bounds
+// the walk exactly as the body collection later does.
+func caseBodyExitNodes(manager *RewriteManager, startSwitchNode, startNode *core.Node) map[*core.Node]struct{} {
+	exits := map[*core.Node]struct{}{}
+	if startNode == nil {
+		return exits
+	}
+	_ = core.WalkGraph[*core.Node](startNode, func(n *core.Node) ([]*core.Node, error) {
+		if n == startNode && !slices.Contains(manager.DominatorMap[startSwitchNode], n) {
+			return nil, nil
+		}
+		var next []*core.Node
+		for _, nx := range n.Next {
+			if slices.Contains(manager.DominatorMap[n], nx) {
+				next = append(next, nx)
+			} else {
+				exits[nx] = struct{}{}
+			}
+		}
+		return next, nil
+	})
+	return exits
+}
+
+// countOtherCasesExitingTo counts how many case bodies OTHER than the one rooted at cand exit (break /
+// goto) to cand. A switch's post-switch merge point that happens to also be the start node of an
+// EMPTY case (`case K: break;`, whose only bytecode is `goto merge`, so after goto-folding its start
+// IS the merge) is reached by >=2 sibling case bodies that break to it; a genuine case body, by
+// contrast, is reached at most by the single physically-preceding case that falls through into it.
+// Counting DISTINCT sibling cases (not raw predecessor edges) avoids over-counting a single case that
+// jumps to the merge from two spots (an if-branch plus the trailing goto).
+func countOtherCasesExitingTo(manager *RewriteManager, switchNode, cand *core.Node, caseStarts []*core.Node) int {
+	if cand == nil {
+		return 0
+	}
+	cnt := 0
+	for _, s := range caseStarts {
+		if s == nil || s == cand {
+			continue
+		}
+		if _, ok := caseBodyExitNodes(manager, switchNode, s)[cand]; ok {
+			cnt++
+		}
+	}
+	return cnt
+}
+
 func SwitchRewriter1(manager *RewriteManager, node *core.Node) error {
 	// manager.DominatorMap = GenerateDominatorTree(manager.RootNode)
 	// manager.DumpDominatorTree()
@@ -173,13 +223,8 @@ func SwitchRewriter1(manager *RewriteManager, node *core.Node) error {
 	// break-insertion below then gives every case an explicit `break` and the post-switch code is
 	// emitted after the switch.
 	if mergeNode == nil {
+		// Bug K (default form): an EMPTY `default` whose target is the switch's natural exit/merge.
 		if defNode := caseMap.GetMust(-1); defNode != nil {
-			// Count case bodies that UNCONDITIONALLY break (goto) to the default target: an in-switch
-			// predecessor whose ONLY successor is the default target. Requiring an unconditional jump
-			// excludes the String-switch shape (a hashCode lookupswitch whose equals blocks reach the
-			// second dispatch switch via CONDITIONAL `ifeq` nodes that have two successors, and which
-			// must FALL THROUGH into that second switch rather than `break`); promoting/dropping there
-			// would strip the dispatch and make every case return the default.
 			breakingPreds := 0
 			for _, src := range defNode.Source {
 				if src == node || !slices.Contains(manager.DominatorMap[node], src) {
@@ -195,12 +240,58 @@ func SwitchRewriter1(manager *RewriteManager, node *core.Node) error {
 			}
 		}
 	}
+	if mergeNode == nil && node.SwitchEmptyCaseMerge && node.SwitchEmptyCaseMergeNode != nil {
+		// Re-entrant call: the empty-case merge was resolved on a prior pass and the case `break`s were
+		// already inserted, so the structure no longer re-derives it (unlike an empty default, whose
+		// merge equals caseMap[-1] and is restored by the generic fallback below). Reuse the saved node
+		// before that fallback wrongly promotes the default/throw node to the merge.
+		mergeNode = node.SwitchEmptyCaseMergeNode
+	}
+	if mergeNode == nil && os.Getenv("JDEC_SWITCH_EMPTY_CASE_MERGE_OFF") == "" {
+		// Empty case whose target is the switch's merge (commons-codec Base64/Base32 EOF switch). The
+		// start node of an empty `case K:` is just `goto merge` in bytecode, so after goto-folding its
+		// start node IS the post-switch merge. The dominator-based search excludes it (it is a case
+		// start), and the empty-default fallback above misses it both when the empty case is NOT the
+		// default and when the merge is reached through multi-node case bodies (whose last node is not
+		// an idom-child of the switch, so the cheap predecessor count sees 0). Detect it robustly: the
+		// merge is the case start that >=2 OTHER case bodies EXIT (break/goto) to. Without this the
+		// merge/tail code was absorbed into that case and every case `break` dropped, so cases fell
+		// through into `default: throw` ("Impossible modulus N"). Kill-switch:
+		// JDEC_SWITCH_EMPTY_CASE_MERGE_OFF=1.
+		caseStarts := caseMap.Values()
+		var best *core.Node
+		bestCnt := 0
+		caseMap.ForEach(func(k int, cand *core.Node) bool {
+			if cand == nil {
+				return true
+			}
+			if c := countOtherCasesExitingTo(manager, node, cand, caseStarts); c >= 2 && c > bestCnt {
+				best = cand
+				bestCnt = c
+			}
+			return true
+		})
+		if best != nil {
+			mergeNode = best
+			if best == caseMap.GetMust(-1) {
+				node.SwitchEmptyDefaultMerge = true
+			} else {
+				node.SwitchEmptyCaseMerge = true
+				node.SwitchEmptyCaseMergeNode = best
+			}
+		}
+	}
 	if mergeNode != nil {
 		allSources := slices.Clone(mergeNode.Source)
-		mergeNode.RemoveAllSource()
 		for _, source := range allSources {
-			// The switch's own default/no-match edge into the merge needs no `break` leaf; only real
-			// case bodies that fall/jump out of the switch get an explicit break.
+			// The switch's own edge into the merge needs no `break` leaf and, crucially, must be left in
+			// place: when the merge IS an empty non-default case target (Base64 EOF `case 0: goto merge`)
+			// it sits at a fixed index in node.Next, and caseToIndexMap (captured at parse time) maps
+			// every case value to that index. The previous mergeNode.RemoveAllSource() + node.AddNext()
+			// removed the switch->merge edge and re-appended it at the END, shifting node.Next and making
+			// every case render the NEXT case's body (case 0 got case 1's body, default got the tail) -
+			// the off-by-one that put the `throw` on a real case and the post-switch tail in `default`.
+			// Only detach the real case bodies that fall/jump out of the switch and give them a break.
 			if source == node {
 				continue
 			}
@@ -208,9 +299,18 @@ func SwitchRewriter1(manager *RewriteManager, node *core.Node) error {
 				return "break"
 			}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
 			}))
-			source.AddNext(breakNode)
+			// Splice the break leaf in at the merge edge's ORIGINAL position instead of remove+append.
+			// A case body that breaks to the merge via a ConditionStatement (the String-switch
+			// `if (s.equals(k)) var=i;` guard reaches the dispatch switch on its FALSE edge) keeps its
+			// two successors as [falseBranch, trueBranch]; remove+AddNext pushed the break to the end and
+			// silently swapped the guard's then/else (Bug M), making the equals test set the wrong index.
+			source.ReplaceNextSliceKeepOrder(mergeNode, []*core.Node{breakNode})
 		}
-		node.AddNext(mergeNode)
+		// Ensure the switch reaches the merge (normal switches: merge is the post-switch target, not yet
+		// a successor; empty-case/default: it already is, so preserve its position rather than re-adding).
+		if !slices.Contains(node.Next, mergeNode) {
+			node.AddNext(mergeNode)
+		}
 	}
 	if mergeNode == nil {
 		mergeNode = caseMap.GetMust(-1)
@@ -333,6 +433,19 @@ func SwitchRewriter(manager *RewriteManager, node *core.Node) error {
 		// entirely (`default: break;` is equivalent to no default) so the merge code is emitted AFTER
 		// the switch instead of being walked into the default body.
 		if caseItem.IsDefault && node.SwitchEmptyDefaultMerge && startNode == node.MergeNode {
+			continue
+		}
+		// Empty NON-default case whose target is the switch merge (SwitchRewriter1 detected it). Its
+		// start node IS the post-switch merge, already wired as the switch's successor; walking it would
+		// absorb the merge/tail code into this case and (because no break is emitted) make every case
+		// fall through into `default: throw`. Emit `case K: break;` (empty body + explicit break) so the
+		// matched value is a no-op and control leaves the switch; the merge code is emitted after it.
+		if !caseItem.IsDefault && node.SwitchEmptyCaseMerge && startNode == node.MergeNode {
+			caseItem.Body = []statements.Statement{statements.NewCustomStatement(func(funcCtx *class_context.ClassContext) string {
+				return "break"
+			}, func(oldId *utils3.VariableId, newId *utils3.VariableId) {
+			})}
+			caseItems = append(caseItems, caseItem)
 			continue
 		}
 		if caseItem.IsDefault {

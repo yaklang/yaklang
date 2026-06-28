@@ -737,13 +737,17 @@ func TestDecompilePostBranchReassignNoSelfInit(t *testing.T) {
 //go:embed testdata/regression/*.class
 var regressionFS embed.FS
 
-// TestNestedClassVisibilityDemotion is a stricter guard for the nested-class visibility
-// demotion (root cause B, declaration side). A class whose binary name contains '$' (i.e. a
-// nested/local/anonymous class) is decompiled as a standalone top-level type; emitting it with
-// its original `public`/`protected` modifier yields illegal Java ("X$Y is public, should be
-// declared in a file named X$Y.java"). The fix demotes such classes to package-private. This
-// test asserts the declaration carries no access modifier, independent of the syntax frontend.
-func TestNestedClassVisibilityDemotion(t *testing.T) {
+// TestNestedClassVisibilityPublicIsLoadBearing is the承重 guard for the nested-type visibility fix.
+// A genuinely PUBLIC nested class (binary name Outer$Inner) is decompiled as a standalone flat
+// top-level unit. Yak writes it to a file named after its binary name (Outer$Inner.java), where
+// `public class Outer$Inner` is legal Java; the real visibility is recovered from the InnerClasses
+// attribute (the top-level ClassFile access_flags of a nested type omit ACC_PUBLIC). Keeping `public`
+// is REQUIRED for cross-package use sites to resolve the type - the legacy unconditional demotion to
+// package-private made every public nested type cross-package-inaccessible, the single biggest
+// fastjson2 recompile blocker (`... inaccessible class` + `package Outer$Inner does not exist`).
+// Kill-switch JDEC_NESTED_PUBLIC_OFF=1 restores the legacy demotion; flipping it MUST change the
+// rendered modifier, proving the fix is load-bearing.
+func TestNestedClassVisibilityPublicIsLoadBearing(t *testing.T) {
 	raw, err := regressionFS.ReadFile("testdata/regression/nested_class_visibility.class")
 	if err != nil {
 		t.Fatalf("read embedded class failed: %v", err)
@@ -752,12 +756,58 @@ func TestNestedClassVisibilityDemotion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decompile failed: %v", err)
 	}
-	if strings.Contains(source, "public class Outer$Inner") {
-		t.Errorf("nested class regression: Outer$Inner still declared public (visibility not demoted)\n----- source -----\n%s", source)
+	// Fix ON (default): the public nested type keeps `public` (the InnerClasses access flag is public).
+	if !strings.Contains(source, "public class Outer$Inner") {
+		t.Errorf("nested class regression: public Outer$Inner lost its `public` modifier\n----- source -----\n%s", source)
 	}
-	// It must still be declared (just package-private now).
-	if !strings.Contains(source, "class Outer$Inner") {
-		t.Errorf("nested class regression: Outer$Inner declaration missing\n----- source -----\n%s", source)
+	// Fix OFF: legacy demotion strips `public`, proving the new rendering is load-bearing.
+	t.Setenv("JDEC_NESTED_PUBLIC_OFF", "1")
+	demoted, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile (kill-switch) failed: %v", err)
+	}
+	if strings.Contains(demoted, "public class Outer$Inner") {
+		t.Errorf("kill-switch JDEC_NESTED_PUBLIC_OFF did not demote public Outer$Inner\n----- source -----\n%s", demoted)
+	}
+	if !strings.Contains(demoted, "class Outer$Inner") {
+		t.Errorf("Outer$Inner declaration missing under kill-switch\n----- source -----\n%s", demoted)
+	}
+}
+
+// TestNestedCrossPackageImportIsLoadBearing is the承重 guard for the same-jar nested-type import fix.
+// A class in package `b` references a nested type `a.Holder$Tag` in another package. Yak emits each
+// nested type as a STANDALONE flat top-level unit literally named `Holder$Tag` and references it by
+// that flat name, so the import MUST carry the flat `$` name (`import a.Holder$Tag;` - legal Java).
+// The legacy importer instead emitted the OUTER class (`import a.Holder;`) on the false premise that
+// imports cannot contain '$', leaving `Holder$Tag` unresolved -> javac `package Holder$Tag does not
+// exist` at every cross-package use site (the second-largest fastjson2 recompile blocker). Kill-switch
+// JDEC_NESTED_FLAT_IMPORT_OFF=1 restores the legacy outer-only import; flipping it MUST change the
+// emitted import, proving the fix is load-bearing.
+func TestNestedCrossPackageImportIsLoadBearing(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/nested_cross_package_import.class")
+	if err != nil {
+		t.Fatalf("read embedded class failed: %v", err)
+	}
+	source, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile failed: %v", err)
+	}
+	// Fix ON (default): the cross-package nested type is imported by its flat `$` name.
+	if !strings.Contains(source, "import a.Holder$Tag;") {
+		t.Errorf("nested cross-package import regression: expected flat `import a.Holder$Tag;`\n----- source -----\n%s", source)
+	}
+	// The reference site uses the matching flat name (never the unresolvable dotted Holder.Tag).
+	if !strings.Contains(source, "Holder$Tag") {
+		t.Errorf("nested cross-package import regression: reference to Holder$Tag missing\n----- source -----\n%s", source)
+	}
+	// Fix OFF: legacy importer drops to the OUTER class, proving the flat import is load-bearing.
+	t.Setenv("JDEC_NESTED_FLAT_IMPORT_OFF", "1")
+	legacy, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile (kill-switch) failed: %v", err)
+	}
+	if strings.Contains(legacy, "import a.Holder$Tag;") {
+		t.Errorf("kill-switch JDEC_NESTED_FLAT_IMPORT_OFF did not revert the flat import\n----- source -----\n%s", legacy)
 	}
 }
 
@@ -805,6 +855,133 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			// the empty-string guard becomes a real if returning the input, and the arm stores survive
 			mustContain: []string{"firstCharOnlyToUpper", "isEmpty()", "Ascii.toUpperCase", "Ascii.toLowerCase"},
 			// must fully decompile (no stub) and not leak a bare ternary-condition fork
+			mustNotContain: []string{"yak-decompiler"},
+		},
+		{
+			file: "synchronized_return_scope.class",
+			desc: "a local DECLARED inside a synchronized block but READ after it (javac compiles " +
+				"`synchronized (lock) { ...; return v; }` as load-v; monitorexit; areturn, so the " +
+				"structurer emits the trailing `return v` as a sibling AFTER the block). The declaration " +
+				"must be hoisted ahead of the synchronized statement, otherwise the trailing read is out " +
+				"of scope (\"cannot find symbol\" - the single root cause of guava base's whole " +
+				"cannot-find-symbol recompile cascade via Enums.getEnumConstants).",
+			mustContain:    []string{"Map var3;", "synchronized", "return var3"},
+			mustNotContain: []string{"yak-decompiler"},
+		},
+		{
+			file: "method_type_params.class",
+			desc: "a generic method's own formal type parameters (`<T> T checkNotNull(T)`, " +
+				"`<K, V> Map<K, V> single(...)`, `<T extends Comparable<T>> T max(...)`) recovered from " +
+				"the method Signature attribute. The old parser bailed on the leading `<...>` section, so " +
+				"these rendered as `Object checkNotNull(Object)` etc., making every generic-inference call " +
+				"site (e.g. guava `predicate.apply(Preconditions.checkNotNull(x))`) fail to recompile " +
+				"\"Object cannot be converted to CAP#1\". A redundant `extends Object` bound is dropped.",
+			mustContain: []string{
+				"<T> T checkNotNull(",
+				"<K, V> Map<K, V> single(",
+				"<T extends Comparable<T>> T max(",
+			},
+			mustNotContain: []string{"Object checkNotNull(Object", "yak-decompiler"},
+		},
+		{
+			file: "method_type_params_array.class",
+			desc: "method-level generics whose parameter/return types are ARRAYS of a type variable " +
+				"(`<T> T[] newArray(T[], int)`, `<E> E first(E[])`), the exact shape of guava " +
+				"`ObjectArrays.newArray`. Verifies ParseMethodSignatureFull preserves the `[]` of `T[]` " +
+				"rather than erasing to `Object[]`.",
+			mustContain:    []string{"<T> T[] newArray(T[] ", "<E> E first(E[] "},
+			mustNotContain: []string{"Object[] newArray(Object[]", "yak-decompiler"},
+		},
+		{
+			file: "invokespecial_super_call.class",
+			desc: "a subclass override that calls `super.describe(s)` (invokespecial to the SUPERCLASS " +
+				"method) plus `this.helper(s)` (invokespecial to a private SAME-class method). The super " +
+				"call MUST render as `super.describe(...)`: rendering it as `this.describe(...)` re-dispatches " +
+				"virtually to the override and recurses infinitely (guava CaseFormat constant-body convert " +
+				"-> StackOverflow). The private same-class call must stay `this.helper(...)`.",
+			mustContain:    []string{"super.describe(var1)", "this.helper("},
+			mustNotContain: []string{"this.describe("},
+		},
+		{
+			file: "nested_generic_return_raw_bridge_cast.class",
+			desc: "guava Suppliers: `static <T> Function<Supplier<T>, T> supplierFunction() { return " +
+				"SupplierFunctionImpl.INSTANCE; }` where the enum singleton concretely implements " +
+				"`Function<Supplier<Object>, Object>`. The type-variable return cast to the NESTED-generic " +
+				"target `Function<Supplier<T>, T>` is inconvertible directly (javac proves `Supplier<Object>` " +
+				"!= `Supplier<T>`); a raw-erasure bridge `(Function<Supplier<T>, T>) (Function) (INSTANCE)` " +
+				"makes it legal. Bare-type-arg casts must NOT get the bridge.",
+			mustContain: []string{"(Function<Supplier<T>, T>) (Function) (Suppliers$SupplierFunctionImpl.INSTANCE)"},
+		},
+		{
+			file: "synthetic_bridge_ctor_generic_param.class",
+			desc: "a nested generic class with a PRIVATE generic ctor reached from its encloser (compiled " +
+				"--release 8 so javac emits the pre-nestmates synthetic access-bridge ctor " +
+				"`Box(Object, BridgeGen$1)` forwarding `this(var1)` to the private `Box(T)`). The bridge " +
+				"carries no Signature attribute, so its param would render as erased `Object` and the " +
+				"`this(var1)` delegation fails 'Object cannot be converted to T'. The bridge must adopt the " +
+				"target ctor's generic param type (T) - byte-faithful (erases back to Object). This pattern " +
+				"recurs across guava (Equivalence.Wrapper, Predicates.IsEqualToPredicate, ...).",
+			mustContain:    []string{"BridgeGen$Box(T var1, BridgeGen$1 var2)", "this(var1)"},
+			mustNotContain: []string{"BridgeGen$Box(Object var1, BridgeGen$1"},
+		},
+		{
+			file: "keep_declared_noarg_ctor.class",
+			desc: "a class with MULTIPLE constructors where the no-arg one has only the implicit super() " +
+				"(empty body). javac generates NO default ctor when others exist, so this no-arg ctor is " +
+				"programmer-declared and part of the API (guava `VerifyException()` -> `new VerifyException()`). " +
+				"An empty-body-method drop once removed it because its return type is void; it must be kept. " +
+				"The parameterized empty-body ctor `(int)` must also survive (a real overload).",
+			mustContain: []string{"public KeepDeclaredCtors()", "public KeepDeclaredCtors(int var1)", "public KeepDeclaredCtors(String var1)"},
+		},
+		{
+			file: "keep_private_singleton_ctor.class",
+			desc: "a singleton whose SOLE constructor is `private` with an empty body. Dropping it (as the " +
+				"javac-default look-alike) would let javac regenerate a PUBLIC default ctor, silently widening " +
+				"accessibility - a semantic regression. A non-public sole ctor must be emitted.",
+			mustContain: []string{"private SingletonPrivateCtor()"},
+		},
+		{
+			file: "drop_implicit_default_ctor.class",
+			desc: "over-keeping guard: a plain public class with NO declared constructor. Its bytecode carries " +
+				"the implicit public no-arg default whose body is empty; this IS indistinguishable from the " +
+				"javac-generated default (sole, no-arg, accessibility matches the class), so omitting it is " +
+				"loss-less and keeps output clean. The decompiled source must NOT print a default ctor.",
+			mustContain:    []string{"public int compute("},
+			mustNotContain: []string{"PlainEmptyClass()"},
+		},
+		{
+			file: "enum_nested_marker_ctor_contravariant_this.class",
+			desc: "a NESTED enum with constant-specific bodies (guava Predicates.ObjectPredicate). Two " +
+				"fixes: (1) the javac synthetic marker constructor whose trailing param is an anonymous " +
+				"class of the ENCLOSING class (`ObjectPredicate(String,int,Predicates$1)`, not the enum's " +
+				"own `$N`) must be suppressed - emitting it produced an illegal `this(var1,var2)` after " +
+				"local decls; (2) `<T> Predicate<T> withNarrowedType() { return this; }` returns `this` " +
+				"(a Predicate<Object>) as a DIFFERENT parameterized supertype `Predicate<T>`, which needs " +
+				"guava's own unchecked contravariant cast `(Predicate<T>) this`.",
+			mustContain:    []string{"<T> Predicate<T> withNarrowedType()", "(Predicate<T>) (this)"},
+			mustNotContain: []string{"this(var1,var2)", "Predicates$1", "yak-decompiler"},
+		},
+		{
+			file: "wildcard_param_no_phantom_decl.class",
+			desc: "a method parameter whose generic type ENDS in a wildcard token (`Map<?, ?> var2`, " +
+				"`Iterable<? extends Map.Entry<?, ?>>`) must be recognized as already declared, so the " +
+				"missing-local-declaration safety net does NOT inject a bogus `Object var2 = null;` that " +
+				"shadows the parameter (and makes `var2.entrySet()` resolve against Object -> cannot find " +
+				"symbol). The brittle type-prefix regex could not match a param whose final token before " +
+				"the name is `?>` (no leading identifier char), unlike `String>` in `Map<String, String>`; " +
+				"this was the whole guava base Joiner$MapJoiner recompile cascade (21 errors in one unit).",
+			mustContain:    []string{"Map<?, ?> var2", "var2.entrySet()"},
+			mustNotContain: []string{"Object var2 = null", "Object var1 = null", "yak-decompiler"},
+		},
+		{
+			file: "generic_field_return_cast.class",
+			desc: "a method with a generic return type that mentions a type variable (`Box<T>`) whose " +
+				"body returns a singleton field typed with a wildcard (`Box<?> INSTANCE`, captured to " +
+				"Box<CAP>) needs an unchecked cast to the recovered return type, exactly as guava's own " +
+				"source (Converter.identity returns IdentityConverter.INSTANCE into Converter<T, T>). The " +
+				"cast is gated on a field-access value so `return this` / `return this.method(...)` / " +
+				"`return new X(...)` are not gratuitously cast.",
+			mustContain:    []string{"(GenRetCast$Box<T>) (GenRetCast$Box.INSTANCE)"},
 			mustNotContain: []string{"yak-decompiler"},
 		},
 		{
@@ -862,12 +1039,15 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 		},
 		{
 			file: "nested_class_visibility.class",
-			desc: "a nested class (binary name Outer$Inner) decompiled as a standalone top-level type " +
-				"must have its public/protected visibility demoted to package-private, because Java " +
-				"forbids a public type in a file not named after it ('X$Y is public, should be declared " +
-				"in a file named X$Y.java'). The class body and members are unaffected.",
-			mustContain:    []string{"class Outer$Inner"},
-			mustNotContain: []string{"public class Outer$Inner", "protected class Outer$Inner", "yak-decompiler"},
+			desc: "a PUBLIC nested class (binary name Outer$Inner) decompiled as a standalone top-level " +
+				"unit keeps its `public` modifier: Yak writes each flat unit to a file named after its " +
+				"binary name (Outer$Inner.java), so `public class Outer$Inner` is legal Java and is REQUIRED " +
+				"for cross-package use sites to resolve it (the legacy unconditional demotion to " +
+				"package-private made every public nested type inaccessible across packages - the biggest " +
+				"fastjson2 recompile blocker). The real visibility is recovered from InnerClasses. " +
+				"`protected` is still dropped (illegal at top level).",
+			mustContain:    []string{"public class Outer$Inner"},
+			mustNotContain: []string{"protected class Outer$Inner", "yak-decompiler"},
 		},
 		{
 			file: "ifnonnull_branch.class",

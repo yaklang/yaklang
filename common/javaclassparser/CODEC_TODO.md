@@ -9,157 +9,202 @@
 
 ---
 
-## 当前状态
+## 当前状态 (只保留里程碑 / 指标 / 杠杆, 不留已治本叙述)
 
-- 真实库差分调用 (guava 28.2-android): 反编译 → 重编译成 overlay → classpath 覆盖原 jar →
-  用 `GuavaProbe` 反射跑算法对比指纹。**18 个类 (IntMath / Ints / Longs / UnsignedInts /
-  UnsignedLongs / Ascii / Strings + 各自内部类) overlay 重编译 exit 0, GuavaProbe 输出与原 jar
-  byte-identical (同 MD5)**。本轮借此挖出并治本 5 个长尾 bug (注解 boolean/char 渲染成 int、
-  varargs 形参被注入 `Object varN=null` 幽灵声明、引用型形参被同类型子类重赋值时被影子拆分成块作用域
-  局部、泛型父类型/接口签名被擦除致抽象方法未覆盖、数值转换 (l2i/i2c...) CustomValue 未转发
-  ReplaceVar 致 `(int)x` 强转保留过期变量名)。按约定均不留文字记录, 其回归测试即档案。
-- 差分门禁 `TestCodecSemanticsRoundTrip`: **45 个自托管 battery 全绿** (byte-for-byte round-trip);
-  新增 `IincWidenDecl` (承重负向锁定 Bug W「iinc 目标 slot 声明过窄」治本: baload 喂入的 int 局部被
-  推断成 byte, 随后 `b += 256`/`b -= 200` 被 javac 编成 `iinc_w`(javac 只对真 int 局部发 iinc,
-  byte/char/short 复合赋值走 iadd+i2b/i2c/i2s), 非 ±1 iinc 反糖成 `b = b + 256` 对 byte 声明是可能精度
-  丢失; 治本: iinc 处把 narrow int 类别 slot 声明宽化为 int, 关 `JDEC_IINC_WIDEN_OFF` 即报
-  `possible lossy conversion from int to byte`, 由 `TestIincWidenDeclIsLoadBearing` 守卫, 真实命中
-  commons-codec `Base64.encode`);
-  新增 `LoopCounterSlotReuse` (承重负向锁定 Bug X「循环计数器 slot 被循环后 byte[] 复用致 iinc 绑错
-  化身」治本: javac 把已死的循环计数器槽复用给循环后的 byte[] (Base64.decode 形态), 单一全局
-  slot->ref 表在 DFS 顺序里先访问循环后的 byte[] 存储, 致 `GetVar(slot)` 在循环内 iinc 处返回 byte[]
-  化身, `i++` 渲染成 `someByteArray++`; 治本: iinc 处沿 Source 回溯到 int 类别的到达定义 (复用 load
-  失配修复的同一回溯), 关 `JDEC_IINC_REACHING_OFF` 即报 `bad operand type byte[] for unary operator
-  ++`, 由 `TestLoopCounterSlotReuseIsLoadBearing` 守卫);
-  新增 `EmbeddedAssignDecl` (锁定「dup-collapse 嵌入式赋值致 int 局部无声明被安全网猜成 Object」治本:
-  `(v = a[i]) == 0` 等值比较整型字面量 / `(v = a[i]) < limit` 关系比较, 关 `JDEC_NO_EMBED_ASSIGN_INT`
-  即退化报 Object/int 不兼容, 由 `TestEmbeddedAssignDeclIntIsLoadBearing` 承重守卫);
-  新增 `JumpEnteredTryCatch` (承重负向锁定「跳转进入的 try-catch 被丢弃」治本: guard-return 后接 try /
-  try 作循环体 / try 作 else 分支体 / guard 后接 catch checked-exception; 关闭
-  `JDEC_TRY_JUMP_ANCHOR_OFF` 即报 `unreported exception UnsupportedEncodingException` 或运行期异常逃逸,
-  由 `TestJumpEnteredTryCatchAnchorIsLoadBearing` 守卫, 真实命中 commons-codec `QCodec.encode/decode`);
-  新增 `StaticInitForwardRef` (承重负向锁定「<clinit> 字段初始化器越过副作用语句被提升」治本: SAFE 先 new
-  再被 set() 循环改写, DERIVED=SAFE.clone() 作为 clinit 最后一步且声明在 SAFE 之前; 提升会 forward-ref +
-  clone 空集; 关闭 `JDEC_NO_CLINIT_HOIST_BARRIER` 即报 `illegal forward reference`, 由
-  `TestClinitHoistBarrierIsLoadBearing` 守卫, 真实命中 commons-codec `URLCodec`);
-  新增 `ClassLiteralRendering` (锁定 ldc Class 字面量渲染治本: `String.class.getName()` 实例调用接收者 /
-  `nameOf(Double.class)` 字面量作实参 / `int[].class`+`byte[][].class` 数组字面量 / 当前类自有字面量
-  `ClassLiteralRendering.class.getName()` 实例调用, 同时静态调用 `Integer.parseInt` 保持裸类名不退化为
-  `Integer.class.parseInt`; 真实命中 commons-codec `ColognePhonetic`;
-  另含「Class 字面量存入局部多次读取」形态 `Class<?> c = Long.class; c.getName()/c.isPrimitive()/
-  c.getSimpleName()` —— 捕获局部必须定型为 `java.lang.Class` 而非被引用类 `Long`, 否则成员读取报
-  `cannot find symbol`; 关闭 `JDEC_NO_CLASSLIT_SLOT_TYPE` 即声明成 `Long c = Long.class;` 重编译失败,
-  由 `TestClassLiteralSlotTypeIsLoadBearing` 承重守卫);
-  新增 `IntCategoryNarrowing` (承重负向锁定本轮 4 个 int 计算类别治本: ① 单 slot 条件重赋值合并
-  decodeOctet 形态、② byte 初值 + int 重赋值的声明宽化 getUnsignedOctet 形态、③ JLS 5.6.2 二元数值
-  提升 byte/short/char 算术结果为 int、④ int 值存入 byte[] 重新补 `(byte)` 收窄转换; 关闭
-  `JDEC_INTCAT_REASSIGN_SPLIT`/`JDEC_NO_BINNUM_PROMOTE` 即失败, 证明承重);
-  含 `ControlFlowAlgorithms` (自然 sieve 守卫嵌套循环 + 2D 带标签 break/continue)、
-  `SortingAlgorithms` (bubble/insert/select/quick/heap, 嵌套循环 + 递归 + 短路条件)、
-  `ChainedAssignAlgorithms` (2/3/4 槽链式赋值 + 数组元素链 + 链后独立修改 + 终结链 +
-  三元赋值副作用回读 `(cond)?(x=a):(x=b)` 两侧读位置, 锁定 Bug T 求值顺序治本)、
-  `Sha256Algorithms` / `Sha512Algorithms` (从零实现, 分别压 32 位 int 与 64 位 long 位运算族,
-  rotr / `>>>` / 调度数组 / 64-80 轮压缩, sanity 锁定空串摘要)、
-  `CipherAlgorithms` (TEA / XTEA / RC4 加解密自校验, 回绕 int 算术 + 字节置换)、
-  `StringSwitchAlgorithms` (String-switch 两段 hashCode+equals 降级 + char-switch fall-through;
-  含「单方法内 String-switch 临时槽被后续 int 复用」合并形态, 锁定 Bug S slot 读取版本归属治本) 与
-  `TryWithResourcesAlgorithms` (try-with-resources 降级: 单资源 / 多资源一 try 反序 close /
-  twr+catch / twr+catch+finally(循环体, 正常退出后跑 finally 再 return) / 嵌套 twr(外层循环体里再套
-  twr), 含 `Throwable primary` + `addSuppressed` 抑制机; 后两者锁定 Bug U「异常处理器边被循环结构化
-  误当正常退出边」治本) 与
-  `TryFinallyLoopAlgorithms` (非 twr 的纯 try/catch/finally + 循环体: for/while 循环正常退出后跑
-  finally、嵌套循环带标签 break、long 累加、finally 体自身含循环, 锁定 Bug U 在非 twr 场景的同源治本) 与
-  `ConversionRenameAlgorithms` (mirror guava UnsignedLongs.toString: 嵌套 else 分支里算出的 long
-  被 `(int)` 强转消费, 深度碰撞重命名后强转操作数变量名串号, 锁定数值转换 ReplaceVar 转发治本)。
-- 注解默认值 `default <value>` 治本 (承重 `TestAnnotationDefaultIsLoadBearing`): `@interface` 元素的
-  `AnnotationDefault` 属性此前被当 `UnparsedAttribute` 丢弃, 反编译出的注解声明缺 `default false` 等子句,
-  致**任何省略该元素的使用点**重编译失败 (`annotation @X is missing a default value for the element 'serializable'`)。
-  这正是 guava 重编译率被压低的主因 (`@GwtCompatible`/`@GwtIncompatible` 几乎覆盖全 guava)。治本: 解析
-  `AnnotationDefault` 的 element_value (复用 `ParseAnnotationElementValue`)、并在 dumper 抽象方法处补
-  `default <value>` (复用抽出的 `formatAnnotationElementValue`, 覆盖 Z/I/s/c/e/[ 全标签); 同时捕获原始字节
-  保 marshal 字节级一致。关 `JDEC_ANNO_DEFAULT_OFF` 即丢 default 重编译失败, 由承重测试守卫。
-  实测 guava yak-syntax 重编译率 7%(131/1892) → 30%(574/1892)。
-- 标准库嵌套类型点号渲染治本 (承重 `TestStdlibNestedDotIsLoadBearing` + 自动 round-trip battery
-  `StdlibNestedDot`): 对 **外部标准库** (`java.*`/`javax.*`/`jdk.*`/`sun.*`/`com.sun.*`/`org.w3c.*`/
-  `org.xml.*`/`org.ietf.*`/`org.omg.*`) 的嵌套类型引用, 此前按 Yak 自有扁平单元的二进制名 `Map$Entry` 渲染,
-  而这些类型在 classpath 上只以真正嵌套的 `Map.Entry` 存在, 源码无法用 `Map$Entry` 解析 →
-  `cannot find symbol: class Map$Entry`。这是 guava/spring 重编译的**最大单一阻断点** (仅 guava 全量批量
-  编译就有 706 处 `Map$Entry` "cannot find symbol")。治本: `class_context.ShortTypeName` 对标准库包的嵌套
-  类型改用 `binaryNestedNameToSource` 输出点号形式 (`Map.Entry`), import 仍带外层类 (`import java.util.Map;`)。
-  标准库包永不会是 Yak 单元, 故 100% 安全; 自有扁平单元 (同 jar) 仍保持 `$` 以匹配扁平声明。关
-  `JDEC_STDLIB_NESTED_DOT_OFF` 即退回 `Map$Entry` 重编译失败, 由承重测试守卫。
-- 泛型方法零参返回类型还原治本 (承重 `TestGenericMethodReturnIsLoadBearing` + 自动 round-trip battery
-  `GenericMethodReturn`): 方法 Signature `()TK;` 经 `ParseMethodSignature` 解析得 (nil 形参, K 返回),
-  旧 `sigParams != nil` 闸门恰好跳过零参方法, 使 `getKey()`/`getValue()`/`iterator()` 等被擦除为
-  `Object` 返回, 无法覆盖泛型接口方法 (`return type Object is not compatible with K`)。这是「标准库嵌套点号」
-  修好后**新暴露**的 guava 次大阻断 (AbstractMapEntry / Maps$* / Multimaps$* 等)。治本: `dumper.go`
-  方法签名覆盖改以 `sigRet != nil` 为闸门 (形参仍按数量匹配且仅在非 nil 时覆盖), 零参泛型返回得以还原为
-  K/V; `<...>` 形参方法仍回退 descriptor (见下方残留说明)。关 `JDEC_METHOD_SIG_RET_OFF` 退回旧闸门即重编译
-  失败, 由承重测试守卫。
-- 内部类自由类型变量注入治本 (承重 `TestInnerClassTypeVarIsLoadBearing`): 非静态内部/局部/匿名类被 Yak
-  扁平成顶层 `Outer$Inner` 单元后, 其从外层继承的类型变量 (K/V/E) 丢失声明 →
-  `cannot find symbol: class K` (guava Multimap/Table/cache 内部类族此前约 2000 处)。治本: 在 `DumpClass`
-  扫描本单元父类型签名 + 字段签名里实际引用的 `T<name>;` 变量, 给扁平类补声明 `<K, V>`; 仅限**本身不声明
-  任何形参**的纯继承内部类 (否则声明/引用 arity 失配致 `wrong number of type arguments`)。关
-  `JDEC_INNER_TYPEVAR_OFF` 即丢声明重编译失败。残留 (并入 Bug AD/V 跨类整体重建): ① 内部类构造器合成的
-  外层实例形参使 Signature 形参计数比 descriptor 少 1, 致捕获形参 (如 `K owner`) 仍擦除为 `Object`; ②
-  `this$0` 字段擦除为裸外层类型 (无 Signature), 经其读外层泛型字段得 `Object`; ③ 只引用外层变量**子集**
-  的内部类, 注入 arity 可能与外层引用点 arity 失配。
-- 泛型返回值类型变量强转治本 (承重 `TestTypeVarReturnCastIsLoadBearing` + 自动 round-trip battery
-  `TypeVarReturnCast`): 上面「零参泛型返回还原」把 `max()` 正确定型为返回类型变量 `T` 后, 方法体若 `return`
-  一个被推断成**擦除 bound** (`Comparable`) 的局部, 重编译报 `incompatible types: Comparable cannot be
-  converted to T` (字节码把 `()TT;` 擦除到 bound, 局部即 bound 类型)。这是「零参泛型返回还原」在 gated
-  `Generics` 语料引入的回归。治本: `ReturnStatement.String` 在「方法返回类型是类作用域类型变量 (经
-  `ClassContext.TypeParams` 识别) 且返回值静态类型为不同引用类型」时补 `return (T) (expr)` 无检查强转
-  (与 CFR/Fernflower 一致, 行为等价); `TypeParams` 由 `DumpClass` 用类形参 + 注入的自由变量填充。关
-  `JDEC_TYPEVAR_RET_CAST_OFF` 即丢强转重编译失败, 由承重测试守卫。
-- OPCODE 解析覆盖门禁 `TestOpcodeParseCoverage`: **195/195 (100.0%)** (语料 126 class + 31 battery,
+- **GA 里程碑 — guava 真实差分调用 = IDENTICAL**: guava 28.2-android 反编译 → 重编译成 overlay →
+  classpath 覆盖原 jar → `GuavaProbe` 反射跑算法对比指纹。18 个类 (IntMath / Ints / Longs / UnsignedInts /
+  UnsignedLongs / Ascii / Strings + 各自内部类) overlay 重编译 exit 0, 输出与原 jar byte-identical (同 MD5)。
+  即直接回答「能否反编译 guava 并被外部调用」: **能**。
+- **里程碑 — enum 常量体跨类折叠已接入生产 jar 路径**: 多类折叠 (合成 `Outer$N` 常量体内联回 enum, 并抑制
+  `$N` 独立产出) 不再只是 `DecompileWithResolver` API, 已在 `JarFS.decompileClassBytes` 落地, 整 jar 反编译
+  即享受。承重双测 `TestEnumConstantBodyFoldIsLoadBearing` (resolver API) + `TestEnumConstantBodyFoldJarPathIsLoadBearing`
+  (jar 路径), 均带 `JDEC_NO_ENUM_FOLD` kill-switch。另抑制了 enum 合成 marker 构造器
+  `<Enum>(String,int,<Enum>$N)` (承重测试 `TestEnumMarkerCtorSuppressionIsLoadBearing`, kill-switch
+  `JDEC_NO_ENUM_MARKER_CTOR`)。实测 guava `CaseFormat` (release-8, 含 access$N + marker ctor) 折叠成单一合法
+  enum 且 round-trip 通过。详见 Bug V。
+- **差分门禁 `TestCodecSemanticsRoundTrip`: 57 个自托管 battery 全绿** (byte-for-byte round-trip), 覆盖
+  控制流 / 排序 / 链式赋值 / SHA-256 / SHA-512 / TEA-XTEA-RC4 / String-switch / try-with-resources /
+  try-finally-loop / 数值转换重命名 / iinc 宽化 / 循环计数器 slot 复用 / 嵌入式赋值 / Class 字面量 /
+  int 类别收窄 / guava IntMath(gcd·log2·floor-sqrt·pow·isPrime·checkedAdd) / 严格 Hex 编解码(收窄+校验异常) /
+  boolean-int 槽复用形态 / **空前导 case 的 tableswitch (Base32/Base64 EOF 形态)** /
+  **对象-null 守卫后接底部测试循环 (Md5Crypt salt 形态)** /
+  **短路 `(A&&B)||C` 中 C 为内联数组可变参调用 (DoubleMetaphone.conditionC0 形态)** 等。已治本 bug 的文字记录
+  按约定删除, 其承重 `Test*` + testdata 种子即永久档案。
+- **OPCODE 解析覆盖门禁 `TestOpcodeParseCoverage`: 195/195 (100.0%)** (语料 126 class + 31 battery,
   命中 198 distinct opcode), 7 个文档化排除
   (jsr / jsr_w / ret / goto_w / wide / ldc_w / nop —— 均为 javac 不由源码产生或前缀修饰)。
+- **GA 里程碑 — guava `base` 整包「反编译→重编译→打回 jar→外部反射调用」= IDENTICAL (语义, 非仅编译)**:
+  经生产 JarFS 路径重生 160 单元后整目录 `javac` (guava + 5 传递依赖上 classpath): **158/160 单元可重编译**
+  (残留 2 单元 = Bug AH Group A, 临时手补 cast 后)。重编译产物覆盖回 overlay jar, 外部 `BaseProbe` 反射跑
+  VerifyException / Predicates / Suppliers / **CaseFormat** / Ascii / Strings / Equivalence, 输出与原 jar
+  **逐行 IDENTICAL**。其中 `CaseFormat` 此前 `StackOverflowError` (常量体 `super.convert` 被误渲染成
+  `this.convert` 致无限递归) —— 这是**编译期测不出、必须运行**才暴露的语义 bug, 本轮已治本 (见下「本轮新增治本」
+  第 4 项)。残留 2 条全部是 Group A「类型变量擦除成 Object 出现在非返回位置」(`PairwiseEquivalence` 的
+  `Iterator var=it()` 应为 `Iterator<T>`、`Equivalence$Wrapper` 的 `Wrapper var=(Wrapper)o` 应为 `Wrapper<?>`);
+  需把泛型类型沿数据流传播 (方法返回按接收者类型实参实例化), 属大特性, 见 Bug AH。
+- **本轮新增治本 (codec 真实差分新发现, 4 项, 均已锁回归种子, 种子即档案)**:
+  - **布尔合并 (mergeCondition) 重排 `Next` 后未刷新 true/false 闭包, 致条件取反 + then/else 对调 (Nysiis 编码截断)**
+    (语义正确性, 编译期测不出): if 分支体 `return new char[]{...}` 这类**多 opcode 数组构建叶**被上游折叠把
+    if 节点的 `Next` 重排成 `[true,false]`, 故 `JmpNode` 钉支捕获到 trueIndex=0; 随后短路布尔合并
+    (`mergeCondition`) 把 `Next` 重建成 `[false,true]` (4 个分支恒按此序写) 却**没更新** `RemoveGotoStatement`
+    早先按旧序捕获的 `TrueNode`/`FalseNode` 闭包 → 合并条件极性被悄悄取反 (丢 `!`)、then/else 两叶对调。源码
+    仍可编译, 故只有「反编译→重编译→运行对比」能暴露: commons-codec `Nysiis.encode("Thompson")` 得 `TAN` 而非
+    `TANPSA` (每个 encode 都被截断)。同形态但叶为 `int` 不触发重排、保持正确, 是它逃过纯语法/编译检查的原因。现于
+    `mergeCondition` 每次重建 `parentNode.Next` 后, 按刚建好的 `[false,true]` 序重钉 `JmpNode` 并刷新
+    `TrueNode`/`FalseNode` 闭包 (对常见 trueIndex=1 节点为 no-op)。实测修复 Nysiis (overlay 差分 byte-identical)。
+    种子 `ShortCircuitArrayLeaf` (承重测试 `TestShortCircuitArrayLeafIsLoadBearing`, kill-switch `JDEC_MERGEIF_PIN_OFF`
+    跑负向测试: 关闭即复现指纹分叉)。
+  - **短路 `(A&&B)||C` 中 C 为「内联数组可变参调用」时布尔物化退化 (DoubleMetaphone.conditionC0)** (语义正确性 +
+    编译错误, 编译期会报「缺少返回语句」): `return (c!='I' && c!='E') || contains(value, i, n, "BACHER");` —— 右
+    操作数 C 是可变参调用, javac 用 `anewarray; dup; idx; ldc; aastore` 在栈上构建数组实参。原理化三目重建
+    (`buildSharedLeafTernary` 的 `arm()` 走查) 把数组元素写 `aastore`(经 `isTernaryArmStore`) 误判成「语句级
+    赋值分派」→ 整体 decline、退回旧合并器, 后者错连前导条件并丢 else, 产出缺返回的 `if (A'&&B') return C;` 且把
+    第二个比较取反弄反。现新增 `isInlineArrayInitStore` (识别 `Xastore` 且数组引用是新建 `NewExpression` 的内联
+    数组字面量构建), 在 `arm()` 两处把 `isTernaryArmStore(op)` 收紧为 `isTernaryArmStore(op) && !isInlineArrayInitStore`,
+    使原理化构建器能跨过这些「取值型」数组写、正确物化短路 `||`。实测修复 commons-codec `DoubleMetaphone`。种子
+    `ShortCircuitArrayArg` (承重测试 `TestShortCircuitArrayArgIsLoadBearing`, kill-switch `JDEC_ARRAYINIT_TERNARY_OFF`
+    跑负向测试: 关闭即复现「缺少返回语句」)。
+  - **空前导 case 的 tableswitch 结构化错位 (Base32/Base64 EOF 形态)** (语义正确性, 编译期测不出):
+    `BaseNCodec.encode` 的 EOF 收尾 `switch(modulus)` —— 稠密 tableswitch、**首个 case (case 0) 为空**(仅
+    break 到 switch 后)、真实工作在 case 1/2 各带内层 if、`default: throw`、switch 后还有所有 case 都要到达的
+    尾码。goto 折叠后空前导 case 的起点节点恰是 switch 后的合并点。旧 `SwitchRewriter1` 用
+    `mergeNode.RemoveAllSource()` + `node.AddNext()` 插 break, 把 switch→merge 边从原位移到 `node.Next` 末尾,
+    而 `caseToIndexMap` 在解析期已按固定下标捕获 → **整体错位一格** (throw 落到真实 case, 尾码进 default), 且把
+    某些 case 守卫的 then/else 也悄悄对调 → 运行时 `IllegalStateException: Impossible modulus N`。现改为按原位
+    `source.ReplaceNextSliceKeepOrder(mergeNode, breakNode)` 原地替换, 并跨两次 `SwitchRewriter1` 用
+    `Node.SwitchEmptyCaseMergeNode` 持久化已解出的合并点 (避免第二遍把 default/throw 误判成 merge)。实测修复
+    Base32 / Base64 / BCodec。种子 `SwitchEmptyLeadingCaseAlgorithms`。
+  - **对象-null 守卫的 then/else 在「后接底部测试循环」时被对调 (Md5Crypt salt 被忽略)** (语义正确性, 编译期测不出):
+    `if (salt == null) { 随机 } else { 解析 }` (字节码 `ifnonnull`) 在 else 带内层 if+throw、且 switch 后跟
+    test-at-bottom 循环 (`while`/`do-while` javac 编成 `goto test; body; test: if(cond) goto body`) 时, 节点图
+    重建会在「条件 sense 已定」之后**重排守卫的两个后继 `node.Next`**, 而 `RemoveGotoStatement` 旧逻辑按
+    `node.Next` 下标 (trueIndex 固定为 1) 选 true/false 分支 → 选错支 → salt 走了随机分支被忽略。现于建图时
+    (`opcode.Target` 顺序仍可靠的 `[falseBranch, trueBranch]` 处) 把 true 分支按**节点身份**钉到 `Node.JmpNode`,
+    `RemoveGotoStatement` 改用身份匹配 (`Next[0]==JmpNode` 选 0 否则 1) 选支, 顺序保持时为严格 no-op、节点被替换
+    (非仅重排) 时优雅退回旧 fallback, 故不会回退既有正确用例。实测修复 Md5Crypt salt 解析。种子
+    `NullCheckBranchThenLoop` (kill-switch `JDEC_IFBRANCH_PIN_OFF` 跑负向测试)。
+- **此前本轮新增治本 (4 项, 均已锁回归种子, 种子即档案)**:
+  - **invokespecial 超类调用渲染成 `super.m()` 而非 `this.m()`** (语义正确性, 编译期测不出): 非构造器
+    invokespecial、接收者为 `this`、目标类 ≠ 当前类时, 是 `super.m(...)` 调用; 旧版一律渲染成 `this.m(...)`,
+    在被子类覆盖的方法 (如 enum 常量体覆盖父 enum 的 `convert`) 上**虚分派回覆盖体→无限递归→StackOverflow**
+    (guava `CaseFormat.LOWER_UNDERSCORE.to(...)` 实测崩)。现 `FunctionCallExpression.IsSpecialInvoke` 标记
+    invokespecial (两处解码点均置位), `String()` 渲染时按「非 `<init>` + 接收者 `this` + 目标类≠当前类」判定
+    super 调用; 私有同类 invokespecial (目标类 == 当前类) 仍 `this.m()`。种子 `invokespecial_super_call`
+    (含 super 调用 + 私有同类调用双断言)。
+  - **被误删的「已声明」构造器恢复** (语义正确性, 非编译): 空体构造器 (体仅隐式 `super()`) 以前因「返回类型
+    void 的空体方法」一刀切被 `continue` 丢弃, 导致**真实声明的**无参构造器在类还有其它构造器时凭空消失
+    (guava `VerifyException()` → 调用点 `new VerifyException()` 找不到构造器)。现 `isOmittableDefaultCtor`
+    仅在「唯一 + 无参 + 可见性等同 javac 隐式默认」三条全满足时才省略 (此时省略无损, javac 自再生同款); 其余
+    一律保留 —— 含**多构造器下的无参体**、**私有唯一构造器** (单例, 否则可见性被悄悄放宽)、**带参空体构造器**
+    (真实重载)。种子 `keep_declared_noarg_ctor` / `keep_private_singleton_ctor` / `drop_implicit_default_ctor`。
+    kill-switch `JDEC_NO_KEEP_DECLARED_CTOR`。
+  - **合成访问桥构造器形参按目标泛型定型**: 桥构造器 (末参为合成匿名 marker 类) 无 Signature, 形参本会以擦除
+    `Object`/raw 渲染, 其唯一体 `this(args...)` 转发到声明了类型变量的私有目标构造器时报「Object 无法转换为 T」
+    (guava `Equivalence$Wrapper(Equivalence,Object,Equivalence$1)` / `Predicates$IsEqualToPredicate(Object,
+    Predicates$1)`)。现 `reTypeSyntheticBridgeCtorParams` 按「擦除形参表等于桥去掉 marker 后的前缀」定位唯一非
+    合成目标构造器, 取其 Signature 的泛型形参类型就地覆盖桥的非 marker 形参 (桥擦除回同 descriptor, 字节忠实;
+    raw 调用点照样通过)。此形态在每个「私有泛型构造器被外层访问」的嵌套类反复出现, 故收益面广。种子
+    `synthetic_bridge_ctor_generic_param`。kill-switch `JDEC_NO_SYN_BRIDGE_CTOR_RETYPE`。
+  - **嵌套泛型返回强转走 raw 桥**: 类型变量返回强转的目标若带**嵌套**泛型实参 (`Function<Supplier<T>,T>`)、且
+    返回值是被转成该接口的**另一类** (枚举单例 `SupplierFunctionImpl.INSTANCE` 具体实现 `Function<Supplier<
+    Object>,Object>`), 直接强转被 javac 判为不可转 (`Supplier<Object>` ≠ `Supplier<T>`)。现 `nestedGenericRawBridge`
+    在「目标含嵌套泛型 (多于一个 `<`) 且值擦除≠目标擦除」时插入 raw 桥 `(目标) (raw目标) (值)` (合法: 先降到 raw
+    超类再非受检放宽); 裸类型实参 (`Predicate<T>` / `Converter<T,T>`) 仍用单层直转。种子
+    `nested_generic_return_raw_bridge_cast` (真实 guava `Suppliers.class`)。
+- **早前本轮治本 (4 项, 均已锁回归种子, 文字记录按约定删除, 种子即档案)**:
+  - **方法级形参类型变量 `<...>` 还原** (原 Bug AG): `ParseMethodSignatureFull` + `parseFormalTypeParams`
+    解析签名首部 `<T:...>` 段, dumper `writeMethodTypeParams` 渲染方法级 `<T>` 声明并把名字临时注入
+    `FuncCtx.TypeParams`; 形参/返回保留类型变量 (含 `T[]` 数组形态), 冗余 `extends Object` 界已剥离。
+    种子 `method_type_params.class` + `method_type_params_array.class`。清掉 guava base 大量
+    `Object cannot be converted to CAP#N` (泛型推断调用点)。
+  - **synchronized 块声明提升** (Bug Y synchronized 变体): 见下文 Bug Y。种子 `synchronized_return_scope.class`。
+    清掉 guava base 整个 cannot-find-symbol 级联 (`Enums.getEnumConstants`)。
+  - **合成访问桥构造器空体不再丢弃**: dumper `isSyntheticAccessBridgeCtor` (名为 `<init>` + ACC_SYNTHETIC +
+    末参为合成匿名 marker 类型) 的空体 `this(...)` 委托构造器以前被「丢空体方法」逻辑删掉, 导致
+    `new Platform$JdkPatternCompiler((Platform$1)null)` 等调用点找不到构造器。现保留渲染。
+  - **字段单例返回的非受检强转**: 返回类型提及在作用域类型变量 (`Box<T>`)、而 return 的值是字段访问单例
+    (`Box<?> INSTANCE`, 捕获为 `Box<CAP>`) 时补 `(Box<T>)` 非受检强转 (与 guava `Converter.identity` 返回
+    `IdentityConverter.INSTANCE` 完全同构)。强转仅对字段访问值生效, 不波及 `return this`/`new`/方法调用。
+    种子 `generic_field_return_cast.class`。清掉 guava base `IdentityConverter<CAP> cannot be converted to
+    Converter<T>` 簇。
 - 全量 `go test ./common/javaclassparser/...` 全绿。
+- **权威多维对比报告 v2** (`report-v2.{md,json}`; 5 真实 jar × 4 工具 yak-syntax/yak-raw/
+  cfr-0.152/vineflower-1.10.1, jar+deps 上 classpath, 逐单元 `javac`, 89 分钟):
+  - **速度**: yak-syntax 吞吐 **9.3-15.1×** 快于 CFR (guava 13.0×, codec 15.1×); yak-raw 更快 (guava 反编译
+    并发 0.52s vs CFR 5.01s / VF 4.45s)。
+  - **健壮性**: 5 jar 全部 **100% 产出, 0 stub / 0 err** (从不崩/不退化)。
+  - **重编译率 (单元口径, Yak 每个扁平内部类算 1 单元, CFR/VF 每外层文件 1 单元, 分母不同)**:
+    guava yak **59%(1107/1892)** > cfr 44% < vf 70%; codec yak **92%** > cfr 82% ≈ vf 97%;
+    jackson yak **18%** > cfr 16% ≈ vf 16%; spring yak 32% ≈ cfr 36% / vf 39%; fastjson2 yak 15% ~ cfr 12% ≪ **vf 79%**。
+  - **绝对覆盖 (回填进可用 jar 的 class 数, §5 overlay)**: guava Yak **1092** ≫ cfr 430 / vf 953; codec Yak 98 > cfr 70 / vf 85。
+    即 **Yak 实际成功回填的 class 比两个对手都多** (单元率被高分母拉低, 但绝对回填最多)。
+  - **正确性**: 所有 jar/工具 **verify_fail=0** (spring 仅 1, 三家共有); guava **语义差分调用 = IDENTICAL**。
+  - **missing_dep=0** (deps 已上 classpath), 故失败基本都是 decompiler_err; 但 spring 的
+    `package javax.annotation does not exist` (jsr305 传递依赖缺失) 三家共有, 拉低 spring 全员、非 Yak 缺陷。
+  - **明显偏低指标 (待探因)**: ① fastjson2 yak 15% ≪ vf 79% (当前最大单 jar 差距); ② jackson yak 18% (绝对值低,
+    虽略胜 cfr/vf); ③ spring 32% (但含 jsr305 依赖缺失的全员共有噪声)。
+- (历史 guava yak-syntax 重编译率: 7% → 标准库点号前 30% → 零参泛型返回+内部类自由类型变量+泛型(T)强转后 57.6%
+  → 叠加「窄整型形参 descriptor 定型」**59%**)。
+- **精确错误直方图** (整目录 `javac` 一次性编译 1892 个 guava yak-syntax 单元, `-Xmaxerrs` 不截断, locale=en,
+  共 1212 条 error; 比逐单元抽样更准, 去掉了跨单元级联噪声) —— 下一步杠杆按此排序:
+  - **enum 高级 idiom 重建 — 常量体 + marker 构造器均已治本 (核心 + jar 路径, 见 Bug V)**: 原 ≈200 条
+    (`enum types are not extensible` 67 + `constructor <Enum> cannot be applied` ≈91 +
+    `cannot inherit from final <Enum>` 8 + `call to this must be first statement in constructor` 21)
+    主因是常量体合成子类 `<Enum>$N` 与合成 marker 构造器 `<Enum>(String,int,<Enum>$N)`; 本轮跨类折叠**已接入
+    生产 jar 路径** (JarFS.ReadFile 内对 enum 用 resolver 折叠、对合成 `$N` 抑制独立产出), **marker 构造器亦已
+    抑制** (清掉 `call to this must be first statement` 21 + 部分 `constructor cannot be applied`)。真实 guava
+    `CaseFormat` (5 常量体, release-8 含 access$N + marker ctor) 实测折叠成单一合法 enum 且 round-trip 通过。
+    待下次跑全量 1892-unit 直方图量化清零量 (本表数字是接入前旧值)。残留: enum-switch 脱糖复原 (低优, 非阻断,
+    见 Bug V-2)。`access$N` 经查非缺陷 (保留声明即自洽可编译)。
+  - `cannot find symbol` 214 (多为类型变量/同 jar 跨包嵌套残留, 多数需跨类整体重建, 见 Bug AD/V)。
+  - 类型变量擦除成 `Object`/bound 出现在**非返回位置** (字段读/构造器形参赋值/方法实参):
+    `Object→K/E/N/V/T/C/CAP` ≈ 196 + `Comparable→C/Cut<C>` ≈ 33 + `type argument not within bounds` ≈ 80。
+    与「泛型返回 (T) 强转」同源, 但在赋值/实参位, 部分需 this$0 参数化即跨类重建。
+  - `return outside method` 7 (见 Bug AC)。
+  - boolean↔int 局部误定型 6 (见 Bug AI, 实际远小于此前抽样的 81)。
 
 ---
 
 ## 未修复缺陷 (下一轮治本目标)
 
-### Bug V — enum 高级 idiom 跨类重建 (需多类整体反编译能力, 非单类 bug)
+### Bug V — enum 高级 idiom 跨类重建 (常量体已治本; 残留仅 enum-switch idiom 复原)
 
-当前架构 (`javaclassparser.Decompile` + jar parser) 对每个 `.class` **独立**反编译并各自落一个
-`.java`, 没有「把内部类折叠进外层类」的整体重建能力。两类 enum idiom 因此产出**不可编译**输出:
+「把合成内部类折叠进外层类」的多类折叠能力**已落地并接入生产 jar 路径**, 常量体 idiom 已治本
+(其承重测试 `TestEnumConstantBodyFoldIsLoadBearing` 单类 resolver 路径 +
+`TestEnumConstantBodyFoldJarPathIsLoadBearing` jar 路径, 均带 `JDEC_NO_ENUM_FOLD` kill-switch, 即永久档案)。
+实现散落: 附加式入口 `DecompileWithResolver` / `ClassObject.DumpWithResolver` (`parse_class_object.go`)、
+折叠逻辑 `dumper_enum_fold.go` (`foldEnumConstantBodies` 从 `<clinit>` 的 `new Op$N(...)` 映射常量→子类,
+内联方法体、剥离合成构造器、合并 import)、jar 接线 `fs.go` (`JarFS.decompileClassBytes`: 对真 enum 用
+`enumSiblingResolver` 折叠, 对合成 `$N`(ACC_ENUM 且 super≠java.lang.Enum) 输出抑制标记, javac 重编译时自再生)。
+另: **合成 marker 构造器抑制已治本** —— 带常量体的 enum (尤其 `--release 8` 等前 nestmates 字节码) 会有一个
+javac 合成的 `<Enum>(String,int,<Enum>$N)` marker 构造器, 旧版渲染成 `this(var1,var2)` 垃圾 ctor (引用已折叠的
+`$N`、且 `this(...)` 不在首句)。现于 `isSyntheticEnumMethod` 按「末参为本 enum 自身匿名子类 `L<self>$<digits>;`」
+精确识别并抑制 (kill-switch `JDEC_NO_ENUM_MARKER_CTOR`), 承重测试 `TestEnumMarkerCtorSuppressionIsLoadBearing`。
+注: 合成访问器 `access$N` 经查**不是缺陷** —— 反编译保留其方法声明且调用点一致引用, 自洽可编译 (实测 guava
+`CaseFormat.access$100` round-trip 通过), 故无需内联还原。
+实测: guava `CaseFormat` 折叠成单一合法 enum (5 常量体内联, `$StringConverter` 真嵌套类保留不抑制)。
 
-1. **enum 常量体 (constant-specific class body)** —— 形如
-   `enum Op { ADD { long apply(...){...} }, MUL { ... }; abstract long apply(...); }`。
-   javac 把每个带体常量降级成合成子类 `Op$1`/`Op$2`(带 `ACC_ENUM` 且 `extends Op`)。
-   - 症状: 反编译 `Op` 得到 `abstract long apply(...)` 但常量 `ADD/MUL` 无内联体 →「ADD 未覆盖
-     抽象方法」; 反编译 `Op$1` 得到 `class Op$1 extends Op` →「枚举类型不可继承」。两者**单类都无法
-     编译**, 唯一正确写法是把 `Op$N` 的方法体折叠回常量声明。
-   - 复现: `/tmp/grt/EnumBody.java` (最小); 真实命中 guava `LongMath$MillerRabinTester`。
-   - 规避现状: `dumper.go` 已把合成子类降级成普通 class (去 `enum` 关键字), 但 `extends <enum>`
-     仍非法。彻底治本需新增「外层 + 全部内部类一起喂入」的反编译入口, 在 dumper 里按 `<clinit>`
-     的 `ADD = new Op$1("ADD",0)` 映射把子类体内联进常量、并抑制独立 `Op$N` 输出。
+**残留 (仅一项, 低优, 非阻断正确性)**: **enum-switch 脱糖复原** —— `switch(enumVar)` 被 javac 降级成合成类
+`Outer$1` 内的 `$SwitchMap$<Enum>[]` 序数映射数组 + `enumVar.ordinal()` 查表。
+- 症状: 反编译保留低层 `Outer$1.$SwitchMap$...[v.ordinal()]` 形态而非还原 `switch(enum)`。
+- 现状: 外层与合成 `Outer$1` 两 class **同时**反编译并一起编译时可正常编译运行 (实测), 真实整 jar 会同时产出
+  两文件, 故仅「美观/idiom 复原」, 非阻断。
 
-2. **enum-switch 脱糖** —— `switch(enumVar)` 被 javac 降级成合成类 `Outer$1` 内的
-   `$SwitchMap$<Enum>[] ` 序数映射数组 + `enumVar.ordinal()` 查表。
-   - 症状: 反编译保留低层 `Outer$1.$SwitchMap$...[v.ordinal()]` 形态而非还原 `switch(enum)`。
-   - 现状: 当外层与合成 `Outer$1` 两个 class **同时**反编译并一起编译时可正常编译运行 (实测), 故
-     列为「美观/idiom 复原」低优, 非阻断正确性。真实整 jar 反编译会同时产出两文件。
+### Bug Y (残留) — 纯分支内赋值的目标局部声明作用域过窄, 被读出作用域
 
-> 两者同源: 都需要**跨类整体重建** (multi-class folding) 能力, 是下一个独立大特性, 不做半成品式
-> 改动以免破坏现有逐类架构与全量回归。
-
-### Bug Y — 分支/条件内赋值的目标局部声明作用域过窄, 被读出作用域 (int 嵌入式赋值已治, 引用形态残留)
-
-- 已治 (int 嵌入式赋值): `if ((var4 = expr) == 0)` / `(v = a[i]) < n` 这类「dup-collapse 形成的嵌入式
-  赋值致变量无独立声明」, 安全网原先猜成 `Object v = null` 致 int 存储与算术读取重编译失败; 现在
-  `generatedLocalLooksInt` 识别「嵌入式赋值参与关系比较 / 与整型字面量等值比较」补成 `int v = 0`。
-  回归 battery `EmbeddedAssignDecl` + 承重测试 `TestEmbeddedAssignDeclIntIsLoadBearing`
-  (关 `JDEC_NO_EMBED_ASSIGN_INT` 即退化报 Object/int 不兼容)。
-- 残留 (引用嵌入式赋值): `(s = parts[i]) != null` 后接 `s.length()` → 安全网仍补 `Object s = null`,
-  致引用方法调用 `cannot find symbol`。根因: dumper 末端的字符串安全网 (`addMissingGeneratedLocalDecls`)
-  丢失了真实 ref 类型, 只能靠启发式; 引用类型无法从字符串可靠反推。治本需把真实类型从
-  `ParseBytesCode` 的 statementList 透传到安全网 (varN→type 映射), 属跨层管线改动。
+- 嵌入式赋值 (int + 引用) 两形态均已治本, 其承重测试即档案 (battery `EmbeddedAssignDecl` /
+  `EmbeddedAssignRef` + `TestEmbeddedAssignDeclIntIsLoadBearing` / `TestEmbeddedAssignRefIsLoadBearing`,
+  kill-switch `JDEC_NO_EMBED_ASSIGN_INT` / `JDEC_NO_EMBED_ASSIGN_REF`)。
+- **synchronized 块变体已治本**: `synchronized(lock){ ...; v=...; } return v;` —— javac 把 `return v` 编成
+  load-v; monitorexit; areturn, 结构化器据此把 `return v` 作为 synchronized 语句的**兄弟节点**放到块外, 而 v 的
+  声明仍在块内 → 读出作用域。现于 `rewrite_var.go` 的 `syncHoistDeclarations` (经 `hoistSwitchDeclarations` 接线)
+  把「块内声明、块外被读」的局部声明提升到 synchronized 语句之前 (块内降级为纯赋值)。这是 guava base 整个
+  cannot-find-symbol 重编译级联的单一根因 (`Enums.getEnumConstants`)。承重种子 `synchronized_return_scope.class`
+  (`TestDecompileSyntaxRegression`)。
 - 残留 (纯分支声明): `if(...) v=x; ... use(v);` 中 v 声明被限制在 if 块内 →
-  `cannot find symbol`。需把声明提升到支配作用域 / 跨分支合并同槽局部 (与 Bug W 同源)。
+  `cannot find symbol`。这不是嵌入式赋值 (没有 `(v = ...)` 的条件内赋值形态), 而是普通分支内首次赋值后
+  在分支外被读, 声明未提升到支配作用域。需把声明提升到支配作用域 / 跨分支合并同槽局部 (与 Bug W 同源)。
+  (synchronized 变体已如上治本; 此残留专指 if/else 分支形态。)
 - 复现: commons-codec `Metaphone` / `MatchRatingApproachEncoder` / `DaitchMokotoffSoundex` /
   `bm.Rule`。
 
@@ -171,26 +216,12 @@
 
 ### Bug AD (残留) — 非标准库外部依赖 / 同 jar 跨包嵌套类型按 `$` 引用
 
-- JDK/标准库子集已治本 (见当前状态「标准库嵌套类型点号渲染」, `Map.Entry` 等), 占 guava `cannot find
-  symbol` 的最大头 (706 处)。以下两类残留仍未治:
-  1. **非标准库外部依赖 jar** 的嵌套类型 (如 `com.google.errorprone.*$*`, `org.checkerframework.*$*`):
-     这些在 classpath 上也是真正嵌套的, 应渲染 `.`; 但单类入口无法区分「同 jar 自有扁平单元」与「依赖 jar
-     外部类型」(两者都可能是 `com.google.*` 前缀), 故未扩到非标准库包。
-  2. **同 jar 跨包**嵌套类型 (如 base 包引用 collect 的 `Multiset$Entry`): 自有扁平单元需保持 `$`,
-     与 §「Bug V / 根因 B」同源, 属跨类整体重建特性。
-- 复现: guava `Multimaps$Keys$1` (`Multiset$Entry`)、commons-codec `DaitchMokotoffSoundex`。
-
-### Bug AG (残留) — 方法级形参类型变量 `<...>` 签名未还原
-
-- 零参泛型返回 (`()TK;`) 已治本 (见当前状态「泛型方法零参返回类型还原」)。残留: 方法**自带形参类型变量**的
-  签名 (`<T:...>(...)...`, 如 `<T> T[] toArray(T[] a)`) 仍不还原。
-- 原因有二: (1) `ParseMethodSignature` 遇到 sig 首字符 `<` 直接返回 (nil,nil) 回退 descriptor;
-  (2) 即便解析了形参与返回, dumper 目前不渲染方法级 `<T>` 声明 (仅 `ParseMethodSignatureTypeParams` 提取但
-  未接入渲染), 贸然代入 `T foo(T)` 会因 `T` 未声明而编译失败。故需「解析 `<...>` + 渲染方法级 `<T>` 声明 +
-  形参/返回代入」三者一并落地, 属下一轮独立特性 (风险集中在方法头渲染, 建议带 kill-switch)。
-- 影响: guava 含方法级泛型的工具方法 (`<T> T[] toArray`, `<E> ImmutableList<E> of(...)` 等) 仍可能不可重编译;
-  但类级类型变量 (K/V/E) 的方法此前已随零参修复覆盖大部分常见集合接口。
-- 复现: guava `collect/ObjectArrays` (`<T> T[] newArray(...)`)。
+- JDK/标准库子集已治本 (`Map.Entry` 等); 同 jar 跨包扁平 `$` import 也已治本 (见承重测试)。以下残留仍未治:
+  - **非标准库外部依赖 jar** 的嵌套类型 (如 `com.google.errorprone.*$*`, `org.checkerframework.*$*`):
+    这些在 classpath 上是真正嵌套的, 应渲染 `.` + 外层 import; 但单类入口无法区分「同 jar 自有扁平单元」与
+    「依赖 jar 外部类型」(两者都可能是 `com.google.*` 前缀), 故未扩到非标准库包。注: 该残留**不会**让原本可编译
+    的单元退化 (扁平 `$` 引用在旧外层 import 下本就不可解析), 仅是这类单元仍编不过。
+- 复现: guava 引用 `com.google.errorprone.annotations.*` 嵌套类型的单元。
 
 ### Bug AF — RuntimeInvisibleAnnotations 重新 marshal 时被写成 RuntimeVisibleAnnotations (pre-existing, 非反编译路径)
 
@@ -204,6 +235,71 @@
   两条用户路径均不经此, 故不影响当前重编译率/差分指标。治本: 解析时把真实属性名记入 struct 的 `Type` 字段,
   marshal 时据此选 `RuntimeVisibleAnnotations`/`RuntimeInvisibleAnnotations`。
 - 复现: 任意带 `@Retention(CLASS)`/编译期注解的 class (如 guava `GwtCompatible.class`)。
+
+### Bug AI (已定位 + 已取最小复现, 体量小) — 复用槽内局部变量被误定型成 boolean/int
+
+- 症状 (整目录精确计数, 仅 ≈10 条): `int cannot be converted to boolean` 4 + `boolean cannot be converted
+  to int` 6, 集中在 `MapMakerInternalMap$Segment` / `LocalCache$Segment` / `ImmutableSortedMap` /
+  `LongMath` 等少数类。**自托管常见 boolean 形态 (位运算 & | ^、复合赋值 &=、三目、布尔数组、参数/返回) 全部
+  干净 round-trip** (见 battery BooleanEdge / BooleanBitwise / BoolIntSlotReuse), 故本 bug 只在特定数据流出现。
+- **最小复现 (本轮取得, 工作流第一相)**: 方法返回 boolean, 在 `return` 前把布尔结果**存入局部并跨一次方法调用**
+  再读回 (`boolean r = false; this.touch(); return r;`); javac 把这个 boolean 局部复用到前面一个 int 临时量的
+  同一槽 (slot 2)。Yak 输出 `boolean var2;` 后既有 `var2 = this.count - 1;`(int)/`this.count = var2;` 又有
+  `var2 = false; return var2;`(boolean) → 两处类型冲突, 不可重编译。注意同方法的 else 分支 (`boolean var2_1 = true`)
+  已被**名字冲突拆分**正确处理, 仅 if 分支的合并槽未拆。battery `BoolIntSlotReuse` 收录 Yak **能**正确处理的相邻
+  变体 (布尔以字面量直接 return, 不经槽), 失败变体见此处描述。
+- 根因 (已取实证): 同一 JVM 槽在不重叠活跃区间先后存放 int 与 boolean, 槽复用合并把它们并成**同一个**
+  `VariableId` 并按其中一种 (boolean, 多由 ireturn / 返回类型主导) 定型。`dumper.go` 的名字冲突拆分
+  (`declareLocalInScope`/`resolveLocalNameCollisions`) 只在「两个**不同** id 渲染成同名 varN」时触发, 此处是**单个**
+  合并 id 跨两种类型, 故不触发。
+- 治本难点 (为何本轮不强改): 真正治本是「复用槽按活跃区间拆分」, 必须在槽合并层 (`rewriter/rewrite_var.go`) 或
+  dumper 做**基于支配/活跃性**的拆分; 槽合并层有专门的「禁止过度拆分」回归 (`regression_test.go` 的
+  `var3_1 leaked` 等) 把握平衡, 贸然「遇冲突即不合并」会触发它们; 而在 dumper 做线性扫描拆分则在跨分支/循环
+  时可能**静默错拆 (语义错误, 比编译报错更危险)**。故需先建活跃性分析再拆, 属与 Bug W/Y 同族的核心特性。
+  体量小 (≈6-10 条), 优先级低于 enum 簇, 但已具备最小复现, 可作为活跃性拆分特性的首个承重用例。
+
+### Bug AJ (新登记, 已取最小复现) — 两个不同槽的同型 int 局部被并成同一 varN, 致循环/返回引用错变量
+
+- 症状 (语义错误, 编译期测不出 —— 类型一致仍能编过): `int kind` (跨分支两段活跃区, 循环内 + 返回处被读)
+  与紧随其后的循环计数器 `int i` 是**两个不同 JVM 槽** (javac: kind=slot3, i=slot4), 反编译却把二者并成同一个
+  `var3`: 循环体 `acc = acc*31 + kind` 与 `return (acc<<3) + kind` 里的 `kind` 全被渲染成计数器 `var3`(=i),
+  数值算错。最小复现 (已实测): 见下源 (kind 在 if/else 各赋值一次, 循环内既用 kind 又自增 i, 返回再用 kind):
+  ```java
+  static int classify(String ref, int seed) {
+      int acc = seed;
+      int kind;
+      if (ref == null) { kind = 1; acc += 7; }
+      else { kind = 2 + (ref.charAt(0) & 7); acc += ref.length(); }
+      int i = 0;
+      while (i < 4) { acc = (acc * 31) + kind; i++; }   // 这里的 kind 被错成 i
+      return (acc << 3) + kind;                          // 这里的 kind 被错成 i
+  }
+  ```
+  javap 实证: LocalVariableTable 中 kind=slot3 (两段: Start8/Len6 + Start25/Len35), i=slot4, 且 kind[25,60)
+  与 i[35,60) **活跃区重叠** → 必为不同槽, 不该合并。
+- 根因 (待最终定位): 槽合并 / 变量命名层把 slot3(kind, 双活跃段) 与 slot4(i) 误并成单一 `var3`。疑似「kind 的
+  第二活跃段」未被识别为 kind 而与 i 槽混淆, 或命名按声明序而非槽号致冲突未触发拆分。与 Bug AI/W 同属「槽×活跃区
+  ×变量身份」族, 但方向相反 (AI 是单槽双型需拆; 此处是双槽被误并)。
+- 现状: 未治本。该形态因「分支内首次赋值 + 后接循环」在真实算法 (Md5Crypt 已修的是其**分支顺序**, 变量身份仍可能
+  踩此) 中可复发, 故先登记最小复现, 留作活跃性拆分特性的承重用例之一。注: NullCheckBranchThenLoop 种子已绕开此
+  形态 (各局部独占槽), 以隔离已治本的分支顺序回归。
+
+### Bug AH (新登记, guava base 唯一残留) — 类型变量擦除成 Object 出现在非返回位置 (需泛型沿数据流传播)
+
+- 症状 (guava base 整目录精确计数: 3 条, 2 单元): 局部变量按字节码 descriptor 定型为 **raw**, 致其成员/返回值
+  退化成 Object, 流入需要类型变量的形参时报「Object 无法转换为 CAP#N / T」:
+  - `PairwiseEquivalence.doEquivalent/doHash`: `Iterator var3 = var1.iterator();` 中 `var1` 是 `Iterable<T>`,
+    应推出 `Iterator<T> var3`, 则 `var3.next()` 为 `T`; 现 raw `Iterator` → `next()` 为 Object →
+    `elementEquivalence.equivalent(var3.next(), ...)` (形参 `? super T`) 报错。
+  - `Equivalence$Wrapper.equals`: `Equivalence$Wrapper var2 = (Equivalence$Wrapper)var1;` 应为 `Wrapper<?>`,
+    则 `var2.reference` 为捕获类型; 现 raw → `var2.reference` 为 Object → `equivalent(this.reference, var2.reference)` 报错。
+- 根因: 局部变量类型来自 descriptor (擦除态, 无泛型), 缺「按接收者类型实参实例化方法返回签名」与「checkcast 目标按
+  上下文补泛型实参」的泛型传播。这是与「泛型返回 (T) 强转」同源、但发生在**赋值/局部声明**位的镜像问题, 全 guava
+  直方图里属最大类 (≈196 `Object→K/E/V/T` + 33 `Comparable→C` + 80 `type argument not within bounds`)。
+- 治本方向 (大特性, 须谨慎, 高回归风险): 在 dumper/类型恢复层做有限泛型实例化 —— 当局部 = `recv.m(...)` 且 recv
+  有已知泛型类型、m 的 Signature 返回引用了 recv 的类型参数时, 用实例化后的泛型类型给局部定型 (而非 raw); checkcast
+  目标同理按目标上下文补实参。须先有承重用例与 kill-switch, 避免误扩到无法静态判定的场景 (那比编译报错更危险)。
+- 复现: guava `PairwiseEquivalence` / `Equivalence$Wrapper` (base 包仅此 2 单元残留)。
 
 ### Bug AE — 嵌套 enum 引用 / try-with-resources 抑制变量类型
 

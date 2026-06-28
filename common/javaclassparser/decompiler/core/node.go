@@ -29,7 +29,22 @@ type Node struct {
 	// `break`s (Bug K). It is NOT set for the ordinary fallback where the default genuinely owns the
 	// body (e.g. fall-through-into-default), so that case is structured unchanged.
 	SwitchEmptyDefaultMerge bool
-	IsTryCatch              bool
+	// SwitchEmptyCaseMerge marks a switch node whose post-switch merge point is the start node of an
+	// EMPTY non-default case (`case K: break;` whose only body in bytecode is `goto merge`). After
+	// goto-folding that case's start node IS the merge, which the dominator-based merge search excludes
+	// (it is a case start) and the empty-default fallback misses (the default here genuinely throws).
+	// Without detecting it, the merge/tail code was absorbed into that case and every case `break` was
+	// dropped, so cases fell through into `default: throw` (commons-codec Base64/Base32 EOF switch:
+	// `Impossible modulus N` for any non-block-aligned input). When set, SwitchRewriter renders the
+	// matching case as an empty `case K: break;` and emits the merge code after the switch.
+	SwitchEmptyCaseMerge bool
+	// SwitchEmptyCaseMergeNode persists the empty-case merge node across the two SwitchRewriter1
+	// invocations per switch (the prep loop, then the call inside SwitchRewriter). After the first run
+	// inserts the case `break`s, the structure no longer re-derives this merge (unlike an empty default,
+	// whose merge coincides with caseMap[-1] so the generic fallback restores it), so without saving it
+	// the second run would corrupt MergeNode to the default/throw node. Reused on re-entry.
+	SwitchEmptyCaseMergeNode *Node
+	IsTryCatch               bool
 	// IsCatchStart marks a node that is the entry of an exception handler (catch / finally-desugar)
 	// block, set when the try node is built from the exception table. TryRewriter uses it to classify
 	// a try node's successors structurally instead of inferring the handler from its body's first
