@@ -304,6 +304,24 @@ type RuntimeInvisibleParameterAnnotationsAttribute struct {
 	}
 */
 type AnnotationDefaultAttribute struct {
+	AttrLen uint32
+	// DefaultValue is the single element_value carrying this annotation element's default (the
+	// `default <value>` clause). Without parsing it the decompiled @interface dropped every
+	// `default`, so any use site that omitted such an element ("@GwtCompatible(emulated=true)")
+	// failed to recompile ("annotation @X is missing a default value for the element 'serializable'").
+	DefaultValue *ElementValuePairAttribute
+	// Info is the raw attribute body, captured verbatim so re-marshaling stays byte-exact (this
+	// attribute previously fell through to UnparsedAttribute, which round-tripped raw bytes).
+	Info []byte
+}
+
+func (a *AnnotationDefaultAttribute) readInfo(cp *ClassParser) {
+	before := cp.reader.data
+	a.DefaultValue = ParseAnnotationElementValue(cp)
+	consumed := len(before) - len(cp.reader.data)
+	if consumed >= 0 && consumed <= len(before) {
+		a.Info = before[:consumed]
+	}
 }
 
 /*
@@ -384,6 +402,11 @@ func newAttributeInfo(attrName string, attrLen uint32) AttributeInfo {
 		// reuse the same struct so invisible annotations (compiler-only, e.g. @Override, @Lazy)
 		// are parsed without falling through to UnparsedAttribute.
 		return &RuntimeVisibleAnnotationsAttribute{AttrLen: attrLen}
+	case "AnnotationDefault":
+		// The default value of an annotation element (`boolean serializable() default false;`).
+		// Parsing it lets the dumper re-emit the `default <value>` clause; without it the
+		// @interface drops all defaults and use sites that omit the element no longer compile.
+		return &AnnotationDefaultAttribute{AttrLen: attrLen}
 	case "BootstrapMethods":
 		return &BootstrapMethodsAttribute{AttributeLength: attrLen}
 	case "InnerClasses":

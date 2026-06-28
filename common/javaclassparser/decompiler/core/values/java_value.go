@@ -323,13 +323,17 @@ func (j *JavaClassValue) ReplaceVar(oldId *utils.VariableId, newId *utils.Variab
 // String implements JavaValue.
 // Subtle: this method shadows the method (JavaType).String of JavaClassValue.JavaType.
 func (j *JavaClassValue) String(funcCtx *class_context.ClassContext) string {
-	// An array-typed class value can only appear as a class literal (e.g. boolean[].class),
-	// never as a cast target or static-call receiver (those bypass this method via Type()).
-	// Rendering the bare type "boolean[]" would be invalid in expression position.
+	// A JavaClassValue is a Class-object literal (ldc of a class constant), so in expression
+	// position it must render as `Type.class` — both for the array form (boolean[].class) and the
+	// ordinary form (String.class). Rendering the bare type ("String") produced broken output when
+	// the literal was used as a value (e.g. `return Integer.class`) or as the receiver of an
+	// instance method on the Class object (e.g. `String.class.getName()` came out as
+	// `String.getName()`). Static method invocations (Integer.parseInt(...)) use the bare type name
+	// and are handled in FunctionCallExpression.String via Type(), so they never reach this method.
 	if j.JavaType != nil && j.JavaType.IsArray() {
 		return j.JavaType.String(funcCtx) + ".class"
 	}
-	return j.JavaType.String(funcCtx)
+	return j.JavaType.String(funcCtx) + ".class"
 }
 
 func (j *JavaClassValue) Type() types.JavaType {

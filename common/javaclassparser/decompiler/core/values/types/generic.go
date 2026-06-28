@@ -329,6 +329,165 @@ func skipAngleSection(sig string) (string, bool) {
 	return "", false
 }
 
+// ClassFormalTypeParamNames returns the bare names declared in a leading formal type parameter
+// section of a class signature, e.g. "<K:Ljava/lang/Object;V:Ljava/lang/Object;>L..." -> ["K","V"].
+// Returns nil when the signature has no leading "<...>" section or cannot be parsed.
+func ClassFormalTypeParamNames(sig string) []string {
+	if len(sig) == 0 || sig[0] != '<' {
+		return nil
+	}
+	rest := sig[1:]
+	var names []string
+	for len(rest) > 0 && rest[0] != '>' {
+		colonIdx := strings.IndexByte(rest, ':')
+		if colonIdx < 0 {
+			return names
+		}
+		names = append(names, rest[:colonIdx])
+		rest = rest[colonIdx:]
+		for len(rest) > 0 && rest[0] == ':' {
+			rest = rest[1:]
+			if len(rest) > 0 && (rest[0] == ':' || rest[0] == '>') {
+				continue
+			}
+			_, remaining, ok := parseSigType(rest)
+			if !ok {
+				return names
+			}
+			rest = remaining
+		}
+	}
+	return names
+}
+
+// scanTypeVarRefs consumes exactly one type signature at sig and appends every TypeVariableSignature
+// name (the `T<name>;` form, including those nested inside type arguments and array element types) to
+// *out. It mirrors parseSigType's grammar so a `T` is only treated as a type-variable tag when it
+// actually starts a type (never when it merely appears inside a class internal name like
+// Lcom/example/TestClass;). Returns the remaining string and whether parsing succeeded.
+func scanTypeVarRefs(sig string, out *[]string) (string, bool) {
+	if len(sig) == 0 {
+		return "", false
+	}
+	switch sig[0] {
+	case 'B', 'C', 'D', 'F', 'I', 'J', 'S', 'Z', 'V':
+		return sig[1:], true
+	case 'T':
+		end := strings.IndexByte(sig, ';')
+		if end < 0 {
+			return "", false
+		}
+		*out = append(*out, sig[1:end])
+		return sig[end+1:], true
+	case '[':
+		return scanTypeVarRefs(sig[1:], out)
+	case 'L':
+		return scanClassTypeVarRefs(sig, out)
+	default:
+		return "", false
+	}
+}
+
+// scanClassTypeVarRefs consumes one ClassTypeSignature (Lpkg/Name<args>.Inner<args>;) and records the
+// type-variable names found in its (possibly nested) type arguments. It does not record the class name
+// itself, which is never a type variable.
+func scanClassTypeVarRefs(sig string, out *[]string) (string, bool) {
+	rest := sig[1:]
+	lt := strings.IndexByte(rest, '<')
+	sc := strings.IndexByte(rest, ';')
+	if lt >= 0 && (sc < 0 || lt < sc) {
+		rest = rest[lt:]
+	} else if sc >= 0 {
+		rest = rest[sc:]
+	} else {
+		return "", false
+	}
+	scanArgs := func(r string) (string, bool) {
+		r = r[1:] // skip '<'
+		for len(r) > 0 && r[0] != '>' {
+			switch r[0] {
+			case '*':
+				r = r[1:]
+				continue
+			case '+', '-', '=':
+				r = r[1:]
+				if len(r) > 0 && (r[0] == '>' || r[0] == '*') {
+					continue
+				}
+			}
+			remaining, ok := scanTypeVarRefs(r, out)
+			if !ok {
+				return "", false
+			}
+			r = remaining
+		}
+		if len(r) == 0 || r[0] != '>' {
+			return "", false
+		}
+		return r[1:], true
+	}
+	if len(rest) > 0 && rest[0] == '<' {
+		r, ok := scanArgs(rest)
+		if !ok {
+			return "", false
+		}
+		rest = r
+	}
+	for len(rest) > 0 && rest[0] == '.' {
+		innerEnd := 1
+		for innerEnd < len(rest) && rest[innerEnd] != ';' && rest[innerEnd] != '<' && rest[innerEnd] != '.' {
+			innerEnd++
+		}
+		rest = rest[innerEnd:]
+		if len(rest) > 0 && rest[0] == '<' {
+			r, ok := scanArgs(rest)
+			if !ok {
+				return "", false
+			}
+			rest = r
+		}
+	}
+	if len(rest) == 0 || rest[0] != ';' {
+		return "", false
+	}
+	return rest[1:], true
+}
+
+// TypeVarRefsInFieldSig returns the type-variable names referenced in a single field type signature,
+// in first-seen order (with duplicates preserved; the caller dedups). E.g. "Ljava/util/List<TV;>;"
+// -> ["V"]; "TK;" -> ["K"].
+func TypeVarRefsInFieldSig(sig string) []string {
+	var out []string
+	if _, ok := scanTypeVarRefs(sig, &out); !ok {
+		return nil
+	}
+	return out
+}
+
+// FreeTypeVarRefsInClassSig returns the type-variable names referenced in the SUPERTYPE portion of a
+// class signature (the superclass + interfaces that follow the formal type parameter section), in
+// first-seen order. Subtracting ClassFormalTypeParamNames from these yields the "free" variables a
+// nested/inner/anonymous class inherits from an enclosing scope.
+func FreeTypeVarRefsInClassSig(sig string) []string {
+	rest := sig
+	if len(rest) > 0 && rest[0] == '<' {
+		r, ok := skipAngleSection(rest)
+		if !ok {
+			return nil
+		}
+		rest = r
+	}
+	var out []string
+	for len(rest) > 0 {
+		remaining, ok := scanTypeVarRefs(rest, &out)
+		if !ok {
+			break
+		}
+		rest = remaining
+	}
+	return out
+}
+
 // ParseMethodSignatureTypeParams extracts formal type parameters from a method
 // signature, e.g. "<E:Ljava/lang/Object;>(LList<TE;>;)TE;" returns "<E>".
 // Returns "" if the method has no type parameters or parsing fails.

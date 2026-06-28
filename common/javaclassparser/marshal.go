@@ -261,6 +261,14 @@ func writeAttributes(writer *JavaBufferWriter, info []AttributeInfo, classObj *C
 			for t := 0; t < len(info[j].(*RuntimeVisibleAnnotationsAttribute).Annotations); t++ {
 				WriteAnnotation(classObj.ConstantPoolManager, info[j].(*RuntimeVisibleAnnotationsAttribute).Annotations[t], writer)
 			}
+		case *AnnotationDefaultAttribute:
+			// Re-emit the raw body verbatim (captured at parse time) so marshaling stays byte-exact;
+			// the parsed DefaultValue is only used by the source dumper, not by re-serialization.
+			ad := info[j].(*AnnotationDefaultAttribute)
+			n := classObj.findUtf8IndexFromPool("AnnotationDefault") + 1
+			writer.Write2Byte(n)
+			writer.Write4Byte(ad.AttrLen)
+			writer.Write(ad.Info)
 		case *UnparsedAttribute:
 			n := classObj.findUtf8IndexFromPool(info[j].(*UnparsedAttribute).Name) + 1
 			writer.Write2Byte(n)

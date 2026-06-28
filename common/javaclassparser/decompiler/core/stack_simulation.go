@@ -90,13 +90,33 @@ func (s *StackSimulationImpl) GetVar(slot int) *values.JavaRef {
 
 func (s *StackSimulationImpl) NewVar(val values.JavaValue) *values.JavaRef {
 	s.currentVarId = s.currentVarId.Next()
-	newRef := values.NewJavaRef(s.currentVarId, val, val.Type())
+	newRef := values.NewJavaRef(s.currentVarId, val, slotDeclType(val))
 	//d.idToValue[d.currentVarId] = val
 	return newRef
 }
 
+// slotDeclType returns the static type to declare a local slot with when val is stored into it. It
+// equals val.Type() for every value EXCEPT a class literal (`Foo.class`): a JavaClassValue.Type()
+// reports the *referenced* class (Foo) because that drives bare-type rendering (the `Foo.class`
+// receiver and the `Foo.parseInt(...)` static-call qualifier), but as a stored rvalue the literal is
+// a java.lang.Class instance, so the capturing local must be declared `Class`, not `Foo`. Declaring
+// it `Foo` made later reads (`c.getName()`, `c.isPrimitive()`) fail to recompile with
+// "cannot find symbol". Inline (single-use) class literals are unaffected because they fold back to
+// `Foo.class.getName()` and never reach a declaration. Kill-switch: JDEC_NO_CLASSLIT_SLOT_TYPE=1.
+func slotDeclType(val values.JavaValue) types.JavaType {
+	if val == nil {
+		return nil
+	}
+	if os.Getenv("JDEC_NO_CLASSLIT_SLOT_TYPE") == "" {
+		if _, ok := values.UnpackSoltValue(val).(*values.JavaClassValue); ok {
+			return types.NewJavaClass("java.lang.Class")
+		}
+	}
+	return val.Type()
+}
+
 func (s *StackSimulationImpl) AssignVar(slot int, val values.JavaValue) (*values.JavaRef, bool) {
-	typ := val.Type()
+	typ := slotDeclType(val)
 	ref, ok := s.varTable[slot]
 	// Both the incoming value's type and the slot's current ref type must be present to compare
 	// them; an upstream value occasionally carries a nil type (incomplete simulation), and
@@ -136,10 +156,49 @@ func (s *StackSimulationImpl) AssignVar(slot int, val values.JavaValue) (*values
 				return ref, false
 			}
 		}
+		// A primitive slot reassigned within the numeric int computational category
+		// (byte/char/short/int — NOT boolean, which has no int<->boolean conversion) is the SAME
+		// local widening, not a slot reused for a new variable. The JVM stores all of
+		// byte/char/short/int through the int stack category and the same slot, so a value's static
+		// element type (e.g. a byte from baload, an int from iconst) routinely disagrees with the
+		// slot's declared type while denoting one variable. Splitting it minted a fresh block-scoped
+		// ref whose declaration sat inside the branch performing the reassignment, so a later read of
+		// the slot referenced an out-of-scope name (commons-codec Base16.decodeOctet:
+		// `int r = -1; if (...) r = table[b]; if (r == -1) ...` read `r` outside its if). Keep one
+		// variable and widen its declared type to int so every store assigns by implicit widening;
+		// narrowing at byte/short/char-typed use sites is reintroduced by the call/return cast logic.
+		// Same-slot int-category locals never have overlapping live ranges (the verifier would force
+		// distinct slots), so merging is always safe to compile. Kill-switch:
+		// JDEC_INTCAT_REASSIGN_SPLIT=1.
+		if isIntCategoryNumeric(ref.Type()) && isIntCategoryNumeric(typ) && os.Getenv("JDEC_INTCAT_REASSIGN_SPLIT") == "" {
+			if p, okp := ref.Type().RawType().(*types.JavaPrimer); okp && p.Name != types.JavaInteger {
+				ref.ResetVarType(types.NewJavaPrimer(types.JavaInteger))
+			}
+			return ref, false
+		}
 	}
 	newRef := s.NewVar(val)
 	s.varTable[slot] = newRef
 	return newRef, true
+}
+
+// isIntCategoryNumeric reports whether t is one of the numeric primitive types that share the JVM int
+// computational category and hold each other's values by implicit widening on read: byte, char,
+// short, int. boolean is deliberately excluded (Java forbids int<->boolean conversion); long, float
+// and double are distinct categories with their own load/store opcodes and slot widths.
+func isIntCategoryNumeric(t types.JavaType) bool {
+	if t == nil {
+		return false
+	}
+	p, ok := t.RawType().(*types.JavaPrimer)
+	if !ok {
+		return false
+	}
+	switch p.Name {
+	case types.JavaByte, types.JavaChar, types.JavaShort, types.JavaInteger:
+		return true
+	}
+	return false
 }
 
 func NewEmptyStackEntry() *StackItem {

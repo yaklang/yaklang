@@ -53,6 +53,13 @@ type ClassObjectDumper struct {
 	// method that reaches both degradation points (DumpMethods and degradeInvalidMethods) is
 	// re-decompiled at most once; the aggressive path is deterministic, so repeating is pointless.
 	aggressiveRetried map[string]bool
+	// fieldStoreTotals counts, per field name, how many putfield/putstatic targets it has across
+	// ALL of this class's <init> and <clinit> bodies. It is computed lazily (and cached) by a
+	// read-only opcode pre-scan and is used to suppress field-initializer hoisting for blank-final
+	// fields that are assigned in more than one place (multiple constructors or multiple branches),
+	// which would otherwise emit an illegal double assignment to a final field. A nil map means the
+	// pre-scan has not run yet; an entry of 0 means "not seen", so callers treat <=1 as hoistable.
+	fieldStoreTotals map[string]int
 }
 
 func (c *ClassObjectDumper) GetConstructorMethodName() string {
@@ -291,15 +298,83 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	// fields/methods referencing type variables (e.g. `T value`) compile. A class
 	// without generic parameters or without a Signature attribute yields "".
 	classTypeParams := ""
+	classSigStr := ""
 	for _, attr := range c.obj.Attributes {
 		if sigAttr, ok := attr.(*SignatureAttribute); ok {
 			if sigStr, err := c.obj.getUtf8(sigAttr.SignatureIndex); err == nil && sigStr != "" {
+				classSigStr = sigStr
 				if tp := types.ParseClassSignature(sigStr); tp != "" {
 					classTypeParams = tp
 				}
 			}
 			break
 		}
+	}
+	// A non-static inner / local / anonymous class inherits type variables from its enclosing scope.
+	// When Yak flattens it to a top-level `Outer$Inner` unit, those variables lose their declaration:
+	// `class AbstractMapBasedMultimap$WrappedList extends AbstractMapBasedMultimap$WrappedCollection<K, V>
+	// implements List<V>` references K, V that nothing declares -> javac "cannot find symbol: class K".
+	// This was the single largest remaining guava recompile blocker (~2000 undeclared type-variable
+	// errors across the Multimap/Table/cache inner-class families). Recover the variables this unit
+	// actually USES by scanning its own supertype + field signatures for TypeVariableSignature references
+	// and declaring them on the flattened class. Those positions can only reference class- or
+	// enclosing-class-level variables (never method-level ones), so this never clashes with a method's
+	// own `<T>`. Bounds default to Object, matching the common unbounded enclosing variable; a bounded
+	// enclosing variable used in a bound-requiring position is a known residual. Kill-switch:
+	// JDEC_INNER_TYPEVAR_OFF=1.
+	//
+	// RESTRICTED to classes that declare NO formal type parameters of their own. For such a
+	// pure-inherited inner class the flattened reference sites still carry the enclosing type arguments
+	// (parseSigClassType keeps the outer args of `LOuter<..>.Inner;`), so injecting the matching free
+	// variables is arity-consistent. An inner class that ALSO has its own parameters (e.g.
+	// MapMakerInternalMap$HashIterator<T>) renders references with only its own-param arity, so injecting
+	// the enclosing variables would make declaration and reference arities disagree ("wrong number of
+	// type arguments"); those are left to the future cross-class integral rebuild. A self-contained
+	// top-level class references no free variables, so this is a strict no-op for it.
+	// classTypeParamNames tracks the bare names of the type variables in scope for this class
+	// (its own formal parameters, or the free variables injected on a flattened inner class).
+	// It is propagated to the render context so statement renderers can recognize type-variable
+	// references (e.g. to emit an unchecked `(T)` cast on an erased return value).
+	classTypeParamNames := types.ClassFormalTypeParamNames(classSigStr)
+	if os.Getenv("JDEC_INNER_TYPEVAR_OFF") == "" && len(classTypeParamNames) == 0 {
+		seen := map[string]bool{}
+		var free []string
+		addRef := func(n string) {
+			if n == "" || seen[n] {
+				return
+			}
+			seen[n] = true
+			free = append(free, n)
+		}
+		if classSigStr != "" {
+			for _, n := range types.FreeTypeVarRefsInClassSig(classSigStr) {
+				addRef(n)
+			}
+		}
+		for _, field := range c.obj.Fields {
+			for _, fattr := range field.Attributes {
+				if sa, ok := fattr.(*SignatureAttribute); ok {
+					if fs, err := c.obj.getUtf8(sa.SignatureIndex); err == nil && fs != "" {
+						for _, n := range types.TypeVarRefsInFieldSig(fs) {
+							addRef(n)
+						}
+					}
+					break
+				}
+			}
+		}
+		// Variables are emitted in first-seen (supertype-then-field) order. The canonical enclosing order
+		// is NOT recoverable from single-class bytecode (the synthetic this$0 field is erased to the raw
+		// enclosing type with no Signature, and InnerClasses carries only names), so a sibling override
+		// chain can occasionally bind a variable to a swapped position; that residual is left to the
+		// future cross-class integral rebuild.
+		if len(free) > 0 {
+			classTypeParams = "<" + strings.Join(free, ", ") + ">"
+			classTypeParamNames = free
+		}
+	}
+	if c.FuncCtx != nil {
+		c.FuncCtx.TypeParams = classTypeParamNames
 	}
 	packageSource := fmt.Sprintf("package %s;\n\n", packageName)
 	if className == "" {
@@ -635,6 +710,122 @@ func javaCharLiteralFromCode(code int) string {
 	return fmt.Sprintf("'\\u%04x'", code&0xffff)
 }
 
+// formatAnnotationElementValue renders a single annotation element_value (the right-hand side of an
+// element-value pair, or an AnnotationDefault's default value) into its Java source form. Extracted
+// from DumpAnnotation so the annotation-default renderer (`@interface` element `default <value>`)
+// can reuse the exact same value formatting.
+func (c *ClassObjectDumper) formatAnnotationElementValue(element *ElementValuePairAttribute) (string, error) {
+	valStr := ""
+	switch element.Tag {
+	case 'B', 'C', 'D', 'F', 'I', 'J', 'S', 'Z':
+		constant := element.Value.(ConstantInfo)
+		switch ret := constant.(type) {
+		case *ConstantStringInfo:
+			s, err := c.obj.getUtf8(ret.StringIndex)
+			if err != nil {
+				return "", err
+			}
+			valStr = values.JavaStringToLiteral(s)
+		case *ConstantLongInfo:
+			valStr = fmt.Sprintf("%dL", ret.Value)
+		case *ConstantIntegerInfo:
+			if os.Getenv("JDEC_ANNO_LITERAL_OFF") == "" && element.Tag == 'Z' {
+				if ret.Value == 0 {
+					valStr = "false"
+				} else {
+					valStr = "true"
+				}
+			} else if os.Getenv("JDEC_ANNO_LITERAL_OFF") == "" && element.Tag == 'C' {
+				valStr = javaCharLiteralFromCode(int(ret.Value))
+			} else {
+				valStr = fmt.Sprintf("%d", ret.Value)
+			}
+		case *ConstantDoubleInfo:
+			valStr = fmt.Sprintf("%f", ret.Value)
+		case *ConstantFloatInfo:
+			valStr = fmt.Sprintf("%f", ret.Value)
+		default:
+			return "", errors.New("parse annotation error, unknown constant type")
+		}
+	case 's':
+		valStr = values.JavaStringToLiteral(element.Value)
+	case 'c':
+		descStr, _ := element.Value.(string)
+		classTyp, perr := types.ParseDescriptor(descStr)
+		if perr != nil || classTyp == nil {
+			fallback := strings.TrimSuffix(strings.TrimPrefix(descStr, "L"), ";")
+			valStr = strings.Replace(fallback, "/", ".", -1) + ".class"
+		} else {
+			typeStr := classTyp.String(c.FuncCtx)
+			if !classTyp.IsArray() {
+				c.FuncCtx.Import(typeStr)
+				typeStr = c.FuncCtx.ShortTypeName(typeStr)
+			}
+			valStr = typeStr + ".class"
+		}
+	case '@':
+		annotation := element.Value.(*AnnotationAttribute)
+		res, err := c.DumpAnnotation(annotation)
+		if err != nil {
+			return "", err
+		}
+		valStr = res
+	case '[':
+		l := element.Value.([]*ElementValuePairAttribute)
+		eleList := []string{}
+		for _, e := range l {
+			res, err := c.formatAnnotationElementValue(e)
+			if err != nil {
+				return "", err
+			}
+			eleList = append(eleList, res)
+		}
+		valStr = fmt.Sprintf("{%s}", strings.Join(eleList, ", "))
+	case 'e':
+		switch ret := element.Value.(type) {
+		case *EnumConstValue:
+			if len(ret.TypeName) <= 2 {
+				return "", fmt.Errorf("parse annotation error, invalid enum type name: %s", ret.TypeName)
+			}
+			fullqualifiedName := ret.TypeName[1 : len(ret.TypeName)-1]
+			fullqualifiedName = strings.Replace(fullqualifiedName, "/", ".", -1)
+			c.FuncCtx.Import(fullqualifiedName)
+			last := strings.LastIndex(fullqualifiedName, ".")
+			if last == -1 {
+				return fullqualifiedName + "." + ret.ConstName, nil
+			}
+			return fullqualifiedName[last+1:] + "." + ret.ConstName, nil
+		default:
+			return "", fmt.Errorf("parse annotation error, unknown tag: %c, ret: %T", element.Tag, ret)
+		}
+	default:
+		return "", fmt.Errorf("parse annotation error, unknown tag: %c", element.Tag)
+	}
+	return valStr, nil
+}
+
+// annotationElementDefaultClause returns the ` default <value>` suffix for an annotation element
+// method (an abstract method of an @interface) when it carries an AnnotationDefault attribute, or
+// "" otherwise. Without it javac rejects any use site that omits the element. Kill-switch:
+// JDEC_ANNO_DEFAULT_OFF=1.
+func (c *ClassObjectDumper) annotationElementDefaultClause(method *MemberInfo) string {
+	if method == nil || os.Getenv("JDEC_ANNO_DEFAULT_OFF") != "" {
+		return ""
+	}
+	for _, attr := range method.Attributes {
+		ad, ok := attr.(*AnnotationDefaultAttribute)
+		if !ok || ad.DefaultValue == nil {
+			continue
+		}
+		val, err := c.formatAnnotationElementValue(ad.DefaultValue)
+		if err != nil || val == "" {
+			return ""
+		}
+		return " default " + val
+	}
+	return ""
+}
+
 func (c *ClassObjectDumper) DumpAnnotation(anno *AnnotationAttribute) (string, error) {
 	result := ""
 
@@ -966,12 +1157,27 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	for _, attr := range method.Attributes {
 		if sigAttr, ok := attr.(*SignatureAttribute); ok {
 			if sigStr, err := c.obj.getUtf8(sigAttr.SignatureIndex); err == nil && sigStr != "" {
-				if sigParams, sigRet := types.ParseMethodSignature(sigStr); sigParams != nil {
+				sigParams, sigRet := types.ParseMethodSignature(sigStr)
+				// Gate on sigRet (not sigParams): a zero-arg generic method like
+				// `()TK;` (Map.Entry.getKey) parses to (nil params, K return). The old
+				// `sigParams != nil` guard skipped exactly these, leaving the return type
+				// erased to Object so the override of an interface method failed to compile
+				// ("return type Object is not compatible with V"). sigRet==nil still means a
+				// genuine parse failure (or unsupported `<...>` formal-type-param method),
+				// so we fall back to the descriptor as before. Kill-switch
+				// JDEC_METHOD_SIG_RET_OFF restores the legacy sigParams!=nil gate.
+				applicable := sigRet != nil
+				if os.Getenv("JDEC_METHOD_SIG_RET_OFF") != "" {
+					applicable = sigParams != nil
+				}
+				if applicable {
 					mt := methodType.FunctionType()
 					// Only override when the param count matches (signature may include
 					// formal type parameters that shift the count; skip those for safety).
 					if len(sigParams) == len(mt.ParamTypes) {
-						mt.ParamTypes = sigParams
+						if sigParams != nil {
+							mt.ParamTypes = sigParams
+						}
 						mt.ReturnType = sigRet
 					}
 				}
@@ -1131,8 +1337,38 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 			// nested catch parameters both named var4) so the emitted Java is re-compilable.
 			resolveLocalNameCollisions(params, statementList)
 
+			// Per-constructor/<clinit> count of field assignments. A final field is only safe to
+			// lift into a field initializer when assigned exactly once in this body; a blank final
+			// assigned across multiple branches must keep its in-body assignments (see
+			// countConstructorFieldAssignments).
+			ctorFieldAssignCount := countConstructorFieldAssignments(statementList, funcCtx.ClassName)
+
+			// Cross-constructor/<clinit> totals: a final field assigned exactly once HERE may still
+			// be assigned in another overloaded constructor. Hoisting it then double-assigns a final
+			// field, so the hoist guards below additionally require the class-wide store count <= 1.
+			fieldStoreTotal := c.constructorFieldStoreTotals()
+
 			sourceCode := "\n"
 			hoistableStaticInitLocals := map[string]string{}
+			// Contiguous-prefix hoist barrier for <clinit>. The dumper emits every lifted field
+			// initializer as a field declaration ABOVE the static{} block, so a <clinit> assignment
+			// may only be lifted while every preceding top-level <clinit> statement was also lifted.
+			// Once a side-effecting / non-hoistable statement stays in the static block (a loop, a
+			// `someField.set(...)` call, a branch), any later field initializer that reads the state
+			// those statements produced (e.g. commons-codec URLCodec `WWW_FORM_URL = (BitSet)
+			// WWW_FORM_URL_SAFE.clone()` emitted after all the `WWW_FORM_URL_SAFE.set(...)` calls) must
+			// stay too: lifting it would reorder the read ahead of the writes AND forward-reference a
+			// field declared later. Kept as a blank-final store in the static block instead.
+			// staticHoistAllowedHere defaults true so non-<clinit> bodies and the pre-barrier prefix
+			// are unaffected. Interfaces/annotations (classStaticInitializersMustHoist) are EXCLUDED:
+			// they cannot declare static{} blocks, so every constant initializer MUST be lifted to its
+			// declaration and there is no place to leave a deferred store — the barrier only applies to
+			// ordinary classes, which can hold blank-final stores in a static block.
+			// Kill-switch: JDEC_NO_CLINIT_HOIST_BARRIER=1 restores the old behavior.
+			clinitHoistBarrierOn := funcCtx.FunctionName == "<clinit>" && !classStaticInitializersMustHoist && os.Getenv("JDEC_NO_CLINIT_HOIST_BARRIER") == ""
+			staticHoistBarrierHit := false
+			staticHoistAllowedHere := true
+			hoistEventCount := 0
 			statementSet := utils.NewSet[statements.Statement]()
 			var statementToString func(statement statements.Statement) string
 			var statementListToString func(statements []statements.Statement) string
@@ -1174,9 +1410,10 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 					foundFieldInit := false
 					if ret.LeftValue != nil && ret.JavaValue != nil && funcCtx.FunctionName == "<clinit>" && classStaticInitializersMustHoist {
 						if ref, ok := ret.LeftValue.(*values.JavaRef); ok && !ref.IsThis {
-							if rhs := ret.JavaValue.String(funcCtx); canHoistFieldValueInitializer(ret.JavaValue, rhs) {
+							if rhs := ret.JavaValue.String(funcCtx); staticHoistAllowedHere && canHoistFieldValueInitializer(ret.JavaValue, rhs) {
 								hoistableStaticInitLocals[strings.TrimSpace(ref.String(funcCtx))] = rhs
 								foundFieldInit = true
+								hoistEventCount++
 							}
 						}
 					}
@@ -1184,7 +1421,8 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 						obj := core.UnpackSoltValue(v.Object)
 						if v1, ok := obj.(*values.JavaRef); ok && v1.IsThis && (funcCtx.FunctionName == "<init>" || funcCtx.FunctionName == funcCtx.ClassName) {
 							if _, ok := finalFieldMap[v.Member]; ok {
-								if rhs := ret.JavaValue.String(funcCtx); canHoistFieldValueInitializer(ret.JavaValue, rhs) {
+								if rhs := ret.JavaValue.String(funcCtx); canHoistFieldValueInitializer(ret.JavaValue, rhs) &&
+									(!EnableFieldInitHoistGuard || (ctorFieldAssignCount[v.Member] == 1 && crossCtorStoreOK(fieldStoreTotal, v.Member) && !rhsReadsInstanceField(rhs))) {
 									foundFieldInit = true
 									c.fieldDefaultValue[v.Member] = rhs
 								}
@@ -1193,9 +1431,11 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 					} else if v, ok := ret.LeftValue.(*values.JavaClassMember); ok && ret.JavaValue != nil {
 						if (funcCtx.FunctionName == "<clinit>" && classStaticInitializersMustHoist) || v.Name == funcCtx.ClassName {
 							if _, ok := finalFieldMap[v.Member]; ok {
-								if rhs := ret.JavaValue.String(funcCtx); canHoistFieldValueInitializer(ret.JavaValue, rhs) {
+								if rhs := ret.JavaValue.String(funcCtx); staticHoistAllowedHere && canHoistFieldValueInitializer(ret.JavaValue, rhs) &&
+									(!EnableFieldInitHoistGuard || (ctorFieldAssignCount[v.Member] <= 1 && crossCtorStoreOK(fieldStoreTotal, v.Member))) {
 									foundFieldInit = true
 									c.fieldDefaultValue[v.Member] = rhs
+									hoistEventCount++
 								}
 							}
 						}
@@ -1212,9 +1452,11 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 									rhs = localInit
 								}
 							}
-							if canHoistFieldValueInitializer(ret.JavaValue, rhs) {
+							if staticHoistAllowedHere && canHoistFieldValueInitializer(ret.JavaValue, rhs) &&
+								(!EnableFieldInitHoistGuard || (ctorFieldAssignCount[rawName] <= 1 && crossCtorStoreOK(fieldStoreTotal, rawName))) {
 								foundFieldInit = true
 								c.fieldDefaultValue[rawName] = rhs
+								hoistEventCount++
 							}
 						}
 					}
@@ -1360,7 +1602,24 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 						continue
 					}
 				}
+				if clinitHoistBarrierOn {
+					staticHoistAllowedHere = !staticHoistBarrierHit
+				}
+				hoistBefore := hoistEventCount
 				statementStr := statementToString(statement)
+				if clinitHoistBarrierOn && !staticHoistBarrierHit {
+					switch statement.(type) {
+					case *statements.MiddleStatement, *statements.StackAssignStatement:
+						// Structural markers are skipped from the body (see statementListToString);
+						// treat them as transparent so they never trip the barrier.
+					default:
+						// A top-level <clinit> statement that produced no hoist event stays in the
+						// static block; from here on nothing may be lifted ahead of it.
+						if hoistEventCount == hoistBefore {
+							staticHoistBarrierHit = true
+						}
+					}
+				}
 				if statementStr == "" {
 					continue
 				}
@@ -1439,7 +1698,10 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 	}
 	writeBlock := func(buffer io.Writer) {
 		if abstractMethod {
-			methodSourceBuffer.Write([]byte(";"))
+			// An abstract method of an @interface is an annotation element; if it carries an
+			// AnnotationDefault attribute we must re-emit its `default <value>` clause, otherwise
+			// any use site that omits the element fails javac ("missing a default value").
+			methodSourceBuffer.Write([]byte(c.annotationElementDefaultClause(method) + ";"))
 		} else if code == "" {
 			methodSourceBuffer.Write([]byte(" {}"))
 		} else {
@@ -1807,6 +2069,23 @@ func generatedLocalLooksInt(body, name string) bool {
 		`\(` + quoted + `\)\s*(?:<|>|<=|>=|==|!=)`,
 		`\[\s*` + quoted + `\s*\]`,
 	}
+	// Embedded-assignment-in-condition form produced by the dup-collapse, e.g.
+	// `(var4 = expr) == (0)` / `(var4 = expr) < (n)` (commons-codec Metaphone /
+	// MatchRatingApproachEncoder, and the synthetic EmbeddedAssignDecl battery). Such a variable has
+	// no ordinary `T v = ...` declaration, so the safety net must synthesize one; without these
+	// signals it guessed `Object v = null`, which breaks the int store and any arithmetic read.
+	//   - A RELATIONAL comparison (`< > <= >=`) is numeric-only in Java, so the embedded-assign
+	//     target is int-category regardless of the right operand.
+	//   - An EQUALITY comparison (`== !=`) is numeric ONLY when the right operand is a numeric
+	//     literal (`(0)`, `-1`); it must NOT match a reference null-check like
+	//     `(o = foo()) != null`, which legitimately compiles with the `Object o = null` default.
+	// Kill-switch: JDEC_NO_EMBED_ASSIGN_INT=1 restores the pre-fix (Object-defaulting) behavior.
+	if os.Getenv("JDEC_NO_EMBED_ASSIGN_INT") == "" {
+		patterns = append(patterns,
+			`\(`+quoted+` = [^()]*\)\s*(?:<|>|<=|>=)`,
+			`\(`+quoted+` = [^()]*\)\s*(?:==|!=)\s*\(?-?\d`,
+		)
+	}
 	for _, pattern := range patterns {
 		if regexp.MustCompile(pattern).MatchString(body) {
 			return true
@@ -1835,6 +2114,157 @@ func canHoistFieldValueInitializer(value values.JavaValue, rhs string) bool {
 		return true
 	}
 	return false
+}
+
+// EnableFieldInitHoistGuard gates the safety guard that prevents a constructor/<clinit> field
+// assignment from being wrongly lifted into a field initializer. Set to false to restore the
+// legacy (over-eager) hoisting behavior for debugging/regression bisection.
+var EnableFieldInitHoistGuard = true
+
+// EnableCrossConstructorHoistGuard gates ONLY the class-wide (cross-constructor) half of the hoist
+// guard: a blank final assigned exactly once per constructor body but in several overloaded
+// constructors must still not be hoisted. Set to false to drop just this cross-constructor check
+// (keeping the per-body guard) for debugging/regression bisection; the BlankFinalMultiCtor battery
+// regresses when it is off, proving the check is load-bearing.
+var EnableCrossConstructorHoistGuard = true
+
+// crossCtorStoreOK reports whether the class-wide store count permits hoisting field name. When the
+// cross-constructor guard is disabled it is a no-op (always true), isolating its effect.
+func crossCtorStoreOK(totals map[string]int, name string) bool {
+	if !EnableCrossConstructorHoistGuard {
+		return true
+	}
+	return totals[name] <= 1
+}
+
+// rhsReadsInstanceField reports whether a candidate field-initializer right-hand side reads
+// another instance field via `this.`. A real field initializer may reference earlier-declared
+// fields, but the decompiler cannot prove the referenced field already holds its final value at
+// initializer time (a blank final assigned later in the constructor still reads its default 0
+// here). Lifting such an assignment silently changes the value, so we keep it in the constructor
+// body where the referenced field is already assigned — always safe and value-preserving.
+func rhsReadsInstanceField(rhs string) bool {
+	return strings.Contains(rhs, "this.")
+}
+
+// countConstructorFieldAssignments walks a constructor (<init>) or static-initializer (<clinit>)
+// body, recursing into every nested block, and counts how many times each field is assigned:
+// instance fields via `this.f` and same-class static fields via `Class.f`. A genuine field
+// initializer is assigned exactly once (javac copies it into the constructor prologue); a blank
+// final assigned across multiple conditional branches is assigned 2+ times. Only a single
+// assignment may be lifted into a field initializer — otherwise the remaining branch assignments
+// stay in the body and javac rejects the now double-assigned final ("cannot assign a value to
+// final variable").
+func countConstructorFieldAssignments(stmts []statements.Statement, className string) map[string]int {
+	counts := map[string]int{}
+	tally := func(st *statements.AssignStatement) {
+		if st.LeftValue == nil {
+			return
+		}
+		switch lv := st.LeftValue.(type) {
+		case *values.RefMember:
+			if ref, ok := core.UnpackSoltValue(lv.Object).(*values.JavaRef); ok && ref.IsThis {
+				counts[lv.Member]++
+			}
+		case *values.JavaClassMember:
+			if lv.Name == className {
+				counts[lv.Member]++
+			}
+		}
+	}
+	var walk func(list []statements.Statement)
+	walkOne := func(st statements.Statement) {
+		if st != nil {
+			walk([]statements.Statement{st})
+		}
+	}
+	walk = func(list []statements.Statement) {
+		for _, st := range list {
+			switch s := st.(type) {
+			case *statements.AssignStatement:
+				tally(s)
+			case *statements.IfStatement:
+				walk(s.IfBody)
+				walk(s.ElseBody)
+			case *statements.ForStatement:
+				walkOne(s.InitVar)
+				walk(s.SubStatements)
+				walkOne(s.EndExp)
+			case *statements.WhileStatement:
+				walk(s.Body)
+			case *statements.DoWhileStatement:
+				walk(s.Body)
+			case *statements.TryCatchStatement:
+				walk(s.TryBody)
+				for _, b := range s.CatchBodies {
+					walk(b)
+				}
+			case *statements.SwitchStatement:
+				for _, c := range s.Cases {
+					walk(c.Body)
+				}
+			case *statements.SynchronizedStatement:
+				walk(s.Body)
+			}
+		}
+	}
+	walk(stmts)
+	return counts
+}
+
+// constructorFieldStoreTotals returns, per field name, how many putfield/putstatic targets it has
+// across EVERY <init> and <clinit> body of this class. The result is computed once via a read-only
+// opcode pre-scan (core.Decompiler.CountFieldStores) and cached on the dumper.
+//
+// This complements the per-body countConstructorFieldAssignments: a blank-final field may be
+// assigned exactly once in each of two overloaded constructors (per-body count == 1 in both), yet
+// hoisting it into a field initializer is still illegal, because every constructor would then carry
+// both the initializer copy and its own assignment, double-assigning a final field. Only a field
+// assigned in a single place across the whole class is safe to hoist, so callers gate hoisting on
+// this total being <= 1.
+//
+// The scan is best-effort: if a constructor body fails to parse, its counts are simply skipped, so
+// the totals never over-report (they can only under-report), and an under-report degrades to the
+// pre-existing per-body guard rather than to an incorrect hoist.
+func (c *ClassObjectDumper) constructorFieldStoreTotals() map[string]int {
+	if c.fieldStoreTotals != nil {
+		return c.fieldStoreTotals
+	}
+	totals := map[string]int{}
+	c.fieldStoreTotals = totals
+	if c.obj == nil {
+		return totals
+	}
+	for _, info := range c.obj.Methods {
+		name, err := c.obj.getUtf8(info.NameIndex)
+		if err != nil || (name != "<init>" && name != "<clinit>") {
+			continue
+		}
+		var codeAttr *CodeAttribute
+		for _, attribute := range info.Attributes {
+			if ca, ok := attribute.(*CodeAttribute); ok {
+				codeAttr = ca
+				break
+			}
+		}
+		if codeAttr == nil {
+			continue
+		}
+		func() {
+			defer func() { recover() }()
+			parser := core.NewDecompiler(codeAttr.Code, func(id int) values.JavaValue {
+				return GetValueFromCP(c.ConstantPool, id)
+			})
+			counts, err := parser.CountFieldStores()
+			if err != nil {
+				return
+			}
+			for k, v := range counts {
+				totals[k] += v
+			}
+		}()
+	}
+	return totals
 }
 
 func javaFloatLiteral(f float32) string {

@@ -2,6 +2,7 @@ package values
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/class_context"
@@ -280,11 +281,47 @@ func NewBinaryExpression(value1, value2 JavaValue, op string, typ types.JavaType
 		resetTypeSafe(value2, types.NewJavaPrimer(types.JavaBoolean))
 		typ = types.NewJavaPrimer(types.JavaBoolean)
 	}
+	resultType := nonNilType(typ, value1.Type(), value2.Type()).Copy()
+	resultType = promoteBinaryNumericResult(op, resultType)
 	return &JavaExpression{
 		Values: []JavaValue{value1, value2},
 		Op:     op,
-		Typ:    nonNilType(typ, value1.Type(), value2.Type()).Copy(),
+		Typ:    resultType,
 	}
+}
+
+// promoteBinaryNumericResult applies JLS 5.6.2 binary numeric promotion to the result type of an
+// arithmetic/bitwise/shift binary operator: when both operands are in the int computational category
+// (byte/char/short/int) the operation is evaluated in int and yields int — never the narrower operand
+// type. The bytecode confirms this (iadd/iand/ishl/... consume and produce the int stack category;
+// there is NO byte/short/char arithmetic opcode), so reporting a narrow operand type for the result
+// disagrees with javac. That disagreement defeated both the slot-merge in AssignVar (a `byte + 256`
+// reassign looked byte-typed, matched the slot type, and never widened the slot to int) and the
+// store/return narrowing-cast rendering (which keys off an int-typed value), producing uncompilable
+// "possible lossy conversion from int to byte" stores (commons-codec Base32/Base64
+// `byte b = in[i++]; if (b < 0) b = b + 256;`). The narrowing cast is reintroduced precisely at the
+// byte/short/char-typed use sites (declaration/return/arg/array-store). Only a byte/char/short result
+// is promoted: int stays int and long/float/double already carry the wider category via `typ`. The
+// boolean &|^ case (handled just above) and comparison operators are left untouched. Kill-switch:
+// JDEC_NO_BINNUM_PROMOTE=1.
+func promoteBinaryNumericResult(op string, resultType types.JavaType) types.JavaType {
+	switch op {
+	case ADD, SUB, MUL, DIV, REM, AND, OR, XOR, SHL, SHR, USHR:
+	default:
+		return resultType
+	}
+	if os.Getenv("JDEC_NO_BINNUM_PROMOTE") != "" {
+		return resultType
+	}
+	p, ok := resultType.RawType().(*types.JavaPrimer)
+	if !ok {
+		return resultType
+	}
+	switch p.Name {
+	case types.JavaByte, types.JavaChar, types.JavaShort:
+		return types.NewJavaPrimer(types.JavaInteger)
+	}
+	return resultType
 }
 
 type FunctionCallExpression struct {
@@ -348,26 +385,33 @@ func (f *FunctionCallExpression) ArgumentStrings(funcCtx *class_context.ClassCon
 				})
 			}
 		} else if expectPrim, okp := primerRawType(argType); okp {
-			// Method-invocation context (JLS 5.3) forbids implicit narrowing, even for constant
-			// expressions, but the JVM stack collapses byte/short/char to int (iconst/bipush/sipush),
-			// so an int-typed value flowing into a byte/short/char parameter must be cast explicitly or
-			// the decompiled call fails to recompile ("possible lossy conversion from int to char").
-			if expectPrim.Name == types.JavaByte || expectPrim.Name == types.JavaShort || expectPrim.Name == types.JavaChar {
-				if actualPrim, oka := primerRawType(arg.Type()); oka && actualPrim.Name == types.JavaInteger {
-					argStr := arg.String(funcCtx)
-					argTypeStr := expectPrim.Name
-					arg = NewCustomValue(func(funcCtx *class_context.ClassContext) string {
-						return fmt.Sprintf("(%s)(%s)", argTypeStr, argStr)
-					}, func() types.JavaType {
-						return argType
-					})
-				}
-			} else if expectPrim.Name == types.JavaBoolean {
+			if expectPrim.Name == types.JavaBoolean {
 				// The JVM has no boolean opcodes: a boolean argument is pushed as an int
 				// constant (iconst_0/iconst_1). Java forbids int->boolean conversion, so values
 				// flowing into a boolean parameter must render with boolean literals, including
 				// ternary trees like `cond ? 1 : 0`.
 				arg = coerceBooleanArgument(arg)
+			} else if actualPrim, oka := primerRawType(arg.Type()); oka &&
+				actualPrim.Name != types.JavaBoolean && actualPrim.Name != expectPrim.Name {
+				// The JVM descriptor pins the EXACT primitive parameter type, but byte/short/char/int
+				// all share the int stack category and convert between each other without an opcode, so
+				// the argument's static type frequently disagrees with the parameter type. Two failure
+				// modes follow if the cast is dropped:
+				//   - narrowing (int -> byte/short/char): illegal in invocation context (JLS 5.3),
+				//     "possible lossy conversion from int to char";
+				//   - widening that changes overloading (char/byte/short -> int): source picks a
+				//     DIFFERENT overload than the bytecode (e.g. StringBuilder.append(char) instead of
+				//     append(int)), silently changing behavior.
+				// Emitting an explicit cast to the descriptor's parameter type reproduces the original
+				// invocation exactly. (long/float/double mismatches already carry an i2l/i2d/... opcode
+				// that makes the argument type match, so this fires only for the int-category gap.)
+				argStr := arg.String(funcCtx)
+				argTypeStr := expectPrim.Name
+				arg = NewCustomValue(func(funcCtx *class_context.ClassContext) string {
+					return fmt.Sprintf("(%s)(%s)", argTypeStr, argStr)
+				}, func() types.JavaType {
+					return argType
+				})
 			}
 		}
 		argStr := arg.String(funcCtx)
@@ -393,8 +437,18 @@ func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) str
 	functionName := class_context.SafeIdentifier(f.FunctionName)
 
 	if v, ok := f.Object.(*JavaClassValue); ok {
-		if classType, ok2 := v.Type().RawType().(*types.JavaClass); ok2 && classType.Name == funcCtx.ClassName {
+		if classType, ok2 := v.Type().RawType().(*types.JavaClass); ok2 && classType.Name == funcCtx.ClassName && f.IsStatic {
+			// Unqualified static call to a method of the current class (foo() instead of Foo.foo()).
+			// Only valid for static dispatch; an instance call on the current class's own class
+			// literal (Foo.class.getName()) must keep the `Foo.class` receiver, so it falls through.
 			return fmt.Sprintf("%s(%s)", functionName, strings.Join(paramStrs, ","))
+		}
+		if f.IsStatic {
+			// Static method invocation: the receiver is a type reference, so render the bare type
+			// name (Integer.parseInt(...)). JavaClassValue.String() now yields the Class-object
+			// literal form `Integer.class`, which is correct for value/instance-receiver positions
+			// but wrong here, so bypass it via Type().
+			return fmt.Sprintf("%s.%s(%s)", v.Type().String(funcCtx), functionName, strings.Join(paramStrs, ","))
 		}
 	}
 	obj := UnpackSoltValue(f.Object)

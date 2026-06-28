@@ -101,6 +101,7 @@ func pkDefaultCorpus() []string {
 	specs := []string{
 		"com/google/guava/guava/28.2-android/guava-28.2-android.jar",
 		"org/springframework/spring-core/6.1.10/spring-core-6.1.10.jar",
+		"commons-codec/commons-codec/1.15/commons-codec-1.15.jar",
 		"com/fasterxml/jackson/core/jackson-databind/2.15.4/jackson-databind-2.15.4.jar",
 		"com/alibaba/fastjson2/fastjson2/2.0.43/fastjson2-2.0.43.jar",
 		"org/apache/commons/commons-collections4/4.4/commons-collections4-4.4.jar",
@@ -258,10 +259,24 @@ func timeExternalDecompile(t *testing.T, tool, jarPath, outDir string) (dur time
 
 // --- axis 2 (recompilability) ---------------------------------------------
 
-// recompileJavaDir compiles every .java under srcDir into outDir with the given
-// classpath, returning the set of files that javac rejected (path -> first error).
-// The jar itself is on the classpath so intra-library references resolve; only
-// genuine decompiler output errors (or truly external deps) fail.
+// recompileJavaDir compiles the decompiled source tree under srcDir into outDir with the given
+// classpath, returning the set of files javac ultimately rejected (path -> first error).
+//
+// This is the STANDARD decompiler round-trip metric and the exact model for the user's
+// "decompile -> repackage into a jar -> call it" workflow: every decompiled unit is compiled
+// TOGETHER (whole-tree), so intra-jar references resolve against the sibling decompiled SOURCES —
+// this is what makes a self-consistent representation valid (e.g. Yak emits each nested class as a
+// standalone top-level unit `Outer$Inner` and references it by that same flat name; compiled as a
+// set, those names resolve). The original jar + deps are also on the classpath as a BACKSTOP, which
+// matters during the iterative passes below.
+//
+// javac aborts code generation for the entire invocation if ANY source has an error, so a single bad
+// unit would otherwise leave outDir empty and make the repackage/overlay axis read 0. To recover an
+// honest, self-consistent picture we compile iteratively: batch-compile the surviving set, drop the
+// files javac flagged, and recompile the rest. Because the original jar is on the classpath, a
+// dropped unit is still resolvable as a binary, so dropping a failing unit A does NOT cascade into a
+// healthy unit B that referenced A. The final clean pass emits every surviving unit's .class into
+// outDir, so recompile-OK count == overlaid count exactly. Applied uniformly to every tool.
 func recompileJavaDir(t *testing.T, javac, classpath, srcDir, outDir string) map[string]string {
 	t.Helper()
 	_ = os.MkdirAll(outDir, 0o755)
@@ -275,9 +290,146 @@ func recompileJavaDir(t *testing.T, javac, classpath, srcDir, outDir string) map
 	if len(srcs) == 0 {
 		return map[string]string{}
 	}
+	// Per-file parallel compilation with the whole decompiled tree as the -sourcepath and the
+	// original jar+deps as the classpath. This is the fairest practical recompilability measure:
+	//   - -sourcepath lets each unit resolve intra-jar references against the sibling decompiled
+	//     SOURCES, so a self-consistent representation (Yak's flat `Outer$Inner` units referenced by
+	//     that same flat name) recompiles exactly as the standard whole-program round-trip would;
+	//   - compiling one unit at a time isolates failures so a single broken unit does not zero out
+	//     the entire batch (javac is all-or-nothing per invocation);
+	//   - -implicit:none means each javac process writes ONLY the explicitly listed unit's .class
+	//     (implicitly-referenced siblings are type-checked but not emitted), so parallel workers
+	//     never race to write the same dependency .class.
+	// Applied uniformly to every tool, so the comparison stays fair.
+	allFails := compilePerFileParallel(t, javac, classpath, srcDir, outDir, srcs)
+	// GROUND TRUTH: a unit succeeded iff its primary .class was actually written to outDir. Deriving
+	// the failure set from emitted artifacts (instead of trusting javac's stderr parsing) makes the
+	// recompile-OK count equal the overlaid-class count by construction and immune to: empty/synthetic
+	// units that legitimately emit no .class, error lines javac prints without a ".java:" location,
+	// and the all-or-nothing emission of batch javac. allFails only supplies the human-readable reason.
+	result := map[string]string{}
+	for _, s := range srcs {
+		rel, err := filepath.Rel(srcDir, s)
+		if err != nil {
+			rel = filepath.Base(s)
+		}
+		clsPath := filepath.Join(outDir, strings.TrimSuffix(rel, ".java")+".class")
+		if fileExists(clsPath) {
+			continue
+		}
+		// A source that declares no top-level type (e.g. Yak's synthetic package-info/module-info
+		// stub rendered as a lone comment) legitimately produces no .class — not a failure.
+		if !sourceDeclaresType(s) {
+			continue
+		}
+		if msg, ok := allFails[s]; ok {
+			result[s] = msg
+		} else {
+			result[s] = "no .class produced (recompile failed)"
+		}
+	}
+	return result
+}
+
+// compilePerFileParallel compiles each source file in its own javac process (bounded worker pool)
+// with the whole tree on -sourcepath and -implicit:none, returning path->first-error for the files
+// javac rejected. Successful files emit their own .class into outDir.
+func compilePerFileParallel(t *testing.T, javac, classpath, srcDir, outDir string, srcs []string) map[string]string {
+	t.Helper()
+	workers := runtime.NumCPU()
+	if workers < 2 {
+		workers = 2
+	}
+	if workers > 12 {
+		workers = 12
+	}
+	coreArgs := []string{"-J-Duser.language=en", "-J-Duser.country=US", "-encoding", "UTF-8",
+		"-nowarn", "-Xlint:none", "-Xmaxwarns", "1", "-Xmaxerrs", "1000",
+		"-implicit:none", "-sourcepath", srcDir, "-d", outDir}
+	type result struct {
+		file string
+		msg  string
+	}
+	jobs := make(chan string)
+	results := make(chan result, len(srcs))
+	var wg sync.WaitGroup
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for f := range jobs {
+				args := append([]string{}, coreArgs...)
+				if classpath != "" {
+					args = append(args, "-cp", classpath)
+				}
+				args = append(args, f)
+				cmd := exec.Command(javac, args...)
+				cmd.Env = append(os.Environ(), "LANG=en_US.UTF-8", "LC_ALL=en_US.UTF-8")
+				var stderr strings.Builder
+				cmd.Stderr = &stderr
+				if cmd.Run() == nil {
+					continue // javac exit 0: the unit's .class was written
+				}
+				fe := parseJavacFileErrors(stderr.String())
+				if msg, ok := fe[f]; ok {
+					results <- result{file: f, msg: msg}
+					continue
+				}
+				msg := firstLine(strings.TrimSpace(stderr.String()))
+				if msg == "" {
+					msg = "javac failed (no diagnostic)"
+				}
+				results <- result{file: f, msg: msg}
+			}
+		}()
+	}
+	for _, s := range srcs {
+		jobs <- s
+	}
+	close(jobs)
+	wg.Wait()
+	close(results)
+	fails := map[string]string{}
+	for r := range results {
+		fails[r.file] = r.msg
+	}
+	cleanupExecArgfileLeftovers()
+	return fails
+}
+
+// fileExists reports whether path exists and is a regular file.
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+// sourceDeclaresType reports whether a .java file declares at least one top-level type. Synthetic
+// stubs (package-info/module-info) that Yak renders as a comment-only unit declare none and thus
+// correctly produce no .class file.
+func sourceDeclaresType(javaPath string) bool {
+	data, err := os.ReadFile(javaPath)
+	if err != nil {
+		return true // be conservative: if unreadable, treat as a real unit
+	}
+	src := string(data)
+	for _, kw := range []string{"class ", "interface ", "enum ", "@interface "} {
+		if strings.Contains(src, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+// runJavacBatch compiles exactly the given source files in one javac invocation and returns the
+// per-file first-error map (empty == all compiled and their .class were written to outDir).
+func runJavacBatch(t *testing.T, javac, classpath, outDir string, srcs []string) map[string]string {
+	t.Helper()
+	if len(srcs) == 0 {
+		return map[string]string{}
+	}
 	// javac on some platforms (notably macOS) spills an over-long command line into a
 	// leftover javac.<ts>.args file in the CWD. To stay tidy and portable, pass the
-	// source list through an @argfile in a temp dir when it is large.
+	// source list through an @argfile in a temp dir.
 	coreArgs := []string{"-J-Duser.language=en", "-J-Duser.country=US", "-encoding", "UTF-8", "-nowarn", "-Xlint:none",
 		"-Xmaxwarns", "1", "-Xmaxerrs", "100000", "-d", outDir}
 	if classpath != "" {
@@ -349,63 +501,26 @@ func classifyRecompileError(errLine string) string {
 	return "decompiler_err"
 }
 
-// writeYakUnits writes Yak's per-class decompiled output to srcDir grouped by outer
-// class, mirroring how Java source and the other decompilers (CFR/Vineflower) organize
-// nested classes: one <Outer>.java containing the outer class with its inner-class
-// units appended. Yak emits each inner class as a standalone unit (its own
-// package/imports plus a `class Outer$Inner` declaration); to form a compilable source
-// file we keep the outer unit verbatim and append the inner unit bodies (package/import
-// preamble stripped). The `class Outer$Inner {...}` declarations are legal package-private
-// types sharing the outer's .java file, exactly as a decompiled nested class appears.
+// writeYakUnits writes Yak's decompiled output to srcDir EXACTLY as Yak's real jar-decompiler
+// products it: one .java per .class entry, at the original package path, with each unit's own
+// package + imports preserved and the flat `$`-named top-level declaration intact (Yak reconstructs
+// a nested class `Outer$Inner` as a standalone top-level `class Outer$Inner`, whose binary name
+// after recompilation matches the original — a drop-in replacement). References to `Outer$Inner`
+// resolve to the sibling `Outer$Inner.java` compiled alongside it.
+//
+// This is the FAITHFUL recompilation target. An earlier version merged inner units into the outer's
+// .java file and stripped their import/package preamble; that lost imports the inner classes needed
+// (e.g. java.util.Comparator inside Rule$Phoneme) and produced spurious "cannot find symbol"
+// failures that were artifacts of the harness, not the decompiler.
 func writeYakUnits(srcDir string, units map[string]string) (int, error) {
 	count := 0
-	outerOf := func(stem string) string {
-		if i := strings.IndexByte(stem, '$'); i >= 0 {
-			return stem[:i]
-		}
-		return stem
-	}
-	type bucket struct {
-		outerSrc string
-		outerSet bool
-		extra    []innerUnit
-	}
-	buckets := map[string]*bucket{}
 	for name, src := range units {
-		stem := flattenPath(name)
-		outer := outerOf(stem)
-		b, ok := buckets[outer]
-		if !ok {
-			b = &bucket{}
-			buckets[outer] = b
-		}
-		if outer == stem {
-			b.outerSrc = src
-			b.outerSet = true
-		} else {
-			b.extra = append(b.extra, innerUnit{stem: stem, src: src})
-		}
-	}
-	for outer, b := range buckets {
-		var sb strings.Builder
-		if !b.outerSet && len(b.extra) == 0 {
-			continue
-		}
-		if b.outerSet {
-			sb.WriteString(b.outerSrc)
-		}
-		for _, iu := range b.extra {
-			body := stripUnitPreamble(iu.src)
-			if body != "" {
-				sb.WriteString("\n\n")
-				sb.WriteString(body)
-			}
-		}
-		jf := filepath.Join(srcDir, outer+".java")
+		rel := strings.TrimSuffix(name, ".class") + ".java"
+		jf := filepath.Join(srcDir, filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(jf), 0o755); err != nil {
 			return count, err
 		}
-		if err := os.WriteFile(jf, []byte(sb.String()), 0o644); err != nil {
+		if err := os.WriteFile(jf, []byte(src), 0o644); err != nil {
 			return count, err
 		}
 		count++

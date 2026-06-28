@@ -2,6 +2,7 @@ package statements
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core/utils"
@@ -122,7 +123,60 @@ func (r *ReturnStatement) String(funcCtx *class_context.ClassContext) string {
 	if cast := narrowingReturnCast(funcCtx, r.JavaValue); cast != "" {
 		return fmt.Sprintf("return (%s) (%s)", cast, expr)
 	}
+	// Type-variable return: when the method's recovered return type is a class-scope type
+	// variable (e.g. T/K/V) but the returned value's static type is the erased bound/Object,
+	// emit an explicit unchecked cast so the source recompiles. `return null` needs no cast
+	// (null is assignable to any type variable).
+	if expr != "null" {
+		if cast := typeVarReturnCast(funcCtx, r.JavaValue); cast != "" {
+			return fmt.Sprintf("return (%s) (%s)", cast, expr)
+		}
+	}
 	return fmt.Sprintf("return %s", expr)
+}
+
+// typeVarReturnCast returns the type-variable name to cast the returned value to when the
+// enclosing method's declared return type is a class-scope type variable (recovered from the
+// method Signature, e.g. `()TT;`) but the returned value's static type is a DIFFERENT reference
+// type (the erased bound, typically Object or the declared bound such as Comparable). Bytecode
+// erases a type-variable return to its bound, so a local typed as that bound, when returned from
+// a method whose return type Yak has correctly recovered to `T`, fails to compile ("incompatible
+// types: Comparable cannot be converted to T"). An explicit `(T)` cast is an unchecked but
+// behavior-preserving rendering fix, matching what CFR/Fernflower emit. Returns "" when the
+// return type is not a type variable, the value is a primitive, or the value already renders as
+// that type variable. Kill-switch JDEC_TYPEVAR_RET_CAST_OFF disables it.
+func typeVarReturnCast(funcCtx *class_context.ClassContext, v values.JavaValue) string {
+	if funcCtx == nil || v == nil {
+		return ""
+	}
+	if os.Getenv("JDEC_TYPEVAR_RET_CAST_OFF") != "" {
+		return ""
+	}
+	ft, ok := funcCtx.FunctionType.(*types.JavaFuncType)
+	if !ok || ft == nil || ft.ReturnType == nil {
+		return ""
+	}
+	retStr := ft.ReturnType.String(funcCtx)
+	if !funcCtx.IsTypeParam(retStr) {
+		return ""
+	}
+	vt := v.Type()
+	if vt == nil {
+		return ""
+	}
+	raw := vt.RawType()
+	if raw == nil {
+		return ""
+	}
+	// A type variable is always a reference type; a primitive value never needs (and cannot take)
+	// this cast.
+	if _, isPrim := raw.(*types.JavaPrimer); isPrim {
+		return ""
+	}
+	if raw.String(funcCtx) == retStr {
+		return ""
+	}
+	return retStr
 }
 
 // narrowingReturnCast returns the cast type name ("char"/"byte"/"short") when the enclosing
@@ -152,6 +206,31 @@ func narrowingReturnCast(funcCtx *class_context.ClassContext, v values.JavaValue
 // local without a cast is a 'possible lossy conversion' javac error (e.g. commons-codec
 // PureJavaCrc32C: `byte x = (arr[i] ^ crc) & 255`). Wrapping the initializer in an explicit cast
 // is a pure rendering fix — the recompiled bytecode is behaviorally identical.
+// intCategoryWiderThan reports whether slot type a is `int` while initializer type b is one of the
+// narrower int-category primitives (byte/char/short). It is used to choose the declared type of a
+// local whose slot was unified to int (because a later store assigns an int-valued expression) but
+// whose first/initializer value is a narrower type that widens to int implicitly. Only the widening
+// to int is recognized (the only widening the slot-merge in AssignVar produces); boolean and the
+// non-int categories are excluded by the underlying name checks.
+func intCategoryWiderThan(a types.JavaType, b types.JavaType) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	pa, oka := a.RawType().(*types.JavaPrimer)
+	pb, okb := b.RawType().(*types.JavaPrimer)
+	if !oka || !okb {
+		return false
+	}
+	if pa.Name != types.JavaInteger {
+		return false
+	}
+	switch pb.Name {
+	case types.JavaByte, types.JavaChar, types.JavaShort:
+		return true
+	}
+	return false
+}
+
 func narrowingInitCast(slotType types.JavaType, valueType types.JavaType) string {
 	if slotType == nil || valueType == nil {
 		return ""
@@ -234,6 +313,18 @@ func arrayStoreRHS(member *values.JavaArrayMember, value values.JavaValue, funcC
 				}
 			}
 		}
+		// Narrowing cast for byte[]/char[]/short[] element stores. bastore/castore/sastore implicitly
+		// truncate the int on the stack to the element width, but Java source assignment context (JLS
+		// 5.2) forbids the implicit int->byte/char/short narrowing, so `arr[i] = intValue` is a
+		// "possible lossy conversion" error (commons-codec QCodec `out[i] = b` where b is int-typed).
+		// The explicit cast reproduces the truncation the opcode already performs, so it is
+		// behaviorally identical; only int-typed values need it (a value already byte/char/short
+		// widens to int and back without change, and long/float/double cannot reach these arrays).
+		if member.Type() != nil {
+			if cast := narrowingInitCast(member.Type(), value.Type()); cast != "" {
+				return fmt.Sprintf("(%s) (%s)", cast, value.String(funcCtx))
+			}
+		}
 	}
 	return value.String(funcCtx)
 }
@@ -273,6 +364,16 @@ func (a *AssignStatement) String(funcCtx *class_context.ClassContext) string {
 		if lit, ok := a.JavaValue.(*values.JavaLiteral); ok && fmt.Sprint(lit.Data) == "null" {
 			declType = a.LeftValue.Type()
 		}
+		// A class literal initializer (`Foo.class`) is a java.lang.Class object, but its
+		// JavaValue.Type() reports the *referenced* class (Foo) to drive bare-name rendering and
+		// static-call receivers (`Foo.class`, `Foo.parseInt(...)`). When captured into a local the
+		// declared type must be java.lang.Class, not Foo, or later member reads (`c.getName()`,
+		// `c.isPrimitive()`) fail to recompile ("cannot find symbol"). Declare it `Class`; raw Class
+		// is assignment-compatible with `Foo.class` and always recompiles. Kill-switch:
+		// JDEC_NO_CLASSLIT_SLOT_TYPE=1 (shared with the slot-typing guard in stack_simulation.go).
+		if _, ok := values.UnpackSoltValue(a.JavaValue).(*values.JavaClassValue); ok && os.Getenv("JDEC_NO_CLASSLIT_SLOT_TYPE") == "" {
+			declType = types.NewJavaClass("java.lang.Class")
+		}
 		// Either side's type can be nil under incomplete simulation; fall back to the other
 		// side rather than dereferencing nil (which panicked the whole method into a stub).
 		if declType == nil {
@@ -291,6 +392,17 @@ func (a *AssignStatement) String(funcCtx *class_context.ClassContext) string {
 			// value is hoisted into an ordinary local (`cause = e` after the catch), render it as
 			// a common Throwable subtype so the declaration remains valid Java.
 			declType = types.NewJavaClass("java.lang.Exception")
+		}
+		// When the slot's resolved type is a WIDER int-category primitive than the initializer's
+		// type, declare with the slot type so the initializer widens implicitly. The slot gets
+		// widened to int when a later reassignment stores an int-valued expression into a slot first
+		// seen as byte/char/short (commons-codec QuotedPrintableCodec.getUnsignedOctet:
+		// `int o = bytes[i]; if (o < 0) o = 256 + o;` — slot is int, the baload initializer is byte).
+		// Without this the variable is declared `byte o = bytes[i]` and the `o = 256 + o` reassign is
+		// a "possible lossy conversion from int to byte" error; casting the reassign to byte would be
+		// SEMANTICALLY WRONG (it truncates 255 back to -1), so the correct fix is the wider int decl.
+		if lt := a.LeftValue.Type(); intCategoryWiderThan(lt, declType) {
+			declType = lt
 		}
 		// Narrowing cast for byte/char/short locals: JLS promotes these types to int in any
 		// arithmetic/bitwise/shift expression, so `byte x = (arr[i] ^ crc) & 255` is int-valued at

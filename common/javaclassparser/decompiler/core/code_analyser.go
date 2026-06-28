@@ -143,6 +143,44 @@ func (d *Decompiler) GetValueFromPool(index int) values.JavaValue {
 func (d *Decompiler) GetMethodFromPool(index int) *values.JavaClassMember {
 	return d.constantPoolGetter(index).(*values.JavaClassMember)
 }
+
+// CountFieldStores parses ONLY the opcode stream of this method and returns, keyed by
+// field name, how many times each field is the target of a putfield/putstatic. It is a
+// read-only structural scan: it does not build statements, simulate the stack, dump
+// lambdas, or touch the FunctionContext, so it has no side effects on the dumper, its
+// imports, or its caches and is safe to call on a throwaway Decompiler during a pre-pass.
+//
+// The caller uses these cross-constructor counts to decide whether a blank-final field is
+// safe to lift into a field initializer: a final field assigned in more than one place
+// (multiple constructors, or multiple branches) must keep its in-body assignments, because
+// emitting a field initializer plus an in-body assignment would compile to an illegal
+// double assignment to a final field.
+func (d *Decompiler) CountFieldStores() (map[string]int, error) {
+	if len(d.opCodes) == 0 {
+		if err := d.ParseOpcode(); err != nil {
+			return nil, err
+		}
+	}
+	counts := map[string]int{}
+	for _, op := range d.opCodes {
+		if op == nil || op.Instr == nil {
+			continue
+		}
+		switch op.Instr.OpCode {
+		case OP_PUTFIELD, OP_PUTSTATIC:
+			if len(op.Data) < 2 {
+				continue
+			}
+			idx := int(Convert2bytesToInt(op.Data))
+			val := d.constantPoolGetter(idx)
+			if m, ok := val.(*values.JavaClassMember); ok && m != nil {
+				counts[m.Member]++
+			}
+		}
+	}
+	return counts, nil
+}
+
 func (d *Decompiler) ParseOpcode() (err error) {
 	defer func() {
 		if e := recover(); e != nil {
@@ -321,8 +359,88 @@ func (d *Decompiler) ScanJmp() error {
 		}
 	}
 	walkNode(0)
+	d.anchorJumpEnteredTryCatch()
 	d.opCodes = append(d.opCodes, endOp)
 	return nil
+}
+
+// anchorJumpEnteredTryCatch records try-catch anchors for protected regions whose try body is entered
+// via a jump (a guard `if (x==null) return;` before the try, a try as a loop/branch body, a try right
+// after a return/throw). For those the try-start opcode is the first opcode of a fresh walkNode
+// invocation, so the inline scan in ScanJmp saw pre==nil and skipped the anchor; the handler then had
+// no predecessor edge and was pruned as unreachable in DropUnreachableOpcode, dropping the entire try
+// (a bare call that silently leaks a checked exception, e.g. commons-codec QCodec.encode). The
+// method-entry try is unaffected because a synthetic OP_START supplies a non-nil pre there. This runs
+// as a post-pass (after the full CFG is built) so a try-start that is ALSO reached by fall-through keeps
+// its inline pre-based anchor and is never double-anchored. Kill-switch: JDEC_TRY_JUMP_ANCHOR_OFF=1.
+func (d *Decompiler) anchorJumpEnteredTryCatch() {
+	if os.Getenv("JDEC_TRY_JUMP_ANCHOR_OFF") != "" || os.Getenv("JDEC_POSTPASS_OFF") != "" {
+		return
+	}
+	anchored := map[*OpCode]struct{}{}
+	for _, op := range d.opCodes {
+		if op.IsTryCatchParent && op.TryNode != nil {
+			anchored[op.TryNode] = struct{}{}
+		}
+	}
+	postAnchored := map[*OpCode]*OpCode{}
+	for _, entry := range d.ExceptionTable {
+		if entry.StartPc == entry.HandlerPc {
+			continue
+		}
+		startIdx, ok := d.offsetToOpcodeIndex[entry.StartPc]
+		if !ok {
+			continue
+		}
+		tryStart := d.opCodes[startIdx]
+		if _, ok := anchored[tryStart]; ok {
+			continue
+		}
+		handlerIdx, ok := d.offsetToOpcodeIndex[entry.HandlerPc]
+		if !ok {
+			continue
+		}
+		handler := d.opCodes[handlerIdx]
+		// Only repair handlers that are genuinely orphaned: if the handler already has a predecessor
+		// edge it is reachable and will be structured by the existing logic (try-with-resources,
+		// finally, switch-body try, multi-catch all add their own edges). Re-anchoring those would
+		// double-structure them and corrupt the output. The bug we fix is specifically the
+		// jump-entered try whose only handler edge (the inline LinkOpcode) was skipped on pre==nil,
+		// leaving the handler with zero predecessors so DropUnreachableOpcode prunes it.
+		if len(handler.Source) > 0 {
+			continue
+		}
+		anchor, seen := postAnchored[tryStart]
+		if !seen {
+			// Pick a predecessor of the try body that lies OUTSIDE the protected region
+			// [StartPc, EndPc) and is not the handler. It dominates entry into the try and is the
+			// correct splice point (mirrors the role `pre` plays on the normal fall-through path).
+			// A back-edge predecessor from inside the loop/try body must be skipped.
+			for _, src := range tryStart.Source {
+				if src == nil || src == tryStart || src == handler {
+					continue
+				}
+				if src.CurrentOffset >= entry.StartPc && src.CurrentOffset < entry.EndPc {
+					continue
+				}
+				anchor = src
+				break
+			}
+			if anchor == nil {
+				continue
+			}
+			postAnchored[tryStart] = anchor
+		}
+		LinkOpcode(anchor, handler)
+		anchor.IsTryCatchParent = true
+		anchor.TryNode = tryStart
+		anchor.CatchNode = append(anchor.CatchNode, &CatchNode{
+			ExceptionTypeIndex: entry.CatchType,
+			StartIndex:         entry.StartPc,
+			EndIndex:           entry.EndPc,
+			OpCode:             handler,
+		})
+	}
 }
 func (d *Decompiler) DropUnreachableOpcode() error {
 	// DropUnreachableOpcode and nop
@@ -636,8 +754,22 @@ func (d *Decompiler) reachingSlotVersionOnMismatch(load *OpCode, slot int, curre
 		// wantRef == refIsPrimitive(current).
 		return nil
 	}
-	visited := map[*OpCode]bool{load: true}
-	queue := append([]*OpCode{}, load.Source...)
+	return d.reachingSlotVersionByCategory(load, slot, wantRef)
+}
+
+// reachingSlotVersionByCategory walks Source edges backward from start to the nearest version-
+// defining local store of `slot` whose ref category (reference vs primitive) matches wantRef, and
+// returns that store's ref. The first same-slot store on each path dominates it, so the search does
+// not expand past a same-slot store of the WRONG category (it just stops that path). Returns nil
+// when no matching reaching definition is found. Shared by the load-mismatch repair
+// (reachingSlotVersionOnMismatch) and the iinc repair, both of which fight the same single-global
+// slot-table corruption introduced by DFS traversal order.
+func (d *Decompiler) reachingSlotVersionByCategory(start *OpCode, slot int, wantRef bool) *values.JavaRef {
+	if start == nil {
+		return nil
+	}
+	visited := map[*OpCode]bool{start: true}
+	queue := append([]*OpCode{}, start.Source...)
 	for len(queue) > 0 {
 		cur := queue[0]
 		queue = queue[1:]
@@ -647,9 +779,9 @@ func (d *Decompiler) reachingSlotVersionOnMismatch(load *OpCode, slot int, curre
 		visited[cur] = true
 		if isLocalStoreOpcode(cur.Instr.OpCode) && GetStoreIdx(cur) == slot {
 			// A version-defining store for this slot shadows anything earlier on this path. Adopt
-			// its ref when the category matches the load; otherwise stop expanding past it (its
-			// own definition dominates this path, so an earlier same-slot store is not reachable
-			// here) and keep searching other paths.
+			// its ref when the category matches; otherwise stop expanding past it (its own
+			// definition dominates this path, so an earlier same-slot store is not reachable here)
+			// and keep searching other paths.
 			if refs, ok := d.opcodeIdToRef[cur]; ok && len(refs) > 0 {
 				if ref, ok2 := refs[len(refs)-1][0].(*values.JavaRef); ok2 && ref != nil && ref.Type() != nil {
 					if wantRef != refIsPrimitive(ref) {
@@ -986,6 +1118,14 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 			return fmt.Sprintf("(%s)(%s)", fname, arg.String(funcCtx))
 		}, func() types.JavaType {
 			return typ
+		}, func(oldId *utils2.VariableId, newId *utils2.VariableId) {
+			// Propagate variable renames into the cast operand. Without this, a later rewriteVar
+			// rename (e.g. a depth-collision rename of the operand's variable) updates the operand's
+			// other occurrences but not this primitive-cast expression, so a `(int)(varN)` cast keeps
+			// a stale name and references an undeclared variable (guava UnsignedLongs.toString:
+			// `(int) rem` printed the old name `var5` after rem was renamed `var4_1`). CHECKCAST
+			// already does this; the numeric conversions must too.
+			arg.ReplaceVar(oldId, newId)
 		}))
 	case OP_INSTANCEOF:
 		classInfo := d.constantPoolGetter(int(Convert2bytesToInt(opcode.Data))).(*values.JavaClassValue).Type()
@@ -1372,6 +1512,33 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 			inc = int(int8(opcode.Data[1]))
 		}
 		ref := runtimeStackSimulation.GetVar(index)
+		// An iinc reads-and-writes a single int-category local (byte/char/short/int), so its ref
+		// can never legitimately be a reference type. When the global slot table was polluted by
+		// DFS traversal order with a LATER, reference-typed reincarnation of this slot (the same
+		// root cause repaired for loads in reachingSlotVersionOnMismatch — e.g. a loop counter
+		// slot that javac reuses for a byte[] AFTER the loop, commons-codec Base64.decode), GetVar
+		// returns that wrong variable and the `i++` renders as `someArray++`. Walk back to the
+		// reaching int-category definition. Kill-switch: JDEC_IINC_REACHING_OFF=1.
+		if ref != nil && !refIsPrimitive(ref) && os.Getenv("JDEC_IINC_REACHING_OFF") == "" {
+			if better := d.reachingSlotVersionByCategory(opcode, index, false); better != nil {
+				ref = better
+			}
+		}
+		// javac emits iinc ONLY for a genuinely `int` local: byte/char/short compound assignment
+		// (`b += k`) desugars to iadd + i2b/i2c/i2s + store, never iinc. So a slot targeted by iinc
+		// is provably int. When the ref was inferred narrower (e.g. byte from the baload that fed
+		// the slot, commons-codec Base64.encode `b += 256` -> `iinc_w 7,256` over a byte-typed
+		// var7), the non-±1 desugar `var7 = var7 + 256` is a possible-lossy byte/short/char
+		// conversion that will not recompile. Widen the slot's declaration to int (always safe:
+		// the slot is int). Kill-switch: JDEC_IINC_WIDEN_OFF=1.
+		if ref != nil && os.Getenv("JDEC_IINC_WIDEN_OFF") == "" {
+			if p, ok := ref.Type().RawType().(*types.JavaPrimer); ok {
+				switch p.Name {
+				case types.JavaByte, types.JavaShort, types.JavaChar:
+					ref.ResetVarType(types.NewJavaPrimer(types.JavaInteger))
+				}
+			}
+		}
 		opcode.Ref = ref
 		// Post-increment / decrement used inside an expression. javac compiles `a[i++] = v`,
 		// `int j = i++`, `return i++` as `iload X; iinc X; ...`, so the OLD value of slot X is
@@ -3511,14 +3678,39 @@ func (d *Decompiler) ParseStatement() error {
 				return endIndexes[i] < endIndexes[j]
 			})
 			// build try node
+			// When the try region is entered via a jump (guard-return / loop / branch body), the
+			// try-catch is anchored on the *condition* that jumps to the try body (see the pre==nil
+			// fallback in ScanJmp). Splicing the MiddleTryStart in must preserve that condition's
+			// branch order and jump-target identity: a condition's true/false branch is index-based
+			// (node.Next[trueIndex]) and RemoveGotoStatement picks the index by matching node.JmpNode.
+			// The legacy steal (remove + append) moved the try body to the end of the predecessor's
+			// successor list and left JmpNode dangling on the now-detached body, inverting the if.
+			// Replace the edge in place and re-point JmpNode/HideNext instead. Equivalent to the old
+			// behavior for single-successor anchors (OP_START / plain statement). Kill-switch:
+			// JDEC_TRY_JUMP_ANCHOR_OFF=1 restores the legacy steal.
+			preserveBranchOrder := os.Getenv("JDEC_TRY_JUMP_ANCHOR_OFF") == ""
 			currentTryNode := tryStartNode
 			for _, endIndex := range endIndexes {
 				catchNodes := catchNodeMap[endIndex]
 				tryNode := NewNode(statements.NewMiddleStatement(statements.MiddleTryStart, nil))
 				tryNode.Id = statementsIndex
-				for _, n := range currentTryNode.Source {
-					currentTryNode.RemoveSource(n)
-					tryNode.AddSource(n)
+				if preserveBranchOrder {
+					for _, n := range slices.Clone(currentTryNode.Source) {
+						n.ReplaceNext(currentTryNode, tryNode)
+						if n.JmpNode == currentTryNode {
+							n.JmpNode = tryNode
+						}
+						if n.HideNext == currentTryNode {
+							n.HideNext = tryNode
+						}
+						tryNode.Source = append(tryNode.Source, n)
+					}
+					currentTryNode.Source = nil
+				} else {
+					for _, n := range currentTryNode.Source {
+						currentTryNode.RemoveSource(n)
+						tryNode.AddSource(n)
+					}
 				}
 				tryNode.AddNext(currentTryNode)
 				statementsIndex++
