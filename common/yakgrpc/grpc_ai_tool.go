@@ -372,7 +372,12 @@ func (s *Server) ImportAITool(req *ypb.ImportAIToolRequest, stream ypb.Yak_Impor
 }
 
 func fixAIToolMetadata(tool *schema.AIYakTool) error {
-	parsedAITool := yakscripttools.LoadYakScriptToAiTools(tool.Name, tool.Content)
+	namePath := tool.Path
+	if namePath == "" {
+		namePath = tool.Name
+	}
+	content := yakscripttools.PrepareToolContent(namePath, tool.Content)
+	parsedAITool := yakscripttools.LoadYakScriptToAiTools(tool.Name, content)
 	if parsedAITool == nil {
 		// 禁止保存解析参数失败的工具，和插件行为保持一致
 		return utils.Errorf("failed to load yak script to AI tool")

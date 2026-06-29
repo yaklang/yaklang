@@ -11,15 +11,9 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-// ImportSkillDBOptions controls optional fields when persisting skills into ai_forges.
-type ImportSkillDBOptions struct {
-	Author    string
-	IsBuiltin bool
-}
-
 // ImportAISkillsToDB imports all skills from a loader into the ai_forges table
 // as skillmd records. The returned count includes only rows that were created or updated.
-func ImportAISkillsToDB(db *gorm.DB, loader SkillLoader, opts ...ImportSkillDBOptions) (int, error) {
+func ImportAISkillsToDB(db *gorm.DB, loader SkillLoader) (int, error) {
 	if db == nil {
 		return 0, utils.Error("db is nil")
 	}
@@ -30,11 +24,6 @@ func ImportAISkillsToDB(db *gorm.DB, loader SkillLoader, opts ...ImportSkillDBOp
 	db.AutoMigrate(&schema.AIForge{})
 	if err := yakit.EnsureAIForgeFTS5(db); err != nil {
 		return 0, utils.Wrap(err, "ensure ai_forges FTS5 failed")
-	}
-
-	var opt ImportSkillDBOptions
-	if len(opts) > 0 {
-		opt = opts[0]
 	}
 
 	persisted := 0
@@ -48,12 +37,6 @@ func ImportAISkillsToDB(db *gorm.DB, loader SkillLoader, opts ...ImportSkillDBOp
 		if err != nil {
 			log.Warnf("failed to convert skill %q to forge: %v", meta.Name, err)
 			continue
-		}
-		if opt.Author != "" {
-			forge.Author = opt.Author
-		}
-		if opt.IsBuiltin {
-			forge.IsBuiltin = true
 		}
 		existing, err := yakit.GetAIForgeByNameAndTypes(db, meta.Name, schema.FORGE_TYPE_SkillMD)
 		if err == nil && sameSkillMDForge(existing, forge) {
@@ -81,39 +64,16 @@ func sameSkillMDForge(existing *schema.AIForge, current *schema.AIForge) bool {
 		existing.Description == current.Description &&
 		existing.Tags == current.Tags &&
 		existing.InitPrompt == current.InitPrompt &&
-		existing.Author == current.Author &&
-		existing.IsBuiltin == current.IsBuiltin &&
 		bytes.Equal(existing.FSBytes, current.FSBytes)
 }
 
-// ImportAISkillsFromAllDirsToDB scans well-known skill directories and imports
-// discovered SKILL.md entries into ai_forges for Yakit skill library listing.
-func ImportAISkillsFromAllDirsToDB(db *gorm.DB, dirs []string) (int, error) {
-	if db == nil {
-		return 0, utils.Error("db is nil")
-	}
-	total := 0
-	for _, dir := range dirs {
-		if dir == "" || !utils.IsDir(dir) {
-			continue
-		}
-		n, err := ImportAISkillsFromLocalDirToDB(db, dir)
-		if err != nil {
-			log.Warnf("import skills from %q failed: %v", dir, err)
-			continue
-		}
-		total += n
-	}
-	return total, nil
-}
-
 // ImportAISkillsFromLocalDirToDB imports skills from a local directory into ai_forges.
-func ImportAISkillsFromLocalDirToDB(db *gorm.DB, dirPath string, opts ...ImportSkillDBOptions) (int, error) {
+func ImportAISkillsFromLocalDirToDB(db *gorm.DB, dirPath string) (int, error) {
 	loader, err := NewAutoSkillLoader(WithAutoLoad_LocalDir(dirPath))
 	if err != nil {
 		return 0, err
 	}
-	return ImportAISkillsToDB(db, loader, opts...)
+	return ImportAISkillsToDB(db, loader)
 }
 
 // ImportAISkillsFromArchiveFileToDB imports skills from an archive file into ai_forges.
@@ -133,10 +93,10 @@ func ImportAISkillsFromZipFileToDB(db *gorm.DB, zipPath string) (int, error) {
 }
 
 // ImportAISkillsFromFileSystemToDB imports skills from a filesystem into ai_forges.
-func ImportAISkillsFromFileSystemToDB(db *gorm.DB, fsys fi.FileSystem, opts ...ImportSkillDBOptions) (int, error) {
+func ImportAISkillsFromFileSystemToDB(db *gorm.DB, fsys fi.FileSystem) (int, error) {
 	loader, err := NewAutoSkillLoader(WithAutoLoad_FileSystem(fsys))
 	if err != nil {
 		return 0, err
 	}
-	return ImportAISkillsToDB(db, loader, opts...)
+	return ImportAISkillsToDB(db, loader)
 }

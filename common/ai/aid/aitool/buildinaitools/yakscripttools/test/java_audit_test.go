@@ -33,7 +33,7 @@ func loadJavaAuditTool(t *testing.T, relPath, toolName string) *aitool.Tool {
 	if err != nil {
 		t.Fatalf("read embed yak %s: %v", relPath, err)
 	}
-	prepared := yakscripttools.PrepareJavaAuditToolContent("java_audit", string(content))
+	prepared := yakscripttools.PrepareToolContent("java_audit", string(content))
 	aiTool := yakscripttools.LoadYakScriptToAiTools(toolName, prepared)
 	if aiTool == nil {
 		t.Fatalf("parse yak tool %s failed", toolName)
@@ -334,9 +334,9 @@ func TestJavaProjectProbe_RuoYiCloudScope(t *testing.T) {
 	assert.Assert(t, len(findings) >= 1, "expected RuoYi CMS findings from ruoyi-admin configs, got %d", len(findings))
 }
 
-func TestPrepareJavaAuditToolContent_SkipsLibOnly(t *testing.T) {
+func TestPrepareToolContent_SkipsLibOnly(t *testing.T) {
 	raw := "__DESC__ = \"x\"\ncli.check()"
-	prepared := yakscripttools.PrepareJavaAuditToolContent("java_audit/lib/common", raw)
+	prepared := yakscripttools.PrepareToolContent("java_audit/lib/common", raw)
 	assert.Equal(t, raw, prepared)
 }
 

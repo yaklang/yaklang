@@ -29,16 +29,10 @@ func TestSSAParse(t *testing.T) {
 			return nil
 		}
 
-		namePath := strings.Trim(strings.TrimPrefix(dirname, "yakscriptforai"), "/")
-		// java_audit tools prepend shared lib/*.yak at runtime; concatenated lib + tool
-		// fails Yak SSA closure checks today. Covered by java_audit_test.go instead.
-		if strings.HasPrefix(namePath, "java_audit") {
-			return nil
-		}
-
 		content, err := filesystem.ReadFile(s)
 		require.NoError(t, err)
 
+		// Analyze raw tool scripts; lib-injected content is validated in java_audit_test.go.
 		res := yak.StaticAnalyze(string(content))
 		errRes := lo.Filter(res, func(item *result.StaticAnalyzeResult, _ int) bool {
 			return item.Severity == result.Error

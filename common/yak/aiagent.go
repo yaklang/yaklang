@@ -10,8 +10,8 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	// blank-import aive 触发价值评估 submitter 的 init() 注册 (默认开启).
 	// 关键词: aive blank import, RegisterValueFeedbackSubmitter 触发
-	_ "github.com/yaklang/yaklang/common/ai/aid/aive"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata/genmetadata"
+	_ "github.com/yaklang/yaklang/common/ai/aid/aive"
 	"github.com/yaklang/yaklang/common/aiforge"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
@@ -122,7 +122,12 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 					return nil
 				})
 
-				_, err = engine.ExecuteExWithContext(ctx, aiTool.Content, map[string]interface{}{
+				namePath := aiTool.Path
+				if namePath == "" {
+					namePath = aiTool.Name
+				}
+				scriptContent := yakscripttools.PrepareToolContent(namePath, aiTool.Content)
+				_, err = engine.ExecuteExWithContext(ctx, scriptContent, map[string]interface{}{
 					"RUNTIME_ID":   runtimeId,
 					"CTX":          ctx,
 					"PLUGIN_NAME":  aiTool.Name + ".yak",
