@@ -4,7 +4,7 @@ import (
 	"os"
 	"time"
 
-	yaklog "github.com/yaklang/yaklang/common/log"
+	stdlog "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
@@ -35,7 +35,7 @@ var hotInstructionOpcodeBlacklist = map[Opcode]struct{}{
 }
 
 func instructionCacheDebugEnabled() bool {
-	return yaklog.GetLevel() >= yaklog.DebugLevel
+	return log.Level >= stdlog.DebugLevel
 }
 
 func instructionCacheEventDebugEnabled() bool {
