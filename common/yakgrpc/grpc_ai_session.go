@@ -8,6 +8,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/aisessioncleanup"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -126,6 +127,11 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 			return nil, err
 		}
 
+		memResult, err := aisessioncleanup.DeleteAllSessionArtifacts(projectDB)
+		if err != nil {
+			return nil, err
+		}
+
 		deletedSessions, deletedRuntimes, deletedEvents, deletedPlanExec, err := yakit.DeleteAllAISessionData(projectDB)
 		if err != nil {
 			return nil, err
@@ -136,12 +142,19 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 			Operation:  "delete",
 			EffectRows: deletedRuntimes + deletedEvents,
 			ExtraMessage: fmt.Sprintf(
-				"delete_all=true deleted_sessions=%d deleted_runtimes=%d deleted_events=%d deleted_plan_exec=%d deleted_workdirs=%d",
+				"delete_all=true deleted_sessions=%d deleted_runtimes=%d deleted_events=%d deleted_plan_exec=%d deleted_workdirs=%d deleted_memory_entities=%d deleted_memory_collections=%d deleted_rag_collections=%d deleted_entity_repositories=%d deleted_entity_relationships=%d deleted_knowledge_bases=%d deleted_knowledge_entries=%d",
 				deletedSessions,
 				deletedRuntimes,
 				deletedEvents,
 				deletedPlanExec,
 				deletedWorkDirs,
+				memResult.DeletedMemoryEntities,
+				memResult.DeletedMemoryCollections,
+				memResult.DeletedRAGCollections,
+				memResult.DeletedEntityRepositories,
+				memResult.DeletedEntityRelationships,
+				memResult.DeletedKnowledgeBases,
+				memResult.DeletedKnowledgeEntries,
 			),
 		}, nil
 	}
@@ -166,8 +179,25 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 
 	var deletedRuntimes int64
 	var deletedEvents int64
+	var deletedMemoryEntities, deletedMemoryCollections, deletedRAGCollections int64
+	var deletedEntityRepositories, deletedEntityRelationships int64
+	var deletedKnowledgeBases, deletedKnowledgeEntries int64
 	for _, sessionID := range targetSessionIDs {
-		runtimeCount, eventCount, err := yakit.DeleteAISession(projectDB, strings.TrimSpace(sessionID))
+		sessionID = strings.TrimSpace(sessionID)
+
+		memResult, err := aisessioncleanup.DeleteSessionArtifacts(projectDB, sessionID)
+		if err != nil {
+			return nil, err
+		}
+		deletedMemoryEntities += memResult.DeletedMemoryEntities
+		deletedMemoryCollections += memResult.DeletedMemoryCollections
+		deletedRAGCollections += memResult.DeletedRAGCollections
+		deletedEntityRepositories += memResult.DeletedEntityRepositories
+		deletedEntityRelationships += memResult.DeletedEntityRelationships
+		deletedKnowledgeBases += memResult.DeletedKnowledgeBases
+		deletedKnowledgeEntries += memResult.DeletedKnowledgeEntries
+
+		runtimeCount, eventCount, err := yakit.DeleteAISession(projectDB, sessionID)
 		if err != nil {
 			return nil, err
 		}
@@ -180,11 +210,18 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 		Operation:  "delete",
 		EffectRows: deletedRuntimes + deletedEvents,
 		ExtraMessage: fmt.Sprintf(
-			"deleted_sessions=%d deleted_runtimes=%d deleted_events=%d deleted_workdirs=%d",
+			"deleted_sessions=%d deleted_runtimes=%d deleted_events=%d deleted_workdirs=%d deleted_memory_entities=%d deleted_memory_collections=%d deleted_rag_collections=%d deleted_entity_repositories=%d deleted_entity_relationships=%d deleted_knowledge_bases=%d deleted_knowledge_entries=%d",
 			len(targetSessionIDs),
 			deletedRuntimes,
 			deletedEvents,
 			deletedWorkDirs,
+			deletedMemoryEntities,
+			deletedMemoryCollections,
+			deletedRAGCollections,
+			deletedEntityRepositories,
+			deletedEntityRelationships,
+			deletedKnowledgeBases,
+			deletedKnowledgeEntries,
 		),
 	}, nil
 }
