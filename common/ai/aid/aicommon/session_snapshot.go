@@ -38,10 +38,11 @@ type SessionSnapshot struct {
 // SessionSnapshotBackgroundProcess describes a long-lived background resource owned by the session.
 // Process types are extensible; only "browser" is supported today.
 type SessionSnapshotBackgroundProcess struct {
-	Type      string `json:"type"`
-	ProcessID string `json:"process_id"`
-	Status    string `json:"status"`
-	StartedAt int64  `json:"started_at"`
+	Type        string `json:"type"`
+	ProcessID   string `json:"process_id"`
+	ProcessName string `json:"process_name"`
+	Status      string `json:"status"`
+	StartedAt   int64  `json:"started_at"`
 }
 
 type SessionSnapshotExecution struct {
@@ -275,11 +276,15 @@ func (c *Config) SetSessionSnapshotPerceptionCapabilityMatches(matches *SessionS
 	state.perceptionExtras.CapabilityMatches = &copied
 }
 
-func (c *Config) AddSessionSnapshotBackgroundProcess(processType, processID string) {
+func (c *Config) AddSessionSnapshotBackgroundProcess(processType, processID, processName string) {
 	processType = strings.TrimSpace(processType)
 	processID = strings.TrimSpace(processID)
+	processName = strings.TrimSpace(processName)
 	if c == nil || processType == "" || processID == "" {
 		return
+	}
+	if processName == "" {
+		processName = processID
 	}
 	state := c.ensureSessionSnapshotState()
 	if state == nil {
@@ -291,10 +296,11 @@ func (c *Config) AddSessionSnapshotBackgroundProcess(processType, processID stri
 		state.backgroundProcesses = make(map[string]SessionSnapshotBackgroundProcess)
 	}
 	state.backgroundProcesses[processID] = SessionSnapshotBackgroundProcess{
-		Type:      processType,
-		ProcessID: processID,
-		Status:    SessionSnapshotProcessStatusRunning,
-		StartedAt: time.Now().Unix(),
+		Type:        processType,
+		ProcessID:   processID,
+		ProcessName: processName,
+		Status:      SessionSnapshotProcessStatusRunning,
+		StartedAt:   time.Now().Unix(),
 	}
 }
 
@@ -643,9 +649,9 @@ func NotifySessionSnapshotEmit(cfg AICallerConfigIf, immediate ...bool) {
 	}
 }
 
-func NotifySessionSnapshotBrowserOpened(cfg AICallerConfigIf, browserID string) {
+func NotifySessionSnapshotBrowserOpened(cfg AICallerConfigIf, browserID, processName string) {
 	if c := ConfigFromAICaller(cfg); c != nil {
-		c.AddSessionSnapshotBackgroundProcess(SessionSnapshotProcessTypeBrowser, browserID)
+		c.AddSessionSnapshotBackgroundProcess(SessionSnapshotProcessTypeBrowser, browserID, processName)
 		c.NotifySessionSnapshotEmit(true)
 	}
 }

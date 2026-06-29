@@ -26,7 +26,7 @@ func (r *ReAct) TrackBrowserSession(id string) {
 	r.browserSessionIDs[id] = struct{}{}
 	r.browserSessionsMu.Unlock()
 
-	aicommon.NotifySessionSnapshotBrowserOpened(r.config, id)
+	aicommon.NotifySessionSnapshotBrowserOpened(r.config, id, browser.BackgroundProcessName(id))
 }
 
 // UntrackBrowserSession removes a browser instance id after browser.Close.

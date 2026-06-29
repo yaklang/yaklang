@@ -70,8 +70,8 @@ func TestNormalizeSessionSnapshot_FullPayload(t *testing.T) {
 
 func TestSessionSnapshot_BackgroundProcesses(t *testing.T) {
 	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
-	cfg.AddSessionSnapshotBackgroundProcess(SessionSnapshotProcessTypeBrowser, "scanner")
-	cfg.AddSessionSnapshotBackgroundProcess(SessionSnapshotProcessTypeBrowser, "crawler")
+	cfg.AddSessionSnapshotBackgroundProcess(SessionSnapshotProcessTypeBrowser, "scanner", "Scanner Browser")
+	cfg.AddSessionSnapshotBackgroundProcess(SessionSnapshotProcessTypeBrowser, "crawler", "Crawler Browser")
 
 	procs := cfg.BuildSessionSnapshotBackgroundProcesses()
 	require.Len(t, procs, 2)
@@ -80,6 +80,7 @@ func TestSessionSnapshot_BackgroundProcesses(t *testing.T) {
 	procs = cfg.BuildSessionSnapshotBackgroundProcesses()
 	require.Len(t, procs, 1)
 	require.Equal(t, "crawler", procs[0].ProcessID)
+	require.Equal(t, "Crawler Browser", procs[0].ProcessName)
 	require.Equal(t, SessionSnapshotProcessTypeBrowser, procs[0].Type)
 	require.Equal(t, SessionSnapshotProcessStatusRunning, procs[0].Status)
 }
