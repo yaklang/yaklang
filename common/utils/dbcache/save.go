@@ -205,6 +205,22 @@ func (s *Save[T]) processBuffer() {
 			save(items)
 			return
 		case done := <-s.flush:
+			// Synchronous flush: save the current batch, then drain
+			// everything still buffered before acking. Callers MUST NOT
+			// call Save concurrently with Flush.
+			save(items)
+			items = make([]T, 0, saveSize)
+			for s.buffer.Len() > 0 {
+				item, ok := <-s.buffer.OutputChannel()
+				if !ok {
+					break
+				}
+				items = append(items, item)
+				if len(items) >= currentSaveSize {
+					save(items)
+					items = make([]T, 0, saveSize)
+				}
+			}
 			save(items)
 			items = make([]T, 0, saveSize)
 			resetTimer(timer, saveTime)
@@ -274,20 +290,15 @@ func (s *Save[T]) Save(item T) {
 	}
 }
 
-// Flush synchronously saves all currently queued items without closing the
-// saver. Items added concurrently after the flush request may be saved by a
-// later batch.
+// Flush synchronously persists all items queued so far and returns once they
+// have been handed to the save function. The caller MUST NOT call Save
+// concurrently with Flush. Flush is safe to call after Close returns (it is a
+// no-op once the context is cancelled).
 func (s *Save[T]) Flush() {
 	if s == nil {
 		return
 	}
 	done := make(chan struct{})
-	defer func() {
-		if r := recover(); r != nil {
-			log.Errorf("dbcache flush panic: %v", r)
-			utils.PrintCurrentGoroutineRuntimeStack()
-		}
-	}()
 	select {
 	case s.flush <- done:
 		<-done

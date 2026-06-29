@@ -1,14 +1,13 @@
 package ssa
 
 import (
-	"fmt"
 	"runtime"
 	"runtime/debug"
 	"strings"
 
+	stdlog "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	yaklog "github.com/yaklang/yaklang/common/log"
 )
 
 // BeginCompileUnit marks the start of a compile unit: subsequent lazy/deferred
@@ -70,9 +69,11 @@ func (prog *Program) ReleaseCompletedUnitMemory(unitKeys []string) int {
 		completedUnits[key] = struct{}{}
 	}
 
-	fmt.Printf("\n[RELEASE-TRACE] Starting release: units=%d, totalFuncs=%d\n", len(unitKeys), app.Funcs.Len())
-	if len(unitKeys) > 0 {
-		fmt.Printf("[RELEASE-TRACE] First 3 unit keys: %v\n", unitKeys[:min(3, len(unitKeys))])
+	if compileUnitMemoryDebugEnabled() {
+		log.Debugf("[split-compile] release start units=%d total_funcs=%d", len(unitKeys), app.Funcs.Len())
+		if len(unitKeys) > 0 {
+			log.Debugf("[split-compile] release unit keys sample=%v", unitKeys[:min(3, len(unitKeys))])
+		}
 	}
 
 	// Iterate through all functions and release bodies for completed units
@@ -89,8 +90,8 @@ func (prog *Program) ReleaseCompletedUnitMemory(unitKeys []string) int {
 		}
 
 		// Debug first few functions
-		if checkedFuncs <= 3 {
-			fmt.Printf("[RELEASE-TRACE] Func#%d: key=%s → unitKey=%s\n", checkedFuncs, funcKey, fnUnitKey)
+		if compileUnitMemoryDebugEnabled() && checkedFuncs <= 3 {
+			log.Debugf("[split-compile] release func#%d key=%s unit=%s", checkedFuncs, funcKey, fnUnitKey)
 		}
 
 		// Check if this function belongs to a completed unit
@@ -116,26 +117,34 @@ func (prog *Program) ReleaseCompletedUnitMemory(unitKeys []string) int {
 			releasedFuncs++
 			releasedBlocks += blockCount
 
-			if releasedFuncs <= 3 {
-				fmt.Printf("[RELEASE-TRACE] Released func: %s (blocks=%d)\n", funcKey, blockCount)
+			if compileUnitMemoryDebugEnabled() && releasedFuncs <= 3 {
+				log.Debugf("[split-compile] released func=%s blocks=%d", funcKey, blockCount)
 			}
 		}
 		return true
 	})
 
-	fmt.Printf("[RELEASE-TRACE] Summary: checked=%d released=%d skipped_public=%d skipped_nomatch=%d\n",
-		checkedFuncs, releasedFuncs, skippedPublic, skippedNoMatch)
+	if compileUnitMemoryDebugEnabled() {
+		log.Debugf("[split-compile] release summary checked=%d released=%d skipped_public=%d skipped_nomatch=%d",
+			checkedFuncs, releasedFuncs, skippedPublic, skippedNoMatch)
+	}
 
 	// Force GC to reclaim memory immediately
 	if releasedFuncs > 0 {
 		runtime.GC()
-		var m runtime.MemStats
-		runtime.ReadMemStats(&m)
-		fmt.Printf("[RELEASE-SUCCESS] Released %d function bodies (%d blocks) - heap=%.1fMB\n",
-			releasedFuncs, releasedBlocks, float64(m.HeapInuse)/(1024*1024))
+		if compileUnitMemoryDebugEnabled() {
+			var m runtime.MemStats
+			runtime.ReadMemStats(&m)
+			log.Debugf("[split-compile] released %d function bodies (%d blocks) heap=%.1fMB",
+				releasedFuncs, releasedBlocks, float64(m.HeapInuse)/(1024*1024))
+		}
 	}
 
 	return releasedFuncs
+}
+
+func compileUnitMemoryDebugEnabled() bool {
+	return log.Level >= stdlog.DebugLevel
 }
 
 func min(a, b int) int {
@@ -202,14 +211,14 @@ func (prog *Program) CheckMemoryPressure(batchIndex, totalBatches int) bool {
 	)
 
 	if heapMB > criticalThresholdMB {
-		yaklog.Warnf("[split-compile] CRITICAL memory pressure detected: heap=%.1fMB batch=%d/%d - forcing aggressive cleanup",
+		log.Warnf("[split-compile] CRITICAL memory pressure detected: heap=%.1fMB batch=%d/%d - forcing aggressive cleanup",
 			heapMB, batchIndex, totalBatches)
 		prog.AggressiveClearMemory()
 		return true
 	}
 
 	if heapMB > warningThresholdMB {
-		yaklog.Warnf("[split-compile] Memory pressure warning: heap=%.1fMB batch=%d/%d",
+		log.Warnf("[split-compile] Memory pressure warning: heap=%.1fMB batch=%d/%d",
 			heapMB, batchIndex, totalBatches)
 	}
 
@@ -286,8 +295,9 @@ func (prog *Program) AggressiveClearMemory() int64 {
 	afterMB := m.HeapInuse / (1024 * 1024)
 
 	freedMB := int64(beforeMB - afterMB)
-	fmt.Printf("[AGGRESSIVE-CLEAR] Cleared caches and forced GC: %d MB → %d MB (freed %d MB)\n",
-		beforeMB, afterMB, freedMB)
+	if compileUnitMemoryDebugEnabled() {
+		log.Debugf("[split-compile] aggressive clear heap=%dMB->%dMB freed=%dMB", beforeMB, afterMB, freedMB)
+	}
 
 	return freedMB
 }
