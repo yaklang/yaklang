@@ -144,8 +144,9 @@ func (s *Scanner) scanBuffer(host string, data []byte, direction, surface string
 				continue
 			}
 			raw := data[span.Start:span.End]
-			// 阶段三: 上下文/值形态校验, 剔除明显误报(厂商自有域、非真 JWT、源码型口令字段等)。
-			if !validateFinding(&r, raw, validateCtx{host: host, direction: direction}) {
+			// 阶段三: 上下文/值形态校验, 剔除明显误报(厂商自有域、非真 JWT、源码型口令字段、
+			// 登录框本地化文案等)。传完整 data + 偏移, 以便口令字段校验回看注释等上下文。
+			if !validateFinding(&r, data, span.Start, span.End, validateCtx{host: host, direction: direction}) {
 				continue
 			}
 			out = append(out, Finding{

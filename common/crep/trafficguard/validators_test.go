@@ -136,6 +136,90 @@ func TestSecretFieldTightening(t *testing.T) {
 	}
 }
 
+// TestLoginFormLabelNotReported 是用户反馈"访问任意登录页就报 password"误报的回归样本:
+// 登录页/表单的本地化文案(i18n)、UI 占位/动作词被当成口令值是规则23最严重的误报源, 必须抑制。
+// 这些样本均为"负样本"(登录框文案), 规则23一律不应命中。
+func TestLoginFormLabelNotReported(t *testing.T) {
+	s, err := NewScanner()
+	if err != nil {
+		t.Fatalf("NewScanner failed: %v", err)
+	}
+	negatives := []struct {
+		name string
+		data string
+	}{
+		// 复刻用户反馈截图: JS i18n 词典里的中文文案 password:"设置密码" / "忘记密码"。
+		{"js-i18n-cjk", `var L={"zpglet.adjusted_post":"调整间距","password":"设置密码","zpglet.download_fjmd":"下载附件模板","name_already_exists":"名称已存在"};`},
+		{"login-page-cjk", `{"login":"登录","username":"用户名","password":"请输入密码","confirmPassword":"确认密码"}`},
+		{"forgot-pwd-cjk", `{"forgotPassword":"忘记密码","pwd":"忘记密码？"}`},
+		{"reset-pwd-cjk", `{"password":"修改密码","newPassword":"新密码","oldPassword":"原密码"}`},
+		// 英文 UI 文案: 值就是字段名 / 动作 / 占位词。
+		{"en-label-word", `{"password":"Password","login":"Login","submit":"Submit","username":"Username"}`},
+		{"en-placeholder-phrase", `{"password":"Enter your password","pwd":"Please input password"}`},
+		// 压缩 JS 里的协议相对地址 //cdn 不应被误判成行注释而放行 CJK 文案。
+		{"minified-protocol-relative-url", `var a="//cdn.example.com/lib.js";var L={"password":"设置密码"};`},
+		// 页面里有一段"已闭合"的 HTML 注释, 之后脚本里的 CJK 文案仍应抑制(不在注释体内)。
+		{"closed-html-comment-then-i18n", `<!-- page header --><script>var L={"password":"忘记密码"};</script>`},
+	}
+	for _, c := range negatives {
+		t.Run(c.name, func(t *testing.T) {
+			if fs := s.ScanResponse([]byte(c.data)); ruleHit(fs, 23) {
+				t.Errorf("login-form label should NOT be reported as secret: %q -> %v", c.data, summarize(fs))
+			}
+		})
+	}
+}
+
+// TestDefaultPasswordInCommentReported 验证"登录页/源码注释里写死的默认口令必须报出"。
+// 与登录框文案相反, 被开发者写进注释的默认/初始口令是真实风险线索, 即便值看起来像普通词也要报。
+// 这些样本均为"正样本"(注释中的默认口令), 规则23必须命中。
+func TestDefaultPasswordInCommentReported(t *testing.T) {
+	s, err := NewScanner()
+	if err != nil {
+		t.Fatalf("NewScanner failed: %v", err)
+	}
+	positives := []struct {
+		name string
+		data string
+	}{
+		// 强凭证型默认口令: 不在注释里也会报, 这里确认注释里同样报。
+		{"html-comment-strong", `<!-- TODO 默认管理员 admin 默认密码 password: Admin@123456 -->`},
+		// 弱口令但写在注释里: 常规上下文会被当 UI 词/slug 抑制, 注释里必须报。
+		{"html-comment-weak-word", `<!-- 测试环境默认口令 password: adminpwd -->`},
+		{"line-comment-slash", `// initial password: changeme (please reset after first login)`},
+		{"block-comment", "/* default account\n   password: rootpass\n*/"},
+		{"hash-comment-conf", "# db_password: changeme"},
+		// 默认口令恰好等于字段名(常见占位式默认值)写在注释里也要报。
+		{"comment-label-as-default", `<!-- password: password -->`},
+	}
+	for _, c := range positives {
+		t.Run(c.name, func(t *testing.T) {
+			if fs := s.ScanResponse([]byte(c.data)); !ruleHit(fs, 23) {
+				t.Errorf("default password in comment MUST be reported: %q -> %v", c.data, summarize(fs))
+			}
+		})
+	}
+}
+
+// TestRealSecretInLoginPageStillReported 验证收紧后真实凭证(即便出现在登录相关响应里)仍会报出,
+// 避免"为了压误报把真泄漏也压没了"。
+func TestRealSecretInLoginPageStillReported(t *testing.T) {
+	s, err := NewScanner()
+	if err != nil {
+		t.Fatalf("NewScanner failed: %v", err)
+	}
+	positives := []string{
+		`{"code":0,"data":{"username":"alice","password":"S3cr3tP@ssw0rd2024"}}`, // 接口返回明文真口令
+		`{"password":"Xk9Lm2Zq7Rw8Tt5Yu3Vb"}`,                                     // 大小写+数字随机串
+		`config: {"db_password":"Pg#2024Prod!"}`,                                  // 含特殊字符
+	}
+	for _, p := range positives {
+		if fs := s.ScanResponse([]byte(p)); !ruleHit(fs, 23) {
+			t.Errorf("real plaintext secret should still be reported: %q -> %v", p, summarize(fs))
+		}
+	}
+}
+
 // TestAuthHeaderRulesRemoved 验证 Authorization Bearer/Basic 规则(原20/21)已从内置规则集移除,
 // 且 X-API-Key(25)、口令字段(23)、URL api_key(24) 仍在。
 func TestAuthHeaderRulesRemoved(t *testing.T) {
