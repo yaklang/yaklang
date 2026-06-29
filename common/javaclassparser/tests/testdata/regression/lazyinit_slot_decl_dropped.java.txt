@@ -1,0 +1,26 @@
+// Minimal reproduction of the lazy-init slot-declaration-dropped bug (NOT YET FIXED).
+// javac -g:none. The single-use value fold (code_analyser foldReordersSideEffect neighborhood)
+// folds the FIRST store `r = (List)map.get(k)` (bytecode `... checkcast List; astore_3; aload_3;
+// ifnonnull`) into the null test and DROPS the store, even though slot 3 is read again on the
+// if-not-taken fall-through path (`aload_3` at the trailing `r.add(v)`). The slot's sole surviving
+// declaration ends up inside the if-arm (`ArrayList var3 = new ArrayList()`), so the trailing
+// `var3.add(var2)` reads it out of scope -> `cannot find symbol: var3`. A bare-decl hoist is NOT a
+// valid fix: with the first store dropped, var3 would be assigned only inside the if, so a hoisted
+// `ArrayList var3;` + `var3.add` trips definite-assignment (`might not have been initialized`) when
+// the if is not taken. The correct fix must PRESERVE the first store as the initializing declaration
+// (`List var3 = (List)this.map.get(...); if (var3 == null) {...}`), i.e. make the single-use fold
+// liveness-aware (do not fold/drop a store whose slot is live-out of the fold point). Real-world:
+// commons-codec DaitchMokotoffSoundex.parseRules (rules.get/put lazy init), and the ubiquitous
+// `Map.get -> if null -> put -> use` idiom across guava/spring/commons.
+import java.util.*;
+public class LazyInit {
+	private Map<Character, List<String>> map = new HashMap<Character, List<String>>();
+	public void add(char c, String v) {
+		List<String> r = this.map.get(Character.valueOf(c));
+		if (r == null) {
+			r = new ArrayList<String>();
+			this.map.put(Character.valueOf(c), r);
+		}
+		r.add(v);
+	}
+}

@@ -76,6 +76,23 @@ type Decompiler struct {
 	// in a ternary/expression branch and break structuring (multiple next).
 	selfOpFoldedRefs map[string]bool
 	slotStoreTrace   map[int]slotStoreTraceInfo
+	// slotStoreValue records, per local-store opcode, the value committed into the slot. It lets the
+	// reaching-definition passes inspect a definition's RHS (e.g. recognize an `iconst_0`/`iconst_1`
+	// default initializer that must be re-typed when its slot is later proven boolean). Used by the
+	// boolean default-init phi merge (Bug AI residual).
+	slotStoreValue map[*OpCode]values.JavaValue
+
+	// EmbeddedAssignDeclRefs collects the LHS local of every dup-collapse that bakes an embedded
+	// assignment `(varN = expr)` into an opaque CustomValue (e.g. `s == null || (n = s.length()) == 0`,
+	// bytecode `... length; dup; istore; ifne`). Such a local has NO DeclareStatement in the tree (its
+	// only definition lives inside the CustomValue closure, which carries no ReplaceFunc and is invisible
+	// to both the structural collision renamer and the textual missing-decl safety net), so when its
+	// slot-derived `varN` name collides with a later sibling-scope local it renders undeclared and
+	// duplicate-named -> `cannot find symbol`. RewriteVar consumes this list to synthesize a bare
+	// `T varN;` declaration at method top for any such local lacking a declaration, which makes the
+	// local visible to the identity-based collision renamer (Bug Y residual C). Kill-switch:
+	// JDEC_EMBED_ASSIGN_DECL_OFF.
+	EmbeddedAssignDeclRefs []*values.JavaRef
 
 	// Aggressive enables higher-risk reconstruction paths (relaxed merge-condition structuring,
 	// bounded node-duplication, synthetic-method rebuilds) that are only used as a SECOND attempt
@@ -133,6 +150,7 @@ func NewDecompiler(bytecodes []byte, constantPoolGetter func(id int) values.Java
 		delRefUserAttr:       map[string][3]int{},
 		selfOpFoldedRefs:     map[string]bool{},
 		slotStoreTrace:       map[int]slotStoreTraceInfo{},
+		slotStoreValue:       map[*OpCode]values.JavaValue{},
 	}
 }
 
@@ -977,6 +995,287 @@ func (d *Decompiler) nullInitDefDominates(store *OpCode, slot int, nullRef *valu
 	return true
 }
 
+// reachingSlotStoreOps is the opcode-returning sibling of reachingSlotStoreRefs: per backward path it
+// collects the NEAREST version-defining local store of `slot` (the reaching definition), keyed by the
+// VarUid of the ref that store committed. It lets a reaching-definition pass recover not just the ref
+// but the defining opcode, so the store's RHS (recorded in slotStoreValue) can be inspected.
+func (d *Decompiler) reachingSlotStoreOps(start *OpCode, slot int) map[string]*OpCode {
+	out := map[string]*OpCode{}
+	if start == nil {
+		return out
+	}
+	visited := map[*OpCode]bool{start: true}
+	queue := append([]*OpCode{}, start.Source...)
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		if cur == nil || visited[cur] {
+			continue
+		}
+		visited[cur] = true
+		if isLocalStoreOpcode(cur.Instr.OpCode) && GetStoreIdx(cur) == slot {
+			if refs, ok := d.opcodeIdToRef[cur]; ok && len(refs) > 0 {
+				if ref, ok2 := refs[len(refs)-1][0].(*values.JavaRef); ok2 && ref != nil {
+					out[ref.VarUid] = cur
+				}
+			}
+			continue
+		}
+		queue = append(queue, cur.Source...)
+	}
+	return out
+}
+
+// isExactPrimer reports whether t is exactly the named primitive type (e.g. boolean, int).
+func isExactPrimer(t types.JavaType, name string) bool {
+	if t == nil {
+		return false
+	}
+	p, ok := t.RawType().(*types.JavaPrimer)
+	return ok && p.Name == name
+}
+
+// intLiteral01 reports whether v (unwrapped) is an int literal whose value is 0 or 1, i.e. a default
+// initializer that can be losslessly re-typed to a boolean false/true.
+func intLiteral01(v values.JavaValue) (*values.JavaLiteral, bool) {
+	lit, ok := values.UnpackSoltValue(v).(*values.JavaLiteral)
+	if !ok || lit == nil {
+		return nil, false
+	}
+	if !isExactPrimer(lit.JavaType, types.JavaInteger) {
+		return nil, false
+	}
+	iv, ok := lit.Data.(int)
+	if !ok || (iv != 0 && iv != 1) {
+		return nil, false
+	}
+	return lit, true
+}
+
+// slotDefPhiReachesLoad reports whether some load of `slot` is reachable forward from `store` (across
+// the fall-through/branch CFG, stopping at any redefining store of `slot`) AND that same load also has
+// `defUid` among its backward reaching definitions. That is exactly the phi/diamond shape proving the
+// reaching definition `defUid` (a default init) and the value about to be stored at `store` denote ONE
+// source variable: both arms flow into a common downstream read. Used to gate the boolean default-init
+// merge so it fires ONLY on genuinely-shared variables (rejecting `int a=0; use(a); boolean b=...;
+// return b;`, where the int default and the boolean store reach disjoint loads).
+func (d *Decompiler) slotDefPhiReachesLoad(store *OpCode, slot int, defUid string) bool {
+	if store == nil {
+		return false
+	}
+	visited := map[*OpCode]bool{store: true}
+	queue := append([]*OpCode{}, store.Target...)
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		if cur == nil || visited[cur] {
+			continue
+		}
+		visited[cur] = true
+		if isLocalStoreOpcode(cur.Instr.OpCode) && GetStoreIdx(cur) == slot {
+			// A redefinition kills `store`'s value; do not look past it on this path.
+			continue
+		}
+		if isLocalLoadOpcode(cur.Instr.OpCode) && GetRetrieveIdx(cur) == slot {
+			if _, ok := d.reachingSlotStoreRefs(cur, slot)[defUid]; ok {
+				return true
+			}
+		}
+		queue = append(queue, cur.Target...)
+	}
+	return false
+}
+
+// reachingBoolDefaultMerge handles the boolean default-init slot split (Bug AI residual). javac emits
+// `boolean b = false;` as `iconst_0; istore S` whose pushed constant is an int (the JVM operand stack
+// has no boolean category), so the default initializer is typed int. A later `b = <boolean expr>`
+// (e.g. inside an `if` arm) stores a boolean-typed value into the SAME slot; AssignVarGuarded refuses
+// to merge int with boolean (Java has no int<->boolean conversion) and mints a fresh block-scoped
+// variable, leaving the trailing `return b` reading the inner variable out of scope ("cannot find
+// symbol", commons-codec Metaphone.regionMatch / MatchRatingApproachEncoder).
+//
+// It fires ONLY on that exact, provably-safe signature:
+//   - the value being stored is boolean-typed;
+//   - the slot has a UNIQUE reaching definition, and that definition's RHS is an int 0/1 literal
+//     (a default initializer that can be re-typed to false/true losslessly);
+//   - a phi (shared downstream load reached by both the default and this store) proves the two are
+//     one source variable — this rejects the disjoint-variable counter-example where the int default
+//     is read as int before an unrelated boolean reuse of the slot.
+//
+// On a match it re-types the default's ref AND its 0/1 literal to boolean (so the declaration renders
+// `boolean b = false`) and returns that ref to continue, so the boolean store reuses it instead of
+// minting. Returns nil in every other case. Kill-switch: JDEC_BOOL_DEFAULT_MERGE_OFF=1.
+func (d *Decompiler) reachingBoolDefaultMerge(store *OpCode, slot int, current *values.JavaRef, val values.JavaValue) *values.JavaRef {
+	if os.Getenv("JDEC_BOOL_DEFAULT_MERGE_OFF") == "1" {
+		return nil
+	}
+	if store == nil || val == nil || val.Type() == nil {
+		return nil
+	}
+	if !isExactPrimer(val.Type(), types.JavaBoolean) {
+		return nil
+	}
+	defOps := d.reachingSlotStoreOps(store, slot)
+	if len(defOps) != 1 {
+		return nil
+	}
+	for uid, defOp := range defOps {
+		if current != nil && current.VarUid == uid {
+			// The store already continues this definition; no split would occur.
+		}
+		refs, ok := d.opcodeIdToRef[defOp]
+		if !ok || len(refs) == 0 {
+			return nil
+		}
+		defRef, _ := refs[len(refs)-1][0].(*values.JavaRef)
+		if defRef == nil || !isExactPrimer(defRef.Type(), types.JavaInteger) {
+			return nil
+		}
+		lit, ok := intLiteral01(d.slotStoreValue[defOp])
+		if !ok {
+			return nil
+		}
+		if !d.slotDefPhiReachesLoad(store, slot, uid) {
+			return nil
+		}
+		boolType := types.NewJavaPrimer(types.JavaBoolean)
+		defRef.ResetVarType(boolType)
+		lit.JavaType = boolType
+		return defRef
+	}
+	return nil
+}
+
+// reachingRefSlotPhiMerge handles the lazy-init reference-slot split (Bug AK phi half), the
+// reference-type analogue of reachingBoolDefaultMerge. The ubiquitous idiom
+//
+//	List r = map.get(k); if (r == null) { r = new ArrayList(); map.put(k, r); } r.add(v);
+//
+// stores two values into ONE slot: the first carries the declared type (List, from map.get) and the
+// second, inside the if-arm, carries a SUBTYPE (ArrayList). AssignVarGuarded sees the differing types
+// and -- the slot being neither null-initialized, a parameter, nor int-category -- mints a fresh
+// block-scoped variable for the arm store. The trailing `r.add(v)` then binds (via the single global
+// slot table, DFS order) to that arm variable and renders out of scope ("cannot find symbol"), and
+// the arm store's value, looking single-use, is otherwise dropped by the single-use fold.
+//
+// It fires ONLY on the provably-safe phi signature:
+//   - the value being stored is a reference (non-primitive) type, of a type DIFFERENT from the slot's
+//     reaching definition (a same-type store already reuses via AssignVarGuarded / reachingStoreVersion);
+//   - the slot has a UNIQUE reaching definition D, also a non-null reference type;
+//   - a phi (a downstream load reachable forward from this store AND backward-reached by D) proves the
+//     two denote ONE source variable: the fall-through (D) and the arm (this store) flow into a common
+//     later read. A single source-level read can observe two slot versions only when they are the same
+//     variable, so the phi is sufficient proof, and since the original compiled this store's value is
+//     assignable to D's declared type.
+//
+// On a match it returns D's ref to continue (keeping D's broader declared type), so the arm store
+// becomes a plain reassignment `r = new ArrayList()` and every read binds to the one in-scope variable.
+// Kill-switch: JDEC_REF_SLOT_PHI_MERGE_OFF=1.
+func (d *Decompiler) reachingRefSlotPhiMerge(store *OpCode, slot int, current *values.JavaRef, val values.JavaValue) *values.JavaRef {
+	if os.Getenv("JDEC_REF_SLOT_PHI_MERGE_OFF") == "1" {
+		return nil
+	}
+	if store == nil || val == nil {
+		return nil
+	}
+	// Arm value must be a freshly-ALLOCATED object (`new X()`, non-array). A `new X()` has exactly
+	// static type X, and because the original compiled, X is assignable to the variable's declared
+	// type (= the dominating def D's type), so continuing D (keeping D's type) is provably type-safe.
+	// Method-call / field arm values (`= this.readObject()`, `= cl.getParent()`) carry a type that may
+	// be a SIBLING or SUPERtype of D and would break the merge ("List cannot be converted to Map",
+	// "ClassLoader cannot be converted to DynamicClassLoader"); the lazy-init idiom always allocates,
+	// so this gate keeps the merge to the safe, common `if (r == null) r = new ArrayList();` shape.
+	if ne, ok := values.UnpackSoltValue(val).(*values.NewExpression); !ok || ne == nil || ne.IsArray() {
+		return nil
+	}
+	typ := slotDeclType(val)
+	if typ == nil {
+		return nil
+	}
+	if _, isPrim := typ.RawType().(*types.JavaPrimer); isPrim {
+		return nil
+	}
+	ctx := &class_context.ClassContext{}
+	valTypeStr := typ.String(ctx)
+	defOps := d.reachingSlotStoreOps(store, slot)
+	if len(defOps) != 1 {
+		return nil
+	}
+	for uid, defOp := range defOps {
+		refs, ok := d.opcodeIdToRef[defOp]
+		if !ok || len(refs) == 0 {
+			return nil
+		}
+		defRef, _ := refs[len(refs)-1][0].(*values.JavaRef)
+		if defRef == nil || defRef.Type() == nil {
+			return nil
+		}
+		if _, isPrim := defRef.Type().RawType().(*types.JavaPrimer); isPrim {
+			return nil
+		}
+		if defRef.IsNullInitialized() {
+			// The null-initialized idiom is handled by the null-adopt dominator test in the caller.
+			return nil
+		}
+		if defRef.Type().String(ctx) == valTypeStr {
+			// Same declared type: no split occurs (AssignVarGuarded reuses on type match).
+			return nil
+		}
+		// Tight structural gate: the dominating def D must be IMMEDIATELY null-checked on its own slot
+		// (`astore S; aload S; ifnull/ifnonnull`), i.e. the arm store is control-dependent on D being
+		// null. This is the exact lazy-init signature and excludes Object-dispatch slot reuse (where
+		// one slot holds Map/List/Number/String on instanceof-guarded branches): there D carries a
+		// narrow type and is NOT self-null-checked, so merging onto D's type would wrongly narrow the
+		// variable (`List cannot be converted to Map`). Without this gate the merge over-fires and
+		// regresses such reuse (fastjson2 JSONReader / JSONPathSegment*).
+		if !d.defFollowedBySelfNullCheck(defOp, slot) {
+			return nil
+		}
+		if !d.slotDefPhiReachesLoad(store, slot, uid) {
+			return nil
+		}
+		return defRef
+	}
+	return nil
+}
+
+// defFollowedBySelfNullCheck reports whether the defining store `defOp` is immediately followed (in
+// the raw-bytecode CFG, before any redefinition of the slot) by a load of its OWN slot feeding an
+// ifnull/ifnonnull. This is the lazy-init control-dependence signature `T r = expr; if (r == null) {
+// r = ...; }`: the arm store runs only when D was null, so D and the arm store denote one variable.
+// It deliberately rejects Object-dispatch slot reuse, where the slot is repurposed for unrelated
+// (sibling-typed) values under instanceof/type guards rather than a self-null-check.
+func (d *Decompiler) defFollowedBySelfNullCheck(defOp *OpCode, slot int) bool {
+	if defOp == nil {
+		return false
+	}
+	visited := map[*OpCode]bool{defOp: true}
+	queue := append([]*OpCode{}, defOp.Target...)
+	steps := 0
+	for len(queue) > 0 && steps < 8 {
+		cur := queue[0]
+		queue = queue[1:]
+		steps++
+		if cur == nil || cur.Instr == nil || visited[cur] {
+			continue
+		}
+		visited[cur] = true
+		if isLocalStoreOpcode(cur.Instr.OpCode) && GetStoreIdx(cur) == slot {
+			// A redefinition ends the lazy-init window on this path.
+			continue
+		}
+		if isReferenceLoadOpcode(cur.Instr.OpCode) && GetRetrieveIdx(cur) == slot {
+			for _, t := range cur.Target {
+				if t != nil && t.Instr != nil && (t.Instr.OpCode == OP_IFNULL || t.Instr.OpCode == OP_IFNONNULL) {
+					return true
+				}
+			}
+		}
+		queue = append(queue, cur.Target...)
+	}
+	return false
+}
+
 func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation, opcode *OpCode) error {
 	recordOpcodeHit(opcode.Instr.OpCode)
 	funcCtx := d.FunctionContext
@@ -1095,6 +1394,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 	case OP_ISTORE, OP_ASTORE, OP_LSTORE, OP_DSTORE, OP_FSTORE, OP_ISTORE_0, OP_ASTORE_0, OP_LSTORE_0, OP_DSTORE_0, OP_FSTORE_0, OP_ISTORE_1, OP_ASTORE_1, OP_LSTORE_1, OP_DSTORE_1, OP_FSTORE_1, OP_ISTORE_2, OP_ASTORE_2, OP_LSTORE_2, OP_DSTORE_2, OP_FSTORE_2, OP_ISTORE_3, OP_ASTORE_3, OP_LSTORE_3, OP_DSTORE_3, OP_FSTORE_3:
 		slot := GetStoreIdx(opcode)
 		value := runtimeStackSimulation.Pop().(values.JavaValue)
+		d.slotStoreValue[opcode] = value
 		oldRef := runtimeStackSimulation.GetVar(slot)
 		// Store-side reaching-definition repair (Bug AI store side): undo DFS-order corruption of
 		// the global slot table so a same-type continuation reuses the right variable instead of
@@ -1103,14 +1403,36 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 			runtimeStackSimulation.SetVar(slot, repaired)
 			oldRef = repaired
 		}
+		// Boolean default-init phi merge (Bug AI residual): a `boolean b = false; if(...){ b = expr; }
+		// return b;` slot whose `iconst_0/iconst_1` default initializer was typed int (the JVM has no
+		// boolean stack category) splits from the later boolean store into two variables, leaving the
+		// `return b` read out of scope. When the unique reaching definition is exactly that int-0/1
+		// default and a phi (shared downstream load) proves they are one variable, re-type the default
+		// to boolean (coercing its 0/1 literal to false/true) and continue it instead of minting.
+		if merged := d.reachingBoolDefaultMerge(opcode, slot, oldRef, value); merged != nil {
+			runtimeStackSimulation.SetVar(slot, merged)
+			oldRef = merged
+		}
+		// Reference-type lazy-init phi merge (Bug AK): when the arm store widens the slot's reaching
+		// definition to a subtype (List <- ArrayList) and a phi proves they are one variable, continue
+		// the dominating definition instead of letting AssignVarGuarded mint a block-scoped split.
+		refPhiMerged := false
+		if merged := d.reachingRefSlotPhiMerge(opcode, slot, oldRef, value); merged != nil {
+			runtimeStackSimulation.SetVar(slot, merged)
+			oldRef = merged
+			refPhiMerged = true
+		}
 		ref, isFirst := oldRef, false
 		reuseNullBranchStore := false
-		if values.IsNullLiteral(value) && oldRef != nil && len(opcode.Target) == 1 && opcode.Target[0].Instr.OpCode == OP_GOTO {
+		if !refPhiMerged && values.IsNullLiteral(value) && oldRef != nil && len(opcode.Target) == 1 && opcode.Target[0].Instr.OpCode == OP_GOTO {
 			if _, isPrim := oldRef.Type().RawType().(*types.JavaPrimer); !isPrim {
 				reuseNullBranchStore = true
 			}
 		}
-		if !reuseNullBranchStore {
+		if refPhiMerged {
+			// oldRef is the unified dominating definition; the store is a plain reassignment of it.
+			ref, isFirst = oldRef, false
+		} else if !reuseNullBranchStore {
 			// Gate the null-init type adoption: only let a null-initialized slot adopt this
 			// store's concrete reference type when the null initializer actually reaches here.
 			// A try-with-resources synthetic `primaryExc = null` (one branch) reuses the same JVM
@@ -1121,6 +1443,22 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 			// does not reach this store, mint a fresh variable instead.
 			blockNullAdopt := oldRef != nil && oldRef.IsNullInitialized() &&
 				!d.nullInitDefDominates(opcode, slot, oldRef)
+			// try/catch value-fallback phi merge (Bug AN): a slot whose value is computed in a try
+			// body (`v = readDouble()`) and whose `= null` fallback lives in the catch handler is ONE
+			// variable read after the try. Because the catch store runs only on exception it does NOT
+			// dominate the try store, so the null-adopt dominator gate above blocks adoption and the
+			// try store mints a fresh, differently-typed variable; the post-try read then binds to the
+			// null branch (value silently lost) and javac rejects the type (`Object cannot be converted
+			// to Double/V`). When a phi (a downstream load reached by BOTH this store and the
+			// null-init def) proves they are one source variable, allow the adoption: this is the same
+			// convergence discriminator used by the boolean/ref-slot merges, so the disjoint-reuse
+			// counter-example (twr `Throwable primaryExc = null` later reused as an unrelated loop var,
+			// DaitchMokotoffSoundex) shares no downstream load, fails the phi test, and still splits.
+			// Kill-switch: JDEC_TRY_SLOT_PHI_MERGE_OFF=1.
+			if blockNullAdopt && os.Getenv("JDEC_TRY_SLOT_PHI_MERGE_OFF") == "" &&
+				d.slotDefPhiReachesLoad(opcode, slot, oldRef.VarUid) {
+				blockNullAdopt = false
+			}
 			ref, isFirst = runtimeStackSimulation.AssignVarGuarded(slot, value, blockNullAdopt)
 		}
 		if slot == 0 && oldRef != nil && oldRef.IsThis && ref != nil && oldRef.VarUid == ref.VarUid {
@@ -1494,6 +1832,7 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 		index := Convert2bytesToInt(opcode.Data)
 		member := d.constantPoolGetter(int(index)).(*values.JavaClassMember)
 		v := runtimeStackSimulation.Pop().(values.JavaValue)
+		v = castAnonSubclassReceiverForOwnField(v, member, funcCtx)
 		runtimeStackSimulation.Push(values.NewRefMember(v, member.Member, member.JavaType))
 	case OP_GETSTATIC:
 		index := Convert2bytesToInt(opcode.Data)
@@ -3168,6 +3507,10 @@ func (d *Decompiler) ParseStatement() error {
 							v.ArgumentsGetter = func() string {
 								return funcCallValue.ArgumentString(funcCtx)
 							}
+							// Keep a back-reference so value-tree traversals (notably RewriteVar's
+							// ReplaceVar rename pass) can reach the constructor arguments hidden in
+							// the ArgumentsGetter closure; see NewExpression.ConstructorCall.
+							v.ConstructorCall = funcCallValue
 							skip = true
 						}
 					} else {
@@ -3754,6 +4097,13 @@ func (d *Decompiler) ParseStatement() error {
 			currentNodeSource.AddNext(nnext)
 
 			d.tracef("var-fold", "dup-collapse ref=%s currentNode=%d nextNode=%d", traceRef(ref, d.FunctionContext), currentNode.Id, nextNode.Id)
+			// The embedded assignment `(nextAssign.LeftValue = val)` is baked into the opaque
+			// CustomValue below: its LHS local is thereby consumed into the value stream and its
+			// standalone AssignStatement is dropped, so the local keeps no DeclareStatement. Record it
+			// so RewriteVar can synthesize a bare declaration if nothing else declares it (Bug Y res C).
+			if lref, okl := nextAssign.LeftValue.(*values.JavaRef); okl && lref != nil {
+				d.EmbeddedAssignDeclRefs = append(d.EmbeddedAssignDeclRefs, lref)
+			}
 			pairs[1].Replace(values.NewCustomValue(func(funcCtx *class_context.ClassContext) string {
 				return statements.NewAssignStatement(nextAssign.LeftValue, val, false).String(funcCtx)
 			}, func() types.JavaType {
@@ -4118,4 +4468,48 @@ func DumpOpcodesToDotExp(code *OpCode) string {
 	sb.WriteString("}\n")
 	println(sb.String())
 	return sb.String()
+}
+
+// castAnonSubclassReceiverForOwnField 在 getfield 读取「本类自身字段」、但接收者的静态类型是本类的
+// 合成匿名/局部子类 (形如 `Self$2`) 时, 给接收者套一层到声明类 (本类) 的显式上行 cast。
+//
+// 原因: 源码 `Self s = new Self(){..}` 里 s 的声明类型是父类 `Self`, 字节码却把局部定型成合成子类
+// `Self$N`。若该字段在 `Self` 是 private, 它不会被子类继承 (JLS 8.2), 故经 `Self$N` 引用 `s.field`
+// 不是可见成员, javac 报 `field has private access in Self`。`((Self)s).field` 永远合法 (子类 IS-A
+// Self), 正是 javac 对匿名子类的还原形态。
+//
+// 该判定极窄: 仅当 owner==本类 且接收者静态类型是 `本类$...` 时触发, 故只会给「本就无法重编译」的输出
+// 加 cast, 不影响任何已能编译的代码。kill-switch: JDEC_NO_PRIV_FIELD_CAST。
+func castAnonSubclassReceiverForOwnField(recv values.JavaValue, member *values.JavaClassMember, funcCtx *class_context.ClassContext) values.JavaValue {
+	if os.Getenv("JDEC_NO_PRIV_FIELD_CAST") != "" {
+		return recv
+	}
+	if recv == nil || member == nil || funcCtx == nil {
+		return recv
+	}
+	// 仅本类自身字段才可能对本类 private。
+	if member.Name == "" || member.Name != funcCtx.ClassName {
+		return recv
+	}
+	rt := recv.Type()
+	if rt == nil {
+		return recv
+	}
+	jc, ok := rt.RawType().(*types.JavaClass)
+	if !ok || jc == nil {
+		return recv
+	}
+	// 接收者静态类型须为本类的合成嵌套/匿名子类: `<Self>$<...>`。
+	if !strings.HasPrefix(jc.Name, funcCtx.ClassName+"$") {
+		return recv
+	}
+	owner := member.Name
+	inner := recv
+	return values.NewCustomValue(
+		func(fc *class_context.ClassContext) string {
+			return fmt.Sprintf("((%s)%s)", fc.ShortTypeName(owner), inner.String(fc))
+		},
+		func() types.JavaType { return types.NewJavaClass(owner) },
+		func(oldId *utils2.VariableId, newId *utils2.VariableId) { inner.ReplaceVar(oldId, newId) },
+	)
 }

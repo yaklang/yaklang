@@ -131,7 +131,18 @@ func TestCodecSemanticsRoundTrip(t *testing.T) {
 		t.Fatal("no algorithm batteries found under testdata/codec")
 	}
 
+	// Batteries that compile to MORE than one class file (e.g. an anonymous/inner subclass) cannot be
+	// validated by this single-file round-trip oracle; they carry their own dedicated multi-class
+	// load-bearing test instead.
+	multiClassBatteries := map[string]bool{
+		"AnonSubclassOwnPrivateField": true, // -> TestAnonSubclassOwnPrivateFieldCastIsLoadBearing
+		"CtorArgFreshLocalRename":     true, // -> TestCtorArgFreshLocalRenameIsLoadBearing
+	}
+
 	for _, className := range names {
+		if multiClassBatteries[className] {
+			continue
+		}
 		src, err := codecBatteryFS.ReadFile("testdata/codec/" + className + ".java")
 		if err != nil {
 			t.Fatalf("read battery %s: %v", className, err)
@@ -202,15 +213,37 @@ func TestJumpEnteredTryCatchAnchorIsLoadBearing(t *testing.T) {
 	t.Logf("anchor ON (round-trip preserved) for %s: %s", className, got)
 }
 
-// TestNullInitSlotReuseIsLoadBearing proves the dominance-gated null-init slot adoption
-// (nullInitDefDominates in code_analyser.go) is actually load-bearing. The NullInitSlotReuse
-// battery packs a null-initialized Throwable holder (assigned in a dominated catch on one branch)
-// and an unrelated-typed local on a disjoint branch onto ONE jvm slot. With the gate DISABLED
-// (JDEC_NULLADOPT_REACH_OFF=1) the old unconditional null-init adoption unifies them onto a single
-// mis-typed variable, so the decompiled source no longer recompiles ("Throwable cannot be converted
-// to String" / "cannot find symbol getMessage"). With the gate enabled the two variables split to
-// correctly-typed names and the round-trip is byte-identical. If someone deletes the gate, the
-// "guard off" branch starts round-tripping and this test fails.
+// TestNullInitSlotReuseIsLoadBearing proves the null-init disjoint-slot-reuse split is load-bearing
+// AND isolates the two complementary mechanisms that implement it. The NullInitSlotReuse battery packs
+// a null-initialized Throwable holder (committed in a dominated catch on one branch) and an
+// unrelated-typed local on a disjoint branch onto ONE jvm slot:
+//   - the dominance gate (nullInitDefDominates, JDEC_NULLADOPT_REACH_OFF) blocks the null-init type
+//     adoption when the null initializer does not reach the store along the CFG (disjoint branch);
+//   - the adopt-once guard (AssignVarGuarded + JavaRef.nullTypeAdopted, JDEC_NO_NULL_ADOPT_ONCE)
+//     blocks a SECOND, incompatible adoption after the ref already committed to a concrete type.
+//
+// The test runs all four kill-switch combinations and asserts each mechanism is INDIVIDUALLY
+// sufficient (so neither is dead code), and the merge only surfaces when BOTH are disabled:
+//   - gate ON,  guard OFF -> round-trips  (the gate alone splits the slot)
+//   - gate OFF, guard ON  -> round-trips  (the guard alone splits the slot, since the catch commits the
+//     holder to Throwable before the disjoint store is visited in DFS order)
+//   - gate OFF, guard OFF -> FAILS        (unconditional adoption unifies them onto one mis-typed
+//     variable: "Throwable cannot be converted to String" / "cannot find symbol getMessage")
+//   - gate ON,  guard ON  -> round-trips  (production configuration)
+//
+// Deleting EITHER mechanism flips its "alone" sub-case from pass to fail, so both stay verified. The
+// adopt-once guard additionally has TestTwrSlotReuseNullAdoptOnceIsLoadBearing, where the null-init
+// dominates both stores so the gate never fires and only the guard can keep them apart.
+// setEnv sets the kill-switch env var to "1" when on, or unsets it when off, so a single boolean drives
+// each toggle in the multi-combination load-bearing checks.
+func setEnv(name string, on bool) {
+	if on {
+		os.Setenv(name, "1")
+	} else {
+		os.Unsetenv(name)
+	}
+}
+
 func TestNullInitSlotReuseIsLoadBearing(t *testing.T) {
 	javac, err1 := exec.LookPath("javac")
 	java, err2 := exec.LookPath("java")
@@ -234,7 +267,13 @@ func TestNullInitSlotReuseIsLoadBearing(t *testing.T) {
 		t.Fatalf("read compiled class %s: %v", className, err)
 	}
 
-	roundTrips := func() (string, bool) {
+	// roundTrips decompiles under the given kill-switch combination and reports whether the result
+	// recompiles+runs to the golden fingerprint.
+	roundTrips := func(gateOff, guardOff bool) (string, bool) {
+		setEnv("JDEC_NULLADOPT_REACH_OFF", gateOff)
+		setEnv("JDEC_NO_NULL_ADOPT_ONCE", guardOff)
+		defer os.Unsetenv("JDEC_NULLADOPT_REACH_OFF")
+		defer os.Unsetenv("JDEC_NO_NULL_ADOPT_ONCE")
 		decompiled, derr := javaclassparser.Decompile(raw)
 		if derr != nil {
 			return "decompile error: " + derr.Error(), false
@@ -243,22 +282,24 @@ func TestNullInitSlotReuseIsLoadBearing(t *testing.T) {
 		return got, okRT && got == golden
 	}
 
-	// Gate OFF: unconditional null-init adoption unifies the Throwable holder with the disjoint
-	// branch's local, so the decompiled source must fail to recompile (type conflict).
-	os.Setenv("JDEC_NULLADOPT_REACH_OFF", "1")
-	got, okOff := roundTrips()
-	os.Unsetenv("JDEC_NULLADOPT_REACH_OFF")
-	if okOff {
-		t.Fatalf("expected %s to FAIL the round-trip with the null-init dominance gate disabled, but it succeeded; the gate is not load-bearing", className)
+	// Gate alone (guard disabled): must still split -> round-trips.
+	if got, ok := roundTrips(false, true); !ok {
+		t.Fatalf("expected %s to round-trip with the dominance gate alone (adopt-once guard disabled); the gate is not load-bearing: %s", className, got)
 	}
-	t.Logf("gate OFF (expected failure) for %s: %s", className, got)
-
-	// Gate ON: variables split to correct types; clean behavior-preserving round-trip.
-	got, okOn := roundTrips()
-	if !okOn {
-		t.Fatalf("expected %s to round-trip cleanly with the null-init dominance gate enabled; got: %s", className, got)
+	// Guard alone (gate disabled): must still split -> round-trips.
+	if got, ok := roundTrips(true, false); !ok {
+		t.Fatalf("expected %s to round-trip with the adopt-once guard alone (dominance gate disabled); the guard is not load-bearing: %s", className, got)
 	}
-	t.Logf("gate ON (round-trip preserved) for %s: %s", className, got)
+	// Both disabled: the merge surfaces -> must FAIL to recompile.
+	if got, ok := roundTrips(true, true); ok {
+		t.Fatalf("expected %s to FAIL the round-trip with both null-init split defenses disabled, but it succeeded; the defenses are not load-bearing: %s", className, got)
+	}
+	// Production config: both enabled -> clean behavior-preserving round-trip.
+	got, ok := roundTrips(false, false)
+	if !ok {
+		t.Fatalf("expected %s to round-trip cleanly with the null-init split defenses enabled; got: %s", className, got)
+	}
+	t.Logf("null-init split defenses verified (gate-only, guard-only, both-off, both-on) for %s: %s", className, got)
 }
 
 // TestTwrDuplicateCatchMergeIsLoadBearing proves mergeNestedSameTypeCatches (dumper.go) is
@@ -608,6 +649,391 @@ func TestEmbeddedAssignRefIsLoadBearing(t *testing.T) {
 		t.Fatalf("expected %s to round-trip cleanly with embedded-assign ref recovery enabled; got: %s", className, got)
 	}
 	t.Logf("ref recovery ON (round-trip preserved) for %s: %s", className, got)
+}
+
+// TestEmbeddedAssignGetClassIsLoadBearing proves the embedded-assignment getClass() reference-type
+// recovery is load bearing. A `Class c` local whose only definition is the embedded assignment
+// `(c = obj.getClass()) != type` loses its standalone declaration to the dup-collapse, so the dumper
+// synthesizes one. With the reference recovery DISABLED (JDEC_NO_EMBED_ASSIGN_REF=1) it falls back to
+// `Object c = null`, and the later Class member access (c.getName()/c.getSimpleName()) fails to
+// recompile ("cannot find symbol"); with it enabled the type is recovered as Class and the round-trip
+// is behavior-preserving. Mirrors fastjson2 JSONWriter.checkAndWriteTypeName.
+func TestEmbeddedAssignGetClassIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	java, err2 := exec.LookPath("java")
+	if err1 != nil || err2 != nil {
+		t.Skip("javac/java not available; skipping embedded-assign getClass type test")
+	}
+
+	const className = "EmbeddedAssignGetClass"
+	src, err := codecBatteryFS.ReadFile("testdata/codec/" + className + ".java")
+	if err != nil {
+		t.Fatalf("read battery %s: %v", className, err)
+	}
+
+	origDir := t.TempDir()
+	golden, ok := compileAndRunJavaBattery(t, javac, java, origDir, className, string(src))
+	if !ok {
+		t.Fatalf("failed to compile/run original battery %s:\n%s", className, golden)
+	}
+	raw, err := os.ReadFile(filepath.Join(origDir, "codec", className+".class"))
+	if err != nil {
+		t.Fatalf("read compiled class %s: %v", className, err)
+	}
+
+	roundTrips := func() (string, bool) {
+		decompiled, err := javaclassparser.Decompile(raw)
+		if err != nil {
+			return "decompile error: " + err.Error(), false
+		}
+		got, ok := compileAndRunJavaBattery(t, javac, java, t.TempDir(), className, decompiled)
+		return got, ok && got == golden
+	}
+
+	os.Setenv("JDEC_NO_EMBED_ASSIGN_REF", "1")
+	got, okOff := roundTrips()
+	os.Unsetenv("JDEC_NO_EMBED_ASSIGN_REF")
+	if okOff {
+		t.Fatalf("expected %s to FAIL the round-trip with getClass ref recovery disabled, but it succeeded; the fix is not load-bearing", className)
+	}
+	t.Logf("getClass recovery OFF (expected failure) for %s: %s", className, got)
+
+	got, okOn := roundTrips()
+	if !okOn {
+		t.Fatalf("expected %s to round-trip cleanly with getClass ref recovery enabled; got: %s", className, got)
+	}
+	t.Logf("getClass recovery ON (round-trip preserved) for %s: %s", className, got)
+}
+
+// TestAnonSubclassOwnPrivateFieldCastIsLoadBearing proves the own-private-field up-cast (Bug AN (1))
+// is load bearing. A method of class X reads X's own private field through a reference whose static
+// type is the synthetic anonymous subclass `X$1`. The decompiler types the local as `X$1`, through
+// which the private field is NOT an accessible member, so the read must be rendered `((X)r).field`.
+// With the cast DISABLED (JDEC_NO_PRIV_FIELD_CAST=1) the output is `r.field` and fails to recompile
+// ("field has private access in X"); with it enabled the round-trip is behavior-preserving. Mirrors
+// commons-codec Rule.parseRules.
+func TestAnonSubclassOwnPrivateFieldCastIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	java, err2 := exec.LookPath("java")
+	if err1 != nil || err2 != nil {
+		t.Skip("javac/java not available; skipping anon-subclass own-private-field cast test")
+	}
+
+	const className = "AnonSubclassOwnPrivateField"
+	src, err := codecBatteryFS.ReadFile("testdata/codec/" + className + ".java")
+	if err != nil {
+		t.Fatalf("read battery %s: %v", className, err)
+	}
+
+	origDir := t.TempDir()
+	golden, ok := compileAndRunJavaBattery(t, javac, java, origDir, className, string(src))
+	if !ok {
+		t.Fatalf("failed to compile/run original battery %s:\n%s", className, golden)
+	}
+	raw, err := os.ReadFile(filepath.Join(origDir, "codec", className+".class"))
+	if err != nil {
+		t.Fatalf("read compiled class %s: %v", className, err)
+	}
+
+	// The battery has an anonymous inner class (codec.<className>$1). The single-file battery helper
+	// would leave that sibling dangling, so we recompile the decompiled OUTER unit against the original
+	// classes dir as a classpath backstop (the $1.class binary) — faithfully mirroring the whole-jar
+	// round-trip model where intra-jar siblings resolve. The recompiled outer .class is then run with
+	// the original $1 binary, exercising the cast at runtime.
+	roundTrips := func() (string, bool) {
+		decompiled, err := javaclassparser.Decompile(raw)
+		if err != nil {
+			return "decompile error: " + err.Error(), false
+		}
+		d := t.TempDir()
+		srcPath := filepath.Join(d, className+".java")
+		if werr := os.WriteFile(srcPath, []byte(decompiled), 0644); werr != nil {
+			t.Fatalf("write decompiled source: %v", werr)
+		}
+		out, cerr := exec.Command(javac, "-J-Duser.language=en", "-encoding", "UTF-8", "-nowarn",
+			"-cp", origDir, "-d", d, srcPath).CombinedOutput()
+		if cerr != nil {
+			return string(out), false
+		}
+		// Run with the freshly recompiled outer on top of the original classes (which carry $1).
+		out2, rerr := exec.Command(java, "-cp", d+string(os.PathListSeparator)+origDir, "codec."+className).CombinedOutput()
+		if rerr != nil {
+			return string(out2), false
+		}
+		got := strings.TrimSpace(string(out2))
+		return got, got == golden
+	}
+
+	os.Setenv("JDEC_NO_PRIV_FIELD_CAST", "1")
+	got, okOff := roundTrips()
+	os.Unsetenv("JDEC_NO_PRIV_FIELD_CAST")
+	if okOff {
+		t.Fatalf("expected %s to FAIL the round-trip with own-private-field cast disabled, but it succeeded; the fix is not load-bearing", className)
+	}
+	t.Logf("priv-field cast OFF (expected failure) for %s: %s", className, got)
+
+	got, okOn := roundTrips()
+	if !okOn {
+		t.Fatalf("expected %s to round-trip cleanly with own-private-field cast enabled; got: %s", className, got)
+	}
+	t.Logf("priv-field cast ON (round-trip preserved) for %s: %s", className, got)
+}
+
+// TestCtorArgFreshLocalRenameIsLoadBearing proves the constructor-argument rename propagation (Bug
+// AN(2)) is load bearing. RewriteVar renames a freshly bound local's DECLARATION by minting a new id
+// and retargeting every USE via idReplaceMap+ReplaceVar. A `new T(...)` constructor argument is
+// captured ONLY inside NewExpression.ArgumentsGetter (a render-time closure), so without the
+// NewExpression.ConstructorCall back-reference ReplaceVar cannot reach it: the use keeps the stale
+// slot-derived `varN` that now collides with another live variable of that name (an array), so the
+// call binds the wrong operand (`new Rule(p, q, parts, ...)` — a String[] where a String is
+// required) and fails to recompile. With the back-reference the rename reaches the argument and the
+// round-trip is behavior-preserving. Mirrors commons-codec DaitchMokotoffSoundex.parseRules.
+func TestCtorArgFreshLocalRenameIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	java, err2 := exec.LookPath("java")
+	if err1 != nil || err2 != nil {
+		t.Skip("javac/java not available; skipping ctor-arg fresh-local rename test")
+	}
+
+	const className = "CtorArgFreshLocalRename"
+	src, err := codecBatteryFS.ReadFile("testdata/codec/" + className + ".java")
+	if err != nil {
+		t.Fatalf("read battery %s: %v", className, err)
+	}
+
+	origDir := t.TempDir()
+	golden, ok := compileAndRunJavaBattery(t, javac, java, origDir, className, string(src))
+	if !ok {
+		t.Fatalf("failed to compile/run original battery %s:\n%s", className, golden)
+	}
+	raw, err := os.ReadFile(filepath.Join(origDir, "codec", className+".class"))
+	if err != nil {
+		t.Fatalf("read compiled class %s: %v", className, err)
+	}
+
+	// The battery has a nested Rule class (codec.<className>$Rule). The single-file battery helper
+	// would leave that sibling dangling, so we recompile the decompiled OUTER unit against the
+	// original classes dir as a classpath backstop (the $Rule.class binary) — mirroring the whole-jar
+	// round-trip model where intra-jar siblings resolve. The recompiled outer is then run with the
+	// original $Rule binary, exercising the constructor at runtime.
+	roundTrips := func() (string, bool) {
+		decompiled, err := javaclassparser.Decompile(raw)
+		if err != nil {
+			return "decompile error: " + err.Error(), false
+		}
+		d := t.TempDir()
+		srcPath := filepath.Join(d, className+".java")
+		if werr := os.WriteFile(srcPath, []byte(decompiled), 0644); werr != nil {
+			t.Fatalf("write decompiled source: %v", werr)
+		}
+		out, cerr := exec.Command(javac, "-J-Duser.language=en", "-encoding", "UTF-8", "-nowarn",
+			"-cp", origDir, "-d", d, srcPath).CombinedOutput()
+		if cerr != nil {
+			return string(out), false
+		}
+		out2, rerr := exec.Command(java, "-cp", d+string(os.PathListSeparator)+origDir, "codec."+className).CombinedOutput()
+		if rerr != nil {
+			return string(out2), false
+		}
+		got := strings.TrimSpace(string(out2))
+		return got, got == golden
+	}
+
+	os.Setenv("JDEC_NO_CTOR_ARG_REPLACE", "1")
+	got, okOff := roundTrips()
+	os.Unsetenv("JDEC_NO_CTOR_ARG_REPLACE")
+	if okOff {
+		t.Fatalf("expected %s to FAIL the round-trip with ctor-arg rename propagation disabled, but it succeeded; the fix is not load-bearing", className)
+	}
+	t.Logf("ctor-arg rename OFF (expected failure) for %s: %s", className, got)
+
+	got, okOn := roundTrips()
+	if !okOn {
+		t.Fatalf("expected %s to round-trip cleanly with ctor-arg rename propagation enabled; got: %s", className, got)
+	}
+	t.Logf("ctor-arg rename ON (round-trip preserved) for %s: %s", className, got)
+}
+
+// TestTwrSlotReuseNullAdoptOnceIsLoadBearing proves the null-adopt-once guard (Bug AL,
+// AssignVarGuarded + JavaRef.nullTypeAdopted) is load bearing. A single JVM slot holds the verbose
+// try-with-resources synthetic `Throwable primaryExc = null` (committed to Throwable in the synthetic
+// catch) and is later reused for a `Map.Entry e` loop variable with a disjoint live range. The slot's
+// ref is null-initialized (Val stays the null literal forever because ResetVarType only repoints the
+// type), so without committing the first adoption the same ref adopts a SECOND, incompatible type:
+// the declaration becomes `Map.Entry var1 = null`, the synthetic catch assigns `var1 = <throwable>`
+// and calls `var1.addSuppressed(..)` on it — both reject against Map.Entry, so the unit fails to
+// recompile. With the guard, the first concrete adoption (Throwable) is committed and the loop store
+// mints a fresh local, so primaryExc stays Throwable and the round-trip is behavior-preserving.
+// Mirrors commons-codec DaitchMokotoffSoundex.<clinit>. The battery is a single class (no nested
+// types) so the plain single-file oracle applies. Kill-switch: JDEC_NO_NULL_ADOPT_ONCE=1.
+func TestTwrSlotReuseNullAdoptOnceIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	java, err2 := exec.LookPath("java")
+	if err1 != nil || err2 != nil {
+		t.Skip("javac/java not available; skipping twr slot-reuse null-adopt-once test")
+	}
+
+	const className = "TwrSlotReuseNullAdopt"
+	src, err := codecBatteryFS.ReadFile("testdata/codec/" + className + ".java")
+	if err != nil {
+		t.Fatalf("read battery %s: %v", className, err)
+	}
+
+	origDir := t.TempDir()
+	golden, ok := compileAndRunJavaBattery(t, javac, java, origDir, className, string(src))
+	if !ok {
+		t.Fatalf("failed to compile/run original battery %s:\n%s", className, golden)
+	}
+	raw, err := os.ReadFile(filepath.Join(origDir, "codec", className+".class"))
+	if err != nil {
+		t.Fatalf("read compiled class %s: %v", className, err)
+	}
+
+	roundTrips := func() (string, bool) {
+		decompiled, err := javaclassparser.Decompile(raw)
+		if err != nil {
+			return "decompile error: " + err.Error(), false
+		}
+		d := t.TempDir()
+		got, ok := compileAndRunJavaBattery(t, javac, java, d, className, decompiled)
+		if !ok {
+			return got, false
+		}
+		return got, got == golden
+	}
+
+	os.Setenv("JDEC_NO_NULL_ADOPT_ONCE", "1")
+	got, okOff := roundTrips()
+	os.Unsetenv("JDEC_NO_NULL_ADOPT_ONCE")
+	if okOff {
+		t.Fatalf("expected %s to FAIL the round-trip with null-adopt-once disabled, but it succeeded; the fix is not load-bearing", className)
+	}
+	t.Logf("null-adopt-once OFF (expected failure) for %s: %s", className, got)
+
+	got, okOn := roundTrips()
+	if !okOn {
+		t.Fatalf("expected %s to round-trip cleanly with null-adopt-once enabled; got: %s", className, got)
+	}
+	t.Logf("null-adopt-once ON (round-trip preserved) for %s: %s", className, got)
+}
+
+// TestSwitchCaseLocalReadAfterIsLoadBearing pins the prebindEscapingSwitchSlots fix (Bug AL's dominant
+// fastjson2 shape, fastjson2 integral-jar recompile -72). A local written inside switch cases and read
+// AFTER the switch (fastjson2 DateUtils' hand-unrolled date parser: each pattern case copies the
+// canonical digit chars into locals that are validated after the switch) used to keep its in-case `T x
+// = ...` declaration scoped to the case while the post-switch read kept the slot's original (pre-mint)
+// id, so it rendered out of scope ("cannot find symbol: variable varN"). The prebind unifies the
+// case-written and post-switch-read references onto one parent-scope id so the declaration hoists ahead
+// of the switch. The kill-switch JDEC_SWITCH_PREBIND_OFF=1 disables it; the battery must then FAIL to
+// recompile and must round-trip cleanly with it enabled.
+func TestSwitchCaseLocalReadAfterIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	java, err2 := exec.LookPath("java")
+	if err1 != nil || err2 != nil {
+		t.Skip("javac/java not available; skipping switch-case read-after test")
+	}
+
+	const className = "SwitchCaseLocalReadAfter"
+	src, err := codecBatteryFS.ReadFile("testdata/codec/" + className + ".java")
+	if err != nil {
+		t.Fatalf("read battery %s: %v", className, err)
+	}
+
+	origDir := t.TempDir()
+	golden, ok := compileAndRunJavaBattery(t, javac, java, origDir, className, string(src))
+	if !ok {
+		t.Fatalf("failed to compile/run original battery %s:\n%s", className, golden)
+	}
+	raw, err := os.ReadFile(filepath.Join(origDir, "codec", className+".class"))
+	if err != nil {
+		t.Fatalf("read compiled class %s: %v", className, err)
+	}
+
+	roundTrips := func() (string, bool) {
+		decompiled, err := javaclassparser.Decompile(raw)
+		if err != nil {
+			return "decompile error: " + err.Error(), false
+		}
+		d := t.TempDir()
+		got, ok := compileAndRunJavaBattery(t, javac, java, d, className, decompiled)
+		if !ok {
+			return got, false
+		}
+		return got, got == golden
+	}
+
+	os.Setenv("JDEC_SWITCH_PREBIND_OFF", "1")
+	got, okOff := roundTrips()
+	os.Unsetenv("JDEC_SWITCH_PREBIND_OFF")
+	if okOff {
+		t.Fatalf("expected %s to FAIL the round-trip with switch prebind disabled, but it succeeded; the fix is not load-bearing", className)
+	}
+	t.Logf("switch-prebind OFF (expected failure) for %s: %s", className, got)
+
+	got, okOn := roundTrips()
+	if !okOn {
+		t.Fatalf("expected %s to round-trip cleanly with switch prebind enabled; got: %s", className, got)
+	}
+	t.Logf("switch-prebind ON (round-trip preserved) for %s: %s", className, got)
+}
+
+// TestLambdaLocalRenameIsLoadBearing pins renameLambdaBodyLocals (Bug AL / lambda-inlining shadow
+// family; the dominant "variable varN is already defined" shape across fastjson2). javac compiles each
+// lambda to a private `lambda$...` method whose body locals begin a FRESH jvm slot namespace
+// (slot0,slot1,...). The decompiler splices that body inline as an arrow expression inside the
+// enclosing method, where those slots render as var0,var1,... - colliding by NAME with the enclosing
+// method's own parameters/locals (also var0,var1,...). Java forbids a lambda-body local from shadowing
+// an in-scope enclosing local, so the naive inline emits "variable var0 is already defined in method
+// compute(int)" and does not recompile. The fix lifts each lambda body's locals into a private
+// `lv<seq>_N` namespace. The kill-switch JDEC_NO_LAMBDA_LOCAL_RENAME=1 disables the rename; the battery
+// must then FAIL to recompile (shadowed locals) and must round-trip cleanly with it enabled.
+func TestLambdaLocalRenameIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	java, err2 := exec.LookPath("java")
+	if err1 != nil || err2 != nil {
+		t.Skip("javac/java not available; skipping lambda-local rename test")
+	}
+
+	const className = "LambdaLocalShadowsCapture"
+	src, err := codecBatteryFS.ReadFile("testdata/codec/" + className + ".java")
+	if err != nil {
+		t.Fatalf("read battery %s: %v", className, err)
+	}
+
+	origDir := t.TempDir()
+	golden, ok := compileAndRunJavaBattery(t, javac, java, origDir, className, string(src))
+	if !ok {
+		t.Fatalf("failed to compile/run original battery %s:\n%s", className, golden)
+	}
+	raw, err := os.ReadFile(filepath.Join(origDir, "codec", className+".class"))
+	if err != nil {
+		t.Fatalf("read compiled class %s: %v", className, err)
+	}
+
+	roundTrips := func() (string, bool) {
+		decompiled, derr := javaclassparser.Decompile(raw)
+		if derr != nil {
+			return "decompile error: " + derr.Error(), false
+		}
+		got, okc := compileAndRunJavaBattery(t, javac, java, t.TempDir(), className, decompiled)
+		return got, okc && got == golden
+	}
+
+	// Rename OFF: the inlined lambda body re-declares var0/var1, shadowing the enclosing
+	// parameter/local, so javac rejects the recompile.
+	os.Setenv("JDEC_NO_LAMBDA_LOCAL_RENAME", "1")
+	got, okOff := roundTrips()
+	os.Unsetenv("JDEC_NO_LAMBDA_LOCAL_RENAME")
+	if okOff {
+		t.Fatalf("expected %s to FAIL the round-trip with the lambda-local rename disabled, but it succeeded; the rename is not load-bearing", className)
+	}
+	t.Logf("lambda-local rename OFF (expected failure) for %s: %s", className, got)
+
+	got, okOn := roundTrips()
+	if !okOn {
+		t.Fatalf("expected %s to round-trip cleanly with the lambda-local rename enabled; got: %s", className, got)
+	}
+	t.Logf("lambda-local rename ON (round-trip preserved) for %s: %s", className, got)
 }
 
 // enumConstantBodyFoldSource is an enum with constant-specific bodies (Bug V). javac compiles it into
@@ -1705,9 +2131,17 @@ func TestNarrowParamFieldIsLoadBearing(t *testing.T) {
 		return decompiled, got, ok && got == golden
 	}
 
+	// Disable the narrow-param descriptor fix to prove it is load-bearing. The compensating
+	// narrowing-reassignment cast (java_statements.go: `this.f = (char) intParam`) would otherwise
+	// mask the COMPILE error by casting the int-typed parameter back to the field type -- but that
+	// silently changes the constructor descriptor (C)V -> (I)V, so the narrow-param fix is still
+	// required for descriptor faithfulness. To isolate the narrow-param proof we also disable that
+	// cast here so the original "possible lossy conversion" failure resurfaces.
 	os.Setenv("JDEC_PARAM_DESC_NARROW_OFF", "1")
+	os.Setenv("JDEC_NO_NARROW_REASSIGN_CAST", "1")
 	srcOff, gotOff, okOff := roundTrips()
 	os.Unsetenv("JDEC_PARAM_DESC_NARROW_OFF")
+	os.Unsetenv("JDEC_NO_NARROW_REASSIGN_CAST")
 	if okOff {
 		t.Fatalf("expected %s to FAIL the round-trip with the narrow-param descriptor fix disabled, but it succeeded; the fix is not load-bearing.\n----- src -----\n%s", className, srcOff)
 	}
@@ -1723,6 +2157,70 @@ func TestNarrowParamFieldIsLoadBearing(t *testing.T) {
 		t.Fatalf("expected enabled vs disabled rendering of %s to differ in parameter types; they are identical:\n%s", className, srcOn)
 	}
 	t.Logf("narrow-param descriptor fix ON (round-trip preserved) for %s: %s", className, gotOn)
+}
+
+// TestNarrowFieldReassignCastIsLoadBearing proves the narrowing-reassignment cast in
+// AssignStatement.String (java_statements.go) is load-bearing. The NarrowFieldReassign battery
+// reassigns a char/byte/short FIELD from a non-constant int-category conditional (`this.quote =
+// single ? '\'' : '"'`), which javac lowers to `putfield ... C` with NO i2c (the constants fit), so
+// the decompiler recovers an int-typed conditional. With the cast DISABLED
+// (JDEC_NO_NARROW_REASSIGN_CAST=1) the field store renders `this.quote = single ? 39 : 34`, which
+// fails to recompile ("possible lossy conversion from int to char"). With the cast enabled the store
+// renders `this.quote = (char)(single ? 39 : 34)` and the battery round-trips with a matching
+// fingerprint. If someone deletes the cast, the "guard off" branch starts round-tripping and this
+// test fails.
+func TestNarrowFieldReassignCastIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	java, err2 := exec.LookPath("java")
+	if err1 != nil || err2 != nil {
+		t.Skip("javac/java not available; skipping narrow-field-reassign-cast test")
+	}
+
+	const className = "NarrowFieldReassign"
+	src, err := codecBatteryFS.ReadFile("testdata/codec/" + className + ".java")
+	if err != nil {
+		t.Fatalf("read battery %s: %v", className, err)
+	}
+
+	origDir := t.TempDir()
+	golden, ok := compileAndRunJavaBattery(t, javac, java, origDir, className, string(src))
+	if !ok {
+		t.Fatalf("failed to compile/run original battery %s:\n%s", className, golden)
+	}
+	raw, err := os.ReadFile(filepath.Join(origDir, "codec", className+".class"))
+	if err != nil {
+		t.Fatalf("read compiled class %s: %v", className, err)
+	}
+
+	roundTrips := func() (string, string, bool) {
+		decompiled, err := javaclassparser.Decompile(raw)
+		if err != nil {
+			return "", "decompile error: " + err.Error(), false
+		}
+		got, ok := compileAndRunJavaBattery(t, javac, java, t.TempDir(), className, decompiled)
+		return decompiled, got, ok && got == golden
+	}
+
+	// Cast OFF: the int-typed conditional is stored into the char/byte/short field verbatim, which
+	// fails to recompile ("possible lossy conversion").
+	os.Setenv("JDEC_NO_NARROW_REASSIGN_CAST", "1")
+	srcOff, gotOff, okOff := roundTrips()
+	os.Unsetenv("JDEC_NO_NARROW_REASSIGN_CAST")
+	if okOff {
+		t.Fatalf("expected %s to FAIL the round-trip with the narrowing-reassignment cast disabled, but it succeeded; the cast is not load-bearing.\n----- src -----\n%s", className, srcOff)
+	}
+	t.Logf("narrowing-reassign cast OFF (expected failure) for %s: %s", className, gotOff)
+
+	// Cast ON: the explicit (char)/(byte)/(short) cast makes the field store recompile and the
+	// fingerprint matches the original.
+	srcOn, gotOn, okOn := roundTrips()
+	if !okOn {
+		t.Fatalf("expected %s to round-trip cleanly with the narrowing-reassignment cast enabled; got: %s\n----- src -----\n%s", className, gotOn, srcOn)
+	}
+	if !strings.Contains(srcOn, "(char) (") {
+		t.Fatalf("expected the enabled rendering to emit an explicit `(char)` narrowing cast; got:\n%s", srcOn)
+	}
+	t.Logf("narrowing-reassign cast ON (round-trip preserved) for %s: %s", className, gotOn)
 }
 
 // TestShortCircuitArrayArgIsLoadBearing proves the inline-array-init step-over in the shared-leaf
@@ -1840,4 +2338,593 @@ func TestShortCircuitArrayLeafIsLoadBearing(t *testing.T) {
 		t.Fatalf("expected %s to round-trip cleanly with the merge-time true/false re-pin enabled; got: %s\n----- src -----\n%s", className, got, srcOn)
 	}
 	t.Logf("mergeIf re-pin ON (round-trip preserved) for %s: %s", className, got)
+}
+
+// TestIfElseParallelArrayPhiIsLoadBearing proves prebindParallelTypedIfElseDefs (rewriter/rewrite_var.go)
+// is load-bearing. The IfElseParallelArrayPhi battery assigns the SAME jvm slot a long[] in BOTH arms
+// of an if (read after the if) and then reuses that slot for a different-typed scalar (long), so the
+// simulator's DFS clobbers the slot table and mints DIFFERENT VariableIds for the two arm defs. The
+// existing prebindEscapingIfElseSlots only unifies arms that SHARE a VarUid, so this cross-VarUid
+// same-type phi slips past it: each arm keeps its own `long[] data = ...` declaration and the post-if
+// `data[...]` reads bind to only one arm's id, leaving the variable out of scope ("cannot find symbol:
+// variable varN"). With the parallel-typed prebind DISABLED (JDEC_IFELSE_PARALLEL_PREBIND_OFF=1) the
+// decompiled source must fail to recompile; with it enabled the two defs converge onto one hoisted
+// `long[] data;` declaration and the round-trip is byte-for-byte clean. This is the dominant fastjson2
+// whole-tree blocker (ObjectReaderProvider.<init> long[] acceptHashCodes and the broader "variable
+// varN not found" symbol family).
+func TestIfElseParallelArrayPhiIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	java, err2 := exec.LookPath("java")
+	if err1 != nil || err2 != nil {
+		t.Skip("javac/java not available; skipping if/else parallel-array phi test")
+	}
+
+	const className = "IfElseParallelArrayPhi"
+	src, err := codecBatteryFS.ReadFile("testdata/codec/" + className + ".java")
+	if err != nil {
+		t.Fatalf("read battery %s: %v", className, err)
+	}
+
+	origDir := t.TempDir()
+	golden, ok := compileAndRunJavaBattery(t, javac, java, origDir, className, string(src))
+	if !ok {
+		t.Fatalf("failed to compile/run original battery %s:\n%s", className, golden)
+	}
+	raw, err := os.ReadFile(filepath.Join(origDir, "codec", className+".class"))
+	if err != nil {
+		t.Fatalf("read compiled class %s: %v", className, err)
+	}
+
+	roundTrips := func() (string, string, bool) {
+		decompiled, err := javaclassparser.Decompile(raw)
+		if err != nil {
+			return "", "decompile error: " + err.Error(), false
+		}
+		got, ok := compileAndRunJavaBattery(t, javac, java, t.TempDir(), className, decompiled)
+		return decompiled, got, ok && got == golden
+	}
+
+	os.Setenv("JDEC_IFELSE_PARALLEL_PREBIND_OFF", "1")
+	srcOff, got, okOff := roundTrips()
+	os.Unsetenv("JDEC_IFELSE_PARALLEL_PREBIND_OFF")
+	if okOff {
+		t.Fatalf("expected %s to FAIL the round-trip with the parallel-typed if/else prebind disabled, but it succeeded; the fix is not load-bearing.\n----- src -----\n%s", className, srcOff)
+	}
+	t.Logf("parallel if/else prebind OFF (expected failure) for %s: %s", className, got)
+
+	srcOn, got, okOn := roundTrips()
+	if !okOn {
+		t.Fatalf("expected %s to round-trip cleanly with the parallel-typed if/else prebind enabled; got: %s\n----- src -----\n%s", className, got, srcOn)
+	}
+	t.Logf("parallel if/else prebind ON (round-trip preserved) for %s: %s", className, got)
+}
+
+// varargsAbstractOverrideSource declares an ABSTRACT varargs method in a base class and OVERRIDES it
+// in a concrete subclass. javac records ACC_VARARGS on the descriptor `(...[J)`; the last param type
+// from the descriptor is the array `long[]`. The abstract-method render path must drop one array
+// dimension and emit `long...` (the element type + ellipsis), NOT `long[]...` (the full array type +
+// ellipsis). `long[]...` is a varargs of `long[]` (descriptor [[J), which is NOT override-equivalent
+// to the subclass's faithfully-rendered `long...` (descriptor [J) -> javac rejects the subclass with
+// "VAOImpl is not abstract and does not override abstract method combine(long,long,long[]) in VAOBase".
+// Top-level sibling classes (no `$` nesting) keep the round-trip free of the flat-inner-class confound.
+// Mirrors fastjson2 JSONPath.set(Object,Object,JSONReader.Feature...) and its 6 concrete subclasses.
+const varargsAbstractOverrideSource = `package codec;
+
+public class VarargsAbstractOverride {
+    public static void main(String[] args) {
+        VAOBase b = new VAOImpl();
+        long r = b.combine(2L, 3L, 5L, 7L, 11L);
+        System.out.println("fingerprint=" + r);
+    }
+}
+
+abstract class VAOBase {
+    abstract long combine(long base, long seed, long... extra);
+}
+
+class VAOImpl extends VAOBase {
+    long combine(long base, long seed, long... extra) {
+        long acc = (base * 1000003L) + seed;
+        for (long e : extra) {
+            acc = (acc * 31L) + e;
+        }
+        return acc;
+    }
+}
+`
+
+// TestVarargsAbstractMethodRenderIsLoadBearing proves the abstract-method varargs render fix
+// (dumper.go: strip one array dimension for the last varargs param of an ABSTRACT method, kill-switch
+// JDEC_VARARGS_ABSTRACT_FIX_OFF) is load-bearing. With the fix DISABLED the abstract base renders
+// `long[]... extra` while the concrete override renders `long... extra`; the two are not
+// override-equivalent so the subclass fails to recompile ("is not abstract and does not override").
+// With the fix ENABLED both render `long...` and the whole-tree round-trip recompiles + runs to the
+// golden fingerprint. This flipped 6 fastjson2 files (the JSONPath.set abstract-varargs family) clean.
+func TestVarargsAbstractMethodRenderIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	java, err2 := exec.LookPath("java")
+	if err1 != nil || err2 != nil {
+		t.Skip("javac/java not available; skipping varargs abstract render test")
+	}
+
+	const className = "VarargsAbstractOverride"
+	origDir := t.TempDir()
+	golden, ok := compileAndRunJavaBattery(t, javac, java, origDir, className, varargsAbstractOverrideSource)
+	if !ok {
+		t.Fatalf("failed to compile/run original %s:\n%s", className, golden)
+	}
+	t.Logf("golden fingerprint [%s]: %s", className, golden)
+
+	classDir := filepath.Join(origDir, "codec")
+	entries, err := os.ReadDir(classDir)
+	if err != nil {
+		t.Fatalf("read class dir: %v", err)
+	}
+	var classFiles []string
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".class") {
+			classFiles = append(classFiles, e.Name())
+		}
+	}
+	if len(classFiles) < 3 {
+		t.Fatalf("expected >=3 compiled classes (outer+base+impl), got %v", classFiles)
+	}
+
+	// Decompile every top-level sibling .class, recompile them TOGETHER (whole-tree), and run main.
+	roundTrips := func() (string, string, bool) {
+		recDir := t.TempDir()
+		pkgDir := filepath.Join(recDir, "codec")
+		if e := os.MkdirAll(pkgDir, 0o755); e != nil {
+			return "", "mkdir: " + e.Error(), false
+		}
+		var javaFiles []string
+		var combined strings.Builder
+		for _, cf := range classFiles {
+			raw, e := os.ReadFile(filepath.Join(classDir, cf))
+			if e != nil {
+				return "", "read class: " + e.Error(), false
+			}
+			decompiled, e := javaclassparser.Decompile(raw)
+			if e != nil {
+				return "", "decompile error: " + e.Error(), false
+			}
+			base := strings.TrimSuffix(cf, ".class")
+			jf := filepath.Join(pkgDir, base+".java")
+			if e := os.WriteFile(jf, []byte(decompiled), 0o644); e != nil {
+				return "", "write java: " + e.Error(), false
+			}
+			javaFiles = append(javaFiles, jf)
+			combined.WriteString("// ===== " + base + ".java =====\n")
+			combined.WriteString(decompiled)
+			combined.WriteString("\n")
+		}
+		args := append([]string{"-J-Duser.language=en", "-encoding", "UTF-8", "-nowarn", "-d", recDir}, javaFiles...)
+		out, e := exec.Command(javac, args...).CombinedOutput()
+		if e != nil {
+			return combined.String(), "javac: " + string(out), false
+		}
+		out2, e := exec.Command(java, "-cp", recDir, "codec."+className).CombinedOutput()
+		if e != nil {
+			return combined.String(), "java: " + string(out2), false
+		}
+		got := strings.TrimSpace(string(out2))
+		return combined.String(), got, got == golden
+	}
+
+	os.Setenv("JDEC_VARARGS_ABSTRACT_FIX_OFF", "1")
+	srcOff, gotOff, okOff := roundTrips()
+	os.Unsetenv("JDEC_VARARGS_ABSTRACT_FIX_OFF")
+	if okOff {
+		t.Fatalf("expected %s to FAIL the round-trip with the abstract-varargs render fix disabled, but it succeeded; the fix is not load-bearing.\n----- src -----\n%s", className, srcOff)
+	}
+	t.Logf("varargs abstract render OFF (expected failure) for %s: %s", className, gotOff)
+
+	srcOn, gotOn, okOn := roundTrips()
+	if !okOn {
+		t.Fatalf("expected %s to round-trip cleanly with the abstract-varargs render fix enabled; got: %s\n----- src -----\n%s", className, gotOn, srcOn)
+	}
+	t.Logf("varargs abstract render ON (round-trip preserved) for %s: %s", className, gotOn)
+}
+
+// fnvStubSource is a minimal hand-written stand-in for com.alibaba.fastjson2.util.Fnv, providing only
+// the `hashCode64(String)` method that the pinned SymbolTable references. It isolates the SymbolTable
+// final-field defect from Fnv's own (unrelated) decompile defects so the load-bearing signal is clean.
+const fnvStubSource = `package com.alibaba.fastjson2.util;
+
+public class Fnv {
+    public static long hashCode64(String s) {
+        long h = -3750763034362895579L;
+        for (int i = 0; i < s.length(); i++) {
+            h ^= s.charAt(i);
+            h *= 1099511628211L;
+        }
+        return h;
+    }
+}
+`
+
+// TestFinalFieldRenamedLocalHoistIsLoadBearing proves the final-field-initializer hoist guard's
+// renamed-local fix (dumper.go localSlotRefRe now matches the collision-renamed `varN_M`, kill-switch
+// JDEC_FIELD_HOIST_RENAMED_LOCAL_OFF) is load-bearing. The pinned fastjson2 SymbolTable.class assigns
+// a `final long hashCode64` ONCE at the end of its constructor from a local the renamer disambiguates
+// to `var7_1` (slot 7 is reused across disjoint live ranges - a javac slot allocation a synthetic
+// javac-17 battery will not reliably reproduce, hence the pinned real class). With the legacy narrow
+// matcher restored (kill-switch ON) the assignment is wrongly lifted into a field initializer
+// `final long hashCode64 = var7_1;` that references an out-of-scope constructor local ("cannot find
+// symbol: variable var7_1"); with the fix the assignment stays in the constructor (blank final) and
+// the decompiled SymbolTable recompiles cleanly (against a minimal Fnv stub). Mirrors the whole-jar
+// shape of fastjson2 SymbolTable.hashCode64 and FactoryFunction.function.
+func TestFinalFieldRenamedLocalHoistIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	if err1 != nil {
+		t.Skip("javac not available; skipping final-field renamed-local hoist test")
+	}
+
+	raw, err := regressionFS.ReadFile("testdata/regression/final_field_renamed_local.class")
+	if err != nil {
+		t.Fatalf("read pinned SymbolTable class: %v", err)
+	}
+
+	// Compile the decompiled SymbolTable together with a minimal Fnv stub; success/failure of javac is
+	// the load-bearing signal (the defect is a pure "cannot find symbol", a recompilability defect).
+	compiles := func() (string, string, bool) {
+		decompiled, err := javaclassparser.Decompile(raw)
+		if err != nil {
+			return "", "decompile error: " + err.Error(), false
+		}
+		dir := t.TempDir()
+		stPkg := filepath.Join(dir, "com", "alibaba", "fastjson2")
+		fnvPkg := filepath.Join(stPkg, "util")
+		if e := os.MkdirAll(fnvPkg, 0o755); e != nil {
+			return decompiled, "mkdir: " + e.Error(), false
+		}
+		stFile := filepath.Join(stPkg, "SymbolTable.java")
+		fnvFile := filepath.Join(fnvPkg, "Fnv.java")
+		if e := os.WriteFile(stFile, []byte(decompiled), 0o644); e != nil {
+			return decompiled, "write SymbolTable: " + e.Error(), false
+		}
+		if e := os.WriteFile(fnvFile, []byte(fnvStubSource), 0o644); e != nil {
+			return decompiled, "write Fnv stub: " + e.Error(), false
+		}
+		out, e := exec.Command(javac, "-J-Duser.language=en", "-encoding", "UTF-8", "-nowarn", "-d", filepath.Join(dir, "out"), stFile, fnvFile).CombinedOutput()
+		if e != nil {
+			return decompiled, "javac: " + string(out), false
+		}
+		return decompiled, "", true
+	}
+
+	os.Setenv("JDEC_FIELD_HOIST_RENAMED_LOCAL_OFF", "1")
+	srcOff, gotOff, okOff := compiles()
+	os.Unsetenv("JDEC_FIELD_HOIST_RENAMED_LOCAL_OFF")
+	if okOff {
+		t.Fatalf("expected pinned SymbolTable to FAIL recompile with the renamed-local hoist guard disabled, but it compiled; the fix is not load-bearing.\n----- src -----\n%s", srcOff)
+	}
+	if !strings.Contains(gotOff, "cannot find symbol") {
+		t.Fatalf("expected the OFF failure to be a 'cannot find symbol' for the hoisted renamed local; got: %s\n----- src -----\n%s", gotOff, srcOff)
+	}
+	t.Logf("renamed-local hoist guard OFF (expected cannot-find-symbol) for SymbolTable: %s", gotOff)
+
+	srcOn, gotOn, okOn := compiles()
+	if !okOn {
+		t.Fatalf("expected pinned SymbolTable to recompile cleanly with the renamed-local hoist guard enabled; got: %s\n----- src -----\n%s", gotOn, srcOn)
+	}
+	t.Logf("renamed-local hoist guard ON (SymbolTable recompiles clean)")
+}
+
+// TestParallelArmPhiOrphanHoistIsLoadBearing pins fastjson2's FieldWriterListFunc, whose writeValue
+// jsonb loop has the canonical "if/else parallel-phi orphan read": a JVM slot first-declared in BOTH
+// arms of one if/else (cross-VarUid, `ObjectWriter var10 = var5` vs `var10 = getItemWriter(..)`) then
+// read after the join (`var10.write(..)`). Without parallelArmDeclHoist each arm keeps its own
+// `ObjectWriter var10 = ...` so the post-join read is out of scope and javac rejects it as
+// "cannot find symbol: variable var10". The pass emits one dominating `ObjectWriter var10;` and demotes
+// both arms, putting the read back in scope.
+//
+// The class is compiled against the real fastjson2 jar (its writer hierarchy is too large to stub).
+// Other isolated-compile noise is unrelated (e.g. the JSONWriter$Feature nested-type `$` reference,
+// Bug AD), so the load-bearing signal is precisely the var10 symbol error: present with the pass OFF,
+// absent with it ON. Kill-switch: JDEC_PARALLEL_ARM_HOIST_OFF.
+func TestParallelArmPhiOrphanHoistIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	if err1 != nil {
+		t.Skip("javac not available; skipping parallel-arm phi orphan hoist test")
+	}
+	jar := jarPaths["fastjson2"]
+	if _, e := os.Stat(jar); e != nil {
+		t.Skipf("fastjson2 jar missing (%s); skipping", jar)
+	}
+	raw, err := regressionFS.ReadFile("testdata/regression/parallel_arm_phi_orphan.class")
+	if err != nil {
+		t.Fatalf("read pinned FieldWriterListFunc class: %v", err)
+	}
+
+	// Returns the javac output of compiling the decompiled unit against the fastjson2 jar.
+	compileOut := func() (string, string) {
+		decompiled, e := javaclassparser.Decompile(raw)
+		if e != nil {
+			t.Fatalf("decompile: %v", e)
+		}
+		dir := t.TempDir()
+		pkg := filepath.Join(dir, "com", "alibaba", "fastjson2", "writer")
+		if e := os.MkdirAll(pkg, 0o755); e != nil {
+			t.Fatalf("mkdir: %v", e)
+		}
+		src := filepath.Join(pkg, "FieldWriterListFunc.java")
+		if e := os.WriteFile(src, []byte(decompiled), 0o644); e != nil {
+			t.Fatalf("write src: %v", e)
+		}
+		out, _ := exec.Command(javac, "-J-Duser.language=en", "-encoding", "UTF-8", "-nowarn",
+			"-proc:none", "--release", "8", "-cp", jar, "-d", filepath.Join(dir, "out"), src).CombinedOutput()
+		return decompiled, string(out)
+	}
+
+	const orphanSym = "variable var10"
+
+	os.Setenv("JDEC_PARALLEL_ARM_HOIST_OFF", "1")
+	srcOff, outOff := compileOut()
+	os.Unsetenv("JDEC_PARALLEL_ARM_HOIST_OFF")
+	if !strings.Contains(outOff, "cannot find symbol") || !strings.Contains(outOff, orphanSym) {
+		t.Fatalf("expected pinned FieldWriterListFunc to FAIL with a 'cannot find symbol: %s' when the parallel-arm hoist is disabled, so the fix is load-bearing; got javac:\n%s\n----- src -----\n%s", orphanSym, outOff, srcOff)
+	}
+	t.Logf("parallel-arm hoist OFF (expected orphan-read %q cannot-find-symbol present)", orphanSym)
+
+	srcOn, outOn := compileOut()
+	if strings.Contains(outOn, orphanSym) {
+		t.Fatalf("expected the orphan-read %q symbol error to be GONE with the parallel-arm hoist enabled; got javac:\n%s\n----- src -----\n%s", orphanSym, outOn, srcOn)
+	}
+	t.Logf("parallel-arm hoist ON (orphan-read %q resolved)", orphanSym)
+}
+
+// TestEmptyVoidOverrideEmittedIsLoadBearing pins fastjson2's ObjectWriterBaseModule$VoidObjectWriter,
+// a no-op writer whose sole real method is an empty-bodied override `void write(JSONWriter,Object,
+// Object,Type,long) {}` (bytecode: a bare `return`). The dumper previously DROPPED every empty-body
+// void method, so VoidObjectWriter decompiled with no methods at all and javac rejected the class with
+// "is not abstract and does not override abstract method write(...) in ObjectWriter". methodBodyIsTrivially
+// Empty now keeps the faithful empty override. The pinned class compiles against the real fastjson2 jar
+// (ObjectWriter lives there): with the fix OFF the override is missing, with it ON the class is clean.
+// Kill-switch: JDEC_NO_EMIT_EMPTY_VOID.
+func TestEmptyVoidOverrideEmittedIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	if err1 != nil {
+		t.Skip("javac not available; skipping empty-void override test")
+	}
+	jar := jarPaths["fastjson2"]
+	if _, e := os.Stat(jar); e != nil {
+		t.Skipf("fastjson2 jar missing (%s); skipping", jar)
+	}
+	raw, err := regressionFS.ReadFile("testdata/regression/empty_void_override.class")
+	if err != nil {
+		t.Fatalf("read pinned VoidObjectWriter class: %v", err)
+	}
+
+	compileOut := func() (string, string) {
+		decompiled, e := javaclassparser.Decompile(raw)
+		if e != nil {
+			t.Fatalf("decompile: %v", e)
+		}
+		dir := t.TempDir()
+		pkg := filepath.Join(dir, "com", "alibaba", "fastjson2", "writer")
+		if e := os.MkdirAll(pkg, 0o755); e != nil {
+			t.Fatalf("mkdir: %v", e)
+		}
+		src := filepath.Join(pkg, "ObjectWriterBaseModule$VoidObjectWriter.java")
+		if e := os.WriteFile(src, []byte(decompiled), 0o644); e != nil {
+			t.Fatalf("write src: %v", e)
+		}
+		out, _ := exec.Command(javac, "-J-Duser.language=en", "-encoding", "UTF-8", "-nowarn",
+			"-proc:none", "--release", "8", "-cp", jar, "-d", filepath.Join(dir, "out"), src).CombinedOutput()
+		return decompiled, string(out)
+	}
+
+	const overrideErr = "does not override abstract method write"
+
+	os.Setenv("JDEC_NO_EMIT_EMPTY_VOID", "1")
+	srcOff, outOff := compileOut()
+	os.Unsetenv("JDEC_NO_EMIT_EMPTY_VOID")
+	if strings.Contains(srcOff, "void write(") {
+		t.Fatalf("expected the empty void override to be ABSENT in the decompiled source with the emit-empty-void fix disabled; got src:\n%s", srcOff)
+	}
+	if !strings.Contains(outOff, overrideErr) {
+		t.Fatalf("expected pinned VoidObjectWriter to FAIL with %q when the empty-void emit is disabled, so the fix is load-bearing; got javac:\n%s\n----- src -----\n%s", overrideErr, outOff, srcOff)
+	}
+	t.Logf("emit-empty-void OFF (expected %q present)", overrideErr)
+
+	srcOn, outOn := compileOut()
+	if !strings.Contains(srcOn, "void write(") {
+		t.Fatalf("expected the empty void override `void write(...) {}` to be PRESENT with the fix enabled; got src:\n%s", srcOn)
+	}
+	if strings.Contains(outOn, overrideErr) {
+		t.Fatalf("expected the %q error to be GONE with the empty-void emit enabled; got javac:\n%s\n----- src -----\n%s", overrideErr, outOn, srcOn)
+	}
+	t.Logf("emit-empty-void ON (empty override emitted, class compiles clean)")
+}
+
+// TestTrySlotPhiMergeIsLoadBearing pins fastjson2's FieldReaderDoubleFunc, whose readFieldValue is the
+// canonical try/catch value-fallback idiom: a JVM slot is assigned the read value inside the try body
+// (`v = jsonReader.readDouble()`) and a `= null` fallback inside the catch handler, then read after the
+// try (`function.accept(object, v)`). Because the catch store runs only on exception it does not
+// dominate the try store, so the null-adopt dominator gate splits the slot into two differently-typed
+// variables: the post-try read binds to the `Object var = null` branch (the read value is silently
+// LOST) and javac additionally rejects `Object cannot be converted to Double`. reachingTrySlotPhiMerge
+// (gated by slotDefPhiReachesLoad) proves the two stores converge at a common downstream load and
+// continues one `Double var4;`, so the value flows through and the class compiles. Compiled against the
+// real fastjson2 jar. Kill-switch: JDEC_TRY_SLOT_PHI_MERGE_OFF.
+func TestTrySlotPhiMergeIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	if err1 != nil {
+		t.Skip("javac not available; skipping try-slot phi merge test")
+	}
+	jar := jarPaths["fastjson2"]
+	if _, e := os.Stat(jar); e != nil {
+		t.Skipf("fastjson2 jar missing (%s); skipping", jar)
+	}
+	raw, err := regressionFS.ReadFile("testdata/regression/try_slot_phi_merge.class")
+	if err != nil {
+		t.Fatalf("read pinned FieldReaderDoubleFunc class: %v", err)
+	}
+
+	compileOut := func() (string, string) {
+		decompiled, e := javaclassparser.Decompile(raw)
+		if e != nil {
+			t.Fatalf("decompile: %v", e)
+		}
+		dir := t.TempDir()
+		pkg := filepath.Join(dir, "com", "alibaba", "fastjson2", "reader")
+		if e := os.MkdirAll(pkg, 0o755); e != nil {
+			t.Fatalf("mkdir: %v", e)
+		}
+		src := filepath.Join(pkg, "FieldReaderDoubleFunc.java")
+		if e := os.WriteFile(src, []byte(decompiled), 0o644); e != nil {
+			t.Fatalf("write src: %v", e)
+		}
+		out, _ := exec.Command(javac, "-J-Duser.language=en", "-encoding", "UTF-8", "-nowarn",
+			"-proc:none", "--release", "8", "-cp", jar, "-d", filepath.Join(dir, "out"), src).CombinedOutput()
+		return decompiled, string(out)
+	}
+
+	const convErr = "cannot be converted to Double"
+
+	os.Setenv("JDEC_TRY_SLOT_PHI_MERGE_OFF", "1")
+	srcOff, outOff := compileOut()
+	os.Unsetenv("JDEC_TRY_SLOT_PHI_MERGE_OFF")
+	if !strings.Contains(outOff, convErr) {
+		t.Fatalf("expected pinned FieldReaderDoubleFunc to FAIL with %q when the try-slot phi merge is disabled, so the fix is load-bearing; got javac:\n%s\n----- src -----\n%s", convErr, outOff, srcOff)
+	}
+	t.Logf("try-slot phi merge OFF (expected %q present, read value lost into Object var)", convErr)
+
+	srcOn, outOn := compileOut()
+	if strings.Contains(outOn, convErr) {
+		t.Fatalf("expected the %q error to be GONE with the try-slot phi merge enabled; got javac:\n%s\n----- src -----\n%s", convErr, outOn, srcOn)
+	}
+	if !strings.Contains(srcOn, "Double var4") {
+		t.Fatalf("expected the merged single `Double var4` declaration with the fix enabled; got src:\n%s", srcOn)
+	}
+	t.Logf("try-slot phi merge ON (one Double var4, value flows through, compiles clean)")
+}
+
+// TestCastEscapeHoistIsLoadBearing pins fastjson2's ObjectWriters, whose fieldWriterList is the
+// canonical "if/else parallel-phi orphan read, DIFFERENT-rendered-type subfamily": one JVM slot is
+// first-declared in BOTH arms of an if/else with DIFFERENT types (`ParameterizedType var3 = ...` vs
+// `ParameterizedTypeImpl var3 = ...`) then read after the join only through an explicit cast
+// (`createFieldWriter(.., (Type)(var3), ..)`). parallelArmDeclHoist refuses to merge the arms because
+// their rendered type tokens disagree and the decompiler has no common-supertype facility, so each arm
+// keeps its own decl and the post-join read is out of scope: javac rejects it as
+// "cannot find symbol: variable var3". hoistCastGuardedEscapedLocals proves the merge is sound from the
+// shape alone - every non-declaration use is a cast - and emits one `Object var3 = null;`, demoting both
+// arms. Compiled against the real fastjson2 jar; the load-bearing signal is the var3 symbol error,
+// present with the pass OFF and absent with it ON. Kill-switch: JDEC_CAST_ESCAPE_HOIST_OFF.
+func TestCastEscapeHoistIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	if err1 != nil {
+		t.Skip("javac not available; skipping cast-escape hoist test")
+	}
+	jar := jarPaths["fastjson2"]
+	if _, e := os.Stat(jar); e != nil {
+		t.Skipf("fastjson2 jar missing (%s); skipping", jar)
+	}
+	raw, err := regressionFS.ReadFile("testdata/regression/cast_escape_phi_orphan.class")
+	if err != nil {
+		t.Fatalf("read pinned ObjectWriters class: %v", err)
+	}
+
+	compileOut := func() (string, string) {
+		decompiled, e := javaclassparser.Decompile(raw)
+		if e != nil {
+			t.Fatalf("decompile: %v", e)
+		}
+		dir := t.TempDir()
+		pkg := filepath.Join(dir, "com", "alibaba", "fastjson2", "writer")
+		if e := os.MkdirAll(pkg, 0o755); e != nil {
+			t.Fatalf("mkdir: %v", e)
+		}
+		src := filepath.Join(pkg, "ObjectWriters.java")
+		if e := os.WriteFile(src, []byte(decompiled), 0o644); e != nil {
+			t.Fatalf("write src: %v", e)
+		}
+		out, _ := exec.Command(javac, "-J-Duser.language=en", "-encoding", "UTF-8", "-nowarn",
+			"-proc:none", "--release", "8", "-cp", jar, "-d", filepath.Join(dir, "out"), src).CombinedOutput()
+		return decompiled, string(out)
+	}
+
+	const orphanSym = "variable var3"
+
+	os.Setenv("JDEC_CAST_ESCAPE_HOIST_OFF", "1")
+	srcOff, outOff := compileOut()
+	os.Unsetenv("JDEC_CAST_ESCAPE_HOIST_OFF")
+	if !strings.Contains(outOff, "cannot find symbol") || !strings.Contains(outOff, orphanSym) {
+		t.Fatalf("expected pinned ObjectWriters to FAIL with a 'cannot find symbol: %s' when the cast-escape hoist is disabled, so the fix is load-bearing; got javac:\n%s\n----- src -----\n%s", orphanSym, outOff, srcOff)
+	}
+	t.Logf("cast-escape hoist OFF (expected orphan-read %q cannot-find-symbol present)", orphanSym)
+
+	srcOn, outOn := compileOut()
+	if strings.Contains(outOn, orphanSym) {
+		t.Fatalf("expected the orphan-read %q symbol error to be GONE with the cast-escape hoist enabled; got javac:\n%s\n----- src -----\n%s", orphanSym, outOn, srcOn)
+	}
+	if !strings.Contains(srcOn, "Object var3 = null;") {
+		t.Fatalf("expected the hoisted `Object var3 = null;` declaration with the fix enabled; got src:\n%s", srcOn)
+	}
+	t.Logf("cast-escape hoist ON (one Object var3, both arms demoted, orphan-read resolved)")
+}
+
+// TestPolymorphicSignatureCastIsLoadBearing pins fastjson2's JSONReader$BigIntegerCreator, whose static
+// initializer is the canonical signature-polymorphic call: `LambdaMetafactory...getTarget().invokeExact()`
+// is a @PolymorphicSignature MethodHandle method whose per-call-site bytecode descriptor returns the REAL
+// type (`()Ljava/util/function/BiFunction;`) while the SOURCE-apparent return type is always Object - the
+// original source therefore reads `(BiFunction) handle.invokeExact()`. The decompiler types the call from
+// the descriptor and emitted `BiFunction var3 = handle.invokeExact()` with no cast, which javac rejects
+// ("incompatible types: Object cannot be converted to BiFunction"). polymorphicSignatureCastType re-emits
+// the descriptor-return cast `(BiFunction)(...)`. Compiled against the real fastjson2 jar; the load-bearing
+// signal is the conversion error, present with the pass OFF and absent with it ON. This pattern (always
+// `...getTarget().invokeExact()`) is fastjson2's single biggest 1-error family. Kill-switch:
+// JDEC_NO_POLYSIG_CAST.
+func TestPolymorphicSignatureCastIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	if err1 != nil {
+		t.Skip("javac not available; skipping polymorphic-signature cast test")
+	}
+	jar := jarPaths["fastjson2"]
+	if _, e := os.Stat(jar); e != nil {
+		t.Skipf("fastjson2 jar missing (%s); skipping", jar)
+	}
+	raw, err := regressionFS.ReadFile("testdata/regression/polysig_invokeexact.class")
+	if err != nil {
+		t.Fatalf("read pinned JSONReader$BigIntegerCreator class: %v", err)
+	}
+
+	compileOut := func() (string, string) {
+		decompiled, e := javaclassparser.Decompile(raw)
+		if e != nil {
+			t.Fatalf("decompile: %v", e)
+		}
+		dir := t.TempDir()
+		pkg := filepath.Join(dir, "com", "alibaba", "fastjson2")
+		if e := os.MkdirAll(pkg, 0o755); e != nil {
+			t.Fatalf("mkdir: %v", e)
+		}
+		src := filepath.Join(pkg, "JSONReader$BigIntegerCreator.java")
+		if e := os.WriteFile(src, []byte(decompiled), 0o644); e != nil {
+			t.Fatalf("write src: %v", e)
+		}
+		out, _ := exec.Command(javac, "-J-Duser.language=en", "-encoding", "UTF-8", "-nowarn",
+			"-proc:none", "--release", "8", "-cp", jar, "-d", filepath.Join(dir, "out"), src).CombinedOutput()
+		return decompiled, string(out)
+	}
+
+	const convErr = "cannot be converted to BiFunction"
+
+	os.Setenv("JDEC_NO_POLYSIG_CAST", "1")
+	srcOff, outOff := compileOut()
+	os.Unsetenv("JDEC_NO_POLYSIG_CAST")
+	if !strings.Contains(outOff, convErr) {
+		t.Fatalf("expected pinned BigIntegerCreator to FAIL with %q when the polysig cast is disabled, so the fix is load-bearing; got javac:\n%s\n----- src -----\n%s", convErr, outOff, srcOff)
+	}
+	t.Logf("polysig cast OFF (expected %q present, invokeExact result typed as Object)", convErr)
+
+	srcOn, outOn := compileOut()
+	if strings.Contains(outOn, convErr) {
+		t.Fatalf("expected the %q error to be GONE with the polysig cast enabled; got javac:\n%s\n----- src -----\n%s", convErr, outOn, srcOn)
+	}
+	if !strings.Contains(srcOn, "(BiFunction)(") {
+		t.Fatalf("expected the re-emitted `(BiFunction)(...)` cast with the fix enabled; got src:\n%s", srcOn)
+	}
+	t.Logf("polysig cast ON (invokeExact result down-cast to descriptor return type, compiles clean)")
 }

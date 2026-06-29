@@ -835,6 +835,43 @@ func TestBridgeMethodSuppression(t *testing.T) {
 	}
 }
 
+// TestRefSlotPhiMergeIsLoadBearing is the承重 guard for the lazy-init reference-slot phi merge (Bug
+// AK). The idiom `List r = map.get(k); if (r == null) { r = new ArrayList(); map.put(k, r); }
+// r.add(v);` stores two values into one slot: a List (declared type) and an ArrayList (subtype, in the
+// arm). Without the merge, AssignVarGuarded mints a second block-scoped variable for the arm store and
+// the trailing `r.add(v)` reads it out of scope. reachingRefSlotPhiMerge proves they are one variable
+// via a phi and continues the dominating `List var3` definition. Kill-switch
+// JDEC_REF_SLOT_PHI_MERGE_OFF=1 restores the split; flipping it MUST reintroduce the out-of-scope
+// `var4` read, proving the merge is load-bearing.
+func TestRefSlotPhiMergeIsLoadBearing(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/lazyinit_slot_decl_dropped.class")
+	if err != nil {
+		t.Fatalf("read embedded class failed: %v", err)
+	}
+	// Fix ON (default): one unified variable, arm store is a reassignment, every read in scope.
+	source, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile failed: %v", err)
+	}
+	if !strings.Contains(source, "List var3 = ") || !strings.Contains(source, "var3 = new ArrayList()") || !strings.Contains(source, "var3.add(var2)") {
+		t.Errorf("ref-slot phi merge regression: expected dominating `List var3 = ` decl, arm reassignment `var3 = new ArrayList()`, in-scope `var3.add`\n----- source -----\n%s", source)
+	}
+	// The arm must NOT re-declare a fresh typed `ArrayList var3` (that is the split shape).
+	if strings.Contains(source, "ArrayList var3 = new ArrayList()") {
+		t.Errorf("ref-slot phi merge regression: arm re-declared a split variable instead of reassigning\n----- source -----\n%s", source)
+	}
+	// Fix OFF: the arm store mints a fresh split variable declared ONLY inside the if-arm, so the
+	// trailing `var3.add` reads it out of scope - proving the merge is load-bearing.
+	t.Setenv("JDEC_REF_SLOT_PHI_MERGE_OFF", "1")
+	legacy, err := javaclassparser.Decompile(raw)
+	if err != nil {
+		t.Fatalf("decompile (kill-switch) failed: %v", err)
+	}
+	if !strings.Contains(legacy, "ArrayList var3 = new ArrayList()") || strings.Contains(legacy, "List var3 = (") {
+		t.Errorf("kill-switch JDEC_REF_SLOT_PHI_MERGE_OFF did not reintroduce the slot split\n----- source -----\n%s", legacy)
+	}
+}
+
 // TestDecompileSyntaxRegression decompiles a set of real-world .class files that previously
 // produced syntactically-invalid Java, and asserts the decompiled output now parses cleanly
 // through the java2ssa frontend. Each entry guards a specific decompiler fix.
@@ -867,6 +904,58 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 				"cannot-find-symbol recompile cascade via Enums.getEnumConstants).",
 			mustContain:    []string{"Map var3;", "synchronized", "return var3"},
 			mustNotContain: []string{"yak-decompiler"},
+		},
+		{
+			file: "bool_default_init_merge.class",
+			desc: "a `boolean b = false; if(...){ b = expr; } return b;` slot. javac emits the default " +
+				"initializer as `iconst_0; istore S`, whose pushed constant is an int (the JVM operand " +
+				"stack has no boolean category), so the default is typed int while the later in-`if` " +
+				"boolean store is typed boolean. AssignVarGuarded refuses to merge int with boolean (no " +
+				"int<->boolean conversion in Java) and minted a SECOND, block-scoped variable, so the " +
+				"default rendered `int var4 = 0`, the if-arm `boolean var5 = ...equals(...)`, and the " +
+				"trailing `return var5` read the inner variable OUT OF SCOPE (cannot find symbol). The " +
+				"reaching-definition phi merge re-types the default to boolean (coercing 0 -> false) and " +
+				"continues it, so there is ONE `boolean var4` written in both arms. Real-world: " +
+				"commons-codec Metaphone.regionMatch / MatchRatingApproachEncoder (Bug AI residual). " +
+				"Kill-switch JDEC_BOOL_DEFAULT_MERGE_OFF=1 reintroduces the split.",
+			mustContain:    []string{"boolean var4 = false;", "var4 = var1.substring", "return var4;"},
+			mustNotContain: []string{"int var4 = 0", "var5", "yak-decompiler"},
+		},
+		{
+			file: "embedded_assign_cond_naming.class",
+			desc: "a local whose ONLY definition is an embedded assignment baked into an opaque " +
+				"CustomValue by the dup-collapse: `s == null || (n = s.length()) == 0` compiles to " +
+				"`... length; dup; istore S; ifne`, and `n` is read again in a sibling `if (n == 1)`. The " +
+				"dup-collapse consumed n's standalone AssignStatement into the value stream, leaving n " +
+				"with NO DeclareStatement -> invisible to BOTH the identity-based collision renamer and " +
+				"the textual missing-decl safety net, so it rendered undeclared as `(var4 = ...)` AND " +
+				"collided in name with a later sibling-scope `StringBuilder var4` (both slot-derived var4) " +
+				"-> `cannot find symbol: var4`. SynthesizeUndeclaredEmbeddedAssignDecls now prepends a " +
+				"bare `int var4;`, which the collision renamer then sees, renaming the StringBuilder to " +
+				"var4_1 and its uses with it. Real-world: commons-codec Metaphone.metaphone " +
+				"(`txtLength` embedded assignment). Kill-switch JDEC_EMBED_ASSIGN_DECL_OFF=1 reintroduces " +
+				"the undeclared/colliding split.",
+			mustContain:    []string{"int var4;", "var4 = var1.length()", "StringBuilder var4_1 = ", "var4_1.append"},
+			mustNotContain: []string{"StringBuilder var4 =", "yak-decompiler"},
+		},
+		{
+			file: "lazyinit_slot_decl_dropped.class",
+			desc: "the ubiquitous lazy-init idiom `List r = map.get(k); if (r == null) { r = new " +
+				"ArrayList(); map.put(k, r); } r.add(v);` stores TWO values into ONE slot: the first " +
+				"carries the declared type (List, from map.get), the second (in the if-arm) carries a " +
+				"SUBTYPE (ArrayList). AssignVarGuarded saw the differing types and -- the slot being " +
+				"neither null-initialized, a parameter, nor int-category -- minted a fresh block-scoped " +
+				"variable for the arm store; the trailing `r.add(v)` then bound (via the single global " +
+				"slot table, DFS order) to that arm variable `var4` and rendered out of scope, while the " +
+				"arm store, looking single-use, was otherwise dropped by the single-use fold (Bug AK). " +
+				"reachingRefSlotPhiMerge now proves the two stores denote ONE variable via a phi (a " +
+				"downstream load reached by both the fall-through def and the arm store) and continues " +
+				"the dominating `List var3` definition, so the arm becomes a plain `var3 = new " +
+				"ArrayList()` reassignment and every read binds in scope. Real-world: commons-codec " +
+				"DaitchMokotoffSoundex / any Map<K,List<V>> accumulator. Kill-switch " +
+				"JDEC_REF_SLOT_PHI_MERGE_OFF=1 reintroduces the split.",
+			mustContain:    []string{"List var3 = ", "var3 = new ArrayList()", "var3.add(var2)"},
+			mustNotContain: []string{"ArrayList var3 = new ArrayList()", "var4", "yak-decompiler"},
 		},
 		{
 			file: "method_type_params.class",
@@ -1389,8 +1478,11 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 				"lambda. The assignment must be hoisted into the field initializer because Java source interfaces cannot contain static initializer blocks.",
 			mustContain: []string{
 				"public static final SqlParser DEFAULT = (String l0) ->",
-				"CCJSqlParser var1 = CCJSqlParserUtil.newParser(l0)",
-				"return var1.Statement()",
+				// A lambda body's own locals are lifted into a private `lv<seq>_N` namespace so they
+				// cannot shadow the enclosing scope (see renameLambdaBodyLocals); the `var1` slot local
+				// here therefore renders as `lv1_1`.
+				"CCJSqlParser lv1_1 = CCJSqlParserUtil.newParser(l0)",
+				"return lv1_1.Statement()",
 			},
 			mustNotContain: []string{
 				"yak-decompiler",
@@ -1607,7 +1699,10 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 				"public void write(ChannelHandlerContext var1, Object var2, ChannelPromise var3)",
 				"public void channelRead(ChannelHandlerContext var1, Object var2)",
 				"this.recordRead(var4",
-				"this.recordWrite(var4",
+				// recordWrite is invoked inside a lambda body whose own locals are lifted into the
+				// private `lv<seq>_N` namespace, so the folded checkcast temp renders as `lv1_4` (still a
+				// stable local name, not the inline cast expression - the property this test pins).
+				"this.recordWrite(lv1_4",
 			},
 			mustNotContain: []string{
 				"String ((String)",
@@ -1623,9 +1718,13 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 			mustContain: []string{
 				"abstract class ExcelAbstractExporter<",
 				"public static ExcelAbstractExporter$TextAlignHolder getTextAlignHolder(JRPrintText var0)",
-				"VerticalTextAlignEnum var2;",
-				"HorizontalTextAlignEnum var2_1;",
-				"return new ExcelAbstractExporter$TextAlignHolder(var2_1,var2,var1)",
+				// The two alignment locals are written inside nested switch cases and read after the
+				// switches; prebindEscapingSwitchSlots now unifies each onto a clean parent-scope id
+				// (var2/var3) instead of the old collision-renamed var2/var2_1, so both still hoist to
+				// bare method-top declarations - just with cleaner, distinct names.
+				"VerticalTextAlignEnum var3;",
+				"HorizontalTextAlignEnum var2;",
+				"return new ExcelAbstractExporter$TextAlignHolder(var2,var3,var1)",
 			},
 			mustNotContain: []string{
 				"empty slot value",
@@ -1790,15 +1889,20 @@ func TestDecompileSyntaxRegression(t *testing.T) {
 		},
 		{
 			file: "elasticsearch_client_interface_field.class",
-			desc: "Elasticsearch Client is an interface with a static final Setting field initialized in <clinit>. " +
-				"If the initializer cannot be hoisted, the field must still render as valid Java instead of being dropped.",
+			desc: "Elasticsearch Client is an interface with a static final Setting field initialized in <clinit> " +
+				"with a capturing lambda validator. The <clinit> assignment must be hoisted into the field " +
+				"initializer (interfaces cannot have static blocks) as valid Java, never dropped to a bare decl.",
 			mustContain: []string{
 				"public interface Client",
-				"public static final Setting<String> CLIENT_TYPE_SETTING_S = null",
+				// Once the lambda body's own locals are lifted out of the enclosing `varN` namespace
+				// (renameLambdaBodyLocals), the validator lambda is legal Java, so the real field
+				// initializer hoists instead of degrading to `= null`.
+				"public static final Setting<String> CLIENT_TYPE_SETTING_S = new Setting(\"client.type\",\"node\",(String l0) ->",
 				"public default Client getRemoteClusterClient(String var1)",
 			},
 			mustNotContain: []string{
 				"public static final Setting<String> CLIENT_TYPE_SETTING_S;",
+				"public static final Setting<String> CLIENT_TYPE_SETTING_S = null",
 				"decompiled field org.elasticsearch.client.Client.CLIENT_TYPE_SETTING_S",
 				"yak-decompiler",
 				"post-decompile syntax",

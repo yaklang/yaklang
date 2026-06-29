@@ -187,6 +187,112 @@ func dropDuplicateDeclarations(sts *[]statements.Statement) {
 	*sts = out
 }
 
+// embeddedDeclInfo records one in-tree declaration's identity and rendered type for the
+// embedded-assignment collision check below.
+type embeddedDeclInfo struct {
+	id      *utils.VariableId
+	typeStr string
+}
+
+// collectEmbeddedDeclInfos walks the subtree and records every declaration (IsFirst/IsDeclare
+// AssignStatement) into byID (VariableId set) and byName (rendered slot name -> declarations with
+// their rendered type). Used by SynthesizeUndeclaredEmbeddedAssignDecls to tell a genuine
+// cross-variable name collision (different variable, incompatible type) from the legitimate
+// chained-assignment reuse of an already-declared slot (same name, same type).
+func collectEmbeddedDeclInfos(sts []statements.Statement, byID map[*utils.VariableId]struct{}, byName map[string][]embeddedDeclInfo) {
+	for _, st := range sts {
+		if as, ok := st.(*statements.AssignStatement); ok && as.ArrayMember == nil && (as.IsFirst || as.IsDeclare) {
+			if ref, ok2 := core.UnpackSoltValue(as.LeftValue).(*values.JavaRef); ok2 && ref != nil && ref.Id != nil {
+				byID[ref.Id] = struct{}{}
+				name := ref.String(hoistProbeCtx)
+				ts := ""
+				if t := ref.Type(); t != nil {
+					ts = t.String(hoistProbeCtx)
+				}
+				byName[name] = append(byName[name], embeddedDeclInfo{id: ref.Id, typeStr: ts})
+			}
+		}
+		for _, cl := range childStatementLists(st) {
+			collectEmbeddedDeclInfos(*cl, byID, byName)
+		}
+	}
+}
+
+// SynthesizeUndeclaredEmbeddedAssignDecls fixes Bug Y residual C: a local whose ONLY definition is an
+// embedded assignment baked into an opaque CustomValue (`s == null || (n = s.length()) == 0`, javac
+// `... length; dup; istore; ifne`). The dup-collapse in code_analyser.go consumes such a local's
+// standalone AssignStatement into the value stream, so the local keeps no DeclareStatement; it is then
+// invisible to the identity-based collision renamer (dumper.resolveLocalNameCollisions, which keys on
+// declarations) and to the textual missing-decl safety net (addMissingGeneratedLocalDecls treats a
+// colliding later `T varN` as already declaring varN), so it renders undeclared AND duplicate-named
+// against a later sibling-scope local of the same slot-derived varN -> `cannot find symbol`
+// (commons-codec Metaphone.metaphone: the `txtLength` embedded assignment collides with a later
+// `StringBuilder` local).
+//
+// This is DELIBERATELY narrow. It synthesizes a bare `T varN;` at method top ONLY when the orphan's
+// slot-derived name collides with a declaration of a DIFFERENT variable whose rendered type is
+// INCOMPATIBLE (the residual-C signature: an `int` n vs a `StringBuilder`). That declaration makes the
+// orphan a real declaration the identity collision renamer can see, so it renames the colliding sibling
+// to varN_1 and rebinds its uses. Two cases are intentionally left untouched:
+//   - same name + SAME rendered type: the legitimate chained assignment `int b = a = 1`, where the
+//     embedded `(a = 1)` reuses the already-declared slot `a`; minting a second `int a;` would make the
+//     renamer split one variable into two and break the program (TestDecompiler/ContinuousAssign).
+//   - name with NO declaration at all: an ordinary orphan whose type the textual safety net
+//     (addMissingGeneratedLocalDecls / inferGeneratedLocalRefType, kill-switches JDEC_NO_EMBED_ASSIGN_*)
+//     already recovers; staying out of its way keeps those fixes load-bearing.
+//
+// A bare declaration at method top is legal Java and semantically inert (the embedded assignment still
+// assigns before any read on every reaching path, so definite-assignment holds). Kill-switch:
+// JDEC_EMBED_ASSIGN_DECL_OFF=1.
+func SynthesizeUndeclaredEmbeddedAssignDecls(sts *[]statements.Statement, targets []*values.JavaRef) {
+	if sts == nil || len(targets) == 0 || os.Getenv("JDEC_EMBED_ASSIGN_DECL_OFF") == "1" {
+		return
+	}
+	declaredID := map[*utils.VariableId]struct{}{}
+	declByName := map[string][]embeddedDeclInfo{}
+	collectEmbeddedDeclInfos(*sts, declaredID, declByName)
+	seen := map[*utils.VariableId]struct{}{}
+	var prepend []statements.Statement
+	for _, ref := range targets {
+		if ref == nil || ref.Id == nil || ref.IsThis || ref.IsParam {
+			continue
+		}
+		if _, done := seen[ref.Id]; done {
+			continue
+		}
+		if _, isDeclared := declaredID[ref.Id]; isDeclared {
+			continue
+		}
+		// Only synthetic var<slot> locals are hoist candidates; a value carrying no static type
+		// cannot render a `T x;` declaration, so leave it to the textual safety net.
+		name := ref.String(hoistProbeCtx)
+		if !generatedLocalNameRe.MatchString(name) || ref.Type() == nil {
+			continue
+		}
+		targetType := ref.Type().String(hoistProbeCtx)
+		hasIncompatibleCollider := false
+		hasCompatibleSameName := false
+		for _, d := range declByName[name] {
+			if d.id == ref.Id {
+				continue
+			}
+			if d.typeStr == targetType {
+				hasCompatibleSameName = true
+			} else {
+				hasIncompatibleCollider = true
+			}
+		}
+		if !hasIncompatibleCollider || hasCompatibleSameName {
+			continue
+		}
+		seen[ref.Id] = struct{}{}
+		prepend = append(prepend, statements.NewDeclareStatement(ref))
+	}
+	if len(prepend) > 0 {
+		*sts = append(prepend, *sts...)
+	}
+}
+
 type Scope struct {
 	nowId       int
 	deep        int
@@ -513,6 +619,9 @@ func rewriteVar(scope *Scope, className, methodName string) int {
 			if os.Getenv("JDEC_IFELSE_PREBIND_OFF") == "" {
 				prebindEscapingIfElseSlots(scope, statement, stsSnapshot[stmtIdx+1:], idReplaceMap, className, methodName)
 			}
+			if os.Getenv("JDEC_IFELSE_PARALLEL_PREBIND_OFF") == "" {
+				prebindParallelTypedIfElseDefs(scope, statement, stsSnapshot[stmtIdx+1:], idReplaceMap, className, methodName)
+			}
 			subScope := scope.SubScope(&statement.IfBody)
 			core.TraceRewriteVar(className, methodName, "enter if depth=%d body=%d", subScope.deep, len(statement.IfBody))
 			rewriteVar(subScope, className, methodName)
@@ -532,6 +641,9 @@ func rewriteVar(scope *Scope, className, methodName string) int {
 			core.TraceRewriteVar(className, methodName, "enter do-while depth=%d body=%d", subScope.deep, len(statement.Body))
 			rewriteVar(subScope, className, methodName)
 		case *statements.SwitchStatement:
+			if os.Getenv("JDEC_SWITCH_PREBIND_OFF") == "" {
+				prebindEscapingSwitchSlots(scope, statement, stsSnapshot[stmtIdx+1:], idReplaceMap, className, methodName)
+			}
 			subScope := scope.SubScope(nil)
 			for _, c := range statement.Cases {
 				subScope.sts = &c.Body
@@ -775,6 +887,240 @@ func prebindEscapingIfElseSlots(scope *Scope, ifst *statements.IfStatement, afte
 	}
 }
 
+// prebindParallelTypedIfElseDefs unifies the dominant Bug AL fastjson2 shape that escapes
+// prebindEscapingIfElseSlots: an if/else whose two arms each DECLARE a local of the SAME rendered
+// type into the same JVM slot (a phi at the merge), read after the if, but whose two arm defs were
+// minted with DIFFERENT VariableIds. The split is a simulation-order artifact: the DFS explores one
+// arm's fall-through - and a LATER same-slot reuse of a DIFFERENT type (`long[] x` ... `long x`) -
+// before backtracking to the other arm, so the slot table is clobbered to the foreign type and the
+// second arm mints a fresh ref instead of reusing the first arm's. prebindEscapingIfElseSlots keys on
+// a SHARED VarUid, so this cross-uid phi slips past it: both arms keep their own `T x = ...`
+// declaration and the post-if read binds to only one arm's id, leaving the other arm's value unbound
+// and the read out of scope ("cannot find symbol: variable varN" - fastjson2 ObjectReaderProvider's
+// long[] acceptHashCodes; 357 such symbols dominate the fastjson2 whole-tree recompile).
+//
+// Provably-safe phi signature (all required):
+//   - both arms are non-empty and EACH declares (IsFirst/IsDeclare), at its TOP level, exactly one
+//     local of the candidate rendered type T (an unambiguous 1:1 pairing);
+//   - the two arm defs carry DIFFERENT VarUids (a shared VarUid is already handled above);
+//   - exactly ONE of them is referenced after the if (probed by VariableId identity); the other is
+//     not. Two same-typed branch-EXCLUSIVE defs flowing into a common later read are, by the verifier's
+//     single-type-at-merge guarantee, one source variable, so merging the non-escaping def onto the
+//     escaping one is type-safe; and even were they distinct, the loser is unread after the if and
+//     used only on its own exclusive arm, so the merge stays semantically inert.
+//
+// On a match both arm defs are bound to one freshly-minted parent-scope id (mirroring
+// prebindEscapingIfElseSlots) and recorded `reused`, so placeCrossScopeDeclarations lifts the single
+// `T x;` ahead of the if and the post-if reads converge on it. Kill-switch:
+// JDEC_IFELSE_PARALLEL_PREBIND_OFF=1.
+//
+// KNOWN GAP (see CODEC_TODO Bug AL "if/else parallel-phi orphan read"): when the post-if read binds to
+// a THIRD id (neither arm def's, an unconstructed phi result - fastjson2 FieldWriterListFunc.writeValue
+// var10, ObjectWriters.fieldWriterList var3, JSONStreamReader{UTF8,UTF16} var2), the identity escape
+// probe finds NEITHER arm escaping and this pass correctly declines (firing would orphan the read into
+// var<nowId> while the read still renders var<slot>). Closing it needs name-based escape via
+// statementsReadName plus a join-type for the hoisted declaration; deferred because there is no type-LUB
+// facility to pick a common supertype when the two arms inferred different types.
+func prebindParallelTypedIfElseDefs(scope *Scope, ifst *statements.IfStatement, afterSts []statements.Statement, idReplaceMap map[*utils.VariableId]*utils.VariableId, className, methodName string) {
+	if ifst == nil || len(afterSts) == 0 || len(ifst.IfBody) == 0 || len(ifst.ElseBody) == 0 {
+		return
+	}
+	// Collect each arm's TOP-LEVEL declarations grouped by rendered type. Only direct children are
+	// considered: a declaration nested inside a sub-block of the arm (e.g. a loop) is scoped to that
+	// sub-block and must never be hoisted past the if.
+	collectTopDecls := func(arm []statements.Statement) map[string][]*values.JavaRef {
+		res := map[string][]*values.JavaRef{}
+		seen := map[string]struct{}{}
+		for _, st := range arm {
+			as, ok := st.(*statements.AssignStatement)
+			if !ok || as.ArrayMember != nil || !(as.IsFirst || as.IsDeclare) {
+				continue
+			}
+			ref, ok := core.UnpackSoltValue(as.LeftValue).(*values.JavaRef)
+			if !ok || ref == nil || ref.Id == nil || ref.IsThis || ref.IsParam || ref.Type() == nil {
+				continue
+			}
+			if _, dup := seen[ref.VarUid]; dup {
+				continue
+			}
+			seen[ref.VarUid] = struct{}{}
+			t := ref.Type().String(hoistProbeCtx)
+			res[t] = append(res[t], ref)
+		}
+		return res
+	}
+	ifDecls := collectTopDecls(ifst.IfBody)
+	if len(ifDecls) == 0 {
+		return
+	}
+	elseDecls := collectTopDecls(ifst.ElseBody)
+	if len(elseDecls) == 0 {
+		return
+	}
+	escapesAfter := func(ref *values.JavaRef) bool {
+		const probe = "__jdec_parallel_prebind_probe__"
+		saved := ref.Id.Name
+		ref.Id.SetName(probe)
+		hit := statementsReferenceName(afterSts, probe)
+		ref.Id.SetName(saved)
+		return hit
+	}
+	typeKeys := make([]string, 0, len(ifDecls))
+	for t := range ifDecls {
+		typeKeys = append(typeKeys, t)
+	}
+	sort.Strings(typeKeys)
+	for _, t := range typeKeys {
+		ifs := ifDecls[t]
+		els := elseDecls[t]
+		// Require an unambiguous 1:1 same-type pairing across the two arms.
+		if len(ifs) != 1 || len(els) != 1 {
+			continue
+		}
+		ifRef, elseRef := ifs[0], els[0]
+		if ifRef.VarUid == elseRef.VarUid {
+			continue // shared VarUid is prebindEscapingIfElseSlots' job
+		}
+		ifEsc, elseEsc := escapesAfter(ifRef), escapesAfter(elseRef)
+		if ifEsc == elseEsc {
+			continue // need exactly one escaping def
+		}
+		winner, loser := ifRef, elseRef
+		if elseEsc {
+			winner, loser = elseRef, ifRef
+		}
+		if _, already := scope.assignedMap[winner.VarUid]; already {
+			continue
+		}
+		if _, already := scope.assignedMap[loser.VarUid]; already {
+			continue
+		}
+		newId := utils.NewRootVariableId()
+		newId.SetName(fmt.Sprintf("var%d", scope.nowId))
+		scope.nowId++
+		scope.assignedMap[winner.VarUid] = newId
+		scope.assignedMap[loser.VarUid] = newId
+		scope.reused[newId] = struct{}{}
+		idReplaceMap[winner.Id] = newId
+		idReplaceMap[loser.Id] = newId
+		core.TraceRewriteVar(className, methodName, "prebind parallel if/else typed def type=%s winner=%s/%s loser=%s/%s new=%s",
+			t, winner.VarUid, winner.Id.String(), loser.VarUid, loser.Id.String(), newId.String())
+	}
+}
+
+// prebindEscapingSwitchSlots unifies a local that is WRITTEN inside one or more switch cases and
+// READ after the switch onto a single freshly-minted parent-scope VariableId, BEFORE rewriteVar
+// descends into the cases. This is the switch analogue of prebindEscapingIfElseSlots /
+// prebindSharedTryCatchSlots and fixes Bug AL's dominant fastjson2 shape (DateUtils' hand-unrolled
+// date parser: each pattern case copies the canonical digit chars into a set of locals that are then
+// validated AFTER the switch).
+//
+// rewriteVar processes all cases through ONE shared sub-scope, so the case stores already converge on
+// a single id; the post-switch READS, however, live in the parent scope and keep the slot's original
+// (pre-mint) id. The case stores' minted id and the reads' original id then disagree, so neither
+// switchHoistDeclarations (identity "read after switch" probe) nor placeCrossScopeDeclarations sees
+// the read - the in-case `T x = ...` declarations stay scoped to their case and the post-switch read
+// is out of scope ("cannot find symbol: variable varN"). Pre-binding the slot to a parent-scope id
+// here makes every case store reuse it (hasNamed path mutates the shared ref in place) and records
+// origId->newId so the parent's deferred ReplaceVar redirects the reads, converging all references
+// onto one id. switchHoistDeclarations / placeCrossScopeDeclarations then correctly lift the single
+// `T x;` ahead of the switch.
+//
+// Strictly gated by slot identity: the candidate set is keyed by VarUid (one logical variable - the
+// stack simulator mints a fresh ref, hence a fresh VarUid, whenever a JVM slot is reused for a
+// different type), so a genuine disjoint slot reuse across cases is never merged; the slot must
+// actually be referenced after the switch (probed by id identity via a sentinel rename, so an
+// unrelated later local sharing the rendered varN is excluded); and a slot already bound by the
+// enclosing scope before the switch (an ordinary local merely reassigned in the cases) is skipped.
+// Widening a declaration's scope is always valid Java. Kill-switch: JDEC_SWITCH_PREBIND_OFF=1.
+func prebindEscapingSwitchSlots(scope *Scope, sw *statements.SwitchStatement, afterSts []statements.Statement, idReplaceMap map[*utils.VariableId]*utils.VariableId, className, methodName string) {
+	if sw == nil || len(afterSts) == 0 || len(sw.Cases) == 0 {
+		return
+	}
+	caseWrites := map[string]*values.JavaRef{}
+	var walk func([]statements.Statement)
+	walk = func(sts []statements.Statement) {
+		for _, st := range sts {
+			switch s := st.(type) {
+			case *statements.AssignStatement:
+				if s.ArrayMember != nil {
+					continue
+				}
+				ref, ok := core.UnpackSoltValue(s.LeftValue).(*values.JavaRef)
+				if !ok || ref == nil || ref.Id == nil || ref.IsThis || ref.IsParam {
+					continue
+				}
+				if _, dup := caseWrites[ref.VarUid]; !dup {
+					caseWrites[ref.VarUid] = ref
+				}
+			case *statements.IfStatement:
+				walk(s.IfBody)
+				walk(s.ElseBody)
+			case *statements.ForStatement:
+				walk(s.SubStatements)
+			case *statements.WhileStatement:
+				walk(s.Body)
+			case *statements.DoWhileStatement:
+				walk(s.Body)
+			case *statements.SynchronizedStatement:
+				walk(s.Body)
+			case *statements.SwitchStatement:
+				for _, c := range s.Cases {
+					if c != nil {
+						walk(c.Body)
+					}
+				}
+			case *statements.TryCatchStatement:
+				walk(s.TryBody)
+				for i := range s.CatchBodies {
+					walk(s.CatchBodies[i])
+				}
+			}
+		}
+	}
+	for _, c := range sw.Cases {
+		if c != nil {
+			walk(c.Body)
+		}
+	}
+	if len(caseWrites) == 0 {
+		return
+	}
+	uids := make([]string, 0, len(caseWrites))
+	for uid := range caseWrites {
+		uids = append(uids, uid)
+	}
+	sort.SliceStable(uids, func(i, j int) bool { return varUidLess(uids[i], uids[j]) })
+	for _, uid := range uids {
+		if _, already := scope.assignedMap[uid]; already {
+			continue
+		}
+		ref := caseWrites[uid]
+		if ref.Type() == nil {
+			continue
+		}
+		origId := ref.Id
+		// Must actually be referenced after the switch (escapes the cases). Probe by IDENTITY via a
+		// sentinel rename + the normal text render: only a reference that carries origId renders the
+		// sentinel, so an unrelated later local sharing the same varN is excluded.
+		const probe = "__jdec_switch_prebind_probe__"
+		saved := origId.Name
+		origId.SetName(probe)
+		escapes := statementsReferenceName(afterSts, probe)
+		origId.SetName(saved)
+		if !escapes {
+			continue
+		}
+		newId := utils.NewRootVariableId()
+		newId.SetName(fmt.Sprintf("var%d", scope.nowId))
+		scope.nowId++
+		scope.assignedMap[uid] = newId
+		scope.reused[newId] = struct{}{}
+		idReplaceMap[origId] = newId
+		core.TraceRewriteVar(className, methodName, "prebind switch escaping slot uid=%s old=%s new=%s", uid, origId.String(), newId.String())
+	}
+}
+
 // hoistSwitchDeclarations lifts the declaration of any local that is declared inside a switch
 // case yet shared across more than one case out to the block that contains the switch. A switch
 // body is a single lexical block, so a local first declared in one case is visible to later
@@ -798,6 +1144,11 @@ func hoistSwitchDeclarations(sts *[]statements.Statement) {
 			hoistSwitchDeclarations(&s.ElseBody)
 			if os.Getenv("JDEC_IF_HOIST_OFF") == "" {
 				for _, decl := range ifHoistDeclarations(s, list[i+1:]) {
+					out = append(out, decl)
+				}
+			}
+			if os.Getenv("JDEC_PARALLEL_ARM_HOIST_OFF") == "" {
+				for _, decl := range parallelArmDeclHoist(s, list[:i], list[i+1:]) {
 					out = append(out, decl)
 				}
 			}
@@ -1280,6 +1631,173 @@ func ifHoistDeclarations(ifst *statements.IfStatement, afterSts []statements.Sta
 		redirectPostBlockReassignments(afterSts, uid, targetID)
 	}
 	return declares
+}
+
+// parallelArmDeclHoist closes the "if/else parallel-phi orphan read" gap that ifHoistDeclarations
+// cannot: a JVM slot reused for two DISTINCT logical variables (different VarUid) that are each
+// first-declared at the top level of the two arms of one if/else, then read after the join. Because
+// the two arms carry different VarUids, ifHoistDeclarations (which groups by VarUid) never pairs
+// them, so each arm keeps its own `T varN = ...` declaration; the post-if read - bound by the
+// decompiler to a THIRD merge id but rendered as the same slot name `varN` - then has no dominating
+// declaration and javac rejects it as "cannot find symbol".
+//
+// The fix is purely name-based and id-free, which is sound because the dumper binds locals by their
+// RENDERED NAME end to end (addMissingGeneratedLocalDecls keys on the rendered `varN` token, javac
+// itself binds by name): emit ONE bare `T varN;` ahead of the if and demote both arms to plain
+// `varN = ...`. The single surviving declaration makes the slot name declared, both arm assignments
+// and the orphan read all render `varN` and bind to it, and the missing-decl safety net sees the
+// name as declared so it injects nothing. No VariableId is touched.
+//
+// Declaration type T (the join / least-upper-bound problem): only merge when BOTH arms RENDER the
+// same declaration type token (compared via renderedArmDeclType, NOT ref.Type() - this pass runs
+// before the dumper's final RHS-driven type refinement, so an arm whose stale ref.Type() is Object
+// can still render `ObjectWriter varN = objectWriterValued`). That rendered agreement is the
+// decompiler's own proof that one shared `T varN;` accepts both stores and, being the slot's settled
+// type, the post-if uses (e.g. ObjectWriter/ObjectWriter where the orphan read `varN.write(..)` needs
+// exactly that type). The bare `T varN;` is built from whichever arm ref natively carries T so it
+// renders the concrete type rather than `Object`. Genuinely different rendered types - a real
+// least-upper-bound case (ParameterizedType vs ParameterizedTypeImpl, Long vs BigDecimal) - are left
+// untouched: widening them to Object would break type-specific uses INSIDE the arms (a regression
+// measured at fastjson2 +10), so that subfamily needs a real common-supertype facility (see CODEC_TODO).
+//
+// beforeSts/afterSts are the sibling statements of the if in its block; a name already declared at
+// this block's top level (before or after by re-declaration) is left alone to avoid a duplicate
+// declaration. Kill-switch: JDEC_PARALLEL_ARM_HOIST_OFF.
+func parallelArmDeclHoist(ifst *statements.IfStatement, beforeSts, afterSts []statements.Statement) []statements.Statement {
+	if ifst == nil || len(ifst.IfBody) == 0 || len(ifst.ElseBody) == 0 || len(afterSts) == 0 {
+		return nil
+	}
+	// Top-level declares of one arm, keyed by rendered slot name. A name seen more than once in the
+	// same arm is ambiguous and excluded (value nil).
+	collectArm := func(arm []statements.Statement) map[string]*statements.AssignStatement {
+		out := map[string]*statements.AssignStatement{}
+		seen := map[string]bool{}
+		for _, st := range arm {
+			as, ok := st.(*statements.AssignStatement)
+			if !ok || as.ArrayMember != nil || !(as.IsFirst || as.IsDeclare) {
+				continue
+			}
+			ref, ok := core.UnpackSoltValue(as.LeftValue).(*values.JavaRef)
+			if !ok || ref == nil || ref.Id == nil || ref.IsThis || ref.IsParam {
+				continue
+			}
+			name := ref.String(hoistProbeCtx)
+			if !generatedLocalNameRe.MatchString(name) {
+				continue
+			}
+			if seen[name] {
+				out[name] = nil
+				continue
+			}
+			seen[name] = true
+			out[name] = as
+		}
+		return out
+	}
+	ifDecls := collectArm(ifst.IfBody)
+	elseDecls := collectArm(ifst.ElseBody)
+	if len(ifDecls) == 0 || len(elseDecls) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(ifDecls))
+	for name, as := range ifDecls {
+		if as == nil {
+			continue
+		}
+		if other, ok := elseDecls[name]; ok && other != nil {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	var declares []statements.Statement
+	for _, name := range names {
+		// A name already declared at this block's top level must not be re-declared.
+		if statementsDeclareNameTopLevel(beforeSts, name) || statementsDeclareNameTopLevel(afterSts, name) {
+			continue
+		}
+		if !statementsReadName(afterSts, name) {
+			continue
+		}
+		ifAs, elseAs := ifDecls[name], elseDecls[name]
+		ifRef, ok1 := core.UnpackSoltValue(ifAs.LeftValue).(*values.JavaRef)
+		elseRef, ok2 := core.UnpackSoltValue(elseAs.LeftValue).(*values.JavaRef)
+		if !ok1 || !ok2 || ifRef == nil || elseRef == nil {
+			continue
+		}
+		// Same VarUid is ifHoistDeclarations' job; only handle the cross-variable slot reuse here.
+		if ifRef.VarUid == elseRef.VarUid {
+			continue
+		}
+		if !assignRendersAsPlain(ifAs) || !assignRendersAsPlain(elseAs) {
+			continue
+		}
+		// The DECLARATION type must come from the RENDERED declaration, not ref.Type(): this pass runs
+		// before the dumper's final RHS-driven type refinement, so a ref whose stale Type() is Object
+		// can still render `ObjectWriter varN = objectWriterValued` (the dumper takes the RHS type). Only
+		// merge when BOTH arms render the SAME declaration type token; that agreement is the decompiler's
+		// own evidence that one shared `T varN;` is valid for both stores (and, being the slot's settled
+		// type, for the post-if uses). Genuinely different rendered types (a real least-upper-bound case)
+		// are left untouched - widening them to Object would break type-specific uses inside the arms.
+		ifTok := renderedArmDeclType(ifAs, name)
+		elseTok := renderedArmDeclType(elseAs, name)
+		if ifTok == "" || ifTok != elseTok {
+			continue
+		}
+		// Build the bare declaration from the arm ref that natively carries the agreed type, so the
+		// emitted `T varN;` renders exactly T (a ref whose stale Type() is Object would render `Object varN;`).
+		var declRef values.JavaValue
+		if ifRef.Type().String(hoistProbeCtx) == ifTok {
+			declRef = ifAs.LeftValue
+		} else if elseRef.Type().String(hoistProbeCtx) == elseTok {
+			declRef = elseAs.LeftValue
+		} else {
+			continue
+		}
+		ifAs.IsFirst, ifAs.IsDeclare = false, false
+		elseAs.IsFirst, elseAs.IsDeclare = false, false
+		declares = append(declares, statements.NewDeclareStatement(declRef))
+	}
+	return declares
+}
+
+// renderedArmDeclType renders the arm's declaration statement and extracts the leading type token
+// (everything before " <name>"). This reflects the dumper's RHS-driven type inference, which a ref's
+// pre-refinement Type() does not. Returns "" if the type cannot be isolated.
+func renderedArmDeclType(as *statements.AssignStatement, name string) (tok string) {
+	if as == nil {
+		return ""
+	}
+	defer func() {
+		if recover() != nil {
+			tok = ""
+		}
+	}()
+	s := as.String(hoistProbeCtx)
+	idx := strings.Index(s, " "+name)
+	if idx <= 0 {
+		return ""
+	}
+	return strings.TrimSpace(s[:idx])
+}
+
+// statementsDeclareNameTopLevel reports whether name is first-declared (`T name = ...` / `T name;`)
+// by a top-level statement of sts. Used to avoid emitting a second declaration for a slot already
+// declared in the enclosing block.
+func statementsDeclareNameTopLevel(sts []statements.Statement, name string) bool {
+	for _, st := range sts {
+		as, ok := st.(*statements.AssignStatement)
+		if !ok || !(as.IsFirst || as.IsDeclare) {
+			continue
+		}
+		ref, ok := core.UnpackSoltValue(as.LeftValue).(*values.JavaRef)
+		if !ok || ref == nil {
+			continue
+		}
+		if ref.String(hoistProbeCtx) == name {
+			return true
+		}
+	}
+	return false
 }
 
 func assignRendersAsPlain(as *statements.AssignStatement) (ok bool) {

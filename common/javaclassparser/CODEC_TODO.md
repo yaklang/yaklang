@@ -22,7 +22,7 @@
   `<Enum>(String,int,<Enum>$N)` (承重测试 `TestEnumMarkerCtorSuppressionIsLoadBearing`, kill-switch
   `JDEC_NO_ENUM_MARKER_CTOR`)。实测 guava `CaseFormat` (release-8, 含 access$N + marker ctor) 折叠成单一合法
   enum 且 round-trip 通过。详见 Bug V。
-- **差分门禁 `TestCodecSemanticsRoundTrip`: 61 个自托管 battery 全绿** (byte-for-byte round-trip), 覆盖
+- **差分门禁 `TestCodecSemanticsRoundTrip`: 65 个自托管 battery 全绿** (byte-for-byte round-trip), 覆盖
   控制流 / 排序 / 链式赋值 / SHA-256 / SHA-512 / TEA-XTEA-RC4 / String-switch / try-with-resources /
   try-finally-loop / 数值转换重命名 / iinc 宽化 / 循环计数器 slot 复用 / 嵌入式赋值 / Class 字面量 /
   int 类别收窄 / guava IntMath(gcd·log2·floor-sqrt·pow·isPrime·checkedAdd) / 严格 Hex 编解码(收窄+校验异常) /
@@ -31,8 +31,13 @@
   **短路 `(A&&B)||C` 中 C 为内联数组可变参调用 (DoubleMetaphone.conditionC0 形态)** /
   **if/else 双臂赋值且循环后读的逃逸槽 (Nysiis/Metaphone transcode 形态)** /
   **空-init Throwable holder 与异类局部跨支共槽 (twr primaryExc / catch-holder 形态)** /
+  **null-init 槽仅允许首次类型采纳 (verbose twr `Throwable primaryExc=null` 提交 Throwable 后, 同槽被后继
+  `Map.Entry e` 循环变量复用, 不相交活跃区间须分裂为两变量, DaitchMokotoffSoundex.<clinit> 形态)** /
+  **switch case 内写、switch 后读的局部须前绑分裂出作用域 (fastjson2 DateUtils 手展开日期解析器形态, 每个 pattern case
+  把规范化数字字符拷入一组局部, switch 后再校验)** /
   **单字符 `$` 标识符字段 (asm 混淆 MethodWriter 形态, javac 合法但 yak 文法词法器误当 Dollar token)** /
-  **同槽三段不相交活跃区间 (if 臂 / else 臂 / if 后) 的跨作用域声明支配性 (FloatingDecimal / fastjson2 TypeUtils 形态)** 等。已治本 bug 的
+  **同槽三段不相交活跃区间 (if 臂 / else 臂 / if 后) 的跨作用域声明支配性 (FloatingDecimal / fastjson2 TypeUtils 形态)** /
+  **if/else 双臂同类型同槽但跨 VarUid 的 phi (后继异类标量复用数组槽致 DFS 钳分裂两臂, fastjson2 ObjectReaderProvider 形态)** 等。已治本 bug 的
   文字记录按约定删除, 其承重 `Test*` + testdata 种子即永久档案。
 - **OPCODE 解析覆盖门禁 `TestOpcodeParseCoverage`: 195/195 (100.0%)** (语料 126 class + 31 battery,
   命中 198 distinct opcode), 7 个文档化排除
@@ -51,7 +56,205 @@
   第 4 项)。残留 2 条全部是 Group A「类型变量擦除成 Object 出现在非返回位置」(`PairwiseEquivalence` 的
   `Iterator var=it()` 应为 `Iterator<T>`、`Equivalence$Wrapper` 的 `Wrapper var=(Wrapper)o` 应为 `Wrapper<?>`);
   需把泛型类型沿数据流传播 (方法返回按接收者类型实参实例化), 属大特性, 见 Bug AH。
-- **本轮新增治本 (codec 真实差分 + 工业语料新发现, 10 项, 均已锁回归种子, 种子即档案)**:
+- **本轮新增治本 (codec 真实差分 + 工业语料新发现, 25 项, 均已锁回归种子, 种子即档案)**:
+  - **签名多态 (`@PolymorphicSignature`) `MethodHandle.invoke`/`invokeExact` 调用漏铸返回类型 → `incompatible types: Object cannot be converted to <T>` (fastjson2 -30, 本轮单点最大 1-错族)**
+    (可用性/重编译, 单类反编译即可见, 整树重编译报 `Object cannot be converted to BiFunction/LongFunction/...`): `MethodHandle.invoke`/`invokeExact`
+    在源码层声明 `Object invoke(Object...)` 且带 `@PolymorphicSignature` —— javac 为每个调用点合成专属描述符 (`invokeExact:()Ljava/util/function/BiFunction;`),
+    故字节码返回类型是**真实类型**, 但**源码可见返回类型恒为 Object**, 原始源码必带显式 `(BiFunction) handle.invokeExact()` cast。反编译器从 (真实) 描述符
+    读返回类型, 遂渲染成 `BiFunction var3 = handle.invokeExact()` 无 cast, javac 拒。治本: `FunctionCallExpression.String` 经
+    `polymorphicSignatureCastType` 探测 `java.lang.invoke.MethodHandle.invoke/invokeExact` 且描述符返回非 `void`/`Object` 时, 把整调用裹回
+    `(T)(...)` cast (`renderCall` 出原调用)。形态恒为 `LambdaMetafactory...getTarget().invokeExact()` (JSONReader$BigIntegerCreator/JdbcSupport/DoubleToDecimal 等)。
+    种子 pin 真实 `testdata/regression/polysig_invokeexact.class` (= fastjson2 JSONReader$BigIntegerCreator.class), 承重测试
+    `TestPolymorphicSignatureCastIsLoadBearing` (对 fastjson2 jar classpath 编译, 信号=`cannot be converted to BiFunction`:
+    kill-switch `JDEC_NO_POLYSIG_CAST=1` 时 present、开启时消失且源码出现 `(BiFunction)(`)。实测 **fastjson2 整树 746→716 (-30)**,
+    guava/codec/spring 无回归 (A/B `TestScratchJarErrDelta`)。
+  - **if/else 平行 phi「孤儿读」异渲染类型 LUB 子族 (cast 守卫) → `cannot find symbol: variable varN` (fastjson2 ObjectWriters.fieldWriterList / JSONStreamReaderUTF{8,16}.readLineObject 形态, fastjson2 -5、guava -3)**
+    (可用性/重编译, 单类反编译即可见, 整树重编译报 cannot find symbol): 一个 jvm 槽在 if/else (可嵌套) 多臂各以**不同渲染类型**首声明
+    (`ParameterizedType var3` vs `ParameterizedTypeImpl var3`; 或三臂 `Object`/`List`/`Object var2`), join 后仅经**显式 cast** 读
+    (`(Type)(var3)` / `(T)(var2)`)。`parallelArmDeclHoist` 仅在两臂渲染类型 token 一致时合并, 异类型留待公共超类型设施 (本反编译器
+    无跨类层级解析), 故各臂保留己声明、join 后读出作用域 → cannot find symbol。真 LUB 需跨类层级无法求得, 故治本**不猜** join 类型:
+    仅当该槽**每一处非声明用法都是显式 cast** (或裸赋值左值) 且无任一声明为标量基本类型时触发 —— 此形态下 `Object varN = null;`
+    **必然**类型正确 (各臂存储接纳任意引用、各读 downcast), 且各臂存储仍保留自身 RHS 类型。新增 dumper 文本 pass
+    `hoistCastGuardedEscapedLocals` (在 `addMissingGeneratedLocalDecls` 之前): 按缩进 (dumper 每层一 tab) 探测「声明全在更深内层、
+    却有更浅层 cast 读」的逃逸槽, 把各内层 `T varN = rhs` 降级为 `varN = rhs`、注入单条 `Object varN = null;`。任何其它用法
+    (成员访问 `varN.f`、下标 `varN[i]`、未 cast 实参/返回、算术/关系) 令 Object 不 sound → 该槽**不碰** (文件保留其原有单错, 零回归)。
+    种子 pin 真实 `testdata/regression/cast_escape_phi_orphan.class` (= fastjson2 ObjectWriters.class), 承重测试
+    `TestCastEscapeHoistIsLoadBearing` (对 fastjson2 jar classpath 编译, 信号=孤儿读 `variable var3` 的 cannot-find-symbol:
+    kill-switch `JDEC_CAST_ESCAPE_HOIST_OFF=1` 时 present、开启时消失且源码出现 `Object var3 = null;`)。实测
+    **fastjson2 整树 751→746 (-5)、guava 782→779 (-3)**, codec/spring 无回归 (A/B `TestScratchJarErrDelta`)。
+  - **try/catch 值-兜底 phi 到达定义未合并 → 读出来的恒是 null 默认支、真值被丢且类型错 (Bug AN, 语义+可用性, fastjson2 -8) —— FieldReader{Double,Float,...}Func 族**
+    (语义错: 编译期外加 `Object cannot be converted to Double/V`, 运行期读到的恒为 null): 一个 JVM 槽在 try 体内被赋真值 (`v = readDouble()`)、
+    在 catch 处理器内被赋 `= null` 兜底, try 后读 (`function.accept(obj, v)`) —— 同一逻辑变量。但 catch 仅异常时执行**不支配** try store,
+    `code_analyser.go` 的 null-adopt 支配门 (`blockNullAdopt`) 遂阻止采纳, try store 铸出**另一个**异型变量 (`Double` vs catch 的 `Object`),
+    try 后读经单一全局 slot 表 (DFS 序) 绑到 null 那支 → 真值丢失 + javac 报 `Object→Double`。二者 VarUid 不同, rewriter
+    `prebindSharedTryCatchSlots` (按 VarUid 分组) 亦无法救。治本: store 处加 `reachingTrySlotPhiMerge`(内联实现) —— 当 `slotDefPhiReachesLoad`
+    (一个被 try store 与 null-init def **双向到达**的下游 load) 证明二者汇入同一变量时, 放开 `blockNullAdopt`, 续用支配定义并采纳真值类型 (`Double var4;`)。
+    **复用已有可信 phi 判据**, 故不相交复用反例 (twr `Throwable primaryExc=null` 后续复用为无关循环变量, DaitchMokotoffSoundex) **无公共下游 load、phi 不过、仍拆分** (承重 `TestTwrSlotReuseNullAdoptOnceIsLoadBearing` 仍绿)。
+    种子 pin 真实 `testdata/regression/try_slot_phi_merge.class` (= fastjson2 FieldReaderDoubleFunc.class), 承重测试
+    `TestTrySlotPhiMergeIsLoadBearing` (信号: kill-switch `JDEC_TRY_SLOT_PHI_MERGE_OFF=1` 时 `Object→Double` present、开启时消失且源码出现单一 `Double var4`)。
+    实测 **fastjson2 整树 759→751 (-8)**, guava/codec/spring 无回归 + 65 battery 语义 round-trip 全绿 (无静默语义损伤) + 确定性保持。
+    **后续**: BigIntegerCreator.<clinit> 一类 (entry `=null`、try `=invokeExact()`、if 后 `=new X()`) 的**编译错**根因经查实为上一项「签名多态 invokeExact 漏 cast」
+    (try store 的 `BiFunction var3 = invokeExact()` 缺 `(BiFunction)` cast), 已随该项治本 (fastjson2 -30), 此处不再遗留编译错。其槽分裂 (三 def 未并)
+    属纯**语义保真**残留 (invokeExact 真值落入死局部、最终用 `new X()`), 二者运行等价、不阻编译, 归 Bug AL 语义保真长尾。
+  - **空-body void 方法被整体丢弃 → 子类不 override 抽象方法 / API 缺失 (fastjson2 -60、guava -47, 本轮单点最大杠杆)**
+    (可用性/重编译, 单类反编译即可见, 整树重编译报 `is not abstract and does not override abstract method` / `cannot find symbol`):
+    `DumpMethods` 对「body 反编译为空」的非构造、非抽象/接口/枚举方法, 一旦其返回类型为 `void` 即 `continue` **整条丢弃**。
+    但 javac 对 `void f(){}` (字节码仅一条 `return`) 是**忠实的空 override**: 形如 `ObjectWriterBaseModule$VoidObjectWriter`
+    的空 writer 其唯一真方法 `void write(JSONWriter,Object,Object,Type,long){}` 被丢后, 该类无任何方法 → javac 报
+    「is not abstract and does not override abstract method write(..) in ObjectWriter」; 更广地, 任何空-body 的接口/抽象方法
+    no-op 实现被丢都会令子类缺 override 或调用点缺 API。治本: 新增 `methodBodyIsTriviallyEmpty` —— 仅当方法字节码全由
+    `nop`(0x00) 填充加**恰一条** `return`(0xb1) 构成 (即真·空 void body) 才保留发出 `void f(..){}`; 该 `{nop,return}` 集判定
+    sound (任何带操作数的 opcode 自身不在此集, 其存在即被检出并排除, 故只保留真空体, 反编译丢失了真实内容的「假空」仍按旧逻辑丢弃)。
+    种子 pin 真实 `testdata/regression/empty_void_override.class` (= fastjson2 VoidObjectWriter.class), 承重测试
+    `TestEmptyVoidOverrideEmittedIsLoadBearing` (对 fastjson2 jar classpath 编译, 信号=`does not override abstract method write`:
+    kill-switch `JDEC_NO_EMIT_EMPTY_VOID=1` 时 present 且源码无 `void write(`、开启时该 override 出现且编译干净)。
+    实测 **fastjson2 整树 819→759 (-60)、guava 829→782 (-47)**, codec/spring 无回归 (A/B `TestScratchJarErrDelta`)。
+  - **抽象方法的 varargs 末参渲染成「数组类型 + ...」(`Feature[]...`) 而非「元素类型 + ...」(`Feature...`) → 子类
+    重写报「is not abstract and does not override」(fastjson2 JSONPath.set 抽象 varargs 整族, 整树 -8 / 翻转 6 文件)**
+    (可用性/重编译, 单类反编译即可见, 整树重编译暴露子类不 override): javac 把 varargs 末参编成数组 descriptor (`[J` /
+    `[LFeature;`) 并置 ACC_VARARGS。**拼接式具体方法 / lambda SAM / stub 三条渲染路径都正确剥离一层数组维度** (用
+    `pt.ElementType().String()+"..."`), 唯独 dumper.go 的**抽象方法专用**分支 (`paramsNewStr=="" && abstractMethod`)
+    漏剥离, 直接 `t.String()`(完整数组类型) 拼 `...` → `Feature[]...`。`Feature[]...` 是 `Feature[]` 的 varargs
+    (descriptor `[[LFeature;`), 与子类忠实渲染的 `Feature...` (descriptor `[LFeature;`) **不再 override-equivalent**,
+    故 javac 判子类未重写抽象方法 → 整族子类全部不可编译。治本: 抽象分支镜像其它三路, 末参 varargs 且 `t.IsArray()` 时
+    用 `t.ElementType().String(funcCtx)+"..."`。种子 inline `varargsAbstractOverrideSource` (顶层 sibling 抽象基类
+    `VAOBase` 声明 `combine(long,long,long...)` + 具体子类 `VAOImpl` 重写, 避开 `$` 嵌套噪声), 承重测试
+    `TestVarargsAbstractMethodRenderIsLoadBearing` (多类整树 round-trip, kill-switch `JDEC_VARARGS_ABSTRACT_FIX_OFF=1`
+    跑负向: 关闭即复现 `VAOImpl is not abstract and does not override abstract method combine(long,long,long[]...)`).
+    实测 **fastjson2 整树 839→831, 干净文件 552→558 (翻转 JSONPath/JSONPath$RootPath/JSONPath$PreviousPath/
+    JSONPathSingle/JSONPathTyped/JSONPathTypedMulti/JSONPathCompilerReflect$SingleNamePathTyped 6 个)**, codec/guava/spring 无回归。
+  - **final 字段初始化器误把构造器局部 (碰撞改名 `varN_M`) 上提成字段 initializer → `cannot find symbol: variable varN_M` (fastjson2
+    SymbolTable.hashCode64 / FactoryFunction.function 形态, 整树 -5 / 翻转 2 文件)** (可用性/重编译, 单类反编译即可见, 整树重编译报
+    cannot find symbol): final 字段在构造器尾部由一个**同槽活跃区间分裂**而被改名为 `varN_M` (如 `var7_1`) 的局部赋值
+    (`this.hashCode64 = var7_1;`)。`dumper.go` 的 `canHoistFieldInitializer` 守卫用 `localSlotRefRe` 探测 RHS 是否引用反编译生成局部,
+    若引用则**禁止上提** (局部不在字段 initializer 作用域内); 但旧正则 `\bvar\d+\b` **匹配不到** `var7_1` —— `_` 是 word 字符, 故
+    `\b` 词界在 `var7` 与 `_1` 之间不成立, 整个 `var7_1` 不被视作局部引用 → 守卫漏判 → 赋值被误上提成 `private final long hashCode64 = var7_1;`,
+    而 `var7_1` 是构造器作用域局部, 字段 initializer 处不可见。治本: `localSlotRefRe` 放宽为 `\bvar\d+(?:_\d+)*\b`, 同时匹配 `varN`
+    与碰撞改名 `varN_M` (`var7_1`/`var5_1` 等), 使守卫保守化、把这类赋值留在构造器体内 (blank final + 构造器内赋值, 合法 Java)。
+    种子 pin 真实 `testdata/regression/final_field_renamed_local.class` (= fastjson2 SymbolTable.class, 合成 javac-17 battery 无法稳定
+    复现同槽活跃区间分裂产出的 `varN_M`, 故按 twr-class 先例直接 pin 真类), 承重测试 `TestFinalFieldRenamedLocalHoistIsLoadBearing`
+    (反编译 SymbolTable + 手写最小 `Fnv` stub 一起 javac, kill-switch `JDEC_FIELD_HOIST_RENAMED_LOCAL_OFF=1` 跑负向: 关闭即复现
+    `SymbolTable.java:13: cannot find symbol: variable var7_1`)。实测 **fastjson2 整树 831→826, 干净文件 558→560 (翻转 SymbolTable/
+    FactoryFunction)**, codec/guava/spring 无回归。
+  - **if/else 平行 phi「孤儿读」(同槽跨 VarUid、两臂各自首声明、join 后被读) → `cannot find symbol: variable varN` (fastjson2
+    FieldWriterListFunc.writeValue 等, 整树 -8 / 翻转 2 文件)** (可用性/重编译, 单类反编译即可见, 整树重编译报 cannot find symbol):
+    一个 jvm 槽被复用为两个**不同逻辑变量** (不同 VarUid), 各自在 if/else 两臂顶层首声明 (`ObjectWriter var10 = var5` vs
+    `var10 = getItemWriter(..)`), join 后又被读 (`var10.write(..)`)。`ifHoistDeclarations` 按 VarUid 分组, 两臂 VarUid 不同故
+    从不配对 → 各臂保留自己的 `ObjectWriter var10 = ...`, 而 join 后的读 (反编译器内部绑到**第三个 merge id**、但渲染成同槽名
+    `var10`) 无支配声明 → javac 报 cannot find symbol。治本: 新增 `parallelArmDeclHoist` (在 `hoistSwitchDeclarations` 晚期 pass、
+    紧随 `ifHoistDeclarations`), 纯**按名**、不动任何 id —— dumper 端到端按渲染名绑定 (`addMissingGeneratedLocalDecls` 按 `varN`
+    token 去重、javac 本身按名绑), 故只需在 if 前提一条支配性 `T varN;`、把两臂降级成 `varN = ...`: 唯一存活的声明令该槽名「已声明」,
+    两臂赋值与孤儿读全渲染 `varN` 并按名绑到它, 缺声明兜底网见名已声明遂不再注入。**join 类型用「两臂渲染声明类型 token 一致」判定**
+    (`renderedArmDeclType`, 不用 `ref.Type()` —— 本 pass 早于 dumper 末段 RHS 定型, 某臂 stale `ref.Type()` 仍是 Object 却能渲染
+    `ObjectWriter var10 = objectWriterValued`); 渲染一致即反编译器自证「一条 `T varN;` 同时接纳两臂存储且支持 join 后用法」, 裸声明
+    取自天然带该类型的那一臂。真正不同的渲染类型 (LUB 场景: ParameterizedType vs ParameterizedTypeImpl、Long vs BigDecimal) **不碰**
+    —— 早期试过对不同类型一律 widen 到 Object, 实测 fastjson2 **+10** (臂内类型相关用法 `varN.foo()` 被 Object 打断), 已撤。种子 pin 真实
+    `testdata/regression/parallel_arm_phi_orphan.class` (= fastjson2 FieldWriterListFunc.class), 承重测试
+    `TestParallelArmPhiOrphanHoistIsLoadBearing` (对 fastjson2 jar classpath 编译, 信号=孤儿读 `variable var10` 的 cannot-find-symbol:
+    kill-switch `JDEC_PARALLEL_ARM_HOIST_OFF=1` 时present、开启时消失; 单类隔离编译的 `JSONWriter$Feature` `$` 嵌套噪声属 Bug AD 无关)。
+    实测 **fastjson2 整树 827→819, 干净文件 560→562 (翻转 FieldWriterListFunc 等)**, codec/guava/spring 无回归。
+  - **内联 lambda body 自有局部与外层方法 varN 命名冲突 → 重编译报 `variable varN is already defined in method` (fastjson2
+    ObjectWriterCreatorASM / 任意捕获 forEach 形态; Bug AL lambda-inlining 子族)** (可用性/重编译, 整库 round-trip 暴露):
+    javac 把每个 lambda 编成独立 `lambda$...` 合成方法, 其 body 局部从**全新 jvm 槽命名空间** (slot0,slot1,...) 起算;
+    反编译把该 body 作为箭头表达式**内联**回外层方法, 这些槽遂渲染成 var0,var1,... —— 与外层方法自己的形参/局部 (也是
+    var0,var1,...) **同名**。Java 禁止 lambda body 内声明的局部遮蔽在作用域内的外层局部, 故朴素内联产出
+    `int var0 = ...;` 遮蔽外层 `var0` 形参, 重编译失败。治本: `renameLambdaBodyLocals` 把每个 lambda body 自有局部
+    抬入私有 `lv<seq>_N` 命名空间 (seq 为 `lambdaLocalSeq` 自增, 每个内联 body 唯一); 捕获变量在 body 内是**占位符**,
+    由调用点在 rename **之后**替换为外层 varN, 故 rename 只动真正的 lambda 局部、不碰捕获 (实测 fastjson2 ON 输出 0 个
+    `cannot find symbol: lvN` 即证)。种子 battery `LambdaLocalShadowsCapture.java` (零捕获 IntSupplier, body 局部 acc/i
+    落 slot0/1 与外层 compute 形参/局部 var0/var1 同号, 进 `TestCodecSemanticsRoundTrip` 差分门禁), 承重测试
+    `TestLambdaLocalRenameIsLoadBearing` (kill-switch `JDEC_NO_LAMBDA_LOCAL_RENAME=1` 跑负向: 关闭即复现
+    `variable var0 is already defined in method compute(int)`)。**度量 (关键, 见下「整库度量方法学订正」)**: 该治本消除
+    fastjson2 整库 **41 个 `already defined`** (其单文件隔离编译 ObjectWriterCreatorASM 267→250 错, 真实改善), 但整树
+    `javac` 总错数反而 492→852 —— 此为**遮蔽解除 (un-masking)**: 旧版那 41 个 `already defined` 令 javac 放弃归属对应
+    方法体, 把其中既有的 Bug AL/AH 缺陷一并压住; 治好遮蔽后这些缺陷 (约 +270 `cannot find symbol`) 现形。即治本正确且为
+    那些文件达 GA 的**前置条件**, 整树总数上升是诚实暴露、非回归 (per-file 隔离 recompile 率 ON=OFF=344/681, 该治本
+    本身不翻转任何文件, 但为后续 Bug AL/AH 治本铺路)。
+  - **switch case 内写、switch 后读的局部未前绑分裂 → 声明被困在 case 内、switch 后读出作用域 (fastjson2
+    DateUtils 手展开日期解析器形态, 整库重编译 -72, 本轮单点最大杠杆)** (可用性/重编译, 整库 round-trip 暴露,
+    重编译报 `cannot find symbol: variable varN`):
+    `rewriteVar` 对 switch 的所有 case 复用**同一个** sub-scope, 故各 case 的写已收敛到单一 id; 但 switch 之后的
+    **读**位于父作用域, 仍持槽的原始 (未铸) id。case 写的铸后 id 与读的原始 id 不一致, 故 `switchHoistDeclarations`
+    的 identity「switch 后读」探针与 `placeCrossScopeDeclarations` 都看不到该读 —— case 内的 `T x = ...` 声明被困在 case
+    里, switch 后的读遂出作用域。典型形态: fastjson2 `DateUtils.parseLocalDateTime` 把每个 pattern case 的规范化日期/
+    时间数字字符拷入一组局部 (`char y0=cs[0]; ...`), switch 之后统一做 `'0'..'9'` 校验与整型换算。治本: 仿照既有
+    `prebindEscapingIfElseSlots` / `prebindEscapingSwitchSlots` —— 在下降进 case 前, 把「case 内写且 switch 后读」的槽
+    (按 VarUid 归组, 即同一逻辑变量; 栈模拟在槽因类型复用时铸新 ref/VarUid, 故真正的不相交槽复用不会被合并) 前绑到一个
+    父作用域新 id: case 写经 hasNamed 路径就地复用之, 并记 origId→newId 让父作用域延迟 ReplaceVar 重定向 switch 后的读,
+    全部引用收敛到一个 id; `switchHoistDeclarations`/`placeCrossScopeDeclarations` 随即把单个 `T x;` 提到 switch 前。
+    严格门禁: 按 VarUid 归组 (避免合并异类槽复用) + 必须 switch 后被引用 (origId sentinel 改名探针, 排除同名异 id 的无关
+    局部) + 跳过 switch 前已被外层作用域绑定的槽 (普通局部仅在 case 内再赋值)。种子 battery `SwitchCaseLocalReadAfter.java`
+    (switch 各 case 内写 a/b/c, switch 后校验读取, 进 `TestCodecSemanticsRoundTrip` 差分门禁), 承重测试
+    `TestSwitchCaseLocalReadAfterIsLoadBearing` (kill-switch `JDEC_SWITCH_PREBIND_OFF=1` 跑负向: 关闭即复现
+    `cannot find symbol`)。jasperreports `ExcelAbstractExporter.getTextAlignHolder` 回归用例的两个对齐局部因此从
+    碰撞改名 `var2`/`var2_1` 变为更干净的 `var2`/`var3` (仍提为方法顶 bare 声明, 已同步更新断言)。实测 **fastjson2 整 jar
+    重编译错误 -72 (564→492)**, codec/guava/spring 无回归。
+  - **null-init 引用槽仅允许「首次」类型采纳 → verbose try-with-resources 合成 `Throwable primaryExc=null` 与后继
+    `Map.Entry e` 循环变量共用同槽时被合并成单一误型变量 (commons-codec DaitchMokotoffSoundex.<clinit> 形态, fastjson2 主导杠杆)**
+    (可用性/重编译, 整库 round-trip 暴露, 重编译报 `Throwable cannot be converted to Map.Entry` + `cannot find symbol: addSuppressed`):
+    旧版 javac 的 try-with-resources 脱糖产出一个独立的 `Throwable primaryExc = null` 方法级槽 (现代 javac 直接复用 catch 形参,
+    不复现), 该槽在 twr 合成 catch 里提交为 Throwable (`primaryExc = t; ... primaryExc.addSuppressed(..)`), twr 结束后 javac 把同槽
+    复用给后继 `for (Map.Entry e : ...)` 的循环变量。`JavaRef.IsNullInitialized()` 判据是「Val 仍是 null 字面量」, 而
+    `ResetVarType` 只改声明类型、**不改 Val**, 故该 ref 终生被视作 null-init —— `AssignVarGuarded` 遂让它**反复采纳**: 先采纳
+    Throwable, 后又采纳 Map.Entry, 把两个活跃区间不相交的不同变量塌缩到单一声明 `Map.Entry var1 = null`, 于是 `var1 = <throwable>`
+    与 `var1.addSuppressed(..)` 对 Map.Entry 非法。治本: `JavaRef` 增 `nullTypeAdopted` 标志, `AssignVarGuarded` 的 null-adopt 捷径
+    只在**尚未采纳过**时生效, 首次采纳后置位; 此后同槽的不兼容 store 落入铸新变量 (块作用域局部) —— primaryExc 保持 Throwable,
+    循环变量分裂为独立局部。与既有 `nullInitDefDominates` 支配门 (处理 null-init 在**异支**、首次采纳即跨支误并) 互补:
+    支配门管「首次采纳即在异支」, 本守卫管「提交后再次复用」。种子 battery `TwrSlotReuseNullAdopt.java` (手写 verbose twr 脱糖 +
+    嵌套块释放槽 + 循环变量多次使用迫其入槽, 用现代 javac 即复现旧形态), 承重测试 `TestTwrSlotReuseNullAdoptOnceIsLoadBearing`
+    (kill-switch `JDEC_NO_NULL_ADOPT_ONCE=1` 跑负向); 既有 `TestNullInitSlotReuseIsLoadBearing` 重构为四组合 (gate-only /
+    guard-only / both-off / both-on) 同时隔离两机制各自承重。实测 **fastjson2 整 jar 重编译错误 -39 (608→569)**, **codec -3 (4→1)**,
+    guava/spring 无回归。
+  - **嵌入赋值孤儿局部的合成声明类型推断错误 → 引用 `==`/`!=` 被误判 int + `obj.getClass()` 值未恢复 Class (fastjson2 JSONWriter.checkAndWriteTypeName 的 objectClass 形态)** (可用性/重编译, 单类反编译即可见, 重编译报 `bad operand types` + `int cannot be dereferenced` + `getTypeName(Object)` 不兼容):
+    `(c = obj.getClass()) != type` (字节码 `... getClass; dup; astore; ... if_acmpeq`) 的 dup-collapse 丢掉 `c` 的独立声明,
+    交由 `dumper.go` 文本安全网 `addMissingGeneratedLocalDecls` 合成。两处推断缺陷叠加: ① `generatedLocalLooksInt` 的裸比较
+    基模式把 `==`/`!=` 与关系运算 (`< > <= >=`) 捆在一起当 int 类别, 致 `(c) != (HashMap.class)` 这种**引用相等比较**被误判 int
+    (而 Java 的 `==`/`!=` 对引用合法, 仅当右操作数是**数值字面量**才证明 int —— 文档既有意图, 基模式却违背); ② 即便不误判 int,
+    `inferGeneratedLocalRefType` 也无法从 `obj.getClass()` (实例方法调用, `bareCallRHSRe` 因前导 `obj.` 不匹配) 恢复类型 →
+    默认 `Object c`, 后续 `c.getName()`/`getTypeName(c)` 不可编译。治本: ① 基模式拆分 —— 关系运算仍恒 int, 相等运算仅当右操作数
+    为数值字面量 (`\(?-?\d`) 才 int; ② `inferGeneratedLocalRefType` 新增 `.getClass()→Class` 恢复 (getClass 恒返回 java.lang.Class,
+    裸 Class 对所有用法都可重编译)。种子 battery `EmbeddedAssignGetClass.java` (循环条件嵌入 `(c = objs[i].getClass()) != exclude`、
+    体内 `c.getName()`, 进 `TestCodecSemanticsRoundTrip` 差分门禁), 承重测试 `TestEmbeddedAssignGetClassIsLoadBearing`
+    (kill-switch `JDEC_NO_EMBED_ASSIGN_REF=1` 跑负向: 关闭即退回 `Object c` → `c.getName()` cannot find symbol)。实测 fastjson2
+    整 jar 重编译错误 -8 (685→677), codec/guava/spring 无回归。
+  - **窄基本类型字段/局部「再赋值」(非声明) 由非常量 int 类别表达式写入时未补窄化 cast → `possible lossy conversion from int to char` (fastjson2 JSONWriter.quote / JSONReaderUTF8 字符写入形态)** (可用性/重编译, 单类反编译即可见, 重编译报 lossy conversion):
+    `this.quote = single ? '\'' : '"';` —— javac 把该条件式定型为 char (两臂均 char 字面量), 降级成「分支压入 char 常量
+    (JVM 操作数栈无 char 类别, 按 int 压栈) + `putfield ... C`」, putfield 隐式截断故**不发 i2c**; 反编译遂把两臂恢复成 int
+    字面量、条件式定型 int。原样渲染即 `this.quote = single ? 39 : 34`, 在赋值上下文被 javac 拒 (JLS 5.2; 非常量条件式不是
+    常量表达式, 不享 `char q = 39;` 的常量收窄豁免)。根因: `AssignStatement.String` 的**非声明 (reassignment) 分支**此前
+    不做窄化, 而声明分支 (`narrowingInitCast`) 与数组元素写 (`arrayStoreRHS`) 早已补 cast。治本: 在非声明分支镜像同一
+    `narrowingInitCast` —— 当 LHS 为 char/byte/short 且 RHS 为 int 类别时渲染 `(char)/(byte)/(short)` cast (即 store opcode
+    本就执行的截断, 行为等价; 已是 char/byte/short 或带 i2c/i2b/i2s 的值类型非 int, 自动不动)。种子 battery
+    `NarrowFieldReassign.java` (条件式写 char/byte/short 字段, 进 `TestCodecSemanticsRoundTrip` 差分门禁), 承重测试
+    `TestNarrowFieldReassignCastIsLoadBearing` (kill-switch `JDEC_NO_NARROW_REASSIGN_CAST=1` 跑负向: 关闭即复现 lossy
+    conversion)。实测 fastjson2 整 jar 重编译错误 -14 (699→685), codec/guava/spring 无回归。
+  - **lazy-init 引用槽首个 store 被单次使用折叠丢弃 → slot 声明陷在 if 臂内、臂后读出作用域 (commons-codec DaitchMokotoffSoundex / 任意 `Map<K,List<V>>` 累加器形态)** (原 Bug AK, 可用性/重编译, 单类反编译即可见, 重编译报 `cannot find symbol: varN`):
+    极常见 `List r = map.get(k); if (r == null) { r = new ArrayList(); map.put(k, r); } r.add(v);` 惯用法 ——
+    首个 store 携**声明类型** (List, 来自 map.get), if 臂内第二个 store 携**子类型** (ArrayList)。`AssignVarGuarded`
+    见类型不同且该槽非 null-init / 非形参 / 非 int 类别, 为臂内 store 铸新块作用域 id, 臂后 `r.add` 经单一全局
+    slot 表 (DFS 序) 绑到臂内 id 渲染出作用域; 臂内 store 又因看似单次使用被折叠丢弃。治本: `code_analyser.go`
+    新增 `reachingRefSlotPhiMerge` —— 经 phi (一个被「fall-through 定义」与「臂内 store」双向到达的下游 load) 证明
+    两个 store 实为同一变量, 续用支配性的 `List var3` 定义, 使臂内变成普通 `var3 = new ArrayList()` 重赋值, 每处读
+    都在作用域内。**结构门收窄, 只治 lazy-init 签名**: 支配定义须紧跟**对自身槽的 null 检查** (`defFollowedBySelfNullCheck`,
+    排除 fastjson2 那种 `Object value` 多类型分派槽), 且臂内值须是**新建对象** (`new X()` 非数组, 保证 X 可赋给变量声明
+    类型故续用支配定义类型恒类型安全)。种子 `lazyinit_slot_decl_dropped.class` (承重测试
+    `TestDecompileSyntaxRegression/lazyinit_slot_decl_dropped.class` + `TestRefSlotPhiMergeIsLoadBearing`,
+    kill-switch `JDEC_REF_SLOT_PHI_MERGE_OFF=1` 跑负向: 关闭即复现 `ArrayList var3` 拆分 + 臂后 `cannot find symbol`)。
+    实测整 jar 重编译错误改善: commons-codec +2, fastjson2 +6, guava/spring 无回归。
+  - **boolean 默认 init (`iconst_0; istore`) 与同槽 boolean 赋值未合并 → 拆成 `int varN=0` + 内嵌 `boolean varM`, 外部读出作用域 (commons-codec Metaphone.regionMatch / MatchRatingApproachEncoder 形态)**
+    (可用性/重编译, 单类反编译即可见, 重编译报 `cannot find symbol: varM`): `boolean b=false; if(...){ b=expr; } return b;` ——
+    javac 把默认 init 编成 `iconst_0; istore S`, 其压栈常量在 JVM 操作数栈上是 int (栈无 boolean 类别), 故默认 def 被定型
+    int、if 臂内 boolean 赋值被定型 boolean。`AssignVarGuarded` 的整型类别合并**刻意排除 boolean** (Java 禁 int↔boolean
+    转换), 两个同槽 def 不合并 → 拆成孤立 `int var4=0` + if 臂内 `boolean var5=...`, `return var5` 落在 if 外 →
+    `cannot find symbol`。源码语法本身在不相交支上不矛盾, 故只有「反编译→重编译」暴露。治本: `code_analyser.go` 新增
+    基于到达定义 + phi/diamond 的合并 `reachingBoolDefaultMerge` (配套 `reachingSlotStoreOps` 取到达定义的定义 opcode、
+    `slotStoreValue` 记录每个 store 提交的值、`slotDefPhiReachesLoad` 做前向可达 + 后向到达定义双向校验) —— 仅当某 boolean
+    store 的**唯一**到达定义是 int 0/1 字面量、且二者前向都汇入同一下游 load (phi/diamond, 证明是同一逻辑变量) 时, 才把
+    默认 def 的 ref 与其 0/1 字面量一并改型为 boolean (字面量 0→false/1→true) 并续用, 使两臂共用单一 `boolean var4`。
+    反例 `int a=0; use(a); boolean b=cond; return b;` 因 a/b 无公共 load (phi 测试不过) **绝不合并**, 故不会把
+    `use(a)` 误编成 boolean。实测 commons-codec `Metaphone.regionMatch` 正确产出单一 `boolean var4=false`。种子
+    `bool_default_init_merge.class` (承重测试 `TestDecompileSyntaxRegression/bool_default_init_merge.class`,
+    kill-switch `JDEC_BOOL_DEFAULT_MERGE_OFF=1` 跑负向: 关闭即复现 `int var4=0` + `var5` split → 不可编译)。
   - **同槽多段不相交活跃区间的跨作用域声明被「存在即跳过」误判而不上提 → 兄弟臂用出作用域 (fastjson2 TypeUtils / JDK FloatingDecimal 形态)**
     (可用性/重编译, 单类反编译即可见, 重编译报 `cannot find symbol: varN`): 一个 JVM 槽被三个互不重叠活跃区间的源局部
     复用 (if 臂一个 int、else 臂另一个 int、if 之后第三个 int), minted-id 合并把三段并成同一 `VariableId`; 其声明落在
@@ -166,6 +369,19 @@
     maskMap 该项改成 `strictfp` 并删除遗留的空 `else if verbose == "strict"` 死分支。种子
     `strictfp_method.class` (`--release 8` 编译以确保 ACC_STRICT 真被置位; Java17+ 默认严格已不再产生该位),
     承重测试 `TestDecompileSyntaxRegression/strictfp_method.class` + 根因单测 `TestMethodAccessFlags`。
+  - **嵌入赋值 (DupStore) 孤儿局部「无声明 + 跨兄弟分支异类同名碰撞」→ `cannot find symbol` (commons-codec Metaphone.metaphone 形态)**
+    (可用性/重编译, 单类反编译即可见, 重编译报 `cannot find symbol: varN`): 源码 `if (s==null || (n=s.length())==0){...}`
+    的嵌入赋值 `(n=s.length())` (字节码 `... length; dup; istore_N; ifne`) 被 `code_analyser.go` dup-collapse 折成不透明
+    `CustomValue` (其 ReplaceFunc 为 nil), 故 `n` **没有 DeclareStatement**: 既被声明上提器忽略, 又对 dumper 身份级碰撞
+    重命名器 (只认声明) 不可见; 当其 slot 派生名 `varN` 与后续不同槽异类局部 (如 `StringBuilder`) 同名时不触发重命名 →
+    `(varN=...)` 无声明且与 `StringBuilder varN` 撞名。治本: dup-collapse 时把嵌入赋值 LHS 记入
+    `Decompiler.EmbeddedAssignDeclRefs`; `parser.go` 在 `RewriteVar` 后调 `rewriter.SynthesizeUndeclaredEmbeddedAssignDecls`,
+    为「无声明孤儿」在方法首部合成裸 `T varN;`, 使其对碰撞重命名器可见 (后续同名兄弟被改名 `varN_1` 并同步改引用)。
+    判据**刻意收窄, 只治本签名**: 仅当孤儿名与一个「不同 VariableId 且渲染类型不兼容」的已有声明撞名时才合成; 同名同类型
+    (合法链式赋值 `int b=a=1`, 否则会把同一变量拆成两个, 见 `TestDecompiler/ContinuousAssign`) 与无任何同名声明的普通孤儿
+    (其类型由字符串安全网 `JDEC_NO_EMBED_ASSIGN_*` 恢复) 一律不动。种子 `embedded_assign_cond_naming.class`
+    (承重测试 `TestDecompileSyntaxRegression/embedded_assign_cond_naming.class`, kill-switch `JDEC_EMBED_ASSIGN_DECL_OFF=1`
+    跑负向: 关闭即复现无声明+撞名)。实测 commons-codec 整 jar 重编译错误 10→8 (Metaphone 2 个错误清零)。
 - **此前本轮新增治本 (4 项, 均已锁回归种子, 种子即档案)**:
   - **invokespecial 超类调用渲染成 `super.m()` 而非 `this.m()`** (语义正确性, 编译期测不出): 非构造器
     invokespecial、接收者为 `this`、目标类 ≠ 当前类时, 是 `super.m(...)` 调用; 旧版一律渲染成 `this.m(...)`,
@@ -246,8 +462,75 @@
   - `return outside method` 7: **已治本** (本轮) —— `<clinit>` 静态初始化块里 JDK8 twr 脱糖残留的尾部
     `return;` (静态/实例初始化块禁止 return), 现于 dumper 渲染时丢弃块尾 void return。种子
     `clinit_twr_return.class` + `TestDecompileSyntaxRegression`, kill-switch `JDEC_NO_CLINIT_RETURN_DROP`。
-  - boolean↔int 局部误定型 6: String-switch 幻影 var (load+store 两侧) 已治本 (见 Bug AI); 残留仅
-    boolean 默认 init (iconst_0) 与同槽 boolean 赋值未合并的形态 (Metaphone.regionMatch), 见 Bug AI 残留。
+  - boolean↔int 局部误定型 6: **已全部治本** —— String-switch 幻影 var (load+store 两侧) 见 Bug AI;
+    boolean 默认 init (iconst_0) 与同槽 boolean 赋值未合并 (Metaphone.regionMatch) 本轮经到达定义 phi 合并治本
+    (见「本轮新增治本」首项), 种子 `bool_default_init_merge.class` 即档案。
+
+- **本轮权威重编译度量 (生产 JarFS 路径 + 包目录 + 传递依赖上 classpath, 整目录一次性 `javac --release 8`)** ——
+  纠正了此前 report-v2 的两大度量噪声 (① 扁平文件名导致 `class X should be in X.java` 误报; ② 缺依赖导致
+  `@Beta`/`@DoNotMock`/errorprone/checker 等注解类被记成 `cannot find symbol`/`package does not exist`)。修正后**真实
+  decompiler 错误数** (单元数 / decErr=0 全部成功反编译):
+  - **spring-core 5.3.27: 14 错 / 950 单元 (≈0.015/单元, 已达「非常好」)** —— GA 候选。
+  - **commons-codec 1.15: 1 错 / 106 单元 (本轮 4→1: Bug AL null-adopt-once 治本 -3)** —— **已基本清零**, 余 1 为
+    `DaitchMokotoffSoundex` 的三元 LUB (`ArrayList var = cond ? new ArrayList() : Collections.emptyList()` 应为 `List`, 归 Bug AH)。
+  - **guava 28.2-android: 782 错 / 1877 单元 (本轮 empty-void-emit 治本 829→782, -47)** —— **主导杠杆 = Bug AH 泛型类型变量沿数据流传播** (≈450-500 条:
+    `Object→K/E/V/N/T/C/CAP` ≈300 + `type argument not within bounds` ≈84 + `inference variable has incompatible
+    bounds` ≈75 + `T[]→E[]` 18); 其余 `cannot find symbol` (含 sun.misc 等 JDK 内部 + 少量真缺陷)、`bad type in
+    conditional expression` 12。即 guava 推 GA 必须做 Bug AH。
+  - **fastjson2 2.0.43: 整树 javac 总错数 = 716 (ifelse-parallel-phi 治本 852→839, abstract-varargs 治本 839→831,
+    final-field-renamed-local 治本 831→826, parallel-arm-phi-orphan 治本 827→819, empty-void-emit 治本 819→759 -60,
+    try-slot-phi-merge 治本 759→751 -8, cast-escape-hoist 治本 751→746 -5 / 同治本 guava 782→779 -3,
+    polysig-invokeExact-cast 治本 746→716 -30), 整树「完全干净文件」
+    见 `TestScratchWholeTreePerFile`** ——
+    **注: 整树「干净文件数」是比「总错数」更可靠的 GA 指标 —— 总错数受 javac 遮蔽, 但「0 错=干净」恒真。**
+    **下一杠杆 (按 ROI):**
+    **① `break outside switch or loop` 结构化 goto-到-尾合并 (Bug AM, FieldWriterDate/FieldReaderDateTimeCodec/ASMUtils/MethodWriter 等)** ——
+    `else{ break; }` 实为跳到方法尾的非结构化 goto, 且公共尾块 (字段赋值/return) 被误划入 then 支; 属 CFG 结构化重建, 风险高。
+    (注: 旧「① try-region 值槽子类型 widen 变体」之 BigIntegerCreator/JdbcSupport/DoubleToDecimal **编译错根因查实为签名多态 invokeExact 漏 cast, 已随本轮治本**,
+    其槽分裂仅余语义保真长尾, 不再列为编译杠杆。)
+    **② if/else 平行 phi「孤儿读」的 LUB 子族 (两臂渲染类型**不同**): **cast 守卫子族已治本** (见上「本轮新增治本」, `hoistCastGuardedEscapedLocals`,
+    每处非声明用法皆 cast 时安全 widen `Object` —— ObjectWriters/JSONStreamReaderUTF{8,16} 等); **残留**仅「非 cast 读」子族 (join 后对 varN 直接
+    成员访问/未 cast 实参, 真需公共超类型设施求 LUB, 如 EnumSchema var8 三臂 Integer/Long/BigInteger→Number)。+ `Object cannot be converted to X` 缺 cast 子族 (归 Bug AH)。**
+    lambda-local rename 治本前整树显示 492 (其中 41 个 `already defined`), 治本后那 41 个 `already defined` 清零但整树升至 852 ——
+    **这不是回归而是遮蔽解除**: 旧的 `already defined` 令 javac 放弃归属对应方法体, 把方法内既有的 Bug AL/AH 缺陷一并压住,
+    治好遮蔽后约 +270 `cannot find symbol` 现形。**主导杠杆仍是局部变量声明/槽位数据流 (Bug AL) + 泛型 (Bug AH)**:
+    cannot-find-symbol 450 条中, ObjectWriterCreatorASM 单文件 115 条 (命名局部 fieldClass/features/fieldName/format/
+    fieldType 等沿 lambda body/活跃区间出作用域), 余分布 JSONReaderJSONB 46 / JSONReaderUTF8 28 / JSONReaderASCII 19 /
+    CSVReaderUTF8 19 等密集分派多槽复用方法; 次为泛型 (`name clash ... same erasure` = `FieldWriter` 包歧义 internal.asm
+    vs writer, 归 Bug AH)、控制流 `break outside switch or loop` (Bug AM)。即 fastjson2 推 GA 仍须夯实 Bug AL 命名局部
+    出作用域 + Bug AH 泛型/包歧义 + Bug AM。
+  - 度量复现: `SCRATCH=1 [PROFILE_JAR=guava] go test -run TestScratchProfile ./common/javaclassparser/tests/` (错误类目
+    直方图, **整树, 受遮蔽**) / `TestScratchSymbolDrill` (cannot-find-symbol 细分) / `SCRATCH=1 KILL_SWITCH=<X>
+    TestScratchJarErrDelta` (某 kill-switch 的整树错误前后差, **delta 受遮蔽**) / `SCRATCH=1 PROFILE_JAR=<X>
+    [KILL_SWITCH=<Y>] TestScratchPerFileIso` (**逐文件隔离编译, 免遮蔽; 但扁平内部类 `Outer$Inner` 不能独立编译故绝对率
+    偏悲观, delta 可信**)。详见 `tests/zz_jar_recompile_profile_test.go` (含 `jarDeps` 依赖 classpath 表)。
+  - **⚠ 整树度量遮蔽 (本轮关键方法学发现)**: 「整目录一次性 javac」的总错数**严重受 javac 错误遮蔽影响, 不可靠**: 一个真实
+    含 267 错的文件 (ObjectWriterCreatorASM, 逐文件隔离实测) 在整树编译里可能只报 1 错 —— javac 遇某些错即放弃归属该文件
+    余下代码, 故总数取决于"哪些文件先失败、连带压住谁", 与反编译质量非单调。**推论: 此前所有整树 delta (-72/-39/-14 等)
+    亦为遮蔽敏感的下界, 非精确值。** 逐文件隔离 (`TestScratchPerFileIso`) 免此遮蔽: 本轮实测**生产路径逐文件 recompile 率
+    (绝对悲观, 扁平内部类计入失败) = fastjson2 50.5% (344/681) / guava 52.5% (986/1877) / spring 61.6% (585/950) /
+    codec 68.9% (73/106)**; lambda-local rename 的逐文件 delta = 0 (该治本本身不翻转文件, 只降单文件错密度, 为前置条件)。
+    今后治本以**逐文件隔离 delta** 为准绳, 整树直方图仅用于"找最大杠杆文件/类目"。
+  - **方法学订正**: report-v2 的「重编译率%」用「Yak 每扁平内部类 1 单元」的高分母, 与 CFR/VF 不可直接比; 上面改用**绝对
+    真实错误数** (deps 上 classpath、写回包目录), 更能驱动「哪个 bug 清掉收益最大」的 GA 决策。
+
+- **本轮交叉对比 (Yak vs CFR 0.152 vs Vineflower 1.10.1, 同一 harness, `TestYakDecompilerCrossComparison`,
+  CFR/VF jar 见 `/tmp/decompilers/`)** —— 复现: `CROSS_PK=1 CFR_JAR=.. VINEFLOWER_JAR=.. PK_JARS=.. PK_OUT=..
+  go test -run TestYakDecompilerCrossComparison`。结果 (per-file javac + 仅 jar 上 classpath + flat `$` 单元):
+  - **性能 (反编译墙钟, 越低越好)**: codec Yak并发 0.18s vs CFR 1.58s vs VF 1.60s; fastjson2 3.41s vs 8.19s vs 9.46s;
+    spring 1.75s vs 4.26s vs 3.91s。**Yak 并发快 2.4-8.8x**, 完整性 100% (0 stub / 0 err), 三者中唯一全量产出。
+  - **重编译率 (同 harness, 三者公平可比)**: codec **Yak 97% (103/106) > CFR 82% ≈ VF 97%**;
+    fastjson2 **Yak 16% / CFR 12% / VF 79%**; spring **Yak 35% (342/978) > CFR 24% < VF 39%**。
+  - **关键解读 (绝对%被 harness 严重压低, 仅相对排名可靠)**: 该 harness 用「逐文件 javac + -sourcepath 全树」, 故
+    ① **级联**: 一个热点类 (JSONReader/JSONWriter/TypeUtils/Nullable) 反编译有缺陷, 经 sourcepath 拖垮所有引用它的单元;
+    ② **缺可选依赖** (javax.annotation / kotlin / commons-logging / aspectj / sun.misc.Unsafe) 被误记成 decErr。二者对
+    **三个工具一视同仁**, 故相对排名 (Yak>CFR, VF≥Yak) 可靠; 但绝对%远低于 Yak 自家「整目录 batch + deps 上 classpath」
+    度量 (spring 14 错 / codec 1 错 / fastjson2 492 错), 后者才是真实单元缺陷率。**结论: Yak 全面快于 CFR/VF 且完整性满分;
+    正确性 spring/codec 已与 VF 同档 (codec 余 1 = DaitchMokotoffSoundex 三元 LUB, 归 Bug AH), 唯 fastjson2 仍落后 VF —— 与绝对度量
+    一致地指向局部变量数据流 (Bug AL) 为 fastjson2 推 GA 的主导杠杆 (本轮 Bug AN② 削 70 + Bug AL null-adopt-once 削 39 + Bug AL switch-prebind 削 72)**。
+  - codec 当时距 100% 的 3 个单元 (`Rule.java:228` 匿名子类访父类私有字段、`DaitchMokotoffSoundex.java:85` 构造器
+    实参误绑) **均已治本** (Bug AN ①②); DaitchMokotoffSoundex.<clinit> 的 twr 槽复用 (Throwable/Map.Entry 共槽) 本轮亦经
+    Bug AL null-adopt-once 治本。dep-aware 度量 codec 现仅 1 错 (DaitchMokotoffSoundex 三元 LUB, 归 Bug AH)。
 
 ---
 
@@ -292,14 +575,39 @@ javac 合成的 `<Enum>(String,int,<Enum>$N)` marker 构造器, 旧版渲染成 
   `placeCrossScopeDeclarations` 旧「存在即跳过」误判。现 `topLevelDeclDominatesAllUses` 仅当顶层声明词法上先于
   全部使用才跳过, 否则上提裸声明。种子 `SlotReuseDisjointRanges` / `TestCrossScopeDeclDominanceIsLoadBearing` /
   kill-switch `JDEC_NO_CROSS_SCOPE_DOMINATE`。
-- 残留 A (单 store 分支声明 + 默认 init 被丢): `T v = dflt; if(...){ v = x; } return v;` —— javac 在 if 前有
-  `store v=默认值` (如 `boolean var4=false`), 反编译**丢掉**该默认 init store, 只剩 if 臂内的赋值被当成声明,
-  if 后 `return v` 读不到。此形态 v 只有一处 store (不在 `reused` 集) 且 `ifHoistDeclarations` 要求 ≥2 store, 两套
-  上提器都不接。治本需「带 init 上提」(恢复默认值 store 并提到支配块) 或槽默认 init 不丢, 涉及 definite-assignment,
-  须谨慎 (盲上提无 init 会触发 `variable might not have been initialized`)。复现: commons-codec `Metaphone.regionMatch`
-  (注: 该处实际是**槽误命名**, 见 Bug AI —— boolean 结果 `istore_4` 被渲成 `var5`、`return var4` 渲成 `return var5`)。
-- 残留 B (if/else 分支声明被读出): 与残留 A 同族但双臂均赋值。
-- 复现: commons-codec `Metaphone` / `MatchRatingApproachEncoder` / `DaitchMokotoffSoundex` / `bm.Rule`。
+- **残留 A (boolean `T v = false; if(...){ v = x; } return v;`) 已治本** (本轮): 其唯一已知复现
+  commons-codec `Metaphone.regionMatch` 实为**槽误命名/分裂** (`iconst_0` 默认 init 被定型 int, 与同槽 boolean
+  赋值分裂成 `int var4=0` + `boolean var5`), 现经 Bug AI 的 `reachingBoolDefaultMerge` 到达定义 phi 合并治本,
+  默认 def 改型 boolean 后两臂共用单一 `boolean var4` —— 默认 init **不再被丢/误型**。种子
+  `bool_default_init_merge.class` 即档案。若后续在**非 boolean** 基本类型上发现真正的「默认 init store 被丢」形态,
+  再以「带 init 上提」治本 (须配 definite-assignment, 避免 `variable might not have been initialized`)。
+- 残留 B (if/else 双臂均赋值且分支后被读): 与残留 A 同族但双臂均赋值。注: 其历史复现
+  `Metaphone` / `ColognePhonetic` transcode 形态已由「本轮新增治本」的 `prebindEscapingIfElseSlots`
+  (if/else 双臂逃逸槽预绑定) 覆盖。
+
+- **残留 C 已治本 (本轮, 见「本轮新增治本」) — 嵌入赋值 (DupStore) 变量在短路条件内被铸造、跨兄弟分支读取时
+  「无声明 + 命名碰撞」**: 源码用嵌入赋值缓存 `(n = s.length())` (字节码 `... length; dup; istore_N; ifne`),
+  且 `n` 在 `s == null || (n = s.length()) == 0` 短路 `||` 里赋值、在后续 `if (n == 1)` 兄弟分支读取。结构化器把
+  `||` 拆成嵌套 if 后, 该槽的嵌入赋值落在**内层 if 的条件**里 (渲染成 `(var4 = var1.length())`), 而非一条
+  `AssignStatement`。根因: 嵌入赋值变量经 `code_analyser.go` dup-collapse 折成不透明 `CustomValue` (其 `ReplaceFunc`
+  为 nil), 它**没有 `DeclareStatement`** —— 故 (1) 声明上提器找不到可上提的声明、不会为它补 `int varN;`; (2) dumper 的
+  同名碰撞重命名器只认 `DeclareStatement`, 对这个仅以「条件内嵌入赋值」存在的变量不可见, 于是它与同 `Id()` 深度
+  (分支 `Horizontal()` 同深) 的后续槽 (如 `StringBuilder`) 撞同名 `var4` 却不触发重命名 → `cannot find symbol: var4` /
+  类型冲突。最小复现 (JDK8 `-g:none`):
+  `String f(String s){ boolean hard=false; int n; if(s==null||(n=s.length())==0){return "";} if(n==1){return s.toUpperCase();} char[] c=s.toUpperCase().toCharArray(); StringBuilder a=new StringBuilder(40); StringBuilder b=new StringBuilder(10); a.append(c); return b.append(a).toString(); }`
+  种子 `tests/testdata/regression/embedded_assign_cond_naming.class` (+ `.java.txt`)。真实复现: commons-codec
+  `Metaphone.metaphone` (`txtLength` 嵌入赋值)。**治本**: `code_analyser.go` 在 dup-collapse 时把嵌入赋值 LHS 局部
+  记入 `Decompiler.EmbeddedAssignDeclRefs`; `parser.go` 在 `RewriteVar` 之后调用 `rewriter.SynthesizeUndeclaredEmbeddedAssignDecls`,
+  为这些「无声明孤儿」在方法首部合成裸 `T varN;` 声明, 使其对**身份级**碰撞重命名器可见 (后续同名兄弟被改名 `varN_1`)。
+  判据**刻意收窄, 只治 residual-C 签名**: 仅当孤儿的 slot 派生名与一个「不同 VariableId、且渲染类型不兼容」的已有声明
+  撞名时才合成 (例 `int` n vs `StringBuilder` var4)。两种情形故意不动: (a) 同名 + **同类型** = 合法链式赋值
+  `int b = a = 1`, 合成第二个声明会被重命名器把同一变量拆成两个而破坏程序 (`TestDecompiler/ContinuousAssign` 回归);
+  (b) 同名但**无任何声明**的普通孤儿, 其类型由字符串安全网 (`inferGeneratedLocalRefType` / `generatedLocalLooksInt`,
+  kill-switch `JDEC_NO_EMBED_ASSIGN_*`) 已恢复, 不与之争抢以保持其承重。承重: 新种子 + kill-switch
+  `JDEC_EMBED_ASSIGN_DECL_OFF=1`。commons-codec 整 jar 重编译错误 10 → 8 (Metaphone 2 个错误清零)。
+- 其它待复核复现: commons-codec `MatchRatingApproachEncoder` (本轮复核**已干净**, 重编译通过) /
+  `DaitchMokotoffSoundex` (lazy-init 槽声明被丢已治本, 见「本轮新增治本」首项; 残留属 Bug AH 泛型 + Bug AE twr 槽定型) /
+  `bm.Rule` (残留属 Bug AD 嵌套 `$` 私有访问)。
 
 ### Bug AJ (新登记, 工业语料 STOP_ON_FIRST 命中) — 标号 `continue` 跳向 for 自增锁存被误渲成普通 `continue`
 
@@ -348,20 +656,10 @@ javac 合成的 `<Enum>(String,int,<Enum>$N)` marker 构造器, 旧版渲染成 
   先装回正确 ref 再走 `AssignVarGuarded`, 令同型续写复用而非铸幻影)。承重种子 `strswitch_slot_reuse.class`
   (`TestDecompileSyntaxRegression`, load 侧, kill-switch `JDEC_SLOT_READ_REACHING_OFF`); store 侧承重为真实
   fastjson2 `TypeUtils.loadClass` (`DIAG_JAR` + kill-switch `JDEC_SLOT_STORE_REACHING_OFF`, 该法难以最小化成合成种子)。
-- **残留 (boolean 默认 init 与同槽 boolean 赋值未合并, commons-codec Metaphone.regionMatch / MatchRatingApproachEncoder)**:
-  `boolean r=false; if(...){ r=sub.equals(t); } return r;` —— slot4=`r`(boolean), 其默认 init `iconst_0; istore_4`
-  在字节码层是 int 0, 被定型成 `int`; if 臂内 `equals` 结果 (boolean) 再 `istore_4`。`AssignVarGuarded` 的整型类别
-  合并**刻意排除 boolean** (Java 禁止 int↔boolean 转换), 故 int-默认 与 boolean-赋值两个同槽 def **不合并** →
-  拆成两变量: 孤立 `int var4 = 0` + if 臂内 `boolean var5 = ...`, 而 `return var5` 落在 if 外 → `cannot find symbol: var5`。
-  最小复现 (JDK8, 已取): `boolean rm(StringBuilder sb,int i,String t){ boolean m=false; if(i>=0&&i+t.length()-1<sb.length()){ String s=sb.substring(i,i+t.length()); m=s.equals(t);} return m; }`
-  反编译即得上述形态 (无需 LVT)。
-- **根因 + 为何不强改**: 根因是 `iconst_0` 默认 init 被定型 int 而非 boolean, 致与同槽 boolean def 分裂。安全治本需
-  **基于 phi/活跃性的合并** —— 仅当 int-0/1 默认 def 与 boolean def 同时到达某下游公共 load (即同一逻辑变量) 时才合并并
-  改型为 boolean (并把字面量 0/1 渲成 false/true, 参 `arrayStoreRHS` 的布尔强制)。**不可用 store 期启发式**: 反例
-  `int a=0; use(a); boolean b=cond; return b;` 里 a/b 是不相交两变量 (无公共 load), store 期无前向信息区分,
-  盲合并会把 `use(a)` 编成 `use(boolean)` → 误编译。槽合并层另有「禁止过度拆分」回归 (`var3_1 leaked` 等) 把握平衡,
-  贸然改触发之, 而 dumper 线性拆分跨分支可**静默错拆 (比编译错更危险)**。故需先建到达定义/活跃性 pass 再做, 与 Bug Y/AH 同族核心特性。
-  影响面小 (整目录 ≈6-10 条 `int↔boolean`), 优先级低于 enum 簇, 已具备最小复现可作首个承重用例。
+- **boolean 默认 init 与同槽 boolean 赋值未合并 (Metaphone.regionMatch) 已治本** (本轮): 基于到达定义 + phi/diamond 的
+  `reachingBoolDefaultMerge` —— 仅当 boolean store 的唯一到达定义是 int 0/1 字面量、且二者前向汇入同一下游 load 时,
+  才把默认 def 改型为 boolean。详见「本轮新增治本」首项, 种子 `bool_default_init_merge.class` 即档案
+  (kill-switch `JDEC_BOOL_DEFAULT_MERGE_OFF`)。
 
 ### Bug AH (新登记, guava base 唯一残留) — 类型变量擦除成 Object 出现在非返回位置 (需泛型沿数据流传播)
 
@@ -394,6 +692,128 @@ javac 合成的 `<Enum>(String,int,<Enum>$N)` marker 构造器, 旧版渲染成 
   (`NameType.class` / `NameType.values()` / `RuleType.RULES` / `EnumMap((Class)(NameType.class))`), 无 `cannot find
   symbol`; 单类残留仅 `Languages$LanguageSet`/`Rule$Phoneme` 这类 `$` 嵌套引用, 属 Bug AD 而非本条。该残留不复现。
 - 备注: 完整 twr **回糖** (折回 `try (R r=..){..}`) 仍是可选大特性; 当前产出合法且语义等价的「手写式 twr」, 满足 round-trip。
+
+### Bug AL (新登记, 本轮 fastjson2 度量主导) — 局部变量声明/槽位数据流残留 (undeclared `variable X` + 槽误型)
+
+- 本轮已治本子族 (从本族切出, 见上「本轮新增治本」):
+  - **嵌入赋值孤儿局部 `(c = obj.getClass()) != type` 的合成声明类型** —— `generatedLocalLooksInt` 引用 `==`/`!=` 误判 int +
+    `inferGeneratedLocalRefType` 未恢复 getClass→Class, 已治 (-8)。
+  - **null-init 引用槽仅允许首次类型采纳 (verbose twr `Throwable primaryExc=null` 与后继 `Map.Entry e` 共槽合并)** ——
+    `JavaRef.nullTypeAdopted` + `AssignVarGuarded` null-adopt-once, 已治 (**fastjson2 -39 / codec -3**)。承重
+    `TestTwrSlotReuseNullAdoptOnceIsLoadBearing` + 重构后的 `TestNullInitSlotReuseIsLoadBearing` (四组合隔离支配门与本守卫)。
+  - **switch case 内写、switch 后读的局部前绑分裂 (fastjson2 DateUtils 手展开日期解析器形态)** ——
+    `prebindEscapingSwitchSlots` (rewriter, 仿 if/else / try-catch 前绑), 已治 (**fastjson2 -72, 本轮单点最大杠杆**)。承重
+    `TestSwitchCaseLocalReadAfterIsLoadBearing` (kill-switch `JDEC_SWITCH_PREBIND_OFF`)。
+  - **内联 lambda body 自有局部与外层方法 varN 命名冲突 → `variable varN is already defined in method`** ——
+    `renameLambdaBodyLocals` (dumper, 把 lambda body 局部抬入私有 `lv<seq>_N` 命名空间, 捕获占位符在 rename 后由调用点替换故不受影响),
+    已治 (**fastjson2 整库消除 41 个 `already defined`; ObjectWriterCreatorASM 单文件隔离 267→250**)。承重
+    `TestLambdaLocalRenameIsLoadBearing` (kill-switch `JDEC_NO_LAMBDA_LOCAL_RENAME`)。**注: 此治本解除遮蔽后整树总数升至
+    852 (见上 fastjson2 度量「⚠ 整树度量遮蔽」), 为诚实暴露, 非回归。**
+  - **if/else 平行 phi「孤儿读」异渲染类型 LUB 子族 (cast 守卫): 每处非声明用法皆显式 cast 时安全 widen `Object`** ——
+    `hoistCastGuardedEscapedLocals` (dumper 文本 pass, 在 `addMissingGeneratedLocalDecls` 之前; 按缩进探测「声明全在更深内层、却有更浅层 cast 读」
+    的逃逸槽, 把内层 `T varN = rhs` 降级为 `varN = rhs`、注入 `Object varN = null;`; 排除标量基本类型声明与任何成员访问/下标/未 cast/算术用法),
+    已治 (**fastjson2 751→746 -5 / guava 782→779 -3**)。承重 `TestCastEscapeHoistIsLoadBearing` (kill-switch `JDEC_CAST_ESCAPE_HOIST_OFF`,
+    pin fastjson2 ObjectWriters.class, 信号=孤儿读 `variable var3` 的 cannot-find-symbol)。
+  - **if/else 双臂同类型同槽但跨 VarUid 的 phi (DFS 钳后槽复用致两臂铸不同 VarUid) 未合并 → 各臂各留声明、分支后读出作用域
+    (fastjson2 ObjectReaderProvider.<init> 的 `long[] acceptHashCodes` 形态)** —— `prebindEscapingIfElseSlots` 只合并
+    **共享 VarUid** 的两臂; 但当某槽 (典型: 引用/数组) 在 if/else 后被复用给**异类标量** (如 `long extra` 复用数组 astore 槽,
+    bytecode 实测 `astore_3` 后 `lstore_3`) 时, javac 的 DFS 降级先探一臂的 fall-through 与那处后继标量复用、再回溯另一臂,
+    栈模拟遂把槽表钳成 `long` 并为第二臂的 `long[]` store **铸全新 ref/VarUid** —— 同类型同槽但 VarUid 不同, 滑过既有前绑。
+    治本: `prebindParallelTypedIfElseDefs` (rewriter, 在 `prebindEscapingIfElseSlots` 之后跑) —— 探测「两臂同 slot 同渲染类型
+    但 VarUid 不同、且恰有一处引用逃逸 if/else」的形态, 铸单一父作用域新 id、把两臂引用与逃逸读全部 remap 到它、记 `reused`
+    令 `placeCrossScopeDeclarations` 提一条裸 `T varN;` 到 if 前。种子 battery `IfElseParallelArrayPhi.java` (块作用域
+    `data`/`total` 释放槽迫 `extra` 复用数组槽以触发 DFS 钳, 进 `TestCodecSemanticsRoundTrip`), 承重
+    `TestIfElseParallelArrayPhiIsLoadBearing` (kill-switch `JDEC_IFELSE_PARALLEL_PREBIND_OFF` 跑负向: 关闭即复现
+    `cannot find symbol` + `long cannot be dereferenced` + `array required but long found`)。度量: **整树 fastjson2 -13
+    (852→839, cannot-find-symbol 441→430)**; **逐文件隔离 delta = 0** (受影响文件如 ObjectReaderProvider 仍有其它残留错故未翻转,
+    本治本只降单文件错密度, 为该文件达 GA 的前置条件)。
+- **if/else 平行 phi「孤儿读」子族 —— 同渲染类型部分已治本 (见上「本轮新增治本」parallel-arm-phi-orphan, 整树 827→819, 翻转 2 文件);
+  残留仅「异渲染类型」LUB 子族 (≈4 文件)**。形态: if/else 两臂各在自己臂内声明同一 JVM 槽的局部 (`var<slot>`), 该槽在 if/else **之后**被读
+  (phi 合并); 合并后的「读」绑定到**第三个 id** (既非 if 臂 def 的 id 也非 else 臂 def, 而是未构造的 phi 结果 id), 但**渲染成同槽名** `var<slot>`。
+  治本走 dumper 端到端**按名绑定**这一事实: `parallelArmDeclHoist` (rewrite_var.go) 在 `hoistSwitchDeclarations` 晚期 pass 里, 当两臂顶层各首声明同名
+  `var<slot>` (跨 VarUid)、且 `statementsReadName(afterSts, "var<slot>")` 命中时, 在 if 前提一条裸 `T var<slot>;`、把两臂降级成 `var<slot> = ...` ——
+  唯一存活声明令该名「已声明」, 两臂赋值与孤儿读全按名绑到它, 无需动任何 id (`addMissingGeneratedLocalDecls` 按名去重, 见名已声明不再注入)。
+  **已治: 两臂渲染声明类型 token 一致的子集** (`renderedArmDeclType` 判定, 而非 `ref.Type()` —— 本 pass 早于 dumper 末段 RHS 定型, 某臂 stale
+  `ref.Type()` 仍是 Object 却渲染 `ObjectWriter var10 = ...`; 一致即类型安全, join 类型即该 token, 裸声明取自天然带该类型的臂)。代表已翻转:
+  `FieldWriterListFunc.writeValue` (两臂渲染均 `ObjectWriter var10`, 读 `var10.write(..)`)。
+  **已治 (cast 守卫子族)**: `ObjectWriters.fieldWriterList` (`ParameterizedType` vs `ParameterizedTypeImpl`, 读 `(Type)(var3)`)、
+  `JSONStreamReaderUTF{8,16}` (`Object`/`List`/`Object`, 读 `return (T)(var2)`) 等「每处非声明用法皆显式 cast」者, 由 `hoistCastGuardedEscapedLocals`
+  安全 widen `Object` (见上「本轮已治本子族」)。早期试过「异类型一律 widen 到 `Object`」实测 fastjson2 **+10** (臂内类型相关用法 `varN.foo()` 被 Object
+  打断) 已撤; 新 pass 用「**全用法皆 cast** + 缩进逃逸 + 排除标量基本类型/成员访问/下标/算术」紧门, 故只在 widen 必然 sound 时触发, A/B 零回归。
+  **未治 (非 cast 读子集)**: join 后对 varN 直接成员访问或作未 cast 实参者 —— `EnumSchema` (`Integer`/`Long`/`BigInteger`, 读 `this.items.add(var8)` 未 cast 实参,
+  另伴随读被误提到比 var8 活跃区更浅的作用域, 属更深的作用域重建)、`ObjectReaderImplGenericArray` (读 `var6_1.add(var7)` 成员访问)。这些真需
+  **type-LUB / 公共超类型设施** (反编译器当前无类层级/可赋值性查询, `rg 'Assignable|Superclass|commonSuper'` 命中 0) 才能给出比 `Object` 更具体、
+  支撑成员访问的父类型, 属大特性, 暂留。
+  实现须配 kill-switch + 全量 (codec 差分 + fastjson2/guava/spring 整树基线) 回归, 治本前必须确认整树错数**下降**而非因孤儿读上升。
+  复现: `SCRATCH=1 PROFILE_JAR=fastjson2 MAXERR=1 TOPN=40 go test -run TestScratchWholeTreePerFile ./common/javaclassparser/tests/`
+  (看 1-err 直方图与 closest-to-flipping 列表)。
+  以下为**剩余**残留 (整树计数受遮蔽, 以下取逐文件隔离视角):
+- 症状 (lambda-rename 解除遮蔽后, fastjson2 整树 `cannot find symbol` 升至 450, 但整树计数受遮蔽不可靠; 按出错文件
+  集中度: ObjectWriterCreatorASM 115 / JSONReaderJSONB 46 / JSONReaderUTF8 28 / JSONReaderASCII 19 / CSVReaderUTF8 19
+  等密集分派多槽复用 + lambda 重方法为主):
+  - `cannot find symbol: variable X` (X 既含 `varN` 也含**带调试名的命名局部** fieldClass/features/fieldName/format/
+    fieldType/ordinal 等, 在某分支/lambda body 声明、被兄弟分支或块外读 → 出作用域)。ObjectWriterCreatorASM 单类即 115 条,
+    现为本族最大杠杆文件, 属 lambda body + 活跃区间复合形态, 需完整活跃区间分割。
+  - `int cannot be dereferenced` 15 + `incompatible types: int cannot be converted to T` 44: 引用槽被同槽 int 局部
+    污染后, 读成 int 再 `.method()`/赋给引用 → 误型 (与 Bug AI String-switch 幻影 var 同族, 但形态更广;
+    例 `ObjectReaderImplMapTyped.readObject` 的 `var9` 既作 `Map` 又 `var9++` 当计数器, map 与 i 折叠成同名)。
+  - `variable varN is already defined in method` 14: 同名声明在同作用域出现两次 (声明上提/槽合并把两段并成一个 id
+    却各留一处声明)。
+  - `incompatible types: T cannot be converted to T` 94 (例 `JSONPathSegment→JSONPath`, `Class→Field`): 读到错误的
+    同槽变量。
+- 根因方向: 现有「到达定义 + phi 合并」基础设施 (`reachingSlotVersionGeneral` / `reachingStoreVersion` /
+  `reachingBoolDefaultMerge` / `reachingRefSlotPhiMerge`) 覆盖了若干特定形态, 但 fastjson2 这类**密集分派 + 多槽复用**
+  的方法仍有残留: 需把局部变量识别从「单一全局 slot 表 + DFS 序」升级为**真正的到达定义/活跃区间分割** (同槽不相交活跃
+  区间 → 各自独立变量、声明摆到支配全部读的位置)。属用户要求的「活跃性 + 到达定义 + phi 数据流 pass」核心夯实目标,
+  高回归风险, 须配 kill-switch + 全量 (codec 差分 + 三 jar 基线) 回归逐步推进。
+- 复现: `SCRATCH=1 PROFILE_JAR=fastjson2 go test -run TestScratchSymbolDrill ./common/javaclassparser/tests/`;
+  单类例 `JSONPath` / `ObjectWriterCreator` / `FieldWriter`。
+- 注: DaitchMokotoffSoundex.<clinit> 的 twr `Throwable`/`Map.Entry` 共槽形态 (此前本族最小种子) **本轮已治本**
+  (见上「本轮新增治本」null-adopt-once 项), codec 因此 4→1; 余 1 是三元 LUB (归 Bug AH)。本族剩余主要是 fastjson2 那类
+  密集分派 + 多槽复用方法 (DateUtils / ObjectReaderImplMapTyped / JSONPath), 仍需把单一全局 slot 表升级为真正的活跃区间分割。
+
+### Bug AM (新登记, 本轮 fastjson2 度量) — `break` / `continue` 结构化越界 (无外层循环/switch)
+
+- 症状: `break outside switch or loop` 22 (例 `ObjectWriterProvider.getObjectWriterInternal` 末尾 `}else{ break; }`
+  落在没有任何外层循环的 if/else 里)。结构化器在重建大方法 (含内层 switch/do-while 混合) 时, 把某条本应是
+  `return`/落空的边渲染成 `break`, 而其外层循环已被结构化消解 → `break` 无目标。
+- 根因方向: 控制流结构化 (循环/switch 边界识别 + break/continue 目标绑定) 在复杂嵌套下边界判定不足; 与 Bug AJ (标号
+  continue/for 自增重建) 同属循环结构化族, 但本条是 break 落到无循环上下文。须配 kill-switch + 工业回归 (注意 hang 风险)。
+- 复现: `SCRATCH=1 PROFILE_JAR=fastjson2 DUMP_CLASS=ObjectWriterProvider.class go test -run TestScratchDumpClass
+  ./common/javaclassparser/tests/` 看 `getObjectWriterInternal`。
+
+### Bug AN — 匿名子类局部按合成名定型 (① 已治本) + 构造器实参「新绑定局部」改名漏传 (② 已治本)
+
+- **① 匿名子类局部访问父类私有字段 — 已治本 (本轮)**:
+  - 症状 (`Rule.java:228`, 仅整库 sourcepath round-trip 暴露): `Rule$2 var13 = new Rule$2(..); String x = var13.pattern;`。
+    `pattern` 在父类 `Rule` 是 `private`, 私有成员**不被子类继承**, javac 报 `pattern has private access in Rule`。
+    源码本是 `Rule r = new Rule(..){..}` (匿名子类), 局部声明类型应是父类 `Rule`。
+  - 治本方案 (单类路径即可, 无需跨类 super 信息): `code_analyser.go` 新增 `castAnonSubclassReceiverForOwnField`,
+    在 `OP_GETFIELD` 渲染时, 若 getfield 的 owner == 当前类名, 且 receiver 静态类型是合成匿名子类 `Owner$N`
+    (`strings.HasPrefix(jc.Name, ClassName+"$")`), 则插入 `((Owner)recv).field` 显式上行 cast。仅用 getfield CP 的
+    owner + receiver 静态类型判定, 严格限定到「自身私有字段经合成子类访问」一种形态, 不会给继承公有字段过度加 cast。
+  - kill-switch: `JDEC_NO_PRIV_FIELD_CAST`。承重测试: `TestAnonSubclassOwnPrivateFieldCastIsLoadBearing`
+    (battery `testdata/codec/AnonSubclassOwnPrivateField.java`, 多类匿名子类, ON/OFF 双跑, OFF 必须 javac 失败)。
+- **② 构造器实参「新绑定局部」改名未传播 — 已治本 (本轮, 原误判为内部类合成形参, 实为通用改名漏传)**:
+  - 症状 (`DaitchMokotoffSoundex.java:85`): `new DaitchMokotoffSoundex$Rule(var10,var11,var9,..)` 第 3 实参渲染成
+    数组 `var9` 而非应有的局部 `var12`, javac 报 `incompatible types: String[] cannot be converted to String`。
+  - **真实根因 (经 DMS_TRACE_LOAD / rewrite-var / var-fold 三路 trace 定位)**: 数据流**正确** (第 3 实参绑定到
+    slot12 的 ref-16), 纯属**改名漏传**。`RewriteVar` 对一个新绑定局部 (`bind` 路径, rewrite_var.go:595) 用「拷贝
+    JavaRef + 给副本 SetName + 记 `idReplaceMap[oldId]=newId` + 在 scope defer 里 `statement.ReplaceVar`」改名;
+    但 `new T(..)` 的**构造器实参只活在 `NewExpression.ArgumentsGetter` 这个仅供渲染的闭包里**,
+    `NewExpression.ReplaceVar` 只遍历 `Length/Initializer`, **够不到闭包内的实参**。于是声明被改成 `var12`、调用点
+    仍用旧的 slot 派生名 `var9` (因 `VariableId` 名是树深度派生, ref-16 与数组 ref-12 同处深度 9, 撞名), 编译器把
+    `var9` 绑成数组。
+  - 治本方案: `NewExpression` 增 `ConstructorCall *FunctionCallExpression` 反向引用 (invokespecial `<init>` 处
+    `v.ConstructorCall = funcCallValue`), `NewExpression.ReplaceVar` 追加遍历 `ConstructorCall.Arguments` (**只遍历
+    Arguments, 不碰 Object**——Object 即该 NewExpression 自身, 否则自循环)。这样改名能抵达构造器实参。
+  - kill-switch: `JDEC_NO_CTOR_ARG_REPLACE`。承重测试: `TestCtorArgFreshLocalRenameIsLoadBearing`
+    (battery `testdata/codec/CtorArgFreshLocalRename.java`, 顶层 sibling 类避开 `$` 引用噪声, ON/OFF 双跑,
+    OFF 必报 `String[] cannot be converted to String`)。
+  - **影响面 (dep-aware 整库度量, 通用改名修复)**: codec 6→4, **fastjson2 677→607 (−70)**, guava 835→829 (−6),
+    spring 14→14。fastjson2 收益显著, 是本轮单点最大杠杆。
+- ② 修后 `DaitchMokotoffSoundex` 仅余 4 个其它缺陷 (line 203 conditional 类型、line 296/319 cannot find symbol、
+  line 313 Throwable→Entry), 均属 slot 复用/catch 形参其它子问题, 归并入 Bug AL 处理。
 
 ---
 

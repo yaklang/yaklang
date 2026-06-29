@@ -27,6 +27,15 @@ type JavaRef struct {
 	IsParam bool
 	Val     JavaValue
 	typ     types.JavaType
+	// nullTypeAdopted records that a null-initialized slot (`T x = null`, Val is the null literal so
+	// IsNullInitialized stays true forever) has ALREADY adopted a concrete reference type via the
+	// AssignVarGuarded null-adopt shortcut. Because ResetVarType only repoints typ and never clears
+	// Val, the same ref would otherwise keep adopting every subsequent incompatible store, collapsing
+	// disjoint-live variables that merely reuse the JVM slot (try-with-resources synthetic
+	// `Throwable primaryExc = null` reused as a later `Map.Entry e` loop variable). Once committed,
+	// a further incompatible store is a genuine slot reuse and must mint a fresh variable. See
+	// AssignVarGuarded; kill-switch JDEC_NO_NULL_ADOPT_ONCE.
+	nullTypeAdopted bool
 }
 
 // ReplaceVar implements JavaValue.
@@ -64,6 +73,19 @@ func (j *JavaRef) ResetVarType(t types.JavaType) {
 func (j *JavaRef) IsNullInitialized() bool {
 	lit, ok := j.Val.(*JavaLiteral)
 	return ok && lit != nil && fmt.Sprint(lit.Data) == "null"
+}
+
+// MarkNullTypeAdopted records that this null-initialized ref has committed to a concrete reference
+// type through the AssignVarGuarded null-adopt shortcut. See the nullTypeAdopted field.
+func (j *JavaRef) MarkNullTypeAdopted() {
+	if j != nil {
+		j.nullTypeAdopted = true
+	}
+}
+
+// NullTypeAdopted reports whether this null-initialized ref already adopted a concrete reference type.
+func (j *JavaRef) NullTypeAdopted() bool {
+	return j != nil && j.nullTypeAdopted
 }
 
 func IsNullLiteral(v JavaValue) bool {

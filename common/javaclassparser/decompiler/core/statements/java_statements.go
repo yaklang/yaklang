@@ -545,6 +545,24 @@ func (a *AssignStatement) String(funcCtx *class_context.ClassContext) string {
 		}
 		return declType.String(funcCtx) + " " + assign
 	} else {
+		// Narrowing REASSIGNMENT to a byte/char/short target (field/local) whose RHS is int-typed:
+		// `this.quote = cond ? '\'' : '"'` compiles to a ternary pushing the char constants as ints
+		// (the JVM stack has no char category) followed by `putfield ... C`, which truncates
+		// implicitly, so no i2c opcode is emitted and the value reaches us int-typed. Rendered
+		// verbatim that is `this.quote = cond ? 39 : 34`, which javac rejects in assignment context
+		// (JLS 5.2: "possible lossy conversion from int to char"; a non-constant conditional is not a
+		// constant expression, so constant-narrowing does not apply). The declare branch above and the
+		// array-element store (arrayStoreRHS) already insert this cast; mirror them here so plain
+		// reassignments to narrow primitive fields/locals recompile (fastjson2 JSONWriter.quote,
+		// JSONReaderUTF8 char writes). The explicit cast reproduces exactly the truncation the store
+		// opcode performs, so it is behaviorally identical. Values already typed char/byte/short (and
+		// those carrying an i2c/i2b/i2s cast) report a non-int type, so narrowingInitCast returns ""
+		// and they are untouched. Kill-switch JDEC_NO_NARROW_REASSIGN_CAST=1.
+		if os.Getenv("JDEC_NO_NARROW_REASSIGN_CAST") == "" && a.LeftValue != nil && a.JavaValue != nil {
+			if cast := narrowingInitCast(a.LeftValue.Type(), a.JavaValue.Type()); cast != "" {
+				return fmt.Sprintf("%s = (%s) (%s)", a.LeftValue.String(funcCtx), cast, a.JavaValue.String(funcCtx))
+			}
+		}
 		return assign
 	}
 }

@@ -134,6 +134,11 @@ func ParseBytesCode(decompiler *core.Decompiler) (res []statements.Statement, er
 		}
 	}
 	rewriter.RewriteVar(&sts, decompiler.BodyStartId, params, decompiler.FunctionContext)
+	// Synthesize a bare `T varN;` declaration for any local whose only definition is an embedded
+	// assignment baked into an opaque CustomValue by the dup-collapse (`(n = s.length())` inside a
+	// short-circuit condition). Without it that local renders undeclared and duplicate-named against a
+	// later sibling-scope local sharing its slot-derived name -> cannot find symbol (Bug Y residual C).
+	rewriter.SynthesizeUndeclaredEmbeddedAssignDecls(&sts, decompiler.EmbeddedAssignDeclRefs)
 	// Drop statements javac would reject as unreachable (e.g. a back-edge `continue`
 	// emitted after an inner infinite loop that only exits via return / labelled
 	// continue). The pass is a strict subset of the JLS reachability rules, so it

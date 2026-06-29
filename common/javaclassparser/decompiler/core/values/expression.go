@@ -15,6 +15,18 @@ type NewExpression struct {
 	Length          []JavaValue
 	ArgumentsGetter func() string
 	Initializer     []JavaValue
+	// ConstructorCall holds the invokespecial `<init>` call whose arguments this `new T(...)`
+	// renders through ArgumentsGetter. The arguments live ONLY inside that closure (string
+	// rendering), so without this back-reference any value-tree traversal — most importantly
+	// RewriteVar's idReplaceMap ReplaceVar pass — cannot reach the argument SlotValues. A
+	// constructor argument that is a freshly-bound local then keeps the stale slot-derived
+	// `varN` name minted before renaming while its declaration is renamed, so the call site and
+	// the declaration disagree and a colliding `varN` resolves to the wrong same-name variable
+	// (commons-codec DaitchMokotoffSoundex: `new Rule(p, q, parts, ...)` instead of
+	// `new Rule(p, q, r, ...)`). ReplaceVar recurses into ConstructorCall.Arguments only, never
+	// its Object (which is this same NewExpression — recursing it would loop). Kill-switch:
+	// JDEC_NO_CTOR_ARG_REPLACE=1.
+	ConstructorCall *FunctionCallExpression
 }
 
 // ReplaceVar implements JavaValue.
@@ -24,6 +36,13 @@ func (n *NewExpression) ReplaceVar(oldId *utils.VariableId, newId *utils.Variabl
 	}
 	for _, initializer := range n.Initializer {
 		initializer.ReplaceVar(oldId, newId)
+	}
+	if n.ConstructorCall != nil && os.Getenv("JDEC_NO_CTOR_ARG_REPLACE") == "" {
+		for _, arg := range n.ConstructorCall.Arguments {
+			if arg != nil {
+				arg.ReplaceVar(oldId, newId)
+			}
+		}
 	}
 }
 
@@ -437,7 +456,46 @@ func (f *FunctionCallExpression) ArgumentStrings(funcCtx *class_context.ClassCon
 	return paramStrs
 }
 
+// polymorphicSignatureCastType reports the explicit cast a signature-polymorphic MethodHandle call
+// needs at SOURCE level. MethodHandle.invoke / invokeExact are declared `Object invoke(Object...)`
+// with @PolymorphicSignature: javac synthesizes a per-call-site descriptor (e.g.
+// `invokeExact:()Ljava/util/function/BiFunction;`) so the bytecode return type is the REAL one, but
+// the SOURCE-apparent return type is always Object - the original source therefore carries an explicit
+// `(BiFunction) handle.invokeExact()` cast. The decompiler reads the call's return type from the
+// (real) descriptor, so it declares `BiFunction var = handle.invokeExact()` with no cast and javac
+// rejects it ("incompatible types: Object cannot be converted to BiFunction" - fastjson2
+// JSONReader$BigIntegerCreator / JdbcSupport / DoubleToDecimal, all `LambdaMetafactory...getTarget()
+// .invokeExact()`). Re-emit the cast to the descriptor return type. Object/void returns need no cast.
+// Kill-switch: JDEC_NO_POLYSIG_CAST=1.
+func (f *FunctionCallExpression) polymorphicSignatureCastType(funcCtx *class_context.ClassContext) (string, bool) {
+	if os.Getenv("JDEC_NO_POLYSIG_CAST") != "" {
+		return "", false
+	}
+	if f.FunctionName != "invoke" && f.FunctionName != "invokeExact" {
+		return "", false
+	}
+	if f.ClassName != "java.lang.invoke.MethodHandle" {
+		return "", false
+	}
+	if f.FuncType == nil || f.FuncType.ReturnType == nil {
+		return "", false
+	}
+	rt := f.FuncType.ReturnType.String(funcCtx)
+	switch rt {
+	case "", "void", "Object", "java.lang.Object":
+		return "", false
+	}
+	return rt, true
+}
+
 func (f *FunctionCallExpression) String(funcCtx *class_context.ClassContext) string {
+	if castType, ok := f.polymorphicSignatureCastType(funcCtx); ok {
+		return fmt.Sprintf("(%s)(%s)", castType, f.renderCall(funcCtx))
+	}
+	return f.renderCall(funcCtx)
+}
+
+func (f *FunctionCallExpression) renderCall(funcCtx *class_context.ClassContext) string {
 	paramStrs := f.ArgumentStrings(funcCtx)
 	if f.FunctionName == "<init>" {
 		if f.ClassName == funcCtx.ClassName {

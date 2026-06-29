@@ -41,7 +41,17 @@ type ClassObjectDumper struct {
 	// parameter list and renames them to capture placeholders that the invokedynamic call site
 	// resolves to the actual captured values.
 	lambdaCaptureCount map[string]int
-	fieldDefaultValue  map[string]string
+	// lambdaLocalSeq hands each inlined lambda body a unique id so its own locals can be renamed
+	// into a private `lv<seq>_<n>` namespace. A lambda arrow body is spliced INLINE into the
+	// enclosing method, and Java forbids a local declared in the lambda body from shadowing a
+	// local/parameter of the enclosing scope (or a captured variable, which resolves to an
+	// enclosing `varN`). The fresh-root id namespace gives lambda locals var0,var1,... that collide
+	// with the enclosing method's var0,var1,..., producing "variable varN is already defined".
+	// Renaming them per-lambda eliminates the collision; nested lambdas are dumped first and already
+	// carry their own `lv<innerseq>` names, so the outer rename (matching only `varN`) never touches
+	// them. See renameLambdaBodyLocals.
+	lambdaLocalSeq    int
+	fieldDefaultValue map[string]string
 	dumpedMethodsSet   map[string]*dumpedMethods
 	// aggressive marks that the CURRENT method dump is a second attempt for a method whose
 	// conservative decompilation already failed. While set, the decompiler enables higher-risk
@@ -1861,6 +1871,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 			if !funcCtx.IsStatic && name != "<clinit>" {
 				receiverType = c.GetConstructorMethodName()
 			}
+			sourceCode = hoistCastGuardedEscapedLocals(sourceCode)
 			sourceCode = addMissingGeneratedLocalDecls(sourceCode, paramsNewStr, receiverType, c.methodReturnTypeByName())
 			code = sourceCode
 		}
@@ -1873,7 +1884,14 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 		paramTypes := methodType.FunctionType().ParamTypes
 		for idx, t := range paramTypes {
 			typeName := t.String(funcCtx)
-			if isVarArgs && idx == len(paramTypes)-1 {
+			// 末参为 varargs 时必须渲染成「元素类型 + ...」(如 Feature...), 不能是「数组类型 + ...」
+			// (Feature[]...)。后者会被 javac 当成 Feature[] 的 varargs (descriptor [[LFeature;), 与子类
+			// 重写的 Feature... (descriptor [LFeature;) 不再 override-equivalent → 子类报「is not abstract
+			// and does not override」。这里此前漏掉了 ElementType 剥离 (拼接式方法/lambda/stub 路径都对),
+			// 是 fastjson2 JSONPath.set 等抽象 varargs 方法的整族重编译失败根因。
+			if isVarArgs && idx == len(paramTypes)-1 && t.IsArray() && os.Getenv("JDEC_VARARGS_ABSTRACT_FIX_OFF") == "" {
+				paramList = append(paramList, fmt.Sprintf("%s... var%d", t.ElementType().String(funcCtx), idx))
+			} else if isVarArgs && idx == len(paramTypes)-1 {
 				paramList = append(paramList, fmt.Sprintf("%s... var%d", typeName, idx))
 			} else {
 				paramList = append(paramList, fmt.Sprintf("%s var%d", typeName, idx))
@@ -1882,6 +1900,13 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 		paramsNewStr = strings.Join(paramList, ", ")
 	}
 	if isLambda {
+		// A lambda arrow body is spliced inline into the enclosing method. Lift its own locals into a
+		// private `lv<seq>_N` namespace so they never shadow an enclosing local/parameter or a captured
+		// variable (Java: "variable varN is already defined in method"). Nested lambda bodies were
+		// dumped earlier and already carry their own `lv<innerseq>` names, so this outer rewrite (which
+		// only matches `varN`) leaves them untouched.
+		c.lambdaLocalSeq++
+		code = renameLambdaBodyLocals(code, c.lambdaLocalSeq)
 		res := fmt.Sprintf("(%s) -> {%s", paramsNewStr, code)
 		res += strings.Repeat("\t", c.TabNumber()) + "}"
 		dumped.methodName = name
@@ -2213,11 +2238,37 @@ func renameStatementsInScope(stmts []statements.Statement, live map[string]*util
 	}
 }
 
-// localSlotRefRe matches a decompiler-generated local/parameter reference (var0, var1, ...).
-// `this`, instance fields (this.x), and static members (Class.x) never render this way, so a
-// match means the expression depends on a method-scoped value.
-var localSlotRefRe = regexp.MustCompile(`\bvar\d+\b`)
+// localSlotRefRe matches a decompiler-generated local/parameter reference (var0, var1, ...) INCLUDING
+// the collision-renamed form `varN_M` (resolveLocalNameCollisions disambiguates two same-slot-name
+// locals as varN / varN_1). `this`, instance fields (this.x), and static members (Class.x) never
+// render this way, so a match means the expression depends on a method-scoped value. The `(?:_\d+)*`
+// suffix is load-bearing: the bare `\bvar\d+\b` failed to match `var7_1` (the `_` after the digits is
+// a word char, so there is no `\b` there), letting a final field assigned from a renamed constructor
+// local (`this.hashCode64 = var7_1`) be wrongly lifted to `final long hashCode64 = var7_1;` -> the
+// initializer references an out-of-scope local (fastjson2 SymbolTable.hashCode64 / FactoryFunction.function).
+var localSlotRefRe = regexp.MustCompile(`\bvar\d+(?:_\d+)*\b`)
 var generatedLocalRefRe = regexp.MustCompile(`\bvar\d+(?:_\d+)?\b`)
+
+// lambdaLocalRe captures the numeric tail of a slot-derived local reference (var9, var9_1) so a
+// lambda body's own locals can be lifted into a private namespace. It is applied ONLY to a fully
+// rendered lambda arrow body, where every other `varN`-shaped token has already been resolved away:
+// lambda parameters were renamed to `l0,l1,...`, captured variables to `\x00LCAP%d\x00` placeholders,
+// and any nested lambda body already carries its own `lv<seq>_` names. What remains is exactly the
+// lambda's own locals, which must not shadow the enclosing scope they are spliced into.
+var lambdaLocalRe = regexp.MustCompile(`\bvar(\d+(?:_\d+)?)\b`)
+
+// renameLambdaBodyLocals rewrites a rendered lambda body's own local references from the slot-derived
+// `varN` form into a per-lambda `lv<seq>_N` namespace that the enclosing slot/parameter schemes never
+// produce. This is the structural fix for "variable varN is already defined in method": an inlined
+// lambda arrow body cannot legally declare a local that shadows an enclosing local/parameter or a
+// captured variable (which resolves to the enclosing `varN`). Kill-switch: JDEC_NO_LAMBDA_LOCAL_RENAME.
+func renameLambdaBodyLocals(body string, seq int) string {
+	if os.Getenv("JDEC_NO_LAMBDA_LOCAL_RENAME") != "" {
+		return body
+	}
+	prefix := fmt.Sprintf("lv%d_", seq)
+	return lambdaLocalRe.ReplaceAllString(body, prefix+"$1")
+}
 // The optional `(?:\s*\.\.\.)?` after the type recognizes a varargs parameter declaration
 // (`int[]... var0`, `String... var1`). Without it the ellipsis broke the `Type varN` match, so a
 // varargs parameter was treated as an UNDECLARED local and addMissingGeneratedLocalDecls injected a
@@ -2322,6 +2373,220 @@ func addMissingGeneratedLocalDecls(body, params, receiverType string, methodRetu
 	return "\n" + strings.Join(lines, "") + strings.TrimPrefix(body, "\n")
 }
 
+// castEscapeDeclLineRe matches a single rendered line that DECLARES a generated local
+// (`<type> varN = ...` or `<type> varN;`), capturing the indent (1), the type expression (2), the
+// slot name (3) and the `= rhs` / `;` tail (4). The type char class deliberately allows spaces,
+// `<>?,` and `[]` so generic and array types (`Map<?, ?> var2`, `int[] var3`) are recognized; it
+// excludes `()` and `=` so a cast/return/call line (`return (T) (var2);`, `this.items.add(var8);`)
+// can never be mistaken for a declaration.
+var castEscapeDeclLineRe = regexp.MustCompile(`^(\s*)([A-Za-z_$][A-Za-z0-9_$.<>?,\[\] ]*?)\s+(var\d+(?:_\d+)?)(\s*[=;].*)$`)
+
+// castEscapeTypeKeywords are leading words that look like a type to castEscapeDeclLineRe but are not:
+// `return varN;` / `throw varN;` etc. must be classified as USES, never declarations.
+var castEscapeTypeKeywords = map[string]bool{
+	"return": true, "throw": true, "new": true, "instanceof": true,
+	"else": true, "assert": true, "case": true, "yield": true,
+	"break": true, "continue": true,
+}
+
+var castEscapeScalarPrimitives = map[string]bool{
+	"boolean": true, "byte": true, "char": true, "short": true,
+	"int": true, "long": true, "float": true, "double": true,
+}
+
+func castEscapeFirstToken(s string) string {
+	s = strings.TrimSpace(s)
+	if i := strings.IndexAny(s, " \t<.[("); i >= 0 {
+		return s[:i]
+	}
+	return s
+}
+
+func castEscapeLastToken(s string) string {
+	fields := strings.Fields(strings.TrimSpace(s))
+	if len(fields) == 0 {
+		return ""
+	}
+	return fields[len(fields)-1]
+}
+
+// castEscapeClassifyUse classifies a single NON-declaration occurrence of a generated local by the
+// text immediately around it: 1 = explicit cast (`(X)(name)`, `(X) (name)`, `(X)name` - the run just
+// before name reduces to a closing `)`), 2 = bare assignment LHS (`name = ...`, preceded only by
+// whitespace, a single `=`), 0 = anything else (member access `name.f`, index `name[i]`, an uncast
+// argument/return, an arithmetic/relational operand) - i.e. a use for which an `Object` declaration
+// would be unsound.
+func castEscapeClassifyUse(pre, post string) int {
+	q := strings.TrimRight(pre, " \t")
+	if strings.HasSuffix(q, "(") {
+		q = strings.TrimRight(q[:len(q)-1], " \t")
+	}
+	if strings.HasSuffix(q, ")") {
+		return 1
+	}
+	if strings.TrimLeft(pre, " \t") == "" {
+		t := strings.TrimLeft(post, " \t")
+		if strings.HasPrefix(t, "=") && !strings.HasPrefix(t, "==") {
+			return 2
+		}
+	}
+	return 0
+}
+
+// hoistCastGuardedEscapedLocals closes the "if/else parallel-phi orphan read, DIFFERENT-rendered-type
+// subfamily" (the least-upper-bound subfamily of Bug AL) that the AST pass parallelArmDeclHoist
+// cannot: a JVM slot reused for logically-one variable that is first-declared INSIDE two or more arms
+// of an if/else (possibly nested) with DIFFERENT rendered types - e.g.
+// `ParameterizedType var3 = ...` vs `ParameterizedTypeImpl var3 = ...` (fastjson2
+// ObjectWriters.fieldWriterList), or `Object`/`List`/`Object var2` across three nested arms
+// (JSONStreamReaderUTF8.readLineObject) - and then READ after the join. The arms carry different
+// VarUids, and parallelArmDeclHoist only merges arms whose rendered type tokens AGREE (widening
+// genuinely-different types would need a common-supertype facility this decompiler does not have), so
+// each arm keeps its own decl, the post-join read binds a slot name whose every declaration lives in
+// a non-dominating inner scope, and javac rejects it as "cannot find symbol: variable varN".
+//
+// Computing the true least-upper-bound of the arm types requires a cross-class hierarchy the
+// decompiler cannot resolve, so this pass NEVER guesses a join type. It fires ONLY on the shape where
+// `Object varN` is PROVABLY sound regardless of the LUB: every non-declaration use of the escaped slot
+// is an explicit CAST (`(X)(varN)`) or a bare assignment, and no declaration of it is a scalar
+// primitive. For that shape an `Object varN = null;` at method top is always type-correct - each arm
+// store accepts any reference value and each read down-casts from Object - while every store keeps its
+// own RHS type. Any other use (member access, index, uncast argument/return, arithmetic) makes Object
+// unsound and leaves the slot untouched, so the file simply keeps its one pre-existing error (no
+// regression). The transform demotes each inner `T varN = rhs` to `varN = rhs`, drops a bare
+// `T varN;`, and injects the single `Object varN = null;`; addMissingGeneratedLocalDecls (run next)
+// then sees the name declared and adds nothing.
+//
+// "Escaped" is detected by indentation: the dumper indents one tab per nesting level, so a cast-use
+// whose leading-whitespace depth is SHALLOWER than every declaration of the same name is, by
+// construction, outside all the arms that declare it - exactly the orphan read. A slot whose
+// declaration already dominates its reads (decl depth <= every read depth) is never shallower-read and
+// is left alone. Kill-switch: JDEC_CAST_ESCAPE_HOIST_OFF=1.
+func hoistCastGuardedEscapedLocals(body string) string {
+	if os.Getenv("JDEC_CAST_ESCAPE_HOIST_OFF") != "" {
+		return body
+	}
+	lines := strings.Split(body, "\n")
+	declAt := make([]string, len(lines))
+	primDecl := map[string]bool{}
+	for i, ln := range lines {
+		m := castEscapeDeclLineRe.FindStringSubmatch(ln)
+		if m == nil {
+			continue
+		}
+		if castEscapeTypeKeywords[castEscapeFirstToken(m[2])] {
+			continue
+		}
+		declAt[i] = m[3]
+		typeTok := strings.TrimSpace(m[2])
+		if !strings.Contains(typeTok, "[") && castEscapeScalarPrimitives[castEscapeLastToken(typeTok)] {
+			primDecl[m[3]] = true
+		}
+	}
+
+	type rec struct {
+		declDepths []int
+		castDepths []int
+		bad        bool
+	}
+	recs := map[string]*rec{}
+	get := func(name string) *rec {
+		r := recs[name]
+		if r == nil {
+			r = &rec{}
+			recs[name] = r
+		}
+		return r
+	}
+	for i, ln := range lines {
+		depth := len(ln) - len(strings.TrimLeft(ln, " \t"))
+		for _, loc := range generatedLocalRefRe.FindAllStringIndex(ln, -1) {
+			name := ln[loc[0]:loc[1]]
+			if declAt[i] == name {
+				tail := strings.TrimLeft(ln[loc[1]:], " \t")
+				if strings.HasPrefix(tail, "=") || strings.HasPrefix(tail, ";") {
+					get(name).declDepths = append(get(name).declDepths, depth)
+					continue
+				}
+			}
+			switch castEscapeClassifyUse(ln[:loc[0]], ln[loc[1]:]) {
+			case 1:
+				get(name).castDepths = append(get(name).castDepths, depth)
+			case 2:
+				// benign assignment LHS - neither proves escape nor unsoundness
+			default:
+				get(name).bad = true
+			}
+		}
+	}
+
+	fired := map[string]bool{}
+	for name, r := range recs {
+		if r.bad || primDecl[name] || len(r.declDepths) == 0 || len(r.castDepths) == 0 {
+			continue
+		}
+		minDecl := r.declDepths[0]
+		for _, d := range r.declDepths[1:] {
+			if d < minDecl {
+				minDecl = d
+			}
+		}
+		for _, d := range r.castDepths {
+			if d < minDecl {
+				fired[name] = true
+				break
+			}
+		}
+	}
+	if len(fired) == 0 {
+		return body
+	}
+
+	out := make([]string, 0, len(lines)+len(fired))
+	for i, ln := range lines {
+		if name := declAt[i]; name != "" && fired[name] {
+			m := castEscapeDeclLineRe.FindStringSubmatch(ln)
+			if strings.HasPrefix(strings.TrimLeft(m[4], " \t"), "=") {
+				out = append(out, m[1]+name+m[4])
+			}
+			// a bare `T varN;` is dropped: the injected `Object varN = null;` carries the slot
+			continue
+		}
+		out = append(out, ln)
+	}
+
+	names := make([]string, 0, len(fired))
+	for n := range fired {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	// Insert after any leading blank lines (keep the body's leading newline) and after a
+	// constructor's super()/this() chain call (which must remain the first statement). The injected
+	// declarations adopt the indentation of the first real statement so they align with the body.
+	insertIdx := 0
+	for insertIdx < len(out) && strings.TrimSpace(out[insertIdx]) == "" {
+		insertIdx++
+	}
+	indent := "\t"
+	if insertIdx < len(out) {
+		if t := strings.TrimSpace(out[insertIdx]); strings.HasPrefix(t, "super(") || strings.HasPrefix(t, "this(") {
+			insertIdx++
+		}
+		if insertIdx < len(out) {
+			indent = out[insertIdx][:len(out[insertIdx])-len(strings.TrimLeft(out[insertIdx], " \t"))]
+		}
+	}
+	inject := make([]string, 0, len(names))
+	for _, n := range names {
+		inject = append(inject, indent+"Object "+n+" = null;")
+	}
+	merged := make([]string, 0, len(out)+len(inject))
+	merged = append(merged, out[:insertIdx]...)
+	merged = append(merged, inject...)
+	merged = append(merged, out[insertIdx:]...)
+	return strings.Join(merged, "\n")
+}
+
 // repairMismatchedDoWhileIndexDecls repairs the narrow case where the decompiler mis-named the
 // declaration of a do-while loop index: `int X = 0;\ndo{\n if ((Y) < ...` where the loop body
 // actually iterates on Y, X is a stale name the rest of the body never uses, and Y has no other
@@ -2382,7 +2647,16 @@ func generatedLocalLooksInt(body, name string) bool {
 	patterns := []string{
 		`\b` + quoted + `\s*(?:\+\+|--)`,
 		`(?:\+\+|--)\s*` + quoted + `\b`,
-		`\(` + quoted + `\)\s*(?:<|>|<=|>=|==|!=)`,
+		// A bare RELATIONAL comparison (`(v) < n`) is numeric-only in Java -> int category for
+		// any right operand.
+		`\(` + quoted + `\)\s*(?:<|>|<=|>=)`,
+		// A bare EQUALITY comparison (`(v) == X` / `(v) != X`) is also valid for REFERENCES, so it
+		// only proves int when the right operand is a numeric literal (`(0)`, `-1`). A reference
+		// comparison such as `(v) != (HashMap.class)` or `(v) != (var2)` must NOT be read as int,
+		// otherwise an `objectClass`-style local (fastjson2 JSONWriter.checkAndWriteTypeName, whose
+		// value is `(v = obj.getClass()) != type`) is mis-declared `int v = 0` and every Class
+		// comparison/use fails to recompile.
+		`\(` + quoted + `\)\s*(?:==|!=)\s*\(?-?\d`,
 		`\[\s*` + quoted + `\s*\]`,
 	}
 	// Embedded-assignment-in-condition form produced by the dup-collapse, e.g.
@@ -2495,6 +2769,13 @@ func inferGeneratedLocalRefType(body, params, name string, methodReturnTypes map
 	if !ok {
 		return ""
 	}
+	// `recv.getClass()` always yields java.lang.Class; the raw `Class` type recompiles for every
+	// use (Class comparisons, Class-typed arguments). This is the single most common reference
+	// embedded-assign RHS whose type a textual scan can resolve without a symbol table
+	// (fastjson2 JSONWriter.checkAndWriteTypeName `objectClass = obj.getClass()`).
+	if strings.HasSuffix(rhs, ".getClass()") {
+		return "Class"
+	}
 	if m := arrayLoadRHSRe.FindStringSubmatch(rhs); m != nil {
 		return declaredArrayElementType(params+"\n"+body, m[1])
 	}
@@ -2520,8 +2801,17 @@ func inferGeneratedLocalRefType(body, params, name string, methodReturnTypes map
 // always safe: `this.f = expr;` / `f = expr;` compiles whether or not it could have been an
 // initializer.
 func canHoistFieldInitializer(rhs string) bool {
+	// Kill-switch: restore the legacy narrow `\bvar\d+\b` matcher (the `_M` hole) so the
+	// renamed-local mis-hoist reproduces for the load-bearing test.
+	if os.Getenv("JDEC_FIELD_HOIST_RENAMED_LOCAL_OFF") != "" {
+		return !localSlotRefReNarrowLegacy.MatchString(rhs)
+	}
 	return !localSlotRefRe.MatchString(rhs)
 }
+
+// localSlotRefReNarrowLegacy is the pre-fix matcher that misses the collision-renamed `varN_M` form;
+// retained only behind the JDEC_FIELD_HOIST_RENAMED_LOCAL_OFF kill-switch for the load-bearing test.
+var localSlotRefReNarrowLegacy = regexp.MustCompile(`\bvar\d+\b`)
 
 func canHoistFieldValueInitializer(value values.JavaValue, rhs string) bool {
 	if canHoistFieldInitializer(rhs) {
@@ -3275,17 +3565,31 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 				// keep res as the empty-body constructor (faithful: empty body == implicit super())
 			} else if !slices.Contains(accessFlagsVerbose, "abstract") && !slices.Contains(accessFlagsVerbose, "annotation") && !slices.Contains(accessFlagsVerbose, "interface") && !slices.Contains(accessFlagsVerbose, "enum") {
 				methodType, perr := types.ParseMethodDescriptor(descriptor)
-				if perr != nil || methodType == nil || methodType.FunctionType() == nil ||
-					methodType.FunctionType().ReturnType.String(c.FuncCtx) == "void" {
-					continue
+				descBroken := perr != nil || methodType == nil || methodType.FunctionType() == nil
+				isVoid := !descBroken && methodType.FunctionType().ReturnType.String(c.FuncCtx) == "void"
+				if descBroken || isVoid {
+					// A genuinely-empty void method (its bytecode is just `return`) is a faithful
+					// `void f(...) {}` and MUST be emitted, not dropped: dropping silently removes the
+					// method from the API and, when it overrides an abstract method (a no-op override
+					// such as ObjectWriterBaseModule$VoidObjectWriter.write(JSONWriter,Object,Object,
+					// Type,long){}), makes the subclass "not abstract and does not override". Only the
+					// trivial-return shape is kept; a void body that decompiled to empty but is NOT
+					// backed by a bare return (real content lost) keeps the legacy drop so no half-
+					// decompiled body is emitted as if empty. Kill-switch: JDEC_NO_EMIT_EMPTY_VOID=1.
+					if isVoid && os.Getenv("JDEC_NO_EMIT_EMPTY_VOID") == "" && methodBodyIsTriviallyEmpty(method) {
+						// keep res: renders as the faithful empty-body `void f(...) {}`
+					} else {
+						continue
+					}
+				} else {
+					stub := c.dumpStubMethod(method, name, descriptor, "empty method body after decompilation")
+					if stub == nil {
+						continue
+					}
+					traitId := fmt.Sprintf("name:%s,desc:%s", name, descriptor)
+					c.dumpedMethodsSet[traitId] = stub
+					res = stub
 				}
-				stub := c.dumpStubMethod(method, name, descriptor, "empty method body after decompilation")
-				if stub == nil {
-					continue
-				}
-				traitId := fmt.Sprintf("name:%s,desc:%s", name, descriptor)
-				c.dumpedMethodsSet[traitId] = stub
-				res = stub
 			}
 		}
 		// retain identity so the syntax safety net can re-derive a stub if needed
@@ -3302,6 +3606,40 @@ func (c *ClassObjectDumper) DumpMethods() ([]*dumpedMethods, error) {
 
 func (c *ClassObjectDumper) isInterfaceLike() bool {
 	return slices.Contains(c.obj.AccessFlagsVerbose, "interface") || slices.Contains(c.obj.AccessFlagsVerbose, "annotation")
+}
+
+// methodBodyIsTriviallyEmpty reports whether the method's bytecode is a genuinely empty body: only
+// `nop` (0x00) padding plus exactly one `return` (0xb1, the void return). Such a method is a faithful
+// `void f(...) {}` whose empty decompiled body is correct, so it must be emitted rather than dropped.
+// The {nop,return}-only test is sound: any opcode carrying operand bytes (one of which could happen to
+// be 0xb1) is itself outside {0x00,0xb1}, so its presence is detected and excludes the method, leaving
+// only truly empty bodies. A method that decompiled to empty but has richer bytecode (real content the
+// decompiler failed to recover) returns false and keeps the legacy drop behavior.
+func methodBodyIsTriviallyEmpty(method *MemberInfo) bool {
+	if method == nil {
+		return false
+	}
+	var code []byte
+	for _, attr := range method.Attributes {
+		if ca, ok := attr.(*CodeAttribute); ok {
+			code = ca.Code
+			break
+		}
+	}
+	if len(code) == 0 {
+		return false
+	}
+	returns := 0
+	for _, b := range code {
+		switch b {
+		case 0x00: // nop
+		case 0xb1: // return (void)
+			returns++
+		default:
+			return false
+		}
+	}
+	return returns == 1
 }
 
 // isOmittableDefaultCtor reports whether an empty-body constructor (its body decompiled to just the

@@ -157,9 +157,24 @@ func (s *StackSimulationImpl) AssignVarGuarded(slot int, val values.JavaValue, b
 		// blockNullAdopt suppresses this when the null initializer does not reach this store
 		// (sibling-branch reuse of one slot for unrelated types, e.g. try-with-resources
 		// primaryExc reusing the slot of an else-branch String).
-		if ref.IsNullInitialized() && !blockNullAdopt {
+		// A null-initialized slot may adopt a concrete reference type AT MOST ONCE. ResetVarType only
+		// repoints the declared type and never clears Val, so IsNullInitialized stays true for the
+		// lifetime of the ref; without this guard the same ref keeps adopting every later incompatible
+		// store, collapsing two disjoint-live variables that merely reuse the JVM slot. The dominant
+		// case is the old-javac try-with-resources desugaring: a synthetic `Throwable primaryExc = null`
+		// (committed to Throwable in the synthetic catch) shares slot N with a later
+		// `for (Map.Entry e : ...)` loop variable; adopting Map.Entry onto the already-Throwable ref
+		// mistyped the declaration to `Map.Entry var = null`, so `var = <throwable>` and
+		// `var.addSuppressed(..)` failed to recompile (commons-codec DaitchMokotoffSoundex.<clinit>).
+		// Once committed, the incompatible store is a genuine slot reuse and falls through to minting a
+		// fresh, block-scoped variable. Kill-switch: JDEC_NO_NULL_ADOPT_ONCE=1.
+		if ref.IsNullInitialized() && !blockNullAdopt &&
+			(os.Getenv("JDEC_NO_NULL_ADOPT_ONCE") != "" || !ref.NullTypeAdopted()) {
 			if _, isPrim := typ.RawType().(*types.JavaPrimer); !isPrim {
 				ref.ResetVarType(typ)
+				if os.Getenv("JDEC_NO_NULL_ADOPT_ONCE") == "" {
+					ref.MarkNullTypeAdopted()
+				}
 				return ref, false
 			}
 		}

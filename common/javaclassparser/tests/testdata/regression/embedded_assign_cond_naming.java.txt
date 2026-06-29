@@ -1,0 +1,17 @@
+public class EmbedCond {
+  public String f(String s) {
+    boolean hard = false;
+    int n;
+    if (s == null || (n = s.length()) == 0) {
+      return "";
+    }
+    if (n == 1) {
+      return s.toUpperCase();
+    }
+    char[] c = s.toUpperCase().toCharArray();
+    StringBuilder a = new StringBuilder(40);
+    StringBuilder b = new StringBuilder(10);
+    a.append(c);
+    return b.append(a).toString();
+  }
+}
