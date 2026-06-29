@@ -1,14 +1,12 @@
 package ssa
 
 import (
-	"fmt"
 	"runtime"
 	"runtime/debug"
 	"strings"
 	"time"
 
 	"github.com/jinzhu/gorm"
-	yaklog "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -51,13 +49,13 @@ func NewDBCache(cfg *ssaconfig.Config, prog *Program, databaseKind ProgramCacheK
 	}
 	if databaseKind != ProgramCacheMemory && instructionCacheDebugEnabled() {
 		cacheTTL, cacheMax := resolveInstructionCacheSettings(cfg)
-		yaklog.Debugf("[ssa-ir-cache] init: program=%s ttl=%s max=%d kind=%d",
+		log.Debugf("[ssa-ir-cache] init: program=%s ttl=%s max=%d kind=%d",
 			programName, cacheTTL, cacheMax, databaseKind,
 		)
 	}
 
 	saveSize := min(max(fileSize*5, defaultSaveSize), maxSaveSize)
-	yaklog.Debugf("asyncdb Channel: ReSetSize: fileSize(%d) saveSize(%d)", fileSize, saveSize)
+	log.Debugf("asyncdb Channel: ReSetSize: fileSize(%d) saveSize(%d)", fileSize, saveSize)
 
 	cache.sources = newSourceStore(prog, databaseKind, cache.db)
 	cache.indexes = newIndexStore(cfg, prog, databaseKind, cache.db, saveSize/2)
@@ -107,7 +105,7 @@ func (c *ProgramCache) IsClosed() bool {
 
 func (c *ProgramCache) SetInstruction(inst Instruction) {
 	if utils.IsNil(inst) {
-		yaklog.Errorf("BUG: SetInstruction called with nil instruction")
+		log.Errorf("BUG: SetInstruction called with nil instruction")
 		return
 	}
 	if c != nil && c.indexes != nil {
@@ -180,7 +178,7 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) error {
 		func() error {
 			if c.types != nil {
 				c.types.close()
-				yaklog.Infof("Type Cache closed")
+				log.Infof("Type Cache closed")
 			}
 			return nil
 		},
@@ -195,7 +193,7 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) error {
 				if err := c.instructions.Close(progress); err != nil {
 					return err
 				}
-				yaklog.Infof("Instruction cache closed")
+				log.Infof("Instruction cache closed")
 			}
 			return nil
 		},
@@ -208,7 +206,7 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) error {
 		func() error {
 			if c.program != nil && c.instructions != nil {
 				stats := c.instructions.Stats()
-				yaklog.Debugf("[ssa-ir-cache-saver] program=%s %s", c.program.GetProgramName(), stats)
+				log.Debugf("[ssa-ir-cache-saver] program=%s %s", c.program.GetProgramName(), stats)
 			}
 			return nil
 		},
@@ -272,12 +270,9 @@ func (c *ProgramCache) FlushCompileUnit(unitKey string) {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 
-	fmt.Printf("[REAL-FIX] Cleared %d items, released %d funcs, heap=%.1fMB\n",
-		clearedItems, releasedFuncs, float64(m.HeapInuse)/(1024*1024))
-
 	if instructionCacheDebugEnabled() {
-		yaklog.Debugf("[ssa-ir-cache-flush] program=%s unit=%s mode=%s resident=%d persisted=%d released_editors=%d released_funcs=%d",
-			c.program.GetProgramName(), unitKey, c.InstructionCacheMode(), c.CountInstruction(), c.InstructionPersistedCount(), releasedEditors, releasedFuncs)
+		log.Debugf("[ssa-ir-cache-flush] program=%s unit=%s mode=%s cleared=%d released_funcs=%d heap=%.1fMB resident=%d persisted=%d released_editors=%d",
+			c.program.GetProgramName(), unitKey, c.InstructionCacheMode(), clearedItems, releasedFuncs, float64(m.HeapInuse)/(1024*1024), c.CountInstruction(), c.InstructionPersistedCount(), releasedEditors)
 	}
 }
 
