@@ -170,6 +170,78 @@ diff <(head -1 /tmp/m2-before.txt) <(head -1 /tmp/m2-after.txt)
 
 ---
 
+## 5. 基准与指标：测了哪些 bench、效果如何、如何更新
+
+> 本节回答两个常被问到的问题：**“到底测了哪些 bench、效果怎么样”** 与 **“指标/内容怎么更新、由谁负责保持新鲜”**。
+> 所有数字都必须由命令真实跑出（§3 收尾闸门 + 本文“诚实数据”红线），禁止估算或编造；改了代码就要同步刷新这里，否则文档与现实脱节会“很奇怪”。
+
+### 5.1 一共有哪些 bench / oracle
+
+| 维度 | 测试入口 | 测什么 | CI 行为 |
+|------|----------|--------|---------|
+| 跨反编译器 PK（5 维） | `TestYakDecompilerCrossComparisonV2` | 与 CFR 0.152 / Vineflower 1.10.1 在 11 个知名大型 jar 上 PK：① 完整性 ② 性能/并发 ③ 可回编译 ④ 打回 jar + 外部 verify ⑤ guava 调用差分 | 仅 `CROSS_PK=1` + `CFR_JAR` + `VINEFLOWER_JAR` 才跑，否则 `t.Skip`（CI 绿） |
+| 语义差分回环（最强 oracle） | `TestCodecSemanticsRoundTrip` | **69** 个自托管算法电池（`tests/testdata/codec/*.java`）：`javac` 编译 → Yak 反编译 → 回编译 → 同输入跑出指纹，要求**逐字节一致**，专抓“能编译但算错”的静默 bug | 有 `javac`/`java` 即跑，是硬正确性闸门 |
+| opcode 解析覆盖 | `TestOpcodeParseCoverage` | 反编译嵌入语料 + 电池，断言**每个已注册 handler 的真实 JVM opcode 都被栈模拟器（`calcOpcodeStackInfo`）触达** | 默认跑，CI 内置 |
+| `.m2` 长尾扫描/计数 | `TestM2StubReasons` / `TestM2RegressionHarness` | 真实 `~/.m2` 语料上的 `partial/syntax/err/panic` 定位与计数（本工作流主战场，§1） | 需本机 `~/.m2`，CI 自动 skip |
+| 本地快回归（主闸门） | `TestDecompileSyntaxRegression` / `TestGAPanicFreeBoundary` / `TestSyntaxCoverageMatrix` / `TestRecompileRoundtrip` | 永久回归种子 + 合成语料：0 stub / 0 round-trip 失败 / 0 panic | 默认跑，≤30s，CI 内置 |
+
+### 5.2 当前效果（真实快照）
+
+> 快照：**2026-06-27**，darwin/arm64（10 核），Go 1.22.12，OpenJDK (Corretto) 17.0.12，CFR 0.152，Vineflower 1.10.1。
+> 语料：**11 个知名大型 jar、共 6506 个 `.class`**（guava / spring-core / jackson-databind / fastjson2 / commons-collections4 / logback-core / commons-lang3 / netty-codec / gson / fastjson / commons-codec）。
+> 完整表格、逐 jar 数据与方法学见 [`YAK_JAVA_DECOMPILER_CROSS_COMPARISON.md`](./YAK_JAVA_DECOMPILER_CROSS_COMPARISON.md)；未修复缺陷登记见 [`CODEC_TODO.md`](./CODEC_TODO.md)。
+
+| 维度 | YAK（yak-syntax / yak-raw） | CFR 0.152 | Vineflower 1.10.1 |
+|------|-----|-----------|-------------------|
+| ① 完整性 | **6506/6506（100%），0 stub、0 err** | 100% | 100% |
+| ② 并发总耗时（11 jar） | **yak-raw 4.36s / yak-syntax 9.14s** | 37.67s | 41.00s |
+| ② 并发吞吐（类/秒） | **yak-raw 1492 / yak-syntax 712** | 173 | 159 |
+| ③ 可回编译（各自原生布局） | 1515/6506（23%）\* | 1448/3669（39%） | 1866/3668（51%） |
+| ④ 打回 jar + 外部 verify | **verify_fail = 0（全部 11 jar）** | 0 | 0 |
+| ⑤ guava 调用差分 | **IDENTICAL（17 算法 / 414 字节逐字节一致）** | —（未单测） | —（未单测） |
+
+\* **分母不可比**：Yak 把每个嵌套类拆成独立顶层单元（分母 = 6506），CFR/Vineflower 把嵌套折叠进外部类（分母 ≈ 3669）。逐 jar 看，Yak 在 **commons-lang3（44% vs 41%）、commons-codec（82% 持平）、jackson（16% 持平）、netty（24% vs 22%）、fastjson2（14% vs 12%）** 上持平或反超 CFR。
+
+- **加速比**：yak-raw 比 CFR 快 **8.6x**、比 Vineflower 快 **9.4x**；yak-syntax（带 ANTLR 安全网）仍快 **4.1x / 4.5x**。语法安全网的代价是“串行延迟”而非“吞吐”（并发后被多核摊平）。
+- **语义差分回环**：**69** 个自托管电池（MD5/SHA-1/SHA-256/SHA-512、CRC32/CRC32C/Adler-32、Murmur2/3、xxHash32/64、SipHash-2-4、CRC64、FNV-1a、Base32/Base64、guava/spring 算法、控制流/switch/try-catch/compound-assign 形状等）反编译→回编译→运行**逐字节指纹一致**。
+- **opcode 解析覆盖 = 100%**：所有已注册真实 opcode 都被栈模拟器触达（含 7 项有据排除：jsr/jsr_w/ret/goto_w/wide/ldc_w/nop）。
+- **本地快回归**：整包 `go test ./common/javaclassparser/...` 全绿且 ≤30s，0 stub / 0 panic。
+
+**一句话**：完整性（不漏类）、并发性能（4~9x）、产物可校验性（verify_fail 全 0）、guava 真实调用差分一致，已达**生产可用**强度；尚未全面 GA 的卡点是**嵌套类整树折叠（根因 B）**与**循环/作用域恢复长尾（CODEC_TODO Bug W~AE）**——路线清晰、缺陷可定位、每一条都有复现。
+
+### 5.3 指标与内容如何更新（保持新鲜的流程）
+
+指标会随每轮修复变化，**必须**与代码同步更新。规则：
+
+1. **跑出来再写**：任何 before/after 数字都来自真实命令（§3 收尾闸门强制）。禁止估算/编造。
+2. **谁改谁更新**：
+   - 每轮长尾修复（§3）：在 [`JAVA_DECOMPILER.md`](./JAVA_DECOMPILER.md) 追加一节记录根因/修复点/同配置 before-after 的 `partial/stubs/panic` 计数；并在 [`CODEC_TODO.md`](./CODEC_TODO.md) 更新对应 Bug 状态（新发现→登记；已修→标 resolved + 附承重测试名与 kill-switch）。
+   - 跨反编译器 PK 数字变化：重跑 `TestYakDecompilerCrossComparisonV2`，用新产出的 `report-v2.md`/`report-v2.json` 同步刷新 [`YAK_JAVA_DECOMPILER_CROSS_COMPARISON.md`](./YAK_JAVA_DECOMPILER_CROSS_COMPARISON.md) 与本节 §5.2 表格，并更新顶部“采集快照”的日期/环境。
+   - 新增电池 / opcode：电池数随 `tests/testdata/codec/*.java` 增减、覆盖率随 opcode gate 变化，刷新 §5.1 / §5.2 对应数字。
+3. **更新命令**：
+
+```bash
+# ① 5 维 PK（环境门控，产出 report-v2.md/json）
+CROSS_PK=1 CFR_JAR=$HOME/jdec-cross-tools/cfr-0.152.jar \
+  VINEFLOWER_JAR=$HOME/jdec-cross-tools/vineflower-1.10.1.jar \
+  PK_OUT=/tmp/yak-pk-v2 \
+  go test ./common/javaclassparser/tests/ -run TestYakDecompilerCrossComparisonV2 -count=1 -timeout 300m -v
+
+# ② 语义差分回环（69 电池逐字节一致）
+go test -run TestCodecSemanticsRoundTrip -v ./common/javaclassparser/tests/
+
+# ③ opcode 解析覆盖（100%）
+go test -run TestOpcodeParseCoverage -v ./common/javaclassparser/tests/
+
+# ④ .m2 长尾计数前后对比（partial 是否下降）
+M2_OUT=/tmp/m2-after.txt M2_MAX_JARS=120 M2_MAX_CLASSES=12000 \
+  go test -run TestM2RegressionHarness -v ./common/javaclassparser/tests/
+```
+
+4. **快照三件套对齐**：每次刷新 §5.2，同步核对采集环境（日期、OS/arch、Go、JDK、CFR/Vineflower 版本）与语料（jar 数 / class 数），三处一致才算更新完成。
+
+---
+
 ## 速查表
 
 | 目的 | 命令 |
