@@ -182,3 +182,50 @@ func TestDirectlyAnswerContinue_AutoFinishesSimpleQuery(t *testing.T) {
 	require.False(t, op.IsContinued())
 	assert.Contains(t, invoker.timelineString(), "simple query")
 }
+
+func TestRejectDuplicateDirectlyAnswerWithoutFollowup(t *testing.T) {
+	loop := newMinimalLoopForHelperTest()
+	first, err := aicommon.ExtractAction(`{"@action":"directly_answer","answer_payload":"report one"}`, "directly_answer")
+	require.NoError(t, err)
+	require.NoError(t, loopAction_DirectlyAnswer.ActionVerifier(loop, first))
+
+	noteDirectlyAnswerDeliveredWithoutFollowup(loop, first)
+
+	second, err := aicommon.ExtractAction(`{"@action":"directly_answer","answer_payload":"report two"}`, "directly_answer")
+	require.NoError(t, err)
+	verr := loopAction_DirectlyAnswer.ActionVerifier(loop, second)
+	require.Error(t, verr)
+	assert.Contains(t, verr.Error(), "already delivered")
+	assert.Contains(t, verr.Error(), "finish")
+}
+
+func TestRejectDuplicateDirectlyAnswer_AllowsFollowUpWithNextMovements(t *testing.T) {
+	loop := newMinimalLoopForHelperTest()
+	first, err := aicommon.ExtractAction(`{"@action":"directly_answer","answer_payload":"report one"}`, "directly_answer")
+	require.NoError(t, err)
+	require.NoError(t, loopAction_DirectlyAnswer.ActionVerifier(loop, first))
+	noteDirectlyAnswerDeliveredWithoutFollowup(loop, first)
+
+	withNM, err := aicommon.ExtractAction(
+		`{"@action":"directly_answer","answer_payload":"report two","next_movements":[{"op":"add","id":"follow","content":"继续"}]}`,
+		"directly_answer",
+	)
+	require.NoError(t, err)
+	require.NoError(t, loopAction_DirectlyAnswer.ActionVerifier(loop, withNM))
+}
+
+func TestRejectDuplicateDirectlyAnswer_AllowsSecondWhenFirstHadNextMovements(t *testing.T) {
+	loop := newMinimalLoopForHelperTest()
+	first, err := aicommon.ExtractAction(
+		`{"@action":"directly_answer","answer_payload":"report one","next_movements":[{"op":"add","id":"follow","content":"继续"}]}`,
+		"directly_answer",
+	)
+	require.NoError(t, err)
+	require.NoError(t, loopAction_DirectlyAnswer.ActionVerifier(loop, first))
+	noteDirectlyAnswerDeliveredWithoutFollowup(loop, first)
+	assert.False(t, directlyAnswerDeliveredWithoutFollowup(loop))
+
+	second, err := aicommon.ExtractAction(`{"@action":"directly_answer","answer_payload":"report two"}`, "directly_answer")
+	require.NoError(t, err)
+	require.NoError(t, loopAction_DirectlyAnswer.ActionVerifier(loop, second))
+}

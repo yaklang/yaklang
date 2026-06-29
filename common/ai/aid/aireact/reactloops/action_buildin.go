@@ -55,6 +55,7 @@ var loopAction_DirectlyAnswer = &LoopAction{
 	Description: "Emit a direct answer to the user via 'answer_payload' or FINAL_ANSWER tag. For simple direct answers, omit 'human_readable_thought'. " +
 		"IMPORTANT: directly_answer ONLY delivers the answer; the loop CONTINUES afterwards and this action does NOT end the task. " +
 		"To terminate the ReAct loop you MUST use the 'finish' action (the only terminator). " +
+		"At most ONE directly_answer without 'next_movements' is allowed per CURRENT-TASK; repeating the same report is rejected—use 'finish' or a tool action instead. " +
 		"OPTIONAL: carry a non-empty 'next_movements' delta alongside the answer to schedule follow-up TODO updates.",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
@@ -96,8 +97,7 @@ var loopAction_DirectlyAnswer = &LoopAction{
 			// 关键词: directly_answer ActionVerifier AITAG hint, 5 次重试黑洞修复
 			return WrapDirectlyAnswerError(loop, utils.Error("answer_payload is required for ActionDirectlyAnswer but empty"))
 		}
-		loop.Set("directly_answer_payload", payload)
-		return nil
+		return FinishDirectlyAnswerVerification(loop, action, payload)
 	},
 	ActionHandler: func(loop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {
 		invoker := loop.GetInvoker()

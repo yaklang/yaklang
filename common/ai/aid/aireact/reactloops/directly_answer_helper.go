@@ -32,6 +32,51 @@ import (
 //	directly_answer 改起来很简单
 const loopIntentHintSimpleQuery = "simple_query"
 
+// loopVarDirectlyAnswerDeliveredWithoutFollowup marks that this CURRENT-TASK already
+// emitted a user-visible directly_answer without scheduling next_movements.
+const loopVarDirectlyAnswerDeliveredWithoutFollowup = "directly_answer_delivered_without_followup"
+
+const errDuplicateDirectlyAnswerWithoutFollowup = "directly_answer was already delivered for this task without next_movements; " +
+	"do not emit another report. Use 'finish' to terminate the loop, or choose a tool action " +
+	"(e.g. write_code, modify_code) if more work is required."
+
+func directlyAnswerHasNextMovements(action *aicommon.Action) bool {
+	return len(aicommon.NormalizeVerifyNextMovements(action)) > 0
+}
+
+func directlyAnswerDeliveredWithoutFollowup(loop *ReActLoop) bool {
+	if loop == nil {
+		return false
+	}
+	v, _ := loop.GetVariable(loopVarDirectlyAnswerDeliveredWithoutFollowup).(bool)
+	return v
+}
+
+// RejectDuplicateDirectlyAnswerWithoutFollowup blocks a second directly_answer in the
+// same task when an earlier one already succeeded without next_movements.
+func RejectDuplicateDirectlyAnswerWithoutFollowup(loop *ReActLoop, action *aicommon.Action) error {
+	if loop == nil || action == nil || directlyAnswerHasNextMovements(action) || !directlyAnswerDeliveredWithoutFollowup(loop) {
+		return nil
+	}
+	return utils.Error(errDuplicateDirectlyAnswerWithoutFollowup)
+}
+
+// FinishDirectlyAnswerVerification applies the duplicate guard and stores payload for ActionHandler.
+func FinishDirectlyAnswerVerification(loop *ReActLoop, action *aicommon.Action, payload string) error {
+	if err := RejectDuplicateDirectlyAnswerWithoutFollowup(loop, action); err != nil {
+		return err
+	}
+	loop.Set("directly_answer_payload", payload)
+	return nil
+}
+
+func noteDirectlyAnswerDeliveredWithoutFollowup(loop *ReActLoop, action *aicommon.Action) {
+	if loop == nil || action == nil || directlyAnswerHasNextMovements(action) {
+		return
+	}
+	loop.Set(loopVarDirectlyAnswerDeliveredWithoutFollowup, true)
+}
+
 // ShouldAutoFinishAfterSimpleQueryDirectlyAnswer reports whether a directly_answer
 // on a greeting/status (simple_query) task should terminate the loop immediately
 // after emitting the user-visible answer. No extra LLM round for finish/post-summary.
@@ -42,7 +87,7 @@ func ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop *ReActLoop, action *aic
 	if strings.TrimSpace(loop.Get("intent_hint")) != loopIntentHintSimpleQuery {
 		return false
 	}
-	if len(aicommon.NormalizeVerifyNextMovements(action)) > 0 {
+	if directlyAnswerHasNextMovements(action) {
 		return false
 	}
 	cfg := loop.GetConfig()
@@ -63,8 +108,9 @@ func DirectlyAnswerContinue(loop *ReActLoop, action *aicommon.Action, operator *
 		operator.Continue()
 		return
 	}
+	noteDirectlyAnswerDeliveredWithoutFollowup(loop, action)
 	invoker := loop.GetInvoker()
-	if len(aicommon.NormalizeVerifyNextMovements(action)) > 0 {
+	if directlyAnswerHasNextMovements(action) {
 		if !utils.IsNil(invoker) {
 			invoker.AddToTimeline("directly_answer_continue",
 				"answer delivered; the loop continues to honor the scheduled next_movements. "+

@@ -70,8 +70,7 @@ func directlyAnswerSyntaxFlowVerifier(loop *reactloops.ReActLoop, action *aicomm
 	}
 
 	// 2. Pass payload to handler（规则代码由 replace_payload 检测并丢弃，以文件内容为准）
-	loop.Set("directly_answer_payload", payload)
-	return nil
+	return reactloops.FinishDirectlyAnswerVerification(loop, action, payload)
 }
 
 func directlyAnswerSyntaxFlowHandler(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {

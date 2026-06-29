@@ -63,8 +63,7 @@ var loopActionDirectlyAnswerHTTPFuzztest = &reactloops.LoopAction{
 		if loopHTTPFuzzHasRiskWorthyEvidence(loop, payload) && !loopHTTPFuzzAnswerHasEvidenceChain(payload) {
 			return utils.Error("directly_answer blocked: verified vulnerability conclusions must include an evidence chain, such as tested payloads/parameters, representative request or HTTPFlow, response differences, and reproduction steps.")
 		}
-		loop.Set("directly_answer_payload", payload)
-		return nil
+		return reactloops.FinishDirectlyAnswerVerification(loop, action, payload)
 	},
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
 		invoker := loop.GetInvoker()

@@ -65,8 +65,7 @@ NOTE: Even when using the external tag, a foundational Action JSON structure is 
 			// 关键词: directly_answer ActionVerifier AITAG hint, 5 次重试黑洞修复
 			return reactloops.WrapDirectlyAnswerError(loop, utils.Error("directly_answer requires answer_payload or FINAL_ANSWER tag, but both are empty"))
 		}
-		loop.Set("directly_answer_payload", payload)
-		return nil
+		return reactloops.FinishDirectlyAnswerVerification(loop, action, payload)
 	},
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
 		invoker := loop.GetInvoker()
