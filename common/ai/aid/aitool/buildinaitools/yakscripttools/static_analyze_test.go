@@ -2,6 +2,7 @@ package yakscripttools_test
 
 import (
 	"io/fs"
+	"path"
 	"strings"
 	"testing"
 
@@ -12,6 +13,28 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 )
+
+func embedToolNamePath(dirname, toolname string) string {
+	namePath, ok := strings.CutPrefix(dirname, "yakscriptforai")
+	if !ok {
+		namePath = dirname
+	}
+	namePath = strings.Trim(namePath, `/\`)
+	if namePath == "" {
+		return toolname
+	}
+	return path.Join(namePath, toolname)
+}
+
+// libBundleSSAFalsePositive filters SSA closure-capture noise on concatenated lib+entry scripts.
+// Runtime execution is validated in java_audit_test.go; bundled lib uses nested callbacks SSA mishandles.
+func libBundleSSAFalsePositive(item *result.StaticAnalyzeResult) bool {
+	if item == nil {
+		return false
+	}
+	msg := item.String()
+	return strings.Contains(msg, "closure function expects to capture variable")
+}
 
 func TestSSAParse(t *testing.T) {
 	filesystem := yakscripttools.GetEmbedFS()
@@ -32,10 +55,23 @@ func TestSSAParse(t *testing.T) {
 		content, err := filesystem.ReadFile(s)
 		require.NoError(t, err)
 
-		// Analyze raw tool scripts; lib-injected content is validated in java_audit_test.go.
-		res := yak.StaticAnalyze(string(content))
+		namePath := embedToolNamePath(dirname, toolname)
+		code := string(content)
+		libBundled := false
+		if yakscripttools.NeedsLibBundlePrepForPath(namePath, code) {
+			code = yakscripttools.PrepareToolContent(namePath, code)
+			libBundled = true
+		}
+
+		res := yak.StaticAnalyze(code)
 		errRes := lo.Filter(res, func(item *result.StaticAnalyzeResult, _ int) bool {
-			return item.Severity == result.Error
+			if item.Severity != result.Error {
+				return false
+			}
+			if libBundled && libBundleSSAFalsePositive(item) {
+				return false
+			}
+			return true
 		})
 		if len(errRes) > 0 {
 			results[filename] = errRes
