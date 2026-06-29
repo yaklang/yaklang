@@ -52,7 +52,7 @@ type ClassObjectDumper struct {
 	// them. See renameLambdaBodyLocals.
 	lambdaLocalSeq    int
 	fieldDefaultValue map[string]string
-	dumpedMethodsSet   map[string]*dumpedMethods
+	dumpedMethodsSet  map[string]*dumpedMethods
 	// aggressive marks that the CURRENT method dump is a second attempt for a method whose
 	// conservative decompilation already failed. While set, the decompiler enables higher-risk
 	// reconstruction paths (relaxed structuring, node-duplication, synthetic rebuilds). It is
@@ -125,6 +125,7 @@ func (c *ClassObjectDumper) Tab() {
 func (c *ClassObjectDumper) UnTab() {
 	c.deepStack.Pop()
 }
+
 // selfInnerClassAccessFlags returns the inner_class_access_flags this class carries in its own
 // InnerClasses entry (the entry whose inner_class_info refers to this very class), with ok=false when
 // no such entry exists. For a nested type the top-level ClassFile access_flags omit its real
@@ -469,13 +470,20 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 					if err != nil || len(sigStr) < 3 {
 						continue
 					}
-					// `TK;` form only: starts with 'T', ends with ';', no nested structure.
-					if sigStr[0] != 'T' || sigStr[len(sigStr)-1] != ';' || strings.ContainsAny(sigStr, "<>[/") {
+					// Accept `TK;` (bare type var) and `[TK;`/`[[TK;` (array of type var). The stored
+					// value is the rendered field type (`K` / `K[]` / `K[][]`) used as the cast target.
+					sig := sigStr
+					arrayDepth := 0
+					for len(sig) > 0 && sig[0] == '[' {
+						arrayDepth++
+						sig = sig[1:]
+					}
+					if len(sig) < 3 || sig[0] != 'T' || sig[len(sig)-1] != ';' || strings.ContainsAny(sig, "<>[/") {
 						continue
 					}
-					tv := sigStr[1 : len(sigStr)-1]
+					tv := sig[1 : len(sig)-1]
 					if c.FuncCtx.IsTypeParam(tv) {
-						fieldTypeVars[class_context.SafeIdentifier(name)] = tv
+						fieldTypeVars[class_context.SafeIdentifier(name)] = tv + strings.Repeat("[]", arrayDepth)
 					}
 				}
 			}
@@ -2304,6 +2312,7 @@ func renameLambdaBodyLocals(body string, seq int) string {
 	prefix := fmt.Sprintf("lv%d_", seq)
 	return lambdaLocalRe.ReplaceAllString(body, prefix+"$1")
 }
+
 // The optional `(?:\s*\.\.\.)?` after the type recognizes a varargs parameter declaration
 // (`int[]... var0`, `String... var1`). Without it the ellipsis broke the `Type varN` match, so a
 // varargs parameter was treated as an UNDECLARED local and addMissingGeneratedLocalDecls injected a
@@ -2674,7 +2683,7 @@ func generatedLocalIsDeclared(body, name string) bool {
 
 // generatedLocalOccurrences counts whole-token references to a generated local name in body.
 func generatedLocalOccurrences(body, name string) int {
-	return len(regexp.MustCompile(`\b` + regexp.QuoteMeta(name) + `\b`).FindAllString(body, -1))
+	return len(regexp.MustCompile(`\b`+regexp.QuoteMeta(name)+`\b`).FindAllString(body, -1))
 }
 
 func generatedLocalLooksInt(body, name string) bool {

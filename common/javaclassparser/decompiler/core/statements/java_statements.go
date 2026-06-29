@@ -212,7 +212,11 @@ func typeVarReturnCast(funcCtx *class_context.ClassContext, v values.JavaValue) 
 	//     the raw class) converts to the parameterized return type by UNCHECKED conversion and needs no
 	//     cast; adding one there is gratuitous and was over-casting plain raw-subtype returns.
 	bareTypeVar := funcCtx.IsTypeParam(retStr)
-	if !bareTypeVar && !mentionsTypeParam(retStr, funcCtx.TypeParams) {
+	// arrayTypeVar: the return type is an array whose element is a bare type variable (`E[]`, `T[][]`).
+	// Bytecode erases it to its bound array (Object[]), so a value returning Object[] (typically
+	// `Collection.toArray(E[])` in a `<E> E[] toArray(E[])` override) needs an unchecked `(E[])` cast.
+	arrayTypeVar := !bareTypeVar && isArrayOfTypeParam(retStr, funcCtx.TypeParams)
+	if !bareTypeVar && !arrayTypeVar && !mentionsTypeParam(retStr, funcCtx.TypeParams) {
 		return ""
 	}
 	vt := v.Type()
@@ -228,8 +232,16 @@ func typeVarReturnCast(funcCtx *class_context.ClassContext, v values.JavaValue) 
 	if _, isPrim := raw.(*types.JavaPrimer); isPrim {
 		return ""
 	}
-	if raw.String(funcCtx) == retStr {
+	rawStr := raw.String(funcCtx)
+	if rawStr == retStr {
 		return ""
+	}
+	if arrayTypeVar {
+		// `(E[]) value` is legal only from an array or Object value; guard against unrelated scalars.
+		if !strings.HasSuffix(rawStr, "[]") && rawStr != "Object" && rawStr != "java.lang.Object" {
+			return ""
+		}
+		return retStr
 	}
 	if !bareTypeVar {
 		// Parameterized return type (Converter<T, T>): only certain returned-value forms carry a
@@ -324,8 +336,14 @@ func typeVarFieldStoreCast(funcCtx *class_context.ClassContext, left values.Java
 	if _, isPrim := raw.(*types.JavaPrimer); isPrim {
 		return ""
 	}
+	rawStr := raw.String(funcCtx)
 	// Already rendered as the type variable: no cast needed.
-	if raw.String(funcCtx) == tv {
+	if rawStr == tv {
+		return ""
+	}
+	// Array-of-type-variable field (`E[] rest`): the cast `(E[])` is legal only from an array or
+	// Object value (e.g. `(Object[]) checkNotNull(var2)`); never from an unrelated scalar reference.
+	if strings.HasSuffix(tv, "[]") && !strings.HasSuffix(rawStr, "[]") && rawStr != "Object" && rawStr != "java.lang.Object" {
 		return ""
 	}
 	return tv
@@ -338,6 +356,26 @@ func erasureName(s string) string {
 		s = s[:i]
 	}
 	return strings.TrimSpace(s)
+}
+
+// isArrayOfTypeParam reports whether s is an array (one or more `[]`) whose element type is a bare
+// in-scope type variable (e.g. "E[]", "T[][]"). Used to extend the type-variable cast to array-typed
+// returns and field stores, where bytecode erases the element to its bound (`E[]` -> `Object[]`).
+func isArrayOfTypeParam(s string, typeParams []string) bool {
+	if !strings.HasSuffix(s, "[]") {
+		return false
+	}
+	base := s
+	for strings.HasSuffix(base, "[]") {
+		base = strings.TrimSuffix(base, "[]")
+	}
+	base = strings.TrimSpace(base)
+	for _, tp := range typeParams {
+		if tp != "" && tp == base {
+			return true
+		}
+	}
+	return false
 }
 
 // mentionsTypeParam reports whether retStr contains any of the in-scope type-variable names as a

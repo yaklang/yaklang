@@ -388,6 +388,34 @@ func (f *FunctionCallExpression) ArgumentString(funcCtx *class_context.ClassCont
 	return strings.Join(f.ArgumentStrings(funcCtx), ",")
 }
 
+// suppressTypeVarArgCast reports whether the synthesized argument cast `(expect)(arg)` should be
+// dropped because the argument's static type is a bare in-scope type variable (Bug AH arg-side).
+// A type-variable-typed value is erased to its bound in bytecode and is therefore pushed onto the
+// stack WITHOUT a checkcast, so the descriptor parameter type (the erased bound, e.g. Comparable for
+// `<C extends Comparable>`) differs from the argument's source type (the type variable C) purely
+// through erasure - never through an explicit source cast (which would have changed the argument's
+// static type away from the type variable). Emitting `(Comparable)(cVar)` is then a spurious upcast
+// that javac rejects once it binds the call to the more specific generic signature
+// ("incompatible types: Comparable cannot be converted to C"; same for Object->K/E/V/N/T). The cast
+// is suppressed only when the EXPECTED parameter type is a concrete class (not itself a type
+// variable), so a genuine `<X> m(X)`-style mismatch keeps its cast. Kill-switch:
+// JDEC_NO_TYPEVAR_ARG_NOCAST=1.
+func suppressTypeVarArgCast(funcCtx *class_context.ClassContext, argRaw, expectRaw *types.JavaClass) bool {
+	if os.Getenv("JDEC_NO_TYPEVAR_ARG_NOCAST") != "" {
+		return false
+	}
+	if funcCtx == nil || argRaw == nil || expectRaw == nil {
+		return false
+	}
+	if !funcCtx.IsTypeParam(argRaw.Name) {
+		return false
+	}
+	if funcCtx.IsTypeParam(expectRaw.Name) {
+		return false
+	}
+	return true
+}
+
 func (f *FunctionCallExpression) ArgumentStrings(funcCtx *class_context.ClassContext) []string {
 	paramStrs := []string{}
 	for i, arg := range f.Arguments {
@@ -406,7 +434,7 @@ func (f *FunctionCallExpression) ArgumentStrings(funcCtx *class_context.ClassCon
 			atcClassType, ok2 = at.RawType().(*types.JavaClass)
 		}
 		if ok1 && ok2 && expectClassType.Name != atcClassType.Name {
-			if expectClassType.Name != "java.lang.Object" {
+			if expectClassType.Name != "java.lang.Object" && !suppressTypeVarArgCast(funcCtx, atcClassType, expectClassType) {
 				argStr := arg.String(funcCtx)
 				argTypeStr := argType.String(funcCtx)
 				arg = NewCustomValue(func(funcCtx *class_context.ClassContext) string {

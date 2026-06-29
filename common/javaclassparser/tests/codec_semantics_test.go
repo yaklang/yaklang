@@ -2968,3 +2968,170 @@ func TestTypeVarFieldStoreCastIsLoadBearing(t *testing.T) {
 	}
 	t.Logf("typevar field-store cast ON (Object keys[] element down-cast to K, recompiles clean)")
 }
+
+// TestTypeVarArrayCastIsLoadBearing pins the array-of-type-variable arm of the type-var cast family
+// (whole-tree A/B: guava 757->731). Two real guava units, source-level assertions (both are flat
+// `Outer$Inner` units that javac 17 cannot compile standalone; the dep-aware whole-tree compile is
+// where javac acceptance is measured):
+//   - return side: LocalCache$AbstractCacheSet.toArray, `public <E> E[] toArray(E[] v) { return
+//     coll.toArray(v); }`. Collection.toArray(E[]) erases to Object[], so the `E[]` return needs an
+//     unchecked `(E[])` cast (kill-switch JDEC_TYPEVAR_RET_CAST_OFF).
+//   - field-store side: Lists$OnePlusArrayList stores `(Object[]) checkNotNull(var2)` into the
+//     `final E[] rest` field; the erased Object[] needs an `(E[])` cast (kill-switch
+//     JDEC_NO_TYPEVAR_FIELD_CAST).
+func TestTypeVarArrayCastIsLoadBearing(t *testing.T) {
+	decompilePinned := func(name string) func() string {
+		raw, err := regressionFS.ReadFile("testdata/regression/" + name)
+		if err != nil {
+			t.Fatalf("read pinned %s: %v", name, err)
+		}
+		return func() string {
+			decompiled, e := javaclassparser.Decompile(raw)
+			if e != nil {
+				t.Fatalf("decompile %s: %v", name, e)
+			}
+			return decompiled
+		}
+	}
+
+	// return side: `<E> E[] toArray(E[])` -> `return (E[]) (...toArray(var1));`
+	retSrc := decompilePinned("typevar_array_return.class")
+	os.Setenv("JDEC_TYPEVAR_RET_CAST_OFF", "1")
+	retOff := retSrc()
+	os.Unsetenv("JDEC_TYPEVAR_RET_CAST_OFF")
+	if strings.Contains(retOff, "return (E[]) (") {
+		t.Fatalf("expected NO `(E[])` return cast with JDEC_TYPEVAR_RET_CAST_OFF=1, so the fix is load-bearing; got src:\n%s", retOff)
+	}
+	retOn := retSrc()
+	if !strings.Contains(retOn, "return (E[]) (") {
+		t.Fatalf("expected the re-emitted `return (E[]) (...)` cast with the fix enabled; got src:\n%s", retOn)
+	}
+	t.Logf("typevar array return cast ON (Collection.toArray(E[]) -> Object[] down-cast to E[])")
+
+	// field-store side: `final E[] rest` <- `(Object[]) checkNotNull(var2)` -> `(E[]) (...)`
+	fieldSrc := decompilePinned("typevar_array_field_store.class")
+	os.Setenv("JDEC_NO_TYPEVAR_FIELD_CAST", "1")
+	fieldOff := fieldSrc()
+	os.Unsetenv("JDEC_NO_TYPEVAR_FIELD_CAST")
+	if strings.Contains(fieldOff, "this.rest = (E[]) (") {
+		t.Fatalf("expected NO `(E[])` field-store cast with JDEC_NO_TYPEVAR_FIELD_CAST=1; got src:\n%s", fieldOff)
+	}
+	fieldOn := fieldSrc()
+	if !strings.Contains(fieldOn, "this.rest = (E[]) (") {
+		t.Fatalf("expected the re-emitted `this.rest = (E[]) (...)` cast with the fix enabled; got src:\n%s", fieldOn)
+	}
+	t.Logf("typevar array field-store cast ON (Object[] checkNotNull down-cast to E[])")
+}
+
+// TestTypeVarArgCastSuppressionIsLoadBearing pins guava's AbstractRangeSet<C extends Comparable>,
+// whose `contains(C var1)` calls the same-class `rangeContaining(C var0)`. The descriptor erases the
+// parameter to its bound (Comparable), so without suppression the decompiler synthesizes a spurious
+// upcast `this.rangeContaining((Comparable)(var1))`; javac binds the call to the generic signature and
+// rejects it ("incompatible types: Comparable cannot be converted to C"). A type-variable-typed
+// argument is pushed without a checkcast, so the source needs no cast - suppressTypeVarArgCast drops
+// it (whole-tree A/B: guava 731->699). Source-level assertion (the unit depends on RangeSet/Range and
+// the dep-aware whole-tree compile is where javac acceptance is measured): with the fix the call must
+// be bare `rangeContaining(var1)`, and with JDEC_NO_TYPEVAR_ARG_NOCAST=1 it must carry the
+// `(Comparable)(` upcast. Kill-switch: JDEC_NO_TYPEVAR_ARG_NOCAST.
+func TestTypeVarArgCastSuppressionIsLoadBearing(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/typevar_arg_cast.class")
+	if err != nil {
+		t.Fatalf("read pinned AbstractRangeSet class: %v", err)
+	}
+	decompileSrc := func() string {
+		decompiled, e := javaclassparser.Decompile(raw)
+		if e != nil {
+			t.Fatalf("decompile: %v", e)
+		}
+		return decompiled
+	}
+
+	os.Setenv("JDEC_NO_TYPEVAR_ARG_NOCAST", "1")
+	srcOff := decompileSrc()
+	os.Unsetenv("JDEC_NO_TYPEVAR_ARG_NOCAST")
+	if !strings.Contains(srcOff, "rangeContaining((Comparable)(") {
+		t.Fatalf("expected the spurious `rangeContaining((Comparable)(...))` upcast with JDEC_NO_TYPEVAR_ARG_NOCAST=1, so the fix is load-bearing; got src:\n%s", srcOff)
+	}
+	t.Logf("typevar arg-cast suppression OFF (spurious `(Comparable)(var1)` upcast, would fail Comparable->C)")
+
+	srcOn := decompileSrc()
+	if strings.Contains(srcOn, "rangeContaining((Comparable)(") {
+		t.Fatalf("expected the `(Comparable)` upcast to be GONE with the fix enabled; got src:\n%s", srcOn)
+	}
+	if !strings.Contains(srcOn, "rangeContaining(var1)") {
+		t.Fatalf("expected the bare `rangeContaining(var1)` call with the fix enabled; got src:\n%s", srcOn)
+	}
+	t.Logf("typevar arg-cast suppression ON (bare `rangeContaining(var1)`, type variable already assignable)")
+}
+
+// TestIincIntCategorySlotRepairIsLoadBearing pins fastjson2's Fnv.hashCode64LCase (Bug AL: same-slot
+// disjoint live-range corruption of the single global slot table by DFS traversal order). Slot 5 is
+// reused for THREE disjoint locals: an int loop counter in the first loop, an int char in the second,
+// and a `long` hash accumulator in the third loop. The forward simulation's global slot table, mutated
+// in DFS order, leaks the LATER `long` reincarnation back onto the first loop's counter iinc, so the
+// `i++` renders as `var5_1++` against the long accumulator - which is declared far below, out of scope
+// at the counter site ("cannot find symbol: variable var5_1"). The iinc reaching-definition repair
+// proves the slot must be int-category at the iinc (the verifier guarantees it) and walks back to the
+// reaching int-category definition, rebinding the increment to the correct loop counter `var4`. The
+// repair previously fired ONLY when the leaked version was a reference; this extends it to long/float/
+// double leaks. Compiled against the real fastjson2 jar (Fnv is a flat top-level class that recompiles
+// standalone): the load-bearing signal is the cannot-find-symbol error, present with the repair OFF and
+// absent with it ON. Kill-switch: JDEC_IINC_REACHING_OFF.
+func TestIincIntCategorySlotRepairIsLoadBearing(t *testing.T) {
+	javac, err1 := exec.LookPath("javac")
+	if err1 != nil {
+		t.Skip("javac not available; skipping iinc int-category slot repair test")
+	}
+	jar := jarPaths["fastjson2"]
+	if _, e := os.Stat(jar); e != nil {
+		t.Skipf("fastjson2 jar missing (%s); skipping", jar)
+	}
+	raw, err := regressionFS.ReadFile("testdata/regression/iinc_intcat_slot.class")
+	if err != nil {
+		t.Fatalf("read pinned Fnv class: %v", err)
+	}
+
+	compileOut := func() (string, string) {
+		decompiled, e := javaclassparser.Decompile(raw)
+		if e != nil {
+			t.Fatalf("decompile: %v", e)
+		}
+		dir := t.TempDir()
+		pkg := filepath.Join(dir, "com", "alibaba", "fastjson2", "util")
+		if e := os.MkdirAll(pkg, 0o755); e != nil {
+			t.Fatalf("mkdir: %v", e)
+		}
+		src := filepath.Join(pkg, "Fnv.java")
+		if e := os.WriteFile(src, []byte(decompiled), 0o644); e != nil {
+			t.Fatalf("write src: %v", e)
+		}
+		out, _ := exec.Command(javac, "-J-Duser.language=en", "-encoding", "UTF-8", "-nowarn",
+			"-proc:none", "--release", "8", "-cp", jar, "-d", filepath.Join(dir, "out"), src).CombinedOutput()
+		return decompiled, string(out)
+	}
+
+	const symErr = "cannot find symbol"
+
+	os.Setenv("JDEC_IINC_REACHING_OFF", "1")
+	srcOff, outOff := compileOut()
+	os.Unsetenv("JDEC_IINC_REACHING_OFF")
+	if !strings.Contains(outOff, symErr) {
+		t.Fatalf("expected pinned Fnv to FAIL with %q when the iinc reaching repair is disabled, so the fix is load-bearing; got javac:\n%s\n----- src -----\n%s", symErr, outOff, srcOff)
+	}
+	if !strings.Contains(srcOff, "var5_1++") {
+		t.Fatalf("expected the corrupted counter increment `var5_1++` (bound to the out-of-scope long accumulator) with the repair disabled; got src:\n%s", srcOff)
+	}
+	t.Logf("iinc reaching repair OFF (counter `i++` leaked onto long accumulator `var5_1++`, out of scope)")
+
+	srcOn, outOn := compileOut()
+	if strings.Contains(outOn, symErr) {
+		t.Fatalf("expected the %q error to be GONE with the iinc reaching repair enabled; got javac:\n%s\n----- src -----\n%s", symErr, outOn, srcOn)
+	}
+	if strings.Contains(srcOn, "var5_1++") {
+		t.Fatalf("expected the increment to be rebound off the long accumulator with the fix enabled; got src:\n%s", srcOn)
+	}
+	if !strings.Contains(srcOn, "var4++") {
+		t.Fatalf("expected the increment rebound to the int loop counter `var4++` with the fix enabled; got src:\n%s", srcOn)
+	}
+	t.Logf("iinc reaching repair ON (increment rebound to int loop counter `var4++`, recompiles clean)")
+}

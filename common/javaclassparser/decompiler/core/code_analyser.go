@@ -2054,15 +2054,19 @@ func (d *Decompiler) calcOpcodeStackInfo(runtimeStackSimulation StackSimulation,
 			inc = int(int8(opcode.Data[1]))
 		}
 		ref := runtimeStackSimulation.GetVar(index)
-		// An iinc reads-and-writes a single int-category local (byte/char/short/int), so its ref
-		// can never legitimately be a reference type. When the global slot table was polluted by
-		// DFS traversal order with a LATER, reference-typed reincarnation of this slot (the same
-		// root cause repaired for loads in reachingSlotVersionOnMismatch — e.g. a loop counter
-		// slot that javac reuses for a byte[] AFTER the loop, commons-codec Base64.decode), GetVar
-		// returns that wrong variable and the `i++` renders as `someArray++`. Walk back to the
-		// reaching int-category definition. Kill-switch: JDEC_IINC_REACHING_OFF=1.
-		if ref != nil && !refIsPrimitive(ref) && os.Getenv("JDEC_IINC_REACHING_OFF") == "" {
-			if better := d.reachingSlotVersionByCategory(opcode, index, false); better != nil {
+		// An iinc reads-and-writes a single int-category local (byte/char/short/int); the verifier
+		// guarantees the slot holds an int-category value at this point, so the resolved ref can
+		// never legitimately be a reference NOR a long/float/double. When the global slot table was
+		// polluted by DFS traversal order with a LATER, wrong-category reincarnation of this slot
+		// (the same root cause repaired for loads in reachingSlotVersionOnMismatch — e.g. a loop
+		// counter slot that javac reuses for a byte[] AFTER the loop, commons-codec Base64.decode;
+		// or a `long` hash accumulator that reuses an int loop-counter slot, fastjson2
+		// Fnv.hashCode64LCase rendering the counter `i++` as `longVar++`), GetVar returns that wrong
+		// variable. Walk back to the nearest reaching definition and adopt it only when it is
+		// int-category (the value the iinc provably operates on). Kill-switch:
+		// JDEC_IINC_REACHING_OFF=1.
+		if ref != nil && !isIntCategoryNumeric(ref.Type()) && os.Getenv("JDEC_IINC_REACHING_OFF") == "" {
+			if better := d.reachingSlotVersionByCategory(opcode, index, false); better != nil && isIntCategoryNumeric(better.Type()) {
 				ref = better
 			}
 		}

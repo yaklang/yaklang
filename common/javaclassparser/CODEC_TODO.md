@@ -56,7 +56,16 @@
   第 4 项)。残留 2 条全部是 Group A「类型变量擦除成 Object 出现在非返回位置」(`PairwiseEquivalence` 的
   `Iterator var=it()` 应为 `Iterator<T>`、`Equivalence$Wrapper` 的 `Wrapper var=(Wrapper)o` 应为 `Wrapper<?>`);
   需把泛型类型沿数据流传播 (方法返回按接收者类型实参实例化), 属大特性, 见 Bug AH。
-- **本轮新增治本 (codec 真实差分 + 工业语料新发现, 26 项, 均已锁回归种子, 种子即档案)**:
+- **本轮新增治本 (codec 真实差分 + 工业语料新发现, 29 项, 均已锁回归种子, 种子即档案)**:
+  - **iinc 同槽不相交活跃区间被 DFS 序污染: int 计数器槽被后继 long/float/double 复用 → 计数器 `i++` 误绑到出作用域的后继变量, `cannot find symbol` (Bug AL 收窄子族, fastjson2 -1)**
+    (可用性/重编译, 单类反编译即可见, 整树重编译报 `cannot find symbol: variable varN`): fastjson2 `Fnv.hashCode64LCase` 的 slot5 先后承载 int 计数器 / int 字符 /
+    `long` 哈希累加器三个不相交活跃区间; 前向模拟的单一全局 slot 表按 DFS 序把**后继 long 复生槽**泄漏回首循环计数器的 iinc, 使 `i++` 渲染成 `var5_1++`
+    (绑到方法下方声明的 long 累加器), 在计数器处出作用域。治本是既有 iinc 到达定义修复 (`code_analyser.go` OP_IINC, `reachingSlotVersionByCategory`) 的**类别精化**:
+    verifier 保证 iinc 槽在该点必为 int 类别, 故守卫由「仅引用类型泄漏」(`!refIsPrimitive(ref)`) 扩到「非 int 类别泄漏」(`!isIntCategoryNumeric(ref.Type())`, 覆盖
+    long/float/double), 沿 Source 回walk 取最近到达定义、且**仅当其为 int 类别**才采纳 (引用情形回walk 命中的恒是 int 类别, 行为不变)。种子 pin 真实
+    `testdata/regression/iinc_intcat_slot.class` (= fastjson2 `util/Fnv.class`), 承重 `TestIincIntCategorySlotRepairIsLoadBearing` (对 fastjson2 jar classpath 编译,
+    信号=`cannot find symbol`: kill-switch `JDEC_IINC_REACHING_OFF=1` 时存储为 `var5_1++` 且报错、开启时回绑到 `var4++` 编译干净)。实测 **fastjson2 -1 (Fnv 整方法翻转干净;
+    4-jar A/B 对比旧引用-only 基线 codec/guava/spring 零回归)**; 为「同槽活跃区间分割」大特性的一个可证 sound 子族 (姊妹杠杆 LOAD 侧见 Bug AL 根因方向)。
   - **类型变量字段存储漏铸 (Bug AH 汇点-cast 子族, return 侧之后第二个汇点) → `incompatible types: Object cannot be converted to K/V/E` (guava 整树 779→757 -22, fastjson2 -1, codec/spring 0 回归)**
     (可用性/重编译, 单类反编译即可见, 整树重编译报 `Object cannot be converted to K`): 形如 `private final K key;` 的同类字段, 字节码把字段类型擦除到其
     上界 (Object), 故构造器里 `this.key = var1.keys[var2]` (RHS 为裸 `Object[]` 元素读, 静态类型 Object) 缺源码本有的显式 `(K)` cast, javac 拒
@@ -68,6 +77,24 @@
     `TestTypeVarFieldStoreCastIsLoadBearing` (源码级: kill-switch `JDEC_NO_TYPEVAR_FIELD_CAST=1` 时存储为裸 `this.key = var...`、开启时出现 `this.key = (K) (`;
     因该单元是扁平 `Outer$Inner`、javac 17 独立编译会在 Flow$AliveAnalyzer 崩溃故不用 javac 信号, 重编译收益由整树 A/B `TestScratchJarErrDelta` 度量)。
     实测 **guava 整树 779→757 (-22)**, fastjson2 -1, codec/spring 无回归。
+  - **类型变量数组汇点漏铸 (Bug AH 汇点-cast 子族, 数组臂; return 侧 + 字段存储侧两入口同治) → `incompatible types: Object[] cannot be converted to E[]/T[]` (guava 整树 757→731 -26, fastjson2 -1, codec/spring 0 回归)**
+    (可用性/重编译, 单类反编译即可见): 形如 `public <E> E[] toArray(E[] var1){ return coll.toArray(var1); }` —— `Collection.toArray(E[])` 擦除返回 `Object[]`, 而方法
+    返回类型是 `E[]`, 源码本有 `(E[])` cast; 又如 `final E[] rest;` 字段被 `this.rest = (Object[]) checkNotNull(var2)` 存入, 同缺 `(E[])`。治本是字段存储/return
+    两个既有汇点的**数组泛型自然延伸**: 字段签名解析放宽到 `[TK;`/`[[TK;` (`dumper.go` 剥前导 `[` 后判 `TK;`, `FieldTypeVars` 存渲染型 `E[]`/`E[][]`);
+    `typeVarReturnCast` 新增 `arrayTypeVar` 触发 (返回型是裸类型变量数组 `E[]`, 由 `isArrayOfTypeParam` 判定), 与裸类型变量同样无条件铸, 但加「RHS 必须是数组或
+    Object」守卫确保 `(E[]) value` 合法 (擦除后 `E[]`=`Object[]`, unchecked 但语义保持)。种子 pin 真实 guava `Lists$OnePlusArrayList.class` (字段存储) +
+    `LocalCache$AbstractCacheSet.class` (return), 承重 `TestTypeVarArrayCastIsLoadBearing` (源码级双向 pin, kill-switch `JDEC_TYPEVAR_RET_CAST_OFF` /
+    `JDEC_NO_TYPEVAR_FIELD_CAST`)。实测 **guava 整树 757→731 (-26: return 侧 4 单元 + 字段侧 2 单元 + 级联)**, fastjson2 -1, codec/spring 无回归。
+  - **类型变量实参侧伪上行 cast 抑制 (Bug AH 实参侧, 与汇点-cast 互补的「该删的 cast」方向) → `incompatible types: Comparable/Object cannot be converted to C/K/E/V/N` (guava 整树 731→699 -32, fastjson2/codec/spring 0 回归)**
+    (可用性/重编译, 单类反编译即可见): 形如 `abstract class AbstractRangeSet<C extends Comparable>` 的 `contains(C var1){ return this.rangeContaining(var1)!=null; }` 调用同类
+    `rangeContaining(C var0)` —— 描述符把形参擦除到上界 (Comparable), 反编译器据「实参渲染类型 (类型变量 C) ≠ 形参描述符类型 (Comparable)」合成伪 cast
+    `rangeContaining((Comparable)(var1))`; 但类型变量值在字节码里本就**不带 checkcast** 入栈 (擦除即上界), 故源码无需任何 cast, 该上行 cast 反而在 javac 绑定到更精确的泛型
+    签名后被拒 (`Comparable cannot be converted to C`)。治本 (`expression.go` `ArgumentStrings` 的 cast 合成点经 `suppressTypeVarArgCast`): 当**实参静态类型是在域类型变量
+    (`IsTypeParam(arg.RawType().Name)`) 且形参期望类型不是类型变量** (即被擦成具体上界) 时, 抑制该 cast。收窄判据保证 sound: 显式源码 downcast 会把实参静态类型改成被 cast
+    的具体类 (不再是类型变量), 故不会误抑制真实 cast; 形参仍是类型变量的 `<X> m(X)` 形态保留原 cast。种子 pin 真实 guava `AbstractRangeSet.class`, 承重
+    `TestTypeVarArgCastSuppressionIsLoadBearing` (源码级双向 pin, kill-switch `JDEC_NO_TYPEVAR_ARG_NOCAST`: 关闭出现 `rangeContaining((Comparable)(`, 开启为裸
+    `rangeContaining(var1)`)。实测 **guava 整树 731→699 (-32)**, fastjson2/codec/spring 无回归。注: 实参是**具体类**而非类型变量的同族 (如 enum `state().compareTo((Enum)(State.X))`
+    伪上行到 `Enum`) 不被本治本覆盖 (实参非类型变量), 仍属 Bug AH 实参侧余量。
   - **签名多态 (`@PolymorphicSignature`) `MethodHandle.invoke`/`invokeExact` 调用漏铸返回类型 → `incompatible types: Object cannot be converted to <T>` (fastjson2 -30, 本轮单点最大 1-错族)**
     (可用性/重编译, 单类反编译即可见, 整树重编译报 `Object cannot be converted to BiFunction/LongFunction/...`): `MethodHandle.invoke`/`invokeExact`
     在源码层声明 `Object invoke(Object...)` 且带 `@PolymorphicSignature` —— javac 为每个调用点合成专属描述符 (`invokeExact:()Ljava/util/function/BiFunction;`),
@@ -484,12 +511,13 @@
   - **spring-core 5.3.27: 14 错 / 950 单元 (≈0.015/单元, 已达「非常好」)** —— GA 候选。
   - **commons-codec 1.15: 1 错 / 106 单元 (本轮 4→1: Bug AL null-adopt-once 治本 -3)** —— **已基本清零**, 余 1 为
     `DaitchMokotoffSoundex` 的三元 LUB (`ArrayList var = cond ? new ArrayList() : Collections.emptyList()` 应为 `List`, 归 Bug AH)。
-  - **guava 28.2-android: 757 错 / 1877 单元 (empty-void-emit 治本 829→782 -47, typevar-field-store-cast 治本 779→757 -22; 整树遮蔽下界)** —— **主导杠杆 = Bug AH 泛型类型变量沿数据流传播** (≈450-500 条:
-    `Object→K/E/V/N/T/C/CAP` ≈300 + `type argument not within bounds` ≈84 + `inference variable has incompatible
-    bounds` ≈75 + `T[]→E[]` 18); 其余 `cannot find symbol` (含 sun.misc 等 JDK 内部 + 少量真缺陷)、`bad type in
-    conditional expression` 12。即 guava 推 GA 必须做 Bug AH。**本轮已啃下 Bug AH 的 return 侧 (`typeVarReturnCast`) 与字段存储侧
-    (`typeVarFieldStoreCast`, 同类 K 字段汇点-cast, guava -22) 两个汇点; 余下 `Object→K` 多为实参侧 (`this.get((K)key)`, 需被调方泛型签名解析)
-    与局部泛型恢复 (`Iterator<? extends K> it = iterable.iterator()` 需把接收者类型实参代入方法返回签名做推断), 后者是真正的泛型推断引擎大特性。**
+  - **guava 28.2-android: 699 错 / 1877 单元 (empty-void-emit 治本 829→782 -47, typevar-field-store-cast 779→757 -22, typevar-array-cast 757→731 -26, typevar-arg-nocast 731→699 -32; 整树遮蔽下界)** —— **主导杠杆 = Bug AH 泛型类型变量沿数据流传播** (≈400 条:
+    `Object→K/E/V/N/T/C/CAP` ≈260 + `type argument not within bounds` ≈84 + `inference variable has incompatible
+    bounds` ≈75); 其余 `cannot find symbol` (含 sun.misc 等 JDK 内部 + 少量真缺陷)、`bad type in
+    conditional expression` 12。即 guava 推 GA 必须做 Bug AH。**本轮已啃下 Bug AH 的三个「汇点-cast」入口 (return 侧 `typeVarReturnCast`、
+    字段存储侧 `typeVarFieldStoreCast`、数组臂 `arrayTypeVar`/`isArrayOfTypeParam`) 与实参侧伪上行 cast 抑制 (`suppressTypeVarArgCast`, 实参为类型变量子族),
+    本轮合计 guava -80; 余下 `Object→K` 多为「实参是具体类的伪上行」(enum `compareTo((Enum)...)`, 需被调方泛型签名解析) 与局部泛型恢复
+    (`Iterator<? extends K> it = iterable.iterator()` 需把接收者类型实参代入方法返回签名做推断), 后者是真正的泛型推断引擎大特性。**
   - **fastjson2 2.0.43: 整树 javac 总错数 = 716 (ifelse-parallel-phi 治本 852→839, abstract-varargs 治本 839→831,
     final-field-renamed-local 治本 831→826, parallel-arm-phi-orphan 治本 827→819, empty-void-emit 治本 819→759 -60,
     try-slot-phi-merge 治本 759→751 -8, cast-escape-hoist 治本 751→746 -5 / 同治本 guava 782→779 -3,
@@ -686,10 +714,16 @@ javac 合成的 `<Enum>(String,int,<Enum>$N)` marker 构造器, 旧版渲染成 
 - 根因: 局部变量类型来自 descriptor (擦除态, 无泛型), 缺「按接收者类型实参实例化方法返回签名」与「checkcast 目标按
   上下文补泛型实参」的泛型传播。这是与「泛型返回 (T) 强转」同源、但发生在**赋值/局部声明**位的镜像问题, 全 guava
   直方图里属最大类 (≈196 `Object→K/E/V/T` + 33 `Comparable→C` + 80 `type argument not within bounds`)。
-- 治本方向 (大特性, 须谨慎, 高回归风险): 在 dumper/类型恢复层做有限泛型实例化 —— 当局部 = `recv.m(...)` 且 recv
+- **本轮已啃下的子族 (均带承重 + kill-switch, 见上「本轮新增治本」)**: ① return 侧汇点-cast (`typeVarReturnCast`),
+  ② 同类字段存储汇点-cast (`typeVarFieldStoreCast`), ③ 数组臂汇点-cast (`isArrayOfTypeParam`, return+字段两入口),
+  ④ **实参侧伪上行 cast 抑制** (`suppressTypeVarArgCast`: 实参静态类型是类型变量时, 描述符擦除到上界产生的伪 cast 一律抑制 —— 这是「该删的 cast」方向,
+  与汇点-cast「该补的 cast」互补)。四项合计 guava 整树 -80。
+- 治本方向 (余量, 大特性, 须谨慎, 高回归风险): **真正的有限泛型实例化引擎** —— 当局部 = `recv.m(...)` 且 recv
   有已知泛型类型、m 的 Signature 返回引用了 recv 的类型参数时, 用实例化后的泛型类型给局部定型 (而非 raw); checkcast
   目标同理按目标上下文补实参。须先有承重用例与 kill-switch, 避免误扩到无法静态判定的场景 (那比编译报错更危险)。
-- 复现: guava `PairwiseEquivalence` / `Equivalence$Wrapper` (base 包仅此 2 单元残留)。
+  另一独立余量: 实参是**具体类**而非类型变量的伪上行 (enum `state().compareTo((Enum)(State.X))` 把实参上行到 `Enum`,
+  需被调方泛型/桥接签名解析才能判定该删), `suppressTypeVarArgCast` 刻意不覆盖 (实参非类型变量, 无法本地证 sound)。
+- 复现: guava `PairwiseEquivalence` / `Equivalence$Wrapper` (局部泛型恢复); `AbstractService$*Guard` (enum compareTo 桥接实参伪上行)。
 
 ### Bug AE — try-with-resources 嵌套双资源命名 / 同包 enum 引用 (本轮复核: 两残留均已不复现, 已加守卫)
 
@@ -740,6 +774,15 @@ javac 合成的 `<Enum>(String,int,<Enum>$N)` marker 构造器, 旧版渲染成 
     `cannot find symbol` + `long cannot be dereferenced` + `array required but long found`)。度量: **整树 fastjson2 -13
     (852→839, cannot-find-symbol 441→430)**; **逐文件隔离 delta = 0** (受影响文件如 ObjectReaderProvider 仍有其它残留错故未翻转,
     本治本只降单文件错密度, 为该文件达 GA 的前置条件)。
+  - **同槽不相交活跃区间被 DFS 序污染: int 计数器槽被后继 long/float/double 复用, iinc 误绑到出作用域的后继变量
+    (fastjson2 `Fnv.hashCode64LCase`: slot5 先后承载 int 计数器 / int 字符 / long 哈希累加器; 首循环计数器 `i++` 渲染成
+    `var5_1++` 绑到方法下方声明的 long 累加器, 在计数器处出作用域报 `cannot find symbol: var5_1`)** —— iinc 到达定义修复
+    (verifier 保证 iinc 槽在该点必为 int 类别) 从「仅引用类型泄漏」扩到「long/float/double 类别泄漏」: 守卫 `!refIsPrimitive(ref)`
+    改为 `!isIntCategoryNumeric(ref.Type())`, 沿 Source 回walk 取最近到达定义、且**仅当其为 int 类别**才采纳 (引用情形行为不变,
+    因其回walk 命中的恒是 int 类别)。已治 (**fastjson2 -1, Fnv 整方法翻转干净; 4-jar A/B 对比旧引用-only 基线 codec/guava/spring
+    零回归**)。承重 `TestIincIntCategorySlotRepairIsLoadBearing` (javac 编译真实 Fnv.class, kill-switch `JDEC_IINC_REACHING_OFF`
+    双向: 关闭即复现 `var5_1++` 的 `cannot find symbol`, 开启回绑到 `var4++`)。**注: 这是「同槽不相交活跃区间分割」大特性的一个收窄
+    可证 sound 子族; 天然姊妹杠杆是 LOAD 侧 (ILOAD 系列读到 long/float/double 复生槽), 现走热路径风险更高, 列为下一杠杆。**
 - **if/else 平行 phi「孤儿读」子族 —— 同渲染类型部分已治本 (见上「本轮新增治本」parallel-arm-phi-orphan, 整树 827→819, 翻转 2 文件);
   残留仅「异渲染类型」LUB 子族 (≈4 文件)**。形态: if/else 两臂各在自己臂内声明同一 JVM 槽的局部 (`var<slot>`), 该槽在 if/else **之后**被读
   (phi 合并); 合并后的「读」绑定到**第三个 id** (既非 if 臂 def 的 id 也非 else 臂 def, 而是未构造的 phi 结果 id), 但**渲染成同槽名** `var<slot>`。
@@ -775,10 +818,14 @@ javac 合成的 `<Enum>(String,int,<Enum>$N)` marker 构造器, 旧版渲染成 
   - `incompatible types: T cannot be converted to T` 94 (例 `JSONPathSegment→JSONPath`, `Class→Field`): 读到错误的
     同槽变量。
 - 根因方向: 现有「到达定义 + phi 合并」基础设施 (`reachingSlotVersionGeneral` / `reachingStoreVersion` /
-  `reachingBoolDefaultMerge` / `reachingRefSlotPhiMerge`) 覆盖了若干特定形态, 但 fastjson2 这类**密集分派 + 多槽复用**
-  的方法仍有残留: 需把局部变量识别从「单一全局 slot 表 + DFS 序」升级为**真正的到达定义/活跃区间分割** (同槽不相交活跃
-  区间 → 各自独立变量、声明摆到支配全部读的位置)。属用户要求的「活跃性 + 到达定义 + phi 数据流 pass」核心夯实目标,
-  高回归风险, 须配 kill-switch + 全量 (codec 差分 + 三 jar 基线) 回归逐步推进。
+  `reachingBoolDefaultMerge` / `reachingRefSlotPhiMerge` / `reachingSlotVersionByCategory` 的 iinc 修复) 覆盖了若干
+  特定形态, 但 fastjson2 这类**密集分派 + 多槽复用**的方法仍有残留: 需把局部变量识别从「单一全局 slot 表 + DFS 序」升级
+  为**真正的到达定义/活跃区间分割** (同槽不相交活跃区间 → 各自独立变量、声明摆到支配全部读的位置)。属用户要求的
+  「活跃性 + 到达定义 + phi 数据流 pass」核心夯实目标, 高回归风险, 须配 kill-switch + 全量 (codec 差分 + 三 jar 基线) 回归逐步推进。
+  本轮已切出并治本 iinc 侧的「int 类别槽被 long/float/double 复生槽污染」子族 (见上「本轮已治本子族」iinc-intcat 项)。
+  **下一收窄子族 (姊妹): LOAD 侧 int 类别修复** —— `reachingSlotVersionOnMismatch` 当前只判「引用 vs 基本型」类别,
+  ILOAD 系列读到 long/float/double 复生槽 (两者皆基本型) 漏判; 治法对称 (新增 `isIntCategoryLoadOpcode` + `isIntCategoryNumeric(better)`
+  守卫), 但 LOAD 是热路径、整树度量受遮蔽噪声 ±3, 须独立 4-jar A/B 严格证零回归后再并入。
 - 复现: `SCRATCH=1 PROFILE_JAR=fastjson2 go test -run TestScratchSymbolDrill ./common/javaclassparser/tests/`;
   单类例 `JSONPath` / `ObjectWriterCreator` / `FieldWriter`。
 - 注: DaitchMokotoffSoundex.<clinit> 的 twr `Throwable`/`Map.Entry` 共槽形态 (此前本族最小种子) **本轮已治本**
