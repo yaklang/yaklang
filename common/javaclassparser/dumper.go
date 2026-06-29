@@ -448,6 +448,41 @@ func (c *ClassObjectDumper) DumpClass() (string, error) {
 	}
 	if c.FuncCtx != nil {
 		c.FuncCtx.TypeParams = classTypeParamNames
+		// Record which same-class fields are declared as a bare class-scope type variable (e.g.
+		// `private final K key;`). A store into such a field whose RHS erased to Object/the bound
+		// needs an unchecked `(K)` cast to recompile (see AssignStatement.typeVarFieldStoreCast).
+		// A type-variable field signature is exactly `T<name>;` (JVMS 4.7.9.1) - matched textually
+		// so this never renders a type or touches the import set (no import-order side effects).
+		if len(classTypeParamNames) > 0 {
+			fieldTypeVars := map[string]string{}
+			for _, field := range c.obj.Fields {
+				name, err := c.obj.getUtf8(field.NameIndex)
+				if err != nil || name == "" {
+					continue
+				}
+				for _, attr := range field.Attributes {
+					sigAttr, ok := attr.(*SignatureAttribute)
+					if !ok {
+						continue
+					}
+					sigStr, err := c.obj.getUtf8(sigAttr.SignatureIndex)
+					if err != nil || len(sigStr) < 3 {
+						continue
+					}
+					// `TK;` form only: starts with 'T', ends with ';', no nested structure.
+					if sigStr[0] != 'T' || sigStr[len(sigStr)-1] != ';' || strings.ContainsAny(sigStr, "<>[/") {
+						continue
+					}
+					tv := sigStr[1 : len(sigStr)-1]
+					if c.FuncCtx.IsTypeParam(tv) {
+						fieldTypeVars[class_context.SafeIdentifier(name)] = tv
+					}
+				}
+			}
+			if len(fieldTypeVars) > 0 {
+				c.FuncCtx.FieldTypeVars = fieldTypeVars
+			}
+		}
 	}
 	packageSource := fmt.Sprintf("package %s;\n\n", packageName)
 	if className == "" {

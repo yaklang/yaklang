@@ -28,6 +28,22 @@ type ClassContext struct {
 	// from an ordinary bare-named class so they can, for instance, emit an unchecked cast when
 	// a value erased to a bound is returned from a now-type-variable-typed method.
 	TypeParams []string
+	// FieldTypeVars maps a (same-class) field's safe identifier to the bare class-scope type
+	// variable it is declared as (e.g. `key` -> `K` for `private final K key;`). It is recovered
+	// from each field's generic Signature (`TK;`) once per class. A store into such a field whose
+	// right-hand side erased to Object/the bound needs an explicit unchecked `(K)` cast to
+	// recompile (bytecode erases the field type to its bound, so `this.key = objExpr` otherwise
+	// fails "Object cannot be converted to K"). Empty when the class has no type variables.
+	FieldTypeVars map[string]string
+}
+
+// FieldTypeVar reports the bare class-scope type variable a same-class field is declared as, or ""
+// when name is not a recorded type-variable field (see FieldTypeVars).
+func (f *ClassContext) FieldTypeVar(name string) string {
+	if f == nil || name == "" || f.FieldTypeVars == nil {
+		return ""
+	}
+	return f.FieldTypeVars[name]
 }
 
 // IsTypeParam reports whether name is one of the class-scope type variables (see TypeParams).

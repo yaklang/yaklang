@@ -2928,3 +2928,43 @@ func TestPolymorphicSignatureCastIsLoadBearing(t *testing.T) {
 	}
 	t.Logf("polysig cast ON (invokeExact result down-cast to descriptor return type, compiles clean)")
 }
+
+// TestTypeVarFieldStoreCastIsLoadBearing pins guava's CompactHashMap$MapEntry, whose constructor
+// stores a raw `keys[]` element (typed Object) into the `private final K key` field. Bytecode erases
+// the field to its bound, so without an explicit `(K)` cast the re-emitted source fails to recompile
+// ("incompatible types: Object cannot be converted to K") - the whole-tree A/B confirms guava -22
+// with this fix. The assertion is SOURCE-LEVEL (not javac) on purpose: this is a flat `Outer$Inner`
+// unit, which javac 17 cannot compile standalone (it crashes in Flow$AliveAnalyzer, masking the body
+// error); the dep-aware whole-tree compile is where the javac acceptance is measured. Here we pin the
+// exact rendering both ways so the fix can never silently regress: with JDEC_NO_TYPEVAR_FIELD_CAST the
+// store must be the bare `this.key = var...keys[...]` (no cast), and with the fix it must carry `(K)`.
+func TestTypeVarFieldStoreCastIsLoadBearing(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/typevar_field_store.class")
+	if err != nil {
+		t.Fatalf("read pinned CompactHashMap$MapEntry class: %v", err)
+	}
+	decompileSrc := func() string {
+		decompiled, e := javaclassparser.Decompile(raw)
+		if e != nil {
+			t.Fatalf("decompile: %v", e)
+		}
+		return decompiled
+	}
+
+	os.Setenv("JDEC_NO_TYPEVAR_FIELD_CAST", "1")
+	srcOff := decompileSrc()
+	os.Unsetenv("JDEC_NO_TYPEVAR_FIELD_CAST")
+	if strings.Contains(srcOff, "this.key = (K) (") {
+		t.Fatalf("expected NO `(K)` cast on the field store when JDEC_NO_TYPEVAR_FIELD_CAST=1, so the fix is load-bearing; got src:\n%s", srcOff)
+	}
+	if !strings.Contains(srcOff, "this.key = var") {
+		t.Fatalf("expected the bare `this.key = var...` field store with the cast disabled; got src:\n%s", srcOff)
+	}
+	t.Logf("typevar field-store cast OFF (bare `this.key = var1.keys[var2]`, would fail Object->K)")
+
+	srcOn := decompileSrc()
+	if !strings.Contains(srcOn, "this.key = (K) (") {
+		t.Fatalf("expected the re-emitted `this.key = (K) (...)` cast with the fix enabled; got src:\n%s", srcOn)
+	}
+	t.Logf("typevar field-store cast ON (Object keys[] element down-cast to K, recompiles clean)")
+}

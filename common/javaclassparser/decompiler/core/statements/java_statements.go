@@ -265,6 +265,72 @@ func typeVarReturnCast(funcCtx *class_context.ClassContext, v values.JavaValue) 
 	return retStr
 }
 
+// typeVarFieldStoreCast returns the bare class-scope type variable (e.g. "K") to cast the stored
+// value to when assigning into a SAME-CLASS field that is declared as that type variable but the
+// stored value's static type is a DIFFERENT reference type (Object or the erased bound). Bytecode
+// erases a type-variable field to its bound, so `this.key = objExpr` (objExpr typed Object, as a raw
+// `keys[]` element read produces) fails "incompatible types: Object cannot be converted to K"; the
+// source originally carried an explicit `(K)` cast (guava CompactHashMap.MapEntry). The cast is
+// unchecked but behavior-preserving (the field erases to Object at runtime), matching CFR/Fernflower.
+// Only same-class fields qualify because their declared type variable is only known for the class
+// being rendered (funcCtx.FieldTypeVars). Returns "" for non-field LHS, foreign fields, non-type-var
+// fields, primitive/nil values, null literals, or values already rendering as the type variable.
+// Kill-switch JDEC_NO_TYPEVAR_FIELD_CAST disables it.
+func typeVarFieldStoreCast(funcCtx *class_context.ClassContext, left values.JavaValue, value values.JavaValue) string {
+	if funcCtx == nil || left == nil || value == nil {
+		return ""
+	}
+	if os.Getenv("JDEC_NO_TYPEVAR_FIELD_CAST") != "" {
+		return ""
+	}
+	if len(funcCtx.FieldTypeVars) == 0 {
+		return ""
+	}
+	var fieldName string
+	switch lv := left.(type) {
+	case *values.RefMember:
+		// instance field store `this.field` - the receiver must be `this`.
+		ref, ok := values.UnpackSoltValue(lv.Object).(*values.JavaRef)
+		if !ok || !ref.IsThis {
+			return ""
+		}
+		fieldName = class_context.SafeIdentifier(lv.Member)
+	case *values.JavaClassMember:
+		// static field store `ClassName.field` into the class being rendered.
+		if lv.Name != funcCtx.ClassName {
+			return ""
+		}
+		fieldName = class_context.SafeIdentifier(lv.Member)
+	default:
+		return ""
+	}
+	tv := funcCtx.FieldTypeVar(fieldName)
+	if tv == "" {
+		return ""
+	}
+	if lit, ok := values.UnpackSoltValue(value).(*values.JavaLiteral); ok && fmt.Sprint(lit.Data) == "null" {
+		// null is assignable to any type variable without a cast.
+		return ""
+	}
+	vt := value.Type()
+	if vt == nil {
+		return ""
+	}
+	raw := vt.RawType()
+	if raw == nil {
+		return ""
+	}
+	// A type variable is a reference type; a primitive value never needs (and cannot take) the cast.
+	if _, isPrim := raw.(*types.JavaPrimer); isPrim {
+		return ""
+	}
+	// Already rendered as the type variable: no cast needed.
+	if raw.String(funcCtx) == tv {
+		return ""
+	}
+	return tv
+}
+
 // erasureName strips a generic type string down to its raw/erased name: "Predicate<T>" -> "Predicate",
 // "Map<K, V>" -> "Map", "CopyOnWriteHashMap$InnerNode<K, V>" -> "CopyOnWriteHashMap$InnerNode".
 func erasureName(s string) string {
@@ -562,6 +628,12 @@ func (a *AssignStatement) String(funcCtx *class_context.ClassContext) string {
 			if cast := narrowingInitCast(a.LeftValue.Type(), a.JavaValue.Type()); cast != "" {
 				return fmt.Sprintf("%s = (%s) (%s)", a.LeftValue.String(funcCtx), cast, a.JavaValue.String(funcCtx))
 			}
+		}
+		// Type-variable field store: `this.key = objExpr` where `key` is declared `K` needs an
+		// explicit unchecked `(K)` cast (the field erases to its bound in bytecode). See
+		// typeVarFieldStoreCast.
+		if cast := typeVarFieldStoreCast(funcCtx, a.LeftValue, a.JavaValue); cast != "" {
+			return fmt.Sprintf("%s = (%s) (%s)", a.LeftValue.String(funcCtx), cast, a.JavaValue.String(funcCtx))
 		}
 		return assign
 	}

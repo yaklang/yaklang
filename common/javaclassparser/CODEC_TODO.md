@@ -56,7 +56,18 @@
   第 4 项)。残留 2 条全部是 Group A「类型变量擦除成 Object 出现在非返回位置」(`PairwiseEquivalence` 的
   `Iterator var=it()` 应为 `Iterator<T>`、`Equivalence$Wrapper` 的 `Wrapper var=(Wrapper)o` 应为 `Wrapper<?>`);
   需把泛型类型沿数据流传播 (方法返回按接收者类型实参实例化), 属大特性, 见 Bug AH。
-- **本轮新增治本 (codec 真实差分 + 工业语料新发现, 25 项, 均已锁回归种子, 种子即档案)**:
+- **本轮新增治本 (codec 真实差分 + 工业语料新发现, 26 项, 均已锁回归种子, 种子即档案)**:
+  - **类型变量字段存储漏铸 (Bug AH 汇点-cast 子族, return 侧之后第二个汇点) → `incompatible types: Object cannot be converted to K/V/E` (guava 整树 779→757 -22, fastjson2 -1, codec/spring 0 回归)**
+    (可用性/重编译, 单类反编译即可见, 整树重编译报 `Object cannot be converted to K`): 形如 `private final K key;` 的同类字段, 字节码把字段类型擦除到其
+    上界 (Object), 故构造器里 `this.key = var1.keys[var2]` (RHS 为裸 `Object[]` 元素读, 静态类型 Object) 缺源码本有的显式 `(K)` cast, javac 拒
+    (guava CompactHashMap$MapEntry/EntryForKey、AbstractCache/AbstractLoadingCache 等)。治本与 `typeVarReturnCast` 同构、只作用于**同类字段存储**汇点:
+    dumper 在 DumpMethods 前 (TypeParams 已知后) 从各字段的泛型 Signature (`TK;` 文本即判, 不渲染/不动 import 集) 建 `ClassContext.FieldTypeVars`
+    (字段名→裸类型变量); `AssignStatement.String` 的 reassign 分支经 `typeVarFieldStoreCast` 探测 `this.field`/`ClassName.field` 左值命中该表、且 RHS
+    非 null/非基本/未已渲染为该变量时, 裹 `(K)` cast。仅同类字段 (其类型变量唯本类已知) 触发, 跨类字段/实参侧仍需被调方泛型签名解析 (见 Bug AH 未决)。
+    种子 pin 真实 `testdata/regression/typevar_field_store.class` (= guava CompactHashMap$MapEntry.class), 承重测试
+    `TestTypeVarFieldStoreCastIsLoadBearing` (源码级: kill-switch `JDEC_NO_TYPEVAR_FIELD_CAST=1` 时存储为裸 `this.key = var...`、开启时出现 `this.key = (K) (`;
+    因该单元是扁平 `Outer$Inner`、javac 17 独立编译会在 Flow$AliveAnalyzer 崩溃故不用 javac 信号, 重编译收益由整树 A/B `TestScratchJarErrDelta` 度量)。
+    实测 **guava 整树 779→757 (-22)**, fastjson2 -1, codec/spring 无回归。
   - **签名多态 (`@PolymorphicSignature`) `MethodHandle.invoke`/`invokeExact` 调用漏铸返回类型 → `incompatible types: Object cannot be converted to <T>` (fastjson2 -30, 本轮单点最大 1-错族)**
     (可用性/重编译, 单类反编译即可见, 整树重编译报 `Object cannot be converted to BiFunction/LongFunction/...`): `MethodHandle.invoke`/`invokeExact`
     在源码层声明 `Object invoke(Object...)` 且带 `@PolymorphicSignature` —— javac 为每个调用点合成专属描述符 (`invokeExact:()Ljava/util/function/BiFunction;`),
@@ -473,10 +484,12 @@
   - **spring-core 5.3.27: 14 错 / 950 单元 (≈0.015/单元, 已达「非常好」)** —— GA 候选。
   - **commons-codec 1.15: 1 错 / 106 单元 (本轮 4→1: Bug AL null-adopt-once 治本 -3)** —— **已基本清零**, 余 1 为
     `DaitchMokotoffSoundex` 的三元 LUB (`ArrayList var = cond ? new ArrayList() : Collections.emptyList()` 应为 `List`, 归 Bug AH)。
-  - **guava 28.2-android: 782 错 / 1877 单元 (本轮 empty-void-emit 治本 829→782, -47)** —— **主导杠杆 = Bug AH 泛型类型变量沿数据流传播** (≈450-500 条:
+  - **guava 28.2-android: 757 错 / 1877 单元 (empty-void-emit 治本 829→782 -47, typevar-field-store-cast 治本 779→757 -22; 整树遮蔽下界)** —— **主导杠杆 = Bug AH 泛型类型变量沿数据流传播** (≈450-500 条:
     `Object→K/E/V/N/T/C/CAP` ≈300 + `type argument not within bounds` ≈84 + `inference variable has incompatible
     bounds` ≈75 + `T[]→E[]` 18); 其余 `cannot find symbol` (含 sun.misc 等 JDK 内部 + 少量真缺陷)、`bad type in
-    conditional expression` 12。即 guava 推 GA 必须做 Bug AH。
+    conditional expression` 12。即 guava 推 GA 必须做 Bug AH。**本轮已啃下 Bug AH 的 return 侧 (`typeVarReturnCast`) 与字段存储侧
+    (`typeVarFieldStoreCast`, 同类 K 字段汇点-cast, guava -22) 两个汇点; 余下 `Object→K` 多为实参侧 (`this.get((K)key)`, 需被调方泛型签名解析)
+    与局部泛型恢复 (`Iterator<? extends K> it = iterable.iterator()` 需把接收者类型实参代入方法返回签名做推断), 后者是真正的泛型推断引擎大特性。**
   - **fastjson2 2.0.43: 整树 javac 总错数 = 716 (ifelse-parallel-phi 治本 852→839, abstract-varargs 治本 839→831,
     final-field-renamed-local 治本 831→826, parallel-arm-phi-orphan 治本 827→819, empty-void-emit 治本 819→759 -60,
     try-slot-phi-merge 治本 759→751 -8, cast-escape-hoist 治本 751→746 -5 / 同治本 guava 782→779 -3,
