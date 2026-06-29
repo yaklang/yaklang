@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
 	"io"
 	"sort"
 	"strings"
@@ -133,16 +132,19 @@ func runForkedSubReactAgentJob(
 		defer cancel()
 	}
 
-	childInvoker, err := buildForkedSubReactInvoker(parentCfg, fork, jobCtx)
+	childInvoker, err := buildForkedSubReactInvoker(parentCfg, fork, jobCtx, subTaskID)
 	if err != nil {
 		return nil, err
 	}
 
 	subTask := aicommon.NewSubTaskBase(parentTask, subTaskID, buildSubAgentUserInput(job), true)
 	childInvoker.SetCurrentTask(subTask)
-	subTask.SetEmitter(aicommon.NewEmitter(uuid.NewString(), func(event *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
-		return event, nil // temporary discard emitter
-	}))
+	// Restore sub-agent emit: derive the sub-task emitter from the parent config emitter
+	// (via PushEventProcesser) so sub-agent events reach the frontend, stamped with the
+	// sub-task id as the aggregation marker. This replaces the temporary discard emitter
+	// that suppressed sub-agent output while waiting for the frontend to support
+	// aggregating sub-agent messages.
+	subTask.SetEmitter(buildSubReactForwardingEmitter(parentCfg.GetEmitter(), subTaskID))
 	branchMarker := fmt.Sprintf("sub-react-branch-marker-%s", subTaskID)
 	fork.Branch.PushText(parentCfg.AcquireId(), branchMarker)
 
@@ -162,15 +164,14 @@ func buildForkedSubReactInvoker(
 	parentCfg *aicommon.Config,
 	fork *aicommon.TimelineFork,
 	jobCtx context.Context,
+	subTaskId string,
 ) (aicommon.AITaskInvokeRuntime, error) {
 	baseOpts := aicommon.ConvertConfigToOptions(parentCfg)
 	baseOpts = append(baseOpts,
 		aicommon.WithTimeline(fork.Branch),
 		aicommon.WithContext(jobCtx),
 		aicommon.WithEnablePlanAndExec(false),
-		aicommon.WithEmitter(aicommon.NewEmitter(uuid.NewString(), func(event *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
-			return event, nil
-		})),
+		aicommon.WithEmitter(buildSubReactForwardingEmitter(parentCfg.GetEmitter(), subTaskId)),
 	)
 
 	childInvoker, err := aicommon.AIRuntimeInvokerGetter(jobCtx, baseOpts...)
@@ -178,6 +179,33 @@ func buildForkedSubReactInvoker(
 		return nil, utils.Wrap(err, "create forked sub react invoker failed")
 	}
 	return childInvoker, nil
+}
+
+// buildSubReactForwardingEmitter derives a sub-agent emitter from the parent emitter
+// via PushEventProcesser (same pattern used by coordinator_invoker.go and taskif.go for
+// stamping task identity onto events). The derived emitter shares the parent's frontend
+// sink (its baseEmitter), so sub-agent status/action-log/answer events reach the frontend,
+// while a processor stamps every event's TaskId with the sub-task id — the marker the
+// frontend uses to aggregate sub-agent messages.
+//
+// It derives from the parent *config* emitter (empty processor stack) rather than the
+// parent *task* emitter on purpose: ForeachStack runs top-to-bottom, so deriving from the
+// task emitter would let the parent task's own TaskId stamp (pushed earlier, lower in the
+// stack) overwrite this sub-task stamp. Deriving from the config emitter leaves only this
+// stamp in the stack, so the sub-task id wins.
+//
+// A nil parentEmitter (e.g. some test configs) degrades to a no-op dummy emitter so
+// callers never panic.
+func buildSubReactForwardingEmitter(parentEmitter *aicommon.Emitter, subTaskId string) *aicommon.Emitter {
+	if parentEmitter == nil {
+		return aicommon.NewDummyEmitter()
+	}
+	return parentEmitter.PushEventProcesser(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
+		if event != nil && subTaskId != "" {
+			event.TaskId = subTaskId
+		}
+		return event
+	})
 }
 
 func buildSubReactLoopOptions(job subReactDispatchJob) []reactloops.ReActLoopOption {
