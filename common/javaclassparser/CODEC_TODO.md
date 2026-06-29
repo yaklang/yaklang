@@ -56,7 +56,17 @@
   第 4 项)。残留 2 条全部是 Group A「类型变量擦除成 Object 出现在非返回位置」(`PairwiseEquivalence` 的
   `Iterator var=it()` 应为 `Iterator<T>`、`Equivalence$Wrapper` 的 `Wrapper var=(Wrapper)o` 应为 `Wrapper<?>`);
   需把泛型类型沿数据流传播 (方法返回按接收者类型实参实例化), 属大特性, 见 Bug AH。
-- **本轮新增治本 (codec 真实差分 + 工业语料新发现, 29 项, 均已锁回归种子, 种子即档案)**:
+- **本轮新增治本 (codec 真实差分 + 工业语料新发现, 30 项, 均已锁回归种子, 种子即档案)**:
+  - **同渲染类型 escaped 局部声明上提: 单一逻辑变量 (或多个同型不相交区间) 声明被困在内层作用域 (if/else 臂、switch case、try/catch、循环体) 而汇点后于更浅作用域读取 → `cannot find symbol: variable varN` (Bug AL 收窄子族, fastjson2 -33 / guava -11, 零回归)**
+    (可用性/重编译, 整树重编译报 `cannot find symbol`): fastjson2 `ObjectReaderBean` 的 slot9 是单一 `ObjectReader`, 在 if 臂内声明 `ObjectReader var9 = ...`,
+    汇点后经**成员访问** `var9.getObjectClass()` 在更浅作用域读取; 臂声明渲染类型恒为同一 token `ObjectReader`, AST `parallelArmDeclHoist` (仅 if/else) 与跨作用域放置都够不到,
+    `hoistCastGuardedEscapedLocals` 也治不了 (它唯一可证 sound 的汇点类型是 `Object`, 而 `Object` 上做成员访问编不过)。治本 `hoistSameTypeEscapedLocals` (`dumper.go`, 文本级):
+    因**已知**每处声明共享的真实类型 token T, 故在方法顶注入 `T varN = null;` 并把内层 `T varN = rhs` 降级为 `varN = rhs`; T 正是原字节码每个 store 产生、每个 read 消费的类型, 故对
+    **任意用法** (成员访问/下标/未铸造实参/算术) 都 type-check, 而非仅 cast。仅当**每处声明渲染同一引用类型 token、且无裸赋值定义** (裸赋值可能属同槽异型区间, 如 map key 复用 ObjectReader 槽)、
+    **且无未被 `castEscapeDeclLineRe` 锚定的声明形态** (catch 形参 `catch(EncoderException varN)` / for-init / for-each / try-with-resources, 由 `castEscapePrecedingIdentType` 守卫排除, 否则会重复声明报 `already defined`)
+    时才触发。种子 pin 真实 `testdata/regression/sametype_escaped_decl.class` (= fastjson2 `reader/ObjectReaderBean.class`), 承重 `TestSameTypeEscapedHoistIsLoadBearing` (源级断言: kill-switch
+    `JDEC_SAMETYPE_HOIST_OFF=1` 时声明困在臂内、成员访问 escaped; 开启时 `ObjectReader var9 = null;` 上提到顶支配该读)。实测 **fastjson2 -33 / guava -11, codec/spring 零回归 (4-jar A/B)**;
+    为「同槽活跃区间分割」大特性可证 sound 子族, 与 AST 级 `parallelArmDeclHoist` / 分析级 `reachingRefSlotPhiMerge` 互补防御 (两者先跑、命中时本文本 pass 自动空转, 故承重测试需同时关两者方能隔离)。
   - **iinc 同槽不相交活跃区间被 DFS 序污染: int 计数器槽被后继 long/float/double 复用 → 计数器 `i++` 误绑到出作用域的后继变量, `cannot find symbol` (Bug AL 收窄子族, fastjson2 -1)**
     (可用性/重编译, 单类反编译即可见, 整树重编译报 `cannot find symbol: variable varN`): fastjson2 `Fnv.hashCode64LCase` 的 slot5 先后承载 int 计数器 / int 字符 /
     `long` 哈希累加器三个不相交活跃区间; 前向模拟的单一全局 slot 表按 DFS 序把**后继 long 复生槽**泄漏回首循环计数器的 iinc, 使 `i++` 渲染成 `var5_1++`
@@ -782,7 +792,15 @@ javac 合成的 `<Enum>(String,int,<Enum>$N)` marker 构造器, 旧版渲染成 
     因其回walk 命中的恒是 int 类别)。已治 (**fastjson2 -1, Fnv 整方法翻转干净; 4-jar A/B 对比旧引用-only 基线 codec/guava/spring
     零回归**)。承重 `TestIincIntCategorySlotRepairIsLoadBearing` (javac 编译真实 Fnv.class, kill-switch `JDEC_IINC_REACHING_OFF`
     双向: 关闭即复现 `var5_1++` 的 `cannot find symbol`, 开启回绑到 `var4++`)。**注: 这是「同槽不相交活跃区间分割」大特性的一个收窄
-    可证 sound 子族; 天然姊妹杠杆是 LOAD 侧 (ILOAD 系列读到 long/float/double 复生槽), 现走热路径风险更高, 列为下一杠杆。**
+    可证 sound 子族; 姊妹 LOAD 侧本轮评估语料库无可测出现, 延后 (见下「根因方向」)。**
+  - **同渲染类型 escaped 局部声明上提 (推广到全控制结构 + 成员访问): 单一逻辑变量/多个同型不相交区间声明困在内层、汇点后于更浅作用域读取
+    → `cannot find symbol` (fastjson2 `ObjectReaderBean` slot9 `ObjectReader`, 读 `var9.getObjectClass()` 成员访问)** ——
+    `hoistSameTypeEscapedLocals` (dumper 文本 pass, 在 `hoistCastGuardedEscapedLocals` 之前)。因**已知**各处声明共享真实类型 token T, 在方法顶注入
+    `T varN = null;` 并把内层 `T varN = rhs` 降级为 `varN = rhs`; 用真实 T 故**支持成员访问/下标/未 cast 实参** (cast 守卫子族只能 widen `Object` 故够不到)。
+    仅当**每处声明同一引用类型 token、无裸赋值定义 (排除同槽异型区间)、无未锚定声明形态 (catch 形参/for-init/for-each/try-with-resources, `castEscapePrecedingIdentType` 守卫排除以免 `already defined`)**
+    时触发。已治 (**fastjson2 -33 / guava -11, codec/spring 零回归, 4-jar A/B**)。承重 `TestSameTypeEscapedHoistIsLoadBearing` (源级双向, kill-switch
+    `JDEC_SAMETYPE_HOIST_OFF`, pin `sametype_escaped_decl.class` = fastjson2 `reader/ObjectReaderBean.class`)。与 `parallelArmDeclHoist` / `reachingRefSlotPhiMerge`
+    互补防御 (后两者先跑、命中时本 pass 空转, 故其承重测试 `TestParallelArmPhiOrphanHoistIsLoadBearing` / `TestRefSlotPhiMergeIsLoadBearing` 本轮已加 `JDEC_SAMETYPE_HOIST_OFF` 隔离)。
 - **if/else 平行 phi「孤儿读」子族 —— 同渲染类型部分已治本 (见上「本轮新增治本」parallel-arm-phi-orphan, 整树 827→819, 翻转 2 文件);
   残留仅「异渲染类型」LUB 子族 (≈4 文件)**。形态: if/else 两臂各在自己臂内声明同一 JVM 槽的局部 (`var<slot>`), 该槽在 if/else **之后**被读
   (phi 合并); 合并后的「读」绑定到**第三个 id** (既非 if 臂 def 的 id 也非 else 臂 def, 而是未构造的 phi 结果 id), 但**渲染成同槽名** `var<slot>`。
@@ -796,7 +814,10 @@ javac 合成的 `<Enum>(String,int,<Enum>$N)` marker 构造器, 旧版渲染成 
   `JSONStreamReaderUTF{8,16}` (`Object`/`List`/`Object`, 读 `return (T)(var2)`) 等「每处非声明用法皆显式 cast」者, 由 `hoistCastGuardedEscapedLocals`
   安全 widen `Object` (见上「本轮已治本子族」)。早期试过「异类型一律 widen 到 `Object`」实测 fastjson2 **+10** (臂内类型相关用法 `varN.foo()` 被 Object
   打断) 已撤; 新 pass 用「**全用法皆 cast** + 缩进逃逸 + 排除标量基本类型/成员访问/下标/算术」紧门, 故只在 widen 必然 sound 时触发, A/B 零回归。
-  **未治 (非 cast 读子集)**: join 后对 varN 直接成员访问或作未 cast 实参者 —— `EnumSchema` (`Integer`/`Long`/`BigInteger`, 读 `this.items.add(var8)` 未 cast 实参,
+  **已治 (同渲染类型子集, 推广到全控制结构 + 成员访问)**: 本轮 `hoistSameTypeEscapedLocals` (见上「本轮新增治本」首项) 把「同渲染类型 escaped 读」从
+  `parallelArmDeclHoist` 的 if/else-2-臂推广到 switch case / try-catch / 循环体 / 任意嵌套, 且因用**真实类型 T** (非 `Object`) 注入声明, **支持成员访问/下标/未 cast 实参**
+  (cast 守卫子族只能 widen `Object` 故够不到这些)。代表已翻转: `ObjectReaderBean` (slot9 `ObjectReader`, 读 `var9.getObjectClass()` 成员访问)、`CSVReader`; 实测 fastjson2 -33 / guava -11 零回归。
+  **未治 (异渲染类型 + 非 cast 读子集)**: join 后对 varN 直接成员访问或作未 cast 实参、**且各臂声明类型不同**者 —— `EnumSchema` (`Integer`/`Long`/`BigInteger`, 读 `this.items.add(var8)` 未 cast 实参,
   另伴随读被误提到比 var8 活跃区更浅的作用域, 属更深的作用域重建)、`ObjectReaderImplGenericArray` (读 `var6_1.add(var7)` 成员访问)。这些真需
   **type-LUB / 公共超类型设施** (反编译器当前无类层级/可赋值性查询, `rg 'Assignable|Superclass|commonSuper'` 命中 0) 才能给出比 `Object` 更具体、
   支撑成员访问的父类型, 属大特性, 暂留。
@@ -822,10 +843,11 @@ javac 合成的 `<Enum>(String,int,<Enum>$N)` marker 构造器, 旧版渲染成 
   特定形态, 但 fastjson2 这类**密集分派 + 多槽复用**的方法仍有残留: 需把局部变量识别从「单一全局 slot 表 + DFS 序」升级
   为**真正的到达定义/活跃区间分割** (同槽不相交活跃区间 → 各自独立变量、声明摆到支配全部读的位置)。属用户要求的
   「活跃性 + 到达定义 + phi 数据流 pass」核心夯实目标, 高回归风险, 须配 kill-switch + 全量 (codec 差分 + 三 jar 基线) 回归逐步推进。
-  本轮已切出并治本 iinc 侧的「int 类别槽被 long/float/double 复生槽污染」子族 (见上「本轮已治本子族」iinc-intcat 项)。
-  **下一收窄子族 (姊妹): LOAD 侧 int 类别修复** —— `reachingSlotVersionOnMismatch` 当前只判「引用 vs 基本型」类别,
-  ILOAD 系列读到 long/float/double 复生槽 (两者皆基本型) 漏判; 治法对称 (新增 `isIntCategoryLoadOpcode` + `isIntCategoryNumeric(better)`
-  守卫), 但 LOAD 是热路径、整树度量受遮蔽噪声 ±3, 须独立 4-jar A/B 严格证零回归后再并入。
+  本轮已切出并治本: ① iinc 侧「int 类别槽被 long/float/double 复生槽污染」子族 (见上「本轮已治本子族」iinc-intcat 项);
+  ② 同渲染类型 escaped 声明上提 (`hoistSameTypeEscapedLocals`, fastjson2 -33 / guava -11, 见上「本轮新增治本」首项)。
+  **姊妹杠杆 LOAD 侧 int 类别修复 (ILOAD 读到 long/float/double 复生槽) —— 本轮评估: 整树/逐文件 profile 未见可测出现** (int-类别槽污染只在 iinc 这类
+  「读-改-写同槽计数器」形态发生, 纯 ILOAD 读极少命中; 语料里 `long cannot be converted to int` / `possible lossy conversion` 近乎为零), 实现将是死代码, **延后**至发现真实种子再做。
+  **下一主导杠杆仍是「异渲染类型」LUB 子族 + 密集分派多槽复用的真正活跃区间分割** (见下), 二者均需 type-LUB / 公共超类型设施, 属大特性。
 - 复现: `SCRATCH=1 PROFILE_JAR=fastjson2 go test -run TestScratchSymbolDrill ./common/javaclassparser/tests/`;
   单类例 `JSONPath` / `ObjectWriterCreator` / `FieldWriter`。
 - 注: DaitchMokotoffSoundex.<clinit> 的 twr `Throwable`/`Map.Entry` 共槽形态 (此前本族最小种子) **本轮已治本**

@@ -1914,6 +1914,7 @@ func (c *ClassObjectDumper) DumpMethodWithInitialId(methodName, desc string, id 
 			if !funcCtx.IsStatic && name != "<clinit>" {
 				receiverType = c.GetConstructorMethodName()
 			}
+			sourceCode = hoistSameTypeEscapedLocals(sourceCode)
 			sourceCode = hoistCastGuardedEscapedLocals(sourceCode)
 			sourceCode = addMissingGeneratedLocalDecls(sourceCode, paramsNewStr, receiverType, c.methodReturnTypeByName())
 			code = sourceCode
@@ -2454,6 +2455,38 @@ func castEscapeLastToken(s string) string {
 	return fields[len(fields)-1]
 }
 
+// castEscapePrecedingIdentType reports the simple/qualified type identifier that immediately precedes
+// a `varN` occurrence when the text before it has the shape `... <identifier> ` (an identifier token
+// followed by whitespace, i.e. a `Type varN` declaration: catch parameter, for-init, for-each, or a
+// try-with-resources). It returns "" when the preceding run is not such an identifier - a binary
+// operator (`a > varN`), an assignment (`= varN`), a comma/paren-delimited argument (`(varN`,
+// `, varN`), a cast (`) varN`), or a keyword-led statement (`return varN`) - so genuine reads are
+// never mistaken for declarations. A non-empty, non-keyword result marks the slot as carrying an
+// unanchored declaration and disqualifies it from the same-type hoist.
+func castEscapePrecedingIdentType(pre string) string {
+	if pre == "" {
+		return ""
+	}
+	if c := pre[len(pre)-1]; c != ' ' && c != '\t' {
+		return ""
+	}
+	q := strings.TrimRight(pre, " \t")
+	i := len(q)
+	for i > 0 {
+		c := q[i-1]
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '$' || c == '.' {
+			i--
+			continue
+		}
+		break
+	}
+	tid := q[i:]
+	if tid == "" || castEscapeTypeKeywords[castEscapeFirstToken(tid)] {
+		return ""
+	}
+	return tid
+}
+
 // castEscapeClassifyUse classifies a single NON-declaration occurrence of a generated local by the
 // text immediately around it: 1 = explicit cast (`(X)(name)`, `(X) (name)`, `(X)name` - the run just
 // before name reduces to a closing `)`), 2 = bare assignment LHS (`name = ...`, preceded only by
@@ -2475,6 +2508,180 @@ func castEscapeClassifyUse(pre, post string) int {
 		}
 	}
 	return 0
+}
+
+// hoistSameTypeEscapedLocals closes the SAME-rendered-type subfamily of the escaped-local-read shape
+// of Bug AL - the sound complement of hoistCastGuardedEscapedLocals. A JVM slot reused for a
+// logically-single variable (or several disjoint ranges that all carry the SAME type) is first
+// declared INSIDE one or more nested scopes - an if/else arm, a switch case, a try/catch, a loop body,
+// or any combination - and then READ after the join, at a shallower indentation than every
+// declaration. The arms carry distinct VarUids that render the IDENTICAL type token T (e.g. every arm
+// declares `JSONReader$Context varN = ...`), so the AST pass parallelArmDeclHoist (if/else only) and
+// the cross-scope placement never reach this shape, and javac rejects the post-join read as
+// "cannot find symbol: variable varN".
+//
+// Unlike hoistCastGuardedEscapedLocals - which has NO recovered join type and so can only fire on the
+// provably-Object shape (every use a cast or assignment) - this pass already KNOWS the single type
+// token T shared by every declaration, so it hoists a real `T varN = null;` to method top and demotes
+// each inner `T varN = rhs` to `varN = rhs`. Because T is exactly the type every store produced and
+// every read consumed in the original bytecode, the result type-checks for ANY use - member access,
+// indexing, an uncast argument/return, arithmetic - not only casts. Merging several disjoint same-type
+// ranges into one top-level variable is sound: the ranges never overlap and each is reassigned before
+// it is read.
+//
+// It fires ONLY when every declaration of the slot renders the identical REFERENCE type token T (a
+// primitive T would need a typed zero and is left to the int path / addMissingGeneratedLocalDecls);
+// the slot has NO bare-assignment definition (`varN = rhs` with no type prefix), because such a store
+// could belong to a DIFFERENT, foreign-typed live range of the same slot (e.g. a map key reusing an
+// ObjectReader's slot, fastjson2 ObjectReaderImplMapTyped) over which hoisting T would mistype it; and
+// at least one READ sits at a shallower indentation than every declaration (the orphan post-join
+// read). Any other shape leaves the slot untouched, so a file keeps its pre-existing error rather than
+// regressing. "Escaped" is detected by indentation, exactly as in hoistCastGuardedEscapedLocals.
+// Kill-switch: JDEC_SAMETYPE_HOIST_OFF=1.
+func hoistSameTypeEscapedLocals(body string) string {
+	if os.Getenv("JDEC_SAMETYPE_HOIST_OFF") != "" {
+		return body
+	}
+	lines := strings.Split(body, "\n")
+	declAt := make([]string, len(lines))
+	for i, ln := range lines {
+		m := castEscapeDeclLineRe.FindStringSubmatch(ln)
+		if m == nil {
+			continue
+		}
+		if castEscapeTypeKeywords[castEscapeFirstToken(m[2])] {
+			continue
+		}
+		declAt[i] = m[3]
+	}
+
+	type rec struct {
+		declDepths  []int
+		readDepths  []int
+		declType    string
+		typeClash   bool
+		bareAssign  bool
+		foreignDecl bool
+	}
+	recs := map[string]*rec{}
+	get := func(name string) *rec {
+		r := recs[name]
+		if r == nil {
+			r = &rec{}
+			recs[name] = r
+		}
+		return r
+	}
+	for i, ln := range lines {
+		depth := len(ln) - len(strings.TrimLeft(ln, " \t"))
+		for _, loc := range generatedLocalRefRe.FindAllStringIndex(ln, -1) {
+			name := ln[loc[0]:loc[1]]
+			r := get(name)
+			if declAt[i] == name {
+				tail := strings.TrimLeft(ln[loc[1]:], " \t")
+				if strings.HasPrefix(tail, "=") || strings.HasPrefix(tail, ";") {
+					typeTok := strings.TrimSpace(castEscapeDeclLineRe.FindStringSubmatch(ln)[2])
+					if r.declType == "" {
+						r.declType = typeTok
+					} else if r.declType != typeTok {
+						r.typeClash = true
+					}
+					r.declDepths = append(r.declDepths, depth)
+					continue
+				}
+			}
+			// A `<non-keyword-identifier> varN` shape is a DECLARATION that castEscapeDeclLineRe could
+			// not anchor (a catch parameter `catch(EncoderException varN)`, a for-init `for(int varN`,
+			// a for-each, or a try-with-resources). It declares a slot-sharing - usually
+			// DIFFERENT-typed - variable, so hoisting our type T over it and injecting a top-level decl
+			// would duplicate it ("variable varN is already defined", commons-codec StringEncoderComparator
+			// catch(EncoderException var4)). Disqualify the name. Genuine reads (member access, indexing,
+			// argument, return, arithmetic, cast) never have a non-keyword identifier immediately before
+			// the name, so they are unaffected - that is the whole point of the same-type hoist.
+			if tid := castEscapePrecedingIdentType(ln[:loc[0]]); tid != "" {
+				r.foreignDecl = true
+			}
+			switch castEscapeClassifyUse(ln[:loc[0]], ln[loc[1]:]) {
+			case 2:
+				r.bareAssign = true
+			default:
+				r.readDepths = append(r.readDepths, depth)
+			}
+		}
+	}
+
+	fired := map[string]bool{}
+	fireType := map[string]string{}
+	for name, r := range recs {
+		if r.typeClash || r.bareAssign || r.foreignDecl || len(r.declDepths) == 0 || len(r.readDepths) == 0 {
+			continue
+		}
+		typeTok := r.declType
+		if typeTok == "" || castEscapeTypeKeywords[castEscapeFirstToken(typeTok)] {
+			continue
+		}
+		// Reference types only: a scalar primitive would need a typed zero and is handled elsewhere.
+		if !strings.Contains(typeTok, "[") && castEscapeScalarPrimitives[castEscapeLastToken(typeTok)] {
+			continue
+		}
+		minDecl := r.declDepths[0]
+		for _, d := range r.declDepths[1:] {
+			if d < minDecl {
+				minDecl = d
+			}
+		}
+		for _, d := range r.readDepths {
+			if d < minDecl {
+				fired[name] = true
+				fireType[name] = typeTok
+				break
+			}
+		}
+	}
+	if len(fired) == 0 {
+		return body
+	}
+
+	out := make([]string, 0, len(lines)+len(fired))
+	for i, ln := range lines {
+		if name := declAt[i]; name != "" && fired[name] {
+			m := castEscapeDeclLineRe.FindStringSubmatch(ln)
+			if strings.HasPrefix(strings.TrimLeft(m[4], " \t"), "=") {
+				out = append(out, m[1]+name+m[4])
+			}
+			// a bare `T varN;` is dropped: the injected `T varN = null;` carries the slot
+			continue
+		}
+		out = append(out, ln)
+	}
+
+	names := make([]string, 0, len(fired))
+	for n := range fired {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	insertIdx := 0
+	for insertIdx < len(out) && strings.TrimSpace(out[insertIdx]) == "" {
+		insertIdx++
+	}
+	indent := "\t"
+	if insertIdx < len(out) {
+		if t := strings.TrimSpace(out[insertIdx]); strings.HasPrefix(t, "super(") || strings.HasPrefix(t, "this(") {
+			insertIdx++
+		}
+		if insertIdx < len(out) {
+			indent = out[insertIdx][:len(out[insertIdx])-len(strings.TrimLeft(out[insertIdx], " \t"))]
+		}
+	}
+	inject := make([]string, 0, len(names))
+	for _, n := range names {
+		inject = append(inject, indent+fireType[n]+" "+n+" = null;")
+	}
+	merged := make([]string, 0, len(out)+len(inject))
+	merged = append(merged, out[:insertIdx]...)
+	merged = append(merged, inject...)
+	merged = append(merged, out[insertIdx:]...)
+	return strings.Join(merged, "\n")
 }
 
 // hoistCastGuardedEscapedLocals closes the "if/else parallel-phi orphan read, DIFFERENT-rendered-type

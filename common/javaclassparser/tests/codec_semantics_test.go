@@ -2659,15 +2659,21 @@ func TestParallelArmPhiOrphanHoistIsLoadBearing(t *testing.T) {
 
 	const orphanSym = "variable var10"
 
+	// The text-level hoistSameTypeEscapedLocals (Bug AL same-type subfamily) ALSO rescues this var10
+	// orphan read, so it must be disabled to isolate the AST parallel-arm hoist under test: OFF disables
+	// both (the error returns), ON re-enables only the parallel-arm hoist (it alone fixes the case).
 	os.Setenv("JDEC_PARALLEL_ARM_HOIST_OFF", "1")
+	os.Setenv("JDEC_SAMETYPE_HOIST_OFF", "1")
 	srcOff, outOff := compileOut()
 	os.Unsetenv("JDEC_PARALLEL_ARM_HOIST_OFF")
 	if !strings.Contains(outOff, "cannot find symbol") || !strings.Contains(outOff, orphanSym) {
+		os.Unsetenv("JDEC_SAMETYPE_HOIST_OFF")
 		t.Fatalf("expected pinned FieldWriterListFunc to FAIL with a 'cannot find symbol: %s' when the parallel-arm hoist is disabled, so the fix is load-bearing; got javac:\n%s\n----- src -----\n%s", orphanSym, outOff, srcOff)
 	}
 	t.Logf("parallel-arm hoist OFF (expected orphan-read %q cannot-find-symbol present)", orphanSym)
 
 	srcOn, outOn := compileOut()
+	os.Unsetenv("JDEC_SAMETYPE_HOIST_OFF")
 	if strings.Contains(outOn, orphanSym) {
 		t.Fatalf("expected the orphan-read %q symbol error to be GONE with the parallel-arm hoist enabled; got javac:\n%s\n----- src -----\n%s", orphanSym, outOn, srcOn)
 	}
@@ -3134,4 +3140,57 @@ func TestIincIntCategorySlotRepairIsLoadBearing(t *testing.T) {
 		t.Fatalf("expected the increment rebound to the int loop counter `var4++` with the fix enabled; got src:\n%s", srcOn)
 	}
 	t.Logf("iinc reaching repair ON (increment rebound to int loop counter `var4++`, recompiles clean)")
+}
+
+// TestSameTypeEscapedHoistIsLoadBearing pins fastjson2's ObjectReaderBean (Bug AL: SAME-rendered-type
+// escaped-local-read subfamily). Slot 9 holds a single logical `ObjectReader` that javac declares
+// inside an if-arm (`ObjectReader var9 = var5.getObjectReader(...)`) and then READS after the join via
+// a MEMBER ACCESS - `var9.getObjectClass()` - at a shallower scope than the declaration. The arm
+// declarations all render the identical type token `ObjectReader`, so neither the AST parallel-arm
+// hoist (it only merges if/else arms) nor the cross-scope placement reaches it, and the post-join read
+// is rejected by javac as "cannot find symbol: variable var9" (the whole-tree 4-jar A/B confirms this
+// class flips from failing to clean: fastjson2 -33, guava -11, zero regression). The Object-only
+// hoistCastGuardedEscapedLocals cannot fix it: a member access on an `Object var9` would not compile.
+// The same-type hoist knows the real shared type `ObjectReader`, so it injects `ObjectReader var9 =
+// null;` at method top and demotes the inner declaration to a bare assignment, binding the member
+// access to a dominating declaration of the correct type. The load-bearing signal is asserted on the
+// decompiled source (the isolated single-file compile carries unrelated nested-import noise that the
+// whole-tree A/B does not): with the pass OFF the declaration is trapped in the arm and the read
+// escapes; with it ON the `ObjectReader var9 = null;` declaration dominates the read. Kill-switch:
+// JDEC_SAMETYPE_HOIST_OFF.
+func TestSameTypeEscapedHoistIsLoadBearing(t *testing.T) {
+	raw, err := regressionFS.ReadFile("testdata/regression/sametype_escaped_decl.class")
+	if err != nil {
+		t.Fatalf("read pinned ObjectReaderBean class: %v", err)
+	}
+	decompileSrc := func() string {
+		decompiled, e := javaclassparser.Decompile(raw)
+		if e != nil {
+			t.Fatalf("decompile: %v", e)
+		}
+		return decompiled
+	}
+
+	const hoisted = "ObjectReader var9 = null;"
+	const read = "var9.getObjectClass()"
+
+	os.Setenv("JDEC_SAMETYPE_HOIST_OFF", "1")
+	srcOff := decompileSrc()
+	os.Unsetenv("JDEC_SAMETYPE_HOIST_OFF")
+	if !strings.Contains(srcOff, read) {
+		t.Fatalf("expected the escaped member-access read %q with the hoist disabled; got src:\n%s", read, srcOff)
+	}
+	if strings.Contains(srcOff, hoisted) {
+		t.Fatalf("expected NO hoisted %q with the hoist disabled (declaration trapped in an arm, read escapes -> cannot find symbol); got src:\n%s", hoisted, srcOff)
+	}
+	t.Logf("same-type hoist OFF (escaped member-access read `var9.getObjectClass()`, declaration trapped in an arm)")
+
+	srcOn := decompileSrc()
+	if !strings.Contains(srcOn, hoisted) {
+		t.Fatalf("expected the hoisted %q declaration with the fix enabled; got src:\n%s", hoisted, srcOn)
+	}
+	if !strings.Contains(srcOn, read) {
+		t.Fatalf("expected the member-access read %q to remain (now bound) with the fix enabled; got src:\n%s", read, srcOn)
+	}
+	t.Logf("same-type hoist ON (real type `ObjectReader var9` hoisted to method top, member access binds)")
 }

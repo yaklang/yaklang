@@ -844,6 +844,12 @@ func TestBridgeMethodSuppression(t *testing.T) {
 // JDEC_REF_SLOT_PHI_MERGE_OFF=1 restores the split; flipping it MUST reintroduce the out-of-scope
 // `var4` read, proving the merge is load-bearing.
 func TestRefSlotPhiMergeIsLoadBearing(t *testing.T) {
+	// Isolate the analyser-level ref-slot phi merge from the text-level hoistSameTypeEscapedLocals
+	// (Bug AL same-type subfamily): with the merge OFF the slot splits into an arm-only
+	// `ArrayList var3 = new ArrayList()` plus an out-of-scope trailing read, which the same-type hoist
+	// would otherwise rescue, masking the merge's load-bearing role. The merge runs first when ON, so
+	// disabling the text hoist throughout leaves the ON output unchanged.
+	t.Setenv("JDEC_SAMETYPE_HOIST_OFF", "1")
 	raw, err := regressionFS.ReadFile("testdata/regression/lazyinit_slot_decl_dropped.class")
 	if err != nil {
 		t.Fatalf("read embedded class failed: %v", err)
