@@ -426,6 +426,7 @@ func (r *ReAct) HandleSyncTypeCloseBrowserEvent(event *ypb.AIInputEvent) error {
 		response["error"] = firstErr.Error()
 	}
 	_, _ = r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "close_browser", response, event.SyncID)
+	reactloops.EmitSessionSnapshot(r.config, r.GetCurrentLoop(), r.GetCurrentTask())
 	return nil
 }
 
