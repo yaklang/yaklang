@@ -8,7 +8,6 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -16,8 +15,8 @@ import (
 )
 
 const (
-	aiMemoryRAGCollectionPrefix      = "ai-memory-"
-	aiMemoryEntityDeleteBatchSize    = 200
+	aiMemoryRAGCollectionPrefix   = "ai-memory-"
+	aiMemoryEntityDeleteBatchSize = 200
 )
 
 // Result summarizes orphan cleanup after database init.
@@ -28,19 +27,19 @@ type Result struct {
 	DeletedWorkDirs          int
 }
 
-func init() {
-	yakit.RegisterPostInitDatabaseFunction(func() error {
-		db := consts.GetGormProjectDatabase()
-		if db == nil {
-			return nil
-		}
-		_, err := ReconcileOrphanArtifacts(db)
-		if err != nil {
-			log.Errorf("reconcile orphan ai session artifacts failed: %v", err)
-		}
-		return err
-	}, "reconcile-orphan-ai-session-artifacts")
-}
+//func init() {
+//	yakit.RegisterPostInitDatabaseFunction(func() error {
+//		db := consts.GetGormProjectDatabase()
+//		if db == nil {
+//			return nil
+//		}
+//		_, err := ReconcileOrphanArtifacts(db)
+//		if err != nil {
+//			log.Errorf("reconcile orphan ai session artifacts failed: %v", err)
+//		}
+//		return err
+//	}, "reconcile-orphan-ai-session-artifacts")
+//}
 
 // ReconcileOrphanArtifacts removes AI memory rows and aispace directories
 // that are no longer associated with any persisted AISession.
