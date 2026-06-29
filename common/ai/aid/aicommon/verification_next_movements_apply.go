@@ -1,5 +1,64 @@
 package aicommon
 
+import "strings"
+
+// BuildDoneMovementsForActiveTodos maps each PENDING/DOING TODO item to an
+// op=done movement. The caller must pass items already scoped to the owning task.
+func BuildDoneMovementsForActiveTodos(items []VerificationTodoItem) []VerifyNextMovement {
+	if len(items) == 0 {
+		return nil
+	}
+	movements := make([]VerifyNextMovement, 0, len(items))
+	for _, item := range items {
+		if item.Status != VerificationTodoStatusPending && item.Status != VerificationTodoStatusDoing {
+			continue
+		}
+		id := strings.TrimSpace(item.ID)
+		if id == "" {
+			continue
+		}
+		movements = append(movements, VerifyNextMovement{Op: "done", ID: id})
+	}
+	return movements
+}
+
+// MarkActiveTodosDoneOnAsyncHandoff closes every PENDING/DOING TODO owned by the
+// current main-loop task when the ReAct loop hands execution off to async mode.
+// This prevents leftover main-loop TODOs from blocking a later finish action
+// while the async sub-task owns continued work under its own scope.
+//
+// 关键词: MarkActiveTodosDoneOnAsyncHandoff, async 交接自动 done, 主循环 TODO 收口
+func MarkActiveTodosDoneOnAsyncHandoff(
+	cfg AICallerConfigIf,
+	emitter *Emitter,
+	task AIStatefulTask,
+	iterationIndex int,
+	timelineHook func(category, line string),
+) {
+	if cfg == nil || task == nil {
+		return
+	}
+	scope := BuildVerificationTodoScope(task)
+	if scope.IsZero() {
+		return
+	}
+	active := cfg.ActiveVerificationTodoItemsByScope(scope)
+	movements := BuildDoneMovementsForActiveTodos(active)
+	if len(movements) == 0 {
+		return
+	}
+	ApplyVerificationNextMovementsAndEmit(
+		cfg,
+		emitter,
+		task,
+		scope,
+		iterationIndex,
+		false,
+		movements,
+		timelineHook,
+	)
+}
+
 // ApplyVerificationNextMovementsAndEmit is the single-source-of-truth helper
 // that wires a `next_movements` delta through to the shared
 // VerificationTodoStore and fires the canonical events consumed by the

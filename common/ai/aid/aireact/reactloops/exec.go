@@ -1111,6 +1111,16 @@ LOOP:
 
 		effectiveAsyncMode := handler.AsyncMode || operator.IsAsyncModeRequested()
 		if effectiveAsyncMode {
+			// 主循环进入 async 时, 当前任务残留的活跃 TODO 自动标记为 done,
+			// 避免异步子任务接手后主循环 TODO 仍阻塞 finish.
+			var asyncTodoTimelineHook func(category, line string)
+			if invoker := r.GetInvoker(); invoker != nil {
+				asyncTodoTimelineHook = func(category, line string) {
+					invoker.AddToTimeline(category, line)
+				}
+			}
+			aicommon.MarkActiveTodosDoneOnAsyncHandoff(r.config, emitter, task, iterationCount, asyncTodoTimelineHook)
+
 			if !handler.AsyncMode {
 				// dynamic async mode requested by handler at runtime
 				task.SetAsyncMode(true)
