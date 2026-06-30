@@ -137,7 +137,7 @@ func runForkedSubReactAgentJob(
 		return nil, err
 	}
 
-	subTask := aicommon.NewSubTaskBase(parentTask, subTaskID, buildSubAgentUserInput(job), true)
+	subTask := aicommon.NewSubTaskBase(parentTask, subTaskID, buildSubAgentUserInput(job), false)
 	childInvoker.SetCurrentTask(subTask)
 	// Restore sub-agent emit: derive the sub-task emitter from the parent config emitter
 	// (via PushEventProcesser) so sub-agent events reach the frontend, stamped with the
