@@ -6,6 +6,8 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -90,6 +92,48 @@ func TestMITM_UploadFile(t *testing.T) {
 			log.Info("finished")
 			cancel()
 		}))
+}
+
+func TestMITM_LargeRequestWireForward(t *testing.T) {
+	const bodySize = 300 * 1024
+	token := uuid.New().String()
+	var receivedBodyLen atomic.Int64
+
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		_, body := lowhttp.SplitHTTPPacketFast(req)
+		receivedBodyLen.Store(int64(len(body)))
+		return []byte("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
+	})
+	target := utils.HostPort(host, port)
+	body := strings.Repeat("Z", bodySize)
+
+	mitmPort := 0
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	NewMITMTestCase(t,
+		CaseWithContext(ctx),
+		CaseWithPort(func(i int) { mitmPort = i }),
+		CaseWithServerStart(func() {
+			_, _, err := poc.DoPOST(
+				"http://"+target+"/"+token,
+				poc.WithBody(body),
+				poc.WithProxy("http://127.0.0.1:"+fmt.Sprint(mitmPort)),
+				poc.WithSave(false),
+			)
+			require.NoError(t, err)
+			require.GreaterOrEqual(t, receivedBodyLen.Load(), int64(bodySize))
+
+			flowMsg, err := QueryHTTPFlows(utils.TimeoutContextSeconds(5), localClient, &ypb.QueryHTTPFlowRequest{
+				Keyword:    token,
+				SourceType: "mitm",
+			}, 1)
+			require.NoError(t, err)
+			require.Len(t, flowMsg.Data, 1)
+			require.True(t, flowMsg.Data[0].IsTooLargeRequest)
+			cancel()
+		}),
+	)
 }
 
 func TestMITM_InvalidUTF8Request(t *testing.T) {

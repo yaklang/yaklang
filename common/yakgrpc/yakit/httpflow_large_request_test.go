@@ -53,6 +53,8 @@ func TestPrepareLargeHTTPFlowRequest_Idempotent(t *testing.T) {
 	require.Equal(t, first, second)
 	require.True(t, httpctx.GetRequestTooLarge(req))
 	require.NotEmpty(t, httpctx.GetRequestTooLargeBodyFile(req))
+	require.Contains(t, string(first), "request too large")
+	require.Empty(t, httpctx.GetPlainRequestBytes(req), "plain request must not hold truncated display bytes for wire forwarding")
 	defer os.Remove(httpctx.GetRequestTooLargeHeaderFile(req))
 	defer os.Remove(httpctx.GetRequestTooLargeBodyFile(req))
 
