@@ -56,95 +56,46 @@ User user = sqlSession.selectOne("getUser", Long.parseLong(userInput));
 SOLUTION
 )
 
-.createStatement().executeQuery(,* as $params);
+// ======================== Rule Body ========================
+
+// Match all SQL statement sinks that execute a tainted SQL string.
+// The glob execute* covers executeQuery, executeUpdate, execute and
+// executeLargeUpdate in one pattern. The createStatement() chain keeps
+// the match on java.sql.Statement, so non-SQL execute* calls don't match.
+.createStatement().execute*(,* as $params);
 check $params;
 
+// Track StringBuilder.append chains that also feed the sink, so the
+// propagation covers both concatenation ("a" + x) and append builders.
 $params<getCallee>?{<name>?{have:toString}}<getObject>.append(,* as $appendParams)
 
+// $limited restricts taint to the sink function's own formal parameters,
+// avoiding false positives where a tainted value merely co-occurs with the
+// sink call instead of flowing into its SQL argument.
 $params<getFunc><getFormalParams> as $limited
-
-
 
 $params + $appendParams as $params
 
-$params ?{opcode: param} as $directly 
+$params ?{opcode: param} as $directly
 $params ?{!opcode:param} #{include:<<<INCLUDE
   *?{opcode:param && <self> & $limited}
 INCLUDE
 }-> as $indirectly
 
-$directly + $indirectly as $vuln 
+$directly + $indirectly as $vuln
 
 alert $vuln for {
 	level: "high",
 	title: "Java SQL Injection Vulnerability Was Detected",
 	title_zh: "检测到Java SQL注入漏洞",
-	solution: <<<SOLUTION
-### 修复建议
-#### 1. 使用参数化查询（PreparedStatement）
-通过预编译SQL语句并绑定用户输入，隔离代码与数据，避免恶意输入篡改逻辑。这是防止SQL注入最有效的方法。
-```java
-// 修复代码示例
-String userInput = request.getParameter("id");
-String sql = "SELECT * FROM users WHERE id = ?";  // 使用占位符
-try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-pstmt.setInt(1, Integer.parseInt(userInput));
-ResultSet rs = pstmt.executeQuery();
-// 处理结果集
-}
-```
-#### 2. 使用ORM框架
-利用Hibernate、MyBatis等ORM框架提供的安全特性，这些框架通常内置了参数化查询的功能，能够自动处理用户输入，降低SQL注入风险。
-```java
-// MyBatis示例 (XML映射文件)
-<select id="getUserById" resultType="User">
-SELECT * FROM users WHERE id = #{userId}  <!-- 安全参数占位符 -->
-</select>
-```
-```java
-// 调用代码 (避免直接拼接)
-String userInput = request.getParameter("id");
-User user = sqlSession.selectOne("getUserById", Integer.parseInt(userInput));
-```
-#### 3. 输入合法性校验和过滤
-在将用户输入用于构建SQL语句之前，进行严格的输入验证和过滤。例如，对数字类型输入强制转换为int或long，对字符串类型输入进行转义或过滤潜在的恶意字符。
-```java
-// 示例：校验输入为数字且范围合法
-String userInput = request.getParameter("id");
-if (!userInput.matches("^[0-9]+$")) {
-throw new IllegalArgumentException("ID输入格式不正确");
-}
-int id = Integer.parseInt(userInput);
-// 如果需要，进一步校验数值范围
-if (id < 1 || id > 1000) {
-throw new IllegalArgumentException("ID超出有效范围");
-}
-// 此时可以将id用于安全的SQL操作（最好是参数化查询）
-```
-SOLUTION
-	desc: <<<DESC
-### 漏洞描述
-1. **漏洞原理**
-SQL注入是由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。
-2. **触发场景**
-```java
-String userInput = request.getParameter("id");
-String sql = "SELECT * FROM users WHERE id = " + userInput;
-Statement stmt = connection.createStatement();
-ResultSet rs = stmt.executeQuery(sql);
-```
-攻击者输入 `1 OR 1=1` 可绕过业务逻辑，泄露所有用户数据；输入 `1; DROP TABLE users` 可能导致数据表被删除。
-3. **潜在影响**
-- 数据库敏感信息（如用户凭证、隐私数据）被窃取。
-- 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
-- 通过数据库提权进一步渗透至服务器或其他系统组件。
-DESC
 	name: "vuln",
 	message: "检测到Java SQL注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 	risk: "SQL注入",
 }
 
 
+
+// ======================== Test Cases ========================
 
 desc(
 	language: java
