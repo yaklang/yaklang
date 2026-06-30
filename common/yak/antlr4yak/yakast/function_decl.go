@@ -18,7 +18,7 @@ func (y *YakCompiler) VisitAnonymousFunctionDecl(raw yak.IAnonymousFunctionDeclC
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	var funcName string
@@ -155,7 +155,7 @@ func (y *YakCompiler) VisitFunctionParamDecl(raw yak.IFunctionParamDeclContext) 
 	if i == nil {
 		return nil, false
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	ellipsis := i.Ellipsis()

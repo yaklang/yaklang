@@ -1,13 +1,12 @@
-// Code generated from java-escape by ANTLR 4.11.1. DO NOT EDIT.
+// Code generated from ./CLexer.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
 package c
 
 import (
 	"fmt"
+	"github.com/yaklang/antlr/v4"
 	"sync"
 	"unicode"
-
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 )
 
 // Suppress unused import error
@@ -22,28 +21,28 @@ type CLexer struct {
 	// TODO: EOF string
 }
 
-var clexerLexerStaticData struct {
+var CLexerLexerStaticData struct {
 	once                   sync.Once
 	serializedATN          []int32
-	channelNames           []string
-	modeNames              []string
-	literalNames           []string
-	symbolicNames          []string
-	ruleNames              []string
-	predictionContextCache *antlr.PredictionContextCache
+	ChannelNames           []string
+	ModeNames              []string
+	LiteralNames           []string
+	SymbolicNames          []string
+	RuleNames              []string
+	PredictionContextCache *antlr.PredictionContextCache
 	atn                    *antlr.ATN
 	decisionToDFA          []*antlr.DFA
 }
 
 func clexerLexerInit() {
-	staticData := &clexerLexerStaticData
-	staticData.channelNames = []string{
+	staticData := &CLexerLexerStaticData
+	staticData.ChannelNames = []string{
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN", "ERROR",
 	}
-	staticData.modeNames = []string{
+	staticData.ModeNames = []string{
 		"DEFAULT_MODE",
 	}
-	staticData.literalNames = []string{
+	staticData.LiteralNames = []string{
 		"", "'auto'", "'break'", "'case'", "'char'", "'const'", "'continue'",
 		"'default'", "'do'", "'double'", "'long double'", "'else'", "'enum'",
 		"'extern'", "'float'", "'for'", "'goto'", "'if'", "'inline'", "'int'",
@@ -62,7 +61,7 @@ func clexerLexerInit() {
 		"'__stdcall'", "'__declspec'", "'__cdecl'", "'__clrcall'", "'__fastcall'",
 		"'__thiscall'", "'__vectorcall'", "'__volatile__'",
 	}
-	staticData.symbolicNames = []string{
+	staticData.SymbolicNames = []string{
 		"", "Auto", "Break", "Case", "Char", "Const", "Continue", "Default",
 		"Do", "Double", "Longdouble", "Else", "Enum", "Extern", "Float", "For",
 		"Goto", "If", "Inline", "Int", "Long", "Longlong", "Register", "Restrict",
@@ -84,7 +83,7 @@ func clexerLexerInit() {
 		"AsmBlock", "Whitespace", "Newline", "BlockComment", "LineComment",
 		"LineContinuation", "EOS",
 	}
-	staticData.ruleNames = []string{
+	staticData.RuleNames = []string{
 		"Auto", "Break", "Case", "Char", "Const", "Continue", "Default", "Do",
 		"Double", "Longdouble", "Else", "Enum", "Extern", "Float", "For", "Goto",
 		"If", "Inline", "Int", "Long", "Longlong", "Register", "Restrict", "Return",
@@ -115,7 +114,7 @@ func clexerLexerInit() {
 		"AsmBlock", "Whitespace", "Newline", "BlockComment", "LineComment",
 		"LineContinuation", "EOS",
 	}
-	staticData.predictionContextCache = antlr.NewPredictionContextCache()
+	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
 		4, 0, 126, 1417, 6, -1, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3,
 		2, 4, 7, 4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9,
@@ -787,7 +786,7 @@ func clexerLexerInit() {
 // NewCLexer(). You can call this function if you wish to initialize the static state ahead
 // of time.
 func CLexerInit() {
-	staticData := &clexerLexerStaticData
+	staticData := &CLexerLexerStaticData
 	staticData.once.Do(clexerLexerInit)
 }
 
@@ -796,13 +795,13 @@ func NewCLexer(input antlr.CharStream) *CLexer {
 	CLexerInit()
 	l := new(CLexer)
 	l.BaseLexer = antlr.NewBaseLexer(input)
-	staticData := &clexerLexerStaticData
-	l.Interpreter = antlr.NewLexerATNSimulator(l, staticData.atn, staticData.decisionToDFA, staticData.predictionContextCache)
-	l.channelNames = staticData.channelNames
-	l.modeNames = staticData.modeNames
-	l.RuleNames = staticData.ruleNames
-	l.LiteralNames = staticData.literalNames
-	l.SymbolicNames = staticData.symbolicNames
+	staticData := &CLexerLexerStaticData
+	l.Interpreter = antlr.NewLexerATNSimulator(l, staticData.atn, staticData.decisionToDFA, staticData.PredictionContextCache)
+	l.channelNames = staticData.ChannelNames
+	l.modeNames = staticData.ModeNames
+	l.RuleNames = staticData.RuleNames
+	l.LiteralNames = staticData.LiteralNames
+	l.SymbolicNames = staticData.SymbolicNames
 	l.GrammarFileName = "CLexer.g4"
 	// TODO: l.EOF = antlr.TokenEOF
 

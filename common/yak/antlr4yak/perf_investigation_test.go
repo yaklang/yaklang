@@ -11,7 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 )
 
 // 关键词: yaklang parser performance, lexer vs parser, AdaptivePredict, PredictionMode SLL

@@ -1,4 +1,4 @@
-// Code generated from java-escape by ANTLR 4.11.1. DO NOT EDIT.
+// Code generated from ./SpelParser.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
 package spelparser // SpelParser
 import (
@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 )
 
 // Suppress unused import errors
@@ -18,20 +18,20 @@ type SpelParser struct {
 	*antlr.BaseParser
 }
 
-var spelparserParserStaticData struct {
+var SpelParserParserStaticData struct {
 	once                   sync.Once
 	serializedATN          []int32
-	literalNames           []string
-	symbolicNames          []string
-	ruleNames              []string
-	predictionContextCache *antlr.PredictionContextCache
+	LiteralNames           []string
+	SymbolicNames          []string
+	RuleNames              []string
+	PredictionContextCache *antlr.PredictionContextCache
 	atn                    *antlr.ATN
 	decisionToDFA          []*antlr.DFA
 }
 
 func spelparserParserInit() {
-	staticData := &spelparserParserStaticData
-	staticData.literalNames = []string{
+	staticData := &SpelParserParserStaticData
+	staticData.LiteralNames = []string{
 		"", "';'", "", "'++'", "'+'", "'--'", "'-'", "':'", "'.'", "','", "'*'",
 		"'/'", "'%'", "'('", "')'", "'['", "']'", "'#'", "'@'", "'^['", "'^'",
 		"'!='", "'!['", "'!'", "'=='", "'='", "'&&'", "'&'", "'||'", "'?['",
@@ -40,7 +40,7 @@ func spelparserParserInit() {
 		"'matches'", "'gt'", "'ge'", "'le'", "'lt'", "'eq'", "'ne'", "", "",
 		"", "", "", "", "", "'``'",
 	}
-	staticData.symbolicNames = []string{
+	staticData.SymbolicNames = []string{
 		"", "SEMICOLON", "WS", "INC", "PLUS", "DEC", "MINUS", "COLON", "DOT",
 		"COMMA", "STAR", "DIV", "MOD", "LPAREN", "RPAREN", "LSQUARE", "RSQUARE",
 		"HASH", "BEAN_REF", "SELECT_FIRST", "POWER", "NE", "PROJECT", "NOT",
@@ -52,7 +52,7 @@ func spelparserParserInit() {
 		"STRING_LITERAL", "SINGLE_QUOTED_STRING", "DOUBLE_QUOTED_STRING", "PROPERTY_PLACE_HOLDER",
 		"ESCAPED_BACKTICK", "SPEL_IN_TEMPLATE_STRING_OPEN", "TEMPLATE_TEXT",
 	}
-	staticData.ruleNames = []string{
+	staticData.RuleNames = []string{
 		"script", "spelExpr", "node", "nonDottedNode", "dottedNode", "functionOrVar",
 		"methodArgs", "args", "methodOrProperty", "projection", "selection",
 		"startNode", "literal", "numericLiteral", "parenspelExpr", "typeReference",
@@ -60,7 +60,7 @@ func spelparserParserInit() {
 		"inlineListOrMap", "listBindings", "listBinding", "mapBindings", "mapBinding",
 		"beanReference", "inputParameter", "propertyPlaceHolder",
 	}
-	staticData.predictionContextCache = antlr.NewPredictionContextCache()
+	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
 		4, 1, 64, 284, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
 		4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 2, 10, 7,
@@ -205,7 +205,7 @@ func spelparserParserInit() {
 // NewSpelParser(). You can call this function if you wish to initialize the static state ahead
 // of time.
 func SpelParserInit() {
-	staticData := &spelparserParserStaticData
+	staticData := &SpelParserParserStaticData
 	staticData.once.Do(spelparserParserInit)
 }
 
@@ -214,12 +214,12 @@ func NewSpelParser(input antlr.TokenStream) *SpelParser {
 	SpelParserInit()
 	this := new(SpelParser)
 	this.BaseParser = antlr.NewBaseParser(input)
-	staticData := &spelparserParserStaticData
-	this.Interpreter = antlr.NewParserATNSimulator(this, staticData.atn, staticData.decisionToDFA, staticData.predictionContextCache)
-	this.RuleNames = staticData.ruleNames
-	this.LiteralNames = staticData.literalNames
-	this.SymbolicNames = staticData.symbolicNames
-	this.GrammarFileName = "java-escape"
+	staticData := &SpelParserParserStaticData
+	this.Interpreter = antlr.NewParserATNSimulator(this, staticData.atn, staticData.decisionToDFA, staticData.PredictionContextCache)
+	this.RuleNames = staticData.RuleNames
+	this.LiteralNames = staticData.LiteralNames
+	this.SymbolicNames = staticData.SymbolicNames
+	this.GrammarFileName = "SpelParser.g4"
 
 	return this
 }
@@ -332,20 +332,29 @@ type IScriptContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	SpelExpr() ISpelExprContext
+	EOF() antlr.TerminalNode
+
 	// IsScriptContext differentiates from other interfaces.
 	IsScriptContext()
 }
 
 type ScriptContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyScriptContext() *ScriptContext {
 	var p = new(ScriptContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_script
 	return p
+}
+
+func InitEmptyScriptContext(p *ScriptContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_script
 }
 
 func (*ScriptContext) IsScriptContext() {}
@@ -353,7 +362,7 @@ func (*ScriptContext) IsScriptContext() {}
 func NewScriptContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ScriptContext {
 	var p = new(ScriptContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_script
@@ -402,28 +411,8 @@ func (s *ScriptContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SpelParser) Script() (localctx IScriptContext) {
-	this := p
-	_ = this
-
 	localctx = NewScriptContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, SpelParserRULE_script)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(56)
@@ -432,9 +421,23 @@ func (p *SpelParser) Script() (localctx IScriptContext) {
 	{
 		p.SetState(57)
 		p.Match(SpelParserEOF)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISpelExprContext is an interface to support dynamic dispatch.
@@ -444,20 +447,62 @@ type ISpelExprContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllSpelExpr() []ISpelExprContext
+	SpelExpr(i int) ISpelExprContext
+	PLUS() antlr.TerminalNode
+	MINUS() antlr.TerminalNode
+	NOT() antlr.TerminalNode
+	INC() antlr.TerminalNode
+	DEC() antlr.TerminalNode
+	StartNode() IStartNodeContext
+	AllNode() []INodeContext
+	Node(i int) INodeContext
+	POWER() antlr.TerminalNode
+	STAR() antlr.TerminalNode
+	DIV() antlr.TerminalNode
+	MOD() antlr.TerminalNode
+	GT() antlr.TerminalNode
+	LT() antlr.TerminalNode
+	LE() antlr.TerminalNode
+	GE() antlr.TerminalNode
+	EQ() antlr.TerminalNode
+	NE() antlr.TerminalNode
+	GT_KEYWORD() antlr.TerminalNode
+	LT_KEYWORD() antlr.TerminalNode
+	LE_KEYWORD() antlr.TerminalNode
+	GE_KEYWORD() antlr.TerminalNode
+	EQ_KEYWORD() antlr.TerminalNode
+	NE_KEYWORD() antlr.TerminalNode
+	AND() antlr.TerminalNode
+	SYMBOLIC_AND() antlr.TerminalNode
+	OR() antlr.TerminalNode
+	SYMBOLIC_OR() antlr.TerminalNode
+	MATCHES() antlr.TerminalNode
+	ASSIGN() antlr.TerminalNode
+	ELVIS() antlr.TerminalNode
+	QMARK() antlr.TerminalNode
+	COLON() antlr.TerminalNode
+
 	// IsSpelExprContext differentiates from other interfaces.
 	IsSpelExprContext()
 }
 
 type SpelExprContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptySpelExprContext() *SpelExprContext {
 	var p = new(SpelExprContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_spelExpr
 	return p
+}
+
+func InitEmptySpelExprContext(p *SpelExprContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_spelExpr
 }
 
 func (*SpelExprContext) IsSpelExprContext() {}
@@ -465,7 +510,7 @@ func (*SpelExprContext) IsSpelExprContext() {}
 func NewSpelExprContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SpelExprContext {
 	var p = new(SpelExprContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_spelExpr
@@ -716,10 +761,8 @@ func (p *SpelParser) SpelExpr() (localctx ISpelExprContext) {
 }
 
 func (p *SpelParser) spelExpr(_p int) (localctx ISpelExprContext) {
-	this := p
-	_ = this
-
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
+
 	_parentState := p.GetState()
 	localctx = NewSpelExprContext(p, p.GetParserRuleContext(), _parentState)
 	var _prevctx ISpelExprContext = localctx
@@ -728,27 +771,14 @@ func (p *SpelParser) spelExpr(_p int) (localctx ISpelExprContext) {
 	p.EnterRecursionRule(localctx, 2, SpelParserRULE_spelExpr, _p)
 	var _la int
 
-	defer func() {
-		p.UnrollRecursionContexts(_parentctx)
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(69)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case SpelParserINC, SpelParserPLUS, SpelParserDEC, SpelParserMINUS, SpelParserNOT:
@@ -775,8 +805,13 @@ func (p *SpelParser) spelExpr(_p int) (localctx ISpelExprContext) {
 		}
 		p.SetState(66)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 0, p.GetParserRuleContext())
-
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 0, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 		for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			if _alt == 1 {
 				{
@@ -787,17 +822,29 @@ func (p *SpelParser) spelExpr(_p int) (localctx ISpelExprContext) {
 			}
 			p.SetState(68)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 0, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 0, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 	p.GetParserRuleContext().SetStop(p.GetTokenStream().LT(-1))
 	p.SetState(108)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 3, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 3, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			if p.GetParseListeners() != nil {
@@ -806,18 +853,27 @@ func (p *SpelParser) spelExpr(_p int) (localctx ISpelExprContext) {
 			_prevctx = localctx
 			p.SetState(106)
 			p.GetErrorHandler().Sync(p)
-			switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 2, p.GetParserRuleContext()) {
+			if p.HasError() {
+				goto errorExit
+			}
+
+			switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 2, p.GetParserRuleContext()) {
 			case 1:
 				localctx = NewSpelExprContext(p, _parentctx, _parentState)
 				p.PushNewRecursionContext(localctx, _startState, SpelParserRULE_spelExpr)
 				p.SetState(71)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 11)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 11)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 11)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(72)
 					p.Match(SpelParserPOWER)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(73)
@@ -830,7 +886,8 @@ func (p *SpelParser) spelExpr(_p int) (localctx ISpelExprContext) {
 				p.SetState(74)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 10)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 10)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 10)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(75)
@@ -854,7 +911,8 @@ func (p *SpelParser) spelExpr(_p int) (localctx ISpelExprContext) {
 				p.SetState(77)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 9)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 9)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 9)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(78)
@@ -878,7 +936,8 @@ func (p *SpelParser) spelExpr(_p int) (localctx ISpelExprContext) {
 				p.SetState(80)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 8)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 8)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 8)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(81)
@@ -902,7 +961,8 @@ func (p *SpelParser) spelExpr(_p int) (localctx ISpelExprContext) {
 				p.SetState(83)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 7)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 7)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 7)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(84)
@@ -926,7 +986,8 @@ func (p *SpelParser) spelExpr(_p int) (localctx ISpelExprContext) {
 				p.SetState(86)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 6)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 6)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 6)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(87)
@@ -950,11 +1011,16 @@ func (p *SpelParser) spelExpr(_p int) (localctx ISpelExprContext) {
 				p.SetState(89)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 5)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 5)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 5)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(90)
 					p.Match(SpelParserMATCHES)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(91)
@@ -967,11 +1033,16 @@ func (p *SpelParser) spelExpr(_p int) (localctx ISpelExprContext) {
 				p.SetState(92)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 4)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 4)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 4)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(93)
 					p.Match(SpelParserASSIGN)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(94)
@@ -984,11 +1055,16 @@ func (p *SpelParser) spelExpr(_p int) (localctx ISpelExprContext) {
 				p.SetState(95)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 3)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 3)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 3)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(96)
 					p.Match(SpelParserELVIS)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(97)
@@ -1001,11 +1077,16 @@ func (p *SpelParser) spelExpr(_p int) (localctx ISpelExprContext) {
 				p.SetState(98)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 2)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 2)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 2)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(99)
 					p.Match(SpelParserQMARK)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(100)
@@ -1014,6 +1095,10 @@ func (p *SpelParser) spelExpr(_p int) (localctx ISpelExprContext) {
 				{
 					p.SetState(101)
 					p.Match(SpelParserCOLON)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(102)
@@ -1026,7 +1111,8 @@ func (p *SpelParser) spelExpr(_p int) (localctx ISpelExprContext) {
 				p.SetState(104)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 12)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 12)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 12)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(105)
@@ -1040,15 +1126,33 @@ func (p *SpelParser) spelExpr(_p int) (localctx ISpelExprContext) {
 					}
 				}
 
+			case antlr.ATNInvalidAltNumber:
+				goto errorExit
 			}
 
 		}
 		p.SetState(110)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 3, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 3, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.UnrollRecursionContexts(_parentctx)
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // INodeContext is an interface to support dynamic dispatch.
@@ -1058,20 +1162,29 @@ type INodeContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	DottedNode() IDottedNodeContext
+	NonDottedNode() INonDottedNodeContext
+
 	// IsNodeContext differentiates from other interfaces.
 	IsNodeContext()
 }
 
 type NodeContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyNodeContext() *NodeContext {
 	var p = new(NodeContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_node
 	return p
+}
+
+func InitEmptyNodeContext(p *NodeContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_node
 }
 
 func (*NodeContext) IsNodeContext() {}
@@ -1079,7 +1192,7 @@ func (*NodeContext) IsNodeContext() {}
 func NewNodeContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *NodeContext {
 	var p = new(NodeContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_node
@@ -1140,30 +1253,13 @@ func (s *NodeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SpelParser) Node() (localctx INodeContext) {
-	this := p
-	_ = this
-
 	localctx = NewNodeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 4, SpelParserRULE_node)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(113)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case SpelParserDOT, SpelParserHASH, SpelParserSELECT_FIRST, SpelParserPROJECT, SpelParserSELECT, SpelParserSAFE_NAVI, SpelParserSELECT_LAST:
@@ -1181,10 +1277,21 @@ func (p *SpelParser) Node() (localctx INodeContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // INonDottedNodeContext is an interface to support dynamic dispatch.
@@ -1194,20 +1301,32 @@ type INonDottedNodeContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	LSQUARE() antlr.TerminalNode
+	SpelExpr() ISpelExprContext
+	RSQUARE() antlr.TerminalNode
+	InputParameter() IInputParameterContext
+	PropertyPlaceHolder() IPropertyPlaceHolderContext
+
 	// IsNonDottedNodeContext differentiates from other interfaces.
 	IsNonDottedNodeContext()
 }
 
 type NonDottedNodeContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyNonDottedNodeContext() *NonDottedNodeContext {
 	var p = new(NonDottedNodeContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_nonDottedNode
 	return p
+}
+
+func InitEmptyNonDottedNodeContext(p *NonDottedNodeContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_nonDottedNode
 }
 
 func (*NonDottedNodeContext) IsNonDottedNodeContext() {}
@@ -1215,7 +1334,7 @@ func (*NonDottedNodeContext) IsNonDottedNodeContext() {}
 func NewNonDottedNodeContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *NonDottedNodeContext {
 	var p = new(NonDottedNodeContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_nonDottedNode
@@ -1300,36 +1419,24 @@ func (s *NonDottedNodeContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *SpelParser) NonDottedNode() (localctx INonDottedNodeContext) {
-	this := p
-	_ = this
-
 	localctx = NewNonDottedNodeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, SpelParserRULE_nonDottedNode)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(121)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 5, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 5, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(115)
 			p.Match(SpelParserLSQUARE)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(116)
@@ -1338,6 +1445,10 @@ func (p *SpelParser) NonDottedNode() (localctx INonDottedNodeContext) {
 		{
 			p.SetState(117)
 			p.Match(SpelParserRSQUARE)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 2:
@@ -1354,9 +1465,21 @@ func (p *SpelParser) NonDottedNode() (localctx INonDottedNodeContext) {
 			p.PropertyPlaceHolder()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDottedNodeContext is an interface to support dynamic dispatch.
@@ -1366,20 +1489,33 @@ type IDottedNodeContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	MethodOrProperty() IMethodOrPropertyContext
+	DOT() antlr.TerminalNode
+	SAFE_NAVI() antlr.TerminalNode
+	FunctionOrVar() IFunctionOrVarContext
+	Projection() IProjectionContext
+	Selection() ISelectionContext
+
 	// IsDottedNodeContext differentiates from other interfaces.
 	IsDottedNodeContext()
 }
 
 type DottedNodeContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyDottedNodeContext() *DottedNodeContext {
 	var p = new(DottedNodeContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_dottedNode
 	return p
+}
+
+func InitEmptyDottedNodeContext(p *DottedNodeContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_dottedNode
 }
 
 func (*DottedNodeContext) IsDottedNodeContext() {}
@@ -1387,7 +1523,7 @@ func (*DottedNodeContext) IsDottedNodeContext() {}
 func NewDottedNodeContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DottedNodeContext {
 	var p = new(DottedNodeContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_dottedNode
@@ -1488,31 +1624,15 @@ func (s *DottedNodeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SpelParser) DottedNode() (localctx IDottedNodeContext) {
-	this := p
-	_ = this
-
 	localctx = NewDottedNodeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 8, SpelParserRULE_dottedNode)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(128)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case SpelParserDOT, SpelParserSAFE_NAVI:
@@ -1555,10 +1675,21 @@ func (p *SpelParser) DottedNode() (localctx IDottedNodeContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFunctionOrVarContext is an interface to support dynamic dispatch.
@@ -1568,20 +1699,30 @@ type IFunctionOrVarContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	HASH() antlr.TerminalNode
+	IDENTIFIER() antlr.TerminalNode
+	MethodArgs() IMethodArgsContext
+
 	// IsFunctionOrVarContext differentiates from other interfaces.
 	IsFunctionOrVarContext()
 }
 
 type FunctionOrVarContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFunctionOrVarContext() *FunctionOrVarContext {
 	var p = new(FunctionOrVarContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_functionOrVar
 	return p
+}
+
+func InitEmptyFunctionOrVarContext(p *FunctionOrVarContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_functionOrVar
 }
 
 func (*FunctionOrVarContext) IsFunctionOrVarContext() {}
@@ -1589,7 +1730,7 @@ func (*FunctionOrVarContext) IsFunctionOrVarContext() {}
 func NewFunctionOrVarContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FunctionOrVarContext {
 	var p = new(FunctionOrVarContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_functionOrVar
@@ -1642,40 +1783,32 @@ func (s *FunctionOrVarContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *SpelParser) FunctionOrVar() (localctx IFunctionOrVarContext) {
-	this := p
-	_ = this
-
 	localctx = NewFunctionOrVarContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 10, SpelParserRULE_functionOrVar)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(135)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 7, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 7, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(130)
 			p.Match(SpelParserHASH)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(131)
 			p.Match(SpelParserIDENTIFIER)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 2:
@@ -1683,19 +1816,39 @@ func (p *SpelParser) FunctionOrVar() (localctx IFunctionOrVarContext) {
 		{
 			p.SetState(132)
 			p.Match(SpelParserHASH)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(133)
 			p.Match(SpelParserIDENTIFIER)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(134)
 			p.MethodArgs()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IMethodArgsContext is an interface to support dynamic dispatch.
@@ -1705,20 +1858,30 @@ type IMethodArgsContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	LPAREN() antlr.TerminalNode
+	Args() IArgsContext
+	RPAREN() antlr.TerminalNode
+
 	// IsMethodArgsContext differentiates from other interfaces.
 	IsMethodArgsContext()
 }
 
 type MethodArgsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyMethodArgsContext() *MethodArgsContext {
 	var p = new(MethodArgsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_methodArgs
 	return p
+}
+
+func InitEmptyMethodArgsContext(p *MethodArgsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_methodArgs
 }
 
 func (*MethodArgsContext) IsMethodArgsContext() {}
@@ -1726,7 +1889,7 @@ func (*MethodArgsContext) IsMethodArgsContext() {}
 func NewMethodArgsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MethodArgsContext {
 	var p = new(MethodArgsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_methodArgs
@@ -1779,32 +1942,16 @@ func (s *MethodArgsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SpelParser) MethodArgs() (localctx IMethodArgsContext) {
-	this := p
-	_ = this
-
 	localctx = NewMethodArgsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 12, SpelParserRULE_methodArgs)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(137)
 		p.Match(SpelParserLPAREN)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(138)
@@ -1813,9 +1960,23 @@ func (p *SpelParser) MethodArgs() (localctx IMethodArgsContext) {
 	{
 		p.SetState(139)
 		p.Match(SpelParserRPAREN)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IArgsContext is an interface to support dynamic dispatch.
@@ -1825,20 +1986,31 @@ type IArgsContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllSpelExpr() []ISpelExprContext
+	SpelExpr(i int) ISpelExprContext
+	AllCOMMA() []antlr.TerminalNode
+	COMMA(i int) antlr.TerminalNode
+
 	// IsArgsContext differentiates from other interfaces.
 	IsArgsContext()
 }
 
 type ArgsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyArgsContext() *ArgsContext {
 	var p = new(ArgsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_args
 	return p
+}
+
+func InitEmptyArgsContext(p *ArgsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_args
 }
 
 func (*ArgsContext) IsArgsContext() {}
@@ -1846,7 +2018,7 @@ func (*ArgsContext) IsArgsContext() {}
 func NewArgsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ArgsContext {
 	var p = new(ArgsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_args
@@ -1924,32 +2096,16 @@ func (s *ArgsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SpelParser) Args() (localctx IArgsContext) {
-	this := p
-	_ = this
-
 	localctx = NewArgsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 14, SpelParserRULE_args)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(142)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&2846547927534313592) != 0 {
@@ -1961,12 +2117,19 @@ func (p *SpelParser) Args() (localctx IArgsContext) {
 	}
 	p.SetState(148)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == SpelParserCOMMA {
 		{
 			p.SetState(144)
 			p.Match(SpelParserCOMMA)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(145)
@@ -1975,10 +2138,23 @@ func (p *SpelParser) Args() (localctx IArgsContext) {
 
 		p.SetState(150)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IMethodOrPropertyContext is an interface to support dynamic dispatch.
@@ -1988,20 +2164,29 @@ type IMethodOrPropertyContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	IDENTIFIER() antlr.TerminalNode
+	MethodArgs() IMethodArgsContext
+
 	// IsMethodOrPropertyContext differentiates from other interfaces.
 	IsMethodOrPropertyContext()
 }
 
 type MethodOrPropertyContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyMethodOrPropertyContext() *MethodOrPropertyContext {
 	var p = new(MethodOrPropertyContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_methodOrProperty
 	return p
+}
+
+func InitEmptyMethodOrPropertyContext(p *MethodOrPropertyContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_methodOrProperty
 }
 
 func (*MethodOrPropertyContext) IsMethodOrPropertyContext() {}
@@ -2009,7 +2194,7 @@ func (*MethodOrPropertyContext) IsMethodOrPropertyContext() {}
 func NewMethodOrPropertyContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MethodOrPropertyContext {
 	var p = new(MethodOrPropertyContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_methodOrProperty
@@ -2058,36 +2243,24 @@ func (s *MethodOrPropertyContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *SpelParser) MethodOrProperty() (localctx IMethodOrPropertyContext) {
-	this := p
-	_ = this
-
 	localctx = NewMethodOrPropertyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 16, SpelParserRULE_methodOrProperty)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(154)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 10, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 10, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(151)
 			p.Match(SpelParserIDENTIFIER)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 2:
@@ -2095,15 +2268,31 @@ func (p *SpelParser) MethodOrProperty() (localctx IMethodOrPropertyContext) {
 		{
 			p.SetState(152)
 			p.Match(SpelParserIDENTIFIER)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(153)
 			p.MethodArgs()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IProjectionContext is an interface to support dynamic dispatch.
@@ -2113,20 +2302,30 @@ type IProjectionContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	PROJECT() antlr.TerminalNode
+	SpelExpr() ISpelExprContext
+	RSQUARE() antlr.TerminalNode
+
 	// IsProjectionContext differentiates from other interfaces.
 	IsProjectionContext()
 }
 
 type ProjectionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyProjectionContext() *ProjectionContext {
 	var p = new(ProjectionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_projection
 	return p
+}
+
+func InitEmptyProjectionContext(p *ProjectionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_projection
 }
 
 func (*ProjectionContext) IsProjectionContext() {}
@@ -2134,7 +2333,7 @@ func (*ProjectionContext) IsProjectionContext() {}
 func NewProjectionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ProjectionContext {
 	var p = new(ProjectionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_projection
@@ -2187,32 +2386,16 @@ func (s *ProjectionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SpelParser) Projection() (localctx IProjectionContext) {
-	this := p
-	_ = this
-
 	localctx = NewProjectionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 18, SpelParserRULE_projection)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(156)
 		p.Match(SpelParserPROJECT)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(157)
@@ -2221,9 +2404,23 @@ func (p *SpelParser) Projection() (localctx IProjectionContext) {
 	{
 		p.SetState(158)
 		p.Match(SpelParserRSQUARE)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISelectionContext is an interface to support dynamic dispatch.
@@ -2233,20 +2430,32 @@ type ISelectionContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	SpelExpr() ISpelExprContext
+	RSQUARE() antlr.TerminalNode
+	SELECT() antlr.TerminalNode
+	SELECT_FIRST() antlr.TerminalNode
+	SELECT_LAST() antlr.TerminalNode
+
 	// IsSelectionContext differentiates from other interfaces.
 	IsSelectionContext()
 }
 
 type SelectionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptySelectionContext() *SelectionContext {
 	var p = new(SelectionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_selection
 	return p
+}
+
+func InitEmptySelectionContext(p *SelectionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_selection
 }
 
 func (*SelectionContext) IsSelectionContext() {}
@@ -2254,7 +2463,7 @@ func (*SelectionContext) IsSelectionContext() {}
 func NewSelectionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SelectionContext {
 	var p = new(SelectionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_selection
@@ -2315,28 +2524,9 @@ func (s *SelectionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SpelParser) Selection() (localctx ISelectionContext) {
-	this := p
-	_ = this
-
 	localctx = NewSelectionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 20, SpelParserRULE_selection)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -2357,9 +2547,23 @@ func (p *SpelParser) Selection() (localctx ISelectionContext) {
 	{
 		p.SetState(162)
 		p.Match(SpelParserRSQUARE)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IStartNodeContext is an interface to support dynamic dispatch.
@@ -2369,20 +2573,40 @@ type IStartNodeContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Literal() ILiteralContext
+	ParenspelExpr() IParenspelExprContext
+	TypeReference() ITypeReferenceContext
+	NullReference() INullReferenceContext
+	ConstructorReference() IConstructorReferenceContext
+	MethodOrProperty() IMethodOrPropertyContext
+	FunctionOrVar() IFunctionOrVarContext
+	BeanReference() IBeanReferenceContext
+	Projection() IProjectionContext
+	Selection() ISelectionContext
+	InlineListOrMap() IInlineListOrMapContext
+	InputParameter() IInputParameterContext
+	PropertyPlaceHolder() IPropertyPlaceHolderContext
+
 	// IsStartNodeContext differentiates from other interfaces.
 	IsStartNodeContext()
 }
 
 type StartNodeContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyStartNodeContext() *StartNodeContext {
 	var p = new(StartNodeContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_startNode
 	return p
+}
+
+func InitEmptyStartNodeContext(p *StartNodeContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_startNode
 }
 
 func (*StartNodeContext) IsStartNodeContext() {}
@@ -2390,7 +2614,7 @@ func (*StartNodeContext) IsStartNodeContext() {}
 func NewStartNodeContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *StartNodeContext {
 	var p = new(StartNodeContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_startNode
@@ -2627,30 +2851,13 @@ func (s *StartNodeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SpelParser) StartNode() (localctx IStartNodeContext) {
-	this := p
-	_ = this
-
 	localctx = NewStartNodeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 22, SpelParserRULE_startNode)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(177)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case SpelParserTRUE, SpelParserFALSE, SpelParserREAL_LITERAL, SpelParserINTEGER_LITERAL, SpelParserSTRING_LITERAL:
@@ -2745,10 +2952,21 @@ func (p *SpelParser) StartNode() (localctx IStartNodeContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ILiteralContext is an interface to support dynamic dispatch.
@@ -2758,20 +2976,31 @@ type ILiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	NumericLiteral() INumericLiteralContext
+	STRING_LITERAL() antlr.TerminalNode
+	TRUE() antlr.TerminalNode
+	FALSE() antlr.TerminalNode
+
 	// IsLiteralContext differentiates from other interfaces.
 	IsLiteralContext()
 }
 
 type LiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyLiteralContext() *LiteralContext {
 	var p = new(LiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_literal
 	return p
+}
+
+func InitEmptyLiteralContext(p *LiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_literal
 }
 
 func (*LiteralContext) IsLiteralContext() {}
@@ -2779,7 +3008,7 @@ func (*LiteralContext) IsLiteralContext() {}
 func NewLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *LiteralContext {
 	var p = new(LiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_literal
@@ -2836,30 +3065,13 @@ func (s *LiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SpelParser) Literal() (localctx ILiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 24, SpelParserRULE_literal)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(183)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case SpelParserREAL_LITERAL, SpelParserINTEGER_LITERAL:
@@ -2874,6 +3086,10 @@ func (p *SpelParser) Literal() (localctx ILiteralContext) {
 		{
 			p.SetState(180)
 			p.Match(SpelParserSTRING_LITERAL)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case SpelParserTRUE:
@@ -2881,6 +3097,10 @@ func (p *SpelParser) Literal() (localctx ILiteralContext) {
 		{
 			p.SetState(181)
 			p.Match(SpelParserTRUE)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case SpelParserFALSE:
@@ -2888,13 +3108,28 @@ func (p *SpelParser) Literal() (localctx ILiteralContext) {
 		{
 			p.SetState(182)
 			p.Match(SpelParserFALSE)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // INumericLiteralContext is an interface to support dynamic dispatch.
@@ -2904,20 +3139,29 @@ type INumericLiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	INTEGER_LITERAL() antlr.TerminalNode
+	REAL_LITERAL() antlr.TerminalNode
+
 	// IsNumericLiteralContext differentiates from other interfaces.
 	IsNumericLiteralContext()
 }
 
 type NumericLiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyNumericLiteralContext() *NumericLiteralContext {
 	var p = new(NumericLiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_numericLiteral
 	return p
+}
+
+func InitEmptyNumericLiteralContext(p *NumericLiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_numericLiteral
 }
 
 func (*NumericLiteralContext) IsNumericLiteralContext() {}
@@ -2925,7 +3169,7 @@ func (*NumericLiteralContext) IsNumericLiteralContext() {}
 func NewNumericLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *NumericLiteralContext {
 	var p = new(NumericLiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_numericLiteral
@@ -2962,28 +3206,9 @@ func (s *NumericLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *SpelParser) NumericLiteral() (localctx INumericLiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewNumericLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 26, SpelParserRULE_numericLiteral)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -2998,7 +3223,17 @@ func (p *SpelParser) NumericLiteral() (localctx INumericLiteralContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IParenspelExprContext is an interface to support dynamic dispatch.
@@ -3008,20 +3243,30 @@ type IParenspelExprContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	LPAREN() antlr.TerminalNode
+	SpelExpr() ISpelExprContext
+	RPAREN() antlr.TerminalNode
+
 	// IsParenspelExprContext differentiates from other interfaces.
 	IsParenspelExprContext()
 }
 
 type ParenspelExprContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyParenspelExprContext() *ParenspelExprContext {
 	var p = new(ParenspelExprContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_parenspelExpr
 	return p
+}
+
+func InitEmptyParenspelExprContext(p *ParenspelExprContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_parenspelExpr
 }
 
 func (*ParenspelExprContext) IsParenspelExprContext() {}
@@ -3029,7 +3274,7 @@ func (*ParenspelExprContext) IsParenspelExprContext() {}
 func NewParenspelExprContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ParenspelExprContext {
 	var p = new(ParenspelExprContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_parenspelExpr
@@ -3082,32 +3327,16 @@ func (s *ParenspelExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *SpelParser) ParenspelExpr() (localctx IParenspelExprContext) {
-	this := p
-	_ = this
-
 	localctx = NewParenspelExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 28, SpelParserRULE_parenspelExpr)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(187)
 		p.Match(SpelParserLPAREN)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(188)
@@ -3116,9 +3345,23 @@ func (p *SpelParser) ParenspelExpr() (localctx IParenspelExprContext) {
 	{
 		p.SetState(189)
 		p.Match(SpelParserRPAREN)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITypeReferenceContext is an interface to support dynamic dispatch.
@@ -3128,20 +3371,35 @@ type ITypeReferenceContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	T() antlr.TerminalNode
+	LPAREN() antlr.TerminalNode
+	PossiblyQualifiedId() IPossiblyQualifiedIdContext
+	RPAREN() antlr.TerminalNode
+	AllLSQUARE() []antlr.TerminalNode
+	LSQUARE(i int) antlr.TerminalNode
+	AllRSQUARE() []antlr.TerminalNode
+	RSQUARE(i int) antlr.TerminalNode
+
 	// IsTypeReferenceContext differentiates from other interfaces.
 	IsTypeReferenceContext()
 }
 
 type TypeReferenceContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTypeReferenceContext() *TypeReferenceContext {
 	var p = new(TypeReferenceContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_typeReference
 	return p
+}
+
+func InitEmptyTypeReferenceContext(p *TypeReferenceContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_typeReference
 }
 
 func (*TypeReferenceContext) IsTypeReferenceContext() {}
@@ -3149,7 +3407,7 @@ func (*TypeReferenceContext) IsTypeReferenceContext() {}
 func NewTypeReferenceContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TypeReferenceContext {
 	var p = new(TypeReferenceContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_typeReference
@@ -3222,37 +3480,26 @@ func (s *TypeReferenceContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *SpelParser) TypeReference() (localctx ITypeReferenceContext) {
-	this := p
-	_ = this
-
 	localctx = NewTypeReferenceContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 30, SpelParserRULE_typeReference)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(191)
 		p.Match(SpelParserT)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(192)
 		p.Match(SpelParserLPAREN)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(193)
@@ -3260,28 +3507,56 @@ func (p *SpelParser) TypeReference() (localctx ITypeReferenceContext) {
 	}
 	p.SetState(198)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == SpelParserLSQUARE {
 		{
 			p.SetState(194)
 			p.Match(SpelParserLSQUARE)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(195)
 			p.Match(SpelParserRSQUARE)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 		p.SetState(200)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(201)
 		p.Match(SpelParserRPAREN)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IPossiblyQualifiedIdContext is an interface to support dynamic dispatch.
@@ -3291,20 +3566,31 @@ type IPossiblyQualifiedIdContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllIDENTIFIER() []antlr.TerminalNode
+	IDENTIFIER(i int) antlr.TerminalNode
+	AllDOT() []antlr.TerminalNode
+	DOT(i int) antlr.TerminalNode
+
 	// IsPossiblyQualifiedIdContext differentiates from other interfaces.
 	IsPossiblyQualifiedIdContext()
 }
 
 type PossiblyQualifiedIdContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyPossiblyQualifiedIdContext() *PossiblyQualifiedIdContext {
 	var p = new(PossiblyQualifiedIdContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_possiblyQualifiedId
 	return p
+}
+
+func InitEmptyPossiblyQualifiedIdContext(p *PossiblyQualifiedIdContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_possiblyQualifiedId
 }
 
 func (*PossiblyQualifiedIdContext) IsPossiblyQualifiedIdContext() {}
@@ -3312,7 +3598,7 @@ func (*PossiblyQualifiedIdContext) IsPossiblyQualifiedIdContext() {}
 func NewPossiblyQualifiedIdContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *PossiblyQualifiedIdContext {
 	var p = new(PossiblyQualifiedIdContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_possiblyQualifiedId
@@ -3357,54 +3643,63 @@ func (s *PossiblyQualifiedIdContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *SpelParser) PossiblyQualifiedId() (localctx IPossiblyQualifiedIdContext) {
-	this := p
-	_ = this
-
 	localctx = NewPossiblyQualifiedIdContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 32, SpelParserRULE_possiblyQualifiedId)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(203)
 		p.Match(SpelParserIDENTIFIER)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(208)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == SpelParserDOT {
 		{
 			p.SetState(204)
 			p.Match(SpelParserDOT)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(205)
 			p.Match(SpelParserIDENTIFIER)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 		p.SetState(210)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // INullReferenceContext is an interface to support dynamic dispatch.
@@ -3414,20 +3709,28 @@ type INullReferenceContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	NULL() antlr.TerminalNode
+
 	// IsNullReferenceContext differentiates from other interfaces.
 	IsNullReferenceContext()
 }
 
 type NullReferenceContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyNullReferenceContext() *NullReferenceContext {
 	var p = new(NullReferenceContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_nullReference
 	return p
+}
+
+func InitEmptyNullReferenceContext(p *NullReferenceContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_nullReference
 }
 
 func (*NullReferenceContext) IsNullReferenceContext() {}
@@ -3435,7 +3738,7 @@ func (*NullReferenceContext) IsNullReferenceContext() {}
 func NewNullReferenceContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *NullReferenceContext {
 	var p = new(NullReferenceContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_nullReference
@@ -3468,35 +3771,29 @@ func (s *NullReferenceContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *SpelParser) NullReference() (localctx INullReferenceContext) {
-	this := p
-	_ = this
-
 	localctx = NewNullReferenceContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 34, SpelParserRULE_nullReference)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(211)
 		p.Match(SpelParserNULL)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IConstructorReferenceContext is an interface to support dynamic dispatch.
@@ -3506,20 +3803,37 @@ type IConstructorReferenceContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	NEW() antlr.TerminalNode
+	PossiblyQualifiedId() IPossiblyQualifiedIdContext
+	AllLSQUARE() []antlr.TerminalNode
+	LSQUARE(i int) antlr.TerminalNode
+	AllRSQUARE() []antlr.TerminalNode
+	RSQUARE(i int) antlr.TerminalNode
+	InlineListOrMap() IInlineListOrMapContext
+	AllSpelExpr() []ISpelExprContext
+	SpelExpr(i int) ISpelExprContext
+	ConstructorArgs() IConstructorArgsContext
+
 	// IsConstructorReferenceContext differentiates from other interfaces.
 	IsConstructorReferenceContext()
 }
 
 type ConstructorReferenceContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyConstructorReferenceContext() *ConstructorReferenceContext {
 	var p = new(ConstructorReferenceContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_constructorReference
 	return p
+}
+
+func InitEmptyConstructorReferenceContext(p *ConstructorReferenceContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_constructorReference
 }
 
 func (*ConstructorReferenceContext) IsConstructorReferenceContext() {}
@@ -3527,7 +3841,7 @@ func (*ConstructorReferenceContext) IsConstructorReferenceContext() {}
 func NewConstructorReferenceContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ConstructorReferenceContext {
 	var p = new(ConstructorReferenceContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_constructorReference
@@ -3665,39 +3979,28 @@ func (s *ConstructorReferenceContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *SpelParser) ConstructorReference() (localctx IConstructorReferenceContext) {
-	this := p
-	_ = this
-
 	localctx = NewConstructorReferenceContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 36, SpelParserRULE_constructorReference)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
 	p.SetState(231)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 18, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 18, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(213)
 			p.Match(SpelParserNEW)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(214)
@@ -3705,6 +4008,9 @@ func (p *SpelParser) ConstructorReference() (localctx IConstructorReferenceConte
 		}
 		p.SetState(220)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_alt = 1
 		for ok := true; ok; ok = _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			switch _alt {
@@ -3712,9 +4018,16 @@ func (p *SpelParser) ConstructorReference() (localctx IConstructorReferenceConte
 				{
 					p.SetState(215)
 					p.Match(SpelParserLSQUARE)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				p.SetState(217)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 
 				if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&2846547927534313592) != 0 {
@@ -3727,25 +4040,35 @@ func (p *SpelParser) ConstructorReference() (localctx IConstructorReferenceConte
 				{
 					p.SetState(219)
 					p.Match(SpelParserRSQUARE)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 
 			default:
-				panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				goto errorExit
 			}
 
 			p.SetState(222)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 16, p.GetParserRuleContext())
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 16, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 		p.SetState(225)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 17, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 17, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(224)
 				p.InlineListOrMap()
 			}
 
+		} else if p.HasError() { // JIM
+			goto errorExit
 		}
 
 	case 2:
@@ -3753,6 +4076,10 @@ func (p *SpelParser) ConstructorReference() (localctx IConstructorReferenceConte
 		{
 			p.SetState(227)
 			p.Match(SpelParserNEW)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(228)
@@ -3763,9 +4090,21 @@ func (p *SpelParser) ConstructorReference() (localctx IConstructorReferenceConte
 			p.ConstructorArgs()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IConstructorArgsContext is an interface to support dynamic dispatch.
@@ -3775,20 +4114,30 @@ type IConstructorArgsContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	LPAREN() antlr.TerminalNode
+	Args() IArgsContext
+	RPAREN() antlr.TerminalNode
+
 	// IsConstructorArgsContext differentiates from other interfaces.
 	IsConstructorArgsContext()
 }
 
 type ConstructorArgsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyConstructorArgsContext() *ConstructorArgsContext {
 	var p = new(ConstructorArgsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_constructorArgs
 	return p
+}
+
+func InitEmptyConstructorArgsContext(p *ConstructorArgsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_constructorArgs
 }
 
 func (*ConstructorArgsContext) IsConstructorArgsContext() {}
@@ -3796,7 +4145,7 @@ func (*ConstructorArgsContext) IsConstructorArgsContext() {}
 func NewConstructorArgsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ConstructorArgsContext {
 	var p = new(ConstructorArgsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_constructorArgs
@@ -3849,32 +4198,16 @@ func (s *ConstructorArgsContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *SpelParser) ConstructorArgs() (localctx IConstructorArgsContext) {
-	this := p
-	_ = this
-
 	localctx = NewConstructorArgsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 38, SpelParserRULE_constructorArgs)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(233)
 		p.Match(SpelParserLPAREN)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(234)
@@ -3883,9 +4216,23 @@ func (p *SpelParser) ConstructorArgs() (localctx IConstructorArgsContext) {
 	{
 		p.SetState(235)
 		p.Match(SpelParserRPAREN)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IInlineListOrMapContext is an interface to support dynamic dispatch.
@@ -3895,20 +4242,32 @@ type IInlineListOrMapContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	LCURLY() antlr.TerminalNode
+	RCURLY() antlr.TerminalNode
+	COLON() antlr.TerminalNode
+	ListBindings() IListBindingsContext
+	MapBindings() IMapBindingsContext
+
 	// IsInlineListOrMapContext differentiates from other interfaces.
 	IsInlineListOrMapContext()
 }
 
 type InlineListOrMapContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyInlineListOrMapContext() *InlineListOrMapContext {
 	var p = new(InlineListOrMapContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_inlineListOrMap
 	return p
+}
+
+func InitEmptyInlineListOrMapContext(p *InlineListOrMapContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_inlineListOrMap
 }
 
 func (*InlineListOrMapContext) IsInlineListOrMapContext() {}
@@ -3916,7 +4275,7 @@ func (*InlineListOrMapContext) IsInlineListOrMapContext() {}
 func NewInlineListOrMapContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *InlineListOrMapContext {
 	var p = new(InlineListOrMapContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_inlineListOrMap
@@ -3989,40 +4348,32 @@ func (s *InlineListOrMapContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *SpelParser) InlineListOrMap() (localctx IInlineListOrMapContext) {
-	this := p
-	_ = this
-
 	localctx = NewInlineListOrMapContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 40, SpelParserRULE_inlineListOrMap)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(250)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 19, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 19, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(237)
 			p.Match(SpelParserLCURLY)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(238)
 			p.Match(SpelParserRCURLY)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 2:
@@ -4030,14 +4381,26 @@ func (p *SpelParser) InlineListOrMap() (localctx IInlineListOrMapContext) {
 		{
 			p.SetState(239)
 			p.Match(SpelParserLCURLY)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(240)
 			p.Match(SpelParserCOLON)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(241)
 			p.Match(SpelParserRCURLY)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 3:
@@ -4045,6 +4408,10 @@ func (p *SpelParser) InlineListOrMap() (localctx IInlineListOrMapContext) {
 		{
 			p.SetState(242)
 			p.Match(SpelParserLCURLY)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(243)
@@ -4053,6 +4420,10 @@ func (p *SpelParser) InlineListOrMap() (localctx IInlineListOrMapContext) {
 		{
 			p.SetState(244)
 			p.Match(SpelParserRCURLY)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 4:
@@ -4060,6 +4431,10 @@ func (p *SpelParser) InlineListOrMap() (localctx IInlineListOrMapContext) {
 		{
 			p.SetState(246)
 			p.Match(SpelParserLCURLY)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(247)
@@ -4068,11 +4443,27 @@ func (p *SpelParser) InlineListOrMap() (localctx IInlineListOrMapContext) {
 		{
 			p.SetState(248)
 			p.Match(SpelParserRCURLY)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IListBindingsContext is an interface to support dynamic dispatch.
@@ -4094,12 +4485,18 @@ type IListBindingsContext interface {
 	// SetBindings sets the bindings rule context list.
 	SetBindings([]IListBindingContext)
 
+	// Getter signatures
+	AllListBinding() []IListBindingContext
+	ListBinding(i int) IListBindingContext
+	AllCOMMA() []antlr.TerminalNode
+	COMMA(i int) antlr.TerminalNode
+
 	// IsListBindingsContext differentiates from other interfaces.
 	IsListBindingsContext()
 }
 
 type ListBindingsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser       antlr.Parser
 	_listBinding IListBindingContext
 	bindings     []IListBindingContext
@@ -4107,9 +4504,14 @@ type ListBindingsContext struct {
 
 func NewEmptyListBindingsContext() *ListBindingsContext {
 	var p = new(ListBindingsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_listBindings
 	return p
+}
+
+func InitEmptyListBindingsContext(p *ListBindingsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_listBindings
 }
 
 func (*ListBindingsContext) IsListBindingsContext() {}
@@ -4117,7 +4519,7 @@ func (*ListBindingsContext) IsListBindingsContext() {}
 func NewListBindingsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ListBindingsContext {
 	var p = new(ListBindingsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_listBindings
@@ -4203,28 +4605,9 @@ func (s *ListBindingsContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *SpelParser) ListBindings() (localctx IListBindingsContext) {
-	this := p
-	_ = this
-
 	localctx = NewListBindingsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 42, SpelParserRULE_listBindings)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -4237,12 +4620,19 @@ func (p *SpelParser) ListBindings() (localctx IListBindingsContext) {
 	localctx.(*ListBindingsContext).bindings = append(localctx.(*ListBindingsContext).bindings, localctx.(*ListBindingsContext)._listBinding)
 	p.SetState(257)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == SpelParserCOMMA {
 		{
 			p.SetState(253)
 			p.Match(SpelParserCOMMA)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(254)
@@ -4255,10 +4645,23 @@ func (p *SpelParser) ListBindings() (localctx IListBindingsContext) {
 
 		p.SetState(259)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IListBindingContext is an interface to support dynamic dispatch.
@@ -4268,20 +4671,28 @@ type IListBindingContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	SpelExpr() ISpelExprContext
+
 	// IsListBindingContext differentiates from other interfaces.
 	IsListBindingContext()
 }
 
 type ListBindingContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyListBindingContext() *ListBindingContext {
 	var p = new(ListBindingContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_listBinding
 	return p
+}
+
+func InitEmptyListBindingContext(p *ListBindingContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_listBinding
 }
 
 func (*ListBindingContext) IsListBindingContext() {}
@@ -4289,7 +4700,7 @@ func (*ListBindingContext) IsListBindingContext() {}
 func NewListBindingContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ListBindingContext {
 	var p = new(ListBindingContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_listBinding
@@ -4334,35 +4745,25 @@ func (s *ListBindingContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *SpelParser) ListBinding() (localctx IListBindingContext) {
-	this := p
-	_ = this
-
 	localctx = NewListBindingContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 44, SpelParserRULE_listBinding)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(260)
 		p.spelExpr(0)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IMapBindingsContext is an interface to support dynamic dispatch.
@@ -4384,12 +4785,18 @@ type IMapBindingsContext interface {
 	// SetBindings sets the bindings rule context list.
 	SetBindings([]IMapBindingContext)
 
+	// Getter signatures
+	AllMapBinding() []IMapBindingContext
+	MapBinding(i int) IMapBindingContext
+	AllCOMMA() []antlr.TerminalNode
+	COMMA(i int) antlr.TerminalNode
+
 	// IsMapBindingsContext differentiates from other interfaces.
 	IsMapBindingsContext()
 }
 
 type MapBindingsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser      antlr.Parser
 	_mapBinding IMapBindingContext
 	bindings    []IMapBindingContext
@@ -4397,9 +4804,14 @@ type MapBindingsContext struct {
 
 func NewEmptyMapBindingsContext() *MapBindingsContext {
 	var p = new(MapBindingsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_mapBindings
 	return p
+}
+
+func InitEmptyMapBindingsContext(p *MapBindingsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_mapBindings
 }
 
 func (*MapBindingsContext) IsMapBindingsContext() {}
@@ -4407,7 +4819,7 @@ func (*MapBindingsContext) IsMapBindingsContext() {}
 func NewMapBindingsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MapBindingsContext {
 	var p = new(MapBindingsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_mapBindings
@@ -4493,28 +4905,9 @@ func (s *MapBindingsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *SpelParser) MapBindings() (localctx IMapBindingsContext) {
-	this := p
-	_ = this
-
 	localctx = NewMapBindingsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 46, SpelParserRULE_mapBindings)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -4527,12 +4920,19 @@ func (p *SpelParser) MapBindings() (localctx IMapBindingsContext) {
 	localctx.(*MapBindingsContext).bindings = append(localctx.(*MapBindingsContext).bindings, localctx.(*MapBindingsContext)._mapBinding)
 	p.SetState(267)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == SpelParserCOMMA {
 		{
 			p.SetState(263)
 			p.Match(SpelParserCOMMA)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(264)
@@ -4545,10 +4945,23 @@ func (p *SpelParser) MapBindings() (localctx IMapBindingsContext) {
 
 		p.SetState(269)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IMapBindingContext is an interface to support dynamic dispatch.
@@ -4570,12 +4983,17 @@ type IMapBindingContext interface {
 	// SetValue sets the value rule contexts.
 	SetValue(ISpelExprContext)
 
+	// Getter signatures
+	COLON() antlr.TerminalNode
+	AllSpelExpr() []ISpelExprContext
+	SpelExpr(i int) ISpelExprContext
+
 	// IsMapBindingContext differentiates from other interfaces.
 	IsMapBindingContext()
 }
 
 type MapBindingContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 	key    ISpelExprContext
 	value  ISpelExprContext
@@ -4583,9 +5001,14 @@ type MapBindingContext struct {
 
 func NewEmptyMapBindingContext() *MapBindingContext {
 	var p = new(MapBindingContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_mapBinding
 	return p
+}
+
+func InitEmptyMapBindingContext(p *MapBindingContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_mapBinding
 }
 
 func (*MapBindingContext) IsMapBindingContext() {}
@@ -4593,7 +5016,7 @@ func (*MapBindingContext) IsMapBindingContext() {}
 func NewMapBindingContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MapBindingContext {
 	var p = new(MapBindingContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_mapBinding
@@ -4675,28 +5098,8 @@ func (s *MapBindingContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SpelParser) MapBinding() (localctx IMapBindingContext) {
-	this := p
-	_ = this
-
 	localctx = NewMapBindingContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 48, SpelParserRULE_mapBinding)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(270)
@@ -4708,6 +5111,10 @@ func (p *SpelParser) MapBinding() (localctx IMapBindingContext) {
 	{
 		p.SetState(271)
 		p.Match(SpelParserCOLON)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(272)
@@ -4717,7 +5124,17 @@ func (p *SpelParser) MapBinding() (localctx IMapBindingContext) {
 		localctx.(*MapBindingContext).value = _x
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IBeanReferenceContext is an interface to support dynamic dispatch.
@@ -4727,20 +5144,31 @@ type IBeanReferenceContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	BEAN_REF() antlr.TerminalNode
+	FACTORY_BEAN_REF() antlr.TerminalNode
+	IDENTIFIER() antlr.TerminalNode
+	STRING_LITERAL() antlr.TerminalNode
+
 	// IsBeanReferenceContext differentiates from other interfaces.
 	IsBeanReferenceContext()
 }
 
 type BeanReferenceContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyBeanReferenceContext() *BeanReferenceContext {
 	var p = new(BeanReferenceContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_beanReference
 	return p
+}
+
+func InitEmptyBeanReferenceContext(p *BeanReferenceContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_beanReference
 }
 
 func (*BeanReferenceContext) IsBeanReferenceContext() {}
@@ -4748,7 +5176,7 @@ func (*BeanReferenceContext) IsBeanReferenceContext() {}
 func NewBeanReferenceContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *BeanReferenceContext {
 	var p = new(BeanReferenceContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_beanReference
@@ -4793,28 +5221,9 @@ func (s *BeanReferenceContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *SpelParser) BeanReference() (localctx IBeanReferenceContext) {
-	this := p
-	_ = this
-
 	localctx = NewBeanReferenceContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 50, SpelParserRULE_beanReference)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -4840,7 +5249,17 @@ func (p *SpelParser) BeanReference() (localctx IBeanReferenceContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IInputParameterContext is an interface to support dynamic dispatch.
@@ -4850,20 +5269,30 @@ type IInputParameterContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	LSQUARE() antlr.TerminalNode
+	INTEGER_LITERAL() antlr.TerminalNode
+	RSQUARE() antlr.TerminalNode
+
 	// IsInputParameterContext differentiates from other interfaces.
 	IsInputParameterContext()
 }
 
 type InputParameterContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyInputParameterContext() *InputParameterContext {
 	var p = new(InputParameterContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_inputParameter
 	return p
+}
+
+func InitEmptyInputParameterContext(p *InputParameterContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_inputParameter
 }
 
 func (*InputParameterContext) IsInputParameterContext() {}
@@ -4871,7 +5300,7 @@ func (*InputParameterContext) IsInputParameterContext() {}
 func NewInputParameterContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *InputParameterContext {
 	var p = new(InputParameterContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_inputParameter
@@ -4912,43 +5341,45 @@ func (s *InputParameterContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *SpelParser) InputParameter() (localctx IInputParameterContext) {
-	this := p
-	_ = this
-
 	localctx = NewInputParameterContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 52, SpelParserRULE_inputParameter)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(277)
 		p.Match(SpelParserLSQUARE)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(278)
 		p.Match(SpelParserINTEGER_LITERAL)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(279)
 		p.Match(SpelParserRSQUARE)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IPropertyPlaceHolderContext is an interface to support dynamic dispatch.
@@ -4958,20 +5389,28 @@ type IPropertyPlaceHolderContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	PROPERTY_PLACE_HOLDER() antlr.TerminalNode
+
 	// IsPropertyPlaceHolderContext differentiates from other interfaces.
 	IsPropertyPlaceHolderContext()
 }
 
 type PropertyPlaceHolderContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyPropertyPlaceHolderContext() *PropertyPlaceHolderContext {
 	var p = new(PropertyPlaceHolderContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SpelParserRULE_propertyPlaceHolder
 	return p
+}
+
+func InitEmptyPropertyPlaceHolderContext(p *PropertyPlaceHolderContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SpelParserRULE_propertyPlaceHolder
 }
 
 func (*PropertyPlaceHolderContext) IsPropertyPlaceHolderContext() {}
@@ -4979,7 +5418,7 @@ func (*PropertyPlaceHolderContext) IsPropertyPlaceHolderContext() {}
 func NewPropertyPlaceHolderContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *PropertyPlaceHolderContext {
 	var p = new(PropertyPlaceHolderContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SpelParserRULE_propertyPlaceHolder
@@ -5012,35 +5451,29 @@ func (s *PropertyPlaceHolderContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *SpelParser) PropertyPlaceHolder() (localctx IPropertyPlaceHolderContext) {
-	this := p
-	_ = this
-
 	localctx = NewPropertyPlaceHolderContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 54, SpelParserRULE_propertyPlaceHolder)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(281)
 		p.Match(SpelParserPROPERTY_PLACE_HOLDER)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 func (p *SpelParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int) bool {
@@ -5058,9 +5491,6 @@ func (p *SpelParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex in
 }
 
 func (p *SpelParser) SpelExpr_Sempred(localctx antlr.RuleContext, predIndex int) bool {
-	this := p
-	_ = this
-
 	switch predIndex {
 	case 0:
 		return p.Precpred(p.GetParserRuleContext(), 11)

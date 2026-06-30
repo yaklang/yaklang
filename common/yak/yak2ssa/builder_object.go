@@ -37,14 +37,14 @@ func (b *astbuilder) buildSliceFromExprList(stmt ExpressionListMultiline) ssa.Va
 
 // slice literal
 func (b *astbuilder) buildSliceLiteral(stmt *yak.SliceLiteralContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	return b.buildSliceFromExprList(stmt)
 }
 
 // slice typed literal
 func (b *astbuilder) buildSliceTypedLiteral(stmt *yak.SliceTypedLiteralContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	slice := b.buildSliceFromExprList(stmt)
@@ -109,7 +109,7 @@ func (b *astbuilder) buildMapFromMapPairs(stmt MapPairs) ssa.Value {
 
 // map literal
 func (b *astbuilder) buildMapLiteral(stmt *yak.MapLiteralContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if s := stmt.MapTypedLiteral(); s != nil {
@@ -124,7 +124,7 @@ func (b *astbuilder) buildMapLiteral(stmt *yak.MapLiteralContext) ssa.Value {
 
 // map typed literal
 func (b *astbuilder) buildMapTypedLiteral(stmt *yak.MapTypedLiteralContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	maps := b.buildMapFromMapPairs(stmt)

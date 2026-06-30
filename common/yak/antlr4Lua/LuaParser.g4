@@ -67,7 +67,7 @@ Tested by Matt Hargett with:
 parser grammar LuaParser;
 
 options {
-    tokenVocab=luaLexer;
+    tokenVocab=LuaLexer;
 }
 
 chunk
@@ -79,21 +79,21 @@ block
     ;
 
 stat
-    : ';'
-    | varlist '=' explist
+    : SemiColon
+    | varlist AssignEq explist
     | functioncall
     | label
-    | 'break'
-    | 'goto' NAME
-    | 'do' block 'end'
-    | 'while' exp 'do' block 'end'
-    | 'repeat' block 'until' exp
-    | 'if' exp 'then' block ('elseif' exp 'then' block)* ('else' block)? 'end'
-    | 'for' NAME '=' exp ',' exp (',' exp)? 'do' block 'end'
-    | 'for' namelist 'in' explist 'do' block 'end'
-    | 'function' funcname funcbody
-    | 'local' 'function' NAME funcbody
-    | 'local' attnamelist ('=' explist)?
+    | Break
+    | Goto NAME
+    | Do block End
+    | While exp Do block End
+    | Repeat block Until exp
+    | If exp Then block (ElseIf exp Then block)* (Else block)? End
+    | For NAME AssignEq exp Comma exp (Comma exp)? Do block End
+    | For namelist In explist Do block End
+    | Function funcname funcbody
+    | Local Function NAME funcbody
+    | Local attnamelist (AssignEq explist)?
     ;
 
 attnamelist
@@ -101,38 +101,38 @@ attnamelist
     ;
 
 attrib
-    : ('<' NAME '>')?
+    : (Lt NAME Gt)?
     ;
 
 laststat
-    : 'return' explist? | 'break' | 'continue' ';'?
+    : Return explist? | Break | Continue SemiColon?
     ;
 
 label
-    : '::' NAME '::'
+    : DoubleColon NAME DoubleColon
     ;
 
 funcname
-    : NAME ('.' NAME)* (':' NAME)?
+    : NAME (Dot NAME)* (Colon NAME)?
     ;
 
 varlist
-    : var (',' var)*
+    : var (Comma var)*
     ;
 
 namelist
-    : NAME (',' NAME)*
+    : NAME (Comma NAME)*
     ;
 
 explist
-    : (exp ',')* exp
+    : (exp Comma)* exp
     ;
 
 exp
-    : 'nil' | 'false' | 'true'
+    : Nil | False | True
     | number
     | string
-    | '...'
+    | Ellipsis
     | functiondef
     | prefixexp
     | tableconstructor
@@ -156,39 +156,39 @@ functioncall
     ;
 
 varOrExp
-    : var | '(' exp ')'
+    : var | LParen exp RParen
     ;
 
 var
-    : (NAME | '(' exp ')' varSuffix) varSuffix*
+    : (NAME | LParen exp RParen varSuffix) varSuffix*
     ;
 
 varSuffix
-    : nameAndArgs* ('[' exp ']' | '.' NAME)
+    : nameAndArgs* (LBracket exp RBracket | Dot NAME)
     ;
 
 nameAndArgs
-    : (':' NAME)? args
+    : (Colon NAME)? args
     ;
 
 args
-    : '(' explist? ')' | tableconstructor | string
+    : LParen explist? RParen | tableconstructor | string
     ;
 
 functiondef
-    : 'function' funcbody
+    : Function funcbody
     ;
 
 funcbody
-    : '(' parlist? ')' block 'end'
+    : LParen parlist? RParen block End
     ;
 
 parlist
-    : namelist (',' '...')? | '...'
+    : namelist (Comma Ellipsis)? | Ellipsis
     ;
 
 tableconstructor
-    : '{' fieldlist? '}'
+    : LBrace fieldlist? RBrace
     ;
 
 fieldlist
@@ -196,39 +196,39 @@ fieldlist
     ;
 
 field
-    : '[' exp ']' '=' exp | NAME '=' exp | exp
+    : LBracket exp RBracket AssignEq exp | NAME AssignEq exp | exp
     ;
 
 fieldsep
-    : ',' | ';'
+    : Comma | SemiColon
     ;
 
 operatorOr
-	: 'or';
+	: Or;
 
 operatorAnd
-	: 'and';
+	: And;
 
 operatorComparison
-	: '<' | '>' | '<=' | '>=' | '~=' | '==';
+	: Lt | Gt | LtEq | GtEq | Neq | Eq;
 
 operatorStrcat
-	: '..';
+	: Strcat;
 
 operatorAddSub
-	: '+' | '-';
+	: Plus | Sub;
 
 operatorMulDivMod
-	: '*' | '/' | '%' | '//';
+	: Mul | Div | Mod | IntegralDiv;
 
 operatorBitwise
-	: '&' | '|' | '~' | '<<' | '>>';
+	: Amp | Xand | NotSymbol | LtLt | GtGt;
 
 operatorUnary
-    : 'not' | '#' | '-' | '~';
+    : Not | Pound | Sub | NotSymbol;
 
 operatorPower
-    : '^';
+    : Power;
 
 number
     : INT | HEX | FLOAT | HEX_FLOAT

@@ -1,7 +1,7 @@
-// Code generated from java-escape by ANTLR 4.11.1. DO NOT EDIT.
+// Code generated from ./GoParser.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
 package gol // GoParser
-import "github.com/antlr/antlr4/runtime/Go/antlr/v4"
+import "github.com/yaklang/antlr/v4"
 
 type BaseGoParserVisitor struct {
 	*antlr.BaseParseTreeVisitor

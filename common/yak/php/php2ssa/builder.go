@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 	"github.com/yaklang/yaklang/common/sca"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"go.uber.org/atomic"

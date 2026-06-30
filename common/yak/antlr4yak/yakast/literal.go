@@ -23,7 +23,7 @@ func (y *YakCompiler) VisitNumericLiteral(raw yak.INumericLiteralContext) interf
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 	y.writeString(raw.GetText())
 
@@ -80,7 +80,7 @@ func (y *YakCompiler) VisitBoolLiteral(raw yak.IBoolLiteralContext) interface{} 
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 	y.writeString(raw.GetText())
 
@@ -99,7 +99,7 @@ func (y *YakCompiler) VisitLiteral(raw yak.ILiteralContext) interface{} {
 		return nil
 	}
 
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	if n := i.StringLiteral(); n != nil {
@@ -162,7 +162,7 @@ func (y *YakCompiler) VisitSliceLiteral(raw yak.ISliceLiteralContext) interface{
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	// [ ... ] 语法
@@ -187,7 +187,7 @@ func (y *YakCompiler) VisitSliceTypedLiteral(raw yak.ISliceTypedLiteralContext) 
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	// 先创建一个类型
@@ -222,7 +222,7 @@ func (y *YakCompiler) VisitExpressionListMultiline(raw yak.IExpressionListMultil
 	if i == nil {
 		return 0
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	allExpression := i.AllExpression()
@@ -245,7 +245,7 @@ func (y *YakCompiler) VisitMapLiteral(raw yak.IMapLiteralContext) interface{} {
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	if l := i.MapTypedLiteral(); l != nil {
@@ -287,7 +287,7 @@ func (y *YakCompiler) VisitMapTypedLiteral(raw yak.IMapTypedLiteralContext) inte
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	// 先创建一个类型
@@ -452,7 +452,7 @@ func (y *YakCompiler) VisitStringLiteral(raw yak.IStringLiteralContext) interfac
 		return nil
 	}
 
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 	y.writeString(raw.GetText())
 
@@ -541,7 +541,7 @@ func (y *YakCompiler) VisitDoc(raw yak.IStringLiteralContext) interface{} {
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 	y.writeString(raw.GetText())
 
@@ -564,7 +564,7 @@ func (y *YakCompiler) VisitCharacterLiteral(raw yak.ICharacterLiteralContext) in
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 	y.writeString(raw.GetText())
 

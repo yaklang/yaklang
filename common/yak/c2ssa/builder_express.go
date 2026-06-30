@@ -18,7 +18,7 @@ func (b *astbuilder) ensureValue(v ssa.Value) ssa.Value {
 }
 
 func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext, isLeft bool) (ssa.Value, *ssa.Variable) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	handlerJumpExpression := func(cond func(string) ssa.Value, trueExpr, falseExpr func() ssa.Value, name string) ssa.Value {
@@ -224,7 +224,7 @@ func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext, isLeft bool
 }
 
 func (b *astbuilder) buildCoreExpression(ast *cparser.CoreExpressionContext) ssa.Value {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if c := ast.ComplexCoreExpression(); c != nil {
@@ -297,7 +297,7 @@ func (b *astbuilder) applyAssignmentFromStarCast(
 	op *cparser.AssignmentOperatorContext,
 	expr *cparser.ExpressionContext,
 ) ssa.Value {
-	recoverRange := b.SetRange(castCtx.BaseParserRuleContext)
+	recoverRange := b.SetRange(&castCtx.BaseParserRuleContext)
 	defer recoverRange()
 
 	_, left := b.leftFromStarCast(castCtx, true)
@@ -460,7 +460,7 @@ func (b *astbuilder) applyAssignmentFromCast(
 	op *cparser.AssignmentOperatorContext,
 	expr *cparser.ExpressionContext,
 ) ssa.Value {
-	recoverRange := b.SetRange(castCtx.BaseParserRuleContext)
+	recoverRange := b.SetRange(&castCtx.BaseParserRuleContext)
 	defer recoverRange()
 
 	var right ssa.Value
@@ -522,7 +522,7 @@ func (b *astbuilder) applyAssignmentFromCast(
 }
 
 func (b *astbuilder) buildAssignmentExpression(ast *cparser.AssignmentExpressionContext) ssa.Value {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	var right ssa.Value
@@ -592,7 +592,7 @@ func (b *astbuilder) buildAssignmentExpression(ast *cparser.AssignmentExpression
 }
 
 func (b *astbuilder) buildUnaryExpression(ast *cparser.UnaryExpressionContext, isLeft bool) (ssa.Value, *ssa.Variable) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 	var right ssa.Value
 	var left *ssa.Variable
@@ -687,7 +687,7 @@ func (b *astbuilder) buildUnaryExpression(ast *cparser.UnaryExpressionContext, i
 }
 
 func (b *astbuilder) buildPostfixExpression(ast *cparser.PostfixExpressionContext, isLeft bool) (ssa.Value, *ssa.Variable) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	var right ssa.Value
@@ -724,7 +724,7 @@ func (b *astbuilder) buildPostfixExpression(ast *cparser.PostfixExpressionContex
 
 // buildPostfixSuffix 处理后缀操作（数组下标、函数调用、成员访问、++/--）
 func (b *astbuilder) buildPostfixSuffix(ast *cparser.PostfixSuffixContext, right ssa.Value, left *ssa.Variable, isLeft bool) (ssa.Value, *ssa.Variable) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 	// 1. 数组下标：'[' expression ']'
 	if ast.LeftBracket() != nil && ast.RightBracket() != nil {
@@ -807,7 +807,7 @@ func (b *astbuilder) buildPostfixSuffix(ast *cparser.PostfixSuffixContext, right
 }
 
 func (b *astbuilder) buildInitializerList(ast *cparser.InitializerListContext, ssatype ...ssa.Type) ssa.Value {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	var keys, values ssa.Values
@@ -838,7 +838,7 @@ func (b *astbuilder) buildInitializerList(ast *cparser.InitializerListContext, s
 }
 
 func (b *astbuilder) buildInitializer(ast *cparser.InitializerContext, ssatype ...ssa.Type) ssa.Value {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	var value ssa.Value
@@ -855,7 +855,7 @@ func (b *astbuilder) buildInitializer(ast *cparser.InitializerContext, ssatype .
 }
 
 func (b *astbuilder) buildDesignation(ast *cparser.DesignationContext) ssa.Values {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if d := ast.DesignatorList(); d != nil {
@@ -865,7 +865,7 @@ func (b *astbuilder) buildDesignation(ast *cparser.DesignationContext) ssa.Value
 }
 
 func (b *astbuilder) buildDesignatorList(ast *cparser.DesignatorListContext) ssa.Values {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	var ret ssa.Values
@@ -876,7 +876,7 @@ func (b *astbuilder) buildDesignatorList(ast *cparser.DesignatorListContext) ssa
 }
 
 func (b *astbuilder) buildDesignator(ast *cparser.DesignatorContext) ssa.Value {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	var value ssa.Value
@@ -893,7 +893,7 @@ func (b *astbuilder) buildDesignator(ast *cparser.DesignatorContext) ssa.Value {
 }
 
 func (b *astbuilder) buildCastExpression(ast *cparser.CastExpressionContext, isLeft bool) (ssa.Value, *ssa.Variable) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	var right ssa.Value
@@ -929,7 +929,7 @@ func (b *astbuilder) buildCastExpression(ast *cparser.CastExpressionContext, isL
 }
 
 func (b *astbuilder) buildLeftExpression(ast *cparser.LeftExpressionContext, isLeft bool) (ssa.Value, *ssa.Variable) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	// log.Infof("exp = %s\n", ast.GetText())
@@ -971,7 +971,7 @@ func (b *astbuilder) buildLeftExpression(ast *cparser.LeftExpressionContext, isL
 }
 
 func (b *astbuilder) buildPostfixExpressionLvalue(ast *cparser.PostfixExpressionLvalueContext, isLeft bool) (ssa.Value, *ssa.Variable) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	var right ssa.Value
@@ -1010,7 +1010,7 @@ func (b *astbuilder) buildPostfixExpressionLvalue(ast *cparser.PostfixExpression
 
 // buildPostfixSuffixLvalue 处理左值后缀操作（数组下标、成员访问，不包括函数调用）
 func (b *astbuilder) buildPostfixSuffixLvalue(ast *cparser.PostfixSuffixLvalueContext, right ssa.Value, left *ssa.Variable, isLeft bool) (ssa.Value, *ssa.Variable, bool) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	setReference := false
@@ -1104,7 +1104,7 @@ func (b *astbuilder) buildPostfixSuffixLvalue(ast *cparser.PostfixSuffixLvalueCo
 }
 
 func (b *astbuilder) buildPrimaryExpression(ast *cparser.PrimaryExpressionContext, isLeft bool) (ssa.Value, *ssa.Variable) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	// 1. Identifier
@@ -1199,7 +1199,7 @@ func (b *astbuilder) buildPrimaryExpression(ast *cparser.PrimaryExpressionContex
 }
 
 func (b *astbuilder) buildArgumentExpressionList(ast *cparser.ArgumentExpressionListContext) ssa.Values {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 	var ret ssa.Values
 	// 新语法使用 macroArgument 而不是 expression
@@ -1214,7 +1214,7 @@ func (b *astbuilder) buildArgumentExpressionList(ast *cparser.ArgumentExpression
 
 // buildMacroArgument 处理宏参数（可以是表达式、类型名、数字序列或操作符）
 func (b *astbuilder) buildMacroArgument(ast *cparser.MacroArgumentContext) ssa.Value {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	// 1. expression

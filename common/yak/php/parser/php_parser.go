@@ -1,4 +1,4 @@
-// Code generated from java-escape by ANTLR 4.11.1. DO NOT EDIT.
+// Code generated from ./PHPParser.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
 package phpparser // PHPParser
 import (
@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 )
 
 // Suppress unused import errors
@@ -18,20 +18,20 @@ type PHPParser struct {
 	*antlr.BaseParser
 }
 
-var phpparserParserStaticData struct {
+var PHPParserParserStaticData struct {
 	once                   sync.Once
 	serializedATN          []int32
-	literalNames           []string
-	symbolicNames          []string
-	ruleNames              []string
-	predictionContextCache *antlr.PredictionContextCache
+	LiteralNames           []string
+	SymbolicNames          []string
+	RuleNames              []string
+	PredictionContextCache *antlr.PredictionContextCache
 	atn                    *antlr.ATN
 	decisionToDFA          []*antlr.DFA
 }
 
 func phpparserParserInit() {
-	staticData := &phpparserParserStaticData
-	staticData.literalNames = []string{
+	staticData := &PHPParserParserStaticData
+	staticData.LiteralNames = []string{
 		"", "", "", "'<?xml'", "", "", "", "", "", "", "", "", "", "", "'?>'",
 		"", "", "'/>'", "", "", "", "", "", "", "", "", "", "", "", "", "",
 		"", "", "", "", "", "", "", "", "", "", "", "", "", "'#['", "'abstract'",
@@ -63,7 +63,7 @@ func phpparserParserInit() {
 		"'@'", "", "'.'", "", "'('", "')'", "'['", "']'", "", "'}'", "','",
 		"':'", "';'", "", "'''", "'`'", "'set_include_path'",
 	}
-	staticData.symbolicNames = []string{
+	staticData.SymbolicNames = []string{
 		"", "SeaWhitespace", "HtmlText", "XmlStart", "PHPStart", "HtmlScriptOpen",
 		"HtmlStyleOpen", "HtmlComment", "HtmlDtd", "HtmlOpen", "Shebang", "NumberSign",
 		"Error", "XmlText", "XmlClose", "PHPStartInside", "HtmlClose", "HtmlSlashClose",
@@ -109,7 +109,7 @@ func phpparserParserInit() {
 		"HereDocIdentiferName", "HereDocIdentifierBreak", "EndDoc", "HereDocText",
 		"HereDocVariable", "XmlText2",
 	}
-	staticData.ruleNames = []string{
+	staticData.RuleNames = []string{
 		"htmlDocument", "htmlDocumentElement", "inlineHtml", "htmlElement",
 		"scriptText", "phpBlock", "importStatement", "topStatement", "useDeclaration",
 		"useDeclarationContentList", "namespacePath", "namespaceDeclaration",
@@ -154,7 +154,7 @@ func phpparserParserInit() {
 		"modifier", "identifier", "key", "memberModifier", "magicConstant",
 		"magicMethod", "primitiveType", "castOperation",
 	}
-	staticData.predictionContextCache = antlr.NewPredictionContextCache()
+	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
 		4, 1, 253, 2363, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4,
 		7, 4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 2, 10,
@@ -1377,7 +1377,7 @@ func phpparserParserInit() {
 // NewPHPParser(). You can call this function if you wish to initialize the static state ahead
 // of time.
 func PHPParserInit() {
-	staticData := &phpparserParserStaticData
+	staticData := &PHPParserParserStaticData
 	staticData.once.Do(phpparserParserInit)
 }
 
@@ -1386,12 +1386,12 @@ func NewPHPParser(input antlr.TokenStream) *PHPParser {
 	PHPParserInit()
 	this := new(PHPParser)
 	this.BaseParser = antlr.NewBaseParser(input)
-	staticData := &phpparserParserStaticData
-	this.Interpreter = antlr.NewParserATNSimulator(this, staticData.atn, staticData.decisionToDFA, staticData.predictionContextCache)
-	this.RuleNames = staticData.ruleNames
-	this.LiteralNames = staticData.literalNames
-	this.SymbolicNames = staticData.symbolicNames
-	this.GrammarFileName = "java-escape"
+	staticData := &PHPParserParserStaticData
+	this.Interpreter = antlr.NewParserATNSimulator(this, staticData.atn, staticData.decisionToDFA, staticData.PredictionContextCache)
+	this.RuleNames = staticData.RuleNames
+	this.LiteralNames = staticData.LiteralNames
+	this.SymbolicNames = staticData.SymbolicNames
+	this.GrammarFileName = "PHPParser.g4"
 
 	return this
 }
@@ -1837,20 +1837,33 @@ type IHtmlDocumentContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	EOF() antlr.TerminalNode
+	Shebang() antlr.TerminalNode
+	AllHtmlDocumentElement() []IHtmlDocumentElementContext
+	HtmlDocumentElement(i int) IHtmlDocumentElementContext
+	AllPhpBlock() []IPhpBlockContext
+	PhpBlock(i int) IPhpBlockContext
+
 	// IsHtmlDocumentContext differentiates from other interfaces.
 	IsHtmlDocumentContext()
 }
 
 type HtmlDocumentContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyHtmlDocumentContext() *HtmlDocumentContext {
 	var p = new(HtmlDocumentContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_htmlDocument
 	return p
+}
+
+func InitEmptyHtmlDocumentContext(p *HtmlDocumentContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_htmlDocument
 }
 
 func (*HtmlDocumentContext) IsHtmlDocumentContext() {}
@@ -1858,7 +1871,7 @@ func (*HtmlDocumentContext) IsHtmlDocumentContext() {}
 func NewHtmlDocumentContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *HtmlDocumentContext {
 	var p = new(HtmlDocumentContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_htmlDocument
@@ -1977,56 +1990,49 @@ func (s *HtmlDocumentContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *PHPParser) HtmlDocument() (localctx IHtmlDocumentContext) {
-	this := p
-	_ = this
-
 	localctx = NewHtmlDocumentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, PHPParserRULE_htmlDocument)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(345)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserShebang {
 		{
 			p.SetState(344)
 			p.Match(PHPParserShebang)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 	p.SetState(348)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 1, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 1, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(347)
 			p.HtmlDocumentElement()
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 	p.SetState(356)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-17200488445076) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&-1) != 0 || (int64((_la-128)) & ^0x3f) == 0 && ((int64(1)<<(_la-128))&3573412790271) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70336709945889) != 0 {
+	for ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-17200488445076) != 0) || ((int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&-1) != 0) || ((int64((_la-128)) & ^0x3f) == 0 && ((int64(1)<<(_la-128))&3573412790271) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70336709945889) != 0) {
 		{
 			p.SetState(350)
 			p.PhpBlock()
@@ -2034,24 +2040,43 @@ func (p *PHPParser) HtmlDocument() (localctx IHtmlDocumentContext) {
 		p.SetState(352)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 2, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 2, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(351)
 				p.HtmlDocumentElement()
 			}
 
+		} else if p.HasError() { // JIM
+			goto errorExit
 		}
 
 		p.SetState(358)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(359)
 		p.Match(PHPParserEOF)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IHtmlDocumentElementContext is an interface to support dynamic dispatch.
@@ -2061,20 +2086,31 @@ type IHtmlDocumentElementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllHtmlElement() []IHtmlElementContext
+	HtmlElement(i int) IHtmlElementContext
+	AllScriptText() []antlr.TerminalNode
+	ScriptText(i int) antlr.TerminalNode
+
 	// IsHtmlDocumentElementContext differentiates from other interfaces.
 	IsHtmlDocumentElementContext()
 }
 
 type HtmlDocumentElementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyHtmlDocumentElementContext() *HtmlDocumentElementContext {
 	var p = new(HtmlDocumentElementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_htmlDocumentElement
 	return p
+}
+
+func InitEmptyHtmlDocumentElementContext(p *HtmlDocumentElementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_htmlDocumentElement
 }
 
 func (*HtmlDocumentElementContext) IsHtmlDocumentElementContext() {}
@@ -2082,7 +2118,7 @@ func (*HtmlDocumentElementContext) IsHtmlDocumentElementContext() {}
 func NewHtmlDocumentElementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *HtmlDocumentElementContext {
 	var p = new(HtmlDocumentElementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_htmlDocumentElement
@@ -2160,39 +2196,25 @@ func (s *HtmlDocumentElementContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *PHPParser) HtmlDocumentElement() (localctx IHtmlDocumentElementContext) {
-	this := p
-	_ = this
-
 	localctx = NewHtmlDocumentElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 2, PHPParserRULE_htmlDocumentElement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(363)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_alt = 1
 	for ok := true; ok; ok = _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		switch _alt {
 		case 1:
 			p.SetState(363)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 
 			switch p.GetTokenStream().LA(1) {
 			case PHPParserHtmlText, PHPParserXmlStart, PHPParserHtmlScriptOpen, PHPParserHtmlStyleOpen, PHPParserHtmlDtd, PHPParserHtmlOpen, PHPParserNumberSign, PHPParserHtmlClose, PHPParserHtmlSlashClose, PHPParserHtmlSlash, PHPParserHtmlEquals, PHPParserHtmlStartQuoteString, PHPParserHtmlStartDoubleQuoteString, PHPParserHtmlHex, PHPParserHtmlDecimal, PHPParserHtmlName, PHPParserHtmlEndQuoteString, PHPParserHtmlQuoteString, PHPParserHtmlEndDoubleQuoteString, PHPParserHtmlDoubleQuoteString, PHPParserHtmlScriptClose, PHPParserStyleBody:
@@ -2205,22 +2227,41 @@ func (p *PHPParser) HtmlDocumentElement() (localctx IHtmlDocumentElementContext)
 				{
 					p.SetState(362)
 					p.Match(PHPParserScriptText)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 
 			default:
-				panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				goto errorExit
 			}
 
 		default:
-			panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			goto errorExit
 		}
 
 		p.SetState(365)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 5, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 5, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IInlineHtmlContext is an interface to support dynamic dispatch.
@@ -2230,20 +2271,30 @@ type IInlineHtmlContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllHtmlElement() []IHtmlElementContext
+	HtmlElement(i int) IHtmlElementContext
+	ScriptText() IScriptTextContext
+
 	// IsInlineHtmlContext differentiates from other interfaces.
 	IsInlineHtmlContext()
 }
 
 type InlineHtmlContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyInlineHtmlContext() *InlineHtmlContext {
 	var p = new(InlineHtmlContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_inlineHtml
 	return p
+}
+
+func InitEmptyInlineHtmlContext(p *InlineHtmlContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_inlineHtml
 }
 
 func (*InlineHtmlContext) IsInlineHtmlContext() {}
@@ -2251,7 +2302,7 @@ func (*InlineHtmlContext) IsInlineHtmlContext() {}
 func NewInlineHtmlContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *InlineHtmlContext {
 	var p = new(InlineHtmlContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_inlineHtml
@@ -2337,40 +2388,27 @@ func (s *InlineHtmlContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) InlineHtml() (localctx IInlineHtmlContext) {
-	this := p
-	_ = this
-
 	localctx = NewInlineHtmlContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 4, PHPParserRULE_inlineHtml)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(373)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserHtmlText, PHPParserXmlStart, PHPParserHtmlScriptOpen, PHPParserHtmlStyleOpen, PHPParserHtmlDtd, PHPParserHtmlOpen, PHPParserNumberSign, PHPParserHtmlClose, PHPParserHtmlSlashClose, PHPParserHtmlSlash, PHPParserHtmlEquals, PHPParserHtmlStartQuoteString, PHPParserHtmlStartDoubleQuoteString, PHPParserHtmlHex, PHPParserHtmlDecimal, PHPParserHtmlName, PHPParserHtmlEndQuoteString, PHPParserHtmlQuoteString, PHPParserHtmlEndDoubleQuoteString, PHPParserHtmlDoubleQuoteString, PHPParserHtmlScriptClose, PHPParserStyleBody:
 		p.EnterOuterAlt(localctx, 1)
 		p.SetState(368)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		for ok := true; ok; ok = (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&357337860972) != 0 {
+		for ok := true; ok; ok = ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&357337860972) != 0) {
 			{
 				p.SetState(367)
 				p.HtmlElement()
@@ -2378,6 +2416,9 @@ func (p *PHPParser) InlineHtml() (localctx IInlineHtmlContext) {
 
 			p.SetState(370)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 
@@ -2389,10 +2430,21 @@ func (p *PHPParser) InlineHtml() (localctx IInlineHtmlContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IHtmlElementContext is an interface to support dynamic dispatch.
@@ -2402,20 +2454,52 @@ type IHtmlElementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	HtmlDtd() antlr.TerminalNode
+	HtmlClose() antlr.TerminalNode
+	HtmlStyleOpen() antlr.TerminalNode
+	HtmlOpen() antlr.TerminalNode
+	HtmlName() antlr.TerminalNode
+	HtmlSlashClose() antlr.TerminalNode
+	HtmlSlash() antlr.TerminalNode
+	HtmlText() antlr.TerminalNode
+	HtmlEquals() antlr.TerminalNode
+	HtmlStartQuoteString() antlr.TerminalNode
+	HtmlEndQuoteString() antlr.TerminalNode
+	HtmlStartDoubleQuoteString() antlr.TerminalNode
+	HtmlEndDoubleQuoteString() antlr.TerminalNode
+	HtmlHex() antlr.TerminalNode
+	HtmlDecimal() antlr.TerminalNode
+	HtmlQuoteString() antlr.TerminalNode
+	HtmlDoubleQuoteString() antlr.TerminalNode
+	StyleBody() antlr.TerminalNode
+	HtmlScriptOpen() antlr.TerminalNode
+	HtmlScriptClose() antlr.TerminalNode
+	XmlStart() antlr.TerminalNode
+	XmlClose() antlr.TerminalNode
+	AllXmlText() []antlr.TerminalNode
+	XmlText(i int) antlr.TerminalNode
+	NumberSign() antlr.TerminalNode
+
 	// IsHtmlElementContext differentiates from other interfaces.
 	IsHtmlElementContext()
 }
 
 type HtmlElementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyHtmlElementContext() *HtmlElementContext {
 	var p = new(HtmlElementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_htmlElement
 	return p
+}
+
+func InitEmptyHtmlElementContext(p *HtmlElementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_htmlElement
 }
 
 func (*HtmlElementContext) IsHtmlElementContext() {}
@@ -2423,7 +2507,7 @@ func (*HtmlElementContext) IsHtmlElementContext() {}
 func NewHtmlElementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *HtmlElementContext {
 	var p = new(HtmlElementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_htmlElement
@@ -2552,31 +2636,15 @@ func (s *HtmlElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
-	this := p
-	_ = this
-
 	localctx = NewHtmlElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, PHPParserRULE_htmlElement)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(404)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserHtmlDtd:
@@ -2584,6 +2652,10 @@ func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(375)
 			p.Match(PHPParserHtmlDtd)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserHtmlClose:
@@ -2591,6 +2663,10 @@ func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(376)
 			p.Match(PHPParserHtmlClose)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserHtmlStyleOpen:
@@ -2598,6 +2674,10 @@ func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(377)
 			p.Match(PHPParserHtmlStyleOpen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserHtmlOpen:
@@ -2605,6 +2685,10 @@ func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(378)
 			p.Match(PHPParserHtmlOpen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserHtmlName:
@@ -2612,6 +2696,10 @@ func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(379)
 			p.Match(PHPParserHtmlName)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserHtmlSlashClose:
@@ -2619,6 +2707,10 @@ func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(380)
 			p.Match(PHPParserHtmlSlashClose)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserHtmlSlash:
@@ -2626,6 +2718,10 @@ func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(381)
 			p.Match(PHPParserHtmlSlash)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserHtmlText:
@@ -2633,6 +2729,10 @@ func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(382)
 			p.Match(PHPParserHtmlText)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserHtmlEquals:
@@ -2640,6 +2740,10 @@ func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(383)
 			p.Match(PHPParserHtmlEquals)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserHtmlStartQuoteString:
@@ -2647,6 +2751,10 @@ func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(384)
 			p.Match(PHPParserHtmlStartQuoteString)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserHtmlEndQuoteString:
@@ -2654,6 +2762,10 @@ func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(385)
 			p.Match(PHPParserHtmlEndQuoteString)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserHtmlStartDoubleQuoteString:
@@ -2661,6 +2773,10 @@ func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(386)
 			p.Match(PHPParserHtmlStartDoubleQuoteString)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserHtmlEndDoubleQuoteString:
@@ -2668,6 +2784,10 @@ func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(387)
 			p.Match(PHPParserHtmlEndDoubleQuoteString)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserHtmlHex:
@@ -2675,6 +2795,10 @@ func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(388)
 			p.Match(PHPParserHtmlHex)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserHtmlDecimal:
@@ -2682,6 +2806,10 @@ func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(389)
 			p.Match(PHPParserHtmlDecimal)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserHtmlQuoteString:
@@ -2689,6 +2817,10 @@ func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(390)
 			p.Match(PHPParserHtmlQuoteString)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserHtmlDoubleQuoteString:
@@ -2696,6 +2828,10 @@ func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(391)
 			p.Match(PHPParserHtmlDoubleQuoteString)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserStyleBody:
@@ -2703,6 +2839,10 @@ func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(392)
 			p.Match(PHPParserStyleBody)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserHtmlScriptOpen:
@@ -2710,6 +2850,10 @@ func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(393)
 			p.Match(PHPParserHtmlScriptOpen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserHtmlScriptClose:
@@ -2717,6 +2861,10 @@ func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(394)
 			p.Match(PHPParserHtmlScriptClose)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserXmlStart:
@@ -2724,24 +2872,42 @@ func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(395)
 			p.Match(PHPParserXmlStart)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(399)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == PHPParserXmlText {
 			{
 				p.SetState(396)
 				p.Match(PHPParserXmlText)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 			p.SetState(401)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
 			p.SetState(402)
 			p.Match(PHPParserXmlClose)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserNumberSign:
@@ -2749,13 +2915,28 @@ func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(403)
 			p.Match(PHPParserNumberSign)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IScriptTextContext is an interface to support dynamic dispatch.
@@ -2765,20 +2946,29 @@ type IScriptTextContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllScriptText() []antlr.TerminalNode
+	ScriptText(i int) antlr.TerminalNode
+
 	// IsScriptTextContext differentiates from other interfaces.
 	IsScriptTextContext()
 }
 
 type ScriptTextContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyScriptTextContext() *ScriptTextContext {
 	var p = new(ScriptTextContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_scriptText
 	return p
+}
+
+func InitEmptyScriptTextContext(p *ScriptTextContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_scriptText
 }
 
 func (*ScriptTextContext) IsScriptTextContext() {}
@@ -2786,7 +2976,7 @@ func (*ScriptTextContext) IsScriptTextContext() {}
 func NewScriptTextContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ScriptTextContext {
 	var p = new(ScriptTextContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_scriptText
@@ -2823,46 +3013,47 @@ func (s *ScriptTextContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) ScriptText() (localctx IScriptTextContext) {
-	this := p
-	_ = this
-
 	localctx = NewScriptTextContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 8, PHPParserRULE_scriptText)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(407)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for ok := true; ok; ok = _la == PHPParserScriptText {
 		{
 			p.SetState(406)
 			p.Match(PHPParserScriptText)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 		p.SetState(409)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IPhpBlockContext is an interface to support dynamic dispatch.
@@ -2872,20 +3063,45 @@ type IPhpBlockContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllImportStatement() []IImportStatementContext
+	ImportStatement(i int) IImportStatementContext
+	AllUseDeclaration() []IUseDeclarationContext
+	UseDeclaration(i int) IUseDeclarationContext
+	AllNamespaceDeclaration() []INamespaceDeclarationContext
+	NamespaceDeclaration(i int) INamespaceDeclarationContext
+	AllFunctionDeclaration() []IFunctionDeclarationContext
+	FunctionDeclaration(i int) IFunctionDeclarationContext
+	AllClassDeclaration() []IClassDeclarationContext
+	ClassDeclaration(i int) IClassDeclarationContext
+	AllGlobalConstantDeclaration() []IGlobalConstantDeclarationContext
+	GlobalConstantDeclaration(i int) IGlobalConstantDeclarationContext
+	AllEnumDeclaration() []IEnumDeclarationContext
+	EnumDeclaration(i int) IEnumDeclarationContext
+	AllStatement() []IStatementContext
+	Statement(i int) IStatementContext
+	PHPEnd() antlr.TerminalNode
+	PHPEndSingleLineComment() antlr.TerminalNode
+
 	// IsPhpBlockContext differentiates from other interfaces.
 	IsPhpBlockContext()
 }
 
 type PhpBlockContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyPhpBlockContext() *PhpBlockContext {
 	var p = new(PhpBlockContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_phpBlock
 	return p
+}
+
+func InitEmptyPhpBlockContext(p *PhpBlockContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_phpBlock
 }
 
 func (*PhpBlockContext) IsPhpBlockContext() {}
@@ -2893,7 +3109,7 @@ func (*PhpBlockContext) IsPhpBlockContext() {}
 func NewPhpBlockContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *PhpBlockContext {
 	var p = new(PhpBlockContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_phpBlock
@@ -3258,36 +3474,22 @@ func (s *PhpBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) PhpBlock() (localctx IPhpBlockContext) {
-	this := p
-	_ = this
-
 	localctx = NewPhpBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 10, PHPParserRULE_phpBlock)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(414)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 11, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 11, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -3298,17 +3500,30 @@ func (p *PHPParser) PhpBlock() (localctx IPhpBlockContext) {
 		}
 		p.SetState(416)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 11, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 11, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(424)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_alt = 1
 	for ok := true; ok; ok = _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		switch _alt {
 		case 1:
 			p.SetState(424)
 			p.GetErrorHandler().Sync(p)
-			switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 12, p.GetParserRuleContext()) {
+			if p.HasError() {
+				goto errorExit
+			}
+
+			switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 12, p.GetParserRuleContext()) {
 			case 1:
 				{
 					p.SetState(417)
@@ -3351,18 +3566,27 @@ func (p *PHPParser) PhpBlock() (localctx IPhpBlockContext) {
 					p.Statement()
 				}
 
+			case antlr.ATNInvalidAltNumber:
+				goto errorExit
 			}
 
 		default:
-			panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			goto errorExit
 		}
 
 		p.SetState(426)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 13, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 13, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(429)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserPHPEnd || _la == PHPParserPHPEndSingleLineComment {
@@ -3380,7 +3604,17 @@ func (p *PHPParser) PhpBlock() (localctx IPhpBlockContext) {
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IImportStatementContext is an interface to support dynamic dispatch.
@@ -3390,20 +3624,31 @@ type IImportStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Import() antlr.TerminalNode
+	Namespace() antlr.TerminalNode
+	NamespaceUseDeclaration() INamespaceUseDeclarationContext
+	SemiColon() antlr.TerminalNode
+
 	// IsImportStatementContext differentiates from other interfaces.
 	IsImportStatementContext()
 }
 
 type ImportStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyImportStatementContext() *ImportStatementContext {
 	var p = new(ImportStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_importStatement
 	return p
+}
+
+func InitEmptyImportStatementContext(p *ImportStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_importStatement
 }
 
 func (*ImportStatementContext) IsImportStatementContext() {}
@@ -3411,7 +3656,7 @@ func (*ImportStatementContext) IsImportStatementContext() {}
 func NewImportStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ImportStatementContext {
 	var p = new(ImportStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_importStatement
@@ -3468,36 +3713,24 @@ func (s *ImportStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) ImportStatement() (localctx IImportStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewImportStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 12, PHPParserRULE_importStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(431)
 		p.Match(PHPParserImport)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(432)
 		p.Match(PHPParserNamespace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(433)
@@ -3506,9 +3739,23 @@ func (p *PHPParser) ImportStatement() (localctx IImportStatementContext) {
 	{
 		p.SetState(434)
 		p.Match(PHPParserSemiColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITopStatementContext is an interface to support dynamic dispatch.
@@ -3518,20 +3765,34 @@ type ITopStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	UseDeclaration() IUseDeclarationContext
+	NamespaceDeclaration() INamespaceDeclarationContext
+	FunctionDeclaration() IFunctionDeclarationContext
+	ClassDeclaration() IClassDeclarationContext
+	GlobalConstantDeclaration() IGlobalConstantDeclarationContext
+	EnumDeclaration() IEnumDeclarationContext
+	Statement() IStatementContext
+
 	// IsTopStatementContext differentiates from other interfaces.
 	IsTopStatementContext()
 }
 
 type TopStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTopStatementContext() *TopStatementContext {
 	var p = new(TopStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_topStatement
 	return p
+}
+
+func InitEmptyTopStatementContext(p *TopStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_topStatement
 }
 
 func (*TopStatementContext) IsTopStatementContext() {}
@@ -3539,7 +3800,7 @@ func (*TopStatementContext) IsTopStatementContext() {}
 func NewTopStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TopStatementContext {
 	var p = new(TopStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_topStatement
@@ -3680,31 +3941,15 @@ func (s *TopStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *PHPParser) TopStatement() (localctx ITopStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewTopStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 14, PHPParserRULE_topStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(443)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 15, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 15, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -3754,9 +3999,21 @@ func (p *PHPParser) TopStatement() (localctx ITopStatementContext) {
 			p.Statement()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IUseDeclarationContext is an interface to support dynamic dispatch.
@@ -3772,21 +4029,33 @@ type IUseDeclarationContext interface {
 	// SetOpmode sets the opmode token.
 	SetOpmode(antlr.Token)
 
+	// Getter signatures
+	Use() antlr.TerminalNode
+	UseDeclarationContentList() IUseDeclarationContentListContext
+	SemiColon() antlr.TerminalNode
+	Function_() antlr.TerminalNode
+	Const() antlr.TerminalNode
+
 	// IsUseDeclarationContext differentiates from other interfaces.
 	IsUseDeclarationContext()
 }
 
 type UseDeclarationContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 	opmode antlr.Token
 }
 
 func NewEmptyUseDeclarationContext() *UseDeclarationContext {
 	var p = new(UseDeclarationContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_useDeclaration
 	return p
+}
+
+func InitEmptyUseDeclarationContext(p *UseDeclarationContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_useDeclaration
 }
 
 func (*UseDeclarationContext) IsUseDeclarationContext() {}
@@ -3794,7 +4063,7 @@ func (*UseDeclarationContext) IsUseDeclarationContext() {}
 func NewUseDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *UseDeclarationContext {
 	var p = new(UseDeclarationContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_useDeclaration
@@ -3859,38 +4128,23 @@ func (s *UseDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) UseDeclaration() (localctx IUseDeclarationContext) {
-	this := p
-	_ = this
-
 	localctx = NewUseDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 16, PHPParserRULE_useDeclaration)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(445)
 		p.Match(PHPParserUse)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(447)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 16, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 16, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(446)
 
@@ -3910,6 +4164,8 @@ func (p *PHPParser) UseDeclaration() (localctx IUseDeclarationContext) {
 			}
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 	{
 		p.SetState(449)
@@ -3918,9 +4174,23 @@ func (p *PHPParser) UseDeclaration() (localctx IUseDeclarationContext) {
 	{
 		p.SetState(450)
 		p.Match(PHPParserSemiColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IUseDeclarationContentListContext is an interface to support dynamic dispatch.
@@ -3930,20 +4200,31 @@ type IUseDeclarationContentListContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllNamespaceUseDeclaration() []INamespaceUseDeclarationContext
+	NamespaceUseDeclaration(i int) INamespaceUseDeclarationContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsUseDeclarationContentListContext differentiates from other interfaces.
 	IsUseDeclarationContentListContext()
 }
 
 type UseDeclarationContentListContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyUseDeclarationContentListContext() *UseDeclarationContentListContext {
 	var p = new(UseDeclarationContentListContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_useDeclarationContentList
 	return p
+}
+
+func InitEmptyUseDeclarationContentListContext(p *UseDeclarationContentListContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_useDeclarationContentList
 }
 
 func (*UseDeclarationContentListContext) IsUseDeclarationContentListContext() {}
@@ -3951,7 +4232,7 @@ func (*UseDeclarationContentListContext) IsUseDeclarationContentListContext() {}
 func NewUseDeclarationContentListContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *UseDeclarationContentListContext {
 	var p = new(UseDeclarationContentListContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_useDeclarationContentList
@@ -4029,28 +4310,9 @@ func (s *UseDeclarationContentListContext) Accept(visitor antlr.ParseTreeVisitor
 }
 
 func (p *PHPParser) UseDeclarationContentList() (localctx IUseDeclarationContentListContext) {
-	this := p
-	_ = this
-
 	localctx = NewUseDeclarationContentListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 18, PHPParserRULE_useDeclarationContentList)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -4059,12 +4321,19 @@ func (p *PHPParser) UseDeclarationContentList() (localctx IUseDeclarationContent
 	}
 	p.SetState(457)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == PHPParserComma {
 		{
 			p.SetState(453)
 			p.Match(PHPParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(454)
@@ -4073,10 +4342,23 @@ func (p *PHPParser) UseDeclarationContentList() (localctx IUseDeclarationContent
 
 		p.SetState(459)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // INamespacePathContext is an interface to support dynamic dispatch.
@@ -4086,20 +4368,31 @@ type INamespacePathContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllIdentifier() []IIdentifierContext
+	Identifier(i int) IIdentifierContext
+	AllNamespaceSeparator() []antlr.TerminalNode
+	NamespaceSeparator(i int) antlr.TerminalNode
+
 	// IsNamespacePathContext differentiates from other interfaces.
 	IsNamespacePathContext()
 }
 
 type NamespacePathContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyNamespacePathContext() *NamespacePathContext {
 	var p = new(NamespacePathContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_namespacePath
 	return p
+}
+
+func InitEmptyNamespacePathContext(p *NamespacePathContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_namespacePath
 }
 
 func (*NamespacePathContext) IsNamespacePathContext() {}
@@ -4107,7 +4400,7 @@ func (*NamespacePathContext) IsNamespacePathContext() {}
 func NewNamespacePathContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *NamespacePathContext {
 	var p = new(NamespacePathContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_namespacePath
@@ -4185,40 +4478,28 @@ func (s *NamespacePathContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) NamespacePath() (localctx INamespacePathContext) {
-	this := p
-	_ = this
-
 	localctx = NewNamespacePathContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 20, PHPParserRULE_namespacePath)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(461)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserNamespaceSeparator {
 		{
 			p.SetState(460)
 			p.Match(PHPParserNamespaceSeparator)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
@@ -4228,13 +4509,22 @@ func (p *PHPParser) NamespacePath() (localctx INamespacePathContext) {
 	}
 	p.SetState(471)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 20, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 20, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
 				p.SetState(464)
 				p.Match(PHPParserNamespaceSeparator)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(465)
@@ -4243,21 +4533,43 @@ func (p *PHPParser) NamespacePath() (localctx INamespacePathContext) {
 			p.SetState(467)
 			p.GetErrorHandler().Sync(p)
 
-			if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 19, p.GetParserRuleContext()) == 1 {
+			if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 19, p.GetParserRuleContext()) == 1 {
 				{
 					p.SetState(466)
 					p.Match(PHPParserNamespaceSeparator)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 
+			} else if p.HasError() { // JIM
+				goto errorExit
 			}
 
 		}
 		p.SetState(473)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 20, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 20, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // INamespaceDeclarationContext is an interface to support dynamic dispatch.
@@ -4267,20 +4579,34 @@ type INamespaceDeclarationContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Namespace() antlr.TerminalNode
+	OpenCurlyBracket() antlr.TerminalNode
+	CloseCurlyBracket() antlr.TerminalNode
+	NamespacePath() INamespacePathContext
+	SemiColon() antlr.TerminalNode
+	AllNamespaceStatement() []INamespaceStatementContext
+	NamespaceStatement(i int) INamespaceStatementContext
+
 	// IsNamespaceDeclarationContext differentiates from other interfaces.
 	IsNamespaceDeclarationContext()
 }
 
 type NamespaceDeclarationContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyNamespaceDeclarationContext() *NamespaceDeclarationContext {
 	var p = new(NamespaceDeclarationContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_namespaceDeclaration
 	return p
+}
+
+func InitEmptyNamespaceDeclarationContext(p *NamespaceDeclarationContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_namespaceDeclaration
 }
 
 func (*NamespaceDeclarationContext) IsNamespaceDeclarationContext() {}
@@ -4288,7 +4614,7 @@ func (*NamespaceDeclarationContext) IsNamespaceDeclarationContext() {}
 func NewNamespaceDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *NamespaceDeclarationContext {
 	var p = new(NamespaceDeclarationContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_namespaceDeclaration
@@ -4390,28 +4716,9 @@ func (s *NamespaceDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *PHPParser) NamespaceDeclaration() (localctx INamespaceDeclarationContext) {
-	this := p
-	_ = this
-
 	localctx = NewNamespaceDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 22, PHPParserRULE_namespaceDeclaration)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -4419,16 +4726,27 @@ func (p *PHPParser) NamespaceDeclaration() (localctx INamespaceDeclarationContex
 	{
 		p.SetState(474)
 		p.Match(PHPParserNamespace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(494)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 24, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 24, p.GetParserRuleContext()) {
 	case 1:
 		p.SetState(476)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-848822976643073) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&144115188058944511) != 0 || _la == PHPParserNamespaceSeparator || _la == PHPParserLabel {
+		if ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-848822976643073) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&144115188058944511) != 0) || _la == PHPParserNamespaceSeparator || _la == PHPParserLabel {
 			{
 				p.SetState(475)
 				p.NamespacePath()
@@ -4438,12 +4756,19 @@ func (p *PHPParser) NamespaceDeclaration() (localctx INamespaceDeclarationContex
 		{
 			p.SetState(478)
 			p.Match(PHPParserOpenCurlyBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(482)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-17200488445076) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&-1) != 0 || (int64((_la-128)) & ^0x3f) == 0 && ((int64(1)<<(_la-128))&3573412790271) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70336709945889) != 0 {
+		for ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-17200488445076) != 0) || ((int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&-1) != 0) || ((int64((_la-128)) & ^0x3f) == 0 && ((int64(1)<<(_la-128))&3573412790271) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70336709945889) != 0) {
 			{
 				p.SetState(479)
 				p.NamespaceStatement()
@@ -4451,11 +4776,18 @@ func (p *PHPParser) NamespaceDeclaration() (localctx INamespaceDeclarationContex
 
 			p.SetState(484)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
 			p.SetState(485)
 			p.Match(PHPParserCloseCurlyBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 2:
@@ -4466,11 +4798,20 @@ func (p *PHPParser) NamespaceDeclaration() (localctx INamespaceDeclarationContex
 		{
 			p.SetState(487)
 			p.Match(PHPParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(491)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 23, p.GetParserRuleContext())
-
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 23, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 		for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			if _alt == 1 {
 				{
@@ -4481,12 +4822,30 @@ func (p *PHPParser) NamespaceDeclaration() (localctx INamespaceDeclarationContex
 			}
 			p.SetState(493)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 23, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 23, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // INamespaceDeclarationSemiContext is an interface to support dynamic dispatch.
@@ -4496,20 +4855,32 @@ type INamespaceDeclarationSemiContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Namespace() antlr.TerminalNode
+	NamespacePath() INamespacePathContext
+	SemiColon() antlr.TerminalNode
+	AllNamespaceStatement() []INamespaceStatementContext
+	NamespaceStatement(i int) INamespaceStatementContext
+
 	// IsNamespaceDeclarationSemiContext differentiates from other interfaces.
 	IsNamespaceDeclarationSemiContext()
 }
 
 type NamespaceDeclarationSemiContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyNamespaceDeclarationSemiContext() *NamespaceDeclarationSemiContext {
 	var p = new(NamespaceDeclarationSemiContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_namespaceDeclarationSemi
 	return p
+}
+
+func InitEmptyNamespaceDeclarationSemiContext(p *NamespaceDeclarationSemiContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_namespaceDeclarationSemi
 }
 
 func (*NamespaceDeclarationSemiContext) IsNamespaceDeclarationSemiContext() {}
@@ -4517,7 +4888,7 @@ func (*NamespaceDeclarationSemiContext) IsNamespaceDeclarationSemiContext() {}
 func NewNamespaceDeclarationSemiContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *NamespaceDeclarationSemiContext {
 	var p = new(NamespaceDeclarationSemiContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_namespaceDeclarationSemi
@@ -4611,33 +4982,18 @@ func (s *NamespaceDeclarationSemiContext) Accept(visitor antlr.ParseTreeVisitor)
 }
 
 func (p *PHPParser) NamespaceDeclarationSemi() (localctx INamespaceDeclarationSemiContext) {
-	this := p
-	_ = this
-
 	localctx = NewNamespaceDeclarationSemiContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 24, PHPParserRULE_namespaceDeclarationSemi)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(496)
 		p.Match(PHPParserNamespace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(497)
@@ -4646,12 +5002,19 @@ func (p *PHPParser) NamespaceDeclarationSemi() (localctx INamespaceDeclarationSe
 	{
 		p.SetState(498)
 		p.Match(PHPParserSemiColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(502)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-17200488445076) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&-1) != 0 || (int64((_la-128)) & ^0x3f) == 0 && ((int64(1)<<(_la-128))&3573412790271) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70336709945889) != 0 {
+	for ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-17200488445076) != 0) || ((int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&-1) != 0) || ((int64((_la-128)) & ^0x3f) == 0 && ((int64(1)<<(_la-128))&3573412790271) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70336709945889) != 0) {
 		{
 			p.SetState(499)
 			p.NamespaceStatement()
@@ -4659,10 +5022,23 @@ func (p *PHPParser) NamespaceDeclarationSemi() (localctx INamespaceDeclarationSe
 
 		p.SetState(504)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // INamespaceStatementContext is an interface to support dynamic dispatch.
@@ -4672,20 +5048,33 @@ type INamespaceStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	UseDeclaration() IUseDeclarationContext
+	FunctionDeclaration() IFunctionDeclarationContext
+	ClassDeclaration() IClassDeclarationContext
+	GlobalConstantDeclaration() IGlobalConstantDeclarationContext
+	EnumDeclaration() IEnumDeclarationContext
+	Statement() IStatementContext
+
 	// IsNamespaceStatementContext differentiates from other interfaces.
 	IsNamespaceStatementContext()
 }
 
 type NamespaceStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyNamespaceStatementContext() *NamespaceStatementContext {
 	var p = new(NamespaceStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_namespaceStatement
 	return p
+}
+
+func InitEmptyNamespaceStatementContext(p *NamespaceStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_namespaceStatement
 }
 
 func (*NamespaceStatementContext) IsNamespaceStatementContext() {}
@@ -4693,7 +5082,7 @@ func (*NamespaceStatementContext) IsNamespaceStatementContext() {}
 func NewNamespaceStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *NamespaceStatementContext {
 	var p = new(NamespaceStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_namespaceStatement
@@ -4818,31 +5207,15 @@ func (s *NamespaceStatementContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *PHPParser) NamespaceStatement() (localctx INamespaceStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewNamespaceStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 26, PHPParserRULE_namespaceStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(511)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 26, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 26, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -4885,9 +5258,21 @@ func (p *PHPParser) NamespaceStatement() (localctx INamespaceStatementContext) {
 			p.Statement()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // INamespaceDeclarationBodyContext is an interface to support dynamic dispatch.
@@ -4897,20 +5282,29 @@ type INamespaceDeclarationBodyContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllNamespaceStatement() []INamespaceStatementContext
+	NamespaceStatement(i int) INamespaceStatementContext
+
 	// IsNamespaceDeclarationBodyContext differentiates from other interfaces.
 	IsNamespaceDeclarationBodyContext()
 }
 
 type NamespaceDeclarationBodyContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyNamespaceDeclarationBodyContext() *NamespaceDeclarationBodyContext {
 	var p = new(NamespaceDeclarationBodyContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_namespaceDeclarationBody
 	return p
+}
+
+func InitEmptyNamespaceDeclarationBodyContext(p *NamespaceDeclarationBodyContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_namespaceDeclarationBody
 }
 
 func (*NamespaceDeclarationBodyContext) IsNamespaceDeclarationBodyContext() {}
@@ -4918,7 +5312,7 @@ func (*NamespaceDeclarationBodyContext) IsNamespaceDeclarationBodyContext() {}
 func NewNamespaceDeclarationBodyContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *NamespaceDeclarationBodyContext {
 	var p = new(NamespaceDeclarationBodyContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_namespaceDeclarationBody
@@ -4988,35 +5382,19 @@ func (s *NamespaceDeclarationBodyContext) Accept(visitor antlr.ParseTreeVisitor)
 }
 
 func (p *PHPParser) NamespaceDeclarationBody() (localctx INamespaceDeclarationBodyContext) {
-	this := p
-	_ = this
-
 	localctx = NewNamespaceDeclarationBodyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 28, PHPParserRULE_namespaceDeclarationBody)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(516)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-17200488445076) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&-1) != 0 || (int64((_la-128)) & ^0x3f) == 0 && ((int64(1)<<(_la-128))&3573412790271) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70336709945889) != 0 {
+	for ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-17200488445076) != 0) || ((int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&-1) != 0) || ((int64((_la-128)) & ^0x3f) == 0 && ((int64(1)<<(_la-128))&3573412790271) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70336709945889) != 0) {
 		{
 			p.SetState(513)
 			p.NamespaceStatement()
@@ -5024,10 +5402,23 @@ func (p *PHPParser) NamespaceDeclarationBody() (localctx INamespaceDeclarationBo
 
 		p.SetState(518)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // INamespaceUseDeclarationsContext is an interface to support dynamic dispatch.
@@ -5037,20 +5428,29 @@ type INamespaceUseDeclarationsContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllUseDeclaration() []IUseDeclarationContext
+	UseDeclaration(i int) IUseDeclarationContext
+
 	// IsNamespaceUseDeclarationsContext differentiates from other interfaces.
 	IsNamespaceUseDeclarationsContext()
 }
 
 type NamespaceUseDeclarationsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyNamespaceUseDeclarationsContext() *NamespaceUseDeclarationsContext {
 	var p = new(NamespaceUseDeclarationsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_namespaceUseDeclarations
 	return p
+}
+
+func InitEmptyNamespaceUseDeclarationsContext(p *NamespaceUseDeclarationsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_namespaceUseDeclarations
 }
 
 func (*NamespaceUseDeclarationsContext) IsNamespaceUseDeclarationsContext() {}
@@ -5058,7 +5458,7 @@ func (*NamespaceUseDeclarationsContext) IsNamespaceUseDeclarationsContext() {}
 func NewNamespaceUseDeclarationsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *NamespaceUseDeclarationsContext {
 	var p = new(NamespaceUseDeclarationsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_namespaceUseDeclarations
@@ -5128,32 +5528,16 @@ func (s *NamespaceUseDeclarationsContext) Accept(visitor antlr.ParseTreeVisitor)
 }
 
 func (p *PHPParser) NamespaceUseDeclarations() (localctx INamespaceUseDeclarationsContext) {
-	this := p
-	_ = this
-
 	localctx = NewNamespaceUseDeclarationsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 30, PHPParserRULE_namespaceUseDeclarations)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(520)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for ok := true; ok; ok = _la == PHPParserUse {
@@ -5164,10 +5548,23 @@ func (p *PHPParser) NamespaceUseDeclarations() (localctx INamespaceUseDeclaratio
 
 		p.SetState(522)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFunctionDeclarationContext is an interface to support dynamic dispatch.
@@ -5177,20 +5574,38 @@ type IFunctionDeclarationContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Function_() antlr.TerminalNode
+	CallableIdentifier() ICallableIdentifierContext
+	OpenRoundBracket() antlr.TerminalNode
+	FormalParameterList() IFormalParameterListContext
+	CloseRoundBracket() antlr.TerminalNode
+	BlockStatement() IBlockStatementContext
+	Attributes() IAttributesContext
+	Ampersand() antlr.TerminalNode
+	Colon() antlr.TerminalNode
+	TypeHint() ITypeHintContext
+	QuestionMark() antlr.TerminalNode
+
 	// IsFunctionDeclarationContext differentiates from other interfaces.
 	IsFunctionDeclarationContext()
 }
 
 type FunctionDeclarationContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFunctionDeclarationContext() *FunctionDeclarationContext {
 	var p = new(FunctionDeclarationContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_functionDeclaration
 	return p
+}
+
+func InitEmptyFunctionDeclarationContext(p *FunctionDeclarationContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_functionDeclaration
 }
 
 func (*FunctionDeclarationContext) IsFunctionDeclarationContext() {}
@@ -5198,7 +5613,7 @@ func (*FunctionDeclarationContext) IsFunctionDeclarationContext() {}
 func NewFunctionDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FunctionDeclarationContext {
 	var p = new(FunctionDeclarationContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_functionDeclaration
@@ -5331,32 +5746,16 @@ func (s *FunctionDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *PHPParser) FunctionDeclaration() (localctx IFunctionDeclarationContext) {
-	this := p
-	_ = this
-
 	localctx = NewFunctionDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 32, PHPParserRULE_functionDeclaration)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(525)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserAttributeStart {
@@ -5369,15 +5768,26 @@ func (p *PHPParser) FunctionDeclaration() (localctx IFunctionDeclarationContext)
 	{
 		p.SetState(527)
 		p.Match(PHPParserFunction_)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(529)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserAmpersand {
 		{
 			p.SetState(528)
 			p.Match(PHPParserAmpersand)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
@@ -5388,6 +5798,10 @@ func (p *PHPParser) FunctionDeclaration() (localctx IFunctionDeclarationContext)
 	{
 		p.SetState(532)
 		p.Match(PHPParserOpenRoundBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(533)
@@ -5396,24 +5810,42 @@ func (p *PHPParser) FunctionDeclaration() (localctx IFunctionDeclarationContext)
 	{
 		p.SetState(534)
 		p.Match(PHPParserCloseRoundBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(540)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserColon {
 		{
 			p.SetState(535)
 			p.Match(PHPParserColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(537)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserQuestionMark {
 			{
 				p.SetState(536)
 				p.Match(PHPParserQuestionMark)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
@@ -5428,7 +5860,17 @@ func (p *PHPParser) FunctionDeclaration() (localctx IFunctionDeclarationContext)
 		p.BlockStatement()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IClassDeclarationContext is an interface to support dynamic dispatch.
@@ -5438,20 +5880,42 @@ type IClassDeclarationContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	OpenCurlyBracket() antlr.TerminalNode
+	CloseCurlyBracket() antlr.TerminalNode
+	ClassEntryType() IClassEntryTypeContext
+	Identifier() IIdentifierContext
+	Interface() antlr.TerminalNode
+	Attributes() IAttributesContext
+	Private() antlr.TerminalNode
+	Modifier() IModifierContext
+	Partial() antlr.TerminalNode
+	AllClassStatement() []IClassStatementContext
+	ClassStatement(i int) IClassStatementContext
+	Extends() antlr.TerminalNode
+	QualifiedStaticTypeRef() IQualifiedStaticTypeRefContext
+	Implements() antlr.TerminalNode
+	InterfaceList() IInterfaceListContext
+
 	// IsClassDeclarationContext differentiates from other interfaces.
 	IsClassDeclarationContext()
 }
 
 type ClassDeclarationContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyClassDeclarationContext() *ClassDeclarationContext {
 	var p = new(ClassDeclarationContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_classDeclaration
 	return p
+}
+
+func InitEmptyClassDeclarationContext(p *ClassDeclarationContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_classDeclaration
 }
 
 func (*ClassDeclarationContext) IsClassDeclarationContext() {}
@@ -5459,7 +5923,7 @@ func (*ClassDeclarationContext) IsClassDeclarationContext() {}
 func NewClassDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ClassDeclarationContext {
 	var p = new(ClassDeclarationContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_classDeclaration
@@ -5653,32 +6117,16 @@ func (s *ClassDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *PHPParser) ClassDeclaration() (localctx IClassDeclarationContext) {
-	this := p
-	_ = this
-
 	localctx = NewClassDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 34, PHPParserRULE_classDeclaration)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(545)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserAttributeStart {
@@ -5690,17 +6138,27 @@ func (p *PHPParser) ClassDeclaration() (localctx IClassDeclarationContext) {
 	}
 	p.SetState(548)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserPrivate {
 		{
 			p.SetState(547)
 			p.Match(PHPParserPrivate)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 	p.SetState(551)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserAbstract || _la == PHPParserFinal {
@@ -5712,17 +6170,27 @@ func (p *PHPParser) ClassDeclaration() (localctx IClassDeclarationContext) {
 	}
 	p.SetState(554)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserPartial {
 		{
 			p.SetState(553)
 			p.Match(PHPParserPartial)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 	p.SetState(572)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserClass, PHPParserTrait:
@@ -5736,12 +6204,19 @@ func (p *PHPParser) ClassDeclaration() (localctx IClassDeclarationContext) {
 		}
 		p.SetState(560)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserExtends {
 			{
 				p.SetState(558)
 				p.Match(PHPParserExtends)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(559)
@@ -5751,12 +6226,19 @@ func (p *PHPParser) ClassDeclaration() (localctx IClassDeclarationContext) {
 		}
 		p.SetState(564)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserImplements {
 			{
 				p.SetState(562)
 				p.Match(PHPParserImplements)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(563)
@@ -5769,6 +6251,10 @@ func (p *PHPParser) ClassDeclaration() (localctx IClassDeclarationContext) {
 		{
 			p.SetState(566)
 			p.Match(PHPParserInterface)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(567)
@@ -5776,12 +6262,19 @@ func (p *PHPParser) ClassDeclaration() (localctx IClassDeclarationContext) {
 		}
 		p.SetState(570)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserExtends {
 			{
 				p.SetState(568)
 				p.Match(PHPParserExtends)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(569)
@@ -5791,17 +6284,25 @@ func (p *PHPParser) ClassDeclaration() (localctx IClassDeclarationContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 	{
 		p.SetState(574)
 		p.Match(PHPParserOpenCurlyBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(578)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&144167964633989120) != 0 || (int64((_la-82)) & ^0x3f) == 0 && ((int64(1)<<(_la-82))&6757727313330209) != 0 {
+	for ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&144167964633989120) != 0) || ((int64((_la-82)) & ^0x3f) == 0 && ((int64(1)<<(_la-82))&6757727313330209) != 0) {
 		{
 			p.SetState(575)
 			p.ClassStatement()
@@ -5809,14 +6310,31 @@ func (p *PHPParser) ClassDeclaration() (localctx IClassDeclarationContext) {
 
 		p.SetState(580)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(581)
 		p.Match(PHPParserCloseCurlyBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IClassEntryTypeContext is an interface to support dynamic dispatch.
@@ -5826,20 +6344,29 @@ type IClassEntryTypeContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Class() antlr.TerminalNode
+	Trait() antlr.TerminalNode
+
 	// IsClassEntryTypeContext differentiates from other interfaces.
 	IsClassEntryTypeContext()
 }
 
 type ClassEntryTypeContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyClassEntryTypeContext() *ClassEntryTypeContext {
 	var p = new(ClassEntryTypeContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_classEntryType
 	return p
+}
+
+func InitEmptyClassEntryTypeContext(p *ClassEntryTypeContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_classEntryType
 }
 
 func (*ClassEntryTypeContext) IsClassEntryTypeContext() {}
@@ -5847,7 +6374,7 @@ func (*ClassEntryTypeContext) IsClassEntryTypeContext() {}
 func NewClassEntryTypeContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ClassEntryTypeContext {
 	var p = new(ClassEntryTypeContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_classEntryType
@@ -5884,28 +6411,9 @@ func (s *ClassEntryTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) ClassEntryType() (localctx IClassEntryTypeContext) {
-	this := p
-	_ = this
-
 	localctx = NewClassEntryTypeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 36, PHPParserRULE_classEntryType)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -5920,7 +6428,17 @@ func (p *PHPParser) ClassEntryType() (localctx IClassEntryTypeContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IInterfaceListContext is an interface to support dynamic dispatch.
@@ -5930,20 +6448,31 @@ type IInterfaceListContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllQualifiedStaticTypeRef() []IQualifiedStaticTypeRefContext
+	QualifiedStaticTypeRef(i int) IQualifiedStaticTypeRefContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsInterfaceListContext differentiates from other interfaces.
 	IsInterfaceListContext()
 }
 
 type InterfaceListContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyInterfaceListContext() *InterfaceListContext {
 	var p = new(InterfaceListContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_interfaceList
 	return p
+}
+
+func InitEmptyInterfaceListContext(p *InterfaceListContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_interfaceList
 }
 
 func (*InterfaceListContext) IsInterfaceListContext() {}
@@ -5951,7 +6480,7 @@ func (*InterfaceListContext) IsInterfaceListContext() {}
 func NewInterfaceListContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *InterfaceListContext {
 	var p = new(InterfaceListContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_interfaceList
@@ -6029,28 +6558,9 @@ func (s *InterfaceListContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) InterfaceList() (localctx IInterfaceListContext) {
-	this := p
-	_ = this
-
 	localctx = NewInterfaceListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 38, PHPParserRULE_interfaceList)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -6059,12 +6569,19 @@ func (p *PHPParser) InterfaceList() (localctx IInterfaceListContext) {
 	}
 	p.SetState(590)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == PHPParserComma {
 		{
 			p.SetState(586)
 			p.Match(PHPParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(587)
@@ -6073,10 +6590,23 @@ func (p *PHPParser) InterfaceList() (localctx IInterfaceListContext) {
 
 		p.SetState(592)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITypeParameterListContext is an interface to support dynamic dispatch.
@@ -6086,20 +6616,31 @@ type ITypeParameterListContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllTypeParameterDecl() []ITypeParameterDeclContext
+	TypeParameterDecl(i int) ITypeParameterDeclContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsTypeParameterListContext differentiates from other interfaces.
 	IsTypeParameterListContext()
 }
 
 type TypeParameterListContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTypeParameterListContext() *TypeParameterListContext {
 	var p = new(TypeParameterListContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_typeParameterList
 	return p
+}
+
+func InitEmptyTypeParameterListContext(p *TypeParameterListContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_typeParameterList
 }
 
 func (*TypeParameterListContext) IsTypeParameterListContext() {}
@@ -6107,7 +6648,7 @@ func (*TypeParameterListContext) IsTypeParameterListContext() {}
 func NewTypeParameterListContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TypeParameterListContext {
 	var p = new(TypeParameterListContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_typeParameterList
@@ -6185,28 +6726,9 @@ func (s *TypeParameterListContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *PHPParser) TypeParameterList() (localctx ITypeParameterListContext) {
-	this := p
-	_ = this
-
 	localctx = NewTypeParameterListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 40, PHPParserRULE_typeParameterList)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -6215,12 +6737,19 @@ func (p *PHPParser) TypeParameterList() (localctx ITypeParameterListContext) {
 	}
 	p.SetState(598)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == PHPParserComma {
 		{
 			p.SetState(594)
 			p.Match(PHPParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(595)
@@ -6229,10 +6758,23 @@ func (p *PHPParser) TypeParameterList() (localctx ITypeParameterListContext) {
 
 		p.SetState(600)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITypeParameterWithDefaultsListContext is an interface to support dynamic dispatch.
@@ -6242,20 +6784,31 @@ type ITypeParameterWithDefaultsListContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllTypeParameterWithDefaultDecl() []ITypeParameterWithDefaultDeclContext
+	TypeParameterWithDefaultDecl(i int) ITypeParameterWithDefaultDeclContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsTypeParameterWithDefaultsListContext differentiates from other interfaces.
 	IsTypeParameterWithDefaultsListContext()
 }
 
 type TypeParameterWithDefaultsListContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTypeParameterWithDefaultsListContext() *TypeParameterWithDefaultsListContext {
 	var p = new(TypeParameterWithDefaultsListContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_typeParameterWithDefaultsList
 	return p
+}
+
+func InitEmptyTypeParameterWithDefaultsListContext(p *TypeParameterWithDefaultsListContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_typeParameterWithDefaultsList
 }
 
 func (*TypeParameterWithDefaultsListContext) IsTypeParameterWithDefaultsListContext() {}
@@ -6263,7 +6816,7 @@ func (*TypeParameterWithDefaultsListContext) IsTypeParameterWithDefaultsListCont
 func NewTypeParameterWithDefaultsListContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TypeParameterWithDefaultsListContext {
 	var p = new(TypeParameterWithDefaultsListContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_typeParameterWithDefaultsList
@@ -6341,28 +6894,9 @@ func (s *TypeParameterWithDefaultsListContext) Accept(visitor antlr.ParseTreeVis
 }
 
 func (p *PHPParser) TypeParameterWithDefaultsList() (localctx ITypeParameterWithDefaultsListContext) {
-	this := p
-	_ = this
-
 	localctx = NewTypeParameterWithDefaultsListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 42, PHPParserRULE_typeParameterWithDefaultsList)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -6371,12 +6905,19 @@ func (p *PHPParser) TypeParameterWithDefaultsList() (localctx ITypeParameterWith
 	}
 	p.SetState(606)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == PHPParserComma {
 		{
 			p.SetState(602)
 			p.Match(PHPParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(603)
@@ -6385,10 +6926,23 @@ func (p *PHPParser) TypeParameterWithDefaultsList() (localctx ITypeParameterWith
 
 		p.SetState(608)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITypeParameterDeclContext is an interface to support dynamic dispatch.
@@ -6398,20 +6952,29 @@ type ITypeParameterDeclContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Identifier() IIdentifierContext
+	Attributes() IAttributesContext
+
 	// IsTypeParameterDeclContext differentiates from other interfaces.
 	IsTypeParameterDeclContext()
 }
 
 type TypeParameterDeclContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTypeParameterDeclContext() *TypeParameterDeclContext {
 	var p = new(TypeParameterDeclContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_typeParameterDecl
 	return p
+}
+
+func InitEmptyTypeParameterDeclContext(p *TypeParameterDeclContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_typeParameterDecl
 }
 
 func (*TypeParameterDeclContext) IsTypeParameterDeclContext() {}
@@ -6419,7 +6982,7 @@ func (*TypeParameterDeclContext) IsTypeParameterDeclContext() {}
 func NewTypeParameterDeclContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TypeParameterDeclContext {
 	var p = new(TypeParameterDeclContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_typeParameterDecl
@@ -6480,32 +7043,16 @@ func (s *TypeParameterDeclContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *PHPParser) TypeParameterDecl() (localctx ITypeParameterDeclContext) {
-	this := p
-	_ = this
-
 	localctx = NewTypeParameterDeclContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 44, PHPParserRULE_typeParameterDecl)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(610)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserAttributeStart {
@@ -6520,7 +7067,17 @@ func (p *PHPParser) TypeParameterDecl() (localctx ITypeParameterDeclContext) {
 		p.Identifier()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITypeParameterWithDefaultDeclContext is an interface to support dynamic dispatch.
@@ -6530,20 +7087,32 @@ type ITypeParameterWithDefaultDeclContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Identifier() IIdentifierContext
+	Eq() antlr.TerminalNode
+	QualifiedStaticTypeRef() IQualifiedStaticTypeRefContext
+	PrimitiveType() IPrimitiveTypeContext
+	Attributes() IAttributesContext
+
 	// IsTypeParameterWithDefaultDeclContext differentiates from other interfaces.
 	IsTypeParameterWithDefaultDeclContext()
 }
 
 type TypeParameterWithDefaultDeclContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTypeParameterWithDefaultDeclContext() *TypeParameterWithDefaultDeclContext {
 	var p = new(TypeParameterWithDefaultDeclContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_typeParameterWithDefaultDecl
 	return p
+}
+
+func InitEmptyTypeParameterWithDefaultDeclContext(p *TypeParameterWithDefaultDeclContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_typeParameterWithDefaultDecl
 }
 
 func (*TypeParameterWithDefaultDeclContext) IsTypeParameterWithDefaultDeclContext() {}
@@ -6551,7 +7120,7 @@ func (*TypeParameterWithDefaultDeclContext) IsTypeParameterWithDefaultDeclContex
 func NewTypeParameterWithDefaultDeclContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TypeParameterWithDefaultDeclContext {
 	var p = new(TypeParameterWithDefaultDeclContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_typeParameterWithDefaultDecl
@@ -6648,32 +7217,16 @@ func (s *TypeParameterWithDefaultDeclContext) Accept(visitor antlr.ParseTreeVisi
 }
 
 func (p *PHPParser) TypeParameterWithDefaultDecl() (localctx ITypeParameterWithDefaultDeclContext) {
-	this := p
-	_ = this
-
 	localctx = NewTypeParameterWithDefaultDeclContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 46, PHPParserRULE_typeParameterWithDefaultDecl)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(615)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserAttributeStart {
@@ -6690,10 +7243,18 @@ func (p *PHPParser) TypeParameterWithDefaultDecl() (localctx ITypeParameterWithD
 	{
 		p.SetState(618)
 		p.Match(PHPParserEq)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(621)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 47, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 47, p.GetParserRuleContext()) {
 	case 1:
 		{
 			p.SetState(619)
@@ -6706,9 +7267,21 @@ func (p *PHPParser) TypeParameterWithDefaultDecl() (localctx ITypeParameterWithD
 			p.PrimitiveType()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ICallableIdentifierContext is an interface to support dynamic dispatch.
@@ -6718,20 +7291,30 @@ type ICallableIdentifierContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Identifier() IIdentifierContext
+	Require() antlr.TerminalNode
+	RequireOnce() antlr.TerminalNode
+
 	// IsCallableIdentifierContext differentiates from other interfaces.
 	IsCallableIdentifierContext()
 }
 
 type CallableIdentifierContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyCallableIdentifierContext() *CallableIdentifierContext {
 	var p = new(CallableIdentifierContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_callableIdentifier
 	return p
+}
+
+func InitEmptyCallableIdentifierContext(p *CallableIdentifierContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_callableIdentifier
 }
 
 func (*CallableIdentifierContext) IsCallableIdentifierContext() {}
@@ -6739,7 +7322,7 @@ func (*CallableIdentifierContext) IsCallableIdentifierContext() {}
 func NewCallableIdentifierContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CallableIdentifierContext {
 	var p = new(CallableIdentifierContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_callableIdentifier
@@ -6792,30 +7375,13 @@ func (s *CallableIdentifierContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *PHPParser) CallableIdentifier() (localctx ICallableIdentifierContext) {
-	this := p
-	_ = this
-
 	localctx = NewCallableIdentifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 48, PHPParserRULE_callableIdentifier)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(626)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserAbstract, PHPParserArray, PHPParserAs, PHPParserBinaryCast, PHPParserBoolType, PHPParserBooleanConstant, PHPParserBreak, PHPParserCallable, PHPParserCase, PHPParserCatch, PHPParserClass, PHPParserClone, PHPParserConst, PHPParserContinue, PHPParserDefine, PHPParserDefined, PHPParserDeclare, PHPParserDefault, PHPParserDo, PHPParserDoubleCast, PHPParserDoubleType, PHPParserEcho, PHPParserElse, PHPParserElseIf, PHPParserEmpty, PHPParserEnum_, PHPParserEndDeclare, PHPParserEndFor, PHPParserEndForeach, PHPParserEndIf, PHPParserEndSwitch, PHPParserEndWhile, PHPParserEval, PHPParserAssert, PHPParserDie, PHPParserExit, PHPParserExtends, PHPParserFinal, PHPParserFinally, PHPParserFloatCast, PHPParserFor, PHPParserForeach, PHPParserGlobal, PHPParserGoto, PHPParserIf, PHPParserImplements, PHPParserImport, PHPParserInstanceOf, PHPParserInsteadOf, PHPParserInt8Cast, PHPParserInt16Cast, PHPParserInt64Type, PHPParserIntType, PHPParserInterface, PHPParserIsSet, PHPParserList, PHPParserLogicalAnd, PHPParserLogicalOr, PHPParserLogicalXor, PHPParserMatch_, PHPParserNamespace, PHPParserNew, PHPParserNull, PHPParserObjectType, PHPParserParent_, PHPParserPartial, PHPParserPrint, PHPParserPrivate, PHPParserProtected, PHPParserPublic, PHPParserReadonly, PHPParserResource, PHPParserReturn, PHPParserStatic, PHPParserStringType, PHPParserSwitch, PHPParserTrait, PHPParserTry, PHPParserTypeof, PHPParserUintCast, PHPParserUnicodeCast, PHPParserUnset, PHPParserVar, PHPParserWhile, PHPParserYield, PHPParserFrom, PHPParserLambdaFn, PHPParserTicks, PHPParserEncoding, PHPParserStrictTypes, PHPParserGet, PHPParserSet, PHPParserCall, PHPParserCallStatic, PHPParserConstructor, PHPParserDestruct, PHPParserWakeup, PHPParserSleep, PHPParserAutoload, PHPParserIsSet__, PHPParserUnset__, PHPParserToString__, PHPParserInvoke, PHPParserSetState, PHPParserClone__, PHPParserDebugInfo, PHPParserNamespace__, PHPParserClass__, PHPParserTraic__, PHPParserFunction__, PHPParserMethod__, PHPParserLine__, PHPParserFile__, PHPParserDir__, PHPParserLabel:
@@ -6830,6 +7396,10 @@ func (p *PHPParser) CallableIdentifier() (localctx ICallableIdentifierContext) {
 		{
 			p.SetState(624)
 			p.Match(PHPParserRequire)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserRequireOnce:
@@ -6837,13 +7407,28 @@ func (p *PHPParser) CallableIdentifier() (localctx ICallableIdentifierContext) {
 		{
 			p.SetState(625)
 			p.Match(PHPParserRequireOnce)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAttributesContext is an interface to support dynamic dispatch.
@@ -6853,20 +7438,29 @@ type IAttributesContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllAttributeGroup() []IAttributeGroupContext
+	AttributeGroup(i int) IAttributeGroupContext
+
 	// IsAttributesContext differentiates from other interfaces.
 	IsAttributesContext()
 }
 
 type AttributesContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyAttributesContext() *AttributesContext {
 	var p = new(AttributesContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_attributes
 	return p
+}
+
+func InitEmptyAttributesContext(p *AttributesContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_attributes
 }
 
 func (*AttributesContext) IsAttributesContext() {}
@@ -6874,7 +7468,7 @@ func (*AttributesContext) IsAttributesContext() {}
 func NewAttributesContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AttributesContext {
 	var p = new(AttributesContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_attributes
@@ -6944,32 +7538,16 @@ func (s *AttributesContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Attributes() (localctx IAttributesContext) {
-	this := p
-	_ = this
-
 	localctx = NewAttributesContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 50, PHPParserRULE_attributes)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(629)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for ok := true; ok; ok = _la == PHPParserAttributeStart {
@@ -6980,10 +7558,23 @@ func (p *PHPParser) Attributes() (localctx IAttributesContext) {
 
 		p.SetState(631)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAttributeGroupContext is an interface to support dynamic dispatch.
@@ -6993,20 +7584,35 @@ type IAttributeGroupContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AttributeStart() antlr.TerminalNode
+	AllAttribute() []IAttributeContext
+	Attribute(i int) IAttributeContext
+	CloseSquareBracket() antlr.TerminalNode
+	Identifier() IIdentifierContext
+	Colon() antlr.TerminalNode
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsAttributeGroupContext differentiates from other interfaces.
 	IsAttributeGroupContext()
 }
 
 type AttributeGroupContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyAttributeGroupContext() *AttributeGroupContext {
 	var p = new(AttributeGroupContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_attributeGroup
 	return p
+}
+
+func InitEmptyAttributeGroupContext(p *AttributeGroupContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_attributeGroup
 }
 
 func (*AttributeGroupContext) IsAttributeGroupContext() {}
@@ -7014,7 +7620,7 @@ func (*AttributeGroupContext) IsAttributeGroupContext() {}
 func NewAttributeGroupContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AttributeGroupContext {
 	var p = new(AttributeGroupContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_attributeGroup
@@ -7120,38 +7726,23 @@ func (s *AttributeGroupContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) AttributeGroup() (localctx IAttributeGroupContext) {
-	this := p
-	_ = this
-
 	localctx = NewAttributeGroupContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 52, PHPParserRULE_attributeGroup)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(633)
 		p.Match(PHPParserAttributeStart)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(637)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 50, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 50, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(634)
 			p.Identifier()
@@ -7159,8 +7750,14 @@ func (p *PHPParser) AttributeGroup() (localctx IAttributeGroupContext) {
 		{
 			p.SetState(635)
 			p.Match(PHPParserColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 	{
 		p.SetState(639)
@@ -7168,12 +7765,19 @@ func (p *PHPParser) AttributeGroup() (localctx IAttributeGroupContext) {
 	}
 	p.SetState(644)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == PHPParserComma {
 		{
 			p.SetState(640)
 			p.Match(PHPParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(641)
@@ -7182,14 +7786,31 @@ func (p *PHPParser) AttributeGroup() (localctx IAttributeGroupContext) {
 
 		p.SetState(646)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(647)
 		p.Match(PHPParserCloseSquareBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAttributeContext is an interface to support dynamic dispatch.
@@ -7199,20 +7820,29 @@ type IAttributeContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	QualifiedNamespaceName() IQualifiedNamespaceNameContext
+	Arguments() IArgumentsContext
+
 	// IsAttributeContext differentiates from other interfaces.
 	IsAttributeContext()
 }
 
 type AttributeContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyAttributeContext() *AttributeContext {
 	var p = new(AttributeContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_attribute
 	return p
+}
+
+func InitEmptyAttributeContext(p *AttributeContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_attribute
 }
 
 func (*AttributeContext) IsAttributeContext() {}
@@ -7220,7 +7850,7 @@ func (*AttributeContext) IsAttributeContext() {}
 func NewAttributeContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AttributeContext {
 	var p = new(AttributeContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_attribute
@@ -7281,28 +7911,9 @@ func (s *AttributeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Attribute() (localctx IAttributeContext) {
-	this := p
-	_ = this
-
 	localctx = NewAttributeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 54, PHPParserRULE_attribute)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -7311,6 +7922,9 @@ func (p *PHPParser) Attribute() (localctx IAttributeContext) {
 	}
 	p.SetState(651)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserOpenRoundBracket {
@@ -7321,7 +7935,17 @@ func (p *PHPParser) Attribute() (localctx IAttributeContext) {
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IInnerStatementListContext is an interface to support dynamic dispatch.
@@ -7331,20 +7955,29 @@ type IInnerStatementListContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllInnerStatement() []IInnerStatementContext
+	InnerStatement(i int) IInnerStatementContext
+
 	// IsInnerStatementListContext differentiates from other interfaces.
 	IsInnerStatementListContext()
 }
 
 type InnerStatementListContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyInnerStatementListContext() *InnerStatementListContext {
 	var p = new(InnerStatementListContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_innerStatementList
 	return p
+}
+
+func InitEmptyInnerStatementListContext(p *InnerStatementListContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_innerStatementList
 }
 
 func (*InnerStatementListContext) IsInnerStatementListContext() {}
@@ -7352,7 +7985,7 @@ func (*InnerStatementListContext) IsInnerStatementListContext() {}
 func NewInnerStatementListContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *InnerStatementListContext {
 	var p = new(InnerStatementListContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_innerStatementList
@@ -7422,35 +8055,20 @@ func (s *InnerStatementListContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *PHPParser) InnerStatementList() (localctx IInnerStatementListContext) {
-	this := p
-	_ = this
-
 	localctx = NewInnerStatementListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 56, PHPParserRULE_innerStatementList)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(656)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 53, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 53, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -7461,10 +8079,26 @@ func (p *PHPParser) InnerStatementList() (localctx IInnerStatementListContext) {
 		}
 		p.SetState(658)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 53, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 53, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IInnerStatementContext is an interface to support dynamic dispatch.
@@ -7474,20 +8108,30 @@ type IInnerStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Statement() IStatementContext
+	FunctionDeclaration() IFunctionDeclarationContext
+	ClassDeclaration() IClassDeclarationContext
+
 	// IsInnerStatementContext differentiates from other interfaces.
 	IsInnerStatementContext()
 }
 
 type InnerStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyInnerStatementContext() *InnerStatementContext {
 	var p = new(InnerStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_innerStatement
 	return p
+}
+
+func InitEmptyInnerStatementContext(p *InnerStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_innerStatement
 }
 
 func (*InnerStatementContext) IsInnerStatementContext() {}
@@ -7495,7 +8139,7 @@ func (*InnerStatementContext) IsInnerStatementContext() {}
 func NewInnerStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *InnerStatementContext {
 	var p = new(InnerStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_innerStatement
@@ -7572,31 +8216,15 @@ func (s *InnerStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) InnerStatement() (localctx IInnerStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewInnerStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 58, PHPParserRULE_innerStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(662)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 54, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 54, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -7618,9 +8246,21 @@ func (p *PHPParser) InnerStatement() (localctx IInnerStatementContext) {
 			p.ClassDeclaration()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ILabelStatementContext is an interface to support dynamic dispatch.
@@ -7630,20 +8270,29 @@ type ILabelStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Label() antlr.TerminalNode
+	Colon() antlr.TerminalNode
+
 	// IsLabelStatementContext differentiates from other interfaces.
 	IsLabelStatementContext()
 }
 
 type LabelStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyLabelStatementContext() *LabelStatementContext {
 	var p = new(LabelStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_labelStatement
 	return p
+}
+
+func InitEmptyLabelStatementContext(p *LabelStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_labelStatement
 }
 
 func (*LabelStatementContext) IsLabelStatementContext() {}
@@ -7651,7 +8300,7 @@ func (*LabelStatementContext) IsLabelStatementContext() {}
 func NewLabelStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *LabelStatementContext {
 	var p = new(LabelStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_labelStatement
@@ -7688,39 +8337,37 @@ func (s *LabelStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) LabelStatement() (localctx ILabelStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewLabelStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 60, PHPParserRULE_labelStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(664)
 		p.Match(PHPParserLabel)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(665)
 		p.Match(PHPParserColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IStatementContext is an interface to support dynamic dispatch.
@@ -7730,20 +8377,51 @@ type IStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	LabelStatement() ILabelStatementContext
+	BlockStatement() IBlockStatementContext
+	IfStatement() IIfStatementContext
+	WhileStatement() IWhileStatementContext
+	DoWhileStatement() IDoWhileStatementContext
+	ForStatement() IForStatementContext
+	SwitchStatement() ISwitchStatementContext
+	BreakStatement() IBreakStatementContext
+	ContinueStatement() IContinueStatementContext
+	ReturnStatement() IReturnStatementContext
+	YieldExpression() IYieldExpressionContext
+	SemiColon() antlr.TerminalNode
+	GlobalStatement() IGlobalStatementContext
+	StaticVariableStatement() IStaticVariableStatementContext
+	EchoStatement() IEchoStatementContext
+	ExpressionStatement() IExpressionStatementContext
+	UnsetStatement() IUnsetStatementContext
+	ForeachStatement() IForeachStatementContext
+	TryCatchFinally() ITryCatchFinallyContext
+	ThrowStatement() IThrowStatementContext
+	GotoStatement() IGotoStatementContext
+	DeclareStatement() IDeclareStatementContext
+	EmptyStatement_() IEmptyStatement_Context
+	InlineHtmlStatement() IInlineHtmlStatementContext
+
 	// IsStatementContext differentiates from other interfaces.
 	IsStatementContext()
 }
 
 type StatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyStatementContext() *StatementContext {
 	var p = new(StatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_statement
 	return p
+}
+
+func InitEmptyStatementContext(p *StatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_statement
 }
 
 func (*StatementContext) IsStatementContext() {}
@@ -7751,7 +8429,7 @@ func (*StatementContext) IsStatementContext() {}
 func NewStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *StatementContext {
 	var p = new(StatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_statement
@@ -8152,31 +8830,15 @@ func (s *StatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Statement() (localctx IStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 62, PHPParserRULE_statement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(692)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 55, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 55, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -8256,6 +8918,10 @@ func (p *PHPParser) Statement() (localctx IStatementContext) {
 		{
 			p.SetState(678)
 			p.Match(PHPParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 12:
@@ -8342,9 +9008,21 @@ func (p *PHPParser) Statement() (localctx IStatementContext) {
 			p.InlineHtmlStatement()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IEmptyStatement_Context is an interface to support dynamic dispatch.
@@ -8354,20 +9032,28 @@ type IEmptyStatement_Context interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	SemiColon() antlr.TerminalNode
+
 	// IsEmptyStatement_Context differentiates from other interfaces.
 	IsEmptyStatement_Context()
 }
 
 type EmptyStatement_Context struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyEmptyStatement_Context() *EmptyStatement_Context {
 	var p = new(EmptyStatement_Context)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_emptyStatement_
 	return p
+}
+
+func InitEmptyEmptyStatement_Context(p *EmptyStatement_Context) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_emptyStatement_
 }
 
 func (*EmptyStatement_Context) IsEmptyStatement_Context() {}
@@ -8375,7 +9061,7 @@ func (*EmptyStatement_Context) IsEmptyStatement_Context() {}
 func NewEmptyStatement_Context(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *EmptyStatement_Context {
 	var p = new(EmptyStatement_Context)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_emptyStatement_
@@ -8408,35 +9094,29 @@ func (s *EmptyStatement_Context) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) EmptyStatement_() (localctx IEmptyStatement_Context) {
-	this := p
-	_ = this
-
 	localctx = NewEmptyStatement_Context(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 64, PHPParserRULE_emptyStatement_)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(694)
 		p.Match(PHPParserSemiColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IBlockStatementContext is an interface to support dynamic dispatch.
@@ -8446,20 +9126,30 @@ type IBlockStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	OpenCurlyBracket() antlr.TerminalNode
+	InnerStatementList() IInnerStatementListContext
+	CloseCurlyBracket() antlr.TerminalNode
+
 	// IsBlockStatementContext differentiates from other interfaces.
 	IsBlockStatementContext()
 }
 
 type BlockStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyBlockStatementContext() *BlockStatementContext {
 	var p = new(BlockStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_blockStatement
 	return p
+}
+
+func InitEmptyBlockStatementContext(p *BlockStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_blockStatement
 }
 
 func (*BlockStatementContext) IsBlockStatementContext() {}
@@ -8467,7 +9157,7 @@ func (*BlockStatementContext) IsBlockStatementContext() {}
 func NewBlockStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *BlockStatementContext {
 	var p = new(BlockStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_blockStatement
@@ -8520,32 +9210,16 @@ func (s *BlockStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) BlockStatement() (localctx IBlockStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewBlockStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 66, PHPParserRULE_blockStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(696)
 		p.Match(PHPParserOpenCurlyBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(697)
@@ -8554,9 +9228,23 @@ func (p *PHPParser) BlockStatement() (localctx IBlockStatementContext) {
 	{
 		p.SetState(698)
 		p.Match(PHPParserCloseCurlyBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIfStatementContext is an interface to support dynamic dispatch.
@@ -8566,20 +9254,40 @@ type IIfStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	If() antlr.TerminalNode
+	Parentheses() IParenthesesContext
+	Statement() IStatementContext
+	AllElseIfStatement() []IElseIfStatementContext
+	ElseIfStatement(i int) IElseIfStatementContext
+	ElseStatement() IElseStatementContext
+	Colon() antlr.TerminalNode
+	InnerStatementList() IInnerStatementListContext
+	EndIf() antlr.TerminalNode
+	SemiColon() antlr.TerminalNode
+	AllElseIfColonStatement() []IElseIfColonStatementContext
+	ElseIfColonStatement(i int) IElseIfColonStatementContext
+	ElseColonStatement() IElseColonStatementContext
+
 	// IsIfStatementContext differentiates from other interfaces.
 	IsIfStatementContext()
 }
 
 type IfStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyIfStatementContext() *IfStatementContext {
 	var p = new(IfStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_ifStatement
 	return p
+}
+
+func InitEmptyIfStatementContext(p *IfStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_ifStatement
 }
 
 func (*IfStatementContext) IsIfStatementContext() {}
@@ -8587,7 +9295,7 @@ func (*IfStatementContext) IsIfStatementContext() {}
 func NewIfStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *IfStatementContext {
 	var p = new(IfStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_ifStatement
@@ -8794,39 +9502,28 @@ func (s *IfStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PHPParser) IfStatement() (localctx IIfStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewIfStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 68, PHPParserRULE_ifStatement)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
 	p.SetState(728)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 60, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 60, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(700)
 			p.Match(PHPParserIf)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(701)
@@ -8838,8 +9535,13 @@ func (p *PHPParser) IfStatement() (localctx IIfStatementContext) {
 		}
 		p.SetState(706)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 56, p.GetParserRuleContext())
-
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 56, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 		for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			if _alt == 1 {
 				{
@@ -8850,17 +9552,25 @@ func (p *PHPParser) IfStatement() (localctx IIfStatementContext) {
 			}
 			p.SetState(708)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 56, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 56, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 		p.SetState(710)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 57, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 57, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(709)
 				p.ElseStatement()
 			}
 
+		} else if p.HasError() { // JIM
+			goto errorExit
 		}
 
 	case 2:
@@ -8868,6 +9578,10 @@ func (p *PHPParser) IfStatement() (localctx IIfStatementContext) {
 		{
 			p.SetState(712)
 			p.Match(PHPParserIf)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(713)
@@ -8876,6 +9590,10 @@ func (p *PHPParser) IfStatement() (localctx IIfStatementContext) {
 		{
 			p.SetState(714)
 			p.Match(PHPParserColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(715)
@@ -8883,6 +9601,9 @@ func (p *PHPParser) IfStatement() (localctx IIfStatementContext) {
 		}
 		p.SetState(719)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == PHPParserElseIf {
@@ -8893,10 +9614,16 @@ func (p *PHPParser) IfStatement() (localctx IIfStatementContext) {
 
 			p.SetState(721)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 		p.SetState(723)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserElse {
@@ -8909,15 +9636,35 @@ func (p *PHPParser) IfStatement() (localctx IIfStatementContext) {
 		{
 			p.SetState(725)
 			p.Match(PHPParserEndIf)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(726)
 			p.Match(PHPParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IElseIfStatementContext is an interface to support dynamic dispatch.
@@ -8927,20 +9674,30 @@ type IElseIfStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ElseIf() antlr.TerminalNode
+	Parentheses() IParenthesesContext
+	Statement() IStatementContext
+
 	// IsElseIfStatementContext differentiates from other interfaces.
 	IsElseIfStatementContext()
 }
 
 type ElseIfStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyElseIfStatementContext() *ElseIfStatementContext {
 	var p = new(ElseIfStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_elseIfStatement
 	return p
+}
+
+func InitEmptyElseIfStatementContext(p *ElseIfStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_elseIfStatement
 }
 
 func (*ElseIfStatementContext) IsElseIfStatementContext() {}
@@ -8948,7 +9705,7 @@ func (*ElseIfStatementContext) IsElseIfStatementContext() {}
 func NewElseIfStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ElseIfStatementContext {
 	var p = new(ElseIfStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_elseIfStatement
@@ -9013,32 +9770,16 @@ func (s *ElseIfStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) ElseIfStatement() (localctx IElseIfStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewElseIfStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 70, PHPParserRULE_elseIfStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(730)
 		p.Match(PHPParserElseIf)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(731)
@@ -9049,7 +9790,17 @@ func (p *PHPParser) ElseIfStatement() (localctx IElseIfStatementContext) {
 		p.Statement()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IElseIfColonStatementContext is an interface to support dynamic dispatch.
@@ -9059,20 +9810,31 @@ type IElseIfColonStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ElseIf() antlr.TerminalNode
+	Parentheses() IParenthesesContext
+	Colon() antlr.TerminalNode
+	InnerStatementList() IInnerStatementListContext
+
 	// IsElseIfColonStatementContext differentiates from other interfaces.
 	IsElseIfColonStatementContext()
 }
 
 type ElseIfColonStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyElseIfColonStatementContext() *ElseIfColonStatementContext {
 	var p = new(ElseIfColonStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_elseIfColonStatement
 	return p
+}
+
+func InitEmptyElseIfColonStatementContext(p *ElseIfColonStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_elseIfColonStatement
 }
 
 func (*ElseIfColonStatementContext) IsElseIfColonStatementContext() {}
@@ -9080,7 +9842,7 @@ func (*ElseIfColonStatementContext) IsElseIfColonStatementContext() {}
 func NewElseIfColonStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ElseIfColonStatementContext {
 	var p = new(ElseIfColonStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_elseIfColonStatement
@@ -9149,32 +9911,16 @@ func (s *ElseIfColonStatementContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *PHPParser) ElseIfColonStatement() (localctx IElseIfColonStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewElseIfColonStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 72, PHPParserRULE_elseIfColonStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(734)
 		p.Match(PHPParserElseIf)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(735)
@@ -9183,13 +9929,27 @@ func (p *PHPParser) ElseIfColonStatement() (localctx IElseIfColonStatementContex
 	{
 		p.SetState(736)
 		p.Match(PHPParserColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(737)
 		p.InnerStatementList()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IElseStatementContext is an interface to support dynamic dispatch.
@@ -9199,20 +9959,29 @@ type IElseStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Else() antlr.TerminalNode
+	Statement() IStatementContext
+
 	// IsElseStatementContext differentiates from other interfaces.
 	IsElseStatementContext()
 }
 
 type ElseStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyElseStatementContext() *ElseStatementContext {
 	var p = new(ElseStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_elseStatement
 	return p
+}
+
+func InitEmptyElseStatementContext(p *ElseStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_elseStatement
 }
 
 func (*ElseStatementContext) IsElseStatementContext() {}
@@ -9220,7 +9989,7 @@ func (*ElseStatementContext) IsElseStatementContext() {}
 func NewElseStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ElseStatementContext {
 	var p = new(ElseStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_elseStatement
@@ -9269,39 +10038,33 @@ func (s *ElseStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) ElseStatement() (localctx IElseStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewElseStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 74, PHPParserRULE_elseStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(739)
 		p.Match(PHPParserElse)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(740)
 		p.Statement()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IElseColonStatementContext is an interface to support dynamic dispatch.
@@ -9311,20 +10074,30 @@ type IElseColonStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Else() antlr.TerminalNode
+	Colon() antlr.TerminalNode
+	InnerStatementList() IInnerStatementListContext
+
 	// IsElseColonStatementContext differentiates from other interfaces.
 	IsElseColonStatementContext()
 }
 
 type ElseColonStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyElseColonStatementContext() *ElseColonStatementContext {
 	var p = new(ElseColonStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_elseColonStatement
 	return p
+}
+
+func InitEmptyElseColonStatementContext(p *ElseColonStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_elseColonStatement
 }
 
 func (*ElseColonStatementContext) IsElseColonStatementContext() {}
@@ -9332,7 +10105,7 @@ func (*ElseColonStatementContext) IsElseColonStatementContext() {}
 func NewElseColonStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ElseColonStatementContext {
 	var p = new(ElseColonStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_elseColonStatement
@@ -9385,43 +10158,41 @@ func (s *ElseColonStatementContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *PHPParser) ElseColonStatement() (localctx IElseColonStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewElseColonStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 76, PHPParserRULE_elseColonStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(742)
 		p.Match(PHPParserElse)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(743)
 		p.Match(PHPParserColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(744)
 		p.InnerStatementList()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IWhileStatementContext is an interface to support dynamic dispatch.
@@ -9431,20 +10202,34 @@ type IWhileStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	While() antlr.TerminalNode
+	Parentheses() IParenthesesContext
+	Statement() IStatementContext
+	Colon() antlr.TerminalNode
+	InnerStatementList() IInnerStatementListContext
+	EndWhile() antlr.TerminalNode
+	SemiColon() antlr.TerminalNode
+
 	// IsWhileStatementContext differentiates from other interfaces.
 	IsWhileStatementContext()
 }
 
 type WhileStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyWhileStatementContext() *WhileStatementContext {
 	var p = new(WhileStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_whileStatement
 	return p
+}
+
+func InitEmptyWhileStatementContext(p *WhileStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_whileStatement
 }
 
 func (*WhileStatementContext) IsWhileStatementContext() {}
@@ -9452,7 +10237,7 @@ func (*WhileStatementContext) IsWhileStatementContext() {}
 func NewWhileStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *WhileStatementContext {
 	var p = new(WhileStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_whileStatement
@@ -9545,32 +10330,16 @@ func (s *WhileStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) WhileStatement() (localctx IWhileStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewWhileStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 78, PHPParserRULE_whileStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(746)
 		p.Match(PHPParserWhile)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(747)
@@ -9578,6 +10347,9 @@ func (p *PHPParser) WhileStatement() (localctx IWhileStatementContext) {
 	}
 	p.SetState(754)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserHtmlText, PHPParserXmlStart, PHPParserHtmlScriptOpen, PHPParserHtmlStyleOpen, PHPParserHtmlDtd, PHPParserHtmlOpen, PHPParserNumberSign, PHPParserHtmlClose, PHPParserHtmlSlashClose, PHPParserHtmlSlash, PHPParserHtmlEquals, PHPParserHtmlStartQuoteString, PHPParserHtmlStartDoubleQuoteString, PHPParserHtmlHex, PHPParserHtmlDecimal, PHPParserHtmlName, PHPParserHtmlEndQuoteString, PHPParserHtmlQuoteString, PHPParserHtmlEndDoubleQuoteString, PHPParserHtmlDoubleQuoteString, PHPParserScriptText, PHPParserHtmlScriptClose, PHPParserStyleBody, PHPParserAbstract, PHPParserArray, PHPParserAs, PHPParserBinaryCast, PHPParserBoolType, PHPParserBooleanConstant, PHPParserBreak, PHPParserCallable, PHPParserCase, PHPParserCatch, PHPParserClass, PHPParserClone, PHPParserConst, PHPParserContinue, PHPParserDefine, PHPParserDefined, PHPParserDeclare, PHPParserDefault, PHPParserDo, PHPParserDoubleCast, PHPParserDoubleType, PHPParserEcho, PHPParserElse, PHPParserElseIf, PHPParserEmpty, PHPParserEnum_, PHPParserEndDeclare, PHPParserEndFor, PHPParserEndForeach, PHPParserEndIf, PHPParserEndSwitch, PHPParserEndWhile, PHPParserEval, PHPParserAssert, PHPParserDie, PHPParserExit, PHPParserExtends, PHPParserFinal, PHPParserFinally, PHPParserFloatCast, PHPParserFor, PHPParserForeach, PHPParserFunction_, PHPParserGlobal, PHPParserGoto, PHPParserIf, PHPParserImplements, PHPParserImport, PHPParserInclude, PHPParserIncludeOnce, PHPParserInstanceOf, PHPParserInsteadOf, PHPParserInt8Cast, PHPParserInt16Cast, PHPParserInt64Type, PHPParserIntType, PHPParserInterface, PHPParserIsSet, PHPParserList, PHPParserLogicalAnd, PHPParserLogicalOr, PHPParserLogicalXor, PHPParserMatch_, PHPParserNamespace, PHPParserNew, PHPParserNull, PHPParserObjectType, PHPParserParent_, PHPParserPartial, PHPParserPrint, PHPParserPrivate, PHPParserProtected, PHPParserPublic, PHPParserReadonly, PHPParserRequire, PHPParserRequireOnce, PHPParserResource, PHPParserReturn, PHPParserStatic, PHPParserStringType, PHPParserSwitch, PHPParserThrow, PHPParserTrait, PHPParserTry, PHPParserTypeof, PHPParserUintCast, PHPParserUnicodeCast, PHPParserUnset, PHPParserVar, PHPParserWhile, PHPParserYield, PHPParserFrom, PHPParserLambdaFn, PHPParserTicks, PHPParserEncoding, PHPParserStrictTypes, PHPParserGet, PHPParserSet, PHPParserCall, PHPParserCallStatic, PHPParserConstructor, PHPParserDestruct, PHPParserWakeup, PHPParserSleep, PHPParserAutoload, PHPParserIsSet__, PHPParserUnset__, PHPParserToString__, PHPParserInvoke, PHPParserSetState, PHPParserClone__, PHPParserDebugInfo, PHPParserNamespace__, PHPParserClass__, PHPParserTraic__, PHPParserFunction__, PHPParserMethod__, PHPParserLine__, PHPParserFile__, PHPParserDir__, PHPParserInc, PHPParserDec, PHPParserStartNowDoc, PHPParserNamespaceSeparator, PHPParserAmpersand, PHPParserBang, PHPParserPlus, PHPParserMinus, PHPParserTilde, PHPParserSuppressWarnings, PHPParserDollar, PHPParserOpenRoundBracket, PHPParserOpenSquareBracket, PHPParserOpenCurlyBracket, PHPParserSemiColon, PHPParserSet_Include_Path, PHPParserVarName, PHPParserLabel, PHPParserOctal, PHPParserDecimal, PHPParserReal, PHPParserHex, PHPParserBinary, PHPParserBackQuoteString, PHPParserSingleQuoteString, PHPParserDoubleQuote:
@@ -9590,6 +10362,10 @@ func (p *PHPParser) WhileStatement() (localctx IWhileStatementContext) {
 		{
 			p.SetState(749)
 			p.Match(PHPParserColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(750)
@@ -9598,17 +10374,36 @@ func (p *PHPParser) WhileStatement() (localctx IWhileStatementContext) {
 		{
 			p.SetState(751)
 			p.Match(PHPParserEndWhile)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(752)
 			p.Match(PHPParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDoWhileStatementContext is an interface to support dynamic dispatch.
@@ -9618,20 +10413,32 @@ type IDoWhileStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Do() antlr.TerminalNode
+	Statement() IStatementContext
+	While() antlr.TerminalNode
+	Parentheses() IParenthesesContext
+	SemiColon() antlr.TerminalNode
+
 	// IsDoWhileStatementContext differentiates from other interfaces.
 	IsDoWhileStatementContext()
 }
 
 type DoWhileStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyDoWhileStatementContext() *DoWhileStatementContext {
 	var p = new(DoWhileStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_doWhileStatement
 	return p
+}
+
+func InitEmptyDoWhileStatementContext(p *DoWhileStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_doWhileStatement
 }
 
 func (*DoWhileStatementContext) IsDoWhileStatementContext() {}
@@ -9639,7 +10446,7 @@ func (*DoWhileStatementContext) IsDoWhileStatementContext() {}
 func NewDoWhileStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DoWhileStatementContext {
 	var p = new(DoWhileStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_doWhileStatement
@@ -9712,32 +10519,16 @@ func (s *DoWhileStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *PHPParser) DoWhileStatement() (localctx IDoWhileStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewDoWhileStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 80, PHPParserRULE_doWhileStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(756)
 		p.Match(PHPParserDo)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(757)
@@ -9746,6 +10537,10 @@ func (p *PHPParser) DoWhileStatement() (localctx IDoWhileStatementContext) {
 	{
 		p.SetState(758)
 		p.Match(PHPParserWhile)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(759)
@@ -9754,9 +10549,23 @@ func (p *PHPParser) DoWhileStatement() (localctx IDoWhileStatementContext) {
 	{
 		p.SetState(760)
 		p.Match(PHPParserSemiColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IForStatementContext is an interface to support dynamic dispatch.
@@ -9766,20 +10575,39 @@ type IForStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	For() antlr.TerminalNode
+	OpenRoundBracket() antlr.TerminalNode
+	AllSemiColon() []antlr.TerminalNode
+	SemiColon(i int) antlr.TerminalNode
+	CloseRoundBracket() antlr.TerminalNode
+	Statement() IStatementContext
+	Colon() antlr.TerminalNode
+	InnerStatementList() IInnerStatementListContext
+	EndFor() antlr.TerminalNode
+	ForInit() IForInitContext
+	ExpressionList() IExpressionListContext
+	ForUpdate() IForUpdateContext
+
 	// IsForStatementContext differentiates from other interfaces.
 	IsForStatementContext()
 }
 
 type ForStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyForStatementContext() *ForStatementContext {
 	var p = new(ForStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_forStatement
 	return p
+}
+
+func InitEmptyForStatementContext(p *ForStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_forStatement
 }
 
 func (*ForStatementContext) IsForStatementContext() {}
@@ -9787,7 +10615,7 @@ func (*ForStatementContext) IsForStatementContext() {}
 func NewForStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ForStatementContext {
 	var p = new(ForStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_forStatement
@@ -9924,43 +10752,35 @@ func (s *ForStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *PHPParser) ForStatement() (localctx IForStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewForStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 82, PHPParserRULE_forStatement)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(762)
 		p.Match(PHPParserFor)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(763)
 		p.Match(PHPParserOpenRoundBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(765)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244513) != 0 {
+	if ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244513) != 0) {
 		{
 			p.SetState(764)
 			p.ForInit()
@@ -9970,12 +10790,19 @@ func (p *PHPParser) ForStatement() (localctx IForStatementContext) {
 	{
 		p.SetState(767)
 		p.Match(PHPParserSemiColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(769)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244513) != 0 {
+	if ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244513) != 0) {
 		{
 			p.SetState(768)
 			p.ExpressionList()
@@ -9985,12 +10812,19 @@ func (p *PHPParser) ForStatement() (localctx IForStatementContext) {
 	{
 		p.SetState(771)
 		p.Match(PHPParserSemiColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(773)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244513) != 0 {
+	if ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244513) != 0) {
 		{
 			p.SetState(772)
 			p.ForUpdate()
@@ -10000,9 +10834,16 @@ func (p *PHPParser) ForStatement() (localctx IForStatementContext) {
 	{
 		p.SetState(775)
 		p.Match(PHPParserCloseRoundBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(782)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserHtmlText, PHPParserXmlStart, PHPParserHtmlScriptOpen, PHPParserHtmlStyleOpen, PHPParserHtmlDtd, PHPParserHtmlOpen, PHPParserNumberSign, PHPParserHtmlClose, PHPParserHtmlSlashClose, PHPParserHtmlSlash, PHPParserHtmlEquals, PHPParserHtmlStartQuoteString, PHPParserHtmlStartDoubleQuoteString, PHPParserHtmlHex, PHPParserHtmlDecimal, PHPParserHtmlName, PHPParserHtmlEndQuoteString, PHPParserHtmlQuoteString, PHPParserHtmlEndDoubleQuoteString, PHPParserHtmlDoubleQuoteString, PHPParserScriptText, PHPParserHtmlScriptClose, PHPParserStyleBody, PHPParserAbstract, PHPParserArray, PHPParserAs, PHPParserBinaryCast, PHPParserBoolType, PHPParserBooleanConstant, PHPParserBreak, PHPParserCallable, PHPParserCase, PHPParserCatch, PHPParserClass, PHPParserClone, PHPParserConst, PHPParserContinue, PHPParserDefine, PHPParserDefined, PHPParserDeclare, PHPParserDefault, PHPParserDo, PHPParserDoubleCast, PHPParserDoubleType, PHPParserEcho, PHPParserElse, PHPParserElseIf, PHPParserEmpty, PHPParserEnum_, PHPParserEndDeclare, PHPParserEndFor, PHPParserEndForeach, PHPParserEndIf, PHPParserEndSwitch, PHPParserEndWhile, PHPParserEval, PHPParserAssert, PHPParserDie, PHPParserExit, PHPParserExtends, PHPParserFinal, PHPParserFinally, PHPParserFloatCast, PHPParserFor, PHPParserForeach, PHPParserFunction_, PHPParserGlobal, PHPParserGoto, PHPParserIf, PHPParserImplements, PHPParserImport, PHPParserInclude, PHPParserIncludeOnce, PHPParserInstanceOf, PHPParserInsteadOf, PHPParserInt8Cast, PHPParserInt16Cast, PHPParserInt64Type, PHPParserIntType, PHPParserInterface, PHPParserIsSet, PHPParserList, PHPParserLogicalAnd, PHPParserLogicalOr, PHPParserLogicalXor, PHPParserMatch_, PHPParserNamespace, PHPParserNew, PHPParserNull, PHPParserObjectType, PHPParserParent_, PHPParserPartial, PHPParserPrint, PHPParserPrivate, PHPParserProtected, PHPParserPublic, PHPParserReadonly, PHPParserRequire, PHPParserRequireOnce, PHPParserResource, PHPParserReturn, PHPParserStatic, PHPParserStringType, PHPParserSwitch, PHPParserThrow, PHPParserTrait, PHPParserTry, PHPParserTypeof, PHPParserUintCast, PHPParserUnicodeCast, PHPParserUnset, PHPParserVar, PHPParserWhile, PHPParserYield, PHPParserFrom, PHPParserLambdaFn, PHPParserTicks, PHPParserEncoding, PHPParserStrictTypes, PHPParserGet, PHPParserSet, PHPParserCall, PHPParserCallStatic, PHPParserConstructor, PHPParserDestruct, PHPParserWakeup, PHPParserSleep, PHPParserAutoload, PHPParserIsSet__, PHPParserUnset__, PHPParserToString__, PHPParserInvoke, PHPParserSetState, PHPParserClone__, PHPParserDebugInfo, PHPParserNamespace__, PHPParserClass__, PHPParserTraic__, PHPParserFunction__, PHPParserMethod__, PHPParserLine__, PHPParserFile__, PHPParserDir__, PHPParserInc, PHPParserDec, PHPParserStartNowDoc, PHPParserNamespaceSeparator, PHPParserAmpersand, PHPParserBang, PHPParserPlus, PHPParserMinus, PHPParserTilde, PHPParserSuppressWarnings, PHPParserDollar, PHPParserOpenRoundBracket, PHPParserOpenSquareBracket, PHPParserOpenCurlyBracket, PHPParserSemiColon, PHPParserSet_Include_Path, PHPParserVarName, PHPParserLabel, PHPParserOctal, PHPParserDecimal, PHPParserReal, PHPParserHex, PHPParserBinary, PHPParserBackQuoteString, PHPParserSingleQuoteString, PHPParserDoubleQuote:
@@ -10015,6 +10856,10 @@ func (p *PHPParser) ForStatement() (localctx IForStatementContext) {
 		{
 			p.SetState(777)
 			p.Match(PHPParserColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(778)
@@ -10023,17 +10868,36 @@ func (p *PHPParser) ForStatement() (localctx IForStatementContext) {
 		{
 			p.SetState(779)
 			p.Match(PHPParserEndFor)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(780)
 			p.Match(PHPParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IForInitContext is an interface to support dynamic dispatch.
@@ -10043,20 +10907,28 @@ type IForInitContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ExpressionList() IExpressionListContext
+
 	// IsForInitContext differentiates from other interfaces.
 	IsForInitContext()
 }
 
 type ForInitContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyForInitContext() *ForInitContext {
 	var p = new(ForInitContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_forInit
 	return p
+}
+
+func InitEmptyForInitContext(p *ForInitContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_forInit
 }
 
 func (*ForInitContext) IsForInitContext() {}
@@ -10064,7 +10936,7 @@ func (*ForInitContext) IsForInitContext() {}
 func NewForInitContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ForInitContext {
 	var p = new(ForInitContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_forInit
@@ -10109,35 +10981,25 @@ func (s *ForInitContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) ForInit() (localctx IForInitContext) {
-	this := p
-	_ = this
-
 	localctx = NewForInitContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 84, PHPParserRULE_forInit)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(784)
 		p.ExpressionList()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IForUpdateContext is an interface to support dynamic dispatch.
@@ -10147,20 +11009,28 @@ type IForUpdateContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ExpressionList() IExpressionListContext
+
 	// IsForUpdateContext differentiates from other interfaces.
 	IsForUpdateContext()
 }
 
 type ForUpdateContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyForUpdateContext() *ForUpdateContext {
 	var p = new(ForUpdateContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_forUpdate
 	return p
+}
+
+func InitEmptyForUpdateContext(p *ForUpdateContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_forUpdate
 }
 
 func (*ForUpdateContext) IsForUpdateContext() {}
@@ -10168,7 +11038,7 @@ func (*ForUpdateContext) IsForUpdateContext() {}
 func NewForUpdateContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ForUpdateContext {
 	var p = new(ForUpdateContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_forUpdate
@@ -10213,35 +11083,25 @@ func (s *ForUpdateContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) ForUpdate() (localctx IForUpdateContext) {
-	this := p
-	_ = this
-
 	localctx = NewForUpdateContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 86, PHPParserRULE_forUpdate)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(786)
 		p.ExpressionList()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISwitchStatementContext is an interface to support dynamic dispatch.
@@ -10251,20 +11111,39 @@ type ISwitchStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Switch() antlr.TerminalNode
+	Parentheses() IParenthesesContext
+	OpenCurlyBracket() antlr.TerminalNode
+	CloseCurlyBracket() antlr.TerminalNode
+	Colon() antlr.TerminalNode
+	EndSwitch() antlr.TerminalNode
+	AllSemiColon() []antlr.TerminalNode
+	SemiColon(i int) antlr.TerminalNode
+	AllSwitchCaseBlock() []ISwitchCaseBlockContext
+	SwitchCaseBlock(i int) ISwitchCaseBlockContext
+	AllSwitchDefaultBlock() []ISwitchDefaultBlockContext
+	SwitchDefaultBlock(i int) ISwitchDefaultBlockContext
+
 	// IsSwitchStatementContext differentiates from other interfaces.
 	IsSwitchStatementContext()
 }
 
 type SwitchStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptySwitchStatementContext() *SwitchStatementContext {
 	var p = new(SwitchStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_switchStatement
 	return p
+}
+
+func InitEmptySwitchStatementContext(p *SwitchStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_switchStatement
 }
 
 func (*SwitchStatementContext) IsSwitchStatementContext() {}
@@ -10272,7 +11151,7 @@ func (*SwitchStatementContext) IsSwitchStatementContext() {}
 func NewSwitchStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SwitchStatementContext {
 	var p = new(SwitchStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_switchStatement
@@ -10427,33 +11306,18 @@ func (s *SwitchStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) SwitchStatement() (localctx ISwitchStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewSwitchStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 88, PHPParserRULE_switchStatement)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(788)
 		p.Match(PHPParserSwitch)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(789)
@@ -10461,31 +11325,51 @@ func (p *PHPParser) SwitchStatement() (localctx ISwitchStatementContext) {
 	}
 	p.SetState(815)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserOpenCurlyBracket:
 		{
 			p.SetState(790)
 			p.Match(PHPParserOpenCurlyBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(792)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserSemiColon {
 			{
 				p.SetState(791)
 				p.Match(PHPParserSemiColon)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		p.SetState(798)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == PHPParserCase || _la == PHPParserDefault {
 			p.SetState(796)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 
 			switch p.GetTokenStream().LA(1) {
 			case PHPParserCase:
@@ -10501,41 +11385,66 @@ func (p *PHPParser) SwitchStatement() (localctx ISwitchStatementContext) {
 				}
 
 			default:
-				panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				goto errorExit
 			}
 
 			p.SetState(800)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
 			p.SetState(801)
 			p.Match(PHPParserCloseCurlyBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserColon:
 		{
 			p.SetState(802)
 			p.Match(PHPParserColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(804)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserSemiColon {
 			{
 				p.SetState(803)
 				p.Match(PHPParserSemiColon)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		p.SetState(810)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == PHPParserCase || _la == PHPParserDefault {
 			p.SetState(808)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 
 			switch p.GetTokenStream().LA(1) {
 			case PHPParserCase:
@@ -10551,27 +11460,50 @@ func (p *PHPParser) SwitchStatement() (localctx ISwitchStatementContext) {
 				}
 
 			default:
-				panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				goto errorExit
 			}
 
 			p.SetState(812)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
 			p.SetState(813)
 			p.Match(PHPParserEndSwitch)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(814)
 			p.Match(PHPParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISwitchCaseBlockContext is an interface to support dynamic dispatch.
@@ -10581,20 +11513,33 @@ type ISwitchCaseBlockContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Case() antlr.TerminalNode
+	Expression() IExpressionContext
+	InnerStatementList() IInnerStatementListContext
+	Colon() antlr.TerminalNode
+	AllSemiColon() []antlr.TerminalNode
+	SemiColon(i int) antlr.TerminalNode
+
 	// IsSwitchCaseBlockContext differentiates from other interfaces.
 	IsSwitchCaseBlockContext()
 }
 
 type SwitchCaseBlockContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptySwitchCaseBlockContext() *SwitchCaseBlockContext {
 	var p = new(SwitchCaseBlockContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_switchCaseBlock
 	return p
+}
+
+func InitEmptySwitchCaseBlockContext(p *SwitchCaseBlockContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_switchCaseBlock
 }
 
 func (*SwitchCaseBlockContext) IsSwitchCaseBlockContext() {}
@@ -10602,7 +11547,7 @@ func (*SwitchCaseBlockContext) IsSwitchCaseBlockContext() {}
 func NewSwitchCaseBlockContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SwitchCaseBlockContext {
 	var p = new(SwitchCaseBlockContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_switchCaseBlock
@@ -10679,28 +11624,9 @@ func (s *SwitchCaseBlockContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) SwitchCaseBlock() (localctx ISwitchCaseBlockContext) {
-	this := p
-	_ = this
-
 	localctx = NewSwitchCaseBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 90, PHPParserRULE_switchCaseBlock)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -10708,6 +11634,10 @@ func (p *PHPParser) SwitchCaseBlock() (localctx ISwitchCaseBlockContext) {
 	{
 		p.SetState(817)
 		p.Match(PHPParserCase)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(818)
@@ -10726,26 +11656,51 @@ func (p *PHPParser) SwitchCaseBlock() (localctx ISwitchCaseBlockContext) {
 	}
 	p.SetState(823)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 73, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 73, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
 				p.SetState(820)
 				p.Match(PHPParserSemiColon)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		p.SetState(825)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 73, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 73, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(826)
 		p.InnerStatementList()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISwitchDefaultBlockContext is an interface to support dynamic dispatch.
@@ -10755,20 +11710,32 @@ type ISwitchDefaultBlockContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Default() antlr.TerminalNode
+	InnerStatementList() IInnerStatementListContext
+	Colon() antlr.TerminalNode
+	AllSemiColon() []antlr.TerminalNode
+	SemiColon(i int) antlr.TerminalNode
+
 	// IsSwitchDefaultBlockContext differentiates from other interfaces.
 	IsSwitchDefaultBlockContext()
 }
 
 type SwitchDefaultBlockContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptySwitchDefaultBlockContext() *SwitchDefaultBlockContext {
 	var p = new(SwitchDefaultBlockContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_switchDefaultBlock
 	return p
+}
+
+func InitEmptySwitchDefaultBlockContext(p *SwitchDefaultBlockContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_switchDefaultBlock
 }
 
 func (*SwitchDefaultBlockContext) IsSwitchDefaultBlockContext() {}
@@ -10776,7 +11743,7 @@ func (*SwitchDefaultBlockContext) IsSwitchDefaultBlockContext() {}
 func NewSwitchDefaultBlockContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SwitchDefaultBlockContext {
 	var p = new(SwitchDefaultBlockContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_switchDefaultBlock
@@ -10837,28 +11804,9 @@ func (s *SwitchDefaultBlockContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *PHPParser) SwitchDefaultBlock() (localctx ISwitchDefaultBlockContext) {
-	this := p
-	_ = this
-
 	localctx = NewSwitchDefaultBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 92, PHPParserRULE_switchDefaultBlock)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -10866,6 +11814,10 @@ func (p *PHPParser) SwitchDefaultBlock() (localctx ISwitchDefaultBlockContext) {
 	{
 		p.SetState(828)
 		p.Match(PHPParserDefault)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(829)
@@ -10880,26 +11832,51 @@ func (p *PHPParser) SwitchDefaultBlock() (localctx ISwitchDefaultBlockContext) {
 	}
 	p.SetState(833)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 74, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 74, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
 				p.SetState(830)
 				p.Match(PHPParserSemiColon)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		p.SetState(835)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 74, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 74, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(836)
 		p.InnerStatementList()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISwitchBlockContext is an interface to support dynamic dispatch.
@@ -10909,20 +11886,38 @@ type ISwitchBlockContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	InnerStatementList() IInnerStatementListContext
+	AllColon() []antlr.TerminalNode
+	Colon(i int) antlr.TerminalNode
+	AllSemiColon() []antlr.TerminalNode
+	SemiColon(i int) antlr.TerminalNode
+	AllDefault() []antlr.TerminalNode
+	Default(i int) antlr.TerminalNode
+	AllCase() []antlr.TerminalNode
+	Case(i int) antlr.TerminalNode
+	AllExpression() []IExpressionContext
+	Expression(i int) IExpressionContext
+
 	// IsSwitchBlockContext differentiates from other interfaces.
 	IsSwitchBlockContext()
 }
 
 type SwitchBlockContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptySwitchBlockContext() *SwitchBlockContext {
 	var p = new(SwitchBlockContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_switchBlock
 	return p
+}
+
+func InitEmptySwitchBlockContext(p *SwitchBlockContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_switchBlock
 }
 
 func (*SwitchBlockContext) IsSwitchBlockContext() {}
@@ -10930,7 +11925,7 @@ func (*SwitchBlockContext) IsSwitchBlockContext() {}
 func NewSwitchBlockContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SwitchBlockContext {
 	var p = new(SwitchBlockContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_switchBlock
@@ -11048,46 +12043,37 @@ func (s *SwitchBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PHPParser) SwitchBlock() (localctx ISwitchBlockContext) {
-	this := p
-	_ = this
-
 	localctx = NewSwitchBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 94, PHPParserRULE_switchBlock)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(850)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_alt = 1
 	for ok := true; ok; ok = _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		switch _alt {
 		case 1:
 			p.SetState(841)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 
 			switch p.GetTokenStream().LA(1) {
 			case PHPParserCase:
 				{
 					p.SetState(838)
 					p.Match(PHPParserCase)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(839)
@@ -11098,10 +12084,15 @@ func (p *PHPParser) SwitchBlock() (localctx ISwitchBlockContext) {
 				{
 					p.SetState(840)
 					p.Match(PHPParserDefault)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 
 			default:
-				panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				goto errorExit
 			}
 			{
 				p.SetState(843)
@@ -11116,35 +12107,64 @@ func (p *PHPParser) SwitchBlock() (localctx ISwitchBlockContext) {
 			}
 			p.SetState(847)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 76, p.GetParserRuleContext())
-
+			if p.HasError() {
+				goto errorExit
+			}
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 76, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 			for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 				if _alt == 1 {
 					{
 						p.SetState(844)
 						p.Match(PHPParserSemiColon)
+						if p.HasError() {
+							// Recognition error - abort rule
+							goto errorExit
+						}
 					}
 
 				}
 				p.SetState(849)
 				p.GetErrorHandler().Sync(p)
-				_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 76, p.GetParserRuleContext())
+				if p.HasError() {
+					goto errorExit
+				}
+				_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 76, p.GetParserRuleContext())
+				if p.HasError() {
+					goto errorExit
+				}
 			}
 
 		default:
-			panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			goto errorExit
 		}
 
 		p.SetState(852)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 77, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 77, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(854)
 		p.InnerStatementList()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IBreakStatementContext is an interface to support dynamic dispatch.
@@ -11154,20 +12174,30 @@ type IBreakStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Break() antlr.TerminalNode
+	SemiColon() antlr.TerminalNode
+	Expression() IExpressionContext
+
 	// IsBreakStatementContext differentiates from other interfaces.
 	IsBreakStatementContext()
 }
 
 type BreakStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyBreakStatementContext() *BreakStatementContext {
 	var p = new(BreakStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_breakStatement
 	return p
+}
+
+func InitEmptyBreakStatementContext(p *BreakStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_breakStatement
 }
 
 func (*BreakStatementContext) IsBreakStatementContext() {}
@@ -11175,7 +12205,7 @@ func (*BreakStatementContext) IsBreakStatementContext() {}
 func NewBreakStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *BreakStatementContext {
 	var p = new(BreakStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_breakStatement
@@ -11228,39 +12258,27 @@ func (s *BreakStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) BreakStatement() (localctx IBreakStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewBreakStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 96, PHPParserRULE_breakStatement)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(856)
 		p.Match(PHPParserBreak)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(858)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244513) != 0 {
+	if ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244513) != 0) {
 		{
 			p.SetState(857)
 			p.expression(0)
@@ -11270,9 +12288,23 @@ func (p *PHPParser) BreakStatement() (localctx IBreakStatementContext) {
 	{
 		p.SetState(860)
 		p.Match(PHPParserSemiColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IContinueStatementContext is an interface to support dynamic dispatch.
@@ -11282,20 +12314,30 @@ type IContinueStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Continue() antlr.TerminalNode
+	SemiColon() antlr.TerminalNode
+	Expression() IExpressionContext
+
 	// IsContinueStatementContext differentiates from other interfaces.
 	IsContinueStatementContext()
 }
 
 type ContinueStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyContinueStatementContext() *ContinueStatementContext {
 	var p = new(ContinueStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_continueStatement
 	return p
+}
+
+func InitEmptyContinueStatementContext(p *ContinueStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_continueStatement
 }
 
 func (*ContinueStatementContext) IsContinueStatementContext() {}
@@ -11303,7 +12345,7 @@ func (*ContinueStatementContext) IsContinueStatementContext() {}
 func NewContinueStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ContinueStatementContext {
 	var p = new(ContinueStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_continueStatement
@@ -11356,39 +12398,27 @@ func (s *ContinueStatementContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *PHPParser) ContinueStatement() (localctx IContinueStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewContinueStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 98, PHPParserRULE_continueStatement)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(862)
 		p.Match(PHPParserContinue)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(864)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244513) != 0 {
+	if ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244513) != 0) {
 		{
 			p.SetState(863)
 			p.expression(0)
@@ -11398,9 +12428,23 @@ func (p *PHPParser) ContinueStatement() (localctx IContinueStatementContext) {
 	{
 		p.SetState(866)
 		p.Match(PHPParserSemiColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IReturnStatementContext is an interface to support dynamic dispatch.
@@ -11410,20 +12454,30 @@ type IReturnStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Return() antlr.TerminalNode
+	SemiColon() antlr.TerminalNode
+	Expression() IExpressionContext
+
 	// IsReturnStatementContext differentiates from other interfaces.
 	IsReturnStatementContext()
 }
 
 type ReturnStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyReturnStatementContext() *ReturnStatementContext {
 	var p = new(ReturnStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_returnStatement
 	return p
+}
+
+func InitEmptyReturnStatementContext(p *ReturnStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_returnStatement
 }
 
 func (*ReturnStatementContext) IsReturnStatementContext() {}
@@ -11431,7 +12485,7 @@ func (*ReturnStatementContext) IsReturnStatementContext() {}
 func NewReturnStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ReturnStatementContext {
 	var p = new(ReturnStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_returnStatement
@@ -11484,39 +12538,27 @@ func (s *ReturnStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) ReturnStatement() (localctx IReturnStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewReturnStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 100, PHPParserRULE_returnStatement)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(868)
 		p.Match(PHPParserReturn)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(870)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244513) != 0 {
+	if ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244513) != 0) {
 		{
 			p.SetState(869)
 			p.expression(0)
@@ -11526,9 +12568,23 @@ func (p *PHPParser) ReturnStatement() (localctx IReturnStatementContext) {
 	{
 		p.SetState(872)
 		p.Match(PHPParserSemiColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IExpressionStatementContext is an interface to support dynamic dispatch.
@@ -11538,20 +12594,29 @@ type IExpressionStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Expression() IExpressionContext
+	SemiColon() antlr.TerminalNode
+
 	// IsExpressionStatementContext differentiates from other interfaces.
 	IsExpressionStatementContext()
 }
 
 type ExpressionStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyExpressionStatementContext() *ExpressionStatementContext {
 	var p = new(ExpressionStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_expressionStatement
 	return p
+}
+
+func InitEmptyExpressionStatementContext(p *ExpressionStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_expressionStatement
 }
 
 func (*ExpressionStatementContext) IsExpressionStatementContext() {}
@@ -11559,7 +12624,7 @@ func (*ExpressionStatementContext) IsExpressionStatementContext() {}
 func NewExpressionStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ExpressionStatementContext {
 	var p = new(ExpressionStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_expressionStatement
@@ -11608,28 +12673,8 @@ func (s *ExpressionStatementContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *PHPParser) ExpressionStatement() (localctx IExpressionStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewExpressionStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 102, PHPParserRULE_expressionStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(874)
@@ -11638,9 +12683,23 @@ func (p *PHPParser) ExpressionStatement() (localctx IExpressionStatementContext)
 	{
 		p.SetState(875)
 		p.Match(PHPParserSemiColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IUnsetStatementContext is an interface to support dynamic dispatch.
@@ -11650,20 +12709,32 @@ type IUnsetStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Unset() antlr.TerminalNode
+	OpenRoundBracket() antlr.TerminalNode
+	ChainList() IChainListContext
+	CloseRoundBracket() antlr.TerminalNode
+	SemiColon() antlr.TerminalNode
+
 	// IsUnsetStatementContext differentiates from other interfaces.
 	IsUnsetStatementContext()
 }
 
 type UnsetStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyUnsetStatementContext() *UnsetStatementContext {
 	var p = new(UnsetStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_unsetStatement
 	return p
+}
+
+func InitEmptyUnsetStatementContext(p *UnsetStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_unsetStatement
 }
 
 func (*UnsetStatementContext) IsUnsetStatementContext() {}
@@ -11671,7 +12742,7 @@ func (*UnsetStatementContext) IsUnsetStatementContext() {}
 func NewUnsetStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *UnsetStatementContext {
 	var p = new(UnsetStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_unsetStatement
@@ -11732,36 +12803,24 @@ func (s *UnsetStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) UnsetStatement() (localctx IUnsetStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewUnsetStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 104, PHPParserRULE_unsetStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(877)
 		p.Match(PHPParserUnset)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(878)
 		p.Match(PHPParserOpenRoundBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(879)
@@ -11770,13 +12829,31 @@ func (p *PHPParser) UnsetStatement() (localctx IUnsetStatementContext) {
 	{
 		p.SetState(880)
 		p.Match(PHPParserCloseRoundBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(881)
 		p.Match(PHPParserSemiColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IForeachStatementContext is an interface to support dynamic dispatch.
@@ -11786,20 +12863,48 @@ type IForeachStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Foreach() antlr.TerminalNode
+	AllOpenRoundBracket() []antlr.TerminalNode
+	OpenRoundBracket(i int) antlr.TerminalNode
+	Expression() IExpressionContext
+	As() antlr.TerminalNode
+	ArrayDestructuring() IArrayDestructuringContext
+	AllCloseRoundBracket() []antlr.TerminalNode
+	CloseRoundBracket(i int) antlr.TerminalNode
+	AllChain() []IChainContext
+	Chain(i int) IChainContext
+	Assignable() IAssignableContext
+	List() antlr.TerminalNode
+	AssignmentList() IAssignmentListContext
+	DoubleArrow() antlr.TerminalNode
+	Statement() IStatementContext
+	Colon() antlr.TerminalNode
+	InnerStatementList() IInnerStatementListContext
+	EndForeach() antlr.TerminalNode
+	SemiColon() antlr.TerminalNode
+	AllAmpersand() []antlr.TerminalNode
+	Ampersand(i int) antlr.TerminalNode
+
 	// IsForeachStatementContext differentiates from other interfaces.
 	IsForeachStatementContext()
 }
 
 type ForeachStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyForeachStatementContext() *ForeachStatementContext {
 	var p = new(ForeachStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_foreachStatement
 	return p
+}
+
+func InitEmptyForeachStatementContext(p *ForeachStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_foreachStatement
 }
 
 func (*ForeachStatementContext) IsForeachStatementContext() {}
@@ -11807,7 +12912,7 @@ func (*ForeachStatementContext) IsForeachStatementContext() {}
 func NewForeachStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ForeachStatementContext {
 	var p = new(ForeachStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_foreachStatement
@@ -12025,41 +13130,34 @@ func (s *ForeachStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *PHPParser) ForeachStatement() (localctx IForeachStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewForeachStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 106, PHPParserRULE_foreachStatement)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(883)
 		p.Match(PHPParserForeach)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(954)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 88, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 88, p.GetParserRuleContext()) {
 	case 1:
 		{
 			p.SetState(884)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(885)
@@ -12068,6 +13166,10 @@ func (p *PHPParser) ForeachStatement() (localctx IForeachStatementContext) {
 		{
 			p.SetState(886)
 			p.Match(PHPParserAs)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(887)
@@ -12076,12 +13178,20 @@ func (p *PHPParser) ForeachStatement() (localctx IForeachStatementContext) {
 		{
 			p.SetState(888)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 2:
 		{
 			p.SetState(890)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(891)
@@ -12090,15 +13200,26 @@ func (p *PHPParser) ForeachStatement() (localctx IForeachStatementContext) {
 		{
 			p.SetState(892)
 			p.Match(PHPParserAs)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(894)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserAmpersand {
 			{
 				p.SetState(893)
 				p.Match(PHPParserAmpersand)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
@@ -12108,21 +13229,35 @@ func (p *PHPParser) ForeachStatement() (localctx IForeachStatementContext) {
 		}
 		p.SetState(902)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserDoubleArrow {
 			{
 				p.SetState(897)
 				p.Match(PHPParserDoubleArrow)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			p.SetState(899)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 
 			if _la == PHPParserAmpersand {
 				{
 					p.SetState(898)
 					p.Match(PHPParserAmpersand)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 
 			}
@@ -12135,12 +13270,20 @@ func (p *PHPParser) ForeachStatement() (localctx IForeachStatementContext) {
 		{
 			p.SetState(904)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 3:
 		{
 			p.SetState(906)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(907)
@@ -12149,15 +13292,26 @@ func (p *PHPParser) ForeachStatement() (localctx IForeachStatementContext) {
 		{
 			p.SetState(908)
 			p.Match(PHPParserAs)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(910)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserAmpersand {
 			{
 				p.SetState(909)
 				p.Match(PHPParserAmpersand)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
@@ -12167,21 +13321,35 @@ func (p *PHPParser) ForeachStatement() (localctx IForeachStatementContext) {
 		}
 		p.SetState(918)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserDoubleArrow {
 			{
 				p.SetState(913)
 				p.Match(PHPParserDoubleArrow)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			p.SetState(915)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 
 			if _la == PHPParserAmpersand {
 				{
 					p.SetState(914)
 					p.Match(PHPParserAmpersand)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 
 			}
@@ -12194,12 +13362,20 @@ func (p *PHPParser) ForeachStatement() (localctx IForeachStatementContext) {
 		{
 			p.SetState(920)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 4:
 		{
 			p.SetState(922)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(923)
@@ -12208,14 +13384,26 @@ func (p *PHPParser) ForeachStatement() (localctx IForeachStatementContext) {
 		{
 			p.SetState(924)
 			p.Match(PHPParserAs)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(925)
 			p.Match(PHPParserList)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(926)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(927)
@@ -12224,16 +13412,28 @@ func (p *PHPParser) ForeachStatement() (localctx IForeachStatementContext) {
 		{
 			p.SetState(928)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(929)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 5:
 		{
 			p.SetState(931)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(932)
@@ -12242,15 +13442,26 @@ func (p *PHPParser) ForeachStatement() (localctx IForeachStatementContext) {
 		{
 			p.SetState(933)
 			p.Match(PHPParserAs)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(935)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserAmpersand {
 			{
 				p.SetState(934)
 				p.Match(PHPParserAmpersand)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
@@ -12261,14 +13472,26 @@ func (p *PHPParser) ForeachStatement() (localctx IForeachStatementContext) {
 		{
 			p.SetState(938)
 			p.Match(PHPParserDoubleArrow)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(939)
 			p.Match(PHPParserList)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(940)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(941)
@@ -12277,16 +13500,28 @@ func (p *PHPParser) ForeachStatement() (localctx IForeachStatementContext) {
 		{
 			p.SetState(942)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(943)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 6:
 		{
 			p.SetState(945)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(946)
@@ -12295,14 +13530,26 @@ func (p *PHPParser) ForeachStatement() (localctx IForeachStatementContext) {
 		{
 			p.SetState(947)
 			p.Match(PHPParserAs)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(948)
 			p.Match(PHPParserList)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(949)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(950)
@@ -12311,15 +13558,28 @@ func (p *PHPParser) ForeachStatement() (localctx IForeachStatementContext) {
 		{
 			p.SetState(951)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(952)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 	p.SetState(962)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserHtmlText, PHPParserXmlStart, PHPParserHtmlScriptOpen, PHPParserHtmlStyleOpen, PHPParserHtmlDtd, PHPParserHtmlOpen, PHPParserNumberSign, PHPParserHtmlClose, PHPParserHtmlSlashClose, PHPParserHtmlSlash, PHPParserHtmlEquals, PHPParserHtmlStartQuoteString, PHPParserHtmlStartDoubleQuoteString, PHPParserHtmlHex, PHPParserHtmlDecimal, PHPParserHtmlName, PHPParserHtmlEndQuoteString, PHPParserHtmlQuoteString, PHPParserHtmlEndDoubleQuoteString, PHPParserHtmlDoubleQuoteString, PHPParserScriptText, PHPParserHtmlScriptClose, PHPParserStyleBody, PHPParserAbstract, PHPParserArray, PHPParserAs, PHPParserBinaryCast, PHPParserBoolType, PHPParserBooleanConstant, PHPParserBreak, PHPParserCallable, PHPParserCase, PHPParserCatch, PHPParserClass, PHPParserClone, PHPParserConst, PHPParserContinue, PHPParserDefine, PHPParserDefined, PHPParserDeclare, PHPParserDefault, PHPParserDo, PHPParserDoubleCast, PHPParserDoubleType, PHPParserEcho, PHPParserElse, PHPParserElseIf, PHPParserEmpty, PHPParserEnum_, PHPParserEndDeclare, PHPParserEndFor, PHPParserEndForeach, PHPParserEndIf, PHPParserEndSwitch, PHPParserEndWhile, PHPParserEval, PHPParserAssert, PHPParserDie, PHPParserExit, PHPParserExtends, PHPParserFinal, PHPParserFinally, PHPParserFloatCast, PHPParserFor, PHPParserForeach, PHPParserFunction_, PHPParserGlobal, PHPParserGoto, PHPParserIf, PHPParserImplements, PHPParserImport, PHPParserInclude, PHPParserIncludeOnce, PHPParserInstanceOf, PHPParserInsteadOf, PHPParserInt8Cast, PHPParserInt16Cast, PHPParserInt64Type, PHPParserIntType, PHPParserInterface, PHPParserIsSet, PHPParserList, PHPParserLogicalAnd, PHPParserLogicalOr, PHPParserLogicalXor, PHPParserMatch_, PHPParserNamespace, PHPParserNew, PHPParserNull, PHPParserObjectType, PHPParserParent_, PHPParserPartial, PHPParserPrint, PHPParserPrivate, PHPParserProtected, PHPParserPublic, PHPParserReadonly, PHPParserRequire, PHPParserRequireOnce, PHPParserResource, PHPParserReturn, PHPParserStatic, PHPParserStringType, PHPParserSwitch, PHPParserThrow, PHPParserTrait, PHPParserTry, PHPParserTypeof, PHPParserUintCast, PHPParserUnicodeCast, PHPParserUnset, PHPParserVar, PHPParserWhile, PHPParserYield, PHPParserFrom, PHPParserLambdaFn, PHPParserTicks, PHPParserEncoding, PHPParserStrictTypes, PHPParserGet, PHPParserSet, PHPParserCall, PHPParserCallStatic, PHPParserConstructor, PHPParserDestruct, PHPParserWakeup, PHPParserSleep, PHPParserAutoload, PHPParserIsSet__, PHPParserUnset__, PHPParserToString__, PHPParserInvoke, PHPParserSetState, PHPParserClone__, PHPParserDebugInfo, PHPParserNamespace__, PHPParserClass__, PHPParserTraic__, PHPParserFunction__, PHPParserMethod__, PHPParserLine__, PHPParserFile__, PHPParserDir__, PHPParserInc, PHPParserDec, PHPParserStartNowDoc, PHPParserNamespaceSeparator, PHPParserAmpersand, PHPParserBang, PHPParserPlus, PHPParserMinus, PHPParserTilde, PHPParserSuppressWarnings, PHPParserDollar, PHPParserOpenRoundBracket, PHPParserOpenSquareBracket, PHPParserOpenCurlyBracket, PHPParserSemiColon, PHPParserSet_Include_Path, PHPParserVarName, PHPParserLabel, PHPParserOctal, PHPParserDecimal, PHPParserReal, PHPParserHex, PHPParserBinary, PHPParserBackQuoteString, PHPParserSingleQuoteString, PHPParserDoubleQuote:
@@ -12332,6 +13592,10 @@ func (p *PHPParser) ForeachStatement() (localctx IForeachStatementContext) {
 		{
 			p.SetState(957)
 			p.Match(PHPParserColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(958)
@@ -12340,17 +13604,36 @@ func (p *PHPParser) ForeachStatement() (localctx IForeachStatementContext) {
 		{
 			p.SetState(959)
 			p.Match(PHPParserEndForeach)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(960)
 			p.Match(PHPParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITryCatchFinallyContext is an interface to support dynamic dispatch.
@@ -12360,20 +13643,32 @@ type ITryCatchFinallyContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Try() antlr.TerminalNode
+	BlockStatement() IBlockStatementContext
+	FinallyStatement() IFinallyStatementContext
+	AllCatchClause() []ICatchClauseContext
+	CatchClause(i int) ICatchClauseContext
+
 	// IsTryCatchFinallyContext differentiates from other interfaces.
 	IsTryCatchFinallyContext()
 }
 
 type TryCatchFinallyContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTryCatchFinallyContext() *TryCatchFinallyContext {
 	var p = new(TryCatchFinallyContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_tryCatchFinally
 	return p
+}
+
+func InitEmptyTryCatchFinallyContext(p *TryCatchFinallyContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_tryCatchFinally
 }
 
 func (*TryCatchFinallyContext) IsTryCatchFinallyContext() {}
@@ -12381,7 +13676,7 @@ func (*TryCatchFinallyContext) IsTryCatchFinallyContext() {}
 func NewTryCatchFinallyContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TryCatchFinallyContext {
 	var p = new(TryCatchFinallyContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_tryCatchFinally
@@ -12487,28 +13782,9 @@ func (s *TryCatchFinallyContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) TryCatchFinally() (localctx ITryCatchFinallyContext) {
-	this := p
-	_ = this
-
 	localctx = NewTryCatchFinallyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 108, PHPParserRULE_tryCatchFinally)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -12516,6 +13792,10 @@ func (p *PHPParser) TryCatchFinally() (localctx ITryCatchFinallyContext) {
 	{
 		p.SetState(964)
 		p.Match(PHPParserTry)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(965)
@@ -12523,10 +13803,17 @@ func (p *PHPParser) TryCatchFinally() (localctx ITryCatchFinallyContext) {
 	}
 	p.SetState(981)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 93, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 93, p.GetParserRuleContext()) {
 	case 1:
 		p.SetState(967)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_alt = 1
 		for ok := true; ok; ok = _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			switch _alt {
@@ -12537,27 +13824,36 @@ func (p *PHPParser) TryCatchFinally() (localctx ITryCatchFinallyContext) {
 				}
 
 			default:
-				panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				goto errorExit
 			}
 
 			p.SetState(969)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 90, p.GetParserRuleContext())
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 90, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 		p.SetState(972)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 91, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 91, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(971)
 				p.FinallyStatement()
 			}
 
+		} else if p.HasError() { // JIM
+			goto errorExit
 		}
 
 	case 2:
 		p.SetState(977)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == PHPParserCatch {
@@ -12568,6 +13864,9 @@ func (p *PHPParser) TryCatchFinally() (localctx ITryCatchFinallyContext) {
 
 			p.SetState(979)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
@@ -12575,9 +13874,21 @@ func (p *PHPParser) TryCatchFinally() (localctx ITryCatchFinallyContext) {
 			p.FinallyStatement()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ICatchClauseContext is an interface to support dynamic dispatch.
@@ -12587,20 +13898,36 @@ type ICatchClauseContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Catch() antlr.TerminalNode
+	OpenRoundBracket() antlr.TerminalNode
+	AllQualifiedStaticTypeRef() []IQualifiedStaticTypeRefContext
+	QualifiedStaticTypeRef(i int) IQualifiedStaticTypeRefContext
+	CloseRoundBracket() antlr.TerminalNode
+	BlockStatement() IBlockStatementContext
+	AllPipe() []antlr.TerminalNode
+	Pipe(i int) antlr.TerminalNode
+	VarName() antlr.TerminalNode
+
 	// IsCatchClauseContext differentiates from other interfaces.
 	IsCatchClauseContext()
 }
 
 type CatchClauseContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyCatchClauseContext() *CatchClauseContext {
 	var p = new(CatchClauseContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_catchClause
 	return p
+}
+
+func InitEmptyCatchClauseContext(p *CatchClauseContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_catchClause
 }
 
 func (*CatchClauseContext) IsCatchClauseContext() {}
@@ -12608,7 +13935,7 @@ func (*CatchClauseContext) IsCatchClauseContext() {}
 func NewCatchClauseContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CatchClauseContext {
 	var p = new(CatchClauseContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_catchClause
@@ -12718,37 +14045,26 @@ func (s *CatchClauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PHPParser) CatchClause() (localctx ICatchClauseContext) {
-	this := p
-	_ = this
-
 	localctx = NewCatchClauseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 110, PHPParserRULE_catchClause)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(983)
 		p.Match(PHPParserCatch)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(984)
 		p.Match(PHPParserOpenRoundBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(985)
@@ -12756,12 +14072,19 @@ func (p *PHPParser) CatchClause() (localctx ICatchClauseContext) {
 	}
 	p.SetState(990)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == PHPParserPipe {
 		{
 			p.SetState(986)
 			p.Match(PHPParserPipe)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(987)
@@ -12770,29 +14093,53 @@ func (p *PHPParser) CatchClause() (localctx ICatchClauseContext) {
 
 		p.SetState(992)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	p.SetState(994)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserVarName {
 		{
 			p.SetState(993)
 			p.Match(PHPParserVarName)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 	{
 		p.SetState(996)
 		p.Match(PHPParserCloseRoundBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(997)
 		p.BlockStatement()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFinallyStatementContext is an interface to support dynamic dispatch.
@@ -12802,20 +14149,29 @@ type IFinallyStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Finally() antlr.TerminalNode
+	BlockStatement() IBlockStatementContext
+
 	// IsFinallyStatementContext differentiates from other interfaces.
 	IsFinallyStatementContext()
 }
 
 type FinallyStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFinallyStatementContext() *FinallyStatementContext {
 	var p = new(FinallyStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_finallyStatement
 	return p
+}
+
+func InitEmptyFinallyStatementContext(p *FinallyStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_finallyStatement
 }
 
 func (*FinallyStatementContext) IsFinallyStatementContext() {}
@@ -12823,7 +14179,7 @@ func (*FinallyStatementContext) IsFinallyStatementContext() {}
 func NewFinallyStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FinallyStatementContext {
 	var p = new(FinallyStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_finallyStatement
@@ -12872,39 +14228,33 @@ func (s *FinallyStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *PHPParser) FinallyStatement() (localctx IFinallyStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewFinallyStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 112, PHPParserRULE_finallyStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(999)
 		p.Match(PHPParserFinally)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1000)
 		p.BlockStatement()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IThrowStatementContext is an interface to support dynamic dispatch.
@@ -12914,20 +14264,30 @@ type IThrowStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Throw() antlr.TerminalNode
+	Expression() IExpressionContext
+	SemiColon() antlr.TerminalNode
+
 	// IsThrowStatementContext differentiates from other interfaces.
 	IsThrowStatementContext()
 }
 
 type ThrowStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyThrowStatementContext() *ThrowStatementContext {
 	var p = new(ThrowStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_throwStatement
 	return p
+}
+
+func InitEmptyThrowStatementContext(p *ThrowStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_throwStatement
 }
 
 func (*ThrowStatementContext) IsThrowStatementContext() {}
@@ -12935,7 +14295,7 @@ func (*ThrowStatementContext) IsThrowStatementContext() {}
 func NewThrowStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ThrowStatementContext {
 	var p = new(ThrowStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_throwStatement
@@ -12988,32 +14348,16 @@ func (s *ThrowStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) ThrowStatement() (localctx IThrowStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewThrowStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 114, PHPParserRULE_throwStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1002)
 		p.Match(PHPParserThrow)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1003)
@@ -13022,9 +14366,23 @@ func (p *PHPParser) ThrowStatement() (localctx IThrowStatementContext) {
 	{
 		p.SetState(1004)
 		p.Match(PHPParserSemiColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IGotoStatementContext is an interface to support dynamic dispatch.
@@ -13034,20 +14392,30 @@ type IGotoStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Goto() antlr.TerminalNode
+	Identifier() IIdentifierContext
+	SemiColon() antlr.TerminalNode
+
 	// IsGotoStatementContext differentiates from other interfaces.
 	IsGotoStatementContext()
 }
 
 type GotoStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyGotoStatementContext() *GotoStatementContext {
 	var p = new(GotoStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_gotoStatement
 	return p
+}
+
+func InitEmptyGotoStatementContext(p *GotoStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_gotoStatement
 }
 
 func (*GotoStatementContext) IsGotoStatementContext() {}
@@ -13055,7 +14423,7 @@ func (*GotoStatementContext) IsGotoStatementContext() {}
 func NewGotoStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *GotoStatementContext {
 	var p = new(GotoStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_gotoStatement
@@ -13108,32 +14476,16 @@ func (s *GotoStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) GotoStatement() (localctx IGotoStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewGotoStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 116, PHPParserRULE_gotoStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1006)
 		p.Match(PHPParserGoto)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1007)
@@ -13142,9 +14494,23 @@ func (p *PHPParser) GotoStatement() (localctx IGotoStatementContext) {
 	{
 		p.SetState(1008)
 		p.Match(PHPParserSemiColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDeclareStatementContext is an interface to support dynamic dispatch.
@@ -13154,20 +14520,36 @@ type IDeclareStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Declare() antlr.TerminalNode
+	OpenRoundBracket() antlr.TerminalNode
+	DeclareList() IDeclareListContext
+	CloseRoundBracket() antlr.TerminalNode
+	Statement() IStatementContext
+	Colon() antlr.TerminalNode
+	InnerStatementList() IInnerStatementListContext
+	EndDeclare() antlr.TerminalNode
+	SemiColon() antlr.TerminalNode
+
 	// IsDeclareStatementContext differentiates from other interfaces.
 	IsDeclareStatementContext()
 }
 
 type DeclareStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyDeclareStatementContext() *DeclareStatementContext {
 	var p = new(DeclareStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_declareStatement
 	return p
+}
+
+func InitEmptyDeclareStatementContext(p *DeclareStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_declareStatement
 }
 
 func (*DeclareStatementContext) IsDeclareStatementContext() {}
@@ -13175,7 +14557,7 @@ func (*DeclareStatementContext) IsDeclareStatementContext() {}
 func NewDeclareStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DeclareStatementContext {
 	var p = new(DeclareStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_declareStatement
@@ -13276,36 +14658,24 @@ func (s *DeclareStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *PHPParser) DeclareStatement() (localctx IDeclareStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewDeclareStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 118, PHPParserRULE_declareStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1010)
 		p.Match(PHPParserDeclare)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1011)
 		p.Match(PHPParserOpenRoundBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1012)
@@ -13314,9 +14684,16 @@ func (p *PHPParser) DeclareStatement() (localctx IDeclareStatementContext) {
 	{
 		p.SetState(1013)
 		p.Match(PHPParserCloseRoundBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(1020)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserHtmlText, PHPParserXmlStart, PHPParserHtmlScriptOpen, PHPParserHtmlStyleOpen, PHPParserHtmlDtd, PHPParserHtmlOpen, PHPParserNumberSign, PHPParserHtmlClose, PHPParserHtmlSlashClose, PHPParserHtmlSlash, PHPParserHtmlEquals, PHPParserHtmlStartQuoteString, PHPParserHtmlStartDoubleQuoteString, PHPParserHtmlHex, PHPParserHtmlDecimal, PHPParserHtmlName, PHPParserHtmlEndQuoteString, PHPParserHtmlQuoteString, PHPParserHtmlEndDoubleQuoteString, PHPParserHtmlDoubleQuoteString, PHPParserScriptText, PHPParserHtmlScriptClose, PHPParserStyleBody, PHPParserAbstract, PHPParserArray, PHPParserAs, PHPParserBinaryCast, PHPParserBoolType, PHPParserBooleanConstant, PHPParserBreak, PHPParserCallable, PHPParserCase, PHPParserCatch, PHPParserClass, PHPParserClone, PHPParserConst, PHPParserContinue, PHPParserDefine, PHPParserDefined, PHPParserDeclare, PHPParserDefault, PHPParserDo, PHPParserDoubleCast, PHPParserDoubleType, PHPParserEcho, PHPParserElse, PHPParserElseIf, PHPParserEmpty, PHPParserEnum_, PHPParserEndDeclare, PHPParserEndFor, PHPParserEndForeach, PHPParserEndIf, PHPParserEndSwitch, PHPParserEndWhile, PHPParserEval, PHPParserAssert, PHPParserDie, PHPParserExit, PHPParserExtends, PHPParserFinal, PHPParserFinally, PHPParserFloatCast, PHPParserFor, PHPParserForeach, PHPParserFunction_, PHPParserGlobal, PHPParserGoto, PHPParserIf, PHPParserImplements, PHPParserImport, PHPParserInclude, PHPParserIncludeOnce, PHPParserInstanceOf, PHPParserInsteadOf, PHPParserInt8Cast, PHPParserInt16Cast, PHPParserInt64Type, PHPParserIntType, PHPParserInterface, PHPParserIsSet, PHPParserList, PHPParserLogicalAnd, PHPParserLogicalOr, PHPParserLogicalXor, PHPParserMatch_, PHPParserNamespace, PHPParserNew, PHPParserNull, PHPParserObjectType, PHPParserParent_, PHPParserPartial, PHPParserPrint, PHPParserPrivate, PHPParserProtected, PHPParserPublic, PHPParserReadonly, PHPParserRequire, PHPParserRequireOnce, PHPParserResource, PHPParserReturn, PHPParserStatic, PHPParserStringType, PHPParserSwitch, PHPParserThrow, PHPParserTrait, PHPParserTry, PHPParserTypeof, PHPParserUintCast, PHPParserUnicodeCast, PHPParserUnset, PHPParserVar, PHPParserWhile, PHPParserYield, PHPParserFrom, PHPParserLambdaFn, PHPParserTicks, PHPParserEncoding, PHPParserStrictTypes, PHPParserGet, PHPParserSet, PHPParserCall, PHPParserCallStatic, PHPParserConstructor, PHPParserDestruct, PHPParserWakeup, PHPParserSleep, PHPParserAutoload, PHPParserIsSet__, PHPParserUnset__, PHPParserToString__, PHPParserInvoke, PHPParserSetState, PHPParserClone__, PHPParserDebugInfo, PHPParserNamespace__, PHPParserClass__, PHPParserTraic__, PHPParserFunction__, PHPParserMethod__, PHPParserLine__, PHPParserFile__, PHPParserDir__, PHPParserInc, PHPParserDec, PHPParserStartNowDoc, PHPParserNamespaceSeparator, PHPParserAmpersand, PHPParserBang, PHPParserPlus, PHPParserMinus, PHPParserTilde, PHPParserSuppressWarnings, PHPParserDollar, PHPParserOpenRoundBracket, PHPParserOpenSquareBracket, PHPParserOpenCurlyBracket, PHPParserSemiColon, PHPParserSet_Include_Path, PHPParserVarName, PHPParserLabel, PHPParserOctal, PHPParserDecimal, PHPParserReal, PHPParserHex, PHPParserBinary, PHPParserBackQuoteString, PHPParserSingleQuoteString, PHPParserDoubleQuote:
@@ -13329,6 +14706,10 @@ func (p *PHPParser) DeclareStatement() (localctx IDeclareStatementContext) {
 		{
 			p.SetState(1015)
 			p.Match(PHPParserColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1016)
@@ -13337,17 +14718,36 @@ func (p *PHPParser) DeclareStatement() (localctx IDeclareStatementContext) {
 		{
 			p.SetState(1017)
 			p.Match(PHPParserEndDeclare)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1018)
 			p.Match(PHPParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IInlineHtmlStatementContext is an interface to support dynamic dispatch.
@@ -13357,20 +14757,31 @@ type IInlineHtmlStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllHtmlElement() []IHtmlElementContext
+	HtmlElement(i int) IHtmlElementContext
+	AllScriptText() []antlr.TerminalNode
+	ScriptText(i int) antlr.TerminalNode
+
 	// IsInlineHtmlStatementContext differentiates from other interfaces.
 	IsInlineHtmlStatementContext()
 }
 
 type InlineHtmlStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyInlineHtmlStatementContext() *InlineHtmlStatementContext {
 	var p = new(InlineHtmlStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_inlineHtmlStatement
 	return p
+}
+
+func InitEmptyInlineHtmlStatementContext(p *InlineHtmlStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_inlineHtmlStatement
 }
 
 func (*InlineHtmlStatementContext) IsInlineHtmlStatementContext() {}
@@ -13378,7 +14789,7 @@ func (*InlineHtmlStatementContext) IsInlineHtmlStatementContext() {}
 func NewInlineHtmlStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *InlineHtmlStatementContext {
 	var p = new(InlineHtmlStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_inlineHtmlStatement
@@ -13456,39 +14867,25 @@ func (s *InlineHtmlStatementContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *PHPParser) InlineHtmlStatement() (localctx IInlineHtmlStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewInlineHtmlStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 120, PHPParserRULE_inlineHtmlStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(1024)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_alt = 1
 	for ok := true; ok; ok = _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		switch _alt {
 		case 1:
 			p.SetState(1024)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 
 			switch p.GetTokenStream().LA(1) {
 			case PHPParserHtmlText, PHPParserXmlStart, PHPParserHtmlScriptOpen, PHPParserHtmlStyleOpen, PHPParserHtmlDtd, PHPParserHtmlOpen, PHPParserNumberSign, PHPParserHtmlClose, PHPParserHtmlSlashClose, PHPParserHtmlSlash, PHPParserHtmlEquals, PHPParserHtmlStartQuoteString, PHPParserHtmlStartDoubleQuoteString, PHPParserHtmlHex, PHPParserHtmlDecimal, PHPParserHtmlName, PHPParserHtmlEndQuoteString, PHPParserHtmlQuoteString, PHPParserHtmlEndDoubleQuoteString, PHPParserHtmlDoubleQuoteString, PHPParserHtmlScriptClose, PHPParserStyleBody:
@@ -13501,22 +14898,41 @@ func (p *PHPParser) InlineHtmlStatement() (localctx IInlineHtmlStatementContext)
 				{
 					p.SetState(1023)
 					p.Match(PHPParserScriptText)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 
 			default:
-				panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				goto errorExit
 			}
 
 		default:
-			panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			goto errorExit
 		}
 
 		p.SetState(1026)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 98, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 98, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDeclareListContext is an interface to support dynamic dispatch.
@@ -13526,20 +14942,31 @@ type IDeclareListContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllDirective() []IDirectiveContext
+	Directive(i int) IDirectiveContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsDeclareListContext differentiates from other interfaces.
 	IsDeclareListContext()
 }
 
 type DeclareListContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyDeclareListContext() *DeclareListContext {
 	var p = new(DeclareListContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_declareList
 	return p
+}
+
+func InitEmptyDeclareListContext(p *DeclareListContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_declareList
 }
 
 func (*DeclareListContext) IsDeclareListContext() {}
@@ -13547,7 +14974,7 @@ func (*DeclareListContext) IsDeclareListContext() {}
 func NewDeclareListContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DeclareListContext {
 	var p = new(DeclareListContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_declareList
@@ -13625,28 +15052,9 @@ func (s *DeclareListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PHPParser) DeclareList() (localctx IDeclareListContext) {
-	this := p
-	_ = this
-
 	localctx = NewDeclareListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 122, PHPParserRULE_declareList)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -13655,12 +15063,19 @@ func (p *PHPParser) DeclareList() (localctx IDeclareListContext) {
 	}
 	p.SetState(1033)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == PHPParserComma {
 		{
 			p.SetState(1029)
 			p.Match(PHPParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1030)
@@ -13669,10 +15084,23 @@ func (p *PHPParser) DeclareList() (localctx IDeclareListContext) {
 
 		p.SetState(1035)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDirectiveContext is an interface to support dynamic dispatch.
@@ -13682,20 +15110,34 @@ type IDirectiveContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Ticks() antlr.TerminalNode
+	Eq() antlr.TerminalNode
+	NumericConstant() INumericConstantContext
+	Real() antlr.TerminalNode
+	Encoding() antlr.TerminalNode
+	SingleQuoteString() antlr.TerminalNode
+	StrictTypes() antlr.TerminalNode
+
 	// IsDirectiveContext differentiates from other interfaces.
 	IsDirectiveContext()
 }
 
 type DirectiveContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyDirectiveContext() *DirectiveContext {
 	var p = new(DirectiveContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_directive
 	return p
+}
+
+func InitEmptyDirectiveContext(p *DirectiveContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_directive
 }
 
 func (*DirectiveContext) IsDirectiveContext() {}
@@ -13703,7 +15145,7 @@ func (*DirectiveContext) IsDirectiveContext() {}
 func NewDirectiveContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DirectiveContext {
 	var p = new(DirectiveContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_directive
@@ -13772,30 +15214,13 @@ func (s *DirectiveContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Directive() (localctx IDirectiveContext) {
-	this := p
-	_ = this
-
 	localctx = NewDirectiveContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 124, PHPParserRULE_directive)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1048)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserTicks:
@@ -13803,13 +15228,24 @@ func (p *PHPParser) Directive() (localctx IDirectiveContext) {
 		{
 			p.SetState(1036)
 			p.Match(PHPParserTicks)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1037)
 			p.Match(PHPParserEq)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(1040)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 
 		switch p.GetTokenStream().LA(1) {
 		case PHPParserOctal, PHPParserDecimal, PHPParserHex, PHPParserBinary:
@@ -13822,10 +15258,15 @@ func (p *PHPParser) Directive() (localctx IDirectiveContext) {
 			{
 				p.SetState(1039)
 				p.Match(PHPParserReal)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		default:
-			panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			goto errorExit
 		}
 
 	case PHPParserEncoding:
@@ -13833,14 +15274,26 @@ func (p *PHPParser) Directive() (localctx IDirectiveContext) {
 		{
 			p.SetState(1042)
 			p.Match(PHPParserEncoding)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1043)
 			p.Match(PHPParserEq)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1044)
 			p.Match(PHPParserSingleQuoteString)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserStrictTypes:
@@ -13848,10 +15301,18 @@ func (p *PHPParser) Directive() (localctx IDirectiveContext) {
 		{
 			p.SetState(1045)
 			p.Match(PHPParserStrictTypes)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1046)
 			p.Match(PHPParserEq)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1047)
@@ -13859,10 +15320,21 @@ func (p *PHPParser) Directive() (localctx IDirectiveContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFormalParameterListContext is an interface to support dynamic dispatch.
@@ -13872,20 +15344,31 @@ type IFormalParameterListContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllFormalParameter() []IFormalParameterContext
+	FormalParameter(i int) IFormalParameterContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsFormalParameterListContext differentiates from other interfaces.
 	IsFormalParameterListContext()
 }
 
 type FormalParameterListContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFormalParameterListContext() *FormalParameterListContext {
 	var p = new(FormalParameterListContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_formalParameterList
 	return p
+}
+
+func InitEmptyFormalParameterListContext(p *FormalParameterListContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_formalParameterList
 }
 
 func (*FormalParameterListContext) IsFormalParameterListContext() {}
@@ -13893,7 +15376,7 @@ func (*FormalParameterListContext) IsFormalParameterListContext() {}
 func NewFormalParameterListContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FormalParameterListContext {
 	var p = new(FormalParameterListContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_formalParameterList
@@ -13971,37 +15454,21 @@ func (s *FormalParameterListContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *PHPParser) FormalParameterList() (localctx IFormalParameterListContext) {
-	this := p
-	_ = this
-
 	localctx = NewFormalParameterListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 126, PHPParserRULE_formalParameterList)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(1051)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64((_la-44)) & ^0x3f) == 0 && ((int64(1)<<(_la-44))&-1697645953286145) != 0 || (int64((_la-108)) & ^0x3f) == 0 && ((int64(1)<<(_la-108))&288230376117889023) != 0 || (int64((_la-199)) & ^0x3f) == 0 && ((int64(1)<<(_la-199))&6442582035) != 0 {
+	if ((int64((_la-44)) & ^0x3f) == 0 && ((int64(1)<<(_la-44))&-1697645953286145) != 0) || ((int64((_la-108)) & ^0x3f) == 0 && ((int64(1)<<(_la-108))&288230376117889023) != 0) || ((int64((_la-199)) & ^0x3f) == 0 && ((int64(1)<<(_la-199))&6442582035) != 0) {
 		{
 			p.SetState(1050)
 			p.FormalParameter()
@@ -14010,13 +15477,22 @@ func (p *PHPParser) FormalParameterList() (localctx IFormalParameterListContext)
 	}
 	p.SetState(1057)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 103, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 103, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
 				p.SetState(1053)
 				p.Match(PHPParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(1054)
@@ -14026,21 +15502,44 @@ func (p *PHPParser) FormalParameterList() (localctx IFormalParameterListContext)
 		}
 		p.SetState(1059)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 103, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 103, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(1061)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserComma {
 		{
 			p.SetState(1060)
 			p.Match(PHPParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFormalParameterContext is an interface to support dynamic dispatch.
@@ -14050,20 +15549,35 @@ type IFormalParameterContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	VariableInitializer() IVariableInitializerContext
+	Attributes() IAttributesContext
+	AllMemberModifier() []IMemberModifierContext
+	MemberModifier(i int) IMemberModifierContext
+	QuestionMark() antlr.TerminalNode
+	TypeHint() ITypeHintContext
+	Ampersand() antlr.TerminalNode
+	Ellipsis() antlr.TerminalNode
+
 	// IsFormalParameterContext differentiates from other interfaces.
 	IsFormalParameterContext()
 }
 
 type FormalParameterContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFormalParameterContext() *FormalParameterContext {
 	var p = new(FormalParameterContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_formalParameter
 	return p
+}
+
+func InitEmptyFormalParameterContext(p *FormalParameterContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_formalParameter
 }
 
 func (*FormalParameterContext) IsFormalParameterContext() {}
@@ -14071,7 +15585,7 @@ func (*FormalParameterContext) IsFormalParameterContext() {}
 func NewFormalParameterContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FormalParameterContext {
 	var p = new(FormalParameterContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_formalParameter
@@ -14201,34 +15715,18 @@ func (s *FormalParameterContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) FormalParameter() (localctx IFormalParameterContext) {
-	this := p
-	_ = this
-
 	localctx = NewFormalParameterContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 128, PHPParserRULE_formalParameter)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(1064)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserAttributeStart {
@@ -14240,8 +15738,13 @@ func (p *PHPParser) FormalParameter() (localctx IFormalParameterContext) {
 	}
 	p.SetState(1069)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 106, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 106, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -14252,24 +15755,40 @@ func (p *PHPParser) FormalParameter() (localctx IFormalParameterContext) {
 		}
 		p.SetState(1071)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 106, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 106, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(1073)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserQuestionMark {
 		{
 			p.SetState(1072)
 			p.Match(PHPParserQuestionMark)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 	p.SetState(1076)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-848822976643073) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&144115188058944511) != 0 || _la == PHPParserNamespaceSeparator || _la == PHPParserLabel {
+	if ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-848822976643073) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&144115188058944511) != 0) || _la == PHPParserNamespaceSeparator || _la == PHPParserLabel {
 		{
 			p.SetState(1075)
 			p.TypeHint()
@@ -14278,23 +15797,37 @@ func (p *PHPParser) FormalParameter() (localctx IFormalParameterContext) {
 	}
 	p.SetState(1079)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserAmpersand {
 		{
 			p.SetState(1078)
 			p.Match(PHPParserAmpersand)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 	p.SetState(1082)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserEllipsis {
 		{
 			p.SetState(1081)
 			p.Match(PHPParserEllipsis)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
@@ -14303,7 +15836,17 @@ func (p *PHPParser) FormalParameter() (localctx IFormalParameterContext) {
 		p.VariableInitializer()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITypeHintContext is an interface to support dynamic dispatch.
@@ -14313,20 +15856,30 @@ type ITypeHintContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	TypeHintAtom() ITypeHintAtomContext
+	TypeHintIntersection() ITypeHintIntersectionContext
+	TypeHintUnion() ITypeHintUnionContext
+
 	// IsTypeHintContext differentiates from other interfaces.
 	IsTypeHintContext()
 }
 
 type TypeHintContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTypeHintContext() *TypeHintContext {
 	var p = new(TypeHintContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_typeHint
 	return p
+}
+
+func InitEmptyTypeHintContext(p *TypeHintContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_typeHint
 }
 
 func (*TypeHintContext) IsTypeHintContext() {}
@@ -14334,7 +15887,7 @@ func (*TypeHintContext) IsTypeHintContext() {}
 func NewTypeHintContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TypeHintContext {
 	var p = new(TypeHintContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_typeHint
@@ -14411,31 +15964,15 @@ func (s *TypeHintContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) TypeHint() (localctx ITypeHintContext) {
-	this := p
-	_ = this
-
 	localctx = NewTypeHintContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 130, PHPParserRULE_typeHint)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1089)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 111, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 111, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -14457,9 +15994,21 @@ func (p *PHPParser) TypeHint() (localctx ITypeHintContext) {
 			p.TypeHintUnion()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITypeHintAtomContext is an interface to support dynamic dispatch.
@@ -14469,20 +16018,30 @@ type ITypeHintAtomContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Callable() antlr.TerminalNode
+	PrimitiveType() IPrimitiveTypeContext
+	QualifiedStaticTypeRef() IQualifiedStaticTypeRefContext
+
 	// IsTypeHintAtomContext differentiates from other interfaces.
 	IsTypeHintAtomContext()
 }
 
 type TypeHintAtomContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTypeHintAtomContext() *TypeHintAtomContext {
 	var p = new(TypeHintAtomContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_typeHintAtom
 	return p
+}
+
+func InitEmptyTypeHintAtomContext(p *TypeHintAtomContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_typeHintAtom
 }
 
 func (*TypeHintAtomContext) IsTypeHintAtomContext() {}
@@ -14490,7 +16049,7 @@ func (*TypeHintAtomContext) IsTypeHintAtomContext() {}
 func NewTypeHintAtomContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TypeHintAtomContext {
 	var p = new(TypeHintAtomContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_typeHintAtom
@@ -14555,36 +16114,24 @@ func (s *TypeHintAtomContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *PHPParser) TypeHintAtom() (localctx ITypeHintAtomContext) {
-	this := p
-	_ = this
-
 	localctx = NewTypeHintAtomContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 132, PHPParserRULE_typeHintAtom)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1094)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 112, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 112, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(1091)
 			p.Match(PHPParserCallable)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 2:
@@ -14601,9 +16148,21 @@ func (p *PHPParser) TypeHintAtom() (localctx ITypeHintAtomContext) {
 			p.QualifiedStaticTypeRef()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITypeHintIntersectionContext is an interface to support dynamic dispatch.
@@ -14613,20 +16172,31 @@ type ITypeHintIntersectionContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllTypeHintAtom() []ITypeHintAtomContext
+	TypeHintAtom(i int) ITypeHintAtomContext
+	AllAmpersand() []antlr.TerminalNode
+	Ampersand(i int) antlr.TerminalNode
+
 	// IsTypeHintIntersectionContext differentiates from other interfaces.
 	IsTypeHintIntersectionContext()
 }
 
 type TypeHintIntersectionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTypeHintIntersectionContext() *TypeHintIntersectionContext {
 	var p = new(TypeHintIntersectionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_typeHintIntersection
 	return p
+}
+
+func InitEmptyTypeHintIntersectionContext(p *TypeHintIntersectionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_typeHintIntersection
 }
 
 func (*TypeHintIntersectionContext) IsTypeHintIntersectionContext() {}
@@ -14634,7 +16204,7 @@ func (*TypeHintIntersectionContext) IsTypeHintIntersectionContext() {}
 func NewTypeHintIntersectionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TypeHintIntersectionContext {
 	var p = new(TypeHintIntersectionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_typeHintIntersection
@@ -14712,28 +16282,8 @@ func (s *TypeHintIntersectionContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *PHPParser) TypeHintIntersection() (localctx ITypeHintIntersectionContext) {
-	this := p
-	_ = this
-
 	localctx = NewTypeHintIntersectionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 134, PHPParserRULE_typeHintIntersection)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -14743,6 +16293,9 @@ func (p *PHPParser) TypeHintIntersection() (localctx ITypeHintIntersectionContex
 	}
 	p.SetState(1099)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_alt = 1
 	for ok := true; ok; ok = _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		switch _alt {
@@ -14750,6 +16303,10 @@ func (p *PHPParser) TypeHintIntersection() (localctx ITypeHintIntersectionContex
 			{
 				p.SetState(1097)
 				p.Match(PHPParserAmpersand)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(1098)
@@ -14757,15 +16314,29 @@ func (p *PHPParser) TypeHintIntersection() (localctx ITypeHintIntersectionContex
 			}
 
 		default:
-			panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			goto errorExit
 		}
 
 		p.SetState(1101)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 113, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 113, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITypeHintUnionContext is an interface to support dynamic dispatch.
@@ -14775,20 +16346,31 @@ type ITypeHintUnionContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllTypeHintAtom() []ITypeHintAtomContext
+	TypeHintAtom(i int) ITypeHintAtomContext
+	AllPipe() []antlr.TerminalNode
+	Pipe(i int) antlr.TerminalNode
+
 	// IsTypeHintUnionContext differentiates from other interfaces.
 	IsTypeHintUnionContext()
 }
 
 type TypeHintUnionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTypeHintUnionContext() *TypeHintUnionContext {
 	var p = new(TypeHintUnionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_typeHintUnion
 	return p
+}
+
+func InitEmptyTypeHintUnionContext(p *TypeHintUnionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_typeHintUnion
 }
 
 func (*TypeHintUnionContext) IsTypeHintUnionContext() {}
@@ -14796,7 +16378,7 @@ func (*TypeHintUnionContext) IsTypeHintUnionContext() {}
 func NewTypeHintUnionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TypeHintUnionContext {
 	var p = new(TypeHintUnionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_typeHintUnion
@@ -14874,28 +16456,9 @@ func (s *TypeHintUnionContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) TypeHintUnion() (localctx ITypeHintUnionContext) {
-	this := p
-	_ = this
-
 	localctx = NewTypeHintUnionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 136, PHPParserRULE_typeHintUnion)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -14904,12 +16467,19 @@ func (p *PHPParser) TypeHintUnion() (localctx ITypeHintUnionContext) {
 	}
 	p.SetState(1106)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for ok := true; ok; ok = _la == PHPParserPipe {
 		{
 			p.SetState(1104)
 			p.Match(PHPParserPipe)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1105)
@@ -14918,10 +16488,23 @@ func (p *PHPParser) TypeHintUnion() (localctx ITypeHintUnionContext) {
 
 		p.SetState(1108)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IGlobalStatementContext is an interface to support dynamic dispatch.
@@ -14931,20 +16514,33 @@ type IGlobalStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Global() antlr.TerminalNode
+	AllChain() []IChainContext
+	Chain(i int) IChainContext
+	SemiColon() antlr.TerminalNode
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsGlobalStatementContext differentiates from other interfaces.
 	IsGlobalStatementContext()
 }
 
 type GlobalStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyGlobalStatementContext() *GlobalStatementContext {
 	var p = new(GlobalStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_globalStatement
 	return p
+}
+
+func InitEmptyGlobalStatementContext(p *GlobalStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_globalStatement
 }
 
 func (*GlobalStatementContext) IsGlobalStatementContext() {}
@@ -14952,7 +16548,7 @@ func (*GlobalStatementContext) IsGlobalStatementContext() {}
 func NewGlobalStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *GlobalStatementContext {
 	var p = new(GlobalStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_globalStatement
@@ -15038,33 +16634,18 @@ func (s *GlobalStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) GlobalStatement() (localctx IGlobalStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewGlobalStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 138, PHPParserRULE_globalStatement)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1110)
 		p.Match(PHPParserGlobal)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1111)
@@ -15072,12 +16653,19 @@ func (p *PHPParser) GlobalStatement() (localctx IGlobalStatementContext) {
 	}
 	p.SetState(1116)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == PHPParserComma {
 		{
 			p.SetState(1112)
 			p.Match(PHPParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1113)
@@ -15086,14 +16674,31 @@ func (p *PHPParser) GlobalStatement() (localctx IGlobalStatementContext) {
 
 		p.SetState(1118)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(1119)
 		p.Match(PHPParserSemiColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IEchoStatementContext is an interface to support dynamic dispatch.
@@ -15103,20 +16708,30 @@ type IEchoStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Echo() antlr.TerminalNode
+	ExpressionList() IExpressionListContext
+	SemiColon() antlr.TerminalNode
+
 	// IsEchoStatementContext differentiates from other interfaces.
 	IsEchoStatementContext()
 }
 
 type EchoStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyEchoStatementContext() *EchoStatementContext {
 	var p = new(EchoStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_echoStatement
 	return p
+}
+
+func InitEmptyEchoStatementContext(p *EchoStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_echoStatement
 }
 
 func (*EchoStatementContext) IsEchoStatementContext() {}
@@ -15124,7 +16739,7 @@ func (*EchoStatementContext) IsEchoStatementContext() {}
 func NewEchoStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *EchoStatementContext {
 	var p = new(EchoStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_echoStatement
@@ -15177,32 +16792,16 @@ func (s *EchoStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) EchoStatement() (localctx IEchoStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewEchoStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 140, PHPParserRULE_echoStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1121)
 		p.Match(PHPParserEcho)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1122)
@@ -15211,9 +16810,23 @@ func (p *PHPParser) EchoStatement() (localctx IEchoStatementContext) {
 	{
 		p.SetState(1123)
 		p.Match(PHPParserSemiColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IStaticVariableStatementContext is an interface to support dynamic dispatch.
@@ -15223,20 +16836,33 @@ type IStaticVariableStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Static() antlr.TerminalNode
+	AllVariableInitializer() []IVariableInitializerContext
+	VariableInitializer(i int) IVariableInitializerContext
+	SemiColon() antlr.TerminalNode
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsStaticVariableStatementContext differentiates from other interfaces.
 	IsStaticVariableStatementContext()
 }
 
 type StaticVariableStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyStaticVariableStatementContext() *StaticVariableStatementContext {
 	var p = new(StaticVariableStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_staticVariableStatement
 	return p
+}
+
+func InitEmptyStaticVariableStatementContext(p *StaticVariableStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_staticVariableStatement
 }
 
 func (*StaticVariableStatementContext) IsStaticVariableStatementContext() {}
@@ -15244,7 +16870,7 @@ func (*StaticVariableStatementContext) IsStaticVariableStatementContext() {}
 func NewStaticVariableStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *StaticVariableStatementContext {
 	var p = new(StaticVariableStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_staticVariableStatement
@@ -15330,33 +16956,18 @@ func (s *StaticVariableStatementContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 func (p *PHPParser) StaticVariableStatement() (localctx IStaticVariableStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewStaticVariableStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 142, PHPParserRULE_staticVariableStatement)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1125)
 		p.Match(PHPParserStatic)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1126)
@@ -15364,12 +16975,19 @@ func (p *PHPParser) StaticVariableStatement() (localctx IStaticVariableStatement
 	}
 	p.SetState(1131)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == PHPParserComma {
 		{
 			p.SetState(1127)
 			p.Match(PHPParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1128)
@@ -15378,14 +16996,31 @@ func (p *PHPParser) StaticVariableStatement() (localctx IStaticVariableStatement
 
 		p.SetState(1133)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(1134)
 		p.Match(PHPParserSemiColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IClassStatementContext is an interface to support dynamic dispatch.
@@ -15394,21 +17029,25 @@ type IClassStatementContext interface {
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
-
 	// IsClassStatementContext differentiates from other interfaces.
 	IsClassStatementContext()
 }
 
 type ClassStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyClassStatementContext() *ClassStatementContext {
 	var p = new(ClassStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_classStatement
 	return p
+}
+
+func InitEmptyClassStatementContext(p *ClassStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_classStatement
 }
 
 func (*ClassStatementContext) IsClassStatementContext() {}
@@ -15416,7 +17055,7 @@ func (*ClassStatementContext) IsClassStatementContext() {}
 func NewClassStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ClassStatementContext {
 	var p = new(ClassStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_classStatement
@@ -15426,8 +17065,8 @@ func NewClassStatementContext(parser antlr.Parser, parent antlr.ParserRuleContex
 
 func (s *ClassStatementContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *ClassStatementContext) CopyFrom(ctx *ClassStatementContext) {
-	s.BaseParserRuleContext.CopyFrom(ctx.BaseParserRuleContext)
+func (s *ClassStatementContext) CopyAll(ctx *ClassStatementContext) {
+	s.CopyFrom(&ctx.BaseParserRuleContext)
 }
 
 func (s *ClassStatementContext) GetRuleContext() antlr.RuleContext {
@@ -15439,15 +17078,15 @@ func (s *ClassStatementContext) ToStringTree(ruleNames []string, recog antlr.Rec
 }
 
 type FunctionContext struct {
-	*ClassStatementContext
+	ClassStatementContext
 }
 
 func NewFunctionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *FunctionContext {
 	var p = new(FunctionContext)
 
-	p.ClassStatementContext = NewEmptyClassStatementContext()
+	InitEmptyClassStatementContext(&p.ClassStatementContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ClassStatementContext))
+	p.CopyAll(ctx.(*ClassStatementContext))
 
 	return p
 }
@@ -15595,15 +17234,15 @@ func (s *FunctionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 type TraitUseContext struct {
-	*ClassStatementContext
+	ClassStatementContext
 }
 
 func NewTraitUseContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *TraitUseContext {
 	var p = new(TraitUseContext)
 
-	p.ClassStatementContext = NewEmptyClassStatementContext()
+	InitEmptyClassStatementContext(&p.ClassStatementContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ClassStatementContext))
+	p.CopyAll(ctx.(*ClassStatementContext))
 
 	return p
 }
@@ -15659,15 +17298,15 @@ func (s *TraitUseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 type ConstContext struct {
-	*ClassStatementContext
+	ClassStatementContext
 }
 
 func NewConstContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ConstContext {
 	var p = new(ConstContext)
 
-	p.ClassStatementContext = NewEmptyClassStatementContext()
+	InitEmptyClassStatementContext(&p.ClassStatementContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ClassStatementContext))
+	p.CopyAll(ctx.(*ClassStatementContext))
 
 	return p
 }
@@ -15792,15 +17431,15 @@ func (s *ConstContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 type PropertyModifiersVariableContext struct {
-	*ClassStatementContext
+	ClassStatementContext
 }
 
 func NewPropertyModifiersVariableContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *PropertyModifiersVariableContext {
 	var p = new(PropertyModifiersVariableContext)
 
-	p.ClassStatementContext = NewEmptyClassStatementContext()
+	InitEmptyClassStatementContext(&p.ClassStatementContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ClassStatementContext))
+	p.CopyAll(ctx.(*ClassStatementContext))
 
 	return p
 }
@@ -15925,38 +17564,27 @@ func (s *PropertyModifiersVariableContext) Accept(visitor antlr.ParseTreeVisitor
 }
 
 func (p *PHPParser) ClassStatement() (localctx IClassStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewClassStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 144, PHPParserRULE_classStatement)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1200)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 129, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 129, p.GetParserRuleContext()) {
 	case 1:
 		localctx = NewTraitUseContext(p, localctx)
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(1136)
 			p.Match(PHPParserUse)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1137)
@@ -15972,6 +17600,9 @@ func (p *PHPParser) ClassStatement() (localctx IClassStatementContext) {
 		p.EnterOuterAlt(localctx, 2)
 		p.SetState(1141)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserAttributeStart {
@@ -15987,20 +17618,30 @@ func (p *PHPParser) ClassStatement() (localctx IClassStatementContext) {
 		}
 		p.SetState(1145)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserQuestionMark {
 			{
 				p.SetState(1144)
 				p.Match(PHPParserQuestionMark)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		p.SetState(1148)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-848822976643073) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&144115188058944511) != 0 || _la == PHPParserNamespaceSeparator || _la == PHPParserLabel {
+		if ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-848822976643073) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&144115188058944511) != 0) || _la == PHPParserNamespaceSeparator || _la == PHPParserLabel {
 			{
 				p.SetState(1147)
 				p.TypeHint()
@@ -16013,12 +17654,19 @@ func (p *PHPParser) ClassStatement() (localctx IClassStatementContext) {
 		}
 		p.SetState(1155)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == PHPParserComma {
 			{
 				p.SetState(1151)
 				p.Match(PHPParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(1152)
@@ -16027,11 +17675,18 @@ func (p *PHPParser) ClassStatement() (localctx IClassStatementContext) {
 
 			p.SetState(1157)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
 			p.SetState(1158)
 			p.Match(PHPParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 3:
@@ -16039,6 +17694,9 @@ func (p *PHPParser) ClassStatement() (localctx IClassStatementContext) {
 		p.EnterOuterAlt(localctx, 3)
 		p.SetState(1161)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserAttributeStart {
@@ -16050,9 +17708,12 @@ func (p *PHPParser) ClassStatement() (localctx IClassStatementContext) {
 		}
 		p.SetState(1164)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == PHPParserAbstract || (int64((_la-82)) & ^0x3f) == 0 && ((int64(1)<<(_la-82))&2327872274433) != 0 {
+		if _la == PHPParserAbstract || ((int64((_la-82)) & ^0x3f) == 0 && ((int64(1)<<(_la-82))&2327872274433) != 0) {
 			{
 				p.SetState(1163)
 				p.MemberModifiers()
@@ -16062,16 +17723,22 @@ func (p *PHPParser) ClassStatement() (localctx IClassStatementContext) {
 		{
 			p.SetState(1166)
 			p.Match(PHPParserConst)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(1168)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 123, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 123, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(1167)
 				p.TypeHint()
 			}
 
+		} else if p.HasError() { // JIM
+			goto errorExit
 		}
 		{
 			p.SetState(1170)
@@ -16079,12 +17746,19 @@ func (p *PHPParser) ClassStatement() (localctx IClassStatementContext) {
 		}
 		p.SetState(1175)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == PHPParserComma {
 			{
 				p.SetState(1171)
 				p.Match(PHPParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(1172)
@@ -16093,11 +17767,18 @@ func (p *PHPParser) ClassStatement() (localctx IClassStatementContext) {
 
 			p.SetState(1177)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
 			p.SetState(1178)
 			p.Match(PHPParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 4:
@@ -16105,6 +17786,9 @@ func (p *PHPParser) ClassStatement() (localctx IClassStatementContext) {
 		p.EnterOuterAlt(localctx, 4)
 		p.SetState(1181)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserAttributeStart {
@@ -16116,9 +17800,12 @@ func (p *PHPParser) ClassStatement() (localctx IClassStatementContext) {
 		}
 		p.SetState(1184)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == PHPParserAbstract || (int64((_la-82)) & ^0x3f) == 0 && ((int64(1)<<(_la-82))&2327872274433) != 0 {
+		if _la == PHPParserAbstract || ((int64((_la-82)) & ^0x3f) == 0 && ((int64(1)<<(_la-82))&2327872274433) != 0) {
 			{
 				p.SetState(1183)
 				p.MemberModifiers()
@@ -16128,15 +17815,26 @@ func (p *PHPParser) ClassStatement() (localctx IClassStatementContext) {
 		{
 			p.SetState(1186)
 			p.Match(PHPParserFunction_)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(1188)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserAmpersand {
 			{
 				p.SetState(1187)
 				p.Match(PHPParserAmpersand)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
@@ -16147,6 +17845,10 @@ func (p *PHPParser) ClassStatement() (localctx IClassStatementContext) {
 		{
 			p.SetState(1191)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1192)
@@ -16155,31 +17857,51 @@ func (p *PHPParser) ClassStatement() (localctx IClassStatementContext) {
 		{
 			p.SetState(1193)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(1196)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 128, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 128, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(1194)
 				p.BaseCtorCall()
 			}
 
-		} else if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 128, p.GetParserRuleContext()) == 2 {
+		} else if p.HasError() { // JIM
+			goto errorExit
+		} else if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 128, p.GetParserRuleContext()) == 2 {
 			{
 				p.SetState(1195)
 				p.ReturnTypeDecl()
 			}
 
+		} else if p.HasError() { // JIM
+			goto errorExit
 		}
 		{
 			p.SetState(1198)
 			p.MethodBody()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITraitAdaptationsContext is an interface to support dynamic dispatch.
@@ -16189,20 +17911,32 @@ type ITraitAdaptationsContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	SemiColon() antlr.TerminalNode
+	OpenCurlyBracket() antlr.TerminalNode
+	CloseCurlyBracket() antlr.TerminalNode
+	AllTraitAdaptationStatement() []ITraitAdaptationStatementContext
+	TraitAdaptationStatement(i int) ITraitAdaptationStatementContext
+
 	// IsTraitAdaptationsContext differentiates from other interfaces.
 	IsTraitAdaptationsContext()
 }
 
 type TraitAdaptationsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTraitAdaptationsContext() *TraitAdaptationsContext {
 	var p = new(TraitAdaptationsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_traitAdaptations
 	return p
+}
+
+func InitEmptyTraitAdaptationsContext(p *TraitAdaptationsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_traitAdaptations
 }
 
 func (*TraitAdaptationsContext) IsTraitAdaptationsContext() {}
@@ -16210,7 +17944,7 @@ func (*TraitAdaptationsContext) IsTraitAdaptationsContext() {}
 func NewTraitAdaptationsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TraitAdaptationsContext {
 	var p = new(TraitAdaptationsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_traitAdaptations
@@ -16292,31 +18026,15 @@ func (s *TraitAdaptationsContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *PHPParser) TraitAdaptations() (localctx ITraitAdaptationsContext) {
-	this := p
-	_ = this
-
 	localctx = NewTraitAdaptationsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 146, PHPParserRULE_traitAdaptations)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1211)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserSemiColon:
@@ -16324,6 +18042,10 @@ func (p *PHPParser) TraitAdaptations() (localctx ITraitAdaptationsContext) {
 		{
 			p.SetState(1202)
 			p.Match(PHPParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserOpenCurlyBracket:
@@ -16331,12 +18053,19 @@ func (p *PHPParser) TraitAdaptations() (localctx ITraitAdaptationsContext) {
 		{
 			p.SetState(1203)
 			p.Match(PHPParserOpenCurlyBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(1207)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		for (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-848822976643073) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&144115188058944511) != 0 || _la == PHPParserNamespaceSeparator || _la == PHPParserLabel {
+		for ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-848822976643073) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&144115188058944511) != 0) || _la == PHPParserNamespaceSeparator || _la == PHPParserLabel {
 			{
 				p.SetState(1204)
 				p.TraitAdaptationStatement()
@@ -16344,18 +18073,36 @@ func (p *PHPParser) TraitAdaptations() (localctx ITraitAdaptationsContext) {
 
 			p.SetState(1209)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
 			p.SetState(1210)
 			p.Match(PHPParserCloseCurlyBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITraitAdaptationStatementContext is an interface to support dynamic dispatch.
@@ -16365,20 +18112,29 @@ type ITraitAdaptationStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	TraitPrecedence() ITraitPrecedenceContext
+	TraitAlias() ITraitAliasContext
+
 	// IsTraitAdaptationStatementContext differentiates from other interfaces.
 	IsTraitAdaptationStatementContext()
 }
 
 type TraitAdaptationStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTraitAdaptationStatementContext() *TraitAdaptationStatementContext {
 	var p = new(TraitAdaptationStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_traitAdaptationStatement
 	return p
+}
+
+func InitEmptyTraitAdaptationStatementContext(p *TraitAdaptationStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_traitAdaptationStatement
 }
 
 func (*TraitAdaptationStatementContext) IsTraitAdaptationStatementContext() {}
@@ -16386,7 +18142,7 @@ func (*TraitAdaptationStatementContext) IsTraitAdaptationStatementContext() {}
 func NewTraitAdaptationStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TraitAdaptationStatementContext {
 	var p = new(TraitAdaptationStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_traitAdaptationStatement
@@ -16447,31 +18203,15 @@ func (s *TraitAdaptationStatementContext) Accept(visitor antlr.ParseTreeVisitor)
 }
 
 func (p *PHPParser) TraitAdaptationStatement() (localctx ITraitAdaptationStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewTraitAdaptationStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 148, PHPParserRULE_traitAdaptationStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1215)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 132, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 132, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -16486,9 +18226,21 @@ func (p *PHPParser) TraitAdaptationStatement() (localctx ITraitAdaptationStateme
 			p.TraitAlias()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITraitPrecedenceContext is an interface to support dynamic dispatch.
@@ -16498,20 +18250,33 @@ type ITraitPrecedenceContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	QualifiedNamespaceName() IQualifiedNamespaceNameContext
+	DoubleColon() antlr.TerminalNode
+	Identifier() IIdentifierContext
+	InsteadOf() antlr.TerminalNode
+	QualifiedNamespaceNameList() IQualifiedNamespaceNameListContext
+	SemiColon() antlr.TerminalNode
+
 	// IsTraitPrecedenceContext differentiates from other interfaces.
 	IsTraitPrecedenceContext()
 }
 
 type TraitPrecedenceContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTraitPrecedenceContext() *TraitPrecedenceContext {
 	var p = new(TraitPrecedenceContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_traitPrecedence
 	return p
+}
+
+func InitEmptyTraitPrecedenceContext(p *TraitPrecedenceContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_traitPrecedence
 }
 
 func (*TraitPrecedenceContext) IsTraitPrecedenceContext() {}
@@ -16519,7 +18284,7 @@ func (*TraitPrecedenceContext) IsTraitPrecedenceContext() {}
 func NewTraitPrecedenceContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TraitPrecedenceContext {
 	var p = new(TraitPrecedenceContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_traitPrecedence
@@ -16608,28 +18373,8 @@ func (s *TraitPrecedenceContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) TraitPrecedence() (localctx ITraitPrecedenceContext) {
-	this := p
-	_ = this
-
 	localctx = NewTraitPrecedenceContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 150, PHPParserRULE_traitPrecedence)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1217)
@@ -16638,6 +18383,10 @@ func (p *PHPParser) TraitPrecedence() (localctx ITraitPrecedenceContext) {
 	{
 		p.SetState(1218)
 		p.Match(PHPParserDoubleColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1219)
@@ -16646,6 +18395,10 @@ func (p *PHPParser) TraitPrecedence() (localctx ITraitPrecedenceContext) {
 	{
 		p.SetState(1220)
 		p.Match(PHPParserInsteadOf)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1221)
@@ -16654,9 +18407,23 @@ func (p *PHPParser) TraitPrecedence() (localctx ITraitPrecedenceContext) {
 	{
 		p.SetState(1222)
 		p.Match(PHPParserSemiColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITraitAliasContext is an interface to support dynamic dispatch.
@@ -16666,20 +18433,32 @@ type ITraitAliasContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	TraitMethodReference() ITraitMethodReferenceContext
+	As() antlr.TerminalNode
+	SemiColon() antlr.TerminalNode
+	MemberModifier() IMemberModifierContext
+	Identifier() IIdentifierContext
+
 	// IsTraitAliasContext differentiates from other interfaces.
 	IsTraitAliasContext()
 }
 
 type TraitAliasContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTraitAliasContext() *TraitAliasContext {
 	var p = new(TraitAliasContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_traitAlias
 	return p
+}
+
+func InitEmptyTraitAliasContext(p *TraitAliasContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_traitAlias
 }
 
 func (*TraitAliasContext) IsTraitAliasContext() {}
@@ -16687,7 +18466,7 @@ func (*TraitAliasContext) IsTraitAliasContext() {}
 func NewTraitAliasContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TraitAliasContext {
 	var p = new(TraitAliasContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_traitAlias
@@ -16772,28 +18551,8 @@ func (s *TraitAliasContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) TraitAlias() (localctx ITraitAliasContext) {
-	this := p
-	_ = this
-
 	localctx = NewTraitAliasContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 152, PHPParserRULE_traitAlias)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1224)
@@ -16802,10 +18561,18 @@ func (p *PHPParser) TraitAlias() (localctx ITraitAliasContext) {
 	{
 		p.SetState(1225)
 		p.Match(PHPParserAs)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(1231)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 134, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 134, p.GetParserRuleContext()) {
 	case 1:
 		{
 			p.SetState(1226)
@@ -16816,25 +18583,43 @@ func (p *PHPParser) TraitAlias() (localctx ITraitAliasContext) {
 		p.SetState(1228)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 133, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 133, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(1227)
 				p.MemberModifier()
 			}
 
+		} else if p.HasError() { // JIM
+			goto errorExit
 		}
 		{
 			p.SetState(1230)
 			p.Identifier()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 	{
 		p.SetState(1233)
 		p.Match(PHPParserSemiColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITraitMethodReferenceContext is an interface to support dynamic dispatch.
@@ -16844,20 +18629,30 @@ type ITraitMethodReferenceContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Identifier() IIdentifierContext
+	QualifiedNamespaceName() IQualifiedNamespaceNameContext
+	DoubleColon() antlr.TerminalNode
+
 	// IsTraitMethodReferenceContext differentiates from other interfaces.
 	IsTraitMethodReferenceContext()
 }
 
 type TraitMethodReferenceContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTraitMethodReferenceContext() *TraitMethodReferenceContext {
 	var p = new(TraitMethodReferenceContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_traitMethodReference
 	return p
+}
+
+func InitEmptyTraitMethodReferenceContext(p *TraitMethodReferenceContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_traitMethodReference
 }
 
 func (*TraitMethodReferenceContext) IsTraitMethodReferenceContext() {}
@@ -16865,7 +18660,7 @@ func (*TraitMethodReferenceContext) IsTraitMethodReferenceContext() {}
 func NewTraitMethodReferenceContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TraitMethodReferenceContext {
 	var p = new(TraitMethodReferenceContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_traitMethodReference
@@ -16930,33 +18725,13 @@ func (s *TraitMethodReferenceContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *PHPParser) TraitMethodReference() (localctx ITraitMethodReferenceContext) {
-	this := p
-	_ = this
-
 	localctx = NewTraitMethodReferenceContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 154, PHPParserRULE_traitMethodReference)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(1238)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 135, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 135, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(1235)
 			p.QualifiedNamespaceName()
@@ -16964,15 +18739,31 @@ func (p *PHPParser) TraitMethodReference() (localctx ITraitMethodReferenceContex
 		{
 			p.SetState(1236)
 			p.Match(PHPParserDoubleColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 	{
 		p.SetState(1240)
 		p.Identifier()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IBaseCtorCallContext is an interface to support dynamic dispatch.
@@ -16982,20 +18773,30 @@ type IBaseCtorCallContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Colon() antlr.TerminalNode
+	Identifier() IIdentifierContext
+	Arguments() IArgumentsContext
+
 	// IsBaseCtorCallContext differentiates from other interfaces.
 	IsBaseCtorCallContext()
 }
 
 type BaseCtorCallContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyBaseCtorCallContext() *BaseCtorCallContext {
 	var p = new(BaseCtorCallContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_baseCtorCall
 	return p
+}
+
+func InitEmptyBaseCtorCallContext(p *BaseCtorCallContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_baseCtorCall
 }
 
 func (*BaseCtorCallContext) IsBaseCtorCallContext() {}
@@ -17003,7 +18804,7 @@ func (*BaseCtorCallContext) IsBaseCtorCallContext() {}
 func NewBaseCtorCallContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *BaseCtorCallContext {
 	var p = new(BaseCtorCallContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_baseCtorCall
@@ -17068,33 +18869,18 @@ func (s *BaseCtorCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *PHPParser) BaseCtorCall() (localctx IBaseCtorCallContext) {
-	this := p
-	_ = this
-
 	localctx = NewBaseCtorCallContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 156, PHPParserRULE_baseCtorCall)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1242)
 		p.Match(PHPParserColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1243)
@@ -17102,6 +18888,9 @@ func (p *PHPParser) BaseCtorCall() (localctx IBaseCtorCallContext) {
 	}
 	p.SetState(1245)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserOpenRoundBracket {
@@ -17112,7 +18901,17 @@ func (p *PHPParser) BaseCtorCall() (localctx IBaseCtorCallContext) {
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IReturnTypeDeclContext is an interface to support dynamic dispatch.
@@ -17122,20 +18921,30 @@ type IReturnTypeDeclContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Colon() antlr.TerminalNode
+	TypeHint() ITypeHintContext
+	QuestionMark() antlr.TerminalNode
+
 	// IsReturnTypeDeclContext differentiates from other interfaces.
 	IsReturnTypeDeclContext()
 }
 
 type ReturnTypeDeclContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyReturnTypeDeclContext() *ReturnTypeDeclContext {
 	var p = new(ReturnTypeDeclContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_returnTypeDecl
 	return p
+}
+
+func InitEmptyReturnTypeDeclContext(p *ReturnTypeDeclContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_returnTypeDecl
 }
 
 func (*ReturnTypeDeclContext) IsReturnTypeDeclContext() {}
@@ -17143,7 +18952,7 @@ func (*ReturnTypeDeclContext) IsReturnTypeDeclContext() {}
 func NewReturnTypeDeclContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ReturnTypeDeclContext {
 	var p = new(ReturnTypeDeclContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_returnTypeDecl
@@ -17196,42 +19005,34 @@ func (s *ReturnTypeDeclContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) ReturnTypeDecl() (localctx IReturnTypeDeclContext) {
-	this := p
-	_ = this
-
 	localctx = NewReturnTypeDeclContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 158, PHPParserRULE_returnTypeDecl)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1247)
 		p.Match(PHPParserColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(1249)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserQuestionMark {
 		{
 			p.SetState(1248)
 			p.Match(PHPParserQuestionMark)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
@@ -17240,7 +19041,17 @@ func (p *PHPParser) ReturnTypeDecl() (localctx IReturnTypeDeclContext) {
 		p.TypeHint()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IMethodBodyContext is an interface to support dynamic dispatch.
@@ -17250,20 +19061,29 @@ type IMethodBodyContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	SemiColon() antlr.TerminalNode
+	BlockStatement() IBlockStatementContext
+
 	// IsMethodBodyContext differentiates from other interfaces.
 	IsMethodBodyContext()
 }
 
 type MethodBodyContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyMethodBodyContext() *MethodBodyContext {
 	var p = new(MethodBodyContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_methodBody
 	return p
+}
+
+func InitEmptyMethodBodyContext(p *MethodBodyContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_methodBody
 }
 
 func (*MethodBodyContext) IsMethodBodyContext() {}
@@ -17271,7 +19091,7 @@ func (*MethodBodyContext) IsMethodBodyContext() {}
 func NewMethodBodyContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MethodBodyContext {
 	var p = new(MethodBodyContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_methodBody
@@ -17320,30 +19140,13 @@ func (s *MethodBodyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) MethodBody() (localctx IMethodBodyContext) {
-	this := p
-	_ = this
-
 	localctx = NewMethodBodyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 160, PHPParserRULE_methodBody)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1255)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserSemiColon:
@@ -17351,6 +19154,10 @@ func (p *PHPParser) MethodBody() (localctx IMethodBodyContext) {
 		{
 			p.SetState(1253)
 			p.Match(PHPParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserOpenCurlyBracket:
@@ -17361,10 +19168,21 @@ func (p *PHPParser) MethodBody() (localctx IMethodBodyContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IPropertyModifiersContext is an interface to support dynamic dispatch.
@@ -17374,20 +19192,29 @@ type IPropertyModifiersContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	MemberModifiers() IMemberModifiersContext
+	Var() antlr.TerminalNode
+
 	// IsPropertyModifiersContext differentiates from other interfaces.
 	IsPropertyModifiersContext()
 }
 
 type PropertyModifiersContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyPropertyModifiersContext() *PropertyModifiersContext {
 	var p = new(PropertyModifiersContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_propertyModifiers
 	return p
+}
+
+func InitEmptyPropertyModifiersContext(p *PropertyModifiersContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_propertyModifiers
 }
 
 func (*PropertyModifiersContext) IsPropertyModifiersContext() {}
@@ -17395,7 +19222,7 @@ func (*PropertyModifiersContext) IsPropertyModifiersContext() {}
 func NewPropertyModifiersContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *PropertyModifiersContext {
 	var p = new(PropertyModifiersContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_propertyModifiers
@@ -17444,30 +19271,13 @@ func (s *PropertyModifiersContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *PHPParser) PropertyModifiers() (localctx IPropertyModifiersContext) {
-	this := p
-	_ = this
-
 	localctx = NewPropertyModifiersContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 162, PHPParserRULE_propertyModifiers)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1259)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserAbstract, PHPParserFinal, PHPParserPrivate, PHPParserProtected, PHPParserPublic, PHPParserReadonly, PHPParserStatic:
@@ -17482,13 +19292,28 @@ func (p *PHPParser) PropertyModifiers() (localctx IPropertyModifiersContext) {
 		{
 			p.SetState(1258)
 			p.Match(PHPParserVar)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IMemberModifiersContext is an interface to support dynamic dispatch.
@@ -17498,20 +19323,29 @@ type IMemberModifiersContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllMemberModifier() []IMemberModifierContext
+	MemberModifier(i int) IMemberModifierContext
+
 	// IsMemberModifiersContext differentiates from other interfaces.
 	IsMemberModifiersContext()
 }
 
 type MemberModifiersContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyMemberModifiersContext() *MemberModifiersContext {
 	var p = new(MemberModifiersContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_memberModifiers
 	return p
+}
+
+func InitEmptyMemberModifiersContext(p *MemberModifiersContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_memberModifiers
 }
 
 func (*MemberModifiersContext) IsMemberModifiersContext() {}
@@ -17519,7 +19353,7 @@ func (*MemberModifiersContext) IsMemberModifiersContext() {}
 func NewMemberModifiersContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MemberModifiersContext {
 	var p = new(MemberModifiersContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_memberModifiers
@@ -17589,33 +19423,16 @@ func (s *MemberModifiersContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) MemberModifiers() (localctx IMemberModifiersContext) {
-	this := p
-	_ = this
-
 	localctx = NewMemberModifiersContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 164, PHPParserRULE_memberModifiers)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(1262)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_alt = 1
 	for ok := true; ok; ok = _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		switch _alt {
@@ -17626,15 +19443,29 @@ func (p *PHPParser) MemberModifiers() (localctx IMemberModifiersContext) {
 			}
 
 		default:
-			panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			goto errorExit
 		}
 
 		p.SetState(1264)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 140, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 140, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IVariableInitializerContext is an interface to support dynamic dispatch.
@@ -17644,20 +19475,30 @@ type IVariableInitializerContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	VarName() antlr.TerminalNode
+	Eq() antlr.TerminalNode
+	ConstantInitializer() IConstantInitializerContext
+
 	// IsVariableInitializerContext differentiates from other interfaces.
 	IsVariableInitializerContext()
 }
 
 type VariableInitializerContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyVariableInitializerContext() *VariableInitializerContext {
 	var p = new(VariableInitializerContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_variableInitializer
 	return p
+}
+
+func InitEmptyVariableInitializerContext(p *VariableInitializerContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_variableInitializer
 }
 
 func (*VariableInitializerContext) IsVariableInitializerContext() {}
@@ -17665,7 +19506,7 @@ func (*VariableInitializerContext) IsVariableInitializerContext() {}
 func NewVariableInitializerContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *VariableInitializerContext {
 	var p = new(VariableInitializerContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_variableInitializer
@@ -17718,42 +19559,34 @@ func (s *VariableInitializerContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *PHPParser) VariableInitializer() (localctx IVariableInitializerContext) {
-	this := p
-	_ = this
-
 	localctx = NewVariableInitializerContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 166, PHPParserRULE_variableInitializer)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1266)
 		p.Match(PHPParserVarName)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(1269)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserEq {
 		{
 			p.SetState(1267)
 			p.Match(PHPParserEq)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1268)
@@ -17762,7 +19595,17 @@ func (p *PHPParser) VariableInitializer() (localctx IVariableInitializerContext)
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIdentifierInitializerContext is an interface to support dynamic dispatch.
@@ -17772,20 +19615,30 @@ type IIdentifierInitializerContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Identifier() IIdentifierContext
+	Eq() antlr.TerminalNode
+	ConstantInitializer() IConstantInitializerContext
+
 	// IsIdentifierInitializerContext differentiates from other interfaces.
 	IsIdentifierInitializerContext()
 }
 
 type IdentifierInitializerContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyIdentifierInitializerContext() *IdentifierInitializerContext {
 	var p = new(IdentifierInitializerContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_identifierInitializer
 	return p
+}
+
+func InitEmptyIdentifierInitializerContext(p *IdentifierInitializerContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_identifierInitializer
 }
 
 func (*IdentifierInitializerContext) IsIdentifierInitializerContext() {}
@@ -17793,7 +19646,7 @@ func (*IdentifierInitializerContext) IsIdentifierInitializerContext() {}
 func NewIdentifierInitializerContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *IdentifierInitializerContext {
 	var p = new(IdentifierInitializerContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_identifierInitializer
@@ -17858,28 +19711,8 @@ func (s *IdentifierInitializerContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *PHPParser) IdentifierInitializer() (localctx IIdentifierInitializerContext) {
-	this := p
-	_ = this
-
 	localctx = NewIdentifierInitializerContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 168, PHPParserRULE_identifierInitializer)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1271)
@@ -17888,13 +19721,27 @@ func (p *PHPParser) IdentifierInitializer() (localctx IIdentifierInitializerCont
 	{
 		p.SetState(1272)
 		p.Match(PHPParserEq)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1273)
 		p.ConstantInitializer()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IGlobalConstantDeclarationContext is an interface to support dynamic dispatch.
@@ -17904,20 +19751,34 @@ type IGlobalConstantDeclarationContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Const() antlr.TerminalNode
+	AllIdentifierInitializer() []IIdentifierInitializerContext
+	IdentifierInitializer(i int) IIdentifierInitializerContext
+	SemiColon() antlr.TerminalNode
+	Attributes() IAttributesContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsGlobalConstantDeclarationContext differentiates from other interfaces.
 	IsGlobalConstantDeclarationContext()
 }
 
 type GlobalConstantDeclarationContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyGlobalConstantDeclarationContext() *GlobalConstantDeclarationContext {
 	var p = new(GlobalConstantDeclarationContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_globalConstantDeclaration
 	return p
+}
+
+func InitEmptyGlobalConstantDeclarationContext(p *GlobalConstantDeclarationContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_globalConstantDeclaration
 }
 
 func (*GlobalConstantDeclarationContext) IsGlobalConstantDeclarationContext() {}
@@ -17925,7 +19786,7 @@ func (*GlobalConstantDeclarationContext) IsGlobalConstantDeclarationContext() {}
 func NewGlobalConstantDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *GlobalConstantDeclarationContext {
 	var p = new(GlobalConstantDeclarationContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_globalConstantDeclaration
@@ -18027,32 +19888,16 @@ func (s *GlobalConstantDeclarationContext) Accept(visitor antlr.ParseTreeVisitor
 }
 
 func (p *PHPParser) GlobalConstantDeclaration() (localctx IGlobalConstantDeclarationContext) {
-	this := p
-	_ = this
-
 	localctx = NewGlobalConstantDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 170, PHPParserRULE_globalConstantDeclaration)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(1276)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserAttributeStart {
@@ -18065,6 +19910,10 @@ func (p *PHPParser) GlobalConstantDeclaration() (localctx IGlobalConstantDeclara
 	{
 		p.SetState(1278)
 		p.Match(PHPParserConst)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1279)
@@ -18072,12 +19921,19 @@ func (p *PHPParser) GlobalConstantDeclaration() (localctx IGlobalConstantDeclara
 	}
 	p.SetState(1284)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == PHPParserComma {
 		{
 			p.SetState(1280)
 			p.Match(PHPParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1281)
@@ -18086,14 +19942,31 @@ func (p *PHPParser) GlobalConstantDeclaration() (localctx IGlobalConstantDeclara
 
 		p.SetState(1286)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(1287)
 		p.Match(PHPParserSemiColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IEnumDeclarationContext is an interface to support dynamic dispatch.
@@ -18103,20 +19976,38 @@ type IEnumDeclarationContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Enum_() antlr.TerminalNode
+	Identifier() IIdentifierContext
+	OpenCurlyBracket() antlr.TerminalNode
+	CloseCurlyBracket() antlr.TerminalNode
+	Colon() antlr.TerminalNode
+	Implements() antlr.TerminalNode
+	InterfaceList() IInterfaceListContext
+	AllEnumItem() []IEnumItemContext
+	EnumItem(i int) IEnumItemContext
+	IntType() antlr.TerminalNode
+	StringType() antlr.TerminalNode
+
 	// IsEnumDeclarationContext differentiates from other interfaces.
 	IsEnumDeclarationContext()
 }
 
 type EnumDeclarationContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyEnumDeclarationContext() *EnumDeclarationContext {
 	var p = new(EnumDeclarationContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_enumDeclaration
 	return p
+}
+
+func InitEmptyEnumDeclarationContext(p *EnumDeclarationContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_enumDeclaration
 }
 
 func (*EnumDeclarationContext) IsEnumDeclarationContext() {}
@@ -18124,7 +20015,7 @@ func (*EnumDeclarationContext) IsEnumDeclarationContext() {}
 func NewEnumDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *EnumDeclarationContext {
 	var p = new(EnumDeclarationContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_enumDeclaration
@@ -18254,33 +20145,18 @@ func (s *EnumDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) EnumDeclaration() (localctx IEnumDeclarationContext) {
-	this := p
-	_ = this
-
 	localctx = NewEnumDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 172, PHPParserRULE_enumDeclaration)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1289)
 		p.Match(PHPParserEnum_)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1290)
@@ -18288,12 +20164,19 @@ func (p *PHPParser) EnumDeclaration() (localctx IEnumDeclarationContext) {
 	}
 	p.SetState(1293)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserColon {
 		{
 			p.SetState(1291)
 			p.Match(PHPParserColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1292)
@@ -18310,12 +20193,19 @@ func (p *PHPParser) EnumDeclaration() (localctx IEnumDeclarationContext) {
 	}
 	p.SetState(1297)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserImplements {
 		{
 			p.SetState(1295)
 			p.Match(PHPParserImplements)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1296)
@@ -18326,12 +20216,19 @@ func (p *PHPParser) EnumDeclaration() (localctx IEnumDeclarationContext) {
 	{
 		p.SetState(1299)
 		p.Match(PHPParserOpenCurlyBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(1303)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&153175163888730112) != 0 || (int64((_la-82)) & ^0x3f) == 0 && ((int64(1)<<(_la-82))&2254127685959713) != 0 {
+	for ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&153175163888730112) != 0) || ((int64((_la-82)) & ^0x3f) == 0 && ((int64(1)<<(_la-82))&2254127685959713) != 0) {
 		{
 			p.SetState(1300)
 			p.EnumItem()
@@ -18339,14 +20236,31 @@ func (p *PHPParser) EnumDeclaration() (localctx IEnumDeclarationContext) {
 
 		p.SetState(1305)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(1306)
 		p.Match(PHPParserCloseCurlyBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IEnumItemContext is an interface to support dynamic dispatch.
@@ -18356,20 +20270,44 @@ type IEnumItemContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Case() antlr.TerminalNode
+	Identifier() IIdentifierContext
+	SemiColon() antlr.TerminalNode
+	Eq() antlr.TerminalNode
+	Expression() IExpressionContext
+	Const() antlr.TerminalNode
+	AllIdentifierInitializer() []IIdentifierInitializerContext
+	IdentifierInitializer(i int) IIdentifierInitializerContext
+	Attributes() IAttributesContext
+	MemberModifiers() IMemberModifiersContext
+	TypeHint() ITypeHintContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+	FunctionDeclaration() IFunctionDeclarationContext
+	Use() antlr.TerminalNode
+	QualifiedNamespaceNameList() IQualifiedNamespaceNameListContext
+	TraitAdaptations() ITraitAdaptationsContext
+
 	// IsEnumItemContext differentiates from other interfaces.
 	IsEnumItemContext()
 }
 
 type EnumItemContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyEnumItemContext() *EnumItemContext {
 	var p = new(EnumItemContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_enumItem
 	return p
+}
+
+func InitEmptyEnumItemContext(p *EnumItemContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_enumItem
 }
 
 func (*EnumItemContext) IsEnumItemContext() {}
@@ -18377,7 +20315,7 @@ func (*EnumItemContext) IsEnumItemContext() {}
 func NewEnumItemContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *EnumItemContext {
 	var p = new(EnumItemContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_enumItem
@@ -18603,37 +20541,26 @@ func (s *EnumItemContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) EnumItem() (localctx IEnumItemContext) {
-	this := p
-	_ = this
-
 	localctx = NewEnumItemContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 174, PHPParserRULE_enumItem)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1344)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 153, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 153, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(1308)
 			p.Match(PHPParserCase)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1309)
@@ -18641,12 +20568,19 @@ func (p *PHPParser) EnumItem() (localctx IEnumItemContext) {
 		}
 		p.SetState(1312)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserEq {
 			{
 				p.SetState(1310)
 				p.Match(PHPParserEq)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(1311)
@@ -18657,12 +20591,19 @@ func (p *PHPParser) EnumItem() (localctx IEnumItemContext) {
 		{
 			p.SetState(1314)
 			p.Match(PHPParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 2:
 		p.EnterOuterAlt(localctx, 2)
 		p.SetState(1317)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserAttributeStart {
@@ -18674,9 +20615,12 @@ func (p *PHPParser) EnumItem() (localctx IEnumItemContext) {
 		}
 		p.SetState(1320)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == PHPParserAbstract || (int64((_la-82)) & ^0x3f) == 0 && ((int64(1)<<(_la-82))&2327872274433) != 0 {
+		if _la == PHPParserAbstract || ((int64((_la-82)) & ^0x3f) == 0 && ((int64(1)<<(_la-82))&2327872274433) != 0) {
 			{
 				p.SetState(1319)
 				p.MemberModifiers()
@@ -18686,16 +20630,22 @@ func (p *PHPParser) EnumItem() (localctx IEnumItemContext) {
 		{
 			p.SetState(1322)
 			p.Match(PHPParserConst)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(1324)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 150, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 150, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(1323)
 				p.TypeHint()
 			}
 
+		} else if p.HasError() { // JIM
+			goto errorExit
 		}
 		{
 			p.SetState(1326)
@@ -18703,12 +20653,19 @@ func (p *PHPParser) EnumItem() (localctx IEnumItemContext) {
 		}
 		p.SetState(1331)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == PHPParserComma {
 			{
 				p.SetState(1327)
 				p.Match(PHPParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(1328)
@@ -18717,20 +20674,30 @@ func (p *PHPParser) EnumItem() (localctx IEnumItemContext) {
 
 			p.SetState(1333)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
 			p.SetState(1334)
 			p.Match(PHPParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 3:
 		p.EnterOuterAlt(localctx, 3)
 		p.SetState(1337)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == PHPParserAbstract || (int64((_la-82)) & ^0x3f) == 0 && ((int64(1)<<(_la-82))&2327872274433) != 0 {
+		if _la == PHPParserAbstract || ((int64((_la-82)) & ^0x3f) == 0 && ((int64(1)<<(_la-82))&2327872274433) != 0) {
 			{
 				p.SetState(1336)
 				p.MemberModifiers()
@@ -18747,6 +20714,10 @@ func (p *PHPParser) EnumItem() (localctx IEnumItemContext) {
 		{
 			p.SetState(1340)
 			p.Match(PHPParserUse)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1341)
@@ -18757,9 +20728,21 @@ func (p *PHPParser) EnumItem() (localctx IEnumItemContext) {
 			p.TraitAdaptations()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IExpressionListContext is an interface to support dynamic dispatch.
@@ -18769,20 +20752,31 @@ type IExpressionListContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllExpression() []IExpressionContext
+	Expression(i int) IExpressionContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsExpressionListContext differentiates from other interfaces.
 	IsExpressionListContext()
 }
 
 type ExpressionListContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyExpressionListContext() *ExpressionListContext {
 	var p = new(ExpressionListContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_expressionList
 	return p
+}
+
+func InitEmptyExpressionListContext(p *ExpressionListContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_expressionList
 }
 
 func (*ExpressionListContext) IsExpressionListContext() {}
@@ -18790,7 +20784,7 @@ func (*ExpressionListContext) IsExpressionListContext() {}
 func NewExpressionListContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ExpressionListContext {
 	var p = new(ExpressionListContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_expressionList
@@ -18868,28 +20862,9 @@ func (s *ExpressionListContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) ExpressionList() (localctx IExpressionListContext) {
-	this := p
-	_ = this
-
 	localctx = NewExpressionListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 176, PHPParserRULE_expressionList)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -18898,12 +20873,19 @@ func (p *PHPParser) ExpressionList() (localctx IExpressionListContext) {
 	}
 	p.SetState(1351)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == PHPParserComma {
 		{
 			p.SetState(1347)
 			p.Match(PHPParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1348)
@@ -18912,10 +20894,23 @@ func (p *PHPParser) ExpressionList() (localctx IExpressionListContext) {
 
 		p.SetState(1353)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IParenthesesContext is an interface to support dynamic dispatch.
@@ -18925,20 +20920,30 @@ type IParenthesesContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	OpenRoundBracket() antlr.TerminalNode
+	Expression() IExpressionContext
+	CloseRoundBracket() antlr.TerminalNode
+
 	// IsParenthesesContext differentiates from other interfaces.
 	IsParenthesesContext()
 }
 
 type ParenthesesContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyParenthesesContext() *ParenthesesContext {
 	var p = new(ParenthesesContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_parentheses
 	return p
+}
+
+func InitEmptyParenthesesContext(p *ParenthesesContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_parentheses
 }
 
 func (*ParenthesesContext) IsParenthesesContext() {}
@@ -18946,7 +20951,7 @@ func (*ParenthesesContext) IsParenthesesContext() {}
 func NewParenthesesContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ParenthesesContext {
 	var p = new(ParenthesesContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_parentheses
@@ -18999,32 +21004,16 @@ func (s *ParenthesesContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PHPParser) Parentheses() (localctx IParenthesesContext) {
-	this := p
-	_ = this
-
 	localctx = NewParenthesesContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 178, PHPParserRULE_parentheses)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1354)
 		p.Match(PHPParserOpenRoundBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1355)
@@ -19033,9 +21022,23 @@ func (p *PHPParser) Parentheses() (localctx IParenthesesContext) {
 	{
 		p.SetState(1356)
 		p.Match(PHPParserCloseRoundBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFullyQualifiedNamespaceExprContext is an interface to support dynamic dispatch.
@@ -19045,20 +21048,31 @@ type IFullyQualifiedNamespaceExprContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllIdentifier() []IIdentifierContext
+	Identifier(i int) IIdentifierContext
+	AllNamespaceSeparator() []antlr.TerminalNode
+	NamespaceSeparator(i int) antlr.TerminalNode
+
 	// IsFullyQualifiedNamespaceExprContext differentiates from other interfaces.
 	IsFullyQualifiedNamespaceExprContext()
 }
 
 type FullyQualifiedNamespaceExprContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFullyQualifiedNamespaceExprContext() *FullyQualifiedNamespaceExprContext {
 	var p = new(FullyQualifiedNamespaceExprContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_fullyQualifiedNamespaceExpr
 	return p
+}
+
+func InitEmptyFullyQualifiedNamespaceExprContext(p *FullyQualifiedNamespaceExprContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_fullyQualifiedNamespaceExpr
 }
 
 func (*FullyQualifiedNamespaceExprContext) IsFullyQualifiedNamespaceExprContext() {}
@@ -19066,7 +21080,7 @@ func (*FullyQualifiedNamespaceExprContext) IsFullyQualifiedNamespaceExprContext(
 func NewFullyQualifiedNamespaceExprContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FullyQualifiedNamespaceExprContext {
 	var p = new(FullyQualifiedNamespaceExprContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_fullyQualifiedNamespaceExpr
@@ -19144,40 +21158,28 @@ func (s *FullyQualifiedNamespaceExprContext) Accept(visitor antlr.ParseTreeVisit
 }
 
 func (p *PHPParser) FullyQualifiedNamespaceExpr() (localctx IFullyQualifiedNamespaceExprContext) {
-	this := p
-	_ = this
-
 	localctx = NewFullyQualifiedNamespaceExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 180, PHPParserRULE_fullyQualifiedNamespaceExpr)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(1359)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserNamespaceSeparator {
 		{
 			p.SetState(1358)
 			p.Match(PHPParserNamespaceSeparator)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
@@ -19188,11 +21190,20 @@ func (p *PHPParser) FullyQualifiedNamespaceExpr() (localctx IFullyQualifiedNames
 	{
 		p.SetState(1362)
 		p.Match(PHPParserNamespaceSeparator)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(1368)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 156, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 156, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -19202,19 +21213,39 @@ func (p *PHPParser) FullyQualifiedNamespaceExpr() (localctx IFullyQualifiedNames
 			{
 				p.SetState(1364)
 				p.Match(PHPParserNamespaceSeparator)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		p.SetState(1370)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 156, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 156, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1371)
 		p.Identifier()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IStaticClassExprContext is an interface to support dynamic dispatch.
@@ -19224,20 +21255,29 @@ type IStaticClassExprContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	StaticClassExprFunctionMember() IStaticClassExprFunctionMemberContext
+	StaticClassExprVariableMember() IStaticClassExprVariableMemberContext
+
 	// IsStaticClassExprContext differentiates from other interfaces.
 	IsStaticClassExprContext()
 }
 
 type StaticClassExprContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyStaticClassExprContext() *StaticClassExprContext {
 	var p = new(StaticClassExprContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_staticClassExpr
 	return p
+}
+
+func InitEmptyStaticClassExprContext(p *StaticClassExprContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_staticClassExpr
 }
 
 func (*StaticClassExprContext) IsStaticClassExprContext() {}
@@ -19245,7 +21285,7 @@ func (*StaticClassExprContext) IsStaticClassExprContext() {}
 func NewStaticClassExprContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *StaticClassExprContext {
 	var p = new(StaticClassExprContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_staticClassExpr
@@ -19306,31 +21346,15 @@ func (s *StaticClassExprContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) StaticClassExpr() (localctx IStaticClassExprContext) {
-	this := p
-	_ = this
-
 	localctx = NewStaticClassExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 182, PHPParserRULE_staticClassExpr)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1375)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 157, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 157, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -19345,9 +21369,21 @@ func (p *PHPParser) StaticClassExpr() (localctx IStaticClassExprContext) {
 			p.StaticClassExprVariableMember()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IStaticClassExprFunctionMemberContext is an interface to support dynamic dispatch.
@@ -19357,20 +21393,30 @@ type IStaticClassExprFunctionMemberContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	StaticClass() IStaticClassContext
+	DoubleColon() antlr.TerminalNode
+	MemberCallKey() IMemberCallKeyContext
+
 	// IsStaticClassExprFunctionMemberContext differentiates from other interfaces.
 	IsStaticClassExprFunctionMemberContext()
 }
 
 type StaticClassExprFunctionMemberContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyStaticClassExprFunctionMemberContext() *StaticClassExprFunctionMemberContext {
 	var p = new(StaticClassExprFunctionMemberContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_staticClassExprFunctionMember
 	return p
+}
+
+func InitEmptyStaticClassExprFunctionMemberContext(p *StaticClassExprFunctionMemberContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_staticClassExprFunctionMember
 }
 
 func (*StaticClassExprFunctionMemberContext) IsStaticClassExprFunctionMemberContext() {}
@@ -19378,7 +21424,7 @@ func (*StaticClassExprFunctionMemberContext) IsStaticClassExprFunctionMemberCont
 func NewStaticClassExprFunctionMemberContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *StaticClassExprFunctionMemberContext {
 	var p = new(StaticClassExprFunctionMemberContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_staticClassExprFunctionMember
@@ -19443,28 +21489,8 @@ func (s *StaticClassExprFunctionMemberContext) Accept(visitor antlr.ParseTreeVis
 }
 
 func (p *PHPParser) StaticClassExprFunctionMember() (localctx IStaticClassExprFunctionMemberContext) {
-	this := p
-	_ = this
-
 	localctx = NewStaticClassExprFunctionMemberContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 184, PHPParserRULE_staticClassExprFunctionMember)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1377)
@@ -19473,13 +21499,27 @@ func (p *PHPParser) StaticClassExprFunctionMember() (localctx IStaticClassExprFu
 	{
 		p.SetState(1378)
 		p.Match(PHPParserDoubleColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1379)
 		p.MemberCallKey()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IStaticClassExprVariableMemberContext is an interface to support dynamic dispatch.
@@ -19489,20 +21529,30 @@ type IStaticClassExprVariableMemberContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	StaticClass() IStaticClassContext
+	DoubleColon() antlr.TerminalNode
+	Variable() IVariableContext
+
 	// IsStaticClassExprVariableMemberContext differentiates from other interfaces.
 	IsStaticClassExprVariableMemberContext()
 }
 
 type StaticClassExprVariableMemberContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyStaticClassExprVariableMemberContext() *StaticClassExprVariableMemberContext {
 	var p = new(StaticClassExprVariableMemberContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_staticClassExprVariableMember
 	return p
+}
+
+func InitEmptyStaticClassExprVariableMemberContext(p *StaticClassExprVariableMemberContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_staticClassExprVariableMember
 }
 
 func (*StaticClassExprVariableMemberContext) IsStaticClassExprVariableMemberContext() {}
@@ -19510,7 +21560,7 @@ func (*StaticClassExprVariableMemberContext) IsStaticClassExprVariableMemberCont
 func NewStaticClassExprVariableMemberContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *StaticClassExprVariableMemberContext {
 	var p = new(StaticClassExprVariableMemberContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_staticClassExprVariableMember
@@ -19575,28 +21625,8 @@ func (s *StaticClassExprVariableMemberContext) Accept(visitor antlr.ParseTreeVis
 }
 
 func (p *PHPParser) StaticClassExprVariableMember() (localctx IStaticClassExprVariableMemberContext) {
-	this := p
-	_ = this
-
 	localctx = NewStaticClassExprVariableMemberContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 186, PHPParserRULE_staticClassExprVariableMember)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1381)
@@ -19605,13 +21635,27 @@ func (p *PHPParser) StaticClassExprVariableMember() (localctx IStaticClassExprVa
 	{
 		p.SetState(1382)
 		p.Match(PHPParserDoubleColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1383)
 		p.Variable()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IStaticClassContext is an interface to support dynamic dispatch.
@@ -19621,20 +21665,31 @@ type IStaticClassContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	FullyQualifiedNamespaceExpr() IFullyQualifiedNamespaceExprContext
+	Identifier() IIdentifierContext
+	String_() IStringContext
+	FlexiVariable() IFlexiVariableContext
+
 	// IsStaticClassContext differentiates from other interfaces.
 	IsStaticClassContext()
 }
 
 type StaticClassContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyStaticClassContext() *StaticClassContext {
 	var p = new(StaticClassContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_staticClass
 	return p
+}
+
+func InitEmptyStaticClassContext(p *StaticClassContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_staticClass
 }
 
 func (*StaticClassContext) IsStaticClassContext() {}
@@ -19642,7 +21697,7 @@ func (*StaticClassContext) IsStaticClassContext() {}
 func NewStaticClassContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *StaticClassContext {
 	var p = new(StaticClassContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_staticClass
@@ -19735,31 +21790,15 @@ func (s *StaticClassContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PHPParser) StaticClass() (localctx IStaticClassContext) {
-	this := p
-	_ = this
-
 	localctx = NewStaticClassContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 188, PHPParserRULE_staticClass)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1389)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 158, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 158, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -19788,9 +21827,21 @@ func (p *PHPParser) StaticClass() (localctx IStaticClassContext) {
 			p.flexiVariable(0)
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IMemberCallKeyContext is an interface to support dynamic dispatch.
@@ -19800,20 +21851,35 @@ type IMemberCallKeyContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Identifier() IIdentifierContext
+	Require() antlr.TerminalNode
+	RequireOnce() antlr.TerminalNode
+	String_() IStringContext
+	Variable() IVariableContext
+	OpenCurlyBracket() antlr.TerminalNode
+	Expression() IExpressionContext
+	CloseCurlyBracket() antlr.TerminalNode
+
 	// IsMemberCallKeyContext differentiates from other interfaces.
 	IsMemberCallKeyContext()
 }
 
 type MemberCallKeyContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyMemberCallKeyContext() *MemberCallKeyContext {
 	var p = new(MemberCallKeyContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_memberCallKey
 	return p
+}
+
+func InitEmptyMemberCallKeyContext(p *MemberCallKeyContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_memberCallKey
 }
 
 func (*MemberCallKeyContext) IsMemberCallKeyContext() {}
@@ -19821,7 +21887,7 @@ func (*MemberCallKeyContext) IsMemberCallKeyContext() {}
 func NewMemberCallKeyContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MemberCallKeyContext {
 	var p = new(MemberCallKeyContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_memberCallKey
@@ -19930,30 +21996,13 @@ func (s *MemberCallKeyContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) MemberCallKey() (localctx IMemberCallKeyContext) {
-	this := p
-	_ = this
-
 	localctx = NewMemberCallKeyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 190, PHPParserRULE_memberCallKey)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1400)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserAbstract, PHPParserArray, PHPParserAs, PHPParserBinaryCast, PHPParserBoolType, PHPParserBooleanConstant, PHPParserBreak, PHPParserCallable, PHPParserCase, PHPParserCatch, PHPParserClass, PHPParserClone, PHPParserConst, PHPParserContinue, PHPParserDefine, PHPParserDefined, PHPParserDeclare, PHPParserDefault, PHPParserDo, PHPParserDoubleCast, PHPParserDoubleType, PHPParserEcho, PHPParserElse, PHPParserElseIf, PHPParserEmpty, PHPParserEnum_, PHPParserEndDeclare, PHPParserEndFor, PHPParserEndForeach, PHPParserEndIf, PHPParserEndSwitch, PHPParserEndWhile, PHPParserEval, PHPParserAssert, PHPParserDie, PHPParserExit, PHPParserExtends, PHPParserFinal, PHPParserFinally, PHPParserFloatCast, PHPParserFor, PHPParserForeach, PHPParserGlobal, PHPParserGoto, PHPParserIf, PHPParserImplements, PHPParserImport, PHPParserInstanceOf, PHPParserInsteadOf, PHPParserInt8Cast, PHPParserInt16Cast, PHPParserInt64Type, PHPParserIntType, PHPParserInterface, PHPParserIsSet, PHPParserList, PHPParserLogicalAnd, PHPParserLogicalOr, PHPParserLogicalXor, PHPParserMatch_, PHPParserNamespace, PHPParserNew, PHPParserNull, PHPParserObjectType, PHPParserParent_, PHPParserPartial, PHPParserPrint, PHPParserPrivate, PHPParserProtected, PHPParserPublic, PHPParserReadonly, PHPParserResource, PHPParserReturn, PHPParserStatic, PHPParserStringType, PHPParserSwitch, PHPParserTrait, PHPParserTry, PHPParserTypeof, PHPParserUintCast, PHPParserUnicodeCast, PHPParserUnset, PHPParserVar, PHPParserWhile, PHPParserYield, PHPParserFrom, PHPParserLambdaFn, PHPParserTicks, PHPParserEncoding, PHPParserStrictTypes, PHPParserGet, PHPParserSet, PHPParserCall, PHPParserCallStatic, PHPParserConstructor, PHPParserDestruct, PHPParserWakeup, PHPParserSleep, PHPParserAutoload, PHPParserIsSet__, PHPParserUnset__, PHPParserToString__, PHPParserInvoke, PHPParserSetState, PHPParserClone__, PHPParserDebugInfo, PHPParserNamespace__, PHPParserClass__, PHPParserTraic__, PHPParserFunction__, PHPParserMethod__, PHPParserLine__, PHPParserFile__, PHPParserDir__, PHPParserLabel:
@@ -19968,6 +22017,10 @@ func (p *PHPParser) MemberCallKey() (localctx IMemberCallKeyContext) {
 		{
 			p.SetState(1392)
 			p.Match(PHPParserRequire)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserRequireOnce:
@@ -19975,6 +22028,10 @@ func (p *PHPParser) MemberCallKey() (localctx IMemberCallKeyContext) {
 		{
 			p.SetState(1393)
 			p.Match(PHPParserRequireOnce)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserStartNowDoc, PHPParserSingleQuoteString, PHPParserDoubleQuote:
@@ -19996,6 +22053,10 @@ func (p *PHPParser) MemberCallKey() (localctx IMemberCallKeyContext) {
 		{
 			p.SetState(1396)
 			p.Match(PHPParserOpenCurlyBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1397)
@@ -20004,13 +22065,28 @@ func (p *PHPParser) MemberCallKey() (localctx IMemberCallKeyContext) {
 		{
 			p.SetState(1398)
 			p.Match(PHPParserCloseCurlyBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIndexMemberCallKeyContext is an interface to support dynamic dispatch.
@@ -20020,20 +22096,30 @@ type IIndexMemberCallKeyContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	MemberCallKey() IMemberCallKeyContext
+	NumericConstant() INumericConstantContext
+	Expression() IExpressionContext
+
 	// IsIndexMemberCallKeyContext differentiates from other interfaces.
 	IsIndexMemberCallKeyContext()
 }
 
 type IndexMemberCallKeyContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyIndexMemberCallKeyContext() *IndexMemberCallKeyContext {
 	var p = new(IndexMemberCallKeyContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_indexMemberCallKey
 	return p
+}
+
+func InitEmptyIndexMemberCallKeyContext(p *IndexMemberCallKeyContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_indexMemberCallKey
 }
 
 func (*IndexMemberCallKeyContext) IsIndexMemberCallKeyContext() {}
@@ -20041,7 +22127,7 @@ func (*IndexMemberCallKeyContext) IsIndexMemberCallKeyContext() {}
 func NewIndexMemberCallKeyContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *IndexMemberCallKeyContext {
 	var p = new(IndexMemberCallKeyContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_indexMemberCallKey
@@ -20118,31 +22204,15 @@ func (s *IndexMemberCallKeyContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *PHPParser) IndexMemberCallKey() (localctx IIndexMemberCallKeyContext) {
-	this := p
-	_ = this
-
 	localctx = NewIndexMemberCallKeyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 192, PHPParserRULE_indexMemberCallKey)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1405)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 160, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 160, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -20164,9 +22234,21 @@ func (p *PHPParser) IndexMemberCallKey() (localctx IIndexMemberCallKeyContext) {
 			p.expression(0)
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDynamicStaticClassExprContext is an interface to support dynamic dispatch.
@@ -20176,20 +22258,31 @@ type IDynamicStaticClassExprContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	DynamicStaticReceiver() IDynamicStaticReceiverContext
+	DoubleColon() antlr.TerminalNode
+	MemberCallKey() IMemberCallKeyContext
+	Variable() IVariableContext
+
 	// IsDynamicStaticClassExprContext differentiates from other interfaces.
 	IsDynamicStaticClassExprContext()
 }
 
 type DynamicStaticClassExprContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyDynamicStaticClassExprContext() *DynamicStaticClassExprContext {
 	var p = new(DynamicStaticClassExprContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_dynamicStaticClassExpr
 	return p
+}
+
+func InitEmptyDynamicStaticClassExprContext(p *DynamicStaticClassExprContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_dynamicStaticClassExpr
 }
 
 func (*DynamicStaticClassExprContext) IsDynamicStaticClassExprContext() {}
@@ -20197,7 +22290,7 @@ func (*DynamicStaticClassExprContext) IsDynamicStaticClassExprContext() {}
 func NewDynamicStaticClassExprContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DynamicStaticClassExprContext {
 	var p = new(DynamicStaticClassExprContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_dynamicStaticClassExpr
@@ -20278,31 +22371,15 @@ func (s *DynamicStaticClassExprContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 func (p *PHPParser) DynamicStaticClassExpr() (localctx IDynamicStaticClassExprContext) {
-	this := p
-	_ = this
-
 	localctx = NewDynamicStaticClassExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 194, PHPParserRULE_dynamicStaticClassExpr)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1415)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 161, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 161, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -20312,6 +22389,10 @@ func (p *PHPParser) DynamicStaticClassExpr() (localctx IDynamicStaticClassExprCo
 		{
 			p.SetState(1408)
 			p.Match(PHPParserDoubleColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1409)
@@ -20327,15 +22408,31 @@ func (p *PHPParser) DynamicStaticClassExpr() (localctx IDynamicStaticClassExprCo
 		{
 			p.SetState(1412)
 			p.Match(PHPParserDoubleColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1413)
 			p.Variable()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDynamicStaticReceiverContext is an interface to support dynamic dispatch.
@@ -20345,20 +22442,31 @@ type IDynamicStaticReceiverContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	StaticClassExpr() IStaticClassExprContext
+	DynamicStaticReceiverBase() IDynamicStaticReceiverBaseContext
+	AllDynamicStaticReceiverAccess() []IDynamicStaticReceiverAccessContext
+	DynamicStaticReceiverAccess(i int) IDynamicStaticReceiverAccessContext
+
 	// IsDynamicStaticReceiverContext differentiates from other interfaces.
 	IsDynamicStaticReceiverContext()
 }
 
 type DynamicStaticReceiverContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyDynamicStaticReceiverContext() *DynamicStaticReceiverContext {
 	var p = new(DynamicStaticReceiverContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_dynamicStaticReceiver
 	return p
+}
+
+func InitEmptyDynamicStaticReceiverContext(p *DynamicStaticReceiverContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_dynamicStaticReceiver
 }
 
 func (*DynamicStaticReceiverContext) IsDynamicStaticReceiverContext() {}
@@ -20366,7 +22474,7 @@ func (*DynamicStaticReceiverContext) IsDynamicStaticReceiverContext() {}
 func NewDynamicStaticReceiverContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DynamicStaticReceiverContext {
 	var p = new(DynamicStaticReceiverContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_dynamicStaticReceiver
@@ -20468,32 +22576,17 @@ func (s *DynamicStaticReceiverContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *PHPParser) DynamicStaticReceiver() (localctx IDynamicStaticReceiverContext) {
-	this := p
-	_ = this
-
 	localctx = NewDynamicStaticReceiverContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 196, PHPParserRULE_dynamicStaticReceiver)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1425)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 163, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 163, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -20509,6 +22602,9 @@ func (p *PHPParser) DynamicStaticReceiver() (localctx IDynamicStaticReceiverCont
 		}
 		p.SetState(1422)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		for (int64((_la-193)) & ^0x3f) == 0 && ((int64(1)<<(_la-193))&335544353) != 0 {
@@ -20519,12 +22615,27 @@ func (p *PHPParser) DynamicStaticReceiver() (localctx IDynamicStaticReceiverCont
 
 			p.SetState(1424)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDynamicStaticReceiverBaseContext is an interface to support dynamic dispatch.
@@ -20534,20 +22645,30 @@ type IDynamicStaticReceiverBaseContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	FunctionCall() IFunctionCallContext
+	Parentheses() IParenthesesContext
+	FlexiVariable() IFlexiVariableContext
+
 	// IsDynamicStaticReceiverBaseContext differentiates from other interfaces.
 	IsDynamicStaticReceiverBaseContext()
 }
 
 type DynamicStaticReceiverBaseContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyDynamicStaticReceiverBaseContext() *DynamicStaticReceiverBaseContext {
 	var p = new(DynamicStaticReceiverBaseContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_dynamicStaticReceiverBase
 	return p
+}
+
+func InitEmptyDynamicStaticReceiverBaseContext(p *DynamicStaticReceiverBaseContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_dynamicStaticReceiverBase
 }
 
 func (*DynamicStaticReceiverBaseContext) IsDynamicStaticReceiverBaseContext() {}
@@ -20555,7 +22676,7 @@ func (*DynamicStaticReceiverBaseContext) IsDynamicStaticReceiverBaseContext() {}
 func NewDynamicStaticReceiverBaseContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DynamicStaticReceiverBaseContext {
 	var p = new(DynamicStaticReceiverBaseContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_dynamicStaticReceiverBase
@@ -20632,31 +22753,15 @@ func (s *DynamicStaticReceiverBaseContext) Accept(visitor antlr.ParseTreeVisitor
 }
 
 func (p *PHPParser) DynamicStaticReceiverBase() (localctx IDynamicStaticReceiverBaseContext) {
-	this := p
-	_ = this
-
 	localctx = NewDynamicStaticReceiverBaseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 198, PHPParserRULE_dynamicStaticReceiverBase)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1430)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 164, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 164, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -20678,9 +22783,21 @@ func (p *PHPParser) DynamicStaticReceiverBase() (localctx IDynamicStaticReceiver
 			p.flexiVariable(0)
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDynamicStaticReceiverAccessContext is an interface to support dynamic dispatch.
@@ -20690,20 +22807,32 @@ type IDynamicStaticReceiverAccessContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ObjectOperator() antlr.TerminalNode
+	MemberCallKey() IMemberCallKeyContext
+	Arguments() IArgumentsContext
+	NullsafeObjectOperator() antlr.TerminalNode
+	SquareCurlyExpression() ISquareCurlyExpressionContext
+
 	// IsDynamicStaticReceiverAccessContext differentiates from other interfaces.
 	IsDynamicStaticReceiverAccessContext()
 }
 
 type DynamicStaticReceiverAccessContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyDynamicStaticReceiverAccessContext() *DynamicStaticReceiverAccessContext {
 	var p = new(DynamicStaticReceiverAccessContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_dynamicStaticReceiverAccess
 	return p
+}
+
+func InitEmptyDynamicStaticReceiverAccessContext(p *DynamicStaticReceiverAccessContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_dynamicStaticReceiverAccess
 }
 
 func (*DynamicStaticReceiverAccessContext) IsDynamicStaticReceiverAccessContext() {}
@@ -20711,7 +22840,7 @@ func (*DynamicStaticReceiverAccessContext) IsDynamicStaticReceiverAccessContext(
 func NewDynamicStaticReceiverAccessContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DynamicStaticReceiverAccessContext {
 	var p = new(DynamicStaticReceiverAccessContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_dynamicStaticReceiverAccess
@@ -20796,31 +22925,15 @@ func (s *DynamicStaticReceiverAccessContext) Accept(visitor antlr.ParseTreeVisit
 }
 
 func (p *PHPParser) DynamicStaticReceiverAccess() (localctx IDynamicStaticReceiverAccessContext) {
-	this := p
-	_ = this
-
 	localctx = NewDynamicStaticReceiverAccessContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 200, PHPParserRULE_dynamicStaticReceiverAccess)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1443)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserObjectOperator:
@@ -20828,6 +22941,10 @@ func (p *PHPParser) DynamicStaticReceiverAccess() (localctx IDynamicStaticReceiv
 		{
 			p.SetState(1432)
 			p.Match(PHPParserObjectOperator)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1433)
@@ -20835,6 +22952,9 @@ func (p *PHPParser) DynamicStaticReceiverAccess() (localctx IDynamicStaticReceiv
 		}
 		p.SetState(1435)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserOpenRoundBracket {
@@ -20850,6 +22970,10 @@ func (p *PHPParser) DynamicStaticReceiverAccess() (localctx IDynamicStaticReceiv
 		{
 			p.SetState(1437)
 			p.Match(PHPParserNullsafeObjectOperator)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1438)
@@ -20857,6 +22981,9 @@ func (p *PHPParser) DynamicStaticReceiverAccess() (localctx IDynamicStaticReceiv
 		}
 		p.SetState(1440)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserOpenRoundBracket {
@@ -20875,10 +23002,21 @@ func (p *PHPParser) DynamicStaticReceiverAccess() (localctx IDynamicStaticReceiv
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IExpressionContext is an interface to support dynamic dispatch.
@@ -20887,21 +23025,25 @@ type IExpressionContext interface {
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
-
 	// IsExpressionContext differentiates from other interfaces.
 	IsExpressionContext()
 }
 
 type ExpressionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyExpressionContext() *ExpressionContext {
 	var p = new(ExpressionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_expression
 	return p
+}
+
+func InitEmptyExpressionContext(p *ExpressionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_expression
 }
 
 func (*ExpressionContext) IsExpressionContext() {}
@@ -20909,7 +23051,7 @@ func (*ExpressionContext) IsExpressionContext() {}
 func NewExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ExpressionContext {
 	var p = new(ExpressionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_expression
@@ -20919,8 +23061,8 @@ func NewExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 
 func (s *ExpressionContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *ExpressionContext) CopyFrom(ctx *ExpressionContext) {
-	s.BaseParserRuleContext.CopyFrom(ctx.BaseParserRuleContext)
+func (s *ExpressionContext) CopyAll(ctx *ExpressionContext) {
+	s.CopyFrom(&ctx.BaseParserRuleContext)
 }
 
 func (s *ExpressionContext) GetRuleContext() antlr.RuleContext {
@@ -20932,15 +23074,15 @@ func (s *ExpressionContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 }
 
 type SpecialWordExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewSpecialWordExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *SpecialWordExpressionContext {
 	var p = new(SpecialWordExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -21016,15 +23158,15 @@ func (s *SpecialWordExpressionContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 type ShortQualifiedNameExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewShortQualifiedNameExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ShortQualifiedNameExpressionContext {
 	var p = new(ShortQualifiedNameExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -21064,15 +23206,15 @@ func (s *ShortQualifiedNameExpressionContext) Accept(visitor antlr.ParseTreeVisi
 }
 
 type ArrayCreationExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewArrayCreationExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ArrayCreationExpressionContext {
 	var p = new(ArrayCreationExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -21108,15 +23250,15 @@ func (s *ArrayCreationExpressionContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 type BackQuoteStringExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewBackQuoteStringExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *BackQuoteStringExpressionContext {
 	var p = new(BackQuoteStringExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -21140,15 +23282,15 @@ func (s *BackQuoteStringExpressionContext) Accept(visitor antlr.ParseTreeVisitor
 }
 
 type MemberCallExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewMemberCallExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *MemberCallExpressionContext {
 	var p = new(MemberCallExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -21208,15 +23350,15 @@ func (s *MemberCallExpressionContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 type ArrayCreationUnpackExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewArrayCreationUnpackExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ArrayCreationUnpackExpressionContext {
 	var p = new(ArrayCreationUnpackExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -21272,15 +23414,15 @@ func (s *ArrayCreationUnpackExpressionContext) Accept(visitor antlr.ParseTreeVis
 }
 
 type KeywordNewExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewKeywordNewExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *KeywordNewExpressionContext {
 	var p = new(KeywordNewExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -21316,15 +23458,15 @@ func (s *KeywordNewExpressionContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 type MatchExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewMatchExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *MatchExpressionContext {
 	var p = new(MatchExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -21360,15 +23502,15 @@ func (s *MatchExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 type FunctionCallExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewFunctionCallExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *FunctionCallExpressionContext {
 	var p = new(FunctionCallExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -21420,16 +23562,16 @@ func (s *FunctionCallExpressionContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 type LogicalExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 	op antlr.Token
 }
 
 func NewLogicalExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *LogicalExpressionContext {
 	var p = new(LogicalExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -21506,15 +23648,15 @@ func (s *LogicalExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 type PrintExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewPrintExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *PrintExpressionContext {
 	var p = new(PrintExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -21554,15 +23696,15 @@ func (s *PrintExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 type PostfixIncDecExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewPostfixIncDecExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *PostfixIncDecExpressionContext {
 	var p = new(PostfixIncDecExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -21606,15 +23748,15 @@ func (s *PostfixIncDecExpressionContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 type FunctionCallAssignableReferenceAssignmentExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewFunctionCallAssignableReferenceAssignmentExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *FunctionCallAssignableReferenceAssignmentExpressionContext {
 	var p = new(FunctionCallAssignableReferenceAssignmentExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -21674,15 +23816,15 @@ func (s *FunctionCallAssignableReferenceAssignmentExpressionContext) Accept(visi
 }
 
 type IncludeExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewIncludeExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *IncludeExpressionContext {
 	var p = new(IncludeExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -21738,15 +23880,15 @@ func (s *IncludeExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 type IndexCallExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewIndexCallExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *IndexCallExpressionContext {
 	var p = new(IndexCallExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -21806,15 +23948,15 @@ func (s *IndexCallExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 type ReferenceAssignmentExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewReferenceAssignmentExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ReferenceAssignmentExpressionContext {
 	var p = new(ReferenceAssignmentExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -21874,15 +24016,15 @@ func (s *ReferenceAssignmentExpressionContext) Accept(visitor antlr.ParseTreeVis
 }
 
 type CloneExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewCloneExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *CloneExpressionContext {
 	var p = new(CloneExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -21922,15 +24064,15 @@ func (s *CloneExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 type UnaryOperatorExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewUnaryOperatorExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *UnaryOperatorExpressionContext {
 	var p = new(UnaryOperatorExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -21986,15 +24128,15 @@ func (s *UnaryOperatorExpressionContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 type FunctionCallAssignableAssignmentExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewFunctionCallAssignableAssignmentExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *FunctionCallAssignableAssignmentExpressionContext {
 	var p = new(FunctionCallAssignableAssignmentExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -22062,15 +24204,15 @@ func (s *FunctionCallAssignableAssignmentExpressionContext) Accept(visitor antlr
 }
 
 type ParenthesisExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewParenthesisExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ParenthesisExpressionContext {
 	var p = new(ParenthesisExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -22114,16 +24256,16 @@ func (s *ParenthesisExpressionContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 type SpaceshipExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 	op antlr.Token
 }
 
 func NewSpaceshipExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *SpaceshipExpressionContext {
 	var p = new(SpaceshipExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -22192,16 +24334,16 @@ func (s *SpaceshipExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 type ConditionalExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 	op antlr.Token
 }
 
 func NewConditionalExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ConditionalExpressionContext {
 	var p = new(ConditionalExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -22274,15 +24416,15 @@ func (s *ConditionalExpressionContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 type DynamicStaticClassAccessExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewDynamicStaticClassAccessExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *DynamicStaticClassAccessExpressionContext {
 	var p = new(DynamicStaticClassAccessExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -22318,15 +24460,15 @@ func (s *DynamicStaticClassAccessExpressionContext) Accept(visitor antlr.ParseTr
 }
 
 type TemplateExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewTemplateExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *TemplateExpressionContext {
 	var p = new(TemplateExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -22378,15 +24520,15 @@ func (s *TemplateExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 type VariableExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewVariableExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *VariableExpressionContext {
 	var p = new(VariableExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -22426,16 +24568,16 @@ func (s *VariableExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 type NullCoalescingExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 	op antlr.Token
 }
 
 func NewNullCoalescingExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *NullCoalescingExpressionContext {
 	var p = new(NullCoalescingExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -22504,15 +24646,15 @@ func (s *NullCoalescingExpressionContext) Accept(visitor antlr.ParseTreeVisitor)
 }
 
 type DefinedOrScanDefinedExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewDefinedOrScanDefinedExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *DefinedOrScanDefinedExpressionContext {
 	var p = new(DefinedOrScanDefinedExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -22548,16 +24690,16 @@ func (s *DefinedOrScanDefinedExpressionContext) Accept(visitor antlr.ParseTreeVi
 }
 
 type ArithmeticExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 	op antlr.Token
 }
 
 func NewArithmeticExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ArithmeticExpressionContext {
 	var p = new(ArithmeticExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -22650,15 +24792,15 @@ func (s *ArithmeticExpressionContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 type ScalarExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewScalarExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ScalarExpressionContext {
 	var p = new(ScalarExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -22714,15 +24856,15 @@ func (s *ScalarExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 type PrefixIncDecExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewPrefixIncDecExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *PrefixIncDecExpressionContext {
 	var p = new(PrefixIncDecExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -22766,16 +24908,16 @@ func (s *PrefixIncDecExpressionContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 type ComparisonExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 	op antlr.Token
 }
 
 func NewComparisonExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ComparisonExpressionContext {
 	var p = new(ComparisonExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -22880,15 +25022,15 @@ func (s *ComparisonExpressionContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 type ParentExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewParentExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ParentExpressionContext {
 	var p = new(ParentExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -22932,15 +25074,15 @@ func (s *ParentExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 type IndexLegacyCallExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewIndexLegacyCallExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *IndexLegacyCallExpressionContext {
 	var p = new(IndexLegacyCallExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -23004,15 +25146,15 @@ func (s *IndexLegacyCallExpressionContext) Accept(visitor antlr.ParseTreeVisitor
 }
 
 type OrdinaryAssignmentExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewOrdinaryAssignmentExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *OrdinaryAssignmentExpressionContext {
 	var p = new(OrdinaryAssignmentExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -23080,15 +25222,15 @@ func (s *OrdinaryAssignmentExpressionContext) Accept(visitor antlr.ParseTreeVisi
 }
 
 type DirectFunctionCallExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewDirectFunctionCallExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *DirectFunctionCallExpressionContext {
 	var p = new(DirectFunctionCallExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -23124,15 +25266,15 @@ func (s *DirectFunctionCallExpressionContext) Accept(visitor antlr.ParseTreeVisi
 }
 
 type CastExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewCastExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *CastExpressionContext {
 	var p = new(CastExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -23192,15 +25334,15 @@ func (s *CastExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 type InstanceOfExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewInstanceOfExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *InstanceOfExpressionContext {
 	var p = new(InstanceOfExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -23265,15 +25407,15 @@ func (s *InstanceOfExpressionContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 type LambdaFunctionExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewLambdaFunctionExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *LambdaFunctionExpressionContext {
 	var p = new(LambdaFunctionExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -23309,16 +25451,16 @@ func (s *LambdaFunctionExpressionContext) Accept(visitor antlr.ParseTreeVisitor)
 }
 
 type BitwiseExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 	op antlr.Token
 }
 
 func NewBitwiseExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *BitwiseExpressionContext {
 	var p = new(BitwiseExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -23403,15 +25545,15 @@ func (s *BitwiseExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 type FullyQualifiedNamespaceExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewFullyQualifiedNamespaceExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *FullyQualifiedNamespaceExpressionContext {
 	var p = new(FullyQualifiedNamespaceExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -23447,15 +25589,15 @@ func (s *FullyQualifiedNamespaceExpressionContext) Accept(visitor antlr.ParseTre
 }
 
 type StaticClassAccessExpressionContext struct {
-	*ExpressionContext
+	ExpressionContext
 }
 
 func NewStaticClassAccessExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *StaticClassAccessExpressionContext {
 	var p = new(StaticClassAccessExpressionContext)
 
-	p.ExpressionContext = NewEmptyExpressionContext()
+	InitEmptyExpressionContext(&p.ExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpressionContext))
+	p.CopyAll(ctx.(*ExpressionContext))
 
 	return p
 }
@@ -23499,10 +25641,8 @@ func (p *PHPParser) Expression() (localctx IExpressionContext) {
 }
 
 func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
-	this := p
-	_ = this
-
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
+
 	_parentState := p.GetState()
 	localctx = NewExpressionContext(p, p.GetParserRuleContext(), _parentState)
 	var _prevctx IExpressionContext = localctx
@@ -23511,28 +25651,16 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 	p.EnterRecursionRule(localctx, 202, PHPParserRULE_expression, _p)
 	var _la int
 
-	defer func() {
-		p.UnrollRecursionContexts(_parentctx)
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(1535)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 170, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 170, p.GetParserRuleContext()) {
 	case 1:
 		localctx = NewCloneExpressionContext(p, localctx)
 		p.SetParserRuleContext(localctx)
@@ -23541,6 +25669,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 		{
 			p.SetState(1446)
 			p.Match(PHPParserClone)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1447)
@@ -23581,10 +25713,18 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 		{
 			p.SetState(1451)
 			p.Match(PHPParserParent_)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1452)
 			p.Match(PHPParserDoubleColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1453)
@@ -23607,12 +25747,18 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 		p.SetState(1456)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 168, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 168, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(1455)
 				p.Match(PHPParserNamespaceSeparator)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
+		} else if p.HasError() { // JIM
+			goto errorExit
 		}
 		{
 			p.SetState(1458)
@@ -23635,6 +25781,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 		{
 			p.SetState(1460)
 			p.Match(PHPParserNamespaceSeparator)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1461)
@@ -23647,12 +25797,19 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 		_prevctx = localctx
 		p.SetState(1463)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserAmpersand {
 			{
 				p.SetState(1462)
 				p.Match(PHPParserAmpersand)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
@@ -23704,6 +25861,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 		{
 			p.SetState(1470)
 			p.Match(PHPParserPrint)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1471)
@@ -23717,6 +25878,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 		{
 			p.SetState(1472)
 			p.Match(PHPParserLabel)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 17:
@@ -23726,6 +25891,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 		{
 			p.SetState(1473)
 			p.Match(PHPParserBackQuoteString)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 18:
@@ -23735,6 +25904,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 		{
 			p.SetState(1474)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1475)
@@ -23743,6 +25916,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 		{
 			p.SetState(1476)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 19:
@@ -23761,6 +25938,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 		{
 			p.SetState(1479)
 			p.Match(PHPParserSet_Include_Path)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1480)
@@ -23774,6 +25955,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 		{
 			p.SetState(1481)
 			p.Match(PHPParserYield)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 22:
@@ -23783,10 +25968,18 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 		{
 			p.SetState(1482)
 			p.Match(PHPParserList)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1483)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1484)
@@ -23795,10 +25988,18 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 		{
 			p.SetState(1485)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1486)
 			p.Match(PHPParserEq)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1487)
@@ -23812,6 +26013,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 		{
 			p.SetState(1489)
 			p.Match(PHPParserThrow)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1490)
@@ -23843,6 +26048,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 		{
 			p.SetState(1493)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1494)
@@ -23851,6 +26060,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 		{
 			p.SetState(1495)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1496)
@@ -23948,6 +26161,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 		{
 			p.SetState(1508)
 			p.Match(PHPParserEq)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1509)
@@ -23965,10 +26182,18 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 		{
 			p.SetState(1512)
 			p.Match(PHPParserEq)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1513)
 			p.Match(PHPParserAmpersand)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1514)
@@ -24003,10 +26228,18 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 		{
 			p.SetState(1521)
 			p.Match(PHPParserEq)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1522)
 			p.Match(PHPParserAmpersand)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1523)
@@ -24037,10 +26270,18 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 		{
 			p.SetState(1529)
 			p.Match(PHPParserDoubleQuote)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1530)
 			p.Match(PHPParserOpenCurlyBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1531)
@@ -24049,18 +26290,33 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 		{
 			p.SetState(1532)
 			p.Match(PHPParserCloseCurlyBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1533)
 			p.Match(PHPParserDoubleQuote)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 	p.GetParserRuleContext().SetStop(p.GetTokenStream().LT(-1))
 	p.SetState(1619)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 175, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 175, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			if p.GetParseListeners() != nil {
@@ -24069,14 +26325,19 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 			_prevctx = localctx
 			p.SetState(1617)
 			p.GetErrorHandler().Sync(p)
-			switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 174, p.GetParserRuleContext()) {
+			if p.HasError() {
+				goto errorExit
+			}
+
+			switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 174, p.GetParserRuleContext()) {
 			case 1:
 				localctx = NewArithmeticExpressionContext(p, NewExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, PHPParserRULE_expression)
 				p.SetState(1537)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 24)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 24)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 24)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1538)
@@ -24084,6 +26345,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 					var _m = p.Match(PHPParserPow)
 
 					localctx.(*ArithmeticExpressionContext).op = _m
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(1539)
@@ -24096,11 +26361,16 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(1540)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 23)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 23)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 23)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1541)
 					p.Match(PHPParserInstanceOf)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(1542)
@@ -24113,7 +26383,8 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(1543)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 22)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 22)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 22)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1544)
@@ -24144,7 +26415,8 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(1546)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 21)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 21)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 21)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1547)
@@ -24175,7 +26447,8 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(1549)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 20)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 20)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 20)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1550)
@@ -24206,7 +26479,8 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(1552)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 19)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 19)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 19)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1553)
@@ -24237,7 +26511,8 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(1555)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 18)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 18)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 18)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1556)
@@ -24268,7 +26543,8 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(1558)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 17)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 17)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 17)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1559)
@@ -24276,6 +26552,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 					var _m = p.Match(PHPParserAmpersand)
 
 					localctx.(*BitwiseExpressionContext).op = _m
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(1560)
@@ -24288,7 +26568,8 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(1561)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 16)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 16)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 16)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1562)
@@ -24296,6 +26577,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 					var _m = p.Match(PHPParserCaret)
 
 					localctx.(*BitwiseExpressionContext).op = _m
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(1563)
@@ -24308,7 +26593,8 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(1564)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 15)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 15)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 15)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1565)
@@ -24316,6 +26602,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 					var _m = p.Match(PHPParserPipe)
 
 					localctx.(*BitwiseExpressionContext).op = _m
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(1566)
@@ -24328,7 +26618,8 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(1567)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 14)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 14)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 14)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1568)
@@ -24336,6 +26627,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 					var _m = p.Match(PHPParserBooleanAnd)
 
 					localctx.(*BitwiseExpressionContext).op = _m
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(1569)
@@ -24348,7 +26643,8 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(1570)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 13)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 13)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 13)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1571)
@@ -24356,6 +26652,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 					var _m = p.Match(PHPParserBooleanOr)
 
 					localctx.(*BitwiseExpressionContext).op = _m
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(1572)
@@ -24368,7 +26668,8 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(1573)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 12)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 12)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 12)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1574)
@@ -24376,12 +26677,19 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 					var _m = p.Match(PHPParserQuestionMark)
 
 					localctx.(*ConditionalExpressionContext).op = _m
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				p.SetState(1576)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 
-				if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244513) != 0 {
+				if ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244513) != 0) {
 					{
 						p.SetState(1575)
 						p.expression(0)
@@ -24391,6 +26699,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				{
 					p.SetState(1578)
 					p.Match(PHPParserColon)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(1579)
@@ -24403,7 +26715,8 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(1580)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 11)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 11)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 11)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1581)
@@ -24411,6 +26724,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 					var _m = p.Match(PHPParserNullCoalescing)
 
 					localctx.(*NullCoalescingExpressionContext).op = _m
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(1582)
@@ -24423,7 +26740,8 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(1583)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 10)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 10)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 10)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1584)
@@ -24431,6 +26749,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 					var _m = p.Match(PHPParserSpaceship)
 
 					localctx.(*SpaceshipExpressionContext).op = _m
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(1585)
@@ -24443,7 +26765,8 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(1586)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 4)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 4)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 4)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1587)
@@ -24451,6 +26774,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 					var _m = p.Match(PHPParserLogicalAnd)
 
 					localctx.(*LogicalExpressionContext).op = _m
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(1588)
@@ -24463,7 +26790,8 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(1589)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 3)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 3)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 3)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1590)
@@ -24471,6 +26799,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 					var _m = p.Match(PHPParserLogicalXor)
 
 					localctx.(*LogicalExpressionContext).op = _m
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(1591)
@@ -24483,7 +26815,8 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(1592)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 2)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 2)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 2)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1593)
@@ -24491,6 +26824,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 					var _m = p.Match(PHPParserLogicalOr)
 
 					localctx.(*LogicalExpressionContext).op = _m
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(1594)
@@ -24503,11 +26840,16 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(1595)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 53)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 53)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 53)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1596)
 					p.Match(PHPParserObjectOperator)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(1597)
@@ -24520,11 +26862,16 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(1598)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 52)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 52)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 52)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1599)
 					p.Match(PHPParserNullsafeObjectOperator)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(1600)
@@ -24537,11 +26884,16 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(1601)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 51)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 51)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 51)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1602)
 					p.Match(PHPParserOpenSquareBracket)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(1603)
@@ -24550,6 +26902,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				{
 					p.SetState(1604)
 					p.Match(PHPParserCloseSquareBracket)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 
 			case 22:
@@ -24558,28 +26914,43 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(1606)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 50)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 50)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 50)", ""))
+					goto errorExit
 				}
 				p.SetState(1608)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 
 				if _la == PHPParserObjectOperator {
 					{
 						p.SetState(1607)
 						p.Match(PHPParserObjectOperator)
+						if p.HasError() {
+							// Recognition error - abort rule
+							goto errorExit
+						}
 					}
 
 				}
 				{
 					p.SetState(1610)
 					p.Match(PHPParserOpenCurlyBracket)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				p.SetState(1612)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 
-				if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334562462241) != 0 {
+				if ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334562462241) != 0) {
 					{
 						p.SetState(1611)
 						p.IndexMemberCallKey()
@@ -24589,6 +26960,10 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				{
 					p.SetState(1614)
 					p.Match(PHPParserCloseCurlyBracket)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 
 			case 23:
@@ -24597,22 +26972,41 @@ func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(1615)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 29)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 29)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 29)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1616)
 					p.Arguments()
 				}
 
+			case antlr.ATNInvalidAltNumber:
+				goto errorExit
 			}
 
 		}
 		p.SetState(1621)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 175, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 175, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.UnrollRecursionContexts(_parentctx)
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFlexiVariableContext is an interface to support dynamic dispatch.
@@ -24621,21 +27015,25 @@ type IFlexiVariableContext interface {
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
-
 	// IsFlexiVariableContext differentiates from other interfaces.
 	IsFlexiVariableContext()
 }
 
 type FlexiVariableContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFlexiVariableContext() *FlexiVariableContext {
 	var p = new(FlexiVariableContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_flexiVariable
 	return p
+}
+
+func InitEmptyFlexiVariableContext(p *FlexiVariableContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_flexiVariable
 }
 
 func (*FlexiVariableContext) IsFlexiVariableContext() {}
@@ -24643,7 +27041,7 @@ func (*FlexiVariableContext) IsFlexiVariableContext() {}
 func NewFlexiVariableContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FlexiVariableContext {
 	var p = new(FlexiVariableContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_flexiVariable
@@ -24653,8 +27051,8 @@ func NewFlexiVariableContext(parser antlr.Parser, parent antlr.ParserRuleContext
 
 func (s *FlexiVariableContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *FlexiVariableContext) CopyFrom(ctx *FlexiVariableContext) {
-	s.BaseParserRuleContext.CopyFrom(ctx.BaseParserRuleContext)
+func (s *FlexiVariableContext) CopyAll(ctx *FlexiVariableContext) {
+	s.CopyFrom(&ctx.BaseParserRuleContext)
 }
 
 func (s *FlexiVariableContext) GetRuleContext() antlr.RuleContext {
@@ -24666,15 +27064,15 @@ func (s *FlexiVariableContext) ToStringTree(ruleNames []string, recog antlr.Reco
 }
 
 type FlexiMemberAccessContext struct {
-	*FlexiVariableContext
+	FlexiVariableContext
 }
 
 func NewFlexiMemberAccessContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *FlexiMemberAccessContext {
 	var p = new(FlexiMemberAccessContext)
 
-	p.FlexiVariableContext = NewEmptyFlexiVariableContext()
+	InitEmptyFlexiVariableContext(&p.FlexiVariableContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*FlexiVariableContext))
+	p.CopyAll(ctx.(*FlexiVariableContext))
 
 	return p
 }
@@ -24746,15 +27144,15 @@ func (s *FlexiMemberAccessContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 type IndexLegacyCallVariableContext struct {
-	*FlexiVariableContext
+	FlexiVariableContext
 }
 
 func NewIndexLegacyCallVariableContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *IndexLegacyCallVariableContext {
 	var p = new(IndexLegacyCallVariableContext)
 
-	p.FlexiVariableContext = NewEmptyFlexiVariableContext()
+	InitEmptyFlexiVariableContext(&p.FlexiVariableContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*FlexiVariableContext))
+	p.CopyAll(ctx.(*FlexiVariableContext))
 
 	return p
 }
@@ -24814,15 +27212,15 @@ func (s *IndexLegacyCallVariableContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 type IndexVariableContext struct {
-	*FlexiVariableContext
+	FlexiVariableContext
 }
 
 func NewIndexVariableContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *IndexVariableContext {
 	var p = new(IndexVariableContext)
 
-	p.FlexiVariableContext = NewEmptyFlexiVariableContext()
+	InitEmptyFlexiVariableContext(&p.FlexiVariableContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*FlexiVariableContext))
+	p.CopyAll(ctx.(*FlexiVariableContext))
 
 	return p
 }
@@ -24882,15 +27280,15 @@ func (s *IndexVariableContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 type CustomVariableContext struct {
-	*FlexiVariableContext
+	FlexiVariableContext
 }
 
 func NewCustomVariableContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *CustomVariableContext {
 	var p = new(CustomVariableContext)
 
-	p.FlexiVariableContext = NewEmptyFlexiVariableContext()
+	InitEmptyFlexiVariableContext(&p.FlexiVariableContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*FlexiVariableContext))
+	p.CopyAll(ctx.(*FlexiVariableContext))
 
 	return p
 }
@@ -24930,10 +27328,8 @@ func (p *PHPParser) FlexiVariable() (localctx IFlexiVariableContext) {
 }
 
 func (p *PHPParser) flexiVariable(_p int) (localctx IFlexiVariableContext) {
-	this := p
-	_ = this
-
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
+
 	_parentState := p.GetState()
 	localctx = NewFlexiVariableContext(p, p.GetParserRuleContext(), _parentState)
 	var _prevctx IFlexiVariableContext = localctx
@@ -24941,22 +27337,6 @@ func (p *PHPParser) flexiVariable(_p int) (localctx IFlexiVariableContext) {
 	_startState := 204
 	p.EnterRecursionRule(localctx, 204, PHPParserRULE_flexiVariable, _p)
 	var _la int
-
-	defer func() {
-		p.UnrollRecursionContexts(_parentctx)
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -24973,8 +27353,13 @@ func (p *PHPParser) flexiVariable(_p int) (localctx IFlexiVariableContext) {
 	p.GetParserRuleContext().SetStop(p.GetTokenStream().LT(-1))
 	p.SetState(1645)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 180, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 180, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			if p.GetParseListeners() != nil {
@@ -24983,24 +27368,36 @@ func (p *PHPParser) flexiVariable(_p int) (localctx IFlexiVariableContext) {
 			_prevctx = localctx
 			p.SetState(1643)
 			p.GetErrorHandler().Sync(p)
-			switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 179, p.GetParserRuleContext()) {
+			if p.HasError() {
+				goto errorExit
+			}
+
+			switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 179, p.GetParserRuleContext()) {
 			case 1:
 				localctx = NewIndexVariableContext(p, NewFlexiVariableContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, PHPParserRULE_flexiVariable)
 				p.SetState(1625)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 3)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 3)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 3)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1626)
 					p.Match(PHPParserOpenSquareBracket)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				p.SetState(1628)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 
-				if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334562462241) != 0 {
+				if ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334562462241) != 0) {
 					{
 						p.SetState(1627)
 						p.IndexMemberCallKey()
@@ -25010,6 +27407,10 @@ func (p *PHPParser) flexiVariable(_p int) (localctx IFlexiVariableContext) {
 				{
 					p.SetState(1630)
 					p.Match(PHPParserCloseSquareBracket)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 
 			case 2:
@@ -25018,17 +27419,25 @@ func (p *PHPParser) flexiVariable(_p int) (localctx IFlexiVariableContext) {
 				p.SetState(1631)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 2)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 2)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 2)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1632)
 					p.Match(PHPParserOpenCurlyBracket)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				p.SetState(1634)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 
-				if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334562462241) != 0 {
+				if ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334562462241) != 0) {
 					{
 						p.SetState(1633)
 						p.IndexMemberCallKey()
@@ -25038,6 +27447,10 @@ func (p *PHPParser) flexiVariable(_p int) (localctx IFlexiVariableContext) {
 				{
 					p.SetState(1636)
 					p.Match(PHPParserCloseCurlyBracket)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 
 			case 3:
@@ -25046,11 +27459,16 @@ func (p *PHPParser) flexiVariable(_p int) (localctx IFlexiVariableContext) {
 				p.SetState(1637)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 1)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 1)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 1)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(1638)
 					p.Match(PHPParserObjectOperator)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(1639)
@@ -25059,23 +27477,43 @@ func (p *PHPParser) flexiVariable(_p int) (localctx IFlexiVariableContext) {
 				p.SetState(1641)
 				p.GetErrorHandler().Sync(p)
 
-				if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 178, p.GetParserRuleContext()) == 1 {
+				if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 178, p.GetParserRuleContext()) == 1 {
 					{
 						p.SetState(1640)
 						p.Arguments()
 					}
 
+				} else if p.HasError() { // JIM
+					goto errorExit
 				}
 
+			case antlr.ATNInvalidAltNumber:
+				goto errorExit
 			}
 
 		}
 		p.SetState(1647)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 180, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 180, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.UnrollRecursionContexts(_parentctx)
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDefineExprContext is an interface to support dynamic dispatch.
@@ -25085,20 +27523,34 @@ type IDefineExprContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Define() antlr.TerminalNode
+	OpenRoundBracket() antlr.TerminalNode
+	ConstantString() IConstantStringContext
+	Comma() antlr.TerminalNode
+	Expression() IExpressionContext
+	CloseRoundBracket() antlr.TerminalNode
+	Defined() antlr.TerminalNode
+
 	// IsDefineExprContext differentiates from other interfaces.
 	IsDefineExprContext()
 }
 
 type DefineExprContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyDefineExprContext() *DefineExprContext {
 	var p = new(DefineExprContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_defineExpr
 	return p
+}
+
+func InitEmptyDefineExprContext(p *DefineExprContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_defineExpr
 }
 
 func (*DefineExprContext) IsDefineExprContext() {}
@@ -25106,7 +27558,7 @@ func (*DefineExprContext) IsDefineExprContext() {}
 func NewDefineExprContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DefineExprContext {
 	var p = new(DefineExprContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_defineExpr
@@ -25187,30 +27639,13 @@ func (s *DefineExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) DefineExpr() (localctx IDefineExprContext) {
-	this := p
-	_ = this
-
 	localctx = NewDefineExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 206, PHPParserRULE_defineExpr)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1660)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserDefine:
@@ -25218,10 +27653,18 @@ func (p *PHPParser) DefineExpr() (localctx IDefineExprContext) {
 		{
 			p.SetState(1648)
 			p.Match(PHPParserDefine)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1649)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1650)
@@ -25230,6 +27673,10 @@ func (p *PHPParser) DefineExpr() (localctx IDefineExprContext) {
 		{
 			p.SetState(1651)
 			p.Match(PHPParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1652)
@@ -25238,6 +27685,10 @@ func (p *PHPParser) DefineExpr() (localctx IDefineExprContext) {
 		{
 			p.SetState(1653)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserDefined:
@@ -25245,10 +27696,18 @@ func (p *PHPParser) DefineExpr() (localctx IDefineExprContext) {
 		{
 			p.SetState(1655)
 			p.Match(PHPParserDefined)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1656)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1657)
@@ -25257,13 +27716,28 @@ func (p *PHPParser) DefineExpr() (localctx IDefineExprContext) {
 		{
 			p.SetState(1658)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IVariableContext is an interface to support dynamic dispatch.
@@ -25272,21 +27746,25 @@ type IVariableContext interface {
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
-
 	// IsVariableContext differentiates from other interfaces.
 	IsVariableContext()
 }
 
 type VariableContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyVariableContext() *VariableContext {
 	var p = new(VariableContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_variable
 	return p
+}
+
+func InitEmptyVariableContext(p *VariableContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_variable
 }
 
 func (*VariableContext) IsVariableContext() {}
@@ -25294,7 +27772,7 @@ func (*VariableContext) IsVariableContext() {}
 func NewVariableContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *VariableContext {
 	var p = new(VariableContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_variable
@@ -25304,8 +27782,8 @@ func NewVariableContext(parser antlr.Parser, parent antlr.ParserRuleContext, inv
 
 func (s *VariableContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *VariableContext) CopyFrom(ctx *VariableContext) {
-	s.BaseParserRuleContext.CopyFrom(ctx.BaseParserRuleContext)
+func (s *VariableContext) CopyAll(ctx *VariableContext) {
+	s.CopyFrom(&ctx.BaseParserRuleContext)
 }
 
 func (s *VariableContext) GetRuleContext() antlr.RuleContext {
@@ -25317,15 +27795,15 @@ func (s *VariableContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 }
 
 type NormalVariableContext struct {
-	*VariableContext
+	VariableContext
 }
 
 func NewNormalVariableContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *NormalVariableContext {
 	var p = new(NormalVariableContext)
 
-	p.VariableContext = NewEmptyVariableContext()
+	InitEmptyVariableContext(&p.VariableContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*VariableContext))
+	p.CopyAll(ctx.(*VariableContext))
 
 	return p
 }
@@ -25390,15 +27868,15 @@ func (s *NormalVariableContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 type DynamicVariableContext struct {
-	*VariableContext
+	VariableContext
 }
 
 func NewDynamicVariableContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *DynamicVariableContext {
 	var p = new(DynamicVariableContext)
 
-	p.VariableContext = NewEmptyVariableContext()
+	InitEmptyVariableContext(&p.VariableContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*VariableContext))
+	p.CopyAll(ctx.(*VariableContext))
 
 	return p
 }
@@ -25471,15 +27949,15 @@ func (s *DynamicVariableContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 type MemberCallVariableContext struct {
-	*VariableContext
+	VariableContext
 }
 
 func NewMemberCallVariableContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *MemberCallVariableContext {
 	var p = new(MemberCallVariableContext)
 
-	p.VariableContext = NewEmptyVariableContext()
+	InitEmptyVariableContext(&p.VariableContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*VariableContext))
+	p.CopyAll(ctx.(*VariableContext))
 
 	return p
 }
@@ -25572,45 +28050,39 @@ func (s *MemberCallVariableContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *PHPParser) Variable() (localctx IVariableContext) {
-	this := p
-	_ = this
-
 	localctx = NewVariableContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 208, PHPParserRULE_variable)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
 	p.SetState(1695)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 187, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 187, p.GetParserRuleContext()) {
 	case 1:
 		localctx = NewNormalVariableContext(p, localctx)
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(1662)
 			p.Match(PHPParserVarName)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(1666)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 182, p.GetParserRuleContext())
-
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 182, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 		for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			if _alt == 1 {
 				{
@@ -25621,7 +28093,13 @@ func (p *PHPParser) Variable() (localctx IVariableContext) {
 			}
 			p.SetState(1668)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 182, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 182, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 
 	case 2:
@@ -25629,26 +28107,45 @@ func (p *PHPParser) Variable() (localctx IVariableContext) {
 		p.EnterOuterAlt(localctx, 2)
 		p.SetState(1670)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		for ok := true; ok; ok = _la == PHPParserDollar {
 			{
 				p.SetState(1669)
 				p.Match(PHPParserDollar)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 			p.SetState(1672)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
 			p.SetState(1674)
 			p.Match(PHPParserVarName)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(1678)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 184, p.GetParserRuleContext())
-
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 184, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 		for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			if _alt == 1 {
 				{
@@ -25659,7 +28156,13 @@ func (p *PHPParser) Variable() (localctx IVariableContext) {
 			}
 			p.SetState(1680)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 184, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 184, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 
 	case 3:
@@ -25667,21 +28170,35 @@ func (p *PHPParser) Variable() (localctx IVariableContext) {
 		p.EnterOuterAlt(localctx, 3)
 		p.SetState(1682)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		for ok := true; ok; ok = _la == PHPParserDollar {
 			{
 				p.SetState(1681)
 				p.Match(PHPParserDollar)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 			p.SetState(1684)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
 			p.SetState(1686)
 			p.Match(PHPParserOpenCurlyBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1687)
@@ -25690,11 +28207,20 @@ func (p *PHPParser) Variable() (localctx IVariableContext) {
 		{
 			p.SetState(1688)
 			p.Match(PHPParserCloseCurlyBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(1692)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 186, p.GetParserRuleContext())
-
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 186, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 		for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			if _alt == 1 {
 				{
@@ -25705,12 +28231,30 @@ func (p *PHPParser) Variable() (localctx IVariableContext) {
 			}
 			p.SetState(1694)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 186, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 186, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIncludeContext is an interface to support dynamic dispatch.
@@ -25720,20 +28264,32 @@ type IIncludeContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Expression() IExpressionContext
+	Include() antlr.TerminalNode
+	IncludeOnce() antlr.TerminalNode
+	Require() antlr.TerminalNode
+	RequireOnce() antlr.TerminalNode
+
 	// IsIncludeContext differentiates from other interfaces.
 	IsIncludeContext()
 }
 
 type IncludeContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyIncludeContext() *IncludeContext {
 	var p = new(IncludeContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_include
 	return p
+}
+
+func InitEmptyIncludeContext(p *IncludeContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_include
 }
 
 func (*IncludeContext) IsIncludeContext() {}
@@ -25741,7 +28297,7 @@ func (*IncludeContext) IsIncludeContext() {}
 func NewIncludeContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *IncludeContext {
 	var p = new(IncludeContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_include
@@ -25802,28 +28358,9 @@ func (s *IncludeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Include() (localctx IIncludeContext) {
-	this := p
-	_ = this
-
 	localctx = NewIncludeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 210, PHPParserRULE_include)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -25842,7 +28379,17 @@ func (p *PHPParser) Include() (localctx IIncludeContext) {
 		p.expression(0)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ILeftArrayCreationContext is an interface to support dynamic dispatch.
@@ -25852,20 +28399,32 @@ type ILeftArrayCreationContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Identifier() IIdentifierContext
+	OpenRoundBracket() antlr.TerminalNode
+	CloseRoundBracket() antlr.TerminalNode
+	ArrayItemList() IArrayItemListContext
+	ArrayDestructuring() IArrayDestructuringContext
+
 	// IsLeftArrayCreationContext differentiates from other interfaces.
 	IsLeftArrayCreationContext()
 }
 
 type LeftArrayCreationContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyLeftArrayCreationContext() *LeftArrayCreationContext {
 	var p = new(LeftArrayCreationContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_leftArrayCreation
 	return p
+}
+
+func InitEmptyLeftArrayCreationContext(p *LeftArrayCreationContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_leftArrayCreation
 }
 
 func (*LeftArrayCreationContext) IsLeftArrayCreationContext() {}
@@ -25873,7 +28432,7 @@ func (*LeftArrayCreationContext) IsLeftArrayCreationContext() {}
 func NewLeftArrayCreationContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *LeftArrayCreationContext {
 	var p = new(LeftArrayCreationContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_leftArrayCreation
@@ -25958,31 +28517,15 @@ func (s *LeftArrayCreationContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *PHPParser) LeftArrayCreation() (localctx ILeftArrayCreationContext) {
-	this := p
-	_ = this
-
 	localctx = NewLeftArrayCreationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 212, PHPParserRULE_leftArrayCreation)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1708)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserAbstract, PHPParserArray, PHPParserAs, PHPParserBinaryCast, PHPParserBoolType, PHPParserBooleanConstant, PHPParserBreak, PHPParserCallable, PHPParserCase, PHPParserCatch, PHPParserClass, PHPParserClone, PHPParserConst, PHPParserContinue, PHPParserDefine, PHPParserDefined, PHPParserDeclare, PHPParserDefault, PHPParserDo, PHPParserDoubleCast, PHPParserDoubleType, PHPParserEcho, PHPParserElse, PHPParserElseIf, PHPParserEmpty, PHPParserEnum_, PHPParserEndDeclare, PHPParserEndFor, PHPParserEndForeach, PHPParserEndIf, PHPParserEndSwitch, PHPParserEndWhile, PHPParserEval, PHPParserAssert, PHPParserDie, PHPParserExit, PHPParserExtends, PHPParserFinal, PHPParserFinally, PHPParserFloatCast, PHPParserFor, PHPParserForeach, PHPParserGlobal, PHPParserGoto, PHPParserIf, PHPParserImplements, PHPParserImport, PHPParserInstanceOf, PHPParserInsteadOf, PHPParserInt8Cast, PHPParserInt16Cast, PHPParserInt64Type, PHPParserIntType, PHPParserInterface, PHPParserIsSet, PHPParserList, PHPParserLogicalAnd, PHPParserLogicalOr, PHPParserLogicalXor, PHPParserMatch_, PHPParserNamespace, PHPParserNew, PHPParserNull, PHPParserObjectType, PHPParserParent_, PHPParserPartial, PHPParserPrint, PHPParserPrivate, PHPParserProtected, PHPParserPublic, PHPParserReadonly, PHPParserResource, PHPParserReturn, PHPParserStatic, PHPParserStringType, PHPParserSwitch, PHPParserTrait, PHPParserTry, PHPParserTypeof, PHPParserUintCast, PHPParserUnicodeCast, PHPParserUnset, PHPParserVar, PHPParserWhile, PHPParserYield, PHPParserFrom, PHPParserLambdaFn, PHPParserTicks, PHPParserEncoding, PHPParserStrictTypes, PHPParserGet, PHPParserSet, PHPParserCall, PHPParserCallStatic, PHPParserConstructor, PHPParserDestruct, PHPParserWakeup, PHPParserSleep, PHPParserAutoload, PHPParserIsSet__, PHPParserUnset__, PHPParserToString__, PHPParserInvoke, PHPParserSetState, PHPParserClone__, PHPParserDebugInfo, PHPParserNamespace__, PHPParserClass__, PHPParserTraic__, PHPParserFunction__, PHPParserMethod__, PHPParserLine__, PHPParserFile__, PHPParserDir__, PHPParserLabel:
@@ -25994,12 +28537,19 @@ func (p *PHPParser) LeftArrayCreation() (localctx ILeftArrayCreationContext) {
 		{
 			p.SetState(1701)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(1703)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244577) != 0 {
+		if ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244577) != 0) {
 			{
 				p.SetState(1702)
 				p.ArrayItemList()
@@ -26009,6 +28559,10 @@ func (p *PHPParser) LeftArrayCreation() (localctx ILeftArrayCreationContext) {
 		{
 			p.SetState(1705)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserOpenSquareBracket:
@@ -26019,10 +28573,21 @@ func (p *PHPParser) LeftArrayCreation() (localctx ILeftArrayCreationContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAssignableContext is an interface to support dynamic dispatch.
@@ -26032,20 +28597,29 @@ type IAssignableContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Chain() IChainContext
+	ArrayCreation() IArrayCreationContext
+
 	// IsAssignableContext differentiates from other interfaces.
 	IsAssignableContext()
 }
 
 type AssignableContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyAssignableContext() *AssignableContext {
 	var p = new(AssignableContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_assignable
 	return p
+}
+
+func InitEmptyAssignableContext(p *AssignableContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_assignable
 }
 
 func (*AssignableContext) IsAssignableContext() {}
@@ -26053,7 +28627,7 @@ func (*AssignableContext) IsAssignableContext() {}
 func NewAssignableContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AssignableContext {
 	var p = new(AssignableContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_assignable
@@ -26114,31 +28688,15 @@ func (s *AssignableContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Assignable() (localctx IAssignableContext) {
-	this := p
-	_ = this
-
 	localctx = NewAssignableContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 214, PHPParserRULE_assignable)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1712)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 190, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 190, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -26153,9 +28711,21 @@ func (p *PHPParser) Assignable() (localctx IAssignableContext) {
 			p.ArrayCreation()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IArrayCreationContext is an interface to support dynamic dispatch.
@@ -26165,20 +28735,35 @@ type IArrayCreationContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Array() antlr.TerminalNode
+	OpenRoundBracket() antlr.TerminalNode
+	CloseRoundBracket() antlr.TerminalNode
+	ArrayItemList() IArrayItemListContext
+	List() antlr.TerminalNode
+	OpenSquareBracket() antlr.TerminalNode
+	CloseSquareBracket() antlr.TerminalNode
+	Ellipsis() antlr.TerminalNode
+
 	// IsArrayCreationContext differentiates from other interfaces.
 	IsArrayCreationContext()
 }
 
 type ArrayCreationContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyArrayCreationContext() *ArrayCreationContext {
 	var p = new(ArrayCreationContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_arrayCreation
 	return p
+}
+
+func InitEmptyArrayCreationContext(p *ArrayCreationContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_arrayCreation
 }
 
 func (*ArrayCreationContext) IsArrayCreationContext() {}
@@ -26186,7 +28771,7 @@ func (*ArrayCreationContext) IsArrayCreationContext() {}
 func NewArrayCreationContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ArrayCreationContext {
 	var p = new(ArrayCreationContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_arrayCreation
@@ -26259,31 +28844,15 @@ func (s *ArrayCreationContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) ArrayCreation() (localctx IArrayCreationContext) {
-	this := p
-	_ = this
-
 	localctx = NewArrayCreationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 216, PHPParserRULE_arrayCreation)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1734)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserArray:
@@ -26291,16 +28860,27 @@ func (p *PHPParser) ArrayCreation() (localctx IArrayCreationContext) {
 		{
 			p.SetState(1714)
 			p.Match(PHPParserArray)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1715)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(1717)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244577) != 0 {
+		if ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244577) != 0) {
 			{
 				p.SetState(1716)
 				p.ArrayItemList()
@@ -26310,6 +28890,10 @@ func (p *PHPParser) ArrayCreation() (localctx IArrayCreationContext) {
 		{
 			p.SetState(1719)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserList:
@@ -26317,16 +28901,27 @@ func (p *PHPParser) ArrayCreation() (localctx IArrayCreationContext) {
 		{
 			p.SetState(1720)
 			p.Match(PHPParserList)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1721)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(1723)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244577) != 0 {
+		if ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244577) != 0) {
 			{
 				p.SetState(1722)
 				p.ArrayItemList()
@@ -26336,6 +28931,10 @@ func (p *PHPParser) ArrayCreation() (localctx IArrayCreationContext) {
 		{
 			p.SetState(1725)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserOpenSquareBracket:
@@ -26343,22 +28942,35 @@ func (p *PHPParser) ArrayCreation() (localctx IArrayCreationContext) {
 		{
 			p.SetState(1726)
 			p.Match(PHPParserOpenSquareBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(1728)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 193, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 193, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(1727)
 				p.Match(PHPParserEllipsis)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
+		} else if p.HasError() { // JIM
+			goto errorExit
 		}
 		p.SetState(1731)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244577) != 0 {
+		if ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244577) != 0) {
 			{
 				p.SetState(1730)
 				p.ArrayItemList()
@@ -26368,13 +28980,28 @@ func (p *PHPParser) ArrayCreation() (localctx IArrayCreationContext) {
 		{
 			p.SetState(1733)
 			p.Match(PHPParserCloseSquareBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IArrayDestructuringContext is an interface to support dynamic dispatch.
@@ -26384,20 +29011,35 @@ type IArrayDestructuringContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	OpenSquareBracket() antlr.TerminalNode
+	AllIndexedDestructItem() []IIndexedDestructItemContext
+	IndexedDestructItem(i int) IIndexedDestructItemContext
+	CloseSquareBracket() antlr.TerminalNode
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+	AllKeyedDestructItem() []IKeyedDestructItemContext
+	KeyedDestructItem(i int) IKeyedDestructItemContext
+
 	// IsArrayDestructuringContext differentiates from other interfaces.
 	IsArrayDestructuringContext()
 }
 
 type ArrayDestructuringContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyArrayDestructuringContext() *ArrayDestructuringContext {
 	var p = new(ArrayDestructuringContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_arrayDestructuring
 	return p
+}
+
+func InitEmptyArrayDestructuringContext(p *ArrayDestructuringContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_arrayDestructuring
 }
 
 func (*ArrayDestructuringContext) IsArrayDestructuringContext() {}
@@ -26405,7 +29047,7 @@ func (*ArrayDestructuringContext) IsArrayDestructuringContext() {}
 func NewArrayDestructuringContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ArrayDestructuringContext {
 	var p = new(ArrayDestructuringContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_arrayDestructuring
@@ -26532,52 +29174,51 @@ func (s *ArrayDestructuringContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *PHPParser) ArrayDestructuring() (localctx IArrayDestructuringContext) {
-	this := p
-	_ = this
-
 	localctx = NewArrayDestructuringContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 218, PHPParserRULE_arrayDestructuring)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
 	p.SetState(1781)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 203, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 203, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(1736)
 			p.Match(PHPParserOpenSquareBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(1740)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == PHPParserComma {
 			{
 				p.SetState(1737)
 				p.Match(PHPParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 			p.SetState(1742)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
@@ -26586,22 +29227,37 @@ func (p *PHPParser) ArrayDestructuring() (localctx IArrayDestructuringContext) {
 		}
 		p.SetState(1752)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 198, p.GetParserRuleContext())
-
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 198, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 		for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			if _alt == 1 {
 				p.SetState(1745)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 
 				for ok := true; ok; ok = _la == PHPParserComma {
 					{
 						p.SetState(1744)
 						p.Match(PHPParserComma)
+						if p.HasError() {
+							// Recognition error - abort rule
+							goto errorExit
+						}
 					}
 
 					p.SetState(1747)
 					p.GetErrorHandler().Sync(p)
+					if p.HasError() {
+						goto errorExit
+					}
 					_la = p.GetTokenStream().LA(1)
 				}
 				{
@@ -26612,25 +29268,45 @@ func (p *PHPParser) ArrayDestructuring() (localctx IArrayDestructuringContext) {
 			}
 			p.SetState(1754)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 198, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 198, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 		p.SetState(1758)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == PHPParserComma {
 			{
 				p.SetState(1755)
 				p.Match(PHPParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 			p.SetState(1760)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
 			p.SetState(1761)
 			p.Match(PHPParserCloseSquareBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 2:
@@ -26638,6 +29314,10 @@ func (p *PHPParser) ArrayDestructuring() (localctx IArrayDestructuringContext) {
 		{
 			p.SetState(1763)
 			p.Match(PHPParserOpenSquareBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1764)
@@ -26645,22 +29325,37 @@ func (p *PHPParser) ArrayDestructuring() (localctx IArrayDestructuringContext) {
 		}
 		p.SetState(1773)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 201, p.GetParserRuleContext())
-
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 201, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 		for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			if _alt == 1 {
 				p.SetState(1766)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 
 				for ok := true; ok; ok = _la == PHPParserComma {
 					{
 						p.SetState(1765)
 						p.Match(PHPParserComma)
+						if p.HasError() {
+							// Recognition error - abort rule
+							goto errorExit
+						}
 					}
 
 					p.SetState(1768)
 					p.GetErrorHandler().Sync(p)
+					if p.HasError() {
+						goto errorExit
+					}
 					_la = p.GetTokenStream().LA(1)
 				}
 				{
@@ -26671,27 +29366,56 @@ func (p *PHPParser) ArrayDestructuring() (localctx IArrayDestructuringContext) {
 			}
 			p.SetState(1775)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 201, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 201, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 		p.SetState(1777)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserComma {
 			{
 				p.SetState(1776)
 				p.Match(PHPParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		{
 			p.SetState(1779)
 			p.Match(PHPParserCloseSquareBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIndexedDestructItemContext is an interface to support dynamic dispatch.
@@ -26701,20 +29425,29 @@ type IIndexedDestructItemContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Chain() IChainContext
+	Ampersand() antlr.TerminalNode
+
 	// IsIndexedDestructItemContext differentiates from other interfaces.
 	IsIndexedDestructItemContext()
 }
 
 type IndexedDestructItemContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyIndexedDestructItemContext() *IndexedDestructItemContext {
 	var p = new(IndexedDestructItemContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_indexedDestructItem
 	return p
+}
+
+func InitEmptyIndexedDestructItemContext(p *IndexedDestructItemContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_indexedDestructItem
 }
 
 func (*IndexedDestructItemContext) IsIndexedDestructItemContext() {}
@@ -26722,7 +29455,7 @@ func (*IndexedDestructItemContext) IsIndexedDestructItemContext() {}
 func NewIndexedDestructItemContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *IndexedDestructItemContext {
 	var p = new(IndexedDestructItemContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_indexedDestructItem
@@ -26771,38 +29504,26 @@ func (s *IndexedDestructItemContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *PHPParser) IndexedDestructItem() (localctx IIndexedDestructItemContext) {
-	this := p
-	_ = this
-
 	localctx = NewIndexedDestructItemContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 220, PHPParserRULE_indexedDestructItem)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(1784)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserAmpersand {
 		{
 			p.SetState(1783)
 			p.Match(PHPParserAmpersand)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
@@ -26811,7 +29532,17 @@ func (p *PHPParser) IndexedDestructItem() (localctx IIndexedDestructItemContext)
 		p.Chain()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IKeyedDestructItemContext is an interface to support dynamic dispatch.
@@ -26821,20 +29552,31 @@ type IKeyedDestructItemContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Chain() IChainContext
+	Expression() IExpressionContext
+	DoubleArrow() antlr.TerminalNode
+	Ampersand() antlr.TerminalNode
+
 	// IsKeyedDestructItemContext differentiates from other interfaces.
 	IsKeyedDestructItemContext()
 }
 
 type KeyedDestructItemContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyKeyedDestructItemContext() *KeyedDestructItemContext {
 	var p = new(KeyedDestructItemContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_keyedDestructItem
 	return p
+}
+
+func InitEmptyKeyedDestructItemContext(p *KeyedDestructItemContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_keyedDestructItem
 }
 
 func (*KeyedDestructItemContext) IsKeyedDestructItemContext() {}
@@ -26842,7 +29584,7 @@ func (*KeyedDestructItemContext) IsKeyedDestructItemContext() {}
 func NewKeyedDestructItemContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *KeyedDestructItemContext {
 	var p = new(KeyedDestructItemContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_keyedDestructItem
@@ -26911,34 +29653,15 @@ func (s *KeyedDestructItemContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *PHPParser) KeyedDestructItem() (localctx IKeyedDestructItemContext) {
-	this := p
-	_ = this
-
 	localctx = NewKeyedDestructItemContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 222, PHPParserRULE_keyedDestructItem)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(1791)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 205, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 205, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(1788)
 			p.expression(0)
@@ -26946,17 +29669,30 @@ func (p *PHPParser) KeyedDestructItem() (localctx IKeyedDestructItemContext) {
 		{
 			p.SetState(1789)
 			p.Match(PHPParserDoubleArrow)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 	p.SetState(1794)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserAmpersand {
 		{
 			p.SetState(1793)
 			p.Match(PHPParserAmpersand)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
@@ -26965,7 +29701,17 @@ func (p *PHPParser) KeyedDestructItem() (localctx IKeyedDestructItemContext) {
 		p.Chain()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ILambdaFunctionExprContext is an interface to support dynamic dispatch.
@@ -26975,20 +29721,41 @@ type ILambdaFunctionExprContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Function_() antlr.TerminalNode
+	OpenRoundBracket() antlr.TerminalNode
+	FormalParameterList() IFormalParameterListContext
+	CloseRoundBracket() antlr.TerminalNode
+	BlockStatement() IBlockStatementContext
+	Static() antlr.TerminalNode
+	Ampersand() antlr.TerminalNode
+	LambdaFunctionUseVars() ILambdaFunctionUseVarsContext
+	Colon() antlr.TerminalNode
+	TypeHint() ITypeHintContext
+	QuestionMark() antlr.TerminalNode
+	LambdaFn() antlr.TerminalNode
+	DoubleArrow() antlr.TerminalNode
+	Expression() IExpressionContext
+
 	// IsLambdaFunctionExprContext differentiates from other interfaces.
 	IsLambdaFunctionExprContext()
 }
 
 type LambdaFunctionExprContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyLambdaFunctionExprContext() *LambdaFunctionExprContext {
 	var p = new(LambdaFunctionExprContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_lambdaFunctionExpr
 	return p
+}
+
+func InitEmptyLambdaFunctionExprContext(p *LambdaFunctionExprContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_lambdaFunctionExpr
 }
 
 func (*LambdaFunctionExprContext) IsLambdaFunctionExprContext() {}
@@ -26996,7 +29763,7 @@ func (*LambdaFunctionExprContext) IsLambdaFunctionExprContext() {}
 func NewLambdaFunctionExprContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *LambdaFunctionExprContext {
 	var p = new(LambdaFunctionExprContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_lambdaFunctionExpr
@@ -27141,63 +29908,70 @@ func (s *LambdaFunctionExprContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *PHPParser) LambdaFunctionExpr() (localctx ILambdaFunctionExprContext) {
-	this := p
-	_ = this
-
 	localctx = NewLambdaFunctionExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 224, PHPParserRULE_lambdaFunctionExpr)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1837)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 215, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 215, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		p.SetState(1799)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserStatic {
 			{
 				p.SetState(1798)
 				p.Match(PHPParserStatic)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		{
 			p.SetState(1801)
 			p.Match(PHPParserFunction_)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(1803)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserAmpersand {
 			{
 				p.SetState(1802)
 				p.Match(PHPParserAmpersand)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		{
 			p.SetState(1805)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1806)
@@ -27206,9 +29980,16 @@ func (p *PHPParser) LambdaFunctionExpr() (localctx ILambdaFunctionExprContext) {
 		{
 			p.SetState(1807)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(1809)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserUse {
@@ -27220,21 +30001,35 @@ func (p *PHPParser) LambdaFunctionExpr() (localctx ILambdaFunctionExprContext) {
 		}
 		p.SetState(1816)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserColon {
 			{
 				p.SetState(1811)
 				p.Match(PHPParserColon)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			p.SetState(1813)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 
 			if _la == PHPParserQuestionMark {
 				{
 					p.SetState(1812)
 					p.Match(PHPParserQuestionMark)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 
 			}
@@ -27253,22 +30048,37 @@ func (p *PHPParser) LambdaFunctionExpr() (localctx ILambdaFunctionExprContext) {
 		p.EnterOuterAlt(localctx, 2)
 		p.SetState(1821)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserStatic {
 			{
 				p.SetState(1820)
 				p.Match(PHPParserStatic)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		{
 			p.SetState(1823)
 			p.Match(PHPParserLambdaFn)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1824)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1825)
@@ -27277,24 +30087,42 @@ func (p *PHPParser) LambdaFunctionExpr() (localctx ILambdaFunctionExprContext) {
 		{
 			p.SetState(1826)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(1832)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserColon {
 			{
 				p.SetState(1827)
 				p.Match(PHPParserColon)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			p.SetState(1829)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 
 			if _la == PHPParserQuestionMark {
 				{
 					p.SetState(1828)
 					p.Match(PHPParserQuestionMark)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 
 			}
@@ -27307,15 +30135,31 @@ func (p *PHPParser) LambdaFunctionExpr() (localctx ILambdaFunctionExprContext) {
 		{
 			p.SetState(1834)
 			p.Match(PHPParserDoubleArrow)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1835)
 			p.expression(0)
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IMatchExprContext is an interface to support dynamic dispatch.
@@ -27325,20 +30169,37 @@ type IMatchExprContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Match_() antlr.TerminalNode
+	OpenRoundBracket() antlr.TerminalNode
+	Expression() IExpressionContext
+	CloseRoundBracket() antlr.TerminalNode
+	OpenCurlyBracket() antlr.TerminalNode
+	AllMatchItem() []IMatchItemContext
+	MatchItem(i int) IMatchItemContext
+	CloseCurlyBracket() antlr.TerminalNode
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsMatchExprContext differentiates from other interfaces.
 	IsMatchExprContext()
 }
 
 type MatchExprContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyMatchExprContext() *MatchExprContext {
 	var p = new(MatchExprContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_matchExpr
 	return p
+}
+
+func InitEmptyMatchExprContext(p *MatchExprContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_matchExpr
 }
 
 func (*MatchExprContext) IsMatchExprContext() {}
@@ -27346,7 +30207,7 @@ func (*MatchExprContext) IsMatchExprContext() {}
 func NewMatchExprContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MatchExprContext {
 	var p = new(MatchExprContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_matchExpr
@@ -27460,28 +30321,9 @@ func (s *MatchExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) MatchExpr() (localctx IMatchExprContext) {
-	this := p
-	_ = this
-
 	localctx = NewMatchExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 226, PHPParserRULE_matchExpr)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -27489,10 +30331,18 @@ func (p *PHPParser) MatchExpr() (localctx IMatchExprContext) {
 	{
 		p.SetState(1839)
 		p.Match(PHPParserMatch_)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1840)
 		p.Match(PHPParserOpenRoundBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1841)
@@ -27501,10 +30351,18 @@ func (p *PHPParser) MatchExpr() (localctx IMatchExprContext) {
 	{
 		p.SetState(1842)
 		p.Match(PHPParserCloseRoundBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1843)
 		p.Match(PHPParserOpenCurlyBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1844)
@@ -27512,13 +30370,22 @@ func (p *PHPParser) MatchExpr() (localctx IMatchExprContext) {
 	}
 	p.SetState(1849)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 216, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 216, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
 				p.SetState(1845)
 				p.Match(PHPParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(1846)
@@ -27528,25 +30395,52 @@ func (p *PHPParser) MatchExpr() (localctx IMatchExprContext) {
 		}
 		p.SetState(1851)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 216, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 216, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(1853)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserComma {
 		{
 			p.SetState(1852)
 			p.Match(PHPParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 	{
 		p.SetState(1855)
 		p.Match(PHPParserCloseCurlyBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IMatchItemContext is an interface to support dynamic dispatch.
@@ -27556,20 +30450,32 @@ type IMatchItemContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllExpression() []IExpressionContext
+	Expression(i int) IExpressionContext
+	DoubleArrow() antlr.TerminalNode
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsMatchItemContext differentiates from other interfaces.
 	IsMatchItemContext()
 }
 
 type MatchItemContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyMatchItemContext() *MatchItemContext {
 	var p = new(MatchItemContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_matchItem
 	return p
+}
+
+func InitEmptyMatchItemContext(p *MatchItemContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_matchItem
 }
 
 func (*MatchItemContext) IsMatchItemContext() {}
@@ -27577,7 +30483,7 @@ func (*MatchItemContext) IsMatchItemContext() {}
 func NewMatchItemContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MatchItemContext {
 	var p = new(MatchItemContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_matchItem
@@ -27659,28 +30565,9 @@ func (s *MatchItemContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) MatchItem() (localctx IMatchItemContext) {
-	this := p
-	_ = this
-
 	localctx = NewMatchItemContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 228, PHPParserRULE_matchItem)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -27691,13 +30578,22 @@ func (p *PHPParser) MatchItem() (localctx IMatchItemContext) {
 	}
 	p.SetState(1862)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 218, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 218, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
 				p.SetState(1858)
 				p.Match(PHPParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(1859)
@@ -27707,29 +30603,56 @@ func (p *PHPParser) MatchItem() (localctx IMatchItemContext) {
 		}
 		p.SetState(1864)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 218, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 218, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(1866)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserComma {
 		{
 			p.SetState(1865)
 			p.Match(PHPParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 	{
 		p.SetState(1868)
 		p.Match(PHPParserDoubleArrow)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1869)
 		p.expression(0)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // INewExprContext is an interface to support dynamic dispatch.
@@ -27739,20 +30662,31 @@ type INewExprContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	New() antlr.TerminalNode
+	AnonymousClass() IAnonymousClassContext
+	TypeRef() ITypeRefContext
+	Arguments() IArgumentsContext
+
 	// IsNewExprContext differentiates from other interfaces.
 	IsNewExprContext()
 }
 
 type NewExprContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyNewExprContext() *NewExprContext {
 	var p = new(NewExprContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_newExpr
 	return p
+}
+
+func InitEmptyNewExprContext(p *NewExprContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_newExpr
 }
 
 func (*NewExprContext) IsNewExprContext() {}
@@ -27760,7 +30694,7 @@ func (*NewExprContext) IsNewExprContext() {}
 func NewNewExprContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *NewExprContext {
 	var p = new(NewExprContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_newExpr
@@ -27841,36 +30775,24 @@ func (s *NewExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) NewExpr() (localctx INewExprContext) {
-	this := p
-	_ = this
-
 	localctx = NewNewExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 230, PHPParserRULE_newExpr)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1878)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 221, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 221, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(1871)
 			p.Match(PHPParserNew)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1872)
@@ -27882,6 +30804,10 @@ func (p *PHPParser) NewExpr() (localctx INewExprContext) {
 		{
 			p.SetState(1873)
 			p.Match(PHPParserNew)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1874)
@@ -27890,17 +30816,31 @@ func (p *PHPParser) NewExpr() (localctx INewExprContext) {
 		p.SetState(1876)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 220, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 220, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(1875)
 				p.Arguments()
 			}
 
+		} else if p.HasError() { // JIM
+			goto errorExit
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAssignmentOperatorContext is an interface to support dynamic dispatch.
@@ -27910,20 +30850,41 @@ type IAssignmentOperatorContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Eq() antlr.TerminalNode
+	PlusEqual() antlr.TerminalNode
+	MinusEqual() antlr.TerminalNode
+	MulEqual() antlr.TerminalNode
+	PowEqual() antlr.TerminalNode
+	DivEqual() antlr.TerminalNode
+	Concaequal() antlr.TerminalNode
+	ModEqual() antlr.TerminalNode
+	AndEqual() antlr.TerminalNode
+	OrEqual() antlr.TerminalNode
+	XorEqual() antlr.TerminalNode
+	ShiftLeftEqual() antlr.TerminalNode
+	ShiftRightEqual() antlr.TerminalNode
+	NullCoalescingEqual() antlr.TerminalNode
+
 	// IsAssignmentOperatorContext differentiates from other interfaces.
 	IsAssignmentOperatorContext()
 }
 
 type AssignmentOperatorContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyAssignmentOperatorContext() *AssignmentOperatorContext {
 	var p = new(AssignmentOperatorContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_assignmentOperator
 	return p
+}
+
+func InitEmptyAssignmentOperatorContext(p *AssignmentOperatorContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_assignmentOperator
 }
 
 func (*AssignmentOperatorContext) IsAssignmentOperatorContext() {}
@@ -27931,7 +30892,7 @@ func (*AssignmentOperatorContext) IsAssignmentOperatorContext() {}
 func NewAssignmentOperatorContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AssignmentOperatorContext {
 	var p = new(AssignmentOperatorContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_assignmentOperator
@@ -28016,28 +30977,9 @@ func (s *AssignmentOperatorContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *PHPParser) AssignmentOperator() (localctx IAssignmentOperatorContext) {
-	this := p
-	_ = this
-
 	localctx = NewAssignmentOperatorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 232, PHPParserRULE_assignmentOperator)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -28052,7 +30994,17 @@ func (p *PHPParser) AssignmentOperator() (localctx IAssignmentOperatorContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IYieldExpressionContext is an interface to support dynamic dispatch.
@@ -28062,20 +31014,32 @@ type IYieldExpressionContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Yield() antlr.TerminalNode
+	AllExpression() []IExpressionContext
+	Expression(i int) IExpressionContext
+	From() antlr.TerminalNode
+	DoubleArrow() antlr.TerminalNode
+
 	// IsYieldExpressionContext differentiates from other interfaces.
 	IsYieldExpressionContext()
 }
 
 type YieldExpressionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyYieldExpressionContext() *YieldExpressionContext {
 	var p = new(YieldExpressionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_yieldExpression
 	return p
+}
+
+func InitEmptyYieldExpressionContext(p *YieldExpressionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_yieldExpression
 }
 
 func (*YieldExpressionContext) IsYieldExpressionContext() {}
@@ -28083,7 +31047,7 @@ func (*YieldExpressionContext) IsYieldExpressionContext() {}
 func NewYieldExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *YieldExpressionContext {
 	var p = new(YieldExpressionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_yieldExpression
@@ -28165,37 +31129,26 @@ func (s *YieldExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) YieldExpression() (localctx IYieldExpressionContext) {
-	this := p
-	_ = this
-
 	localctx = NewYieldExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 234, PHPParserRULE_yieldExpression)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1882)
 		p.Match(PHPParserYield)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(1890)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 223, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 223, p.GetParserRuleContext()) {
 	case 1:
 		{
 			p.SetState(1883)
@@ -28203,12 +31156,19 @@ func (p *PHPParser) YieldExpression() (localctx IYieldExpressionContext) {
 		}
 		p.SetState(1886)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserDoubleArrow {
 			{
 				p.SetState(1884)
 				p.Match(PHPParserDoubleArrow)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(1885)
@@ -28221,15 +31181,31 @@ func (p *PHPParser) YieldExpression() (localctx IYieldExpressionContext) {
 		{
 			p.SetState(1888)
 			p.Match(PHPParserFrom)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1889)
 			p.expression(0)
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IArrayItemListContext is an interface to support dynamic dispatch.
@@ -28239,20 +31215,31 @@ type IArrayItemListContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllArrayItem() []IArrayItemContext
+	ArrayItem(i int) IArrayItemContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsArrayItemListContext differentiates from other interfaces.
 	IsArrayItemListContext()
 }
 
 type ArrayItemListContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyArrayItemListContext() *ArrayItemListContext {
 	var p = new(ArrayItemListContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_arrayItemList
 	return p
+}
+
+func InitEmptyArrayItemListContext(p *ArrayItemListContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_arrayItemList
 }
 
 func (*ArrayItemListContext) IsArrayItemListContext() {}
@@ -28260,7 +31247,7 @@ func (*ArrayItemListContext) IsArrayItemListContext() {}
 func NewArrayItemListContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ArrayItemListContext {
 	var p = new(ArrayItemListContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_arrayItemList
@@ -28338,28 +31325,8 @@ func (s *ArrayItemListContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) ArrayItemList() (localctx IArrayItemListContext) {
-	this := p
-	_ = this
-
 	localctx = NewArrayItemListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 236, PHPParserRULE_arrayItemList)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -28369,13 +31336,22 @@ func (p *PHPParser) ArrayItemList() (localctx IArrayItemListContext) {
 	}
 	p.SetState(1897)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 224, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 224, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
 				p.SetState(1893)
 				p.Match(PHPParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(1894)
@@ -28385,20 +31361,42 @@ func (p *PHPParser) ArrayItemList() (localctx IArrayItemListContext) {
 		}
 		p.SetState(1899)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 224, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 224, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(1901)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 225, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 225, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(1900)
 			p.Match(PHPParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IArrayItemContext is an interface to support dynamic dispatch.
@@ -28408,20 +31406,33 @@ type IArrayItemContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Ellipsis() antlr.TerminalNode
+	AllExpression() []IExpressionContext
+	Expression(i int) IExpressionContext
+	DoubleArrow() antlr.TerminalNode
+	Ampersand() antlr.TerminalNode
+	Chain() IChainContext
+
 	// IsArrayItemContext differentiates from other interfaces.
 	IsArrayItemContext()
 }
 
 type ArrayItemContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyArrayItemContext() *ArrayItemContext {
 	var p = new(ArrayItemContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_arrayItem
 	return p
+}
+
+func InitEmptyArrayItemContext(p *ArrayItemContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_arrayItem
 }
 
 func (*ArrayItemContext) IsArrayItemContext() {}
@@ -28429,7 +31440,7 @@ func (*ArrayItemContext) IsArrayItemContext() {}
 func NewArrayItemContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ArrayItemContext {
 	var p = new(ArrayItemContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_arrayItem
@@ -28527,37 +31538,26 @@ func (s *ArrayItemContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) ArrayItem() (localctx IArrayItemContext) {
-	this := p
-	_ = this
-
 	localctx = NewArrayItemContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 238, PHPParserRULE_arrayItem)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1917)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 228, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 228, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(1903)
 			p.Match(PHPParserEllipsis)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1904)
@@ -28572,12 +31572,19 @@ func (p *PHPParser) ArrayItem() (localctx IArrayItemContext) {
 		}
 		p.SetState(1908)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserDoubleArrow {
 			{
 				p.SetState(1906)
 				p.Match(PHPParserDoubleArrow)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(1907)
@@ -28591,7 +31598,7 @@ func (p *PHPParser) ArrayItem() (localctx IArrayItemContext) {
 		p.SetState(1913)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 227, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 227, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(1910)
 				p.expression(0)
@@ -28599,21 +31606,43 @@ func (p *PHPParser) ArrayItem() (localctx IArrayItemContext) {
 			{
 				p.SetState(1911)
 				p.Match(PHPParserDoubleArrow)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
+		} else if p.HasError() { // JIM
+			goto errorExit
 		}
 		{
 			p.SetState(1915)
 			p.Match(PHPParserAmpersand)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1916)
 			p.Chain()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ILambdaFunctionUseVarsContext is an interface to support dynamic dispatch.
@@ -28623,20 +31652,34 @@ type ILambdaFunctionUseVarsContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Use() antlr.TerminalNode
+	OpenRoundBracket() antlr.TerminalNode
+	AllLambdaFunctionUseVar() []ILambdaFunctionUseVarContext
+	LambdaFunctionUseVar(i int) ILambdaFunctionUseVarContext
+	CloseRoundBracket() antlr.TerminalNode
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsLambdaFunctionUseVarsContext differentiates from other interfaces.
 	IsLambdaFunctionUseVarsContext()
 }
 
 type LambdaFunctionUseVarsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyLambdaFunctionUseVarsContext() *LambdaFunctionUseVarsContext {
 	var p = new(LambdaFunctionUseVarsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_lambdaFunctionUseVars
 	return p
+}
+
+func InitEmptyLambdaFunctionUseVarsContext(p *LambdaFunctionUseVarsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_lambdaFunctionUseVars
 }
 
 func (*LambdaFunctionUseVarsContext) IsLambdaFunctionUseVarsContext() {}
@@ -28644,7 +31687,7 @@ func (*LambdaFunctionUseVarsContext) IsLambdaFunctionUseVarsContext() {}
 func NewLambdaFunctionUseVarsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *LambdaFunctionUseVarsContext {
 	var p = new(LambdaFunctionUseVarsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_lambdaFunctionUseVars
@@ -28734,37 +31777,26 @@ func (s *LambdaFunctionUseVarsContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *PHPParser) LambdaFunctionUseVars() (localctx ILambdaFunctionUseVarsContext) {
-	this := p
-	_ = this
-
 	localctx = NewLambdaFunctionUseVarsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 240, PHPParserRULE_lambdaFunctionUseVars)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1919)
 		p.Match(PHPParserUse)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1920)
 		p.Match(PHPParserOpenRoundBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1921)
@@ -28772,12 +31804,19 @@ func (p *PHPParser) LambdaFunctionUseVars() (localctx ILambdaFunctionUseVarsCont
 	}
 	p.SetState(1926)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == PHPParserComma {
 		{
 			p.SetState(1922)
 			p.Match(PHPParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1923)
@@ -28786,14 +31825,31 @@ func (p *PHPParser) LambdaFunctionUseVars() (localctx ILambdaFunctionUseVarsCont
 
 		p.SetState(1928)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(1929)
 		p.Match(PHPParserCloseRoundBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ILambdaFunctionUseVarContext is an interface to support dynamic dispatch.
@@ -28803,20 +31859,29 @@ type ILambdaFunctionUseVarContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	VarName() antlr.TerminalNode
+	Ampersand() antlr.TerminalNode
+
 	// IsLambdaFunctionUseVarContext differentiates from other interfaces.
 	IsLambdaFunctionUseVarContext()
 }
 
 type LambdaFunctionUseVarContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyLambdaFunctionUseVarContext() *LambdaFunctionUseVarContext {
 	var p = new(LambdaFunctionUseVarContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_lambdaFunctionUseVar
 	return p
+}
+
+func InitEmptyLambdaFunctionUseVarContext(p *LambdaFunctionUseVarContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_lambdaFunctionUseVar
 }
 
 func (*LambdaFunctionUseVarContext) IsLambdaFunctionUseVarContext() {}
@@ -28824,7 +31889,7 @@ func (*LambdaFunctionUseVarContext) IsLambdaFunctionUseVarContext() {}
 func NewLambdaFunctionUseVarContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *LambdaFunctionUseVarContext {
 	var p = new(LambdaFunctionUseVarContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_lambdaFunctionUseVar
@@ -28861,47 +31926,49 @@ func (s *LambdaFunctionUseVarContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *PHPParser) LambdaFunctionUseVar() (localctx ILambdaFunctionUseVarContext) {
-	this := p
-	_ = this
-
 	localctx = NewLambdaFunctionUseVarContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 242, PHPParserRULE_lambdaFunctionUseVar)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(1932)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserAmpersand {
 		{
 			p.SetState(1931)
 			p.Match(PHPParserAmpersand)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 	{
 		p.SetState(1934)
 		p.Match(PHPParserVarName)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IQualifiedStaticTypeRefContext is an interface to support dynamic dispatch.
@@ -28911,20 +31978,29 @@ type IQualifiedStaticTypeRefContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	QualifiedNamespaceName() IQualifiedNamespaceNameContext
+	Static() antlr.TerminalNode
+
 	// IsQualifiedStaticTypeRefContext differentiates from other interfaces.
 	IsQualifiedStaticTypeRefContext()
 }
 
 type QualifiedStaticTypeRefContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyQualifiedStaticTypeRefContext() *QualifiedStaticTypeRefContext {
 	var p = new(QualifiedStaticTypeRefContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_qualifiedStaticTypeRef
 	return p
+}
+
+func InitEmptyQualifiedStaticTypeRefContext(p *QualifiedStaticTypeRefContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_qualifiedStaticTypeRef
 }
 
 func (*QualifiedStaticTypeRefContext) IsQualifiedStaticTypeRefContext() {}
@@ -28932,7 +32008,7 @@ func (*QualifiedStaticTypeRefContext) IsQualifiedStaticTypeRefContext() {}
 func NewQualifiedStaticTypeRefContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *QualifiedStaticTypeRefContext {
 	var p = new(QualifiedStaticTypeRefContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_qualifiedStaticTypeRef
@@ -28981,31 +32057,15 @@ func (s *QualifiedStaticTypeRefContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 func (p *PHPParser) QualifiedStaticTypeRef() (localctx IQualifiedStaticTypeRefContext) {
-	this := p
-	_ = this
-
 	localctx = NewQualifiedStaticTypeRefContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 244, PHPParserRULE_qualifiedStaticTypeRef)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1938)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 231, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 231, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -29018,11 +32078,27 @@ func (p *PHPParser) QualifiedStaticTypeRef() (localctx IQualifiedStaticTypeRefCo
 		{
 			p.SetState(1937)
 			p.Match(PHPParserStatic)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITypeRefContext is an interface to support dynamic dispatch.
@@ -29032,20 +32108,34 @@ type ITypeRefContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	IndirectTypeRef() IIndirectTypeRefContext
+	QualifiedNamespaceName() IQualifiedNamespaceNameContext
+	PrimitiveType() IPrimitiveTypeContext
+	Static() antlr.TerminalNode
+	FlexiVariable() IFlexiVariableContext
+	StaticClassExprVariableMember() IStaticClassExprVariableMemberContext
+	AnonymousClass() IAnonymousClassContext
+
 	// IsTypeRefContext differentiates from other interfaces.
 	IsTypeRefContext()
 }
 
 type TypeRefContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTypeRefContext() *TypeRefContext {
 	var p = new(TypeRefContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_typeRef
 	return p
+}
+
+func InitEmptyTypeRefContext(p *TypeRefContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_typeRef
 }
 
 func (*TypeRefContext) IsTypeRefContext() {}
@@ -29053,7 +32143,7 @@ func (*TypeRefContext) IsTypeRefContext() {}
 func NewTypeRefContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TypeRefContext {
 	var p = new(TypeRefContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_typeRef
@@ -29182,31 +32272,15 @@ func (s *TypeRefContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) TypeRef() (localctx ITypeRefContext) {
-	this := p
-	_ = this
-
 	localctx = NewTypeRefContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 246, PHPParserRULE_typeRef)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1947)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 232, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 232, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -29233,6 +32307,10 @@ func (p *PHPParser) TypeRef() (localctx ITypeRefContext) {
 		{
 			p.SetState(1943)
 			p.Match(PHPParserStatic)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 5:
@@ -29256,9 +32334,21 @@ func (p *PHPParser) TypeRef() (localctx ITypeRefContext) {
 			p.AnonymousClass()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAnonymousClassContext is an interface to support dynamic dispatch.
@@ -29268,20 +32358,43 @@ type IAnonymousClassContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	OpenCurlyBracket() antlr.TerminalNode
+	CloseCurlyBracket() antlr.TerminalNode
+	ClassEntryType() IClassEntryTypeContext
+	Interface() antlr.TerminalNode
+	Identifier() IIdentifierContext
+	Attributes() IAttributesContext
+	Private() antlr.TerminalNode
+	Modifier() IModifierContext
+	Partial() antlr.TerminalNode
+	AllClassStatement() []IClassStatementContext
+	ClassStatement(i int) IClassStatementContext
+	Arguments() IArgumentsContext
+	Extends() antlr.TerminalNode
+	QualifiedStaticTypeRef() IQualifiedStaticTypeRefContext
+	Implements() antlr.TerminalNode
+	InterfaceList() IInterfaceListContext
+
 	// IsAnonymousClassContext differentiates from other interfaces.
 	IsAnonymousClassContext()
 }
 
 type AnonymousClassContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyAnonymousClassContext() *AnonymousClassContext {
 	var p = new(AnonymousClassContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_anonymousClass
 	return p
+}
+
+func InitEmptyAnonymousClassContext(p *AnonymousClassContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_anonymousClass
 }
 
 func (*AnonymousClassContext) IsAnonymousClassContext() {}
@@ -29289,7 +32402,7 @@ func (*AnonymousClassContext) IsAnonymousClassContext() {}
 func NewAnonymousClassContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AnonymousClassContext {
 	var p = new(AnonymousClassContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_anonymousClass
@@ -29499,32 +32612,16 @@ func (s *AnonymousClassContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) AnonymousClass() (localctx IAnonymousClassContext) {
-	this := p
-	_ = this
-
 	localctx = NewAnonymousClassContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 248, PHPParserRULE_anonymousClass)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(1950)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserAttributeStart {
@@ -29536,17 +32633,27 @@ func (p *PHPParser) AnonymousClass() (localctx IAnonymousClassContext) {
 	}
 	p.SetState(1953)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserPrivate {
 		{
 			p.SetState(1952)
 			p.Match(PHPParserPrivate)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 	p.SetState(1956)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserAbstract || _la == PHPParserFinal {
@@ -29558,17 +32665,27 @@ func (p *PHPParser) AnonymousClass() (localctx IAnonymousClassContext) {
 	}
 	p.SetState(1959)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserPartial {
 		{
 			p.SetState(1958)
 			p.Match(PHPParserPartial)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 	p.SetState(1979)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserClass, PHPParserTrait:
@@ -29578,6 +32695,9 @@ func (p *PHPParser) AnonymousClass() (localctx IAnonymousClassContext) {
 		}
 		p.SetState(1963)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserOpenRoundBracket {
@@ -29589,12 +32709,19 @@ func (p *PHPParser) AnonymousClass() (localctx IAnonymousClassContext) {
 		}
 		p.SetState(1967)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserExtends {
 			{
 				p.SetState(1965)
 				p.Match(PHPParserExtends)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(1966)
@@ -29604,12 +32731,19 @@ func (p *PHPParser) AnonymousClass() (localctx IAnonymousClassContext) {
 		}
 		p.SetState(1971)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserImplements {
 			{
 				p.SetState(1969)
 				p.Match(PHPParserImplements)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(1970)
@@ -29622,6 +32756,10 @@ func (p *PHPParser) AnonymousClass() (localctx IAnonymousClassContext) {
 		{
 			p.SetState(1973)
 			p.Match(PHPParserInterface)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1974)
@@ -29629,12 +32767,19 @@ func (p *PHPParser) AnonymousClass() (localctx IAnonymousClassContext) {
 		}
 		p.SetState(1977)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserExtends {
 			{
 				p.SetState(1975)
 				p.Match(PHPParserExtends)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(1976)
@@ -29644,17 +32789,25 @@ func (p *PHPParser) AnonymousClass() (localctx IAnonymousClassContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 	{
 		p.SetState(1981)
 		p.Match(PHPParserOpenCurlyBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(1985)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&144167964633989120) != 0 || (int64((_la-82)) & ^0x3f) == 0 && ((int64(1)<<(_la-82))&6757727313330209) != 0 {
+	for ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&144167964633989120) != 0) || ((int64((_la-82)) & ^0x3f) == 0 && ((int64(1)<<(_la-82))&6757727313330209) != 0) {
 		{
 			p.SetState(1982)
 			p.ClassStatement()
@@ -29662,14 +32815,31 @@ func (p *PHPParser) AnonymousClass() (localctx IAnonymousClassContext) {
 
 		p.SetState(1987)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(1988)
 		p.Match(PHPParserCloseCurlyBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIndirectTypeRefContext is an interface to support dynamic dispatch.
@@ -29679,20 +32849,30 @@ type IIndirectTypeRefContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Expression() IExpressionContext
+	ObjectOperator() antlr.TerminalNode
+	MemberCallKey() IMemberCallKeyContext
+
 	// IsIndirectTypeRefContext differentiates from other interfaces.
 	IsIndirectTypeRefContext()
 }
 
 type IndirectTypeRefContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyIndirectTypeRefContext() *IndirectTypeRefContext {
 	var p = new(IndirectTypeRefContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_indirectTypeRef
 	return p
+}
+
+func InitEmptyIndirectTypeRefContext(p *IndirectTypeRefContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_indirectTypeRef
 }
 
 func (*IndirectTypeRefContext) IsIndirectTypeRefContext() {}
@@ -29700,7 +32880,7 @@ func (*IndirectTypeRefContext) IsIndirectTypeRefContext() {}
 func NewIndirectTypeRefContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *IndirectTypeRefContext {
 	var p = new(IndirectTypeRefContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_indirectTypeRef
@@ -29765,28 +32945,8 @@ func (s *IndirectTypeRefContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) IndirectTypeRef() (localctx IIndirectTypeRefContext) {
-	this := p
-	_ = this
-
 	localctx = NewIndirectTypeRefContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 250, PHPParserRULE_indirectTypeRef)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1990)
@@ -29795,13 +32955,27 @@ func (p *PHPParser) IndirectTypeRef() (localctx IIndirectTypeRefContext) {
 	{
 		p.SetState(1991)
 		p.Match(PHPParserObjectOperator)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1992)
 		p.MemberCallKey()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IQualifiedNamespaceNameContext is an interface to support dynamic dispatch.
@@ -29811,20 +32985,29 @@ type IQualifiedNamespaceNameContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	NamespacePath() INamespacePathContext
+	Namespace() antlr.TerminalNode
+
 	// IsQualifiedNamespaceNameContext differentiates from other interfaces.
 	IsQualifiedNamespaceNameContext()
 }
 
 type QualifiedNamespaceNameContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyQualifiedNamespaceNameContext() *QualifiedNamespaceNameContext {
 	var p = new(QualifiedNamespaceNameContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_qualifiedNamespaceName
 	return p
+}
+
+func InitEmptyQualifiedNamespaceNameContext(p *QualifiedNamespaceNameContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_qualifiedNamespaceName
 }
 
 func (*QualifiedNamespaceNameContext) IsQualifiedNamespaceNameContext() {}
@@ -29832,7 +33015,7 @@ func (*QualifiedNamespaceNameContext) IsQualifiedNamespaceNameContext() {}
 func NewQualifiedNamespaceNameContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *QualifiedNamespaceNameContext {
 	var p = new(QualifiedNamespaceNameContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_qualifiedNamespaceName
@@ -29881,45 +33064,41 @@ func (s *QualifiedNamespaceNameContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 func (p *PHPParser) QualifiedNamespaceName() (localctx IQualifiedNamespaceNameContext) {
-	this := p
-	_ = this
-
 	localctx = NewQualifiedNamespaceNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 252, PHPParserRULE_qualifiedNamespaceName)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(1995)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 243, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 243, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(1994)
 			p.Match(PHPParserNamespace)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 	{
 		p.SetState(1997)
 		p.NamespacePath()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // INamespaceUseDeclarationContext is an interface to support dynamic dispatch.
@@ -29929,20 +33108,32 @@ type INamespaceUseDeclarationContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	NamespacePath() INamespacePathContext
+	As() antlr.TerminalNode
+	Identifier() IIdentifierContext
+	NamespaceSeparator() antlr.TerminalNode
+	NamespaceUseTail() INamespaceUseTailContext
+
 	// IsNamespaceUseDeclarationContext differentiates from other interfaces.
 	IsNamespaceUseDeclarationContext()
 }
 
 type NamespaceUseDeclarationContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyNamespaceUseDeclarationContext() *NamespaceUseDeclarationContext {
 	var p = new(NamespaceUseDeclarationContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_namespaceUseDeclaration
 	return p
+}
+
+func InitEmptyNamespaceUseDeclarationContext(p *NamespaceUseDeclarationContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_namespaceUseDeclaration
 }
 
 func (*NamespaceUseDeclarationContext) IsNamespaceUseDeclarationContext() {}
@@ -29950,7 +33141,7 @@ func (*NamespaceUseDeclarationContext) IsNamespaceUseDeclarationContext() {}
 func NewNamespaceUseDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *NamespaceUseDeclarationContext {
 	var p = new(NamespaceUseDeclarationContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_namespaceUseDeclaration
@@ -30035,32 +33226,17 @@ func (s *NamespaceUseDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 func (p *PHPParser) NamespaceUseDeclaration() (localctx INamespaceUseDeclarationContext) {
-	this := p
-	_ = this
-
 	localctx = NewNamespaceUseDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 254, PHPParserRULE_namespaceUseDeclaration)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(2008)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 245, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 245, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -30069,12 +33245,19 @@ func (p *PHPParser) NamespaceUseDeclaration() (localctx INamespaceUseDeclaration
 		}
 		p.SetState(2002)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserAs {
 			{
 				p.SetState(2000)
 				p.Match(PHPParserAs)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(2001)
@@ -30092,15 +33275,31 @@ func (p *PHPParser) NamespaceUseDeclaration() (localctx INamespaceUseDeclaration
 		{
 			p.SetState(2005)
 			p.Match(PHPParserNamespaceSeparator)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(2006)
 			p.NamespaceUseTail()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // INamespaceUseTailContext is an interface to support dynamic dispatch.
@@ -30110,20 +33309,33 @@ type INamespaceUseTailContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	OpenCurlyBracket() antlr.TerminalNode
+	AllNamespaceUseClause() []INamespaceUseClauseContext
+	NamespaceUseClause(i int) INamespaceUseClauseContext
+	CloseCurlyBracket() antlr.TerminalNode
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsNamespaceUseTailContext differentiates from other interfaces.
 	IsNamespaceUseTailContext()
 }
 
 type NamespaceUseTailContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyNamespaceUseTailContext() *NamespaceUseTailContext {
 	var p = new(NamespaceUseTailContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_namespaceUseTail
 	return p
+}
+
+func InitEmptyNamespaceUseTailContext(p *NamespaceUseTailContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_namespaceUseTail
 }
 
 func (*NamespaceUseTailContext) IsNamespaceUseTailContext() {}
@@ -30131,7 +33343,7 @@ func (*NamespaceUseTailContext) IsNamespaceUseTailContext() {}
 func NewNamespaceUseTailContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *NamespaceUseTailContext {
 	var p = new(NamespaceUseTailContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_namespaceUseTail
@@ -30217,28 +33429,9 @@ func (s *NamespaceUseTailContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *PHPParser) NamespaceUseTail() (localctx INamespaceUseTailContext) {
-	this := p
-	_ = this
-
 	localctx = NewNamespaceUseTailContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 256, PHPParserRULE_namespaceUseTail)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -30246,6 +33439,10 @@ func (p *PHPParser) NamespaceUseTail() (localctx INamespaceUseTailContext) {
 	{
 		p.SetState(2010)
 		p.Match(PHPParserOpenCurlyBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(2011)
@@ -30253,13 +33450,22 @@ func (p *PHPParser) NamespaceUseTail() (localctx INamespaceUseTailContext) {
 	}
 	p.SetState(2016)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 246, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 246, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
 				p.SetState(2012)
 				p.Match(PHPParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(2013)
@@ -30269,25 +33475,52 @@ func (p *PHPParser) NamespaceUseTail() (localctx INamespaceUseTailContext) {
 		}
 		p.SetState(2018)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 246, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 246, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(2020)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == PHPParserComma {
 		{
 			p.SetState(2019)
 			p.Match(PHPParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 	{
 		p.SetState(2022)
 		p.Match(PHPParserCloseCurlyBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // INamespaceUseClauseContext is an interface to support dynamic dispatch.
@@ -30297,20 +33530,32 @@ type INamespaceUseClauseContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	NamespacePath() INamespacePathContext
+	As() antlr.TerminalNode
+	Identifier() IIdentifierContext
+	NamespaceSeparator() antlr.TerminalNode
+	NamespaceUseTail() INamespaceUseTailContext
+
 	// IsNamespaceUseClauseContext differentiates from other interfaces.
 	IsNamespaceUseClauseContext()
 }
 
 type NamespaceUseClauseContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyNamespaceUseClauseContext() *NamespaceUseClauseContext {
 	var p = new(NamespaceUseClauseContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_namespaceUseClause
 	return p
+}
+
+func InitEmptyNamespaceUseClauseContext(p *NamespaceUseClauseContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_namespaceUseClause
 }
 
 func (*NamespaceUseClauseContext) IsNamespaceUseClauseContext() {}
@@ -30318,7 +33563,7 @@ func (*NamespaceUseClauseContext) IsNamespaceUseClauseContext() {}
 func NewNamespaceUseClauseContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *NamespaceUseClauseContext {
 	var p = new(NamespaceUseClauseContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_namespaceUseClause
@@ -30403,32 +33648,17 @@ func (s *NamespaceUseClauseContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *PHPParser) NamespaceUseClause() (localctx INamespaceUseClauseContext) {
-	this := p
-	_ = this
-
 	localctx = NewNamespaceUseClauseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 258, PHPParserRULE_namespaceUseClause)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(2033)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 249, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 249, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -30437,12 +33667,19 @@ func (p *PHPParser) NamespaceUseClause() (localctx INamespaceUseClauseContext) {
 		}
 		p.SetState(2027)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserAs {
 			{
 				p.SetState(2025)
 				p.Match(PHPParserAs)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(2026)
@@ -30460,15 +33697,31 @@ func (p *PHPParser) NamespaceUseClause() (localctx INamespaceUseClauseContext) {
 		{
 			p.SetState(2030)
 			p.Match(PHPParserNamespaceSeparator)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(2031)
 			p.NamespaceUseTail()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IQualifiedNamespaceNameListContext is an interface to support dynamic dispatch.
@@ -30478,20 +33731,31 @@ type IQualifiedNamespaceNameListContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllQualifiedNamespaceName() []IQualifiedNamespaceNameContext
+	QualifiedNamespaceName(i int) IQualifiedNamespaceNameContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsQualifiedNamespaceNameListContext differentiates from other interfaces.
 	IsQualifiedNamespaceNameListContext()
 }
 
 type QualifiedNamespaceNameListContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyQualifiedNamespaceNameListContext() *QualifiedNamespaceNameListContext {
 	var p = new(QualifiedNamespaceNameListContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_qualifiedNamespaceNameList
 	return p
+}
+
+func InitEmptyQualifiedNamespaceNameListContext(p *QualifiedNamespaceNameListContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_qualifiedNamespaceNameList
 }
 
 func (*QualifiedNamespaceNameListContext) IsQualifiedNamespaceNameListContext() {}
@@ -30499,7 +33763,7 @@ func (*QualifiedNamespaceNameListContext) IsQualifiedNamespaceNameListContext() 
 func NewQualifiedNamespaceNameListContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *QualifiedNamespaceNameListContext {
 	var p = new(QualifiedNamespaceNameListContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_qualifiedNamespaceNameList
@@ -30577,28 +33841,9 @@ func (s *QualifiedNamespaceNameListContext) Accept(visitor antlr.ParseTreeVisito
 }
 
 func (p *PHPParser) QualifiedNamespaceNameList() (localctx IQualifiedNamespaceNameListContext) {
-	this := p
-	_ = this
-
 	localctx = NewQualifiedNamespaceNameListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 260, PHPParserRULE_qualifiedNamespaceNameList)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -30607,12 +33852,19 @@ func (p *PHPParser) QualifiedNamespaceNameList() (localctx IQualifiedNamespaceNa
 	}
 	p.SetState(2040)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == PHPParserComma {
 		{
 			p.SetState(2036)
 			p.Match(PHPParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(2037)
@@ -30621,10 +33873,23 @@ func (p *PHPParser) QualifiedNamespaceNameList() (localctx IQualifiedNamespaceNa
 
 		p.SetState(2042)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IArgumentsContext is an interface to support dynamic dispatch.
@@ -30634,20 +33899,34 @@ type IArgumentsContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	OpenRoundBracket() antlr.TerminalNode
+	Ellipsis() antlr.TerminalNode
+	CloseRoundBracket() antlr.TerminalNode
+	AllActualArgument() []IActualArgumentContext
+	ActualArgument(i int) IActualArgumentContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsArgumentsContext differentiates from other interfaces.
 	IsArgumentsContext()
 }
 
 type ArgumentsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyArgumentsContext() *ArgumentsContext {
 	var p = new(ArgumentsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_arguments
 	return p
+}
+
+func InitEmptyArgumentsContext(p *ArgumentsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_arguments
 }
 
 func (*ArgumentsContext) IsArgumentsContext() {}
@@ -30655,7 +33934,7 @@ func (*ArgumentsContext) IsArgumentsContext() {}
 func NewArgumentsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ArgumentsContext {
 	var p = new(ArgumentsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_arguments
@@ -30745,47 +34024,44 @@ func (s *ArgumentsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Arguments() (localctx IArgumentsContext) {
-	this := p
-	_ = this
-
 	localctx = NewArgumentsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 262, PHPParserRULE_arguments)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
 	p.SetState(2061)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 254, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 254, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(2043)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(2044)
 			p.Match(PHPParserEllipsis)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(2045)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 2:
@@ -30793,12 +34069,19 @@ func (p *PHPParser) Arguments() (localctx IArgumentsContext) {
 		{
 			p.SetState(2046)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(2048)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334562462305) != 0 {
+		if ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334562462305) != 0) {
 			{
 				p.SetState(2047)
 				p.ActualArgument()
@@ -30807,13 +34090,22 @@ func (p *PHPParser) Arguments() (localctx IArgumentsContext) {
 		}
 		p.SetState(2054)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 252, p.GetParserRuleContext())
-
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 252, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 		for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			if _alt == 1 {
 				{
 					p.SetState(2050)
 					p.Match(PHPParserComma)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(2051)
@@ -30823,27 +34115,56 @@ func (p *PHPParser) Arguments() (localctx IArgumentsContext) {
 			}
 			p.SetState(2056)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 252, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 252, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 		p.SetState(2058)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserComma {
 			{
 				p.SetState(2057)
 				p.Match(PHPParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		{
 			p.SetState(2060)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IActualArgumentContext is an interface to support dynamic dispatch.
@@ -30853,20 +34174,35 @@ type IActualArgumentContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Expression() IExpressionContext
+	ArgumentName() IArgumentNameContext
+	Ellipsis() antlr.TerminalNode
+	OpenCurlyBracket() antlr.TerminalNode
+	FlexiVariable() IFlexiVariableContext
+	CloseCurlyBracket() antlr.TerminalNode
+	Ampersand() antlr.TerminalNode
+	Chain() IChainContext
+
 	// IsActualArgumentContext differentiates from other interfaces.
 	IsActualArgumentContext()
 }
 
 type ActualArgumentContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyActualArgumentContext() *ActualArgumentContext {
 	var p = new(ActualArgumentContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_actualArgument
 	return p
+}
+
+func InitEmptyActualArgumentContext(p *ActualArgumentContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_actualArgument
 }
 
 func (*ActualArgumentContext) IsActualArgumentContext() {}
@@ -30874,7 +34210,7 @@ func (*ActualArgumentContext) IsActualArgumentContext() {}
 func NewActualArgumentContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ActualArgumentContext {
 	var p = new(ActualArgumentContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_actualArgument
@@ -30983,52 +34319,46 @@ func (s *ActualArgumentContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) ActualArgument() (localctx IActualArgumentContext) {
-	this := p
-	_ = this
-
 	localctx = NewActualArgumentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 264, PHPParserRULE_actualArgument)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(2076)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 257, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 257, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		p.SetState(2064)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 255, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 255, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(2063)
 				p.ArgumentName()
 			}
 
+		} else if p.HasError() { // JIM
+			goto errorExit
 		}
 		p.SetState(2067)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserEllipsis {
 			{
 				p.SetState(2066)
 				p.Match(PHPParserEllipsis)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
@@ -31042,6 +34372,10 @@ func (p *PHPParser) ActualArgument() (localctx IActualArgumentContext) {
 		{
 			p.SetState(2070)
 			p.Match(PHPParserOpenCurlyBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(2071)
@@ -31050,6 +34384,10 @@ func (p *PHPParser) ActualArgument() (localctx IActualArgumentContext) {
 		{
 			p.SetState(2072)
 			p.Match(PHPParserCloseCurlyBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 3:
@@ -31057,15 +34395,31 @@ func (p *PHPParser) ActualArgument() (localctx IActualArgumentContext) {
 		{
 			p.SetState(2074)
 			p.Match(PHPParserAmpersand)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(2075)
 			p.Chain()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IArgumentNameContext is an interface to support dynamic dispatch.
@@ -31075,20 +34429,29 @@ type IArgumentNameContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Identifier() IIdentifierContext
+	Colon() antlr.TerminalNode
+
 	// IsArgumentNameContext differentiates from other interfaces.
 	IsArgumentNameContext()
 }
 
 type ArgumentNameContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyArgumentNameContext() *ArgumentNameContext {
 	var p = new(ArgumentNameContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_argumentName
 	return p
+}
+
+func InitEmptyArgumentNameContext(p *ArgumentNameContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_argumentName
 }
 
 func (*ArgumentNameContext) IsArgumentNameContext() {}
@@ -31096,7 +34459,7 @@ func (*ArgumentNameContext) IsArgumentNameContext() {}
 func NewArgumentNameContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ArgumentNameContext {
 	var p = new(ArgumentNameContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_argumentName
@@ -31145,28 +34508,8 @@ func (s *ArgumentNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *PHPParser) ArgumentName() (localctx IArgumentNameContext) {
-	this := p
-	_ = this
-
 	localctx = NewArgumentNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 266, PHPParserRULE_argumentName)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(2078)
@@ -31175,9 +34518,23 @@ func (p *PHPParser) ArgumentName() (localctx IArgumentNameContext) {
 	{
 		p.SetState(2079)
 		p.Match(PHPParserColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IConstantInitializerContext is an interface to support dynamic dispatch.
@@ -31186,21 +34543,25 @@ type IConstantInitializerContext interface {
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
-
 	// IsConstantInitializerContext differentiates from other interfaces.
 	IsConstantInitializerContext()
 }
 
 type ConstantInitializerContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyConstantInitializerContext() *ConstantInitializerContext {
 	var p = new(ConstantInitializerContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_constantInitializer
 	return p
+}
+
+func InitEmptyConstantInitializerContext(p *ConstantInitializerContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_constantInitializer
 }
 
 func (*ConstantInitializerContext) IsConstantInitializerContext() {}
@@ -31208,7 +34569,7 @@ func (*ConstantInitializerContext) IsConstantInitializerContext() {}
 func NewConstantInitializerContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ConstantInitializerContext {
 	var p = new(ConstantInitializerContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_constantInitializer
@@ -31218,8 +34579,8 @@ func NewConstantInitializerContext(parser antlr.Parser, parent antlr.ParserRuleC
 
 func (s *ConstantInitializerContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *ConstantInitializerContext) CopyFrom(ctx *ConstantInitializerContext) {
-	s.BaseParserRuleContext.CopyFrom(ctx.BaseParserRuleContext)
+func (s *ConstantInitializerContext) CopyAll(ctx *ConstantInitializerContext) {
+	s.CopyFrom(&ctx.BaseParserRuleContext)
 }
 
 func (s *ConstantInitializerContext) GetRuleContext() antlr.RuleContext {
@@ -31231,15 +34592,15 @@ func (s *ConstantInitializerContext) ToStringTree(ruleNames []string, recog antl
 }
 
 type UnitializerContext struct {
-	*ConstantInitializerContext
+	ConstantInitializerContext
 }
 
 func NewUnitializerContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *UnitializerContext {
 	var p = new(UnitializerContext)
 
-	p.ConstantInitializerContext = NewEmptyConstantInitializerContext()
+	InitEmptyConstantInitializerContext(&p.ConstantInitializerContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ConstantInitializerContext))
+	p.CopyAll(ctx.(*ConstantInitializerContext))
 
 	return p
 }
@@ -31283,15 +34644,15 @@ func (s *UnitializerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 type ConstantStringitializerContext struct {
-	*ConstantInitializerContext
+	ConstantInitializerContext
 }
 
 func NewConstantStringitializerContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ConstantStringitializerContext {
 	var p = new(ConstantStringitializerContext)
 
-	p.ConstantInitializerContext = NewEmptyConstantInitializerContext()
+	InitEmptyConstantInitializerContext(&p.ConstantInitializerContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ConstantInitializerContext))
+	p.CopyAll(ctx.(*ConstantInitializerContext))
 
 	return p
 }
@@ -31360,15 +34721,15 @@ func (s *ConstantStringitializerContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 type ExpressionitializerContext struct {
-	*ConstantInitializerContext
+	ConstantInitializerContext
 }
 
 func NewExpressionitializerContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExpressionitializerContext {
 	var p = new(ExpressionitializerContext)
 
-	p.ConstantInitializerContext = NewEmptyConstantInitializerContext()
+	InitEmptyConstantInitializerContext(&p.ConstantInitializerContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ConstantInitializerContext))
+	p.CopyAll(ctx.(*ConstantInitializerContext))
 
 	return p
 }
@@ -31404,15 +34765,15 @@ func (s *ExpressionitializerContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 type ArrayInitializerContext struct {
-	*ConstantInitializerContext
+	ConstantInitializerContext
 }
 
 func NewArrayInitializerContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ArrayInitializerContext {
 	var p = new(ArrayInitializerContext)
 
-	p.ConstantInitializerContext = NewEmptyConstantInitializerContext()
+	InitEmptyConstantInitializerContext(&p.ConstantInitializerContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ConstantInitializerContext))
+	p.CopyAll(ctx.(*ConstantInitializerContext))
 
 	return p
 }
@@ -31472,32 +34833,17 @@ func (s *ArrayInitializerContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *PHPParser) ConstantInitializer() (localctx IConstantInitializerContext) {
-	this := p
-	_ = this
-
 	localctx = NewConstantInitializerContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 268, PHPParserRULE_constantInitializer)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(2109)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 263, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 263, p.GetParserRuleContext()) {
 	case 1:
 		localctx = NewConstantStringitializerContext(p, localctx)
 		p.EnterOuterAlt(localctx, 1)
@@ -31507,12 +34853,19 @@ func (p *PHPParser) ConstantInitializer() (localctx IConstantInitializerContext)
 		}
 		p.SetState(2086)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == PHPParserDot {
 			{
 				p.SetState(2082)
 				p.Match(PHPParserDot)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(2083)
@@ -31521,6 +34874,9 @@ func (p *PHPParser) ConstantInitializer() (localctx IConstantInitializerContext)
 
 			p.SetState(2088)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 
@@ -31530,28 +34886,46 @@ func (p *PHPParser) ConstantInitializer() (localctx IConstantInitializerContext)
 		{
 			p.SetState(2089)
 			p.Match(PHPParserArray)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(2090)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(2095)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244577) != 0 {
+		if ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244577) != 0) {
 			{
 				p.SetState(2091)
 				p.ArrayItemList()
 			}
 			p.SetState(2093)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 
 			if _la == PHPParserComma {
 				{
 					p.SetState(2092)
 					p.Match(PHPParserComma)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 
 			}
@@ -31560,6 +34934,10 @@ func (p *PHPParser) ConstantInitializer() (localctx IConstantInitializerContext)
 		{
 			p.SetState(2097)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 3:
@@ -31568,24 +34946,38 @@ func (p *PHPParser) ConstantInitializer() (localctx IConstantInitializerContext)
 		{
 			p.SetState(2098)
 			p.Match(PHPParserOpenSquareBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(2103)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244577) != 0 {
+		if ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244577) != 0) {
 			{
 				p.SetState(2099)
 				p.ArrayItemList()
 			}
 			p.SetState(2101)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 
 			if _la == PHPParserComma {
 				{
 					p.SetState(2100)
 					p.Match(PHPParserComma)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 
 			}
@@ -31594,6 +34986,10 @@ func (p *PHPParser) ConstantInitializer() (localctx IConstantInitializerContext)
 		{
 			p.SetState(2105)
 			p.Match(PHPParserCloseSquareBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 4:
@@ -31623,9 +35019,21 @@ func (p *PHPParser) ConstantInitializer() (localctx IConstantInitializerContext)
 			p.expression(0)
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IConstantStringContext is an interface to support dynamic dispatch.
@@ -31635,20 +35043,29 @@ type IConstantStringContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	String_() IStringContext
+	Constant() IConstantContext
+
 	// IsConstantStringContext differentiates from other interfaces.
 	IsConstantStringContext()
 }
 
 type ConstantStringContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyConstantStringContext() *ConstantStringContext {
 	var p = new(ConstantStringContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_constantString
 	return p
+}
+
+func InitEmptyConstantStringContext(p *ConstantStringContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_constantString
 }
 
 func (*ConstantStringContext) IsConstantStringContext() {}
@@ -31656,7 +35073,7 @@ func (*ConstantStringContext) IsConstantStringContext() {}
 func NewConstantStringContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ConstantStringContext {
 	var p = new(ConstantStringContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_constantString
@@ -31717,30 +35134,13 @@ func (s *ConstantStringContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) ConstantString() (localctx IConstantStringContext) {
-	this := p
-	_ = this
-
 	localctx = NewConstantStringContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 270, PHPParserRULE_constantString)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(2113)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserStartNowDoc, PHPParserSingleQuoteString, PHPParserDoubleQuote:
@@ -31758,10 +35158,21 @@ func (p *PHPParser) ConstantString() (localctx IConstantStringContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IConstantContext is an interface to support dynamic dispatch.
@@ -31771,20 +35182,30 @@ type IConstantContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Null() antlr.TerminalNode
+	LiteralConstant() ILiteralConstantContext
+	MagicConstant() IMagicConstantContext
+
 	// IsConstantContext differentiates from other interfaces.
 	IsConstantContext()
 }
 
 type ConstantContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyConstantContext() *ConstantContext {
 	var p = new(ConstantContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_constant
 	return p
+}
+
+func InitEmptyConstantContext(p *ConstantContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_constant
 }
 
 func (*ConstantContext) IsConstantContext() {}
@@ -31792,7 +35213,7 @@ func (*ConstantContext) IsConstantContext() {}
 func NewConstantContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ConstantContext {
 	var p = new(ConstantContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_constant
@@ -31857,30 +35278,13 @@ func (s *ConstantContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Constant() (localctx IConstantContext) {
-	this := p
-	_ = this
-
 	localctx = NewConstantContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 272, PHPParserRULE_constant)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(2118)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserNull:
@@ -31888,6 +35292,10 @@ func (p *PHPParser) Constant() (localctx IConstantContext) {
 		{
 			p.SetState(2115)
 			p.Match(PHPParserNull)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserBooleanConstant, PHPParserLabel, PHPParserOctal, PHPParserDecimal, PHPParserReal, PHPParserHex, PHPParserBinary:
@@ -31905,10 +35313,21 @@ func (p *PHPParser) Constant() (localctx IConstantContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ILiteralConstantContext is an interface to support dynamic dispatch.
@@ -31918,20 +35337,31 @@ type ILiteralConstantContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Real() antlr.TerminalNode
+	BooleanConstant() antlr.TerminalNode
+	NumericConstant() INumericConstantContext
+	StringConstant() IStringConstantContext
+
 	// IsLiteralConstantContext differentiates from other interfaces.
 	IsLiteralConstantContext()
 }
 
 type LiteralConstantContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyLiteralConstantContext() *LiteralConstantContext {
 	var p = new(LiteralConstantContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_literalConstant
 	return p
+}
+
+func InitEmptyLiteralConstantContext(p *LiteralConstantContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_literalConstant
 }
 
 func (*LiteralConstantContext) IsLiteralConstantContext() {}
@@ -31939,7 +35369,7 @@ func (*LiteralConstantContext) IsLiteralConstantContext() {}
 func NewLiteralConstantContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *LiteralConstantContext {
 	var p = new(LiteralConstantContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_literalConstant
@@ -32008,30 +35438,13 @@ func (s *LiteralConstantContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) LiteralConstant() (localctx ILiteralConstantContext) {
-	this := p
-	_ = this
-
 	localctx = NewLiteralConstantContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 274, PHPParserRULE_literalConstant)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(2124)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserReal:
@@ -32039,6 +35452,10 @@ func (p *PHPParser) LiteralConstant() (localctx ILiteralConstantContext) {
 		{
 			p.SetState(2120)
 			p.Match(PHPParserReal)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserBooleanConstant:
@@ -32046,6 +35463,10 @@ func (p *PHPParser) LiteralConstant() (localctx ILiteralConstantContext) {
 		{
 			p.SetState(2121)
 			p.Match(PHPParserBooleanConstant)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserOctal, PHPParserDecimal, PHPParserHex, PHPParserBinary:
@@ -32063,10 +35484,21 @@ func (p *PHPParser) LiteralConstant() (localctx ILiteralConstantContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // INumericConstantContext is an interface to support dynamic dispatch.
@@ -32076,20 +35508,31 @@ type INumericConstantContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Octal() antlr.TerminalNode
+	Decimal() antlr.TerminalNode
+	Hex() antlr.TerminalNode
+	Binary() antlr.TerminalNode
+
 	// IsNumericConstantContext differentiates from other interfaces.
 	IsNumericConstantContext()
 }
 
 type NumericConstantContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyNumericConstantContext() *NumericConstantContext {
 	var p = new(NumericConstantContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_numericConstant
 	return p
+}
+
+func InitEmptyNumericConstantContext(p *NumericConstantContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_numericConstant
 }
 
 func (*NumericConstantContext) IsNumericConstantContext() {}
@@ -32097,7 +35540,7 @@ func (*NumericConstantContext) IsNumericConstantContext() {}
 func NewNumericConstantContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *NumericConstantContext {
 	var p = new(NumericConstantContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_numericConstant
@@ -32142,28 +35585,9 @@ func (s *NumericConstantContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) NumericConstant() (localctx INumericConstantContext) {
-	this := p
-	_ = this
-
 	localctx = NewNumericConstantContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 276, PHPParserRULE_numericConstant)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -32178,7 +35602,17 @@ func (p *PHPParser) NumericConstant() (localctx INumericConstantContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IClassConstantContext is an interface to support dynamic dispatch.
@@ -32188,20 +35622,38 @@ type IClassConstantContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	DoubleColon() antlr.TerminalNode
+	Class() antlr.TerminalNode
+	Parent_() antlr.TerminalNode
+	Identifier() IIdentifierContext
+	Constructor() antlr.TerminalNode
+	Get() antlr.TerminalNode
+	Set() antlr.TerminalNode
+	QualifiedStaticTypeRef() IQualifiedStaticTypeRefContext
+	AllKeyedVariable() []IKeyedVariableContext
+	KeyedVariable(i int) IKeyedVariableContext
+	String_() IStringContext
+
 	// IsClassConstantContext differentiates from other interfaces.
 	IsClassConstantContext()
 }
 
 type ClassConstantContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyClassConstantContext() *ClassConstantContext {
 	var p = new(ClassConstantContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_classConstant
 	return p
+}
+
+func InitEmptyClassConstantContext(p *ClassConstantContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_classConstant
 }
 
 func (*ClassConstantContext) IsClassConstantContext() {}
@@ -32209,7 +35661,7 @@ func (*ClassConstantContext) IsClassConstantContext() {}
 func NewClassConstantContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ClassConstantContext {
 	var p = new(ClassConstantContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_classConstant
@@ -32351,32 +35803,17 @@ func (s *ClassConstantContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) ClassConstant() (localctx IClassConstantContext) {
-	this := p
-	_ = this
-
 	localctx = NewClassConstantContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 278, PHPParserRULE_classConstant)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(2146)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 270, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 270, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -32393,10 +35830,18 @@ func (p *PHPParser) ClassConstant() (localctx IClassConstantContext) {
 		{
 			p.SetState(2129)
 			p.Match(PHPParserDoubleColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(2134)
 		p.GetErrorHandler().Sync(p)
-		switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 267, p.GetParserRuleContext()) {
+		if p.HasError() {
+			goto errorExit
+		}
+
+		switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 267, p.GetParserRuleContext()) {
 		case 1:
 			{
 				p.SetState(2130)
@@ -32407,26 +35852,43 @@ func (p *PHPParser) ClassConstant() (localctx IClassConstantContext) {
 			{
 				p.SetState(2131)
 				p.Match(PHPParserConstructor)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		case 3:
 			{
 				p.SetState(2132)
 				p.Match(PHPParserGet)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		case 4:
 			{
 				p.SetState(2133)
 				p.Match(PHPParserSet)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
+		case antlr.ATNInvalidAltNumber:
+			goto errorExit
 		}
 
 	case 2:
 		p.EnterOuterAlt(localctx, 2)
 		p.SetState(2139)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 
 		switch p.GetTokenStream().LA(1) {
 		case PHPParserAbstract, PHPParserArray, PHPParserAs, PHPParserBinaryCast, PHPParserBoolType, PHPParserBooleanConstant, PHPParserBreak, PHPParserCallable, PHPParserCase, PHPParserCatch, PHPParserClass, PHPParserClone, PHPParserConst, PHPParserContinue, PHPParserDefine, PHPParserDefined, PHPParserDeclare, PHPParserDefault, PHPParserDo, PHPParserDoubleCast, PHPParserDoubleType, PHPParserEcho, PHPParserElse, PHPParserElseIf, PHPParserEmpty, PHPParserEnum_, PHPParserEndDeclare, PHPParserEndFor, PHPParserEndForeach, PHPParserEndIf, PHPParserEndSwitch, PHPParserEndWhile, PHPParserEval, PHPParserAssert, PHPParserDie, PHPParserExit, PHPParserExtends, PHPParserFinal, PHPParserFinally, PHPParserFloatCast, PHPParserFor, PHPParserForeach, PHPParserGlobal, PHPParserGoto, PHPParserIf, PHPParserImplements, PHPParserImport, PHPParserInstanceOf, PHPParserInsteadOf, PHPParserInt8Cast, PHPParserInt16Cast, PHPParserInt64Type, PHPParserIntType, PHPParserInterface, PHPParserIsSet, PHPParserList, PHPParserLogicalAnd, PHPParserLogicalOr, PHPParserLogicalXor, PHPParserMatch_, PHPParserNamespace, PHPParserNew, PHPParserNull, PHPParserObjectType, PHPParserParent_, PHPParserPartial, PHPParserPrint, PHPParserPrivate, PHPParserProtected, PHPParserPublic, PHPParserReadonly, PHPParserResource, PHPParserReturn, PHPParserStatic, PHPParserStringType, PHPParserSwitch, PHPParserTrait, PHPParserTry, PHPParserTypeof, PHPParserUintCast, PHPParserUnicodeCast, PHPParserUnset, PHPParserVar, PHPParserWhile, PHPParserYield, PHPParserFrom, PHPParserLambdaFn, PHPParserTicks, PHPParserEncoding, PHPParserStrictTypes, PHPParserGet, PHPParserSet, PHPParserCall, PHPParserCallStatic, PHPParserConstructor, PHPParserDestruct, PHPParserWakeup, PHPParserSleep, PHPParserAutoload, PHPParserIsSet__, PHPParserUnset__, PHPParserToString__, PHPParserInvoke, PHPParserSetState, PHPParserClone__, PHPParserDebugInfo, PHPParserNamespace__, PHPParserClass__, PHPParserTraic__, PHPParserFunction__, PHPParserMethod__, PHPParserLine__, PHPParserFile__, PHPParserDir__, PHPParserNamespaceSeparator, PHPParserLabel:
@@ -32448,14 +35910,22 @@ func (p *PHPParser) ClassConstant() (localctx IClassConstantContext) {
 			}
 
 		default:
-			panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			goto errorExit
 		}
 		{
 			p.SetState(2141)
 			p.Match(PHPParserDoubleColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(2144)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 
 		switch p.GetTokenStream().LA(1) {
 		case PHPParserAbstract, PHPParserArray, PHPParserAs, PHPParserBinaryCast, PHPParserBoolType, PHPParserBooleanConstant, PHPParserBreak, PHPParserCallable, PHPParserCase, PHPParserCatch, PHPParserClass, PHPParserClone, PHPParserConst, PHPParserContinue, PHPParserDefine, PHPParserDefined, PHPParserDeclare, PHPParserDefault, PHPParserDo, PHPParserDoubleCast, PHPParserDoubleType, PHPParserEcho, PHPParserElse, PHPParserElseIf, PHPParserEmpty, PHPParserEnum_, PHPParserEndDeclare, PHPParserEndFor, PHPParserEndForeach, PHPParserEndIf, PHPParserEndSwitch, PHPParserEndWhile, PHPParserEval, PHPParserAssert, PHPParserDie, PHPParserExit, PHPParserExtends, PHPParserFinal, PHPParserFinally, PHPParserFloatCast, PHPParserFor, PHPParserForeach, PHPParserGlobal, PHPParserGoto, PHPParserIf, PHPParserImplements, PHPParserImport, PHPParserInstanceOf, PHPParserInsteadOf, PHPParserInt8Cast, PHPParserInt16Cast, PHPParserInt64Type, PHPParserIntType, PHPParserInterface, PHPParserIsSet, PHPParserList, PHPParserLogicalAnd, PHPParserLogicalOr, PHPParserLogicalXor, PHPParserMatch_, PHPParserNamespace, PHPParserNew, PHPParserNull, PHPParserObjectType, PHPParserParent_, PHPParserPartial, PHPParserPrint, PHPParserPrivate, PHPParserProtected, PHPParserPublic, PHPParserReadonly, PHPParserResource, PHPParserReturn, PHPParserStatic, PHPParserStringType, PHPParserSwitch, PHPParserTrait, PHPParserTry, PHPParserTypeof, PHPParserUintCast, PHPParserUnicodeCast, PHPParserUnset, PHPParserVar, PHPParserWhile, PHPParserYield, PHPParserFrom, PHPParserLambdaFn, PHPParserTicks, PHPParserEncoding, PHPParserStrictTypes, PHPParserGet, PHPParserSet, PHPParserCall, PHPParserCallStatic, PHPParserConstructor, PHPParserDestruct, PHPParserWakeup, PHPParserSleep, PHPParserAutoload, PHPParserIsSet__, PHPParserUnset__, PHPParserToString__, PHPParserInvoke, PHPParserSetState, PHPParserClone__, PHPParserDebugInfo, PHPParserNamespace__, PHPParserClass__, PHPParserTraic__, PHPParserFunction__, PHPParserMethod__, PHPParserLine__, PHPParserFile__, PHPParserDir__, PHPParserLabel:
@@ -32471,12 +35941,25 @@ func (p *PHPParser) ClassConstant() (localctx IClassConstantContext) {
 			}
 
 		default:
-			panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			goto errorExit
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IStringConstantContext is an interface to support dynamic dispatch.
@@ -32486,20 +35969,28 @@ type IStringConstantContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Label() antlr.TerminalNode
+
 	// IsStringConstantContext differentiates from other interfaces.
 	IsStringConstantContext()
 }
 
 type StringConstantContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyStringConstantContext() *StringConstantContext {
 	var p = new(StringConstantContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_stringConstant
 	return p
+}
+
+func InitEmptyStringConstantContext(p *StringConstantContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_stringConstant
 }
 
 func (*StringConstantContext) IsStringConstantContext() {}
@@ -32507,7 +35998,7 @@ func (*StringConstantContext) IsStringConstantContext() {}
 func NewStringConstantContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *StringConstantContext {
 	var p = new(StringConstantContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_stringConstant
@@ -32540,35 +36031,29 @@ func (s *StringConstantContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) StringConstant() (localctx IStringConstantContext) {
-	this := p
-	_ = this
-
 	localctx = NewStringConstantContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 280, PHPParserRULE_stringConstant)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(2148)
 		p.Match(PHPParserLabel)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IStringContext is an interface to support dynamic dispatch.
@@ -32578,20 +36063,37 @@ type IStringContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	StartNowDoc() antlr.TerminalNode
+	HereDocIdentiferName() antlr.TerminalNode
+	HereDocIdentifierBreak() antlr.TerminalNode
+	EndDoc() antlr.TerminalNode
+	HereDocContent() IHereDocContentContext
+	SingleQuoteString() antlr.TerminalNode
+	AllDoubleQuote() []antlr.TerminalNode
+	DoubleQuote(i int) antlr.TerminalNode
+	AllInterpolatedStringPart() []IInterpolatedStringPartContext
+	InterpolatedStringPart(i int) IInterpolatedStringPartContext
+
 	// IsStringContext differentiates from other interfaces.
 	IsStringContext()
 }
 
 type StringContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyStringContext() *StringContext {
 	var p = new(StringContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_string
 	return p
+}
+
+func InitEmptyStringContext(p *StringContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_string
 }
 
 func (*StringContext) IsStringContext() {}
@@ -32599,7 +36101,7 @@ func (*StringContext) IsStringContext() {}
 func NewStringContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *StringContext {
 	var p = new(StringContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_string
@@ -32713,33 +36215,17 @@ func (s *StringContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) String_() (localctx IStringContext) {
-	this := p
-	_ = this
-
 	localctx = NewStringContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 282, PHPParserRULE_string)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
 	p.SetState(2166)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserStartNowDoc:
@@ -32747,17 +36233,32 @@ func (p *PHPParser) String_() (localctx IStringContext) {
 		{
 			p.SetState(2150)
 			p.Match(PHPParserStartNowDoc)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(2151)
 			p.Match(PHPParserHereDocIdentiferName)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(2152)
 			p.Match(PHPParserHereDocIdentifierBreak)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(2154)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserHereDocText {
@@ -32770,6 +36271,10 @@ func (p *PHPParser) String_() (localctx IStringContext) {
 		{
 			p.SetState(2156)
 			p.Match(PHPParserEndDoc)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserSingleQuoteString:
@@ -32777,6 +36282,10 @@ func (p *PHPParser) String_() (localctx IStringContext) {
 		{
 			p.SetState(2157)
 			p.Match(PHPParserSingleQuoteString)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserDoubleQuote:
@@ -32784,11 +36293,20 @@ func (p *PHPParser) String_() (localctx IStringContext) {
 		{
 			p.SetState(2158)
 			p.Match(PHPParserDoubleQuote)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(2162)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 272, p.GetParserRuleContext())
-
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 272, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 		for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			if _alt == 1 {
 				{
@@ -32799,18 +36317,39 @@ func (p *PHPParser) String_() (localctx IStringContext) {
 			}
 			p.SetState(2164)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 272, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 272, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(2165)
 			p.Match(PHPParserDoubleQuote)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IHereDocContentContext is an interface to support dynamic dispatch.
@@ -32820,20 +36359,29 @@ type IHereDocContentContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllHereDocText() []antlr.TerminalNode
+	HereDocText(i int) antlr.TerminalNode
+
 	// IsHereDocContentContext differentiates from other interfaces.
 	IsHereDocContentContext()
 }
 
 type HereDocContentContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyHereDocContentContext() *HereDocContentContext {
 	var p = new(HereDocContentContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_hereDocContent
 	return p
+}
+
+func InitEmptyHereDocContentContext(p *HereDocContentContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_hereDocContent
 }
 
 func (*HereDocContentContext) IsHereDocContentContext() {}
@@ -32841,7 +36389,7 @@ func (*HereDocContentContext) IsHereDocContentContext() {}
 func NewHereDocContentContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *HereDocContentContext {
 	var p = new(HereDocContentContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_hereDocContent
@@ -32878,46 +36426,47 @@ func (s *HereDocContentContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) HereDocContent() (localctx IHereDocContentContext) {
-	this := p
-	_ = this
-
 	localctx = NewHereDocContentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 284, PHPParserRULE_hereDocContent)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(2169)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for ok := true; ok; ok = _la == PHPParserHereDocText {
 		{
 			p.SetState(2168)
 			p.Match(PHPParserHereDocText)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 		p.SetState(2171)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IInterpolatedStringPartContext is an interface to support dynamic dispatch.
@@ -32927,20 +36476,34 @@ type IInterpolatedStringPartContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	CurlyOpen() antlr.TerminalNode
+	Expression() IExpressionContext
+	CloseCurlyBracket() antlr.TerminalNode
+	OpenCurlyBracket() antlr.TerminalNode
+	StringPart() antlr.TerminalNode
+	UnicodeEscape() antlr.TerminalNode
+	Chain() IChainContext
+
 	// IsInterpolatedStringPartContext differentiates from other interfaces.
 	IsInterpolatedStringPartContext()
 }
 
 type InterpolatedStringPartContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyInterpolatedStringPartContext() *InterpolatedStringPartContext {
 	var p = new(InterpolatedStringPartContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_interpolatedStringPart
 	return p
+}
+
+func InitEmptyInterpolatedStringPartContext(p *InterpolatedStringPartContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_interpolatedStringPart
 }
 
 func (*InterpolatedStringPartContext) IsInterpolatedStringPartContext() {}
@@ -32948,7 +36511,7 @@ func (*InterpolatedStringPartContext) IsInterpolatedStringPartContext() {}
 func NewInterpolatedStringPartContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *InterpolatedStringPartContext {
 	var p = new(InterpolatedStringPartContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_interpolatedStringPart
@@ -33029,30 +36592,13 @@ func (s *InterpolatedStringPartContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 func (p *PHPParser) InterpolatedStringPart() (localctx IInterpolatedStringPartContext) {
-	this := p
-	_ = this
-
 	localctx = NewInterpolatedStringPartContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 286, PHPParserRULE_interpolatedStringPart)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(2184)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserCurlyOpen:
@@ -33060,6 +36606,10 @@ func (p *PHPParser) InterpolatedStringPart() (localctx IInterpolatedStringPartCo
 		{
 			p.SetState(2173)
 			p.Match(PHPParserCurlyOpen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(2174)
@@ -33068,6 +36618,10 @@ func (p *PHPParser) InterpolatedStringPart() (localctx IInterpolatedStringPartCo
 		{
 			p.SetState(2175)
 			p.Match(PHPParserCloseCurlyBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserOpenCurlyBracket:
@@ -33075,6 +36629,10 @@ func (p *PHPParser) InterpolatedStringPart() (localctx IInterpolatedStringPartCo
 		{
 			p.SetState(2177)
 			p.Match(PHPParserOpenCurlyBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(2178)
@@ -33083,6 +36641,10 @@ func (p *PHPParser) InterpolatedStringPart() (localctx IInterpolatedStringPartCo
 		{
 			p.SetState(2179)
 			p.Match(PHPParserCloseCurlyBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserStringPart:
@@ -33090,6 +36652,10 @@ func (p *PHPParser) InterpolatedStringPart() (localctx IInterpolatedStringPartCo
 		{
 			p.SetState(2181)
 			p.Match(PHPParserStringPart)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserUnicodeEscape:
@@ -33097,6 +36663,10 @@ func (p *PHPParser) InterpolatedStringPart() (localctx IInterpolatedStringPartCo
 		{
 			p.SetState(2182)
 			p.Match(PHPParserUnicodeEscape)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserAbstract, PHPParserArray, PHPParserAs, PHPParserBinaryCast, PHPParserBoolType, PHPParserBooleanConstant, PHPParserBreak, PHPParserCallable, PHPParserCase, PHPParserCatch, PHPParserClass, PHPParserClone, PHPParserConst, PHPParserContinue, PHPParserDefine, PHPParserDefined, PHPParserDeclare, PHPParserDefault, PHPParserDo, PHPParserDoubleCast, PHPParserDoubleType, PHPParserEcho, PHPParserElse, PHPParserElseIf, PHPParserEmpty, PHPParserEnum_, PHPParserEndDeclare, PHPParserEndFor, PHPParserEndForeach, PHPParserEndIf, PHPParserEndSwitch, PHPParserEndWhile, PHPParserEval, PHPParserAssert, PHPParserDie, PHPParserExit, PHPParserExtends, PHPParserFinal, PHPParserFinally, PHPParserFloatCast, PHPParserFor, PHPParserForeach, PHPParserGlobal, PHPParserGoto, PHPParserIf, PHPParserImplements, PHPParserImport, PHPParserInstanceOf, PHPParserInsteadOf, PHPParserInt8Cast, PHPParserInt16Cast, PHPParserInt64Type, PHPParserIntType, PHPParserInterface, PHPParserIsSet, PHPParserList, PHPParserLogicalAnd, PHPParserLogicalOr, PHPParserLogicalXor, PHPParserMatch_, PHPParserNamespace, PHPParserNew, PHPParserNull, PHPParserObjectType, PHPParserParent_, PHPParserPartial, PHPParserPrint, PHPParserPrivate, PHPParserProtected, PHPParserPublic, PHPParserReadonly, PHPParserResource, PHPParserReturn, PHPParserStatic, PHPParserStringType, PHPParserSwitch, PHPParserTrait, PHPParserTry, PHPParserTypeof, PHPParserUintCast, PHPParserUnicodeCast, PHPParserUnset, PHPParserVar, PHPParserWhile, PHPParserYield, PHPParserFrom, PHPParserLambdaFn, PHPParserTicks, PHPParserEncoding, PHPParserStrictTypes, PHPParserGet, PHPParserSet, PHPParserCall, PHPParserCallStatic, PHPParserConstructor, PHPParserDestruct, PHPParserWakeup, PHPParserSleep, PHPParserAutoload, PHPParserIsSet__, PHPParserUnset__, PHPParserToString__, PHPParserInvoke, PHPParserSetState, PHPParserClone__, PHPParserDebugInfo, PHPParserNamespace__, PHPParserClass__, PHPParserTraic__, PHPParserFunction__, PHPParserMethod__, PHPParserLine__, PHPParserFile__, PHPParserDir__, PHPParserStartNowDoc, PHPParserNamespaceSeparator, PHPParserDollar, PHPParserVarName, PHPParserLabel, PHPParserSingleQuoteString, PHPParserDoubleQuote:
@@ -33107,10 +36677,21 @@ func (p *PHPParser) InterpolatedStringPart() (localctx IInterpolatedStringPartCo
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IChainListContext is an interface to support dynamic dispatch.
@@ -33120,20 +36701,31 @@ type IChainListContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllChain() []IChainContext
+	Chain(i int) IChainContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsChainListContext differentiates from other interfaces.
 	IsChainListContext()
 }
 
 type ChainListContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyChainListContext() *ChainListContext {
 	var p = new(ChainListContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_chainList
 	return p
+}
+
+func InitEmptyChainListContext(p *ChainListContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_chainList
 }
 
 func (*ChainListContext) IsChainListContext() {}
@@ -33141,7 +36733,7 @@ func (*ChainListContext) IsChainListContext() {}
 func NewChainListContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ChainListContext {
 	var p = new(ChainListContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_chainList
@@ -33219,28 +36811,9 @@ func (s *ChainListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) ChainList() (localctx IChainListContext) {
-	this := p
-	_ = this
-
 	localctx = NewChainListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 288, PHPParserRULE_chainList)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -33249,12 +36822,19 @@ func (p *PHPParser) ChainList() (localctx IChainListContext) {
 	}
 	p.SetState(2191)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == PHPParserComma {
 		{
 			p.SetState(2187)
 			p.Match(PHPParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(2188)
@@ -33263,10 +36843,23 @@ func (p *PHPParser) ChainList() (localctx IChainListContext) {
 
 		p.SetState(2193)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IChainContext is an interface to support dynamic dispatch.
@@ -33276,20 +36869,29 @@ type IChainContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	FlexiVariable() IFlexiVariableContext
+	StaticClassExprVariableMember() IStaticClassExprVariableMemberContext
+
 	// IsChainContext differentiates from other interfaces.
 	IsChainContext()
 }
 
 type ChainContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyChainContext() *ChainContext {
 	var p = new(ChainContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_chain
 	return p
+}
+
+func InitEmptyChainContext(p *ChainContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_chain
 }
 
 func (*ChainContext) IsChainContext() {}
@@ -33297,7 +36899,7 @@ func (*ChainContext) IsChainContext() {}
 func NewChainContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ChainContext {
 	var p = new(ChainContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_chain
@@ -33358,31 +36960,15 @@ func (s *ChainContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Chain() (localctx IChainContext) {
-	this := p
-	_ = this
-
 	localctx = NewChainContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 290, PHPParserRULE_chain)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(2196)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 277, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 277, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -33397,9 +36983,21 @@ func (p *PHPParser) Chain() (localctx IChainContext) {
 			p.StaticClassExprVariableMember()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAssignableChainContext is an interface to support dynamic dispatch.
@@ -33409,20 +37007,32 @@ type IAssignableChainContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	FlexiVariable() IFlexiVariableContext
+	StaticClassExprVariableMember() IStaticClassExprVariableMemberContext
+	AssignableChainOrigin() IAssignableChainOriginContext
+	AllAssignableChainAccess() []IAssignableChainAccessContext
+	AssignableChainAccess(i int) IAssignableChainAccessContext
+
 	// IsAssignableChainContext differentiates from other interfaces.
 	IsAssignableChainContext()
 }
 
 type AssignableChainContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyAssignableChainContext() *AssignableChainContext {
 	var p = new(AssignableChainContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_assignableChain
 	return p
+}
+
+func InitEmptyAssignableChainContext(p *AssignableChainContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_assignableChain
 }
 
 func (*AssignableChainContext) IsAssignableChainContext() {}
@@ -33430,7 +37040,7 @@ func (*AssignableChainContext) IsAssignableChainContext() {}
 func NewAssignableChainContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AssignableChainContext {
 	var p = new(AssignableChainContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_assignableChain
@@ -33548,33 +37158,17 @@ func (s *AssignableChainContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) AssignableChain() (localctx IAssignableChainContext) {
-	this := p
-	_ = this
-
 	localctx = NewAssignableChainContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 292, PHPParserRULE_assignableChain)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.SetState(2206)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 279, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 279, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -33597,6 +37191,9 @@ func (p *PHPParser) AssignableChain() (localctx IAssignableChainContext) {
 		}
 		p.SetState(2202)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_alt = 1
 		for ok := true; ok; ok = _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			switch _alt {
@@ -33607,17 +37204,33 @@ func (p *PHPParser) AssignableChain() (localctx IAssignableChainContext) {
 				}
 
 			default:
-				panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				goto errorExit
 			}
 
 			p.SetState(2204)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 278, p.GetParserRuleContext())
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 278, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFunctionCallAssignableContext is an interface to support dynamic dispatch.
@@ -33627,20 +37240,30 @@ type IFunctionCallAssignableContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	FunctionCall() IFunctionCallContext
+	AllFunctionCallAssignableAccess() []IFunctionCallAssignableAccessContext
+	FunctionCallAssignableAccess(i int) IFunctionCallAssignableAccessContext
+
 	// IsFunctionCallAssignableContext differentiates from other interfaces.
 	IsFunctionCallAssignableContext()
 }
 
 type FunctionCallAssignableContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFunctionCallAssignableContext() *FunctionCallAssignableContext {
 	var p = new(FunctionCallAssignableContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_functionCallAssignable
 	return p
+}
+
+func InitEmptyFunctionCallAssignableContext(p *FunctionCallAssignableContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_functionCallAssignable
 }
 
 func (*FunctionCallAssignableContext) IsFunctionCallAssignableContext() {}
@@ -33648,7 +37271,7 @@ func (*FunctionCallAssignableContext) IsFunctionCallAssignableContext() {}
 func NewFunctionCallAssignableContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FunctionCallAssignableContext {
 	var p = new(FunctionCallAssignableContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_functionCallAssignable
@@ -33734,28 +37357,9 @@ func (s *FunctionCallAssignableContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 func (p *PHPParser) FunctionCallAssignable() (localctx IFunctionCallAssignableContext) {
-	this := p
-	_ = this
-
 	localctx = NewFunctionCallAssignableContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 294, PHPParserRULE_functionCallAssignable)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -33764,9 +37368,12 @@ func (p *PHPParser) FunctionCallAssignable() (localctx IFunctionCallAssignableCo
 	}
 	p.SetState(2210)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	for ok := true; ok; ok = (int64((_la-198)) & ^0x3f) == 0 && ((int64(1)<<(_la-198))&10485761) != 0 {
+	for ok := true; ok; ok = ((int64((_la-198)) & ^0x3f) == 0 && ((int64(1)<<(_la-198))&10485761) != 0) {
 		{
 			p.SetState(2209)
 			p.FunctionCallAssignableAccess()
@@ -33774,10 +37381,23 @@ func (p *PHPParser) FunctionCallAssignable() (localctx IFunctionCallAssignableCo
 
 		p.SetState(2212)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFunctionCallAssignableAccessContext is an interface to support dynamic dispatch.
@@ -33787,20 +37407,29 @@ type IFunctionCallAssignableAccessContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	MemberAccess() IMemberAccessContext
+	SquareCurlyExpression() ISquareCurlyExpressionContext
+
 	// IsFunctionCallAssignableAccessContext differentiates from other interfaces.
 	IsFunctionCallAssignableAccessContext()
 }
 
 type FunctionCallAssignableAccessContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFunctionCallAssignableAccessContext() *FunctionCallAssignableAccessContext {
 	var p = new(FunctionCallAssignableAccessContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_functionCallAssignableAccess
 	return p
+}
+
+func InitEmptyFunctionCallAssignableAccessContext(p *FunctionCallAssignableAccessContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_functionCallAssignableAccess
 }
 
 func (*FunctionCallAssignableAccessContext) IsFunctionCallAssignableAccessContext() {}
@@ -33808,7 +37437,7 @@ func (*FunctionCallAssignableAccessContext) IsFunctionCallAssignableAccessContex
 func NewFunctionCallAssignableAccessContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FunctionCallAssignableAccessContext {
 	var p = new(FunctionCallAssignableAccessContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_functionCallAssignableAccess
@@ -33869,30 +37498,13 @@ func (s *FunctionCallAssignableAccessContext) Accept(visitor antlr.ParseTreeVisi
 }
 
 func (p *PHPParser) FunctionCallAssignableAccess() (localctx IFunctionCallAssignableAccessContext) {
-	this := p
-	_ = this
-
 	localctx = NewFunctionCallAssignableAccessContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 296, PHPParserRULE_functionCallAssignableAccess)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(2216)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserObjectOperator:
@@ -33910,10 +37522,21 @@ func (p *PHPParser) FunctionCallAssignableAccess() (localctx IFunctionCallAssign
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAssignableChainOriginContext is an interface to support dynamic dispatch.
@@ -33923,20 +37546,30 @@ type IAssignableChainOriginContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	StaticMethodCall() IStaticMethodCallContext
+	StaticClassExprVariableMember() IStaticClassExprVariableMemberContext
+	Parentheses() IParenthesesContext
+
 	// IsAssignableChainOriginContext differentiates from other interfaces.
 	IsAssignableChainOriginContext()
 }
 
 type AssignableChainOriginContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyAssignableChainOriginContext() *AssignableChainOriginContext {
 	var p = new(AssignableChainOriginContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_assignableChainOrigin
 	return p
+}
+
+func InitEmptyAssignableChainOriginContext(p *AssignableChainOriginContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_assignableChainOrigin
 }
 
 func (*AssignableChainOriginContext) IsAssignableChainOriginContext() {}
@@ -33944,7 +37577,7 @@ func (*AssignableChainOriginContext) IsAssignableChainOriginContext() {}
 func NewAssignableChainOriginContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AssignableChainOriginContext {
 	var p = new(AssignableChainOriginContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_assignableChainOrigin
@@ -34021,31 +37654,15 @@ func (s *AssignableChainOriginContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *PHPParser) AssignableChainOrigin() (localctx IAssignableChainOriginContext) {
-	this := p
-	_ = this
-
 	localctx = NewAssignableChainOriginContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 298, PHPParserRULE_assignableChainOrigin)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(2221)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 282, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 282, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -34067,9 +37684,21 @@ func (p *PHPParser) AssignableChainOrigin() (localctx IAssignableChainOriginCont
 			p.Parentheses()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAssignableChainAccessContext is an interface to support dynamic dispatch.
@@ -34079,20 +37708,29 @@ type IAssignableChainAccessContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	MemberAccess() IMemberAccessContext
+	SquareCurlyExpression() ISquareCurlyExpressionContext
+
 	// IsAssignableChainAccessContext differentiates from other interfaces.
 	IsAssignableChainAccessContext()
 }
 
 type AssignableChainAccessContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyAssignableChainAccessContext() *AssignableChainAccessContext {
 	var p = new(AssignableChainAccessContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_assignableChainAccess
 	return p
+}
+
+func InitEmptyAssignableChainAccessContext(p *AssignableChainAccessContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_assignableChainAccess
 }
 
 func (*AssignableChainAccessContext) IsAssignableChainAccessContext() {}
@@ -34100,7 +37738,7 @@ func (*AssignableChainAccessContext) IsAssignableChainAccessContext() {}
 func NewAssignableChainAccessContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AssignableChainAccessContext {
 	var p = new(AssignableChainAccessContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_assignableChainAccess
@@ -34161,30 +37799,13 @@ func (s *AssignableChainAccessContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *PHPParser) AssignableChainAccess() (localctx IAssignableChainAccessContext) {
-	this := p
-	_ = this
-
 	localctx = NewAssignableChainAccessContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 300, PHPParserRULE_assignableChainAccess)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(2225)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserObjectOperator:
@@ -34202,10 +37823,21 @@ func (p *PHPParser) AssignableChainAccess() (localctx IAssignableChainAccessCont
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IStaticMethodCallContext is an interface to support dynamic dispatch.
@@ -34215,20 +37847,29 @@ type IStaticMethodCallContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ClassConstant() IClassConstantContext
+	ActualArguments() IActualArgumentsContext
+
 	// IsStaticMethodCallContext differentiates from other interfaces.
 	IsStaticMethodCallContext()
 }
 
 type StaticMethodCallContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyStaticMethodCallContext() *StaticMethodCallContext {
 	var p = new(StaticMethodCallContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_staticMethodCall
 	return p
+}
+
+func InitEmptyStaticMethodCallContext(p *StaticMethodCallContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_staticMethodCall
 }
 
 func (*StaticMethodCallContext) IsStaticMethodCallContext() {}
@@ -34236,7 +37877,7 @@ func (*StaticMethodCallContext) IsStaticMethodCallContext() {}
 func NewStaticMethodCallContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *StaticMethodCallContext {
 	var p = new(StaticMethodCallContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_staticMethodCall
@@ -34297,28 +37938,8 @@ func (s *StaticMethodCallContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *PHPParser) StaticMethodCall() (localctx IStaticMethodCallContext) {
-	this := p
-	_ = this
-
 	localctx = NewStaticMethodCallContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 302, PHPParserRULE_staticMethodCall)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(2227)
@@ -34329,7 +37950,17 @@ func (p *PHPParser) StaticMethodCall() (localctx IStaticMethodCallContext) {
 		p.ActualArguments()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IChainOriginContext is an interface to support dynamic dispatch.
@@ -34339,20 +37970,32 @@ type IChainOriginContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ChainBase() IChainBaseContext
+	FunctionCall() IFunctionCallContext
+	OpenRoundBracket() antlr.TerminalNode
+	NewExpr() INewExprContext
+	CloseRoundBracket() antlr.TerminalNode
+
 	// IsChainOriginContext differentiates from other interfaces.
 	IsChainOriginContext()
 }
 
 type ChainOriginContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyChainOriginContext() *ChainOriginContext {
 	var p = new(ChainOriginContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_chainOrigin
 	return p
+}
+
+func InitEmptyChainOriginContext(p *ChainOriginContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_chainOrigin
 }
 
 func (*ChainOriginContext) IsChainOriginContext() {}
@@ -34360,7 +38003,7 @@ func (*ChainOriginContext) IsChainOriginContext() {}
 func NewChainOriginContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ChainOriginContext {
 	var p = new(ChainOriginContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_chainOrigin
@@ -34445,31 +38088,15 @@ func (s *ChainOriginContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PHPParser) ChainOrigin() (localctx IChainOriginContext) {
-	this := p
-	_ = this
-
 	localctx = NewChainOriginContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 304, PHPParserRULE_chainOrigin)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(2236)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 284, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 284, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -34489,6 +38116,10 @@ func (p *PHPParser) ChainOrigin() (localctx IChainOriginContext) {
 		{
 			p.SetState(2232)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(2233)
@@ -34497,11 +38128,27 @@ func (p *PHPParser) ChainOrigin() (localctx IChainOriginContext) {
 		{
 			p.SetState(2234)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IMemberAccessContext is an interface to support dynamic dispatch.
@@ -34511,20 +38158,30 @@ type IMemberAccessContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ObjectOperator() antlr.TerminalNode
+	KeyedFieldName() IKeyedFieldNameContext
+	ActualArguments() IActualArgumentsContext
+
 	// IsMemberAccessContext differentiates from other interfaces.
 	IsMemberAccessContext()
 }
 
 type MemberAccessContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyMemberAccessContext() *MemberAccessContext {
 	var p = new(MemberAccessContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_memberAccess
 	return p
+}
+
+func InitEmptyMemberAccessContext(p *MemberAccessContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_memberAccess
 }
 
 func (*MemberAccessContext) IsMemberAccessContext() {}
@@ -34532,7 +38189,7 @@ func (*MemberAccessContext) IsMemberAccessContext() {}
 func NewMemberAccessContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MemberAccessContext {
 	var p = new(MemberAccessContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_memberAccess
@@ -34597,32 +38254,16 @@ func (s *MemberAccessContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *PHPParser) MemberAccess() (localctx IMemberAccessContext) {
-	this := p
-	_ = this
-
 	localctx = NewMemberAccessContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 306, PHPParserRULE_memberAccess)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(2238)
 		p.Match(PHPParserObjectOperator)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(2239)
@@ -34631,15 +38272,27 @@ func (p *PHPParser) MemberAccess() (localctx IMemberAccessContext) {
 	p.SetState(2241)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 285, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 285, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(2240)
 			p.ActualArguments()
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFunctionCallContext is an interface to support dynamic dispatch.
@@ -34649,20 +38302,29 @@ type IFunctionCallContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	FunctionCallName() IFunctionCallNameContext
+	ActualArguments() IActualArgumentsContext
+
 	// IsFunctionCallContext differentiates from other interfaces.
 	IsFunctionCallContext()
 }
 
 type FunctionCallContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFunctionCallContext() *FunctionCallContext {
 	var p = new(FunctionCallContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_functionCall
 	return p
+}
+
+func InitEmptyFunctionCallContext(p *FunctionCallContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_functionCall
 }
 
 func (*FunctionCallContext) IsFunctionCallContext() {}
@@ -34670,7 +38332,7 @@ func (*FunctionCallContext) IsFunctionCallContext() {}
 func NewFunctionCallContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FunctionCallContext {
 	var p = new(FunctionCallContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_functionCall
@@ -34731,28 +38393,8 @@ func (s *FunctionCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *PHPParser) FunctionCall() (localctx IFunctionCallContext) {
-	this := p
-	_ = this
-
 	localctx = NewFunctionCallContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 308, PHPParserRULE_functionCall)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(2243)
@@ -34763,7 +38405,17 @@ func (p *PHPParser) FunctionCall() (localctx IFunctionCallContext) {
 		p.ActualArguments()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFunctionCallNameContext is an interface to support dynamic dispatch.
@@ -34773,20 +38425,32 @@ type IFunctionCallNameContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	QualifiedNamespaceName() IQualifiedNamespaceNameContext
+	ClassConstant() IClassConstantContext
+	ChainBase() IChainBaseContext
+	Parentheses() IParenthesesContext
+	Label() antlr.TerminalNode
+
 	// IsFunctionCallNameContext differentiates from other interfaces.
 	IsFunctionCallNameContext()
 }
 
 type FunctionCallNameContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFunctionCallNameContext() *FunctionCallNameContext {
 	var p = new(FunctionCallNameContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_functionCallName
 	return p
+}
+
+func InitEmptyFunctionCallNameContext(p *FunctionCallNameContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_functionCallName
 }
 
 func (*FunctionCallNameContext) IsFunctionCallNameContext() {}
@@ -34794,7 +38458,7 @@ func (*FunctionCallNameContext) IsFunctionCallNameContext() {}
 func NewFunctionCallNameContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FunctionCallNameContext {
 	var p = new(FunctionCallNameContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_functionCallName
@@ -34891,31 +38555,15 @@ func (s *FunctionCallNameContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *PHPParser) FunctionCallName() (localctx IFunctionCallNameContext) {
-	this := p
-	_ = this
-
 	localctx = NewFunctionCallNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 310, PHPParserRULE_functionCallName)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(2251)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 286, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 286, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -34949,11 +38597,27 @@ func (p *PHPParser) FunctionCallName() (localctx IFunctionCallNameContext) {
 		{
 			p.SetState(2250)
 			p.Match(PHPParserLabel)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IActualArgumentsContext is an interface to support dynamic dispatch.
@@ -34963,20 +38627,31 @@ type IActualArgumentsContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllArguments() []IArgumentsContext
+	Arguments(i int) IArgumentsContext
+	AllSquareCurlyExpression() []ISquareCurlyExpressionContext
+	SquareCurlyExpression(i int) ISquareCurlyExpressionContext
+
 	// IsActualArgumentsContext differentiates from other interfaces.
 	IsActualArgumentsContext()
 }
 
 type ActualArgumentsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyActualArgumentsContext() *ActualArgumentsContext {
 	var p = new(ActualArgumentsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_actualArguments
 	return p
+}
+
+func InitEmptyActualArgumentsContext(p *ActualArgumentsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_actualArguments
 }
 
 func (*ActualArgumentsContext) IsActualArgumentsContext() {}
@@ -34984,7 +38659,7 @@ func (*ActualArgumentsContext) IsActualArgumentsContext() {}
 func NewActualArgumentsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ActualArgumentsContext {
 	var p = new(ActualArgumentsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_actualArguments
@@ -35095,33 +38770,16 @@ func (s *ActualArgumentsContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) ActualArguments() (localctx IActualArgumentsContext) {
-	this := p
-	_ = this
-
 	localctx = NewActualArgumentsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 312, PHPParserRULE_actualArguments)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(2254)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_alt = 1
 	for ok := true; ok; ok = _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		switch _alt {
@@ -35132,17 +38790,26 @@ func (p *PHPParser) ActualArguments() (localctx IActualArgumentsContext) {
 			}
 
 		default:
-			panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			goto errorExit
 		}
 
 		p.SetState(2256)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 287, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 287, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(2261)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 288, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 288, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -35153,10 +38820,26 @@ func (p *PHPParser) ActualArguments() (localctx IActualArgumentsContext) {
 		}
 		p.SetState(2263)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 288, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 288, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IChainBaseContext is an interface to support dynamic dispatch.
@@ -35166,20 +38849,31 @@ type IChainBaseContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllKeyedVariable() []IKeyedVariableContext
+	KeyedVariable(i int) IKeyedVariableContext
+	DoubleColon() antlr.TerminalNode
+	QualifiedStaticTypeRef() IQualifiedStaticTypeRefContext
+
 	// IsChainBaseContext differentiates from other interfaces.
 	IsChainBaseContext()
 }
 
 type ChainBaseContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyChainBaseContext() *ChainBaseContext {
 	var p = new(ChainBaseContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_chainBase
 	return p
+}
+
+func InitEmptyChainBaseContext(p *ChainBaseContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_chainBase
 }
 
 func (*ChainBaseContext) IsChainBaseContext() {}
@@ -35187,7 +38881,7 @@ func (*ChainBaseContext) IsChainBaseContext() {}
 func NewChainBaseContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ChainBaseContext {
 	var p = new(ChainBaseContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_chainBase
@@ -35277,31 +38971,15 @@ func (s *ChainBaseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) ChainBase() (localctx IChainBaseContext) {
-	this := p
-	_ = this
-
 	localctx = NewChainBaseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 314, PHPParserRULE_chainBase)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(2273)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserDollar, PHPParserVarName:
@@ -35312,12 +38990,19 @@ func (p *PHPParser) ChainBase() (localctx IChainBaseContext) {
 		}
 		p.SetState(2267)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == PHPParserDoubleColon {
 			{
 				p.SetState(2265)
 				p.Match(PHPParserDoubleColon)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(2266)
@@ -35335,6 +39020,10 @@ func (p *PHPParser) ChainBase() (localctx IChainBaseContext) {
 		{
 			p.SetState(2270)
 			p.Match(PHPParserDoubleColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(2271)
@@ -35342,10 +39031,21 @@ func (p *PHPParser) ChainBase() (localctx IChainBaseContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IKeyedFieldNameContext is an interface to support dynamic dispatch.
@@ -35355,20 +39055,29 @@ type IKeyedFieldNameContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	KeyedSimpleFieldName() IKeyedSimpleFieldNameContext
+	KeyedVariable() IKeyedVariableContext
+
 	// IsKeyedFieldNameContext differentiates from other interfaces.
 	IsKeyedFieldNameContext()
 }
 
 type KeyedFieldNameContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyKeyedFieldNameContext() *KeyedFieldNameContext {
 	var p = new(KeyedFieldNameContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_keyedFieldName
 	return p
+}
+
+func InitEmptyKeyedFieldNameContext(p *KeyedFieldNameContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_keyedFieldName
 }
 
 func (*KeyedFieldNameContext) IsKeyedFieldNameContext() {}
@@ -35376,7 +39085,7 @@ func (*KeyedFieldNameContext) IsKeyedFieldNameContext() {}
 func NewKeyedFieldNameContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *KeyedFieldNameContext {
 	var p = new(KeyedFieldNameContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_keyedFieldName
@@ -35437,30 +39146,13 @@ func (s *KeyedFieldNameContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) KeyedFieldName() (localctx IKeyedFieldNameContext) {
-	this := p
-	_ = this
-
 	localctx = NewKeyedFieldNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 316, PHPParserRULE_keyedFieldName)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(2277)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserAbstract, PHPParserArray, PHPParserAs, PHPParserBinaryCast, PHPParserBoolType, PHPParserBooleanConstant, PHPParserBreak, PHPParserCallable, PHPParserCase, PHPParserCatch, PHPParserClass, PHPParserClone, PHPParserConst, PHPParserContinue, PHPParserDefine, PHPParserDefined, PHPParserDeclare, PHPParserDefault, PHPParserDo, PHPParserDoubleCast, PHPParserDoubleType, PHPParserEcho, PHPParserElse, PHPParserElseIf, PHPParserEmpty, PHPParserEnum_, PHPParserEndDeclare, PHPParserEndFor, PHPParserEndForeach, PHPParserEndIf, PHPParserEndSwitch, PHPParserEndWhile, PHPParserEval, PHPParserAssert, PHPParserDie, PHPParserExit, PHPParserExtends, PHPParserFinal, PHPParserFinally, PHPParserFloatCast, PHPParserFor, PHPParserForeach, PHPParserGlobal, PHPParserGoto, PHPParserIf, PHPParserImplements, PHPParserImport, PHPParserInstanceOf, PHPParserInsteadOf, PHPParserInt8Cast, PHPParserInt16Cast, PHPParserInt64Type, PHPParserIntType, PHPParserInterface, PHPParserIsSet, PHPParserList, PHPParserLogicalAnd, PHPParserLogicalOr, PHPParserLogicalXor, PHPParserMatch_, PHPParserNamespace, PHPParserNew, PHPParserNull, PHPParserObjectType, PHPParserParent_, PHPParserPartial, PHPParserPrint, PHPParserPrivate, PHPParserProtected, PHPParserPublic, PHPParserReadonly, PHPParserResource, PHPParserReturn, PHPParserStatic, PHPParserStringType, PHPParserSwitch, PHPParserTrait, PHPParserTry, PHPParserTypeof, PHPParserUintCast, PHPParserUnicodeCast, PHPParserUnset, PHPParserVar, PHPParserWhile, PHPParserYield, PHPParserFrom, PHPParserLambdaFn, PHPParserTicks, PHPParserEncoding, PHPParserStrictTypes, PHPParserGet, PHPParserSet, PHPParserCall, PHPParserCallStatic, PHPParserConstructor, PHPParserDestruct, PHPParserWakeup, PHPParserSleep, PHPParserAutoload, PHPParserIsSet__, PHPParserUnset__, PHPParserToString__, PHPParserInvoke, PHPParserSetState, PHPParserClone__, PHPParserDebugInfo, PHPParserNamespace__, PHPParserClass__, PHPParserTraic__, PHPParserFunction__, PHPParserMethod__, PHPParserLine__, PHPParserFile__, PHPParserDir__, PHPParserOpenCurlyBracket, PHPParserLabel:
@@ -35478,10 +39170,21 @@ func (p *PHPParser) KeyedFieldName() (localctx IKeyedFieldNameContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IKeyedSimpleFieldNameContext is an interface to support dynamic dispatch.
@@ -35491,20 +39194,33 @@ type IKeyedSimpleFieldNameContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Identifier() IIdentifierContext
+	OpenCurlyBracket() antlr.TerminalNode
+	Expression() IExpressionContext
+	CloseCurlyBracket() antlr.TerminalNode
+	AllSquareCurlyExpression() []ISquareCurlyExpressionContext
+	SquareCurlyExpression(i int) ISquareCurlyExpressionContext
+
 	// IsKeyedSimpleFieldNameContext differentiates from other interfaces.
 	IsKeyedSimpleFieldNameContext()
 }
 
 type KeyedSimpleFieldNameContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyKeyedSimpleFieldNameContext() *KeyedSimpleFieldNameContext {
 	var p = new(KeyedSimpleFieldNameContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_keyedSimpleFieldName
 	return p
+}
+
+func InitEmptyKeyedSimpleFieldNameContext(p *KeyedSimpleFieldNameContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_keyedSimpleFieldName
 }
 
 func (*KeyedSimpleFieldNameContext) IsKeyedSimpleFieldNameContext() {}
@@ -35512,7 +39228,7 @@ func (*KeyedSimpleFieldNameContext) IsKeyedSimpleFieldNameContext() {}
 func NewKeyedSimpleFieldNameContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *KeyedSimpleFieldNameContext {
 	var p = new(KeyedSimpleFieldNameContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_keyedSimpleFieldName
@@ -35622,33 +39338,16 @@ func (s *KeyedSimpleFieldNameContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *PHPParser) KeyedSimpleFieldName() (localctx IKeyedSimpleFieldNameContext) {
-	this := p
-	_ = this
-
 	localctx = NewKeyedSimpleFieldNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 318, PHPParserRULE_keyedSimpleFieldName)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(2284)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserAbstract, PHPParserArray, PHPParserAs, PHPParserBinaryCast, PHPParserBoolType, PHPParserBooleanConstant, PHPParserBreak, PHPParserCallable, PHPParserCase, PHPParserCatch, PHPParserClass, PHPParserClone, PHPParserConst, PHPParserContinue, PHPParserDefine, PHPParserDefined, PHPParserDeclare, PHPParserDefault, PHPParserDo, PHPParserDoubleCast, PHPParserDoubleType, PHPParserEcho, PHPParserElse, PHPParserElseIf, PHPParserEmpty, PHPParserEnum_, PHPParserEndDeclare, PHPParserEndFor, PHPParserEndForeach, PHPParserEndIf, PHPParserEndSwitch, PHPParserEndWhile, PHPParserEval, PHPParserAssert, PHPParserDie, PHPParserExit, PHPParserExtends, PHPParserFinal, PHPParserFinally, PHPParserFloatCast, PHPParserFor, PHPParserForeach, PHPParserGlobal, PHPParserGoto, PHPParserIf, PHPParserImplements, PHPParserImport, PHPParserInstanceOf, PHPParserInsteadOf, PHPParserInt8Cast, PHPParserInt16Cast, PHPParserInt64Type, PHPParserIntType, PHPParserInterface, PHPParserIsSet, PHPParserList, PHPParserLogicalAnd, PHPParserLogicalOr, PHPParserLogicalXor, PHPParserMatch_, PHPParserNamespace, PHPParserNew, PHPParserNull, PHPParserObjectType, PHPParserParent_, PHPParserPartial, PHPParserPrint, PHPParserPrivate, PHPParserProtected, PHPParserPublic, PHPParserReadonly, PHPParserResource, PHPParserReturn, PHPParserStatic, PHPParserStringType, PHPParserSwitch, PHPParserTrait, PHPParserTry, PHPParserTypeof, PHPParserUintCast, PHPParserUnicodeCast, PHPParserUnset, PHPParserVar, PHPParserWhile, PHPParserYield, PHPParserFrom, PHPParserLambdaFn, PHPParserTicks, PHPParserEncoding, PHPParserStrictTypes, PHPParserGet, PHPParserSet, PHPParserCall, PHPParserCallStatic, PHPParserConstructor, PHPParserDestruct, PHPParserWakeup, PHPParserSleep, PHPParserAutoload, PHPParserIsSet__, PHPParserUnset__, PHPParserToString__, PHPParserInvoke, PHPParserSetState, PHPParserClone__, PHPParserDebugInfo, PHPParserNamespace__, PHPParserClass__, PHPParserTraic__, PHPParserFunction__, PHPParserMethod__, PHPParserLine__, PHPParserFile__, PHPParserDir__, PHPParserLabel:
@@ -35661,6 +39360,10 @@ func (p *PHPParser) KeyedSimpleFieldName() (localctx IKeyedSimpleFieldNameContex
 		{
 			p.SetState(2280)
 			p.Match(PHPParserOpenCurlyBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(2281)
@@ -35669,15 +39372,25 @@ func (p *PHPParser) KeyedSimpleFieldName() (localctx IKeyedSimpleFieldNameContex
 		{
 			p.SetState(2282)
 			p.Match(PHPParserCloseCurlyBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 	p.SetState(2289)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 293, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 293, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -35688,10 +39401,26 @@ func (p *PHPParser) KeyedSimpleFieldName() (localctx IKeyedSimpleFieldNameContex
 		}
 		p.SetState(2291)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 293, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 293, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IKeyedVariableContext is an interface to support dynamic dispatch.
@@ -35701,20 +39430,35 @@ type IKeyedVariableContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	VarName() antlr.TerminalNode
+	AllDollar() []antlr.TerminalNode
+	Dollar(i int) antlr.TerminalNode
+	OpenCurlyBracket() antlr.TerminalNode
+	Expression() IExpressionContext
+	CloseCurlyBracket() antlr.TerminalNode
+	AllSquareCurlyExpression() []ISquareCurlyExpressionContext
+	SquareCurlyExpression(i int) ISquareCurlyExpressionContext
+
 	// IsKeyedVariableContext differentiates from other interfaces.
 	IsKeyedVariableContext()
 }
 
 type KeyedVariableContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyKeyedVariableContext() *KeyedVariableContext {
 	var p = new(KeyedVariableContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_keyedVariable
 	return p
+}
+
+func InitEmptyKeyedVariableContext(p *KeyedVariableContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_keyedVariable
 }
 
 func (*KeyedVariableContext) IsKeyedVariableContext() {}
@@ -35722,7 +39466,7 @@ func (*KeyedVariableContext) IsKeyedVariableContext() {}
 func NewKeyedVariableContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *KeyedVariableContext {
 	var p = new(KeyedVariableContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_keyedVariable
@@ -35828,65 +39572,75 @@ func (s *KeyedVariableContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) KeyedVariable() (localctx IKeyedVariableContext) {
-	this := p
-	_ = this
-
 	localctx = NewKeyedVariableContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 320, PHPParserRULE_keyedVariable)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(2295)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 294, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 294, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
 				p.SetState(2292)
 				p.Match(PHPParserDollar)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		p.SetState(2297)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 294, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 294, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(2304)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserVarName:
 		{
 			p.SetState(2298)
 			p.Match(PHPParserVarName)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserDollar:
 		{
 			p.SetState(2299)
 			p.Match(PHPParserDollar)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(2300)
 			p.Match(PHPParserOpenCurlyBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(2301)
@@ -35895,15 +39649,25 @@ func (p *PHPParser) KeyedVariable() (localctx IKeyedVariableContext) {
 		{
 			p.SetState(2302)
 			p.Match(PHPParserCloseCurlyBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 	p.SetState(2309)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 296, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 296, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -35914,10 +39678,26 @@ func (p *PHPParser) KeyedVariable() (localctx IKeyedVariableContext) {
 		}
 		p.SetState(2311)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 296, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 296, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISquareCurlyExpressionContext is an interface to support dynamic dispatch.
@@ -35927,20 +39707,32 @@ type ISquareCurlyExpressionContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	OpenSquareBracket() antlr.TerminalNode
+	CloseSquareBracket() antlr.TerminalNode
+	Expression() IExpressionContext
+	OpenCurlyBracket() antlr.TerminalNode
+	CloseCurlyBracket() antlr.TerminalNode
+
 	// IsSquareCurlyExpressionContext differentiates from other interfaces.
 	IsSquareCurlyExpressionContext()
 }
 
 type SquareCurlyExpressionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptySquareCurlyExpressionContext() *SquareCurlyExpressionContext {
 	var p = new(SquareCurlyExpressionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_squareCurlyExpression
 	return p
+}
+
+func InitEmptySquareCurlyExpressionContext(p *SquareCurlyExpressionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_squareCurlyExpression
 }
 
 func (*SquareCurlyExpressionContext) IsSquareCurlyExpressionContext() {}
@@ -35948,7 +39740,7 @@ func (*SquareCurlyExpressionContext) IsSquareCurlyExpressionContext() {}
 func NewSquareCurlyExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SquareCurlyExpressionContext {
 	var p = new(SquareCurlyExpressionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_squareCurlyExpression
@@ -36009,31 +39801,15 @@ func (s *SquareCurlyExpressionContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *PHPParser) SquareCurlyExpression() (localctx ISquareCurlyExpressionContext) {
-	this := p
-	_ = this
-
 	localctx = NewSquareCurlyExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 322, PHPParserRULE_squareCurlyExpression)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(2321)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserOpenSquareBracket:
@@ -36041,12 +39817,19 @@ func (p *PHPParser) SquareCurlyExpression() (localctx ISquareCurlyExpressionCont
 		{
 			p.SetState(2312)
 			p.Match(PHPParserOpenSquareBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(2314)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244513) != 0 {
+		if ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244513) != 0) {
 			{
 				p.SetState(2313)
 				p.expression(0)
@@ -36056,6 +39839,10 @@ func (p *PHPParser) SquareCurlyExpression() (localctx ISquareCurlyExpressionCont
 		{
 			p.SetState(2316)
 			p.Match(PHPParserCloseSquareBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserOpenCurlyBracket:
@@ -36063,6 +39850,10 @@ func (p *PHPParser) SquareCurlyExpression() (localctx ISquareCurlyExpressionCont
 		{
 			p.SetState(2317)
 			p.Match(PHPParserOpenCurlyBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(2318)
@@ -36071,13 +39862,28 @@ func (p *PHPParser) SquareCurlyExpression() (localctx ISquareCurlyExpressionCont
 		{
 			p.SetState(2319)
 			p.Match(PHPParserCloseCurlyBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAssignmentListContext is an interface to support dynamic dispatch.
@@ -36087,20 +39893,31 @@ type IAssignmentListContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllAssignmentListElement() []IAssignmentListElementContext
+	AssignmentListElement(i int) IAssignmentListElementContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsAssignmentListContext differentiates from other interfaces.
 	IsAssignmentListContext()
 }
 
 type AssignmentListContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyAssignmentListContext() *AssignmentListContext {
 	var p = new(AssignmentListContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_assignmentList
 	return p
+}
+
+func InitEmptyAssignmentListContext(p *AssignmentListContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_assignmentList
 }
 
 func (*AssignmentListContext) IsAssignmentListContext() {}
@@ -36108,7 +39925,7 @@ func (*AssignmentListContext) IsAssignmentListContext() {}
 func NewAssignmentListContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AssignmentListContext {
 	var p = new(AssignmentListContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_assignmentList
@@ -36186,35 +40003,19 @@ func (s *AssignmentListContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) AssignmentList() (localctx IAssignmentListContext) {
-	this := p
-	_ = this
-
 	localctx = NewAssignmentListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 324, PHPParserRULE_assignmentList)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(2324)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244577) != 0 {
+	if ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244577) != 0) {
 		{
 			p.SetState(2323)
 			p.AssignmentListElement()
@@ -36223,18 +40024,28 @@ func (p *PHPParser) AssignmentList() (localctx IAssignmentListContext) {
 	}
 	p.SetState(2332)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == PHPParserComma {
 		{
 			p.SetState(2326)
 			p.Match(PHPParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(2328)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0 || (int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244577) != 0 {
+		if ((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-1) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&1873497444969349119) != 0) || ((int64((_la-194)) & ^0x3f) == 0 && ((int64(1)<<(_la-194))&70334428244577) != 0) {
 			{
 				p.SetState(2327)
 				p.AssignmentListElement()
@@ -36244,10 +40055,23 @@ func (p *PHPParser) AssignmentList() (localctx IAssignmentListContext) {
 
 		p.SetState(2334)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAssignmentListElementContext is an interface to support dynamic dispatch.
@@ -36257,20 +40081,33 @@ type IAssignmentListElementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Chain() IChainContext
+	List() antlr.TerminalNode
+	OpenRoundBracket() antlr.TerminalNode
+	AssignmentList() IAssignmentListContext
+	CloseRoundBracket() antlr.TerminalNode
+	ArrayItem() IArrayItemContext
+
 	// IsAssignmentListElementContext differentiates from other interfaces.
 	IsAssignmentListElementContext()
 }
 
 type AssignmentListElementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyAssignmentListElementContext() *AssignmentListElementContext {
 	var p = new(AssignmentListElementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_assignmentListElement
 	return p
+}
+
+func InitEmptyAssignmentListElementContext(p *AssignmentListElementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_assignmentListElement
 }
 
 func (*AssignmentListElementContext) IsAssignmentListElementContext() {}
@@ -36278,7 +40115,7 @@ func (*AssignmentListElementContext) IsAssignmentListElementContext() {}
 func NewAssignmentListElementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AssignmentListElementContext {
 	var p = new(AssignmentListElementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_assignmentListElement
@@ -36367,31 +40204,15 @@ func (s *AssignmentListElementContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *PHPParser) AssignmentListElement() (localctx IAssignmentListElementContext) {
-	this := p
-	_ = this
-
 	localctx = NewAssignmentListElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 326, PHPParserRULE_assignmentListElement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(2342)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 302, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 302, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -36404,10 +40225,18 @@ func (p *PHPParser) AssignmentListElement() (localctx IAssignmentListElementCont
 		{
 			p.SetState(2336)
 			p.Match(PHPParserList)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(2337)
 			p.Match(PHPParserOpenRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(2338)
@@ -36416,6 +40245,10 @@ func (p *PHPParser) AssignmentListElement() (localctx IAssignmentListElementCont
 		{
 			p.SetState(2339)
 			p.Match(PHPParserCloseRoundBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 3:
@@ -36425,9 +40258,21 @@ func (p *PHPParser) AssignmentListElement() (localctx IAssignmentListElementCont
 			p.ArrayItem()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IModifierContext is an interface to support dynamic dispatch.
@@ -36437,20 +40282,29 @@ type IModifierContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Abstract() antlr.TerminalNode
+	Final() antlr.TerminalNode
+
 	// IsModifierContext differentiates from other interfaces.
 	IsModifierContext()
 }
 
 type ModifierContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyModifierContext() *ModifierContext {
 	var p = new(ModifierContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_modifier
 	return p
+}
+
+func InitEmptyModifierContext(p *ModifierContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_modifier
 }
 
 func (*ModifierContext) IsModifierContext() {}
@@ -36458,7 +40312,7 @@ func (*ModifierContext) IsModifierContext() {}
 func NewModifierContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ModifierContext {
 	var p = new(ModifierContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_modifier
@@ -36495,28 +40349,9 @@ func (s *ModifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Modifier() (localctx IModifierContext) {
-	this := p
-	_ = this
-
 	localctx = NewModifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 328, PHPParserRULE_modifier)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -36531,7 +40366,17 @@ func (p *PHPParser) Modifier() (localctx IModifierContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIdentifierContext is an interface to support dynamic dispatch.
@@ -36541,20 +40386,29 @@ type IIdentifierContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Label() antlr.TerminalNode
+	Key() IKeyContext
+
 	// IsIdentifierContext differentiates from other interfaces.
 	IsIdentifierContext()
 }
 
 type IdentifierContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyIdentifierContext() *IdentifierContext {
 	var p = new(IdentifierContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_identifier
 	return p
+}
+
+func InitEmptyIdentifierContext(p *IdentifierContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_identifier
 }
 
 func (*IdentifierContext) IsIdentifierContext() {}
@@ -36562,7 +40416,7 @@ func (*IdentifierContext) IsIdentifierContext() {}
 func NewIdentifierContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *IdentifierContext {
 	var p = new(IdentifierContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_identifier
@@ -36611,30 +40465,13 @@ func (s *IdentifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Identifier() (localctx IIdentifierContext) {
-	this := p
-	_ = this
-
 	localctx = NewIdentifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 330, PHPParserRULE_identifier)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(2348)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case PHPParserLabel:
@@ -36642,6 +40479,10 @@ func (p *PHPParser) Identifier() (localctx IIdentifierContext) {
 		{
 			p.SetState(2346)
 			p.Match(PHPParserLabel)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case PHPParserAbstract, PHPParserArray, PHPParserAs, PHPParserBinaryCast, PHPParserBoolType, PHPParserBooleanConstant, PHPParserBreak, PHPParserCallable, PHPParserCase, PHPParserCatch, PHPParserClass, PHPParserClone, PHPParserConst, PHPParserContinue, PHPParserDefine, PHPParserDefined, PHPParserDeclare, PHPParserDefault, PHPParserDo, PHPParserDoubleCast, PHPParserDoubleType, PHPParserEcho, PHPParserElse, PHPParserElseIf, PHPParserEmpty, PHPParserEnum_, PHPParserEndDeclare, PHPParserEndFor, PHPParserEndForeach, PHPParserEndIf, PHPParserEndSwitch, PHPParserEndWhile, PHPParserEval, PHPParserAssert, PHPParserDie, PHPParserExit, PHPParserExtends, PHPParserFinal, PHPParserFinally, PHPParserFloatCast, PHPParserFor, PHPParserForeach, PHPParserGlobal, PHPParserGoto, PHPParserIf, PHPParserImplements, PHPParserImport, PHPParserInstanceOf, PHPParserInsteadOf, PHPParserInt8Cast, PHPParserInt16Cast, PHPParserInt64Type, PHPParserIntType, PHPParserInterface, PHPParserIsSet, PHPParserList, PHPParserLogicalAnd, PHPParserLogicalOr, PHPParserLogicalXor, PHPParserMatch_, PHPParserNamespace, PHPParserNew, PHPParserNull, PHPParserObjectType, PHPParserParent_, PHPParserPartial, PHPParserPrint, PHPParserPrivate, PHPParserProtected, PHPParserPublic, PHPParserReadonly, PHPParserResource, PHPParserReturn, PHPParserStatic, PHPParserStringType, PHPParserSwitch, PHPParserTrait, PHPParserTry, PHPParserTypeof, PHPParserUintCast, PHPParserUnicodeCast, PHPParserUnset, PHPParserVar, PHPParserWhile, PHPParserYield, PHPParserFrom, PHPParserLambdaFn, PHPParserTicks, PHPParserEncoding, PHPParserStrictTypes, PHPParserGet, PHPParserSet, PHPParserCall, PHPParserCallStatic, PHPParserConstructor, PHPParserDestruct, PHPParserWakeup, PHPParserSleep, PHPParserAutoload, PHPParserIsSet__, PHPParserUnset__, PHPParserToString__, PHPParserInvoke, PHPParserSetState, PHPParserClone__, PHPParserDebugInfo, PHPParserNamespace__, PHPParserClass__, PHPParserTraic__, PHPParserFunction__, PHPParserMethod__, PHPParserLine__, PHPParserFile__, PHPParserDir__:
@@ -36652,10 +40493,21 @@ func (p *PHPParser) Identifier() (localctx IIdentifierContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IKeyContext is an interface to support dynamic dispatch.
@@ -36665,20 +40517,141 @@ type IKeyContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Abstract() antlr.TerminalNode
+	Array() antlr.TerminalNode
+	Assert() antlr.TerminalNode
+	As() antlr.TerminalNode
+	BinaryCast() antlr.TerminalNode
+	BoolType() antlr.TerminalNode
+	BooleanConstant() antlr.TerminalNode
+	Break() antlr.TerminalNode
+	Callable() antlr.TerminalNode
+	Case() antlr.TerminalNode
+	Catch() antlr.TerminalNode
+	Class() antlr.TerminalNode
+	Clone() antlr.TerminalNode
+	Const() antlr.TerminalNode
+	Continue() antlr.TerminalNode
+	Define() antlr.TerminalNode
+	Defined() antlr.TerminalNode
+	Declare() antlr.TerminalNode
+	Default() antlr.TerminalNode
+	Do() antlr.TerminalNode
+	DoubleCast() antlr.TerminalNode
+	DoubleType() antlr.TerminalNode
+	Echo() antlr.TerminalNode
+	Else() antlr.TerminalNode
+	ElseIf() antlr.TerminalNode
+	Empty() antlr.TerminalNode
+	EndDeclare() antlr.TerminalNode
+	EndFor() antlr.TerminalNode
+	EndForeach() antlr.TerminalNode
+	EndIf() antlr.TerminalNode
+	EndSwitch() antlr.TerminalNode
+	EndWhile() antlr.TerminalNode
+	Eval() antlr.TerminalNode
+	Exit() antlr.TerminalNode
+	Die() antlr.TerminalNode
+	Extends() antlr.TerminalNode
+	Final() antlr.TerminalNode
+	Finally() antlr.TerminalNode
+	FloatCast() antlr.TerminalNode
+	For() antlr.TerminalNode
+	Foreach() antlr.TerminalNode
+	Global() antlr.TerminalNode
+	Goto() antlr.TerminalNode
+	If() antlr.TerminalNode
+	Implements() antlr.TerminalNode
+	Import() antlr.TerminalNode
+	InstanceOf() antlr.TerminalNode
+	InsteadOf() antlr.TerminalNode
+	Int16Cast() antlr.TerminalNode
+	Int64Type() antlr.TerminalNode
+	Int8Cast() antlr.TerminalNode
+	Interface() antlr.TerminalNode
+	IntType() antlr.TerminalNode
+	IsSet() antlr.TerminalNode
+	LambdaFn() antlr.TerminalNode
+	List() antlr.TerminalNode
+	LogicalAnd() antlr.TerminalNode
+	LogicalOr() antlr.TerminalNode
+	LogicalXor() antlr.TerminalNode
+	Namespace() antlr.TerminalNode
+	New() antlr.TerminalNode
+	Null() antlr.TerminalNode
+	ObjectType() antlr.TerminalNode
+	Parent_() antlr.TerminalNode
+	Partial() antlr.TerminalNode
+	Print() antlr.TerminalNode
+	Private() antlr.TerminalNode
+	Protected() antlr.TerminalNode
+	Public() antlr.TerminalNode
+	Readonly() antlr.TerminalNode
+	Resource() antlr.TerminalNode
+	Return() antlr.TerminalNode
+	Static() antlr.TerminalNode
+	StringType() antlr.TerminalNode
+	Switch() antlr.TerminalNode
+	Trait() antlr.TerminalNode
+	Try() antlr.TerminalNode
+	Typeof() antlr.TerminalNode
+	UintCast() antlr.TerminalNode
+	UnicodeCast() antlr.TerminalNode
+	Unset() antlr.TerminalNode
+	Var() antlr.TerminalNode
+	While() antlr.TerminalNode
+	Yield() antlr.TerminalNode
+	From() antlr.TerminalNode
+	Enum_() antlr.TerminalNode
+	Match_() antlr.TerminalNode
+	Ticks() antlr.TerminalNode
+	Encoding() antlr.TerminalNode
+	StrictTypes() antlr.TerminalNode
+	Get() antlr.TerminalNode
+	Set() antlr.TerminalNode
+	Call() antlr.TerminalNode
+	CallStatic() antlr.TerminalNode
+	Constructor() antlr.TerminalNode
+	Destruct() antlr.TerminalNode
+	Wakeup() antlr.TerminalNode
+	Sleep() antlr.TerminalNode
+	Autoload() antlr.TerminalNode
+	IsSet__() antlr.TerminalNode
+	Unset__() antlr.TerminalNode
+	ToString__() antlr.TerminalNode
+	Invoke() antlr.TerminalNode
+	SetState() antlr.TerminalNode
+	Clone__() antlr.TerminalNode
+	DebugInfo() antlr.TerminalNode
+	Namespace__() antlr.TerminalNode
+	Class__() antlr.TerminalNode
+	Traic__() antlr.TerminalNode
+	Function__() antlr.TerminalNode
+	Method__() antlr.TerminalNode
+	Line__() antlr.TerminalNode
+	File__() antlr.TerminalNode
+	Dir__() antlr.TerminalNode
+
 	// IsKeyContext differentiates from other interfaces.
 	IsKeyContext()
 }
 
 type KeyContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyKeyContext() *KeyContext {
 	var p = new(KeyContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_key
 	return p
+}
+
+func InitEmptyKeyContext(p *KeyContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_key
 }
 
 func (*KeyContext) IsKeyContext() {}
@@ -36686,7 +40659,7 @@ func (*KeyContext) IsKeyContext() {}
 func NewKeyContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *KeyContext {
 	var p = new(KeyContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_key
@@ -37171,35 +41144,16 @@ func (s *KeyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Key() (localctx IKeyContext) {
-	this := p
-	_ = this
-
 	localctx = NewKeyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 332, PHPParserRULE_key)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(2350)
 		_la = p.GetTokenStream().LA(1)
 
-		if !((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-848822976643073) != 0 || (int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&144115188058944511) != 0) {
+		if !(((int64((_la-45)) & ^0x3f) == 0 && ((int64(1)<<(_la-45))&-848822976643073) != 0) || ((int64((_la-109)) & ^0x3f) == 0 && ((int64(1)<<(_la-109))&144115188058944511) != 0)) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -37207,7 +41161,17 @@ func (p *PHPParser) Key() (localctx IKeyContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IMemberModifierContext is an interface to support dynamic dispatch.
@@ -37217,20 +41181,34 @@ type IMemberModifierContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Public() antlr.TerminalNode
+	Protected() antlr.TerminalNode
+	Private() antlr.TerminalNode
+	Static() antlr.TerminalNode
+	Abstract() antlr.TerminalNode
+	Final() antlr.TerminalNode
+	Readonly() antlr.TerminalNode
+
 	// IsMemberModifierContext differentiates from other interfaces.
 	IsMemberModifierContext()
 }
 
 type MemberModifierContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyMemberModifierContext() *MemberModifierContext {
 	var p = new(MemberModifierContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_memberModifier
 	return p
+}
+
+func InitEmptyMemberModifierContext(p *MemberModifierContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_memberModifier
 }
 
 func (*MemberModifierContext) IsMemberModifierContext() {}
@@ -37238,7 +41216,7 @@ func (*MemberModifierContext) IsMemberModifierContext() {}
 func NewMemberModifierContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MemberModifierContext {
 	var p = new(MemberModifierContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_memberModifier
@@ -37295,35 +41273,16 @@ func (s *MemberModifierContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) MemberModifier() (localctx IMemberModifierContext) {
-	this := p
-	_ = this
-
 	localctx = NewMemberModifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 334, PHPParserRULE_memberModifier)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(2352)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(_la == PHPParserAbstract || (int64((_la-82)) & ^0x3f) == 0 && ((int64(1)<<(_la-82))&2327872274433) != 0) {
+		if !(_la == PHPParserAbstract || ((int64((_la-82)) & ^0x3f) == 0 && ((int64(1)<<(_la-82))&2327872274433) != 0)) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -37331,7 +41290,17 @@ func (p *PHPParser) MemberModifier() (localctx IMemberModifierContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IMagicConstantContext is an interface to support dynamic dispatch.
@@ -37341,20 +41310,35 @@ type IMagicConstantContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Namespace__() antlr.TerminalNode
+	Class__() antlr.TerminalNode
+	Traic__() antlr.TerminalNode
+	Function__() antlr.TerminalNode
+	Method__() antlr.TerminalNode
+	Line__() antlr.TerminalNode
+	File__() antlr.TerminalNode
+	Dir__() antlr.TerminalNode
+
 	// IsMagicConstantContext differentiates from other interfaces.
 	IsMagicConstantContext()
 }
 
 type MagicConstantContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyMagicConstantContext() *MagicConstantContext {
 	var p = new(MagicConstantContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_magicConstant
 	return p
+}
+
+func InitEmptyMagicConstantContext(p *MagicConstantContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_magicConstant
 }
 
 func (*MagicConstantContext) IsMagicConstantContext() {}
@@ -37362,7 +41346,7 @@ func (*MagicConstantContext) IsMagicConstantContext() {}
 func NewMagicConstantContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MagicConstantContext {
 	var p = new(MagicConstantContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_magicConstant
@@ -37423,28 +41407,9 @@ func (s *MagicConstantContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) MagicConstant() (localctx IMagicConstantContext) {
-	this := p
-	_ = this
-
 	localctx = NewMagicConstantContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 336, PHPParserRULE_magicConstant)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -37459,7 +41424,17 @@ func (p *PHPParser) MagicConstant() (localctx IMagicConstantContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IMagicMethodContext is an interface to support dynamic dispatch.
@@ -37469,20 +41444,43 @@ type IMagicMethodContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Get() antlr.TerminalNode
+	Set() antlr.TerminalNode
+	Call() antlr.TerminalNode
+	CallStatic() antlr.TerminalNode
+	Constructor() antlr.TerminalNode
+	Destruct() antlr.TerminalNode
+	Wakeup() antlr.TerminalNode
+	Sleep() antlr.TerminalNode
+	Autoload() antlr.TerminalNode
+	IsSet__() antlr.TerminalNode
+	Unset__() antlr.TerminalNode
+	ToString__() antlr.TerminalNode
+	Invoke() antlr.TerminalNode
+	SetState() antlr.TerminalNode
+	Clone__() antlr.TerminalNode
+	DebugInfo() antlr.TerminalNode
+
 	// IsMagicMethodContext differentiates from other interfaces.
 	IsMagicMethodContext()
 }
 
 type MagicMethodContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyMagicMethodContext() *MagicMethodContext {
 	var p = new(MagicMethodContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_magicMethod
 	return p
+}
+
+func InitEmptyMagicMethodContext(p *MagicMethodContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_magicMethod
 }
 
 func (*MagicMethodContext) IsMagicMethodContext() {}
@@ -37490,7 +41488,7 @@ func (*MagicMethodContext) IsMagicMethodContext() {}
 func NewMagicMethodContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MagicMethodContext {
 	var p = new(MagicMethodContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_magicMethod
@@ -37583,28 +41581,9 @@ func (s *MagicMethodContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PHPParser) MagicMethod() (localctx IMagicMethodContext) {
-	this := p
-	_ = this
-
 	localctx = NewMagicMethodContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 338, PHPParserRULE_magicMethod)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -37619,7 +41598,17 @@ func (p *PHPParser) MagicMethod() (localctx IMagicMethodContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IPrimitiveTypeContext is an interface to support dynamic dispatch.
@@ -37629,20 +41618,35 @@ type IPrimitiveTypeContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	BoolType() antlr.TerminalNode
+	IntType() antlr.TerminalNode
+	Int64Type() antlr.TerminalNode
+	DoubleType() antlr.TerminalNode
+	StringType() antlr.TerminalNode
+	Resource() antlr.TerminalNode
+	ObjectType() antlr.TerminalNode
+	Array() antlr.TerminalNode
+
 	// IsPrimitiveTypeContext differentiates from other interfaces.
 	IsPrimitiveTypeContext()
 }
 
 type PrimitiveTypeContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyPrimitiveTypeContext() *PrimitiveTypeContext {
 	var p = new(PrimitiveTypeContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_primitiveType
 	return p
+}
+
+func InitEmptyPrimitiveTypeContext(p *PrimitiveTypeContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_primitiveType
 }
 
 func (*PrimitiveTypeContext) IsPrimitiveTypeContext() {}
@@ -37650,7 +41654,7 @@ func (*PrimitiveTypeContext) IsPrimitiveTypeContext() {}
 func NewPrimitiveTypeContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *PrimitiveTypeContext {
 	var p = new(PrimitiveTypeContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_primitiveType
@@ -37711,35 +41715,16 @@ func (s *PrimitiveTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) PrimitiveType() (localctx IPrimitiveTypeContext) {
-	this := p
-	_ = this
-
 	localctx = NewPrimitiveTypeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 340, PHPParserRULE_primitiveType)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(2358)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(_la == PHPParserArray || _la == PHPParserBoolType || (int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&648588766625136641) != 0) {
+		if !(_la == PHPParserArray || _la == PHPParserBoolType || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&648588766625136641) != 0)) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -37747,7 +41732,17 @@ func (p *PHPParser) PrimitiveType() (localctx IPrimitiveTypeContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ICastOperationContext is an interface to support dynamic dispatch.
@@ -37757,20 +41752,43 @@ type ICastOperationContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	BoolType() antlr.TerminalNode
+	Int8Cast() antlr.TerminalNode
+	Int16Cast() antlr.TerminalNode
+	IntType() antlr.TerminalNode
+	Int64Type() antlr.TerminalNode
+	UintCast() antlr.TerminalNode
+	DoubleCast() antlr.TerminalNode
+	DoubleType() antlr.TerminalNode
+	FloatCast() antlr.TerminalNode
+	StringType() antlr.TerminalNode
+	BinaryCast() antlr.TerminalNode
+	UnicodeCast() antlr.TerminalNode
+	Array() antlr.TerminalNode
+	ObjectType() antlr.TerminalNode
+	Resource() antlr.TerminalNode
+	Unset() antlr.TerminalNode
+
 	// IsCastOperationContext differentiates from other interfaces.
 	IsCastOperationContext()
 }
 
 type CastOperationContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyCastOperationContext() *CastOperationContext {
 	var p = new(CastOperationContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = PHPParserRULE_castOperation
 	return p
+}
+
+func InitEmptyCastOperationContext(p *CastOperationContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = PHPParserRULE_castOperation
 }
 
 func (*CastOperationContext) IsCastOperationContext() {}
@@ -37778,7 +41796,7 @@ func (*CastOperationContext) IsCastOperationContext() {}
 func NewCastOperationContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CastOperationContext {
 	var p = new(CastOperationContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = PHPParserRULE_castOperation
@@ -37871,35 +41889,16 @@ func (s *CastOperationContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) CastOperation() (localctx ICastOperationContext) {
-	this := p
-	_ = this
-
 	localctx = NewCastOperationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 342, PHPParserRULE_castOperation)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(2360)
 		_la = p.GetTokenStream().LA(1)
 
-		if !((int64((_la-46)) & ^0x3f) == 0 && ((int64(1)<<(_la-46))&33777272083972109) != 0 || (int64((_la-111)) & ^0x3f) == 0 && ((int64(1)<<(_la-111))&3679233) != 0) {
+		if !(((int64((_la-46)) & ^0x3f) == 0 && ((int64(1)<<(_la-46))&33777272083972109) != 0) || ((int64((_la-111)) & ^0x3f) == 0 && ((int64(1)<<(_la-111))&3679233) != 0)) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -37907,7 +41906,17 @@ func (p *PHPParser) CastOperation() (localctx ICastOperationContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 func (p *PHPParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int) bool {
@@ -37932,9 +41941,6 @@ func (p *PHPParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int
 }
 
 func (p *PHPParser) Expression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
-	this := p
-	_ = this
-
 	switch predIndex {
 	case 0:
 		return p.Precpred(p.GetParserRuleContext(), 24)
@@ -38011,9 +42017,6 @@ func (p *PHPParser) Expression_Sempred(localctx antlr.RuleContext, predIndex int
 }
 
 func (p *PHPParser) FlexiVariable_Sempred(localctx antlr.RuleContext, predIndex int) bool {
-	this := p
-	_ = this
-
 	switch predIndex {
 	case 23:
 		return p.Precpred(p.GetParserRuleContext(), 3)

@@ -16,7 +16,7 @@ func (y *YakCompiler) VisitFunctionCall(raw yak.IFunctionCallContext) interface{
 		return nil
 	}
 
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 	y.writeString("(")
 
@@ -46,7 +46,7 @@ func (y *YakCompiler) VisitOrdinaryArguments(raw yak.IOrdinaryArgumentsContext) 
 	if i == nil {
 		return 0, false
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	ellipsis := i.Ellipsis()

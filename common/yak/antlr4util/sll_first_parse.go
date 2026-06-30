@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
 )
 
@@ -155,6 +155,14 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 						cancelled = true
 						return
 					}
+					// ANTLR 4.13.1 ParseCancellationException.GetMessage() panics with
+					// "implement me" (upstream bug, see antlr/antlr4#4603). When running
+					// under BailErrorStrategy (SLL stage), such panics originate from the
+					// bail-out path and should be treated as cancellation, not propagated.
+					if s, ok := r.(string); ok && s == "implement me" && predictionMode == antlr.PredictionModeSLL {
+						cancelled = true
+						return
+					}
 					panic(r)
 				}
 			}()
@@ -177,7 +185,7 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 	if statsEnabled {
 		atomic.AddUint64(&sllFirstSLLAttempts, 1)
 	}
-	ast, err, cancelled, sllElapsed := run(antlr.PredictionModeSLL, antlr.NewBailErrorStrategy())
+	ast, err, cancelled, sllElapsed := run(antlr.PredictionModeSLL, NewBailErrorStrategy())
 	if !cancelled && err == nil {
 		return ast, nil
 	}

@@ -18,7 +18,7 @@ func (b *astbuilder) build(ast *JS.ProgramContext) {
 
 // statement list
 func (b *astbuilder) buildStatements(stmtlist *JS.StatementsContext) {
-	recoverRange := b.SetRange(stmtlist.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmtlist.BaseParserRuleContext)
 	defer recoverRange()
 	allstmt := stmtlist.AllStatement()
 	if len(allstmt) == 0 {
@@ -36,7 +36,7 @@ func (b *astbuilder) buildStatement(stmt *JS.StatementContext) {
 	if b.IsBlockFinish() {
 		return
 	}
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	b.AppendBlockRange()
 	// var
@@ -117,7 +117,7 @@ func (b *astbuilder) buildStatement(stmt *JS.StatementContext) {
 }
 
 func (b *astbuilder) buildVariableStatement(stmt *JS.VariableStatementContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if s, ok := stmt.VariableDeclarationList().(*JS.VariableDeclarationListContext); ok {
@@ -128,7 +128,7 @@ func (b *astbuilder) buildVariableStatement(stmt *JS.VariableStatementContext) {
 }
 
 func (b *astbuilder) buildAllVariableDeclaration(stmt *JS.VariableDeclarationListContext, left bool) (ssa.Value, *ssa.Variable) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	// var ret []ssa.Value
 
@@ -168,7 +168,7 @@ func (b *astbuilder) buildAllVariableDeclaration(stmt *JS.VariableDeclarationLis
 }
 
 func (b *astbuilder) buildVariableDeclaration(stmt *JS.VariableDeclarationContext, Type string, left bool) (ssa.Value, *ssa.Variable) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	a := stmt.Assign()
@@ -246,7 +246,7 @@ func (b *astbuilder) buildVariableDeclaration(stmt *JS.VariableDeclarationContex
 }
 
 func (b *astbuilder) buildAssignableContext(stmt *JS.AssignableContext) *ssa.Variable {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if i := stmt.Identifier(); i != nil {
@@ -737,7 +737,7 @@ func (b *astbuilder) buildKeywordSingleExpression(stmt JS.IKeywordSingleExpressi
 }
 
 func (b *astbuilder) buildOptionalChainExpression(stmt *JS.OptionalChainExpressionContext, left bool) (ssa.Value, *ssa.Variable) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	var expr ssa.Value
@@ -767,7 +767,7 @@ func (b *astbuilder) buildOptionalChainExpression(stmt *JS.OptionalChainExpressi
 }
 
 func (b *astbuilder) buildFunctionExpression(stmt *JS.FunctionExpressionContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if s, ok := stmt.AnonymousFunction().(*JS.ArrowFunctionContext); ok {
@@ -780,7 +780,7 @@ func (b *astbuilder) buildFunctionExpression(stmt *JS.FunctionExpressionContext)
 
 		newFunc := b.NewFunc(funcName)
 		{
-			recoverRange := b.SetRange(s.BaseParserRuleContext)
+			recoverRange := b.SetRange(&s.BaseParserRuleContext)
 
 			b.FunctionBuilder = b.PushFunction(newFunc)
 
@@ -880,7 +880,7 @@ func (b *astbuilder) buildArgumentsExpression(stmt funcCall) *ssa.Call {
 }
 
 func (b *astbuilder) buildArguments(stmt *JS.ArgumentsContext) ([]ssa.Value, bool) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	hasEll := false
 	var v []ssa.Value
@@ -905,7 +905,7 @@ func (b *astbuilder) buildArguments(stmt *JS.ArgumentsContext) ([]ssa.Value, boo
 }
 
 func (b *astbuilder) buildAssignmentOperatorContext(stmt *JS.AssignmentOperatorContext, variable *ssa.Variable, rValue ssa.Value) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	var Op ssa.BinaryOpcode
@@ -966,7 +966,7 @@ func (b *astbuilder) buildIdentifierExpression(text string, IslValue bool, force
 }
 
 func (b *astbuilder) buildMemberIndexExpression(stmt *JS.MemberIndexExpressionContext, IsValue bool) (ssa.Value, *ssa.Variable) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	// fmt.Println("memberIndex: ", stmt.GetText())
@@ -1003,7 +1003,7 @@ func (b *astbuilder) buildMemberIndexExpression(stmt *JS.MemberIndexExpressionCo
 }
 
 func (b *astbuilder) buildChainExpression(stmt *JS.ChainExpressionContext, IsValue bool) (ssa.Value, *ssa.Variable) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	var expr ssa.Value
@@ -1028,7 +1028,7 @@ func (b *astbuilder) buildChainExpression(stmt *JS.ChainExpressionContext, IsVal
 }
 
 func (b *astbuilder) buildArrayLiteral(stmt *JS.ArrayLiteralContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	var value []ssa.Value
@@ -1050,7 +1050,7 @@ func (b *astbuilder) buildArrayLiteral(stmt *JS.ArrayLiteralContext) ssa.Value {
 }
 
 func (b *astbuilder) buildObjectLiteral(stmt *JS.ObjectLiteralContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	// TODO: ObjectLiteral propertyAssignment remain 2
@@ -1111,7 +1111,7 @@ func (b *astbuilder) buildObjectLiteral(stmt *JS.ObjectLiteralContext) ssa.Value
 
 			// buildFunc := func() {
 			{
-				recoverRange := b.SetRange(pro.BaseParserRuleContext)
+				recoverRange := b.SetRange(&pro.BaseParserRuleContext)
 
 				b.FunctionBuilder = b.PushFunction(newFunc)
 
@@ -1172,7 +1172,7 @@ func (b *astbuilder) buildObjectLiteral(stmt *JS.ObjectLiteralContext) ssa.Value
 }
 
 func (b *astbuilder) buildPropertyName(stmt *JS.PropertyNameContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if s, ok := stmt.IdentifierName().(*JS.IdentifierNameContext); ok {
@@ -1218,7 +1218,7 @@ func (b *astbuilder) buildExpressionSequence(stmt *JS.ExpressionSequenceContext)
 	// 需要修改改函数及引用，不存在if中存在多个singleExpression的情况
 	// compelte
 
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	var val ssa.Value
@@ -1246,7 +1246,7 @@ func (b *astbuilder) buildExpressionSequence(stmt *JS.ExpressionSequenceContext)
 func (b *astbuilder) buildIfStatementContext(stmt *JS.IfStatementContext) {
 	// var buildIf func(stmt *JS.IfStatementContext) *ssa.IfBuilder
 	buildIf := func(stmt *JS.IfStatementContext) *ssa.IfBuilder {
-		recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+		recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 		defer recoverRange()
 
 		i := b.CreateIfBuilder()
@@ -1309,7 +1309,7 @@ func (b *astbuilder) buildIfStatementContext(stmt *JS.IfStatementContext) {
 }
 
 func (b *astbuilder) buildBlock(stmt *JS.BlockContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	// b.CurrentBlock.SetRange(b.CurrentRange)
 
@@ -1324,7 +1324,7 @@ func (b *astbuilder) buildBlock(stmt *JS.BlockContext) {
 
 // do while
 func (b *astbuilder) buildDoStatement(stmt *JS.DoStatementContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	// do while需要分次
@@ -1368,7 +1368,7 @@ func (b *astbuilder) buildDoStatement(stmt *JS.DoStatementContext) {
 
 // while
 func (b *astbuilder) buildwhileStatement(stmt *JS.WhileStatementContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	// 构建循环进行条件判断
@@ -1405,7 +1405,7 @@ func (b *astbuilder) buildwhileStatement(stmt *JS.WhileStatementContext) {
 
 // for
 func (b *astbuilder) buildForStatement(stmt *JS.ForStatementContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	loop := b.CreateLoopBuilder()
@@ -1416,14 +1416,14 @@ func (b *astbuilder) buildForStatement(stmt *JS.ForStatementContext) {
 	if first, ok := stmt.ForFirst().(*JS.ForFirstContext); ok {
 		if f, ok := first.VariableDeclarationList().(*JS.VariableDeclarationListContext); ok {
 			loop.SetFirst(func() []ssa.Value {
-				recoverRange := b.SetRange(f.BaseParserRuleContext)
+				recoverRange := b.SetRange(&f.BaseParserRuleContext)
 				defer recoverRange()
 				rv, _ := b.buildAllVariableDeclaration(f, false)
 				return []ssa.Value{rv}
 			})
 		} else if f, ok := first.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
 			loop.SetFirst(func() []ssa.Value {
-				// recoverRange := b.SetRange(&f.BaseParserRuleContext)
+				// recoverRange := b.SetRange(f.BaseParserRuleContext)
 				// defer recoverRange()
 				ret := b.buildExpressionSequence(f)
 				return []ssa.Value{ret}
@@ -1441,7 +1441,7 @@ func (b *astbuilder) buildForStatement(stmt *JS.ForStatementContext) {
 		if t, ok := third.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
 			loop.SetThird(func() []ssa.Value {
 				// build third expression in loop.latch
-				// recoverRange := b.SetRange(&t.BaseParserRuleContext)
+				// recoverRange := b.SetRange(t.BaseParserRuleContext)
 				// defer recoverRange()
 				// var ret []ssa.Value
 				ret := b.buildExpressionSequence(t)
@@ -1477,7 +1477,7 @@ func (b *astbuilder) buildForStatement(stmt *JS.ForStatementContext) {
 
 // for in 取key
 func (b *astbuilder) buildForInStatement(stmt *JS.ForInStatementContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	loop := b.CreateLoopBuilder()
@@ -1518,7 +1518,7 @@ func (b *astbuilder) buildForInStatement(stmt *JS.ForInStatementContext) {
 func (b *astbuilder) buildForOfStatement(stmt *JS.ForOfStatementContext) {
 	// todo: handle await
 
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	loop := b.CreateLoopBuilder()
@@ -1556,7 +1556,7 @@ func (b *astbuilder) buildForOfStatement(stmt *JS.ForOfStatementContext) {
 }
 
 func (b *astbuilder) buildFunctionDeclaration(stmt *JS.FunctionDeclarationContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	funcName := ""
@@ -1568,7 +1568,7 @@ func (b *astbuilder) buildFunctionDeclaration(stmt *JS.FunctionDeclarationContex
 
 	newFunc := b.NewFunc(funcName)
 	{
-		recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+		recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 
 		b.FunctionBuilder = b.PushFunction(newFunc)
 
@@ -1594,7 +1594,7 @@ func (b *astbuilder) buildFunctionDeclaration(stmt *JS.FunctionDeclarationContex
 }
 
 func (b *astbuilder) buildFunctionBody(stmt *JS.FunctionBodyContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if s, ok := stmt.Statements().(*JS.StatementsContext); ok {
@@ -1622,7 +1622,7 @@ func (b *astbuilder) buildFunctionBody(stmt *JS.FunctionBodyContext) {
 // }
 
 func (b *astbuilder) buildFormalParameterList(stmt *JS.FormalParameterListContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if f := stmt.AllFormalParameterArg(); f != nil {
@@ -1647,7 +1647,7 @@ func (b *astbuilder) buildFormalParameterList(stmt *JS.FormalParameterListContex
 }
 
 func (b *astbuilder) buildFormalParameterArg(stmt *JS.FormalParameterArgContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	a := stmt.Assign()
@@ -1667,7 +1667,7 @@ func (b *astbuilder) buildFormalParameterArg(stmt *JS.FormalParameterArgContext)
 }
 
 func (b *astbuilder) buildLastFormalParameterArg(stmt *JS.LastFormalParameterArgContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if e := stmt.Ellipsis(); e != nil {
@@ -1680,7 +1680,7 @@ func (b *astbuilder) buildLastFormalParameterArg(stmt *JS.LastFormalParameterArg
 }
 
 func (b *astbuilder) buildReturnStatement(stmt *JS.ReturnStatementContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	if s, ok := stmt.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
 		values := b.buildExpressionSequence(s)
@@ -1691,7 +1691,7 @@ func (b *astbuilder) buildReturnStatement(stmt *JS.ReturnStatementContext) {
 }
 
 func (b *astbuilder) buildBreakStatement(stmt *JS.BreakStatementContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	var _break *ssa.BasicBlock
@@ -1715,7 +1715,7 @@ func (b *astbuilder) buildBreakStatement(stmt *JS.BreakStatementContext) {
 
 // TODO: block sealed
 func (b *astbuilder) buildLabelledStatement(stmt *JS.LabelledStatementContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	text := ""
 	if s, ok := stmt.Identifier().(*JS.IdentifierContext); ok {
@@ -1737,7 +1737,7 @@ func (b *astbuilder) buildLabelledStatement(stmt *JS.LabelledStatementContext) {
 }
 
 func (b *astbuilder) buildTryStatement(stmt *JS.TryStatementContext) {
-	revcoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	revcoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer revcoverRange()
 
 	try := b.BuildTry()
@@ -1779,7 +1779,7 @@ func (b *astbuilder) buildTryStatement(stmt *JS.TryStatementContext) {
 }
 
 func (b *astbuilder) buildSwitchStatement(stmt *JS.SwitchStatementContext) {
-	revcoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	revcoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer revcoverRange()
 
 	Switchb := b.BuildSwitch()
@@ -1802,7 +1802,7 @@ func (b *astbuilder) buildSwitchStatement(stmt *JS.SwitchStatementContext) {
 }
 
 func (b *astbuilder) buildCaseBlock(stmt *JS.CaseBlockContext, Switchb *ssa.SwitchBuilder) {
-	revcoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	revcoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer revcoverRange()
 
 	type caseClause struct {

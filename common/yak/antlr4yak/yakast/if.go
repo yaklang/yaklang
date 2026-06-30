@@ -116,7 +116,7 @@ func (y *YakCompiler) VisitIfStmtInit(raw yak.IIfStmtInitContext) interface{} {
 		return nil
 	}
 
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	// 变量声明：if var a = f(); a != nil { ... }

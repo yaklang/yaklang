@@ -24,7 +24,7 @@ func (y *YakCompiler) VisitStatementList(raw yak.IStatementListContext, inline .
 	}
 	i := raw.(*yak.StatementListContext)
 	newLine := false
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 	allStatement := i.AllStatement()
 	lenOfAllStatement := len(allStatement)
@@ -61,7 +61,7 @@ func (y *YakCompiler) VisitStatement(i *yak.StatementContext) (newLine bool) {
 		return true
 	}
 
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	if s := i.LineCommentStmt(); s != nil {

@@ -1,13 +1,12 @@
-// Code generated from java-escape by ANTLR 4.11.1. DO NOT EDIT.
+// Code generated from ./SuricataRuleLexer.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
 package parser
 
 import (
 	"fmt"
+	"github.com/yaklang/antlr/v4"
 	"sync"
 	"unicode"
-
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 )
 
 // Suppress unused import error
@@ -22,34 +21,34 @@ type SuricataRuleLexer struct {
 	// TODO: EOF string
 }
 
-var suricatarulelexerLexerStaticData struct {
+var SuricataRuleLexerLexerStaticData struct {
 	once                   sync.Once
 	serializedATN          []int32
-	channelNames           []string
-	modeNames              []string
-	literalNames           []string
-	symbolicNames          []string
-	ruleNames              []string
-	predictionContextCache *antlr.PredictionContextCache
+	ChannelNames           []string
+	ModeNames              []string
+	LiteralNames           []string
+	SymbolicNames          []string
+	RuleNames              []string
+	PredictionContextCache *antlr.PredictionContextCache
 	atn                    *antlr.ATN
 	decisionToDFA          []*antlr.DFA
 }
 
 func suricatarulelexerLexerInit() {
-	staticData := &suricatarulelexerLexerStaticData
-	staticData.channelNames = []string{
+	staticData := &SuricataRuleLexerLexerStaticData
+	staticData.ChannelNames = []string{
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN",
 	}
-	staticData.modeNames = []string{
+	staticData.ModeNames = []string{
 		"DEFAULT_MODE", "PARAM_MODE", "UNTIL_SEP_MODE", "MODE_STRING",
 	}
-	staticData.literalNames = []string{
+	staticData.LiteralNames = []string{
 		"", "'any'", "", "'$'", "'->'", "'<>'", "'*'", "'/'", "'%'", "'&'",
 		"'+'", "'-'", "'^'", "'<'", "'>'", "'<='", "'>='", "", "'::'", "'['",
 		"']'", "'('", "'{'", "'}'", "", "'='", "'~'", "'.'", "", "", "", "",
 		"", "", "", "", "", "", "')'",
 	}
-	staticData.symbolicNames = []string{
+	staticData.SymbolicNames = []string{
 		"", "Any", "Negative", "Dollar", "Arrow", "BothDirect", "Mul", "Div",
 		"Mod", "Amp", "Plus", "Sub", "Power", "Lt", "Gt", "LtEq", "GtEq", "Colon",
 		"DoubleColon", "LBracket", "RBracket", "ParamStart", "LBrace", "RBrace",
@@ -60,7 +59,7 @@ func suricatarulelexerLexerInit() {
 		"UntilSEPParamWS", "NonQuotedString", "ModeString", "ModeStringEnd",
 		"ANY",
 	}
-	staticData.ruleNames = []string{
+	staticData.RuleNames = []string{
 		"Any", "Negative", "Dollar", "Arrow", "BothDirect", "Mul", "Div", "Mod",
 		"Amp", "Plus", "Sub", "Power", "Lt", "Gt", "LtEq", "GtEq", "Colon",
 		"DoubleColon", "LBracket", "RBracket", "ParamStart", "LBrace", "RBrace",
@@ -73,7 +72,7 @@ func suricatarulelexerLexerInit() {
 		"UntilSEPParamWS", "NonQuotedString", "ModeStringChar", "ModeString",
 		"ModeStringEnd", "ANY",
 	}
-	staticData.predictionContextCache = antlr.NewPredictionContextCache()
+	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
 		4, 0, 51, 385, 6, -1, 6, -1, 6, -1, 6, -1, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2,
 		7, 2, 2, 3, 7, 3, 2, 4, 7, 4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8,
@@ -269,7 +268,7 @@ func suricatarulelexerLexerInit() {
 // NewSuricataRuleLexer(). You can call this function if you wish to initialize the static state ahead
 // of time.
 func SuricataRuleLexerInit() {
-	staticData := &suricatarulelexerLexerStaticData
+	staticData := &SuricataRuleLexerLexerStaticData
 	staticData.once.Do(suricatarulelexerLexerInit)
 }
 
@@ -278,13 +277,13 @@ func NewSuricataRuleLexer(input antlr.CharStream) *SuricataRuleLexer {
 	SuricataRuleLexerInit()
 	l := new(SuricataRuleLexer)
 	l.BaseLexer = antlr.NewBaseLexer(input)
-	staticData := &suricatarulelexerLexerStaticData
-	l.Interpreter = antlr.NewLexerATNSimulator(l, staticData.atn, staticData.decisionToDFA, staticData.predictionContextCache)
-	l.channelNames = staticData.channelNames
-	l.modeNames = staticData.modeNames
-	l.RuleNames = staticData.ruleNames
-	l.LiteralNames = staticData.literalNames
-	l.SymbolicNames = staticData.symbolicNames
+	staticData := &SuricataRuleLexerLexerStaticData
+	l.Interpreter = antlr.NewLexerATNSimulator(l, staticData.atn, staticData.decisionToDFA, staticData.PredictionContextCache)
+	l.channelNames = staticData.ChannelNames
+	l.modeNames = staticData.ModeNames
+	l.RuleNames = staticData.RuleNames
+	l.LiteralNames = staticData.LiteralNames
+	l.SymbolicNames = staticData.SymbolicNames
 	l.GrammarFileName = "SuricataRuleLexer.g4"
 	// TODO: l.EOF = antlr.TokenEOF
 

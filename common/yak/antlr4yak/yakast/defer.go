@@ -14,7 +14,7 @@ func (y *YakCompiler) VisitDeferStmt(raw yak.IDeferStmtContext) interface{} {
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 	y.writeString("defer ")
 

@@ -16,7 +16,7 @@ func (y *YakCompiler) VisitInstanceCode(raw yak.IInstanceCodeContext) interface{
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 	if op := i.Func(); op != nil {
 		y.writeString(op.GetText() + " ")

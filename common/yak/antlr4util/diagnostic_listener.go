@@ -9,7 +9,7 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -151,7 +151,7 @@ func antlrDecisionDescription(recognizer antlr.Parser) string {
 	return fmt.Sprintf("decision=%d%s", decision, ruleDesc)
 }
 
-func (l *loggingDiagnosticErrorListener) ReportAmbiguity(recognizer antlr.Parser, dfa *antlr.DFA, startIndex, stopIndex int, exact bool, ambigAlts *antlr.BitSet, configs antlr.ATNConfigSet) {
+func (l *loggingDiagnosticErrorListener) ReportAmbiguity(recognizer antlr.Parser, dfa *antlr.DFA, startIndex, stopIndex int, exact bool, ambigAlts *antlr.BitSet, configs *antlr.ATNConfigSet) {
 	if l.exactOnly && !exact {
 		return
 	}
@@ -162,10 +162,10 @@ func (l *loggingDiagnosticErrorListener) ReportAmbiguity(recognizer antlr.Parser
 	l.emit("ambiguity", recognizer, startIndex, stopIndex, extra)
 }
 
-func (l *loggingDiagnosticErrorListener) ReportAttemptingFullContext(recognizer antlr.Parser, dfa *antlr.DFA, startIndex, stopIndex int, conflictingAlts *antlr.BitSet, configs antlr.ATNConfigSet) {
+func (l *loggingDiagnosticErrorListener) ReportAttemptingFullContext(recognizer antlr.Parser, dfa *antlr.DFA, startIndex, stopIndex int, conflictingAlts *antlr.BitSet, configs *antlr.ATNConfigSet) {
 	l.emit("attempting_full_context", recognizer, startIndex, stopIndex, "")
 }
 
-func (l *loggingDiagnosticErrorListener) ReportContextSensitivity(recognizer antlr.Parser, dfa *antlr.DFA, startIndex, stopIndex, prediction int, configs antlr.ATNConfigSet) {
+func (l *loggingDiagnosticErrorListener) ReportContextSensitivity(recognizer antlr.Parser, dfa *antlr.DFA, startIndex, stopIndex, prediction int, configs *antlr.ATNConfigSet) {
 	l.emit("context_sensitivity", recognizer, startIndex, stopIndex, fmt.Sprintf("prediction=%d", prediction))
 }

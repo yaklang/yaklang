@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/yaklang/yaklang/common/yak/antlr4util"
+	"github.com/yaklang/antlr/v4"
 	cparser "github.com/yaklang/yaklang/common/yak/antlr4c/parser"
+	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"github.com/yaklang/yaklang/common/yak/c2ssa"
 )
 
@@ -111,7 +111,7 @@ func cSLLBailParse(code string) (tree string, bailed bool, listenerErr error) {
 	parser := cparser.NewCParser(tokenStream)
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(el)
-	parser.SetErrorHandler(antlr.NewBailErrorStrategy())
+	parser.SetErrorHandler(antlr4util.NewBailErrorStrategy())
 	parser.GetInterpreter().SetPredictionMode(antlr.PredictionModeSLL)
 
 	func() {

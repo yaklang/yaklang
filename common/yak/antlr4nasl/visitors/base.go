@@ -2,7 +2,7 @@ package visitors
 
 import (
 	"fmt"
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 	"github.com/yaklang/yaklang/common/utils"
 	nasl "github.com/yaklang/yaklang/common/yak/antlr4nasl/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"

@@ -14,7 +14,7 @@ type getSingleExpr interface {
 }
 
 func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) (ssa.Value, *ssa.Variable) {
-	recoverRange := b.SetRange(exp.BaseParserRuleContext)
+	recoverRange := b.SetRange(&exp.BaseParserRuleContext)
 	defer recoverRange()
 
 	getValue := func(single getSingleExpr, i int) ssa.Value {
@@ -203,7 +203,7 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) 
 }
 
 func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValue bool, isFunction ...bool) (ssa.Value, *ssa.Variable) {
-	recoverRange := b.SetRange(exp.BaseParserRuleContext)
+	recoverRange := b.SetRange(&exp.BaseParserRuleContext)
 	defer recoverRange()
 
 	if ret := exp.Operand(); ret != nil {
@@ -391,7 +391,7 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 }
 
 func (b *astbuilder) buildMethodExpression(exp *gol.MethodExprContext, IslValue bool) (ssa.Value, *ssa.Variable) {
-	recoverRange := b.SetRange(exp.BaseParserRuleContext)
+	recoverRange := b.SetRange(&exp.BaseParserRuleContext)
 	defer recoverRange()
 	var typ ssa.Type
 	var text string
@@ -413,7 +413,7 @@ func (b *astbuilder) buildMethodExpression(exp *gol.MethodExprContext, IslValue 
 }
 
 func (b *astbuilder) buildConversion(exp *gol.ConversionContext, IslValue bool) (ssa.Value, *ssa.Variable) {
-	recoverRange := b.SetRange(exp.BaseParserRuleContext)
+	recoverRange := b.SetRange(&exp.BaseParserRuleContext)
 	defer recoverRange()
 	var typ ssa.Type
 	var rightv ssa.Value
@@ -489,7 +489,7 @@ func (b *astbuilder) buildArgumentsExpression(arg *gol.ArgumentsContext) []ssa.V
 }
 
 func (b *astbuilder) buildOperandExpression(exp *gol.OperandContext, IslValue bool) (ssa.Value, *ssa.Variable) {
-	recoverRange := b.SetRange(exp.BaseParserRuleContext)
+	recoverRange := b.SetRange(&exp.BaseParserRuleContext)
 	defer recoverRange()
 	var rightv ssa.Value
 	var leftv *ssa.Variable
@@ -519,7 +519,7 @@ func (b *astbuilder) buildOperandExpression(exp *gol.OperandContext, IslValue bo
 }
 
 func (b *astbuilder) buildOperandNameL(name *gol.OperandNameContext, isLocal bool) *ssa.Variable {
-	recoverRange := b.SetRange(name.BaseParserRuleContext)
+	recoverRange := b.SetRange(&name.BaseParserRuleContext)
 	defer recoverRange()
 
 	if id := name.IDENTIFIER(); id != nil {
@@ -542,7 +542,7 @@ func (b *astbuilder) buildOperandNameL(name *gol.OperandNameContext, isLocal boo
 }
 
 func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
-	recoverRange := b.SetRange(name.BaseParserRuleContext)
+	recoverRange := b.SetRange(&name.BaseParserRuleContext)
 	defer recoverRange()
 
 	if id := name.IDENTIFIER(); id != nil {

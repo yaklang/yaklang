@@ -18,7 +18,7 @@ func (y *YakCompiler) VisitGoStmt(raw yak.IGoStmtContext) interface{} {
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 	y.writeString("go ")
 

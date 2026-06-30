@@ -13,7 +13,7 @@ import (
 
 // entry point
 func (b *astbuilder) build(ast *gol.SourceFileContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	var pkgNameCurrent string
@@ -284,7 +284,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 }
 
 func (b *astbuilder) buildPackage(p *gol.PackageClauseContext) []string {
-	recoverRange := b.SetRange(p.BaseParserRuleContext)
+	recoverRange := b.SetRange(&p.BaseParserRuleContext)
 	defer recoverRange()
 
 	if n := p.PackageName(); n != nil {
@@ -295,7 +295,7 @@ func (b *astbuilder) buildPackage(p *gol.PackageClauseContext) []string {
 }
 
 func (b *astbuilder) buildPackageName(packageName *gol.PackageNameContext) string {
-	recoverRange := b.SetRange(packageName.BaseParserRuleContext)
+	recoverRange := b.SetRange(&packageName.BaseParserRuleContext)
 	defer recoverRange()
 
 	if id := packageName.IDENTIFIER(); id != nil {
@@ -305,7 +305,7 @@ func (b *astbuilder) buildPackageName(packageName *gol.PackageNameContext) strin
 }
 
 func (b *astbuilder) buildImportDecl(importDecl *gol.ImportDeclContext) ([]string, []string) {
-	recoverRange := b.SetRange(importDecl.BaseParserRuleContext)
+	recoverRange := b.SetRange(&importDecl.BaseParserRuleContext)
 	defer recoverRange()
 	var namel, pathl []string
 
@@ -320,7 +320,7 @@ func (b *astbuilder) buildImportDecl(importDecl *gol.ImportDeclContext) ([]strin
 }
 
 func (b *astbuilder) buildImportSpec(importSpec *gol.ImportSpecContext) ([]string, string) {
-	recoverRange := b.SetRange(importSpec.BaseParserRuleContext)
+	recoverRange := b.SetRange(&importSpec.BaseParserRuleContext)
 	defer recoverRange()
 	var name []string
 	var path string
@@ -349,7 +349,7 @@ func (b *astbuilder) buildImportSpec(importSpec *gol.ImportSpecContext) ([]strin
 }
 
 func (b *astbuilder) buildImportPath(importPath *gol.ImportPathContext) string {
-	recoverRange := b.SetRange(importPath.BaseParserRuleContext)
+	recoverRange := b.SetRange(&importPath.BaseParserRuleContext)
 	defer recoverRange()
 
 	if s := importPath.String_(); s != nil {
@@ -383,7 +383,7 @@ func (b *astbuilder) handleImportPackage() {
 }
 
 func (b *astbuilder) buildDeclaration(decl *gol.DeclarationContext, isglobal bool) {
-	recoverRange := b.SetRange(decl.BaseParserRuleContext)
+	recoverRange := b.SetRange(&decl.BaseParserRuleContext)
 	defer recoverRange()
 
 	if constDecl := decl.ConstDecl(); constDecl != nil {
@@ -398,7 +398,7 @@ func (b *astbuilder) buildDeclaration(decl *gol.DeclarationContext, isglobal boo
 }
 
 func (b *astbuilder) buildConstDecl(constDecl *gol.ConstDeclContext) {
-	recoverRange := b.SetRange(constDecl.BaseParserRuleContext)
+	recoverRange := b.SetRange(&constDecl.BaseParserRuleContext)
 	defer recoverRange()
 	var defaul ssa.Value = nil
 	var index int
@@ -420,7 +420,7 @@ func (b *astbuilder) buildConstDecl(constDecl *gol.ConstDeclContext) {
 }
 
 func (b *astbuilder) buildConstSpec(constSpec *gol.ConstSpecContext, defaul ssa.Value) (ssa.Value, bool) {
-	recoverRange := b.SetRange(constSpec.BaseParserRuleContext)
+	recoverRange := b.SetRange(&constSpec.BaseParserRuleContext)
 	defer recoverRange()
 
 	var leftvl []*ssa.Variable
@@ -464,7 +464,7 @@ func (b *astbuilder) buildConstSpec(constSpec *gol.ConstSpecContext, defaul ssa.
 }
 
 func (b *astbuilder) buildVarDecl(varDecl *gol.VarDeclContext, isglobal bool) {
-	recoverRange := b.SetRange(varDecl.BaseParserRuleContext)
+	recoverRange := b.SetRange(&varDecl.BaseParserRuleContext)
 	defer recoverRange()
 	for _, v := range varDecl.AllVarSpec() {
 		b.buildVarSpec(v.(*gol.VarSpecContext), isglobal)
@@ -472,7 +472,7 @@ func (b *astbuilder) buildVarDecl(varDecl *gol.VarDeclContext, isglobal bool) {
 }
 
 func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
-	recoverRange := b.SetRange(varSpec.BaseParserRuleContext)
+	recoverRange := b.SetRange(&varSpec.BaseParserRuleContext)
 	defer recoverRange()
 
 	var ssaTyp ssa.Type
@@ -516,7 +516,7 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 
 		if !hasAssign {
 			for _, ident := range leftList {
-				recoverRange := b.SetRange(ident.(*gol.IdentifierContext).BaseParserRuleContext)
+				recoverRange := b.SetRange(&ident.(*gol.IdentifierContext).BaseParserRuleContext)
 				registerDefault(gol.IdentifierName(ident))
 				recoverRange()
 			}
@@ -545,7 +545,7 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 	var leftvl []*ssa.Variable
 	if !hasAssign {
 		for _, ident := range leftList {
-			recoverRange := b.SetRange(ident.(*gol.IdentifierContext).BaseParserRuleContext)
+			recoverRange := b.SetRange(&ident.(*gol.IdentifierContext).BaseParserRuleContext)
 			id := gol.IdentifierName(ident)
 			checkCannotAssign(id)
 
@@ -646,7 +646,7 @@ func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []
 }
 
 func (b *astbuilder) buildTypeDecl(typeDecl *gol.TypeDeclContext) {
-	recoverRange := b.SetRange(typeDecl.BaseParserRuleContext)
+	recoverRange := b.SetRange(&typeDecl.BaseParserRuleContext)
 	defer recoverRange()
 
 	for _, t := range typeDecl.AllTypeSpec() {
@@ -657,7 +657,7 @@ func (b *astbuilder) buildTypeDecl(typeDecl *gol.TypeDeclContext) {
 }
 
 func (b *astbuilder) buildTypeSpec(ts *gol.TypeSpecContext) {
-	recoverRange := b.SetRange(ts.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ts.BaseParserRuleContext)
 	defer recoverRange()
 
 	if alias := ts.AliasDecl(); alias != nil {
@@ -669,7 +669,7 @@ func (b *astbuilder) buildTypeSpec(ts *gol.TypeSpecContext) {
 }
 
 func (b *astbuilder) buildAliasDecl(alias *gol.AliasDeclContext) {
-	recoverRange := b.SetRange(alias.BaseParserRuleContext)
+	recoverRange := b.SetRange(&alias.BaseParserRuleContext)
 	defer recoverRange()
 
 	if param := alias.TypeParameters(); param != nil {
@@ -688,7 +688,7 @@ func (b *astbuilder) buildAliasDecl(alias *gol.AliasDeclContext) {
 }
 
 func (b *astbuilder) buildTypeDef(typedef *gol.TypeDefContext) {
-	recoverRange := b.SetRange(typedef.BaseParserRuleContext)
+	recoverRange := b.SetRange(&typedef.BaseParserRuleContext)
 	defer recoverRange()
 
 	if param := typedef.TypeParameters(); param != nil {
@@ -726,7 +726,7 @@ func (b *astbuilder) buildTypeDef(typedef *gol.TypeDefContext) {
 }
 
 func (b *astbuilder) buildTypeParameters(typ *gol.TypeParametersContext) func() {
-	recoverRange := b.SetRange(typ.BaseParserRuleContext)
+	recoverRange := b.SetRange(&typ.BaseParserRuleContext)
 	defer recoverRange()
 	var alias []*ssa.AliasType
 
@@ -746,7 +746,7 @@ func (b *astbuilder) buildTypeParameters(typ *gol.TypeParametersContext) func() 
 }
 
 func (b *astbuilder) buildTypeParameterDecl(typ *gol.TypeParameterDeclContext) []*ssa.AliasType {
-	recoverRange := b.SetRange(typ.BaseParserRuleContext)
+	recoverRange := b.SetRange(&typ.BaseParserRuleContext)
 	defer recoverRange()
 
 	var ssatyp ssa.Type
@@ -777,7 +777,7 @@ func functionDeclName(fun *gol.FunctionDeclContext) string {
 }
 
 func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
-	recoverRange := b.SetRange(fun.BaseParserRuleContext)
+	recoverRange := b.SetRange(&fun.BaseParserRuleContext)
 	defer recoverRange()
 
 	var params []ssa.Type
@@ -910,7 +910,7 @@ func (b *astbuilder) getReceiverDecl(para *gol.ParameterDeclContext) string {
 }
 
 func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
-	recoverRange := b.SetRange(fun.BaseParserRuleContext)
+	recoverRange := b.SetRange(&fun.BaseParserRuleContext)
 	defer recoverRange()
 
 	var params []ssa.Type
@@ -1020,7 +1020,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 }
 
 func (b *astbuilder) buildReceiver(stmt *gol.ReceiverContext) []ssa.Type {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	var ssatyp []ssa.Type
 
@@ -1031,7 +1031,7 @@ func (b *astbuilder) buildReceiver(stmt *gol.ReceiverContext) []ssa.Type {
 }
 
 func (b *astbuilder) buildReceiverParameter(parms *gol.ParametersContext) []ssa.Type {
-	recoverRange := b.SetRange(parms.BaseParserRuleContext)
+	recoverRange := b.SetRange(&parms.BaseParserRuleContext)
 	defer recoverRange()
 	var types []ssa.Type
 
@@ -1045,7 +1045,7 @@ func (b *astbuilder) buildReceiverParameter(parms *gol.ParametersContext) []ssa.
 }
 
 func (b *astbuilder) buildReceiverDecl(para *gol.ParameterDeclContext) ssa.Type {
-	recoverRange := b.SetRange(para.BaseParserRuleContext)
+	recoverRange := b.SetRange(&para.BaseParserRuleContext)
 	defer recoverRange()
 
 	var typeType ssa.Type
@@ -1066,7 +1066,7 @@ func (b *astbuilder) buildReceiverDecl(para *gol.ParameterDeclContext) ssa.Type 
 }
 
 func (b *astbuilder) buildSignature(stmt *gol.SignatureContext) ([]ssa.Type, ssa.Type) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	var paramt []ssa.Type
@@ -1084,7 +1084,7 @@ func (b *astbuilder) buildSignature(stmt *gol.SignatureContext) ([]ssa.Type, ssa
 }
 
 func (b *astbuilder) buildParameters(parms *gol.ParametersContext) []ssa.Type {
-	recoverRange := b.SetRange(parms.BaseParserRuleContext)
+	recoverRange := b.SetRange(&parms.BaseParserRuleContext)
 	defer recoverRange()
 
 	var paramt []ssa.Type
@@ -1104,7 +1104,7 @@ func (b *astbuilder) buildParameters(parms *gol.ParametersContext) []ssa.Type {
 }
 
 func (b *astbuilder) buildParameterDecl(para *gol.ParameterDeclContext) []ssa.Type {
-	recoverRange := b.SetRange(para.BaseParserRuleContext)
+	recoverRange := b.SetRange(&para.BaseParserRuleContext)
 	defer recoverRange()
 
 	var typeType ssa.Type
@@ -1139,7 +1139,7 @@ func (b *astbuilder) buildParameterDecl(para *gol.ParameterDeclContext) []ssa.Ty
 }
 
 func (b *astbuilder) buildParamList(idList *gol.IdentifierListContext) []*ssa.Parameter {
-	recoverRange := b.SetRange(idList.BaseParserRuleContext)
+	recoverRange := b.SetRange(&idList.BaseParserRuleContext)
 	defer recoverRange()
 
 	var pList []*ssa.Parameter
@@ -1153,7 +1153,7 @@ func (b *astbuilder) buildParamList(idList *gol.IdentifierListContext) []*ssa.Pa
 }
 
 func (b *astbuilder) buildStructList(idList *gol.IdentifierListContext) []ssa.Value {
-	recoverRange := b.SetRange(idList.BaseParserRuleContext)
+	recoverRange := b.SetRange(&idList.BaseParserRuleContext)
 	defer recoverRange()
 
 	var pList []ssa.Value
@@ -1167,7 +1167,7 @@ func (b *astbuilder) buildStructList(idList *gol.IdentifierListContext) []ssa.Va
 }
 
 func (b *astbuilder) buildIdentifierList(idList *gol.IdentifierListContext, isLocal bool) []*ssa.Variable {
-	recoverRange := b.SetRange(idList.BaseParserRuleContext)
+	recoverRange := b.SetRange(&idList.BaseParserRuleContext)
 	defer recoverRange()
 
 	var vList []*ssa.Variable
@@ -1185,7 +1185,7 @@ func (b *astbuilder) buildIdentifierList(idList *gol.IdentifierListContext, isLo
 }
 
 func (b *astbuilder) buildResult(rety *gol.ResultContext) ssa.Type {
-	recoverRange := b.SetRange(rety.BaseParserRuleContext)
+	recoverRange := b.SetRange(&rety.BaseParserRuleContext)
 	defer recoverRange()
 	var typeType ssa.Type
 	if typ := rety.Type_(); typ != nil {
@@ -1206,7 +1206,7 @@ func (b *astbuilder) buildResult(rety *gol.ResultContext) ssa.Type {
 }
 
 func (b *astbuilder) buildResultParameters(parms *gol.ParametersContext) ([]ssa.Value, []ssa.Type) {
-	recoverRange := b.SetRange(parms.BaseParserRuleContext)
+	recoverRange := b.SetRange(&parms.BaseParserRuleContext)
 	defer recoverRange()
 
 	var key []ssa.Value
@@ -1229,7 +1229,7 @@ func (b *astbuilder) buildResultParameters(parms *gol.ParametersContext) ([]ssa.
 }
 
 func (b *astbuilder) buildResultParameterDecl(para *gol.ParameterDeclContext) ([]ssa.Value, []ssa.Type) {
-	recoverRange := b.SetRange(para.BaseParserRuleContext)
+	recoverRange := b.SetRange(&para.BaseParserRuleContext)
 	defer recoverRange()
 
 	var key []ssa.Value
@@ -1263,7 +1263,7 @@ func (b *astbuilder) buildBlock(block *gol.BlockContext, buildGlobal bool, synta
 		syntaxBlock = syntaxBlocks[0]
 	}
 
-	recoverRange := b.SetRange(block.BaseParserRuleContext)
+	recoverRange := b.SetRange(&block.BaseParserRuleContext)
 	defer recoverRange()
 
 	b.InCmapLevel()
@@ -1289,7 +1289,7 @@ func (b *astbuilder) buildBlock(block *gol.BlockContext, buildGlobal bool, synta
 }
 
 func (b *astbuilder) buildStatementList(stmt *gol.StatementListContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	allstmt := stmt.AllStatement()
 	if len(allstmt) == 0 {
@@ -1310,7 +1310,7 @@ func (b *astbuilder) buildStatement(stmt *gol.StatementContext) {
 	if b.IsBlockFinish() {
 		return
 	}
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	b.AppendBlockRange()
 
@@ -1376,7 +1376,7 @@ func (b *astbuilder) buildStatement(stmt *gol.StatementContext) {
 }
 
 func (b *astbuilder) buildGoStmt(stmt *gol.GoStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if stmt, ok := stmt.Expression().(*gol.ExpressionContext); ok {
@@ -1392,7 +1392,7 @@ func (b *astbuilder) buildGoStmt(stmt *gol.GoStmtContext) {
 }
 
 func (b *astbuilder) buildFallthroughStmt(stmt *gol.FallthroughStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if !b.Fallthrough() {
@@ -1401,7 +1401,7 @@ func (b *astbuilder) buildFallthroughStmt(stmt *gol.FallthroughStmtContext) {
 }
 
 func (b *astbuilder) buildDeferStmt(stmt *gol.DeferStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if stmt, ok := stmt.Expression().(*gol.ExpressionContext); ok {
@@ -1417,7 +1417,7 @@ func (b *astbuilder) buildDeferStmt(stmt *gol.DeferStmtContext) {
 }
 
 func (b *astbuilder) buildDeferGoExpression(stmt *gol.ExpressionContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	var rv ssa.Value
@@ -1458,7 +1458,7 @@ func (b *astbuilder) handlerGoto(labelName string, isBreak ...bool) {
 }
 
 func (b *astbuilder) buildGotoStmt(stmt *gol.GotoStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	if id := stmt.IDENTIFIER(); id != nil {
 		b.handlerGoto(id.GetText())
@@ -1466,7 +1466,7 @@ func (b *astbuilder) buildGotoStmt(stmt *gol.GotoStmtContext) {
 }
 
 func (b *astbuilder) buildContinueStmt(stmt *gol.ContinueStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	// if exist label, goto label
@@ -1481,7 +1481,7 @@ func (b *astbuilder) buildContinueStmt(stmt *gol.ContinueStmtContext) {
 }
 
 func (b *astbuilder) buildBreakStmt(stmt *gol.BreakStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	// if exist label, goto label
@@ -1496,7 +1496,7 @@ func (b *astbuilder) buildBreakStmt(stmt *gol.BreakStmtContext) {
 }
 
 func (b *astbuilder) buildLabeledStmt(stmt *gol.LabeledStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	text := ""
@@ -1522,7 +1522,7 @@ func (b *astbuilder) buildLabeledStmt(stmt *gol.LabeledStmtContext) {
 }
 
 func (b *astbuilder) buildSelectStmt(stmt *gol.SelectStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	SwitchBuilder := b.BuildSwitch()
@@ -1574,7 +1574,7 @@ func (b *astbuilder) buildSelectStmt(stmt *gol.SelectStmtContext) {
 }
 
 func (b *astbuilder) buildSendStmt(stmt *gol.SendStmtContext) []ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	var channv ssa.Value
@@ -1597,7 +1597,7 @@ func (b *astbuilder) buildSendStmt(stmt *gol.SendStmtContext) []ssa.Value {
 }
 
 func (b *astbuilder) buildRecvStmt(stmt *gol.RecvStmtContext) []ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	var recvv ssa.Value
@@ -1624,7 +1624,7 @@ func (b *astbuilder) buildRecvStmt(stmt *gol.RecvStmtContext) []ssa.Value {
 }
 
 func (b *astbuilder) buildSwitchStmt(stmt *gol.SwitchStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if s, ok := stmt.ExprSwitchStmt().(*gol.ExprSwitchStmtContext); ok {
@@ -1636,7 +1636,7 @@ func (b *astbuilder) buildSwitchStmt(stmt *gol.SwitchStmtContext) {
 }
 
 func (b *astbuilder) buildExprSwitchStmt(stmt *gol.ExprSwitchStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	SwitchBuilder := b.BuildSwitch()
@@ -1701,7 +1701,7 @@ func (b *astbuilder) buildExprSwitchStmt(stmt *gol.ExprSwitchStmtContext) {
 }
 
 func (b *astbuilder) buildTypeSwitchStmt(stmt *gol.TypeSwitchStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	SwitchBuilder := b.BuildSwitch()
@@ -1770,7 +1770,7 @@ func (b *astbuilder) buildTypeSwitchStmt(stmt *gol.TypeSwitchStmtContext) {
 }
 
 func (b *astbuilder) buildForStmt(stmt *gol.ForStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	loop := b.CreateLoopBuilder()
 
@@ -1791,7 +1791,7 @@ func (b *astbuilder) buildForStmt(stmt *gol.ForStmtContext) {
 	} else if condition, ok := stmt.ForClause().(*gol.ForClauseContext); ok {
 		if first, ok := condition.GetInitStmt().(*gol.SimpleStmtContext); ok {
 			loop.SetFirst(func() []ssa.Value {
-				recoverRange := b.SetRange(first.BaseParserRuleContext)
+				recoverRange := b.SetRange(&first.BaseParserRuleContext)
 				defer recoverRange()
 				return b.buildSimpleStmt(first)
 			})
@@ -1818,7 +1818,7 @@ func (b *astbuilder) buildForStmt(stmt *gol.ForStmtContext) {
 
 		if third, ok := condition.GetPostStmt().(*gol.SimpleStmtContext); ok {
 			loop.SetThird(func() []ssa.Value {
-				recoverRange := b.SetRange(third.BaseParserRuleContext)
+				recoverRange := b.SetRange(&third.BaseParserRuleContext)
 				defer recoverRange()
 				return b.buildSimpleStmt(third)
 			})
@@ -1878,7 +1878,7 @@ func (b *astbuilder) buildForRangeStmt(stmt *gol.RangeClauseContext, loop *ssa.L
 }
 
 func (b *astbuilder) buildIfStmt(stmt *gol.IfStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	builder := b.CreateIfBuilder()
@@ -1897,7 +1897,7 @@ func (b *astbuilder) buildIfStmt(stmt *gol.IfStmtContext) {
 						return nil
 					}
 
-					recoverRange := b.SetRange(expressionStmt.BaseParserRuleContext)
+					recoverRange := b.SetRange(&expressionStmt.BaseParserRuleContext)
 					b.AppendBlockRange()
 					recoverRange()
 
@@ -1931,7 +1931,7 @@ func (b *astbuilder) buildIfStmt(stmt *gol.IfStmtContext) {
 }
 
 func (b *astbuilder) buildReturnStmt(stmt *gol.ReturnStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	var values []ssa.Value
@@ -1962,7 +1962,7 @@ func (b *astbuilder) buildReturnStmt(stmt *gol.ReturnStmtContext) {
 }
 
 func (b *astbuilder) buildSimpleStmt(stmt *gol.SimpleStmtContext) []ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	var rightv []ssa.Value
 
@@ -2123,7 +2123,7 @@ func (b *astbuilder) buildAssignment(stmt *gol.ExprSimpleStmtContext) []ssa.Valu
 }
 
 func (b *astbuilder) buildTypeArgs(stmt *gol.TypeArgsContext) func() {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	var alias []*ssa.AliasType
 	var ssatyp ssa.Type
@@ -2147,7 +2147,7 @@ func (b *astbuilder) buildTypeArgs(stmt *gol.TypeArgsContext) func() {
 }
 
 func (b *astbuilder) buildType(typ *gol.Type_Context) ssa.Type {
-	recoverRange := b.SetRange(typ.BaseParserRuleContext)
+	recoverRange := b.SetRange(&typ.BaseParserRuleContext)
 	defer recoverRange()
 	var ssatyp ssa.Type
 
@@ -2170,7 +2170,7 @@ func (b *astbuilder) buildType(typ *gol.Type_Context) ssa.Type {
 }
 
 func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
-	recoverRange := b.SetRange(tname.BaseParserRuleContext)
+	recoverRange := b.SetRange(&tname.BaseParserRuleContext)
 	defer recoverRange()
 
 	if iqul := tname.QualifiedIdent(); iqul != nil {
@@ -2235,7 +2235,7 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 }
 
 func (b *astbuilder) buildTypeElement(stmt *gol.TypeElementContext) ssa.Type {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	var ssatyp ssa.Type
 
@@ -2248,7 +2248,7 @@ func (b *astbuilder) buildTypeElement(stmt *gol.TypeElementContext) ssa.Type {
 }
 
 func (b *astbuilder) buildMethodSpec(stmt *gol.MethodSpecContext, interfacetyp *ssa.InterfaceType) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	funcName := ""
@@ -2280,7 +2280,7 @@ func (b *astbuilder) buildMethodSpec(stmt *gol.MethodSpecContext, interfacetyp *
 	}
 
 	{
-		recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+		recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 		b.FunctionBuilder = b.PushFunction(newFunc)
 
 		if para, ok := stmt.Result().(*gol.ResultContext); ok {

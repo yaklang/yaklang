@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
