@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -112,6 +113,66 @@ func OverrideYakScriptAiTools() {
 	})
 }
 
+func ShouldSkipYakScriptEmbedPath(dirname, toolname string) bool {
+	return shouldSkipYakScriptEmbedPath(dirname, toolname)
+}
+
+func shouldSkipYakScriptEmbedPath(dirname, toolname string) bool {
+	if strings.HasPrefix(toolname, "_") {
+		return true
+	}
+	parts := strings.Split(strings.Trim(dirname, "/"), "/")
+	for _, p := range parts {
+		if p == "lib" || p == "testfixtures" {
+			return true
+		}
+	}
+	return false
+}
+
+// PrepareJavaAuditToolContent prepends shared java_audit/_lib helpers for tool execution and metadata parsing.
+func PrepareJavaAuditToolContent(namePath, content string) string {
+	namePath = strings.Trim(namePath, `/`)
+	if namePath != "java_audit" && !strings.HasPrefix(namePath, "java_audit/") {
+		return content
+	}
+	if strings.Contains(namePath, "/lib") || strings.HasSuffix(namePath, "/lib") {
+		return content
+	}
+	libContent, err := loadJavaAuditLibContent()
+	if err != nil || libContent == "" {
+		return content
+	}
+	return libContent + "\n" + content
+}
+
+func loadJavaAuditLibContent() (string, error) {
+	efs := yakScriptFS
+	libDir := "yakscriptforai/java_audit/lib"
+	entries, err := fs.ReadDir(efs, libDir)
+	if err != nil {
+		return "", err
+	}
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yak") {
+			continue
+		}
+		names = append(names, entry.Name())
+	}
+	sort.Strings(names)
+	var b strings.Builder
+	for _, name := range names {
+		data, err := efs.ReadFile(filepath.Join(libDir, name))
+		if err != nil {
+			continue
+		}
+		b.Write(data)
+		b.WriteByte('\n')
+	}
+	return b.String(), nil
+}
+
 func loadAllYakScriptFromEmbedFS() ([]*schema.AIYakTool, error) {
 	aiTools := []*schema.AIYakTool{}
 	efs := yakScriptFS
@@ -123,24 +184,28 @@ func loadAllYakScriptFromEmbedFS() ([]*schema.AIYakTool, error) {
 			return nil
 		}
 		toolname := strings.TrimSuffix(filename, ".yak")
+		if shouldSkipYakScriptEmbedPath(dirname, toolname) {
+			return nil
+		}
 
 		content, err := efs.ReadFile(s)
 		if err != nil {
 			return nil
 		}
-		aiTool := LoadYakScriptToAiTools(toolname, string(content))
-		if aiTool == nil {
-			return nil
-		}
-		aiTool.Author = schema.AIResourceAuthorBuiltin
-		aiTool.IsBuiltin = true
-
 		namePath := ""
 		dirnameClean, ok := strings.CutPrefix(dirname, `yakscriptforai`)
 		if ok {
 			namePath = dirnameClean
 		}
 		namePath = strings.Trim(namePath, `/`)
+		prepared := PrepareJavaAuditToolContent(namePath, string(content))
+		aiTool := LoadYakScriptToAiTools(toolname, prepared)
+		if aiTool == nil {
+			return nil
+		}
+		aiTool.Author = schema.AIResourceAuthorBuiltin
+		aiTool.IsBuiltin = true
+
 		aiTool.Path = filepath.Join(namePath, toolname)
 
 		aiTools = append(aiTools, aiTool)

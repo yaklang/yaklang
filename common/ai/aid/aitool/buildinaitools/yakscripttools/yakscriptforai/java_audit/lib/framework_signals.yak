@@ -1,0 +1,398 @@
+// Framework detection and tool routing for java_audit.
+
+javaAuditFrameworkCatalog = [
+    {
+        "name": "spring_boot",
+        "display": "Spring Boot / Spring MVC",
+        "arch_tool": "java_audit/spring_boot_arch_info",
+        "config_tool": "java_audit/spring_boot_config_audit",
+        "file_markers": ["pom.xml", "build.gradle", "application.properties", "application.yml", "application.yaml"],
+        "content_markers": ["@SpringBootApplication", "org.springframework.boot", "spring-boot-starter"],
+        "strong_content_markers": ["@SpringBootApplication", "spring-boot-starter", "org.springframework.boot"],
+    },
+    {
+        "name": "servlet",
+        "display": "Servlet / Java EE",
+        "arch_tool": "java_audit/servlet_arch_info",
+        "config_tool": "java_audit/servlet_config_audit",
+        "file_markers": ["web.xml", "WEB-INF"],
+        "content_markers": ["javax.servlet", "jakarta.servlet", "<servlet", "<filter"],
+        "strong_content_markers": ["<servlet", "<filter", "jakarta.servlet", "javax.servlet"],
+    },
+    {
+        "name": "struts2",
+        "display": "Apache Struts 2",
+        "arch_tool": "java_audit/struts2_arch_info",
+        "config_tool": "java_audit/struts2_config_audit",
+        "file_markers": ["struts.xml", "struts-plugin.xml"],
+        "content_markers": ["struts-default", "ActionSupport", "org.apache.struts2"],
+        "strong_content_markers": ["struts-default", "org.apache.struts2"],
+    },
+    {
+        "name": "mybatis",
+        "display": "MyBatis",
+        "arch_tool": "java_audit/mybatis_arch_info",
+        "config_tool": "java_audit/mybatis_config_audit",
+        "file_markers": ["mybatis-config.xml"],
+        "content_markers": ["org.apache.ibatis", "@Mapper", "Mapper.xml", "<mapper"],
+        "strong_content_markers": ["org.apache.ibatis", "@Mapper", "<mapper"],
+    },
+    {
+        "name": "shiro",
+        "display": "Apache Shiro",
+        "arch_tool": "java_audit/shiro_arch_info",
+        "config_tool": "java_audit/shiro_config_audit",
+        "file_markers": ["shiro.ini"],
+        "content_markers": ["org.apache.shiro", "ShiroFilterFactoryBean", "[users]", "[urls]"],
+        "strong_content_markers": ["ShiroFilterFactoryBean", "[urls]", "[users]", "file:shiro.ini"],
+    },
+    {
+        "name": "spring_security",
+        "display": "Spring Security",
+        "arch_tool": "java_audit/spring_security_arch_info",
+        "config_tool": "java_audit/spring_security_config_audit",
+        "file_markers": [],
+        "content_markers": ["org.springframework.security", "WebSecurityConfigurerAdapter", "SecurityFilterChain", "spring.security"],
+        "strong_content_markers": ["SecurityFilterChain", "WebSecurityConfigurerAdapter", "spring-security"],
+    },
+    {
+        "name": "jpa",
+        "display": "Hibernate / JPA",
+        "arch_tool": "java_audit/jpa_arch_info",
+        "config_tool": "java_audit/jpa_config_audit",
+        "file_markers": ["persistence.xml", "hibernate.cfg.xml"],
+        "content_markers": ["javax.persistence", "jakarta.persistence", "@Entity", "org.hibernate"],
+        "strong_content_markers": ["@Entity", "org.hibernate", "jakarta.persistence"],
+    },
+    {
+        "name": "dubbo",
+        "display": "Apache Dubbo",
+        "arch_tool": "java_audit/dubbo_arch_info",
+        "config_tool": "java_audit/dubbo_config_audit",
+        "file_markers": ["dubbo.properties"],
+        "content_markers": ["org.apache.dubbo", "@DubboService", "dubbo:service", "dubbo.application"],
+        "strong_content_markers": ["org.apache.dubbo", "@DubboService", "dubbo:service"],
+    },
+    {
+        "name": "spring_cloud",
+        "display": "Spring Cloud",
+        "arch_tool": "java_audit/spring_cloud_arch_info",
+        "config_tool": "java_audit/spring_cloud_config_audit",
+        "file_markers": ["bootstrap.yml", "bootstrap.yaml", "bootstrap.properties"],
+        "content_markers": ["@EnableDiscoveryClient", "spring.cloud", "org.springframework.cloud", "@FeignClient"],
+        "strong_content_markers": ["@EnableDiscoveryClient", "@FeignClient", "org.springframework.cloud", "spring.cloud"],
+    },
+    {
+        "name": "jfinal",
+        "display": "JFinal",
+        "arch_tool": "java_audit/jfinal_arch_info",
+        "config_tool": "java_audit/jfinal_config_audit",
+        "file_markers": ["config.properties"],
+        "content_markers": ["com.jfinal", "JFinalConfig", "Routes", "Plugins"],
+        "strong_content_markers": ["JFinalConfig", "com.jfinal"],
+    },
+    {
+        "name": "vertx",
+        "display": "Eclipse Vert.x",
+        "arch_tool": "java_audit/vertx_arch_info",
+        "config_tool": "java_audit/vertx_config_audit",
+        "file_markers": ["vertx.json"],
+        "content_markers": ["io.vertx", "AbstractVerticle", "Router", "Verticle"],
+        "strong_content_markers": ["io.vertx", "AbstractVerticle", "file:vertx.json"],
+    },
+    {
+        "name": "play",
+        "display": "Play Framework",
+        "arch_tool": "java_audit/play_arch_info",
+        "config_tool": "java_audit/play_config_audit",
+        "file_markers": ["routes", "application.conf"],
+        "content_markers": ["play.mvc", "play.api", "play.http", "play.server"],
+        "strong_content_markers": ["play.mvc", "play.api", "play.http", "play.server"],
+    },
+]
+
+javaAuditSignalHasStrongMarker = (signals, strongMarkers) => {
+    for s in signals {
+        for sm in strongMarkers {
+            sml = string(sm)
+            if str.HasPrefix(sml, "file:") {
+                if s == sml {
+                    return true
+                }
+                continue
+            }
+            if str.Contains(s, sprintf("content:%v", sm)) || str.Contains(s, sml) {
+                return true
+            }
+        }
+    }
+    return false
+}
+
+javaAuditFrameworkPostValidate = (fwName, signals, score, opts) => {
+    mode = "balanced"
+    if opts != nil && opts["detection_mode"] != nil {
+        mode = opts["detection_mode"]
+    }
+    if mode == "permissive" {
+        return score, signals
+    }
+
+    meta = nil
+    for fw in javaAuditFrameworkCatalog {
+        if fw["name"] == fwName {
+            meta = fw
+            break
+        }
+    }
+    if meta == nil {
+        return score, signals
+    }
+    strong = meta["strong_content_markers"]
+    if strong == nil {
+        strong = meta["content_markers"]
+    }
+
+    if fwName == "shiro" {
+        if !javaAuditSignalHasStrongMarker(signals, ["ShiroFilterFactoryBean", "[urls]", "[users]", "file:shiro.ini"]) {
+            return 0.0, []
+        }
+    }
+    if fwName == "play" {
+        hasConf = false
+        for s in signals {
+            if s == "file:application.conf" {
+                hasConf = true
+                break
+            }
+        }
+        if !hasConf {
+            return 0.0, []
+        }
+    }
+    if fwName == "spring_boot" {
+        if !javaAuditSignalHasStrongMarker(signals, strong) {
+            return 0.0, []
+        }
+    }
+    if fwName == "jfinal" {
+        if !javaAuditSignalHasStrongMarker(signals, strong) {
+            return 0.0, []
+        }
+    }
+    if fwName == "vertx" {
+        if !javaAuditSignalHasStrongMarker(signals, strong) {
+            return 0.0, []
+        }
+    }
+    if fwName == "spring_security" {
+        if !javaAuditSignalHasStrongMarker(signals, strong) {
+            return 0.0, []
+        }
+    }
+    if mode == "strict" {
+        if !javaAuditSignalHasStrongMarker(signals, strong) {
+            // strict mode: weak file-only hits are dropped for all frameworks
+            fileOnly = true
+            for s in signals {
+                if str.HasPrefix(s, "content:") {
+                    fileOnly = false
+                    break
+                }
+            }
+            if fileOnly {
+                return 0.0, []
+            }
+        }
+    }
+    return score, signals
+}
+
+javaAuditDetectBuildSystem = (root, index) => {
+    findByName = (name, ext) => {
+        if index != nil {
+            return javaAuditIndexFindByName(index, name, ext)
+        }
+        return javaAuditFindFilesByName(root, name, ext)
+    }
+    hasPom = len(findByName("pom.xml", "")) > 0
+    hasGradle = len(findByName("build.gradle", "")) > 0 || len(findByName("build.gradle.kts", "")) > 0
+    if hasPom && hasGradle {
+        return "mixed"
+    }
+    if hasPom {
+        return "maven"
+    }
+    if hasGradle {
+        return "gradle"
+    }
+    return "unknown"
+}
+
+javaAuditDetectFrameworks = (root, index, opts) => {
+    contentMarkers = []
+    for fw in javaAuditFrameworkCatalog {
+        for marker in fw["content_markers"] {
+            contentMarkers = append(contentMarkers, marker)
+        }
+    }
+    contentHits = {}
+    if index != nil {
+        contentHits = javaAuditIndexScanContentMarkers(index, contentMarkers, 3)
+    }
+
+    detected = []
+    for fw in javaAuditFrameworkCatalog {
+        signals = []
+        score = 0.0
+        for marker in fw["file_markers"] {
+            hits = []
+            if index != nil {
+                hits = javaAuditIndexFindByName(index, marker, "")
+            } else {
+                hits = javaAuditFindFilesByName(root, marker, "")
+            }
+            if len(hits) > 0 {
+                score += 0.35
+                signals = append(signals, sprintf("file:%v", marker))
+            }
+        }
+        for marker in fw["content_markers"] {
+            hits = []
+            if index != nil {
+                hits = contentHits[marker]
+                if hits == nil {
+                    hits = []
+                }
+            } else {
+                hits = javaAuditGrepInRelevantFiles(root, marker, 3)
+            }
+            if len(hits) > 0 {
+                score += 0.25
+                signals = append(signals, sprintf("content:%v", marker))
+            }
+        }
+        score, signals = javaAuditFrameworkPostValidate(fw["name"], signals, score, opts)
+        if score <= 0 {
+            continue
+        }
+        confidence = score
+        if confidence > 1.0 {
+            confidence = 1.0
+        }
+        detected = append(detected, {
+            "name": fw["name"],
+            "display": fw["display"],
+            "confidence": confidence,
+            "signals": signals,
+            "arch_tool": fw["arch_tool"],
+            "config_tool": fw["config_tool"],
+        })
+    }
+    return javaAuditFilterFrameworksByOptions(detected, opts)
+}
+
+javaAuditRecommendTools = (frameworks, buildSystem, cmsProducts, opts) => {
+    profile = "full"
+    if opts != nil && opts["tool_profile"] != nil {
+        profile = opts["tool_profile"]
+    }
+    tools = []
+    if profile == "minimal" || profile == "deps-secrets" {
+        tools = ["java_audit/java_maven_gradle_dependencies", "java_audit/java_hardcoded_secrets_scan"]
+    } else if profile == "config-only" {
+        tools = ["java_audit/java_hardcoded_secrets_scan"]
+    } else {
+        tools = ["java_audit/java_maven_gradle_dependencies", "java_audit/java_hardcoded_secrets_scan"]
+    }
+
+    if profile != "deps-secrets" && profile != "minimal" {
+        if cmsProducts != nil && len(cmsProducts) > 0 {
+            tools = append(tools, "java_audit/java_cms_product_audit")
+        }
+    }
+
+    skipArch = opts != nil && opts["skip_arch_tools"]
+    skipConfig = opts != nil && opts["skip_config_tools"]
+    if profile == "config-only" {
+        skipArch = true
+    }
+
+    for fw in frameworks {
+        if !skipArch && fw["arch_tool"] != nil && fw["arch_tool"] != "" {
+            tools = append(tools, fw["arch_tool"])
+        }
+        if !skipConfig && fw["config_tool"] != nil && fw["config_tool"] != "" {
+            tools = append(tools, fw["config_tool"])
+        }
+    }
+    seen = {}
+    out = []
+    for t in tools {
+        if seen[t] {
+            continue
+        }
+        seen[t] = true
+        out = append(out, t)
+    }
+    return out
+}
+
+javaAuditRunProjectProbe = (target, opts) => {
+    if opts == nil {
+        opts = javaAuditDefaultOptions()
+        opts = javaAuditApplyDetectionModeDefaults(opts)
+    }
+    start = javaAuditNowMs()
+    root = javaAuditResolveScanRoot(target, opts)
+    index = javaAuditBuildProjectIndex(root, opts)
+    filesScanned = index["files_scanned"]
+
+    buildSystem = javaAuditDetectBuildSystem(root, index)
+    frameworks = javaAuditDetectFrameworks(root, index, opts)
+    cmsProducts = javaAuditDetectCmsProducts(index, opts)
+    recommended = javaAuditRecommendTools(frameworks, buildSystem, cmsProducts, opts)
+
+    modules = javaAuditIndexFindByName(index, "pom.xml", "")
+    gradleFiles = javaAuditIndexFindByName(index, "build.gradle", "")
+    gradleKts = javaAuditIndexFindByName(index, "build.gradle.kts", "")
+    for p in gradleKts {
+        gradleFiles = append(gradleFiles, p)
+    }
+
+    report = javaAuditNewReport("java_audit/java_project_probe", root, "java")
+    report["artifacts"] = {
+        "build_system": buildSystem,
+        "detected_frameworks": frameworks,
+        "detected_cms_products": cmsProducts,
+        "recommended_tools": recommended,
+        "modules": modules,
+        "gradle_files": gradleFiles,
+        "audit_options": opts,
+        "scan_root": root,
+        "java_markers": javaAuditIndexCollectConfigFiles(index, ["web\\.xml", "application\\.(properties|yml|yaml)", "struts\\.xml", "shiro\\.ini"]),
+    }
+    if len(frameworks) == 0 && len(cmsProducts) == 0 {
+        report["status"] = "partial"
+        report["summary"] = "Java project markers found but no mainstream framework or CMS product confidently detected; run generic dependency and secrets tools"
+    } else {
+        names = []
+        for fw in frameworks {
+            names = append(names, fw["display"])
+        }
+        for cms in cmsProducts {
+            names = append(names, cms["display"])
+        }
+        report["summary"] = sprintf("detected %v stack marker(s): %v", len(names), str.Join(names, ", "))
+    }
+    return javaAuditFinishReport(report, start, filesScanned, opts)
+}
+
+javaAuditGetFrameworkMeta = (frameworkName) => {
+    for fw in javaAuditFrameworkCatalog {
+        if fw["name"] == frameworkName {
+            return fw
+        }
+    }
+    return nil
+}

@@ -1,0 +1,594 @@
+// Shared helpers for java_audit AI tools (prepended at load time; not registered as a tool).
+
+javaAuditDefaultExcludeParts = ["\\.git", "\\.svn", "\\.hg", "node_modules", "__pycache__", "\\.idea", "\\.vscode", "target", "build", "\\.gradle", "out", "dist"]
+
+javaAuditRiskyComponents = {
+    "com.alibaba:fastjson": {"label": "fastjson", "risk": "high", "note": "historical deserialization RCE"},
+    "org.apache.shiro:shiro-core": {"label": "shiro", "risk": "high", "note": "rememberMe / auth bypass history"},
+    "commons-collections:commons-collections": {"label": "commons-collections3", "risk": "high", "note": "deserialization gadget chain"},
+    "org.apache.commons:commons-collections4": {"label": "commons-collections4", "risk": "medium", "note": "deserialization gadget chain"},
+    "com.thoughtworks.xstream:xstream": {"label": "xstream", "risk": "high", "note": "deserialization issues"},
+    "org.apache.logging.log4j:log4j-core": {"label": "log4j", "risk": "high", "note": "Log4Shell class of issues"},
+    "com.fasterxml.jackson.core:jackson-databind": {"label": "jackson", "risk": "medium", "note": "unsafe polymorphic deserialization when misconfigured"},
+    "mysql:mysql-connector-java": {"label": "mysql-connector", "risk": "medium", "note": "track version for known driver issues"},
+    "com.mysql:mysql-connector-j": {"label": "mysql-connector-j", "risk": "medium", "note": "track version for known driver issues"},
+}
+
+javaAuditPlaceholderPatterns = [
+    `(?i)^changeme$`, `(?i)^password$`, `(?i)^123456$`, `(?i)^admin$`,
+    `(?i)^xxx+$`, `(?i)^your[_-]?password`, `(?i)^example$`, `(?i)^test$`, `(?i)^null$`, `(?i)^""$`,
+]
+
+javaAuditNowMs = () => {
+    return int(time.Now().Unix() * 1000)
+}
+
+javaAuditNormalizeTarget = (target) => {
+    if target == nil || str.TrimSpace(target) == "" {
+        die("target path is required")
+    }
+    p = file.Abs(target)~
+    if !file.IsExisted(p) {
+        die(sprintf("target path not found: %v", p))
+    }
+    return p
+}
+
+javaAuditIsExcludedPath = (path) => {
+    lower = str.ToLower(path)
+    for part in javaAuditDefaultExcludeParts {
+        pat = part
+        if !str.HasPrefix(pat, "(?") {
+            pat = sprintf(`(?:^|/)%v(?:/|$)`, part)
+        }
+        if re.Match(pat, lower) {
+            return true
+        }
+    }
+    if re.Match(`(?i)(^|/)(src/test|src/tests|test/java|tests/java|test-fixtures|testfixtures)(/|$)`, lower) {
+        return true
+    }
+    return false
+}
+
+javaAuditNewReport = (toolPath, target, framework) => {
+    return {
+        "tool": toolPath,
+        "target": target,
+        "status": "ok",
+        "framework": framework,
+        "summary": "",
+        "findings": [],
+        "artifacts": {},
+        "meta": {"duration_ms": 0, "files_scanned": 0},
+    }
+}
+
+javaAuditAddFinding = (report, id, severity, title, recommendation, evidence) => {
+    if report["findings"] == nil {
+        report["findings"] = []
+    }
+    report["findings"] = append(report["findings"], {
+        "id": id,
+        "severity": severity,
+        "title": title,
+        "recommendation": recommendation,
+        "evidence": evidence,
+    })
+}
+
+javaAuditFinishReport = (report, startMs, filesScanned, opts) => {
+    report["meta"]["duration_ms"] = javaAuditNowMs() - startMs
+    report["meta"]["files_scanned"] = filesScanned
+    if opts != nil {
+        report = javaAuditDedupeReportFindings(report, opts)
+    }
+    if report["summary"] == "" {
+        n = len(report["findings"])
+        report["summary"] = sprintf("completed with %v finding(s)", n)
+    }
+    return report
+}
+
+javaAuditReportToMarkdown = (report) => {
+    lines = []
+    lines = append(lines, sprintf("# %v", report["tool"]))
+    lines = append(lines, sprintf("- target: `%v`", report["target"]))
+    lines = append(lines, sprintf("- framework: `%v`", report["framework"]))
+    lines = append(lines, sprintf("- status: `%v`", report["status"]))
+    lines = append(lines, sprintf("- summary: %v", report["summary"]))
+    lines = append(lines, "")
+    lines = append(lines, "## Findings")
+    if len(report["findings"]) == 0 {
+        lines = append(lines, "_none_")
+    } else {
+        for f in report["findings"] {
+            lines = append(lines, sprintf("### [%v] %v", f["severity"], f["title"]))
+            lines = append(lines, sprintf("- id: `%v`", f["id"]))
+            if f["recommendation"] != nil && f["recommendation"] != "" {
+                lines = append(lines, sprintf("- recommendation: %v", f["recommendation"]))
+            }
+            if f["evidence"] != nil {
+                for ev in f["evidence"] {
+                    lines = append(lines, sprintf("- evidence: `%v:%v` %v", ev["file"], ev["line"], ev["snippet"]))
+                }
+            }
+            lines = append(lines, "")
+        }
+    }
+    return str.Join(lines, "\n")
+}
+
+javaAuditEmitReport = (report, outputMd) => {
+    out = json.dumps(report)
+    yakit.AIOutput(out)
+    println(out)
+    if outputMd != nil && str.TrimSpace(outputMd) != "" {
+        md = javaAuditReportToMarkdown(report)
+        file.Save(outputMd, md)~
+        yakit.Info("markdown report written: %v", outputMd)
+    }
+}
+
+javaAuditReadTextLimited = (path, maxSize) => {
+    if maxSize <= 0 {
+        maxSize = 2000000
+    }
+    info = file.Stat(path)~
+    if info.Size() > maxSize {
+        return "", false
+    }
+    return string(file.ReadFile(path)~), true
+}
+
+javaAuditWalkFiles = (root, callback) => {
+    counter = {"n": 0}
+    if !file.IsDir(root) {
+        if !javaAuditIsExcludedPath(root) {
+            callback(root)
+            counter["n"] = 1
+        }
+        return counter["n"]
+    }
+    file.Walk(root, (info) => {
+        if info == nil {
+            return true
+        }
+        pathName = info.Path
+        if pathName == "" {
+            pathName = file.Join(root, info.Name)
+        }
+        if javaAuditIsExcludedPath(pathName) {
+            return true
+        }
+        if info.IsDir {
+            return true
+        }
+        callback(pathName)
+        counter["n"] = counter["n"] + 1
+        return true
+    })
+    return counter["n"]
+}
+
+javaAuditBaseName = (pathName) => {
+    _, base = file.Split(pathName)
+    return base
+}
+
+javaAuditDirectoryOf = (pathName) => {
+    dir, _ = file.Split(pathName)
+    if dir == "" {
+        return dir
+    }
+    return str.TrimSuffix(dir, "/")
+}
+
+javaAuditFindFilesByName = (root, nameSubstr, includeExt) => {
+    collector = {"hits": []}
+    javaAuditWalkFiles(root, (pathName) => {
+        base = javaAuditBaseName(pathName)
+        if nameSubstr != "" && !str.Contains(str.ToLower(base), str.ToLower(nameSubstr)) {
+            return
+        }
+        if includeExt != "" {
+            ext = str.ToLower(file.GetExt(pathName))
+            want = str.ToLower(includeExt)
+            if !str.HasPrefix(want, ".") {
+                want = "." + want
+            }
+            if ext != want {
+                return
+            }
+        }
+        collector["hits"] = append(collector["hits"], pathName)
+    })
+    return collector["hits"]
+}
+
+javaAuditRelevantSourceExts = [
+    ".java", ".kt", ".groovy", ".xml", ".properties", ".yml", ".yaml",
+    ".gradle", ".kts", ".conf", ".ini", ".jsp",
+]
+
+javaAuditIsRelevantSourceFile = (pathName) => {
+    ext = str.ToLower(file.GetExt(pathName))
+    if ext == "" {
+        base = str.ToLower(javaAuditBaseName(pathName))
+        if base == "pom.xml" || base == "build.gradle" || base == "build.gradle.kts" || base == "web.xml" {
+            return true
+        }
+        return false
+    }
+    for want in javaAuditRelevantSourceExts {
+        if ext == want {
+            return true
+        }
+    }
+    return false
+}
+
+javaAuditBuildProjectIndex = (root, opts) => {
+    index = {
+        "root": root,
+        "files_scanned": 0,
+        "relevant_files": [],
+        "by_basename": {},
+        "audit_options": opts,
+    }
+    javaAuditWalkFiles(root, (pathName) => {
+        if !javaAuditIsInScanScope(pathName, root, opts) {
+            return
+        }
+        index["files_scanned"] = index["files_scanned"] + 1
+        base = str.ToLower(javaAuditBaseName(pathName))
+        if index["by_basename"][base] == nil {
+            index["by_basename"][base] = []
+        }
+        index["by_basename"][base] = append(index["by_basename"][base], pathName)
+        if javaAuditIsRelevantSourceFile(pathName) {
+            index["relevant_files"] = append(index["relevant_files"], pathName)
+        }
+    })
+    return index
+}
+
+javaAuditIndexFindByName = (index, nameSubstr, includeExt) => {
+    hits = []
+    needle = str.ToLower(nameSubstr)
+    for base, paths in index["by_basename"] {
+        if nameSubstr != "" && !str.Contains(base, needle) {
+            continue
+        }
+        for pathName in paths {
+            if includeExt != "" {
+                ext = str.ToLower(file.GetExt(pathName))
+                want = str.ToLower(includeExt)
+                if !str.HasPrefix(want, ".") {
+                    want = "." + want
+                }
+                if ext != want {
+                    continue
+                }
+            }
+            hits = append(hits, pathName)
+        }
+    }
+    return hits
+}
+
+javaAuditIndexGrepRelevant = (index, pattern, limit) => {
+    if limit <= 0 {
+        limit = 3
+    }
+    collector = {"results": []}
+    if !str.HasPrefix(pattern, "(?m)") {
+        pattern = "(?m)" + pattern
+    }
+    for pathName in index["relevant_files"] {
+        if len(collector["results"]) >= limit {
+            break
+        }
+        content, ok = javaAuditReadTextLimited(pathName, 2000000)
+        if !ok || content == "" {
+            continue
+        }
+        lines = str.Split(content, "\n")
+        for i, line = range lines {
+            if re.Match(pattern, line) {
+                snippet = str.TrimSpace(line)
+                if len(snippet) > 240 {
+                    snippet = snippet[0:240]
+                }
+                collector["results"] = append(collector["results"], {
+                    "file": pathName,
+                    "line": i + 1,
+                    "snippet": snippet,
+                })
+                if len(collector["results"]) >= limit {
+                    break
+                }
+            }
+        }
+    }
+    return collector["results"]
+}
+
+javaAuditIndexCollectConfigFiles = (index, patterns) => {
+    collector = {"files": []}
+    for pathName in index["relevant_files"] {
+        base = str.ToLower(javaAuditBaseName(pathName))
+        for p in patterns {
+            pl = str.ToLower(p)
+            if str.Contains(base, pl) || re.Match(pl, base) || re.Match(p, pathName) {
+                collector["files"] = append(collector["files"], pathName)
+                break
+            }
+        }
+    }
+    return collector["files"]
+}
+
+javaAuditIndexScanContentMarkers = (index, markers, limitPerMarker) => {
+    if limitPerMarker <= 0 {
+        limitPerMarker = 3
+    }
+    uniq = {}
+    ordered = []
+    for m in markers {
+        if uniq[m] {
+            continue
+        }
+        uniq[m] = true
+        ordered = append(ordered, m)
+    }
+    hitsByMarker = {}
+    for m in ordered {
+        hitsByMarker[m] = []
+    }
+    compiled = {}
+    for m in ordered {
+        pat = m
+        if !str.HasPrefix(pat, "(?m)") {
+            pat = "(?m)" + pat
+        }
+        compiled[m] = pat
+    }
+    for pathName in index["relevant_files"] {
+        allDone = true
+        for m in ordered {
+            if len(hitsByMarker[m]) < limitPerMarker {
+                allDone = false
+                break
+            }
+        }
+        if allDone {
+            break
+        }
+        base = str.ToLower(javaAuditBaseName(pathName))
+        if re.Match(`(?i)(uilabels|entitylabels|erroruilabels|labels)\.xml$`, base) {
+            continue
+        }
+        info = file.Stat(pathName)~
+        if info.Size() > 400000 {
+            ext = str.ToLower(file.GetExt(pathName))
+            if ext != ".java" && base != "pom.xml" && base != "build.gradle" && base != "build.gradle.kts" && base != "web.xml" && !str.HasPrefix(base, "application.") {
+                continue
+            }
+        }
+        content, ok = javaAuditReadTextLimited(pathName, 400000)
+        if !ok || content == "" {
+            continue
+        }
+        lines = str.Split(content, "\n")
+        for i, line = range lines {
+            for m in ordered {
+                if len(hitsByMarker[m]) >= limitPerMarker {
+                    continue
+                }
+                if re.Match(compiled[m], line) {
+                    snippet = str.TrimSpace(line)
+                    if len(snippet) > 240 {
+                        snippet = snippet[0:240]
+                    }
+                    hitsByMarker[m] = append(hitsByMarker[m], {
+                        "file": pathName,
+                        "line": i + 1,
+                        "snippet": snippet,
+                    })
+                }
+            }
+        }
+    }
+    return hitsByMarker
+}
+
+javaAuditGrepInTree = (root, pattern, includeExt, limit) => {
+    if limit <= 0 {
+        limit = 500
+    }
+    collector = {"results": []}
+    if !str.HasPrefix(pattern, "(?m)") {
+        pattern = "(?m)" + pattern
+    }
+    javaAuditWalkFiles(root, (pathName) => {
+        if len(collector["results"]) >= limit {
+            return
+        }
+        if includeExt != "" {
+            ext = str.ToLower(file.GetExt(pathName))
+            want = str.ToLower(includeExt)
+            if !str.HasPrefix(want, ".") {
+                want = "." + want
+            }
+            if ext != want {
+                return
+            }
+        }
+        content, ok = javaAuditReadTextLimited(pathName, 2000000)
+        if !ok || content == "" {
+            return
+        }
+        lines = str.Split(content, "\n")
+        for i, line = range lines {
+            if re.Match(pattern, line) {
+                snippet = str.TrimSpace(line)
+                if len(snippet) > 240 {
+                    snippet = snippet[0:240]
+                }
+                collector["results"] = append(collector["results"], {
+                    "file": pathName,
+                    "line": i + 1,
+                    "snippet": snippet,
+                })
+                if len(collector["results"]) >= limit {
+                    return
+                }
+            }
+        }
+    })
+    return collector["results"]
+}
+
+javaAuditGrepInRelevantFiles = (root, pattern, limit) => {
+    if limit <= 0 {
+        limit = 3
+    }
+    collector = {"results": []}
+    if !str.HasPrefix(pattern, "(?m)") {
+        pattern = "(?m)" + pattern
+    }
+    javaAuditWalkFiles(root, (pathName) => {
+        if len(collector["results"]) >= limit {
+            return
+        }
+        if !javaAuditIsRelevantSourceFile(pathName) {
+            return
+        }
+        content, ok = javaAuditReadTextLimited(pathName, 2000000)
+        if !ok || content == "" {
+            return
+        }
+        lines = str.Split(content, "\n")
+        for i, line = range lines {
+            if re.Match(pattern, line) {
+                snippet = str.TrimSpace(line)
+                if len(snippet) > 240 {
+                    snippet = snippet[0:240]
+                }
+                collector["results"] = append(collector["results"], {
+                    "file": pathName,
+                    "line": i + 1,
+                    "snippet": snippet,
+                })
+                if len(collector["results"]) >= limit {
+                    return
+                }
+            }
+        }
+    })
+    return collector["results"]
+}
+
+javaAuditParseProperties = (content) => {
+    kv = {}
+    for line in str.Split(content, "\n") {
+        line = str.TrimSpace(line)
+        if line == "" || str.HasPrefix(line, "#") || str.HasPrefix(line, "!") {
+            continue
+        }
+        if str.Contains(line, "=") {
+            parts = str.SplitN(line, "=", 2)
+            key = str.TrimSpace(parts[0])
+            val = str.TrimSpace(parts[1])
+            kv[key] = val
+        }
+    }
+    return kv
+}
+
+javaAuditParseSimpleYaml = (content) => {
+    kv = {}
+    for line in str.Split(content, "\n") {
+        raw = str.TrimSpace(line)
+        if raw == "" || str.HasPrefix(raw, "#") {
+            continue
+        }
+        if str.HasPrefix(raw, "- ") {
+            continue
+        }
+        if str.Contains(raw, ":") {
+            parts = str.SplitN(raw, ":", 2)
+            key = str.TrimSpace(parts[0])
+            val = str.TrimSpace(parts[1])
+            val = str.Trim(val, `"'`)
+            kv[key] = val
+        }
+    }
+    return kv
+}
+
+javaAuditLoadConfigMap = (path) => {
+    content, ok = javaAuditReadTextLimited(path, 1000000)
+    if !ok {
+        return {}, path
+    }
+    lower = str.ToLower(path)
+    if str.HasSuffix(lower, ".properties") {
+        return javaAuditParseProperties(content), path
+    }
+    if str.HasSuffix(lower, ".yml") || str.HasSuffix(lower, ".yaml") {
+        return javaAuditParseSimpleYaml(content), path
+    }
+    if str.HasSuffix(lower, ".conf") {
+        return javaAuditParseSimpleYaml(content), path
+    }
+    return {}, path
+}
+
+javaAuditCollectConfigFiles = (root, patterns, opts) => {
+    collector = {"files": []}
+    javaAuditWalkFiles(root, (pathName) => {
+        if !javaAuditIsInScanScope(pathName, root, opts) {
+            return
+        }
+        base = str.ToLower(javaAuditBaseName(pathName))
+        for p in patterns {
+            pl = str.ToLower(p)
+            if str.Contains(base, pl) || re.Match(pl, base) || re.Match(p, pathName) {
+                collector["files"] = append(collector["files"], pathName)
+                return
+            }
+        }
+    })
+    return collector["files"]
+}
+
+javaAuditEvidenceFromMatch = (match) => {
+    return [{"file": match["file"], "line": match["line"], "snippet": match["snippet"]}]
+}
+
+javaAuditIsPlaceholderSecret = (val) => {
+    v = str.TrimSpace(val)
+    if v == "" {
+        return true
+    }
+    for p in javaAuditPlaceholderPatterns {
+        if re.Match(p, v) {
+            return true
+        }
+    }
+    return false
+}
+
+javaAuditMatchRiskyDependency = (name, version) => {
+    hits = []
+    lowerName = str.ToLower(name)
+    for key, meta in javaAuditRiskyComponents {
+        keyName = str.ToLower(key)
+        if str.Contains(lowerName, str.Split(keyName, ":")[1]) || str.Contains(lowerName, str.ReplaceAll(keyName, ":", "/")) || lowerName == keyName {
+            hits = append(hits, {"coordinate": key, "name": name, "version": version, "label": meta["label"], "risk": meta["risk"], "note": meta["note"]})
+        }
+    }
+    return hits
+}
