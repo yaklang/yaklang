@@ -192,6 +192,11 @@ func (e *AIEngine) SendMsg(input string, options ...AIEngineConfigOption) error 
 	return nil
 }
 
+// ErrAITaskAborted is returned by WaitTaskFinishByTaskName when the waited
+// ReAct task terminated in the Aborted state, so callers can distinguish an
+// abnormal termination from a successful completion.
+var ErrAITaskAborted = utils.Error("ai task aborted")
+
 // WaitTaskFinishByTaskName 等待指定任务完成
 // 传入任务ID，等待该任务状态变为 Completed 或 Aborted
 func (e *AIEngine) WaitTaskFinishByTaskName(taskID string) error {
@@ -204,7 +209,7 @@ func (e *AIEngine) WaitTaskFinishByTaskName(taskID string) error {
 	status, exists := e.activeTasks[taskID]
 	if exists && (status == aicommon.AITaskState_Completed || status == aicommon.AITaskState_Aborted) {
 		e.tasksMutex.RUnlock()
-		return nil
+		return waitTaskFinishByTaskNameResult(status)
 	}
 	e.tasksMutex.RUnlock()
 
@@ -220,7 +225,36 @@ func (e *AIEngine) WaitTaskFinishByTaskName(taskID string) error {
 
 	// 等待任务完成
 	taskEndpoint.WaitContext(e.ctx)
-	return e.ctx.Err()
+
+	// 引擎上下文取消优先报告，使调用方能区分"整体关闭"与"任务自身终止"。
+	if err := e.ctx.Err(); err != nil {
+		return err
+	}
+
+	// 唤醒后必须重新读取最新状态：任务可能在 fast-path 检查之后才被写入
+	// activeTasks，随后翻成终态并 release endpoint。复用进入等待前捕获的
+	// status/exists 会读到过时的非终态值，把成功完成的任务误判为失败。
+	e.tasksMutex.RLock()
+	finalStatus, finalExists := e.activeTasks[taskID]
+	e.tasksMutex.RUnlock()
+	if !finalExists {
+		// 任务条目缺失：未经过 react_task_* 事件序列即结束，视为成功。
+		return nil
+	}
+	return waitTaskFinishByTaskNameResult(finalStatus)
+}
+
+// waitTaskFinishByTaskNameResult 将终态映射为返回值：Completed -> nil，
+// Aborted -> ErrAITaskAborted，非终态（防御性，正常不应发生）-> error。
+func waitTaskFinishByTaskNameResult(status aicommon.AITaskState) error {
+	switch status {
+	case aicommon.AITaskState_Completed:
+		return nil
+	case aicommon.AITaskState_Aborted:
+		return ErrAITaskAborted
+	default:
+		return utils.Errorf("ai task ended in non-terminal state: %s", status)
+	}
 }
 
 // WaitTaskFinish 等待所有任务完成
