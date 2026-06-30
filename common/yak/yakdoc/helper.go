@@ -45,12 +45,23 @@ func shouldSkipDocWalkDir(name string) bool {
 	return strings.HasPrefix(name, ".")
 }
 
+func isDocTestSourceFile(name string) bool {
+	return strings.HasSuffix(name, "_test.go")
+}
+
+// shouldSkipDocPackage reports whether a parsed package should be excluded.
+// Go external test packages conventionally use the *_test suffix; their sources
+// are already removed by docParseFileFilter, and this remains as a fallback.
+func shouldSkipDocPackage(name string) bool {
+	return strings.HasSuffix(name, "_test")
+}
+
 // docParseFileFilter returns a ParseDir filter that excludes test sources and
 // files excluded by the current platform's build constraints (e.g. //go:build ignore).
 func docParseFileFilter(dir string) func(os.FileInfo) bool {
 	return func(fi os.FileInfo) bool {
 		name := fi.Name()
-		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+		if !strings.HasSuffix(name, ".go") || isDocTestSourceFile(name) {
 			return false
 		}
 		matched, err := build.Default.MatchFile(dir, name)
@@ -82,8 +93,7 @@ func GetProjectAstPackages() (map[string]*ast.Package, *token.FileSet, error) {
 			return nil
 		}
 		for name, pkg := range pkgs {
-			// skip test pkg
-			if strings.HasSuffix(name, "_test") {
+			if shouldSkipDocPackage(name) {
 				continue
 			}
 			path, _ = filepath.Rel(rootDir, path)
