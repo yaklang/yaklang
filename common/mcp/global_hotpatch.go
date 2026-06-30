@@ -2,12 +2,20 @@ package mcp
 
 import (
 	"context"
+	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+)
+
+const (
+	globalHotPatchTemplateType      = "global"
+	globalHotPatchCompileTimeoutSec = 5.0
 )
 
 func init() {
@@ -51,6 +59,27 @@ func init() {
 			handleResetGlobalHotPatchConfig,
 		),
 		WithTool(
+			mcp.NewTool("create_global_hotpatch_template",
+				mcp.WithDescription("Create a global HotPatchTemplate (全局热加载模板) in profile DB. The Yak script must define beforeRequest/afterRequest hooks. Use enable_global_hotpatch to activate it on MITM and WebFuzzer."),
+				mcp.WithString("name",
+					mcp.Description("Unique template name"),
+					mcp.Required(),
+				),
+				mcp.WithString("content",
+					mcp.Description("Yak hotpatch script body, e.g. beforeRequest/afterRequest functions"),
+					mcp.Required(),
+				),
+				mcp.WithStringArray("tags",
+					mcp.Description("Optional tags for organizing templates"),
+				),
+				mcp.WithBool("validateContent",
+					mcp.Description("Whether to compile-check content before saving (recommended)"),
+					mcp.Default(true),
+				),
+			),
+			handleCreateGlobalHotPatchTemplate,
+		),
+		WithTool(
 			mcp.NewTool("query_hotpatch_template_list",
 				mcp.WithDescription("List available HotPatchTemplate names, optionally filtered by type (fuzzer/mitm/httpflow-analyze/global)"),
 				mcp.WithString("type",
@@ -61,6 +90,20 @@ func init() {
 			handleQueryHotPatchTemplateList,
 		),
 	)
+}
+
+func validateGlobalHotPatchContent(code string) error {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return utils.Error("hotpatch content is empty")
+	}
+	caller, err := yak.NewMixPluginCaller()
+	if err != nil {
+		return err
+	}
+	caller.SetLoadPluginTimeout(globalHotPatchCompileTimeoutSec)
+	caller.SetCallPluginTimeout(consts.GetGlobalCallerCallPluginTimeout())
+	return caller.LoadHotPatch(utils.TimeoutContextSeconds(globalHotPatchCompileTimeoutSec), nil, code)
 }
 
 func handleGetGlobalHotPatchConfig(s *MCPServer) server.ToolHandlerFunc {
@@ -138,6 +181,49 @@ func handleResetGlobalHotPatchConfig(s *MCPServer) server.ToolHandlerFunc {
 		rsp, err := s.grpcClient.ResetGlobalHotPatchConfig(ctx, &ypb.Empty{})
 		if err != nil {
 			return nil, utils.Wrap(err, "failed to reset global hotpatch config")
+		}
+		return NewCommonCallToolResult(rsp)
+	}
+}
+
+func handleCreateGlobalHotPatchTemplate(s *MCPServer) server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		var args struct {
+			Name            string   `mapstructure:"name"`
+			Content         string   `mapstructure:"content"`
+			Tags            []string `mapstructure:"tags"`
+			ValidateContent *bool    `mapstructure:"validateContent"`
+		}
+		if err := mapstructure.Decode(request.Params.Arguments, &args); err != nil {
+			return nil, utils.Wrap(err, "invalid argument")
+		}
+		name := strings.TrimSpace(args.Name)
+		content := strings.TrimSpace(args.Content)
+		if name == "" {
+			return nil, utils.Error("name is required")
+		}
+		if content == "" {
+			return nil, utils.Error("content is required")
+		}
+
+		validateContent := true
+		if args.ValidateContent != nil {
+			validateContent = *args.ValidateContent
+		}
+		if validateContent {
+			if err := validateGlobalHotPatchContent(content); err != nil {
+				return nil, utils.Wrap(err, "global hotpatch content validation failed")
+			}
+		}
+
+		rsp, err := s.grpcClient.CreateHotPatchTemplate(ctx, &ypb.HotPatchTemplate{
+			Name:    name,
+			Content: content,
+			Type:    globalHotPatchTemplateType,
+			Tags:    args.Tags,
+		})
+		if err != nil {
+			return nil, utils.Wrap(err, "failed to create global hotpatch template")
 		}
 		return NewCommonCallToolResult(rsp)
 	}

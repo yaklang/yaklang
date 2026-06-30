@@ -238,6 +238,43 @@ func TestMCP_GlobalHotPatch_WebFuzzer_EnableDisableCycle(t *testing.T) {
 	require.NotContains(t, reqSnap, globalHotPatchProbeHeader+": on")
 }
 
+func TestMCP_GlobalHotPatch_CreateAndEnableViaMCP(t *testing.T) {
+	client, _, err := NewLocalClientAndServerWithTempDatabase(t)
+	require.NoError(t, err)
+
+	ctx := utils.TimeoutContextSeconds(12)
+	tplName := "mcp-global-create-" + utils.RandStringBytes(8)
+	mcpServer := newMCPGlobalHotPatchTestServer(t, client)
+
+	t.Cleanup(func() {
+		_, _ = client.ResetGlobalHotPatchConfig(context.Background(), &ypb.Empty{})
+	})
+
+	_, err = mcp.CallBuiltinTool(mcpServer, ctx, "create_global_hotpatch_template", map[string]any{
+		"name":    tplName,
+		"content": globalHotPatchYakCode,
+	})
+	require.NoError(t, err)
+
+	list := callMCPGlobalHotPatchTool(t, mcpServer, ctx, "query_hotpatch_template_list", map[string]any{
+		"type": "global",
+	})
+	names, _ := list["Name"].([]any)
+	found := false
+	for _, n := range names {
+		if s, ok := n.(string); ok && s == tplName {
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "created template should appear in list: %#v", list)
+
+	enableCfg := callMCPGlobalHotPatchTool(t, mcpServer, ctx, "enable_global_hotpatch", map[string]any{
+		"templateName": tplName,
+	})
+	assertMCPGlobalHotPatchEnabled(t, enableCfg, true)
+}
+
 func TestMCP_GlobalHotPatch_QueryTemplateList(t *testing.T) {
 	client, _, err := NewLocalClientAndServerWithTempDatabase(t)
 	require.NoError(t, err)
