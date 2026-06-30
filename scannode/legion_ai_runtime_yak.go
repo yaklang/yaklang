@@ -3,6 +3,7 @@ package scannode
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -163,13 +164,23 @@ func (h *yakAIEngineRuntimeHandle) sendMessage(ctx context.Context, content stri
 
 	if err := h.engine.SendMsg(content, options...); err != nil {
 		if ctx.Err() != nil {
+			// 上下文已取消（关闭/关停），不报失败事件。
 			return
 		}
-		detail := mustJSON(map[string]string{
+		// 任务异常终止时上报失败事件，使绑定任务能即时收敛。
+		h.emitter.Failed(yakAISendFailureCode(err), err.Error(), mustJSON(map[string]string{
 			"runtime": "yak_ai_engine",
-		})
-		h.emitter.Failed("yak_ai_send_failed", err.Error(), detail)
+		}))
 	}
+}
+
+// yakAISendFailureCode 将 SendMsg 错误映射为失败事件错误码：任务中止用
+// yak_ai_task_aborted，其他发送/传输失败用 yak_ai_send_failed。
+func yakAISendFailureCode(err error) string {
+	if errors.Is(err, aiengine.ErrAITaskAborted) {
+		return "yak_ai_task_aborted"
+	}
+	return "yak_ai_send_failed"
 }
 
 type yakRuntimeOptions struct {
