@@ -492,6 +492,7 @@ slugTargetForWorkdir = rootU => {
     s = str.ReplaceAll(s, "<", "_")
     s = str.ReplaceAll(s, ">", "_")
     s = str.ReplaceAll(s, "\"", "_")
+    s = str.ReplaceAll(s, ",", "_")
     if len(s) > 100 {
         s = s[:100]
     }
@@ -621,7 +622,35 @@ if maxBodyBytes <= 0 {
     maxBodyBytes = 524288
 }
 
-rootUrl = str.TrimSpace(targetUrl)
+pickFirstHttpUrl = raw => {
+    raw = str.TrimSpace(raw)
+    if raw == "" {
+        return ""
+    }
+    if !str.Contains(raw, ",") {
+        return raw
+    }
+    httpFallback = ""
+    for _, part := range str.Split(raw, ",") {
+        p = str.TrimSpace(part)
+        if p == "" {
+            continue
+        }
+        lp = str.ToLower(p)
+        if str.HasPrefix(lp, "https://") {
+            return p
+        }
+        if httpFallback == "" && str.HasPrefix(lp, "http://") {
+            httpFallback = p
+        }
+    }
+    if httpFallback != "" {
+        return httpFallback
+    }
+    return raw
+}
+
+rootUrl = pickFirstHttpUrl(str.TrimSpace(targetUrl))
 if !str.HasPrefix(rootUrl, "http://") && !str.HasPrefix(rootUrl, "https://") {
     die("url 必须以 http:// 或 https:// 开头")
 }

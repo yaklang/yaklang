@@ -92,6 +92,15 @@ func registerSeedAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 				wd = workDirFromInvoker(r)
 			}
 			seed := strings.TrimSpace(action.GetString("seed_url"))
+			if norm, coerced, note := infosecPickFirstHTTPURL(seed); coerced {
+				seed = norm
+				r.AddToTimeline("infosec_seed_url_coerced", note)
+			}
+			if err := infosecValidateHTTPURL(seed); err != nil {
+				op.Feedback(fmt.Sprintf("recon_register_seed: invalid seed_url: %v", err))
+				op.Continue()
+				return
+			}
 			loop.Set(keySeedURL, seed)
 			if sh := strings.TrimSpace(action.GetString("scope_hosts")); sh != "" {
 				loop.Set(keyScopeHosts, sh)
@@ -233,6 +242,10 @@ func crawlJsCollectorAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 				op.Continue()
 				return
 			}
+			if norm, coerced, note := infosecPickFirstHTTPURL(seed); coerced {
+				seed = norm
+				r.AddToTimeline("infosec_crawl_url_coerced", note)
+			}
 			if err := infosecValidateHTTPURL(seed); err != nil {
 				op.Feedback(fmt.Sprintf("%s: invalid start_url / seed (require http/https): %v", ToolCrawlJsCollector, err))
 				op.Continue()
@@ -278,8 +291,11 @@ func crawlJsCollectorAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 					} `json:"artifacts"`
 					Verified []any `json:"verified_js_urls"`
 				}
-				if json.Unmarshal(data, &rep) == nil && rep.Artifacts != nil {
-					b.WriteString(fmt.Sprintf("Pass this directory to %s paths: %s\n", ToolJsStaticExtractAI, rep.Artifacts.VerifiedJsDir))
+				if json.Unmarshal(data, &rep) == nil && rep.Artifacts != nil && strings.TrimSpace(rep.Artifacts.VerifiedJsDir) != "" {
+					vdir := strings.TrimSpace(rep.Artifacts.VerifiedJsDir)
+					loop.Set(keyVerifiedJsDir, vdir)
+					b.WriteString(fmt.Sprintf("Pass this directory to %s dir (preferred) or paths: %s\n", ToolJsStaticExtractAI, vdir))
+					b.WriteString("If the directory name contains commas, you MUST use dir=, not paths=.\n")
 				}
 				b.WriteString(fmt.Sprintf("Verified JS URLs in report: %d\n", len(rep.Verified)))
 			}
@@ -303,13 +319,21 @@ func runJsStaticAnalysisAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 	return reactloops.WithRegisterLoopAction(
 		ToolJsStaticExtractAI,
 		"Run registered tool "+ToolJsStaticExtractAI+" once: static JS API extraction; output JSON is merged into the API pool. "+
-			"If paths is exactly one local directory, passes dir=; otherwise passes files= (comma-separated). Default skip_phase2=true.",
+			"Prefer dir= for a single local directory (especially verified_js_dir). paths= is comma-separated for multiple entries. Default skip_phase2=true.",
 		[]aitool.ToolOption{
-			aitool.WithStringParam("paths", aitool.WithParam_Required(true), aitool.WithParam_Description("Comma-separated: directory and/or files and/or http(s) URLs. After "+ToolCrawlJsCollector+", use artifacts.verified_js_dir from crawl-js-collector-result.json.")),
+			aitool.WithStringParam("dir", aitool.WithParam_Description("Single local directory (preferred after "+ToolCrawlJsCollector+"; safe when directory names contain commas).")),
+			aitool.WithStringParam("paths", aitool.WithParam_Description("Optional comma-separated files/dirs/http(s) URLs. Omit when dir= is set; auto-fills from crawl verified_js_dir if empty.")),
 			aitool.WithIntegerParam("concurrent", aitool.WithParam_Default(2)),
 			aitool.WithBoolParam("skip_phase2", aitool.WithParam_Default(true)),
 		},
-		nil,
+		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
+			dir := strings.TrimSpace(action.GetString("dir"))
+			paths := strings.TrimSpace(action.GetString("paths"))
+			if dir == "" && paths == "" && strings.TrimSpace(loop.Get(keyVerifiedJsDir)) == "" {
+				return utils.Error("js_static_extract_ai requires dir= or paths= (or run crawl_js_collector first for auto dir)")
+			}
+			return nil
+		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			reactloops.EmitActionLog(loop, infosecJsCrawlNodeID, fmt.Sprintf("开始: %s / Start: %s", ToolJsStaticExtractAI, ToolJsStaticExtractAI))
 			reactloops.EmitStatus(loop, "JS 静态分析中 / Running JS static analysis...")
@@ -319,40 +343,22 @@ func runJsStaticAnalysisAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 				wd = workDirFromInvoker(r)
 			}
 			pathsStr := action.GetString("paths")
-			parts := strings.Split(pathsStr, ",")
-			var paths []string
-			for _, p := range parts {
-				p = strings.TrimSpace(p)
-				if p != "" {
-					paths = append(paths, p)
+			dirStr := action.GetString("dir")
+			verifiedDir := loop.Get(keyVerifiedJsDir)
+			paths, pathSource, resolveErr := infosecResolveJsStaticPaths(pathsStr, dirStr, verifiedDir, wd)
+			if resolveErr != nil {
+				fb := resolveErr.Error()
+				infosecRecordJsStaticPathFailure(loop, fb)
+				if hint := strings.TrimSpace(loop.Get(keySpinRecoveryHint)); hint != "" {
+					fb += "\n\n" + hint
 				}
-			}
-			if len(paths) == 0 {
-				op.Feedback("no paths in paths= parameter")
+				op.Feedback(fb)
 				op.Continue()
 				return
 			}
-			var normPaths []string
-			for _, p := range paths {
-				lp := strings.ToLower(p)
-				if strings.HasPrefix(lp, "http://") || strings.HasPrefix(lp, "https://") {
-					if err := infosecValidateHTTPURL(p); err != nil {
-						op.Feedback(fmt.Sprintf("invalid URL in paths: %v", err))
-						op.Continue()
-						return
-					}
-					normPaths = append(normPaths, p)
-					continue
-				}
-				absLocal, err := infosecResolveLocalPathForExec(p, wd)
-				if err != nil {
-					op.Feedback(fmt.Sprintf("invalid local path %q: %v", p, err))
-					op.Continue()
-					return
-				}
-				normPaths = append(normPaths, absLocal)
+			if pathSource != "comma-separated paths" {
+				log.Infof("infosec_recon: js_static_extract_ai input resolved via %s: %v", pathSource, paths)
 			}
-			paths = normPaths
 			conc := action.GetInt("concurrent")
 			if conc < 1 {
 				conc = 2
@@ -386,6 +392,7 @@ func runJsStaticAnalysisAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 				log.Warnf("%s: %v", ToolJsStaticExtractAI, err)
 				r.AddToTimeline(ToolJsStaticExtractAI+"_err", fmt.Sprintf("%v", err))
 				op.Feedback(fmt.Sprintf("%s failed: %v", ToolJsStaticExtractAI, err))
+				infosecRecordJsStaticPathFailure(loop, err.Error())
 			} else {
 				data, rerr := os.ReadFile(outPath)
 				if rerr != nil {
@@ -417,8 +424,9 @@ func runJsStaticAnalysisAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 				op.Continue()
 				return
 			}
+			infosecClearJsStaticPathFailures(loop)
 			r.AddToTimeline(ToolJsStaticExtractAI+"_done", fmt.Sprintf("added %d from js static", totalAdded))
-			op.Feedback(fmt.Sprintf("JS static pass done: +%d pool entries (total %d).", totalAdded, len(pool.Entries)))
+			op.Feedback(fmt.Sprintf("JS static pass done: +%d pool entries (total %d). Resolved via %s.", totalAdded, len(pool.Entries), pathSource))
 			op.Feedback("[Next] " + ToolJsStaticExtractAI + " 已完成。请根据 API 池摘要、ReconLog 与本轮反馈决定下一步（如 probe_api_candidates）；勿对已成功分析的 paths 无意义重复调用。")
 			reactloops.EmitStatus(loop, "完成 / Complete")
 			reactloops.EmitActionLog(loop, infosecJsCrawlNodeID, fmt.Sprintf("完成: %s (+%d) / Done: %s (+%d)", ToolJsStaticExtractAI, totalAdded, ToolJsStaticExtractAI, totalAdded))
