@@ -342,7 +342,7 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 var cachedTLSConfig *tls.Config
 
 func (p *Proxy) defaultTLSConfig() *tls.Config {
-	if cachedTLSConfig != nil {
+	if cachedTLSConfig == nil {
 		cachedTLSConfig = &tls.Config{
 			InsecureSkipVerify: true,
 			GetCertificate: func(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
@@ -364,9 +364,10 @@ func GetDialDetectionAddr(ctx *Context, conn net.Conn) string {
 	connectedHost := ctx.GetSessionStringValue(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
 	connectedPort := ctx.GetSessionIntValue(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
 	if connectedHost == "" || connectedPort == 0 {
-		if !ctx.GetSessionBoolValue(httpctx.REQUEST_CONTEXT_KEY_IsListenedConn) {
-			return conn.RemoteAddr().String()
-		}
+		// Transparent hijack (e.g. TUN) entry has no upstream target yet.
+		// conn.RemoteAddr() is the client's source, not the server; probing it
+		// blocks the real client<->mitm TLS handshake (webfuzzer HTTPS over TUN).
+		return ""
 	}
 	return utils.HostPort(connectedHost, connectedPort)
 }
