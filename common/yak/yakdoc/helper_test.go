@@ -17,6 +17,16 @@ func TestShouldSkipDocWalkDir(t *testing.T) {
 	require.False(t, shouldSkipDocWalkDir("yakdoc"))
 }
 
+func TestShouldSkipDocPackage(t *testing.T) {
+	require.True(t, shouldSkipDocPackage("yakdoc_test"))
+	require.False(t, shouldSkipDocPackage("yakdoc"))
+}
+
+func TestIsDocTestSourceFile(t *testing.T) {
+	require.True(t, isDocTestSourceFile("helper_test.go"))
+	require.False(t, isDocTestSourceFile("helper.go"))
+}
+
 func TestDocParseFileFilter(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\n"), 0o644))
