@@ -104,14 +104,17 @@ func init() {
 						srcParts = append(srcParts, k+":"+utils.InterfaceToString(bySrc[k]))
 					}
 					reconLog := loop.Get(keyReconLog)
-				if ytoken.CalcTokenCount(reconLog) > 6000 {
-					reconLog = reconLog[len(reconLog)-6000:]
+				if ytoken.CalcTokenCount(reconLog) > 3500 {
+					reconLog = reconLog[len(reconLog)-3500:]
 				}
+					spinHint := strings.TrimSpace(loop.Get(keySpinRecoveryHint))
 					renderMap := map[string]any{
 						"Nonce":            nonce,
 						"SeedURL":          loop.Get(keySeedURL),
 						"ScopeHosts":       loop.Get(keyScopeHosts),
 						"WorkDir":          wd,
+						"VerifiedJsDir":    loop.Get(keyVerifiedJsDir),
+						"SpinRecoveryHint": spinHint,
 						"PoolTotal":        tot,
 						"PoolVerified":     ver,
 						"PoolUnverified":   unver,
@@ -128,6 +131,7 @@ func init() {
 				runJsStaticAnalysisAction(r),
 				probeAPICandidatesAction(r),
 				searchKnowledgeInfosec(r),
+				buildInfosecPostIterationHook(r),
 				webSearchAction(r),
 				scanPortAction(r),
 				simpleCrawlerAction(r),
