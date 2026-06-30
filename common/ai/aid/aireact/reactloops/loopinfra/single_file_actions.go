@@ -54,11 +54,26 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 
 			log.Infof("write_code: extracted code length=%d", len(code))
 			if code == "" {
+				// 空 write_code 不应让整个任务夭折: AI 常常是"想先查文档/样例, 却误把动作选成了
+				// write_code 而没附代码块"。这里给出纠正反馈并继续循环, 让 AI 下一轮改用查询动作或
+				// 补上完整代码块; 仅当连续多次空写(模型真卡住)才放弃, 既容错又避免死循环。
+				// 关键词: 空 write_code 容错, 反馈而非夭折, 连续空写阈值
+				const maxEmptyWriteRetry = 3
+				emptyCountVar := actionName + "_empty_write_count"
+				emptyCount := loop.GetInt(emptyCountVar) + 1
+				loop.Set(emptyCountVar, fmt.Sprint(emptyCount))
 				failMsg := f.DiagnoseMissingWriteCode(loop)
 				runtime.AddToTimeline("error", failMsg)
-				operator.Fail(failMsg)
+				if emptyCount >= maxEmptyWriteRetry {
+					operator.Fail(fmt.Sprintf("%s (consecutive empty write_code x%d, give up)", failMsg, emptyCount))
+					return
+				}
+				operator.Feedback(failMsg + "\n\nHINT: 你很可能【输出完 @action JSON 就停下了】, 没有紧接着输出代码块。@action JSON 与紧随其后的 `<|" + f.aiTagName + "_<nonce>|> ... <|" + f.aiTagName + "_END_<nonce>|>` 代码块是【同一次回复、不可分割的一体】——发完 JSON 不要结束, 必须在同一条消息里把代码块完整写完(含 END 结束标记)再停。\n如果你只是想先确认 API 签名或语法, 请改用查询动作 (yakdoc_function_details / grep_yaklang_samples / semantic_search_yaklang_samples), 不要发空的 write_code。")
+				loopInfraStatus(loop, "write_code 缺少代码, 已反馈纠正并继续 / write_code missing code, fed back and continue")
 				return
 			}
+			// 成功提取到代码, 重置空写计数。
+			loop.Set(actionName+"_empty_write_count", "0")
 			err := f.persistLoopFileContent(
 				runtime, filename, code,
 				"write_success", "write_failed",

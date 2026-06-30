@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yakdoc"
+	"github.com/yaklang/yaklang/common/yak/yakdoc/overviewutil"
 	"github.com/yaklang/yaklang/common/yak/yakdoc/webdoc"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
@@ -21,34 +22,10 @@ import (
 const aiOverviewFallback = "AI 模块提供了与多种大语言模型集成的能力，支持 OpenAI、ChatGLM、Moonshot 等主流 AI 服务。通过统一的接口调用不同的 AI 服务，支持对话、函数调用、流式输出等功能。"
 
 // loadOverviews 读取 overviews 目录下的所有 <lib>.md，返回 库名 -> 总览正文 的映射。
-// 目录不存在或为空时返回空映射(模块总览为可选增强)。
-// 关键词: 模块总览加载, overviews 目录
+// 复用 overviewutil.LoadAll 作为单一数据源, 与 doc.gob.zst 里 OverviewShort 的派生同源, 避免漂移。
+// 关键词: 模块总览加载, overviews 单一数据源, overviewutil
 func loadOverviews(dir string) map[string]string {
-	res := map[string]string{}
-	if strings.TrimSpace(dir) == "" {
-		return res
-	}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		log.Warnf("read overviews dir %s failed: %v", dir, err)
-		return res
-	}
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
-			continue
-		}
-		name := strings.TrimSuffix(e.Name(), ".md")
-		content, err := os.ReadFile(filepath.Join(dir, e.Name()))
-		if err != nil {
-			log.Warnf("read overview %s failed: %v", e.Name(), err)
-			continue
-		}
-		res[name] = strings.TrimSpace(string(content))
-	}
-	if len(res) > 0 {
-		log.Infof("loaded %d module overview(s) from %s", len(res), dir)
-	}
-	return res
+	return overviewutil.LoadAll(dir)
 }
 
 // collapseToSingleLine 把多行文本压成单行(用于 MDX frontmatter 的 description 字段，避免破坏 YAML)。

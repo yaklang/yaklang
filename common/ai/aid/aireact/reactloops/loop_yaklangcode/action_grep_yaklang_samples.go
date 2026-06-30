@@ -247,7 +247,7 @@ func compressGrepResults(resultStr string, pattern string, userContext string, i
 	return compressSearchResults(resultStr, pattern, userContext, invoker, op, 10, 3, 15, "【AI智能提取】按重要性排序的代码片段：", false)
 }
 
-var grepYaklangSamplesAction = func(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearcher) reactloops.ReActLoopOption {
+var grepYaklangSamplesAction = func(r aicommon.AIInvokeRuntime, holder *searcherHolder) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopActionWithStreamField(
 		"grep_yaklang_samples",
 		`Grep Yaklang 代码样例库 - 快速搜索真实代码示例
@@ -353,6 +353,9 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 			reactloops.EmitStatus(loop, "Grep 搜索中 / Grep searching...")
 
 			invoker.AddToTimeline("start_grep_yaklang_samples", startLine)
+
+			// 运行时从 holder 读取最新搜索器(自动安装后会被回填), 避免拿到注册时的 nil 快照
+			docSearcher := holder.getGrep()
 
 			// 检查 docSearcher
 			if docSearcher == nil {
@@ -591,6 +594,7 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 			if fullcode != "" {
 				errMsg, hasBlockingErrors := checkCodeAndFormatErrors(fullcode)
 				if hasBlockingErrors {
+					reactloops.EmitStatus(loop, "检测到语法错误，修复中 / Syntax error detected, fixing...")
 					op.DisallowNextLoopExit()
 				}
 				if errMsg != "" {

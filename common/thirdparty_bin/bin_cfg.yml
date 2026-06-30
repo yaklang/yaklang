@@ -199,3 +199,20 @@ binaries:
         pick: "*"
         bin_dir: "hack-skills"
         bin_path: "hack-skills/version.txt"
+  # yak-skills: Yaklang 编程 / Yak 热加载 SKILL pack from yaklang/yak-skills
+  # 关键词: yak-skills, ai-skills, AutoSkillLoader, yak-skills 注册, 普通 zip 无加密
+  # 注意: 与 hack-skills 不同, yak-skills 是普通编程技能, 使用明文 zip(无 password),
+  #       解压后由现有 AutoSkillLoader 自动递归发现 SKILL.md, 锚点同样是 version.txt。
+  - name: "yak-skills"
+    description: "Yak Skills - Yaklang programming / hot-patch SKILL pack from yaklang/yak-skills"
+    tags: "skill,ai-skills,yaklang"
+    version: "latest"
+    install_type: "archive"
+    archive_type: ".zip"
+    install_root: "ai-skills"
+    download_info_map:
+      "*":
+        url: "/yak-skills/latest/yak-skills.zip"
+        pick: "*"
+        bin_dir: "yak-skills"
+        bin_path: "yak-skills/version.txt"

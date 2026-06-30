@@ -14,10 +14,18 @@ import (
 )
 
 // buildInitTask creates the initialization task handler with file detection and initial code search
-func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearcher, ragSearcher *rag.RAGSystem) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
+func buildInitTask(r aicommon.AIInvokeRuntime, holder *searcherHolder, installCfg *aikbInstallConfig) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 		emitter := r.GetConfig().GetEmitter()
 		attachedDatas := task.GetAttachedDatas()
+
+		// 关键依赖自动安装: AIKB(grep/rag) 缺失则阻塞下载(带进度), 成功回填 holder, 失败降级。
+		// yak-skills 缺失则后台安装并刷新 AutoSkillLoader。详见 ensureDependencies。
+		ensureDependencies(r, loop, task, holder, installCfg)
+
+		// 从 holder 读取(可能已被上面的自动安装回填)的最新搜索器
+		docSearcher := holder.getGrep()
+		ragSearcher := holder.getRAG()
 		reactloops.RunAttachedExtraResourcesInit(r, loop, attachedDatas)
 		editorCtx := initYaklangEditorContextFromAttached(r, loop, attachedDatas)
 		if editorCtx == nil {
@@ -71,6 +79,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 			reason            string
 			searchPatterns    []string
 			semanticQuestions []string
+			coreLibraries     []string
 		)
 
 		if needLiteforge {
@@ -100,12 +109,25 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 				existed = step1Result.GetString("existed_filepath")
 			}
 			reason = step1Result.GetString("reason")
+			coreLibraries = step1Result.GetStringSlice("core_libraries")
 			if hasSearcher {
 				searchPatterns = step1Result.GetStringSlice("search_patterns")
 				semanticQuestions = step1Result.GetStringSlice("semantic_questions")
 			}
 		} else {
 			log.Infof("skip liteforge file detection: target path already attached (%s)", attachedPath)
+		}
+
+		// PIN 接口: 把 AI 选定的核心库(及搜索关键字派生的库)的权威函数签名锁进反应数据,
+		// 让模型上手即有正确签名(参数类型/个数), 从源头减少类型/参数/猜名错误。yakdoc 始终可用,
+		// 因此即使 AIKB 缺失也能 PIN。详见 BuildPinnedAPISection。
+		pinnedLibs := CollectPinnedLibraries(coreLibraries, searchPatterns)
+		if pinned := BuildPinnedAPISection(pinnedLibs); pinned != "" {
+			loop.Set("pinned_apis", pinned)
+			loop.Set("pinned_libraries", strings.Join(pinnedLibs, ","))
+			reactloops.EmitStatus(loop, fmt.Sprintf("已锁定核心库 API: %s / Pinned core library APIs: %s",
+				strings.Join(pinnedLibs, ", "), strings.Join(pinnedLibs, ", ")))
+			log.Infof("pinned core library APIs for libs: %v (%d bytes)", pinnedLibs, len(pinned))
 		}
 
 		userRequirements := utils.MustRenderTemplate(`<|USER_REQUIREMENTS_{{.nonce}}|>

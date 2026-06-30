@@ -15,6 +15,7 @@ func yakdocActions(r aicommon.AIInvokeRuntime) []reactloops.ReActLoopOption {
 	return []reactloops.ReActLoopOption{
 		yakdocSearchAction(r),
 		yakdocGetAllLibraryNamesAction(r),
+		yakdocModuleOverviewAction(r),
 		yakdocLibraryDetailsAction(r),
 		yakdocFunctionDetailsAction(r),
 		yakdocVariableDetailsAction(r),
@@ -159,6 +160,59 @@ yakdoc_get_all_library_names()`,
 				return
 			}
 			yakdocHandleSuccess(loop, op, "yakdoc_get_all_library_names", "yakdoc_all_libraries", FormatAllLibraryNames(names))
+		},
+	)
+}
+
+func yakdocModuleOverviewAction(_ aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
+	return reactloops.WithRegisterLoopActionWithStreamField(
+		"yakdoc_module_overview",
+		`查询 Yaklang 标准库"模块速览"：一句话库定位 + 函数/变量名索引（YakDocument）
+
+【使用场景】：
+- 拆解需求后已锁定候选库，进一步确认该库职责与可用 API 名
+- 在 grep/语义搜索具体代码样例之前，先快速建立对模块的整体认知
+
+【参数】：
+- library (string, 必需) - 库名，如 "http"、"poc"、"file"
+
+【与其他动作分工】：
+- yakdoc_module_overview：库定位 + 全量函数/变量名（选库后定位 API）
+- yakdoc_function_details：单个函数的完整签名与说明
+- grep_yaklang_samples / semantic_search_yaklang_samples：完整代码样例
+
+【示例】：
+yakdoc_module_overview(library="poc")`,
+		[]aitool.ToolOption{
+			aitool.WithStringParam(
+				"library",
+				aitool.WithParam_Required(true),
+				aitool.WithParam_Description("Library name to overview, e.g. http/poc/file"),
+			),
+		},
+		nil,
+		func(_ *reactloops.ReActLoop, action *aicommon.Action) error {
+			if strings.TrimSpace(action.GetString("library")) == "" {
+				return utils.Error("yakdoc_module_overview requires 'library' parameter")
+			}
+			return nil
+		},
+		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+			libName := strings.TrimSpace(action.GetString("library"))
+			currentQuery := "module_overview:" + libName
+			const queryKey = "last_yakdoc_query"
+			if yakdocCheckDuplicate(loop, op, queryKey, currentQuery) {
+				return
+			}
+			loop.Set(queryKey, currentQuery)
+
+			yakdocEmitStart(loop)
+			result, err := QueryModuleOverview(libName)
+			if err != nil {
+				yakdocHandleError(loop, op, "yakdoc_module_overview", queryKey, err)
+				return
+			}
+			yakdocHandleSuccess(loop, op, "yakdoc_module_overview", "yakdoc_module_overview", result)
 		},
 	)
 }
