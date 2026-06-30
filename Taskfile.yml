@@ -53,3 +53,41 @@ tasks:
      - go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.2
      - go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
      - echo "download protoc from https://github.com/protocolbuffers/protobuf/releases/tag/v27.3"
+  legion_smoke_node_build:
+    desc: Build the Legion smoke node without optional HIDS support
+    cmds:
+      - go build -o ./legion-smoke-node ./cmd/legion-smoke-node
+    generates:
+      - ./legion-smoke-node
+    aliases: [lsnb]
+  legion_smoke_node_build_hids:
+    desc: Build the Legion smoke node with Linux HIDS support enabled
+    cmds:
+      - go build -tags hids -o ./legion-smoke-node-hids ./cmd/legion-smoke-node
+    generates:
+      - ./legion-smoke-node-hids
+    aliases: [lsnbh]
+  legion_smoke_node_build_hids_linux_amd64:
+    desc: Build the Legion smoke node for Linux amd64 with HIDS support enabled
+    cmds:
+      - GOOS=linux GOARCH=amd64 go build -tags hids -o ./legion-smoke-node-hids-linux-amd64 ./cmd/legion-smoke-node
+    generates:
+      - ./legion-smoke-node-hids-linux-amd64
+    aliases: [lsnbhla]
+  test_hids:
+    desc: Run Legion HIDS packaging and runtime tests
+    cmds:
+      - go test ./scannode -run '^(TestNormalizeScanNodeCapabilityKeys.*|TestCapabilityManagerApplyRejectsHIDSCapabilityWhenNotCompiled)$'
+      - go test -tags hids ./scannode -run '^(TestHIDSCapabilityHooks|TestCapabilityManager.*(HIDS|StructuredDetail)|TestNormalizeCapabilityEventStatus|TestNormalizeScanNodeCapabilityKeys.*)$'
+      - go test -tags hids ./common/hids/runtime ./common/hids/rule ./common/hids/rule/cmd/hids-desired-spec-check
+    aliases: [thids]
+  hids_spec_check:
+    desc: "Validate a HIDS desired spec JSON file (usage: task hids_spec_check -- ./spec.json)"
+    cmds:
+      - |
+        input="{{.CLI_ARGS}}"
+        if [ -z "$input" ]; then
+          input="-"
+        fi
+        go run -tags hids ./common/hids/rule/cmd/hids-desired-spec-check --input "$input"
+    aliases: [hsc]

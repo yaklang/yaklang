@@ -145,7 +145,7 @@ func TestAppendKeyValueParams_SkipScannodeInternalKeys(t *testing.T) {
 		"_scannode_ssa_upload_url":  "http://localhost/upload",
 		"_scannode_ssa_object_key":  "ssa/tasks/t1/report.json.gz",
 		"_scannode_ssa_codec":       "gzip",
-		"ruleset-hash":              "abc",
+		"rule_snapshot_id":          "rulesnapshot-a",
 		"_scannode_unknown_setting": "x",
 	})
 
@@ -154,12 +154,34 @@ func TestAppendKeyValueParams_SkipScannodeInternalKeys(t *testing.T) {
 		joined[a] = struct{}{}
 	}
 	_, hasTask := joined["--task-id"]
-	_, hasRuleset := joined["--ruleset-hash"]
-	_, hasInternalUpload := joined["--_scannode_ssa_upload_url"]
+	_, hasRuleSnapshot := joined["--rule_snapshot_id"]
+	_, hasInternalObjectKey := joined["--_scannode_ssa_object_key"]
 	_, hasInternalCodec := joined["--_scannode_ssa_codec"]
 
 	require.True(t, hasTask)
-	require.True(t, hasRuleset)
-	require.False(t, hasInternalUpload)
+	require.True(t, hasRuleSnapshot)
+	require.False(t, hasInternalObjectKey)
 	require.False(t, hasInternalCodec)
+}
+
+func TestAppendKeyValueParams_ExpandsStringSliceValues(t *testing.T) {
+	node := &ScanNode{}
+	args := node.appendKeyValueParams(nil, map[string]interface{}{
+		"port-preset": []string{"top100"},
+		"ports":       "2080",
+	})
+
+	require.Equal(t, []string{"top100"}, valuesAfterFlag(args, "--port-preset"))
+	require.NotContains(t, args, `["top100"]`)
+	require.Equal(t, []string{"2080"}, valuesAfterFlag(args, "--ports"))
+}
+
+func valuesAfterFlag(args []string, flag string) []string {
+	values := make([]string, 0)
+	for index := 0; index < len(args)-1; index++ {
+		if args[index] == flag {
+			values = append(values, args[index+1])
+		}
+	}
+	return values
 }
