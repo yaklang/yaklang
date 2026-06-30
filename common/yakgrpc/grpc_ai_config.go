@@ -2,6 +2,9 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -110,4 +113,27 @@ func (s *Server) GetAIThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Em
 		return nil, err
 	}
 	return &ypb.GetThirdPartyAppConfigTemplateResponse{Templates: templates}, nil
+}
+
+func (s *Server) GetApiKey(ctx context.Context, req *ypb.GetApiKeyRequest) (*ypb.Empty, error) {
+	cancelCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+	apiKey, err := client.CreateAIApiKeyByOnline(cancelCtx, req.Token)
+	if err != nil {
+		return nil, err
+	}
+
+	var aiThirdPartyConfig schema.AIThirdPartyConfig
+	if err := consts.GetGormProfileDatabase().First(&aiThirdPartyConfig).Error; err != nil {
+		return nil, utils.Errorf("get aiThirdPartyConfig failed: %v", err)
+	}
+
+	aiThirdPartyConfig.APIKey = apiKey
+
+	if err := consts.GetGormProfileDatabase().Save(&aiThirdPartyConfig).Error; err != nil {
+		return nil, utils.Errorf("update apiKey failed: %v", err)
+	}
+
+	return &ypb.Empty{}, nil
 }
