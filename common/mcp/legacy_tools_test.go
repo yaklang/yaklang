@@ -490,6 +490,46 @@ var legacyToolIntegrationCases = map[string][]legacyToolCase{
 			},
 		},
 	},
+	"create_global_hotpatch_template": {
+		{
+			name:        "reject_missing_name",
+			args:        map[string]any{"content": "beforeRequest = func(isHttps, originReq, req) { return req }"},
+			wantErr:     true,
+			errContains: []string{"name is required"},
+		},
+		{
+			name:        "reject_missing_content",
+			args:        map[string]any{"name": "legacy-mcp-empty-content"},
+			wantErr:     true,
+			errContains: []string{"content is required"},
+		},
+		{
+			name:        "reject_invalid_content",
+			args:        map[string]any{"name": "legacy-mcp-bad-yak", "content": "this is not valid yak hotpatch"},
+			wantErr:     true,
+			errContains: []string{"validation failed"},
+		},
+		{
+			name: "create_valid_template",
+			buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
+				return map[string]any{
+					"name": uniqueName("legacy-mcp-create-global"),
+					"content": `
+beforeRequest = func(isHttps, originReq, req) { return req }
+afterRequest = func(isHttps, originReq, req, originRsp, rsp) { return rsp }
+`,
+					"tags": []any{"mcp", "global"},
+				}
+			},
+			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+				var payload map[string]any
+				decodeToolResultJSON(t, text, &payload)
+				msg, ok := payload["Message"].(map[string]any)
+				require.True(t, ok, "expected Message in response: %s", text)
+				assert.Equal(t, "create", msg["Operation"])
+			},
+		},
+	},
 	"get_current_database_context": {
 		{
 			name: "returns_database_paths",
