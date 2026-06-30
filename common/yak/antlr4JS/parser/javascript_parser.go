@@ -1,4 +1,4 @@
-// Code generated from java-escape by ANTLR 4.11.1. DO NOT EDIT.
+// Code generated from ./JavaScriptParser.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
 package JS // JavaScriptParser
 import (
@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 )
 
 // Suppress unused import errors
@@ -18,20 +18,20 @@ type JavaScriptParser struct {
 	JavaScriptParserBase
 }
 
-var javascriptparserParserStaticData struct {
+var JavaScriptParserParserStaticData struct {
 	once                   sync.Once
 	serializedATN          []int32
-	literalNames           []string
-	symbolicNames          []string
-	ruleNames              []string
-	predictionContextCache *antlr.PredictionContextCache
+	LiteralNames           []string
+	SymbolicNames          []string
+	RuleNames              []string
+	PredictionContextCache *antlr.PredictionContextCache
 	atn                    *antlr.ATN
 	decisionToDFA          []*antlr.DFA
 }
 
 func javascriptparserParserInit() {
-	staticData := &javascriptparserParserStaticData
-	staticData.literalNames = []string{
+	staticData := &JavaScriptParserParserStaticData
+	staticData.LiteralNames = []string{
 		"", "", "", "", "", "", "'['", "']'", "'('", "')'", "'{'", "", "'}'",
 		"';'", "','", "'='", "'?'", "':'", "'...'", "'.'", "'++'", "'--'", "'+'",
 		"'-'", "'~'", "'!'", "'*'", "'/'", "'%'", "'**'", "'??'", "'#'", "'>>'",
@@ -49,7 +49,7 @@ func javascriptparserParserInit() {
 		"'protected'", "'static'", "", "", "", "'\\r'", "", "", "", "", "",
 		"", "'${'",
 	}
-	staticData.symbolicNames = []string{
+	staticData.SymbolicNames = []string{
 		"", "HashBangLine", "SingleLineComment", "BlockComment", "MultiLineComment",
 		"RegularExpressionLiteral", "OpenBracket", "CloseBracket", "OpenParen",
 		"CloseParen", "OpenBrace", "TemplateCloseBrace", "CloseBrace", "SemiColon",
@@ -75,7 +75,7 @@ func javascriptparserParserInit() {
 		"WS", "LineTerminatorNoHide", "LineTerminator", "HtmlComment", "CDataComment",
 		"UnexpectedCharacter", "TemplateStringStartExpression", "TemplateStringAtom",
 	}
-	staticData.ruleNames = []string{
+	staticData.RuleNames = []string{
 		"program", "statements", "statement", "block", "importStatement", "importFromBlock",
 		"importModuleItems", "importAliasName", "moduleExportName", "importedBinding",
 		"importDefault", "importNamespace", "importFrom", "aliasName", "exportStatement",
@@ -97,7 +97,7 @@ func javascriptparserParserInit() {
 		"templateStringAtom", "numericLiteral", "bigintLiteral", "getter", "setter",
 		"identifierName", "word", "identifier", "optionalChainMember", "eos",
 	}
-	staticData.predictionContextCache = antlr.NewPredictionContextCache()
+	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
 		4, 1, 132, 1067, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4,
 		7, 4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 2, 10,
@@ -617,7 +617,7 @@ func javascriptparserParserInit() {
 // NewJavaScriptParser(). You can call this function if you wish to initialize the static state ahead
 // of time.
 func JavaScriptParserInit() {
-	staticData := &javascriptparserParserStaticData
+	staticData := &JavaScriptParserParserStaticData
 	staticData.once.Do(javascriptparserParserInit)
 }
 
@@ -626,12 +626,12 @@ func NewJavaScriptParser(input antlr.TokenStream) *JavaScriptParser {
 	JavaScriptParserInit()
 	this := new(JavaScriptParser)
 	this.BaseParser = antlr.NewBaseParser(input)
-	staticData := &javascriptparserParserStaticData
-	this.Interpreter = antlr.NewParserATNSimulator(this, staticData.atn, staticData.decisionToDFA, staticData.predictionContextCache)
-	this.RuleNames = staticData.ruleNames
-	this.LiteralNames = staticData.literalNames
-	this.SymbolicNames = staticData.symbolicNames
-	this.GrammarFileName = "java-escape"
+	staticData := &JavaScriptParserParserStaticData
+	this.Interpreter = antlr.NewParserATNSimulator(this, staticData.atn, staticData.decisionToDFA, staticData.PredictionContextCache)
+	this.RuleNames = staticData.RuleNames
+	this.LiteralNames = staticData.LiteralNames
+	this.SymbolicNames = staticData.SymbolicNames
+	this.GrammarFileName = "JavaScriptParser.g4"
 
 	return this
 }
@@ -873,20 +873,30 @@ type IProgramContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	EOF() antlr.TerminalNode
+	HashBangLine() antlr.TerminalNode
+	Statements() IStatementsContext
+
 	// IsProgramContext differentiates from other interfaces.
 	IsProgramContext()
 }
 
 type ProgramContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyProgramContext() *ProgramContext {
 	var p = new(ProgramContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_program
 	return p
+}
+
+func InitEmptyProgramContext(p *ProgramContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_program
 }
 
 func (*ProgramContext) IsProgramContext() {}
@@ -894,7 +904,7 @@ func (*ProgramContext) IsProgramContext() {}
 func NewProgramContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ProgramContext {
 	var p = new(ProgramContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_program
@@ -947,46 +957,37 @@ func (s *ProgramContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Program() (localctx IProgramContext) {
-	this := p
-	_ = this
-
 	localctx = NewProgramContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, JavaScriptParserRULE_program)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(179)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JavaScriptParserHashBangLine {
 		{
 			p.SetState(178)
 			p.Match(JavaScriptParserHashBangLine)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 	p.SetState(182)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009147624096) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1082832581574839295) != 0 {
+	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009147624096) != 0) || ((int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1082832581574839295) != 0) {
 		{
 			p.SetState(181)
 			p.Statements()
@@ -996,9 +997,23 @@ func (p *JavaScriptParser) Program() (localctx IProgramContext) {
 	{
 		p.SetState(184)
 		p.Match(JavaScriptParserEOF)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IStatementsContext is an interface to support dynamic dispatch.
@@ -1008,20 +1023,29 @@ type IStatementsContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllStatement() []IStatementContext
+	Statement(i int) IStatementContext
+
 	// IsStatementsContext differentiates from other interfaces.
 	IsStatementsContext()
 }
 
 type StatementsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyStatementsContext() *StatementsContext {
 	var p = new(StatementsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_statements
 	return p
+}
+
+func InitEmptyStatementsContext(p *StatementsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_statements
 }
 
 func (*StatementsContext) IsStatementsContext() {}
@@ -1029,7 +1053,7 @@ func (*StatementsContext) IsStatementsContext() {}
 func NewStatementsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *StatementsContext {
 	var p = new(StatementsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_statements
@@ -1099,35 +1123,19 @@ func (s *StatementsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Statements() (localctx IStatementsContext) {
-	this := p
-	_ = this
-
 	localctx = NewStatementsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 2, JavaScriptParserRULE_statements)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(187)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	for ok := true; ok; ok = (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009147624096) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1082832581574839295) != 0 {
+	for ok := true; ok; ok = ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009147624096) != 0) || ((int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1082832581574839295) != 0) {
 		{
 			p.SetState(186)
 			p.Statement()
@@ -1135,10 +1143,23 @@ func (p *JavaScriptParser) Statements() (localctx IStatementsContext) {
 
 		p.SetState(189)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IStatementContext is an interface to support dynamic dispatch.
@@ -1148,20 +1169,48 @@ type IStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Block() IBlockContext
+	VariableStatement() IVariableStatementContext
+	ImportStatement() IImportStatementContext
+	ExportStatement() IExportStatementContext
+	SemiColon() antlr.TerminalNode
+	ClassDeclaration() IClassDeclarationContext
+	FunctionDeclaration() IFunctionDeclarationContext
+	ExpressionSequence() IExpressionSequenceContext
+	Eos() IEosContext
+	IfStatement() IIfStatementContext
+	IterationStatement() IIterationStatementContext
+	ContinueStatement() IContinueStatementContext
+	BreakStatement() IBreakStatementContext
+	ReturnStatement() IReturnStatementContext
+	YieldStatement() IYieldStatementContext
+	WithStatement() IWithStatementContext
+	LabelledStatement() ILabelledStatementContext
+	SwitchStatement() ISwitchStatementContext
+	ThrowStatement() IThrowStatementContext
+	TryStatement() ITryStatementContext
+	DebuggerStatement() IDebuggerStatementContext
+
 	// IsStatementContext differentiates from other interfaces.
 	IsStatementContext()
 }
 
 type StatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyStatementContext() *StatementContext {
 	var p = new(StatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_statement
 	return p
+}
+
+func InitEmptyStatementContext(p *StatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_statement
 }
 
 func (*StatementContext) IsStatementContext() {}
@@ -1169,7 +1218,7 @@ func (*StatementContext) IsStatementContext() {}
 func NewStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *StatementContext {
 	var p = new(StatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_statement
@@ -1522,31 +1571,15 @@ func (s *StatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Statement() (localctx IStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 4, JavaScriptParserRULE_statement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(213)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 3, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 3, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -1580,6 +1613,10 @@ func (p *JavaScriptParser) Statement() (localctx IStatementContext) {
 		{
 			p.SetState(195)
 			p.Match(JavaScriptParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 6:
@@ -1691,9 +1728,21 @@ func (p *JavaScriptParser) Statement() (localctx IStatementContext) {
 			p.DebuggerStatement()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IBlockContext is an interface to support dynamic dispatch.
@@ -1703,20 +1752,30 @@ type IBlockContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	OpenBrace() antlr.TerminalNode
+	CloseBrace() antlr.TerminalNode
+	Statements() IStatementsContext
+
 	// IsBlockContext differentiates from other interfaces.
 	IsBlockContext()
 }
 
 type BlockContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyBlockContext() *BlockContext {
 	var p = new(BlockContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_block
 	return p
+}
+
+func InitEmptyBlockContext(p *BlockContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_block
 }
 
 func (*BlockContext) IsBlockContext() {}
@@ -1724,7 +1783,7 @@ func (*BlockContext) IsBlockContext() {}
 func NewBlockContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *BlockContext {
 	var p = new(BlockContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_block
@@ -1777,39 +1836,27 @@ func (s *BlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Block() (localctx IBlockContext) {
-	this := p
-	_ = this
-
 	localctx = NewBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, JavaScriptParserRULE_block)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(215)
 		p.Match(JavaScriptParserOpenBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(217)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009147624096) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1082832581574839295) != 0 {
+	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009147624096) != 0) || ((int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1082832581574839295) != 0) {
 		{
 			p.SetState(216)
 			p.Statements()
@@ -1819,9 +1866,23 @@ func (p *JavaScriptParser) Block() (localctx IBlockContext) {
 	{
 		p.SetState(219)
 		p.Match(JavaScriptParserCloseBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IImportStatementContext is an interface to support dynamic dispatch.
@@ -1831,20 +1892,29 @@ type IImportStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Import() antlr.TerminalNode
+	ImportFromBlock() IImportFromBlockContext
+
 	// IsImportStatementContext differentiates from other interfaces.
 	IsImportStatementContext()
 }
 
 type ImportStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyImportStatementContext() *ImportStatementContext {
 	var p = new(ImportStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_importStatement
 	return p
+}
+
+func InitEmptyImportStatementContext(p *ImportStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_importStatement
 }
 
 func (*ImportStatementContext) IsImportStatementContext() {}
@@ -1852,7 +1922,7 @@ func (*ImportStatementContext) IsImportStatementContext() {}
 func NewImportStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ImportStatementContext {
 	var p = new(ImportStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_importStatement
@@ -1901,39 +1971,33 @@ func (s *ImportStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) ImportStatement() (localctx IImportStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewImportStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 8, JavaScriptParserRULE_importStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(221)
 		p.Match(JavaScriptParserImport)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(222)
 		p.ImportFromBlock()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IImportFromBlockContext is an interface to support dynamic dispatch.
@@ -1943,20 +2007,33 @@ type IImportFromBlockContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ImportFrom() IImportFromContext
+	Eos() IEosContext
+	ImportNamespace() IImportNamespaceContext
+	ImportModuleItems() IImportModuleItemsContext
+	ImportDefault() IImportDefaultContext
+	StringLiteral() antlr.TerminalNode
+
 	// IsImportFromBlockContext differentiates from other interfaces.
 	IsImportFromBlockContext()
 }
 
 type ImportFromBlockContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyImportFromBlockContext() *ImportFromBlockContext {
 	var p = new(ImportFromBlockContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_importFromBlock
 	return p
+}
+
+func InitEmptyImportFromBlockContext(p *ImportFromBlockContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_importFromBlock
 }
 
 func (*ImportFromBlockContext) IsImportFromBlockContext() {}
@@ -1964,7 +2041,7 @@ func (*ImportFromBlockContext) IsImportFromBlockContext() {}
 func NewImportFromBlockContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ImportFromBlockContext {
 	var p = new(ImportFromBlockContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_importFromBlock
@@ -2077,30 +2154,13 @@ func (s *ImportFromBlockContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) ImportFromBlock() (localctx IImportFromBlockContext) {
-	this := p
-	_ = this
-
 	localctx = NewImportFromBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 10, JavaScriptParserRULE_importFromBlock)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(236)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case JavaScriptParserOpenBrace, JavaScriptParserMultiply, JavaScriptParserNullLiteral, JavaScriptParserBooleanLiteral, JavaScriptParserBreak, JavaScriptParserDo, JavaScriptParserInstanceof, JavaScriptParserTypeof, JavaScriptParserCase, JavaScriptParserElse, JavaScriptParserNew, JavaScriptParserVar, JavaScriptParserCatch, JavaScriptParserFinally, JavaScriptParserReturn, JavaScriptParserVoid, JavaScriptParserContinue, JavaScriptParserFor, JavaScriptParserSwitch, JavaScriptParserWhile, JavaScriptParserDebugger, JavaScriptParserFunction_, JavaScriptParserThis, JavaScriptParserWith, JavaScriptParserDefault, JavaScriptParserIf, JavaScriptParserThrow, JavaScriptParserDelete, JavaScriptParserIn, JavaScriptParserTry, JavaScriptParserAs, JavaScriptParserFrom, JavaScriptParserGet, JavaScriptParserSet, JavaScriptParserClass, JavaScriptParserEnum, JavaScriptParserExtends, JavaScriptParserSuper, JavaScriptParserConst, JavaScriptParserExport, JavaScriptParserImport, JavaScriptParserAsync, JavaScriptParserAwait, JavaScriptParserYield, JavaScriptParserImplements, JavaScriptParserStrictLet, JavaScriptParserNonStrictLet, JavaScriptParserPrivate, JavaScriptParserPublic, JavaScriptParserInterface, JavaScriptParserPackage, JavaScriptParserProtected, JavaScriptParserStatic, JavaScriptParserIdentifier:
@@ -2108,15 +2168,20 @@ func (p *JavaScriptParser) ImportFromBlock() (localctx IImportFromBlockContext) 
 		p.SetState(225)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 5, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 5, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(224)
 				p.ImportDefault()
 			}
 
+		} else if p.HasError() { // JIM
+			goto errorExit
 		}
 		p.SetState(229)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 
 		switch p.GetTokenStream().LA(1) {
 		case JavaScriptParserMultiply, JavaScriptParserNullLiteral, JavaScriptParserBooleanLiteral, JavaScriptParserBreak, JavaScriptParserDo, JavaScriptParserInstanceof, JavaScriptParserTypeof, JavaScriptParserCase, JavaScriptParserElse, JavaScriptParserNew, JavaScriptParserVar, JavaScriptParserCatch, JavaScriptParserFinally, JavaScriptParserReturn, JavaScriptParserVoid, JavaScriptParserContinue, JavaScriptParserFor, JavaScriptParserSwitch, JavaScriptParserWhile, JavaScriptParserDebugger, JavaScriptParserFunction_, JavaScriptParserThis, JavaScriptParserWith, JavaScriptParserDefault, JavaScriptParserIf, JavaScriptParserThrow, JavaScriptParserDelete, JavaScriptParserIn, JavaScriptParserTry, JavaScriptParserAs, JavaScriptParserFrom, JavaScriptParserGet, JavaScriptParserSet, JavaScriptParserClass, JavaScriptParserEnum, JavaScriptParserExtends, JavaScriptParserSuper, JavaScriptParserConst, JavaScriptParserExport, JavaScriptParserImport, JavaScriptParserAsync, JavaScriptParserAwait, JavaScriptParserYield, JavaScriptParserImplements, JavaScriptParserStrictLet, JavaScriptParserNonStrictLet, JavaScriptParserPrivate, JavaScriptParserPublic, JavaScriptParserInterface, JavaScriptParserPackage, JavaScriptParserProtected, JavaScriptParserStatic, JavaScriptParserIdentifier:
@@ -2132,7 +2197,8 @@ func (p *JavaScriptParser) ImportFromBlock() (localctx IImportFromBlockContext) 
 			}
 
 		default:
-			panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			goto errorExit
 		}
 		{
 			p.SetState(231)
@@ -2148,6 +2214,10 @@ func (p *JavaScriptParser) ImportFromBlock() (localctx IImportFromBlockContext) 
 		{
 			p.SetState(234)
 			p.Match(JavaScriptParserStringLiteral)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(235)
@@ -2155,10 +2225,21 @@ func (p *JavaScriptParser) ImportFromBlock() (localctx IImportFromBlockContext) 
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IImportModuleItemsContext is an interface to support dynamic dispatch.
@@ -2168,20 +2249,33 @@ type IImportModuleItemsContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	OpenBrace() antlr.TerminalNode
+	CloseBrace() antlr.TerminalNode
+	AllImportAliasName() []IImportAliasNameContext
+	ImportAliasName(i int) IImportAliasNameContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsImportModuleItemsContext differentiates from other interfaces.
 	IsImportModuleItemsContext()
 }
 
 type ImportModuleItemsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyImportModuleItemsContext() *ImportModuleItemsContext {
 	var p = new(ImportModuleItemsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_importModuleItems
 	return p
+}
+
+func InitEmptyImportModuleItemsContext(p *ImportModuleItemsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_importModuleItems
 }
 
 func (*ImportModuleItemsContext) IsImportModuleItemsContext() {}
@@ -2189,7 +2283,7 @@ func (*ImportModuleItemsContext) IsImportModuleItemsContext() {}
 func NewImportModuleItemsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ImportModuleItemsContext {
 	var p = new(ImportModuleItemsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_importModuleItems
@@ -2275,28 +2369,9 @@ func (s *ImportModuleItemsContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaScriptParser) ImportModuleItems() (localctx IImportModuleItemsContext) {
-	this := p
-	_ = this
-
 	localctx = NewImportModuleItemsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 12, JavaScriptParserRULE_importModuleItems)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -2304,11 +2379,20 @@ func (p *JavaScriptParser) ImportModuleItems() (localctx IImportModuleItemsConte
 	{
 		p.SetState(238)
 		p.Match(JavaScriptParserOpenBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(244)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 8, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 8, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -2318,15 +2402,28 @@ func (p *JavaScriptParser) ImportModuleItems() (localctx IImportModuleItemsConte
 			{
 				p.SetState(240)
 				p.Match(JavaScriptParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		p.SetState(246)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 8, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 8, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(251)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if (int64((_la-61)) & ^0x3f) == 0 && ((int64(1)<<(_la-61))&4611686018427385859) != 0 {
@@ -2336,12 +2433,19 @@ func (p *JavaScriptParser) ImportModuleItems() (localctx IImportModuleItemsConte
 		}
 		p.SetState(249)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == JavaScriptParserComma {
 			{
 				p.SetState(248)
 				p.Match(JavaScriptParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
@@ -2350,9 +2454,23 @@ func (p *JavaScriptParser) ImportModuleItems() (localctx IImportModuleItemsConte
 	{
 		p.SetState(253)
 		p.Match(JavaScriptParserCloseBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IImportAliasNameContext is an interface to support dynamic dispatch.
@@ -2362,20 +2480,30 @@ type IImportAliasNameContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ModuleExportName() IModuleExportNameContext
+	As() antlr.TerminalNode
+	ImportedBinding() IImportedBindingContext
+
 	// IsImportAliasNameContext differentiates from other interfaces.
 	IsImportAliasNameContext()
 }
 
 type ImportAliasNameContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyImportAliasNameContext() *ImportAliasNameContext {
 	var p = new(ImportAliasNameContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_importAliasName
 	return p
+}
+
+func InitEmptyImportAliasNameContext(p *ImportAliasNameContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_importAliasName
 }
 
 func (*ImportAliasNameContext) IsImportAliasNameContext() {}
@@ -2383,7 +2511,7 @@ func (*ImportAliasNameContext) IsImportAliasNameContext() {}
 func NewImportAliasNameContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ImportAliasNameContext {
 	var p = new(ImportAliasNameContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_importAliasName
@@ -2448,28 +2576,9 @@ func (s *ImportAliasNameContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) ImportAliasName() (localctx IImportAliasNameContext) {
-	this := p
-	_ = this
-
 	localctx = NewImportAliasNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 14, JavaScriptParserRULE_importAliasName)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -2478,12 +2587,19 @@ func (p *JavaScriptParser) ImportAliasName() (localctx IImportAliasNameContext) 
 	}
 	p.SetState(258)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JavaScriptParserAs {
 		{
 			p.SetState(256)
 			p.Match(JavaScriptParserAs)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(257)
@@ -2492,7 +2608,17 @@ func (p *JavaScriptParser) ImportAliasName() (localctx IImportAliasNameContext) 
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IModuleExportNameContext is an interface to support dynamic dispatch.
@@ -2502,20 +2628,29 @@ type IModuleExportNameContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	IdentifierName() IIdentifierNameContext
+	StringLiteral() antlr.TerminalNode
+
 	// IsModuleExportNameContext differentiates from other interfaces.
 	IsModuleExportNameContext()
 }
 
 type ModuleExportNameContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyModuleExportNameContext() *ModuleExportNameContext {
 	var p = new(ModuleExportNameContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_moduleExportName
 	return p
+}
+
+func InitEmptyModuleExportNameContext(p *ModuleExportNameContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_moduleExportName
 }
 
 func (*ModuleExportNameContext) IsModuleExportNameContext() {}
@@ -2523,7 +2658,7 @@ func (*ModuleExportNameContext) IsModuleExportNameContext() {}
 func NewModuleExportNameContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ModuleExportNameContext {
 	var p = new(ModuleExportNameContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_moduleExportName
@@ -2572,30 +2707,13 @@ func (s *ModuleExportNameContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaScriptParser) ModuleExportName() (localctx IModuleExportNameContext) {
-	this := p
-	_ = this
-
 	localctx = NewModuleExportNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 16, JavaScriptParserRULE_moduleExportName)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(262)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case JavaScriptParserNullLiteral, JavaScriptParserBooleanLiteral, JavaScriptParserBreak, JavaScriptParserDo, JavaScriptParserInstanceof, JavaScriptParserTypeof, JavaScriptParserCase, JavaScriptParserElse, JavaScriptParserNew, JavaScriptParserVar, JavaScriptParserCatch, JavaScriptParserFinally, JavaScriptParserReturn, JavaScriptParserVoid, JavaScriptParserContinue, JavaScriptParserFor, JavaScriptParserSwitch, JavaScriptParserWhile, JavaScriptParserDebugger, JavaScriptParserFunction_, JavaScriptParserThis, JavaScriptParserWith, JavaScriptParserDefault, JavaScriptParserIf, JavaScriptParserThrow, JavaScriptParserDelete, JavaScriptParserIn, JavaScriptParserTry, JavaScriptParserAs, JavaScriptParserFrom, JavaScriptParserGet, JavaScriptParserSet, JavaScriptParserClass, JavaScriptParserEnum, JavaScriptParserExtends, JavaScriptParserSuper, JavaScriptParserConst, JavaScriptParserExport, JavaScriptParserImport, JavaScriptParserAsync, JavaScriptParserAwait, JavaScriptParserYield, JavaScriptParserImplements, JavaScriptParserStrictLet, JavaScriptParserNonStrictLet, JavaScriptParserPrivate, JavaScriptParserPublic, JavaScriptParserInterface, JavaScriptParserPackage, JavaScriptParserProtected, JavaScriptParserStatic, JavaScriptParserIdentifier:
@@ -2610,13 +2728,28 @@ func (p *JavaScriptParser) ModuleExportName() (localctx IModuleExportNameContext
 		{
 			p.SetState(261)
 			p.Match(JavaScriptParserStringLiteral)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IImportedBindingContext is an interface to support dynamic dispatch.
@@ -2626,20 +2759,30 @@ type IImportedBindingContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Identifier() antlr.TerminalNode
+	Yield() antlr.TerminalNode
+	Await() antlr.TerminalNode
+
 	// IsImportedBindingContext differentiates from other interfaces.
 	IsImportedBindingContext()
 }
 
 type ImportedBindingContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyImportedBindingContext() *ImportedBindingContext {
 	var p = new(ImportedBindingContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_importedBinding
 	return p
+}
+
+func InitEmptyImportedBindingContext(p *ImportedBindingContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_importedBinding
 }
 
 func (*ImportedBindingContext) IsImportedBindingContext() {}
@@ -2647,7 +2790,7 @@ func (*ImportedBindingContext) IsImportedBindingContext() {}
 func NewImportedBindingContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ImportedBindingContext {
 	var p = new(ImportedBindingContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_importedBinding
@@ -2688,28 +2831,9 @@ func (s *ImportedBindingContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) ImportedBinding() (localctx IImportedBindingContext) {
-	this := p
-	_ = this
-
 	localctx = NewImportedBindingContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 18, JavaScriptParserRULE_importedBinding)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -2724,7 +2848,17 @@ func (p *JavaScriptParser) ImportedBinding() (localctx IImportedBindingContext) 
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IImportDefaultContext is an interface to support dynamic dispatch.
@@ -2734,20 +2868,29 @@ type IImportDefaultContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AliasName() IAliasNameContext
+	Comma() antlr.TerminalNode
+
 	// IsImportDefaultContext differentiates from other interfaces.
 	IsImportDefaultContext()
 }
 
 type ImportDefaultContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyImportDefaultContext() *ImportDefaultContext {
 	var p = new(ImportDefaultContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_importDefault
 	return p
+}
+
+func InitEmptyImportDefaultContext(p *ImportDefaultContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_importDefault
 }
 
 func (*ImportDefaultContext) IsImportDefaultContext() {}
@@ -2755,7 +2898,7 @@ func (*ImportDefaultContext) IsImportDefaultContext() {}
 func NewImportDefaultContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ImportDefaultContext {
 	var p = new(ImportDefaultContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_importDefault
@@ -2804,28 +2947,8 @@ func (s *ImportDefaultContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *JavaScriptParser) ImportDefault() (localctx IImportDefaultContext) {
-	this := p
-	_ = this
-
 	localctx = NewImportDefaultContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 20, JavaScriptParserRULE_importDefault)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(266)
@@ -2834,9 +2957,23 @@ func (p *JavaScriptParser) ImportDefault() (localctx IImportDefaultContext) {
 	{
 		p.SetState(267)
 		p.Match(JavaScriptParserComma)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IImportNamespaceContext is an interface to support dynamic dispatch.
@@ -2846,20 +2983,31 @@ type IImportNamespaceContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Multiply() antlr.TerminalNode
+	AllIdentifierName() []IIdentifierNameContext
+	IdentifierName(i int) IIdentifierNameContext
+	As() antlr.TerminalNode
+
 	// IsImportNamespaceContext differentiates from other interfaces.
 	IsImportNamespaceContext()
 }
 
 type ImportNamespaceContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyImportNamespaceContext() *ImportNamespaceContext {
 	var p = new(ImportNamespaceContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_importNamespace
 	return p
+}
+
+func InitEmptyImportNamespaceContext(p *ImportNamespaceContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_importNamespace
 }
 
 func (*ImportNamespaceContext) IsImportNamespaceContext() {}
@@ -2867,7 +3015,7 @@ func (*ImportNamespaceContext) IsImportNamespaceContext() {}
 func NewImportNamespaceContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ImportNamespaceContext {
 	var p = new(ImportNamespaceContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_importNamespace
@@ -2945,38 +3093,26 @@ func (s *ImportNamespaceContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) ImportNamespace() (localctx IImportNamespaceContext) {
-	this := p
-	_ = this
-
 	localctx = NewImportNamespaceContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 22, JavaScriptParserRULE_importNamespace)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(271)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case JavaScriptParserMultiply:
 		{
 			p.SetState(269)
 			p.Match(JavaScriptParserMultiply)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case JavaScriptParserNullLiteral, JavaScriptParserBooleanLiteral, JavaScriptParserBreak, JavaScriptParserDo, JavaScriptParserInstanceof, JavaScriptParserTypeof, JavaScriptParserCase, JavaScriptParserElse, JavaScriptParserNew, JavaScriptParserVar, JavaScriptParserCatch, JavaScriptParserFinally, JavaScriptParserReturn, JavaScriptParserVoid, JavaScriptParserContinue, JavaScriptParserFor, JavaScriptParserSwitch, JavaScriptParserWhile, JavaScriptParserDebugger, JavaScriptParserFunction_, JavaScriptParserThis, JavaScriptParserWith, JavaScriptParserDefault, JavaScriptParserIf, JavaScriptParserThrow, JavaScriptParserDelete, JavaScriptParserIn, JavaScriptParserTry, JavaScriptParserAs, JavaScriptParserFrom, JavaScriptParserGet, JavaScriptParserSet, JavaScriptParserClass, JavaScriptParserEnum, JavaScriptParserExtends, JavaScriptParserSuper, JavaScriptParserConst, JavaScriptParserExport, JavaScriptParserImport, JavaScriptParserAsync, JavaScriptParserAwait, JavaScriptParserYield, JavaScriptParserImplements, JavaScriptParserStrictLet, JavaScriptParserNonStrictLet, JavaScriptParserPrivate, JavaScriptParserPublic, JavaScriptParserInterface, JavaScriptParserPackage, JavaScriptParserProtected, JavaScriptParserStatic, JavaScriptParserIdentifier:
@@ -2986,16 +3122,24 @@ func (p *JavaScriptParser) ImportNamespace() (localctx IImportNamespaceContext) 
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 	p.SetState(275)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JavaScriptParserAs {
 		{
 			p.SetState(273)
 			p.Match(JavaScriptParserAs)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(274)
@@ -3004,7 +3148,17 @@ func (p *JavaScriptParser) ImportNamespace() (localctx IImportNamespaceContext) 
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IImportFromContext is an interface to support dynamic dispatch.
@@ -3014,20 +3168,29 @@ type IImportFromContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	From() antlr.TerminalNode
+	StringLiteral() antlr.TerminalNode
+
 	// IsImportFromContext differentiates from other interfaces.
 	IsImportFromContext()
 }
 
 type ImportFromContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyImportFromContext() *ImportFromContext {
 	var p = new(ImportFromContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_importFrom
 	return p
+}
+
+func InitEmptyImportFromContext(p *ImportFromContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_importFrom
 }
 
 func (*ImportFromContext) IsImportFromContext() {}
@@ -3035,7 +3198,7 @@ func (*ImportFromContext) IsImportFromContext() {}
 func NewImportFromContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ImportFromContext {
 	var p = new(ImportFromContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_importFrom
@@ -3072,39 +3235,37 @@ func (s *ImportFromContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) ImportFrom() (localctx IImportFromContext) {
-	this := p
-	_ = this
-
 	localctx = NewImportFromContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 24, JavaScriptParserRULE_importFrom)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(277)
 		p.Match(JavaScriptParserFrom)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(278)
 		p.Match(JavaScriptParserStringLiteral)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAliasNameContext is an interface to support dynamic dispatch.
@@ -3114,20 +3275,30 @@ type IAliasNameContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllIdentifierName() []IIdentifierNameContext
+	IdentifierName(i int) IIdentifierNameContext
+	As() antlr.TerminalNode
+
 	// IsAliasNameContext differentiates from other interfaces.
 	IsAliasNameContext()
 }
 
 type AliasNameContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyAliasNameContext() *AliasNameContext {
 	var p = new(AliasNameContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_aliasName
 	return p
+}
+
+func InitEmptyAliasNameContext(p *AliasNameContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_aliasName
 }
 
 func (*AliasNameContext) IsAliasNameContext() {}
@@ -3135,7 +3306,7 @@ func (*AliasNameContext) IsAliasNameContext() {}
 func NewAliasNameContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AliasNameContext {
 	var p = new(AliasNameContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_aliasName
@@ -3209,28 +3380,9 @@ func (s *AliasNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) AliasName() (localctx IAliasNameContext) {
-	this := p
-	_ = this
-
 	localctx = NewAliasNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 26, JavaScriptParserRULE_aliasName)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -3239,12 +3391,19 @@ func (p *JavaScriptParser) AliasName() (localctx IAliasNameContext) {
 	}
 	p.SetState(283)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JavaScriptParserAs {
 		{
 			p.SetState(281)
 			p.Match(JavaScriptParserAs)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(282)
@@ -3253,7 +3412,17 @@ func (p *JavaScriptParser) AliasName() (localctx IAliasNameContext) {
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IExportStatementContext is an interface to support dynamic dispatch.
@@ -3262,21 +3431,25 @@ type IExportStatementContext interface {
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
-
 	// IsExportStatementContext differentiates from other interfaces.
 	IsExportStatementContext()
 }
 
 type ExportStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyExportStatementContext() *ExportStatementContext {
 	var p = new(ExportStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_exportStatement
 	return p
+}
+
+func InitEmptyExportStatementContext(p *ExportStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_exportStatement
 }
 
 func (*ExportStatementContext) IsExportStatementContext() {}
@@ -3284,7 +3457,7 @@ func (*ExportStatementContext) IsExportStatementContext() {}
 func NewExportStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ExportStatementContext {
 	var p = new(ExportStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_exportStatement
@@ -3294,8 +3467,8 @@ func NewExportStatementContext(parser antlr.Parser, parent antlr.ParserRuleConte
 
 func (s *ExportStatementContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *ExportStatementContext) CopyFrom(ctx *ExportStatementContext) {
-	s.BaseParserRuleContext.CopyFrom(ctx.BaseParserRuleContext)
+func (s *ExportStatementContext) CopyAll(ctx *ExportStatementContext) {
+	s.CopyFrom(&ctx.BaseParserRuleContext)
 }
 
 func (s *ExportStatementContext) GetRuleContext() antlr.RuleContext {
@@ -3307,15 +3480,15 @@ func (s *ExportStatementContext) ToStringTree(ruleNames []string, recog antlr.Re
 }
 
 type ExportDefaultDeclarationContext struct {
-	*ExportStatementContext
+	ExportStatementContext
 }
 
 func NewExportDefaultDeclarationContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExportDefaultDeclarationContext {
 	var p = new(ExportDefaultDeclarationContext)
 
-	p.ExportStatementContext = NewEmptyExportStatementContext()
+	InitEmptyExportStatementContext(&p.ExportStatementContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExportStatementContext))
+	p.CopyAll(ctx.(*ExportStatementContext))
 
 	return p
 }
@@ -3375,15 +3548,15 @@ func (s *ExportDefaultDeclarationContext) Accept(visitor antlr.ParseTreeVisitor)
 }
 
 type ExportDeclarationContext struct {
-	*ExportStatementContext
+	ExportStatementContext
 }
 
 func NewExportDeclarationContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExportDeclarationContext {
 	var p = new(ExportDeclarationContext)
 
-	p.ExportStatementContext = NewEmptyExportStatementContext()
+	InitEmptyExportStatementContext(&p.ExportStatementContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExportStatementContext))
+	p.CopyAll(ctx.(*ExportStatementContext))
 
 	return p
 }
@@ -3459,51 +3632,49 @@ func (s *ExportDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaScriptParser) ExportStatement() (localctx IExportStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewExportStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 28, JavaScriptParserRULE_exportStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(300)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 18, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 18, p.GetParserRuleContext()) {
 	case 1:
 		localctx = NewExportDeclarationContext(p, localctx)
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(285)
 			p.Match(JavaScriptParserExport)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(287)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 16, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 16, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(286)
 				p.Match(JavaScriptParserDefault)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
+		} else if p.HasError() { // JIM
+			goto errorExit
 		}
 		p.SetState(291)
 		p.GetErrorHandler().Sync(p)
-		switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 17, p.GetParserRuleContext()) {
+		if p.HasError() {
+			goto errorExit
+		}
+
+		switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 17, p.GetParserRuleContext()) {
 		case 1:
 			{
 				p.SetState(289)
@@ -3516,6 +3687,8 @@ func (p *JavaScriptParser) ExportStatement() (localctx IExportStatementContext) 
 				p.Declaration()
 			}
 
+		case antlr.ATNInvalidAltNumber:
+			goto errorExit
 		}
 		{
 			p.SetState(293)
@@ -3528,10 +3701,18 @@ func (p *JavaScriptParser) ExportStatement() (localctx IExportStatementContext) 
 		{
 			p.SetState(295)
 			p.Match(JavaScriptParserExport)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(296)
 			p.Match(JavaScriptParserDefault)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(297)
@@ -3542,9 +3723,21 @@ func (p *JavaScriptParser) ExportStatement() (localctx IExportStatementContext) 
 			p.Eos()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IExportFromBlockContext is an interface to support dynamic dispatch.
@@ -3554,20 +3747,31 @@ type IExportFromBlockContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ImportNamespace() IImportNamespaceContext
+	ImportFrom() IImportFromContext
+	Eos() IEosContext
+	ExportModuleItems() IExportModuleItemsContext
+
 	// IsExportFromBlockContext differentiates from other interfaces.
 	IsExportFromBlockContext()
 }
 
 type ExportFromBlockContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyExportFromBlockContext() *ExportFromBlockContext {
 	var p = new(ExportFromBlockContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_exportFromBlock
 	return p
+}
+
+func InitEmptyExportFromBlockContext(p *ExportFromBlockContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_exportFromBlock
 }
 
 func (*ExportFromBlockContext) IsExportFromBlockContext() {}
@@ -3575,7 +3779,7 @@ func (*ExportFromBlockContext) IsExportFromBlockContext() {}
 func NewExportFromBlockContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ExportFromBlockContext {
 	var p = new(ExportFromBlockContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_exportFromBlock
@@ -3668,30 +3872,13 @@ func (s *ExportFromBlockContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) ExportFromBlock() (localctx IExportFromBlockContext) {
-	this := p
-	_ = this
-
 	localctx = NewExportFromBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 30, JavaScriptParserRULE_exportFromBlock)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(312)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case JavaScriptParserMultiply, JavaScriptParserNullLiteral, JavaScriptParserBooleanLiteral, JavaScriptParserBreak, JavaScriptParserDo, JavaScriptParserInstanceof, JavaScriptParserTypeof, JavaScriptParserCase, JavaScriptParserElse, JavaScriptParserNew, JavaScriptParserVar, JavaScriptParserCatch, JavaScriptParserFinally, JavaScriptParserReturn, JavaScriptParserVoid, JavaScriptParserContinue, JavaScriptParserFor, JavaScriptParserSwitch, JavaScriptParserWhile, JavaScriptParserDebugger, JavaScriptParserFunction_, JavaScriptParserThis, JavaScriptParserWith, JavaScriptParserDefault, JavaScriptParserIf, JavaScriptParserThrow, JavaScriptParserDelete, JavaScriptParserIn, JavaScriptParserTry, JavaScriptParserAs, JavaScriptParserFrom, JavaScriptParserGet, JavaScriptParserSet, JavaScriptParserClass, JavaScriptParserEnum, JavaScriptParserExtends, JavaScriptParserSuper, JavaScriptParserConst, JavaScriptParserExport, JavaScriptParserImport, JavaScriptParserAsync, JavaScriptParserAwait, JavaScriptParserYield, JavaScriptParserImplements, JavaScriptParserStrictLet, JavaScriptParserNonStrictLet, JavaScriptParserPrivate, JavaScriptParserPublic, JavaScriptParserInterface, JavaScriptParserPackage, JavaScriptParserProtected, JavaScriptParserStatic, JavaScriptParserIdentifier:
@@ -3718,12 +3905,14 @@ func (p *JavaScriptParser) ExportFromBlock() (localctx IExportFromBlockContext) 
 		p.SetState(308)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 19, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 19, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(307)
 				p.ImportFrom()
 			}
 
+		} else if p.HasError() { // JIM
+			goto errorExit
 		}
 		{
 			p.SetState(310)
@@ -3731,10 +3920,21 @@ func (p *JavaScriptParser) ExportFromBlock() (localctx IExportFromBlockContext) 
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IExportModuleItemsContext is an interface to support dynamic dispatch.
@@ -3744,20 +3944,33 @@ type IExportModuleItemsContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	OpenBrace() antlr.TerminalNode
+	CloseBrace() antlr.TerminalNode
+	AllExportAliasName() []IExportAliasNameContext
+	ExportAliasName(i int) IExportAliasNameContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsExportModuleItemsContext differentiates from other interfaces.
 	IsExportModuleItemsContext()
 }
 
 type ExportModuleItemsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyExportModuleItemsContext() *ExportModuleItemsContext {
 	var p = new(ExportModuleItemsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_exportModuleItems
 	return p
+}
+
+func InitEmptyExportModuleItemsContext(p *ExportModuleItemsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_exportModuleItems
 }
 
 func (*ExportModuleItemsContext) IsExportModuleItemsContext() {}
@@ -3765,7 +3978,7 @@ func (*ExportModuleItemsContext) IsExportModuleItemsContext() {}
 func NewExportModuleItemsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ExportModuleItemsContext {
 	var p = new(ExportModuleItemsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_exportModuleItems
@@ -3851,28 +4064,9 @@ func (s *ExportModuleItemsContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaScriptParser) ExportModuleItems() (localctx IExportModuleItemsContext) {
-	this := p
-	_ = this
-
 	localctx = NewExportModuleItemsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 32, JavaScriptParserRULE_exportModuleItems)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -3880,11 +4074,20 @@ func (p *JavaScriptParser) ExportModuleItems() (localctx IExportModuleItemsConte
 	{
 		p.SetState(314)
 		p.Match(JavaScriptParserOpenBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(320)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 21, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 21, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -3894,15 +4097,28 @@ func (p *JavaScriptParser) ExportModuleItems() (localctx IExportModuleItemsConte
 			{
 				p.SetState(316)
 				p.Match(JavaScriptParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		p.SetState(322)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 21, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 21, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(327)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if (int64((_la-61)) & ^0x3f) == 0 && ((int64(1)<<(_la-61))&4611686018427385859) != 0 {
@@ -3912,12 +4128,19 @@ func (p *JavaScriptParser) ExportModuleItems() (localctx IExportModuleItemsConte
 		}
 		p.SetState(325)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == JavaScriptParserComma {
 			{
 				p.SetState(324)
 				p.Match(JavaScriptParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
@@ -3926,9 +4149,23 @@ func (p *JavaScriptParser) ExportModuleItems() (localctx IExportModuleItemsConte
 	{
 		p.SetState(329)
 		p.Match(JavaScriptParserCloseBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IExportAliasNameContext is an interface to support dynamic dispatch.
@@ -3938,20 +4175,30 @@ type IExportAliasNameContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllModuleExportName() []IModuleExportNameContext
+	ModuleExportName(i int) IModuleExportNameContext
+	As() antlr.TerminalNode
+
 	// IsExportAliasNameContext differentiates from other interfaces.
 	IsExportAliasNameContext()
 }
 
 type ExportAliasNameContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyExportAliasNameContext() *ExportAliasNameContext {
 	var p = new(ExportAliasNameContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_exportAliasName
 	return p
+}
+
+func InitEmptyExportAliasNameContext(p *ExportAliasNameContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_exportAliasName
 }
 
 func (*ExportAliasNameContext) IsExportAliasNameContext() {}
@@ -3959,7 +4206,7 @@ func (*ExportAliasNameContext) IsExportAliasNameContext() {}
 func NewExportAliasNameContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ExportAliasNameContext {
 	var p = new(ExportAliasNameContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_exportAliasName
@@ -4033,28 +4280,9 @@ func (s *ExportAliasNameContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) ExportAliasName() (localctx IExportAliasNameContext) {
-	this := p
-	_ = this
-
 	localctx = NewExportAliasNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 34, JavaScriptParserRULE_exportAliasName)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -4063,12 +4291,19 @@ func (p *JavaScriptParser) ExportAliasName() (localctx IExportAliasNameContext) 
 	}
 	p.SetState(334)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JavaScriptParserAs {
 		{
 			p.SetState(332)
 			p.Match(JavaScriptParserAs)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(333)
@@ -4077,7 +4312,17 @@ func (p *JavaScriptParser) ExportAliasName() (localctx IExportAliasNameContext) 
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDeclarationContext is an interface to support dynamic dispatch.
@@ -4087,20 +4332,30 @@ type IDeclarationContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	VariableStatement() IVariableStatementContext
+	ClassDeclaration() IClassDeclarationContext
+	FunctionDeclaration() IFunctionDeclarationContext
+
 	// IsDeclarationContext differentiates from other interfaces.
 	IsDeclarationContext()
 }
 
 type DeclarationContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyDeclarationContext() *DeclarationContext {
 	var p = new(DeclarationContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_declaration
 	return p
+}
+
+func InitEmptyDeclarationContext(p *DeclarationContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_declaration
 }
 
 func (*DeclarationContext) IsDeclarationContext() {}
@@ -4108,7 +4363,7 @@ func (*DeclarationContext) IsDeclarationContext() {}
 func NewDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DeclarationContext {
 	var p = new(DeclarationContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_declaration
@@ -4185,30 +4440,13 @@ func (s *DeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JavaScriptParser) Declaration() (localctx IDeclarationContext) {
-	this := p
-	_ = this
-
 	localctx = NewDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 36, JavaScriptParserRULE_declaration)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(339)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case JavaScriptParserVar, JavaScriptParserConst, JavaScriptParserStrictLet, JavaScriptParserNonStrictLet:
@@ -4233,10 +4471,21 @@ func (p *JavaScriptParser) Declaration() (localctx IDeclarationContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IVariableStatementContext is an interface to support dynamic dispatch.
@@ -4246,20 +4495,29 @@ type IVariableStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	VariableDeclarationList() IVariableDeclarationListContext
+	Eos() IEosContext
+
 	// IsVariableStatementContext differentiates from other interfaces.
 	IsVariableStatementContext()
 }
 
 type VariableStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyVariableStatementContext() *VariableStatementContext {
 	var p = new(VariableStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_variableStatement
 	return p
+}
+
+func InitEmptyVariableStatementContext(p *VariableStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_variableStatement
 }
 
 func (*VariableStatementContext) IsVariableStatementContext() {}
@@ -4267,7 +4525,7 @@ func (*VariableStatementContext) IsVariableStatementContext() {}
 func NewVariableStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *VariableStatementContext {
 	var p = new(VariableStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_variableStatement
@@ -4328,28 +4586,8 @@ func (s *VariableStatementContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaScriptParser) VariableStatement() (localctx IVariableStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewVariableStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 38, JavaScriptParserRULE_variableStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(341)
@@ -4360,7 +4598,17 @@ func (p *JavaScriptParser) VariableStatement() (localctx IVariableStatementConte
 		p.Eos()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IVariableDeclarationListContext is an interface to support dynamic dispatch.
@@ -4376,21 +4624,36 @@ type IVariableDeclarationListContext interface {
 	// SetModifier sets the modifier token.
 	SetModifier(antlr.Token)
 
+	// Getter signatures
+	AllVariableDeclaration() []IVariableDeclarationContext
+	VariableDeclaration(i int) IVariableDeclarationContext
+	Var() antlr.TerminalNode
+	Const() antlr.TerminalNode
+	NonStrictLet() antlr.TerminalNode
+	StrictLet() antlr.TerminalNode
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsVariableDeclarationListContext differentiates from other interfaces.
 	IsVariableDeclarationListContext()
 }
 
 type VariableDeclarationListContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser   antlr.Parser
 	modifier antlr.Token
 }
 
 func NewEmptyVariableDeclarationListContext() *VariableDeclarationListContext {
 	var p = new(VariableDeclarationListContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_variableDeclarationList
 	return p
+}
+
+func InitEmptyVariableDeclarationListContext(p *VariableDeclarationListContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_variableDeclarationList
 }
 
 func (*VariableDeclarationListContext) IsVariableDeclarationListContext() {}
@@ -4398,7 +4661,7 @@ func (*VariableDeclarationListContext) IsVariableDeclarationListContext() {}
 func NewVariableDeclarationListContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *VariableDeclarationListContext {
 	var p = new(VariableDeclarationListContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_variableDeclarationList
@@ -4496,28 +4759,9 @@ func (s *VariableDeclarationListContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 func (p *JavaScriptParser) VariableDeclarationList() (localctx IVariableDeclarationListContext) {
-	this := p
-	_ = this
-
 	localctx = NewVariableDeclarationListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 40, JavaScriptParserRULE_variableDeclarationList)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -4546,13 +4790,22 @@ func (p *JavaScriptParser) VariableDeclarationList() (localctx IVariableDeclarat
 	}
 	p.SetState(350)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 26, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 26, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
 				p.SetState(346)
 				p.Match(JavaScriptParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(347)
@@ -4562,10 +4815,26 @@ func (p *JavaScriptParser) VariableDeclarationList() (localctx IVariableDeclarat
 		}
 		p.SetState(352)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 26, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 26, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IVariableDeclarationContext is an interface to support dynamic dispatch.
@@ -4575,20 +4844,30 @@ type IVariableDeclarationContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Assignable() IAssignableContext
+	Assign() antlr.TerminalNode
+	SingleExpression() ISingleExpressionContext
+
 	// IsVariableDeclarationContext differentiates from other interfaces.
 	IsVariableDeclarationContext()
 }
 
 type VariableDeclarationContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyVariableDeclarationContext() *VariableDeclarationContext {
 	var p = new(VariableDeclarationContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_variableDeclaration
 	return p
+}
+
+func InitEmptyVariableDeclarationContext(p *VariableDeclarationContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_variableDeclaration
 }
 
 func (*VariableDeclarationContext) IsVariableDeclarationContext() {}
@@ -4596,7 +4875,7 @@ func (*VariableDeclarationContext) IsVariableDeclarationContext() {}
 func NewVariableDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *VariableDeclarationContext {
 	var p = new(VariableDeclarationContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_variableDeclaration
@@ -4661,28 +4940,8 @@ func (s *VariableDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *JavaScriptParser) VariableDeclaration() (localctx IVariableDeclarationContext) {
-	this := p
-	_ = this
-
 	localctx = NewVariableDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 42, JavaScriptParserRULE_variableDeclaration)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(353)
@@ -4691,19 +4950,35 @@ func (p *JavaScriptParser) VariableDeclaration() (localctx IVariableDeclarationC
 	p.SetState(356)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 27, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 27, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(354)
 			p.Match(JavaScriptParserAssign)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(355)
 			p.singleExpression(0)
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IEmptyStatement_Context is an interface to support dynamic dispatch.
@@ -4713,20 +4988,28 @@ type IEmptyStatement_Context interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	SemiColon() antlr.TerminalNode
+
 	// IsEmptyStatement_Context differentiates from other interfaces.
 	IsEmptyStatement_Context()
 }
 
 type EmptyStatement_Context struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyEmptyStatement_Context() *EmptyStatement_Context {
 	var p = new(EmptyStatement_Context)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_emptyStatement_
 	return p
+}
+
+func InitEmptyEmptyStatement_Context(p *EmptyStatement_Context) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_emptyStatement_
 }
 
 func (*EmptyStatement_Context) IsEmptyStatement_Context() {}
@@ -4734,7 +5017,7 @@ func (*EmptyStatement_Context) IsEmptyStatement_Context() {}
 func NewEmptyStatement_Context(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *EmptyStatement_Context {
 	var p = new(EmptyStatement_Context)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_emptyStatement_
@@ -4767,35 +5050,29 @@ func (s *EmptyStatement_Context) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) EmptyStatement_() (localctx IEmptyStatement_Context) {
-	this := p
-	_ = this
-
 	localctx = NewEmptyStatement_Context(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 44, JavaScriptParserRULE_emptyStatement_)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(358)
 		p.Match(JavaScriptParserSemiColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIfStatementContext is an interface to support dynamic dispatch.
@@ -4805,20 +5082,40 @@ type IIfStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllIf() []antlr.TerminalNode
+	If(i int) antlr.TerminalNode
+	AllOpenParen() []antlr.TerminalNode
+	OpenParen(i int) antlr.TerminalNode
+	AllExpressionSequence() []IExpressionSequenceContext
+	ExpressionSequence(i int) IExpressionSequenceContext
+	AllCloseParen() []antlr.TerminalNode
+	CloseParen(i int) antlr.TerminalNode
+	AllStatement() []IStatementContext
+	Statement(i int) IStatementContext
+	AllElse() []antlr.TerminalNode
+	Else(i int) antlr.TerminalNode
+	ElseBlock() IElseBlockContext
+
 	// IsIfStatementContext differentiates from other interfaces.
 	IsIfStatementContext()
 }
 
 type IfStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyIfStatementContext() *IfStatementContext {
 	var p = new(IfStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_ifStatement
 	return p
+}
+
+func InitEmptyIfStatementContext(p *IfStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_ifStatement
 }
 
 func (*IfStatementContext) IsIfStatementContext() {}
@@ -4826,7 +5123,7 @@ func (*IfStatementContext) IsIfStatementContext() {}
 func NewIfStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *IfStatementContext {
 	var p = new(IfStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_ifStatement
@@ -4985,38 +5282,26 @@ func (s *IfStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JavaScriptParser) IfStatement() (localctx IIfStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewIfStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 46, JavaScriptParserRULE_ifStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(360)
 		p.Match(JavaScriptParserIf)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(361)
 		p.Match(JavaScriptParserOpenParen)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(362)
@@ -5025,6 +5310,10 @@ func (p *JavaScriptParser) IfStatement() (localctx IIfStatementContext) {
 	{
 		p.SetState(363)
 		p.Match(JavaScriptParserCloseParen)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(364)
@@ -5032,21 +5321,38 @@ func (p *JavaScriptParser) IfStatement() (localctx IIfStatementContext) {
 	}
 	p.SetState(374)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 28, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 28, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
 				p.SetState(365)
 				p.Match(JavaScriptParserElse)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(366)
 				p.Match(JavaScriptParserIf)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(367)
 				p.Match(JavaScriptParserOpenParen)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(368)
@@ -5055,6 +5361,10 @@ func (p *JavaScriptParser) IfStatement() (localctx IIfStatementContext) {
 			{
 				p.SetState(369)
 				p.Match(JavaScriptParserCloseParen)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(370)
@@ -5064,20 +5374,38 @@ func (p *JavaScriptParser) IfStatement() (localctx IIfStatementContext) {
 		}
 		p.SetState(376)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 28, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 28, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(378)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 29, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 29, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(377)
 			p.ElseBlock()
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IElseBlockContext is an interface to support dynamic dispatch.
@@ -5087,20 +5415,29 @@ type IElseBlockContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Else() antlr.TerminalNode
+	Statement() IStatementContext
+
 	// IsElseBlockContext differentiates from other interfaces.
 	IsElseBlockContext()
 }
 
 type ElseBlockContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyElseBlockContext() *ElseBlockContext {
 	var p = new(ElseBlockContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_elseBlock
 	return p
+}
+
+func InitEmptyElseBlockContext(p *ElseBlockContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_elseBlock
 }
 
 func (*ElseBlockContext) IsElseBlockContext() {}
@@ -5108,7 +5445,7 @@ func (*ElseBlockContext) IsElseBlockContext() {}
 func NewElseBlockContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ElseBlockContext {
 	var p = new(ElseBlockContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_elseBlock
@@ -5157,39 +5494,33 @@ func (s *ElseBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) ElseBlock() (localctx IElseBlockContext) {
-	this := p
-	_ = this
-
 	localctx = NewElseBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 48, JavaScriptParserRULE_elseBlock)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(380)
 		p.Match(JavaScriptParserElse)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(381)
 		p.Statement()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IForFirstContext is an interface to support dynamic dispatch.
@@ -5199,20 +5530,29 @@ type IForFirstContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ExpressionSequence() IExpressionSequenceContext
+	VariableDeclarationList() IVariableDeclarationListContext
+
 	// IsForFirstContext differentiates from other interfaces.
 	IsForFirstContext()
 }
 
 type ForFirstContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyForFirstContext() *ForFirstContext {
 	var p = new(ForFirstContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_forFirst
 	return p
+}
+
+func InitEmptyForFirstContext(p *ForFirstContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_forFirst
 }
 
 func (*ForFirstContext) IsForFirstContext() {}
@@ -5220,7 +5560,7 @@ func (*ForFirstContext) IsForFirstContext() {}
 func NewForFirstContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ForFirstContext {
 	var p = new(ForFirstContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_forFirst
@@ -5281,31 +5621,15 @@ func (s *ForFirstContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) ForFirst() (localctx IForFirstContext) {
-	this := p
-	_ = this
-
 	localctx = NewForFirstContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 50, JavaScriptParserRULE_forFirst)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(385)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 30, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 30, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -5320,9 +5644,21 @@ func (p *JavaScriptParser) ForFirst() (localctx IForFirstContext) {
 			p.VariableDeclarationList()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IForSecondContext is an interface to support dynamic dispatch.
@@ -5332,20 +5668,28 @@ type IForSecondContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ExpressionSequence() IExpressionSequenceContext
+
 	// IsForSecondContext differentiates from other interfaces.
 	IsForSecondContext()
 }
 
 type ForSecondContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyForSecondContext() *ForSecondContext {
 	var p = new(ForSecondContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_forSecond
 	return p
+}
+
+func InitEmptyForSecondContext(p *ForSecondContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_forSecond
 }
 
 func (*ForSecondContext) IsForSecondContext() {}
@@ -5353,7 +5697,7 @@ func (*ForSecondContext) IsForSecondContext() {}
 func NewForSecondContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ForSecondContext {
 	var p = new(ForSecondContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_forSecond
@@ -5398,35 +5742,25 @@ func (s *ForSecondContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) ForSecond() (localctx IForSecondContext) {
-	this := p
-	_ = this
-
 	localctx = NewForSecondContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 52, JavaScriptParserRULE_forSecond)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(387)
 		p.ExpressionSequence()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IForThirdContext is an interface to support dynamic dispatch.
@@ -5436,20 +5770,28 @@ type IForThirdContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ExpressionSequence() IExpressionSequenceContext
+
 	// IsForThirdContext differentiates from other interfaces.
 	IsForThirdContext()
 }
 
 type ForThirdContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyForThirdContext() *ForThirdContext {
 	var p = new(ForThirdContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_forThird
 	return p
+}
+
+func InitEmptyForThirdContext(p *ForThirdContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_forThird
 }
 
 func (*ForThirdContext) IsForThirdContext() {}
@@ -5457,7 +5799,7 @@ func (*ForThirdContext) IsForThirdContext() {}
 func NewForThirdContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ForThirdContext {
 	var p = new(ForThirdContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_forThird
@@ -5502,35 +5844,25 @@ func (s *ForThirdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) ForThird() (localctx IForThirdContext) {
-	this := p
-	_ = this
-
 	localctx = NewForThirdContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 54, JavaScriptParserRULE_forThird)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(389)
 		p.ExpressionSequence()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIterationStatementContext is an interface to support dynamic dispatch.
@@ -5539,21 +5871,25 @@ type IIterationStatementContext interface {
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
-
 	// IsIterationStatementContext differentiates from other interfaces.
 	IsIterationStatementContext()
 }
 
 type IterationStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyIterationStatementContext() *IterationStatementContext {
 	var p = new(IterationStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_iterationStatement
 	return p
+}
+
+func InitEmptyIterationStatementContext(p *IterationStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_iterationStatement
 }
 
 func (*IterationStatementContext) IsIterationStatementContext() {}
@@ -5561,7 +5897,7 @@ func (*IterationStatementContext) IsIterationStatementContext() {}
 func NewIterationStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *IterationStatementContext {
 	var p = new(IterationStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_iterationStatement
@@ -5571,8 +5907,8 @@ func NewIterationStatementContext(parser antlr.Parser, parent antlr.ParserRuleCo
 
 func (s *IterationStatementContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *IterationStatementContext) CopyFrom(ctx *IterationStatementContext) {
-	s.BaseParserRuleContext.CopyFrom(ctx.BaseParserRuleContext)
+func (s *IterationStatementContext) CopyAll(ctx *IterationStatementContext) {
+	s.CopyFrom(&ctx.BaseParserRuleContext)
 }
 
 func (s *IterationStatementContext) GetRuleContext() antlr.RuleContext {
@@ -5584,15 +5920,15 @@ func (s *IterationStatementContext) ToStringTree(ruleNames []string, recog antlr
 }
 
 type DoStatementContext struct {
-	*IterationStatementContext
+	IterationStatementContext
 }
 
 func NewDoStatementContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *DoStatementContext {
 	var p = new(DoStatementContext)
 
-	p.IterationStatementContext = NewEmptyIterationStatementContext()
+	InitEmptyIterationStatementContext(&p.IterationStatementContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*IterationStatementContext))
+	p.CopyAll(ctx.(*IterationStatementContext))
 
 	return p
 }
@@ -5676,15 +6012,15 @@ func (s *DoStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 type WhileStatementContext struct {
-	*IterationStatementContext
+	IterationStatementContext
 }
 
 func NewWhileStatementContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *WhileStatementContext {
 	var p = new(WhileStatementContext)
 
-	p.IterationStatementContext = NewEmptyIterationStatementContext()
+	InitEmptyIterationStatementContext(&p.IterationStatementContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*IterationStatementContext))
+	p.CopyAll(ctx.(*IterationStatementContext))
 
 	return p
 }
@@ -5748,15 +6084,15 @@ func (s *WhileStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 type ForStatementContext struct {
-	*IterationStatementContext
+	IterationStatementContext
 }
 
 func NewForStatementContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ForStatementContext {
 	var p = new(ForStatementContext)
 
-	p.IterationStatementContext = NewEmptyIterationStatementContext()
+	InitEmptyIterationStatementContext(&p.IterationStatementContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*IterationStatementContext))
+	p.CopyAll(ctx.(*IterationStatementContext))
 
 	return p
 }
@@ -5860,15 +6196,15 @@ func (s *ForStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 type ForInStatementContext struct {
-	*IterationStatementContext
+	IterationStatementContext
 }
 
 func NewForInStatementContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ForInStatementContext {
 	var p = new(ForInStatementContext)
 
-	p.IterationStatementContext = NewEmptyIterationStatementContext()
+	InitEmptyIterationStatementContext(&p.IterationStatementContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*IterationStatementContext))
+	p.CopyAll(ctx.(*IterationStatementContext))
 
 	return p
 }
@@ -5968,15 +6304,15 @@ func (s *ForInStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 type ForOfStatementContext struct {
-	*IterationStatementContext
+	IterationStatementContext
 }
 
 func NewForOfStatementContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ForOfStatementContext {
 	var p = new(ForOfStatementContext)
 
-	p.IterationStatementContext = NewEmptyIterationStatementContext()
+	InitEmptyIterationStatementContext(&p.IterationStatementContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*IterationStatementContext))
+	p.CopyAll(ctx.(*IterationStatementContext))
 
 	return p
 }
@@ -6092,38 +6428,27 @@ func (s *ForOfStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JavaScriptParser) IterationStatement() (localctx IIterationStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewIterationStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 56, JavaScriptParserRULE_iterationStatement)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(446)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 37, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 37, p.GetParserRuleContext()) {
 	case 1:
 		localctx = NewDoStatementContext(p, localctx)
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(391)
 			p.Match(JavaScriptParserDo)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(392)
@@ -6132,10 +6457,18 @@ func (p *JavaScriptParser) IterationStatement() (localctx IIterationStatementCon
 		{
 			p.SetState(393)
 			p.Match(JavaScriptParserWhile)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(394)
 			p.Match(JavaScriptParserOpenParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(395)
@@ -6144,6 +6477,10 @@ func (p *JavaScriptParser) IterationStatement() (localctx IIterationStatementCon
 		{
 			p.SetState(396)
 			p.Match(JavaScriptParserCloseParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(397)
@@ -6156,10 +6493,18 @@ func (p *JavaScriptParser) IterationStatement() (localctx IIterationStatementCon
 		{
 			p.SetState(399)
 			p.Match(JavaScriptParserWhile)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(400)
 			p.Match(JavaScriptParserOpenParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(401)
@@ -6168,6 +6513,10 @@ func (p *JavaScriptParser) IterationStatement() (localctx IIterationStatementCon
 		{
 			p.SetState(402)
 			p.Match(JavaScriptParserCloseParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(403)
@@ -6180,16 +6529,27 @@ func (p *JavaScriptParser) IterationStatement() (localctx IIterationStatementCon
 		{
 			p.SetState(405)
 			p.Match(JavaScriptParserFor)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(406)
 			p.Match(JavaScriptParserOpenParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(408)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009147632288) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1082823775114283263) != 0 {
+		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009147632288) != 0) || ((int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1082823775114283263) != 0) {
 			{
 				p.SetState(407)
 				p.ForFirst()
@@ -6199,12 +6559,19 @@ func (p *JavaScriptParser) IterationStatement() (localctx IIterationStatementCon
 		{
 			p.SetState(410)
 			p.Match(JavaScriptParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(412)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009147632288) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1082256427114318079) != 0 {
+		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009147632288) != 0) || ((int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1082256427114318079) != 0) {
 			{
 				p.SetState(411)
 				p.ForSecond()
@@ -6214,12 +6581,19 @@ func (p *JavaScriptParser) IterationStatement() (localctx IIterationStatementCon
 		{
 			p.SetState(414)
 			p.Match(JavaScriptParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(416)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009147632288) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1082256427114318079) != 0 {
+		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009147632288) != 0) || ((int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1082256427114318079) != 0) {
 			{
 				p.SetState(415)
 				p.ForThird()
@@ -6229,6 +6603,10 @@ func (p *JavaScriptParser) IterationStatement() (localctx IIterationStatementCon
 		{
 			p.SetState(418)
 			p.Match(JavaScriptParserCloseParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(419)
@@ -6241,14 +6619,26 @@ func (p *JavaScriptParser) IterationStatement() (localctx IIterationStatementCon
 		{
 			p.SetState(420)
 			p.Match(JavaScriptParserFor)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(421)
 			p.Match(JavaScriptParserOpenParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(424)
 		p.GetErrorHandler().Sync(p)
-		switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 34, p.GetParserRuleContext()) {
+		if p.HasError() {
+			goto errorExit
+		}
+
+		switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 34, p.GetParserRuleContext()) {
 		case 1:
 			{
 				p.SetState(422)
@@ -6261,10 +6651,16 @@ func (p *JavaScriptParser) IterationStatement() (localctx IIterationStatementCon
 				p.VariableDeclarationList()
 			}
 
+		case antlr.ATNInvalidAltNumber:
+			goto errorExit
 		}
 		{
 			p.SetState(426)
 			p.Match(JavaScriptParserIn)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(427)
@@ -6273,6 +6669,10 @@ func (p *JavaScriptParser) IterationStatement() (localctx IIterationStatementCon
 		{
 			p.SetState(428)
 			p.Match(JavaScriptParserCloseParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(429)
@@ -6285,25 +6685,44 @@ func (p *JavaScriptParser) IterationStatement() (localctx IIterationStatementCon
 		{
 			p.SetState(431)
 			p.Match(JavaScriptParserFor)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(433)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == JavaScriptParserAwait {
 			{
 				p.SetState(432)
 				p.Match(JavaScriptParserAwait)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		{
 			p.SetState(435)
 			p.Match(JavaScriptParserOpenParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(438)
 		p.GetErrorHandler().Sync(p)
-		switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 36, p.GetParserRuleContext()) {
+		if p.HasError() {
+			goto errorExit
+		}
+
+		switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 36, p.GetParserRuleContext()) {
 		case 1:
 			{
 				p.SetState(436)
@@ -6316,6 +6735,8 @@ func (p *JavaScriptParser) IterationStatement() (localctx IIterationStatementCon
 				p.VariableDeclarationList()
 			}
 
+		case antlr.ATNInvalidAltNumber:
+			goto errorExit
 		}
 		{
 			p.SetState(440)
@@ -6324,7 +6745,8 @@ func (p *JavaScriptParser) IterationStatement() (localctx IIterationStatementCon
 		p.SetState(441)
 
 		if !(p.p("of")) {
-			panic(antlr.NewFailedPredicateException(p, "p.p(\"of\")", ""))
+			p.SetError(antlr.NewFailedPredicateException(p, "p.p(\"of\")", ""))
+			goto errorExit
 		}
 		{
 			p.SetState(442)
@@ -6333,15 +6755,31 @@ func (p *JavaScriptParser) IterationStatement() (localctx IIterationStatementCon
 		{
 			p.SetState(443)
 			p.Match(JavaScriptParserCloseParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(444)
 			p.Statement()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IContinueStatementContext is an interface to support dynamic dispatch.
@@ -6351,20 +6789,32 @@ type IContinueStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Continue() antlr.TerminalNode
+	Eos() IEosContext
+	Identifier() IIdentifierContext
+	AllLineTerminatorNoHide() []antlr.TerminalNode
+	LineTerminatorNoHide(i int) antlr.TerminalNode
+
 	// IsContinueStatementContext differentiates from other interfaces.
 	IsContinueStatementContext()
 }
 
 type ContinueStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyContinueStatementContext() *ContinueStatementContext {
 	var p = new(ContinueStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_continueStatement
 	return p
+}
+
+func InitEmptyContinueStatementContext(p *ContinueStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_continueStatement
 }
 
 func (*ContinueStatementContext) IsContinueStatementContext() {}
@@ -6372,7 +6822,7 @@ func (*ContinueStatementContext) IsContinueStatementContext() {}
 func NewContinueStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ContinueStatementContext {
 	var p = new(ContinueStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_continueStatement
@@ -6445,67 +6895,78 @@ func (s *ContinueStatementContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaScriptParser) ContinueStatement() (localctx IContinueStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewContinueStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 58, JavaScriptParserRULE_continueStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(448)
 		p.Match(JavaScriptParserContinue)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(450)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 38, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 38, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(449)
 			p.Identifier()
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 	p.SetState(455)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 39, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 39, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
 				p.SetState(452)
 				p.Match(JavaScriptParserLineTerminatorNoHide)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		p.SetState(457)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 39, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 39, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(458)
 		p.Eos()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IBreakStatementContext is an interface to support dynamic dispatch.
@@ -6515,20 +6976,32 @@ type IBreakStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Break() antlr.TerminalNode
+	Eos() IEosContext
+	Identifier() IIdentifierContext
+	AllLineTerminatorNoHide() []antlr.TerminalNode
+	LineTerminatorNoHide(i int) antlr.TerminalNode
+
 	// IsBreakStatementContext differentiates from other interfaces.
 	IsBreakStatementContext()
 }
 
 type BreakStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyBreakStatementContext() *BreakStatementContext {
 	var p = new(BreakStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_breakStatement
 	return p
+}
+
+func InitEmptyBreakStatementContext(p *BreakStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_breakStatement
 }
 
 func (*BreakStatementContext) IsBreakStatementContext() {}
@@ -6536,7 +7009,7 @@ func (*BreakStatementContext) IsBreakStatementContext() {}
 func NewBreakStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *BreakStatementContext {
 	var p = new(BreakStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_breakStatement
@@ -6609,67 +7082,78 @@ func (s *BreakStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JavaScriptParser) BreakStatement() (localctx IBreakStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewBreakStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 60, JavaScriptParserRULE_breakStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(460)
 		p.Match(JavaScriptParserBreak)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(462)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 40, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 40, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(461)
 			p.Identifier()
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 	p.SetState(467)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 41, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 41, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
 				p.SetState(464)
 				p.Match(JavaScriptParserLineTerminatorNoHide)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		p.SetState(469)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 41, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 41, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(470)
 		p.Eos()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IReturnStatementContext is an interface to support dynamic dispatch.
@@ -6679,20 +7163,32 @@ type IReturnStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Return() antlr.TerminalNode
+	Eos() IEosContext
+	ExpressionSequence() IExpressionSequenceContext
+	AllLineTerminatorNoHide() []antlr.TerminalNode
+	LineTerminatorNoHide(i int) antlr.TerminalNode
+
 	// IsReturnStatementContext differentiates from other interfaces.
 	IsReturnStatementContext()
 }
 
 type ReturnStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyReturnStatementContext() *ReturnStatementContext {
 	var p = new(ReturnStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_returnStatement
 	return p
+}
+
+func InitEmptyReturnStatementContext(p *ReturnStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_returnStatement
 }
 
 func (*ReturnStatementContext) IsReturnStatementContext() {}
@@ -6700,7 +7196,7 @@ func (*ReturnStatementContext) IsReturnStatementContext() {}
 func NewReturnStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ReturnStatementContext {
 	var p = new(ReturnStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_returnStatement
@@ -6773,67 +7269,78 @@ func (s *ReturnStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) ReturnStatement() (localctx IReturnStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewReturnStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 62, JavaScriptParserRULE_returnStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(472)
 		p.Match(JavaScriptParserReturn)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(474)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 42, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 42, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(473)
 			p.ExpressionSequence()
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 	p.SetState(479)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 43, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 43, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
 				p.SetState(476)
 				p.Match(JavaScriptParserLineTerminatorNoHide)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		p.SetState(481)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 43, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 43, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(482)
 		p.Eos()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IYieldStatementContext is an interface to support dynamic dispatch.
@@ -6843,20 +7350,32 @@ type IYieldStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Yield() antlr.TerminalNode
+	Eos() IEosContext
+	ExpressionSequence() IExpressionSequenceContext
+	AllLineTerminatorNoHide() []antlr.TerminalNode
+	LineTerminatorNoHide(i int) antlr.TerminalNode
+
 	// IsYieldStatementContext differentiates from other interfaces.
 	IsYieldStatementContext()
 }
 
 type YieldStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyYieldStatementContext() *YieldStatementContext {
 	var p = new(YieldStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_yieldStatement
 	return p
+}
+
+func InitEmptyYieldStatementContext(p *YieldStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_yieldStatement
 }
 
 func (*YieldStatementContext) IsYieldStatementContext() {}
@@ -6864,7 +7383,7 @@ func (*YieldStatementContext) IsYieldStatementContext() {}
 func NewYieldStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *YieldStatementContext {
 	var p = new(YieldStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_yieldStatement
@@ -6937,67 +7456,78 @@ func (s *YieldStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JavaScriptParser) YieldStatement() (localctx IYieldStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewYieldStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 64, JavaScriptParserRULE_yieldStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(484)
 		p.Match(JavaScriptParserYield)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(486)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 44, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 44, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(485)
 			p.ExpressionSequence()
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 	p.SetState(491)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 45, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 45, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
 				p.SetState(488)
 				p.Match(JavaScriptParserLineTerminatorNoHide)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		p.SetState(493)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 45, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 45, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(494)
 		p.Eos()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IWithStatementContext is an interface to support dynamic dispatch.
@@ -7007,20 +7537,32 @@ type IWithStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	With() antlr.TerminalNode
+	OpenParen() antlr.TerminalNode
+	ExpressionSequence() IExpressionSequenceContext
+	CloseParen() antlr.TerminalNode
+	Statement() IStatementContext
+
 	// IsWithStatementContext differentiates from other interfaces.
 	IsWithStatementContext()
 }
 
 type WithStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyWithStatementContext() *WithStatementContext {
 	var p = new(WithStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_withStatement
 	return p
+}
+
+func InitEmptyWithStatementContext(p *WithStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_withStatement
 }
 
 func (*WithStatementContext) IsWithStatementContext() {}
@@ -7028,7 +7570,7 @@ func (*WithStatementContext) IsWithStatementContext() {}
 func NewWithStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *WithStatementContext {
 	var p = new(WithStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_withStatement
@@ -7101,36 +7643,24 @@ func (s *WithStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *JavaScriptParser) WithStatement() (localctx IWithStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewWithStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 66, JavaScriptParserRULE_withStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(496)
 		p.Match(JavaScriptParserWith)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(497)
 		p.Match(JavaScriptParserOpenParen)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(498)
@@ -7139,13 +7669,27 @@ func (p *JavaScriptParser) WithStatement() (localctx IWithStatementContext) {
 	{
 		p.SetState(499)
 		p.Match(JavaScriptParserCloseParen)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(500)
 		p.Statement()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISwitchStatementContext is an interface to support dynamic dispatch.
@@ -7155,20 +7699,32 @@ type ISwitchStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Switch() antlr.TerminalNode
+	OpenParen() antlr.TerminalNode
+	ExpressionSequence() IExpressionSequenceContext
+	CloseParen() antlr.TerminalNode
+	CaseBlock() ICaseBlockContext
+
 	// IsSwitchStatementContext differentiates from other interfaces.
 	IsSwitchStatementContext()
 }
 
 type SwitchStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptySwitchStatementContext() *SwitchStatementContext {
 	var p = new(SwitchStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_switchStatement
 	return p
+}
+
+func InitEmptySwitchStatementContext(p *SwitchStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_switchStatement
 }
 
 func (*SwitchStatementContext) IsSwitchStatementContext() {}
@@ -7176,7 +7732,7 @@ func (*SwitchStatementContext) IsSwitchStatementContext() {}
 func NewSwitchStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SwitchStatementContext {
 	var p = new(SwitchStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_switchStatement
@@ -7249,36 +7805,24 @@ func (s *SwitchStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) SwitchStatement() (localctx ISwitchStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewSwitchStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 68, JavaScriptParserRULE_switchStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(502)
 		p.Match(JavaScriptParserSwitch)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(503)
 		p.Match(JavaScriptParserOpenParen)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(504)
@@ -7287,13 +7831,27 @@ func (p *JavaScriptParser) SwitchStatement() (localctx ISwitchStatementContext) 
 	{
 		p.SetState(505)
 		p.Match(JavaScriptParserCloseParen)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(506)
 		p.CaseBlock()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ICaseBlockContext is an interface to support dynamic dispatch.
@@ -7303,20 +7861,32 @@ type ICaseBlockContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	OpenBrace() antlr.TerminalNode
+	CloseBrace() antlr.TerminalNode
+	AllCaseClauses() []ICaseClausesContext
+	CaseClauses(i int) ICaseClausesContext
+	DefaultClause() IDefaultClauseContext
+
 	// IsCaseBlockContext differentiates from other interfaces.
 	IsCaseBlockContext()
 }
 
 type CaseBlockContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyCaseBlockContext() *CaseBlockContext {
 	var p = new(CaseBlockContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_caseBlock
 	return p
+}
+
+func InitEmptyCaseBlockContext(p *CaseBlockContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_caseBlock
 }
 
 func (*CaseBlockContext) IsCaseBlockContext() {}
@@ -7324,7 +7894,7 @@ func (*CaseBlockContext) IsCaseBlockContext() {}
 func NewCaseBlockContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CaseBlockContext {
 	var p = new(CaseBlockContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_caseBlock
@@ -7418,36 +7988,24 @@ func (s *CaseBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) CaseBlock() (localctx ICaseBlockContext) {
-	this := p
-	_ = this
-
 	localctx = NewCaseBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 70, JavaScriptParserRULE_caseBlock)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(508)
 		p.Match(JavaScriptParserOpenBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(510)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JavaScriptParserCase {
@@ -7459,6 +8017,9 @@ func (p *JavaScriptParser) CaseBlock() (localctx ICaseBlockContext) {
 	}
 	p.SetState(516)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JavaScriptParserDefault {
@@ -7468,6 +8029,9 @@ func (p *JavaScriptParser) CaseBlock() (localctx ICaseBlockContext) {
 		}
 		p.SetState(514)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == JavaScriptParserCase {
@@ -7482,9 +8046,23 @@ func (p *JavaScriptParser) CaseBlock() (localctx ICaseBlockContext) {
 	{
 		p.SetState(518)
 		p.Match(JavaScriptParserCloseBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ICaseClausesContext is an interface to support dynamic dispatch.
@@ -7494,20 +8072,29 @@ type ICaseClausesContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllCaseClause() []ICaseClauseContext
+	CaseClause(i int) ICaseClauseContext
+
 	// IsCaseClausesContext differentiates from other interfaces.
 	IsCaseClausesContext()
 }
 
 type CaseClausesContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyCaseClausesContext() *CaseClausesContext {
 	var p = new(CaseClausesContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_caseClauses
 	return p
+}
+
+func InitEmptyCaseClausesContext(p *CaseClausesContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_caseClauses
 }
 
 func (*CaseClausesContext) IsCaseClausesContext() {}
@@ -7515,7 +8102,7 @@ func (*CaseClausesContext) IsCaseClausesContext() {}
 func NewCaseClausesContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CaseClausesContext {
 	var p = new(CaseClausesContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_caseClauses
@@ -7585,32 +8172,16 @@ func (s *CaseClausesContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JavaScriptParser) CaseClauses() (localctx ICaseClausesContext) {
-	this := p
-	_ = this
-
 	localctx = NewCaseClausesContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 72, JavaScriptParserRULE_caseClauses)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(521)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for ok := true; ok; ok = _la == JavaScriptParserCase {
@@ -7621,10 +8192,23 @@ func (p *JavaScriptParser) CaseClauses() (localctx ICaseClausesContext) {
 
 		p.SetState(523)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ICaseClauseContext is an interface to support dynamic dispatch.
@@ -7634,20 +8218,31 @@ type ICaseClauseContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Case() antlr.TerminalNode
+	ExpressionSequence() IExpressionSequenceContext
+	Colon() antlr.TerminalNode
+	Statements() IStatementsContext
+
 	// IsCaseClauseContext differentiates from other interfaces.
 	IsCaseClauseContext()
 }
 
 type CaseClauseContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyCaseClauseContext() *CaseClauseContext {
 	var p = new(CaseClauseContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_caseClause
 	return p
+}
+
+func InitEmptyCaseClauseContext(p *CaseClauseContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_caseClause
 }
 
 func (*CaseClauseContext) IsCaseClauseContext() {}
@@ -7655,7 +8250,7 @@ func (*CaseClauseContext) IsCaseClauseContext() {}
 func NewCaseClauseContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CaseClauseContext {
 	var p = new(CaseClauseContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_caseClause
@@ -7724,33 +8319,18 @@ func (s *CaseClauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) CaseClause() (localctx ICaseClauseContext) {
-	this := p
-	_ = this
-
 	localctx = NewCaseClauseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 74, JavaScriptParserRULE_caseClause)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(525)
 		p.Match(JavaScriptParserCase)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(526)
@@ -7759,12 +8339,19 @@ func (p *JavaScriptParser) CaseClause() (localctx ICaseClauseContext) {
 	{
 		p.SetState(527)
 		p.Match(JavaScriptParserColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(529)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009147624096) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1082832581574839295) != 0 {
+	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009147624096) != 0) || ((int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1082832581574839295) != 0) {
 		{
 			p.SetState(528)
 			p.Statements()
@@ -7772,7 +8359,17 @@ func (p *JavaScriptParser) CaseClause() (localctx ICaseClauseContext) {
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDefaultClauseContext is an interface to support dynamic dispatch.
@@ -7782,20 +8379,30 @@ type IDefaultClauseContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Default() antlr.TerminalNode
+	Colon() antlr.TerminalNode
+	Statements() IStatementsContext
+
 	// IsDefaultClauseContext differentiates from other interfaces.
 	IsDefaultClauseContext()
 }
 
 type DefaultClauseContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyDefaultClauseContext() *DefaultClauseContext {
 	var p = new(DefaultClauseContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_defaultClause
 	return p
+}
+
+func InitEmptyDefaultClauseContext(p *DefaultClauseContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_defaultClause
 }
 
 func (*DefaultClauseContext) IsDefaultClauseContext() {}
@@ -7803,7 +8410,7 @@ func (*DefaultClauseContext) IsDefaultClauseContext() {}
 func NewDefaultClauseContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DefaultClauseContext {
 	var p = new(DefaultClauseContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_defaultClause
@@ -7856,43 +8463,35 @@ func (s *DefaultClauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *JavaScriptParser) DefaultClause() (localctx IDefaultClauseContext) {
-	this := p
-	_ = this
-
 	localctx = NewDefaultClauseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 76, JavaScriptParserRULE_defaultClause)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(531)
 		p.Match(JavaScriptParserDefault)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(532)
 		p.Match(JavaScriptParserColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(534)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009147624096) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1082832581574839295) != 0 {
+	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009147624096) != 0) || ((int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1082832581574839295) != 0) {
 		{
 			p.SetState(533)
 			p.Statements()
@@ -7900,7 +8499,17 @@ func (p *JavaScriptParser) DefaultClause() (localctx IDefaultClauseContext) {
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ILabelledStatementContext is an interface to support dynamic dispatch.
@@ -7910,20 +8519,30 @@ type ILabelledStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Identifier() IIdentifierContext
+	Colon() antlr.TerminalNode
+	Statement() IStatementContext
+
 	// IsLabelledStatementContext differentiates from other interfaces.
 	IsLabelledStatementContext()
 }
 
 type LabelledStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyLabelledStatementContext() *LabelledStatementContext {
 	var p = new(LabelledStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_labelledStatement
 	return p
+}
+
+func InitEmptyLabelledStatementContext(p *LabelledStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_labelledStatement
 }
 
 func (*LabelledStatementContext) IsLabelledStatementContext() {}
@@ -7931,7 +8550,7 @@ func (*LabelledStatementContext) IsLabelledStatementContext() {}
 func NewLabelledStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *LabelledStatementContext {
 	var p = new(LabelledStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_labelledStatement
@@ -7996,28 +8615,8 @@ func (s *LabelledStatementContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaScriptParser) LabelledStatement() (localctx ILabelledStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewLabelledStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 78, JavaScriptParserRULE_labelledStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(536)
@@ -8026,13 +8625,27 @@ func (p *JavaScriptParser) LabelledStatement() (localctx ILabelledStatementConte
 	{
 		p.SetState(537)
 		p.Match(JavaScriptParserColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(538)
 		p.Statement()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IThrowStatementContext is an interface to support dynamic dispatch.
@@ -8042,20 +8655,32 @@ type IThrowStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Throw() antlr.TerminalNode
+	ExpressionSequence() IExpressionSequenceContext
+	Eos() IEosContext
+	AllLineTerminatorNoHide() []antlr.TerminalNode
+	LineTerminatorNoHide(i int) antlr.TerminalNode
+
 	// IsThrowStatementContext differentiates from other interfaces.
 	IsThrowStatementContext()
 }
 
 type ThrowStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyThrowStatementContext() *ThrowStatementContext {
 	var p = new(ThrowStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_throwStatement
 	return p
+}
+
+func InitEmptyThrowStatementContext(p *ThrowStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_throwStatement
 }
 
 func (*ThrowStatementContext) IsThrowStatementContext() {}
@@ -8063,7 +8688,7 @@ func (*ThrowStatementContext) IsThrowStatementContext() {}
 func NewThrowStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ThrowStatementContext {
 	var p = new(ThrowStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_throwStatement
@@ -8136,46 +8761,41 @@ func (s *ThrowStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JavaScriptParser) ThrowStatement() (localctx IThrowStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewThrowStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 80, JavaScriptParserRULE_throwStatement)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(540)
 		p.Match(JavaScriptParserThrow)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(544)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == JavaScriptParserLineTerminatorNoHide {
 		{
 			p.SetState(541)
 			p.Match(JavaScriptParserLineTerminatorNoHide)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 		p.SetState(546)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
@@ -8187,7 +8807,17 @@ func (p *JavaScriptParser) ThrowStatement() (localctx IThrowStatementContext) {
 		p.Eos()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITryStatementContext is an interface to support dynamic dispatch.
@@ -8197,20 +8827,31 @@ type ITryStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Try() antlr.TerminalNode
+	Block() IBlockContext
+	CatchProduction() ICatchProductionContext
+	FinallyProduction() IFinallyProductionContext
+
 	// IsTryStatementContext differentiates from other interfaces.
 	IsTryStatementContext()
 }
 
 type TryStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTryStatementContext() *TryStatementContext {
 	var p = new(TryStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_tryStatement
 	return p
+}
+
+func InitEmptyTryStatementContext(p *TryStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_tryStatement
 }
 
 func (*TryStatementContext) IsTryStatementContext() {}
@@ -8218,7 +8859,7 @@ func (*TryStatementContext) IsTryStatementContext() {}
 func NewTryStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TryStatementContext {
 	var p = new(TryStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_tryStatement
@@ -8299,33 +8940,18 @@ func (s *TryStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JavaScriptParser) TryStatement() (localctx ITryStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewTryStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 82, JavaScriptParserRULE_tryStatement)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(550)
 		p.Match(JavaScriptParserTry)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(551)
@@ -8333,6 +8959,9 @@ func (p *JavaScriptParser) TryStatement() (localctx ITryStatementContext) {
 	}
 	p.SetState(557)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case JavaScriptParserCatch:
@@ -8342,6 +8971,9 @@ func (p *JavaScriptParser) TryStatement() (localctx ITryStatementContext) {
 		}
 		p.SetState(554)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == JavaScriptParserFinally {
@@ -8359,10 +8991,21 @@ func (p *JavaScriptParser) TryStatement() (localctx ITryStatementContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ICatchProductionContext is an interface to support dynamic dispatch.
@@ -8372,20 +9015,32 @@ type ICatchProductionContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Catch() antlr.TerminalNode
+	Block() IBlockContext
+	OpenParen() antlr.TerminalNode
+	CloseParen() antlr.TerminalNode
+	Assignable() IAssignableContext
+
 	// IsCatchProductionContext differentiates from other interfaces.
 	IsCatchProductionContext()
 }
 
 type CatchProductionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyCatchProductionContext() *CatchProductionContext {
 	var p = new(CatchProductionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_catchProduction
 	return p
+}
+
+func InitEmptyCatchProductionContext(p *CatchProductionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_catchProduction
 }
 
 func (*CatchProductionContext) IsCatchProductionContext() {}
@@ -8393,7 +9048,7 @@ func (*CatchProductionContext) IsCatchProductionContext() {}
 func NewCatchProductionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CatchProductionContext {
 	var p = new(CatchProductionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_catchProduction
@@ -8466,48 +9121,43 @@ func (s *CatchProductionContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) CatchProduction() (localctx ICatchProductionContext) {
-	this := p
-	_ = this
-
 	localctx = NewCatchProductionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 84, JavaScriptParserRULE_catchProduction)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(559)
 		p.Match(JavaScriptParserCatch)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(565)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JavaScriptParserOpenParen {
 		{
 			p.SetState(560)
 			p.Match(JavaScriptParserOpenParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(562)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == JavaScriptParserOpenBracket || _la == JavaScriptParserOpenBrace || (int64((_la-98)) & ^0x3f) == 0 && ((int64(1)<<(_la-98))&12650511) != 0 {
+		if _la == JavaScriptParserOpenBracket || _la == JavaScriptParserOpenBrace || ((int64((_la-98)) & ^0x3f) == 0 && ((int64(1)<<(_la-98))&12650511) != 0) {
 			{
 				p.SetState(561)
 				p.Assignable()
@@ -8517,6 +9167,10 @@ func (p *JavaScriptParser) CatchProduction() (localctx ICatchProductionContext) 
 		{
 			p.SetState(564)
 			p.Match(JavaScriptParserCloseParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
@@ -8525,7 +9179,17 @@ func (p *JavaScriptParser) CatchProduction() (localctx ICatchProductionContext) 
 		p.Block()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFinallyProductionContext is an interface to support dynamic dispatch.
@@ -8535,20 +9199,29 @@ type IFinallyProductionContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Finally() antlr.TerminalNode
+	Block() IBlockContext
+
 	// IsFinallyProductionContext differentiates from other interfaces.
 	IsFinallyProductionContext()
 }
 
 type FinallyProductionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFinallyProductionContext() *FinallyProductionContext {
 	var p = new(FinallyProductionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_finallyProduction
 	return p
+}
+
+func InitEmptyFinallyProductionContext(p *FinallyProductionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_finallyProduction
 }
 
 func (*FinallyProductionContext) IsFinallyProductionContext() {}
@@ -8556,7 +9229,7 @@ func (*FinallyProductionContext) IsFinallyProductionContext() {}
 func NewFinallyProductionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FinallyProductionContext {
 	var p = new(FinallyProductionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_finallyProduction
@@ -8605,39 +9278,33 @@ func (s *FinallyProductionContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaScriptParser) FinallyProduction() (localctx IFinallyProductionContext) {
-	this := p
-	_ = this
-
 	localctx = NewFinallyProductionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 86, JavaScriptParserRULE_finallyProduction)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(569)
 		p.Match(JavaScriptParserFinally)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(570)
 		p.Block()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDebuggerStatementContext is an interface to support dynamic dispatch.
@@ -8647,20 +9314,29 @@ type IDebuggerStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Debugger() antlr.TerminalNode
+	Eos() IEosContext
+
 	// IsDebuggerStatementContext differentiates from other interfaces.
 	IsDebuggerStatementContext()
 }
 
 type DebuggerStatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyDebuggerStatementContext() *DebuggerStatementContext {
 	var p = new(DebuggerStatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_debuggerStatement
 	return p
+}
+
+func InitEmptyDebuggerStatementContext(p *DebuggerStatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_debuggerStatement
 }
 
 func (*DebuggerStatementContext) IsDebuggerStatementContext() {}
@@ -8668,7 +9344,7 @@ func (*DebuggerStatementContext) IsDebuggerStatementContext() {}
 func NewDebuggerStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DebuggerStatementContext {
 	var p = new(DebuggerStatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_debuggerStatement
@@ -8717,39 +9393,33 @@ func (s *DebuggerStatementContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaScriptParser) DebuggerStatement() (localctx IDebuggerStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewDebuggerStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 88, JavaScriptParserRULE_debuggerStatement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(572)
 		p.Match(JavaScriptParserDebugger)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(573)
 		p.Eos()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFunctionDeclarationContext is an interface to support dynamic dispatch.
@@ -8759,20 +9429,35 @@ type IFunctionDeclarationContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Function_() antlr.TerminalNode
+	Identifier() IIdentifierContext
+	OpenParen() antlr.TerminalNode
+	CloseParen() antlr.TerminalNode
+	FunctionBody() IFunctionBodyContext
+	Async() antlr.TerminalNode
+	Multiply() antlr.TerminalNode
+	FormalParameterList() IFormalParameterListContext
+
 	// IsFunctionDeclarationContext differentiates from other interfaces.
 	IsFunctionDeclarationContext()
 }
 
 type FunctionDeclarationContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFunctionDeclarationContext() *FunctionDeclarationContext {
 	var p = new(FunctionDeclarationContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_functionDeclaration
 	return p
+}
+
+func InitEmptyFunctionDeclarationContext(p *FunctionDeclarationContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_functionDeclaration
 }
 
 func (*FunctionDeclarationContext) IsFunctionDeclarationContext() {}
@@ -8780,7 +9465,7 @@ func (*FunctionDeclarationContext) IsFunctionDeclarationContext() {}
 func NewFunctionDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FunctionDeclarationContext {
 	var p = new(FunctionDeclarationContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_functionDeclaration
@@ -8877,53 +9562,52 @@ func (s *FunctionDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *JavaScriptParser) FunctionDeclaration() (localctx IFunctionDeclarationContext) {
-	this := p
-	_ = this
-
 	localctx = NewFunctionDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 90, JavaScriptParserRULE_functionDeclaration)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(576)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JavaScriptParserAsync {
 		{
 			p.SetState(575)
 			p.Match(JavaScriptParserAsync)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 	{
 		p.SetState(578)
 		p.Match(JavaScriptParserFunction_)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(580)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JavaScriptParserMultiply {
 		{
 			p.SetState(579)
 			p.Match(JavaScriptParserMultiply)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
@@ -8934,12 +9618,19 @@ func (p *JavaScriptParser) FunctionDeclaration() (localctx IFunctionDeclarationC
 	{
 		p.SetState(583)
 		p.Match(JavaScriptParserOpenParen)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(585)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&263232) != 0 || (int64((_la-98)) & ^0x3f) == 0 && ((int64(1)<<(_la-98))&12650511) != 0 {
+	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&263232) != 0) || ((int64((_la-98)) & ^0x3f) == 0 && ((int64(1)<<(_la-98))&12650511) != 0) {
 		{
 			p.SetState(584)
 			p.FormalParameterList()
@@ -8949,13 +9640,27 @@ func (p *JavaScriptParser) FunctionDeclaration() (localctx IFunctionDeclarationC
 	{
 		p.SetState(587)
 		p.Match(JavaScriptParserCloseParen)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(588)
 		p.FunctionBody()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IClassDeclarationContext is an interface to support dynamic dispatch.
@@ -8965,20 +9670,30 @@ type IClassDeclarationContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Class() antlr.TerminalNode
+	Identifier() IIdentifierContext
+	ClassTail() IClassTailContext
+
 	// IsClassDeclarationContext differentiates from other interfaces.
 	IsClassDeclarationContext()
 }
 
 type ClassDeclarationContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyClassDeclarationContext() *ClassDeclarationContext {
 	var p = new(ClassDeclarationContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_classDeclaration
 	return p
+}
+
+func InitEmptyClassDeclarationContext(p *ClassDeclarationContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_classDeclaration
 }
 
 func (*ClassDeclarationContext) IsClassDeclarationContext() {}
@@ -8986,7 +9701,7 @@ func (*ClassDeclarationContext) IsClassDeclarationContext() {}
 func NewClassDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ClassDeclarationContext {
 	var p = new(ClassDeclarationContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_classDeclaration
@@ -9051,32 +9766,16 @@ func (s *ClassDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaScriptParser) ClassDeclaration() (localctx IClassDeclarationContext) {
-	this := p
-	_ = this
-
 	localctx = NewClassDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 92, JavaScriptParserRULE_classDeclaration)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(590)
 		p.Match(JavaScriptParserClass)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(591)
@@ -9087,7 +9786,17 @@ func (p *JavaScriptParser) ClassDeclaration() (localctx IClassDeclarationContext
 		p.ClassTail()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IClassTailContext is an interface to support dynamic dispatch.
@@ -9097,20 +9806,33 @@ type IClassTailContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	OpenBrace() antlr.TerminalNode
+	CloseBrace() antlr.TerminalNode
+	Extends() antlr.TerminalNode
+	SingleExpression() ISingleExpressionContext
+	AllClassElement() []IClassElementContext
+	ClassElement(i int) IClassElementContext
+
 	// IsClassTailContext differentiates from other interfaces.
 	IsClassTailContext()
 }
 
 type ClassTailContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyClassTailContext() *ClassTailContext {
 	var p = new(ClassTailContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_classTail
 	return p
+}
+
+func InitEmptyClassTailContext(p *ClassTailContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_classTail
 }
 
 func (*ClassTailContext) IsClassTailContext() {}
@@ -9118,7 +9840,7 @@ func (*ClassTailContext) IsClassTailContext() {}
 func NewClassTailContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ClassTailContext {
 	var p = new(ClassTailContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_classTail
@@ -9216,38 +9938,26 @@ func (s *ClassTailContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) ClassTail() (localctx IClassTailContext) {
-	this := p
-	_ = this
-
 	localctx = NewClassTailContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 94, JavaScriptParserRULE_classTail)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(596)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JavaScriptParserExtends {
 		{
 			p.SetState(594)
 			p.Match(JavaScriptParserExtends)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(595)
@@ -9258,12 +9968,19 @@ func (p *JavaScriptParser) ClassTail() (localctx IClassTailContext) {
 	{
 		p.SetState(598)
 		p.Match(JavaScriptParserOpenBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(602)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843006999093184) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&5188146770730811151) != 0 {
+	for ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843006999093184) != 0) || ((int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&5188146770730811151) != 0) {
 		{
 			p.SetState(599)
 			p.ClassElement()
@@ -9271,14 +9988,31 @@ func (p *JavaScriptParser) ClassTail() (localctx IClassTailContext) {
 
 		p.SetState(604)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(605)
 		p.Match(JavaScriptParserCloseBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IClassElementContext is an interface to support dynamic dispatch.
@@ -9288,20 +10022,32 @@ type IClassElementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	MethodDefinition() IMethodDefinitionContext
+	Static() antlr.TerminalNode
+	FieldDefinition() IFieldDefinitionContext
+	Block() IBlockContext
+	SemiColon() antlr.TerminalNode
+
 	// IsClassElementContext differentiates from other interfaces.
 	IsClassElementContext()
 }
 
 type ClassElementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyClassElementContext() *ClassElementContext {
 	var p = new(ClassElementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_classElement
 	return p
+}
+
+func InitEmptyClassElementContext(p *ClassElementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_classElement
 }
 
 func (*ClassElementContext) IsClassElementContext() {}
@@ -9309,7 +10055,7 @@ func (*ClassElementContext) IsClassElementContext() {}
 func NewClassElementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ClassElementContext {
 	var p = new(ClassElementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_classElement
@@ -9394,42 +10140,32 @@ func (s *ClassElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JavaScriptParser) ClassElement() (localctx IClassElementContext) {
-	this := p
-	_ = this
-
 	localctx = NewClassElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 96, JavaScriptParserRULE_classElement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(618)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 64, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 64, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		p.SetState(608)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 62, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 62, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(607)
 				p.Match(JavaScriptParserStatic)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
+		} else if p.HasError() { // JIM
+			goto errorExit
 		}
 		{
 			p.SetState(610)
@@ -9441,12 +10177,18 @@ func (p *JavaScriptParser) ClassElement() (localctx IClassElementContext) {
 		p.SetState(612)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 63, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 63, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(611)
 				p.Match(JavaScriptParserStatic)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
+		} else if p.HasError() { // JIM
+			goto errorExit
 		}
 		{
 			p.SetState(614)
@@ -9458,6 +10200,10 @@ func (p *JavaScriptParser) ClassElement() (localctx IClassElementContext) {
 		{
 			p.SetState(615)
 			p.Match(JavaScriptParserStatic)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(616)
@@ -9469,11 +10215,27 @@ func (p *JavaScriptParser) ClassElement() (localctx IClassElementContext) {
 		{
 			p.SetState(617)
 			p.Match(JavaScriptParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IMethodDefinitionContext is an interface to support dynamic dispatch.
@@ -9483,20 +10245,38 @@ type IMethodDefinitionContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ClassElementName() IClassElementNameContext
+	OpenParen() antlr.TerminalNode
+	CloseParen() antlr.TerminalNode
+	FunctionBody() IFunctionBodyContext
+	Async() antlr.TerminalNode
+	AllLineTerminatorNoHide() []antlr.TerminalNode
+	LineTerminatorNoHide(i int) antlr.TerminalNode
+	Multiply() antlr.TerminalNode
+	FormalParameterList() IFormalParameterListContext
+	Getter() IGetterContext
+	Setter() ISetterContext
+
 	// IsMethodDefinitionContext differentiates from other interfaces.
 	IsMethodDefinitionContext()
 }
 
 type MethodDefinitionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyMethodDefinitionContext() *MethodDefinitionContext {
 	var p = new(MethodDefinitionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_methodDefinition
 	return p
+}
+
+func InitEmptyMethodDefinitionContext(p *MethodDefinitionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_methodDefinition
 }
 
 func (*MethodDefinitionContext) IsMethodDefinitionContext() {}
@@ -9504,7 +10284,7 @@ func (*MethodDefinitionContext) IsMethodDefinitionContext() {}
 func NewMethodDefinitionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MethodDefinitionContext {
 	var p = new(MethodDefinitionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_methodDefinition
@@ -9637,66 +10417,74 @@ func (s *MethodDefinitionContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaScriptParser) MethodDefinition() (localctx IMethodDefinitionContext) {
-	this := p
-	_ = this
-
 	localctx = NewMethodDefinitionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 98, JavaScriptParserRULE_methodDefinition)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(659)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 72, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 72, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		p.SetState(621)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 65, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 65, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(620)
 				p.Match(JavaScriptParserAsync)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
+		} else if p.HasError() { // JIM
+			goto errorExit
 		}
 		p.SetState(626)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == JavaScriptParserLineTerminatorNoHide {
 			{
 				p.SetState(623)
 				p.Match(JavaScriptParserLineTerminatorNoHide)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 			p.SetState(628)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 		p.SetState(630)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == JavaScriptParserMultiply {
 			{
 				p.SetState(629)
 				p.Match(JavaScriptParserMultiply)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
@@ -9707,12 +10495,19 @@ func (p *JavaScriptParser) MethodDefinition() (localctx IMethodDefinitionContext
 		{
 			p.SetState(633)
 			p.Match(JavaScriptParserOpenParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(635)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&263232) != 0 || (int64((_la-98)) & ^0x3f) == 0 && ((int64(1)<<(_la-98))&12650511) != 0 {
+		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&263232) != 0) || ((int64((_la-98)) & ^0x3f) == 0 && ((int64(1)<<(_la-98))&12650511) != 0) {
 			{
 				p.SetState(634)
 				p.FormalParameterList()
@@ -9722,6 +10517,10 @@ func (p *JavaScriptParser) MethodDefinition() (localctx IMethodDefinitionContext
 		{
 			p.SetState(637)
 			p.Match(JavaScriptParserCloseParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(638)
@@ -9732,12 +10531,19 @@ func (p *JavaScriptParser) MethodDefinition() (localctx IMethodDefinitionContext
 		p.EnterOuterAlt(localctx, 2)
 		p.SetState(641)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == JavaScriptParserMultiply {
 			{
 				p.SetState(640)
 				p.Match(JavaScriptParserMultiply)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
@@ -9748,10 +10554,18 @@ func (p *JavaScriptParser) MethodDefinition() (localctx IMethodDefinitionContext
 		{
 			p.SetState(644)
 			p.Match(JavaScriptParserOpenParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(645)
 			p.Match(JavaScriptParserCloseParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(646)
@@ -9762,12 +10576,19 @@ func (p *JavaScriptParser) MethodDefinition() (localctx IMethodDefinitionContext
 		p.EnterOuterAlt(localctx, 3)
 		p.SetState(649)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == JavaScriptParserMultiply {
 			{
 				p.SetState(648)
 				p.Match(JavaScriptParserMultiply)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
@@ -9778,12 +10599,19 @@ func (p *JavaScriptParser) MethodDefinition() (localctx IMethodDefinitionContext
 		{
 			p.SetState(652)
 			p.Match(JavaScriptParserOpenParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(654)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&263232) != 0 || (int64((_la-98)) & ^0x3f) == 0 && ((int64(1)<<(_la-98))&12650511) != 0 {
+		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&263232) != 0) || ((int64((_la-98)) & ^0x3f) == 0 && ((int64(1)<<(_la-98))&12650511) != 0) {
 			{
 				p.SetState(653)
 				p.FormalParameterList()
@@ -9793,15 +10621,31 @@ func (p *JavaScriptParser) MethodDefinition() (localctx IMethodDefinitionContext
 		{
 			p.SetState(656)
 			p.Match(JavaScriptParserCloseParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(657)
 			p.FunctionBody()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFieldDefinitionContext is an interface to support dynamic dispatch.
@@ -9811,20 +10655,29 @@ type IFieldDefinitionContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ClassElementName() IClassElementNameContext
+	Initializer() IInitializerContext
+
 	// IsFieldDefinitionContext differentiates from other interfaces.
 	IsFieldDefinitionContext()
 }
 
 type FieldDefinitionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFieldDefinitionContext() *FieldDefinitionContext {
 	var p = new(FieldDefinitionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_fieldDefinition
 	return p
+}
+
+func InitEmptyFieldDefinitionContext(p *FieldDefinitionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_fieldDefinition
 }
 
 func (*FieldDefinitionContext) IsFieldDefinitionContext() {}
@@ -9832,7 +10685,7 @@ func (*FieldDefinitionContext) IsFieldDefinitionContext() {}
 func NewFieldDefinitionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FieldDefinitionContext {
 	var p = new(FieldDefinitionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_fieldDefinition
@@ -9893,28 +10746,9 @@ func (s *FieldDefinitionContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) FieldDefinition() (localctx IFieldDefinitionContext) {
-	this := p
-	_ = this
-
 	localctx = NewFieldDefinitionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 100, JavaScriptParserRULE_fieldDefinition)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -9923,6 +10757,9 @@ func (p *JavaScriptParser) FieldDefinition() (localctx IFieldDefinitionContext) 
 	}
 	p.SetState(663)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JavaScriptParserAssign {
@@ -9933,7 +10770,17 @@ func (p *JavaScriptParser) FieldDefinition() (localctx IFieldDefinitionContext) 
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IClassElementNameContext is an interface to support dynamic dispatch.
@@ -9943,20 +10790,29 @@ type IClassElementNameContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	PropertyName() IPropertyNameContext
+	PrivateIdentifier() IPrivateIdentifierContext
+
 	// IsClassElementNameContext differentiates from other interfaces.
 	IsClassElementNameContext()
 }
 
 type ClassElementNameContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyClassElementNameContext() *ClassElementNameContext {
 	var p = new(ClassElementNameContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_classElementName
 	return p
+}
+
+func InitEmptyClassElementNameContext(p *ClassElementNameContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_classElementName
 }
 
 func (*ClassElementNameContext) IsClassElementNameContext() {}
@@ -9964,7 +10820,7 @@ func (*ClassElementNameContext) IsClassElementNameContext() {}
 func NewClassElementNameContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ClassElementNameContext {
 	var p = new(ClassElementNameContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_classElementName
@@ -10025,30 +10881,13 @@ func (s *ClassElementNameContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaScriptParser) ClassElementName() (localctx IClassElementNameContext) {
-	this := p
-	_ = this
-
 	localctx = NewClassElementNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 102, JavaScriptParserRULE_classElementName)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(667)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case JavaScriptParserOpenBracket, JavaScriptParserNullLiteral, JavaScriptParserBooleanLiteral, JavaScriptParserDecimalLiteral, JavaScriptParserHexIntegerLiteral, JavaScriptParserOctalIntegerLiteral, JavaScriptParserOctalIntegerLiteral2, JavaScriptParserBinaryIntegerLiteral, JavaScriptParserBreak, JavaScriptParserDo, JavaScriptParserInstanceof, JavaScriptParserTypeof, JavaScriptParserCase, JavaScriptParserElse, JavaScriptParserNew, JavaScriptParserVar, JavaScriptParserCatch, JavaScriptParserFinally, JavaScriptParserReturn, JavaScriptParserVoid, JavaScriptParserContinue, JavaScriptParserFor, JavaScriptParserSwitch, JavaScriptParserWhile, JavaScriptParserDebugger, JavaScriptParserFunction_, JavaScriptParserThis, JavaScriptParserWith, JavaScriptParserDefault, JavaScriptParserIf, JavaScriptParserThrow, JavaScriptParserDelete, JavaScriptParserIn, JavaScriptParserTry, JavaScriptParserAs, JavaScriptParserFrom, JavaScriptParserGet, JavaScriptParserSet, JavaScriptParserClass, JavaScriptParserEnum, JavaScriptParserExtends, JavaScriptParserSuper, JavaScriptParserConst, JavaScriptParserExport, JavaScriptParserImport, JavaScriptParserAsync, JavaScriptParserAwait, JavaScriptParserYield, JavaScriptParserImplements, JavaScriptParserStrictLet, JavaScriptParserNonStrictLet, JavaScriptParserPrivate, JavaScriptParserPublic, JavaScriptParserInterface, JavaScriptParserPackage, JavaScriptParserProtected, JavaScriptParserStatic, JavaScriptParserIdentifier, JavaScriptParserStringLiteral:
@@ -10066,10 +10905,21 @@ func (p *JavaScriptParser) ClassElementName() (localctx IClassElementNameContext
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IPrivateIdentifierContext is an interface to support dynamic dispatch.
@@ -10079,20 +10929,29 @@ type IPrivateIdentifierContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Hashtag() antlr.TerminalNode
+	IdentifierName() IIdentifierNameContext
+
 	// IsPrivateIdentifierContext differentiates from other interfaces.
 	IsPrivateIdentifierContext()
 }
 
 type PrivateIdentifierContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyPrivateIdentifierContext() *PrivateIdentifierContext {
 	var p = new(PrivateIdentifierContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_privateIdentifier
 	return p
+}
+
+func InitEmptyPrivateIdentifierContext(p *PrivateIdentifierContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_privateIdentifier
 }
 
 func (*PrivateIdentifierContext) IsPrivateIdentifierContext() {}
@@ -10100,7 +10959,7 @@ func (*PrivateIdentifierContext) IsPrivateIdentifierContext() {}
 func NewPrivateIdentifierContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *PrivateIdentifierContext {
 	var p = new(PrivateIdentifierContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_privateIdentifier
@@ -10149,39 +11008,33 @@ func (s *PrivateIdentifierContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaScriptParser) PrivateIdentifier() (localctx IPrivateIdentifierContext) {
-	this := p
-	_ = this
-
 	localctx = NewPrivateIdentifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 104, JavaScriptParserRULE_privateIdentifier)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(669)
 		p.Match(JavaScriptParserHashtag)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(670)
 		p.IdentifierName()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFormalParameterListContext is an interface to support dynamic dispatch.
@@ -10191,20 +11044,32 @@ type IFormalParameterListContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllFormalParameterArg() []IFormalParameterArgContext
+	FormalParameterArg(i int) IFormalParameterArgContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+	LastFormalParameterArg() ILastFormalParameterArgContext
+
 	// IsFormalParameterListContext differentiates from other interfaces.
 	IsFormalParameterListContext()
 }
 
 type FormalParameterListContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFormalParameterListContext() *FormalParameterListContext {
 	var p = new(FormalParameterListContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_formalParameterList
 	return p
+}
+
+func InitEmptyFormalParameterListContext(p *FormalParameterListContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_formalParameterList
 }
 
 func (*FormalParameterListContext) IsFormalParameterListContext() {}
@@ -10212,7 +11077,7 @@ func (*FormalParameterListContext) IsFormalParameterListContext() {}
 func NewFormalParameterListContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FormalParameterListContext {
 	var p = new(FormalParameterListContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_formalParameterList
@@ -10306,33 +11171,17 @@ func (s *FormalParameterListContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *JavaScriptParser) FormalParameterList() (localctx IFormalParameterListContext) {
-	this := p
-	_ = this
-
 	localctx = NewFormalParameterListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 106, JavaScriptParserRULE_formalParameterList)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
 	p.SetState(685)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case JavaScriptParserOpenBracket, JavaScriptParserOpenBrace, JavaScriptParserAs, JavaScriptParserFrom, JavaScriptParserGet, JavaScriptParserSet, JavaScriptParserAsync, JavaScriptParserNonStrictLet, JavaScriptParserStatic, JavaScriptParserIdentifier:
@@ -10343,13 +11192,22 @@ func (p *JavaScriptParser) FormalParameterList() (localctx IFormalParameterListC
 		}
 		p.SetState(677)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 75, p.GetParserRuleContext())
-
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 75, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 		for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			if _alt == 1 {
 				{
 					p.SetState(673)
 					p.Match(JavaScriptParserComma)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(674)
@@ -10359,16 +11217,29 @@ func (p *JavaScriptParser) FormalParameterList() (localctx IFormalParameterListC
 			}
 			p.SetState(679)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 75, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 75, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 		p.SetState(682)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == JavaScriptParserComma {
 			{
 				p.SetState(680)
 				p.Match(JavaScriptParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(681)
@@ -10385,10 +11256,21 @@ func (p *JavaScriptParser) FormalParameterList() (localctx IFormalParameterListC
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFormalParameterArgContext is an interface to support dynamic dispatch.
@@ -10398,20 +11280,30 @@ type IFormalParameterArgContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Assignable() IAssignableContext
+	Assign() antlr.TerminalNode
+	SingleExpression() ISingleExpressionContext
+
 	// IsFormalParameterArgContext differentiates from other interfaces.
 	IsFormalParameterArgContext()
 }
 
 type FormalParameterArgContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFormalParameterArgContext() *FormalParameterArgContext {
 	var p = new(FormalParameterArgContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_formalParameterArg
 	return p
+}
+
+func InitEmptyFormalParameterArgContext(p *FormalParameterArgContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_formalParameterArg
 }
 
 func (*FormalParameterArgContext) IsFormalParameterArgContext() {}
@@ -10419,7 +11311,7 @@ func (*FormalParameterArgContext) IsFormalParameterArgContext() {}
 func NewFormalParameterArgContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FormalParameterArgContext {
 	var p = new(FormalParameterArgContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_formalParameterArg
@@ -10484,28 +11376,9 @@ func (s *FormalParameterArgContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *JavaScriptParser) FormalParameterArg() (localctx IFormalParameterArgContext) {
-	this := p
-	_ = this
-
 	localctx = NewFormalParameterArgContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 108, JavaScriptParserRULE_formalParameterArg)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -10514,12 +11387,19 @@ func (p *JavaScriptParser) FormalParameterArg() (localctx IFormalParameterArgCon
 	}
 	p.SetState(690)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JavaScriptParserAssign {
 		{
 			p.SetState(688)
 			p.Match(JavaScriptParserAssign)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(689)
@@ -10528,7 +11408,17 @@ func (p *JavaScriptParser) FormalParameterArg() (localctx IFormalParameterArgCon
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ILastFormalParameterArgContext is an interface to support dynamic dispatch.
@@ -10538,20 +11428,29 @@ type ILastFormalParameterArgContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Ellipsis() antlr.TerminalNode
+	SingleExpression() ISingleExpressionContext
+
 	// IsLastFormalParameterArgContext differentiates from other interfaces.
 	IsLastFormalParameterArgContext()
 }
 
 type LastFormalParameterArgContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyLastFormalParameterArgContext() *LastFormalParameterArgContext {
 	var p = new(LastFormalParameterArgContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_lastFormalParameterArg
 	return p
+}
+
+func InitEmptyLastFormalParameterArgContext(p *LastFormalParameterArgContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_lastFormalParameterArg
 }
 
 func (*LastFormalParameterArgContext) IsLastFormalParameterArgContext() {}
@@ -10559,7 +11458,7 @@ func (*LastFormalParameterArgContext) IsLastFormalParameterArgContext() {}
 func NewLastFormalParameterArgContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *LastFormalParameterArgContext {
 	var p = new(LastFormalParameterArgContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_lastFormalParameterArg
@@ -10608,39 +11507,33 @@ func (s *LastFormalParameterArgContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 func (p *JavaScriptParser) LastFormalParameterArg() (localctx ILastFormalParameterArgContext) {
-	this := p
-	_ = this
-
 	localctx = NewLastFormalParameterArgContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 110, JavaScriptParserRULE_lastFormalParameterArg)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(692)
 		p.Match(JavaScriptParserEllipsis)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(693)
 		p.singleExpression(0)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFunctionBodyContext is an interface to support dynamic dispatch.
@@ -10650,20 +11543,30 @@ type IFunctionBodyContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	OpenBrace() antlr.TerminalNode
+	CloseBrace() antlr.TerminalNode
+	Statements() IStatementsContext
+
 	// IsFunctionBodyContext differentiates from other interfaces.
 	IsFunctionBodyContext()
 }
 
 type FunctionBodyContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFunctionBodyContext() *FunctionBodyContext {
 	var p = new(FunctionBodyContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_functionBody
 	return p
+}
+
+func InitEmptyFunctionBodyContext(p *FunctionBodyContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_functionBody
 }
 
 func (*FunctionBodyContext) IsFunctionBodyContext() {}
@@ -10671,7 +11574,7 @@ func (*FunctionBodyContext) IsFunctionBodyContext() {}
 func NewFunctionBodyContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FunctionBodyContext {
 	var p = new(FunctionBodyContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_functionBody
@@ -10724,39 +11627,27 @@ func (s *FunctionBodyContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JavaScriptParser) FunctionBody() (localctx IFunctionBodyContext) {
-	this := p
-	_ = this
-
 	localctx = NewFunctionBodyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 112, JavaScriptParserRULE_functionBody)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(695)
 		p.Match(JavaScriptParserOpenBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(697)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009147624096) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1082832581574839295) != 0 {
+	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009147624096) != 0) || ((int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1082832581574839295) != 0) {
 		{
 			p.SetState(696)
 			p.Statements()
@@ -10766,9 +11657,23 @@ func (p *JavaScriptParser) FunctionBody() (localctx IFunctionBodyContext) {
 	{
 		p.SetState(699)
 		p.Match(JavaScriptParserCloseBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IArrayLiteralContext is an interface to support dynamic dispatch.
@@ -10778,20 +11683,30 @@ type IArrayLiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	OpenBracket() antlr.TerminalNode
+	ElementList() IElementListContext
+	CloseBracket() antlr.TerminalNode
+
 	// IsArrayLiteralContext differentiates from other interfaces.
 	IsArrayLiteralContext()
 }
 
 type ArrayLiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyArrayLiteralContext() *ArrayLiteralContext {
 	var p = new(ArrayLiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_arrayLiteral
 	return p
+}
+
+func InitEmptyArrayLiteralContext(p *ArrayLiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_arrayLiteral
 }
 
 func (*ArrayLiteralContext) IsArrayLiteralContext() {}
@@ -10799,7 +11714,7 @@ func (*ArrayLiteralContext) IsArrayLiteralContext() {}
 func NewArrayLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ArrayLiteralContext {
 	var p = new(ArrayLiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_arrayLiteral
@@ -10852,32 +11767,16 @@ func (s *ArrayLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JavaScriptParser) ArrayLiteral() (localctx IArrayLiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewArrayLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 114, JavaScriptParserRULE_arrayLiteral)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(701)
 		p.Match(JavaScriptParserOpenBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(702)
@@ -10886,9 +11785,23 @@ func (p *JavaScriptParser) ArrayLiteral() (localctx IArrayLiteralContext) {
 	{
 		p.SetState(703)
 		p.Match(JavaScriptParserCloseBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IElementListContext is an interface to support dynamic dispatch.
@@ -10898,20 +11811,31 @@ type IElementListContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+	AllArrayElement() []IArrayElementContext
+	ArrayElement(i int) IArrayElementContext
+
 	// IsElementListContext differentiates from other interfaces.
 	IsElementListContext()
 }
 
 type ElementListContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyElementListContext() *ElementListContext {
 	var p = new(ElementListContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_elementList
 	return p
+}
+
+func InitEmptyElementListContext(p *ElementListContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_elementList
 }
 
 func (*ElementListContext) IsElementListContext() {}
@@ -10919,7 +11843,7 @@ func (*ElementListContext) IsElementListContext() {}
 func NewElementListContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ElementListContext {
 	var p = new(ElementListContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_elementList
@@ -10997,53 +11921,52 @@ func (s *ElementListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JavaScriptParser) ElementList() (localctx IElementListContext) {
-	this := p
-	_ = this
-
 	localctx = NewElementListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 116, JavaScriptParserRULE_elementList)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(708)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 80, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 80, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
 				p.SetState(705)
 				p.Match(JavaScriptParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		p.SetState(710)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 80, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 80, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(712)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009147370144) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1082256427114318079) != 0 {
+	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009147370144) != 0) || ((int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1082256427114318079) != 0) {
 		{
 			p.SetState(711)
 			p.ArrayElement()
@@ -11052,22 +11975,37 @@ func (p *JavaScriptParser) ElementList() (localctx IElementListContext) {
 	}
 	p.SetState(722)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 83, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 83, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			p.SetState(715)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 
 			for ok := true; ok; ok = _la == JavaScriptParserComma {
 				{
 					p.SetState(714)
 					p.Match(JavaScriptParserComma)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 
 				p.SetState(717)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 			}
 			{
@@ -11078,24 +12016,50 @@ func (p *JavaScriptParser) ElementList() (localctx IElementListContext) {
 		}
 		p.SetState(724)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 83, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 83, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(728)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == JavaScriptParserComma {
 		{
 			p.SetState(725)
 			p.Match(JavaScriptParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 		p.SetState(730)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IArrayElementContext is an interface to support dynamic dispatch.
@@ -11105,20 +12069,29 @@ type IArrayElementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	SingleExpression() ISingleExpressionContext
+	Ellipsis() antlr.TerminalNode
+
 	// IsArrayElementContext differentiates from other interfaces.
 	IsArrayElementContext()
 }
 
 type ArrayElementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyArrayElementContext() *ArrayElementContext {
 	var p = new(ArrayElementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_arrayElement
 	return p
+}
+
+func InitEmptyArrayElementContext(p *ArrayElementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_arrayElement
 }
 
 func (*ArrayElementContext) IsArrayElementContext() {}
@@ -11126,7 +12099,7 @@ func (*ArrayElementContext) IsArrayElementContext() {}
 func NewArrayElementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ArrayElementContext {
 	var p = new(ArrayElementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_arrayElement
@@ -11175,38 +12148,26 @@ func (s *ArrayElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JavaScriptParser) ArrayElement() (localctx IArrayElementContext) {
-	this := p
-	_ = this
-
 	localctx = NewArrayElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 118, JavaScriptParserRULE_arrayElement)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(732)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JavaScriptParserEllipsis {
 		{
 			p.SetState(731)
 			p.Match(JavaScriptParserEllipsis)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
@@ -11215,7 +12176,17 @@ func (p *JavaScriptParser) ArrayElement() (localctx IArrayElementContext) {
 		p.singleExpression(0)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IPropertyAssignmentContext is an interface to support dynamic dispatch.
@@ -11224,21 +12195,25 @@ type IPropertyAssignmentContext interface {
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
-
 	// IsPropertyAssignmentContext differentiates from other interfaces.
 	IsPropertyAssignmentContext()
 }
 
 type PropertyAssignmentContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyPropertyAssignmentContext() *PropertyAssignmentContext {
 	var p = new(PropertyAssignmentContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_propertyAssignment
 	return p
+}
+
+func InitEmptyPropertyAssignmentContext(p *PropertyAssignmentContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_propertyAssignment
 }
 
 func (*PropertyAssignmentContext) IsPropertyAssignmentContext() {}
@@ -11246,7 +12221,7 @@ func (*PropertyAssignmentContext) IsPropertyAssignmentContext() {}
 func NewPropertyAssignmentContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *PropertyAssignmentContext {
 	var p = new(PropertyAssignmentContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_propertyAssignment
@@ -11256,8 +12231,8 @@ func NewPropertyAssignmentContext(parser antlr.Parser, parent antlr.ParserRuleCo
 
 func (s *PropertyAssignmentContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *PropertyAssignmentContext) CopyFrom(ctx *PropertyAssignmentContext) {
-	s.BaseParserRuleContext.CopyFrom(ctx.BaseParserRuleContext)
+func (s *PropertyAssignmentContext) CopyAll(ctx *PropertyAssignmentContext) {
+	s.CopyFrom(&ctx.BaseParserRuleContext)
 }
 
 func (s *PropertyAssignmentContext) GetRuleContext() antlr.RuleContext {
@@ -11269,15 +12244,15 @@ func (s *PropertyAssignmentContext) ToStringTree(ruleNames []string, recog antlr
 }
 
 type PropertyExpressionAssignmentContext struct {
-	*PropertyAssignmentContext
+	PropertyAssignmentContext
 }
 
 func NewPropertyExpressionAssignmentContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *PropertyExpressionAssignmentContext {
 	var p = new(PropertyExpressionAssignmentContext)
 
-	p.PropertyAssignmentContext = NewEmptyPropertyAssignmentContext()
+	InitEmptyPropertyAssignmentContext(&p.PropertyAssignmentContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*PropertyAssignmentContext))
+	p.CopyAll(ctx.(*PropertyAssignmentContext))
 
 	return p
 }
@@ -11333,15 +12308,15 @@ func (s *PropertyExpressionAssignmentContext) Accept(visitor antlr.ParseTreeVisi
 }
 
 type ComputedPropertyExpressionAssignmentContext struct {
-	*PropertyAssignmentContext
+	PropertyAssignmentContext
 }
 
 func NewComputedPropertyExpressionAssignmentContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ComputedPropertyExpressionAssignmentContext {
 	var p = new(ComputedPropertyExpressionAssignmentContext)
 
-	p.PropertyAssignmentContext = NewEmptyPropertyAssignmentContext()
+	InitEmptyPropertyAssignmentContext(&p.PropertyAssignmentContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*PropertyAssignmentContext))
+	p.CopyAll(ctx.(*PropertyAssignmentContext))
 
 	return p
 }
@@ -11414,15 +12389,15 @@ func (s *ComputedPropertyExpressionAssignmentContext) Accept(visitor antlr.Parse
 }
 
 type PropertyShorthandContext struct {
-	*PropertyAssignmentContext
+	PropertyAssignmentContext
 }
 
 func NewPropertyShorthandContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *PropertyShorthandContext {
 	var p = new(PropertyShorthandContext)
 
-	p.PropertyAssignmentContext = NewEmptyPropertyAssignmentContext()
+	InitEmptyPropertyAssignmentContext(&p.PropertyAssignmentContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*PropertyAssignmentContext))
+	p.CopyAll(ctx.(*PropertyAssignmentContext))
 
 	return p
 }
@@ -11462,15 +12437,15 @@ func (s *PropertyShorthandContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 type PropertySetterContext struct {
-	*PropertyAssignmentContext
+	PropertyAssignmentContext
 }
 
 func NewPropertySetterContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *PropertySetterContext {
 	var p = new(PropertySetterContext)
 
-	p.PropertyAssignmentContext = NewEmptyPropertyAssignmentContext()
+	InitEmptyPropertyAssignmentContext(&p.PropertyAssignmentContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*PropertyAssignmentContext))
+	p.CopyAll(ctx.(*PropertyAssignmentContext))
 
 	return p
 }
@@ -11546,15 +12521,15 @@ func (s *PropertySetterContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 type PropertyGetterContext struct {
-	*PropertyAssignmentContext
+	PropertyAssignmentContext
 }
 
 func NewPropertyGetterContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *PropertyGetterContext {
 	var p = new(PropertyGetterContext)
 
-	p.PropertyAssignmentContext = NewEmptyPropertyAssignmentContext()
+	InitEmptyPropertyAssignmentContext(&p.PropertyAssignmentContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*PropertyAssignmentContext))
+	p.CopyAll(ctx.(*PropertyAssignmentContext))
 
 	return p
 }
@@ -11614,15 +12589,15 @@ func (s *PropertyGetterContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 type FunctionPropertyContext struct {
-	*PropertyAssignmentContext
+	PropertyAssignmentContext
 }
 
 func NewFunctionPropertyContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *FunctionPropertyContext {
 	var p = new(FunctionPropertyContext)
 
-	p.PropertyAssignmentContext = NewEmptyPropertyAssignmentContext()
+	InitEmptyPropertyAssignmentContext(&p.PropertyAssignmentContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*PropertyAssignmentContext))
+	p.CopyAll(ctx.(*PropertyAssignmentContext))
 
 	return p
 }
@@ -11706,32 +12681,17 @@ func (s *FunctionPropertyContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaScriptParser) PropertyAssignment() (localctx IPropertyAssignmentContext) {
-	this := p
-	_ = this
-
 	localctx = NewPropertyAssignmentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 120, JavaScriptParserRULE_propertyAssignment)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(775)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 90, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 90, p.GetParserRuleContext()) {
 	case 1:
 		localctx = NewPropertyExpressionAssignmentContext(p, localctx)
 		p.EnterOuterAlt(localctx, 1)
@@ -11742,6 +12702,10 @@ func (p *JavaScriptParser) PropertyAssignment() (localctx IPropertyAssignmentCon
 		{
 			p.SetState(737)
 			p.Match(JavaScriptParserColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(738)
@@ -11754,6 +12718,10 @@ func (p *JavaScriptParser) PropertyAssignment() (localctx IPropertyAssignmentCon
 		{
 			p.SetState(740)
 			p.Match(JavaScriptParserOpenBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(741)
@@ -11762,10 +12730,18 @@ func (p *JavaScriptParser) PropertyAssignment() (localctx IPropertyAssignmentCon
 		{
 			p.SetState(742)
 			p.Match(JavaScriptParserCloseBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(743)
 			p.Match(JavaScriptParserColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(744)
@@ -11778,21 +12754,34 @@ func (p *JavaScriptParser) PropertyAssignment() (localctx IPropertyAssignmentCon
 		p.SetState(747)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 86, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 86, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(746)
 				p.Match(JavaScriptParserAsync)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
+		} else if p.HasError() { // JIM
+			goto errorExit
 		}
 		p.SetState(750)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == JavaScriptParserMultiply {
 			{
 				p.SetState(749)
 				p.Match(JavaScriptParserMultiply)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
@@ -11803,12 +12792,19 @@ func (p *JavaScriptParser) PropertyAssignment() (localctx IPropertyAssignmentCon
 		{
 			p.SetState(753)
 			p.Match(JavaScriptParserOpenParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(755)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&263232) != 0 || (int64((_la-98)) & ^0x3f) == 0 && ((int64(1)<<(_la-98))&12650511) != 0 {
+		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&263232) != 0) || ((int64((_la-98)) & ^0x3f) == 0 && ((int64(1)<<(_la-98))&12650511) != 0) {
 			{
 				p.SetState(754)
 				p.FormalParameterList()
@@ -11818,6 +12814,10 @@ func (p *JavaScriptParser) PropertyAssignment() (localctx IPropertyAssignmentCon
 		{
 			p.SetState(757)
 			p.Match(JavaScriptParserCloseParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(758)
@@ -11834,10 +12834,18 @@ func (p *JavaScriptParser) PropertyAssignment() (localctx IPropertyAssignmentCon
 		{
 			p.SetState(761)
 			p.Match(JavaScriptParserOpenParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(762)
 			p.Match(JavaScriptParserCloseParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(763)
@@ -11854,6 +12862,10 @@ func (p *JavaScriptParser) PropertyAssignment() (localctx IPropertyAssignmentCon
 		{
 			p.SetState(766)
 			p.Match(JavaScriptParserOpenParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(767)
@@ -11862,6 +12874,10 @@ func (p *JavaScriptParser) PropertyAssignment() (localctx IPropertyAssignmentCon
 		{
 			p.SetState(768)
 			p.Match(JavaScriptParserCloseParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(769)
@@ -11873,12 +12889,19 @@ func (p *JavaScriptParser) PropertyAssignment() (localctx IPropertyAssignmentCon
 		p.EnterOuterAlt(localctx, 6)
 		p.SetState(772)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == JavaScriptParserEllipsis {
 			{
 				p.SetState(771)
 				p.Match(JavaScriptParserEllipsis)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
@@ -11887,9 +12910,21 @@ func (p *JavaScriptParser) PropertyAssignment() (localctx IPropertyAssignmentCon
 			p.singleExpression(0)
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IPropertyNameContext is an interface to support dynamic dispatch.
@@ -11899,20 +12934,33 @@ type IPropertyNameContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	IdentifierName() IIdentifierNameContext
+	StringLiteral() antlr.TerminalNode
+	NumericLiteral() INumericLiteralContext
+	OpenBracket() antlr.TerminalNode
+	SingleExpression() ISingleExpressionContext
+	CloseBracket() antlr.TerminalNode
+
 	// IsPropertyNameContext differentiates from other interfaces.
 	IsPropertyNameContext()
 }
 
 type PropertyNameContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyPropertyNameContext() *PropertyNameContext {
 	var p = new(PropertyNameContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_propertyName
 	return p
+}
+
+func InitEmptyPropertyNameContext(p *PropertyNameContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_propertyName
 }
 
 func (*PropertyNameContext) IsPropertyNameContext() {}
@@ -11920,7 +12968,7 @@ func (*PropertyNameContext) IsPropertyNameContext() {}
 func NewPropertyNameContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *PropertyNameContext {
 	var p = new(PropertyNameContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_propertyName
@@ -12009,30 +13057,13 @@ func (s *PropertyNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JavaScriptParser) PropertyName() (localctx IPropertyNameContext) {
-	this := p
-	_ = this
-
 	localctx = NewPropertyNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 122, JavaScriptParserRULE_propertyName)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(784)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case JavaScriptParserNullLiteral, JavaScriptParserBooleanLiteral, JavaScriptParserBreak, JavaScriptParserDo, JavaScriptParserInstanceof, JavaScriptParserTypeof, JavaScriptParserCase, JavaScriptParserElse, JavaScriptParserNew, JavaScriptParserVar, JavaScriptParserCatch, JavaScriptParserFinally, JavaScriptParserReturn, JavaScriptParserVoid, JavaScriptParserContinue, JavaScriptParserFor, JavaScriptParserSwitch, JavaScriptParserWhile, JavaScriptParserDebugger, JavaScriptParserFunction_, JavaScriptParserThis, JavaScriptParserWith, JavaScriptParserDefault, JavaScriptParserIf, JavaScriptParserThrow, JavaScriptParserDelete, JavaScriptParserIn, JavaScriptParserTry, JavaScriptParserAs, JavaScriptParserFrom, JavaScriptParserGet, JavaScriptParserSet, JavaScriptParserClass, JavaScriptParserEnum, JavaScriptParserExtends, JavaScriptParserSuper, JavaScriptParserConst, JavaScriptParserExport, JavaScriptParserImport, JavaScriptParserAsync, JavaScriptParserAwait, JavaScriptParserYield, JavaScriptParserImplements, JavaScriptParserStrictLet, JavaScriptParserNonStrictLet, JavaScriptParserPrivate, JavaScriptParserPublic, JavaScriptParserInterface, JavaScriptParserPackage, JavaScriptParserProtected, JavaScriptParserStatic, JavaScriptParserIdentifier:
@@ -12047,6 +13078,10 @@ func (p *JavaScriptParser) PropertyName() (localctx IPropertyNameContext) {
 		{
 			p.SetState(778)
 			p.Match(JavaScriptParserStringLiteral)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case JavaScriptParserDecimalLiteral, JavaScriptParserHexIntegerLiteral, JavaScriptParserOctalIntegerLiteral, JavaScriptParserOctalIntegerLiteral2, JavaScriptParserBinaryIntegerLiteral:
@@ -12061,6 +13096,10 @@ func (p *JavaScriptParser) PropertyName() (localctx IPropertyNameContext) {
 		{
 			p.SetState(780)
 			p.Match(JavaScriptParserOpenBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(781)
@@ -12069,13 +13108,28 @@ func (p *JavaScriptParser) PropertyName() (localctx IPropertyNameContext) {
 		{
 			p.SetState(782)
 			p.Match(JavaScriptParserCloseBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IArgumentsContext is an interface to support dynamic dispatch.
@@ -12085,20 +13139,33 @@ type IArgumentsContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	OpenParen() antlr.TerminalNode
+	CloseParen() antlr.TerminalNode
+	AllArgument() []IArgumentContext
+	Argument(i int) IArgumentContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsArgumentsContext differentiates from other interfaces.
 	IsArgumentsContext()
 }
 
 type ArgumentsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyArgumentsContext() *ArgumentsContext {
 	var p = new(ArgumentsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_arguments
 	return p
+}
+
+func InitEmptyArgumentsContext(p *ArgumentsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_arguments
 }
 
 func (*ArgumentsContext) IsArgumentsContext() {}
@@ -12106,7 +13173,7 @@ func (*ArgumentsContext) IsArgumentsContext() {}
 func NewArgumentsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ArgumentsContext {
 	var p = new(ArgumentsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_arguments
@@ -12192,28 +13259,9 @@ func (s *ArgumentsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Arguments() (localctx IArgumentsContext) {
-	this := p
-	_ = this
-
 	localctx = NewArgumentsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 124, JavaScriptParserRULE_arguments)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -12221,25 +13269,41 @@ func (p *JavaScriptParser) Arguments() (localctx IArgumentsContext) {
 	{
 		p.SetState(786)
 		p.Match(JavaScriptParserOpenParen)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(798)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009147370144) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1082256427114318079) != 0 {
+	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009147370144) != 0) || ((int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1082256427114318079) != 0) {
 		{
 			p.SetState(787)
 			p.Argument()
 		}
 		p.SetState(792)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 92, p.GetParserRuleContext())
-
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 92, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 		for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			if _alt == 1 {
 				{
 					p.SetState(788)
 					p.Match(JavaScriptParserComma)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(789)
@@ -12249,16 +13313,29 @@ func (p *JavaScriptParser) Arguments() (localctx IArgumentsContext) {
 			}
 			p.SetState(794)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 92, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 92, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 		p.SetState(796)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == JavaScriptParserComma {
 			{
 				p.SetState(795)
 				p.Match(JavaScriptParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
@@ -12267,9 +13344,23 @@ func (p *JavaScriptParser) Arguments() (localctx IArgumentsContext) {
 	{
 		p.SetState(800)
 		p.Match(JavaScriptParserCloseParen)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IArgumentContext is an interface to support dynamic dispatch.
@@ -12279,20 +13370,30 @@ type IArgumentContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	SingleExpression() ISingleExpressionContext
+	Identifier() IIdentifierContext
+	Ellipsis() antlr.TerminalNode
+
 	// IsArgumentContext differentiates from other interfaces.
 	IsArgumentContext()
 }
 
 type ArgumentContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyArgumentContext() *ArgumentContext {
 	var p = new(ArgumentContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_argument
 	return p
+}
+
+func InitEmptyArgumentContext(p *ArgumentContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_argument
 }
 
 func (*ArgumentContext) IsArgumentContext() {}
@@ -12300,7 +13401,7 @@ func (*ArgumentContext) IsArgumentContext() {}
 func NewArgumentContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ArgumentContext {
 	var p = new(ArgumentContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_argument
@@ -12365,44 +13466,36 @@ func (s *ArgumentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Argument() (localctx IArgumentContext) {
-	this := p
-	_ = this
-
 	localctx = NewArgumentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 126, JavaScriptParserRULE_argument)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(803)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JavaScriptParserEllipsis {
 		{
 			p.SetState(802)
 			p.Match(JavaScriptParserEllipsis)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 	p.SetState(807)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 96, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 96, p.GetParserRuleContext()) {
 	case 1:
 		{
 			p.SetState(805)
@@ -12415,9 +13508,21 @@ func (p *JavaScriptParser) Argument() (localctx IArgumentContext) {
 			p.Identifier()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IExpressionSequenceContext is an interface to support dynamic dispatch.
@@ -12427,20 +13532,31 @@ type IExpressionSequenceContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllSingleExpression() []ISingleExpressionContext
+	SingleExpression(i int) ISingleExpressionContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsExpressionSequenceContext differentiates from other interfaces.
 	IsExpressionSequenceContext()
 }
 
 type ExpressionSequenceContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyExpressionSequenceContext() *ExpressionSequenceContext {
 	var p = new(ExpressionSequenceContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_expressionSequence
 	return p
+}
+
+func InitEmptyExpressionSequenceContext(p *ExpressionSequenceContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_expressionSequence
 }
 
 func (*ExpressionSequenceContext) IsExpressionSequenceContext() {}
@@ -12448,7 +13564,7 @@ func (*ExpressionSequenceContext) IsExpressionSequenceContext() {}
 func NewExpressionSequenceContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ExpressionSequenceContext {
 	var p = new(ExpressionSequenceContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_expressionSequence
@@ -12526,28 +13642,8 @@ func (s *ExpressionSequenceContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *JavaScriptParser) ExpressionSequence() (localctx IExpressionSequenceContext) {
-	this := p
-	_ = this
-
 	localctx = NewExpressionSequenceContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 128, JavaScriptParserRULE_expressionSequence)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -12557,13 +13653,22 @@ func (p *JavaScriptParser) ExpressionSequence() (localctx IExpressionSequenceCon
 	}
 	p.SetState(814)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 97, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 97, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
 				p.SetState(810)
 				p.Match(JavaScriptParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(811)
@@ -12573,10 +13678,26 @@ func (p *JavaScriptParser) ExpressionSequence() (localctx IExpressionSequenceCon
 		}
 		p.SetState(816)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 97, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 97, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISpecificExpressionContext is an interface to support dynamic dispatch.
@@ -12586,20 +13707,30 @@ type ISpecificExpressionContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	IdentifierName() IIdentifierNameContext
+	TemplateStringLiteral() ITemplateStringLiteralContext
+	Arguments() IArgumentsContext
+
 	// IsSpecificExpressionContext differentiates from other interfaces.
 	IsSpecificExpressionContext()
 }
 
 type SpecificExpressionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptySpecificExpressionContext() *SpecificExpressionContext {
 	var p = new(SpecificExpressionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_specificExpression
 	return p
+}
+
+func InitEmptySpecificExpressionContext(p *SpecificExpressionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_specificExpression
 }
 
 func (*SpecificExpressionContext) IsSpecificExpressionContext() {}
@@ -12607,7 +13738,7 @@ func (*SpecificExpressionContext) IsSpecificExpressionContext() {}
 func NewSpecificExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SpecificExpressionContext {
 	var p = new(SpecificExpressionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_specificExpression
@@ -12684,30 +13815,13 @@ func (s *SpecificExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *JavaScriptParser) SpecificExpression() (localctx ISpecificExpressionContext) {
-	this := p
-	_ = this
-
 	localctx = NewSpecificExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 130, JavaScriptParserRULE_specificExpression)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(820)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case JavaScriptParserNullLiteral, JavaScriptParserBooleanLiteral, JavaScriptParserBreak, JavaScriptParserDo, JavaScriptParserInstanceof, JavaScriptParserTypeof, JavaScriptParserCase, JavaScriptParserElse, JavaScriptParserNew, JavaScriptParserVar, JavaScriptParserCatch, JavaScriptParserFinally, JavaScriptParserReturn, JavaScriptParserVoid, JavaScriptParserContinue, JavaScriptParserFor, JavaScriptParserSwitch, JavaScriptParserWhile, JavaScriptParserDebugger, JavaScriptParserFunction_, JavaScriptParserThis, JavaScriptParserWith, JavaScriptParserDefault, JavaScriptParserIf, JavaScriptParserThrow, JavaScriptParserDelete, JavaScriptParserIn, JavaScriptParserTry, JavaScriptParserAs, JavaScriptParserFrom, JavaScriptParserGet, JavaScriptParserSet, JavaScriptParserClass, JavaScriptParserEnum, JavaScriptParserExtends, JavaScriptParserSuper, JavaScriptParserConst, JavaScriptParserExport, JavaScriptParserImport, JavaScriptParserAsync, JavaScriptParserAwait, JavaScriptParserYield, JavaScriptParserImplements, JavaScriptParserStrictLet, JavaScriptParserNonStrictLet, JavaScriptParserPrivate, JavaScriptParserPublic, JavaScriptParserInterface, JavaScriptParserPackage, JavaScriptParserProtected, JavaScriptParserStatic, JavaScriptParserIdentifier:
@@ -12732,10 +13846,21 @@ func (p *JavaScriptParser) SpecificExpression() (localctx ISpecificExpressionCon
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IQuestionDotContext is an interface to support dynamic dispatch.
@@ -12745,20 +13870,29 @@ type IQuestionDotContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	QuestionMark() antlr.TerminalNode
+	Dot() antlr.TerminalNode
+
 	// IsQuestionDotContext differentiates from other interfaces.
 	IsQuestionDotContext()
 }
 
 type QuestionDotContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyQuestionDotContext() *QuestionDotContext {
 	var p = new(QuestionDotContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_questionDot
 	return p
+}
+
+func InitEmptyQuestionDotContext(p *QuestionDotContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_questionDot
 }
 
 func (*QuestionDotContext) IsQuestionDotContext() {}
@@ -12766,7 +13900,7 @@ func (*QuestionDotContext) IsQuestionDotContext() {}
 func NewQuestionDotContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *QuestionDotContext {
 	var p = new(QuestionDotContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_questionDot
@@ -12803,39 +13937,37 @@ func (s *QuestionDotContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JavaScriptParser) QuestionDot() (localctx IQuestionDotContext) {
-	this := p
-	_ = this
-
 	localctx = NewQuestionDotContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 132, JavaScriptParserRULE_questionDot)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(822)
 		p.Match(JavaScriptParserQuestionMark)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(823)
 		p.Match(JavaScriptParserDot)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IKeywordSingleExpressionContext is an interface to support dynamic dispatch.
@@ -12844,21 +13976,25 @@ type IKeywordSingleExpressionContext interface {
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
-
 	// IsKeywordSingleExpressionContext differentiates from other interfaces.
 	IsKeywordSingleExpressionContext()
 }
 
 type KeywordSingleExpressionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyKeywordSingleExpressionContext() *KeywordSingleExpressionContext {
 	var p = new(KeywordSingleExpressionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_keywordSingleExpression
 	return p
+}
+
+func InitEmptyKeywordSingleExpressionContext(p *KeywordSingleExpressionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_keywordSingleExpression
 }
 
 func (*KeywordSingleExpressionContext) IsKeywordSingleExpressionContext() {}
@@ -12866,7 +14002,7 @@ func (*KeywordSingleExpressionContext) IsKeywordSingleExpressionContext() {}
 func NewKeywordSingleExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *KeywordSingleExpressionContext {
 	var p = new(KeywordSingleExpressionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_keywordSingleExpression
@@ -12876,8 +14012,8 @@ func NewKeywordSingleExpressionContext(parser antlr.Parser, parent antlr.ParserR
 
 func (s *KeywordSingleExpressionContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *KeywordSingleExpressionContext) CopyFrom(ctx *KeywordSingleExpressionContext) {
-	s.BaseParserRuleContext.CopyFrom(ctx.BaseParserRuleContext)
+func (s *KeywordSingleExpressionContext) CopyAll(ctx *KeywordSingleExpressionContext) {
+	s.CopyFrom(&ctx.BaseParserRuleContext)
 }
 
 func (s *KeywordSingleExpressionContext) GetRuleContext() antlr.RuleContext {
@@ -12889,15 +14025,15 @@ func (s *KeywordSingleExpressionContext) ToStringTree(ruleNames []string, recog 
 }
 
 type AwaitExpressionContext struct {
-	*KeywordSingleExpressionContext
+	KeywordSingleExpressionContext
 }
 
 func NewAwaitExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *AwaitExpressionContext {
 	var p = new(AwaitExpressionContext)
 
-	p.KeywordSingleExpressionContext = NewEmptyKeywordSingleExpressionContext()
+	InitEmptyKeywordSingleExpressionContext(&p.KeywordSingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*KeywordSingleExpressionContext))
+	p.CopyAll(ctx.(*KeywordSingleExpressionContext))
 
 	return p
 }
@@ -12937,15 +14073,15 @@ func (s *AwaitExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 type NewExpressionContext struct {
-	*KeywordSingleExpressionContext
+	KeywordSingleExpressionContext
 }
 
 func NewNewExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *NewExpressionContext {
 	var p = new(NewExpressionContext)
 
-	p.KeywordSingleExpressionContext = NewEmptyKeywordSingleExpressionContext()
+	InitEmptyKeywordSingleExpressionContext(&p.KeywordSingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*KeywordSingleExpressionContext))
+	p.CopyAll(ctx.(*KeywordSingleExpressionContext))
 
 	return p
 }
@@ -13001,15 +14137,15 @@ func (s *NewExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 type MetaExpressionContext struct {
-	*KeywordSingleExpressionContext
+	KeywordSingleExpressionContext
 }
 
 func NewMetaExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *MetaExpressionContext {
 	var p = new(MetaExpressionContext)
 
-	p.KeywordSingleExpressionContext = NewEmptyKeywordSingleExpressionContext()
+	InitEmptyKeywordSingleExpressionContext(&p.KeywordSingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*KeywordSingleExpressionContext))
+	p.CopyAll(ctx.(*KeywordSingleExpressionContext))
 
 	return p
 }
@@ -13053,15 +14189,15 @@ func (s *MetaExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 type NewExpressionWithoutArgumentsExpressionContext struct {
-	*KeywordSingleExpressionContext
+	KeywordSingleExpressionContext
 }
 
 func NewNewExpressionWithoutArgumentsExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *NewExpressionWithoutArgumentsExpressionContext {
 	var p = new(NewExpressionWithoutArgumentsExpressionContext)
 
-	p.KeywordSingleExpressionContext = NewEmptyKeywordSingleExpressionContext()
+	InitEmptyKeywordSingleExpressionContext(&p.KeywordSingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*KeywordSingleExpressionContext))
+	p.CopyAll(ctx.(*KeywordSingleExpressionContext))
 
 	return p
 }
@@ -13101,15 +14237,15 @@ func (s *NewExpressionWithoutArgumentsExpressionContext) Accept(visitor antlr.Pa
 }
 
 type ImportExpressionContext struct {
-	*KeywordSingleExpressionContext
+	KeywordSingleExpressionContext
 }
 
 func NewImportExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ImportExpressionContext {
 	var p = new(ImportExpressionContext)
 
-	p.KeywordSingleExpressionContext = NewEmptyKeywordSingleExpressionContext()
+	InitEmptyKeywordSingleExpressionContext(&p.KeywordSingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*KeywordSingleExpressionContext))
+	p.CopyAll(ctx.(*KeywordSingleExpressionContext))
 
 	return p
 }
@@ -13157,41 +14293,33 @@ func (s *ImportExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaScriptParser) KeywordSingleExpression() (localctx IKeywordSingleExpressionContext) {
-	this := p
-	_ = this
-
 	localctx = NewKeywordSingleExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 134, JavaScriptParserRULE_keywordSingleExpression)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(841)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 99, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 99, p.GetParserRuleContext()) {
 	case 1:
 		localctx = NewImportExpressionContext(p, localctx)
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(825)
 			p.Match(JavaScriptParserImport)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(826)
 			p.Match(JavaScriptParserOpenParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(827)
@@ -13200,6 +14328,10 @@ func (p *JavaScriptParser) KeywordSingleExpression() (localctx IKeywordSingleExp
 		{
 			p.SetState(828)
 			p.Match(JavaScriptParserCloseParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 2:
@@ -13208,6 +14340,10 @@ func (p *JavaScriptParser) KeywordSingleExpression() (localctx IKeywordSingleExp
 		{
 			p.SetState(830)
 			p.Match(JavaScriptParserNew)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(831)
@@ -13224,6 +14360,10 @@ func (p *JavaScriptParser) KeywordSingleExpression() (localctx IKeywordSingleExp
 		{
 			p.SetState(834)
 			p.Match(JavaScriptParserNew)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(835)
@@ -13236,10 +14376,18 @@ func (p *JavaScriptParser) KeywordSingleExpression() (localctx IKeywordSingleExp
 		{
 			p.SetState(836)
 			p.Match(JavaScriptParserNew)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(837)
 			p.Match(JavaScriptParserDot)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(838)
@@ -13252,15 +14400,31 @@ func (p *JavaScriptParser) KeywordSingleExpression() (localctx IKeywordSingleExp
 		{
 			p.SetState(839)
 			p.Match(JavaScriptParserAwait)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(840)
 			p.singleExpression(0)
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISingleExpressionContext is an interface to support dynamic dispatch.
@@ -13269,21 +14433,25 @@ type ISingleExpressionContext interface {
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
-
 	// IsSingleExpressionContext differentiates from other interfaces.
 	IsSingleExpressionContext()
 }
 
 type SingleExpressionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptySingleExpressionContext() *SingleExpressionContext {
 	var p = new(SingleExpressionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_singleExpression
 	return p
+}
+
+func InitEmptySingleExpressionContext(p *SingleExpressionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_singleExpression
 }
 
 func (*SingleExpressionContext) IsSingleExpressionContext() {}
@@ -13291,7 +14459,7 @@ func (*SingleExpressionContext) IsSingleExpressionContext() {}
 func NewSingleExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SingleExpressionContext {
 	var p = new(SingleExpressionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_singleExpression
@@ -13301,8 +14469,8 @@ func NewSingleExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCont
 
 func (s *SingleExpressionContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *SingleExpressionContext) CopyFrom(ctx *SingleExpressionContext) {
-	s.BaseParserRuleContext.CopyFrom(ctx.BaseParserRuleContext)
+func (s *SingleExpressionContext) CopyAll(ctx *SingleExpressionContext) {
+	s.CopyFrom(&ctx.BaseParserRuleContext)
 }
 
 func (s *SingleExpressionContext) GetRuleContext() antlr.RuleContext {
@@ -13314,15 +14482,15 @@ func (s *SingleExpressionContext) ToStringTree(ruleNames []string, recog antlr.R
 }
 
 type TemplateStringExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewTemplateStringExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *TemplateStringExpressionContext {
 	var p = new(TemplateStringExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -13374,15 +14542,15 @@ func (s *TemplateStringExpressionContext) Accept(visitor antlr.ParseTreeVisitor)
 }
 
 type TernaryExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewTernaryExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *TernaryExpressionContext {
 	var p = new(TernaryExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -13451,15 +14619,15 @@ func (s *TernaryExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 type LogicalAndExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewLogicalAndExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *LogicalAndExpressionContext {
 	var p = new(LogicalAndExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -13524,15 +14692,15 @@ func (s *LogicalAndExpressionContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 type ChainExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewChainExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ChainExpressionContext {
 	var p = new(ChainExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -13592,15 +14760,15 @@ func (s *ChainExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 type PowerExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewPowerExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *PowerExpressionContext {
 	var p = new(PowerExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -13665,15 +14833,15 @@ func (s *PowerExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 type ObjectLiteralExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewObjectLiteralExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ObjectLiteralExpressionContext {
 	var p = new(ObjectLiteralExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -13709,15 +14877,15 @@ func (s *ObjectLiteralExpressionContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 type LogicalOrExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewLogicalOrExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *LogicalOrExpressionContext {
 	var p = new(LogicalOrExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -13782,15 +14950,15 @@ func (s *LogicalOrExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 type OptionalChainExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewOptionalChainExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *OptionalChainExpressionContext {
 	var p = new(OptionalChainExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -13858,15 +15026,15 @@ func (s *OptionalChainExpressionContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 type ArgumentsExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewArgumentsExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ArgumentsExpressionContext {
 	var p = new(ArgumentsExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -13918,15 +15086,15 @@ func (s *ArgumentsExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 type ThisExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewThisExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ThisExpressionContext {
 	var p = new(ThisExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -13950,15 +15118,15 @@ func (s *ThisExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 type FunctionExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewFunctionExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *FunctionExpressionContext {
 	var p = new(FunctionExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -13994,15 +15162,15 @@ func (s *FunctionExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 type SuperExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewSuperExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *SuperExpressionContext {
 	var p = new(SuperExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -14026,16 +15194,16 @@ func (s *SuperExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 type MultiplicativeExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 	op antlr.Token
 }
 
 func NewMultiplicativeExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *MultiplicativeExpressionContext {
 	var p = new(MultiplicativeExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -14112,16 +15280,16 @@ func (s *MultiplicativeExpressionContext) Accept(visitor antlr.ParseTreeVisitor)
 }
 
 type BitShiftExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 	op antlr.Token
 }
 
 func NewBitShiftExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *BitShiftExpressionContext {
 	var p = new(BitShiftExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -14198,15 +15366,15 @@ func (s *BitShiftExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 type ParenthesizedExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewParenthesizedExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ParenthesizedExpressionContext {
 	var p = new(ParenthesizedExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -14250,16 +15418,16 @@ func (s *ParenthesizedExpressionContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 type AdditiveExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 	op antlr.Token
 }
 
 func NewAdditiveExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *AdditiveExpressionContext {
 	var p = new(AdditiveExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -14332,16 +15500,16 @@ func (s *AdditiveExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 type RelationalExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 	op antlr.Token
 }
 
 func NewRelationalExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *RelationalExpressionContext {
 	var p = new(RelationalExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -14430,15 +15598,15 @@ func (s *RelationalExpressionContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 type YieldExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewYieldExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *YieldExpressionContext {
 	var p = new(YieldExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -14474,16 +15642,16 @@ func (s *YieldExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 type EqExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 	op antlr.Token
 }
 
 func NewEqExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *EqExpressionContext {
 	var p = new(EqExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -14564,15 +15732,15 @@ func (s *EqExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 type LiteralExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewLiteralExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *LiteralExpressionContext {
 	var p = new(LiteralExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -14608,15 +15776,15 @@ func (s *LiteralExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 type ArrayLiteralExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewArrayLiteralExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ArrayLiteralExpressionContext {
 	var p = new(ArrayLiteralExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -14652,15 +15820,15 @@ func (s *ArrayLiteralExpressionContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 type ClassExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewClassExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ClassExpressionContext {
 	var p = new(ClassExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -14716,15 +15884,15 @@ func (s *ClassExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 type KeywordExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewKeywordExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *KeywordExpressionContext {
 	var p = new(KeywordExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -14760,15 +15928,15 @@ func (s *KeywordExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 type MemberIndexExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewMemberIndexExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *MemberIndexExpressionContext {
 	var p = new(MemberIndexExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -14837,15 +16005,15 @@ func (s *MemberIndexExpressionContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 type IdentifierExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewIdentifierExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *IdentifierExpressionContext {
 	var p = new(IdentifierExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -14881,15 +16049,15 @@ func (s *IdentifierExpressionContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 type PreUnaryExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewPreUnaryExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *PreUnaryExpressionContext {
 	var p = new(PreUnaryExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -14941,16 +16109,16 @@ func (s *PreUnaryExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 type PostUnaryExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 	op antlr.Token
 }
 
 func NewPostUnaryExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *PostUnaryExpressionContext {
 	var p = new(PostUnaryExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -14998,15 +16166,15 @@ func (s *PostUnaryExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 type BitExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewBitExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *BitExpressionContext {
 	var p = new(BitExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -15079,15 +16247,15 @@ func (s *BitExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 type AssignmentOperatorExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewAssignmentOperatorExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *AssignmentOperatorExpressionContext {
 	var p = new(AssignmentOperatorExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -15164,15 +16332,15 @@ func (s *AssignmentOperatorExpressionContext) Accept(visitor antlr.ParseTreeVisi
 }
 
 type CoalesceExpressionContext struct {
-	*SingleExpressionContext
+	SingleExpressionContext
 }
 
 func NewCoalesceExpressionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *CoalesceExpressionContext {
 	var p = new(CoalesceExpressionContext)
 
-	p.SingleExpressionContext = NewEmptySingleExpressionContext()
+	InitEmptySingleExpressionContext(&p.SingleExpressionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*SingleExpressionContext))
+	p.CopyAll(ctx.(*SingleExpressionContext))
 
 	return p
 }
@@ -15241,10 +16409,8 @@ func (p *JavaScriptParser) SingleExpression() (localctx ISingleExpressionContext
 }
 
 func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionContext) {
-	this := p
-	_ = this
-
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
+
 	_parentState := p.GetState()
 	localctx = NewSingleExpressionContext(p, p.GetParserRuleContext(), _parentState)
 	var _prevctx ISingleExpressionContext = localctx
@@ -15253,28 +16419,16 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 	p.EnterRecursionRule(localctx, 136, JavaScriptParserRULE_singleExpression, _p)
 	var _la int
 
-	defer func() {
-		p.UnrollRecursionContexts(_parentctx)
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(865)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 101, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 101, p.GetParserRuleContext()) {
 	case 1:
 		localctx = NewKeywordExpressionContext(p, localctx)
 		p.SetParserRuleContext(localctx)
@@ -15301,9 +16455,16 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 		{
 			p.SetState(846)
 			p.Match(JavaScriptParserClass)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(848)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if (int64((_la-98)) & ^0x3f) == 0 && ((int64(1)<<(_la-98))&12650511) != 0 {
@@ -15343,6 +16504,10 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 		{
 			p.SetState(853)
 			p.Match(JavaScriptParserThis)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 7:
@@ -15361,6 +16526,10 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 		{
 			p.SetState(855)
 			p.Match(JavaScriptParserSuper)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 9:
@@ -15388,6 +16557,10 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 		{
 			p.SetState(858)
 			p.Match(JavaScriptParserOpenParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(859)
@@ -15396,6 +16569,10 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 		{
 			p.SetState(860)
 			p.Match(JavaScriptParserCloseParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 12:
@@ -15411,12 +16588,19 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 			p.singleExpression(13)
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 	p.GetParserRuleContext().SetStop(p.GetTokenStream().LT(-1))
 	p.SetState(930)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 104, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 104, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			if p.GetParseListeners() != nil {
@@ -15425,18 +16609,27 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 			_prevctx = localctx
 			p.SetState(928)
 			p.GetErrorHandler().Sync(p)
-			switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 103, p.GetParserRuleContext()) {
+			if p.HasError() {
+				goto errorExit
+			}
+
+			switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 103, p.GetParserRuleContext()) {
 			case 1:
 				localctx = NewPowerExpressionContext(p, NewSingleExpressionContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, JavaScriptParserRULE_singleExpression)
 				p.SetState(867)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 12)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 12)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 12)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(868)
 					p.Match(JavaScriptParserPower)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(869)
@@ -15449,7 +16642,8 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 				p.SetState(870)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 11)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 11)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 11)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(871)
@@ -15480,7 +16674,8 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 				p.SetState(873)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 10)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 10)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 10)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(874)
@@ -15511,7 +16706,8 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 				p.SetState(876)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 9)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 9)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 9)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(877)
@@ -15542,7 +16738,8 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 				p.SetState(879)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 8)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 8)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 8)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(880)
@@ -15573,7 +16770,8 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 				p.SetState(882)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 7)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 7)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 7)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(883)
@@ -15604,7 +16802,8 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 				p.SetState(885)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 6)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 6)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 6)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(886)
@@ -15628,11 +16827,16 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 				p.SetState(888)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 5)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 5)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 5)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(889)
 					p.Match(JavaScriptParserAnd)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(890)
@@ -15645,11 +16849,16 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 				p.SetState(891)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 4)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 4)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 4)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(892)
 					p.Match(JavaScriptParserOr)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(893)
@@ -15662,11 +16871,16 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 				p.SetState(894)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 3)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 3)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 3)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(895)
 					p.Match(JavaScriptParserNullCoalesce)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(896)
@@ -15679,11 +16893,16 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 				p.SetState(897)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 2)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 2)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 2)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(898)
 					p.Match(JavaScriptParserQuestionMark)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(899)
@@ -15692,6 +16911,10 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 				{
 					p.SetState(900)
 					p.Match(JavaScriptParserColon)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(901)
@@ -15704,7 +16927,8 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 				p.SetState(903)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 1)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 1)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 1)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(904)
@@ -15721,7 +16945,8 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 				p.SetState(907)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 26)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 26)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 26)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(908)
@@ -15734,7 +16959,8 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 				p.SetState(909)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 18)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 18)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 18)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(910)
@@ -15751,20 +16977,32 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 				p.SetState(913)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 17)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 17)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 17)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(914)
 					p.Match(JavaScriptParserDot)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				p.SetState(916)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 
 				if _la == JavaScriptParserHashtag {
 					{
 						p.SetState(915)
 						p.Match(JavaScriptParserHashtag)
+						if p.HasError() {
+							// Recognition error - abort rule
+							goto errorExit
+						}
 					}
 
 				}
@@ -15779,11 +17017,16 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 				p.SetState(919)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 16)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 16)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 16)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(920)
 					p.Match(JavaScriptParserOpenBracket)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(921)
@@ -15792,6 +17035,10 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 				{
 					p.SetState(922)
 					p.Match(JavaScriptParserCloseBracket)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 
 			case 17:
@@ -15800,7 +17047,8 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 				p.SetState(924)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 15)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 15)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 15)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(925)
@@ -15813,7 +17061,8 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 				p.SetState(926)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 14)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 14)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 14)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(927)
@@ -15834,15 +17083,33 @@ func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionC
 					}
 				}
 
+			case antlr.ATNInvalidAltNumber:
+				goto errorExit
 			}
 
 		}
 		p.SetState(932)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 104, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 104, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.UnrollRecursionContexts(_parentctx)
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IPreUnaryOperatorContext is an interface to support dynamic dispatch.
@@ -15852,20 +17119,36 @@ type IPreUnaryOperatorContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	PlusPlus() antlr.TerminalNode
+	MinusMinus() antlr.TerminalNode
+	Plus() antlr.TerminalNode
+	Minus() antlr.TerminalNode
+	Not() antlr.TerminalNode
+	BitNot() antlr.TerminalNode
+	Typeof() antlr.TerminalNode
+	Void() antlr.TerminalNode
+	Delete() antlr.TerminalNode
+
 	// IsPreUnaryOperatorContext differentiates from other interfaces.
 	IsPreUnaryOperatorContext()
 }
 
 type PreUnaryOperatorContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyPreUnaryOperatorContext() *PreUnaryOperatorContext {
 	var p = new(PreUnaryOperatorContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_preUnaryOperator
 	return p
+}
+
+func InitEmptyPreUnaryOperatorContext(p *PreUnaryOperatorContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_preUnaryOperator
 }
 
 func (*PreUnaryOperatorContext) IsPreUnaryOperatorContext() {}
@@ -15873,7 +17156,7 @@ func (*PreUnaryOperatorContext) IsPreUnaryOperatorContext() {}
 func NewPreUnaryOperatorContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *PreUnaryOperatorContext {
 	var p = new(PreUnaryOperatorContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_preUnaryOperator
@@ -15938,31 +17221,15 @@ func (s *PreUnaryOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaScriptParser) PreUnaryOperator() (localctx IPreUnaryOperatorContext) {
-	this := p
-	_ = this
-
 	localctx = NewPreUnaryOperatorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 138, JavaScriptParserRULE_preUnaryOperator)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(938)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case JavaScriptParserPlusPlus, JavaScriptParserMinusMinus:
@@ -15998,6 +17265,10 @@ func (p *JavaScriptParser) PreUnaryOperator() (localctx IPreUnaryOperatorContext
 		{
 			p.SetState(935)
 			p.Match(JavaScriptParserTypeof)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case JavaScriptParserVoid:
@@ -16005,6 +17276,10 @@ func (p *JavaScriptParser) PreUnaryOperator() (localctx IPreUnaryOperatorContext
 		{
 			p.SetState(936)
 			p.Match(JavaScriptParserVoid)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case JavaScriptParserDelete:
@@ -16012,13 +17287,28 @@ func (p *JavaScriptParser) PreUnaryOperator() (localctx IPreUnaryOperatorContext
 		{
 			p.SetState(937)
 			p.Match(JavaScriptParserDelete)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IInitializerContext is an interface to support dynamic dispatch.
@@ -16028,20 +17318,29 @@ type IInitializerContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Assign() antlr.TerminalNode
+	SingleExpression() ISingleExpressionContext
+
 	// IsInitializerContext differentiates from other interfaces.
 	IsInitializerContext()
 }
 
 type InitializerContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyInitializerContext() *InitializerContext {
 	var p = new(InitializerContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_initializer
 	return p
+}
+
+func InitEmptyInitializerContext(p *InitializerContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_initializer
 }
 
 func (*InitializerContext) IsInitializerContext() {}
@@ -16049,7 +17348,7 @@ func (*InitializerContext) IsInitializerContext() {}
 func NewInitializerContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *InitializerContext {
 	var p = new(InitializerContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_initializer
@@ -16098,39 +17397,33 @@ func (s *InitializerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JavaScriptParser) Initializer() (localctx IInitializerContext) {
-	this := p
-	_ = this
-
 	localctx = NewInitializerContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 140, JavaScriptParserRULE_initializer)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(940)
 		p.Match(JavaScriptParserAssign)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(941)
 		p.singleExpression(0)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAssignableContext is an interface to support dynamic dispatch.
@@ -16140,20 +17433,30 @@ type IAssignableContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Identifier() IIdentifierContext
+	ArrayLiteral() IArrayLiteralContext
+	ObjectLiteral() IObjectLiteralContext
+
 	// IsAssignableContext differentiates from other interfaces.
 	IsAssignableContext()
 }
 
 type AssignableContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyAssignableContext() *AssignableContext {
 	var p = new(AssignableContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_assignable
 	return p
+}
+
+func InitEmptyAssignableContext(p *AssignableContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_assignable
 }
 
 func (*AssignableContext) IsAssignableContext() {}
@@ -16161,7 +17464,7 @@ func (*AssignableContext) IsAssignableContext() {}
 func NewAssignableContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AssignableContext {
 	var p = new(AssignableContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_assignable
@@ -16238,30 +17541,13 @@ func (s *AssignableContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Assignable() (localctx IAssignableContext) {
-	this := p
-	_ = this
-
 	localctx = NewAssignableContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 142, JavaScriptParserRULE_assignable)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(946)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case JavaScriptParserAs, JavaScriptParserFrom, JavaScriptParserGet, JavaScriptParserSet, JavaScriptParserAsync, JavaScriptParserNonStrictLet, JavaScriptParserStatic, JavaScriptParserIdentifier:
@@ -16286,10 +17572,21 @@ func (p *JavaScriptParser) Assignable() (localctx IAssignableContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IObjectLiteralContext is an interface to support dynamic dispatch.
@@ -16299,20 +17596,34 @@ type IObjectLiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	OpenBrace() antlr.TerminalNode
+	CloseBrace() antlr.TerminalNode
+	AllPropertyAssignment() []IPropertyAssignmentContext
+	PropertyAssignment(i int) IPropertyAssignmentContext
+	SemiColon() antlr.TerminalNode
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsObjectLiteralContext differentiates from other interfaces.
 	IsObjectLiteralContext()
 }
 
 type ObjectLiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyObjectLiteralContext() *ObjectLiteralContext {
 	var p = new(ObjectLiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_objectLiteral
 	return p
+}
+
+func InitEmptyObjectLiteralContext(p *ObjectLiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_objectLiteral
 }
 
 func (*ObjectLiteralContext) IsObjectLiteralContext() {}
@@ -16320,7 +17631,7 @@ func (*ObjectLiteralContext) IsObjectLiteralContext() {}
 func NewObjectLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ObjectLiteralContext {
 	var p = new(ObjectLiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_objectLiteral
@@ -16410,28 +17721,9 @@ func (s *ObjectLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *JavaScriptParser) ObjectLiteral() (localctx IObjectLiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewObjectLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 144, JavaScriptParserRULE_objectLiteral)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -16439,25 +17731,41 @@ func (p *JavaScriptParser) ObjectLiteral() (localctx IObjectLiteralContext) {
 	{
 		p.SetState(948)
 		p.Match(JavaScriptParserOpenBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(960)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009080261280) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1152921504606846975) != 0 {
+	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-2305843009080261280) != 0) || ((int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&1152921504606846975) != 0) {
 		{
 			p.SetState(949)
 			p.PropertyAssignment()
 		}
 		p.SetState(954)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 107, p.GetParserRuleContext())
-
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 107, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 		for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			if _alt == 1 {
 				{
 					p.SetState(950)
 					p.Match(JavaScriptParserComma)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(951)
@@ -16467,16 +17775,29 @@ func (p *JavaScriptParser) ObjectLiteral() (localctx IObjectLiteralContext) {
 			}
 			p.SetState(956)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 107, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 107, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 		p.SetState(958)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == JavaScriptParserComma {
 			{
 				p.SetState(957)
 				p.Match(JavaScriptParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
@@ -16484,21 +17805,42 @@ func (p *JavaScriptParser) ObjectLiteral() (localctx IObjectLiteralContext) {
 	}
 	p.SetState(963)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JavaScriptParserSemiColon {
 		{
 			p.SetState(962)
 			p.Match(JavaScriptParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 	{
 		p.SetState(965)
 		p.Match(JavaScriptParserCloseBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAnonymousFunctionContext is an interface to support dynamic dispatch.
@@ -16507,21 +17849,25 @@ type IAnonymousFunctionContext interface {
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
-
 	// IsAnonymousFunctionContext differentiates from other interfaces.
 	IsAnonymousFunctionContext()
 }
 
 type AnonymousFunctionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyAnonymousFunctionContext() *AnonymousFunctionContext {
 	var p = new(AnonymousFunctionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_anonymousFunction
 	return p
+}
+
+func InitEmptyAnonymousFunctionContext(p *AnonymousFunctionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_anonymousFunction
 }
 
 func (*AnonymousFunctionContext) IsAnonymousFunctionContext() {}
@@ -16529,7 +17875,7 @@ func (*AnonymousFunctionContext) IsAnonymousFunctionContext() {}
 func NewAnonymousFunctionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AnonymousFunctionContext {
 	var p = new(AnonymousFunctionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_anonymousFunction
@@ -16539,8 +17885,8 @@ func NewAnonymousFunctionContext(parser antlr.Parser, parent antlr.ParserRuleCon
 
 func (s *AnonymousFunctionContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *AnonymousFunctionContext) CopyFrom(ctx *AnonymousFunctionContext) {
-	s.BaseParserRuleContext.CopyFrom(ctx.BaseParserRuleContext)
+func (s *AnonymousFunctionContext) CopyAll(ctx *AnonymousFunctionContext) {
+	s.CopyFrom(&ctx.BaseParserRuleContext)
 }
 
 func (s *AnonymousFunctionContext) GetRuleContext() antlr.RuleContext {
@@ -16552,15 +17898,15 @@ func (s *AnonymousFunctionContext) ToStringTree(ruleNames []string, recog antlr.
 }
 
 type AnonymousFunctionDeclContext struct {
-	*AnonymousFunctionContext
+	AnonymousFunctionContext
 }
 
 func NewAnonymousFunctionDeclContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *AnonymousFunctionDeclContext {
 	var p = new(AnonymousFunctionDeclContext)
 
-	p.AnonymousFunctionContext = NewEmptyAnonymousFunctionContext()
+	InitEmptyAnonymousFunctionContext(&p.AnonymousFunctionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*AnonymousFunctionContext))
+	p.CopyAll(ctx.(*AnonymousFunctionContext))
 
 	return p
 }
@@ -16648,15 +17994,15 @@ func (s *AnonymousFunctionDeclContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 type ArrowFunctionContext struct {
-	*AnonymousFunctionContext
+	AnonymousFunctionContext
 }
 
 func NewArrowFunctionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ArrowFunctionContext {
 	var p = new(ArrowFunctionContext)
 
-	p.AnonymousFunctionContext = NewEmptyAnonymousFunctionContext()
+	InitEmptyAnonymousFunctionContext(&p.AnonymousFunctionContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*AnonymousFunctionContext))
+	p.CopyAll(ctx.(*AnonymousFunctionContext))
 
 	return p
 }
@@ -16716,63 +18062,69 @@ func (s *ArrowFunctionContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *JavaScriptParser) AnonymousFunction() (localctx IAnonymousFunctionContext) {
-	this := p
-	_ = this
-
 	localctx = NewAnonymousFunctionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 146, JavaScriptParserRULE_anonymousFunction)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(990)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 116, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 116, p.GetParserRuleContext()) {
 	case 1:
 		localctx = NewAnonymousFunctionDeclContext(p, localctx)
 		p.EnterOuterAlt(localctx, 1)
 		p.SetState(968)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == JavaScriptParserAsync {
 			{
 				p.SetState(967)
 				p.Match(JavaScriptParserAsync)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		{
 			p.SetState(970)
 			p.Match(JavaScriptParserFunction_)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(972)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == JavaScriptParserMultiply {
 			{
 				p.SetState(971)
 				p.Match(JavaScriptParserMultiply)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		p.SetState(975)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if (int64((_la-98)) & ^0x3f) == 0 && ((int64(1)<<(_la-98))&12650511) != 0 {
@@ -16785,12 +18137,19 @@ func (p *JavaScriptParser) AnonymousFunction() (localctx IAnonymousFunctionConte
 		{
 			p.SetState(977)
 			p.Match(JavaScriptParserOpenParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(979)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&263232) != 0 || (int64((_la-98)) & ^0x3f) == 0 && ((int64(1)<<(_la-98))&12650511) != 0 {
+		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&263232) != 0) || ((int64((_la-98)) & ^0x3f) == 0 && ((int64(1)<<(_la-98))&12650511) != 0) {
 			{
 				p.SetState(978)
 				p.FormalParameterList()
@@ -16800,6 +18159,10 @@ func (p *JavaScriptParser) AnonymousFunction() (localctx IAnonymousFunctionConte
 		{
 			p.SetState(981)
 			p.Match(JavaScriptParserCloseParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(982)
@@ -16812,12 +18175,18 @@ func (p *JavaScriptParser) AnonymousFunction() (localctx IAnonymousFunctionConte
 		p.SetState(984)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 115, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 115, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(983)
 				p.Match(JavaScriptParserAsync)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
+		} else if p.HasError() { // JIM
+			goto errorExit
 		}
 		{
 			p.SetState(986)
@@ -16826,15 +18195,31 @@ func (p *JavaScriptParser) AnonymousFunction() (localctx IAnonymousFunctionConte
 		{
 			p.SetState(987)
 			p.Match(JavaScriptParserARROW)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(988)
 			p.ArrowFunctionBody()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IArrowFunctionParametersContext is an interface to support dynamic dispatch.
@@ -16844,20 +18229,31 @@ type IArrowFunctionParametersContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Identifier() IIdentifierContext
+	OpenParen() antlr.TerminalNode
+	CloseParen() antlr.TerminalNode
+	FormalParameterList() IFormalParameterListContext
+
 	// IsArrowFunctionParametersContext differentiates from other interfaces.
 	IsArrowFunctionParametersContext()
 }
 
 type ArrowFunctionParametersContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyArrowFunctionParametersContext() *ArrowFunctionParametersContext {
 	var p = new(ArrowFunctionParametersContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_arrowFunctionParameters
 	return p
+}
+
+func InitEmptyArrowFunctionParametersContext(p *ArrowFunctionParametersContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_arrowFunctionParameters
 }
 
 func (*ArrowFunctionParametersContext) IsArrowFunctionParametersContext() {}
@@ -16865,7 +18261,7 @@ func (*ArrowFunctionParametersContext) IsArrowFunctionParametersContext() {}
 func NewArrowFunctionParametersContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ArrowFunctionParametersContext {
 	var p = new(ArrowFunctionParametersContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_arrowFunctionParameters
@@ -16934,31 +18330,15 @@ func (s *ArrowFunctionParametersContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 func (p *JavaScriptParser) ArrowFunctionParameters() (localctx IArrowFunctionParametersContext) {
-	this := p
-	_ = this
-
 	localctx = NewArrowFunctionParametersContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 148, JavaScriptParserRULE_arrowFunctionParameters)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(998)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case JavaScriptParserAs, JavaScriptParserFrom, JavaScriptParserGet, JavaScriptParserSet, JavaScriptParserAsync, JavaScriptParserNonStrictLet, JavaScriptParserStatic, JavaScriptParserIdentifier:
@@ -16973,12 +18353,19 @@ func (p *JavaScriptParser) ArrowFunctionParameters() (localctx IArrowFunctionPar
 		{
 			p.SetState(993)
 			p.Match(JavaScriptParserOpenParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(995)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&263232) != 0 || (int64((_la-98)) & ^0x3f) == 0 && ((int64(1)<<(_la-98))&12650511) != 0 {
+		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&263232) != 0) || ((int64((_la-98)) & ^0x3f) == 0 && ((int64(1)<<(_la-98))&12650511) != 0) {
 			{
 				p.SetState(994)
 				p.FormalParameterList()
@@ -16988,13 +18375,28 @@ func (p *JavaScriptParser) ArrowFunctionParameters() (localctx IArrowFunctionPar
 		{
 			p.SetState(997)
 			p.Match(JavaScriptParserCloseParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IArrowFunctionBodyContext is an interface to support dynamic dispatch.
@@ -17004,20 +18406,29 @@ type IArrowFunctionBodyContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	FunctionBody() IFunctionBodyContext
+	SingleExpression() ISingleExpressionContext
+
 	// IsArrowFunctionBodyContext differentiates from other interfaces.
 	IsArrowFunctionBodyContext()
 }
 
 type ArrowFunctionBodyContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyArrowFunctionBodyContext() *ArrowFunctionBodyContext {
 	var p = new(ArrowFunctionBodyContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_arrowFunctionBody
 	return p
+}
+
+func InitEmptyArrowFunctionBodyContext(p *ArrowFunctionBodyContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_arrowFunctionBody
 }
 
 func (*ArrowFunctionBodyContext) IsArrowFunctionBodyContext() {}
@@ -17025,7 +18436,7 @@ func (*ArrowFunctionBodyContext) IsArrowFunctionBodyContext() {}
 func NewArrowFunctionBodyContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ArrowFunctionBodyContext {
 	var p = new(ArrowFunctionBodyContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_arrowFunctionBody
@@ -17086,31 +18497,15 @@ func (s *ArrowFunctionBodyContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaScriptParser) ArrowFunctionBody() (localctx IArrowFunctionBodyContext) {
-	this := p
-	_ = this
-
 	localctx = NewArrowFunctionBodyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 150, JavaScriptParserRULE_arrowFunctionBody)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1002)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 119, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 119, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -17125,9 +18520,21 @@ func (p *JavaScriptParser) ArrowFunctionBody() (localctx IArrowFunctionBodyConte
 			p.singleExpression(0)
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAssignmentOperatorContext is an interface to support dynamic dispatch.
@@ -17137,20 +18544,40 @@ type IAssignmentOperatorContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Assign() antlr.TerminalNode
+	MultiplyAssign() antlr.TerminalNode
+	DivideAssign() antlr.TerminalNode
+	ModulusAssign() antlr.TerminalNode
+	PlusAssign() antlr.TerminalNode
+	MinusAssign() antlr.TerminalNode
+	LeftShiftArithmeticAssign() antlr.TerminalNode
+	RightShiftArithmeticAssign() antlr.TerminalNode
+	RightShiftLogicalAssign() antlr.TerminalNode
+	BitAndAssign() antlr.TerminalNode
+	BitXorAssign() antlr.TerminalNode
+	BitOrAssign() antlr.TerminalNode
+	PowerAssign() antlr.TerminalNode
+
 	// IsAssignmentOperatorContext differentiates from other interfaces.
 	IsAssignmentOperatorContext()
 }
 
 type AssignmentOperatorContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyAssignmentOperatorContext() *AssignmentOperatorContext {
 	var p = new(AssignmentOperatorContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_assignmentOperator
 	return p
+}
+
+func InitEmptyAssignmentOperatorContext(p *AssignmentOperatorContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_assignmentOperator
 }
 
 func (*AssignmentOperatorContext) IsAssignmentOperatorContext() {}
@@ -17158,7 +18585,7 @@ func (*AssignmentOperatorContext) IsAssignmentOperatorContext() {}
 func NewAssignmentOperatorContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AssignmentOperatorContext {
 	var p = new(AssignmentOperatorContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_assignmentOperator
@@ -17239,28 +18666,9 @@ func (s *AssignmentOperatorContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *JavaScriptParser) AssignmentOperator() (localctx IAssignmentOperatorContext) {
-	this := p
-	_ = this
-
 	localctx = NewAssignmentOperatorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 152, JavaScriptParserRULE_assignmentOperator)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -17275,7 +18683,17 @@ func (p *JavaScriptParser) AssignmentOperator() (localctx IAssignmentOperatorCon
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ILiteralContext is an interface to support dynamic dispatch.
@@ -17285,20 +18703,34 @@ type ILiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	NullLiteral() antlr.TerminalNode
+	BooleanLiteral() antlr.TerminalNode
+	StringLiteral() antlr.TerminalNode
+	TemplateStringLiteral() ITemplateStringLiteralContext
+	RegularExpressionLiteral() antlr.TerminalNode
+	NumericLiteral() INumericLiteralContext
+	BigintLiteral() IBigintLiteralContext
+
 	// IsLiteralContext differentiates from other interfaces.
 	IsLiteralContext()
 }
 
 type LiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyLiteralContext() *LiteralContext {
 	var p = new(LiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_literal
 	return p
+}
+
+func InitEmptyLiteralContext(p *LiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_literal
 }
 
 func (*LiteralContext) IsLiteralContext() {}
@@ -17306,7 +18738,7 @@ func (*LiteralContext) IsLiteralContext() {}
 func NewLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *LiteralContext {
 	var p = new(LiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_literal
@@ -17399,30 +18831,13 @@ func (s *LiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Literal() (localctx ILiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 154, JavaScriptParserRULE_literal)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1013)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case JavaScriptParserNullLiteral:
@@ -17430,6 +18845,10 @@ func (p *JavaScriptParser) Literal() (localctx ILiteralContext) {
 		{
 			p.SetState(1006)
 			p.Match(JavaScriptParserNullLiteral)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case JavaScriptParserBooleanLiteral:
@@ -17437,6 +18856,10 @@ func (p *JavaScriptParser) Literal() (localctx ILiteralContext) {
 		{
 			p.SetState(1007)
 			p.Match(JavaScriptParserBooleanLiteral)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case JavaScriptParserStringLiteral:
@@ -17444,6 +18867,10 @@ func (p *JavaScriptParser) Literal() (localctx ILiteralContext) {
 		{
 			p.SetState(1008)
 			p.Match(JavaScriptParserStringLiteral)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case JavaScriptParserBackTick:
@@ -17458,6 +18885,10 @@ func (p *JavaScriptParser) Literal() (localctx ILiteralContext) {
 		{
 			p.SetState(1010)
 			p.Match(JavaScriptParserRegularExpressionLiteral)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case JavaScriptParserDecimalLiteral, JavaScriptParserHexIntegerLiteral, JavaScriptParserOctalIntegerLiteral, JavaScriptParserOctalIntegerLiteral2, JavaScriptParserBinaryIntegerLiteral:
@@ -17475,10 +18906,21 @@ func (p *JavaScriptParser) Literal() (localctx ILiteralContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITemplateStringLiteralContext is an interface to support dynamic dispatch.
@@ -17488,20 +18930,31 @@ type ITemplateStringLiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllBackTick() []antlr.TerminalNode
+	BackTick(i int) antlr.TerminalNode
+	AllTemplateStringAtom() []ITemplateStringAtomContext
+	TemplateStringAtom(i int) ITemplateStringAtomContext
+
 	// IsTemplateStringLiteralContext differentiates from other interfaces.
 	IsTemplateStringLiteralContext()
 }
 
 type TemplateStringLiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTemplateStringLiteralContext() *TemplateStringLiteralContext {
 	var p = new(TemplateStringLiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_templateStringLiteral
 	return p
+}
+
+func InitEmptyTemplateStringLiteralContext(p *TemplateStringLiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_templateStringLiteral
 }
 
 func (*TemplateStringLiteralContext) IsTemplateStringLiteralContext() {}
@@ -17509,7 +18962,7 @@ func (*TemplateStringLiteralContext) IsTemplateStringLiteralContext() {}
 func NewTemplateStringLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TemplateStringLiteralContext {
 	var p = new(TemplateStringLiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_templateStringLiteral
@@ -17587,36 +19040,24 @@ func (s *TemplateStringLiteralContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *JavaScriptParser) TemplateStringLiteral() (localctx ITemplateStringLiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewTemplateStringLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 156, JavaScriptParserRULE_templateStringLiteral)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1015)
 		p.Match(JavaScriptParserBackTick)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(1019)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == JavaScriptParserTemplateStringStartExpression || _la == JavaScriptParserTemplateStringAtom {
@@ -17627,14 +19068,31 @@ func (p *JavaScriptParser) TemplateStringLiteral() (localctx ITemplateStringLite
 
 		p.SetState(1021)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(1022)
 		p.Match(JavaScriptParserBackTick)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITemplateStringAtomContext is an interface to support dynamic dispatch.
@@ -17644,20 +19102,31 @@ type ITemplateStringAtomContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	TemplateStringAtom() antlr.TerminalNode
+	TemplateStringStartExpression() antlr.TerminalNode
+	SingleExpression() ISingleExpressionContext
+	TemplateCloseBrace() antlr.TerminalNode
+
 	// IsTemplateStringAtomContext differentiates from other interfaces.
 	IsTemplateStringAtomContext()
 }
 
 type TemplateStringAtomContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTemplateStringAtomContext() *TemplateStringAtomContext {
 	var p = new(TemplateStringAtomContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_templateStringAtom
 	return p
+}
+
+func InitEmptyTemplateStringAtomContext(p *TemplateStringAtomContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_templateStringAtom
 }
 
 func (*TemplateStringAtomContext) IsTemplateStringAtomContext() {}
@@ -17665,7 +19134,7 @@ func (*TemplateStringAtomContext) IsTemplateStringAtomContext() {}
 func NewTemplateStringAtomContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TemplateStringAtomContext {
 	var p = new(TemplateStringAtomContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_templateStringAtom
@@ -17722,30 +19191,13 @@ func (s *TemplateStringAtomContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *JavaScriptParser) TemplateStringAtom() (localctx ITemplateStringAtomContext) {
-	this := p
-	_ = this
-
 	localctx = NewTemplateStringAtomContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 158, JavaScriptParserRULE_templateStringAtom)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1029)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case JavaScriptParserTemplateStringAtom:
@@ -17753,6 +19205,10 @@ func (p *JavaScriptParser) TemplateStringAtom() (localctx ITemplateStringAtomCon
 		{
 			p.SetState(1024)
 			p.Match(JavaScriptParserTemplateStringAtom)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case JavaScriptParserTemplateStringStartExpression:
@@ -17760,6 +19216,10 @@ func (p *JavaScriptParser) TemplateStringAtom() (localctx ITemplateStringAtomCon
 		{
 			p.SetState(1025)
 			p.Match(JavaScriptParserTemplateStringStartExpression)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1026)
@@ -17768,13 +19228,28 @@ func (p *JavaScriptParser) TemplateStringAtom() (localctx ITemplateStringAtomCon
 		{
 			p.SetState(1027)
 			p.Match(JavaScriptParserTemplateCloseBrace)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // INumericLiteralContext is an interface to support dynamic dispatch.
@@ -17784,20 +19259,32 @@ type INumericLiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	DecimalLiteral() antlr.TerminalNode
+	HexIntegerLiteral() antlr.TerminalNode
+	OctalIntegerLiteral() antlr.TerminalNode
+	OctalIntegerLiteral2() antlr.TerminalNode
+	BinaryIntegerLiteral() antlr.TerminalNode
+
 	// IsNumericLiteralContext differentiates from other interfaces.
 	IsNumericLiteralContext()
 }
 
 type NumericLiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyNumericLiteralContext() *NumericLiteralContext {
 	var p = new(NumericLiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_numericLiteral
 	return p
+}
+
+func InitEmptyNumericLiteralContext(p *NumericLiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_numericLiteral
 }
 
 func (*NumericLiteralContext) IsNumericLiteralContext() {}
@@ -17805,7 +19292,7 @@ func (*NumericLiteralContext) IsNumericLiteralContext() {}
 func NewNumericLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *NumericLiteralContext {
 	var p = new(NumericLiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_numericLiteral
@@ -17854,28 +19341,9 @@ func (s *NumericLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JavaScriptParser) NumericLiteral() (localctx INumericLiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewNumericLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 160, JavaScriptParserRULE_numericLiteral)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -17890,7 +19358,17 @@ func (p *JavaScriptParser) NumericLiteral() (localctx INumericLiteralContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IBigintLiteralContext is an interface to support dynamic dispatch.
@@ -17900,20 +19378,31 @@ type IBigintLiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	BigDecimalIntegerLiteral() antlr.TerminalNode
+	BigHexIntegerLiteral() antlr.TerminalNode
+	BigOctalIntegerLiteral() antlr.TerminalNode
+	BigBinaryIntegerLiteral() antlr.TerminalNode
+
 	// IsBigintLiteralContext differentiates from other interfaces.
 	IsBigintLiteralContext()
 }
 
 type BigintLiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyBigintLiteralContext() *BigintLiteralContext {
 	var p = new(BigintLiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_bigintLiteral
 	return p
+}
+
+func InitEmptyBigintLiteralContext(p *BigintLiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_bigintLiteral
 }
 
 func (*BigintLiteralContext) IsBigintLiteralContext() {}
@@ -17921,7 +19410,7 @@ func (*BigintLiteralContext) IsBigintLiteralContext() {}
 func NewBigintLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *BigintLiteralContext {
 	var p = new(BigintLiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_bigintLiteral
@@ -17966,28 +19455,9 @@ func (s *BigintLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *JavaScriptParser) BigintLiteral() (localctx IBigintLiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewBigintLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 162, JavaScriptParserRULE_bigintLiteral)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -18002,7 +19472,17 @@ func (p *JavaScriptParser) BigintLiteral() (localctx IBigintLiteralContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IGetterContext is an interface to support dynamic dispatch.
@@ -18012,20 +19492,29 @@ type IGetterContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Get() antlr.TerminalNode
+	ClassElementName() IClassElementNameContext
+
 	// IsGetterContext differentiates from other interfaces.
 	IsGetterContext()
 }
 
 type GetterContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyGetterContext() *GetterContext {
 	var p = new(GetterContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_getter
 	return p
+}
+
+func InitEmptyGetterContext(p *GetterContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_getter
 }
 
 func (*GetterContext) IsGetterContext() {}
@@ -18033,7 +19522,7 @@ func (*GetterContext) IsGetterContext() {}
 func NewGetterContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *GetterContext {
 	var p = new(GetterContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_getter
@@ -18082,39 +19571,33 @@ func (s *GetterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Getter() (localctx IGetterContext) {
-	this := p
-	_ = this
-
 	localctx = NewGetterContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 164, JavaScriptParserRULE_getter)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1035)
 		p.Match(JavaScriptParserGet)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1036)
 		p.ClassElementName()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISetterContext is an interface to support dynamic dispatch.
@@ -18124,20 +19607,29 @@ type ISetterContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Set() antlr.TerminalNode
+	ClassElementName() IClassElementNameContext
+
 	// IsSetterContext differentiates from other interfaces.
 	IsSetterContext()
 }
 
 type SetterContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptySetterContext() *SetterContext {
 	var p = new(SetterContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_setter
 	return p
+}
+
+func InitEmptySetterContext(p *SetterContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_setter
 }
 
 func (*SetterContext) IsSetterContext() {}
@@ -18145,7 +19637,7 @@ func (*SetterContext) IsSetterContext() {}
 func NewSetterContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SetterContext {
 	var p = new(SetterContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_setter
@@ -18194,39 +19686,33 @@ func (s *SetterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Setter() (localctx ISetterContext) {
-	this := p
-	_ = this
-
 	localctx = NewSetterContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 166, JavaScriptParserRULE_setter)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1038)
 		p.Match(JavaScriptParserSet)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1039)
 		p.ClassElementName()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIdentifierNameContext is an interface to support dynamic dispatch.
@@ -18236,20 +19722,31 @@ type IIdentifierNameContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Identifier() IIdentifierContext
+	NullLiteral() antlr.TerminalNode
+	BooleanLiteral() antlr.TerminalNode
+	Word() IWordContext
+
 	// IsIdentifierNameContext differentiates from other interfaces.
 	IsIdentifierNameContext()
 }
 
 type IdentifierNameContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyIdentifierNameContext() *IdentifierNameContext {
 	var p = new(IdentifierNameContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_identifierName
 	return p
+}
+
+func InitEmptyIdentifierNameContext(p *IdentifierNameContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_identifierName
 }
 
 func (*IdentifierNameContext) IsIdentifierNameContext() {}
@@ -18257,7 +19754,7 @@ func (*IdentifierNameContext) IsIdentifierNameContext() {}
 func NewIdentifierNameContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *IdentifierNameContext {
 	var p = new(IdentifierNameContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_identifierName
@@ -18326,31 +19823,15 @@ func (s *IdentifierNameContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JavaScriptParser) IdentifierName() (localctx IIdentifierNameContext) {
-	this := p
-	_ = this
-
 	localctx = NewIdentifierNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 168, JavaScriptParserRULE_identifierName)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1045)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 123, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 123, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -18363,6 +19844,10 @@ func (p *JavaScriptParser) IdentifierName() (localctx IIdentifierNameContext) {
 		{
 			p.SetState(1042)
 			p.Match(JavaScriptParserNullLiteral)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 3:
@@ -18370,6 +19855,10 @@ func (p *JavaScriptParser) IdentifierName() (localctx IIdentifierNameContext) {
 		{
 			p.SetState(1043)
 			p.Match(JavaScriptParserBooleanLiteral)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 4:
@@ -18379,9 +19868,21 @@ func (p *JavaScriptParser) IdentifierName() (localctx IIdentifierNameContext) {
 			p.Word()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IWordContext is an interface to support dynamic dispatch.
@@ -18391,20 +19892,74 @@ type IWordContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Break() antlr.TerminalNode
+	Do() antlr.TerminalNode
+	Instanceof() antlr.TerminalNode
+	Typeof() antlr.TerminalNode
+	Case() antlr.TerminalNode
+	Else() antlr.TerminalNode
+	New() antlr.TerminalNode
+	Var() antlr.TerminalNode
+	Catch() antlr.TerminalNode
+	Finally() antlr.TerminalNode
+	Return() antlr.TerminalNode
+	Void() antlr.TerminalNode
+	Continue() antlr.TerminalNode
+	For() antlr.TerminalNode
+	Switch() antlr.TerminalNode
+	While() antlr.TerminalNode
+	Debugger() antlr.TerminalNode
+	Function_() antlr.TerminalNode
+	This() antlr.TerminalNode
+	With() antlr.TerminalNode
+	Default() antlr.TerminalNode
+	If() antlr.TerminalNode
+	Throw() antlr.TerminalNode
+	Delete() antlr.TerminalNode
+	In() antlr.TerminalNode
+	Try() antlr.TerminalNode
+	Class() antlr.TerminalNode
+	Enum() antlr.TerminalNode
+	Extends() antlr.TerminalNode
+	Super() antlr.TerminalNode
+	Const() antlr.TerminalNode
+	Export() antlr.TerminalNode
+	Import() antlr.TerminalNode
+	Implements() antlr.TerminalNode
+	NonStrictLet() antlr.TerminalNode
+	StrictLet() antlr.TerminalNode
+	Private() antlr.TerminalNode
+	Public() antlr.TerminalNode
+	Interface() antlr.TerminalNode
+	Package() antlr.TerminalNode
+	Protected() antlr.TerminalNode
+	Static() antlr.TerminalNode
+	Yield() antlr.TerminalNode
+	Async() antlr.TerminalNode
+	Await() antlr.TerminalNode
+	From() antlr.TerminalNode
+	As() antlr.TerminalNode
+
 	// IsWordContext differentiates from other interfaces.
 	IsWordContext()
 }
 
 type WordContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyWordContext() *WordContext {
 	var p = new(WordContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_word
 	return p
+}
+
+func InitEmptyWordContext(p *WordContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_word
 }
 
 func (*WordContext) IsWordContext() {}
@@ -18412,7 +19967,7 @@ func (*WordContext) IsWordContext() {}
 func NewWordContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *WordContext {
 	var p = new(WordContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_word
@@ -18629,28 +20184,9 @@ func (s *WordContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Word() (localctx IWordContext) {
-	this := p
-	_ = this
-
 	localctx = NewWordContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 170, JavaScriptParserRULE_word)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -18665,7 +20201,17 @@ func (p *JavaScriptParser) Word() (localctx IWordContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIdentifierContext is an interface to support dynamic dispatch.
@@ -18675,20 +20221,35 @@ type IIdentifierContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Identifier() antlr.TerminalNode
+	NonStrictLet() antlr.TerminalNode
+	Async() antlr.TerminalNode
+	As() antlr.TerminalNode
+	From() antlr.TerminalNode
+	Get() antlr.TerminalNode
+	Set() antlr.TerminalNode
+	Static() antlr.TerminalNode
+
 	// IsIdentifierContext differentiates from other interfaces.
 	IsIdentifierContext()
 }
 
 type IdentifierContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyIdentifierContext() *IdentifierContext {
 	var p = new(IdentifierContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_identifier
 	return p
+}
+
+func InitEmptyIdentifierContext(p *IdentifierContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_identifier
 }
 
 func (*IdentifierContext) IsIdentifierContext() {}
@@ -18696,7 +20257,7 @@ func (*IdentifierContext) IsIdentifierContext() {}
 func NewIdentifierContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *IdentifierContext {
 	var p = new(IdentifierContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_identifier
@@ -18757,28 +20318,9 @@ func (s *IdentifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Identifier() (localctx IIdentifierContext) {
-	this := p
-	_ = this
-
 	localctx = NewIdentifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 172, JavaScriptParserRULE_identifier)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -18793,7 +20335,17 @@ func (p *JavaScriptParser) Identifier() (localctx IIdentifierContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IOptionalChainMemberContext is an interface to support dynamic dispatch.
@@ -18803,20 +20355,32 @@ type IOptionalChainMemberContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	IdentifierName() IIdentifierNameContext
+	Hashtag() antlr.TerminalNode
+	OpenBracket() antlr.TerminalNode
+	SingleExpression() ISingleExpressionContext
+	CloseBracket() antlr.TerminalNode
+
 	// IsOptionalChainMemberContext differentiates from other interfaces.
 	IsOptionalChainMemberContext()
 }
 
 type OptionalChainMemberContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyOptionalChainMemberContext() *OptionalChainMemberContext {
 	var p = new(OptionalChainMemberContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_optionalChainMember
 	return p
+}
+
+func InitEmptyOptionalChainMemberContext(p *OptionalChainMemberContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_optionalChainMember
 }
 
 func (*OptionalChainMemberContext) IsOptionalChainMemberContext() {}
@@ -18824,7 +20388,7 @@ func (*OptionalChainMemberContext) IsOptionalChainMemberContext() {}
 func NewOptionalChainMemberContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *OptionalChainMemberContext {
 	var p = new(OptionalChainMemberContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_optionalChainMember
@@ -18897,43 +20461,34 @@ func (s *OptionalChainMemberContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *JavaScriptParser) OptionalChainMember() (localctx IOptionalChainMemberContext) {
-	this := p
-	_ = this
-
 	localctx = NewOptionalChainMemberContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 174, JavaScriptParserRULE_optionalChainMember)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1059)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case JavaScriptParserHashtag, JavaScriptParserNullLiteral, JavaScriptParserBooleanLiteral, JavaScriptParserBreak, JavaScriptParserDo, JavaScriptParserInstanceof, JavaScriptParserTypeof, JavaScriptParserCase, JavaScriptParserElse, JavaScriptParserNew, JavaScriptParserVar, JavaScriptParserCatch, JavaScriptParserFinally, JavaScriptParserReturn, JavaScriptParserVoid, JavaScriptParserContinue, JavaScriptParserFor, JavaScriptParserSwitch, JavaScriptParserWhile, JavaScriptParserDebugger, JavaScriptParserFunction_, JavaScriptParserThis, JavaScriptParserWith, JavaScriptParserDefault, JavaScriptParserIf, JavaScriptParserThrow, JavaScriptParserDelete, JavaScriptParserIn, JavaScriptParserTry, JavaScriptParserAs, JavaScriptParserFrom, JavaScriptParserGet, JavaScriptParserSet, JavaScriptParserClass, JavaScriptParserEnum, JavaScriptParserExtends, JavaScriptParserSuper, JavaScriptParserConst, JavaScriptParserExport, JavaScriptParserImport, JavaScriptParserAsync, JavaScriptParserAwait, JavaScriptParserYield, JavaScriptParserImplements, JavaScriptParserStrictLet, JavaScriptParserNonStrictLet, JavaScriptParserPrivate, JavaScriptParserPublic, JavaScriptParserInterface, JavaScriptParserPackage, JavaScriptParserProtected, JavaScriptParserStatic, JavaScriptParserIdentifier:
 		p.EnterOuterAlt(localctx, 1)
 		p.SetState(1052)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == JavaScriptParserHashtag {
 			{
 				p.SetState(1051)
 				p.Match(JavaScriptParserHashtag)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
@@ -18947,6 +20502,10 @@ func (p *JavaScriptParser) OptionalChainMember() (localctx IOptionalChainMemberC
 		{
 			p.SetState(1055)
 			p.Match(JavaScriptParserOpenBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(1056)
@@ -18955,13 +20514,28 @@ func (p *JavaScriptParser) OptionalChainMember() (localctx IOptionalChainMemberC
 		{
 			p.SetState(1057)
 			p.Match(JavaScriptParserCloseBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IEosContext is an interface to support dynamic dispatch.
@@ -18971,20 +20545,29 @@ type IEosContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	SemiColon() antlr.TerminalNode
+	EOF() antlr.TerminalNode
+
 	// IsEosContext differentiates from other interfaces.
 	IsEosContext()
 }
 
 type EosContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyEosContext() *EosContext {
 	var p = new(EosContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JavaScriptParserRULE_eos
 	return p
+}
+
+func InitEmptyEosContext(p *EosContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JavaScriptParserRULE_eos
 }
 
 func (*EosContext) IsEosContext() {}
@@ -18992,7 +20575,7 @@ func (*EosContext) IsEosContext() {}
 func NewEosContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *EosContext {
 	var p = new(EosContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JavaScriptParserRULE_eos
@@ -19029,36 +20612,24 @@ func (s *EosContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Eos() (localctx IEosContext) {
-	this := p
-	_ = this
-
 	localctx = NewEosContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 176, JavaScriptParserRULE_eos)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(1064)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 126, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 126, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(1061)
 			p.Match(JavaScriptParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 2:
@@ -19066,7 +20637,8 @@ func (p *JavaScriptParser) Eos() (localctx IEosContext) {
 		p.SetState(1062)
 
 		if !(p.isEOS()) {
-			panic(antlr.NewFailedPredicateException(p, "p.isEOS()", ""))
+			p.SetError(antlr.NewFailedPredicateException(p, "p.isEOS()", ""))
+			goto errorExit
 		}
 
 	case 3:
@@ -19074,11 +20646,27 @@ func (p *JavaScriptParser) Eos() (localctx IEosContext) {
 		{
 			p.SetState(1063)
 			p.Match(JavaScriptParserEOF)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 func (p *JavaScriptParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int) bool {
@@ -19110,9 +20698,6 @@ func (p *JavaScriptParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIn
 }
 
 func (p *JavaScriptParser) IterationStatement_Sempred(localctx antlr.RuleContext, predIndex int) bool {
-	this := p
-	_ = this
-
 	switch predIndex {
 	case 0:
 		return p.p("of")
@@ -19123,9 +20708,6 @@ func (p *JavaScriptParser) IterationStatement_Sempred(localctx antlr.RuleContext
 }
 
 func (p *JavaScriptParser) SingleExpression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
-	this := p
-	_ = this
-
 	switch predIndex {
 	case 1:
 		return p.Precpred(p.GetParserRuleContext(), 12)
@@ -19187,9 +20769,6 @@ func (p *JavaScriptParser) SingleExpression_Sempred(localctx antlr.RuleContext, 
 }
 
 func (p *JavaScriptParser) Eos_Sempred(localctx antlr.RuleContext, predIndex int) bool {
-	this := p
-	_ = this
-
 	switch predIndex {
 	case 19:
 		return p.isEOS()

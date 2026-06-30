@@ -1,4 +1,4 @@
-// Code generated from java-escape by ANTLR 4.11.1. DO NOT EDIT.
+// Code generated from ./LuaParser.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
 package parser // LuaParser
 
@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 )
 
 // Suppress unused import errors
@@ -19,20 +19,20 @@ type LuaParser struct {
 	*antlr.BaseParser
 }
 
-var luaparserParserStaticData struct {
+var LuaParserParserStaticData struct {
 	once                   sync.Once
 	serializedATN          []int32
-	literalNames           []string
-	symbolicNames          []string
-	ruleNames              []string
-	predictionContextCache *antlr.PredictionContextCache
+	LiteralNames           []string
+	SymbolicNames          []string
+	RuleNames              []string
+	PredictionContextCache *antlr.PredictionContextCache
 	atn                    *antlr.ATN
 	decisionToDFA          []*antlr.DFA
 }
 
 func luaparserParserInit() {
-	staticData := &luaparserParserStaticData
-	staticData.literalNames = []string{
+	staticData := &LuaParserParserStaticData
+	staticData.LiteralNames = []string{
 		"", "'function'", "'nil'", "'false'", "'true'", "'return'", "'break'",
 		"'continue'", "'goto'", "'repeat'", "'until'", "'while'", "'do'", "'end'",
 		"'if'", "'then'", "'else'", "'elseif'", "'for'", "'in'", "'local'",
@@ -42,7 +42,7 @@ func luaparserParserInit() {
 		"'#'", "'='", "'++'", "'--'", "'+='", "'-='", "'*='", "'/='", "'%='",
 		"';'", "'...'", "'~'", "'.'", "'..'",
 	}
-	staticData.symbolicNames = []string{
+	staticData.SymbolicNames = []string{
 		"", "Function", "Nil", "False", "True", "Return", "Break", "Continue",
 		"Goto", "Repeat", "Until", "While", "Do", "End", "If", "Then", "Else",
 		"ElseIf", "For", "In", "Local", "Not", "Or", "And", "Mul", "Div", "IntegralDiv",
@@ -54,7 +54,7 @@ func luaparserParserInit() {
 		"NORMALSTRING", "CHARSTRING", "LONGSTRING", "INT", "HEX", "FLOAT", "HEX_FLOAT",
 		"COMMENT", "LINE_COMMENT", "WS", "SHEBANG",
 	}
-	staticData.ruleNames = []string{
+	staticData.RuleNames = []string{
 		"chunk", "block", "stat", "attnamelist", "attrib", "laststat", "label",
 		"funcname", "varlist", "namelist", "explist", "exp", "prefixexp", "functioncall",
 		"varOrExp", "var", "varSuffix", "nameAndArgs", "args", "functiondef",
@@ -63,7 +63,7 @@ func luaparserParserInit() {
 		"operatorAddSub", "operatorMulDivMod", "operatorBitwise", "operatorUnary",
 		"operatorPower", "number", "string",
 	}
-	staticData.predictionContextCache = antlr.NewPredictionContextCache()
+	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
 		4, 1, 75, 426, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
 		4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 2, 10, 7,
@@ -270,7 +270,7 @@ func luaparserParserInit() {
 // NewLuaParser(). You can call this function if you wish to initialize the static state ahead
 // of time.
 func LuaParserInit() {
-	staticData := &luaparserParserStaticData
+	staticData := &LuaParserParserStaticData
 	staticData.once.Do(luaparserParserInit)
 }
 
@@ -279,12 +279,12 @@ func NewLuaParser(input antlr.TokenStream) *LuaParser {
 	LuaParserInit()
 	this := new(LuaParser)
 	this.BaseParser = antlr.NewBaseParser(input)
-	staticData := &luaparserParserStaticData
-	this.Interpreter = antlr.NewParserATNSimulator(this, staticData.atn, staticData.decisionToDFA, staticData.predictionContextCache)
-	this.RuleNames = staticData.ruleNames
-	this.LiteralNames = staticData.literalNames
-	this.SymbolicNames = staticData.symbolicNames
-	this.GrammarFileName = "java-escape"
+	staticData := &LuaParserParserStaticData
+	this.Interpreter = antlr.NewParserATNSimulator(this, staticData.atn, staticData.decisionToDFA, staticData.PredictionContextCache)
+	this.RuleNames = staticData.RuleNames
+	this.LiteralNames = staticData.LiteralNames
+	this.SymbolicNames = staticData.SymbolicNames
+	this.GrammarFileName = "LuaParser.g4"
 
 	return this
 }
@@ -417,20 +417,29 @@ type IChunkContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Block() IBlockContext
+	EOF() antlr.TerminalNode
+
 	// IsChunkContext differentiates from other interfaces.
 	IsChunkContext()
 }
 
 type ChunkContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyChunkContext() *ChunkContext {
 	var p = new(ChunkContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_chunk
 	return p
+}
+
+func InitEmptyChunkContext(p *ChunkContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_chunk
 }
 
 func (*ChunkContext) IsChunkContext() {}
@@ -438,7 +447,7 @@ func (*ChunkContext) IsChunkContext() {}
 func NewChunkContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ChunkContext {
 	var p = new(ChunkContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_chunk
@@ -487,28 +496,8 @@ func (s *ChunkContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Chunk() (localctx IChunkContext) {
-	this := p
-	_ = this
-
 	localctx = NewChunkContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, LuaParserRULE_chunk)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(74)
@@ -517,9 +506,23 @@ func (p *LuaParser) Chunk() (localctx IChunkContext) {
 	{
 		p.SetState(75)
 		p.Match(LuaParserEOF)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IBlockContext is an interface to support dynamic dispatch.
@@ -529,20 +532,30 @@ type IBlockContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllStat() []IStatContext
+	Stat(i int) IStatContext
+	Laststat() ILaststatContext
+
 	// IsBlockContext differentiates from other interfaces.
 	IsBlockContext()
 }
 
 type BlockContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyBlockContext() *BlockContext {
 	var p = new(BlockContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_block
 	return p
+}
+
+func InitEmptyBlockContext(p *BlockContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_block
 }
 
 func (*BlockContext) IsBlockContext() {}
@@ -550,7 +563,7 @@ func (*BlockContext) IsBlockContext() {}
 func NewBlockContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *BlockContext {
 	var p = new(BlockContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_block
@@ -636,36 +649,22 @@ func (s *BlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Block() (localctx IBlockContext) {
-	this := p
-	_ = this
-
 	localctx = NewBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 2, LuaParserRULE_block)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(80)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 0, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 0, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -676,10 +675,19 @@ func (p *LuaParser) Block() (localctx IBlockContext) {
 		}
 		p.SetState(82)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 0, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 0, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(84)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&224) != 0 {
@@ -690,7 +698,17 @@ func (p *LuaParser) Block() (localctx IBlockContext) {
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IStatContext is an interface to support dynamic dispatch.
@@ -700,20 +718,61 @@ type IStatContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	SemiColon() antlr.TerminalNode
+	Varlist() IVarlistContext
+	AssignEq() antlr.TerminalNode
+	Explist() IExplistContext
+	Functioncall() IFunctioncallContext
+	Label() ILabelContext
+	Break() antlr.TerminalNode
+	Goto() antlr.TerminalNode
+	NAME() antlr.TerminalNode
+	Do() antlr.TerminalNode
+	AllBlock() []IBlockContext
+	Block(i int) IBlockContext
+	End() antlr.TerminalNode
+	While() antlr.TerminalNode
+	AllExp() []IExpContext
+	Exp(i int) IExpContext
+	Repeat() antlr.TerminalNode
+	Until() antlr.TerminalNode
+	If() antlr.TerminalNode
+	AllThen() []antlr.TerminalNode
+	Then(i int) antlr.TerminalNode
+	AllElseIf() []antlr.TerminalNode
+	ElseIf(i int) antlr.TerminalNode
+	Else() antlr.TerminalNode
+	For() antlr.TerminalNode
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+	Namelist() INamelistContext
+	In() antlr.TerminalNode
+	Function() antlr.TerminalNode
+	Funcname() IFuncnameContext
+	Funcbody() IFuncbodyContext
+	Local() antlr.TerminalNode
+	Attnamelist() IAttnamelistContext
+
 	// IsStatContext differentiates from other interfaces.
 	IsStatContext()
 }
 
 type StatContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyStatContext() *StatContext {
 	var p = new(StatContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_stat
 	return p
+}
+
+func InitEmptyStatContext(p *StatContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_stat
 }
 
 func (*StatContext) IsStatContext() {}
@@ -721,7 +780,7 @@ func (*StatContext) IsStatContext() {}
 func NewStatContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *StatContext {
 	var p = new(StatContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_stat
@@ -1048,37 +1107,26 @@ func (s *StatContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Stat() (localctx IStatContext) {
-	this := p
-	_ = this
-
 	localctx = NewStatContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 4, LuaParserRULE_stat)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(167)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 6, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 6, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(86)
 			p.Match(LuaParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 2:
@@ -1090,6 +1138,10 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(88)
 			p.Match(LuaParserAssignEq)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(89)
@@ -1115,6 +1167,10 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(93)
 			p.Match(LuaParserBreak)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 6:
@@ -1122,10 +1178,18 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(94)
 			p.Match(LuaParserGoto)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(95)
 			p.Match(LuaParserNAME)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 7:
@@ -1133,6 +1197,10 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(96)
 			p.Match(LuaParserDo)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(97)
@@ -1141,6 +1209,10 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(98)
 			p.Match(LuaParserEnd)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 8:
@@ -1148,6 +1220,10 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(100)
 			p.Match(LuaParserWhile)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(101)
@@ -1156,6 +1232,10 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(102)
 			p.Match(LuaParserDo)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(103)
@@ -1164,6 +1244,10 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(104)
 			p.Match(LuaParserEnd)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 9:
@@ -1171,6 +1255,10 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(106)
 			p.Match(LuaParserRepeat)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(107)
@@ -1179,6 +1267,10 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(108)
 			p.Match(LuaParserUntil)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(109)
@@ -1190,6 +1282,10 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(111)
 			p.Match(LuaParserIf)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(112)
@@ -1198,6 +1294,10 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(113)
 			p.Match(LuaParserThen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(114)
@@ -1205,12 +1305,19 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		}
 		p.SetState(122)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == LuaParserElseIf {
 			{
 				p.SetState(115)
 				p.Match(LuaParserElseIf)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(116)
@@ -1219,6 +1326,10 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 			{
 				p.SetState(117)
 				p.Match(LuaParserThen)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(118)
@@ -1227,16 +1338,26 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 
 			p.SetState(124)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 		p.SetState(127)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == LuaParserElse {
 			{
 				p.SetState(125)
 				p.Match(LuaParserElse)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(126)
@@ -1247,6 +1368,10 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(129)
 			p.Match(LuaParserEnd)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 11:
@@ -1254,14 +1379,26 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(131)
 			p.Match(LuaParserFor)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(132)
 			p.Match(LuaParserNAME)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(133)
 			p.Match(LuaParserAssignEq)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(134)
@@ -1270,6 +1407,10 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(135)
 			p.Match(LuaParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(136)
@@ -1277,12 +1418,19 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		}
 		p.SetState(139)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == LuaParserComma {
 			{
 				p.SetState(137)
 				p.Match(LuaParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(138)
@@ -1293,6 +1441,10 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(141)
 			p.Match(LuaParserDo)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(142)
@@ -1301,6 +1453,10 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(143)
 			p.Match(LuaParserEnd)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 12:
@@ -1308,6 +1464,10 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(145)
 			p.Match(LuaParserFor)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(146)
@@ -1316,6 +1476,10 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(147)
 			p.Match(LuaParserIn)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(148)
@@ -1324,6 +1488,10 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(149)
 			p.Match(LuaParserDo)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(150)
@@ -1332,6 +1500,10 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(151)
 			p.Match(LuaParserEnd)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 13:
@@ -1339,6 +1511,10 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(153)
 			p.Match(LuaParserFunction)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(154)
@@ -1354,14 +1530,26 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(157)
 			p.Match(LuaParserLocal)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(158)
 			p.Match(LuaParserFunction)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(159)
 			p.Match(LuaParserNAME)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(160)
@@ -1373,6 +1561,10 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		{
 			p.SetState(161)
 			p.Match(LuaParserLocal)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(162)
@@ -1380,12 +1572,19 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 		}
 		p.SetState(165)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == LuaParserAssignEq {
 			{
 				p.SetState(163)
 				p.Match(LuaParserAssignEq)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(164)
@@ -1394,9 +1593,21 @@ func (p *LuaParser) Stat() (localctx IStatContext) {
 
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAttnamelistContext is an interface to support dynamic dispatch.
@@ -1406,20 +1617,33 @@ type IAttnamelistContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllNAME() []antlr.TerminalNode
+	NAME(i int) antlr.TerminalNode
+	AllAttrib() []IAttribContext
+	Attrib(i int) IAttribContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsAttnamelistContext differentiates from other interfaces.
 	IsAttnamelistContext()
 }
 
 type AttnamelistContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyAttnamelistContext() *AttnamelistContext {
 	var p = new(AttnamelistContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_attnamelist
 	return p
+}
+
+func InitEmptyAttnamelistContext(p *AttnamelistContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_attnamelist
 }
 
 func (*AttnamelistContext) IsAttnamelistContext() {}
@@ -1427,7 +1651,7 @@ func (*AttnamelistContext) IsAttnamelistContext() {}
 func NewAttnamelistContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AttnamelistContext {
 	var p = new(AttnamelistContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_attnamelist
@@ -1513,33 +1737,18 @@ func (s *AttnamelistContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *LuaParser) Attnamelist() (localctx IAttnamelistContext) {
-	this := p
-	_ = this
-
 	localctx = NewAttnamelistContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, LuaParserRULE_attnamelist)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(169)
 		p.Match(LuaParserNAME)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(170)
@@ -1547,16 +1756,27 @@ func (p *LuaParser) Attnamelist() (localctx IAttnamelistContext) {
 	}
 	p.SetState(176)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == LuaParserComma {
 		{
 			p.SetState(171)
 			p.Match(LuaParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(172)
 			p.Match(LuaParserNAME)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(173)
@@ -1565,10 +1785,23 @@ func (p *LuaParser) Attnamelist() (localctx IAttnamelistContext) {
 
 		p.SetState(178)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAttribContext is an interface to support dynamic dispatch.
@@ -1578,20 +1811,30 @@ type IAttribContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Lt() antlr.TerminalNode
+	NAME() antlr.TerminalNode
+	Gt() antlr.TerminalNode
+
 	// IsAttribContext differentiates from other interfaces.
 	IsAttribContext()
 }
 
 type AttribContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyAttribContext() *AttribContext {
 	var p = new(AttribContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_attrib
 	return p
+}
+
+func InitEmptyAttribContext(p *AttribContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_attrib
 }
 
 func (*AttribContext) IsAttribContext() {}
@@ -1599,7 +1842,7 @@ func (*AttribContext) IsAttribContext() {}
 func NewAttribContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AttribContext {
 	var p = new(AttribContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_attrib
@@ -1640,51 +1883,57 @@ func (s *AttribContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Attrib() (localctx IAttribContext) {
-	this := p
-	_ = this
-
 	localctx = NewAttribContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 8, LuaParserRULE_attrib)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(182)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == LuaParserLt {
 		{
 			p.SetState(179)
 			p.Match(LuaParserLt)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(180)
 			p.Match(LuaParserNAME)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(181)
 			p.Match(LuaParserGt)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ILaststatContext is an interface to support dynamic dispatch.
@@ -1694,20 +1943,32 @@ type ILaststatContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Return() antlr.TerminalNode
+	Explist() IExplistContext
+	Break() antlr.TerminalNode
+	Continue() antlr.TerminalNode
+	SemiColon() antlr.TerminalNode
+
 	// IsLaststatContext differentiates from other interfaces.
 	IsLaststatContext()
 }
 
 type LaststatContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyLaststatContext() *LaststatContext {
 	var p = new(LaststatContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_laststat
 	return p
+}
+
+func InitEmptyLaststatContext(p *LaststatContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_laststat
 }
 
 func (*LaststatContext) IsLaststatContext() {}
@@ -1715,7 +1976,7 @@ func (*LaststatContext) IsLaststatContext() {}
 func NewLaststatContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *LaststatContext {
 	var p = new(LaststatContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_laststat
@@ -1776,31 +2037,15 @@ func (s *LaststatContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Laststat() (localctx ILaststatContext) {
-	this := p
-	_ = this
-
 	localctx = NewLaststatContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 10, LuaParserRULE_laststat)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(193)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case LuaParserReturn:
@@ -1808,12 +2053,19 @@ func (p *LuaParser) Laststat() (localctx ILaststatContext) {
 		{
 			p.SetState(184)
 			p.Match(LuaParserReturn)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(186)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&3460066344179859486) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&255) != 0 {
+		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&3460066344179859486) != 0) || ((int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&255) != 0) {
 			{
 				p.SetState(185)
 				p.Explist()
@@ -1826,6 +2078,10 @@ func (p *LuaParser) Laststat() (localctx ILaststatContext) {
 		{
 			p.SetState(188)
 			p.Match(LuaParserBreak)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case LuaParserContinue:
@@ -1833,24 +2089,46 @@ func (p *LuaParser) Laststat() (localctx ILaststatContext) {
 		{
 			p.SetState(189)
 			p.Match(LuaParserContinue)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(191)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == LuaParserSemiColon {
 			{
 				p.SetState(190)
 				p.Match(LuaParserSemiColon)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ILabelContext is an interface to support dynamic dispatch.
@@ -1860,20 +2138,30 @@ type ILabelContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllDoubleColon() []antlr.TerminalNode
+	DoubleColon(i int) antlr.TerminalNode
+	NAME() antlr.TerminalNode
+
 	// IsLabelContext differentiates from other interfaces.
 	IsLabelContext()
 }
 
 type LabelContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyLabelContext() *LabelContext {
 	var p = new(LabelContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_label
 	return p
+}
+
+func InitEmptyLabelContext(p *LabelContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_label
 }
 
 func (*LabelContext) IsLabelContext() {}
@@ -1881,7 +2169,7 @@ func (*LabelContext) IsLabelContext() {}
 func NewLabelContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *LabelContext {
 	var p = new(LabelContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_label
@@ -1922,43 +2210,45 @@ func (s *LabelContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Label() (localctx ILabelContext) {
-	this := p
-	_ = this
-
 	localctx = NewLabelContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 12, LuaParserRULE_label)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(195)
 		p.Match(LuaParserDoubleColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(196)
 		p.Match(LuaParserNAME)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(197)
 		p.Match(LuaParserDoubleColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFuncnameContext is an interface to support dynamic dispatch.
@@ -1968,20 +2258,32 @@ type IFuncnameContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllNAME() []antlr.TerminalNode
+	NAME(i int) antlr.TerminalNode
+	AllDot() []antlr.TerminalNode
+	Dot(i int) antlr.TerminalNode
+	Colon() antlr.TerminalNode
+
 	// IsFuncnameContext differentiates from other interfaces.
 	IsFuncnameContext()
 }
 
 type FuncnameContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFuncnameContext() *FuncnameContext {
 	var p = new(FuncnameContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_funcname
 	return p
+}
+
+func InitEmptyFuncnameContext(p *FuncnameContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_funcname
 }
 
 func (*FuncnameContext) IsFuncnameContext() {}
@@ -1989,7 +2291,7 @@ func (*FuncnameContext) IsFuncnameContext() {}
 func NewFuncnameContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FuncnameContext {
 	var p = new(FuncnameContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_funcname
@@ -2038,69 +2340,89 @@ func (s *FuncnameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Funcname() (localctx IFuncnameContext) {
-	this := p
-	_ = this
-
 	localctx = NewFuncnameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 14, LuaParserRULE_funcname)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(199)
 		p.Match(LuaParserNAME)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(204)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == LuaParserDot {
 		{
 			p.SetState(200)
 			p.Match(LuaParserDot)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(201)
 			p.Match(LuaParserNAME)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 		p.SetState(206)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	p.SetState(209)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == LuaParserColon {
 		{
 			p.SetState(207)
 			p.Match(LuaParserColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(208)
 			p.Match(LuaParserNAME)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IVarlistContext is an interface to support dynamic dispatch.
@@ -2110,20 +2432,31 @@ type IVarlistContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllVar_() []IVarContext
+	Var_(i int) IVarContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsVarlistContext differentiates from other interfaces.
 	IsVarlistContext()
 }
 
 type VarlistContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyVarlistContext() *VarlistContext {
 	var p = new(VarlistContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_varlist
 	return p
+}
+
+func InitEmptyVarlistContext(p *VarlistContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_varlist
 }
 
 func (*VarlistContext) IsVarlistContext() {}
@@ -2131,7 +2464,7 @@ func (*VarlistContext) IsVarlistContext() {}
 func NewVarlistContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *VarlistContext {
 	var p = new(VarlistContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_varlist
@@ -2209,28 +2542,9 @@ func (s *VarlistContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Varlist() (localctx IVarlistContext) {
-	this := p
-	_ = this
-
 	localctx = NewVarlistContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 16, LuaParserRULE_varlist)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -2239,12 +2553,19 @@ func (p *LuaParser) Varlist() (localctx IVarlistContext) {
 	}
 	p.SetState(216)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == LuaParserComma {
 		{
 			p.SetState(212)
 			p.Match(LuaParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(213)
@@ -2253,10 +2574,23 @@ func (p *LuaParser) Varlist() (localctx IVarlistContext) {
 
 		p.SetState(218)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // INamelistContext is an interface to support dynamic dispatch.
@@ -2266,20 +2600,31 @@ type INamelistContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllNAME() []antlr.TerminalNode
+	NAME(i int) antlr.TerminalNode
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsNamelistContext differentiates from other interfaces.
 	IsNamelistContext()
 }
 
 type NamelistContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyNamelistContext() *NamelistContext {
 	var p = new(NamelistContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_namelist
 	return p
+}
+
+func InitEmptyNamelistContext(p *NamelistContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_namelist
 }
 
 func (*NamelistContext) IsNamelistContext() {}
@@ -2287,7 +2632,7 @@ func (*NamelistContext) IsNamelistContext() {}
 func NewNamelistContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *NamelistContext {
 	var p = new(NamelistContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_namelist
@@ -2332,57 +2677,70 @@ func (s *NamelistContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Namelist() (localctx INamelistContext) {
-	this := p
-	_ = this
-
 	localctx = NewNamelistContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 18, LuaParserRULE_namelist)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(219)
 		p.Match(LuaParserNAME)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(224)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 15, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 15, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
 				p.SetState(220)
 				p.Match(LuaParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(221)
 				p.Match(LuaParserNAME)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		p.SetState(226)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 15, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 15, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IExplistContext is an interface to support dynamic dispatch.
@@ -2392,20 +2750,31 @@ type IExplistContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllExp() []IExpContext
+	Exp(i int) IExpContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsExplistContext differentiates from other interfaces.
 	IsExplistContext()
 }
 
 type ExplistContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyExplistContext() *ExplistContext {
 	var p = new(ExplistContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_explist
 	return p
+}
+
+func InitEmptyExplistContext(p *ExplistContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_explist
 }
 
 func (*ExplistContext) IsExplistContext() {}
@@ -2413,7 +2782,7 @@ func (*ExplistContext) IsExplistContext() {}
 func NewExplistContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ExplistContext {
 	var p = new(ExplistContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_explist
@@ -2491,35 +2860,20 @@ func (s *ExplistContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Explist() (localctx IExplistContext) {
-	this := p
-	_ = this
-
 	localctx = NewExplistContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 20, LuaParserRULE_explist)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(232)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 16, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 16, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -2529,19 +2883,39 @@ func (p *LuaParser) Explist() (localctx IExplistContext) {
 			{
 				p.SetState(228)
 				p.Match(LuaParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		p.SetState(234)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 16, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 16, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(235)
 		p.exp(0)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IExpContext is an interface to support dynamic dispatch.
@@ -2551,20 +2925,47 @@ type IExpContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Nil() antlr.TerminalNode
+	False() antlr.TerminalNode
+	True() antlr.TerminalNode
+	Number() INumberContext
+	String_() IStringContext
+	Ellipsis() antlr.TerminalNode
+	Functiondef() IFunctiondefContext
+	Prefixexp() IPrefixexpContext
+	Tableconstructor() ITableconstructorContext
+	OperatorUnary() IOperatorUnaryContext
+	AllExp() []IExpContext
+	Exp(i int) IExpContext
+	OperatorPower() IOperatorPowerContext
+	OperatorMulDivMod() IOperatorMulDivModContext
+	OperatorAddSub() IOperatorAddSubContext
+	OperatorStrcat() IOperatorStrcatContext
+	OperatorComparison() IOperatorComparisonContext
+	OperatorAnd() IOperatorAndContext
+	OperatorOr() IOperatorOrContext
+	OperatorBitwise() IOperatorBitwiseContext
+
 	// IsExpContext differentiates from other interfaces.
 	IsExpContext()
 }
 
 type ExpContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyExpContext() *ExpContext {
 	var p = new(ExpContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_exp
 	return p
+}
+
+func InitEmptyExpContext(p *ExpContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_exp
 }
 
 func (*ExpContext) IsExpContext() {}
@@ -2572,7 +2973,7 @@ func (*ExpContext) IsExpContext() {}
 func NewExpContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ExpContext {
 	var p = new(ExpContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_exp
@@ -2886,56 +3287,52 @@ func (p *LuaParser) Exp() (localctx IExpContext) {
 }
 
 func (p *LuaParser) exp(_p int) (localctx IExpContext) {
-	this := p
-	_ = this
-
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
+
 	_parentState := p.GetState()
 	localctx = NewExpContext(p, p.GetParserRuleContext(), _parentState)
 	var _prevctx IExpContext = localctx
 	var _ antlr.ParserRuleContext = _prevctx // TODO: To prevent unused variable warning.
 	_startState := 22
 	p.EnterRecursionRule(localctx, 22, LuaParserRULE_exp, _p)
-
-	defer func() {
-		p.UnrollRecursionContexts(_parentctx)
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(250)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case LuaParserNil:
 		{
 			p.SetState(238)
 			p.Match(LuaParserNil)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case LuaParserFalse:
 		{
 			p.SetState(239)
 			p.Match(LuaParserFalse)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case LuaParserTrue:
 		{
 			p.SetState(240)
 			p.Match(LuaParserTrue)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case LuaParserINT, LuaParserHEX, LuaParserFLOAT, LuaParserHEX_FLOAT:
@@ -2954,6 +3351,10 @@ func (p *LuaParser) exp(_p int) (localctx IExpContext) {
 		{
 			p.SetState(243)
 			p.Match(LuaParserEllipsis)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case LuaParserFunction:
@@ -2985,13 +3386,19 @@ func (p *LuaParser) exp(_p int) (localctx IExpContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 	p.GetParserRuleContext().SetStop(p.GetTokenStream().LT(-1))
 	p.SetState(286)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 19, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 19, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			if p.GetParseListeners() != nil {
@@ -3000,14 +3407,19 @@ func (p *LuaParser) exp(_p int) (localctx IExpContext) {
 			_prevctx = localctx
 			p.SetState(284)
 			p.GetErrorHandler().Sync(p)
-			switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 18, p.GetParserRuleContext()) {
+			if p.HasError() {
+				goto errorExit
+			}
+
+			switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 18, p.GetParserRuleContext()) {
 			case 1:
 				localctx = NewExpContext(p, _parentctx, _parentState)
 				p.PushNewRecursionContext(localctx, _startState, LuaParserRULE_exp)
 				p.SetState(252)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 9)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 9)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 9)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(253)
@@ -3024,7 +3436,8 @@ func (p *LuaParser) exp(_p int) (localctx IExpContext) {
 				p.SetState(256)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 7)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 7)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 7)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(257)
@@ -3041,7 +3454,8 @@ func (p *LuaParser) exp(_p int) (localctx IExpContext) {
 				p.SetState(260)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 6)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 6)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 6)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(261)
@@ -3058,7 +3472,8 @@ func (p *LuaParser) exp(_p int) (localctx IExpContext) {
 				p.SetState(264)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 5)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 5)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 5)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(265)
@@ -3075,7 +3490,8 @@ func (p *LuaParser) exp(_p int) (localctx IExpContext) {
 				p.SetState(268)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 4)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 4)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 4)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(269)
@@ -3092,7 +3508,8 @@ func (p *LuaParser) exp(_p int) (localctx IExpContext) {
 				p.SetState(272)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 3)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 3)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 3)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(273)
@@ -3109,7 +3526,8 @@ func (p *LuaParser) exp(_p int) (localctx IExpContext) {
 				p.SetState(276)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 2)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 2)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 2)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(277)
@@ -3126,7 +3544,8 @@ func (p *LuaParser) exp(_p int) (localctx IExpContext) {
 				p.SetState(280)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 1)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 1)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 1)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(281)
@@ -3137,15 +3556,33 @@ func (p *LuaParser) exp(_p int) (localctx IExpContext) {
 					p.exp(2)
 				}
 
+			case antlr.ATNInvalidAltNumber:
+				goto errorExit
 			}
 
 		}
 		p.SetState(288)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 19, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 19, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.UnrollRecursionContexts(_parentctx)
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IPrefixexpContext is an interface to support dynamic dispatch.
@@ -3155,20 +3592,30 @@ type IPrefixexpContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	VarOrExp() IVarOrExpContext
+	AllNameAndArgs() []INameAndArgsContext
+	NameAndArgs(i int) INameAndArgsContext
+
 	// IsPrefixexpContext differentiates from other interfaces.
 	IsPrefixexpContext()
 }
 
 type PrefixexpContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyPrefixexpContext() *PrefixexpContext {
 	var p = new(PrefixexpContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_prefixexp
 	return p
+}
+
+func InitEmptyPrefixexpContext(p *PrefixexpContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_prefixexp
 }
 
 func (*PrefixexpContext) IsPrefixexpContext() {}
@@ -3176,7 +3623,7 @@ func (*PrefixexpContext) IsPrefixexpContext() {}
 func NewPrefixexpContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *PrefixexpContext {
 	var p = new(PrefixexpContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_prefixexp
@@ -3262,28 +3709,8 @@ func (s *PrefixexpContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Prefixexp() (localctx IPrefixexpContext) {
-	this := p
-	_ = this
-
 	localctx = NewPrefixexpContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 24, LuaParserRULE_prefixexp)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -3293,8 +3720,13 @@ func (p *LuaParser) Prefixexp() (localctx IPrefixexpContext) {
 	}
 	p.SetState(293)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 20, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 20, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -3305,10 +3737,26 @@ func (p *LuaParser) Prefixexp() (localctx IPrefixexpContext) {
 		}
 		p.SetState(295)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 20, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 20, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFunctioncallContext is an interface to support dynamic dispatch.
@@ -3318,20 +3766,30 @@ type IFunctioncallContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	VarOrExp() IVarOrExpContext
+	AllNameAndArgs() []INameAndArgsContext
+	NameAndArgs(i int) INameAndArgsContext
+
 	// IsFunctioncallContext differentiates from other interfaces.
 	IsFunctioncallContext()
 }
 
 type FunctioncallContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFunctioncallContext() *FunctioncallContext {
 	var p = new(FunctioncallContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_functioncall
 	return p
+}
+
+func InitEmptyFunctioncallContext(p *FunctioncallContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_functioncall
 }
 
 func (*FunctioncallContext) IsFunctioncallContext() {}
@@ -3339,7 +3797,7 @@ func (*FunctioncallContext) IsFunctioncallContext() {}
 func NewFunctioncallContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FunctioncallContext {
 	var p = new(FunctioncallContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_functioncall
@@ -3425,28 +3883,8 @@ func (s *FunctioncallContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *LuaParser) Functioncall() (localctx IFunctioncallContext) {
-	this := p
-	_ = this
-
 	localctx = NewFunctioncallContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 26, LuaParserRULE_functioncall)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -3456,6 +3894,9 @@ func (p *LuaParser) Functioncall() (localctx IFunctioncallContext) {
 	}
 	p.SetState(298)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_alt = 1
 	for ok := true; ok; ok = _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		switch _alt {
@@ -3466,15 +3907,29 @@ func (p *LuaParser) Functioncall() (localctx IFunctioncallContext) {
 			}
 
 		default:
-			panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			goto errorExit
 		}
 
 		p.SetState(300)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 21, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 21, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IVarOrExpContext is an interface to support dynamic dispatch.
@@ -3484,20 +3939,31 @@ type IVarOrExpContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Var_() IVarContext
+	LParen() antlr.TerminalNode
+	Exp() IExpContext
+	RParen() antlr.TerminalNode
+
 	// IsVarOrExpContext differentiates from other interfaces.
 	IsVarOrExpContext()
 }
 
 type VarOrExpContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyVarOrExpContext() *VarOrExpContext {
 	var p = new(VarOrExpContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_varOrExp
 	return p
+}
+
+func InitEmptyVarOrExpContext(p *VarOrExpContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_varOrExp
 }
 
 func (*VarOrExpContext) IsVarOrExpContext() {}
@@ -3505,7 +3971,7 @@ func (*VarOrExpContext) IsVarOrExpContext() {}
 func NewVarOrExpContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *VarOrExpContext {
 	var p = new(VarOrExpContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_varOrExp
@@ -3574,31 +4040,15 @@ func (s *VarOrExpContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) VarOrExp() (localctx IVarOrExpContext) {
-	this := p
-	_ = this
-
 	localctx = NewVarOrExpContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 28, LuaParserRULE_varOrExp)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(307)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 22, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 22, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -3611,6 +4061,10 @@ func (p *LuaParser) VarOrExp() (localctx IVarOrExpContext) {
 		{
 			p.SetState(303)
 			p.Match(LuaParserLParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(304)
@@ -3619,11 +4073,27 @@ func (p *LuaParser) VarOrExp() (localctx IVarOrExpContext) {
 		{
 			p.SetState(305)
 			p.Match(LuaParserRParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IVarContext is an interface to support dynamic dispatch.
@@ -3633,20 +4103,33 @@ type IVarContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	NAME() antlr.TerminalNode
+	LParen() antlr.TerminalNode
+	Exp() IExpContext
+	RParen() antlr.TerminalNode
+	AllVarSuffix() []IVarSuffixContext
+	VarSuffix(i int) IVarSuffixContext
+
 	// IsVarContext differentiates from other interfaces.
 	IsVarContext()
 }
 
 type VarContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyVarContext() *VarContext {
 	var p = new(VarContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_var
 	return p
+}
+
+func InitEmptyVarContext(p *VarContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_var
 }
 
 func (*VarContext) IsVarContext() {}
@@ -3654,7 +4137,7 @@ func (*VarContext) IsVarContext() {}
 func NewVarContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *VarContext {
 	var p = new(VarContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_var
@@ -3752,45 +4235,36 @@ func (s *VarContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Var_() (localctx IVarContext) {
-	this := p
-	_ = this
-
 	localctx = NewVarContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 30, LuaParserRULE_var)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(315)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case LuaParserNAME:
 		{
 			p.SetState(309)
 			p.Match(LuaParserNAME)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case LuaParserLParen:
 		{
 			p.SetState(310)
 			p.Match(LuaParserLParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(311)
@@ -3799,6 +4273,10 @@ func (p *LuaParser) Var_() (localctx IVarContext) {
 		{
 			p.SetState(312)
 			p.Match(LuaParserRParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(313)
@@ -3806,12 +4284,18 @@ func (p *LuaParser) Var_() (localctx IVarContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 	p.SetState(320)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 24, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 24, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -3822,10 +4306,26 @@ func (p *LuaParser) Var_() (localctx IVarContext) {
 		}
 		p.SetState(322)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 24, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 24, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IVarSuffixContext is an interface to support dynamic dispatch.
@@ -3835,20 +4335,34 @@ type IVarSuffixContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	LBracket() antlr.TerminalNode
+	Exp() IExpContext
+	RBracket() antlr.TerminalNode
+	Dot() antlr.TerminalNode
+	NAME() antlr.TerminalNode
+	AllNameAndArgs() []INameAndArgsContext
+	NameAndArgs(i int) INameAndArgsContext
+
 	// IsVarSuffixContext differentiates from other interfaces.
 	IsVarSuffixContext()
 }
 
 type VarSuffixContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyVarSuffixContext() *VarSuffixContext {
 	var p = new(VarSuffixContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_varSuffix
 	return p
+}
+
+func InitEmptyVarSuffixContext(p *VarSuffixContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_varSuffix
 }
 
 func (*VarSuffixContext) IsVarSuffixContext() {}
@@ -3856,7 +4370,7 @@ func (*VarSuffixContext) IsVarSuffixContext() {}
 func NewVarSuffixContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *VarSuffixContext {
 	var p = new(VarSuffixContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_varSuffix
@@ -3958,32 +4472,16 @@ func (s *VarSuffixContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) VarSuffix() (localctx IVarSuffixContext) {
-	this := p
-	_ = this
-
 	localctx = NewVarSuffixContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 32, LuaParserRULE_varSuffix)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(326)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for (int64((_la-41)) & ^0x3f) == 0 && ((int64(1)<<(_la-41))&117440593) != 0 {
@@ -3994,16 +4492,26 @@ func (p *LuaParser) VarSuffix() (localctx IVarSuffixContext) {
 
 		p.SetState(328)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	p.SetState(335)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case LuaParserLBracket:
 		{
 			p.SetState(329)
 			p.Match(LuaParserLBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(330)
@@ -4012,23 +4520,46 @@ func (p *LuaParser) VarSuffix() (localctx IVarSuffixContext) {
 		{
 			p.SetState(331)
 			p.Match(LuaParserRBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case LuaParserDot:
 		{
 			p.SetState(333)
 			p.Match(LuaParserDot)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(334)
 			p.Match(LuaParserNAME)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // INameAndArgsContext is an interface to support dynamic dispatch.
@@ -4038,20 +4569,30 @@ type INameAndArgsContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Args() IArgsContext
+	Colon() antlr.TerminalNode
+	NAME() antlr.TerminalNode
+
 	// IsNameAndArgsContext differentiates from other interfaces.
 	IsNameAndArgsContext()
 }
 
 type NameAndArgsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyNameAndArgsContext() *NameAndArgsContext {
 	var p = new(NameAndArgsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_nameAndArgs
 	return p
+}
+
+func InitEmptyNameAndArgsContext(p *NameAndArgsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_nameAndArgs
 }
 
 func (*NameAndArgsContext) IsNameAndArgsContext() {}
@@ -4059,7 +4600,7 @@ func (*NameAndArgsContext) IsNameAndArgsContext() {}
 func NewNameAndArgsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *NameAndArgsContext {
 	var p = new(NameAndArgsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_nameAndArgs
@@ -4112,42 +4653,34 @@ func (s *NameAndArgsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *LuaParser) NameAndArgs() (localctx INameAndArgsContext) {
-	this := p
-	_ = this
-
 	localctx = NewNameAndArgsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 34, LuaParserRULE_nameAndArgs)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(339)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == LuaParserColon {
 		{
 			p.SetState(337)
 			p.Match(LuaParserColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(338)
 			p.Match(LuaParserNAME)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
@@ -4156,7 +4689,17 @@ func (p *LuaParser) NameAndArgs() (localctx INameAndArgsContext) {
 		p.Args()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IArgsContext is an interface to support dynamic dispatch.
@@ -4166,20 +4709,32 @@ type IArgsContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	LParen() antlr.TerminalNode
+	RParen() antlr.TerminalNode
+	Explist() IExplistContext
+	Tableconstructor() ITableconstructorContext
+	String_() IStringContext
+
 	// IsArgsContext differentiates from other interfaces.
 	IsArgsContext()
 }
 
 type ArgsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyArgsContext() *ArgsContext {
 	var p = new(ArgsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_args
 	return p
+}
+
+func InitEmptyArgsContext(p *ArgsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_args
 }
 
 func (*ArgsContext) IsArgsContext() {}
@@ -4187,7 +4742,7 @@ func (*ArgsContext) IsArgsContext() {}
 func NewArgsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ArgsContext {
 	var p = new(ArgsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_args
@@ -4272,31 +4827,15 @@ func (s *ArgsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Args() (localctx IArgsContext) {
-	this := p
-	_ = this
-
 	localctx = NewArgsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 36, LuaParserRULE_args)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(350)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case LuaParserLParen:
@@ -4304,12 +4843,19 @@ func (p *LuaParser) Args() (localctx IArgsContext) {
 		{
 			p.SetState(343)
 			p.Match(LuaParserLParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(345)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&3460066344179859486) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&255) != 0 {
+		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&3460066344179859486) != 0) || ((int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&255) != 0) {
 			{
 				p.SetState(344)
 				p.Explist()
@@ -4319,6 +4865,10 @@ func (p *LuaParser) Args() (localctx IArgsContext) {
 		{
 			p.SetState(347)
 			p.Match(LuaParserRParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case LuaParserLBrace:
@@ -4336,10 +4886,21 @@ func (p *LuaParser) Args() (localctx IArgsContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFunctiondefContext is an interface to support dynamic dispatch.
@@ -4349,20 +4910,29 @@ type IFunctiondefContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Function() antlr.TerminalNode
+	Funcbody() IFuncbodyContext
+
 	// IsFunctiondefContext differentiates from other interfaces.
 	IsFunctiondefContext()
 }
 
 type FunctiondefContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFunctiondefContext() *FunctiondefContext {
 	var p = new(FunctiondefContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_functiondef
 	return p
+}
+
+func InitEmptyFunctiondefContext(p *FunctiondefContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_functiondef
 }
 
 func (*FunctiondefContext) IsFunctiondefContext() {}
@@ -4370,7 +4940,7 @@ func (*FunctiondefContext) IsFunctiondefContext() {}
 func NewFunctiondefContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FunctiondefContext {
 	var p = new(FunctiondefContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_functiondef
@@ -4419,39 +4989,33 @@ func (s *FunctiondefContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *LuaParser) Functiondef() (localctx IFunctiondefContext) {
-	this := p
-	_ = this
-
 	localctx = NewFunctiondefContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 38, LuaParserRULE_functiondef)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(352)
 		p.Match(LuaParserFunction)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(353)
 		p.Funcbody()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFuncbodyContext is an interface to support dynamic dispatch.
@@ -4461,20 +5025,32 @@ type IFuncbodyContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	LParen() antlr.TerminalNode
+	RParen() antlr.TerminalNode
+	Block() IBlockContext
+	End() antlr.TerminalNode
+	Parlist() IParlistContext
+
 	// IsFuncbodyContext differentiates from other interfaces.
 	IsFuncbodyContext()
 }
 
 type FuncbodyContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFuncbodyContext() *FuncbodyContext {
 	var p = new(FuncbodyContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_funcbody
 	return p
+}
+
+func InitEmptyFuncbodyContext(p *FuncbodyContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_funcbody
 }
 
 func (*FuncbodyContext) IsFuncbodyContext() {}
@@ -4482,7 +5058,7 @@ func (*FuncbodyContext) IsFuncbodyContext() {}
 func NewFuncbodyContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FuncbodyContext {
 	var p = new(FuncbodyContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_funcbody
@@ -4555,36 +5131,24 @@ func (s *FuncbodyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Funcbody() (localctx IFuncbodyContext) {
-	this := p
-	_ = this
-
 	localctx = NewFuncbodyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 40, LuaParserRULE_funcbody)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(355)
 		p.Match(LuaParserLParen)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(357)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == LuaParserEllipsis || _la == LuaParserNAME {
@@ -4597,6 +5161,10 @@ func (p *LuaParser) Funcbody() (localctx IFuncbodyContext) {
 	{
 		p.SetState(359)
 		p.Match(LuaParserRParen)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(360)
@@ -4605,9 +5173,23 @@ func (p *LuaParser) Funcbody() (localctx IFuncbodyContext) {
 	{
 		p.SetState(361)
 		p.Match(LuaParserEnd)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IParlistContext is an interface to support dynamic dispatch.
@@ -4617,20 +5199,30 @@ type IParlistContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Namelist() INamelistContext
+	Comma() antlr.TerminalNode
+	Ellipsis() antlr.TerminalNode
+
 	// IsParlistContext differentiates from other interfaces.
 	IsParlistContext()
 }
 
 type ParlistContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyParlistContext() *ParlistContext {
 	var p = new(ParlistContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_parlist
 	return p
+}
+
+func InitEmptyParlistContext(p *ParlistContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_parlist
 }
 
 func (*ParlistContext) IsParlistContext() {}
@@ -4638,7 +5230,7 @@ func (*ParlistContext) IsParlistContext() {}
 func NewParlistContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ParlistContext {
 	var p = new(ParlistContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_parlist
@@ -4691,31 +5283,15 @@ func (s *ParlistContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Parlist() (localctx IParlistContext) {
-	this := p
-	_ = this
-
 	localctx = NewParlistContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 42, LuaParserRULE_parlist)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(369)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case LuaParserNAME:
@@ -4726,16 +5302,27 @@ func (p *LuaParser) Parlist() (localctx IParlistContext) {
 		}
 		p.SetState(366)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == LuaParserComma {
 			{
 				p.SetState(364)
 				p.Match(LuaParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(365)
 				p.Match(LuaParserEllipsis)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
@@ -4745,13 +5332,28 @@ func (p *LuaParser) Parlist() (localctx IParlistContext) {
 		{
 			p.SetState(368)
 			p.Match(LuaParserEllipsis)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITableconstructorContext is an interface to support dynamic dispatch.
@@ -4761,20 +5363,30 @@ type ITableconstructorContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	LBrace() antlr.TerminalNode
+	RBrace() antlr.TerminalNode
+	Fieldlist() IFieldlistContext
+
 	// IsTableconstructorContext differentiates from other interfaces.
 	IsTableconstructorContext()
 }
 
 type TableconstructorContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTableconstructorContext() *TableconstructorContext {
 	var p = new(TableconstructorContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_tableconstructor
 	return p
+}
+
+func InitEmptyTableconstructorContext(p *TableconstructorContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_tableconstructor
 }
 
 func (*TableconstructorContext) IsTableconstructorContext() {}
@@ -4782,7 +5394,7 @@ func (*TableconstructorContext) IsTableconstructorContext() {}
 func NewTableconstructorContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TableconstructorContext {
 	var p = new(TableconstructorContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_tableconstructor
@@ -4835,39 +5447,27 @@ func (s *TableconstructorContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *LuaParser) Tableconstructor() (localctx ITableconstructorContext) {
-	this := p
-	_ = this
-
 	localctx = NewTableconstructorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 44, LuaParserRULE_tableconstructor)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(371)
 		p.Match(LuaParserLBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(373)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&3460075140272881694) != 0 || (int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&255) != 0 {
+	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&3460075140272881694) != 0) || ((int64((_la-64)) & ^0x3f) == 0 && ((int64(1)<<(_la-64))&255) != 0) {
 		{
 			p.SetState(372)
 			p.Fieldlist()
@@ -4877,9 +5477,23 @@ func (p *LuaParser) Tableconstructor() (localctx ITableconstructorContext) {
 	{
 		p.SetState(375)
 		p.Match(LuaParserRBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFieldlistContext is an interface to support dynamic dispatch.
@@ -4889,20 +5503,31 @@ type IFieldlistContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllField() []IFieldContext
+	Field(i int) IFieldContext
+	AllFieldsep() []IFieldsepContext
+	Fieldsep(i int) IFieldsepContext
+
 	// IsFieldlistContext differentiates from other interfaces.
 	IsFieldlistContext()
 }
 
 type FieldlistContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFieldlistContext() *FieldlistContext {
 	var p = new(FieldlistContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_fieldlist
 	return p
+}
+
+func InitEmptyFieldlistContext(p *FieldlistContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_fieldlist
 }
 
 func (*FieldlistContext) IsFieldlistContext() {}
@@ -4910,7 +5535,7 @@ func (*FieldlistContext) IsFieldlistContext() {}
 func NewFieldlistContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FieldlistContext {
 	var p = new(FieldlistContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_fieldlist
@@ -5021,28 +5646,9 @@ func (s *FieldlistContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Fieldlist() (localctx IFieldlistContext) {
-	this := p
-	_ = this
-
 	localctx = NewFieldlistContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 46, LuaParserRULE_fieldlist)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -5053,8 +5659,13 @@ func (p *LuaParser) Fieldlist() (localctx IFieldlistContext) {
 	}
 	p.SetState(383)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 34, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 34, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -5069,10 +5680,19 @@ func (p *LuaParser) Fieldlist() (localctx IFieldlistContext) {
 		}
 		p.SetState(385)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 34, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 34, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(387)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == LuaParserComma || _la == LuaParserSemiColon {
@@ -5083,7 +5703,17 @@ func (p *LuaParser) Fieldlist() (localctx IFieldlistContext) {
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFieldContext is an interface to support dynamic dispatch.
@@ -5093,20 +5723,33 @@ type IFieldContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	LBracket() antlr.TerminalNode
+	AllExp() []IExpContext
+	Exp(i int) IExpContext
+	RBracket() antlr.TerminalNode
+	AssignEq() antlr.TerminalNode
+	NAME() antlr.TerminalNode
+
 	// IsFieldContext differentiates from other interfaces.
 	IsFieldContext()
 }
 
 type FieldContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFieldContext() *FieldContext {
 	var p = new(FieldContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_field
 	return p
+}
+
+func InitEmptyFieldContext(p *FieldContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_field
 }
 
 func (*FieldContext) IsFieldContext() {}
@@ -5114,7 +5757,7 @@ func (*FieldContext) IsFieldContext() {}
 func NewFieldContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FieldContext {
 	var p = new(FieldContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_field
@@ -5200,36 +5843,24 @@ func (s *FieldContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Field() (localctx IFieldContext) {
-	this := p
-	_ = this
-
 	localctx = NewFieldContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 48, LuaParserRULE_field)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(399)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 36, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 36, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(389)
 			p.Match(LuaParserLBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(390)
@@ -5238,10 +5869,18 @@ func (p *LuaParser) Field() (localctx IFieldContext) {
 		{
 			p.SetState(391)
 			p.Match(LuaParserRBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(392)
 			p.Match(LuaParserAssignEq)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(393)
@@ -5253,10 +5892,18 @@ func (p *LuaParser) Field() (localctx IFieldContext) {
 		{
 			p.SetState(395)
 			p.Match(LuaParserNAME)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(396)
 			p.Match(LuaParserAssignEq)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(397)
@@ -5270,9 +5917,21 @@ func (p *LuaParser) Field() (localctx IFieldContext) {
 			p.exp(0)
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFieldsepContext is an interface to support dynamic dispatch.
@@ -5282,20 +5941,29 @@ type IFieldsepContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Comma() antlr.TerminalNode
+	SemiColon() antlr.TerminalNode
+
 	// IsFieldsepContext differentiates from other interfaces.
 	IsFieldsepContext()
 }
 
 type FieldsepContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFieldsepContext() *FieldsepContext {
 	var p = new(FieldsepContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_fieldsep
 	return p
+}
+
+func InitEmptyFieldsepContext(p *FieldsepContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_fieldsep
 }
 
 func (*FieldsepContext) IsFieldsepContext() {}
@@ -5303,7 +5971,7 @@ func (*FieldsepContext) IsFieldsepContext() {}
 func NewFieldsepContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FieldsepContext {
 	var p = new(FieldsepContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_fieldsep
@@ -5340,28 +6008,9 @@ func (s *FieldsepContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Fieldsep() (localctx IFieldsepContext) {
-	this := p
-	_ = this
-
 	localctx = NewFieldsepContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 50, LuaParserRULE_fieldsep)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -5376,7 +6025,17 @@ func (p *LuaParser) Fieldsep() (localctx IFieldsepContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IOperatorOrContext is an interface to support dynamic dispatch.
@@ -5386,20 +6045,28 @@ type IOperatorOrContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Or() antlr.TerminalNode
+
 	// IsOperatorOrContext differentiates from other interfaces.
 	IsOperatorOrContext()
 }
 
 type OperatorOrContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyOperatorOrContext() *OperatorOrContext {
 	var p = new(OperatorOrContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_operatorOr
 	return p
+}
+
+func InitEmptyOperatorOrContext(p *OperatorOrContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_operatorOr
 }
 
 func (*OperatorOrContext) IsOperatorOrContext() {}
@@ -5407,7 +6074,7 @@ func (*OperatorOrContext) IsOperatorOrContext() {}
 func NewOperatorOrContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *OperatorOrContext {
 	var p = new(OperatorOrContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_operatorOr
@@ -5440,35 +6107,29 @@ func (s *OperatorOrContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) OperatorOr() (localctx IOperatorOrContext) {
-	this := p
-	_ = this
-
 	localctx = NewOperatorOrContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 52, LuaParserRULE_operatorOr)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(403)
 		p.Match(LuaParserOr)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IOperatorAndContext is an interface to support dynamic dispatch.
@@ -5478,20 +6139,28 @@ type IOperatorAndContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	And() antlr.TerminalNode
+
 	// IsOperatorAndContext differentiates from other interfaces.
 	IsOperatorAndContext()
 }
 
 type OperatorAndContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyOperatorAndContext() *OperatorAndContext {
 	var p = new(OperatorAndContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_operatorAnd
 	return p
+}
+
+func InitEmptyOperatorAndContext(p *OperatorAndContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_operatorAnd
 }
 
 func (*OperatorAndContext) IsOperatorAndContext() {}
@@ -5499,7 +6168,7 @@ func (*OperatorAndContext) IsOperatorAndContext() {}
 func NewOperatorAndContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *OperatorAndContext {
 	var p = new(OperatorAndContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_operatorAnd
@@ -5532,35 +6201,29 @@ func (s *OperatorAndContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *LuaParser) OperatorAnd() (localctx IOperatorAndContext) {
-	this := p
-	_ = this
-
 	localctx = NewOperatorAndContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 54, LuaParserRULE_operatorAnd)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(405)
 		p.Match(LuaParserAnd)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IOperatorComparisonContext is an interface to support dynamic dispatch.
@@ -5570,20 +6233,33 @@ type IOperatorComparisonContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Lt() antlr.TerminalNode
+	Gt() antlr.TerminalNode
+	LtEq() antlr.TerminalNode
+	GtEq() antlr.TerminalNode
+	Neq() antlr.TerminalNode
+	Eq() antlr.TerminalNode
+
 	// IsOperatorComparisonContext differentiates from other interfaces.
 	IsOperatorComparisonContext()
 }
 
 type OperatorComparisonContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyOperatorComparisonContext() *OperatorComparisonContext {
 	var p = new(OperatorComparisonContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_operatorComparison
 	return p
+}
+
+func InitEmptyOperatorComparisonContext(p *OperatorComparisonContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_operatorComparison
 }
 
 func (*OperatorComparisonContext) IsOperatorComparisonContext() {}
@@ -5591,7 +6267,7 @@ func (*OperatorComparisonContext) IsOperatorComparisonContext() {}
 func NewOperatorComparisonContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *OperatorComparisonContext {
 	var p = new(OperatorComparisonContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_operatorComparison
@@ -5644,28 +6320,9 @@ func (s *OperatorComparisonContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *LuaParser) OperatorComparison() (localctx IOperatorComparisonContext) {
-	this := p
-	_ = this
-
 	localctx = NewOperatorComparisonContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 56, LuaParserRULE_operatorComparison)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -5680,7 +6337,17 @@ func (p *LuaParser) OperatorComparison() (localctx IOperatorComparisonContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IOperatorStrcatContext is an interface to support dynamic dispatch.
@@ -5690,20 +6357,28 @@ type IOperatorStrcatContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Strcat() antlr.TerminalNode
+
 	// IsOperatorStrcatContext differentiates from other interfaces.
 	IsOperatorStrcatContext()
 }
 
 type OperatorStrcatContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyOperatorStrcatContext() *OperatorStrcatContext {
 	var p = new(OperatorStrcatContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_operatorStrcat
 	return p
+}
+
+func InitEmptyOperatorStrcatContext(p *OperatorStrcatContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_operatorStrcat
 }
 
 func (*OperatorStrcatContext) IsOperatorStrcatContext() {}
@@ -5711,7 +6386,7 @@ func (*OperatorStrcatContext) IsOperatorStrcatContext() {}
 func NewOperatorStrcatContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *OperatorStrcatContext {
 	var p = new(OperatorStrcatContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_operatorStrcat
@@ -5744,35 +6419,29 @@ func (s *OperatorStrcatContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *LuaParser) OperatorStrcat() (localctx IOperatorStrcatContext) {
-	this := p
-	_ = this
-
 	localctx = NewOperatorStrcatContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 58, LuaParserRULE_operatorStrcat)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(409)
 		p.Match(LuaParserStrcat)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IOperatorAddSubContext is an interface to support dynamic dispatch.
@@ -5782,20 +6451,29 @@ type IOperatorAddSubContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Plus() antlr.TerminalNode
+	Sub() antlr.TerminalNode
+
 	// IsOperatorAddSubContext differentiates from other interfaces.
 	IsOperatorAddSubContext()
 }
 
 type OperatorAddSubContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyOperatorAddSubContext() *OperatorAddSubContext {
 	var p = new(OperatorAddSubContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_operatorAddSub
 	return p
+}
+
+func InitEmptyOperatorAddSubContext(p *OperatorAddSubContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_operatorAddSub
 }
 
 func (*OperatorAddSubContext) IsOperatorAddSubContext() {}
@@ -5803,7 +6481,7 @@ func (*OperatorAddSubContext) IsOperatorAddSubContext() {}
 func NewOperatorAddSubContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *OperatorAddSubContext {
 	var p = new(OperatorAddSubContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_operatorAddSub
@@ -5840,28 +6518,9 @@ func (s *OperatorAddSubContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *LuaParser) OperatorAddSub() (localctx IOperatorAddSubContext) {
-	this := p
-	_ = this
-
 	localctx = NewOperatorAddSubContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 60, LuaParserRULE_operatorAddSub)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -5876,7 +6535,17 @@ func (p *LuaParser) OperatorAddSub() (localctx IOperatorAddSubContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IOperatorMulDivModContext is an interface to support dynamic dispatch.
@@ -5886,20 +6555,31 @@ type IOperatorMulDivModContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Mul() antlr.TerminalNode
+	Div() antlr.TerminalNode
+	Mod() antlr.TerminalNode
+	IntegralDiv() antlr.TerminalNode
+
 	// IsOperatorMulDivModContext differentiates from other interfaces.
 	IsOperatorMulDivModContext()
 }
 
 type OperatorMulDivModContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyOperatorMulDivModContext() *OperatorMulDivModContext {
 	var p = new(OperatorMulDivModContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_operatorMulDivMod
 	return p
+}
+
+func InitEmptyOperatorMulDivModContext(p *OperatorMulDivModContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_operatorMulDivMod
 }
 
 func (*OperatorMulDivModContext) IsOperatorMulDivModContext() {}
@@ -5907,7 +6587,7 @@ func (*OperatorMulDivModContext) IsOperatorMulDivModContext() {}
 func NewOperatorMulDivModContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *OperatorMulDivModContext {
 	var p = new(OperatorMulDivModContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_operatorMulDivMod
@@ -5952,28 +6632,9 @@ func (s *OperatorMulDivModContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *LuaParser) OperatorMulDivMod() (localctx IOperatorMulDivModContext) {
-	this := p
-	_ = this
-
 	localctx = NewOperatorMulDivModContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 62, LuaParserRULE_operatorMulDivMod)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -5988,7 +6649,17 @@ func (p *LuaParser) OperatorMulDivMod() (localctx IOperatorMulDivModContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IOperatorBitwiseContext is an interface to support dynamic dispatch.
@@ -5998,20 +6669,32 @@ type IOperatorBitwiseContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Amp() antlr.TerminalNode
+	Xand() antlr.TerminalNode
+	NotSymbol() antlr.TerminalNode
+	LtLt() antlr.TerminalNode
+	GtGt() antlr.TerminalNode
+
 	// IsOperatorBitwiseContext differentiates from other interfaces.
 	IsOperatorBitwiseContext()
 }
 
 type OperatorBitwiseContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyOperatorBitwiseContext() *OperatorBitwiseContext {
 	var p = new(OperatorBitwiseContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_operatorBitwise
 	return p
+}
+
+func InitEmptyOperatorBitwiseContext(p *OperatorBitwiseContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_operatorBitwise
 }
 
 func (*OperatorBitwiseContext) IsOperatorBitwiseContext() {}
@@ -6019,7 +6702,7 @@ func (*OperatorBitwiseContext) IsOperatorBitwiseContext() {}
 func NewOperatorBitwiseContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *OperatorBitwiseContext {
 	var p = new(OperatorBitwiseContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_operatorBitwise
@@ -6068,28 +6751,9 @@ func (s *OperatorBitwiseContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *LuaParser) OperatorBitwise() (localctx IOperatorBitwiseContext) {
-	this := p
-	_ = this
-
 	localctx = NewOperatorBitwiseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 64, LuaParserRULE_operatorBitwise)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -6104,7 +6768,17 @@ func (p *LuaParser) OperatorBitwise() (localctx IOperatorBitwiseContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IOperatorUnaryContext is an interface to support dynamic dispatch.
@@ -6114,20 +6788,31 @@ type IOperatorUnaryContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Not() antlr.TerminalNode
+	Pound() antlr.TerminalNode
+	Sub() antlr.TerminalNode
+	NotSymbol() antlr.TerminalNode
+
 	// IsOperatorUnaryContext differentiates from other interfaces.
 	IsOperatorUnaryContext()
 }
 
 type OperatorUnaryContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyOperatorUnaryContext() *OperatorUnaryContext {
 	var p = new(OperatorUnaryContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_operatorUnary
 	return p
+}
+
+func InitEmptyOperatorUnaryContext(p *OperatorUnaryContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_operatorUnary
 }
 
 func (*OperatorUnaryContext) IsOperatorUnaryContext() {}
@@ -6135,7 +6820,7 @@ func (*OperatorUnaryContext) IsOperatorUnaryContext() {}
 func NewOperatorUnaryContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *OperatorUnaryContext {
 	var p = new(OperatorUnaryContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_operatorUnary
@@ -6180,28 +6865,9 @@ func (s *OperatorUnaryContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *LuaParser) OperatorUnary() (localctx IOperatorUnaryContext) {
-	this := p
-	_ = this
-
 	localctx = NewOperatorUnaryContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 66, LuaParserRULE_operatorUnary)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -6216,7 +6882,17 @@ func (p *LuaParser) OperatorUnary() (localctx IOperatorUnaryContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IOperatorPowerContext is an interface to support dynamic dispatch.
@@ -6226,20 +6902,28 @@ type IOperatorPowerContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Power() antlr.TerminalNode
+
 	// IsOperatorPowerContext differentiates from other interfaces.
 	IsOperatorPowerContext()
 }
 
 type OperatorPowerContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyOperatorPowerContext() *OperatorPowerContext {
 	var p = new(OperatorPowerContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_operatorPower
 	return p
+}
+
+func InitEmptyOperatorPowerContext(p *OperatorPowerContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_operatorPower
 }
 
 func (*OperatorPowerContext) IsOperatorPowerContext() {}
@@ -6247,7 +6931,7 @@ func (*OperatorPowerContext) IsOperatorPowerContext() {}
 func NewOperatorPowerContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *OperatorPowerContext {
 	var p = new(OperatorPowerContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_operatorPower
@@ -6280,35 +6964,29 @@ func (s *OperatorPowerContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *LuaParser) OperatorPower() (localctx IOperatorPowerContext) {
-	this := p
-	_ = this
-
 	localctx = NewOperatorPowerContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 68, LuaParserRULE_operatorPower)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(419)
 		p.Match(LuaParserPower)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // INumberContext is an interface to support dynamic dispatch.
@@ -6318,20 +6996,31 @@ type INumberContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	INT() antlr.TerminalNode
+	HEX() antlr.TerminalNode
+	FLOAT() antlr.TerminalNode
+	HEX_FLOAT() antlr.TerminalNode
+
 	// IsNumberContext differentiates from other interfaces.
 	IsNumberContext()
 }
 
 type NumberContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyNumberContext() *NumberContext {
 	var p = new(NumberContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_number
 	return p
+}
+
+func InitEmptyNumberContext(p *NumberContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_number
 }
 
 func (*NumberContext) IsNumberContext() {}
@@ -6339,7 +7028,7 @@ func (*NumberContext) IsNumberContext() {}
 func NewNumberContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *NumberContext {
 	var p = new(NumberContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_number
@@ -6384,28 +7073,9 @@ func (s *NumberContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Number() (localctx INumberContext) {
-	this := p
-	_ = this
-
 	localctx = NewNumberContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 70, LuaParserRULE_number)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -6420,7 +7090,17 @@ func (p *LuaParser) Number() (localctx INumberContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IStringContext is an interface to support dynamic dispatch.
@@ -6430,20 +7110,30 @@ type IStringContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	NORMALSTRING() antlr.TerminalNode
+	CHARSTRING() antlr.TerminalNode
+	LONGSTRING() antlr.TerminalNode
+
 	// IsStringContext differentiates from other interfaces.
 	IsStringContext()
 }
 
 type StringContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyStringContext() *StringContext {
 	var p = new(StringContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = LuaParserRULE_string
 	return p
+}
+
+func InitEmptyStringContext(p *StringContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = LuaParserRULE_string
 }
 
 func (*StringContext) IsStringContext() {}
@@ -6451,7 +7141,7 @@ func (*StringContext) IsStringContext() {}
 func NewStringContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *StringContext {
 	var p = new(StringContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = LuaParserRULE_string
@@ -6492,28 +7182,9 @@ func (s *StringContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) String_() (localctx IStringContext) {
-	this := p
-	_ = this
-
 	localctx = NewStringContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 72, LuaParserRULE_string)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -6528,7 +7199,17 @@ func (p *LuaParser) String_() (localctx IStringContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 func (p *LuaParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int) bool {
@@ -6546,9 +7227,6 @@ func (p *LuaParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int
 }
 
 func (p *LuaParser) Exp_Sempred(localctx antlr.RuleContext, predIndex int) bool {
-	this := p
-	_ = this
-
 	switch predIndex {
 	case 0:
 		return p.Precpred(p.GetParserRuleContext(), 9)

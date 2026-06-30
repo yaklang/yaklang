@@ -15,7 +15,7 @@ func (y *YakCompiler) VisitExpressionStmt(raw yak.IExpressionStmtContext) interf
 		return nil
 	}
 
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	y.VisitExpression(i.Expression())
@@ -34,7 +34,7 @@ func (y *YakCompiler) VisitExpressionList(raw yak.IExpressionListContext) int {
 	if i == nil {
 		return -1
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	// 如果 expression 不为一的话，列表就是表达式，直接执行 list 0 表示跳过指令
@@ -61,7 +61,7 @@ func (y *YakCompiler) VisitExpression(raw yak.IExpressionContext) interface{} {
 		return nil
 	}
 
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 	if op := i.TypeLiteral(); op != nil {
 		if i.LParen() != nil && i.RParen() != nil {

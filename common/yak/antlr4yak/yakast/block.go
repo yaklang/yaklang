@@ -41,7 +41,7 @@ func (y *YakCompiler) VisitBlockWithCallbacks(raw yak.IBlockContext, preCallback
 		inline = inlineOpt[0]
 	}
 
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	lines, firstStmt := y.PreviewStatementList(i.StatementList())

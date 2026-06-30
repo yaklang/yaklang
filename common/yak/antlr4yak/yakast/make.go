@@ -13,7 +13,7 @@ func (y *YakCompiler) VisitMakeExpression(raw yak.IMakeExpressionContext) interf
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	y.writeString("make(")

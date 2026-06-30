@@ -16,7 +16,7 @@ func (y *YakCompiler) VisitTypeLiteral(raw yak.ITypeLiteralContext) interface{} 
 		return nil
 	}
 
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	text := i.GetText()

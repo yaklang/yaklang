@@ -16,7 +16,7 @@ func (y *YakCompiler) VisitAssignExpressionStmt(raw yak.IAssignExpressionStmtCon
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	if i.AssignExpression() != nil {
@@ -35,7 +35,7 @@ func (y *YakCompiler) VisitAssignExpression(raw yak.IAssignExpressionContext) in
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	// assign eq  /  colon assign eq
@@ -118,7 +118,7 @@ func (y *YakCompiler) VisitLeftExpressionList(forceNewSymbol bool, raw yak.ILeft
 	if i == nil {
 		return -1
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	allExpr := i.AllLeftExpression()
@@ -154,7 +154,7 @@ func (y *YakCompiler) VisitLeftExpression(forceNewSymbol bool, raw yak.ILeftExpr
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	// Identifier 备选：裸标识符左值
@@ -245,7 +245,7 @@ func (y *YakCompiler) visitLeftIdentifier(forceNewSymbol bool, idName string) {
 
 // visitLeftMemberCallKey 将成员访问的 key 压栈（.id 压字符串常量，.$var 压变量引用）
 func (y *YakCompiler) visitLeftMemberCallKey(i *yak.MemberCallContext) {
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	y.writeString(".")
@@ -366,7 +366,7 @@ func (y *YakCompiler) VisitDeclareVariableExpressionStmt(raw yak.IDeclareVariabl
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	y.VisitDeclareVariableExpression(i.DeclareVariableExpression())

@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
@@ -14,7 +14,7 @@ import (
 )
 
 func (b *astbuilder) buildLiteralExpression(stmt *JS.LiteralExpressionContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if s, ok := stmt.Literal().(*JS.LiteralContext); ok {
@@ -24,7 +24,7 @@ func (b *astbuilder) buildLiteralExpression(stmt *JS.LiteralExpressionContext) s
 }
 
 func (b *astbuilder) buildLiteral(stmt *JS.LiteralContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if s, ok := stmt.TemplateStringLiteral().(*JS.TemplateStringLiteralContext); ok {
@@ -59,7 +59,7 @@ func (b *astbuilder) buildLiteral(stmt *JS.LiteralContext) ssa.Value {
 }
 
 func (b *astbuilder) buildTemplateStringLiteral(stmt *JS.TemplateStringLiteralContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	type StringAtom interface {
@@ -121,7 +121,7 @@ func (b *astbuilder) buildTemplateStringLiteral(stmt *JS.TemplateStringLiteralCo
 }
 
 func (b *astbuilder) buildNumericLiteral(stmt *JS.NumericLiteralContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	lit := stmt.GetText()

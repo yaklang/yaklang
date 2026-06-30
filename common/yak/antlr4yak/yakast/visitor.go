@@ -13,7 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 )
 
 type Position struct {
@@ -312,7 +312,12 @@ func (y *YakCompiler) parseProgramTwoStage(tokenStream *antlr.CommonTokenStream)
 	// 阶段一：SLL 快速解析 + BailErrorStrategy，一旦出错立即中止(panic ParseCancellationException)。
 	sllParser := yak.NewYaklangParser(tokenStream)
 	sllParser.RemoveErrorListeners()
-	sllParser.SetErrorHandler(antlr.NewBailErrorStrategy())
+	// antlr4-go v4.13.1 内置 antlr.NewBailErrorStrategy 不再 panic Recover（commit c0f6ece
+	// "eliminate panic/recover as flow control"），导致 SLL 阶段遇到错误时走昂贵的错误恢复
+	// 而非立即退出，在畸形输入（如 `dump(123)))` 多余右括号）上 LL full-context 不收敛而挂起。
+	// 改用项目本地 antlr4util.NewBailErrorStrategy（恢复 panic(ParseCancellationException) 语义），
+	// 与 SSA 前端 ParseASTWithSLLFirst 保持一致。
+	sllParser.SetErrorHandler(antlr4util.NewBailErrorStrategy())
 	sllParser.GetInterpreter().SetPredictionMode(antlr.PredictionModeSLL)
 
 	raw, ok := func() (raw yak.IProgramContext, ok bool) {
@@ -374,7 +379,7 @@ func (y *YakCompiler) VisitProgram(raw yak.IProgramContext, inline ...bool) inte
 		return nil
 	}
 
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 	y.VisitStatementList(i.StatementList(), inline...)
 	return nil
@@ -392,7 +397,7 @@ func (y *YakCompiler) VisitProgramWithoutSymbolTable(raw yak.IProgramContext, in
 
 	y.writeAllWS(i.AllWs())
 
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 	y.VisitStatementList(i.StatementList(), inline...)
 	return nil

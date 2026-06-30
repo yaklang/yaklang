@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 	gol "github.com/yaklang/yaklang/common/yak/antlr4go/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"github.com/yaklang/yaklang/common/yak/go2ssa"
@@ -111,7 +111,7 @@ func goSLLBailParse(code string) (tree string, bailed bool, listenerErr error) {
 	parser := gol.NewGoParser(tokenStream)
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(el)
-	parser.SetErrorHandler(antlr.NewBailErrorStrategy())
+	parser.SetErrorHandler(antlr4util.NewBailErrorStrategy())
 	parser.GetInterpreter().SetPredictionMode(antlr.PredictionModeSLL)
 
 	func() {

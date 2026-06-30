@@ -1,15 +1,15 @@
 package gol
 
-import "github.com/antlr/antlr4/runtime/Go/antlr/v4"
+import "github.com/yaklang/antlr/v4"
 
 func GetGoParserSerializedATN() []int32 {
 	GoParserInit()
-	return goparserParserStaticData.serializedATN
+	return GoParserParserStaticData.serializedATN
 }
 
 func GetGoLexerSerializedATN() []int32 {
 	GoLexerInit()
-	return golexerLexerStaticData.serializedATN
+	return GoLexerLexerStaticData.serializedATN
 }
 
 func (l *GoLexer) SetInterpreter(atn *antlr.ATN, decisionToDFA []*antlr.DFA, predictionContextCache *antlr.PredictionContextCache) {

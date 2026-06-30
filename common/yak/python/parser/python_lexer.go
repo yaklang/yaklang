@@ -1,13 +1,12 @@
-// Code generated from java-escape by ANTLR 4.11.1. DO NOT EDIT.
+// Code generated from ./PythonLexer.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
 package pythonparser
 
 import (
 	"fmt"
+	"github.com/yaklang/antlr/v4"
 	"sync"
 	"unicode"
-
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 )
 
 // Suppress unused import error
@@ -22,28 +21,28 @@ type PythonLexer struct {
 	// TODO: EOF string
 }
 
-var pythonlexerLexerStaticData struct {
+var PythonLexerLexerStaticData struct {
 	once                   sync.Once
 	serializedATN          []int32
-	channelNames           []string
-	modeNames              []string
-	literalNames           []string
-	symbolicNames          []string
-	ruleNames              []string
-	predictionContextCache *antlr.PredictionContextCache
+	ChannelNames           []string
+	ModeNames              []string
+	LiteralNames           []string
+	SymbolicNames          []string
+	RuleNames              []string
+	PredictionContextCache *antlr.PredictionContextCache
 	atn                    *antlr.ATN
 	decisionToDFA          []*antlr.DFA
 }
 
 func pythonlexerLexerInit() {
-	staticData := &pythonlexerLexerStaticData
-	staticData.channelNames = []string{
+	staticData := &PythonLexerLexerStaticData
+	staticData.ChannelNames = []string{
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN",
 	}
-	staticData.modeNames = []string{
+	staticData.ModeNames = []string{
 		"DEFAULT_MODE",
 	}
-	staticData.literalNames = []string{
+	staticData.LiteralNames = []string{
 		"", "", "", "", "'def'", "'return'", "'raise'", "'from'", "'import'",
 		"'nonlocal'", "'as'", "'global'", "'assert'", "'if'", "'elif'", "'else'",
 		"'while'", "'for'", "'in'", "'try'", "'None'", "'finally'", "'with'",
@@ -57,7 +56,7 @@ func pythonlexerLexerInit() {
 		"'//='", "", "", "", "", "", "", "", "'('", "')'", "'{'", "'}'", "'['",
 		"']'",
 	}
-	staticData.symbolicNames = []string{
+	staticData.SymbolicNames = []string{
 		"", "INDENT", "DEDENT", "LINE_BREAK", "DEF", "RETURN", "RAISE", "FROM",
 		"IMPORT", "NONLOCAL", "AS", "GLOBAL", "ASSERT", "IF", "ELIF", "ELSE",
 		"WHILE", "FOR", "IN", "TRY", "NONE", "FINALLY", "WITH", "EXCEPT", "LAMBDA",
@@ -75,7 +74,7 @@ func pythonlexerLexerInit() {
 		"CLOSE_BRACE", "OPEN_BRACKET", "CLOSE_BRACKET", "NAME", "LINE_JOIN",
 		"NEWLINE", "WS", "COMMENT",
 	}
-	staticData.ruleNames = []string{
+	staticData.RuleNames = []string{
 		"DEF", "RETURN", "RAISE", "FROM", "IMPORT", "NONLOCAL", "AS", "GLOBAL",
 		"ASSERT", "IF", "ELIF", "ELSE", "WHILE", "FOR", "IN", "TRY", "NONE",
 		"FINALLY", "WITH", "EXCEPT", "LAMBDA", "OR", "AND", "NOT", "IS", "CLASS",
@@ -96,7 +95,7 @@ func pythonlexerLexerInit() {
 		"SHORT_BYTES_CHAR_NO_DOUBLE_QUOTE", "LONG_BYTES_CHAR", "BYTES_ESCAPE_SEQ",
 		"ID_CONTINUE", "ID_START",
 	}
-	staticData.predictionContextCache = antlr.NewPredictionContextCache()
+	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
 		4, 0, 101, 860, 6, -1, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3,
 		2, 4, 7, 4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9,
@@ -580,7 +579,7 @@ func pythonlexerLexerInit() {
 // NewPythonLexer(). You can call this function if you wish to initialize the static state ahead
 // of time.
 func PythonLexerInit() {
-	staticData := &pythonlexerLexerStaticData
+	staticData := &PythonLexerLexerStaticData
 	staticData.once.Do(pythonlexerLexerInit)
 }
 
@@ -589,13 +588,13 @@ func NewPythonLexer(input antlr.CharStream) *PythonLexer {
 	PythonLexerInit()
 	l := new(PythonLexer)
 	l.BaseLexer = antlr.NewBaseLexer(input)
-	staticData := &pythonlexerLexerStaticData
-	l.Interpreter = antlr.NewLexerATNSimulator(l, staticData.atn, staticData.decisionToDFA, staticData.predictionContextCache)
-	l.channelNames = staticData.channelNames
-	l.modeNames = staticData.modeNames
-	l.RuleNames = staticData.ruleNames
-	l.LiteralNames = staticData.literalNames
-	l.SymbolicNames = staticData.symbolicNames
+	staticData := &PythonLexerLexerStaticData
+	l.Interpreter = antlr.NewLexerATNSimulator(l, staticData.atn, staticData.decisionToDFA, staticData.PredictionContextCache)
+	l.channelNames = staticData.ChannelNames
+	l.modeNames = staticData.ModeNames
+	l.RuleNames = staticData.RuleNames
+	l.LiteralNames = staticData.LiteralNames
+	l.SymbolicNames = staticData.SymbolicNames
 	l.GrammarFileName = "PythonLexer.g4"
 	// TODO: l.EOF = antlr.TokenEOF
 
@@ -739,96 +738,72 @@ func (l *PythonLexer) Action(localctx antlr.RuleContext, ruleIndex, actionIndex 
 }
 
 func (l *PythonLexer) OPEN_PAREN_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 0:
-		this.IncIndentLevel()
+		l.IncIndentLevel()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *PythonLexer) CLOSE_PAREN_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 1:
-		this.DecIndentLevel()
+		l.DecIndentLevel()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *PythonLexer) OPEN_BRACE_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 2:
-		this.IncIndentLevel()
+		l.IncIndentLevel()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *PythonLexer) CLOSE_BRACE_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 3:
-		this.DecIndentLevel()
+		l.DecIndentLevel()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *PythonLexer) OPEN_BRACKET_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 4:
-		this.IncIndentLevel()
+		l.IncIndentLevel()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *PythonLexer) CLOSE_BRACKET_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 5:
-		this.DecIndentLevel()
+		l.DecIndentLevel()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *PythonLexer) NEWLINE_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 6:
-		this.HandleNewLine()
+		l.HandleNewLine()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *PythonLexer) WS_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 7:
-		this.HandleSpaces()
+		l.HandleSpaces()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))

@@ -1,7 +1,7 @@
 package gol
 
 import (
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 )
 
 // GoParserBase implementation.

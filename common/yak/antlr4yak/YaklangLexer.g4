@@ -1,6 +1,6 @@
 lexer grammar YaklangLexer;
 
-// antlr 4.11.1
+// antlr 4.13.2
 
 options {
     superClass = YaklangLexerBase;

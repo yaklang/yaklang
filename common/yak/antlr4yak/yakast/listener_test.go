@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/visitors"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 )

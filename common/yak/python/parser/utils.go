@@ -1,13 +1,13 @@
 package pythonparser
 
-import "github.com/antlr/antlr4/runtime/Go/antlr/v4"
+import "github.com/yaklang/antlr/v4"
 
 // GetPythonParserSerializedATN returns the serialized ATN for the Python parser.
 // This is used for caching parser state to improve performance.
 // Similar to GetJavaParserSerializedATN in java/parser/utils.go
 func GetPythonParserSerializedATN() []int32 {
 	pythonparserParserInit()
-	return pythonparserParserStaticData.serializedATN
+	return PythonParserParserStaticData.serializedATN
 }
 
 // GetPythonLexerSerializedATN returns the serialized ATN for the Python lexer.
@@ -15,7 +15,7 @@ func GetPythonParserSerializedATN() []int32 {
 // Similar to GetJavaLexerSerializedATN in java/parser/utils.go
 func GetPythonLexerSerializedATN() []int32 {
 	PythonLexerInit()
-	return pythonlexerLexerStaticData.serializedATN
+	return PythonLexerLexerStaticData.serializedATN
 }
 
 // SetInterpreter methods are used to override the default interpreter behavior

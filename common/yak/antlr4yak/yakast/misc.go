@@ -7,7 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 )
 
 func (y *YakCompiler) SwitchSymbolTableInNewScope(name ...string) func() {

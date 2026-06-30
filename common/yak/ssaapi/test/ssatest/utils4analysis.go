@@ -10,7 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfanalysis"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"

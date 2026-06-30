@@ -6,13 +6,13 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 func (b *astbuilder) handlerWs(ws *yak.WsContext) {
-	recoverRange := b.SetRange(ws.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ws.BaseParserRuleContext)
 	defer recoverRange()
 	for _, line := range ws.AllLINE_COMMENT() {
 		token := line.GetSymbol()
@@ -60,7 +60,7 @@ func (b *astbuilder) build(raw ssa.FrontAST) {
 	for _, ws := range ast.AllWs() {
 		b.handlerWs(ws.(*yak.WsContext))
 	}
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 	b.Function.SetRange(b.CurrentRange)
 	if stmt, ok := ast.StatementList().(*yak.StatementListContext); ok {
@@ -73,7 +73,7 @@ func (b *astbuilder) build(raw ssa.FrontAST) {
 
 // statement list
 func (b *astbuilder) buildStatementList(stmtlist *yak.StatementListContext) {
-	recoverRange := b.SetRange(stmtlist.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmtlist.BaseParserRuleContext)
 	defer recoverRange()
 	allstmt := stmtlist.AllStatement()
 	for _, stmt := range allstmt {
@@ -87,7 +87,7 @@ func (b *astbuilder) buildStatementList(stmtlist *yak.StatementListContext) {
 }
 
 func (b *astbuilder) buildLineComment(stmt *yak.LineCommentStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	if line := stmt.LINE_COMMENT(); line != nil {
 		if err := b.AddErrorComment(line.GetText(), line.GetSymbol().GetLine()); err != nil {
@@ -97,7 +97,7 @@ func (b *astbuilder) buildLineComment(stmt *yak.LineCommentStmtContext) {
 }
 
 func (b *astbuilder) buildEmpty(stmt *yak.EmptyContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if ws, ok := stmt.Ws().(*yak.WsContext); ok {
@@ -109,7 +109,7 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 	if b.IsBlockFinish() {
 		return
 	}
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	b.AppendBlockRange()
 	if s, ok := stmt.LineCommentStmt().(*yak.LineCommentStmtContext); ok {
@@ -221,7 +221,7 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 }
 
 func (b *astbuilder) buildAssertStmt(stmt *yak.AssertStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	getExpr := func(i int) ssa.Value {
@@ -247,7 +247,7 @@ func (b *astbuilder) buildAssertStmt(stmt *yak.AssertStmtContext) {
 
 // try stmt
 func (b *astbuilder) buildTryCatchStmt(stmt *yak.TryStmtContext) {
-	revcoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	revcoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer revcoverRange()
 
 	tryBuilder := b.BuildTry()
@@ -281,7 +281,7 @@ func (b *astbuilder) buildTryCatchStmt(stmt *yak.TryStmtContext) {
 
 // expression stmt
 func (b *astbuilder) buildExpressionStmt(stmt *yak.ExpressionStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
 		b.buildExpression(s)
@@ -290,7 +290,7 @@ func (b *astbuilder) buildExpressionStmt(stmt *yak.ExpressionStmtContext) {
 
 // assign expression stmt
 func (b *astbuilder) buildAssignExpressionStmt(stmt *yak.AssignExpressionStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	s := stmt.AssignExpression()
 	if s == nil {
@@ -304,7 +304,7 @@ func (b *astbuilder) buildAssignExpressionStmt(stmt *yak.AssignExpressionStmtCon
 // TODO: include stmt
 
 func (b *astbuilder) buildCallExpr(stmt *yak.CallExprContext) (c *ssa.Call) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	// functionCallExpr: expression（见 YaklangParser.g4）。这里刻意“只构造不 emit”，
@@ -343,7 +343,7 @@ func (b *astbuilder) buildCallExpr(stmt *yak.CallExprContext) (c *ssa.Call) {
 
 // defer stmt
 func (b *astbuilder) buildDeferStmt(stmt *yak.DeferStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	var i ssa.Instruction
@@ -371,7 +371,7 @@ func (b *astbuilder) buildDeferStmt(stmt *yak.DeferStmtContext) {
 
 // go stmt
 func (b *astbuilder) buildGoStmt(stmt *yak.GoStmtContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	var c *ssa.Call
@@ -387,7 +387,7 @@ func (b *astbuilder) buildGoStmt(stmt *yak.GoStmtContext) ssa.Value {
 
 // return stmt
 func (b *astbuilder) buildReturnStmt(stmt *yak.ReturnStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	if list, ok := stmt.ExpressionList().(*yak.ExpressionListContext); ok {
 		values := b.buildExpressionList(list)
@@ -399,7 +399,7 @@ func (b *astbuilder) buildReturnStmt(stmt *yak.ReturnStmtContext) {
 
 // for stmt
 func (b *astbuilder) buildForStmt(stmt *yak.ForStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	// current := f.currentBlock
 	loop := b.CreateLoopBuilder()
@@ -413,7 +413,7 @@ func (b *astbuilder) buildForStmt(stmt *yak.ForStmtContext) {
 		if first, ok := condition.ForFirstExpr().(*yak.ForFirstExprContext); ok {
 			// first expression is initialization, in enter block
 			loop.SetFirst(func() []ssa.Value {
-				recoverRange := b.SetRange(first.BaseParserRuleContext)
+				recoverRange := b.SetRange(&first.BaseParserRuleContext)
 				defer recoverRange()
 				return b.ForExpr(first)
 			})
@@ -427,7 +427,7 @@ func (b *astbuilder) buildForStmt(stmt *yak.ForStmtContext) {
 			// build latch
 			loop.SetThird(func() []ssa.Value {
 				// build third expression in loop.latch
-				recoverRange := b.SetRange(third.BaseParserRuleContext)
+				recoverRange := b.SetRange(&third.BaseParserRuleContext)
 				defer recoverRange()
 				return b.ForExpr(third)
 			})
@@ -439,7 +439,7 @@ func (b *astbuilder) buildForStmt(stmt *yak.ForStmtContext) {
 		if utils.IsNil(cond) {
 			condition = b.EmitConstInst(true)
 		} else {
-			// recoverRange := b.SetRange(cond.BaseParserRuleContext)
+			// recoverRange := b.SetRange(&cond.BaseParserRuleContext)
 			// defer recoverRange()
 			condition = b.buildExpression(cond)
 		}
@@ -478,7 +478,7 @@ func (b *astbuilder) ForExpr(stmt forExpr) []ssa.Value {
 
 // for range stmt
 func (b *astbuilder) buildForRangeStmt(stmt *yak.ForRangeStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	// current := f.currentBlock
 	loop := b.CreateLoopBuilder()
@@ -532,7 +532,7 @@ func (b *astbuilder) buildForRangeStmt(stmt *yak.ForRangeStmtContext) {
 
 // switch stmt
 func (b *astbuilder) buildSwitchStmt(stmt *yak.SwitchStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	SwitchBuilder := b.BuildSwitch()
@@ -595,7 +595,7 @@ func (b *astbuilder) buildIfStmt(stmt *yak.IfStmtContext) {
 
 // buildIfStmtInit 构建 if 初始化语句（if <init>; <cond> { ... }）
 func (b *astbuilder) buildIfStmtInit(stmt *yak.IfStmtInitContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if s, ok := stmt.DeclareVariableExpression().(*yak.DeclareVariableExpressionContext); ok {
@@ -628,7 +628,7 @@ func (b *astbuilder) buildIfStmtInner(stmt *yak.IfStmtContext) {
 						return nil
 					}
 
-					recoverRange := b.SetRange(expressionStmt.BaseParserRuleContext)
+					recoverRange := b.SetRange(&expressionStmt.BaseParserRuleContext)
 					b.AppendBlockRange()
 					recoverRange()
 
@@ -688,7 +688,7 @@ func (b *astbuilder) buildBlock(stmt *yak.BlockContext, syntaxBlocks ...bool) {
 	if len(syntaxBlocks) > 0 {
 		syntaxBlock = syntaxBlocks[0]
 	}
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	// b.CurrentBlock.SetRange(b.CurrentRange)
 	s, ok := stmt.StatementList().(*yak.StatementListContext)
@@ -901,7 +901,7 @@ func (b *astbuilder) AssignList(forceAssign bool, stmt assignlist) []ssa.Value {
 
 // assign expression
 func (b *astbuilder) buildAssignExpression(stmt *yak.AssignExpressionContext) []ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if ret := b.AssignList(false, stmt); ret != nil {
@@ -969,7 +969,7 @@ func (b *astbuilder) buildAssignExpression(stmt *yak.AssignExpressionContext) []
 
 // declare variable expression
 func (b *astbuilder) buildDeclareVariableExpressionStmt(stmt *yak.DeclareVariableExpressionStmtContext) {
-	// recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	// recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	// defer recoverRange()
 	if s, ok := stmt.DeclareVariableExpression().(*yak.DeclareVariableExpressionContext); ok {
 		b.buildDeclareVariableExpression(s)
@@ -977,7 +977,7 @@ func (b *astbuilder) buildDeclareVariableExpressionStmt(stmt *yak.DeclareVariabl
 }
 
 func (b *astbuilder) buildDeclareVariableExpression(stmt *yak.DeclareVariableExpressionContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if s, ok := stmt.DeclareVariableOnly().(*yak.DeclareVariableOnlyContext); ok {
@@ -989,7 +989,7 @@ func (b *astbuilder) buildDeclareVariableExpression(stmt *yak.DeclareVariableExp
 }
 
 func (b *astbuilder) buildDeclareVariableOnly(stmt *yak.DeclareVariableOnlyContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	for _, idstmt := range stmt.AllIdentifier() {
 		recoverRange := b.SetRangeFromTerminalNode(idstmt)
@@ -1001,14 +1001,14 @@ func (b *astbuilder) buildDeclareVariableOnly(stmt *yak.DeclareVariableOnlyConte
 }
 
 func (b *astbuilder) buildDeclareAndAssignExpression(stmt *yak.DeclareAndAssignExpressionContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	b.AssignList(true, stmt)
 }
 
 // left expression list
 func (b *astbuilder) buildLeftExpressionList(forceAssign bool, stmt *yak.LeftExpressionListContext) []*ssa.Variable {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	exprs := stmt.AllLeftExpression()
 	valueLen := len(exprs)
@@ -1032,7 +1032,7 @@ func (b *astbuilder) buildLeftExpressionList(forceAssign bool, stmt *yak.LeftExp
 //
 // 其余表达式不是合法左值，报错返回 nil。
 func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpressionContext) *ssa.Variable {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	createVar := func(text string) *ssa.Variable {
@@ -1067,7 +1067,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 			return nil
 		}
 		obj := b.buildExpression(base)
-		recoverRange := b.SetRange(m.BaseParserRuleContext)
+		recoverRange := b.SetRange(&m.BaseParserRuleContext)
 		defer recoverRange()
 		if id := m.Identifier(); id != nil {
 			callee := b.EmitConstInstPlaceholder(id.GetText())
@@ -1091,7 +1091,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 			return nil
 		}
 		obj := b.buildExpression(base)
-		recoverRange := b.SetRange(s.BaseParserRuleContext)
+		recoverRange := b.SetRange(&s.BaseParserRuleContext)
 		defer recoverRange()
 		if idx, ok := s.Expression(0).(*yak.ExpressionContext); ok {
 			index := b.buildExpression(idx)
@@ -1106,7 +1106,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 
 // expression
 func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	getValue := func(index int) ssa.Value {
@@ -1163,7 +1163,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 	}
 	// member call
 	if s, ok := stmt.MemberCall().(*yak.MemberCallContext); ok {
-		recoverRange := b.SetRange(s.BaseParserRuleContext)
+		recoverRange := b.SetRange(&s.BaseParserRuleContext)
 		defer recoverRange()
 
 		expr, ok := stmt.Expression(0).(*yak.ExpressionContext)
@@ -1486,7 +1486,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 
 // make expression
 func (b *astbuilder) buildMakeExpression(stmt *yak.MakeExpressionContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	var typ ssa.Type
 	if s, ok := stmt.TypeLiteral().(*yak.TypeLiteralContext); ok {
@@ -1539,7 +1539,7 @@ func (b *astbuilder) buildMakeExpression(stmt *yak.MakeExpressionContext) ssa.Va
 
 // instance code
 func (b *astbuilder) buildInstanceCode(stmt *yak.InstanceCodeContext) *ssa.Call {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	newFunc := b.NewFunc("")
@@ -1559,7 +1559,7 @@ func (b *astbuilder) buildInstanceCode(stmt *yak.InstanceCodeContext) *ssa.Call 
 
 // anonymous function decl
 func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	funcName := ""
 	// If this function has an explicit name, use it
@@ -1609,7 +1609,7 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 	}
 
 	{
-		recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+		recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 
 		b.FunctionBuilder = b.PushFunction(newFunc)
 		if b.MarkedThisObject != nil {
@@ -1676,7 +1676,7 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 
 // function param decl
 func (b *astbuilder) buildFunctionParamDecl(stmt *yak.FunctionParamDeclContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	ellipsis := stmt.Ellipsis() // if has "...",  use array pass this argument
 	ids := stmt.AllIdentifier()
@@ -1705,7 +1705,7 @@ func (b *astbuilder) buildFunctionCallWarp(exprstmt *yak.ExpressionContext, stmt
 
 // function call
 func (b *astbuilder) buildFunctionCall(stmt *yak.FunctionCallContext, v ssa.Value) *ssa.Call {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	var args []ssa.Value
 	isEllipsis := false
@@ -1724,7 +1724,7 @@ func (b *astbuilder) buildFunctionCall(stmt *yak.FunctionCallContext, v ssa.Valu
 
 // ordinary argument
 func (b *astbuilder) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) (v []ssa.Value, hasEll bool) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	ellipsis := stmt.Ellipsis()
 	allExprs := stmt.AllExpression()
@@ -1758,7 +1758,7 @@ func (b *astbuilder) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) 
 
 // slice call
 func (b *astbuilder) buildSliceCall(stmt *yak.SliceCallContext) []ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	exprLen := len(stmt.AllColon()) + 1
 	exprs := stmt.AllExpression()
@@ -1783,7 +1783,7 @@ func (b *astbuilder) buildSliceCall(stmt *yak.SliceCallContext) []ssa.Value {
 
 // expression list
 func (b *astbuilder) buildExpressionList(stmt *yak.ExpressionListContext) []ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	exprs := stmt.AllExpression()
 	valueLen := len(exprs)
@@ -1800,7 +1800,7 @@ func (b *astbuilder) buildExpressionList(stmt *yak.ExpressionListContext) []ssa.
 
 // expression list multiline
 func (b *astbuilder) buildExpressionListMultiline(stmt *yak.ExpressionListMultilineContext) []ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	allExprs := stmt.AllExpression()
 	exprs := make([]ssa.Value, 0, len(allExprs))

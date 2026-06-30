@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 
 	"github.com/yaklang/yaklang/common/utils"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
@@ -20,7 +20,7 @@ func (y *YakCompiler) VisitIncludeStmt(raw yak.IIncludeStmtContext) interface{} 
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 	y.writeString("include ")
 

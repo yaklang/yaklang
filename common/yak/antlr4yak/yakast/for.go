@@ -82,7 +82,7 @@ func (y *YakCompiler) VisitForStmt(raw yak.IForStmtContext) interface{} {
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 	y.writeString("for ")
 
@@ -206,7 +206,7 @@ func (y *YakCompiler) VisitForRangeStmt(raw yak.IForRangeStmtContext) interface{
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 	y.writeString("for ")
 
@@ -443,7 +443,7 @@ func (y *YakCompiler) VisitForThirdExpr(raw yak.IForThirdExprContext) interface{
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	if ae := i.AssignExpression(); ae != nil {
@@ -472,7 +472,7 @@ func (y *YakCompiler) VisitForFirstExpr(raw yak.IForFirstExprContext) interface{
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	if ae := i.AssignExpression(); ae != nil {

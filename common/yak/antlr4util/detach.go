@@ -4,10 +4,10 @@ import (
 	"reflect"
 	"unsafe"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 )
 
-const antlrRuntimeVersion = "github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20220911224424-aa1f1f12a846"
+const antlrRuntimeVersion = "github.com/yaklang/antlr/v4 v4.13.1"
 
 type tokenSourcePairer interface {
 	GetTokenSourceCharStreamPair() *antlr.TokenSourceCharStreamPair
@@ -39,11 +39,11 @@ func DetachParserATNSimulatorCaches(parser antlr.Parser) {
 		return
 	}
 	interpreter := parser.GetInterpreter()
-	if interpreter == nil || interpreter.BaseATNSimulator == nil {
+	if interpreter == nil {
 		return
 	}
-	zeroUnexportedField(interpreter.BaseATNSimulator, "decisionToDFA")
-	zeroUnexportedField(interpreter.BaseATNSimulator, "sharedContextCache")
+	zeroUnexportedField(&interpreter.BaseATNSimulator, "decisionToDFA")
+	zeroUnexportedField(&interpreter.BaseATNSimulator, "sharedContextCache")
 }
 
 // SlimParserTree trims a retained ANTLR parse subtree in place.
@@ -183,7 +183,7 @@ func baseToken(token antlr.Token) *antlr.BaseToken {
 		return nil
 	}
 	if common, ok := token.(*antlr.CommonToken); ok {
-		return common.BaseToken
+		return &common.BaseToken
 	}
 	v := reflect.ValueOf(token)
 	if v.Kind() != reflect.Ptr || v.IsNil() {

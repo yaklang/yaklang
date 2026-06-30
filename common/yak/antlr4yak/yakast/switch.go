@@ -55,7 +55,7 @@ func (y *YakCompiler) _VisitSwitchStmt(raw yak.ISwitchStmtContext) interface{} {
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 	y.writeString("switch ")
 

@@ -3,7 +3,7 @@ package ssa
 import (
 	"testing"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"

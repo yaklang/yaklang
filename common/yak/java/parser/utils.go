@@ -1,15 +1,15 @@
 package javaparser
 
-import "github.com/antlr/antlr4/runtime/Go/antlr/v4"
+import "github.com/yaklang/antlr/v4"
 
 func GetJavaParserSerializedATN() []int32 {
 	javaparserParserInit()
-	return javaparserParserStaticData.serializedATN
+	return JavaParserParserStaticData.serializedATN
 }
 
 func GetJavaLexerSerializedATN() []int32 {
 	JavaLexerInit()
-	return javalexerLexerStaticData.serializedATN
+	return JavaLexerLexerStaticData.serializedATN
 }
 
 func (l *JavaLexer) SetInterpreter(atn *antlr.ATN, decisionToDFA []*antlr.DFA, predictionContextCache *antlr.PredictionContextCache) {
