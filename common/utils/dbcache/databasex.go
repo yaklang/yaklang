@@ -488,11 +488,3 @@ func (c *Cache[T, D]) handleSaveBatch(tasks []*saveTask[D], save SaveFunc[D]) {
 		c.resident.FinishPersist(task.request.key, task.request.generation, true)
 	}
 }
-
-// AggressiveClear drops ALL cached items without persistence.
-func (c *Cache[T, D]) AggressiveClear() int {
-	if c == nil || c.resident == nil {
-		return 0
-	}
-	return c.resident.AggressiveClear()
-}

@@ -78,8 +78,8 @@ func NewProgram(
 }
 
 // Compile-unit lifecycle (BeginCompileUnit/EndCompileUnit/CurrentCompileUnit),
-// ReleaseCompletedUnitMemory, CheckMemoryPressure, AggressiveClearMemory and
-// helpers live in program_unit.go.
+// ReleaseCompletedUnitMemory, CheckMemoryPressure and helpers live in
+// program_unit.go.
 
 func NewTmpProgram(ProgramName string) *Program {
 	prog := &Program{

@@ -2,7 +2,6 @@ package ssa
 
 import (
 	"runtime"
-	"runtime/debug"
 	"strings"
 
 	stdlog "github.com/yaklang/yaklang/common/log"
@@ -46,7 +45,10 @@ func (prog *Program) CurrentCompileUnit() string {
 	return app.currentCompileUnit
 }
 
-// ReleaseCompletedUnitMemory releases memory for completed compile units after flush.
+// ReleaseCompletedUnitMemory releases the completed compile units' function
+// bodies and clears program-level caches that the per-unit flush path no
+// longer needs. Called once per unit at the end of FlushCompileUnit; the GC
+// itself runs once in FlushCompileUnit after this returns.
 func (prog *Program) ReleaseCompletedUnitMemory(unitKeys []string) int {
 	if prog == nil || len(unitKeys) == 0 {
 		return 0
@@ -107,12 +109,12 @@ func (prog *Program) ReleaseCompletedUnitMemory(unitKeys []string) int {
 			return true
 		}
 
-		// Release function body (blocks and instructions)
+		// Release the function body. Keep EnterBlock/ExitBlock: they are valid
+		// block ids that may still be referenced or flushed later, and zeroing
+		// them would write empty block ids into the DB.
 		if len(fn.Blocks) > 0 {
 			blockCount := len(fn.Blocks)
 			fn.Blocks = nil
-			fn.EnterBlock = 0
-			fn.ExitBlock = 0
 
 			releasedFuncs++
 			releasedBlocks += blockCount
@@ -124,23 +126,63 @@ func (prog *Program) ReleaseCompletedUnitMemory(unitKeys []string) int {
 		return true
 	})
 
-	if compileUnitMemoryDebugEnabled() {
-		log.Debugf("[split-compile] release summary checked=%d released=%d skipped_public=%d skipped_nomatch=%d",
-			checkedFuncs, releasedFuncs, skippedPublic, skippedNoMatch)
-	}
+	// Drop program-level caches accumulated during this unit's build that the
+	// flush path has already persisted or that subsequent units rebuild.
+	prog.clearCompletedUnitProgramState()
 
-	// Force GC to reclaim memory immediately
-	if releasedFuncs > 0 {
-		runtime.GC()
-		if compileUnitMemoryDebugEnabled() {
-			var m runtime.MemStats
-			runtime.ReadMemStats(&m)
-			log.Debugf("[split-compile] released %d function bodies (%d blocks) heap=%.1fMB",
-				releasedFuncs, releasedBlocks, float64(m.HeapInuse)/(1024*1024))
-		}
+	if compileUnitMemoryDebugEnabled() {
+		log.Debugf("[split-compile] release summary checked=%d released=%d skipped_public=%d skipped_nomatch=%d blocks=%d",
+			checkedFuncs, releasedFuncs, skippedPublic, skippedNoMatch, releasedBlocks)
 	}
 
 	return releasedFuncs
+}
+
+// clearCompletedUnitProgramState drops program-level caches accumulated during
+// a unit's build that the per-unit flush no longer needs. It does not touch
+// Funcs (lazy cross-unit builders need earlier units' functions) nor
+// CurrentIncludingStack (needed by lazy builders that may run after cleanup).
+func (prog *Program) clearCompletedUnitProgramState() {
+	if prog == nil {
+		return
+	}
+
+	prog.cacheExternInstance = make(map[string]Value)
+	prog.externType = make(map[string]Type)
+	prog.ExternInstance = make(map[string]any)
+	prog.ExternLib = make(map[string]map[string]any)
+
+	// Clear offset map (can be rebuilt if needed)
+	prog.OffsetMap = make(map[int]*OffsetItem)
+	prog.OffsetSortedSlice = make([]int, 0)
+
+	// Keep only GlobalVariables blueprint; drop the rest.
+	globalVars, _ := prog.Blueprint.Get("__GlobalVariables__")
+	prog.Blueprint = omap.NewEmptyOrderedMap[string, *Blueprint]()
+	if globalVars != nil {
+		prog.Blueprint.Set("__GlobalVariables__", globalVars)
+	}
+
+	// Clear UpStream dependencies
+	prog.UpStream = omap.NewEmptyOrderedMap[string, *Program]()
+	prog.DownStream = make(map[string]*Program)
+
+	// Constants and exports accumulate heavily across units.
+	prog.Consts = make(map[string]Value)
+	prog.ExportValue = make(map[string]Value)
+	prog.ExportType = make(map[string]Type)
+
+	prog.deferredBuilds = omap.NewEmptyOrderedMap[string, *deferredBuildTask]()
+
+	// Clear editor stack - holds file content
+	prog.editorStack = omap.NewEmptyOrderedMap[string, *memedit.MemEditor]()
+
+	// Diagnostics recorder accumulates trace steps heavily; drop it.
+	prog.diagnosticsRecorder = nil
+
+	// File hash mappings
+	prog.FileList = make(map[string]string)
+	prog.LibraryFile = make(map[string][]string)
 }
 
 func compileUnitMemoryDebugEnabled() bool {
@@ -194,7 +236,9 @@ func shouldKeepFunctionForCrossUnitReference(fn *Function) bool {
 	return false
 }
 
-// CheckMemoryPressure checks memory usage after each batch.
+// CheckMemoryPressure checks memory usage after each batch. It only reports;
+// reclamation is left to the per-unit flush path and the adaptive GC
+// (GOMEMLIMIT) started at compile start.
 func (prog *Program) CheckMemoryPressure(batchIndex, totalBatches int) bool {
 	if prog == nil {
 		return false
@@ -211,9 +255,8 @@ func (prog *Program) CheckMemoryPressure(batchIndex, totalBatches int) bool {
 	)
 
 	if heapMB > criticalThresholdMB {
-		log.Warnf("[split-compile] CRITICAL memory pressure detected: heap=%.1fMB batch=%d/%d - forcing aggressive cleanup",
+		log.Warnf("[split-compile] CRITICAL memory pressure detected: heap=%.1fMB batch=%d/%d - relying on per-unit flush + adaptive GC for reclaim",
 			heapMB, batchIndex, totalBatches)
-		prog.AggressiveClearMemory()
 		return true
 	}
 
@@ -223,81 +266,4 @@ func (prog *Program) CheckMemoryPressure(batchIndex, totalBatches int) bool {
 	}
 
 	return false
-}
-
-// AggressiveClearMemory forcefully clears all non-essential Program structures
-// This is the NUCLEAR option for split compile memory control
-// WARNING: This may break cross-unit references, only use after batch flush
-func (prog *Program) AggressiveClearMemory() int64 {
-	if prog == nil {
-		return 0
-	}
-
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-	beforeMB := m.HeapInuse / (1024 * 1024)
-
-	// Clear all caches
-	prog.cacheExternInstance = make(map[string]Value)
-	prog.externType = make(map[string]Type)
-	prog.ExternInstance = make(map[string]any)
-	prog.ExternLib = make(map[string]map[string]any)
-
-	// Clear offset map (can be rebuilt if needed)
-	prog.OffsetMap = make(map[int]*OffsetItem)
-	prog.OffsetSortedSlice = make([]int, 0)
-
-	// NUCLEAR: Clear Blueprint map (type definitions)
-	// Keep only GlobalVariables blueprint
-	globalVars, _ := prog.Blueprint.Get("__GlobalVariables__")
-	prog.Blueprint = omap.NewEmptyOrderedMap[string, *Blueprint]()
-	if globalVars != nil {
-		prog.Blueprint.Set("__GlobalVariables__", globalVars)
-	}
-
-	// NUCLEAR: Clear UpStream dependencies
-	prog.UpStream = omap.NewEmptyOrderedMap[string, *Program]()
-	prog.DownStream = make(map[string]*Program)
-
-	// Note: Do NOT clear Funcs here - lazy builders need access to functions
-	// defined in earlier batches. Only clear constants and exports.
-
-	// Also clear constants - these accumulate heavily!
-	prog.Consts = make(map[string]Value)
-	prog.ExportValue = make(map[string]Value)
-	prog.ExportType = make(map[string]Type)
-
-	prog.deferredBuilds = omap.NewEmptyOrderedMap[string, *deferredBuildTask]()
-
-	// NEW: Clear editor stack - holds file content
-	prog.editorStack = omap.NewEmptyOrderedMap[string, *memedit.MemEditor]()
-
-	// CRITICAL: Clear diagnostics recorder - this accumulates trace steps heavily!
-	// Found via heap profiling: diagnostics.appendStep grows by 587 KB per batch
-	if prog.diagnosticsRecorder != nil {
-		prog.diagnosticsRecorder = nil
-	}
-
-	// CRITICAL: Clear FileList - file hash mappings
-	prog.FileList = make(map[string]string)
-	prog.LibraryFile = make(map[string][]string)
-
-	// Note: Do NOT clear CurrentIncludingStack here - it's needed by lazy builders
-	// that may run after this cleanup
-
-	// Force GC multiple times to ensure everything is collected
-	runtime.GC()
-	runtime.GC()
-	runtime.GC()
-	debug.FreeOSMemory()
-
-	runtime.ReadMemStats(&m)
-	afterMB := m.HeapInuse / (1024 * 1024)
-
-	freedMB := int64(beforeMB - afterMB)
-	if compileUnitMemoryDebugEnabled() {
-		log.Debugf("[split-compile] aggressive clear heap=%dMB->%dMB freed=%dMB", beforeMB, afterMB, freedMB)
-	}
-
-	return freedMB
 }
