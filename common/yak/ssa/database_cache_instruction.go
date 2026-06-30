@@ -34,8 +34,9 @@ type instructionStore struct {
 
 	flushResidentOnClose bool
 	saveSize             int
-	residentFlushMu      sync.Mutex
-	residentPersisted    map[int64]struct{}
+	// residentCache drives the adaptive DB-write fast path: all instructions
+	// stay resident until Close, with synchronous incremental batched flush.
+	residentCache *dbcache.ResidentFlushCache[int64, Instruction, *instructionPersistRecord]
 
 	persistedCount atomic.Int64
 
@@ -96,10 +97,14 @@ func newInstructionStore(
 		store.reader = reader
 	case ProgramCacheDBWrite:
 		if useAdaptiveInstructionFastPath(cfg) {
-			store.resident = utils.NewSafeMapWithKey[int64, Instruction]()
 			store.flushResidentOnClose = true
 			store.saveSize = min(max(saveSize*20, 5000), maxSaveSize)
-			store.residentPersisted = make(map[int64]struct{})
+			store.residentCache = dbcache.NewResidentFlushCache[int64, Instruction, *instructionPersistRecord](
+				store.saveSize,
+				store.marshalResidentRecord,
+				store.saveInstructionPersistRecords,
+			)
+			store.resident = store.residentCache.Map()
 			return store
 		}
 
@@ -245,8 +250,8 @@ func (s *instructionStore) Flush() {
 		} else {
 			s.writer.Flush(utils.EvictionReasonCapacityReached)
 		}
-	case s.flushResidentOnClose && s.resident != nil:
-		if err := s.flushResident(false); err != nil {
+	case s.residentCache != nil:
+		if err := s.residentCache.Flush(false); err != nil {
 			log.Errorf("flush resident instructions failed: %v", err)
 		}
 	}
@@ -302,35 +307,6 @@ func (s *instructionStore) EnableSpill() {
 		return
 	}
 	s.writer.EnableSave()
-}
-
-// AggressiveClearInstructions drops ALL cached instructions from memory.
-// In writer mode, this clears the writer cache after DB flush.
-// In memory mode, this clears the resident map.
-// In reader mode, this clears the reader cache.
-func (s *instructionStore) AggressiveClearInstructions() int {
-	if s == nil {
-		return 0
-	}
-	cleared := 0
-	switch {
-	case s.writer != nil:
-		cleared = s.writer.AggressiveClear()
-	case s.reader != nil:
-		cleared = s.reader.AggressiveClear()
-	case s.resident != nil:
-		// Create a new safe map to release memory
-		oldCount := s.resident.Count()
-		s.resident = utils.NewSafeMapWithKey[int64, Instruction]()
-		cleared = oldCount
-	}
-
-	// Also clear residentPersisted map to release memory
-	s.residentFlushMu.Lock()
-	s.residentPersisted = make(map[int64]struct{})
-	s.residentFlushMu.Unlock()
-
-	return cleared
 }
 
 func (s *instructionStore) IsSpillDisabled() bool {
@@ -399,126 +375,37 @@ func (s *instructionStore) Close(progress func(int)) error {
 		if err := s.writer.Close(); err != nil {
 			return err
 		}
-	case s.flushResidentOnClose:
-		if len(s.residentPersisted) == 0 {
-			if err := s.flushResidentOnCloseOnly(); err != nil {
-				return err
-			}
-			break
-		}
-		if err := s.flushResident(true); err != nil {
+	case s.residentCache != nil:
+		if err := s.residentCache.Flush(true); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (s *instructionStore) flushResidentOnCloseOnly() error {
-	if s == nil || s.resident == nil || s.db == nil {
-		return nil
+// marshalResidentRecord is the marshal callback for the adaptive fast-path
+// residentCache. It turns an instruction into a persist record for the close
+// flush (EvictionReasonDeleted). ok=false means the item has no DB row to
+// write (e.g. an empty instruction) and is silently skipped; err is a marshal
+// failure to accumulate and return. updateExisting is the cache's per-Flush
+// decision: true on a close flush that follows an incremental flush (upsert),
+// false otherwise (insert).
+func (s *instructionStore) marshalResidentRecord(inst Instruction, updateExisting bool) (*instructionPersistRecord, bool, error) {
+	irCode, err := s.marshalIrCodeWithReason(inst, utils.EvictionReasonDeleted)
+	if err != nil {
+		log.Errorf("marshal ir code failed: %v", err)
+		return nil, false, err
 	}
-
-	saveBatch := saveInstructionIrCodesFast(s.program, s.db, s.notifyProgress)
-	batch := make([]*ssadb.IrCode, 0, s.saveSize)
-	var flushErr error
-	flush := func() {
-		if len(batch) == 0 {
-			return
-		}
-		if err := saveBatch(batch); err != nil {
-			log.Errorf("save ir code batch fast path failed: %v", err)
-			flushErr = utils.JoinErrors(flushErr, err)
-		}
-		batch = make([]*ssadb.IrCode, 0, s.saveSize)
+	if irCode == nil {
+		return nil, false, nil
 	}
-
-	s.resident.ForEach(func(_ int64, inst Instruction) bool {
-		irCode, err := s.marshalIrCodeWithReason(inst, utils.EvictionReasonDeleted)
-		if err != nil {
-			log.Errorf("marshal ir code failed: %v", err)
-			flushErr = utils.JoinErrors(flushErr, err)
-			return true
-		}
-		if irCode == nil {
-			return true
-		}
-		batch = append(batch, irCode)
-		if len(batch) >= s.saveSize {
-			flush()
-		}
-		return true
-	})
-	flush()
-	return flushErr
-}
-
-func (s *instructionStore) flushResident(final bool) error {
-	if s == nil || s.resident == nil || s.db == nil {
-		return nil
-	}
-	s.residentFlushMu.Lock()
-	defer s.residentFlushMu.Unlock()
-	if s.residentPersisted == nil {
-		s.residentPersisted = make(map[int64]struct{})
-	}
-
-	batch := make([]*instructionPersistRecord, 0, s.saveSize)
-	batchIDs := make([]int64, 0, s.saveSize)
-	var flushErr error
-	flush := func() {
-		if len(batch) == 0 {
-			return
-		}
-		if err := s.saveInstructionPersistRecords(batch); err != nil {
-			log.Errorf("save ir code batch fast path failed: %v", err)
-			flushErr = utils.JoinErrors(flushErr, err)
-		} else {
-			for _, id := range batchIDs {
-				if id > 0 {
-					s.residentPersisted[id] = struct{}{}
-				}
-			}
-		}
-		batch = make([]*instructionPersistRecord, 0, s.saveSize)
-		batchIDs = make([]int64, 0, s.saveSize)
-	}
-
-	s.resident.ForEach(func(id int64, inst Instruction) bool {
-		if utils.IsNil(inst) {
-			return true
-		}
-		codeID := inst.GetId()
-		if codeID <= 0 {
-			codeID = id
-		}
-		_, alreadyPersisted := s.residentPersisted[codeID]
-		if alreadyPersisted && !final {
-			return true
-		}
-		irCode, err := s.marshalIrCodeWithReason(inst, utils.EvictionReasonDeleted)
-		if err != nil {
-			log.Errorf("marshal ir code failed: %v", err)
-			flushErr = utils.JoinErrors(flushErr, err)
-			return true
-		}
-		if irCode == nil {
-			return true
-		}
-		batch = append(batch, &instructionPersistRecord{
-			IrCode:         irCode,
-			Opcode:         inst.GetOpcode(),
-			Reason:         utils.EvictionReasonDeleted,
-			UpdateExisting: final || alreadyPersisted,
-			CodeID:         codeID,
-		})
-		batchIDs = append(batchIDs, codeID)
-		if len(batch) >= s.saveSize {
-			flush()
-		}
-		return true
-	})
-	flush()
-	return flushErr
+	return &instructionPersistRecord{
+		IrCode:         irCode,
+		Opcode:         inst.GetOpcode(),
+		Reason:         utils.EvictionReasonDeleted,
+		UpdateExisting: updateExisting,
+		CodeID:         inst.GetId(),
+	}, true, nil
 }
 
 func (s *instructionStore) PreloadByIDsFast(ids []int64) {
@@ -689,41 +576,6 @@ func (s *instructionStore) notifyProgress(size int) {
 	s.progressMu.RUnlock()
 	if fn != nil {
 		fn(size)
-	}
-}
-
-func saveInstructionIrCodesFast(prog *Program, db *gorm.DB, notify func(int)) dbcache.SaveFunc[*ssadb.IrCode] {
-	return func(records []*ssadb.IrCode) error {
-		if len(records) == 0 {
-			return nil
-		}
-		var saveErr error
-		saveStep := func() error {
-			saveErr = utils.GormTransaction(db, func(tx *gorm.DB) error {
-				for _, irCode := range records {
-					if irCode == nil {
-						continue
-					}
-					if err := tx.Save(irCode).Error; err != nil {
-						return err
-					}
-				}
-				return nil
-			})
-			return saveErr
-		}
-		if prog != nil {
-			prog.DiagnosticsTrack("ssa.Database.SaveIrCodeBatchFastPath", saveStep)
-		} else {
-			saveStep()
-		}
-		if saveErr != nil {
-			return saveErr
-		}
-		if notify != nil {
-			notify(len(records))
-		}
-		return nil
 	}
 }
 

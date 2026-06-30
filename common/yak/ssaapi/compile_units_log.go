@@ -37,7 +37,11 @@ func logPhaseHeap(tag string) {
 	if !heapLogEnabled && profileDir == "" {
 		return
 	}
-	runtime.GC()
+	// Note: no runtime.GC() here — the per-unit flush already GCs once at unit
+	// end, and an extra GC per phase was deemed too frequent. The retained-heap
+	// numbers and opt-in heap profiles therefore include un-collected garbage;
+	// acceptable for a diagnostic. Run GODEBUG=gctrace=1 or a manual GC if you
+	// need a precise retained snapshot.
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 	if heapLogEnabled {

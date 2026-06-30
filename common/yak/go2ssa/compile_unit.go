@@ -11,8 +11,13 @@ import (
 )
 
 var (
-	goImportRe = regexp.MustCompile(`(?m)^\s*(?:import\s+)?(?:[A-Za-z_][A-Za-z0-9_]*\s+)?\"([^\"]+)\"`)
-	goModuleRe  = regexp.MustCompile(`(?m)^\s*module\s+(\S+)`)
+	// goImportRe matches a quoted import path per line. The optional prefix
+	// accepts `import "p"`, `import a "p"`, and the dot import `import . "p"`,
+	// plus the bare `"p"` lines inside a multi-line `import ( ... )` block (the
+	// `import` keyword only appears on the block opener, so each member line has
+	// none). `(?m)` makes `^` match each line, so multi-line import blocks work.
+	goImportRe = regexp.MustCompile(`(?m)^\s*(?:import\s+)?(?:(?:[A-Za-z_][A-Za-z0-9_]*|\.)\s+)?\"([^\"]+)\"`)
+	goModuleRe = regexp.MustCompile(`(?m)^\s*module\s+(\S+)`)
 )
 
 type goModuleRoot struct {

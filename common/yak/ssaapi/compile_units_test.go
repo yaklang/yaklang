@@ -380,3 +380,127 @@ func testCompileUnit(key string, fileCount int, bytes int64) *CompileUnit {
 		Bytes: bytes,
 	}
 }
+
+// TestCompileUnitPlanGoImportBlock exercises a multi-line `import ( ... )` block
+// with bare, aliased, and dot imports, and asserts `package main` does not
+// produce a spurious import edge.
+func TestCompileUnitPlanGoImportBlock(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", "module github.com/yaklang/yaklang\n\ngo 1.20\n")
+	vf.AddFile("src/main/go/main.go", `package main
+
+import (
+	"github.com/yaklang/yaklang/A"
+	"github.com/yaklang/yaklang/B"
+
+	myc "github.com/yaklang/yaklang/C"
+	. "github.com/yaklang/yaklang/D"
+)
+
+var _ = A.PI
+var _ = B.PI
+var _ = myc.PI
+var _ = PI
+`)
+	vf.AddFile("src/main/go/A/a.go", "package A\nvar PI = 1\n")
+	vf.AddFile("src/main/go/B/b.go", "package B\nvar PI = 2\n")
+	vf.AddFile("src/main/go/C/c.go", "package C\nvar PI = 3\n")
+	vf.AddFile("src/main/go/D/d.go", "package D\nvar PI = 4\n")
+
+	plan := buildPlanForLanguage(t, ssaconfig.GO, vf, []string{
+		"src/main/go/go.mod", "src/main/go/main.go",
+		"src/main/go/A/a.go", "src/main/go/B/b.go",
+		"src/main/go/C/c.go", "src/main/go/D/d.go",
+	})
+
+	// `package main` must not be treated as an import path.
+	for _, e := range plan.Edges {
+		require.NotEqual(t, "main", e.Raw)
+	}
+	require.Contains(t, plan.Edges, UnitRef{From: "dir:src/main/go", To: "dir:src/main/go/A", Kind: "import", Raw: "github.com/yaklang/yaklang/A"})
+	require.Contains(t, plan.Edges, UnitRef{From: "dir:src/main/go", To: "dir:src/main/go/B", Kind: "import", Raw: "github.com/yaklang/yaklang/B"})
+	require.Contains(t, plan.Edges, UnitRef{From: "dir:src/main/go", To: "dir:src/main/go/C", Kind: "import", Raw: "github.com/yaklang/yaklang/C"})
+	require.Contains(t, plan.Edges, UnitRef{From: "dir:src/main/go", To: "dir:src/main/go/D", Kind: "import", Raw: "github.com/yaklang/yaklang/D"})
+}
+
+// TestCompileUnitPlanJavaImportForms exercises multiple imports, a static
+// import, and a wildcard import, plus a package declaration.
+func TestCompileUnitPlanJavaImportForms(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/a/A.java", `package a;
+import b.B;
+import static c.C.method;
+import d.*;
+class A { B b; C c; }
+`)
+	vf.AddFile("src/b/B.java", "package b;\nclass B {}\n")
+	vf.AddFile("src/c/C.java", "package c;\nclass C {}\n")
+	vf.AddFile("src/d/D.java", "package d;\nclass D {}\n")
+
+	plan := buildPlanForLanguage(t, ssaconfig.JAVA, vf, []string{
+		"src/a/A.java", "src/b/B.java", "src/c/C.java", "src/d/D.java",
+	})
+
+	require.Contains(t, plan.Units, "java:a")
+	require.Contains(t, plan.Edges, UnitRef{From: "java:a", To: "java:b", Kind: "import", Raw: "b.B"})
+	require.Contains(t, plan.Edges, UnitRef{From: "java:a", To: "java:c", Kind: "import", Raw: "c.C.method"})
+	require.Contains(t, plan.Edges, UnitRef{From: "java:a", To: "java:d", Kind: "import", Raw: "d"})
+}
+
+// TestCompileUnitPlanPythonMultiNameImport exercises `import a, b, c` and
+// `import a as b, c as d` (multiple modules per statement, aliases stripped),
+// plus `from x import ...`.
+func TestCompileUnitPlanPythonMultiNameImport(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("helper/__init__.py", "")
+	vf.AddFile("helper/db.py", "class DB: pass\n")
+	vf.AddFile("helper/cache.py", "class Cache: pass\n")
+	vf.AddFile("helper/util.py", "class Util: pass\n")
+	vf.AddFile("app.py", "import helper.db, helper.cache\nimport helper.util as u\nfrom helper.db import DB\nDB()\n")
+
+	plan := buildPlanForLanguage(t, ssaconfig.PYTHON, vf, []string{
+		"helper/__init__.py", "helper/db.py", "helper/cache.py", "helper/util.py", "app.py",
+	})
+
+	require.Contains(t, plan.Units, "dir:helper")
+	require.Contains(t, plan.Units, "dir:.")
+	require.Contains(t, plan.Edges, UnitRef{From: "dir:.", To: "dir:helper", Kind: "import", Raw: "helper.db"})
+	require.Contains(t, plan.Edges, UnitRef{From: "dir:.", To: "dir:helper", Kind: "import", Raw: "helper.cache"})
+	require.Contains(t, plan.Edges, UnitRef{From: "dir:.", To: "dir:helper", Kind: "import", Raw: "helper.util"})
+}
+
+// TestCompileUnitPlanTypeScriptImportForms exercises a multi-line named import,
+// a namespace import, `export * from`, `require()`, and dynamic `import()`.
+func TestCompileUnitPlanTypeScriptImportForms(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/interfaces/I.ts", "export interface I {}\n")
+	vf.AddFile("src/services/S.ts", "import {\n\tI,\n} from '../interfaces/I';\nexport class S {}\n")
+	vf.AddFile("src/lib/util.ts", "export const u = 1\n")
+	vf.AddFile("src/main.ts", "import * as S from './services/S';\nexport * from './lib/util';\nconst u = require('./lib/util');\nimport('./lib/util');\nS;\n")
+
+	plan := buildPlanForLanguage(t, ssaconfig.TS, vf, []string{
+		"src/interfaces/I.ts", "src/services/S.ts", "src/lib/util.ts", "src/main.ts",
+	})
+
+	require.Contains(t, plan.Edges, UnitRef{From: "dir:src/services", To: "dir:src/interfaces", Kind: "import", Raw: "../interfaces/I"})
+	require.Contains(t, plan.Edges, UnitRef{From: "dir:src", To: "dir:src/services", Kind: "import", Raw: "./services/S"})
+	require.Contains(t, plan.Edges, UnitRef{From: "dir:src", To: "dir:src/lib", Kind: "import", Raw: "./lib/util"})
+}
+
+// TestCompileUnitPlanCIncludes exercises multiple #include forms (angle,
+// quoted, and `#  include` with spaces) resolving to their owning units.
+func TestCompileUnitPlanCIncludes(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("a/a.h", "int a(void);\n")
+	vf.AddFile("b/b.h", "int b(void);\n")
+	vf.AddFile("c/c.h", "int c(void);\n")
+	vf.AddFile("main.c", "#include <a/a.h>\n#include \"b/b.h\"\n#  include <c/c.h>\nint main(void){ return 0; }\n")
+
+	plan := buildPlanForLanguage(t, ssaconfig.C, vf, []string{
+		"main.c", "a/a.h", "b/b.h", "c/c.h",
+	})
+
+	require.Contains(t, plan.Edges, UnitRef{From: "dir:.", To: "dir:a", Kind: "include", Raw: "a/a.h"})
+	require.Contains(t, plan.Edges, UnitRef{From: "dir:.", To: "dir:b", Kind: "include", Raw: "b/b.h"})
+	require.Contains(t, plan.Edges, UnitRef{From: "dir:.", To: "dir:c", Kind: "include", Raw: "c/c.h"})
+}

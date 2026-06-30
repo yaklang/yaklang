@@ -48,7 +48,7 @@ func DeleteInst(i Instruction) {
 	}
 	if user, ok := ToUser(i); ok {
 		for _, value := range user.GetValues() {
-			if value != nil && !isValueNil(value) {
+			if value != nil && !utils.IsNil(value) {
 				value.RemoveUser(user)
 			}
 		}
