@@ -18,7 +18,7 @@ type Save[T any] struct {
 	saveToDB func([]T) // Function to save items to the database
 
 	buffer *chanx.UnlimitedChan[T] // Channel for buffering items
-	flush  chan chan struct{}
+	flush  chan flushRequest
 
 	config *config
 
@@ -139,6 +139,10 @@ func resetTimer(timer *time.Timer, duration time.Duration) {
 	timer.Reset(duration)
 }
 
+// flushRequest asks the saver goroutine to synchronously drain buffered items;
+// it closes done once all queued items have been handed to the save function.
+type flushRequest struct{ done chan struct{} }
+
 // NewSave creates a new Saver with the specified buffer size and save function.
 // It starts a background goroutine to process items from the buffer.
 func NewSave[T any](
@@ -160,7 +164,7 @@ func NewSaveWithConfig[T any](
 	s := &Save[T]{
 		saveToDB: saveToDB,
 		buffer:   chanx.NewUnlimitedChan[T](ctx, cfg.bufferSize),
-		flush:    make(chan chan struct{}),
+		flush:    make(chan flushRequest),
 		ctx:      ctx,
 		cancel:   cancel,
 		config:   cfg,
@@ -204,7 +208,7 @@ func (s *Save[T]) processBuffer() {
 		case <-s.ctx.Done():
 			save(items)
 			return
-		case done := <-s.flush:
+		case req := <-s.flush:
 			// Synchronous flush: save the current batch, then drain
 			// everything still buffered before acking. Callers MUST NOT
 			// call Save concurrently with Flush.
@@ -225,7 +229,7 @@ func (s *Save[T]) processBuffer() {
 			items = make([]T, 0, saveSize)
 			resetTimer(timer, saveTime)
 			s.saveWG.Wait()
-			close(done)
+			close(req.done)
 		case item, ok := <-s.buffer.OutputChannel():
 			if !ok {
 				save(items)
@@ -298,10 +302,10 @@ func (s *Save[T]) Flush() {
 	if s == nil {
 		return
 	}
-	done := make(chan struct{})
+	req := flushRequest{done: make(chan struct{})}
 	select {
-	case s.flush <- done:
-		<-done
+	case s.flush <- req:
+		<-req.done
 	case <-s.ctx.Done():
 	}
 }

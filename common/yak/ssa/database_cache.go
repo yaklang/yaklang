@@ -2,7 +2,6 @@ package ssa
 
 import (
 	"runtime"
-	"runtime/debug"
 	"strings"
 	"time"
 
@@ -248,29 +247,25 @@ func (c *ProgramCache) FlushCompileUnit(unitKey string) {
 	)
 	c.lastReleasedEditors = releasedEditors
 
-	// REAL FIX: Clear auxiliary stores (types/sources) to release memory.
-	// Instruction store is NOT cleared here: flushCompileUnitWriter already
-	// flushed ordinary instructions while keeping function/parameter/free-value
-	// boundary instructions resident for later cross-unit calls.
-	clearedItems := c.aggressiveClearAuxStores()
+	// Clear auxiliary stores (types/sources) to release memory. The instruction
+	// store is NOT cleared here: flushCompileUnitWriter already flushed ordinary
+	// instructions while keeping function/parameter/free-value boundary
+	// instructions resident for later cross-unit calls.
+	clearedItems := c.flushAuxStores()
 
-	// Also clear Program-level structures
+	// Release program-level state for completed units (function bodies plus
+	// program caches the flush path no longer needs).
 	releasedFuncs := 0
 	if c.program != nil {
 		releasedFuncs = c.program.ReleaseCompletedUnitMemory(strings.Split(unitKey, ","))
-		c.program.AggressiveClearMemory()
 	}
 
-	// Force GC to reclaim freed memory
+	// Single GC at unit-run end to reclaim the released resident memory.
 	runtime.GC()
-	runtime.GC()
-	runtime.GC()
-	debug.FreeOSMemory()
-
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
 
 	if instructionCacheDebugEnabled() {
+		var m runtime.MemStats
+		runtime.ReadMemStats(&m)
 		log.Debugf("[ssa-ir-cache-flush] program=%s unit=%s mode=%s cleared=%d released_funcs=%d heap=%.1fMB resident=%d persisted=%d released_editors=%d",
 			c.program.GetProgramName(), unitKey, c.InstructionCacheMode(), clearedItems, releasedFuncs, float64(m.HeapInuse)/(1024*1024), c.CountInstruction(), c.InstructionPersistedCount(), releasedEditors)
 	}
@@ -283,73 +278,12 @@ func (c *ProgramCache) CountReleasedEditors() int {
 	return c.lastReleasedEditors
 }
 
-// AggressiveClearInstructions drops ALL cached instructions from memory.
-// This is the real fix for split compile memory accumulation.
-func (c *ProgramCache) AggressiveClearInstructions() int {
-	if c == nil || c.instructions == nil {
-		return 0
-	}
-	return c.instructions.AggressiveClearInstructions()
-}
-
-// AggressiveClearAllStores clears ALL store caches: instructions, types, sources, indexes.
-// Called after each batch flush to release memory.
-func (c *ProgramCache) AggressiveClearAllStores() int {
-	if c == nil {
-		return 0
-	}
-
-	cleared := 0
-
-	// Clear instruction store
-	if c.instructions != nil {
-		cleared += c.instructions.AggressiveClearInstructions()
-	}
-
-	// Clear type store - holds Type objects in resident map
-	if c.types != nil && c.types.resident != nil {
-		// SafeMapWithKey doesn't have Len(), just recreate it
-		c.types.resident = utils.NewSafeMapWithKey[int64, Type]()
-		cleared += 100 // Estimate, we can't count before clearing
-	}
-
-	// Clear source store - holds editors and payloads (THIS IS BIG!)
-	if c.sources != nil {
-		c.sources.mu.Lock()
-		beforeSize := len(c.sources.payloads) + len(c.sources.editors)
-		c.sources.payloads = make(map[string]*ssadb.IrSource)
-		c.sources.persisted = make(map[string]struct{})
-		c.sources.editors = make(map[string]*memedit.MemEditor)
-		c.sources.editorsByURL = make(map[string]*memedit.MemEditor)
-		c.sources.visitedURLs = make(map[string]*memedit.MemEditor)
-		c.sources.mu.Unlock()
-		cleared += beforeSize
-	}
-
-	// Clear index store - holds IR indexes
-	// (indexStore is typically small, but clear it anyway)
-	if c.indexes != nil {
-		// indexStore doesn't have obvious large caches, skip for now
-	}
-
-	return cleared
-}
-
-// AggressiveClearAuxStoresOnly clears only the non-instruction stores
-// (types, sources). Used after FlushCompileUnit and in non-writer compile
-// paths, where the instruction store must keep resident instructions for
-// index building and Ref() lookups. The instruction store spills to DB via
-// its normal TTL/eviction path.
-func (c *ProgramCache) AggressiveClearAuxStoresOnly() int {
-	return c.aggressiveClearAuxStores()
-}
-
-// aggressiveClearAuxStores clears only the non-instruction stores (types,
-// sources). Used after FlushCompileUnit, where the instruction store has
-// already been selectively flushed by flushCompileUnitWriter and boundary
-// instructions (function/parameter/free-value) must stay resident for later
-// cross-unit calls.
-func (c *ProgramCache) aggressiveClearAuxStores() int {
+// flushAuxStores clears only the non-instruction stores (types, sources) after
+// a compile-unit flush. The instruction store is not touched: its
+// compile-unit-split flush path already persisted ordinary instructions while
+// keeping function/parameter/free-value boundary instructions resident for
+// later cross-unit calls.
+func (c *ProgramCache) flushAuxStores() int {
 	if c == nil {
 		return 0
 	}

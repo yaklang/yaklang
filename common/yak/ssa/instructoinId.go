@@ -1,8 +1,6 @@
 package ssa
 
 import (
-	"reflect"
-
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -104,24 +102,13 @@ func (i *anInstruction) GetBasicBlockByID(id int64) (*BasicBlock, bool) {
 func (v Values) GetIds() []int64 {
 	ret := make([]int64, 0, len(v))
 	for _, val := range v {
-		if val != nil && !isValueNil(val) {
+		if val != nil && !utils.IsNil(val) {
 			ret = append(ret, val.GetId())
 		}
 	}
 	return ret
 }
 
-func isValueNil(v Value) bool {
-	if v == nil {
-		return true
-	}
-	// Check for typed nil (interface with nil underlying pointer)
-	rv := reflect.ValueOf(v)
-	if rv.Kind() == reflect.Ptr && rv.IsNil() {
-		return true
-	}
-	return false
-}
 func GetEx[T any](c *ProgramCache, Cover func(Instruction) (T, bool), id int64) (T, bool) {
 	var zero T
 	if c == nil {

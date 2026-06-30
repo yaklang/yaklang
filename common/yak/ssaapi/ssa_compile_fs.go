@@ -3,7 +3,6 @@ package ssaapi
 import (
 	"fmt"
 	"os"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -456,14 +455,15 @@ func (c *Config) parseProjectWithFSUnits(
 				time.Since(unitBuildStart),
 			)
 	} else if prog.Cache != nil {
-		// Writer cache not enabled: do NOT aggressively clear stores or
-		// program-level structures here. Sources/instructions/editors are
-		// still needed for index building, Ref() lookups, GetEditorByHash,
-		// and Show().ForEachAllFile after compile; they persist to DB via
-		// the normal TTL/eviction path and the final SaveToDatabase flush.
-		// Aggressive clearing (incl. AggressiveClearMemory which wipes
-		// editorStack/UpStream/deferredBuilds) drops un-persisted state and
-		// breaks downstream FromDatabase/Ref/Show.
+		// Writer cache not enabled: do NOT flush/clear stores or program-level
+		// structures here. Sources/instructions/editors are still needed for
+		// index building, Ref() lookups, GetEditorByHash, and
+		// Show().ForEachAllFile after compile; they persist to DB via the normal
+		// TTL/eviction path and the final SaveToDatabase flush. The per-unit
+		// flush path (FlushCompileUnit -> ReleaseCompletedUnitMemory) only runs
+		// in the writer-cache branch above; running it here would drop
+		// un-persisted state (editorStack/UpStream/deferredBuilds) and break
+		// downstream FromDatabase/Ref/Show.
 		preFlushIR := prog.Cache.CountInstruction()
 		preFlushHeap := captureHeapMetrics()
 
@@ -498,7 +498,6 @@ func (c *Config) parseProjectWithFSUnits(
 		}
 		parseTime += time.Since(unitBuildStart)
 		logPhaseHeap(fmt.Sprintf("unit_batch_%03d", batchIndex+1))
-		runtime.GC()
 		prog.SetPreHandler(true)
 		compilePhase = "f1_units"
 	}

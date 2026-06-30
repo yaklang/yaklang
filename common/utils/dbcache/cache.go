@@ -570,26 +570,3 @@ func (c *ResidencyCacheWithKey[K, T]) handleEviction(key K, reason utils.Evictio
 		c.RejectPersist(key, generation)
 	}
 }
-
-// AggressiveClear clears ALL entries from the cache immediately, without persistence.
-// This is for split-compile memory management: after flushing a batch to DB,
-// we need to release ALL cached items from memory.
-// CRITICAL: We recreate the map instead of just clearing it, to force Go runtime
-// to release the underlying memory. A cleared map retains its capacity.
-func (c *ResidencyCacheWithKey[K, T]) AggressiveClear() int {
-	if c == nil {
-		return 0
-	}
-	c.mu.Lock()
-	count := len(c.data)
-	// Recreate the map to force memory release
-	c.data = make(map[K]*residentItem[K, T])
-	c.mu.Unlock()
-
-	// Clear eviction cache too
-	if c.evictionCache != nil {
-		c.evictionCache.Purge()
-	}
-
-	return count
-}

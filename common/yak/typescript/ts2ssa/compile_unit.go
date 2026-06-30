@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	jsImportRe  = regexp.MustCompile(`(?m)^\s*(?:import(?:\s+type)?(?:\s+[^'";]+?\s+from)?|export(?:\s+type)?\s+[^'";]+?\s+from)\s*['"]([^'"]+)['"]`)
-	jsRequireRe = regexp.MustCompile(`\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)`)
+	jsImportRe        = regexp.MustCompile(`(?m)^\s*(?:import(?:\s+type)?(?:\s+[^'";]+?\s+from)?|export(?:\s+type)?\s+[^'";]+?\s+from)\s*['"]([^'"]+)['"]`)
+	jsRequireRe       = regexp.MustCompile(`\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)`)
+	jsDynamicImportRe = regexp.MustCompile(`\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)`)
 )
 
 var jsModuleExtensions = []string{".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs", ".json"}
@@ -61,6 +62,9 @@ func scanJSImportSpecs(src string) []string {
 		add(match[1])
 	}
 	for _, match := range jsRequireRe.FindAllStringSubmatch(src, -1) {
+		add(match[1])
+	}
+	for _, match := range jsDynamicImportRe.FindAllStringSubmatch(src, -1) {
 		add(match[1])
 	}
 	sort.Strings(ret)
