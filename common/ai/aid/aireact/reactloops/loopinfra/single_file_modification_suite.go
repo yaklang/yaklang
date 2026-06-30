@@ -233,11 +233,16 @@ func (f *SingleFileModificationSuiteFactory) applySyntaxLintResult(
 	lintStatusVar := f.GetLintStatusVariableName()
 	if hasBlockingErrors {
 		loop.Set(lintStatusVar, "false")
+		// 修复节点状态反馈: 检测到语法错误, 阻止本轮退出并提示前端进入修复
+		// 关键词: EmitStatus, 语法错误, 修复节点, DisallowNextLoopExit
+		reactloops.EmitStatus(loop, "检测到语法错误，修复中 / Syntax error detected, fixing...")
 		op.DisallowNextLoopExit()
 		op.Continue()
 		return
 	}
 	loop.Set(lintStatusVar, "true")
+	// 语法通过状态反馈, 让前端看到从"修复中"到"通过"的状态切换
+	reactloops.EmitStatus(loop, "语法检查通过 / Syntax check passed")
 	if exitOnClean {
 		op.Exit()
 	}

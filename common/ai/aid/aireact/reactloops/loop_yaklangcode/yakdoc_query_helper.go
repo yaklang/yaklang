@@ -111,6 +111,29 @@ func formatNameList(label string, names []string) string {
 	return buf.String()
 }
 
+// QueryModuleOverview 返回某个库的"模块速览": 一句话库定位(OverviewShort) + 函数/变量名索引。
+// 供 AI 拆解需求选定候选库后, 进一步确认该库职责与可用 API, 再去 grep/语义搜索具体样例。
+// 关键词: 模块速览, 库定位, 选库后定位 API
+func QueryModuleOverview(libName string) (string, error) {
+	libName = strings.TrimSpace(libName)
+	if libName == "" {
+		return "", utils.Error("missing argument: library")
+	}
+	details, err := QueryLibraryDetails([]string{libName})
+	if err != nil {
+		return "", err
+	}
+	var buf strings.Builder
+	buf.WriteString(fmt.Sprintf("[YakDocument] Module overview: %s\n\n", libName))
+	if short := doc.GetLibOverviewShort(libName); short != "" {
+		buf.WriteString("## 库定位 / Positioning\n")
+		buf.WriteString(short)
+		buf.WriteString("\n\n")
+	}
+	buf.WriteString(FormatLibraryDetails(details))
+	return strings.TrimSpace(buf.String()), nil
+}
+
 // QueryFunctionDetails returns function documentation entries.
 func QueryFunctionDetails(libName string, funcNames []string) (map[string]*yakdoc.FuncDecl, error) {
 	if len(funcNames) == 0 {

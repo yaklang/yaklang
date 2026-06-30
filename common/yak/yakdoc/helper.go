@@ -339,10 +339,15 @@ func (i *LibInstance) String() string {
 }
 
 type ScriptLib struct {
-	Name        string
-	Instances   map[string]*LibInstance
-	Functions   map[string]*FuncDecl
-	ElementDocs []string
+	Name      string
+	Instances map[string]*LibInstance
+	Functions map[string]*FuncDecl
+	// OverviewShort 是库级一句话定位(由 overviews/<lib>.md 首段在文档生成期派生),
+	// 用于 AI "目标→模块" 的库选择索引。运行时随 doc.gob.zst 一并加载, 不新增 embed。
+	// 旧 gob 数据解出为空字符串(gob 向后兼容), 缺失时优雅降级。
+	// 关键词: OverviewShort, 库选择索引, overviews 首段, gob 向后兼容
+	OverviewShort string
+	ElementDocs   []string
 }
 
 func (l *ScriptLib) String() string {

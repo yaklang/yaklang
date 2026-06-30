@@ -444,6 +444,16 @@ func (e *AIEngine) handleStreamFinishedEvent(event *schema.AiOutputEvent) {
 		return
 	}
 
+	// System streams (e.g. "fast-memory-fetch") are intentionally NOT persisted to the project
+	// DB: AiOutputEvent.ShouldSave -> saveAllowedByFlags returns false whenever IsSystem is set,
+	// so the stream_start / delta / stream-finished rows are never written. Their content is
+	// delivered live through the stream-delta callback, hence there is no DB row to look up here.
+	// Querying anyway is wasteful and produces a misleading "stream event not found" warning, so
+	// skip system streams early. (OnStreamEnd-with-total cannot be served from DB for them anyway.)
+	if event.IsSystem {
+		return
+	}
+
 	streamEvents, err := yakit.QueryAIEvent(consts.GetGormProjectDatabase(), &ypb.AIEventFilter{
 		EventUUIDS: []string{streamWriterID},
 	})
