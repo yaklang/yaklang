@@ -19,7 +19,7 @@ const (
 )
 
 func (b *astbuilder) build(ast *cparser.CompilationUnitContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	exportHandler := func() {
@@ -49,7 +49,7 @@ func (b *astbuilder) build(ast *cparser.CompilationUnitContext) {
 }
 
 func (b *astbuilder) prebuildTranslationUnit(ast *cparser.TranslationUnitContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	for _, e := range ast.AllExternalDeclaration() {
@@ -58,7 +58,7 @@ func (b *astbuilder) prebuildTranslationUnit(ast *cparser.TranslationUnitContext
 }
 
 func (b *astbuilder) prebuildExternalDeclaration(ast *cparser.ExternalDeclarationContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if f := ast.FunctionDefinition(); f != nil {
@@ -69,7 +69,7 @@ func (b *astbuilder) prebuildExternalDeclaration(ast *cparser.ExternalDeclaratio
 }
 
 func (b *astbuilder) buildTranslationUnit(ast *cparser.TranslationUnitContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	for _, e := range ast.AllExternalDeclaration() {
@@ -78,7 +78,7 @@ func (b *astbuilder) buildTranslationUnit(ast *cparser.TranslationUnitContext) {
 }
 
 func (b *astbuilder) buildExternalDeclaration(ast *cparser.ExternalDeclarationContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if f := ast.FunctionDefinition(); f != nil {
@@ -97,7 +97,7 @@ func (b *astbuilder) buildExternalDeclaration(ast *cparser.ExternalDeclarationCo
 }
 
 func (b *astbuilder) buildFunctionDefinition(ast *cparser.FunctionDefinitionContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 	var retType ssa.Type
 	var paramTypes ssa.Types
@@ -179,7 +179,7 @@ func (b *astbuilder) buildFunctionDefinition(ast *cparser.FunctionDefinitionCont
 }
 
 func (b *astbuilder) buildDirectDeclarator(ast *cparser.DirectDeclaratorContext, kinds ...ConstKind) (*ssa.Variable, ssa.Value, ssa.Types) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	var ssatypes ssa.Types
@@ -334,7 +334,7 @@ func (b *astbuilder) buildIdentifierDeclarator(name string, kind ConstKind) (*ss
 
 // buildDeclaratorSuffix 处理声明符后缀（数组维度或函数参数）
 func (b *astbuilder) buildDeclaratorSuffix(ast *cparser.DeclaratorSuffixContext, variable *ssa.Variable, value ssa.Value, ssatypes ssa.Types, kind ConstKind) (*ssa.Variable, ssa.Value, ssa.Types) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	// 处理数组后缀: arraySuffix
@@ -413,7 +413,7 @@ func (b *astbuilder) buildFunctionSuffixDeclarator(functionSuffix *cparser.Funct
 // buildMacroCallExpression 处理宏调用表达式
 // macroCallExpression: Identifier '(' macroArgumentList? ')' postfixSuffix*
 func (b *astbuilder) buildMacroCallExpression(ast *cparser.MacroCallExpressionContext) ssa.Value {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	var right ssa.Value
@@ -454,7 +454,7 @@ func (b *astbuilder) buildMacroCallExpression(ast *cparser.MacroCallExpressionCo
 
 // buildMacroArgumentList 处理宏参数列表
 func (b *astbuilder) buildMacroArgumentList(ast *cparser.MacroArgumentListContext) ssa.Values {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 	var ret ssa.Values
 	for _, a := range ast.AllMacroArgument() {
@@ -469,7 +469,7 @@ func (b *astbuilder) buildMacroArgumentList(ast *cparser.MacroArgumentListContex
 // buildMacroCallStatement 处理宏调用语句
 // macroCallStatement: Identifier eos*
 func (b *astbuilder) buildMacroCallStatement(ast *cparser.MacroCallStatementContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	// 宏调用语句通常不产生值，只是用于预处理指令或副作用
@@ -523,7 +523,7 @@ func (b *astbuilder) buildDeclaratorCore(directDeclarator *cparser.DirectDeclara
 
 // buildDeclarator 处理完整的声明符：pointer? directDeclarator gccDeclaratorExtension*
 func (b *astbuilder) buildDeclarator(ast *cparser.DeclaratorContext, kinds ...ConstKind) (*ssa.Variable, ssa.Value, ssa.Types) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	// 先处理 directDeclarator（核心逻辑）
@@ -551,24 +551,24 @@ func (b *astbuilder) buildDeclarator(ast *cparser.DeclaratorContext, kinds ...Co
 }
 
 func (b *astbuilder) buildVcSpecificModifer(ast *cparser.VcSpecificModiferContext) ssa.Value {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	return b.EmitConstInst(0)
 }
 
 func (b *astbuilder) buildTypeQualifierList(ast *cparser.TypeQualifierListContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 }
 
 func (b *astbuilder) buildIdentifierList(ast *cparser.IdentifierListContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 }
 
 func (b *astbuilder) buildParameterTypeList(ast *cparser.ParameterTypeListContext) (ssa.Values, ssa.Types) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if p := ast.ParameterList(); p != nil {
@@ -578,7 +578,7 @@ func (b *astbuilder) buildParameterTypeList(ast *cparser.ParameterTypeListContex
 }
 
 func (b *astbuilder) buildParameterList(ast *cparser.ParameterListContext) (ssa.Values, ssa.Types) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	var params ssa.Values
@@ -592,7 +592,7 @@ func (b *astbuilder) buildParameterList(ast *cparser.ParameterListContext) (ssa.
 }
 
 func (b *astbuilder) buildParameterDeclaration(ast *cparser.ParameterDeclarationContext) (ssa.Value, ssa.Type) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if d := ast.DeclarationSpecifier(); d != nil {
@@ -616,7 +616,7 @@ func (b *astbuilder) buildParameterDeclaration(ast *cparser.ParameterDeclaration
 // buildAbstractDeclarator 应用抽象声明符到基础类型上
 // abstractDeclarator 用于描述类型而不包含变量名（如 int *, int (*)(), int [10] 等）
 func (b *astbuilder) buildAbstractDeclarator(ast *cparser.AbstractDeclaratorContext, baseType ssa.Type) ssa.Type {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if utils.IsNil(baseType) {
@@ -652,7 +652,7 @@ func (b *astbuilder) buildAbstractDeclarator(ast *cparser.AbstractDeclaratorCont
 
 // buildDirectAbstractDeclarator 处理直接抽象声明符（数组、函数等）
 func (b *astbuilder) buildDirectAbstractDeclarator(ast *cparser.DirectAbstractDeclaratorContext, baseType ssa.Type) ssa.Type {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	resultType := baseType
@@ -691,7 +691,7 @@ func (b *astbuilder) buildDirectAbstractDeclarator(ast *cparser.DirectAbstractDe
 
 // buildAbstractDeclaratorSuffix 处理抽象声明符后缀（数组维度或函数参数）
 func (b *astbuilder) buildAbstractDeclaratorSuffix(ast *cparser.AbstractDeclaratorSuffixContext, baseType ssa.Type) ssa.Type {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	resultType := baseType
@@ -746,12 +746,12 @@ func (b *astbuilder) buildAbstractDeclaratorSuffix(ast *cparser.AbstractDeclarat
 }
 
 func (b *astbuilder) buildGccDeclaratorExtension(ast *cparser.GccDeclaratorExtensionContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 }
 
 func (b *astbuilder) buildDeclaration(ast *cparser.DeclarationContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if d := ast.DeclarationSpecifier(); d != nil {
@@ -789,7 +789,7 @@ func (b *astbuilder) buildDeclaration(ast *cparser.DeclarationContext) {
 }
 
 func (b *astbuilder) buildStaticAssertDeclaration(ast *cparser.StaticAssertDeclarationContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if c := ast.Expression(); c != nil {
@@ -799,7 +799,7 @@ func (b *astbuilder) buildStaticAssertDeclaration(ast *cparser.StaticAssertDecla
 }
 
 func (b *astbuilder) buildInitDeclaratorList(ast *cparser.InitDeclaratorListContext, ssatype ...ssa.Type) ([]*ssa.Variable, []int) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	var lefts []*ssa.Variable
@@ -815,7 +815,7 @@ func (b *astbuilder) buildInitDeclaratorList(ast *cparser.InitDeclaratorListCont
 }
 
 func (b *astbuilder) buildInitDeclarator(ast *cparser.InitDeclaratorContext, ssatype ...ssa.Type) (*ssa.Variable, int) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if d := ast.Declarator(); d != nil {
@@ -835,7 +835,7 @@ func (b *astbuilder) buildInitDeclarator(ast *cparser.InitDeclaratorContext, ssa
 }
 
 func (b *astbuilder) buildDeclarationSpecifiers(ast *cparser.DeclarationSpecifiersContext) ssa.Types {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 	var rets ssa.Types
 
@@ -846,7 +846,7 @@ func (b *astbuilder) buildDeclarationSpecifiers(ast *cparser.DeclarationSpecifie
 }
 
 func (b *astbuilder) buildDeclarationSpecifier(ast *cparser.DeclarationSpecifierContext) ssa.Type {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 	var ret ssa.Type
 
@@ -907,7 +907,7 @@ func (b *astbuilder) buildDeclarationSpecifier(ast *cparser.DeclarationSpecifier
 }
 
 func (b *astbuilder) buildAlignmentSpecifier(ast *cparser.AlignmentSpecifierContext) ssa.Type {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if t := ast.TypeName(); t != nil {
@@ -917,7 +917,7 @@ func (b *astbuilder) buildAlignmentSpecifier(ast *cparser.AlignmentSpecifierCont
 }
 
 func (b *astbuilder) buildTypeNameByValue(ast *cparser.TypeNameContext) ssa.Value {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	var value ssa.Value
@@ -932,7 +932,7 @@ func (b *astbuilder) buildTypeNameByValue(ast *cparser.TypeNameContext) ssa.Valu
 }
 
 func (b *astbuilder) buildTypeName(ast *cparser.TypeNameContext) ssa.Type {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if s := ast.SpecifierQualifierList(); s != nil {
@@ -951,27 +951,27 @@ func (b *astbuilder) buildTypeName(ast *cparser.TypeNameContext) ssa.Type {
 }
 
 func (b *astbuilder) buildFunctionSpecifier(ast *cparser.FunctionSpecifierContext) ssa.Type {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 	return ssa.CreateAnyType()
 }
 
 func (b *astbuilder) buildTypeQualifier(ast *cparser.TypeQualifierContext) ssa.Type {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	return ssa.CreateAnyType()
 }
 
 func (b *astbuilder) buildStorageClassSpecifier(ast *cparser.StorageClassSpecifierContext) ssa.Type {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	return ssa.CreateAnyType()
 }
 
 func (b *astbuilder) buildTypeSpecifier(ast *cparser.TypeSpecifierContext) ssa.Type {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if a := ast.AtomicTypeSpecifier(); a != nil {
@@ -992,7 +992,7 @@ func (b *astbuilder) buildTypeSpecifier(ast *cparser.TypeSpecifierContext) ssa.T
 }
 
 func (b *astbuilder) buildTypedefName(ast *cparser.TypedefNameContext) ssa.Type {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if id := ast.Identifier(); id != nil {
@@ -1006,7 +1006,7 @@ func (b *astbuilder) buildTypedefName(ast *cparser.TypedefNameContext) ssa.Type 
 }
 
 func (b *astbuilder) buildEnumSpecifier(ast *cparser.EnumSpecifierContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	// 处理枚举标识符（如果有）
@@ -1048,7 +1048,7 @@ func (b *astbuilder) buildEnumSpecifier(ast *cparser.EnumSpecifierContext) {
 }
 
 func (b *astbuilder) buildEnumeratorList(ast *cparser.EnumeratorListContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	// 跟踪当前枚举值，用于自动递增
@@ -1074,7 +1074,7 @@ func (b *astbuilder) buildEnumeratorList(ast *cparser.EnumeratorListContext) {
 }
 
 func (b *astbuilder) buildEnumerator(ast *cparser.EnumeratorContext, defaultValue int64) ssa.Value {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if id := ast.Identifier(); id != nil {
@@ -1107,7 +1107,7 @@ func (b *astbuilder) buildEnumerator(ast *cparser.EnumeratorContext, defaultValu
 }
 
 func (b *astbuilder) buildStructOrUnionSpecifier(ast *cparser.StructOrUnionSpecifierContext) ssa.Type {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if id := ast.Identifier(0); id != nil {
@@ -1128,7 +1128,7 @@ func (b *astbuilder) buildStructOrUnionSpecifier(ast *cparser.StructOrUnionSpeci
 }
 
 func (b *astbuilder) buildStructDeclarationList(ast *cparser.StructDeclarationListContext, structTyp *ssa.ObjectType) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	for _, s := range ast.AllStructDeclaration() {
@@ -1137,7 +1137,7 @@ func (b *astbuilder) buildStructDeclarationList(ast *cparser.StructDeclarationLi
 }
 
 func (b *astbuilder) buildStructDeclaration(ast *cparser.StructDeclarationContext, structTyp *ssa.ObjectType) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if sq := ast.SpecifierQualifierList(); sq != nil {
@@ -1154,7 +1154,7 @@ func (b *astbuilder) buildStructDeclaration(ast *cparser.StructDeclarationContex
 }
 
 func (b *astbuilder) buildSpecifierQualifierList(ast *cparser.SpecifierQualifierListContext) ssa.Type {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	var ssatype ssa.Type
@@ -1171,7 +1171,7 @@ func (b *astbuilder) buildSpecifierQualifierList(ast *cparser.SpecifierQualifier
 }
 
 func (b *astbuilder) buildStructDeclaratorList(ast *cparser.StructDeclaratorListContext) []*ssa.Variable {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	var ret []*ssa.Variable
@@ -1184,7 +1184,7 @@ func (b *astbuilder) buildStructDeclaratorList(ast *cparser.StructDeclaratorList
 }
 
 func (b *astbuilder) buildStructDeclarator(ast *cparser.StructDeclaratorContext) *ssa.Variable {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	var ret *ssa.Variable
@@ -1202,7 +1202,7 @@ func (b *astbuilder) buildStructDeclarator(ast *cparser.StructDeclaratorContext)
 }
 
 func (b *astbuilder) buildDeclarationList(ast *cparser.DeclarationListContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	for _, d := range ast.AllDeclaration() {
@@ -1211,7 +1211,7 @@ func (b *astbuilder) buildDeclarationList(ast *cparser.DeclarationListContext) {
 }
 
 func (b *astbuilder) buildCompoundStatement(ast *cparser.CompoundStatementContext, isBlock ...bool) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if len(isBlock) > 0 && isBlock[0] {
@@ -1228,7 +1228,7 @@ func (b *astbuilder) buildCompoundStatement(ast *cparser.CompoundStatementContex
 }
 
 func (b *astbuilder) buildBlockItemList(ast *cparser.BlockItemListContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	for _, item := range ast.AllBlockItem() {
@@ -1237,7 +1237,7 @@ func (b *astbuilder) buildBlockItemList(ast *cparser.BlockItemListContext) {
 }
 
 func (b *astbuilder) buildBlockItem(ast *cparser.BlockItemContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if s := ast.Statement(); s != nil {
@@ -1248,7 +1248,7 @@ func (b *astbuilder) buildBlockItem(ast *cparser.BlockItemContext) {
 }
 
 func (b *astbuilder) buildStatement(ast *cparser.StatementContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if e := ast.ExpressionStatement(); e != nil {
@@ -1274,7 +1274,7 @@ func (b *astbuilder) buildStatement(ast *cparser.StatementContext) {
 }
 
 func (b *astbuilder) buildLabeledStatement(ast *cparser.StatementContext, text string) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	LabelBuilder := b.GetLabelByName(text)
@@ -1295,19 +1295,19 @@ func (b *astbuilder) buildLabeledStatement(ast *cparser.StatementContext, text s
 }
 
 func (b *astbuilder) buildStatementsExpression(ast *cparser.StatementsExpressionContext) ssa.Value {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	return nil
 }
 
 func (b *astbuilder) buildAsmStatement(ast *cparser.AsmStatementContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 }
 
 func (b *astbuilder) buildIterationStatement(ast *cparser.IterationStatementContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	loop := b.CreateLoopBuilder()
@@ -1332,13 +1332,13 @@ func (b *astbuilder) buildIterationStatement(ast *cparser.IterationStatementCont
 		if first, ok := condition.ForDeclarations().(*cparser.ForDeclarationsContext); ok {
 			// first expression is initialization, in enter block
 			loop.SetFirst(func() []ssa.Value {
-				recoverRange := b.SetRange(first.BaseParserRuleContext)
+				recoverRange := b.SetRange(&first.BaseParserRuleContext)
 				defer recoverRange()
 				return b.buildForDeclarations(first)
 			})
 		} else if first, ok := condition.AssignmentExpressions().(*cparser.AssignmentExpressionsContext); ok {
 			loop.SetFirst(func() []ssa.Value {
-				recoverRange := b.SetRange(first.BaseParserRuleContext)
+				recoverRange := b.SetRange(&first.BaseParserRuleContext)
 				defer recoverRange()
 				return b.buildAssignmentExpressions(first)
 			})
@@ -1369,7 +1369,7 @@ func (b *astbuilder) buildIterationStatement(ast *cparser.IterationStatementCont
 			// build latch
 			loop.SetThird(func() []ssa.Value {
 				// build third expression in loop.latch
-				recoverRange := b.SetRange(third.BaseParserRuleContext)
+				recoverRange := b.SetRange(&third.BaseParserRuleContext)
 				defer recoverRange()
 				return b.buildForExpression(third)
 			})
@@ -1385,7 +1385,7 @@ func (b *astbuilder) buildIterationStatement(ast *cparser.IterationStatementCont
 }
 
 func (b *astbuilder) buildForDeclarations(ast *cparser.ForDeclarationsContext) ssa.Values {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 	var ret ssa.Values
 
@@ -1396,7 +1396,7 @@ func (b *astbuilder) buildForDeclarations(ast *cparser.ForDeclarationsContext) s
 }
 
 func (b *astbuilder) buildForDeclaration(ast *cparser.ForDeclarationContext) ssa.Values {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if d := ast.DeclarationSpecifier(); d != nil {
@@ -1421,7 +1421,7 @@ func (b *astbuilder) buildForDeclaration(ast *cparser.ForDeclarationContext) ssa
 }
 
 func (b *astbuilder) buildForExpression(ast *cparser.ForExpressionContext) ssa.Values {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	var ret ssa.Values
@@ -1433,7 +1433,7 @@ func (b *astbuilder) buildForExpression(ast *cparser.ForExpressionContext) ssa.V
 }
 
 func (b *astbuilder) buildJumpStatement(ast *cparser.JumpStatementContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if ast.Return() != nil {
@@ -1541,7 +1541,7 @@ func (b *astbuilder) buildSwitchStatement(ast *cparser.SelectionStatementContext
 }
 
 func (b *astbuilder) buildSelectionStatement(ast *cparser.SelectionStatementContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if ast.If() != nil {
@@ -1552,7 +1552,7 @@ func (b *astbuilder) buildSelectionStatement(ast *cparser.SelectionStatementCont
 }
 
 func (b *astbuilder) buildExpressionStatement(ast *cparser.ExpressionStatementContext) ssa.Values {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if a := ast.CoreExpressions(); a != nil {

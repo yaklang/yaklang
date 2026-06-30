@@ -1,7 +1,7 @@
 package pythonparser
 
 import (
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 )
 
 // PythonParserBase provides base functionality for the Python parser,

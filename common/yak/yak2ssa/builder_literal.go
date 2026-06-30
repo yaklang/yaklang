@@ -14,7 +14,7 @@ import (
 )
 
 func (b *astbuilder) buildLiteral(stmt *yak.LiteralContext) (v ssa.Value) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	// template string literal
@@ -97,7 +97,7 @@ func (b *astbuilder) buildLiteral(stmt *yak.LiteralContext) (v ssa.Value) {
 
 // type literal
 func (b *astbuilder) buildTypeLiteral(stmt *yak.TypeLiteralContext) ssa.Type {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	text := stmt.GetText()
 	// var type name
@@ -131,7 +131,7 @@ func (b *astbuilder) buildTypeLiteral(stmt *yak.TypeLiteralContext) ssa.Type {
 
 // slice type literal
 func (b *astbuilder) buildSliceTypeLiteral(stmt *yak.SliceTypeLiteralContext) ssa.Type {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	// fmt.Println(stmt.GetText())
 	if stmt.GetText() == "[]byte" || stmt.GetText() == "[]uint8" {
@@ -147,7 +147,7 @@ func (b *astbuilder) buildSliceTypeLiteral(stmt *yak.SliceTypeLiteralContext) ss
 
 // map type literal
 func (b *astbuilder) buildMapTypeLiteral(stmt *yak.MapTypeLiteralContext) ssa.Type {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	// key
 	var keyTyp ssa.Type
@@ -169,7 +169,7 @@ func (b *astbuilder) buildMapTypeLiteral(stmt *yak.MapTypeLiteralContext) ssa.Ty
 
 // numeric literal
 func (b *astbuilder) buildNumericLiteral(stmt *yak.NumericLiteralContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	// integer literal
@@ -215,7 +215,7 @@ func (b *astbuilder) buildNumericLiteral(stmt *yak.NumericLiteralContext) ssa.Va
 }
 
 func (b *astbuilder) buildTemplateStringLiteral(stmt *yak.TemplateStringLiteralContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	type StringAtom interface {
 		GetText() string
@@ -295,7 +295,7 @@ func (b *astbuilder) buildTemplateStringLiteral(stmt *yak.TemplateStringLiteralC
 
 // string literal
 func (b *astbuilder) buildStringLiteral(stmt *yak.StringLiteralContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if stmt.StartNowDoc() != nil {

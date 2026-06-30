@@ -2,7 +2,7 @@ package antlr4JS
 
 import (
 	_ "embed"
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
 	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
 	"testing"

@@ -3,7 +3,7 @@ package jsp
 import (
 	"strings"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 	jspparser "github.com/yaklang/yaklang/common/yak/java/jsp/parser"
 )
 

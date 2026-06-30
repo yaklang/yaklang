@@ -1,13 +1,12 @@
-// Code generated from java-escape by ANTLR 4.11.1. DO NOT EDIT.
+// Code generated from ./PHPLexer.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
 package phpparser
 
 import (
 	"fmt"
+	"github.com/yaklang/antlr/v4"
 	"sync"
 	"unicode"
-
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 )
 
 // Suppress unused import error
@@ -22,30 +21,30 @@ type PHPLexer struct {
 	// TODO: EOF string
 }
 
-var phplexerLexerStaticData struct {
+var PHPLexerLexerStaticData struct {
 	once                   sync.Once
 	serializedATN          []int32
-	channelNames           []string
-	modeNames              []string
-	literalNames           []string
-	symbolicNames          []string
-	ruleNames              []string
-	predictionContextCache *antlr.PredictionContextCache
+	ChannelNames           []string
+	ModeNames              []string
+	LiteralNames           []string
+	SymbolicNames          []string
+	RuleNames              []string
+	PredictionContextCache *antlr.PredictionContextCache
 	atn                    *antlr.ATN
 	decisionToDFA          []*antlr.DFA
 }
 
 func phplexerLexerInit() {
-	staticData := &phplexerLexerStaticData
-	staticData.channelNames = []string{
+	staticData := &PHPLexerLexerStaticData
+	staticData.ChannelNames = []string{
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN", "PhpComments", "ErrorLexem", "SkipChannel",
 	}
-	staticData.modeNames = []string{
+	staticData.ModeNames = []string{
 		"DEFAULT_MODE", "XML", "INSIDE", "HtmlQuoteStringMode", "HtmlDoubleQuoteStringMode",
 		"SCRIPT", "STYLE", "PHP", "InterpolationString", "SingleLineCommentMode",
 		"HereDocIdentifer", "HereDoc",
 	}
-	staticData.literalNames = []string{
+	staticData.LiteralNames = []string{
 		"", "", "", "'<?xml'", "", "", "", "", "", "", "", "", "", "", "'?>'",
 		"", "", "'/>'", "", "", "", "", "", "", "", "", "", "", "", "", "",
 		"", "", "", "", "", "", "", "", "", "", "", "", "", "'#['", "'abstract'",
@@ -77,7 +76,7 @@ func phplexerLexerInit() {
 		"'@'", "", "'.'", "", "'('", "')'", "'['", "']'", "", "'}'", "','",
 		"':'", "';'", "", "'''", "'`'", "'set_include_path'",
 	}
-	staticData.symbolicNames = []string{
+	staticData.SymbolicNames = []string{
 		"", "SeaWhitespace", "HtmlText", "XmlStart", "PHPStart", "HtmlScriptOpen",
 		"HtmlStyleOpen", "HtmlComment", "HtmlDtd", "HtmlOpen", "Shebang", "NumberSign",
 		"Error", "XmlText", "XmlClose", "PHPStartInside", "HtmlClose", "HtmlSlashClose",
@@ -123,7 +122,7 @@ func phplexerLexerInit() {
 		"HereDocIdentiferName", "HereDocIdentifierBreak", "EndDoc", "HereDocText",
 		"HereDocVariable", "XmlText2",
 	}
-	staticData.ruleNames = []string{
+	staticData.RuleNames = []string{
 		"SeaWhitespace", "HtmlText", "XmlStart", "PHPStartEcho", "PHPStart",
 		"HtmlScriptOpen", "HtmlStyleOpen", "HtmlComment", "HtmlDtd", "HtmlOpen",
 		"Shebang", "NumberSign", "Error", "XmlText", "XmlClose", "XmlText2",
@@ -176,7 +175,7 @@ func phplexerLexerInit() {
 		"HtmlNameStartChar", "LNum", "ExponentPart", "NonZeroDigit", "Digit",
 		"OctalDigit", "HexDigit",
 	}
-	staticData.predictionContextCache = antlr.NewPredictionContextCache()
+	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
 		4, 0, 253, 2362, 6, -1, 6, -1, 6, -1, 6, -1, 6, -1, 6, -1, 6, -1, 6, -1,
 		6, -1, 6, -1, 6, -1, 6, -1, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7,
@@ -1292,7 +1291,7 @@ func phplexerLexerInit() {
 // NewPHPLexer(). You can call this function if you wish to initialize the static state ahead
 // of time.
 func PHPLexerInit() {
-	staticData := &phplexerLexerStaticData
+	staticData := &PHPLexerLexerStaticData
 	staticData.once.Do(phplexerLexerInit)
 }
 
@@ -1301,13 +1300,13 @@ func NewPHPLexer(input antlr.CharStream) *PHPLexer {
 	PHPLexerInit()
 	l := new(PHPLexer)
 	l.BaseLexer = antlr.NewBaseLexer(input)
-	staticData := &phplexerLexerStaticData
-	l.Interpreter = antlr.NewLexerATNSimulator(l, staticData.atn, staticData.decisionToDFA, staticData.predictionContextCache)
-	l.channelNames = staticData.channelNames
-	l.modeNames = staticData.modeNames
-	l.RuleNames = staticData.ruleNames
-	l.LiteralNames = staticData.literalNames
-	l.SymbolicNames = staticData.symbolicNames
+	staticData := &PHPLexerLexerStaticData
+	l.Interpreter = antlr.NewLexerATNSimulator(l, staticData.atn, staticData.decisionToDFA, staticData.PredictionContextCache)
+	l.channelNames = staticData.ChannelNames
+	l.modeNames = staticData.ModeNames
+	l.RuleNames = staticData.RuleNames
+	l.LiteralNames = staticData.LiteralNames
+	l.SymbolicNames = staticData.SymbolicNames
 	l.GrammarFileName = "PHPLexer.g4"
 	// TODO: l.EOF = antlr.TokenEOF
 
@@ -1622,9 +1621,6 @@ func (l *PHPLexer) Action(localctx antlr.RuleContext, ruleIndex, actionIndex int
 }
 
 func (l *PHPLexer) HtmlScriptOpen_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 0:
 		l._scriptTag = true
@@ -1634,9 +1630,6 @@ func (l *PHPLexer) HtmlScriptOpen_Action(localctx antlr.RuleContext, actionIndex
 	}
 }
 func (l *PHPLexer) HtmlStyleOpen_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 1:
 		l._styleTag = true
@@ -1646,75 +1639,60 @@ func (l *PHPLexer) HtmlStyleOpen_Action(localctx antlr.RuleContext, actionIndex 
 	}
 }
 func (l *PHPLexer) HtmlClose_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 2:
-		this.PushModeOnHtmlClose()
+		l.PushModeOnHtmlClose()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *PHPLexer) CloseCurlyBracket_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 3:
-		this.PopModeOnCurlyBracketClose()
+		l.PopModeOnCurlyBracketClose()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *PHPLexer) CurlyDollar_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 4:
-		this.SetInsideString()
+		l.SetInsideString()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *PHPLexer) CurlyOpen_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 5:
-		this.SetInsideString()
+		l.SetInsideString()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *PHPLexer) HereDocIdentiferName_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 6:
-		this.startRecordHereDocLabel()
+		l.startRecordHereDocLabel()
 
 	case 7:
-		this.endRecordHereDocLabel()
+		l.endRecordHereDocLabel()
 
 	case 8:
-		this.startRecordHereDocLabel()
+		l.startRecordHereDocLabel()
 
 	case 9:
-		this.endRecordHereDocLabel()
+		l.endRecordHereDocLabel()
 
 	case 10:
-		this.startRecordHereDocLabel()
+		l.startRecordHereDocLabel()
 
 	case 11:
-		this.endRecordHereDocLabel()
+		l.endRecordHereDocLabel()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
@@ -1753,12 +1731,9 @@ func (l *PHPLexer) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int)
 }
 
 func (p *PHPLexer) Shebang_Sempred(localctx antlr.RuleContext, predIndex int) bool {
-	this := p
-	_ = this
-
 	switch predIndex {
 	case 0:
-		return this.IsNewLineOrStart(-2)
+		return p.IsNewLineOrStart(-2)
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1766,15 +1741,12 @@ func (p *PHPLexer) Shebang_Sempred(localctx antlr.RuleContext, predIndex int) bo
 }
 
 func (p *PHPLexer) PHPEnd_Sempred(localctx antlr.RuleContext, predIndex int) bool {
-	this := p
-	_ = this
-
 	switch predIndex {
 	case 1:
-		return this.HasAspTags()
+		return p.HasAspTags()
 
 	case 2:
-		return this.HasPhpScriptTag()
+		return p.HasPhpScriptTag()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1782,12 +1754,9 @@ func (p *PHPLexer) PHPEnd_Sempred(localctx antlr.RuleContext, predIndex int) boo
 }
 
 func (p *PHPLexer) CurlyDollar_Sempred(localctx antlr.RuleContext, predIndex int) bool {
-	this := p
-	_ = this
-
 	switch predIndex {
 	case 3:
-		return this.IsCurlyDollarInterpolationOpen(1)
+		return p.IsCurlyDollarInterpolationOpen(1)
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1795,12 +1764,9 @@ func (p *PHPLexer) CurlyDollar_Sempred(localctx antlr.RuleContext, predIndex int
 }
 
 func (p *PHPLexer) CurlyOpen_Sempred(localctx antlr.RuleContext, predIndex int) bool {
-	this := p
-	_ = this
-
 	switch predIndex {
 	case 4:
-		return this.IsComplexInterpolationCurlyOpen()
+		return p.IsComplexInterpolationCurlyOpen()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1808,12 +1774,9 @@ func (p *PHPLexer) CurlyOpen_Sempred(localctx antlr.RuleContext, predIndex int) 
 }
 
 func (p *PHPLexer) EndDoc_Sempred(localctx antlr.RuleContext, predIndex int) bool {
-	this := p
-	_ = this
-
 	switch predIndex {
 	case 5:
-		return this.DocIsEnd()
+		return p.DocIsEnd()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1821,15 +1784,12 @@ func (p *PHPLexer) EndDoc_Sempred(localctx antlr.RuleContext, predIndex int) boo
 }
 
 func (p *PHPLexer) HereDocText_Sempred(localctx antlr.RuleContext, predIndex int) bool {
-	this := p
-	_ = this
-
 	switch predIndex {
 	case 6:
-		return !this.DocIsEnd()
+		return !p.DocIsEnd()
 
 	case 7:
-		return !this.DocIsEnd()
+		return !p.DocIsEnd()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1837,12 +1797,9 @@ func (p *PHPLexer) HereDocText_Sempred(localctx antlr.RuleContext, predIndex int
 }
 
 func (p *PHPLexer) PhpStartEchoFragment_Sempred(localctx antlr.RuleContext, predIndex int) bool {
-	this := p
-	_ = this
-
 	switch predIndex {
 	case 8:
-		return this.HasAspTags()
+		return p.HasAspTags()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1850,12 +1807,9 @@ func (p *PHPLexer) PhpStartEchoFragment_Sempred(localctx antlr.RuleContext, pred
 }
 
 func (p *PHPLexer) PhpStartFragment_Sempred(localctx antlr.RuleContext, predIndex int) bool {
-	this := p
-	_ = this
-
 	switch predIndex {
 	case 9:
-		return this.HasAspTags()
+		return p.HasAspTags()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))

@@ -1,15 +1,15 @@
 package c
 
-import "github.com/antlr/antlr4/runtime/Go/antlr/v4"
+import "github.com/yaklang/antlr/v4"
 
 func GetParserSerializedATN() []int32 {
-	staticData := &cparserParserStaticData
+	staticData := &CParserParserStaticData
 	staticData.once.Do(cparserParserInit)
 	return staticData.serializedATN
 }
 
 func GetLexerSerializedATN() []int32 {
-	staticData := &clexerLexerStaticData
+	staticData := &CLexerLexerStaticData
 	staticData.once.Do(clexerLexerInit)
 	return staticData.serializedATN
 }

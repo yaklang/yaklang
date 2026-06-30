@@ -1,4 +1,4 @@
-// Code generated from java-escape by ANTLR 4.11.1. DO NOT EDIT.
+// Code generated from ./JSPParser.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
 package jspparser // JSPParser
 import (
@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 )
 
 // Suppress unused import errors
@@ -18,25 +18,25 @@ type JSPParser struct {
 	*antlr.BaseParser
 }
 
-var jspparserParserStaticData struct {
+var JSPParserParserStaticData struct {
 	once                   sync.Once
 	serializedATN          []int32
-	literalNames           []string
-	symbolicNames          []string
-	ruleNames              []string
-	predictionContextCache *antlr.PredictionContextCache
+	LiteralNames           []string
+	SymbolicNames          []string
+	RuleNames              []string
+	PredictionContextCache *antlr.PredictionContextCache
 	atn                    *antlr.ATN
 	decisionToDFA          []*antlr.DFA
 }
 
 func jspparserParserInit() {
-	staticData := &jspparserParserStaticData
-	staticData.literalNames = []string{
+	staticData := &JSPParserParserStaticData
+	staticData.LiteralNames = []string{
 		"", "", "", "", "", "", "'<!DOCTYPE'", "", "", "", "'<?xml'", "", "",
 		"", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "'PUBLIC'",
 		"'SYSTEM'", "", "", "", "", "", "':'", "", "", "", "'/'",
 	}
-	staticData.symbolicNames = []string{
+	staticData.SymbolicNames = []string{
 		"", "JSP_COMMENT", "JSP_SCRIPT_COMMENT", "JSP_CONDITIONAL_COMMENT",
 		"SCRIPT_OPEN", "STYLE_OPEN", "DTD", "CDATA", "JSP_INCLUDE_DIRECTIVE_SKIP",
 		"WHITESPACES", "XML_DECLARATION", "WHITESPACE_SKIP", "CLOSE_TAG_BEGIN",
@@ -49,7 +49,7 @@ func jspparserParserInit() {
 		"TAG_WHITESPACE", "SCRIPT_BODY", "SCRIPT_SHORT_BODY", "STYLE_BODY",
 		"STYLE_SHORT_BODY", "ATTVAL_WHITESPACE_SKIP", "ATTVAL_EL_EXPR", "EL_EXPR_CONTENT",
 	}
-	staticData.ruleNames = []string{
+	staticData.RuleNames = []string{
 		"jspDocuments", "jspDocument", "jspStart", "jspElements", "htmlMiscs",
 		"jspScript", "htmlElement", "htmlCloseElement", "htmlBegin", "htmlBeginElement",
 		"tagJspFragment", "htmlTag", "jspDirective", "htmlContents", "htmlContent",
@@ -59,7 +59,7 @@ func jspparserParserInit() {
 		"systemId", "xml", "jspScriptlet", "jspExpression", "scriptletStart",
 		"scriptletContent", "javaScript", "style",
 	}
-	staticData.predictionContextCache = antlr.NewPredictionContextCache()
+	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
 		4, 1, 49, 325, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
 		4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 2, 10, 7,
@@ -221,7 +221,7 @@ func jspparserParserInit() {
 // NewJSPParser(). You can call this function if you wish to initialize the static state ahead
 // of time.
 func JSPParserInit() {
-	staticData := &jspparserParserStaticData
+	staticData := &JSPParserParserStaticData
 	staticData.once.Do(jspparserParserInit)
 }
 
@@ -230,12 +230,12 @@ func NewJSPParser(input antlr.TokenStream) *JSPParser {
 	JSPParserInit()
 	this := new(JSPParser)
 	this.BaseParser = antlr.NewBaseParser(input)
-	staticData := &jspparserParserStaticData
-	this.Interpreter = antlr.NewParserATNSimulator(this, staticData.atn, staticData.decisionToDFA, staticData.predictionContextCache)
-	this.RuleNames = staticData.ruleNames
-	this.LiteralNames = staticData.literalNames
-	this.SymbolicNames = staticData.symbolicNames
-	this.GrammarFileName = "java-escape"
+	staticData := &JSPParserParserStaticData
+	this.Interpreter = antlr.NewParserATNSimulator(this, staticData.atn, staticData.decisionToDFA, staticData.PredictionContextCache)
+	this.RuleNames = staticData.RuleNames
+	this.LiteralNames = staticData.LiteralNames
+	this.SymbolicNames = staticData.SymbolicNames
+	this.GrammarFileName = "JSPParser.g4"
 
 	return this
 }
@@ -342,20 +342,32 @@ type IJspDocumentsContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	EOF() antlr.TerminalNode
+	AllJspStart() []IJspStartContext
+	JspStart(i int) IJspStartContext
+	AllJspDocument() []IJspDocumentContext
+	JspDocument(i int) IJspDocumentContext
+
 	// IsJspDocumentsContext differentiates from other interfaces.
 	IsJspDocumentsContext()
 }
 
 type JspDocumentsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyJspDocumentsContext() *JspDocumentsContext {
 	var p = new(JspDocumentsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_jspDocuments
 	return p
+}
+
+func InitEmptyJspDocumentsContext(p *JspDocumentsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_jspDocuments
 }
 
 func (*JspDocumentsContext) IsJspDocumentsContext() {}
@@ -363,7 +375,7 @@ func (*JspDocumentsContext) IsJspDocumentsContext() {}
 func NewJspDocumentsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *JspDocumentsContext {
 	var p = new(JspDocumentsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_jspDocuments
@@ -478,36 +490,22 @@ func (s *JspDocumentsContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JSPParser) JspDocuments() (localctx IJspDocumentsContext) {
-	this := p
-	_ = this
-
 	localctx = NewJspDocumentsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, JSPParserRULE_jspDocuments)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(77)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 0, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 0, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -518,13 +516,22 @@ func (p *JSPParser) JspDocuments() (localctx IJspDocumentsContext) {
 		}
 		p.SetState(79)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 0, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 0, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(81)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	for ok := true; ok; ok = (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&4716154) != 0 {
+	for ok := true; ok; ok = ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&4716154) != 0) {
 		{
 			p.SetState(80)
 			p.JspDocument()
@@ -532,14 +539,31 @@ func (p *JSPParser) JspDocuments() (localctx IJspDocumentsContext) {
 
 		p.SetState(83)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(85)
 		p.Match(JSPParserEOF)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IJspDocumentContext is an interface to support dynamic dispatch.
@@ -549,20 +573,32 @@ type IJspDocumentContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Xml() IXmlContext
+	Dtd() IDtdContext
+	JspScript() IJspScriptContext
+	JspIfBlock() IJspIfBlockContext
+	JspElements() IJspElementsContext
+
 	// IsJspDocumentContext differentiates from other interfaces.
 	IsJspDocumentContext()
 }
 
 type JspDocumentContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyJspDocumentContext() *JspDocumentContext {
 	var p = new(JspDocumentContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_jspDocument
 	return p
+}
+
+func InitEmptyJspDocumentContext(p *JspDocumentContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_jspDocument
 }
 
 func (*JspDocumentContext) IsJspDocumentContext() {}
@@ -570,7 +606,7 @@ func (*JspDocumentContext) IsJspDocumentContext() {}
 func NewJspDocumentContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *JspDocumentContext {
 	var p = new(JspDocumentContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_jspDocument
@@ -679,31 +715,15 @@ func (s *JspDocumentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JSPParser) JspDocument() (localctx IJspDocumentContext) {
-	this := p
-	_ = this
-
 	localctx = NewJspDocumentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 2, JSPParserRULE_jspDocument)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(92)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 2, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 2, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -739,9 +759,21 @@ func (p *JSPParser) JspDocument() (localctx IJspDocumentContext) {
 			p.JspElements()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IJspStartContext is an interface to support dynamic dispatch.
@@ -751,20 +783,29 @@ type IJspStartContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	JspScript() IJspScriptContext
+	WHITESPACES() antlr.TerminalNode
+
 	// IsJspStartContext differentiates from other interfaces.
 	IsJspStartContext()
 }
 
 type JspStartContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyJspStartContext() *JspStartContext {
 	var p = new(JspStartContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_jspStart
 	return p
+}
+
+func InitEmptyJspStartContext(p *JspStartContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_jspStart
 }
 
 func (*JspStartContext) IsJspStartContext() {}
@@ -772,7 +813,7 @@ func (*JspStartContext) IsJspStartContext() {}
 func NewJspStartContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *JspStartContext {
 	var p = new(JspStartContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_jspStart
@@ -821,30 +862,13 @@ func (s *JspStartContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) JspStart() (localctx IJspStartContext) {
-	this := p
-	_ = this
-
 	localctx = NewJspStartContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 4, JSPParserRULE_jspStart)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(96)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case JSPParserDIRECTIVE_BEGIN, JSPParserDECLARATION_BEGIN, JSPParserECHO_EXPRESSION_OPEN, JSPParserSCRIPTLET_OPEN:
@@ -859,13 +883,28 @@ func (p *JSPParser) JspStart() (localctx IJspStartContext) {
 		{
 			p.SetState(95)
 			p.Match(JSPParserWHITESPACES)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IJspElementsContext is an interface to support dynamic dispatch.
@@ -887,12 +926,23 @@ type IJspElementsContext interface {
 	// SetAfterContent sets the afterContent rule contexts.
 	SetAfterContent(IHtmlMiscsContext)
 
+	// Getter signatures
+	AllHtmlMiscs() []IHtmlMiscsContext
+	HtmlMiscs(i int) IHtmlMiscsContext
+	HtmlElement() IHtmlElementContext
+	HtmlCloseElement() IHtmlCloseElementContext
+	JspScript() IJspScriptContext
+	JspExpression() IJspExpressionContext
+	JspIfBlock() IJspIfBlockContext
+	Style() IStyleContext
+	JavaScript() IJavaScriptContext
+
 	// IsJspElementsContext differentiates from other interfaces.
 	IsJspElementsContext()
 }
 
 type JspElementsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser        antlr.Parser
 	beforeContent IHtmlMiscsContext
 	afterContent  IHtmlMiscsContext
@@ -900,9 +950,14 @@ type JspElementsContext struct {
 
 func NewEmptyJspElementsContext() *JspElementsContext {
 	var p = new(JspElementsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_jspElements
 	return p
+}
+
+func InitEmptyJspElementsContext(p *JspElementsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_jspElements
 }
 
 func (*JspElementsContext) IsJspElementsContext() {}
@@ -910,7 +965,7 @@ func (*JspElementsContext) IsJspElementsContext() {}
 func NewJspElementsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *JspElementsContext {
 	var p = new(JspElementsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_jspElements
@@ -1100,28 +1155,8 @@ func (s *JspElementsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JSPParser) JspElements() (localctx IJspElementsContext) {
-	this := p
-	_ = this
-
 	localctx = NewJspElementsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, JSPParserRULE_jspElements)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(98)
@@ -1132,7 +1167,11 @@ func (p *JSPParser) JspElements() (localctx IJspElementsContext) {
 	}
 	p.SetState(106)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 4, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 4, p.GetParserRuleContext()) {
 	case 1:
 		{
 			p.SetState(99)
@@ -1175,6 +1214,8 @@ func (p *JSPParser) JspElements() (localctx IJspElementsContext) {
 			p.JavaScript()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 	{
 		p.SetState(108)
@@ -1184,7 +1225,17 @@ func (p *JSPParser) JspElements() (localctx IJspElementsContext) {
 		localctx.(*JspElementsContext).afterContent = _x
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IHtmlMiscsContext is an interface to support dynamic dispatch.
@@ -1194,20 +1245,29 @@ type IHtmlMiscsContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllHtmlMisc() []IHtmlMiscContext
+	HtmlMisc(i int) IHtmlMiscContext
+
 	// IsHtmlMiscsContext differentiates from other interfaces.
 	IsHtmlMiscsContext()
 }
 
 type HtmlMiscsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyHtmlMiscsContext() *HtmlMiscsContext {
 	var p = new(HtmlMiscsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_htmlMiscs
 	return p
+}
+
+func InitEmptyHtmlMiscsContext(p *HtmlMiscsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_htmlMiscs
 }
 
 func (*HtmlMiscsContext) IsHtmlMiscsContext() {}
@@ -1215,7 +1275,7 @@ func (*HtmlMiscsContext) IsHtmlMiscsContext() {}
 func NewHtmlMiscsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *HtmlMiscsContext {
 	var p = new(HtmlMiscsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_htmlMiscs
@@ -1285,35 +1345,20 @@ func (s *HtmlMiscsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) HtmlMiscs() (localctx IHtmlMiscsContext) {
-	this := p
-	_ = this
-
 	localctx = NewHtmlMiscsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 8, JSPParserRULE_htmlMiscs)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(113)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 5, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 5, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -1324,10 +1369,26 @@ func (p *JSPParser) HtmlMiscs() (localctx IHtmlMiscsContext) {
 		}
 		p.SetState(115)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 5, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 5, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IJspScriptContext is an interface to support dynamic dispatch.
@@ -1337,20 +1398,29 @@ type IJspScriptContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	JspDirective() IJspDirectiveContext
+	JspScriptlet() IJspScriptletContext
+
 	// IsJspScriptContext differentiates from other interfaces.
 	IsJspScriptContext()
 }
 
 type JspScriptContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyJspScriptContext() *JspScriptContext {
 	var p = new(JspScriptContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_jspScript
 	return p
+}
+
+func InitEmptyJspScriptContext(p *JspScriptContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_jspScript
 }
 
 func (*JspScriptContext) IsJspScriptContext() {}
@@ -1358,7 +1428,7 @@ func (*JspScriptContext) IsJspScriptContext() {}
 func NewJspScriptContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *JspScriptContext {
 	var p = new(JspScriptContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_jspScript
@@ -1419,30 +1489,13 @@ func (s *JspScriptContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) JspScript() (localctx IJspScriptContext) {
-	this := p
-	_ = this
-
 	localctx = NewJspScriptContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 10, JSPParserRULE_jspScript)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(118)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case JSPParserDIRECTIVE_BEGIN:
@@ -1460,10 +1513,21 @@ func (p *JSPParser) JspScript() (localctx IJspScriptContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IHtmlElementContext is an interface to support dynamic dispatch.
@@ -1473,20 +1537,34 @@ type IHtmlElementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	HtmlBegin() IHtmlBeginContext
+	AllTAG_CLOSE() []antlr.TerminalNode
+	TAG_CLOSE(i int) antlr.TerminalNode
+	HtmlContents() IHtmlContentsContext
+	CLOSE_TAG_BEGIN() antlr.TerminalNode
+	HtmlTag() IHtmlTagContext
+	TAG_SLASH_END() antlr.TerminalNode
+
 	// IsHtmlElementContext differentiates from other interfaces.
 	IsHtmlElementContext()
 }
 
 type HtmlElementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyHtmlElementContext() *HtmlElementContext {
 	var p = new(HtmlElementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_htmlElement
 	return p
+}
+
+func InitEmptyHtmlElementContext(p *HtmlElementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_htmlElement
 }
 
 func (*HtmlElementContext) IsHtmlElementContext() {}
@@ -1494,7 +1572,7 @@ func (*HtmlElementContext) IsHtmlElementContext() {}
 func NewHtmlElementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *HtmlElementContext {
 	var p = new(HtmlElementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_htmlElement
@@ -1587,31 +1665,15 @@ func (s *HtmlElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JSPParser) HtmlElement() (localctx IHtmlElementContext) {
-	this := p
-	_ = this
-
 	localctx = NewHtmlElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 12, JSPParserRULE_htmlElement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(139)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 7, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 7, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -1621,6 +1683,10 @@ func (p *JSPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(121)
 			p.Match(JSPParserTAG_CLOSE)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(122)
@@ -1629,6 +1695,10 @@ func (p *JSPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(123)
 			p.Match(JSPParserCLOSE_TAG_BEGIN)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(124)
@@ -1637,6 +1707,10 @@ func (p *JSPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(125)
 			p.Match(JSPParserTAG_CLOSE)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 2:
@@ -1648,10 +1722,18 @@ func (p *JSPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(128)
 			p.Match(JSPParserTAG_CLOSE)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(129)
 			p.Match(JSPParserCLOSE_TAG_BEGIN)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(130)
@@ -1660,6 +1742,10 @@ func (p *JSPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(131)
 			p.Match(JSPParserTAG_CLOSE)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 3:
@@ -1671,6 +1757,10 @@ func (p *JSPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(134)
 			p.Match(JSPParserTAG_SLASH_END)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 4:
@@ -1682,11 +1772,27 @@ func (p *JSPParser) HtmlElement() (localctx IHtmlElementContext) {
 		{
 			p.SetState(137)
 			p.Match(JSPParserTAG_CLOSE)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IHtmlCloseElementContext is an interface to support dynamic dispatch.
@@ -1696,20 +1802,30 @@ type IHtmlCloseElementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	CLOSE_TAG_BEGIN() antlr.TerminalNode
+	HtmlTag() IHtmlTagContext
+	TAG_CLOSE() antlr.TerminalNode
+
 	// IsHtmlCloseElementContext differentiates from other interfaces.
 	IsHtmlCloseElementContext()
 }
 
 type HtmlCloseElementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyHtmlCloseElementContext() *HtmlCloseElementContext {
 	var p = new(HtmlCloseElementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_htmlCloseElement
 	return p
+}
+
+func InitEmptyHtmlCloseElementContext(p *HtmlCloseElementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_htmlCloseElement
 }
 
 func (*HtmlCloseElementContext) IsHtmlCloseElementContext() {}
@@ -1717,7 +1833,7 @@ func (*HtmlCloseElementContext) IsHtmlCloseElementContext() {}
 func NewHtmlCloseElementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *HtmlCloseElementContext {
 	var p = new(HtmlCloseElementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_htmlCloseElement
@@ -1770,32 +1886,16 @@ func (s *HtmlCloseElementContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JSPParser) HtmlCloseElement() (localctx IHtmlCloseElementContext) {
-	this := p
-	_ = this
-
 	localctx = NewHtmlCloseElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 14, JSPParserRULE_htmlCloseElement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(141)
 		p.Match(JSPParserCLOSE_TAG_BEGIN)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(142)
@@ -1804,9 +1904,23 @@ func (p *JSPParser) HtmlCloseElement() (localctx IHtmlCloseElementContext) {
 	{
 		p.SetState(143)
 		p.Match(JSPParserTAG_CLOSE)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IHtmlBeginContext is an interface to support dynamic dispatch.
@@ -1816,20 +1930,31 @@ type IHtmlBeginContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	TAG_BEGIN() antlr.TerminalNode
+	HtmlTag() IHtmlTagContext
+	AllHtmlBeginElement() []IHtmlBeginElementContext
+	HtmlBeginElement(i int) IHtmlBeginElementContext
+
 	// IsHtmlBeginContext differentiates from other interfaces.
 	IsHtmlBeginContext()
 }
 
 type HtmlBeginContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyHtmlBeginContext() *HtmlBeginContext {
 	var p = new(HtmlBeginContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_htmlBegin
 	return p
+}
+
+func InitEmptyHtmlBeginContext(p *HtmlBeginContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_htmlBegin
 }
 
 func (*HtmlBeginContext) IsHtmlBeginContext() {}
@@ -1837,7 +1962,7 @@ func (*HtmlBeginContext) IsHtmlBeginContext() {}
 func NewHtmlBeginContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *HtmlBeginContext {
 	var p = new(HtmlBeginContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_htmlBegin
@@ -1927,33 +2052,18 @@ func (s *HtmlBeginContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) HtmlBegin() (localctx IHtmlBeginContext) {
-	this := p
-	_ = this
-
 	localctx = NewHtmlBeginContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 16, JSPParserRULE_htmlBegin)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(145)
 		p.Match(JSPParserTAG_BEGIN)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(146)
@@ -1961,6 +2071,9 @@ func (p *JSPParser) HtmlBegin() (localctx IHtmlBeginContext) {
 	}
 	p.SetState(150)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&2267743092736) != 0 {
@@ -1971,10 +2084,23 @@ func (p *JSPParser) HtmlBegin() (localctx IHtmlBeginContext) {
 
 		p.SetState(152)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IHtmlBeginElementContext is an interface to support dynamic dispatch.
@@ -1984,20 +2110,30 @@ type IHtmlBeginElementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	HtmlAttribute() IHtmlAttributeContext
+	TagJspFragment() ITagJspFragmentContext
+	JspScriptlet() IJspScriptletContext
+
 	// IsHtmlBeginElementContext differentiates from other interfaces.
 	IsHtmlBeginElementContext()
 }
 
 type HtmlBeginElementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyHtmlBeginElementContext() *HtmlBeginElementContext {
 	var p = new(HtmlBeginElementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_htmlBeginElement
 	return p
+}
+
+func InitEmptyHtmlBeginElementContext(p *HtmlBeginElementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_htmlBeginElement
 }
 
 func (*HtmlBeginElementContext) IsHtmlBeginElementContext() {}
@@ -2005,7 +2141,7 @@ func (*HtmlBeginElementContext) IsHtmlBeginElementContext() {}
 func NewHtmlBeginElementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *HtmlBeginElementContext {
 	var p = new(HtmlBeginElementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_htmlBeginElement
@@ -2082,31 +2218,15 @@ func (s *HtmlBeginElementContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JSPParser) HtmlBeginElement() (localctx IHtmlBeginElementContext) {
-	this := p
-	_ = this
-
 	localctx = NewHtmlBeginElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 18, JSPParserRULE_htmlBeginElement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(156)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 9, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 9, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -2128,9 +2248,21 @@ func (p *JSPParser) HtmlBeginElement() (localctx IHtmlBeginElementContext) {
 			p.JspScriptlet()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITagJspFragmentContext is an interface to support dynamic dispatch.
@@ -2140,20 +2272,28 @@ type ITagJspFragmentContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	TAG_JSP_IF_FRAGMENT() antlr.TerminalNode
+
 	// IsTagJspFragmentContext differentiates from other interfaces.
 	IsTagJspFragmentContext()
 }
 
 type TagJspFragmentContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTagJspFragmentContext() *TagJspFragmentContext {
 	var p = new(TagJspFragmentContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_tagJspFragment
 	return p
+}
+
+func InitEmptyTagJspFragmentContext(p *TagJspFragmentContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_tagJspFragment
 }
 
 func (*TagJspFragmentContext) IsTagJspFragmentContext() {}
@@ -2161,7 +2301,7 @@ func (*TagJspFragmentContext) IsTagJspFragmentContext() {}
 func NewTagJspFragmentContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TagJspFragmentContext {
 	var p = new(TagJspFragmentContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_tagJspFragment
@@ -2194,35 +2334,29 @@ func (s *TagJspFragmentContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JSPParser) TagJspFragment() (localctx ITagJspFragmentContext) {
-	this := p
-	_ = this
-
 	localctx = NewTagJspFragmentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 20, JSPParserRULE_tagJspFragment)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(158)
 		p.Match(JSPParserTAG_JSP_IF_FRAGMENT)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IHtmlTagContext is an interface to support dynamic dispatch.
@@ -2232,20 +2366,30 @@ type IHtmlTagContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllHtmlTagName() []IHtmlTagNameContext
+	HtmlTagName(i int) IHtmlTagNameContext
+	JSP_JSTL_COLON() antlr.TerminalNode
+
 	// IsHtmlTagContext differentiates from other interfaces.
 	IsHtmlTagContext()
 }
 
 type HtmlTagContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyHtmlTagContext() *HtmlTagContext {
 	var p = new(HtmlTagContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_htmlTag
 	return p
+}
+
+func InitEmptyHtmlTagContext(p *HtmlTagContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_htmlTag
 }
 
 func (*HtmlTagContext) IsHtmlTagContext() {}
@@ -2253,7 +2397,7 @@ func (*HtmlTagContext) IsHtmlTagContext() {}
 func NewHtmlTagContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *HtmlTagContext {
 	var p = new(HtmlTagContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_htmlTag
@@ -2327,28 +2471,9 @@ func (s *HtmlTagContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) HtmlTag() (localctx IHtmlTagContext) {
-	this := p
-	_ = this
-
 	localctx = NewHtmlTagContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 22, JSPParserRULE_htmlTag)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -2357,12 +2482,19 @@ func (p *JSPParser) HtmlTag() (localctx IHtmlTagContext) {
 	}
 	p.SetState(163)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JSPParserJSP_JSTL_COLON {
 		{
 			p.SetState(161)
 			p.Match(JSPParserJSP_JSTL_COLON)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(162)
@@ -2371,7 +2503,17 @@ func (p *JSPParser) HtmlTag() (localctx IHtmlTagContext) {
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IJspDirectiveContext is an interface to support dynamic dispatch.
@@ -2381,20 +2523,34 @@ type IJspDirectiveContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	DIRECTIVE_BEGIN() antlr.TerminalNode
+	HtmlTagName() IHtmlTagNameContext
+	DIRECTIVE_END() antlr.TerminalNode
+	AllHtmlAttribute() []IHtmlAttributeContext
+	HtmlAttribute(i int) IHtmlAttributeContext
+	AllTAG_WHITESPACE() []antlr.TerminalNode
+	TAG_WHITESPACE(i int) antlr.TerminalNode
+
 	// IsJspDirectiveContext differentiates from other interfaces.
 	IsJspDirectiveContext()
 }
 
 type JspDirectiveContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyJspDirectiveContext() *JspDirectiveContext {
 	var p = new(JspDirectiveContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_jspDirective
 	return p
+}
+
+func InitEmptyJspDirectiveContext(p *JspDirectiveContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_jspDirective
 }
 
 func (*JspDirectiveContext) IsJspDirectiveContext() {}
@@ -2402,7 +2558,7 @@ func (*JspDirectiveContext) IsJspDirectiveContext() {}
 func NewJspDirectiveContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *JspDirectiveContext {
 	var p = new(JspDirectiveContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_jspDirective
@@ -2504,28 +2660,9 @@ func (s *JspDirectiveContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JSPParser) JspDirective() (localctx IJspDirectiveContext) {
-	this := p
-	_ = this
-
 	localctx = NewJspDirectiveContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 24, JSPParserRULE_jspDirective)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -2533,6 +2670,10 @@ func (p *JSPParser) JspDirective() (localctx IJspDirectiveContext) {
 	{
 		p.SetState(165)
 		p.Match(JSPParserDIRECTIVE_BEGIN)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(166)
@@ -2540,8 +2681,13 @@ func (p *JSPParser) JspDirective() (localctx IJspDirectiveContext) {
 	}
 	p.SetState(170)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 11, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 11, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 1 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1+1 {
 			{
@@ -2552,28 +2698,58 @@ func (p *JSPParser) JspDirective() (localctx IJspDirectiveContext) {
 		}
 		p.SetState(172)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 11, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 11, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(176)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == JSPParserTAG_WHITESPACE {
 		{
 			p.SetState(173)
 			p.Match(JSPParserTAG_WHITESPACE)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 		p.SetState(178)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(179)
 		p.Match(JSPParserDIRECTIVE_END)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IHtmlContentsContext is an interface to support dynamic dispatch.
@@ -2583,20 +2759,31 @@ type IHtmlContentsContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllHtmlChardata() []IHtmlChardataContext
+	HtmlChardata(i int) IHtmlChardataContext
+	AllHtmlContent() []IHtmlContentContext
+	HtmlContent(i int) IHtmlContentContext
+
 	// IsHtmlContentsContext differentiates from other interfaces.
 	IsHtmlContentsContext()
 }
 
 type HtmlContentsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyHtmlContentsContext() *HtmlContentsContext {
 	var p = new(HtmlContentsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_htmlContents
 	return p
+}
+
+func InitEmptyHtmlContentsContext(p *HtmlContentsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_htmlContents
 }
 
 func (*HtmlContentsContext) IsHtmlContentsContext() {}
@@ -2604,7 +2791,7 @@ func (*HtmlContentsContext) IsHtmlContentsContext() {}
 func NewHtmlContentsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *HtmlContentsContext {
 	var p = new(HtmlContentsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_htmlContents
@@ -2715,33 +2902,17 @@ func (s *HtmlContentsContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JSPParser) HtmlContents() (localctx IHtmlContentsContext) {
-	this := p
-	_ = this
-
 	localctx = NewHtmlContentsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 26, JSPParserRULE_htmlContents)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.SetState(204)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 18, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 18, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -2750,8 +2921,13 @@ func (p *JSPParser) HtmlContents() (localctx IHtmlContentsContext) {
 		}
 		p.SetState(188)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 14, p.GetParserRuleContext())
-
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 14, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 		for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			if _alt == 1 {
 				{
@@ -2761,18 +2937,26 @@ func (p *JSPParser) HtmlContents() (localctx IHtmlContentsContext) {
 				p.SetState(184)
 				p.GetErrorHandler().Sync(p)
 
-				if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 13, p.GetParserRuleContext()) == 1 {
+				if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 13, p.GetParserRuleContext()) == 1 {
 					{
 						p.SetState(183)
 						p.HtmlChardata()
 					}
 
+				} else if p.HasError() { // JIM
+					goto errorExit
 				}
 
 			}
 			p.SetState(190)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 14, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 14, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 
 	case 2:
@@ -2784,17 +2968,24 @@ func (p *JSPParser) HtmlContents() (localctx IHtmlContentsContext) {
 		p.SetState(193)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 15, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 15, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(192)
 				p.HtmlChardata()
 			}
 
+		} else if p.HasError() { // JIM
+			goto errorExit
 		}
 		p.SetState(201)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 17, p.GetParserRuleContext())
-
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 17, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 		for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			if _alt == 1 {
 				{
@@ -2804,23 +2995,43 @@ func (p *JSPParser) HtmlContents() (localctx IHtmlContentsContext) {
 				p.SetState(197)
 				p.GetErrorHandler().Sync(p)
 
-				if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 16, p.GetParserRuleContext()) == 1 {
+				if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 16, p.GetParserRuleContext()) == 1 {
 					{
 						p.SetState(196)
 						p.HtmlChardata()
 					}
 
+				} else if p.HasError() { // JIM
+					goto errorExit
 				}
 
 			}
 			p.SetState(203)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 17, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 17, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IHtmlContentContext is an interface to support dynamic dispatch.
@@ -2830,20 +3041,33 @@ type IHtmlContentContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ElExpression() IElExpressionContext
+	JspScript() IJspScriptContext
+	JspIfBlock() IJspIfBlockContext
+	JspElements() IJspElementsContext
+	XhtmlCDATA() IXhtmlCDATAContext
+	HtmlComment() IHtmlCommentContext
+
 	// IsHtmlContentContext differentiates from other interfaces.
 	IsHtmlContentContext()
 }
 
 type HtmlContentContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyHtmlContentContext() *HtmlContentContext {
 	var p = new(HtmlContentContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_htmlContent
 	return p
+}
+
+func InitEmptyHtmlContentContext(p *HtmlContentContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_htmlContent
 }
 
 func (*HtmlContentContext) IsHtmlContentContext() {}
@@ -2851,7 +3075,7 @@ func (*HtmlContentContext) IsHtmlContentContext() {}
 func NewHtmlContentContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *HtmlContentContext {
 	var p = new(HtmlContentContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_htmlContent
@@ -2976,31 +3200,15 @@ func (s *HtmlContentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JSPParser) HtmlContent() (localctx IHtmlContentContext) {
-	this := p
-	_ = this
-
 	localctx = NewHtmlContentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 28, JSPParserRULE_htmlContent)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(212)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 19, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 19, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -3043,9 +3251,21 @@ func (p *JSPParser) HtmlContent() (localctx IHtmlContentContext) {
 			p.HtmlComment()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IJspIfBlockContext is an interface to support dynamic dispatch.
@@ -3055,20 +3275,28 @@ type IJspIfBlockContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	JSP_IF_BLOCK() antlr.TerminalNode
+
 	// IsJspIfBlockContext differentiates from other interfaces.
 	IsJspIfBlockContext()
 }
 
 type JspIfBlockContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyJspIfBlockContext() *JspIfBlockContext {
 	var p = new(JspIfBlockContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_jspIfBlock
 	return p
+}
+
+func InitEmptyJspIfBlockContext(p *JspIfBlockContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_jspIfBlock
 }
 
 func (*JspIfBlockContext) IsJspIfBlockContext() {}
@@ -3076,7 +3304,7 @@ func (*JspIfBlockContext) IsJspIfBlockContext() {}
 func NewJspIfBlockContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *JspIfBlockContext {
 	var p = new(JspIfBlockContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_jspIfBlock
@@ -3109,35 +3337,29 @@ func (s *JspIfBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) JspIfBlock() (localctx IJspIfBlockContext) {
-	this := p
-	_ = this
-
 	localctx = NewJspIfBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 30, JSPParserRULE_jspIfBlock)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(214)
 		p.Match(JSPParserJSP_IF_BLOCK)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IElExpressionContext is an interface to support dynamic dispatch.
@@ -3147,20 +3369,30 @@ type IElExpressionContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	EL_EXPR_START() antlr.TerminalNode
+	EL_EXPR_CONTENT() antlr.TerminalNode
+	EL_EXPR_END() antlr.TerminalNode
+
 	// IsElExpressionContext differentiates from other interfaces.
 	IsElExpressionContext()
 }
 
 type ElExpressionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyElExpressionContext() *ElExpressionContext {
 	var p = new(ElExpressionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_elExpression
 	return p
+}
+
+func InitEmptyElExpressionContext(p *ElExpressionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_elExpression
 }
 
 func (*ElExpressionContext) IsElExpressionContext() {}
@@ -3168,7 +3400,7 @@ func (*ElExpressionContext) IsElExpressionContext() {}
 func NewElExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ElExpressionContext {
 	var p = new(ElExpressionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_elExpression
@@ -3209,43 +3441,45 @@ func (s *ElExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JSPParser) ElExpression() (localctx IElExpressionContext) {
-	this := p
-	_ = this
-
 	localctx = NewElExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 32, JSPParserRULE_elExpression)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(216)
 		p.Match(JSPParserEL_EXPR_START)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(217)
 		p.Match(JSPParserEL_EXPR_CONTENT)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(218)
 		p.Match(JSPParserEL_EXPR_END)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IHtmlAttributeContext is an interface to support dynamic dispatch.
@@ -3254,21 +3488,25 @@ type IHtmlAttributeContext interface {
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
-
 	// IsHtmlAttributeContext differentiates from other interfaces.
 	IsHtmlAttributeContext()
 }
 
 type HtmlAttributeContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyHtmlAttributeContext() *HtmlAttributeContext {
 	var p = new(HtmlAttributeContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_htmlAttribute
 	return p
+}
+
+func InitEmptyHtmlAttributeContext(p *HtmlAttributeContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_htmlAttribute
 }
 
 func (*HtmlAttributeContext) IsHtmlAttributeContext() {}
@@ -3276,7 +3514,7 @@ func (*HtmlAttributeContext) IsHtmlAttributeContext() {}
 func NewHtmlAttributeContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *HtmlAttributeContext {
 	var p = new(HtmlAttributeContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_htmlAttribute
@@ -3286,8 +3524,8 @@ func NewHtmlAttributeContext(parser antlr.Parser, parent antlr.ParserRuleContext
 
 func (s *HtmlAttributeContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *HtmlAttributeContext) CopyFrom(ctx *HtmlAttributeContext) {
-	s.BaseParserRuleContext.CopyFrom(ctx.BaseParserRuleContext)
+func (s *HtmlAttributeContext) CopyAll(ctx *HtmlAttributeContext) {
+	s.CopyFrom(&ctx.BaseParserRuleContext)
 }
 
 func (s *HtmlAttributeContext) GetRuleContext() antlr.RuleContext {
@@ -3299,15 +3537,15 @@ func (s *HtmlAttributeContext) ToStringTree(ruleNames []string, recog antlr.Reco
 }
 
 type PureHTMLAttributeContext struct {
-	*HtmlAttributeContext
+	HtmlAttributeContext
 }
 
 func NewPureHTMLAttributeContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *PureHTMLAttributeContext {
 	var p = new(PureHTMLAttributeContext)
 
-	p.HtmlAttributeContext = NewEmptyHtmlAttributeContext()
+	InitEmptyHtmlAttributeContext(&p.HtmlAttributeContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*HtmlAttributeContext))
+	p.CopyAll(ctx.(*HtmlAttributeContext))
 
 	return p
 }
@@ -3343,15 +3581,15 @@ func (s *PureHTMLAttributeContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 type EqualHTMLAttributeContext struct {
-	*HtmlAttributeContext
+	HtmlAttributeContext
 }
 
 func NewEqualHTMLAttributeContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *EqualHTMLAttributeContext {
 	var p = new(EqualHTMLAttributeContext)
 
-	p.HtmlAttributeContext = NewEmptyHtmlAttributeContext()
+	InitEmptyHtmlAttributeContext(&p.HtmlAttributeContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*HtmlAttributeContext))
+	p.CopyAll(ctx.(*HtmlAttributeContext))
 
 	return p
 }
@@ -3407,15 +3645,15 @@ func (s *EqualHTMLAttributeContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 type JSPExpressionAttributeContext struct {
-	*HtmlAttributeContext
+	HtmlAttributeContext
 }
 
 func NewJSPExpressionAttributeContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *JSPExpressionAttributeContext {
 	var p = new(JSPExpressionAttributeContext)
 
-	p.HtmlAttributeContext = NewEmptyHtmlAttributeContext()
+	InitEmptyHtmlAttributeContext(&p.HtmlAttributeContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*HtmlAttributeContext))
+	p.CopyAll(ctx.(*HtmlAttributeContext))
 
 	return p
 }
@@ -3451,31 +3689,15 @@ func (s *JSPExpressionAttributeContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 func (p *JSPParser) HtmlAttribute() (localctx IHtmlAttributeContext) {
-	this := p
-	_ = this
-
 	localctx = NewHtmlAttributeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 34, JSPParserRULE_htmlAttribute)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(226)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 20, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 20, p.GetParserRuleContext()) {
 	case 1:
 		localctx = NewEqualHTMLAttributeContext(p, localctx)
 		p.EnterOuterAlt(localctx, 1)
@@ -3486,6 +3708,10 @@ func (p *JSPParser) HtmlAttribute() (localctx IHtmlAttributeContext) {
 		{
 			p.SetState(221)
 			p.Match(JSPParserEQUALS)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(222)
@@ -3508,9 +3734,21 @@ func (p *JSPParser) HtmlAttribute() (localctx IHtmlAttributeContext) {
 			p.JspExpression()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IHtmlAttributeNameContext is an interface to support dynamic dispatch.
@@ -3520,20 +3758,31 @@ type IHtmlAttributeNameContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllTAG_IDENTIFIER() []antlr.TerminalNode
+	TAG_IDENTIFIER(i int) antlr.TerminalNode
+	AllJSP_JSTL_COLON() []antlr.TerminalNode
+	JSP_JSTL_COLON(i int) antlr.TerminalNode
+
 	// IsHtmlAttributeNameContext differentiates from other interfaces.
 	IsHtmlAttributeNameContext()
 }
 
 type HtmlAttributeNameContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyHtmlAttributeNameContext() *HtmlAttributeNameContext {
 	var p = new(HtmlAttributeNameContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_htmlAttributeName
 	return p
+}
+
+func InitEmptyHtmlAttributeNameContext(p *HtmlAttributeNameContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_htmlAttributeName
 }
 
 func (*HtmlAttributeNameContext) IsHtmlAttributeNameContext() {}
@@ -3541,7 +3790,7 @@ func (*HtmlAttributeNameContext) IsHtmlAttributeNameContext() {}
 func NewHtmlAttributeNameContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *HtmlAttributeNameContext {
 	var p = new(HtmlAttributeNameContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_htmlAttributeName
@@ -3586,54 +3835,63 @@ func (s *HtmlAttributeNameContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JSPParser) HtmlAttributeName() (localctx IHtmlAttributeNameContext) {
-	this := p
-	_ = this
-
 	localctx = NewHtmlAttributeNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 36, JSPParserRULE_htmlAttributeName)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(228)
 		p.Match(JSPParserTAG_IDENTIFIER)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(233)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == JSPParserJSP_JSTL_COLON {
 		{
 			p.SetState(229)
 			p.Match(JSPParserJSP_JSTL_COLON)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(230)
 			p.Match(JSPParserTAG_IDENTIFIER)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 		p.SetState(235)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IHtmlAttributeValueContext is an interface to support dynamic dispatch.
@@ -3643,20 +3901,31 @@ type IHtmlAttributeValueContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllQUOTE() []antlr.TerminalNode
+	QUOTE(i int) antlr.TerminalNode
+	AllHtmlAttributeValueElement() []IHtmlAttributeValueElementContext
+	HtmlAttributeValueElement(i int) IHtmlAttributeValueElementContext
+
 	// IsHtmlAttributeValueContext differentiates from other interfaces.
 	IsHtmlAttributeValueContext()
 }
 
 type HtmlAttributeValueContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyHtmlAttributeValueContext() *HtmlAttributeValueContext {
 	var p = new(HtmlAttributeValueContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_htmlAttributeValue
 	return p
+}
+
+func InitEmptyHtmlAttributeValueContext(p *HtmlAttributeValueContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_htmlAttributeValue
 }
 
 func (*HtmlAttributeValueContext) IsHtmlAttributeValueContext() {}
@@ -3664,7 +3933,7 @@ func (*HtmlAttributeValueContext) IsHtmlAttributeValueContext() {}
 func NewHtmlAttributeValueContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *HtmlAttributeValueContext {
 	var p = new(HtmlAttributeValueContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_htmlAttributeValue
@@ -3742,28 +4011,9 @@ func (s *HtmlAttributeValueContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *JSPParser) HtmlAttributeValue() (localctx IHtmlAttributeValueContext) {
-	this := p
-	_ = this
-
 	localctx = NewHtmlAttributeValueContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 38, JSPParserRULE_htmlAttributeValue)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -3771,17 +4021,28 @@ func (p *JSPParser) HtmlAttributeValue() (localctx IHtmlAttributeValueContext) {
 	p.SetState(237)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 22, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 22, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(236)
 			p.Match(JSPParserQUOTE)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 	p.SetState(242)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 23, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 23, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -3792,21 +4053,44 @@ func (p *JSPParser) HtmlAttributeValue() (localctx IHtmlAttributeValueContext) {
 		}
 		p.SetState(244)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 23, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 23, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(246)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JSPParserQUOTE {
 		{
 			p.SetState(245)
 			p.Match(JSPParserQUOTE)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IHtmlAttributeValueElementContext is an interface to support dynamic dispatch.
@@ -3816,20 +4100,33 @@ type IHtmlAttributeValueElementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ATTVAL_ATTRIBUTE() antlr.TerminalNode
+	ElExpression() IElExpressionContext
+	JspExpression() IJspExpressionContext
+	JspElements() IJspElementsContext
+	JspScript() IJspScriptContext
+	JspIfBlock() IJspIfBlockContext
+
 	// IsHtmlAttributeValueElementContext differentiates from other interfaces.
 	IsHtmlAttributeValueElementContext()
 }
 
 type HtmlAttributeValueElementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyHtmlAttributeValueElementContext() *HtmlAttributeValueElementContext {
 	var p = new(HtmlAttributeValueElementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_htmlAttributeValueElement
 	return p
+}
+
+func InitEmptyHtmlAttributeValueElementContext(p *HtmlAttributeValueElementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_htmlAttributeValueElement
 }
 
 func (*HtmlAttributeValueElementContext) IsHtmlAttributeValueElementContext() {}
@@ -3837,7 +4134,7 @@ func (*HtmlAttributeValueElementContext) IsHtmlAttributeValueElementContext() {}
 func NewHtmlAttributeValueElementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *HtmlAttributeValueElementContext {
 	var p = new(HtmlAttributeValueElementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_htmlAttributeValueElement
@@ -3950,36 +4247,24 @@ func (s *HtmlAttributeValueElementContext) Accept(visitor antlr.ParseTreeVisitor
 }
 
 func (p *JSPParser) HtmlAttributeValueElement() (localctx IHtmlAttributeValueElementContext) {
-	this := p
-	_ = this
-
 	localctx = NewHtmlAttributeValueElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 40, JSPParserRULE_htmlAttributeValueElement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(254)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 25, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 25, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(248)
 			p.Match(JSPParserATTVAL_ATTRIBUTE)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 2:
@@ -4017,9 +4302,21 @@ func (p *JSPParser) HtmlAttributeValueElement() (localctx IHtmlAttributeValueEle
 			p.JspIfBlock()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IHtmlTagNameContext is an interface to support dynamic dispatch.
@@ -4029,20 +4326,28 @@ type IHtmlTagNameContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	TAG_IDENTIFIER() antlr.TerminalNode
+
 	// IsHtmlTagNameContext differentiates from other interfaces.
 	IsHtmlTagNameContext()
 }
 
 type HtmlTagNameContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyHtmlTagNameContext() *HtmlTagNameContext {
 	var p = new(HtmlTagNameContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_htmlTagName
 	return p
+}
+
+func InitEmptyHtmlTagNameContext(p *HtmlTagNameContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_htmlTagName
 }
 
 func (*HtmlTagNameContext) IsHtmlTagNameContext() {}
@@ -4050,7 +4355,7 @@ func (*HtmlTagNameContext) IsHtmlTagNameContext() {}
 func NewHtmlTagNameContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *HtmlTagNameContext {
 	var p = new(HtmlTagNameContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_htmlTagName
@@ -4083,35 +4388,29 @@ func (s *HtmlTagNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JSPParser) HtmlTagName() (localctx IHtmlTagNameContext) {
-	this := p
-	_ = this
-
 	localctx = NewHtmlTagNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 42, JSPParserRULE_htmlTagName)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(256)
 		p.Match(JSPParserTAG_IDENTIFIER)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IHtmlChardataContext is an interface to support dynamic dispatch.
@@ -4121,20 +4420,29 @@ type IHtmlChardataContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	JSP_STATIC_CONTENT_CHARS() antlr.TerminalNode
+	WHITESPACES() antlr.TerminalNode
+
 	// IsHtmlChardataContext differentiates from other interfaces.
 	IsHtmlChardataContext()
 }
 
 type HtmlChardataContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyHtmlChardataContext() *HtmlChardataContext {
 	var p = new(HtmlChardataContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_htmlChardata
 	return p
+}
+
+func InitEmptyHtmlChardataContext(p *HtmlChardataContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_htmlChardata
 }
 
 func (*HtmlChardataContext) IsHtmlChardataContext() {}
@@ -4142,7 +4450,7 @@ func (*HtmlChardataContext) IsHtmlChardataContext() {}
 func NewHtmlChardataContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *HtmlChardataContext {
 	var p = new(HtmlChardataContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_htmlChardata
@@ -4179,28 +4487,9 @@ func (s *HtmlChardataContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JSPParser) HtmlChardata() (localctx IHtmlChardataContext) {
-	this := p
-	_ = this
-
 	localctx = NewHtmlChardataContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 44, JSPParserRULE_htmlChardata)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -4215,7 +4504,17 @@ func (p *JSPParser) HtmlChardata() (localctx IHtmlChardataContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IHtmlMiscContext is an interface to support dynamic dispatch.
@@ -4225,20 +4524,32 @@ type IHtmlMiscContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	HtmlComment() IHtmlCommentContext
+	ElExpression() IElExpressionContext
+	JspScript() IJspScriptContext
+	JspScriptlet() IJspScriptletContext
+	WHITESPACES() antlr.TerminalNode
+
 	// IsHtmlMiscContext differentiates from other interfaces.
 	IsHtmlMiscContext()
 }
 
 type HtmlMiscContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyHtmlMiscContext() *HtmlMiscContext {
 	var p = new(HtmlMiscContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_htmlMisc
 	return p
+}
+
+func InitEmptyHtmlMiscContext(p *HtmlMiscContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_htmlMisc
 }
 
 func (*HtmlMiscContext) IsHtmlMiscContext() {}
@@ -4246,7 +4557,7 @@ func (*HtmlMiscContext) IsHtmlMiscContext() {}
 func NewHtmlMiscContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *HtmlMiscContext {
 	var p = new(HtmlMiscContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_htmlMisc
@@ -4343,31 +4654,15 @@ func (s *HtmlMiscContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) HtmlMisc() (localctx IHtmlMiscContext) {
-	this := p
-	_ = this
-
 	localctx = NewHtmlMiscContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 46, JSPParserRULE_htmlMisc)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(265)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 26, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 26, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -4401,11 +4696,27 @@ func (p *JSPParser) HtmlMisc() (localctx IHtmlMiscContext) {
 		{
 			p.SetState(264)
 			p.Match(JSPParserWHITESPACES)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IHtmlCommentContext is an interface to support dynamic dispatch.
@@ -4415,20 +4726,29 @@ type IHtmlCommentContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	JSP_COMMENT() antlr.TerminalNode
+	JSP_CONDITIONAL_COMMENT() antlr.TerminalNode
+
 	// IsHtmlCommentContext differentiates from other interfaces.
 	IsHtmlCommentContext()
 }
 
 type HtmlCommentContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyHtmlCommentContext() *HtmlCommentContext {
 	var p = new(HtmlCommentContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_htmlComment
 	return p
+}
+
+func InitEmptyHtmlCommentContext(p *HtmlCommentContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_htmlComment
 }
 
 func (*HtmlCommentContext) IsHtmlCommentContext() {}
@@ -4436,7 +4756,7 @@ func (*HtmlCommentContext) IsHtmlCommentContext() {}
 func NewHtmlCommentContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *HtmlCommentContext {
 	var p = new(HtmlCommentContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_htmlComment
@@ -4473,28 +4793,9 @@ func (s *HtmlCommentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JSPParser) HtmlComment() (localctx IHtmlCommentContext) {
-	this := p
-	_ = this
-
 	localctx = NewHtmlCommentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 48, JSPParserRULE_htmlComment)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -4509,7 +4810,17 @@ func (p *JSPParser) HtmlComment() (localctx IHtmlCommentContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IXhtmlCDATAContext is an interface to support dynamic dispatch.
@@ -4519,20 +4830,28 @@ type IXhtmlCDATAContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	CDATA() antlr.TerminalNode
+
 	// IsXhtmlCDATAContext differentiates from other interfaces.
 	IsXhtmlCDATAContext()
 }
 
 type XhtmlCDATAContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyXhtmlCDATAContext() *XhtmlCDATAContext {
 	var p = new(XhtmlCDATAContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_xhtmlCDATA
 	return p
+}
+
+func InitEmptyXhtmlCDATAContext(p *XhtmlCDATAContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_xhtmlCDATA
 }
 
 func (*XhtmlCDATAContext) IsXhtmlCDATAContext() {}
@@ -4540,7 +4859,7 @@ func (*XhtmlCDATAContext) IsXhtmlCDATAContext() {}
 func NewXhtmlCDATAContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *XhtmlCDATAContext {
 	var p = new(XhtmlCDATAContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_xhtmlCDATA
@@ -4573,35 +4892,29 @@ func (s *XhtmlCDATAContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) XhtmlCDATA() (localctx IXhtmlCDATAContext) {
-	this := p
-	_ = this
-
 	localctx = NewXhtmlCDATAContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 50, JSPParserRULE_xhtmlCDATA)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(269)
 		p.Match(JSPParserCDATA)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDtdContext is an interface to support dynamic dispatch.
@@ -4611,20 +4924,35 @@ type IDtdContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	DTD() antlr.TerminalNode
+	DtdElementName() IDtdElementNameContext
+	TAG_END() antlr.TerminalNode
+	DTD_PUBLIC() antlr.TerminalNode
+	DTD_SYSTEM() antlr.TerminalNode
+	SystemId() ISystemIdContext
+	AllPublicId() []IPublicIdContext
+	PublicId(i int) IPublicIdContext
+
 	// IsDtdContext differentiates from other interfaces.
 	IsDtdContext()
 }
 
 type DtdContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyDtdContext() *DtdContext {
 	var p = new(DtdContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_dtd
 	return p
+}
+
+func InitEmptyDtdContext(p *DtdContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_dtd
 }
 
 func (*DtdContext) IsDtdContext() {}
@@ -4632,7 +4960,7 @@ func (*DtdContext) IsDtdContext() {}
 func NewDtdContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DtdContext {
 	var p = new(DtdContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_dtd
@@ -4750,33 +5078,18 @@ func (s *DtdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) Dtd() (localctx IDtdContext) {
-	this := p
-	_ = this
-
 	localctx = NewDtdContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 52, JSPParserRULE_dtd)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(271)
 		p.Match(JSPParserDTD)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(272)
@@ -4784,15 +5097,25 @@ func (p *JSPParser) Dtd() (localctx IDtdContext) {
 	}
 	p.SetState(280)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JSPParserDTD_PUBLIC {
 		{
 			p.SetState(273)
 			p.Match(JSPParserDTD_PUBLIC)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(277)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == JSPParserDTD_QUOTED {
@@ -4803,18 +5126,28 @@ func (p *JSPParser) Dtd() (localctx IDtdContext) {
 
 			p.SetState(279)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 
 	}
 	p.SetState(284)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JSPParserDTD_SYSTEM {
 		{
 			p.SetState(282)
 			p.Match(JSPParserDTD_SYSTEM)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(283)
@@ -4825,9 +5158,23 @@ func (p *JSPParser) Dtd() (localctx IDtdContext) {
 	{
 		p.SetState(286)
 		p.Match(JSPParserTAG_END)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDtdElementNameContext is an interface to support dynamic dispatch.
@@ -4837,20 +5184,28 @@ type IDtdElementNameContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	DTD_IDENTIFIER() antlr.TerminalNode
+
 	// IsDtdElementNameContext differentiates from other interfaces.
 	IsDtdElementNameContext()
 }
 
 type DtdElementNameContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyDtdElementNameContext() *DtdElementNameContext {
 	var p = new(DtdElementNameContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_dtdElementName
 	return p
+}
+
+func InitEmptyDtdElementNameContext(p *DtdElementNameContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_dtdElementName
 }
 
 func (*DtdElementNameContext) IsDtdElementNameContext() {}
@@ -4858,7 +5213,7 @@ func (*DtdElementNameContext) IsDtdElementNameContext() {}
 func NewDtdElementNameContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DtdElementNameContext {
 	var p = new(DtdElementNameContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_dtdElementName
@@ -4891,35 +5246,29 @@ func (s *DtdElementNameContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JSPParser) DtdElementName() (localctx IDtdElementNameContext) {
-	this := p
-	_ = this
-
 	localctx = NewDtdElementNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 54, JSPParserRULE_dtdElementName)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(288)
 		p.Match(JSPParserDTD_IDENTIFIER)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IPublicIdContext is an interface to support dynamic dispatch.
@@ -4929,20 +5278,28 @@ type IPublicIdContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	DTD_QUOTED() antlr.TerminalNode
+
 	// IsPublicIdContext differentiates from other interfaces.
 	IsPublicIdContext()
 }
 
 type PublicIdContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyPublicIdContext() *PublicIdContext {
 	var p = new(PublicIdContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_publicId
 	return p
+}
+
+func InitEmptyPublicIdContext(p *PublicIdContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_publicId
 }
 
 func (*PublicIdContext) IsPublicIdContext() {}
@@ -4950,7 +5307,7 @@ func (*PublicIdContext) IsPublicIdContext() {}
 func NewPublicIdContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *PublicIdContext {
 	var p = new(PublicIdContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_publicId
@@ -4983,35 +5340,29 @@ func (s *PublicIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) PublicId() (localctx IPublicIdContext) {
-	this := p
-	_ = this
-
 	localctx = NewPublicIdContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 56, JSPParserRULE_publicId)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(290)
 		p.Match(JSPParserDTD_QUOTED)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISystemIdContext is an interface to support dynamic dispatch.
@@ -5021,20 +5372,28 @@ type ISystemIdContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	DTD_QUOTED() antlr.TerminalNode
+
 	// IsSystemIdContext differentiates from other interfaces.
 	IsSystemIdContext()
 }
 
 type SystemIdContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptySystemIdContext() *SystemIdContext {
 	var p = new(SystemIdContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_systemId
 	return p
+}
+
+func InitEmptySystemIdContext(p *SystemIdContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_systemId
 }
 
 func (*SystemIdContext) IsSystemIdContext() {}
@@ -5042,7 +5401,7 @@ func (*SystemIdContext) IsSystemIdContext() {}
 func NewSystemIdContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SystemIdContext {
 	var p = new(SystemIdContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_systemId
@@ -5075,35 +5434,29 @@ func (s *SystemIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) SystemId() (localctx ISystemIdContext) {
-	this := p
-	_ = this
-
 	localctx = NewSystemIdContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 58, JSPParserRULE_systemId)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(292)
 		p.Match(JSPParserDTD_QUOTED)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IXmlContext is an interface to support dynamic dispatch.
@@ -5131,12 +5484,19 @@ type IXmlContext interface {
 	// SetAtts sets the atts rule context list.
 	SetAtts([]IHtmlAttributeContext)
 
+	// Getter signatures
+	XML_DECLARATION() antlr.TerminalNode
+	TAG_END() antlr.TerminalNode
+	HtmlTagName() IHtmlTagNameContext
+	AllHtmlAttribute() []IHtmlAttributeContext
+	HtmlAttribute(i int) IHtmlAttributeContext
+
 	// IsXmlContext differentiates from other interfaces.
 	IsXmlContext()
 }
 
 type XmlContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser         antlr.Parser
 	name           IHtmlTagNameContext
 	_htmlAttribute IHtmlAttributeContext
@@ -5145,9 +5505,14 @@ type XmlContext struct {
 
 func NewEmptyXmlContext() *XmlContext {
 	var p = new(XmlContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_xml
 	return p
+}
+
+func InitEmptyXmlContext(p *XmlContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_xml
 }
 
 func (*XmlContext) IsXmlContext() {}
@@ -5155,7 +5520,7 @@ func (*XmlContext) IsXmlContext() {}
 func NewXmlContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *XmlContext {
 	var p = new(XmlContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_xml
@@ -5261,34 +5626,18 @@ func (s *XmlContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) Xml() (localctx IXmlContext) {
-	this := p
-	_ = this
-
 	localctx = NewXmlContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 60, JSPParserRULE_xml)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(294)
 		p.Match(JSPParserXML_DECLARATION)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(295)
@@ -5299,8 +5648,13 @@ func (p *JSPParser) Xml() (localctx IXmlContext) {
 	}
 	p.SetState(299)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 30, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 30, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 1 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1+1 {
 			{
@@ -5315,14 +5669,34 @@ func (p *JSPParser) Xml() (localctx IXmlContext) {
 		}
 		p.SetState(301)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 30, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 30, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(302)
 		p.Match(JSPParserTAG_END)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IJspScriptletContext is an interface to support dynamic dispatch.
@@ -5332,20 +5706,30 @@ type IJspScriptletContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ScriptletStart() IScriptletStartContext
+	ScriptletContent() IScriptletContentContext
+	JspExpression() IJspExpressionContext
+
 	// IsJspScriptletContext differentiates from other interfaces.
 	IsJspScriptletContext()
 }
 
 type JspScriptletContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyJspScriptletContext() *JspScriptletContext {
 	var p = new(JspScriptletContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_jspScriptlet
 	return p
+}
+
+func InitEmptyJspScriptletContext(p *JspScriptletContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_jspScriptlet
 }
 
 func (*JspScriptletContext) IsJspScriptletContext() {}
@@ -5353,7 +5737,7 @@ func (*JspScriptletContext) IsJspScriptletContext() {}
 func NewJspScriptletContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *JspScriptletContext {
 	var p = new(JspScriptletContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_jspScriptlet
@@ -5430,30 +5814,13 @@ func (s *JspScriptletContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JSPParser) JspScriptlet() (localctx IJspScriptletContext) {
-	this := p
-	_ = this
-
 	localctx = NewJspScriptletContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 62, JSPParserRULE_jspScriptlet)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(308)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case JSPParserDECLARATION_BEGIN, JSPParserSCRIPTLET_OPEN:
@@ -5475,10 +5842,21 @@ func (p *JSPParser) JspScriptlet() (localctx IJspScriptletContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IJspExpressionContext is an interface to support dynamic dispatch.
@@ -5488,20 +5866,29 @@ type IJspExpressionContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ECHO_EXPRESSION_OPEN() antlr.TerminalNode
+	ScriptletContent() IScriptletContentContext
+
 	// IsJspExpressionContext differentiates from other interfaces.
 	IsJspExpressionContext()
 }
 
 type JspExpressionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyJspExpressionContext() *JspExpressionContext {
 	var p = new(JspExpressionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_jspExpression
 	return p
+}
+
+func InitEmptyJspExpressionContext(p *JspExpressionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_jspExpression
 }
 
 func (*JspExpressionContext) IsJspExpressionContext() {}
@@ -5509,7 +5896,7 @@ func (*JspExpressionContext) IsJspExpressionContext() {}
 func NewJspExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *JspExpressionContext {
 	var p = new(JspExpressionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_jspExpression
@@ -5558,39 +5945,33 @@ func (s *JspExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *JSPParser) JspExpression() (localctx IJspExpressionContext) {
-	this := p
-	_ = this
-
 	localctx = NewJspExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 64, JSPParserRULE_jspExpression)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(310)
 		p.Match(JSPParserECHO_EXPRESSION_OPEN)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(311)
 		p.ScriptletContent()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IScriptletStartContext is an interface to support dynamic dispatch.
@@ -5600,20 +5981,29 @@ type IScriptletStartContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	SCRIPTLET_OPEN() antlr.TerminalNode
+	DECLARATION_BEGIN() antlr.TerminalNode
+
 	// IsScriptletStartContext differentiates from other interfaces.
 	IsScriptletStartContext()
 }
 
 type ScriptletStartContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyScriptletStartContext() *ScriptletStartContext {
 	var p = new(ScriptletStartContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_scriptletStart
 	return p
+}
+
+func InitEmptyScriptletStartContext(p *ScriptletStartContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_scriptletStart
 }
 
 func (*ScriptletStartContext) IsScriptletStartContext() {}
@@ -5621,7 +6011,7 @@ func (*ScriptletStartContext) IsScriptletStartContext() {}
 func NewScriptletStartContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ScriptletStartContext {
 	var p = new(ScriptletStartContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_scriptletStart
@@ -5658,28 +6048,9 @@ func (s *ScriptletStartContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JSPParser) ScriptletStart() (localctx IScriptletStartContext) {
-	this := p
-	_ = this
-
 	localctx = NewScriptletStartContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 66, JSPParserRULE_scriptletStart)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -5694,7 +6065,17 @@ func (p *JSPParser) ScriptletStart() (localctx IScriptletStartContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IScriptletContentContext is an interface to support dynamic dispatch.
@@ -5704,20 +6085,29 @@ type IScriptletContentContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	BLOB_CONTENT() antlr.TerminalNode
+	BLOB_CLOSE() antlr.TerminalNode
+
 	// IsScriptletContentContext differentiates from other interfaces.
 	IsScriptletContentContext()
 }
 
 type ScriptletContentContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyScriptletContentContext() *ScriptletContentContext {
 	var p = new(ScriptletContentContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_scriptletContent
 	return p
+}
+
+func InitEmptyScriptletContentContext(p *ScriptletContentContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_scriptletContent
 }
 
 func (*ScriptletContentContext) IsScriptletContentContext() {}
@@ -5725,7 +6115,7 @@ func (*ScriptletContentContext) IsScriptletContentContext() {}
 func NewScriptletContentContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ScriptletContentContext {
 	var p = new(ScriptletContentContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_scriptletContent
@@ -5762,39 +6152,37 @@ func (s *ScriptletContentContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JSPParser) ScriptletContent() (localctx IScriptletContentContext) {
-	this := p
-	_ = this
-
 	localctx = NewScriptletContentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 68, JSPParserRULE_scriptletContent)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(315)
 		p.Match(JSPParserBLOB_CONTENT)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(316)
 		p.Match(JSPParserBLOB_CLOSE)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IJavaScriptContext is an interface to support dynamic dispatch.
@@ -5804,20 +6192,30 @@ type IJavaScriptContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	SCRIPT_OPEN() antlr.TerminalNode
+	SCRIPT_BODY() antlr.TerminalNode
+	SCRIPT_SHORT_BODY() antlr.TerminalNode
+
 	// IsJavaScriptContext differentiates from other interfaces.
 	IsJavaScriptContext()
 }
 
 type JavaScriptContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyJavaScriptContext() *JavaScriptContext {
 	var p = new(JavaScriptContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_javaScript
 	return p
+}
+
+func InitEmptyJavaScriptContext(p *JavaScriptContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_javaScript
 }
 
 func (*JavaScriptContext) IsJavaScriptContext() {}
@@ -5825,7 +6223,7 @@ func (*JavaScriptContext) IsJavaScriptContext() {}
 func NewJavaScriptContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *JavaScriptContext {
 	var p = new(JavaScriptContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_javaScript
@@ -5866,33 +6264,18 @@ func (s *JavaScriptContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) JavaScript() (localctx IJavaScriptContext) {
-	this := p
-	_ = this
-
 	localctx = NewJavaScriptContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 70, JSPParserRULE_javaScript)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(318)
 		p.Match(JSPParserSCRIPT_OPEN)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(319)
@@ -5906,7 +6289,17 @@ func (p *JSPParser) JavaScript() (localctx IJavaScriptContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IStyleContext is an interface to support dynamic dispatch.
@@ -5916,20 +6309,30 @@ type IStyleContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	STYLE_OPEN() antlr.TerminalNode
+	STYLE_BODY() antlr.TerminalNode
+	STYLE_SHORT_BODY() antlr.TerminalNode
+
 	// IsStyleContext differentiates from other interfaces.
 	IsStyleContext()
 }
 
 type StyleContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyStyleContext() *StyleContext {
 	var p = new(StyleContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = JSPParserRULE_style
 	return p
+}
+
+func InitEmptyStyleContext(p *StyleContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = JSPParserRULE_style
 }
 
 func (*StyleContext) IsStyleContext() {}
@@ -5937,7 +6340,7 @@ func (*StyleContext) IsStyleContext() {}
 func NewStyleContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *StyleContext {
 	var p = new(StyleContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = JSPParserRULE_style
@@ -5978,33 +6381,18 @@ func (s *StyleContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) Style() (localctx IStyleContext) {
-	this := p
-	_ = this
-
 	localctx = NewStyleContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 72, JSPParserRULE_style)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(321)
 		p.Match(JSPParserSTYLE_OPEN)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(322)
@@ -6018,5 +6406,15 @@ func (p *JSPParser) Style() (localctx IStyleContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }

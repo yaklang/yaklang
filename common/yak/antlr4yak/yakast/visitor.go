@@ -13,7 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 )
 
 type Position struct {
@@ -374,7 +374,7 @@ func (y *YakCompiler) VisitProgram(raw yak.IProgramContext, inline ...bool) inte
 		return nil
 	}
 
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 	y.VisitStatementList(i.StatementList(), inline...)
 	return nil
@@ -392,7 +392,7 @@ func (y *YakCompiler) VisitProgramWithoutSymbolTable(raw yak.IProgramContext, in
 
 	y.writeAllWS(i.AllWs())
 
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 	y.VisitStatementList(i.StatementList(), inline...)
 	return nil

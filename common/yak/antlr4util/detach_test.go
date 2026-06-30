@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 )
 
@@ -33,15 +33,15 @@ func TestDetachLexerTokenSource(t *testing.T) {
 }
 
 func TestDetachParserATNSimulatorCaches(t *testing.T) {
-	assertUnexportedFieldExists(t, antlr.NewParserATNSimulator(nil, nil, nil, nil).BaseATNSimulator, "decisionToDFA")
-	assertUnexportedFieldExists(t, antlr.NewParserATNSimulator(nil, nil, nil, nil).BaseATNSimulator, "sharedContextCache")
+	assertUnexportedFieldExists(t, &antlr.NewParserATNSimulator(nil, nil, nil, nil).BaseATNSimulator, "decisionToDFA")
+	assertUnexportedFieldExists(t, &antlr.NewParserATNSimulator(nil, nil, nil, nil).BaseATNSimulator, "sharedContextCache")
 
 	lexer := javaparser.NewJavaLexer(antlr.NewInputStream("class A{}"))
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := javaparser.NewJavaParser(tokenStream)
 
 	interp := parser.GetInterpreter()
-	if interp == nil || interp.BaseATNSimulator == nil {
+	if interp == nil {
 		t.Fatalf("expected parser interpreter to be non-nil")
 	}
 	if interp.DecisionToDFA() == nil || len(interp.DecisionToDFA()) == 0 {

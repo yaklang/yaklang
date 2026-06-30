@@ -6,7 +6,7 @@ import (
 	"unicode/utf8"
 	"unsafe"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 )
 
 type PHPLexerBase struct {
@@ -159,13 +159,54 @@ func (p *PHPLexerBase) startRecordHereDocLabel() {
 
 func (p *PHPLexerBase) endRecordHereDocLabel() {
 	stream := p.GetInputStream()
-	p._endIdentifier = stream.Index()
-	if p._endIdentifier > 1 {
-		p._endIdentifier -= 1
+	// 4.13.2 lexer action timing: endRecordHereDocLabel may fire before NameString
+	// is fully consumed (stream.Index() sits in the middle of the label), so we
+	// cannot rely on the current stream index. Scan forward from _startIdentifier
+	// until a non-NameString rune to capture the full heredoc label.
+	// Baseline 4.11.1 behavior: startRecordHereDocLabel fires after <<< and
+	// optional quote are consumed, so _startIdentifier points at the first
+	// label rune. 4.13.2 fires it earlier, so _startIdentifier points at or
+	// before <<<. We scan forward from _startIdentifier to find the first
+	// NameString rune (skipping <, ', ") then capture until the next
+	// non-NameString rune.
+	size := stream.Size()
+	pos := p._startIdentifier
+	for pos < size {
+		txt := stream.GetText(pos, pos)
+		if len(txt) > 0 && isNameStringRune(rune(txt[0])) {
+			break
+		}
+		pos++
 	}
-	p._heredocIdentifier = stream.GetText(p._startIdentifier, p._endIdentifier)
+	labelStart := pos
+	for pos < size {
+		txt := stream.GetText(pos, pos)
+		if len(txt) == 0 || !isNameStringRune(rune(txt[0])) {
+			break
+		}
+		pos++
+	}
+	if pos > labelStart {
+		p._heredocIdentifier = stream.GetText(labelStart, pos-1)
+	} else {
+		p._heredocIdentifier = ""
+	}
 	p._startIdentifier = 0
 	p._endIdentifier = 0
+}
+
+// isNameStringRune reports whether r is a valid rune inside a PHP NameString
+// (see PHPLexer.g4: [a-zA-Z_\u0080-\ufffe][a-zA-Z0-9_\u0080-\ufffe]*).
+func isNameStringRune(r rune) bool {
+	switch {
+	case r >= 'a' && r <= 'z',
+		r >= 'A' && r <= 'Z',
+		r >= '0' && r <= '9',
+		r == '_',
+		r >= 0x0080 && r <= 0xfffe:
+		return true
+	}
+	return false
 }
 
 func (p *PHPLexerBase) DocIsEnd() bool {

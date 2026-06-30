@@ -16,7 +16,7 @@ func (y *YakCompiler) VisitAssignExpressionStmt(raw yak.IAssignExpressionStmtCon
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	if i.AssignExpression() != nil {
@@ -35,7 +35,7 @@ func (y *YakCompiler) VisitAssignExpression(raw yak.IAssignExpressionContext) in
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	// assign eq  /  colon assign eq
@@ -118,7 +118,7 @@ func (y *YakCompiler) VisitLeftExpressionList(forceNewSymbol bool, raw yak.ILeft
 	if i == nil {
 		return -1
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	allExpr := i.AllLeftExpression()
@@ -145,7 +145,7 @@ func (y *YakCompiler) VisitLeftExpression(forceNewSymbol bool, raw yak.ILeftExpr
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	if id := i.Identifier(); id != nil {
@@ -217,7 +217,7 @@ func (y *YakCompiler) VisitLeftMemberCall(raw yak.ILeftMemberCallContext) interf
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	y.writeString(".")
@@ -256,7 +256,7 @@ func (y *YakCompiler) VisitLeftSliceCall(raw yak.ILeftSliceCallContext) interfac
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	y.writeString("[")
@@ -359,7 +359,7 @@ func (y *YakCompiler) VisitDeclareVariableExpressionStmt(raw yak.IDeclareVariabl
 	if i == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	y.VisitDeclareVariableExpression(i.DeclareVariableExpression())

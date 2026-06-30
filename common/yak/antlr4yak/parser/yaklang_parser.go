@@ -1,4 +1,4 @@
-// Code generated from java-escape by ANTLR 4.11.1. DO NOT EDIT.
+// Code generated from ./YaklangParser.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
 package parser // YaklangParser
 
@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 )
 
 // Suppress unused import errors
@@ -19,20 +19,20 @@ type YaklangParser struct {
 	*antlr.BaseParser
 }
 
-var yaklangparserParserStaticData struct {
+var YaklangParserParserStaticData struct {
 	once                   sync.Once
 	serializedATN          []int32
-	literalNames           []string
-	symbolicNames          []string
-	ruleNames              []string
-	predictionContextCache *antlr.PredictionContextCache
+	LiteralNames           []string
+	SymbolicNames          []string
+	RuleNames              []string
+	PredictionContextCache *antlr.PredictionContextCache
 	atn                    *antlr.ATN
 	decisionToDFA          []*antlr.DFA
 }
 
 func yaklangparserParserInit() {
-	staticData := &yaklangparserParserStaticData
-	staticData.literalNames = []string{
+	staticData := &YaklangParserParserStaticData
+	staticData.LiteralNames = []string{
 		"", "'panic'", "'recover'", "'if'", "'elif'", "'else'", "'switch'",
 		"'case'", "'default'", "'for'", "'continue'", "'break'", "'return'",
 		"'include'", "'try'", "'catch'", "'finally'", "'importmod'", "'as'",
@@ -46,7 +46,7 @@ func yaklangparserParserInit() {
 		"'<<='", "'>>='", "'&='", "'|='", "'&^='", "';'", "'...'", "'=>'", "'<>'",
 		"'!'", "'.'", "", "'/*'", "'*/'", "'`'", "", "'<<<'", "", "'\\n'",
 	}
-	staticData.symbolicNames = []string{
+	staticData.SymbolicNames = []string{
 		"", "Panic", "Recover", "If", "Elif", "Else", "Switch", "Case", "Default",
 		"For", "Continue", "Break", "Return", "Include", "Try", "Catch", "Finally",
 		"Importmod", "As", "Export", "Defer", "Go", "Range", "Func", "Map",
@@ -70,7 +70,7 @@ func yaklangparserParserInit() {
 		"TemplateBackTickStringStartExpression", "HereDocIdentifierName", "HereDocIdentifierBreak",
 		"CRLFEndDoc", "CRLFHereDocText", "LFEndDoc", "LFHereDocText",
 	}
-	staticData.ruleNames = []string{
+	staticData.RuleNames = []string{
 		"program", "statementList", "statement", "tryStmt", "expressionStmt",
 		"assignExpressionStmt", "lineCommentStmt", "includeStmt", "deferStmt",
 		"goStmt", "assertStmt", "fallthroughStmt", "breakStmt", "continueStmt",
@@ -92,7 +92,7 @@ func yaklangparserParserInit() {
 		"sliceTypedLiteral", "expressionList", "expressionListMultiline", "mapLiteral",
 		"mapTypedLiteral", "mapPairs", "mapPair", "ws", "eos",
 	}
-	staticData.predictionContextCache = antlr.NewPredictionContextCache()
+	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
 		4, 1, 123, 1113, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4,
 		7, 4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 2, 10,
@@ -635,7 +635,7 @@ func yaklangparserParserInit() {
 // NewYaklangParser(). You can call this function if you wish to initialize the static state ahead
 // of time.
 func YaklangParserInit() {
-	staticData := &yaklangparserParserStaticData
+	staticData := &YaklangParserParserStaticData
 	staticData.once.Do(yaklangparserParserInit)
 }
 
@@ -644,12 +644,12 @@ func NewYaklangParser(input antlr.TokenStream) *YaklangParser {
 	YaklangParserInit()
 	this := new(YaklangParser)
 	this.BaseParser = antlr.NewBaseParser(input)
-	staticData := &yaklangparserParserStaticData
-	this.Interpreter = antlr.NewParserATNSimulator(this, staticData.atn, staticData.decisionToDFA, staticData.predictionContextCache)
-	this.RuleNames = staticData.ruleNames
-	this.LiteralNames = staticData.literalNames
-	this.SymbolicNames = staticData.symbolicNames
-	this.GrammarFileName = "java-escape"
+	staticData := &YaklangParserParserStaticData
+	this.Interpreter = antlr.NewParserATNSimulator(this, staticData.atn, staticData.decisionToDFA, staticData.PredictionContextCache)
+	this.RuleNames = staticData.RuleNames
+	this.LiteralNames = staticData.LiteralNames
+	this.SymbolicNames = staticData.SymbolicNames
+	this.GrammarFileName = "YaklangParser.g4"
 
 	return this
 }
@@ -876,20 +876,31 @@ type IProgramContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	StatementList() IStatementListContext
+	EOF() antlr.TerminalNode
+	AllWs() []IWsContext
+	Ws(i int) IWsContext
+
 	// IsProgramContext differentiates from other interfaces.
 	IsProgramContext()
 }
 
 type ProgramContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyProgramContext() *ProgramContext {
 	var p = new(ProgramContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_program
 	return p
+}
+
+func InitEmptyProgramContext(p *ProgramContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_program
 }
 
 func (*ProgramContext) IsProgramContext() {}
@@ -897,7 +908,7 @@ func (*ProgramContext) IsProgramContext() {}
 func NewProgramContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ProgramContext {
 	var p = new(ProgramContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_program
@@ -987,35 +998,20 @@ func (s *ProgramContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) Program() (localctx IProgramContext) {
-	this := p
-	_ = this
-
 	localctx = NewProgramContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, YaklangParserRULE_program)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(169)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 0, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 0, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -1026,7 +1022,13 @@ func (p *YaklangParser) Program() (localctx IProgramContext) {
 		}
 		p.SetState(171)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 0, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 0, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(172)
@@ -1035,9 +1037,23 @@ func (p *YaklangParser) Program() (localctx IProgramContext) {
 	{
 		p.SetState(173)
 		p.Match(YaklangParserEOF)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IStatementListContext is an interface to support dynamic dispatch.
@@ -1047,20 +1063,29 @@ type IStatementListContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllStatement() []IStatementContext
+	Statement(i int) IStatementContext
+
 	// IsStatementListContext differentiates from other interfaces.
 	IsStatementListContext()
 }
 
 type StatementListContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyStatementListContext() *StatementListContext {
 	var p = new(StatementListContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_statementList
 	return p
+}
+
+func InitEmptyStatementListContext(p *StatementListContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_statementList
 }
 
 func (*StatementListContext) IsStatementListContext() {}
@@ -1068,7 +1093,7 @@ func (*StatementListContext) IsStatementListContext() {}
 func NewStatementListContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *StatementListContext {
 	var p = new(StatementListContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_statementList
@@ -1138,33 +1163,16 @@ func (s *StatementListContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *YaklangParser) StatementList() (localctx IStatementListContext) {
-	this := p
-	_ = this
-
 	localctx = NewStatementListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 2, YaklangParserRULE_statementList)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(176)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_alt = 1
 	for ok := true; ok; ok = _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		switch _alt {
@@ -1175,15 +1183,29 @@ func (p *YaklangParser) StatementList() (localctx IStatementListContext) {
 			}
 
 		default:
-			panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			goto errorExit
 		}
 
 		p.SetState(178)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 1, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 1, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IStatementContext is an interface to support dynamic dispatch.
@@ -1193,20 +1215,47 @@ type IStatementContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	LineCommentStmt() ILineCommentStmtContext
+	Eos() IEosContext
+	DeclareVariableExpressionStmt() IDeclareVariableExpressionStmtContext
+	AssignExpressionStmt() IAssignExpressionStmtContext
+	ExpressionStmt() IExpressionStmtContext
+	Block() IBlockContext
+	TryStmt() ITryStmtContext
+	Empty() IEmptyContext
+	IfStmt() IIfStmtContext
+	SwitchStmt() ISwitchStmtContext
+	ForRangeStmt() IForRangeStmtContext
+	ForStmt() IForStmtContext
+	BreakStmt() IBreakStmtContext
+	ReturnStmt() IReturnStmtContext
+	ContinueStmt() IContinueStmtContext
+	FallthroughStmt() IFallthroughStmtContext
+	IncludeStmt() IIncludeStmtContext
+	DeferStmt() IDeferStmtContext
+	GoStmt() IGoStmtContext
+	AssertStmt() IAssertStmtContext
+
 	// IsStatementContext differentiates from other interfaces.
 	IsStatementContext()
 }
 
 type StatementContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyStatementContext() *StatementContext {
 	var p = new(StatementContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_statement
 	return p
+}
+
+func InitEmptyStatementContext(p *StatementContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_statement
 }
 
 func (*StatementContext) IsStatementContext() {}
@@ -1214,7 +1263,7 @@ func (*StatementContext) IsStatementContext() {}
 func NewStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *StatementContext {
 	var p = new(StatementContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_statement
@@ -1563,31 +1612,15 @@ func (s *StatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) Statement() (localctx IStatementContext) {
-	this := p
-	_ = this
-
 	localctx = NewStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 4, YaklangParserRULE_statement)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(227)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 2, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 2, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -1777,9 +1810,21 @@ func (p *YaklangParser) Statement() (localctx IStatementContext) {
 			p.Eos()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITryStmtContext is an interface to support dynamic dispatch.
@@ -1789,20 +1834,33 @@ type ITryStmtContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Try() antlr.TerminalNode
+	AllBlock() []IBlockContext
+	Block(i int) IBlockContext
+	Catch() antlr.TerminalNode
+	Identifier() antlr.TerminalNode
+	Finally() antlr.TerminalNode
+
 	// IsTryStmtContext differentiates from other interfaces.
 	IsTryStmtContext()
 }
 
 type TryStmtContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTryStmtContext() *TryStmtContext {
 	var p = new(TryStmtContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_tryStmt
 	return p
+}
+
+func InitEmptyTryStmtContext(p *TryStmtContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_tryStmt
 }
 
 func (*TryStmtContext) IsTryStmtContext() {}
@@ -1810,7 +1868,7 @@ func (*TryStmtContext) IsTryStmtContext() {}
 func NewTryStmtContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TryStmtContext {
 	var p = new(TryStmtContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_tryStmt
@@ -1896,33 +1954,18 @@ func (s *TryStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) TryStmt() (localctx ITryStmtContext) {
-	this := p
-	_ = this
-
 	localctx = NewTryStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, YaklangParserRULE_tryStmt)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(229)
 		p.Match(YaklangParserTry)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(230)
@@ -1931,15 +1974,26 @@ func (p *YaklangParser) TryStmt() (localctx ITryStmtContext) {
 	{
 		p.SetState(231)
 		p.Match(YaklangParserCatch)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(233)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == YaklangParserIdentifier {
 		{
 			p.SetState(232)
 			p.Match(YaklangParserIdentifier)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
@@ -1949,12 +2003,19 @@ func (p *YaklangParser) TryStmt() (localctx ITryStmtContext) {
 	}
 	p.SetState(238)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == YaklangParserFinally {
 		{
 			p.SetState(236)
 			p.Match(YaklangParserFinally)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(237)
@@ -1963,7 +2024,17 @@ func (p *YaklangParser) TryStmt() (localctx ITryStmtContext) {
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IExpressionStmtContext is an interface to support dynamic dispatch.
@@ -1973,20 +2044,28 @@ type IExpressionStmtContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Expression() IExpressionContext
+
 	// IsExpressionStmtContext differentiates from other interfaces.
 	IsExpressionStmtContext()
 }
 
 type ExpressionStmtContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyExpressionStmtContext() *ExpressionStmtContext {
 	var p = new(ExpressionStmtContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_expressionStmt
 	return p
+}
+
+func InitEmptyExpressionStmtContext(p *ExpressionStmtContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_expressionStmt
 }
 
 func (*ExpressionStmtContext) IsExpressionStmtContext() {}
@@ -1994,7 +2073,7 @@ func (*ExpressionStmtContext) IsExpressionStmtContext() {}
 func NewExpressionStmtContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ExpressionStmtContext {
 	var p = new(ExpressionStmtContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_expressionStmt
@@ -2039,35 +2118,25 @@ func (s *ExpressionStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *YaklangParser) ExpressionStmt() (localctx IExpressionStmtContext) {
-	this := p
-	_ = this
-
 	localctx = NewExpressionStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 8, YaklangParserRULE_expressionStmt)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(240)
 		p.expression(0)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAssignExpressionStmtContext is an interface to support dynamic dispatch.
@@ -2077,20 +2146,28 @@ type IAssignExpressionStmtContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AssignExpression() IAssignExpressionContext
+
 	// IsAssignExpressionStmtContext differentiates from other interfaces.
 	IsAssignExpressionStmtContext()
 }
 
 type AssignExpressionStmtContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyAssignExpressionStmtContext() *AssignExpressionStmtContext {
 	var p = new(AssignExpressionStmtContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_assignExpressionStmt
 	return p
+}
+
+func InitEmptyAssignExpressionStmtContext(p *AssignExpressionStmtContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_assignExpressionStmt
 }
 
 func (*AssignExpressionStmtContext) IsAssignExpressionStmtContext() {}
@@ -2098,7 +2175,7 @@ func (*AssignExpressionStmtContext) IsAssignExpressionStmtContext() {}
 func NewAssignExpressionStmtContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AssignExpressionStmtContext {
 	var p = new(AssignExpressionStmtContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_assignExpressionStmt
@@ -2143,35 +2220,25 @@ func (s *AssignExpressionStmtContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *YaklangParser) AssignExpressionStmt() (localctx IAssignExpressionStmtContext) {
-	this := p
-	_ = this
-
 	localctx = NewAssignExpressionStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 10, YaklangParserRULE_assignExpressionStmt)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(242)
 		p.AssignExpression()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ILineCommentStmtContext is an interface to support dynamic dispatch.
@@ -2181,20 +2248,29 @@ type ILineCommentStmtContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	LINE_COMMENT() antlr.TerminalNode
+	COMMENT() antlr.TerminalNode
+
 	// IsLineCommentStmtContext differentiates from other interfaces.
 	IsLineCommentStmtContext()
 }
 
 type LineCommentStmtContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyLineCommentStmtContext() *LineCommentStmtContext {
 	var p = new(LineCommentStmtContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_lineCommentStmt
 	return p
+}
+
+func InitEmptyLineCommentStmtContext(p *LineCommentStmtContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_lineCommentStmt
 }
 
 func (*LineCommentStmtContext) IsLineCommentStmtContext() {}
@@ -2202,7 +2278,7 @@ func (*LineCommentStmtContext) IsLineCommentStmtContext() {}
 func NewLineCommentStmtContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *LineCommentStmtContext {
 	var p = new(LineCommentStmtContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_lineCommentStmt
@@ -2239,28 +2315,9 @@ func (s *LineCommentStmtContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *YaklangParser) LineCommentStmt() (localctx ILineCommentStmtContext) {
-	this := p
-	_ = this
-
 	localctx = NewLineCommentStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 12, YaklangParserRULE_lineCommentStmt)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -2275,7 +2332,17 @@ func (p *YaklangParser) LineCommentStmt() (localctx ILineCommentStmtContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIncludeStmtContext is an interface to support dynamic dispatch.
@@ -2285,20 +2352,29 @@ type IIncludeStmtContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Include() antlr.TerminalNode
+	StringLiteral() antlr.TerminalNode
+
 	// IsIncludeStmtContext differentiates from other interfaces.
 	IsIncludeStmtContext()
 }
 
 type IncludeStmtContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyIncludeStmtContext() *IncludeStmtContext {
 	var p = new(IncludeStmtContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_includeStmt
 	return p
+}
+
+func InitEmptyIncludeStmtContext(p *IncludeStmtContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_includeStmt
 }
 
 func (*IncludeStmtContext) IsIncludeStmtContext() {}
@@ -2306,7 +2382,7 @@ func (*IncludeStmtContext) IsIncludeStmtContext() {}
 func NewIncludeStmtContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *IncludeStmtContext {
 	var p = new(IncludeStmtContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_includeStmt
@@ -2343,39 +2419,37 @@ func (s *IncludeStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *YaklangParser) IncludeStmt() (localctx IIncludeStmtContext) {
-	this := p
-	_ = this
-
 	localctx = NewIncludeStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 14, YaklangParserRULE_includeStmt)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(246)
 		p.Match(YaklangParserInclude)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(247)
 		p.Match(YaklangParserStringLiteral)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDeferStmtContext is an interface to support dynamic dispatch.
@@ -2385,20 +2459,31 @@ type IDeferStmtContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Defer() antlr.TerminalNode
+	RecoverStmt() IRecoverStmtContext
+	PanicStmt() IPanicStmtContext
+	CallExpr() ICallExprContext
+
 	// IsDeferStmtContext differentiates from other interfaces.
 	IsDeferStmtContext()
 }
 
 type DeferStmtContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyDeferStmtContext() *DeferStmtContext {
 	var p = new(DeferStmtContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_deferStmt
 	return p
+}
+
+func InitEmptyDeferStmtContext(p *DeferStmtContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_deferStmt
 }
 
 func (*DeferStmtContext) IsDeferStmtContext() {}
@@ -2406,7 +2491,7 @@ func (*DeferStmtContext) IsDeferStmtContext() {}
 func NewDeferStmtContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DeferStmtContext {
 	var p = new(DeferStmtContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_deferStmt
@@ -2487,36 +2572,24 @@ func (s *DeferStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) DeferStmt() (localctx IDeferStmtContext) {
-	this := p
-	_ = this
-
 	localctx = NewDeferStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 16, YaklangParserRULE_deferStmt)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(249)
 		p.Match(YaklangParserDefer)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(253)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 5, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 5, p.GetParserRuleContext()) {
 	case 1:
 		{
 			p.SetState(250)
@@ -2535,9 +2608,21 @@ func (p *YaklangParser) DeferStmt() (localctx IDeferStmtContext) {
 			p.CallExpr()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IGoStmtContext is an interface to support dynamic dispatch.
@@ -2547,20 +2632,29 @@ type IGoStmtContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Go() antlr.TerminalNode
+	CallExpr() ICallExprContext
+
 	// IsGoStmtContext differentiates from other interfaces.
 	IsGoStmtContext()
 }
 
 type GoStmtContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyGoStmtContext() *GoStmtContext {
 	var p = new(GoStmtContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_goStmt
 	return p
+}
+
+func InitEmptyGoStmtContext(p *GoStmtContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_goStmt
 }
 
 func (*GoStmtContext) IsGoStmtContext() {}
@@ -2568,7 +2662,7 @@ func (*GoStmtContext) IsGoStmtContext() {}
 func NewGoStmtContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *GoStmtContext {
 	var p = new(GoStmtContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_goStmt
@@ -2617,39 +2711,33 @@ func (s *GoStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) GoStmt() (localctx IGoStmtContext) {
-	this := p
-	_ = this
-
 	localctx = NewGoStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 18, YaklangParserRULE_goStmt)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(255)
 		p.Match(YaklangParserGo)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(256)
 		p.CallExpr()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAssertStmtContext is an interface to support dynamic dispatch.
@@ -2659,20 +2747,32 @@ type IAssertStmtContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Assert() antlr.TerminalNode
+	AllExpression() []IExpressionContext
+	Expression(i int) IExpressionContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsAssertStmtContext differentiates from other interfaces.
 	IsAssertStmtContext()
 }
 
 type AssertStmtContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyAssertStmtContext() *AssertStmtContext {
 	var p = new(AssertStmtContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_assertStmt
 	return p
+}
+
+func InitEmptyAssertStmtContext(p *AssertStmtContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_assertStmt
 }
 
 func (*AssertStmtContext) IsAssertStmtContext() {}
@@ -2680,7 +2780,7 @@ func (*AssertStmtContext) IsAssertStmtContext() {}
 func NewAssertStmtContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AssertStmtContext {
 	var p = new(AssertStmtContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_assertStmt
@@ -2762,33 +2862,18 @@ func (s *AssertStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) AssertStmt() (localctx IAssertStmtContext) {
-	this := p
-	_ = this
-
 	localctx = NewAssertStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 20, YaklangParserRULE_assertStmt)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(258)
 		p.Match(YaklangParserAssert)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(259)
@@ -2796,12 +2881,19 @@ func (p *YaklangParser) AssertStmt() (localctx IAssertStmtContext) {
 	}
 	p.SetState(264)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == YaklangParserComma {
 		{
 			p.SetState(260)
 			p.Match(YaklangParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(261)
@@ -2810,10 +2902,23 @@ func (p *YaklangParser) AssertStmt() (localctx IAssertStmtContext) {
 
 		p.SetState(266)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFallthroughStmtContext is an interface to support dynamic dispatch.
@@ -2823,20 +2928,28 @@ type IFallthroughStmtContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Fallthrough() antlr.TerminalNode
+
 	// IsFallthroughStmtContext differentiates from other interfaces.
 	IsFallthroughStmtContext()
 }
 
 type FallthroughStmtContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFallthroughStmtContext() *FallthroughStmtContext {
 	var p = new(FallthroughStmtContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_fallthroughStmt
 	return p
+}
+
+func InitEmptyFallthroughStmtContext(p *FallthroughStmtContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_fallthroughStmt
 }
 
 func (*FallthroughStmtContext) IsFallthroughStmtContext() {}
@@ -2844,7 +2957,7 @@ func (*FallthroughStmtContext) IsFallthroughStmtContext() {}
 func NewFallthroughStmtContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FallthroughStmtContext {
 	var p = new(FallthroughStmtContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_fallthroughStmt
@@ -2877,35 +2990,29 @@ func (s *FallthroughStmtContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *YaklangParser) FallthroughStmt() (localctx IFallthroughStmtContext) {
-	this := p
-	_ = this
-
 	localctx = NewFallthroughStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 22, YaklangParserRULE_fallthroughStmt)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(267)
 		p.Match(YaklangParserFallthrough)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IBreakStmtContext is an interface to support dynamic dispatch.
@@ -2915,20 +3022,28 @@ type IBreakStmtContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Break() antlr.TerminalNode
+
 	// IsBreakStmtContext differentiates from other interfaces.
 	IsBreakStmtContext()
 }
 
 type BreakStmtContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyBreakStmtContext() *BreakStmtContext {
 	var p = new(BreakStmtContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_breakStmt
 	return p
+}
+
+func InitEmptyBreakStmtContext(p *BreakStmtContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_breakStmt
 }
 
 func (*BreakStmtContext) IsBreakStmtContext() {}
@@ -2936,7 +3051,7 @@ func (*BreakStmtContext) IsBreakStmtContext() {}
 func NewBreakStmtContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *BreakStmtContext {
 	var p = new(BreakStmtContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_breakStmt
@@ -2969,35 +3084,29 @@ func (s *BreakStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) BreakStmt() (localctx IBreakStmtContext) {
-	this := p
-	_ = this
-
 	localctx = NewBreakStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 24, YaklangParserRULE_breakStmt)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(269)
 		p.Match(YaklangParserBreak)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IContinueStmtContext is an interface to support dynamic dispatch.
@@ -3007,20 +3116,28 @@ type IContinueStmtContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Continue() antlr.TerminalNode
+
 	// IsContinueStmtContext differentiates from other interfaces.
 	IsContinueStmtContext()
 }
 
 type ContinueStmtContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyContinueStmtContext() *ContinueStmtContext {
 	var p = new(ContinueStmtContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_continueStmt
 	return p
+}
+
+func InitEmptyContinueStmtContext(p *ContinueStmtContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_continueStmt
 }
 
 func (*ContinueStmtContext) IsContinueStmtContext() {}
@@ -3028,7 +3145,7 @@ func (*ContinueStmtContext) IsContinueStmtContext() {}
 func NewContinueStmtContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ContinueStmtContext {
 	var p = new(ContinueStmtContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_continueStmt
@@ -3061,35 +3178,29 @@ func (s *ContinueStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *YaklangParser) ContinueStmt() (localctx IContinueStmtContext) {
-	this := p
-	_ = this
-
 	localctx = NewContinueStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 26, YaklangParserRULE_continueStmt)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(271)
 		p.Match(YaklangParserContinue)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IReturnStmtContext is an interface to support dynamic dispatch.
@@ -3099,20 +3210,29 @@ type IReturnStmtContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Return() antlr.TerminalNode
+	ExpressionList() IExpressionListContext
+
 	// IsReturnStmtContext differentiates from other interfaces.
 	IsReturnStmtContext()
 }
 
 type ReturnStmtContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyReturnStmtContext() *ReturnStmtContext {
 	var p = new(ReturnStmtContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_returnStmt
 	return p
+}
+
+func InitEmptyReturnStmtContext(p *ReturnStmtContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_returnStmt
 }
 
 func (*ReturnStmtContext) IsReturnStmtContext() {}
@@ -3120,7 +3240,7 @@ func (*ReturnStmtContext) IsReturnStmtContext() {}
 func NewReturnStmtContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ReturnStmtContext {
 	var p = new(ReturnStmtContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_returnStmt
@@ -3169,39 +3289,27 @@ func (s *ReturnStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) ReturnStmt() (localctx IReturnStmtContext) {
-	this := p
-	_ = this
-
 	localctx = NewReturnStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 28, YaklangParserRULE_returnStmt)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(273)
 		p.Match(YaklangParserReturn)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(275)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0 || (int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0 {
+	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0) {
 		{
 			p.SetState(274)
 			p.ExpressionList()
@@ -3209,7 +3317,17 @@ func (p *YaklangParser) ReturnStmt() (localctx IReturnStmtContext) {
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ICallExprContext is an interface to support dynamic dispatch.
@@ -3219,20 +3337,29 @@ type ICallExprContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	FunctionCallExpr() IFunctionCallExprContext
+	InstanceCode() IInstanceCodeContext
+
 	// IsCallExprContext differentiates from other interfaces.
 	IsCallExprContext()
 }
 
 type CallExprContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyCallExprContext() *CallExprContext {
 	var p = new(CallExprContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_callExpr
 	return p
+}
+
+func InitEmptyCallExprContext(p *CallExprContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_callExpr
 }
 
 func (*CallExprContext) IsCallExprContext() {}
@@ -3240,7 +3367,7 @@ func (*CallExprContext) IsCallExprContext() {}
 func NewCallExprContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CallExprContext {
 	var p = new(CallExprContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_callExpr
@@ -3301,31 +3428,15 @@ func (s *CallExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) CallExpr() (localctx ICallExprContext) {
-	this := p
-	_ = this
-
 	localctx = NewCallExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 30, YaklangParserRULE_callExpr)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(279)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 8, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 8, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -3340,9 +3451,21 @@ func (p *YaklangParser) CallExpr() (localctx ICallExprContext) {
 			p.InstanceCode()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFunctionCallExprContext is an interface to support dynamic dispatch.
@@ -3352,20 +3475,29 @@ type IFunctionCallExprContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Expression() IExpressionContext
+	FunctionCall() IFunctionCallContext
+
 	// IsFunctionCallExprContext differentiates from other interfaces.
 	IsFunctionCallExprContext()
 }
 
 type FunctionCallExprContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFunctionCallExprContext() *FunctionCallExprContext {
 	var p = new(FunctionCallExprContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_functionCallExpr
 	return p
+}
+
+func InitEmptyFunctionCallExprContext(p *FunctionCallExprContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_functionCallExpr
 }
 
 func (*FunctionCallExprContext) IsFunctionCallExprContext() {}
@@ -3373,7 +3505,7 @@ func (*FunctionCallExprContext) IsFunctionCallExprContext() {}
 func NewFunctionCallExprContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FunctionCallExprContext {
 	var p = new(FunctionCallExprContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_functionCallExpr
@@ -3434,28 +3566,8 @@ func (s *FunctionCallExprContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *YaklangParser) FunctionCallExpr() (localctx IFunctionCallExprContext) {
-	this := p
-	_ = this
-
 	localctx = NewFunctionCallExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 32, YaklangParserRULE_functionCallExpr)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(281)
@@ -3466,7 +3578,17 @@ func (p *YaklangParser) FunctionCallExpr() (localctx IFunctionCallExprContext) {
 		p.FunctionCall()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IForStmtContext is an interface to support dynamic dispatch.
@@ -3476,20 +3598,33 @@ type IForStmtContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	For() antlr.TerminalNode
+	Block() IBlockContext
+	ForStmtCond() IForStmtCondContext
+	LParen() antlr.TerminalNode
+	RParen() antlr.TerminalNode
+	Expression() IExpressionContext
+
 	// IsForStmtContext differentiates from other interfaces.
 	IsForStmtContext()
 }
 
 type ForStmtContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyForStmtContext() *ForStmtContext {
 	var p = new(ForStmtContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_forStmt
 	return p
+}
+
+func InitEmptyForStmtContext(p *ForStmtContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_forStmt
 }
 
 func (*ForStmtContext) IsForStmtContext() {}
@@ -3497,7 +3632,7 @@ func (*ForStmtContext) IsForStmtContext() {}
 func NewForStmtContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ForStmtContext {
 	var p = new(ForStmtContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_forStmt
@@ -3586,46 +3721,36 @@ func (s *ForStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) ForStmt() (localctx IForStmtContext) {
-	this := p
-	_ = this
-
 	localctx = NewForStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 34, YaklangParserRULE_forStmt)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(284)
 		p.Match(YaklangParserFor)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(291)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 9, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 9, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(285)
 			p.ForStmtCond()
 		}
 
-	} else if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 9, p.GetParserRuleContext()) == 2 {
+	} else if p.HasError() { // JIM
+		goto errorExit
+	} else if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 9, p.GetParserRuleContext()) == 2 {
 		{
 			p.SetState(286)
 			p.Match(YaklangParserLParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(287)
@@ -3634,21 +3759,39 @@ func (p *YaklangParser) ForStmt() (localctx IForStmtContext) {
 		{
 			p.SetState(288)
 			p.Match(YaklangParserRParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
-	} else if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 9, p.GetParserRuleContext()) == 3 {
+	} else if p.HasError() { // JIM
+		goto errorExit
+	} else if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 9, p.GetParserRuleContext()) == 3 {
 		{
 			p.SetState(290)
 			p.expression(0)
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 	{
 		p.SetState(293)
 		p.Block()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IForStmtCondContext is an interface to support dynamic dispatch.
@@ -3658,20 +3801,32 @@ type IForStmtCondContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllSemiColon() []antlr.TerminalNode
+	SemiColon(i int) antlr.TerminalNode
+	ForFirstExpr() IForFirstExprContext
+	Expression() IExpressionContext
+	ForThirdExpr() IForThirdExprContext
+
 	// IsForStmtCondContext differentiates from other interfaces.
 	IsForStmtCondContext()
 }
 
 type ForStmtCondContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyForStmtCondContext() *ForStmtCondContext {
 	var p = new(ForStmtCondContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_forStmtCond
 	return p
+}
+
+func InitEmptyForStmtCondContext(p *ForStmtCondContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_forStmtCond
 }
 
 func (*ForStmtCondContext) IsForStmtCondContext() {}
@@ -3679,7 +3834,7 @@ func (*ForStmtCondContext) IsForStmtCondContext() {}
 func NewForStmtCondContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ForStmtCondContext {
 	var p = new(ForStmtCondContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_forStmtCond
@@ -3764,35 +3919,19 @@ func (s *ForStmtCondContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *YaklangParser) ForStmtCond() (localctx IForStmtCondContext) {
-	this := p
-	_ = this
-
 	localctx = NewForStmtCondContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 36, YaklangParserRULE_forStmtCond)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(296)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0 || (int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0 {
+	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0) {
 		{
 			p.SetState(295)
 			p.ForFirstExpr()
@@ -3802,12 +3941,19 @@ func (p *YaklangParser) ForStmtCond() (localctx IForStmtCondContext) {
 	{
 		p.SetState(298)
 		p.Match(YaklangParserSemiColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(300)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0 || (int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0 {
+	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0) {
 		{
 			p.SetState(299)
 			p.expression(0)
@@ -3817,19 +3963,35 @@ func (p *YaklangParser) ForStmtCond() (localctx IForStmtCondContext) {
 	{
 		p.SetState(302)
 		p.Match(YaklangParserSemiColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(304)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 12, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 12, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(303)
 			p.ForThirdExpr()
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IForFirstExprContext is an interface to support dynamic dispatch.
@@ -3839,20 +4001,29 @@ type IForFirstExprContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AssignExpression() IAssignExpressionContext
+	Expression() IExpressionContext
+
 	// IsForFirstExprContext differentiates from other interfaces.
 	IsForFirstExprContext()
 }
 
 type ForFirstExprContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyForFirstExprContext() *ForFirstExprContext {
 	var p = new(ForFirstExprContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_forFirstExpr
 	return p
+}
+
+func InitEmptyForFirstExprContext(p *ForFirstExprContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_forFirstExpr
 }
 
 func (*ForFirstExprContext) IsForFirstExprContext() {}
@@ -3860,7 +4031,7 @@ func (*ForFirstExprContext) IsForFirstExprContext() {}
 func NewForFirstExprContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ForFirstExprContext {
 	var p = new(ForFirstExprContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_forFirstExpr
@@ -3921,31 +4092,15 @@ func (s *ForFirstExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *YaklangParser) ForFirstExpr() (localctx IForFirstExprContext) {
-	this := p
-	_ = this
-
 	localctx = NewForFirstExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 38, YaklangParserRULE_forFirstExpr)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(308)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 13, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 13, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -3960,9 +4115,21 @@ func (p *YaklangParser) ForFirstExpr() (localctx IForFirstExprContext) {
 			p.expression(0)
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IForThirdExprContext is an interface to support dynamic dispatch.
@@ -3972,20 +4139,29 @@ type IForThirdExprContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AssignExpression() IAssignExpressionContext
+	Expression() IExpressionContext
+
 	// IsForThirdExprContext differentiates from other interfaces.
 	IsForThirdExprContext()
 }
 
 type ForThirdExprContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyForThirdExprContext() *ForThirdExprContext {
 	var p = new(ForThirdExprContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_forThirdExpr
 	return p
+}
+
+func InitEmptyForThirdExprContext(p *ForThirdExprContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_forThirdExpr
 }
 
 func (*ForThirdExprContext) IsForThirdExprContext() {}
@@ -3993,7 +4169,7 @@ func (*ForThirdExprContext) IsForThirdExprContext() {}
 func NewForThirdExprContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ForThirdExprContext {
 	var p = new(ForThirdExprContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_forThirdExpr
@@ -4054,31 +4230,15 @@ func (s *ForThirdExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *YaklangParser) ForThirdExpr() (localctx IForThirdExprContext) {
-	this := p
-	_ = this
-
 	localctx = NewForThirdExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 40, YaklangParserRULE_forThirdExpr)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(312)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 14, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 14, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -4093,9 +4253,21 @@ func (p *YaklangParser) ForThirdExpr() (localctx IForThirdExprContext) {
 			p.expression(0)
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IForRangeStmtContext is an interface to support dynamic dispatch.
@@ -4105,20 +4277,35 @@ type IForRangeStmtContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	For() antlr.TerminalNode
+	Expression() IExpressionContext
+	Block() IBlockContext
+	Range() antlr.TerminalNode
+	In() antlr.TerminalNode
+	LeftExpressionList() ILeftExpressionListContext
+	ColonAssignEq() antlr.TerminalNode
+	AssignEq() antlr.TerminalNode
+
 	// IsForRangeStmtContext differentiates from other interfaces.
 	IsForRangeStmtContext()
 }
 
 type ForRangeStmtContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyForRangeStmtContext() *ForRangeStmtContext {
 	var p = new(ForRangeStmtContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_forRangeStmt
 	return p
+}
+
+func InitEmptyForRangeStmtContext(p *ForRangeStmtContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_forRangeStmt
 }
 
 func (*ForRangeStmtContext) IsForRangeStmtContext() {}
@@ -4126,7 +4313,7 @@ func (*ForRangeStmtContext) IsForRangeStmtContext() {}
 func NewForRangeStmtContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ForRangeStmtContext {
 	var p = new(ForRangeStmtContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_forRangeStmt
@@ -4223,43 +4410,35 @@ func (s *ForRangeStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *YaklangParser) ForRangeStmt() (localctx IForRangeStmtContext) {
-	this := p
-	_ = this
-
 	localctx = NewForRangeStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 42, YaklangParserRULE_forRangeStmt)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(314)
 		p.Match(YaklangParserFor)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(325)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 17, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 17, p.GetParserRuleContext()) {
 	case 1:
 		p.SetState(318)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0 || (int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0 {
+		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0) {
 			{
 				p.SetState(315)
 				p.LeftExpressionList()
@@ -4280,14 +4459,21 @@ func (p *YaklangParser) ForRangeStmt() (localctx IForRangeStmtContext) {
 		{
 			p.SetState(320)
 			p.Match(YaklangParserRange)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 2:
 		p.SetState(322)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0 || (int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0 {
+		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0) {
 			{
 				p.SetState(321)
 				p.LeftExpressionList()
@@ -4297,8 +4483,14 @@ func (p *YaklangParser) ForRangeStmt() (localctx IForRangeStmtContext) {
 		{
 			p.SetState(324)
 			p.Match(YaklangParserIn)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 	{
 		p.SetState(327)
@@ -4309,7 +4501,17 @@ func (p *YaklangParser) ForRangeStmt() (localctx IForRangeStmtContext) {
 		p.Block()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISwitchStmtContext is an interface to support dynamic dispatch.
@@ -4319,20 +4521,42 @@ type ISwitchStmtContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Switch() antlr.TerminalNode
+	LBrace() antlr.TerminalNode
+	RBrace() antlr.TerminalNode
+	Expression() IExpressionContext
+	AllCase() []antlr.TerminalNode
+	Case(i int) antlr.TerminalNode
+	AllExpressionList() []IExpressionListContext
+	ExpressionList(i int) IExpressionListContext
+	AllColon() []antlr.TerminalNode
+	Colon(i int) antlr.TerminalNode
+	Default() antlr.TerminalNode
+	AllWs() []IWsContext
+	Ws(i int) IWsContext
+	AllStatementList() []IStatementListContext
+	StatementList(i int) IStatementListContext
+
 	// IsSwitchStmtContext differentiates from other interfaces.
 	IsSwitchStmtContext()
 }
 
 type SwitchStmtContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptySwitchStmtContext() *SwitchStmtContext {
 	var p = new(SwitchStmtContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_switchStmt
 	return p
+}
+
+func InitEmptySwitchStmtContext(p *SwitchStmtContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_switchStmt
 }
 
 func (*SwitchStmtContext) IsSwitchStmtContext() {}
@@ -4340,7 +4564,7 @@ func (*SwitchStmtContext) IsSwitchStmtContext() {}
 func NewSwitchStmtContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SwitchStmtContext {
 	var p = new(SwitchStmtContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_switchStmt
@@ -4540,28 +4764,9 @@ func (s *SwitchStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) SwitchStmt() (localctx ISwitchStmtContext) {
-	this := p
-	_ = this
-
 	localctx = NewSwitchStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 44, YaklangParserRULE_switchStmt)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -4569,29 +4774,47 @@ func (p *YaklangParser) SwitchStmt() (localctx ISwitchStmtContext) {
 	{
 		p.SetState(330)
 		p.Match(YaklangParserSwitch)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(332)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 18, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 18, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(331)
 			p.expression(0)
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 	{
 		p.SetState(334)
 		p.Match(YaklangParserLBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(349)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 21, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 21, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			p.SetState(338)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 
 			for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -4602,11 +4825,18 @@ func (p *YaklangParser) SwitchStmt() (localctx ISwitchStmtContext) {
 
 				p.SetState(340)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 			}
 			{
 				p.SetState(341)
 				p.Match(YaklangParserCase)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(342)
@@ -4615,29 +4845,44 @@ func (p *YaklangParser) SwitchStmt() (localctx ISwitchStmtContext) {
 			{
 				p.SetState(343)
 				p.Match(YaklangParserColon)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			p.SetState(345)
 			p.GetErrorHandler().Sync(p)
 
-			if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 20, p.GetParserRuleContext()) == 1 {
+			if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 20, p.GetParserRuleContext()) == 1 {
 				{
 					p.SetState(344)
 					p.StatementList()
 				}
 
+			} else if p.HasError() { // JIM
+				goto errorExit
 			}
 
 		}
 		p.SetState(351)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 21, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 21, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(363)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 24, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 24, p.GetParserRuleContext()) == 1 {
 		p.SetState(355)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -4648,30 +4893,48 @@ func (p *YaklangParser) SwitchStmt() (localctx ISwitchStmtContext) {
 
 			p.SetState(357)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
 			p.SetState(358)
 			p.Match(YaklangParserDefault)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(359)
 			p.Match(YaklangParserColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(361)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 23, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 23, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(360)
 				p.StatementList()
 			}
 
+		} else if p.HasError() { // JIM
+			goto errorExit
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 	p.SetState(368)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -4682,14 +4945,31 @@ func (p *YaklangParser) SwitchStmt() (localctx ISwitchStmtContext) {
 
 		p.SetState(370)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(371)
 		p.Match(YaklangParserRBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IPanicStmtContext is an interface to support dynamic dispatch.
@@ -4699,20 +4979,33 @@ type IPanicStmtContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Panic() antlr.TerminalNode
+	LParen() antlr.TerminalNode
+	Expression() IExpressionContext
+	RParen() antlr.TerminalNode
+	AllWs() []IWsContext
+	Ws(i int) IWsContext
+
 	// IsPanicStmtContext differentiates from other interfaces.
 	IsPanicStmtContext()
 }
 
 type PanicStmtContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyPanicStmtContext() *PanicStmtContext {
 	var p = new(PanicStmtContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_panicStmt
 	return p
+}
+
+func InitEmptyPanicStmtContext(p *PanicStmtContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_panicStmt
 }
 
 func (*PanicStmtContext) IsPanicStmtContext() {}
@@ -4720,7 +5013,7 @@ func (*PanicStmtContext) IsPanicStmtContext() {}
 func NewPanicStmtContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *PanicStmtContext {
 	var p = new(PanicStmtContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_panicStmt
@@ -4818,40 +5111,32 @@ func (s *PanicStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) PanicStmt() (localctx IPanicStmtContext) {
-	this := p
-	_ = this
-
 	localctx = NewPanicStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 46, YaklangParserRULE_panicStmt)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(373)
 		p.Match(YaklangParserPanic)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(374)
 		p.Match(YaklangParserLParen)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(378)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -4862,6 +5147,9 @@ func (p *YaklangParser) PanicStmt() (localctx IPanicStmtContext) {
 
 		p.SetState(380)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
@@ -4870,6 +5158,9 @@ func (p *YaklangParser) PanicStmt() (localctx IPanicStmtContext) {
 	}
 	p.SetState(385)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -4880,14 +5171,31 @@ func (p *YaklangParser) PanicStmt() (localctx IPanicStmtContext) {
 
 		p.SetState(387)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(388)
 		p.Match(YaklangParserRParen)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IRecoverStmtContext is an interface to support dynamic dispatch.
@@ -4897,20 +5205,30 @@ type IRecoverStmtContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Recover() antlr.TerminalNode
+	LParen() antlr.TerminalNode
+	RParen() antlr.TerminalNode
+
 	// IsRecoverStmtContext differentiates from other interfaces.
 	IsRecoverStmtContext()
 }
 
 type RecoverStmtContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyRecoverStmtContext() *RecoverStmtContext {
 	var p = new(RecoverStmtContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_recoverStmt
 	return p
+}
+
+func InitEmptyRecoverStmtContext(p *RecoverStmtContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_recoverStmt
 }
 
 func (*RecoverStmtContext) IsRecoverStmtContext() {}
@@ -4918,7 +5236,7 @@ func (*RecoverStmtContext) IsRecoverStmtContext() {}
 func NewRecoverStmtContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *RecoverStmtContext {
 	var p = new(RecoverStmtContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_recoverStmt
@@ -4959,43 +5277,45 @@ func (s *RecoverStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *YaklangParser) RecoverStmt() (localctx IRecoverStmtContext) {
-	this := p
-	_ = this
-
 	localctx = NewRecoverStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 48, YaklangParserRULE_recoverStmt)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(390)
 		p.Match(YaklangParserRecover)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(391)
 		p.Match(YaklangParserLParen)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(392)
 		p.Match(YaklangParserRParen)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIfStmtContext is an interface to support dynamic dispatch.
@@ -5005,20 +5325,37 @@ type IIfStmtContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	If() antlr.TerminalNode
+	AllExpression() []IExpressionContext
+	Expression(i int) IExpressionContext
+	AllBlock() []IBlockContext
+	Block(i int) IBlockContext
+	IfStmtInit() IIfStmtInitContext
+	SemiColon() antlr.TerminalNode
+	AllElif() []antlr.TerminalNode
+	Elif(i int) antlr.TerminalNode
+	ElseBlock() IElseBlockContext
+
 	// IsIfStmtContext differentiates from other interfaces.
 	IsIfStmtContext()
 }
 
 type IfStmtContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyIfStmtContext() *IfStmtContext {
 	var p = new(IfStmtContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_ifStmt
 	return p
+}
+
+func InitEmptyIfStmtContext(p *IfStmtContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_ifStmt
 }
 
 func (*IfStmtContext) IsIfStmtContext() {}
@@ -5026,7 +5363,7 @@ func (*IfStmtContext) IsIfStmtContext() {}
 func NewIfStmtContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *IfStmtContext {
 	var p = new(IfStmtContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_ifStmt
@@ -5185,38 +5522,23 @@ func (s *IfStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) IfStmt() (localctx IIfStmtContext) {
-	this := p
-	_ = this
-
 	localctx = NewIfStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 50, YaklangParserRULE_ifStmt)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(394)
 		p.Match(YaklangParserIf)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(398)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 28, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 28, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(395)
 			p.IfStmtInit()
@@ -5224,8 +5546,14 @@ func (p *YaklangParser) IfStmt() (localctx IIfStmtContext) {
 		{
 			p.SetState(396)
 			p.Match(YaklangParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 	{
 		p.SetState(400)
@@ -5237,12 +5565,19 @@ func (p *YaklangParser) IfStmt() (localctx IIfStmtContext) {
 	}
 	p.SetState(408)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == YaklangParserElif {
 		{
 			p.SetState(402)
 			p.Match(YaklangParserElif)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(403)
@@ -5255,10 +5590,16 @@ func (p *YaklangParser) IfStmt() (localctx IIfStmtContext) {
 
 		p.SetState(410)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	p.SetState(412)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == YaklangParserElse {
@@ -5269,7 +5610,17 @@ func (p *YaklangParser) IfStmt() (localctx IIfStmtContext) {
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIfStmtInitContext is an interface to support dynamic dispatch.
@@ -5279,20 +5630,30 @@ type IIfStmtInitContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AssignExpression() IAssignExpressionContext
+	DeclareVariableExpression() IDeclareVariableExpressionContext
+	Expression() IExpressionContext
+
 	// IsIfStmtInitContext differentiates from other interfaces.
 	IsIfStmtInitContext()
 }
 
 type IfStmtInitContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyIfStmtInitContext() *IfStmtInitContext {
 	var p = new(IfStmtInitContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_ifStmtInit
 	return p
+}
+
+func InitEmptyIfStmtInitContext(p *IfStmtInitContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_ifStmtInit
 }
 
 func (*IfStmtInitContext) IsIfStmtInitContext() {}
@@ -5300,7 +5661,7 @@ func (*IfStmtInitContext) IsIfStmtInitContext() {}
 func NewIfStmtInitContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *IfStmtInitContext {
 	var p = new(IfStmtInitContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_ifStmtInit
@@ -5377,31 +5738,15 @@ func (s *IfStmtInitContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) IfStmtInit() (localctx IIfStmtInitContext) {
-	this := p
-	_ = this
-
 	localctx = NewIfStmtInitContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 52, YaklangParserRULE_ifStmtInit)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(417)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 31, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 31, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -5423,9 +5768,21 @@ func (p *YaklangParser) IfStmtInit() (localctx IIfStmtInitContext) {
 			p.expression(0)
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IElseBlockContext is an interface to support dynamic dispatch.
@@ -5435,20 +5792,30 @@ type IElseBlockContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Else() antlr.TerminalNode
+	IfStmt() IIfStmtContext
+	Block() IBlockContext
+
 	// IsElseBlockContext differentiates from other interfaces.
 	IsElseBlockContext()
 }
 
 type ElseBlockContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyElseBlockContext() *ElseBlockContext {
 	var p = new(ElseBlockContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_elseBlock
 	return p
+}
+
+func InitEmptyElseBlockContext(p *ElseBlockContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_elseBlock
 }
 
 func (*ElseBlockContext) IsElseBlockContext() {}
@@ -5456,7 +5823,7 @@ func (*ElseBlockContext) IsElseBlockContext() {}
 func NewElseBlockContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ElseBlockContext {
 	var p = new(ElseBlockContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_elseBlock
@@ -5521,35 +5888,22 @@ func (s *ElseBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) ElseBlock() (localctx IElseBlockContext) {
-	this := p
-	_ = this
-
 	localctx = NewElseBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 54, YaklangParserRULE_elseBlock)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(419)
 		p.Match(YaklangParserElse)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(422)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case YaklangParserIf:
@@ -5565,10 +5919,21 @@ func (p *YaklangParser) ElseBlock() (localctx IElseBlockContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IBlockContext is an interface to support dynamic dispatch.
@@ -5578,20 +5943,32 @@ type IBlockContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	LBrace() antlr.TerminalNode
+	RBrace() antlr.TerminalNode
+	AllWs() []IWsContext
+	Ws(i int) IWsContext
+	StatementList() IStatementListContext
+
 	// IsBlockContext differentiates from other interfaces.
 	IsBlockContext()
 }
 
 type BlockContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyBlockContext() *BlockContext {
 	var p = new(BlockContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_block
 	return p
+}
+
+func InitEmptyBlockContext(p *BlockContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_block
 }
 
 func (*BlockContext) IsBlockContext() {}
@@ -5599,7 +5976,7 @@ func (*BlockContext) IsBlockContext() {}
 func NewBlockContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *BlockContext {
 	var p = new(BlockContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_block
@@ -5693,28 +6070,9 @@ func (s *BlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) Block() (localctx IBlockContext) {
-	this := p
-	_ = this
-
 	localctx = NewBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 56, YaklangParserRULE_block)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -5722,11 +6080,20 @@ func (p *YaklangParser) Block() (localctx IBlockContext) {
 	{
 		p.SetState(424)
 		p.Match(YaklangParserLBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(428)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 33, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 33, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -5737,20 +6104,31 @@ func (p *YaklangParser) Block() (localctx IBlockContext) {
 		}
 		p.SetState(430)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 33, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 33, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(432)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 34, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 34, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(431)
 			p.StatementList()
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 	p.SetState(437)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -5761,14 +6139,31 @@ func (p *YaklangParser) Block() (localctx IBlockContext) {
 
 		p.SetState(439)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(440)
 		p.Match(YaklangParserRBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IEmptyContext is an interface to support dynamic dispatch.
@@ -5778,20 +6173,30 @@ type IEmptyContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	EOS() antlr.TerminalNode
+	SemiColon() antlr.TerminalNode
+	Ws() IWsContext
+
 	// IsEmptyContext differentiates from other interfaces.
 	IsEmptyContext()
 }
 
 type EmptyContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyEmptyContext() *EmptyContext {
 	var p = new(EmptyContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_empty
 	return p
+}
+
+func InitEmptyEmptyContext(p *EmptyContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_empty
 }
 
 func (*EmptyContext) IsEmptyContext() {}
@@ -5799,7 +6204,7 @@ func (*EmptyContext) IsEmptyContext() {}
 func NewEmptyContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *EmptyContext {
 	var p = new(EmptyContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_empty
@@ -5852,30 +6257,13 @@ func (s *EmptyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) Empty() (localctx IEmptyContext) {
-	this := p
-	_ = this
-
 	localctx = NewEmptyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 58, YaklangParserRULE_empty)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(445)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case YaklangParserEOS:
@@ -5883,6 +6271,10 @@ func (p *YaklangParser) Empty() (localctx IEmptyContext) {
 		{
 			p.SetState(442)
 			p.Match(YaklangParserEOS)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case YaklangParserSemiColon:
@@ -5890,6 +6282,10 @@ func (p *YaklangParser) Empty() (localctx IEmptyContext) {
 		{
 			p.SetState(443)
 			p.Match(YaklangParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case YaklangParserCOMMENT, YaklangParserLINE_COMMENT, YaklangParserLF:
@@ -5900,10 +6296,21 @@ func (p *YaklangParser) Empty() (localctx IEmptyContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IInplaceAssignOperatorContext is an interface to support dynamic dispatch.
@@ -5913,20 +6320,38 @@ type IInplaceAssignOperatorContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	PlusEq() antlr.TerminalNode
+	MinusEq() antlr.TerminalNode
+	MulEq() antlr.TerminalNode
+	DivEq() antlr.TerminalNode
+	ModEq() antlr.TerminalNode
+	AmpEq() antlr.TerminalNode
+	BitAndEq() antlr.TerminalNode
+	BitOrEq() antlr.TerminalNode
+	LtLtEq() antlr.TerminalNode
+	GtGtEq() antlr.TerminalNode
+	BitAndNotEq() antlr.TerminalNode
+
 	// IsInplaceAssignOperatorContext differentiates from other interfaces.
 	IsInplaceAssignOperatorContext()
 }
 
 type InplaceAssignOperatorContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyInplaceAssignOperatorContext() *InplaceAssignOperatorContext {
 	var p = new(InplaceAssignOperatorContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_inplaceAssignOperator
 	return p
+}
+
+func InitEmptyInplaceAssignOperatorContext(p *InplaceAssignOperatorContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_inplaceAssignOperator
 }
 
 func (*InplaceAssignOperatorContext) IsInplaceAssignOperatorContext() {}
@@ -5934,7 +6359,7 @@ func (*InplaceAssignOperatorContext) IsInplaceAssignOperatorContext() {}
 func NewInplaceAssignOperatorContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *InplaceAssignOperatorContext {
 	var p = new(InplaceAssignOperatorContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_inplaceAssignOperator
@@ -6007,28 +6432,9 @@ func (s *InplaceAssignOperatorContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *YaklangParser) InplaceAssignOperator() (localctx IInplaceAssignOperatorContext) {
-	this := p
-	_ = this
-
 	localctx = NewInplaceAssignOperatorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 60, YaklangParserRULE_inplaceAssignOperator)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -6043,7 +6449,17 @@ func (p *YaklangParser) InplaceAssignOperator() (localctx IInplaceAssignOperator
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAssignExpressionContext is an interface to support dynamic dispatch.
@@ -6053,20 +6469,36 @@ type IAssignExpressionContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	LeftExpressionList() ILeftExpressionListContext
+	ExpressionList() IExpressionListContext
+	AssignEq() antlr.TerminalNode
+	ColonAssignEq() antlr.TerminalNode
+	LeftExpression() ILeftExpressionContext
+	PlusPlus() antlr.TerminalNode
+	SubSub() antlr.TerminalNode
+	InplaceAssignOperator() IInplaceAssignOperatorContext
+	Expression() IExpressionContext
+
 	// IsAssignExpressionContext differentiates from other interfaces.
 	IsAssignExpressionContext()
 }
 
 type AssignExpressionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyAssignExpressionContext() *AssignExpressionContext {
 	var p = new(AssignExpressionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_assignExpression
 	return p
+}
+
+func InitEmptyAssignExpressionContext(p *AssignExpressionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_assignExpression
 }
 
 func (*AssignExpressionContext) IsAssignExpressionContext() {}
@@ -6074,7 +6506,7 @@ func (*AssignExpressionContext) IsAssignExpressionContext() {}
 func NewAssignExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AssignExpressionContext {
 	var p = new(AssignExpressionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_assignExpression
@@ -6199,32 +6631,17 @@ func (s *AssignExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *YaklangParser) AssignExpression() (localctx IAssignExpressionContext) {
-	this := p
-	_ = this
-
 	localctx = NewAssignExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 62, YaklangParserRULE_assignExpression)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(460)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 37, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 37, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -6280,9 +6697,21 @@ func (p *YaklangParser) AssignExpression() (localctx IAssignExpressionContext) {
 			p.expression(0)
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDeclareVariableExpressionStmtContext is an interface to support dynamic dispatch.
@@ -6292,20 +6721,28 @@ type IDeclareVariableExpressionStmtContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	DeclareVariableExpression() IDeclareVariableExpressionContext
+
 	// IsDeclareVariableExpressionStmtContext differentiates from other interfaces.
 	IsDeclareVariableExpressionStmtContext()
 }
 
 type DeclareVariableExpressionStmtContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyDeclareVariableExpressionStmtContext() *DeclareVariableExpressionStmtContext {
 	var p = new(DeclareVariableExpressionStmtContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_declareVariableExpressionStmt
 	return p
+}
+
+func InitEmptyDeclareVariableExpressionStmtContext(p *DeclareVariableExpressionStmtContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_declareVariableExpressionStmt
 }
 
 func (*DeclareVariableExpressionStmtContext) IsDeclareVariableExpressionStmtContext() {}
@@ -6313,7 +6750,7 @@ func (*DeclareVariableExpressionStmtContext) IsDeclareVariableExpressionStmtCont
 func NewDeclareVariableExpressionStmtContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DeclareVariableExpressionStmtContext {
 	var p = new(DeclareVariableExpressionStmtContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_declareVariableExpressionStmt
@@ -6358,35 +6795,25 @@ func (s *DeclareVariableExpressionStmtContext) Accept(visitor antlr.ParseTreeVis
 }
 
 func (p *YaklangParser) DeclareVariableExpressionStmt() (localctx IDeclareVariableExpressionStmtContext) {
-	this := p
-	_ = this
-
 	localctx = NewDeclareVariableExpressionStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 64, YaklangParserRULE_declareVariableExpressionStmt)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(462)
 		p.DeclareVariableExpression()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDeclareVariableExpressionContext is an interface to support dynamic dispatch.
@@ -6396,20 +6823,29 @@ type IDeclareVariableExpressionContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	DeclareVariableOnly() IDeclareVariableOnlyContext
+	DeclareAndAssignExpression() IDeclareAndAssignExpressionContext
+
 	// IsDeclareVariableExpressionContext differentiates from other interfaces.
 	IsDeclareVariableExpressionContext()
 }
 
 type DeclareVariableExpressionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyDeclareVariableExpressionContext() *DeclareVariableExpressionContext {
 	var p = new(DeclareVariableExpressionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_declareVariableExpression
 	return p
+}
+
+func InitEmptyDeclareVariableExpressionContext(p *DeclareVariableExpressionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_declareVariableExpression
 }
 
 func (*DeclareVariableExpressionContext) IsDeclareVariableExpressionContext() {}
@@ -6417,7 +6853,7 @@ func (*DeclareVariableExpressionContext) IsDeclareVariableExpressionContext() {}
 func NewDeclareVariableExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DeclareVariableExpressionContext {
 	var p = new(DeclareVariableExpressionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_declareVariableExpression
@@ -6478,31 +6914,15 @@ func (s *DeclareVariableExpressionContext) Accept(visitor antlr.ParseTreeVisitor
 }
 
 func (p *YaklangParser) DeclareVariableExpression() (localctx IDeclareVariableExpressionContext) {
-	this := p
-	_ = this
-
 	localctx = NewDeclareVariableExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 66, YaklangParserRULE_declareVariableExpression)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(466)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 38, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 38, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -6517,9 +6937,21 @@ func (p *YaklangParser) DeclareVariableExpression() (localctx IDeclareVariableEx
 			p.DeclareAndAssignExpression()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDeclareVariableOnlyContext is an interface to support dynamic dispatch.
@@ -6529,20 +6961,32 @@ type IDeclareVariableOnlyContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Var() antlr.TerminalNode
+	AllIdentifier() []antlr.TerminalNode
+	Identifier(i int) antlr.TerminalNode
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsDeclareVariableOnlyContext differentiates from other interfaces.
 	IsDeclareVariableOnlyContext()
 }
 
 type DeclareVariableOnlyContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyDeclareVariableOnlyContext() *DeclareVariableOnlyContext {
 	var p = new(DeclareVariableOnlyContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_declareVariableOnly
 	return p
+}
+
+func InitEmptyDeclareVariableOnlyContext(p *DeclareVariableOnlyContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_declareVariableOnly
 }
 
 func (*DeclareVariableOnlyContext) IsDeclareVariableOnlyContext() {}
@@ -6550,7 +6994,7 @@ func (*DeclareVariableOnlyContext) IsDeclareVariableOnlyContext() {}
 func NewDeclareVariableOnlyContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DeclareVariableOnlyContext {
 	var p = new(DeclareVariableOnlyContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_declareVariableOnly
@@ -6599,58 +7043,71 @@ func (s *DeclareVariableOnlyContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *YaklangParser) DeclareVariableOnly() (localctx IDeclareVariableOnlyContext) {
-	this := p
-	_ = this
-
 	localctx = NewDeclareVariableOnlyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 68, YaklangParserRULE_declareVariableOnly)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(468)
 		p.Match(YaklangParserVar)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(469)
 		p.Match(YaklangParserIdentifier)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(474)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == YaklangParserComma {
 		{
 			p.SetState(470)
 			p.Match(YaklangParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(471)
 			p.Match(YaklangParserIdentifier)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 		p.SetState(476)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDeclareAndAssignExpressionContext is an interface to support dynamic dispatch.
@@ -6660,20 +7117,32 @@ type IDeclareAndAssignExpressionContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Var() antlr.TerminalNode
+	LeftExpressionList() ILeftExpressionListContext
+	ExpressionList() IExpressionListContext
+	AssignEq() antlr.TerminalNode
+	ColonAssignEq() antlr.TerminalNode
+
 	// IsDeclareAndAssignExpressionContext differentiates from other interfaces.
 	IsDeclareAndAssignExpressionContext()
 }
 
 type DeclareAndAssignExpressionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyDeclareAndAssignExpressionContext() *DeclareAndAssignExpressionContext {
 	var p = new(DeclareAndAssignExpressionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_declareAndAssignExpression
 	return p
+}
+
+func InitEmptyDeclareAndAssignExpressionContext(p *DeclareAndAssignExpressionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_declareAndAssignExpression
 }
 
 func (*DeclareAndAssignExpressionContext) IsDeclareAndAssignExpressionContext() {}
@@ -6681,7 +7150,7 @@ func (*DeclareAndAssignExpressionContext) IsDeclareAndAssignExpressionContext() 
 func NewDeclareAndAssignExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DeclareAndAssignExpressionContext {
 	var p = new(DeclareAndAssignExpressionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_declareAndAssignExpression
@@ -6754,33 +7223,18 @@ func (s *DeclareAndAssignExpressionContext) Accept(visitor antlr.ParseTreeVisito
 }
 
 func (p *YaklangParser) DeclareAndAssignExpression() (localctx IDeclareAndAssignExpressionContext) {
-	this := p
-	_ = this
-
 	localctx = NewDeclareAndAssignExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 70, YaklangParserRULE_declareAndAssignExpression)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(477)
 		p.Match(YaklangParserVar)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(478)
@@ -6802,7 +7256,17 @@ func (p *YaklangParser) DeclareAndAssignExpression() (localctx IDeclareAndAssign
 		p.ExpressionList()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ILeftExpressionListContext is an interface to support dynamic dispatch.
@@ -6812,20 +7276,31 @@ type ILeftExpressionListContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllLeftExpression() []ILeftExpressionContext
+	LeftExpression(i int) ILeftExpressionContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsLeftExpressionListContext differentiates from other interfaces.
 	IsLeftExpressionListContext()
 }
 
 type LeftExpressionListContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyLeftExpressionListContext() *LeftExpressionListContext {
 	var p = new(LeftExpressionListContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_leftExpressionList
 	return p
+}
+
+func InitEmptyLeftExpressionListContext(p *LeftExpressionListContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_leftExpressionList
 }
 
 func (*LeftExpressionListContext) IsLeftExpressionListContext() {}
@@ -6833,7 +7308,7 @@ func (*LeftExpressionListContext) IsLeftExpressionListContext() {}
 func NewLeftExpressionListContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *LeftExpressionListContext {
 	var p = new(LeftExpressionListContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_leftExpressionList
@@ -6911,28 +7386,9 @@ func (s *LeftExpressionListContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *YaklangParser) LeftExpressionList() (localctx ILeftExpressionListContext) {
-	this := p
-	_ = this
-
 	localctx = NewLeftExpressionListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 72, YaklangParserRULE_leftExpressionList)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -6941,12 +7397,19 @@ func (p *YaklangParser) LeftExpressionList() (localctx ILeftExpressionListContex
 	}
 	p.SetState(487)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == YaklangParserComma {
 		{
 			p.SetState(483)
 			p.Match(YaklangParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(484)
@@ -6955,10 +7418,23 @@ func (p *YaklangParser) LeftExpressionList() (localctx ILeftExpressionListContex
 
 		p.SetState(489)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IUnaryOperatorContext is an interface to support dynamic dispatch.
@@ -6968,20 +7444,34 @@ type IUnaryOperatorContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Not() antlr.TerminalNode
+	Sub() antlr.TerminalNode
+	Plus() antlr.TerminalNode
+	Xor() antlr.TerminalNode
+	Amp() antlr.TerminalNode
+	Mul() antlr.TerminalNode
+	ChanIn() antlr.TerminalNode
+
 	// IsUnaryOperatorContext differentiates from other interfaces.
 	IsUnaryOperatorContext()
 }
 
 type UnaryOperatorContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyUnaryOperatorContext() *UnaryOperatorContext {
 	var p = new(UnaryOperatorContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_unaryOperator
 	return p
+}
+
+func InitEmptyUnaryOperatorContext(p *UnaryOperatorContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_unaryOperator
 }
 
 func (*UnaryOperatorContext) IsUnaryOperatorContext() {}
@@ -6989,7 +7479,7 @@ func (*UnaryOperatorContext) IsUnaryOperatorContext() {}
 func NewUnaryOperatorContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *UnaryOperatorContext {
 	var p = new(UnaryOperatorContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_unaryOperator
@@ -7046,28 +7536,9 @@ func (s *UnaryOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *YaklangParser) UnaryOperator() (localctx IUnaryOperatorContext) {
-	this := p
-	_ = this
-
 	localctx = NewUnaryOperatorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 74, YaklangParserRULE_unaryOperator)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -7082,7 +7553,17 @@ func (p *YaklangParser) UnaryOperator() (localctx IUnaryOperatorContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IBitBinaryOperatorContext is an interface to support dynamic dispatch.
@@ -7092,20 +7573,33 @@ type IBitBinaryOperatorContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	LtLt() antlr.TerminalNode
+	GtGt() antlr.TerminalNode
+	Amp() antlr.TerminalNode
+	AmpNot() antlr.TerminalNode
+	Xand() antlr.TerminalNode
+	Xor() antlr.TerminalNode
+
 	// IsBitBinaryOperatorContext differentiates from other interfaces.
 	IsBitBinaryOperatorContext()
 }
 
 type BitBinaryOperatorContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyBitBinaryOperatorContext() *BitBinaryOperatorContext {
 	var p = new(BitBinaryOperatorContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_bitBinaryOperator
 	return p
+}
+
+func InitEmptyBitBinaryOperatorContext(p *BitBinaryOperatorContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_bitBinaryOperator
 }
 
 func (*BitBinaryOperatorContext) IsBitBinaryOperatorContext() {}
@@ -7113,7 +7607,7 @@ func (*BitBinaryOperatorContext) IsBitBinaryOperatorContext() {}
 func NewBitBinaryOperatorContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *BitBinaryOperatorContext {
 	var p = new(BitBinaryOperatorContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_bitBinaryOperator
@@ -7166,28 +7660,9 @@ func (s *BitBinaryOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *YaklangParser) BitBinaryOperator() (localctx IBitBinaryOperatorContext) {
-	this := p
-	_ = this
-
 	localctx = NewBitBinaryOperatorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 76, YaklangParserRULE_bitBinaryOperator)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -7202,7 +7677,17 @@ func (p *YaklangParser) BitBinaryOperator() (localctx IBitBinaryOperatorContext)
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAdditiveBinaryOperatorContext is an interface to support dynamic dispatch.
@@ -7212,20 +7697,29 @@ type IAdditiveBinaryOperatorContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Plus() antlr.TerminalNode
+	Sub() antlr.TerminalNode
+
 	// IsAdditiveBinaryOperatorContext differentiates from other interfaces.
 	IsAdditiveBinaryOperatorContext()
 }
 
 type AdditiveBinaryOperatorContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyAdditiveBinaryOperatorContext() *AdditiveBinaryOperatorContext {
 	var p = new(AdditiveBinaryOperatorContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_additiveBinaryOperator
 	return p
+}
+
+func InitEmptyAdditiveBinaryOperatorContext(p *AdditiveBinaryOperatorContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_additiveBinaryOperator
 }
 
 func (*AdditiveBinaryOperatorContext) IsAdditiveBinaryOperatorContext() {}
@@ -7233,7 +7727,7 @@ func (*AdditiveBinaryOperatorContext) IsAdditiveBinaryOperatorContext() {}
 func NewAdditiveBinaryOperatorContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AdditiveBinaryOperatorContext {
 	var p = new(AdditiveBinaryOperatorContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_additiveBinaryOperator
@@ -7270,28 +7764,9 @@ func (s *AdditiveBinaryOperatorContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 func (p *YaklangParser) AdditiveBinaryOperator() (localctx IAdditiveBinaryOperatorContext) {
-	this := p
-	_ = this
-
 	localctx = NewAdditiveBinaryOperatorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 78, YaklangParserRULE_additiveBinaryOperator)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -7306,7 +7781,17 @@ func (p *YaklangParser) AdditiveBinaryOperator() (localctx IAdditiveBinaryOperat
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IMultiplicativeBinaryOperatorContext is an interface to support dynamic dispatch.
@@ -7316,20 +7801,30 @@ type IMultiplicativeBinaryOperatorContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Mul() antlr.TerminalNode
+	Div() antlr.TerminalNode
+	Mod() antlr.TerminalNode
+
 	// IsMultiplicativeBinaryOperatorContext differentiates from other interfaces.
 	IsMultiplicativeBinaryOperatorContext()
 }
 
 type MultiplicativeBinaryOperatorContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyMultiplicativeBinaryOperatorContext() *MultiplicativeBinaryOperatorContext {
 	var p = new(MultiplicativeBinaryOperatorContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_multiplicativeBinaryOperator
 	return p
+}
+
+func InitEmptyMultiplicativeBinaryOperatorContext(p *MultiplicativeBinaryOperatorContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_multiplicativeBinaryOperator
 }
 
 func (*MultiplicativeBinaryOperatorContext) IsMultiplicativeBinaryOperatorContext() {}
@@ -7337,7 +7832,7 @@ func (*MultiplicativeBinaryOperatorContext) IsMultiplicativeBinaryOperatorContex
 func NewMultiplicativeBinaryOperatorContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MultiplicativeBinaryOperatorContext {
 	var p = new(MultiplicativeBinaryOperatorContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_multiplicativeBinaryOperator
@@ -7378,28 +7873,9 @@ func (s *MultiplicativeBinaryOperatorContext) Accept(visitor antlr.ParseTreeVisi
 }
 
 func (p *YaklangParser) MultiplicativeBinaryOperator() (localctx IMultiplicativeBinaryOperatorContext) {
-	this := p
-	_ = this
-
 	localctx = NewMultiplicativeBinaryOperatorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 80, YaklangParserRULE_multiplicativeBinaryOperator)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -7414,7 +7890,17 @@ func (p *YaklangParser) MultiplicativeBinaryOperator() (localctx IMultiplicative
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IComparisonBinaryOperatorContext is an interface to support dynamic dispatch.
@@ -7424,20 +7910,34 @@ type IComparisonBinaryOperatorContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Gt() antlr.TerminalNode
+	Lt() antlr.TerminalNode
+	LtEq() antlr.TerminalNode
+	GtEq() antlr.TerminalNode
+	Neq() antlr.TerminalNode
+	LtGt() antlr.TerminalNode
+	Eq() antlr.TerminalNode
+
 	// IsComparisonBinaryOperatorContext differentiates from other interfaces.
 	IsComparisonBinaryOperatorContext()
 }
 
 type ComparisonBinaryOperatorContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyComparisonBinaryOperatorContext() *ComparisonBinaryOperatorContext {
 	var p = new(ComparisonBinaryOperatorContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_comparisonBinaryOperator
 	return p
+}
+
+func InitEmptyComparisonBinaryOperatorContext(p *ComparisonBinaryOperatorContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_comparisonBinaryOperator
 }
 
 func (*ComparisonBinaryOperatorContext) IsComparisonBinaryOperatorContext() {}
@@ -7445,7 +7945,7 @@ func (*ComparisonBinaryOperatorContext) IsComparisonBinaryOperatorContext() {}
 func NewComparisonBinaryOperatorContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ComparisonBinaryOperatorContext {
 	var p = new(ComparisonBinaryOperatorContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_comparisonBinaryOperator
@@ -7502,28 +8002,9 @@ func (s *ComparisonBinaryOperatorContext) Accept(visitor antlr.ParseTreeVisitor)
 }
 
 func (p *YaklangParser) ComparisonBinaryOperator() (localctx IComparisonBinaryOperatorContext) {
-	this := p
-	_ = this
-
 	localctx = NewComparisonBinaryOperatorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 82, YaklangParserRULE_comparisonBinaryOperator)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -7538,7 +8019,17 @@ func (p *YaklangParser) ComparisonBinaryOperator() (localctx IComparisonBinaryOp
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ILeftExpressionContext is an interface to support dynamic dispatch.
@@ -7548,20 +8039,31 @@ type ILeftExpressionContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Expression() IExpressionContext
+	LeftMemberCall() ILeftMemberCallContext
+	LeftSliceCall() ILeftSliceCallContext
+	Identifier() antlr.TerminalNode
+
 	// IsLeftExpressionContext differentiates from other interfaces.
 	IsLeftExpressionContext()
 }
 
 type LeftExpressionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyLeftExpressionContext() *LeftExpressionContext {
 	var p = new(LeftExpressionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_leftExpression
 	return p
+}
+
+func InitEmptyLeftExpressionContext(p *LeftExpressionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_leftExpression
 }
 
 func (*LeftExpressionContext) IsLeftExpressionContext() {}
@@ -7569,7 +8071,7 @@ func (*LeftExpressionContext) IsLeftExpressionContext() {}
 func NewLeftExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *LeftExpressionContext {
 	var p = new(LeftExpressionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_leftExpression
@@ -7650,31 +8152,15 @@ func (s *LeftExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *YaklangParser) LeftExpression() (localctx ILeftExpressionContext) {
-	this := p
-	_ = this
-
 	localctx = NewLeftExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 84, YaklangParserRULE_leftExpression)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(506)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 42, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 42, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -7683,6 +8169,9 @@ func (p *YaklangParser) LeftExpression() (localctx ILeftExpressionContext) {
 		}
 		p.SetState(503)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 
 		switch p.GetTokenStream().LA(1) {
 		case YaklangParserDot:
@@ -7698,7 +8187,8 @@ func (p *YaklangParser) LeftExpression() (localctx ILeftExpressionContext) {
 			}
 
 		default:
-			panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			goto errorExit
 		}
 
 	case 2:
@@ -7706,11 +8196,27 @@ func (p *YaklangParser) LeftExpression() (localctx ILeftExpressionContext) {
 		{
 			p.SetState(505)
 			p.Match(YaklangParserIdentifier)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ILeftMemberCallContext is an interface to support dynamic dispatch.
@@ -7720,20 +8226,30 @@ type ILeftMemberCallContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Dot() antlr.TerminalNode
+	Identifier() antlr.TerminalNode
+	IdentifierWithDollar() antlr.TerminalNode
+
 	// IsLeftMemberCallContext differentiates from other interfaces.
 	IsLeftMemberCallContext()
 }
 
 type LeftMemberCallContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyLeftMemberCallContext() *LeftMemberCallContext {
 	var p = new(LeftMemberCallContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_leftMemberCall
 	return p
+}
+
+func InitEmptyLeftMemberCallContext(p *LeftMemberCallContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_leftMemberCall
 }
 
 func (*LeftMemberCallContext) IsLeftMemberCallContext() {}
@@ -7741,7 +8257,7 @@ func (*LeftMemberCallContext) IsLeftMemberCallContext() {}
 func NewLeftMemberCallContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *LeftMemberCallContext {
 	var p = new(LeftMemberCallContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_leftMemberCall
@@ -7782,33 +8298,18 @@ func (s *LeftMemberCallContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *YaklangParser) LeftMemberCall() (localctx ILeftMemberCallContext) {
-	this := p
-	_ = this
-
 	localctx = NewLeftMemberCallContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 86, YaklangParserRULE_leftMemberCall)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(508)
 		p.Match(YaklangParserDot)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(509)
@@ -7822,7 +8323,17 @@ func (p *YaklangParser) LeftMemberCall() (localctx ILeftMemberCallContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ILeftSliceCallContext is an interface to support dynamic dispatch.
@@ -7832,20 +8343,30 @@ type ILeftSliceCallContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	LBracket() antlr.TerminalNode
+	Expression() IExpressionContext
+	RBracket() antlr.TerminalNode
+
 	// IsLeftSliceCallContext differentiates from other interfaces.
 	IsLeftSliceCallContext()
 }
 
 type LeftSliceCallContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyLeftSliceCallContext() *LeftSliceCallContext {
 	var p = new(LeftSliceCallContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_leftSliceCall
 	return p
+}
+
+func InitEmptyLeftSliceCallContext(p *LeftSliceCallContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_leftSliceCall
 }
 
 func (*LeftSliceCallContext) IsLeftSliceCallContext() {}
@@ -7853,7 +8374,7 @@ func (*LeftSliceCallContext) IsLeftSliceCallContext() {}
 func NewLeftSliceCallContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *LeftSliceCallContext {
 	var p = new(LeftSliceCallContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_leftSliceCall
@@ -7906,32 +8427,16 @@ func (s *LeftSliceCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *YaklangParser) LeftSliceCall() (localctx ILeftSliceCallContext) {
-	this := p
-	_ = this
-
 	localctx = NewLeftSliceCallContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 88, YaklangParserRULE_leftSliceCall)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(511)
 		p.Match(YaklangParserLBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(512)
@@ -7940,9 +8445,23 @@ func (p *YaklangParser) LeftSliceCall() (localctx ILeftSliceCallContext) {
 	{
 		p.SetState(513)
 		p.Match(YaklangParserRBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IExpressionContext is an interface to support dynamic dispatch.
@@ -7952,20 +8471,57 @@ type IExpressionContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	TypeLiteral() ITypeLiteralContext
+	LParen() antlr.TerminalNode
+	RParen() antlr.TerminalNode
+	AllWs() []IWsContext
+	Ws(i int) IWsContext
+	AllExpression() []IExpressionContext
+	Expression(i int) IExpressionContext
+	Literal() ILiteralContext
+	AnonymousFunctionDecl() IAnonymousFunctionDeclContext
+	PanicStmt() IPanicStmtContext
+	RecoverStmt() IRecoverStmtContext
+	Identifier() antlr.TerminalNode
+	ParenExpression() IParenExpressionContext
+	InstanceCode() IInstanceCodeContext
+	MakeExpression() IMakeExpressionContext
+	UnaryOperator() IUnaryOperatorContext
+	BitBinaryOperator() IBitBinaryOperatorContext
+	MultiplicativeBinaryOperator() IMultiplicativeBinaryOperatorContext
+	AdditiveBinaryOperator() IAdditiveBinaryOperatorContext
+	ComparisonBinaryOperator() IComparisonBinaryOperatorContext
+	In() antlr.TerminalNode
+	NotLiteral() antlr.TerminalNode
+	LogicAnd() antlr.TerminalNode
+	LogicOr() antlr.TerminalNode
+	Question() antlr.TerminalNode
+	Colon() antlr.TerminalNode
+	ChanIn() antlr.TerminalNode
+	MemberCall() IMemberCallContext
+	SliceCall() ISliceCallContext
+	FunctionCall() IFunctionCallContext
+
 	// IsExpressionContext differentiates from other interfaces.
 	IsExpressionContext()
 }
 
 type ExpressionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyExpressionContext() *ExpressionContext {
 	var p = new(ExpressionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_expression
 	return p
+}
+
+func InitEmptyExpressionContext(p *ExpressionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_expression
 }
 
 func (*ExpressionContext) IsExpressionContext() {}
@@ -7973,7 +8529,7 @@ func (*ExpressionContext) IsExpressionContext() {}
 func NewExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ExpressionContext {
 	var p = new(ExpressionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_expression
@@ -8384,10 +8940,8 @@ func (p *YaklangParser) Expression() (localctx IExpressionContext) {
 }
 
 func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
-	this := p
-	_ = this
-
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
+
 	_parentState := p.GetState()
 	localctx = NewExpressionContext(p, p.GetParserRuleContext(), _parentState)
 	var _prevctx IExpressionContext = localctx
@@ -8396,28 +8950,16 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 	p.EnterRecursionRule(localctx, 90, YaklangParserRULE_expression, _p)
 	var _la int
 
-	defer func() {
-		p.UnrollRecursionContexts(_parentctx)
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(546)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 46, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 46, p.GetParserRuleContext()) {
 	case 1:
 		{
 			p.SetState(516)
@@ -8426,11 +8968,20 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 		{
 			p.SetState(517)
 			p.Match(YaklangParserLParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(521)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 43, p.GetParserRuleContext())
-
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 43, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 		for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			if _alt == 1 {
 				{
@@ -8441,13 +8992,22 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 			}
 			p.SetState(523)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 43, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 43, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 		p.SetState(525)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0 || (int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0 {
+		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0) {
 			{
 				p.SetState(524)
 				p.expression(0)
@@ -8456,6 +9016,9 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 		}
 		p.SetState(530)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -8466,11 +9029,18 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 
 			p.SetState(532)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
 			p.SetState(533)
 			p.Match(YaklangParserRParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 2:
@@ -8501,6 +9071,10 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 		{
 			p.SetState(539)
 			p.Match(YaklangParserIdentifier)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 7:
@@ -8531,12 +9105,19 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 			p.expression(10)
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 	p.GetParserRuleContext().SetStop(p.GetTokenStream().LT(-1))
 	p.SetState(647)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 59, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 59, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			if p.GetParseListeners() != nil {
@@ -8545,14 +9126,19 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 			_prevctx = localctx
 			p.SetState(645)
 			p.GetErrorHandler().Sync(p)
-			switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 58, p.GetParserRuleContext()) {
+			if p.HasError() {
+				goto errorExit
+			}
+
+			switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 58, p.GetParserRuleContext()) {
 			case 1:
 				localctx = NewExpressionContext(p, _parentctx, _parentState)
 				p.PushNewRecursionContext(localctx, _startState, YaklangParserRULE_expression)
 				p.SetState(548)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 9)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 9)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 9)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(549)
@@ -8560,6 +9146,9 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 				}
 				p.SetState(553)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 
 				for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -8570,6 +9159,9 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 
 					p.SetState(555)
 					p.GetErrorHandler().Sync(p)
+					if p.HasError() {
+						goto errorExit
+					}
 					_la = p.GetTokenStream().LA(1)
 				}
 				{
@@ -8583,7 +9175,8 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(558)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 8)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 8)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 8)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(559)
@@ -8591,6 +9184,9 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 				}
 				p.SetState(563)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 
 				for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -8601,6 +9197,9 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 
 					p.SetState(565)
 					p.GetErrorHandler().Sync(p)
+					if p.HasError() {
+						goto errorExit
+					}
 					_la = p.GetTokenStream().LA(1)
 				}
 				{
@@ -8614,7 +9213,8 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(568)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 7)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 7)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 7)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(569)
@@ -8622,6 +9222,9 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 				}
 				p.SetState(573)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 
 				for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -8632,6 +9235,9 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 
 					p.SetState(575)
 					p.GetErrorHandler().Sync(p)
+					if p.HasError() {
+						goto errorExit
+					}
 					_la = p.GetTokenStream().LA(1)
 				}
 				{
@@ -8645,7 +9251,8 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(578)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 6)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 6)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 6)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(579)
@@ -8653,6 +9260,9 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 				}
 				p.SetState(583)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 
 				for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -8663,6 +9273,9 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 
 					p.SetState(585)
 					p.GetErrorHandler().Sync(p)
+					if p.HasError() {
+						goto errorExit
+					}
 					_la = p.GetTokenStream().LA(1)
 				}
 				{
@@ -8676,22 +9289,34 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(588)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 5)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 5)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 5)", ""))
+					goto errorExit
 				}
 				p.SetState(590)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 
 				if _la == YaklangParserNotLiteral {
 					{
 						p.SetState(589)
 						p.Match(YaklangParserNotLiteral)
+						if p.HasError() {
+							// Recognition error - abort rule
+							goto errorExit
+						}
 					}
 
 				}
 				{
 					p.SetState(592)
 					p.Match(YaklangParserIn)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(593)
@@ -8704,14 +9329,22 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(594)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 4)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 4)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 4)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(595)
 					p.Match(YaklangParserLogicAnd)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				p.SetState(599)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 
 				for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -8722,6 +9355,9 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 
 					p.SetState(601)
 					p.GetErrorHandler().Sync(p)
+					if p.HasError() {
+						goto errorExit
+					}
 					_la = p.GetTokenStream().LA(1)
 				}
 				{
@@ -8735,14 +9371,22 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(603)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 3)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 3)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 3)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(604)
 					p.Match(YaklangParserLogicOr)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				p.SetState(608)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 
 				for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -8753,6 +9397,9 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 
 					p.SetState(610)
 					p.GetErrorHandler().Sync(p)
+					if p.HasError() {
+						goto errorExit
+					}
 					_la = p.GetTokenStream().LA(1)
 				}
 				{
@@ -8766,14 +9413,22 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(612)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 2)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 2)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 2)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(613)
 					p.Match(YaklangParserQuestion)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				p.SetState(617)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 
 				for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -8784,6 +9439,9 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 
 					p.SetState(619)
 					p.GetErrorHandler().Sync(p)
+					if p.HasError() {
+						goto errorExit
+					}
 					_la = p.GetTokenStream().LA(1)
 				}
 				{
@@ -8792,6 +9450,9 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 				}
 				p.SetState(624)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 
 				for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -8802,14 +9463,24 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 
 					p.SetState(626)
 					p.GetErrorHandler().Sync(p)
+					if p.HasError() {
+						goto errorExit
+					}
 					_la = p.GetTokenStream().LA(1)
 				}
 				{
 					p.SetState(627)
 					p.Match(YaklangParserColon)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				p.SetState(631)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 
 				for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -8820,6 +9491,9 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 
 					p.SetState(633)
 					p.GetErrorHandler().Sync(p)
+					if p.HasError() {
+						goto errorExit
+					}
 					_la = p.GetTokenStream().LA(1)
 				}
 				{
@@ -8833,11 +9507,16 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(636)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 1)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 1)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 1)", ""))
+					goto errorExit
 				}
 				{
 					p.SetState(637)
 					p.Match(YaklangParserChanIn)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
 					p.SetState(638)
@@ -8850,10 +9529,14 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 				p.SetState(639)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 14)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 14)", ""))
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 14)", ""))
+					goto errorExit
 				}
 				p.SetState(643)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 
 				switch p.GetTokenStream().LA(1) {
 				case YaklangParserDot:
@@ -8875,18 +9558,37 @@ func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
 					}
 
 				default:
-					panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+					p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+					goto errorExit
 				}
 
+			case antlr.ATNInvalidAltNumber:
+				goto errorExit
 			}
 
 		}
 		p.SetState(649)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 59, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 59, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.UnrollRecursionContexts(_parentctx)
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IParenExpressionContext is an interface to support dynamic dispatch.
@@ -8896,20 +9598,30 @@ type IParenExpressionContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	LParen() antlr.TerminalNode
+	RParen() antlr.TerminalNode
+	Expression() IExpressionContext
+
 	// IsParenExpressionContext differentiates from other interfaces.
 	IsParenExpressionContext()
 }
 
 type ParenExpressionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyParenExpressionContext() *ParenExpressionContext {
 	var p = new(ParenExpressionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_parenExpression
 	return p
+}
+
+func InitEmptyParenExpressionContext(p *ParenExpressionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_parenExpression
 }
 
 func (*ParenExpressionContext) IsParenExpressionContext() {}
@@ -8917,7 +9629,7 @@ func (*ParenExpressionContext) IsParenExpressionContext() {}
 func NewParenExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ParenExpressionContext {
 	var p = new(ParenExpressionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_parenExpression
@@ -8970,39 +9682,27 @@ func (s *ParenExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *YaklangParser) ParenExpression() (localctx IParenExpressionContext) {
-	this := p
-	_ = this
-
 	localctx = NewParenExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 92, YaklangParserRULE_parenExpression)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(650)
 		p.Match(YaklangParserLParen)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(652)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0 || (int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0 {
+	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0) {
 		{
 			p.SetState(651)
 			p.expression(0)
@@ -9012,9 +9712,23 @@ func (p *YaklangParser) ParenExpression() (localctx IParenExpressionContext) {
 	{
 		p.SetState(654)
 		p.Match(YaklangParserRParen)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IMakeExpressionContext is an interface to support dynamic dispatch.
@@ -9024,20 +9738,35 @@ type IMakeExpressionContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Make() antlr.TerminalNode
+	LParen() antlr.TerminalNode
+	TypeLiteral() ITypeLiteralContext
+	RParen() antlr.TerminalNode
+	AllWs() []IWsContext
+	Ws(i int) IWsContext
+	Comma() antlr.TerminalNode
+	ExpressionListMultiline() IExpressionListMultilineContext
+
 	// IsMakeExpressionContext differentiates from other interfaces.
 	IsMakeExpressionContext()
 }
 
 type MakeExpressionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyMakeExpressionContext() *MakeExpressionContext {
 	var p = new(MakeExpressionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_makeExpression
 	return p
+}
+
+func InitEmptyMakeExpressionContext(p *MakeExpressionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_makeExpression
 }
 
 func (*MakeExpressionContext) IsMakeExpressionContext() {}
@@ -9045,7 +9774,7 @@ func (*MakeExpressionContext) IsMakeExpressionContext() {}
 func NewMakeExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MakeExpressionContext {
 	var p = new(MakeExpressionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_makeExpression
@@ -9163,40 +9892,32 @@ func (s *MakeExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *YaklangParser) MakeExpression() (localctx IMakeExpressionContext) {
-	this := p
-	_ = this
-
 	localctx = NewMakeExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 94, YaklangParserRULE_makeExpression)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(656)
 		p.Match(YaklangParserMake)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(657)
 		p.Match(YaklangParserLParen)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(661)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -9207,6 +9928,9 @@ func (p *YaklangParser) MakeExpression() (localctx IMakeExpressionContext) {
 
 		p.SetState(663)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
@@ -9215,15 +9939,25 @@ func (p *YaklangParser) MakeExpression() (localctx IMakeExpressionContext) {
 	}
 	p.SetState(673)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == YaklangParserComma {
 		{
 			p.SetState(665)
 			p.Match(YaklangParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(669)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -9234,6 +9968,9 @@ func (p *YaklangParser) MakeExpression() (localctx IMakeExpressionContext) {
 
 			p.SetState(671)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
@@ -9245,9 +9982,23 @@ func (p *YaklangParser) MakeExpression() (localctx IMakeExpressionContext) {
 	{
 		p.SetState(675)
 		p.Match(YaklangParserRParen)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITypeLiteralContext is an interface to support dynamic dispatch.
@@ -9257,20 +10008,33 @@ type ITypeLiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	VarTypeName() antlr.TerminalNode
+	Var() antlr.TerminalNode
+	SliceTypeLiteral() ISliceTypeLiteralContext
+	MapTypeLiteral() IMapTypeLiteralContext
+	Chan() antlr.TerminalNode
+	TypeLiteral() ITypeLiteralContext
+
 	// IsTypeLiteralContext differentiates from other interfaces.
 	IsTypeLiteralContext()
 }
 
 type TypeLiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTypeLiteralContext() *TypeLiteralContext {
 	var p = new(TypeLiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_typeLiteral
 	return p
+}
+
+func InitEmptyTypeLiteralContext(p *TypeLiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_typeLiteral
 }
 
 func (*TypeLiteralContext) IsTypeLiteralContext() {}
@@ -9278,7 +10042,7 @@ func (*TypeLiteralContext) IsTypeLiteralContext() {}
 func NewTypeLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TypeLiteralContext {
 	var p = new(TypeLiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_typeLiteral
@@ -9367,30 +10131,13 @@ func (s *TypeLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *YaklangParser) TypeLiteral() (localctx ITypeLiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewTypeLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 96, YaklangParserRULE_typeLiteral)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(683)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case YaklangParserVarTypeName:
@@ -9398,6 +10145,10 @@ func (p *YaklangParser) TypeLiteral() (localctx ITypeLiteralContext) {
 		{
 			p.SetState(677)
 			p.Match(YaklangParserVarTypeName)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case YaklangParserVar:
@@ -9405,6 +10156,10 @@ func (p *YaklangParser) TypeLiteral() (localctx ITypeLiteralContext) {
 		{
 			p.SetState(678)
 			p.Match(YaklangParserVar)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case YaklangParserLBracket:
@@ -9426,6 +10181,10 @@ func (p *YaklangParser) TypeLiteral() (localctx ITypeLiteralContext) {
 		{
 			p.SetState(681)
 			p.Match(YaklangParserChan)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(682)
@@ -9433,10 +10192,21 @@ func (p *YaklangParser) TypeLiteral() (localctx ITypeLiteralContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISliceTypeLiteralContext is an interface to support dynamic dispatch.
@@ -9446,20 +10216,30 @@ type ISliceTypeLiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	LBracket() antlr.TerminalNode
+	RBracket() antlr.TerminalNode
+	TypeLiteral() ITypeLiteralContext
+
 	// IsSliceTypeLiteralContext differentiates from other interfaces.
 	IsSliceTypeLiteralContext()
 }
 
 type SliceTypeLiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptySliceTypeLiteralContext() *SliceTypeLiteralContext {
 	var p = new(SliceTypeLiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_sliceTypeLiteral
 	return p
+}
+
+func InitEmptySliceTypeLiteralContext(p *SliceTypeLiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_sliceTypeLiteral
 }
 
 func (*SliceTypeLiteralContext) IsSliceTypeLiteralContext() {}
@@ -9467,7 +10247,7 @@ func (*SliceTypeLiteralContext) IsSliceTypeLiteralContext() {}
 func NewSliceTypeLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SliceTypeLiteralContext {
 	var p = new(SliceTypeLiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_sliceTypeLiteral
@@ -9520,43 +10300,41 @@ func (s *SliceTypeLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *YaklangParser) SliceTypeLiteral() (localctx ISliceTypeLiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewSliceTypeLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 98, YaklangParserRULE_sliceTypeLiteral)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(685)
 		p.Match(YaklangParserLBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(686)
 		p.Match(YaklangParserRBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(687)
 		p.TypeLiteral()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IMapTypeLiteralContext is an interface to support dynamic dispatch.
@@ -9566,20 +10344,32 @@ type IMapTypeLiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Map() antlr.TerminalNode
+	LBracket() antlr.TerminalNode
+	AllTypeLiteral() []ITypeLiteralContext
+	TypeLiteral(i int) ITypeLiteralContext
+	RBracket() antlr.TerminalNode
+
 	// IsMapTypeLiteralContext differentiates from other interfaces.
 	IsMapTypeLiteralContext()
 }
 
 type MapTypeLiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyMapTypeLiteralContext() *MapTypeLiteralContext {
 	var p = new(MapTypeLiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_mapTypeLiteral
 	return p
+}
+
+func InitEmptyMapTypeLiteralContext(p *MapTypeLiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_mapTypeLiteral
 }
 
 func (*MapTypeLiteralContext) IsMapTypeLiteralContext() {}
@@ -9587,7 +10377,7 @@ func (*MapTypeLiteralContext) IsMapTypeLiteralContext() {}
 func NewMapTypeLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MapTypeLiteralContext {
 	var p = new(MapTypeLiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_mapTypeLiteral
@@ -9669,36 +10459,24 @@ func (s *MapTypeLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *YaklangParser) MapTypeLiteral() (localctx IMapTypeLiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewMapTypeLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 100, YaklangParserRULE_mapTypeLiteral)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(689)
 		p.Match(YaklangParserMap)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(690)
 		p.Match(YaklangParserLBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(691)
@@ -9707,13 +10485,27 @@ func (p *YaklangParser) MapTypeLiteral() (localctx IMapTypeLiteralContext) {
 	{
 		p.SetState(692)
 		p.Match(YaklangParserRBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(693)
 		p.TypeLiteral()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IInstanceCodeContext is an interface to support dynamic dispatch.
@@ -9723,20 +10515,29 @@ type IInstanceCodeContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Func() antlr.TerminalNode
+	Block() IBlockContext
+
 	// IsInstanceCodeContext differentiates from other interfaces.
 	IsInstanceCodeContext()
 }
 
 type InstanceCodeContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyInstanceCodeContext() *InstanceCodeContext {
 	var p = new(InstanceCodeContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_instanceCode
 	return p
+}
+
+func InitEmptyInstanceCodeContext(p *InstanceCodeContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_instanceCode
 }
 
 func (*InstanceCodeContext) IsInstanceCodeContext() {}
@@ -9744,7 +10545,7 @@ func (*InstanceCodeContext) IsInstanceCodeContext() {}
 func NewInstanceCodeContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *InstanceCodeContext {
 	var p = new(InstanceCodeContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_instanceCode
@@ -9793,39 +10594,33 @@ func (s *InstanceCodeContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *YaklangParser) InstanceCode() (localctx IInstanceCodeContext) {
-	this := p
-	_ = this
-
 	localctx = NewInstanceCodeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 102, YaklangParserRULE_instanceCode)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(695)
 		p.Match(YaklangParserFunc)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(696)
 		p.Block()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAnonymousFunctionDeclContext is an interface to support dynamic dispatch.
@@ -9835,20 +10630,36 @@ type IAnonymousFunctionDeclContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Func() antlr.TerminalNode
+	LParen() antlr.TerminalNode
+	RParen() antlr.TerminalNode
+	Block() IBlockContext
+	FunctionNameDecl() IFunctionNameDeclContext
+	FunctionParamDecl() IFunctionParamDeclContext
+	EqGt() antlr.TerminalNode
+	Identifier() antlr.TerminalNode
+	Expression() IExpressionContext
+
 	// IsAnonymousFunctionDeclContext differentiates from other interfaces.
 	IsAnonymousFunctionDeclContext()
 }
 
 type AnonymousFunctionDeclContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyAnonymousFunctionDeclContext() *AnonymousFunctionDeclContext {
 	var p = new(AnonymousFunctionDeclContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_anonymousFunctionDecl
 	return p
+}
+
+func InitEmptyAnonymousFunctionDeclContext(p *AnonymousFunctionDeclContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_anonymousFunctionDecl
 }
 
 func (*AnonymousFunctionDeclContext) IsAnonymousFunctionDeclContext() {}
@@ -9856,7 +10667,7 @@ func (*AnonymousFunctionDeclContext) IsAnonymousFunctionDeclContext() {}
 func NewAnonymousFunctionDeclContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AnonymousFunctionDeclContext {
 	var p = new(AnonymousFunctionDeclContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_anonymousFunctionDecl
@@ -9969,31 +10780,15 @@ func (s *AnonymousFunctionDeclContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *YaklangParser) AnonymousFunctionDecl() (localctx IAnonymousFunctionDeclContext) {
-	this := p
-	_ = this
-
 	localctx = NewAnonymousFunctionDeclContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 104, YaklangParserRULE_anonymousFunctionDecl)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(721)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case YaklangParserFunc:
@@ -10001,9 +10796,16 @@ func (p *YaklangParser) AnonymousFunctionDecl() (localctx IAnonymousFunctionDecl
 		{
 			p.SetState(698)
 			p.Match(YaklangParserFunc)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(700)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == YaklangParserIdentifier {
@@ -10016,9 +10818,16 @@ func (p *YaklangParser) AnonymousFunctionDecl() (localctx IAnonymousFunctionDecl
 		{
 			p.SetState(702)
 			p.Match(YaklangParserLParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(704)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if (int64((_la-39)) & ^0x3f) == 0 && ((int64(1)<<(_la-39))&3746994889972252673) != 0 {
@@ -10031,6 +10840,10 @@ func (p *YaklangParser) AnonymousFunctionDecl() (localctx IAnonymousFunctionDecl
 		{
 			p.SetState(706)
 			p.Match(YaklangParserRParen)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(707)
@@ -10041,15 +10854,25 @@ func (p *YaklangParser) AnonymousFunctionDecl() (localctx IAnonymousFunctionDecl
 		p.EnterOuterAlt(localctx, 2)
 		p.SetState(714)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 
 		switch p.GetTokenStream().LA(1) {
 		case YaklangParserLParen:
 			{
 				p.SetState(708)
 				p.Match(YaklangParserLParen)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			p.SetState(710)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 
 			if (int64((_la-39)) & ^0x3f) == 0 && ((int64(1)<<(_la-39))&3746994889972252673) != 0 {
@@ -10062,24 +10885,41 @@ func (p *YaklangParser) AnonymousFunctionDecl() (localctx IAnonymousFunctionDecl
 			{
 				p.SetState(712)
 				p.Match(YaklangParserRParen)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		case YaklangParserIdentifier:
 			{
 				p.SetState(713)
 				p.Match(YaklangParserIdentifier)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		default:
-			panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			goto errorExit
 		}
 		{
 			p.SetState(716)
 			p.Match(YaklangParserEqGt)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(719)
 		p.GetErrorHandler().Sync(p)
-		switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 69, p.GetParserRuleContext()) {
+		if p.HasError() {
+			goto errorExit
+		}
+
+		switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 69, p.GetParserRuleContext()) {
 		case 1:
 			{
 				p.SetState(717)
@@ -10092,13 +10932,26 @@ func (p *YaklangParser) AnonymousFunctionDecl() (localctx IAnonymousFunctionDecl
 				p.expression(0)
 			}
 
+		case antlr.ATNInvalidAltNumber:
+			goto errorExit
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFunctionNameDeclContext is an interface to support dynamic dispatch.
@@ -10108,20 +10961,28 @@ type IFunctionNameDeclContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Identifier() antlr.TerminalNode
+
 	// IsFunctionNameDeclContext differentiates from other interfaces.
 	IsFunctionNameDeclContext()
 }
 
 type FunctionNameDeclContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFunctionNameDeclContext() *FunctionNameDeclContext {
 	var p = new(FunctionNameDeclContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_functionNameDecl
 	return p
+}
+
+func InitEmptyFunctionNameDeclContext(p *FunctionNameDeclContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_functionNameDecl
 }
 
 func (*FunctionNameDeclContext) IsFunctionNameDeclContext() {}
@@ -10129,7 +10990,7 @@ func (*FunctionNameDeclContext) IsFunctionNameDeclContext() {}
 func NewFunctionNameDeclContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FunctionNameDeclContext {
 	var p = new(FunctionNameDeclContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_functionNameDecl
@@ -10162,35 +11023,29 @@ func (s *FunctionNameDeclContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *YaklangParser) FunctionNameDecl() (localctx IFunctionNameDeclContext) {
-	this := p
-	_ = this
-
 	localctx = NewFunctionNameDeclContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 106, YaklangParserRULE_functionNameDecl)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(723)
 		p.Match(YaklangParserIdentifier)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFunctionParamDeclContext is an interface to support dynamic dispatch.
@@ -10200,20 +11055,34 @@ type IFunctionParamDeclContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllIdentifier() []antlr.TerminalNode
+	Identifier(i int) antlr.TerminalNode
+	AllWs() []IWsContext
+	Ws(i int) IWsContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+	Ellipsis() antlr.TerminalNode
+
 	// IsFunctionParamDeclContext differentiates from other interfaces.
 	IsFunctionParamDeclContext()
 }
 
 type FunctionParamDeclContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFunctionParamDeclContext() *FunctionParamDeclContext {
 	var p = new(FunctionParamDeclContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_functionParamDecl
 	return p
+}
+
+func InitEmptyFunctionParamDeclContext(p *FunctionParamDeclContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_functionParamDecl
 }
 
 func (*FunctionParamDeclContext) IsFunctionParamDeclContext() {}
@@ -10221,7 +11090,7 @@ func (*FunctionParamDeclContext) IsFunctionParamDeclContext() {}
 func NewFunctionParamDeclContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FunctionParamDeclContext {
 	var p = new(FunctionParamDeclContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_functionParamDecl
@@ -10311,34 +11180,18 @@ func (s *FunctionParamDeclContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *YaklangParser) FunctionParamDecl() (localctx IFunctionParamDeclContext) {
-	this := p
-	_ = this
-
 	localctx = NewFunctionParamDeclContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 108, YaklangParserRULE_functionParamDecl)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(728)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -10349,20 +11202,35 @@ func (p *YaklangParser) FunctionParamDecl() (localctx IFunctionParamDeclContext)
 
 		p.SetState(730)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(731)
 		p.Match(YaklangParserIdentifier)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(748)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 74, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 74, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			p.SetState(735)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 
 			for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -10373,14 +11241,24 @@ func (p *YaklangParser) FunctionParamDecl() (localctx IFunctionParamDeclContext)
 
 				p.SetState(737)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 			}
 			{
 				p.SetState(738)
 				p.Match(YaklangParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			p.SetState(742)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 
 			for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -10391,33 +11269,58 @@ func (p *YaklangParser) FunctionParamDecl() (localctx IFunctionParamDeclContext)
 
 				p.SetState(744)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 			}
 			{
 				p.SetState(745)
 				p.Match(YaklangParserIdentifier)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		p.SetState(750)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 74, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 74, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(752)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == YaklangParserEllipsis {
 		{
 			p.SetState(751)
 			p.Match(YaklangParserEllipsis)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 	p.SetState(757)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 76, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 76, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -10428,21 +11331,37 @@ func (p *YaklangParser) FunctionParamDecl() (localctx IFunctionParamDeclContext)
 		}
 		p.SetState(759)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 76, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 76, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(761)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == YaklangParserComma {
 		{
 			p.SetState(760)
 			p.Match(YaklangParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 	p.SetState(766)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -10453,10 +11372,23 @@ func (p *YaklangParser) FunctionParamDecl() (localctx IFunctionParamDeclContext)
 
 		p.SetState(768)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IFunctionCallContext is an interface to support dynamic dispatch.
@@ -10466,20 +11398,31 @@ type IFunctionCallContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	LParen() antlr.TerminalNode
+	RParen() antlr.TerminalNode
+	OrdinaryArguments() IOrdinaryArgumentsContext
+	Wavy() antlr.TerminalNode
+
 	// IsFunctionCallContext differentiates from other interfaces.
 	IsFunctionCallContext()
 }
 
 type FunctionCallContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyFunctionCallContext() *FunctionCallContext {
 	var p = new(FunctionCallContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_functionCall
 	return p
+}
+
+func InitEmptyFunctionCallContext(p *FunctionCallContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_functionCall
 }
 
 func (*FunctionCallContext) IsFunctionCallContext() {}
@@ -10487,7 +11430,7 @@ func (*FunctionCallContext) IsFunctionCallContext() {}
 func NewFunctionCallContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *FunctionCallContext {
 	var p = new(FunctionCallContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_functionCall
@@ -10544,39 +11487,27 @@ func (s *FunctionCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *YaklangParser) FunctionCall() (localctx IFunctionCallContext) {
-	this := p
-	_ = this
-
 	localctx = NewFunctionCallContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 110, YaklangParserRULE_functionCall)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(769)
 		p.Match(YaklangParserLParen)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(771)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0 || (int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17519238709253) != 0 {
+	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17519238709253) != 0) {
 		{
 			p.SetState(770)
 			p.OrdinaryArguments()
@@ -10586,19 +11517,39 @@ func (p *YaklangParser) FunctionCall() (localctx IFunctionCallContext) {
 	{
 		p.SetState(773)
 		p.Match(YaklangParserRParen)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(775)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 80, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 80, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(774)
 			p.Match(YaklangParserWavy)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IOrdinaryArgumentsContext is an interface to support dynamic dispatch.
@@ -10608,20 +11559,34 @@ type IOrdinaryArgumentsContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllExpression() []IExpressionContext
+	Expression(i int) IExpressionContext
+	AllWs() []IWsContext
+	Ws(i int) IWsContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+	Ellipsis() antlr.TerminalNode
+
 	// IsOrdinaryArgumentsContext differentiates from other interfaces.
 	IsOrdinaryArgumentsContext()
 }
 
 type OrdinaryArgumentsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyOrdinaryArgumentsContext() *OrdinaryArgumentsContext {
 	var p = new(OrdinaryArgumentsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_ordinaryArguments
 	return p
+}
+
+func InitEmptyOrdinaryArgumentsContext(p *OrdinaryArgumentsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_ordinaryArguments
 }
 
 func (*OrdinaryArgumentsContext) IsOrdinaryArgumentsContext() {}
@@ -10629,7 +11594,7 @@ func (*OrdinaryArgumentsContext) IsOrdinaryArgumentsContext() {}
 func NewOrdinaryArgumentsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *OrdinaryArgumentsContext {
 	var p = new(OrdinaryArgumentsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_ordinaryArguments
@@ -10752,34 +11717,18 @@ func (s *OrdinaryArgumentsContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *YaklangParser) OrdinaryArguments() (localctx IOrdinaryArgumentsContext) {
-	this := p
-	_ = this
-
 	localctx = NewOrdinaryArgumentsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 112, YaklangParserRULE_ordinaryArguments)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(780)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -10790,6 +11739,9 @@ func (p *YaklangParser) OrdinaryArguments() (localctx IOrdinaryArgumentsContext)
 
 		p.SetState(782)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
@@ -10798,12 +11750,20 @@ func (p *YaklangParser) OrdinaryArguments() (localctx IOrdinaryArgumentsContext)
 	}
 	p.SetState(800)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 84, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 84, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			p.SetState(787)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 
 			for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -10814,14 +11774,24 @@ func (p *YaklangParser) OrdinaryArguments() (localctx IOrdinaryArgumentsContext)
 
 				p.SetState(789)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 			}
 			{
 				p.SetState(790)
 				p.Match(YaklangParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			p.SetState(794)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 
 			for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -10832,6 +11802,9 @@ func (p *YaklangParser) OrdinaryArguments() (localctx IOrdinaryArgumentsContext)
 
 				p.SetState(796)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 			}
 			{
@@ -10842,23 +11815,41 @@ func (p *YaklangParser) OrdinaryArguments() (localctx IOrdinaryArgumentsContext)
 		}
 		p.SetState(802)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 84, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 84, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(804)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == YaklangParserEllipsis {
 		{
 			p.SetState(803)
 			p.Match(YaklangParserEllipsis)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 	p.SetState(809)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 86, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 86, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -10869,21 +11860,37 @@ func (p *YaklangParser) OrdinaryArguments() (localctx IOrdinaryArgumentsContext)
 		}
 		p.SetState(811)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 86, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 86, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(813)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == YaklangParserComma {
 		{
 			p.SetState(812)
 			p.Match(YaklangParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 	p.SetState(818)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -10894,10 +11901,23 @@ func (p *YaklangParser) OrdinaryArguments() (localctx IOrdinaryArgumentsContext)
 
 		p.SetState(820)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IMemberCallContext is an interface to support dynamic dispatch.
@@ -10907,20 +11927,30 @@ type IMemberCallContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Dot() antlr.TerminalNode
+	Identifier() antlr.TerminalNode
+	IdentifierWithDollar() antlr.TerminalNode
+
 	// IsMemberCallContext differentiates from other interfaces.
 	IsMemberCallContext()
 }
 
 type MemberCallContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyMemberCallContext() *MemberCallContext {
 	var p = new(MemberCallContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_memberCall
 	return p
+}
+
+func InitEmptyMemberCallContext(p *MemberCallContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_memberCall
 }
 
 func (*MemberCallContext) IsMemberCallContext() {}
@@ -10928,7 +11958,7 @@ func (*MemberCallContext) IsMemberCallContext() {}
 func NewMemberCallContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MemberCallContext {
 	var p = new(MemberCallContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_memberCall
@@ -10969,33 +11999,18 @@ func (s *MemberCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) MemberCall() (localctx IMemberCallContext) {
-	this := p
-	_ = this
-
 	localctx = NewMemberCallContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 114, YaklangParserRULE_memberCall)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(821)
 		p.Match(YaklangParserDot)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(822)
@@ -11009,7 +12024,17 @@ func (p *YaklangParser) MemberCall() (localctx IMemberCallContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISliceCallContext is an interface to support dynamic dispatch.
@@ -11019,20 +12044,33 @@ type ISliceCallContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	LBracket() antlr.TerminalNode
+	AllColon() []antlr.TerminalNode
+	Colon(i int) antlr.TerminalNode
+	RBracket() antlr.TerminalNode
+	AllExpression() []IExpressionContext
+	Expression(i int) IExpressionContext
+
 	// IsSliceCallContext differentiates from other interfaces.
 	IsSliceCallContext()
 }
 
 type SliceCallContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptySliceCallContext() *SliceCallContext {
 	var p = new(SliceCallContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_sliceCall
 	return p
+}
+
+func InitEmptySliceCallContext(p *SliceCallContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_sliceCall
 }
 
 func (*SliceCallContext) IsSliceCallContext() {}
@@ -11040,7 +12078,7 @@ func (*SliceCallContext) IsSliceCallContext() {}
 func NewSliceCallContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SliceCallContext {
 	var p = new(SliceCallContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_sliceCall
@@ -11126,43 +12164,35 @@ func (s *SliceCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) SliceCall() (localctx ISliceCallContext) {
-	this := p
-	_ = this
-
 	localctx = NewSliceCallContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 116, YaklangParserRULE_sliceCall)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(850)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 94, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 94, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(824)
 			p.Match(YaklangParserLBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(826)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0 || (int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0 {
+		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0) {
 			{
 				p.SetState(825)
 				p.expression(0)
@@ -11172,12 +12202,19 @@ func (p *YaklangParser) SliceCall() (localctx ISliceCallContext) {
 		{
 			p.SetState(828)
 			p.Match(YaklangParserColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(830)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0 || (int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0 {
+		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0) {
 			{
 				p.SetState(829)
 				p.expression(0)
@@ -11187,12 +12224,19 @@ func (p *YaklangParser) SliceCall() (localctx ISliceCallContext) {
 		{
 			p.SetState(832)
 			p.Match(YaklangParserColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(834)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0 || (int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0 {
+		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0) {
 			{
 				p.SetState(833)
 				p.expression(0)
@@ -11202,6 +12246,10 @@ func (p *YaklangParser) SliceCall() (localctx ISliceCallContext) {
 		{
 			p.SetState(836)
 			p.Match(YaklangParserRBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 2:
@@ -11209,12 +12257,19 @@ func (p *YaklangParser) SliceCall() (localctx ISliceCallContext) {
 		{
 			p.SetState(837)
 			p.Match(YaklangParserLBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(839)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0 || (int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0 {
+		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0) {
 			{
 				p.SetState(838)
 				p.expression(0)
@@ -11224,12 +12279,19 @@ func (p *YaklangParser) SliceCall() (localctx ISliceCallContext) {
 		{
 			p.SetState(841)
 			p.Match(YaklangParserColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(843)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0 || (int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0 {
+		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0) {
 			{
 				p.SetState(842)
 				p.expression(0)
@@ -11239,6 +12301,10 @@ func (p *YaklangParser) SliceCall() (localctx ISliceCallContext) {
 		{
 			p.SetState(845)
 			p.Match(YaklangParserRBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 3:
@@ -11246,6 +12312,10 @@ func (p *YaklangParser) SliceCall() (localctx ISliceCallContext) {
 		{
 			p.SetState(846)
 			p.Match(YaklangParserLBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(847)
@@ -11254,11 +12324,27 @@ func (p *YaklangParser) SliceCall() (localctx ISliceCallContext) {
 		{
 			p.SetState(848)
 			p.Match(YaklangParserRBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ILiteralContext is an interface to support dynamic dispatch.
@@ -11268,20 +12354,38 @@ type ILiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	TemplateStringLiteral() ITemplateStringLiteralContext
+	StringLiteral() IStringLiteralContext
+	NumericLiteral() INumericLiteralContext
+	CharacterLiteral() ICharacterLiteralContext
+	UndefinedLiteral() antlr.TerminalNode
+	NilLiteral() antlr.TerminalNode
+	BoolLiteral() IBoolLiteralContext
+	MapLiteral() IMapLiteralContext
+	SliceTypedLiteral() ISliceTypedLiteralContext
+	TypeLiteral() ITypeLiteralContext
+	SliceLiteral() ISliceLiteralContext
+
 	// IsLiteralContext differentiates from other interfaces.
 	IsLiteralContext()
 }
 
 type LiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyLiteralContext() *LiteralContext {
 	var p = new(LiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_literal
 	return p
+}
+
+func InitEmptyLiteralContext(p *LiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_literal
 }
 
 func (*LiteralContext) IsLiteralContext() {}
@@ -11289,7 +12393,7 @@ func (*LiteralContext) IsLiteralContext() {}
 func NewLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *LiteralContext {
 	var p = new(LiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_literal
@@ -11470,31 +12574,15 @@ func (s *LiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) Literal() (localctx ILiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 118, YaklangParserRULE_literal)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(863)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 95, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 95, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
@@ -11528,6 +12616,10 @@ func (p *YaklangParser) Literal() (localctx ILiteralContext) {
 		{
 			p.SetState(856)
 			p.Match(YaklangParserUndefinedLiteral)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 6:
@@ -11535,6 +12627,10 @@ func (p *YaklangParser) Literal() (localctx ILiteralContext) {
 		{
 			p.SetState(857)
 			p.Match(YaklangParserNilLiteral)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 7:
@@ -11572,9 +12668,21 @@ func (p *YaklangParser) Literal() (localctx ILiteralContext) {
 			p.SliceLiteral()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // INumericLiteralContext is an interface to support dynamic dispatch.
@@ -11584,20 +12692,29 @@ type INumericLiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	IntegerLiteral() antlr.TerminalNode
+	FloatLiteral() antlr.TerminalNode
+
 	// IsNumericLiteralContext differentiates from other interfaces.
 	IsNumericLiteralContext()
 }
 
 type NumericLiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyNumericLiteralContext() *NumericLiteralContext {
 	var p = new(NumericLiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_numericLiteral
 	return p
+}
+
+func InitEmptyNumericLiteralContext(p *NumericLiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_numericLiteral
 }
 
 func (*NumericLiteralContext) IsNumericLiteralContext() {}
@@ -11605,7 +12722,7 @@ func (*NumericLiteralContext) IsNumericLiteralContext() {}
 func NewNumericLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *NumericLiteralContext {
 	var p = new(NumericLiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_numericLiteral
@@ -11642,28 +12759,9 @@ func (s *NumericLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *YaklangParser) NumericLiteral() (localctx INumericLiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewNumericLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 120, YaklangParserRULE_numericLiteral)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -11678,7 +12776,17 @@ func (p *YaklangParser) NumericLiteral() (localctx INumericLiteralContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IStringLiteralContext is an interface to support dynamic dispatch.
@@ -11688,20 +12796,35 @@ type IStringLiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	StringLiteral() antlr.TerminalNode
+	StartNowDoc() antlr.TerminalNode
+	HereDocIdentifierName() antlr.TerminalNode
+	HereDocIdentifierBreak() antlr.TerminalNode
+	CRLFEndDoc() antlr.TerminalNode
+	CrlfHereDoc() ICrlfHereDocContext
+	LFEndDoc() antlr.TerminalNode
+	LfHereDoc() ILfHereDocContext
+
 	// IsStringLiteralContext differentiates from other interfaces.
 	IsStringLiteralContext()
 }
 
 type StringLiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyStringLiteralContext() *StringLiteralContext {
 	var p = new(StringLiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_stringLiteral
 	return p
+}
+
+func InitEmptyStringLiteralContext(p *StringLiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_stringLiteral
 }
 
 func (*StringLiteralContext) IsStringLiteralContext() {}
@@ -11709,7 +12832,7 @@ func (*StringLiteralContext) IsStringLiteralContext() {}
 func NewStringLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *StringLiteralContext {
 	var p = new(StringLiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_stringLiteral
@@ -11794,37 +12917,26 @@ func (s *StringLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *YaklangParser) StringLiteral() (localctx IStringLiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewStringLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 122, YaklangParserRULE_stringLiteral)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(882)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 98, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 98, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(867)
 			p.Match(YaklangParserStringLiteral)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 2:
@@ -11832,17 +12944,32 @@ func (p *YaklangParser) StringLiteral() (localctx IStringLiteralContext) {
 		{
 			p.SetState(868)
 			p.Match(YaklangParserStartNowDoc)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(869)
 			p.Match(YaklangParserHereDocIdentifierName)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(870)
 			p.Match(YaklangParserHereDocIdentifierBreak)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(872)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == YaklangParserCRLFHereDocText {
@@ -11855,6 +12982,10 @@ func (p *YaklangParser) StringLiteral() (localctx IStringLiteralContext) {
 		{
 			p.SetState(874)
 			p.Match(YaklangParserCRLFEndDoc)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 3:
@@ -11862,17 +12993,32 @@ func (p *YaklangParser) StringLiteral() (localctx IStringLiteralContext) {
 		{
 			p.SetState(875)
 			p.Match(YaklangParserStartNowDoc)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(876)
 			p.Match(YaklangParserHereDocIdentifierName)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(877)
 			p.Match(YaklangParserHereDocIdentifierBreak)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(879)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == YaklangParserLFHereDocText {
@@ -11885,11 +13031,27 @@ func (p *YaklangParser) StringLiteral() (localctx IStringLiteralContext) {
 		{
 			p.SetState(881)
 			p.Match(YaklangParserLFEndDoc)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ICrlfHereDocContext is an interface to support dynamic dispatch.
@@ -11899,20 +13061,29 @@ type ICrlfHereDocContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllCRLFHereDocText() []antlr.TerminalNode
+	CRLFHereDocText(i int) antlr.TerminalNode
+
 	// IsCrlfHereDocContext differentiates from other interfaces.
 	IsCrlfHereDocContext()
 }
 
 type CrlfHereDocContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyCrlfHereDocContext() *CrlfHereDocContext {
 	var p = new(CrlfHereDocContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_crlfHereDoc
 	return p
+}
+
+func InitEmptyCrlfHereDocContext(p *CrlfHereDocContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_crlfHereDoc
 }
 
 func (*CrlfHereDocContext) IsCrlfHereDocContext() {}
@@ -11920,7 +13091,7 @@ func (*CrlfHereDocContext) IsCrlfHereDocContext() {}
 func NewCrlfHereDocContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CrlfHereDocContext {
 	var p = new(CrlfHereDocContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_crlfHereDoc
@@ -11957,46 +13128,47 @@ func (s *CrlfHereDocContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *YaklangParser) CrlfHereDoc() (localctx ICrlfHereDocContext) {
-	this := p
-	_ = this
-
 	localctx = NewCrlfHereDocContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 124, YaklangParserRULE_crlfHereDoc)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(885)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for ok := true; ok; ok = _la == YaklangParserCRLFHereDocText {
 		{
 			p.SetState(884)
 			p.Match(YaklangParserCRLFHereDocText)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 		p.SetState(887)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ILfHereDocContext is an interface to support dynamic dispatch.
@@ -12006,20 +13178,29 @@ type ILfHereDocContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllLFHereDocText() []antlr.TerminalNode
+	LFHereDocText(i int) antlr.TerminalNode
+
 	// IsLfHereDocContext differentiates from other interfaces.
 	IsLfHereDocContext()
 }
 
 type LfHereDocContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyLfHereDocContext() *LfHereDocContext {
 	var p = new(LfHereDocContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_lfHereDoc
 	return p
+}
+
+func InitEmptyLfHereDocContext(p *LfHereDocContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_lfHereDoc
 }
 
 func (*LfHereDocContext) IsLfHereDocContext() {}
@@ -12027,7 +13208,7 @@ func (*LfHereDocContext) IsLfHereDocContext() {}
 func NewLfHereDocContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *LfHereDocContext {
 	var p = new(LfHereDocContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_lfHereDoc
@@ -12064,46 +13245,47 @@ func (s *LfHereDocContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) LfHereDoc() (localctx ILfHereDocContext) {
-	this := p
-	_ = this
-
 	localctx = NewLfHereDocContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 126, YaklangParserRULE_lfHereDoc)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(890)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for ok := true; ok; ok = _la == YaklangParserLFHereDocText {
 		{
 			p.SetState(889)
 			p.Match(YaklangParserLFHereDocText)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 		p.SetState(892)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITemplateSingleQuoteStringLiteralContext is an interface to support dynamic dispatch.
@@ -12113,20 +13295,31 @@ type ITemplateSingleQuoteStringLiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	TemplateSingleQuoteStringStart() antlr.TerminalNode
+	TemplateSingleQuoteStringCharacterStringEnd() antlr.TerminalNode
+	AllTemplateSingleQuoteStringAtom() []ITemplateSingleQuoteStringAtomContext
+	TemplateSingleQuoteStringAtom(i int) ITemplateSingleQuoteStringAtomContext
+
 	// IsTemplateSingleQuoteStringLiteralContext differentiates from other interfaces.
 	IsTemplateSingleQuoteStringLiteralContext()
 }
 
 type TemplateSingleQuoteStringLiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTemplateSingleQuoteStringLiteralContext() *TemplateSingleQuoteStringLiteralContext {
 	var p = new(TemplateSingleQuoteStringLiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_templateSingleQuoteStringLiteral
 	return p
+}
+
+func InitEmptyTemplateSingleQuoteStringLiteralContext(p *TemplateSingleQuoteStringLiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_templateSingleQuoteStringLiteral
 }
 
 func (*TemplateSingleQuoteStringLiteralContext) IsTemplateSingleQuoteStringLiteralContext() {}
@@ -12134,7 +13327,7 @@ func (*TemplateSingleQuoteStringLiteralContext) IsTemplateSingleQuoteStringLiter
 func NewTemplateSingleQuoteStringLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TemplateSingleQuoteStringLiteralContext {
 	var p = new(TemplateSingleQuoteStringLiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_templateSingleQuoteStringLiteral
@@ -12212,36 +13405,24 @@ func (s *TemplateSingleQuoteStringLiteralContext) Accept(visitor antlr.ParseTree
 }
 
 func (p *YaklangParser) TemplateSingleQuoteStringLiteral() (localctx ITemplateSingleQuoteStringLiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewTemplateSingleQuoteStringLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 128, YaklangParserRULE_templateSingleQuoteStringLiteral)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(894)
 		p.Match(YaklangParserTemplateSingleQuoteStringStart)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(898)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == YaklangParserTemplateSingleQuoteStringCharacter || _la == YaklangParserTemplateSingleQuoteStringStartExpression {
@@ -12252,14 +13433,31 @@ func (p *YaklangParser) TemplateSingleQuoteStringLiteral() (localctx ITemplateSi
 
 		p.SetState(900)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(901)
 		p.Match(YaklangParserTemplateSingleQuoteStringCharacterStringEnd)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITemplateDoubleQuoteStringLiteralContext is an interface to support dynamic dispatch.
@@ -12269,20 +13467,31 @@ type ITemplateDoubleQuoteStringLiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	TemplateDoubleQuoteStringStart() antlr.TerminalNode
+	TemplateDoubleQuoteStringCharacterStringEnd() antlr.TerminalNode
+	AllTemplateDoubleQuoteStringAtom() []ITemplateDoubleQuoteStringAtomContext
+	TemplateDoubleQuoteStringAtom(i int) ITemplateDoubleQuoteStringAtomContext
+
 	// IsTemplateDoubleQuoteStringLiteralContext differentiates from other interfaces.
 	IsTemplateDoubleQuoteStringLiteralContext()
 }
 
 type TemplateDoubleQuoteStringLiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTemplateDoubleQuoteStringLiteralContext() *TemplateDoubleQuoteStringLiteralContext {
 	var p = new(TemplateDoubleQuoteStringLiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_templateDoubleQuoteStringLiteral
 	return p
+}
+
+func InitEmptyTemplateDoubleQuoteStringLiteralContext(p *TemplateDoubleQuoteStringLiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_templateDoubleQuoteStringLiteral
 }
 
 func (*TemplateDoubleQuoteStringLiteralContext) IsTemplateDoubleQuoteStringLiteralContext() {}
@@ -12290,7 +13499,7 @@ func (*TemplateDoubleQuoteStringLiteralContext) IsTemplateDoubleQuoteStringLiter
 func NewTemplateDoubleQuoteStringLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TemplateDoubleQuoteStringLiteralContext {
 	var p = new(TemplateDoubleQuoteStringLiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_templateDoubleQuoteStringLiteral
@@ -12368,36 +13577,24 @@ func (s *TemplateDoubleQuoteStringLiteralContext) Accept(visitor antlr.ParseTree
 }
 
 func (p *YaklangParser) TemplateDoubleQuoteStringLiteral() (localctx ITemplateDoubleQuoteStringLiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewTemplateDoubleQuoteStringLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 130, YaklangParserRULE_templateDoubleQuoteStringLiteral)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(903)
 		p.Match(YaklangParserTemplateDoubleQuoteStringStart)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(907)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == YaklangParserTemplateDoubleQuoteStringCharacter || _la == YaklangParserTemplateDoubleQuoteStringStartExpression {
@@ -12408,14 +13605,31 @@ func (p *YaklangParser) TemplateDoubleQuoteStringLiteral() (localctx ITemplateDo
 
 		p.SetState(909)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(910)
 		p.Match(YaklangParserTemplateDoubleQuoteStringCharacterStringEnd)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITemplateBackTickStringLiteralContext is an interface to support dynamic dispatch.
@@ -12425,20 +13639,31 @@ type ITemplateBackTickStringLiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	TemplateBackTickStringStart() antlr.TerminalNode
+	TemplateBackTickStringCharacterStringEnd() antlr.TerminalNode
+	AllTemplateBackTickStringAtom() []ITemplateBackTickStringAtomContext
+	TemplateBackTickStringAtom(i int) ITemplateBackTickStringAtomContext
+
 	// IsTemplateBackTickStringLiteralContext differentiates from other interfaces.
 	IsTemplateBackTickStringLiteralContext()
 }
 
 type TemplateBackTickStringLiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTemplateBackTickStringLiteralContext() *TemplateBackTickStringLiteralContext {
 	var p = new(TemplateBackTickStringLiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_templateBackTickStringLiteral
 	return p
+}
+
+func InitEmptyTemplateBackTickStringLiteralContext(p *TemplateBackTickStringLiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_templateBackTickStringLiteral
 }
 
 func (*TemplateBackTickStringLiteralContext) IsTemplateBackTickStringLiteralContext() {}
@@ -12446,7 +13671,7 @@ func (*TemplateBackTickStringLiteralContext) IsTemplateBackTickStringLiteralCont
 func NewTemplateBackTickStringLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TemplateBackTickStringLiteralContext {
 	var p = new(TemplateBackTickStringLiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_templateBackTickStringLiteral
@@ -12524,36 +13749,24 @@ func (s *TemplateBackTickStringLiteralContext) Accept(visitor antlr.ParseTreeVis
 }
 
 func (p *YaklangParser) TemplateBackTickStringLiteral() (localctx ITemplateBackTickStringLiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewTemplateBackTickStringLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 132, YaklangParserRULE_templateBackTickStringLiteral)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(912)
 		p.Match(YaklangParserTemplateBackTickStringStart)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(916)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == YaklangParserTemplateBackTickStringCharacter || _la == YaklangParserTemplateBackTickStringStartExpression {
@@ -12564,14 +13777,31 @@ func (p *YaklangParser) TemplateBackTickStringLiteral() (localctx ITemplateBackT
 
 		p.SetState(918)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(919)
 		p.Match(YaklangParserTemplateBackTickStringCharacterStringEnd)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITemplateStringLiteralContext is an interface to support dynamic dispatch.
@@ -12581,20 +13811,30 @@ type ITemplateStringLiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	TemplateSingleQuoteStringLiteral() ITemplateSingleQuoteStringLiteralContext
+	TemplateDoubleQuoteStringLiteral() ITemplateDoubleQuoteStringLiteralContext
+	TemplateBackTickStringLiteral() ITemplateBackTickStringLiteralContext
+
 	// IsTemplateStringLiteralContext differentiates from other interfaces.
 	IsTemplateStringLiteralContext()
 }
 
 type TemplateStringLiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTemplateStringLiteralContext() *TemplateStringLiteralContext {
 	var p = new(TemplateStringLiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_templateStringLiteral
 	return p
+}
+
+func InitEmptyTemplateStringLiteralContext(p *TemplateStringLiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_templateStringLiteral
 }
 
 func (*TemplateStringLiteralContext) IsTemplateStringLiteralContext() {}
@@ -12602,7 +13842,7 @@ func (*TemplateStringLiteralContext) IsTemplateStringLiteralContext() {}
 func NewTemplateStringLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TemplateStringLiteralContext {
 	var p = new(TemplateStringLiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_templateStringLiteral
@@ -12679,30 +13919,13 @@ func (s *TemplateStringLiteralContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *YaklangParser) TemplateStringLiteral() (localctx ITemplateStringLiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewTemplateStringLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 134, YaklangParserRULE_templateStringLiteral)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(924)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case YaklangParserTemplateSingleQuoteStringStart:
@@ -12727,10 +13950,21 @@ func (p *YaklangParser) TemplateStringLiteral() (localctx ITemplateStringLiteral
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITemplateSingleQuoteStringAtomContext is an interface to support dynamic dispatch.
@@ -12740,20 +13974,32 @@ type ITemplateSingleQuoteStringAtomContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllTemplateSingleQuoteStringCharacter() []antlr.TerminalNode
+	TemplateSingleQuoteStringCharacter(i int) antlr.TerminalNode
+	TemplateSingleQuoteStringStartExpression() antlr.TerminalNode
+	Expression() IExpressionContext
+	TemplateCloseBrace() antlr.TerminalNode
+
 	// IsTemplateSingleQuoteStringAtomContext differentiates from other interfaces.
 	IsTemplateSingleQuoteStringAtomContext()
 }
 
 type TemplateSingleQuoteStringAtomContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTemplateSingleQuoteStringAtomContext() *TemplateSingleQuoteStringAtomContext {
 	var p = new(TemplateSingleQuoteStringAtomContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_templateSingleQuoteStringAtom
 	return p
+}
+
+func InitEmptyTemplateSingleQuoteStringAtomContext(p *TemplateSingleQuoteStringAtomContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_templateSingleQuoteStringAtom
 }
 
 func (*TemplateSingleQuoteStringAtomContext) IsTemplateSingleQuoteStringAtomContext() {}
@@ -12761,7 +14007,7 @@ func (*TemplateSingleQuoteStringAtomContext) IsTemplateSingleQuoteStringAtomCont
 func NewTemplateSingleQuoteStringAtomContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TemplateSingleQuoteStringAtomContext {
 	var p = new(TemplateSingleQuoteStringAtomContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_templateSingleQuoteStringAtom
@@ -12822,38 +14068,24 @@ func (s *TemplateSingleQuoteStringAtomContext) Accept(visitor antlr.ParseTreeVis
 }
 
 func (p *YaklangParser) TemplateSingleQuoteStringAtom() (localctx ITemplateSingleQuoteStringAtomContext) {
-	this := p
-	_ = this
-
 	localctx = NewTemplateSingleQuoteStringAtomContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 136, YaklangParserRULE_templateSingleQuoteStringAtom)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.SetState(935)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case YaklangParserTemplateSingleQuoteStringCharacter:
 		p.EnterOuterAlt(localctx, 1)
 		p.SetState(927)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_alt = 1
 		for ok := true; ok; ok = _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			switch _alt {
@@ -12861,15 +14093,23 @@ func (p *YaklangParser) TemplateSingleQuoteStringAtom() (localctx ITemplateSingl
 				{
 					p.SetState(926)
 					p.Match(YaklangParserTemplateSingleQuoteStringCharacter)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 
 			default:
-				panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				goto errorExit
 			}
 
 			p.SetState(929)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 105, p.GetParserRuleContext())
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 105, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 
 	case YaklangParserTemplateSingleQuoteStringStartExpression:
@@ -12877,6 +14117,10 @@ func (p *YaklangParser) TemplateSingleQuoteStringAtom() (localctx ITemplateSingl
 		{
 			p.SetState(931)
 			p.Match(YaklangParserTemplateSingleQuoteStringStartExpression)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(932)
@@ -12885,13 +14129,28 @@ func (p *YaklangParser) TemplateSingleQuoteStringAtom() (localctx ITemplateSingl
 		{
 			p.SetState(933)
 			p.Match(YaklangParserTemplateCloseBrace)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITemplateDoubleQuoteStringAtomContext is an interface to support dynamic dispatch.
@@ -12901,20 +14160,32 @@ type ITemplateDoubleQuoteStringAtomContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllTemplateDoubleQuoteStringCharacter() []antlr.TerminalNode
+	TemplateDoubleQuoteStringCharacter(i int) antlr.TerminalNode
+	TemplateDoubleQuoteStringStartExpression() antlr.TerminalNode
+	Expression() IExpressionContext
+	TemplateCloseBrace() antlr.TerminalNode
+
 	// IsTemplateDoubleQuoteStringAtomContext differentiates from other interfaces.
 	IsTemplateDoubleQuoteStringAtomContext()
 }
 
 type TemplateDoubleQuoteStringAtomContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTemplateDoubleQuoteStringAtomContext() *TemplateDoubleQuoteStringAtomContext {
 	var p = new(TemplateDoubleQuoteStringAtomContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_templateDoubleQuoteStringAtom
 	return p
+}
+
+func InitEmptyTemplateDoubleQuoteStringAtomContext(p *TemplateDoubleQuoteStringAtomContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_templateDoubleQuoteStringAtom
 }
 
 func (*TemplateDoubleQuoteStringAtomContext) IsTemplateDoubleQuoteStringAtomContext() {}
@@ -12922,7 +14193,7 @@ func (*TemplateDoubleQuoteStringAtomContext) IsTemplateDoubleQuoteStringAtomCont
 func NewTemplateDoubleQuoteStringAtomContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TemplateDoubleQuoteStringAtomContext {
 	var p = new(TemplateDoubleQuoteStringAtomContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_templateDoubleQuoteStringAtom
@@ -12983,38 +14254,24 @@ func (s *TemplateDoubleQuoteStringAtomContext) Accept(visitor antlr.ParseTreeVis
 }
 
 func (p *YaklangParser) TemplateDoubleQuoteStringAtom() (localctx ITemplateDoubleQuoteStringAtomContext) {
-	this := p
-	_ = this
-
 	localctx = NewTemplateDoubleQuoteStringAtomContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 138, YaklangParserRULE_templateDoubleQuoteStringAtom)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.SetState(946)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case YaklangParserTemplateDoubleQuoteStringCharacter:
 		p.EnterOuterAlt(localctx, 1)
 		p.SetState(938)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_alt = 1
 		for ok := true; ok; ok = _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			switch _alt {
@@ -13022,15 +14279,23 @@ func (p *YaklangParser) TemplateDoubleQuoteStringAtom() (localctx ITemplateDoubl
 				{
 					p.SetState(937)
 					p.Match(YaklangParserTemplateDoubleQuoteStringCharacter)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 
 			default:
-				panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				goto errorExit
 			}
 
 			p.SetState(940)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 107, p.GetParserRuleContext())
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 107, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 
 	case YaklangParserTemplateDoubleQuoteStringStartExpression:
@@ -13038,6 +14303,10 @@ func (p *YaklangParser) TemplateDoubleQuoteStringAtom() (localctx ITemplateDoubl
 		{
 			p.SetState(942)
 			p.Match(YaklangParserTemplateDoubleQuoteStringStartExpression)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(943)
@@ -13046,13 +14315,28 @@ func (p *YaklangParser) TemplateDoubleQuoteStringAtom() (localctx ITemplateDoubl
 		{
 			p.SetState(944)
 			p.Match(YaklangParserTemplateCloseBrace)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ITemplateBackTickStringAtomContext is an interface to support dynamic dispatch.
@@ -13062,20 +14346,32 @@ type ITemplateBackTickStringAtomContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllTemplateBackTickStringCharacter() []antlr.TerminalNode
+	TemplateBackTickStringCharacter(i int) antlr.TerminalNode
+	TemplateBackTickStringStartExpression() antlr.TerminalNode
+	Expression() IExpressionContext
+	TemplateCloseBrace() antlr.TerminalNode
+
 	// IsTemplateBackTickStringAtomContext differentiates from other interfaces.
 	IsTemplateBackTickStringAtomContext()
 }
 
 type TemplateBackTickStringAtomContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyTemplateBackTickStringAtomContext() *TemplateBackTickStringAtomContext {
 	var p = new(TemplateBackTickStringAtomContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_templateBackTickStringAtom
 	return p
+}
+
+func InitEmptyTemplateBackTickStringAtomContext(p *TemplateBackTickStringAtomContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_templateBackTickStringAtom
 }
 
 func (*TemplateBackTickStringAtomContext) IsTemplateBackTickStringAtomContext() {}
@@ -13083,7 +14379,7 @@ func (*TemplateBackTickStringAtomContext) IsTemplateBackTickStringAtomContext() 
 func NewTemplateBackTickStringAtomContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TemplateBackTickStringAtomContext {
 	var p = new(TemplateBackTickStringAtomContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_templateBackTickStringAtom
@@ -13144,38 +14440,24 @@ func (s *TemplateBackTickStringAtomContext) Accept(visitor antlr.ParseTreeVisito
 }
 
 func (p *YaklangParser) TemplateBackTickStringAtom() (localctx ITemplateBackTickStringAtomContext) {
-	this := p
-	_ = this
-
 	localctx = NewTemplateBackTickStringAtomContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 140, YaklangParserRULE_templateBackTickStringAtom)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.SetState(957)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case YaklangParserTemplateBackTickStringCharacter:
 		p.EnterOuterAlt(localctx, 1)
 		p.SetState(949)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_alt = 1
 		for ok := true; ok; ok = _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			switch _alt {
@@ -13183,15 +14465,23 @@ func (p *YaklangParser) TemplateBackTickStringAtom() (localctx ITemplateBackTick
 				{
 					p.SetState(948)
 					p.Match(YaklangParserTemplateBackTickStringCharacter)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 
 			default:
-				panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				goto errorExit
 			}
 
 			p.SetState(951)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 109, p.GetParserRuleContext())
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 109, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 
 	case YaklangParserTemplateBackTickStringStartExpression:
@@ -13199,6 +14489,10 @@ func (p *YaklangParser) TemplateBackTickStringAtom() (localctx ITemplateBackTick
 		{
 			p.SetState(953)
 			p.Match(YaklangParserTemplateBackTickStringStartExpression)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(954)
@@ -13207,13 +14501,28 @@ func (p *YaklangParser) TemplateBackTickStringAtom() (localctx ITemplateBackTick
 		{
 			p.SetState(955)
 			p.Match(YaklangParserTemplateCloseBrace)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IBoolLiteralContext is an interface to support dynamic dispatch.
@@ -13223,20 +14532,29 @@ type IBoolLiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	True() antlr.TerminalNode
+	False() antlr.TerminalNode
+
 	// IsBoolLiteralContext differentiates from other interfaces.
 	IsBoolLiteralContext()
 }
 
 type BoolLiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyBoolLiteralContext() *BoolLiteralContext {
 	var p = new(BoolLiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_boolLiteral
 	return p
+}
+
+func InitEmptyBoolLiteralContext(p *BoolLiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_boolLiteral
 }
 
 func (*BoolLiteralContext) IsBoolLiteralContext() {}
@@ -13244,7 +14562,7 @@ func (*BoolLiteralContext) IsBoolLiteralContext() {}
 func NewBoolLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *BoolLiteralContext {
 	var p = new(BoolLiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_boolLiteral
@@ -13281,28 +14599,9 @@ func (s *BoolLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *YaklangParser) BoolLiteral() (localctx IBoolLiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewBoolLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 142, YaklangParserRULE_boolLiteral)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -13317,7 +14616,17 @@ func (p *YaklangParser) BoolLiteral() (localctx IBoolLiteralContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ICharacterLiteralContext is an interface to support dynamic dispatch.
@@ -13327,20 +14636,28 @@ type ICharacterLiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	CharacterLiteral() antlr.TerminalNode
+
 	// IsCharacterLiteralContext differentiates from other interfaces.
 	IsCharacterLiteralContext()
 }
 
 type CharacterLiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyCharacterLiteralContext() *CharacterLiteralContext {
 	var p = new(CharacterLiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_characterLiteral
 	return p
+}
+
+func InitEmptyCharacterLiteralContext(p *CharacterLiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_characterLiteral
 }
 
 func (*CharacterLiteralContext) IsCharacterLiteralContext() {}
@@ -13348,7 +14665,7 @@ func (*CharacterLiteralContext) IsCharacterLiteralContext() {}
 func NewCharacterLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CharacterLiteralContext {
 	var p = new(CharacterLiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_characterLiteral
@@ -13381,35 +14698,29 @@ func (s *CharacterLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *YaklangParser) CharacterLiteral() (localctx ICharacterLiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewCharacterLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 144, YaklangParserRULE_characterLiteral)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(961)
 		p.Match(YaklangParserCharacterLiteral)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISliceLiteralContext is an interface to support dynamic dispatch.
@@ -13419,20 +14730,32 @@ type ISliceLiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	LBracket() antlr.TerminalNode
+	RBracket() antlr.TerminalNode
+	AllWs() []IWsContext
+	Ws(i int) IWsContext
+	ExpressionListMultiline() IExpressionListMultilineContext
+
 	// IsSliceLiteralContext differentiates from other interfaces.
 	IsSliceLiteralContext()
 }
 
 type SliceLiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptySliceLiteralContext() *SliceLiteralContext {
 	var p = new(SliceLiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_sliceLiteral
 	return p
+}
+
+func InitEmptySliceLiteralContext(p *SliceLiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_sliceLiteral
 }
 
 func (*SliceLiteralContext) IsSliceLiteralContext() {}
@@ -13440,7 +14763,7 @@ func (*SliceLiteralContext) IsSliceLiteralContext() {}
 func NewSliceLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SliceLiteralContext {
 	var p = new(SliceLiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_sliceLiteral
@@ -13534,28 +14857,9 @@ func (s *SliceLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *YaklangParser) SliceLiteral() (localctx ISliceLiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewSliceLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 146, YaklangParserRULE_sliceLiteral)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -13563,11 +14867,20 @@ func (p *YaklangParser) SliceLiteral() (localctx ISliceLiteralContext) {
 	{
 		p.SetState(963)
 		p.Match(YaklangParserLBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(967)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 111, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 111, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -13578,13 +14891,22 @@ func (p *YaklangParser) SliceLiteral() (localctx ISliceLiteralContext) {
 		}
 		p.SetState(969)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 111, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 111, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(971)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0 || (int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0 {
+	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0) {
 		{
 			p.SetState(970)
 			p.ExpressionListMultiline()
@@ -13593,6 +14915,9 @@ func (p *YaklangParser) SliceLiteral() (localctx ISliceLiteralContext) {
 	}
 	p.SetState(976)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -13603,14 +14928,31 @@ func (p *YaklangParser) SliceLiteral() (localctx ISliceLiteralContext) {
 
 		p.SetState(978)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(979)
 		p.Match(YaklangParserRBracket)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISliceTypedLiteralContext is an interface to support dynamic dispatch.
@@ -13620,20 +14962,34 @@ type ISliceTypedLiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	SliceTypeLiteral() ISliceTypeLiteralContext
+	LBrace() antlr.TerminalNode
+	RBrace() antlr.TerminalNode
+	AllWs() []IWsContext
+	Ws(i int) IWsContext
+	ExpressionListMultiline() IExpressionListMultilineContext
+	SemiColon() antlr.TerminalNode
+
 	// IsSliceTypedLiteralContext differentiates from other interfaces.
 	IsSliceTypedLiteralContext()
 }
 
 type SliceTypedLiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptySliceTypedLiteralContext() *SliceTypedLiteralContext {
 	var p = new(SliceTypedLiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_sliceTypedLiteral
 	return p
+}
+
+func InitEmptySliceTypedLiteralContext(p *SliceTypedLiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_sliceTypedLiteral
 }
 
 func (*SliceTypedLiteralContext) IsSliceTypedLiteralContext() {}
@@ -13641,7 +14997,7 @@ func (*SliceTypedLiteralContext) IsSliceTypedLiteralContext() {}
 func NewSliceTypedLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SliceTypedLiteralContext {
 	var p = new(SliceTypedLiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_sliceTypedLiteral
@@ -13755,28 +15111,9 @@ func (s *SliceTypedLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *YaklangParser) SliceTypedLiteral() (localctx ISliceTypedLiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewSliceTypedLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 148, YaklangParserRULE_sliceTypedLiteral)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -13788,11 +15125,20 @@ func (p *YaklangParser) SliceTypedLiteral() (localctx ISliceTypedLiteralContext)
 	{
 		p.SetState(982)
 		p.Match(YaklangParserLBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(986)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 114, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 114, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -13803,13 +15149,22 @@ func (p *YaklangParser) SliceTypedLiteral() (localctx ISliceTypedLiteralContext)
 		}
 		p.SetState(988)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 114, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 114, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(990)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0 || (int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0 {
+	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0) {
 		{
 			p.SetState(989)
 			p.ExpressionListMultiline()
@@ -13818,6 +15173,9 @@ func (p *YaklangParser) SliceTypedLiteral() (localctx ISliceTypedLiteralContext)
 	}
 	p.SetState(995)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -13828,25 +15186,49 @@ func (p *YaklangParser) SliceTypedLiteral() (localctx ISliceTypedLiteralContext)
 
 		p.SetState(997)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	p.SetState(999)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == YaklangParserSemiColon {
 		{
 			p.SetState(998)
 			p.Match(YaklangParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 	{
 		p.SetState(1001)
 		p.Match(YaklangParserRBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IExpressionListContext is an interface to support dynamic dispatch.
@@ -13856,20 +15238,31 @@ type IExpressionListContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllExpression() []IExpressionContext
+	Expression(i int) IExpressionContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+
 	// IsExpressionListContext differentiates from other interfaces.
 	IsExpressionListContext()
 }
 
 type ExpressionListContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyExpressionListContext() *ExpressionListContext {
 	var p = new(ExpressionListContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_expressionList
 	return p
+}
+
+func InitEmptyExpressionListContext(p *ExpressionListContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_expressionList
 }
 
 func (*ExpressionListContext) IsExpressionListContext() {}
@@ -13877,7 +15270,7 @@ func (*ExpressionListContext) IsExpressionListContext() {}
 func NewExpressionListContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ExpressionListContext {
 	var p = new(ExpressionListContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_expressionList
@@ -13955,28 +15348,9 @@ func (s *ExpressionListContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *YaklangParser) ExpressionList() (localctx IExpressionListContext) {
-	this := p
-	_ = this
-
 	localctx = NewExpressionListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 150, YaklangParserRULE_expressionList)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -13987,13 +15361,22 @@ func (p *YaklangParser) ExpressionList() (localctx IExpressionListContext) {
 	}
 	p.SetState(1008)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 118, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 118, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
 				p.SetState(1004)
 				p.Match(YaklangParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(1005)
@@ -14003,21 +15386,44 @@ func (p *YaklangParser) ExpressionList() (localctx IExpressionListContext) {
 		}
 		p.SetState(1010)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 118, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 118, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(1012)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == YaklangParserComma {
 		{
 			p.SetState(1011)
 			p.Match(YaklangParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IExpressionListMultilineContext is an interface to support dynamic dispatch.
@@ -14027,20 +15433,33 @@ type IExpressionListMultilineContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllExpression() []IExpressionContext
+	Expression(i int) IExpressionContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+	AllWs() []IWsContext
+	Ws(i int) IWsContext
+
 	// IsExpressionListMultilineContext differentiates from other interfaces.
 	IsExpressionListMultilineContext()
 }
 
 type ExpressionListMultilineContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyExpressionListMultilineContext() *ExpressionListMultilineContext {
 	var p = new(ExpressionListMultilineContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_expressionListMultiline
 	return p
+}
+
+func InitEmptyExpressionListMultilineContext(p *ExpressionListMultilineContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_expressionListMultiline
 }
 
 func (*ExpressionListMultilineContext) IsExpressionListMultilineContext() {}
@@ -14048,7 +15467,7 @@ func (*ExpressionListMultilineContext) IsExpressionListMultilineContext() {}
 func NewExpressionListMultilineContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ExpressionListMultilineContext {
 	var p = new(ExpressionListMultilineContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_expressionListMultiline
@@ -14167,28 +15586,9 @@ func (s *ExpressionListMultilineContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 func (p *YaklangParser) ExpressionListMultiline() (localctx IExpressionListMultilineContext) {
-	this := p
-	_ = this
-
 	localctx = NewExpressionListMultilineContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 152, YaklangParserRULE_expressionListMultiline)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -14199,16 +15599,28 @@ func (p *YaklangParser) ExpressionListMultiline() (localctx IExpressionListMulti
 	}
 	p.SetState(1025)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 121, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 121, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
 				p.SetState(1015)
 				p.Match(YaklangParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			p.SetState(1019)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 
 			for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -14219,6 +15631,9 @@ func (p *YaklangParser) ExpressionListMultiline() (localctx IExpressionListMulti
 
 				p.SetState(1021)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 			}
 			{
@@ -14229,21 +15644,44 @@ func (p *YaklangParser) ExpressionListMultiline() (localctx IExpressionListMulti
 		}
 		p.SetState(1027)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 121, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 121, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(1029)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == YaklangParserComma {
 		{
 			p.SetState(1028)
 			p.Match(YaklangParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IMapLiteralContext is an interface to support dynamic dispatch.
@@ -14253,20 +15691,34 @@ type IMapLiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	MapTypedLiteral() IMapTypedLiteralContext
+	LBrace() antlr.TerminalNode
+	RBrace() antlr.TerminalNode
+	AllWs() []IWsContext
+	Ws(i int) IWsContext
+	MapPairs() IMapPairsContext
+	SemiColon() antlr.TerminalNode
+
 	// IsMapLiteralContext differentiates from other interfaces.
 	IsMapLiteralContext()
 }
 
 type MapLiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyMapLiteralContext() *MapLiteralContext {
 	var p = new(MapLiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_mapLiteral
 	return p
+}
+
+func InitEmptyMapLiteralContext(p *MapLiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_mapLiteral
 }
 
 func (*MapLiteralContext) IsMapLiteralContext() {}
@@ -14274,7 +15726,7 @@ func (*MapLiteralContext) IsMapLiteralContext() {}
 func NewMapLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MapLiteralContext {
 	var p = new(MapLiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_mapLiteral
@@ -14388,33 +15840,17 @@ func (s *MapLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) MapLiteral() (localctx IMapLiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewMapLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 154, YaklangParserRULE_mapLiteral)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
 	p.SetState(1052)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case YaklangParserMap:
@@ -14429,11 +15865,20 @@ func (p *YaklangParser) MapLiteral() (localctx IMapLiteralContext) {
 		{
 			p.SetState(1032)
 			p.Match(YaklangParserLBrace)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(1036)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 123, p.GetParserRuleContext())
-
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 123, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 		for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			if _alt == 1 {
 				{
@@ -14444,13 +15889,22 @@ func (p *YaklangParser) MapLiteral() (localctx IMapLiteralContext) {
 			}
 			p.SetState(1038)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 123, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 123, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 		p.SetState(1040)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0 || (int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0 {
+		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0) {
 			{
 				p.SetState(1039)
 				p.MapPairs()
@@ -14459,6 +15913,9 @@ func (p *YaklangParser) MapLiteral() (localctx IMapLiteralContext) {
 		}
 		p.SetState(1045)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -14469,29 +15926,54 @@ func (p *YaklangParser) MapLiteral() (localctx IMapLiteralContext) {
 
 			p.SetState(1047)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 		p.SetState(1049)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == YaklangParserSemiColon {
 			{
 				p.SetState(1048)
 				p.Match(YaklangParserSemiColon)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		{
 			p.SetState(1051)
 			p.Match(YaklangParserRBrace)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IMapTypedLiteralContext is an interface to support dynamic dispatch.
@@ -14501,20 +15983,34 @@ type IMapTypedLiteralContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	MapTypeLiteral() IMapTypeLiteralContext
+	LBrace() antlr.TerminalNode
+	RBrace() antlr.TerminalNode
+	AllWs() []IWsContext
+	Ws(i int) IWsContext
+	MapPairs() IMapPairsContext
+	SemiColon() antlr.TerminalNode
+
 	// IsMapTypedLiteralContext differentiates from other interfaces.
 	IsMapTypedLiteralContext()
 }
 
 type MapTypedLiteralContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyMapTypedLiteralContext() *MapTypedLiteralContext {
 	var p = new(MapTypedLiteralContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_mapTypedLiteral
 	return p
+}
+
+func InitEmptyMapTypedLiteralContext(p *MapTypedLiteralContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_mapTypedLiteral
 }
 
 func (*MapTypedLiteralContext) IsMapTypedLiteralContext() {}
@@ -14522,7 +16018,7 @@ func (*MapTypedLiteralContext) IsMapTypedLiteralContext() {}
 func NewMapTypedLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MapTypedLiteralContext {
 	var p = new(MapTypedLiteralContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_mapTypedLiteral
@@ -14636,28 +16132,9 @@ func (s *MapTypedLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *YaklangParser) MapTypedLiteral() (localctx IMapTypedLiteralContext) {
-	this := p
-	_ = this
-
 	localctx = NewMapTypedLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 156, YaklangParserRULE_mapTypedLiteral)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -14669,11 +16146,20 @@ func (p *YaklangParser) MapTypedLiteral() (localctx IMapTypedLiteralContext) {
 	{
 		p.SetState(1055)
 		p.Match(YaklangParserLBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	p.SetState(1059)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 128, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 128, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -14684,13 +16170,22 @@ func (p *YaklangParser) MapTypedLiteral() (localctx IMapTypedLiteralContext) {
 		}
 		p.SetState(1061)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 128, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 128, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(1063)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
-	if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0 || (int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0 {
+	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-8926975740524625914) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&17463404134405) != 0) {
 		{
 			p.SetState(1062)
 			p.MapPairs()
@@ -14699,6 +16194,9 @@ func (p *YaklangParser) MapTypedLiteral() (localctx IMapTypedLiteralContext) {
 	}
 	p.SetState(1068)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -14709,25 +16207,49 @@ func (p *YaklangParser) MapTypedLiteral() (localctx IMapTypedLiteralContext) {
 
 		p.SetState(1070)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	p.SetState(1072)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == YaklangParserSemiColon {
 		{
 			p.SetState(1071)
 			p.Match(YaklangParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 	{
 		p.SetState(1074)
 		p.Match(YaklangParserRBrace)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IMapPairsContext is an interface to support dynamic dispatch.
@@ -14737,20 +16259,33 @@ type IMapPairsContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllMapPair() []IMapPairContext
+	MapPair(i int) IMapPairContext
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+	AllWs() []IWsContext
+	Ws(i int) IWsContext
+
 	// IsMapPairsContext differentiates from other interfaces.
 	IsMapPairsContext()
 }
 
 type MapPairsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyMapPairsContext() *MapPairsContext {
 	var p = new(MapPairsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_mapPairs
 	return p
+}
+
+func InitEmptyMapPairsContext(p *MapPairsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_mapPairs
 }
 
 func (*MapPairsContext) IsMapPairsContext() {}
@@ -14758,7 +16293,7 @@ func (*MapPairsContext) IsMapPairsContext() {}
 func NewMapPairsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MapPairsContext {
 	var p = new(MapPairsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_mapPairs
@@ -14877,28 +16412,9 @@ func (s *MapPairsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) MapPairs() (localctx IMapPairsContext) {
-	this := p
-	_ = this
-
 	localctx = NewMapPairsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 158, YaklangParserRULE_mapPairs)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -14909,16 +16425,28 @@ func (p *YaklangParser) MapPairs() (localctx IMapPairsContext) {
 	}
 	p.SetState(1087)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 133, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 133, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
 				p.SetState(1077)
 				p.Match(YaklangParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			p.SetState(1081)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 
 			for (int64((_la-97)) & ^0x3f) == 0 && ((int64(1)<<(_la-97))&13) != 0 {
@@ -14929,6 +16457,9 @@ func (p *YaklangParser) MapPairs() (localctx IMapPairsContext) {
 
 				p.SetState(1083)
 				p.GetErrorHandler().Sync(p)
+				if p.HasError() {
+					goto errorExit
+				}
 				_la = p.GetTokenStream().LA(1)
 			}
 			{
@@ -14939,21 +16470,44 @@ func (p *YaklangParser) MapPairs() (localctx IMapPairsContext) {
 		}
 		p.SetState(1089)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 133, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 133, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(1091)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == YaklangParserComma {
 		{
 			p.SetState(1090)
 			p.Match(YaklangParserComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IMapPairContext is an interface to support dynamic dispatch.
@@ -14963,20 +16517,30 @@ type IMapPairContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllExpression() []IExpressionContext
+	Expression(i int) IExpressionContext
+	Colon() antlr.TerminalNode
+
 	// IsMapPairContext differentiates from other interfaces.
 	IsMapPairContext()
 }
 
 type MapPairContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyMapPairContext() *MapPairContext {
 	var p = new(MapPairContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_mapPair
 	return p
+}
+
+func InitEmptyMapPairContext(p *MapPairContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_mapPair
 }
 
 func (*MapPairContext) IsMapPairContext() {}
@@ -14984,7 +16548,7 @@ func (*MapPairContext) IsMapPairContext() {}
 func NewMapPairContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MapPairContext {
 	var p = new(MapPairContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_mapPair
@@ -15058,28 +16622,8 @@ func (s *MapPairContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) MapPair() (localctx IMapPairContext) {
-	this := p
-	_ = this
-
 	localctx = NewMapPairContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 160, YaklangParserRULE_mapPair)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1093)
@@ -15088,13 +16632,27 @@ func (p *YaklangParser) MapPair() (localctx IMapPairContext) {
 	{
 		p.SetState(1094)
 		p.Match(YaklangParserColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(1095)
 		p.expression(0)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IWsContext is an interface to support dynamic dispatch.
@@ -15104,20 +16662,33 @@ type IWsContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllLF() []antlr.TerminalNode
+	LF(i int) antlr.TerminalNode
+	AllCOMMENT() []antlr.TerminalNode
+	COMMENT(i int) antlr.TerminalNode
+	AllLINE_COMMENT() []antlr.TerminalNode
+	LINE_COMMENT(i int) antlr.TerminalNode
+
 	// IsWsContext differentiates from other interfaces.
 	IsWsContext()
 }
 
 type WsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyWsContext() *WsContext {
 	var p = new(WsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_ws
 	return p
+}
+
+func InitEmptyWsContext(p *WsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_ws
 }
 
 func (*WsContext) IsWsContext() {}
@@ -15125,7 +16696,7 @@ func (*WsContext) IsWsContext() {}
 func NewWsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *WsContext {
 	var p = new(WsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_ws
@@ -15178,34 +16749,18 @@ func (s *WsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) Ws() (localctx IWsContext) {
-	this := p
-	_ = this
-
 	localctx = NewWsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 162, YaklangParserRULE_ws)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(1098)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_alt = 1
 	for ok := true; ok; ok = _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		switch _alt {
@@ -15223,15 +16778,29 @@ func (p *YaklangParser) Ws() (localctx IWsContext) {
 			}
 
 		default:
-			panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+			goto errorExit
 		}
 
 		p.SetState(1100)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 135, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 135, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IEosContext is an interface to support dynamic dispatch.
@@ -15241,20 +16810,32 @@ type IEosContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	SemiColon() antlr.TerminalNode
+	AllLF() []antlr.TerminalNode
+	LF(i int) antlr.TerminalNode
+	COMMENT() antlr.TerminalNode
+	LINE_COMMENT() antlr.TerminalNode
+
 	// IsEosContext differentiates from other interfaces.
 	IsEosContext()
 }
 
 type EosContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyEosContext() *EosContext {
 	var p = new(EosContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = YaklangParserRULE_eos
 	return p
+}
+
+func InitEmptyEosContext(p *EosContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = YaklangParserRULE_eos
 }
 
 func (*EosContext) IsEosContext() {}
@@ -15262,7 +16843,7 @@ func (*EosContext) IsEosContext() {}
 func NewEosContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *EosContext {
 	var p = new(EosContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = YaklangParserRULE_eos
@@ -15311,32 +16892,15 @@ func (s *EosContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) Eos() (localctx IEosContext) {
-	this := p
-	_ = this
-
 	localctx = NewEosContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 164, YaklangParserRULE_eos)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.SetState(1110)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case YaklangParserSemiColon:
@@ -15344,12 +16908,19 @@ func (p *YaklangParser) Eos() (localctx IEosContext) {
 		{
 			p.SetState(1102)
 			p.Match(YaklangParserSemiColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case YaklangParserLF:
 		p.EnterOuterAlt(localctx, 2)
 		p.SetState(1104)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_alt = 1
 		for ok := true; ok; ok = _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 			switch _alt {
@@ -15357,15 +16928,23 @@ func (p *YaklangParser) Eos() (localctx IEosContext) {
 				{
 					p.SetState(1103)
 					p.Match(YaklangParserLF)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 
 			default:
-				panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+				goto errorExit
 			}
 
 			p.SetState(1106)
 			p.GetErrorHandler().Sync(p)
-			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 136, p.GetParserRuleContext())
+			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 136, p.GetParserRuleContext())
+			if p.HasError() {
+				goto errorExit
+			}
 		}
 
 	case YaklangParserCOMMENT:
@@ -15373,6 +16952,10 @@ func (p *YaklangParser) Eos() (localctx IEosContext) {
 		{
 			p.SetState(1108)
 			p.Match(YaklangParserCOMMENT)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case YaklangParserLINE_COMMENT:
@@ -15380,13 +16963,28 @@ func (p *YaklangParser) Eos() (localctx IEosContext) {
 		{
 			p.SetState(1109)
 			p.Match(YaklangParserLINE_COMMENT)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 func (p *YaklangParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int) bool {
@@ -15404,9 +17002,6 @@ func (p *YaklangParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex
 }
 
 func (p *YaklangParser) Expression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
-	this := p
-	_ = this
-
 	switch predIndex {
 	case 0:
 		return p.Precpred(p.GetParserRuleContext(), 9)

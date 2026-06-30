@@ -1,7 +1,7 @@
 package pythonparser
 
 import (
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 )
 
 // TabSize is the number of spaces that a tab character represents
