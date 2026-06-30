@@ -146,6 +146,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	feedbackToUser := feedbackFactory(s.GetProjectDatabase(), execFeedback, false, "")
 
 	getPlainRequestBytes := func(req *http.Request) []byte {
+		if req != nil && httpctx.GetRequestTooLarge(req) {
+			if cached := httpctx.GetRequestDisplayPacket(req); len(cached) > 0 {
+				return cached
+			}
+		}
 		var plainRequest []byte
 		if httpctx.GetRequestIsModified(req) {
 			plainRequest = httpctx.GetHijackedRequestBytes(req)
@@ -153,8 +158,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			plainRequest = httpctx.GetPlainRequestBytes(req)
 			if len(plainRequest) <= 0 {
 				decoded := lowhttp.DeletePacketEncoding(httpctx.GetBareRequestBytes(req))
-				httpctx.SetPlainRequestBytes(req, decoded)
 				plainRequest = decoded
+				if _, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(decoded); len(body) <= yakit.MaxHTTPFlowRequestBodyInDBBytes {
+					httpctx.SetPlainRequestBytes(req, decoded)
+				}
 			}
 		}
 		return yakit.PrepareLargeHTTPFlowRequest(req, plainRequest)
