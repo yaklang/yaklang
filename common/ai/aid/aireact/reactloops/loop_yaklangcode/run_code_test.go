@@ -70,7 +70,27 @@ if YAK_MAIN { runSelfTest() }
 	assert.True(t, strings.Contains(feedback, "boom") || strings.Contains(err.Error(), "boom"))
 }
 
+func TestRunYakSelfTest_CliCheckWithRequiredTarget(t *testing.T) {
+	code := `
+TARGET = cli.String("target", cli.setRequired(true))
+SQLI_ENABLE = cli.Bool("sqli-enable", cli.setDefault(true))
+cli.check()
+func runSelfTest() {
+    assert true, "ok"
+}
+if YAK_MAIN { runSelfTest() }
+`
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	result, err := RunYakSelfTest(ctx, code, "cli_check_test.yak", 15)
+	require.NoError(t, err, "output=%s err=%v", result.Output, err)
+}
+
 func TestRunYakSelfTest_DebounceTimerDoesNotCrashEngine(t *testing.T) {
+	if _, err := resolveYakEngineBinary(); err != nil {
+		t.Skip("yak engine binary required for subprocess goroutine isolation test")
+	}
 	code := `
 counter = make(map[string]int)
 reloadTarget = func(path, eventType) {

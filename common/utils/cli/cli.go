@@ -41,6 +41,10 @@ func (c *CliApp) SetCliCheckCallback(f func()) {
 	c.cliCheckCallback = f
 }
 
+func (c *CliApp) GetCliCheckCallback() func() {
+	return c.cliCheckCallback
+}
+
 func NewCliApp() *CliApp {
 	helpParam := &cliExtraParams{
 		optShortName: "h",
