@@ -211,8 +211,8 @@ func TestGetApiKey_ReplaceAPIKeys(t *testing.T) {
 			}).
 			Build()
 
-		req := &ypb.GetApiKeyRequest{Token: "test-token"}
-		resp, err := server.GetApiKey(context.Background(), req)
+		req := &ypb.GetApiKeyByOnlineRequest{Token: "test-token"}
+		resp, err := server.GetApiKeyByOnline(context.Background(), req)
 		require.NoError(t, err)
 		require.NotNil(t, resp)
 		assert.Equal(t, newAPIKey, resp.ApiKey)
