@@ -99,6 +99,7 @@ func runJavaBuiltinRule(t *testing.T, ruleContent, filename, code string) alertC
 func TestJavaTruePositiveRegressionRules(t *testing.T) {
 	const cmdiRule = "java/cwe-78-os-command-injection/java-servlet-n-spring-direct-command-injection.sf"
 	const sqliRule = "java/cwe-89-sql-injection/java-execute-query-string-add-out-of-control.sf"
+	const xssRule  = "java/cwe-79-xss/java-servlet-xss.sf"
 
 	cases := []struct {
 		name          string
@@ -106,6 +107,7 @@ func TestJavaTruePositiveRegressionRules(t *testing.T) {
 		fileName      string
 		code          string
 		wantHigh      int  // >0: expect >= this many high alerts (true positive)
+		wantMid       int  // >0: expect >= this many mid alerts (for mid-level rules)
 		negative      bool // true: safe sample, expect zero alerts total
 		allowZeroHigh bool // true: known-uncovered gap, must not be high today
 	}{
@@ -296,6 +298,56 @@ public class Basic19 extends BasicTestCase implements MicroTestCase {
             try { if (con != null) con.close(); } catch (SQLException e) {}
         }
     }
+		}`,
+		},
+		// ---------------- CWE-79: Cross-Site Scripting (Servlet) ----------------
+		// The sink matcher uses <getCallee><typeName> to filter by
+		// HttpServletResponse type rather than receiver variable name
+		// (which is arbitrary and renamed to parameter[N] by SSA).
+		{
+			name:     "xss_servlet_getWriter_println_tainted_is_detected",
+			rulePath: xssRule,
+			fileName: "Basic1.java",
+			wantMid:  1,
+			code: `
+package securibench.micro.basic;
+import java.io.IOException;
+import java.io.PrintWriter;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import securibench.micro.BasicTestCase;
+import securibench.micro.MicroTestCase;
+
+public class Basic1 extends BasicTestCase implements MicroTestCase {
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        String str = req.getParameter("name");
+        PrintWriter writer = resp.getWriter();
+        writer.println(str);    /* BAD */
+    }
+}`,
+		},
+		// Paired negative: a custom class with a getWriter() method that is
+		// NOT HttpServletResponse must not be flagged by the type filter.
+		{
+			name:     "xss_non_http_response_getWriter_not_reported",
+			rulePath: xssRule,
+			fileName: "FakeWriter.java",
+			negative: true,
+			code: `
+package test.fake;
+import java.io.IOException;
+import java.io.PrintWriter;
+import javax.servlet.http.HttpServletRequest;
+
+public class FakeWriter {
+    private PrintWriter internalWriter;
+    public PrintWriter getWriter() { return internalWriter; }
+    public void doGet(HttpServletRequest req) throws IOException {
+        String str = req.getParameter("name");
+        FakeWriter fw = new FakeWriter();
+        PrintWriter w = fw.getWriter();
+        w.println(str);
+    }
 }`,
 		},
 	}
@@ -312,6 +364,9 @@ public class Basic19 extends BasicTestCase implements MicroTestCase {
 					counts.Total, counts.High, counts.Mid, counts.Low)
 			case c.negative:
 				require.Zero(t, counts.Total, "safe/negative sample must produce no alerts")
+			case c.wantMid > 0:
+				require.GreaterOrEqual(t, counts.Mid, c.wantMid,
+					"vulnerable sample must produce at least %d mid alert(s)", c.wantMid)
 			default:
 				require.GreaterOrEqual(t, counts.High, c.wantHigh,
 					"vulnerable sample must produce at least %d high alert(s)", c.wantHigh)
