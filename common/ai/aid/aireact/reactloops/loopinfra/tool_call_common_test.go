@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
@@ -52,4 +54,41 @@ func TestHandleToolCallResult_MCPInitializing_ResultErrorPath(t *testing.T) {
 	assert.Contains(t, feedback, "still initializing")
 	assert.Contains(t, feedback, "same tool")
 	assert.True(t, op.IsContinued())
+}
+
+func TestResolveToolCallReason(t *testing.T) {
+	// reason field wins over human_readable_thought
+	action, err := aicommon.ExtractAction(
+		`{"@action":"require_tool","tool_call_reason":"scan port 443","human_readable_thought":"thinking..."}`,
+		"require_tool",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "scan port 443", resolveToolCallReason(action, "tool_call_reason"))
+
+	// fallback to human_readable_thought when reason field is omitted
+	action2, err := aicommon.ExtractAction(
+		`{"@action":"require_tool","human_readable_thought":"read the file first"}`,
+		"require_tool",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "read the file first", resolveToolCallReason(action2, "tool_call_reason"))
+
+	// empty when neither is present
+	action3, err := aicommon.ExtractAction(
+		`{"@action":"require_tool","tool_require_payload":"foo"}`,
+		"require_tool",
+	)
+	require.NoError(t, err)
+	assert.Empty(t, resolveToolCallReason(action3, "tool_call_reason"))
+
+	// directly_call_reason key path
+	action4, err := aicommon.ExtractAction(
+		`{"@action":"directly_call_tool","directly_call_reason":"retry with cached params"}`,
+		"directly_call_tool",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "retry with cached params", resolveToolCallReason(action4, "directly_call_reason"))
+
+	// nil action is safe
+	assert.Empty(t, resolveToolCallReason(nil, "tool_call_reason"))
 }
