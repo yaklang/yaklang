@@ -193,12 +193,50 @@ javaFiles = ["web.xml", "pom.xml", "application.properties", "struts.xml", "appl
 pythonFiles = ["requirements.txt", "setup.py", "pyproject.toml", "pipfile", "manage.py", "setup.cfg"]
 // 后缀名 -> 语言，用于统一从文件扩展名推断语言
 extToLanguage = {"js": "js", "mjs": "js", "cjs": "js", "ts": "ts", "tsx": "ts", "php": "php", "java": "java", "go": "go", "yak": "yak", "py": "python", "pyi": "python", "pyw": "python"}
-var scoreMap = map[string]int{"php": 0, "go": 0, "java": 0, "yak": 0, "js": 0, "ts": 0, "python": 0}
+var scoreMap = map[string]int{"php": 0, "go": 0, "java": 0, "yak": 0, "js": 0, "ts": 0, "python": 0, "c": 0}
+// markerMap / manifestMap: language detection now SCORES markers (pom.xml,
+// composer.json, go.mod, ...) instead of letting the first marker hit
+// short-circuit setLanguage. A single stray marker (e.g. a requirements.txt in
+// a tooling dir of a 7k-file Java project) used to lock the wrong language
+// because it was seen first in the unsorted walk; scoring lets the clear
+// extension majority win.
+var markerMap = map[string]int{"php": 0, "go": 0, "java": 0, "yak": 0, "js": 0, "ts": 0, "python": 0, "c": 0}
+var manifestMap = map[string]int{"php": 0, "go": 0, "java": 0, "yak": 0, "js": 0, "ts": 0, "python": 0, "c": 0}
+func addMarker(language) {
+    language = sprint(language)
+    if language == "" {
+        return
+    }
+    markerMap[language] = markerMap[language] + 1
+}
+func addManifest(language) {
+    language = sprint(language)
+    if language == "" {
+        return
+    }
+    manifestMap[language] = manifestMap[language] + 1
+}
+// High-signal build/dep manifests (lowercased name -> language key). Strong but
+// not strong enough to override a multi-thousand-file source majority.
+manifestFiles = {"pom.xml": "java", "build.gradle": "java", "build.gradle.kts": "java", "go.mod": "go", "composer.json": "php", "package.json": "js", "requirements.txt": "python", "pyproject.toml": "python", "cmakelists.txt": "c"}
+func manifestLang(name) {
+    if name in manifestFiles {
+        return manifestFiles[name]
+    }
+    return ""
+}
+markerWeight = 200
+manifestWeight = 1500
+langOrder = ["java", "php", "go", "python", "js", "ts", "yak", "c"]
 
 // 语言探测：跳过目录（不参与计分）
+// NOTE: do NOT include generic words like "target"/"build"/"out"/"dist" here —
+// they match legitimate parent dirs (e.g. ~/Target/<project>) and wrongly skip
+// the whole tree. Only dependency/test/cache dirs that never appear as a real
+// project parent are safe.
 skipDirNames = [
     "node_modules", "vendor", "vendors", "docs", "doc", "documentation",
-    "example", "examples", "dist", "build", "out", "target",
+    "example", "examples",
     "test", "tests", ".git", "third_party", "third-party",
     "__pycache__", ".venv", "venv", "static", "assets",
 ]
@@ -357,17 +395,24 @@ func generateFileName(kind, filename) {
     params.project_name = filename2
 }
 func AutoParseLanguage() {
-    maxinfo = {"key": "", "value": 0}
-    for key, value := range scoreMap {
-        if maxinfo.value < value {
-            maxinfo.key = key
-            maxinfo.value = value
+    if params.language != "" {
+        return
+    }
+    // total = extension score (file counts) + marker hits * markerWeight +
+    // manifest hits * manifestWeight. Iterate in a fixed order so map-iteration
+    // nondeterminism cannot flip ties.
+    best = ""
+    bestScore = 0
+    for _, lang := range langOrder {
+        total = scoreMap[lang] + markerMap[lang]*markerWeight + manifestMap[lang]*manifestWeight
+        if total > bestScore {
+            bestScore = total
+            best = lang
         }
     }
-    
 
-    if maxinfo.value != 0 {
-        setLanguage(maxinfo.key)
+    if bestScore != 0 {
+        setLanguage(best)
     } else {
         newLanguageNeedSelectException(f`${params.info.kind} 无法自动检测项目的语言，请手动指定语言。`)
     }
@@ -395,23 +440,28 @@ func getZipinfo(basePath) {
                 addLanguageScore(path)
             }
 
-            if params.language == "" {
+            if params.language == "" && !shouldSkipPath(path) {
+                name = info.Name().Lower()
                 if info.IsDir() {
-                    if info.Name().Lower() in javaDir {
-                        setLanguage(ssa.Java)
+                    if name in javaDir {
+                        addMarker(ssa.Java)
                     }
                 } else {
-                    if info.Name().Lower() in javaFiles {
-                        setLanguage(ssa.Java)
+                    mlang = manifestLang(name)
+                    if mlang != "" {
+                        addManifest(mlang)
                     }
-                    if info.Name().Lower() in phpFiles {
-                        setLanguage(ssa.PHP)
+                    if name in javaFiles {
+                        addMarker(ssa.Java)
                     }
-                    if info.Name().Lower() in jsFiles {
-                        setLanguage(ssa.Javascript)
+                    if name in phpFiles {
+                        addMarker(ssa.PHP)
                     }
-                    if info.Name().Lower() in pythonFiles {
-                        setLanguage(ssa.Python)
+                    if name in jsFiles {
+                        addMarker(ssa.Javascript)
+                    }
+                    if name in pythonFiles {
+                        addMarker(ssa.Python)
                     }
                 }
             }
@@ -454,32 +504,37 @@ func getLocalInfo(localFile) {
 
         params.info.local_file = localFile
         filesys.Recursive(
-            localFile, 
+            localFile,
             filesys.onDirStat(func(path, info) {
-                if params.language == "" {
+                if params.language == "" && !shouldSkipPath(path) {
                     switch  {
                     case info.Name().Lower() in javaDir:
-                        setLanguage(ssa.Java)
+                        addMarker(ssa.Java)
                     }
                 }
-            }), 
+            }),
             filesys.onFileStat(func(path, info) {
                 params.file_count++
                 addLanguageScore(path)
 
-                if params.language == "" {
+                if params.language == "" && !shouldSkipPath(path) {
+                    name = info.Name().Lower()
+                    mlang = manifestLang(name)
+                    if mlang != "" {
+                        addManifest(mlang)
+                    }
                     switch  {
-                    case info.Name().Lower() in javaFiles:
-                        setLanguage(ssa.Java)
-                    case info.Name().Lower() in phpFiles:
-                        setLanguage(ssa.PHP)
-                    case info.Name().Lower() in jsFiles:
-                        setLanguage(ssa.Javascript)
-                    case info.Name().Lower() in pythonFiles:
-                        setLanguage(ssa.Python)
+                    case name in javaFiles:
+                        addMarker(ssa.Java)
+                    case name in phpFiles:
+                        addMarker(ssa.PHP)
+                    case name in jsFiles:
+                        addMarker(ssa.Javascript)
+                    case name in pythonFiles:
+                        addMarker(ssa.Python)
                     }
                 }
-            }), 
+            }),
         )
         generateFileName("local", file.Abs(localFile))
     }
