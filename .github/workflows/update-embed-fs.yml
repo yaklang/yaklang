@@ -41,7 +41,7 @@ jobs:
         if: ${{env.SKIP_CI != 'true'}}
         uses: actions/setup-go@v6
         with:
-          go-version: '1.21'
+          go-version-file: "./go.mod"
           cache: false
 
       # - name: Cache Go modules
