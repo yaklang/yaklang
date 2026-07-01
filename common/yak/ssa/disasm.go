@@ -226,7 +226,9 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 	for _, b := range f.Blocks {
 		block, ok := f.GetBasicBlockByID(b)
 		if !ok || utils.IsNil(block) {
-			log.Errorf("function %s has nil block: %d", f.GetName(), b)
+			// TODO(scan-log): block content was evicted by the split-compile flush while the
+			// function was kept for cross-unit reference; DisAsm is display-only, so skip.
+			log.Debugf("function %s has nil block: %d", f.GetName(), b)
 			continue
 		}
 		ShowBlock(block)

@@ -14,6 +14,15 @@ type OffsetItem struct {
 	rangeLength int
 }
 
+// OffsetLock/OffsetUnlock/OffsetRLock/OffsetRUnlock expose the offset-map guard
+// so cross-package readers (e.g. ssaapi) can hold it while inspecting
+// OffsetMap/OffsetSortedSlice, which are otherwise unsafe under concurrent
+// scan-time lazy reloads.
+func (prog *Program) OffsetLock()    { prog.offsetMu.Lock() }
+func (prog *Program) OffsetUnlock()  { prog.offsetMu.Unlock() }
+func (prog *Program) OffsetRLock()   { prog.offsetMu.RLock() }
+func (prog *Program) OffsetRUnlock() { prog.offsetMu.RUnlock() }
+
 func (item *OffsetItem) GetVariable() *Variable {
 	return item.variable
 }
@@ -40,6 +49,8 @@ func InsertSortedIntSlice(ts []int, t int) []int {
 }
 
 func (prog *Program) ShowOffsetMap() {
+	prog.offsetMu.RLock()
+	defer prog.offsetMu.RUnlock()
 	for i := 0; i < len(prog.OffsetSortedSlice); i++ {
 		offset := prog.OffsetSortedSlice[i]
 		value := prog.OffsetMap[offset].GetValue()
@@ -55,6 +66,8 @@ func (prog *Program) SetOffsetVariable(v *Variable, r *memedit.Range) {
 	}
 	endOffset := r.GetEndOffset()
 
+	prog.offsetMu.Lock()
+	defer prog.offsetMu.Unlock()
 	// If it already exists, then the trust range is smaller
 	if item, ok := prog.OffsetMap[endOffset]; ok && item.rangeLength <= r.Len() {
 		return
@@ -82,6 +95,8 @@ func (prog *Program) SetOffsetValueEx(v Value, r *memedit.Range, force bool) {
 	}
 	endOffset := r.GetEndOffset()
 
+	prog.offsetMu.Lock()
+	defer prog.offsetMu.Unlock()
 	// If it already exists, then the trust range is smaller
 	if item, ok := prog.OffsetMap[endOffset]; !force && ok && item.rangeLength <= r.Len() {
 		return
