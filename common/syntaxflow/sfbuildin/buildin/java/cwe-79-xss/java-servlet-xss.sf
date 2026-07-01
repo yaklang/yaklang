@@ -100,7 +100,13 @@ REFERENCE
 <include('java-servlet-param')> as $source;
 <include('java-escape-method')> as $filter
 
-response?{<typeName>?{have:'javax.servlet.http.HttpServletResponse'}}.getWriter() as $out;
+// Match the HttpServletResponse writer. The receiver variable name is
+// arbitrary (resp, response, r, ...) and SSA renames it to
+// parameter[N], so matching by name never works. Instead, filter by the
+// callee's type name: <getCallee><typeName> returns the declared type of
+// the receiver (e.g. "HttpServletResponse"), which is stable regardless
+// of the variable name the source code used.
+*.getWriter()?{<getCallee><typeName>?{have:'HttpServletResponse'}} as $out;
 $out.print(,* as $sink);
 $out.println(,* as $sink);
 $out.write(,* as $sink);
