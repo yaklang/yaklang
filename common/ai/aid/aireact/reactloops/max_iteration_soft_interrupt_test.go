@@ -56,8 +56,9 @@ type maxIterTestInvoker struct {
 	cfg         *maxIterTestConfig
 	currentTask aicommon.AIStatefulTask
 
-	mu       sync.Mutex
-	timeline []string
+	mu          sync.Mutex
+	timeline    []string
+	emitResults []string
 }
 
 func (i *maxIterTestInvoker) GetConfig() aicommon.AICallerConfigIf { return i.cfg }
@@ -83,6 +84,18 @@ func (i *maxIterTestInvoker) timelineString() string {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	return strings.Join(i.timeline, "\n")
+}
+
+func (i *maxIterTestInvoker) EmitResultAfterStream(result any) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	i.emitResults = append(i.emitResults, utils.InterfaceToString(result))
+}
+
+func (i *maxIterTestInvoker) emitResultString() string {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	return strings.Join(i.emitResults, "\n")
 }
 
 func newMaxIterTestLoop(t *testing.T, active []aicommon.VerificationTodoItem) (*ReActLoop, *maxIterTestInvoker, *maxIterTestConfig, aicommon.AIStatefulTask) {
@@ -148,46 +161,57 @@ func TestMaxIterationSoftInterrupt_NoActiveTodos(t *testing.T) {
 	assert.Contains(t, invoker.timelineString(), "iteration_limit_interrupt")
 }
 
-// TestFinishIterationLoopWithSoftInterrupt_SuppressesFail 验证软性中断收尾会预置
-// IgnoreError: 即便某个 loop 没有 finalize hook 主动 IgnoreError, ExecuteLoopTask
-// 里"reason != nil 且未 IgnoreError -> EmitReActFail"的全局兜底也一定观察到 ignore,
-// 从而不会把"到达迭代上限"当成任务失败上报.
-// 关键词: 软性中断预置 IgnoreError, 抑制 EmitReActFail
-func TestFinishIterationLoopWithSoftInterrupt_SuppressesFail(t *testing.T) {
-	loop, _, _, task := newMaxIterTestLoop(t, nil)
+// TestClassifyLoopFinishEmission_SoftInterruptIsNaturalEnd 覆盖框架层全局收尾的核心
+// 决策 (测试要点 1/2/4):
+//   - 到达迭代上限的软性中断 -> "自然结束"(success) + 补发中断说明, 不报错;
+//   - 对比硬中断 (已结束且带错误、非软中断) -> 硬失败 fail (携带错误信息);
+//   - IgnoreError (隐藏/内部 loop 自管收尾) -> 静默.
+//
+// 关键词: max iteration 软中断 自然结束, 不报错, 对比硬中断报错
+func TestClassifyLoopFinishEmission_SoftInterruptIsNaturalEnd(t *testing.T) {
+	maxIterErr := utils.Errorf("reached max iterations (10), stopping test loop")
 
-	var wouldFail bool
-	// 模拟 ExecuteLoopTask 里注册的全局 fail 兜底: 用 DeferAfterCallbacks 在所有
-	// 回调跑完后再判定, 与线上时序一致.
-	WithOnPostIteraction(func(_ *ReActLoop, _ int, _ aicommon.AIStatefulTask, isDone bool, reason any, operator *OnPostIterationOperator) {
-		operator.DeferAfterCallbacks(func() {
-			if isDone && reason != nil && !operator.ShouldIgnoreError() {
-				wouldFail = true
-			}
-		})
-	})(loop)
+	// 要点1: 软性中断 -> 自然结束(success) + 补发中断说明, 不是 fail
+	got := ClassifyLoopFinishEmission(true, maxIterErr, false, true)
+	require.Equal(t, LoopFinishSuccessWithInterruptSummary, got,
+		"max-iteration soft interrupt must be a natural success with an interrupt summary, not a failure")
 
-	loop.finishIterationLoopWithSoftInterrupt(11, task, utils.Errorf("reached max iterations (10), stopping test loop"))
+	// 要点2: 软性中断不产生 fail
+	require.NotEqual(t, LoopFinishFail, got, "soft interrupt must not be reported as failure")
 
-	require.False(t, wouldFail, "soft interrupt must not trigger EmitReActFail")
+	// 要点4: 对比硬中断 (真实错误, 未标记软中断) -> 携带错误信息的 fail
+	hard := ClassifyLoopFinishEmission(true, utils.Errorf("boom: unexpected transaction error"), false, false)
+	require.Equal(t, LoopFinishFail, hard, "a genuine hard interrupt/error must still be reported as failure")
+
+	// 隐藏/内部 loop 自管收尾 (IgnoreError) -> 静默, 即便标记了软中断也不打扰
+	silent := ClassifyLoopFinishEmission(true, maxIterErr, true, true)
+	require.Equal(t, LoopFinishSilent, silent, "IgnoreError loops must stay silent")
+
+	// 正常完成 (无错误) -> 成功
+	ok := ClassifyLoopFinishEmission(true, nil, false, false)
+	require.Equal(t, LoopFinishSuccess, ok)
 }
 
-// TestFinishIterationLoopWithError_WouldFailWithoutIgnore 作为对照: 老的
-// finishIterationLoopWithError 在没有任何 hook 主动 IgnoreError 时, 全局兜底会判定
-// 为失败. 这正是软性中断路径要修掉的坏体验.
-func TestFinishIterationLoopWithError_WouldFailWithoutIgnore(t *testing.T) {
-	loop, _, _, task := newMaxIterTestLoop(t, nil)
+// TestDeliverMaxIterationInterruptSummary_FallbackExplainsAndAsksNext 验证框架层补发
+// 的中断说明 (测试要点 1): 即便 AI 不可用走兜底, 也会明确"因迭代上限自然结束(非错误)"、
+// 列出未完成 TODO、并提示用户可回复 "继续" 或开启新话题; 同时落一条 timeline.
+// 关键词: 框架中断说明, 自然结束, 未完成 TODO, 询问下一步(继续)
+func TestDeliverMaxIterationInterruptSummary_FallbackExplainsAndAsksNext(t *testing.T) {
+	loop, invoker, _, task := newMaxIterTestLoop(t, []aicommon.VerificationTodoItem{
+		{ID: "check_sensitive", Content: "检查响应体里是否有身份证/手机号", Status: aicommon.VerificationTodoStatusDoing},
+	})
 
-	var wouldFail bool
-	WithOnPostIteraction(func(_ *ReActLoop, _ int, _ aicommon.AIStatefulTask, isDone bool, reason any, operator *OnPostIterationOperator) {
-		operator.DeferAfterCallbacks(func() {
-			if isDone && reason != nil && !operator.ShouldIgnoreError() {
-				wouldFail = true
-			}
-		})
-	})(loop)
+	// 先触发软性中断以记录"未完成 TODO"快照
+	loop.applyMaxIterationSoftInterrupt(21, task, 20)
 
-	loop.finishIterationLoopWithError(11, task, utils.Errorf("reached max iterations (10), stopping test loop"))
+	// mock 的 InvokeSpeedPriorityLiteForge 不会返回可用的 continuation_note,
+	// 因此会走极简兜底文案 —— 兜底同样承担"解释中断 + 询问下一步"的职责.
+	loop.DeliverMaxIterationInterruptSummary()
 
-	require.True(t, wouldFail, "legacy error path would emit fail without an IgnoreError hook")
+	result := invoker.emitResultString()
+	assert.Contains(t, result, "迭代次数上限")
+	assert.Contains(t, result, "继续")
+	assert.Contains(t, result, "检查响应体里是否有身份证/手机号")
+
+	assert.Contains(t, invoker.timelineString(), "iteration_limit_interrupt_summary")
 }
