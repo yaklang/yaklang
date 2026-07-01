@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/javaclassparser"
+	"github.com/yaklang/javajive/classparser"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )

@@ -2,8 +2,8 @@ package yso
 
 import (
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/javaclassparser"
-	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/core"
+	"github.com/yaklang/javajive/classparser"
+	"github.com/yaklang/javajive/classparser/decompiler/core"
 )
 
 func JavaClassModifySuperClass(ins *javaclassparser.ClassObject, className string) error {
