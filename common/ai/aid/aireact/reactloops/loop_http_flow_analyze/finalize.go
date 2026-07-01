@@ -30,9 +30,10 @@ func buildPostIterationHook(invoker aicommon.AIInvokeRuntime) reactloops.ReActLo
 		if hasFinalAnswerDelivered(loop) || hasDirectlyAnswered(loop) || getLastAction(loop) == "directly_answer" {
 			log.Infof("http_flow_analyze: answer already delivered before finalize")
 			if maxIterInterrupt {
-				// 已经给过答复, 但因为迭代上限被中断: 补一条简短中断说明, 告诉
-				// 用户哪些没做完 + 询问下一步 (回复 "继续"). 收尾 IgnoreError.
-				deliverMaxIterationInterruptNotice(loop, invoker)
+				// 已经给过答复, 但因为迭代上限被中断: 让 AI 依据本次分析的真实
+				// 上下文因地制宜地补一条"续做指引", 告诉用户哪些没做完 + 启发下
+				// 一步 (回复 "继续" 续跑, 或给新方向). 收尾 IgnoreError.
+				deliverMaxIterationInterruptNotice(loop, invoker, collectFinalizeContextMaterials(loop, reason))
 				operator.IgnoreError()
 			}
 			return
@@ -63,31 +64,126 @@ func isMaxIterationInterrupt(loop *reactloops.ReActLoop, reason any) bool {
 }
 
 // deliverMaxIterationInterruptNotice 在"答复已下发但仍撞到迭代上限"时补发一条
-// 简短的中断说明气泡: 明确任务被中断、列出未完成的 TODO、并询问用户下一步
-// (回复 "继续" 续跑, 或给新方向). 不覆盖已给出的答复, 只做增量提示.
+// 续做指引: 内容不写死, 而是让 AI 依据本次分析的真实上下文 (已积累证据 / 最近
+// 动作 / 未完成 TODO) 因地制宜地生成 —— 冷静说明这是"被中断"而非失败, 结合具体
+// 调查进展点出还有哪些没做、给出针对性的下一步方向来启发用户, 并告知可回复
+// "继续" 续跑或给新方向. 不覆盖已给出的答复, 只做增量提示. AI 不可用时才退回到
+// 极简兜底文案 (deliverMaxIterationInterruptNoticeFallback).
 //
-// 关键词: 迭代上限软中断补充说明, 未完成 TODO 交接, 询问下一步
-func deliverMaxIterationInterruptNotice(loop *reactloops.ReActLoop, invoker aicommon.AIInvokeRuntime) {
+// 关键词: 迭代上限软中断续做指引, AI 因地制宜生成, 未完成 TODO 交接, 询问下一步
+func deliverMaxIterationInterruptNotice(loop *reactloops.ReActLoop, invoker aicommon.AIInvokeRuntime, contextMaterials string) {
 	if loop == nil || invoker == nil {
 		return
 	}
 
-	var notice strings.Builder
-	notice.WriteString("> 任务因达到迭代次数上限被自动中断（这不是错误，只是本轮已用尽可执行的步数）。\n\n")
+	contextMaterials = strings.TrimSpace(contextMaterials)
 
-	if unfinished := strings.TrimSpace(loop.GetMaxIterationInterruptSummary()); unfinished != "" {
-		notice.WriteString("**尚未完成、已标记为 SKIP 的事项：**\n\n")
-		notice.WriteString(unfinished)
-		notice.WriteString("\n\n")
-	} else {
-		notice.WriteString("当前没有明确记录在案的未完成待办，但分析流程被提前中断，可能仍有可以深入的方向。\n\n")
+	userQuery := ""
+	if task := loop.GetCurrentTask(); task != nil {
+		userQuery = strings.TrimSpace(task.GetUserInput())
 	}
 
-	notice.WriteString("**接下来你可以：**\n")
-	notice.WriteString("- 直接回复 “继续”，我会接着之前的分析继续做未完成的部分；\n")
-	notice.WriteString("- 或者告诉我新的方向/侧重点，我按你的调整来分析。\n")
+	nonce := utils.RandStringBytes(8)
+	noticePrompt := utils.MustRenderTemplate(`
+<|INSTRUCTION_{{ .Nonce }}|>
+You are an HTTP traffic analysis expert. An analysis answer has ALREADY been delivered to the user, but the analysis loop was then INTERRUPTED because it reached the iteration/step limit. This is NOT an error or a failure.
 
-	payload := notice.String()
+Write a SHORT continuation note (do NOT repeat the full report). Requirements:
+1. Calmly state that the analysis was interrupted because the step limit was reached, and make clear this is NOT a failure.
+2. Ground everything in the SPECIFIC context below (accumulated evidence, recent actions, unfinished TODOs). Point out concretely what was left undone, then give 2-4 tailored, inspiring next-step directions for THIS particular investigation. Do NOT give generic advice; refer to the actual endpoints/params/findings seen so far.
+3. End by telling the user they can simply reply "继续" (continue) to resume the unfinished work, or give a new direction/focus to adjust.
+
+Keep it concise: a few short paragraphs or a short bullet list. Use clear Markdown.
+
+CRITICAL LANGUAGE RULE: Write the ENTIRE note in the SAME language as the user's query below. If the user wrote in Chinese, write in Chinese; if in English, write in English. Do NOT mix languages.
+
+User's original query: {{ .UserQuery }}
+<|INSTRUCTION_END_{{ .Nonce }}|>
+
+<|CONTEXT_{{ .Nonce }}|>
+{{ .ContextMaterials }}
+<|CONTEXT_END_{{ .Nonce }}|>
+`, map[string]any{
+		"Nonce":            nonce,
+		"UserQuery":        userQuery,
+		"ContextMaterials": contextMaterials,
+	})
+
+	reactloops.EmitStatus(loop, "生成续做指引 / Generating Continuation Guidance...")
+
+	taskID := ""
+	if task := loop.GetCurrentTask(); task != nil {
+		taskID = task.GetId()
+	}
+
+	action, err := invoker.InvokeSpeedPriorityLiteForge(
+		loop.GetConfig().GetContext(),
+		"http_flow_analyze_interrupt_notice",
+		noticePrompt,
+		[]aitool.ToolOption{
+			aitool.WithStringParam("continuation_note",
+				aitool.WithParam_Description("Short, context-aware continuation note in Markdown that explains the interruption and inspires the user on what to do next"),
+				aitool.WithParam_Required(true),
+			),
+		},
+		aicommon.WithGeneralConfigStreamableFieldEmitterCallback([]string{
+			"continuation_note",
+		}, func(key string, r io.Reader, emitter *aicommon.Emitter) {
+			if emitter == nil {
+				io.Copy(io.Discard, r)
+				return
+			}
+			if event, _ := emitter.EmitStreamEventWithContentType(
+				"re-act-loop-answer-payload",
+				utils.JSONStringReader(r),
+				taskID,
+				aicommon.TypeTextMarkdown,
+				func() {},
+			); event != nil && contextMaterials != "" {
+				emitter.EmitTextReferenceMaterial(event.GetStreamEventWriterId(), contextMaterials)
+			}
+		}),
+	)
+
+	if err != nil {
+		log.Errorf("http_flow_analyze finalize: AI interrupt notice generation failed: %v", err)
+		deliverMaxIterationInterruptNoticeFallback(loop, invoker)
+		return
+	}
+
+	note := strings.TrimSpace(action.GetString("continuation_note"))
+	if note == "" {
+		log.Warnf("http_flow_analyze finalize: AI generated empty interrupt notice, using fallback")
+		deliverMaxIterationInterruptNoticeFallback(loop, invoker)
+		return
+	}
+
+	invoker.EmitResultAfterStream(note)
+	recordMetaAction(loop, "interrupt_notice",
+		"iteration limit continuation guidance",
+		utils.ShrinkTextBlock(note, 240))
+	invoker.AddToTimeline("http_flow_analysis_interrupted",
+		fmt.Sprintf("HTTP flow analysis interrupted by iteration limit after %d iterations; AI generated continuation guidance",
+			loop.GetCurrentIterationIndex()))
+}
+
+// deliverMaxIterationInterruptNoticeFallback 是 AI 生成续做指引失败时的极简兜底:
+// 只在无法调用 AI 时使用, 尽量少写死内容, 仅陈述被中断 + 罗列未完成 TODO + 提示
+// 用户可回复 "继续" 或给新方向. 与 deliverRawContextFallback 的降级定位一致.
+func deliverMaxIterationInterruptNoticeFallback(loop *reactloops.ReActLoop, invoker aicommon.AIInvokeRuntime) {
+	if loop == nil || invoker == nil {
+		return
+	}
+
+	var b strings.Builder
+	b.WriteString("> 分析因达到迭代次数上限被中断（这不是错误，只是本轮已用尽可执行的步数）。\n\n")
+	if unfinished := strings.TrimSpace(loop.GetMaxIterationInterruptSummary()); unfinished != "" {
+		b.WriteString("尚未完成、已标记为 SKIP 的事项：\n\n")
+		b.WriteString(unfinished)
+		b.WriteString("\n\n")
+	}
+	b.WriteString("你可以回复 “继续” 让我接着做，或告诉我新的方向/侧重点。\n")
+	payload := b.String()
 
 	taskID := ""
 	if task := loop.GetCurrentTask(); task != nil {
@@ -100,12 +196,12 @@ func deliverMaxIterationInterruptNotice(loop *reactloops.ReActLoop, invoker aico
 			taskID,
 			func() {},
 		); err != nil {
-			log.Warnf("http_flow_analyze finalize: failed to emit max-iteration interrupt notice: %v", err)
+			log.Warnf("http_flow_analyze finalize: failed to emit interrupt notice fallback: %v", err)
 		}
 	}
 	invoker.EmitResultAfterStream(payload)
 	invoker.AddToTimeline("http_flow_analysis_interrupted",
-		fmt.Sprintf("HTTP flow analysis interrupted by iteration limit after %d iterations; asked user how to proceed",
+		fmt.Sprintf("HTTP flow analysis interrupted by iteration limit after %d iterations (fallback notice)",
 			loop.GetCurrentIterationIndex()))
 }
 
