@@ -260,16 +260,18 @@ public class SafePreparedStatement {
     }
 }`,
 		},
-		// prepareStatement with tainted concatenation is a KNOWN gap: matching
-		// prepareStatement broadly would flag the safe prepared statement above
-		// (the statement object is tainted via setString), so it is excluded
-		// until a concat-aware guard is added. This row pins the gap — it must
-		// not be high today; flip wantHigh on once covered safely.
+		// prepareStatement with tainted concatenation: the SQL string argument
+		// is built by concatenating user input, so prepareStatement is a SQLi
+		// sink. The rule matches prepareStatement by method name; the taint
+		// propagation only alerts when the SQL argument itself is tainted, so
+		// the safe prepared statement above (placeholder + setString) is not
+		// flagged. Paired with the sqli_safe_prepared_statement_not_reported
+		// negative row.
 		{
-			name:          "sqli_prepare_statement_concat_known_gap",
-			rulePath:      sqliRule,
-			fileName:      "Basic19.java",
-			allowZeroHigh: true,
+			name:     "sqli_prepare_statement_concat_detected",
+			rulePath: sqliRule,
+			fileName:  "Basic19.java",
+			wantHigh:  1,
 			code: `
 package securibench.micro.basic;
 import java.io.IOException;
