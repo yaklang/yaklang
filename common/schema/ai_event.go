@@ -148,6 +148,7 @@ const (
 	EVENT_TOOL_CALL_RESULT      = "tool_call_result"      // tool call result event, used to emit the tool call result information
 	EVENT_TOOL_CALL_PARAM       = "tool_call_param"       // tool call param event, used to emit the final invoke params bound to call tool id
 	EVENT_TOOL_CALL_LOG_DIR     = "tool_call_log_dir"     // tool call log dir event, used to emit the tool call log dir information
+	EVENT_TOOL_CALL_REASON      = "tool_call_reason"      // tool call reason event, used to emit the human-readable reason of this tool call
 
 	EVENT_TYPE_START_PLAN_AND_EXECUTION    EventType = "start_plan_and_execution"
 	EVENT_TYPE_FAIL_PLAN_AND_EXECUTION     EventType = "fail_plan_and_execution"
