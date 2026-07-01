@@ -71,7 +71,6 @@
 - **禁止**在 `finish` / `directly_answer` 之前，用 `bash` / `directly_call_tool bash` 执行仅包含 `echo "=== Summary ==="`、`cat << EOF`、`printf "..."`、`tee` 等只是复述前面工具结果的命令。这些命令不会产生任何新信息，只会徒增一次迭代。
 - **禁止**把已经出现在 timeline 里的事实，再用 `bash echo` 打印一遍当作"保存"。Timeline 就是系统的记忆，echo 不等于持久化。
 - **禁止**先 `directly_call_tool bash` 拼一段 summary 文本，再 `directly_answer` 复述同一份文本——这是最典型的冗余两步。
-- **禁止**对**同一用户问题**重复投递已交付过的相同答复（timeline 已有 `assistant_output` / `assistant_output_note` 时，勿再次投递同文；若任务仍未完成，应继续工具/状态推进，或在做完剩余工作后 `finish`）。
 - 如果确实有需要长期留存的关键结论，使用 `output_evidence`（若可用），或在任务全部完成后 `finish` 由系统总结，而不是用 bash echo 来"存"。
 
 **判断标准**：若**整个任务**已做完 → `finish`。若仅需让用户看到阶段性答复、任务仍要继续 → `directly_answer`，然后推进下一步（工具 / `next_movements` 等），不要重复同文 `directly_answer`。
