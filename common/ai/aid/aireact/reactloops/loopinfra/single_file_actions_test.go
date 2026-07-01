@@ -135,24 +135,45 @@ func newLoopAndFactory(t *testing.T, runtime *testRuntimeForSingleFile, opts ...
 	return loop, factory, task
 }
 
+// TestWriteAction_EmptyCode_AddToTimelineAndFail covers the empty-write fault tolerance:
+// a single empty write_code feeds back a correction and continues (does NOT abort the task);
+// only after several consecutive empty writes does it give up and fail. Every empty write still
+// records a "No code generated" diagnosis on the timeline.
 func TestWriteAction_EmptyCode_AddToTimelineAndFail(t *testing.T) {
 	runtime := newTestRuntimeForSingleFile(t)
 	loop, factory, task := newLoopAndFactory(t, runtime, WithActionSuffix("code"))
 	actionName := factory.GetActionName("write")
 	codeVar := factory.GetCodeVariableName()
-	loop.Set(codeVar, "")
 
-	action := mustBuildAction(t, actionName, nil)
 	ac, err := loop.GetActionHandler(actionName)
 	require.NoError(t, err)
-	op := reactloops.NewActionHandlerOperator(task)
-	ac.ActionHandler(loop, action, op)
 
-	terminated, failErr := op.IsTerminated()
-	assert.True(t, terminated)
-	assert.Error(t, failErr)
+	// First empty write: feedback + continue, not terminated.
+	loop.Set(codeVar, "")
+	firstOp := reactloops.NewActionHandlerOperator(task)
+	ac.ActionHandler(loop, mustBuildAction(t, actionName, nil), firstOp)
+
+	terminated, failErr := firstOp.IsTerminated()
+	assert.False(t, terminated, "single empty write should not abort the task")
+	assert.NoError(t, failErr)
+	assert.NotEmpty(t, firstOp.GetFeedback().String(), "empty write should feed back a correction")
 	assert.True(t, runtime.timelineContains("error"))
 	assert.True(t, runtime.timelineContentContains("error", "No code generated"))
+
+	// Consecutive empty writes eventually give up and fail.
+	var lastOp *reactloops.LoopActionHandlerOperator
+	for i := 0; i < 5; i++ {
+		loop.Set(codeVar, "")
+		lastOp = reactloops.NewActionHandlerOperator(task)
+		ac.ActionHandler(loop, mustBuildAction(t, actionName, nil), lastOp)
+		if done, _ := lastOp.IsTerminated(); done {
+			break
+		}
+	}
+
+	terminated, failErr = lastOp.IsTerminated()
+	assert.True(t, terminated, "repeated empty writes should eventually fail")
+	assert.Error(t, failErr)
 }
 
 func TestWriteAction_NoFilename_EmitsNewFileAndWrites(t *testing.T) {
