@@ -8,6 +8,15 @@ import (
 	"testing"
 )
 
+func TestAIStatefulTaskBase_TaskBaseOptions(t *testing.T) {
+	task := newStatefulTaskBase("task-1", "input",
+		WithStatefulTaskBaseName("scan logs"),
+		WithStatefulTaskBaseSubAgent(),
+	)
+	require.Equal(t, "scan logs", task.GetName())
+	require.True(t, task.IsSubAgent())
+}
+
 func TestAIStatefulTaskBase_TaskSemanticAccessors(t *testing.T) {
 	task := NewStatefulTaskBase("task-1", "input", nil, nil, true)
 
