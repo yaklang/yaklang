@@ -39,6 +39,20 @@ time.AfterFunc(2 ,func(){
 	time.Sleep(2 * time.Second)
 }
 
+// TestScriptEngine_AfterFuncYakCallbackPanicDoesNotCrash verifies timer goroutine VM panics are recovered.
+func TestScriptEngine_AfterFuncYakCallbackPanicDoesNotCrash(t *testing.T) {
+	code := `
+counter = make(map[string]int)
+time.AfterFunc(time.ParseDuration("50ms")~, func() {
+    counter["k"] = counter["k"] + 1
+})
+time.Sleep(0.15)
+`
+	engine := NewScriptEngine(10)
+	_, err := engine.ExecuteExWithContext(context.Background(), code, map[string]any{})
+	require.NoError(t, err)
+}
+
 func TestScriptEngine_In(t *testing.T) {
 	code := `code = "{\"a\":1}"
 o = json.loads(code)

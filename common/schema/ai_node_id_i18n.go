@@ -413,6 +413,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "初始化样例搜索",
 		En: "Init Sample Search",
 	},
+	"yaklang-run-self-test": {
+		Zh: "运行代码",
+		En: "Run Code",
+	},
 	"batch-compress": {
 		Zh: "记忆压缩",
 		En: "Memory Compression",

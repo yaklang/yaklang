@@ -47,4 +47,15 @@
 <|ERR/LINT_WARNING_END_{{ .Nonce }}|>
 
 按 persistent 指令里的「编译错误处理规则」对症一步修对（类型1 API不存在→读附加文档/yakdoc；类型2 SyntaxError→grep；类型3 undefined→grep；类型4 参数类型/个数错→改实参不换函数名，poc 取包函数收 []byte / rsp.RawPacket）。**禁止连续猜测**；优先 `modify_code` 一次改对。
+{{ end }}{{ if .NeedsSelfTestBlock }}## 缺少 YAK_MAIN 自测块（语法已通过，系统无法自动运行验证）
+检测到脚本类型：`{{ .ScriptKind }}`。请用 `modify_code` 在文件末尾追加 `func runSelfTest(){...}` 与 `if YAK_MAIN { runSelfTest() }`（禁止 write_code 重置）。
+
+{{ if .SelfTestHint }}{{ .SelfTestHint }}
+{{ end }}{{ end }}{{ if .RunFeedback }}
+## 本轮运行反馈（YAK_MAIN 自测，必须优先处理）
+<|RUNTIME_ERR_{{ .Nonce }}|>
+{{ .RunFeedback }}
+<|RUNTIME_ERR_END_{{ .Nonce }}|>
+
+语法已通过但自测运行失败。根据上面的 panic/日志用 `modify_code` 修复（**禁止** `write_code` 重置）。常见：assert 失败、mock 报文 `\r\n` 用了反引号、map comma-ok、未定义 `runSelfTest`。
 {{ end }}

@@ -125,6 +125,17 @@ func buildYaklangFinalizeReference(loop *reactloops.ReActLoop, task aicommon.AIS
 		} else {
 			out.WriteString(fmt.Sprintf("## 语法状态【系统编译器权威结论，以此为准】\n\n已通过语法检查，零阻塞错误(%d 行代码)。注意：时间线里之前出现过的报错均为中间过程，现已修复，请勿据此判定失败。\n\n", lineCount))
 		}
+		if runOk := loop.Get(loopVarYakRunOK); runOk != "" {
+			if runOk == "true" {
+				out.WriteString("## 运行状态\n\nYAK_MAIN 自测已通过。\n\n")
+			} else {
+				out.WriteString("## 运行状态\n\nYAK_MAIN 自测未通过或未完成。\n\n")
+				if fb := strings.TrimSpace(loop.Get(loopVarYakRunLastFeedback)); fb != "" {
+					out.WriteString(utils.ShrinkTextBlock(fb, 1024))
+					out.WriteString("\n\n")
+				}
+			}
+		}
 		out.WriteString("## 最终代码\n\n```yak\n")
 		out.WriteString(utils.ShrinkTextBlock(code, yaklangFinalizeCodePreviewBytes))
 		out.WriteString("\n```\n\n")
@@ -157,6 +168,11 @@ func buildYaklangFinalizeQuery(loop *reactloops.ReActLoop, task aicommon.AIState
 			} else {
 				verdict = "【权威结论】最终代码已通过语法检查、零阻塞错误。时间线里之前的报错都是中间过程且已修复，绝对不要据此说\"仍有错误/未通过\"。"
 			}
+			if runOk := loop.Get(loopVarYakRunOK); runOk == "true" {
+				verdict += " YAK_MAIN 自测已通过。"
+			} else if runOk == "false" {
+				verdict += " YAK_MAIN 自测未通过（若脚本含 YAK_MAIN 块）。"
+			}
 		}
 	}
 	if verdict != "" {
@@ -165,7 +181,7 @@ func buildYaklangFinalizeQuery(loop *reactloops.ReActLoop, task aicommon.AIState
 	}
 
 	out.WriteString("基于参考资料用 1-3 句中文口语，给出本轮 Yaklang 代码生成的精炼结论：")
-	out.WriteString("写了什么脚本、用到的核心标准库、是否通过语法检查、如何运行。")
+	out.WriteString("写了什么脚本、用到的核心标准库、是否通过语法检查、YAK_MAIN 自测是否通过（若适用）、如何运行。")
 	out.WriteString("是否通过语法检查必须与上面的【权威结论】一致。")
 	out.WriteString("不要标题、列表、编号或任何 markdown，纯短句。")
 	if reasonErr, ok := reason.(error); ok && reasonErr != nil && strings.Contains(reasonErr.Error(), "max iterations") {
@@ -192,7 +208,13 @@ func generateYaklangFinalizeLiteSummary(loop *reactloops.ReActLoop, reason any) 
 		if hasBlockingErrors {
 			parts = append(parts, fmt.Sprintf("已生成 Yaklang 脚本(%d 行)，但仍有语法错误待修复", lineCount))
 		} else {
-			parts = append(parts, fmt.Sprintf("已生成 Yaklang 脚本(%d 行)并通过语法检查", lineCount))
+			runPart := ""
+			if runOk := loop.Get(loopVarYakRunOK); runOk == "true" {
+				runPart = "，YAK_MAIN 自测已通过"
+			} else if runOk == "false" {
+				runPart = "，但 YAK_MAIN 自测未通过"
+			}
+			parts = append(parts, fmt.Sprintf("已生成 Yaklang 脚本(%d 行)并通过语法检查%s", lineCount, runPart))
 		}
 	} else {
 		parts = append(parts, "本轮未产出 Yaklang 代码")

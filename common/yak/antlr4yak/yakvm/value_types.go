@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
 )
@@ -295,7 +296,21 @@ func (v *Frame) AutoConvertReflectValueByType(
 				return utils.Errorf("cannot bind Yaklang.Function Calling for VirtualMachine!")
 			}
 			f := reflectValue.Interface().(*Function)
-			*reflectValue = reflect.MakeFunc(targetType, func(args []reflect.Value) []reflect.Value {
+			*reflectValue = reflect.MakeFunc(targetType, func(args []reflect.Value) (results []reflect.Value) {
+				defer func() {
+					if err := recover(); err != nil {
+						log.Errorf("yak native callback panic (goroutine-safe): %v", err)
+						outCount := targetType.NumOut()
+						if outCount == 0 {
+							results = nil
+							return
+						}
+						results = make([]reflect.Value, outCount)
+						for i := 0; i < outCount; i++ {
+							results[i] = reflect.Zero(targetType.Out(i))
+						}
+					}
+				}()
 				var vmArgs []*Value
 				// fix: unpack variadic args
 				if targetType == literalReflectType_NativeWarpFuntion {
