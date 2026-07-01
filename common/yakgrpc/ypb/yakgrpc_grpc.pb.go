@@ -336,6 +336,7 @@ const (
 	Yak_GetRequestBodyByHTTPFlowID_FullMethodName                 = "/ypb.Yak/GetRequestBodyByHTTPFlowID"
 	Yak_GetResponseBodyByHTTPFlowID_FullMethodName                = "/ypb.Yak/GetResponseBodyByHTTPFlowID"
 	Yak_GetHTTPPacketBody_FullMethodName                          = "/ypb.Yak/GetHTTPPacketBody"
+	Yak_EncodeHTTPPacketContent_FullMethodName                    = "/ypb.Yak/EncodeHTTPPacketContent"
 	Yak_RegisterFacadesHTTP_FullMethodName                        = "/ypb.Yak/RegisterFacadesHTTP"
 	Yak_ResetAndInvalidUserData_FullMethodName                    = "/ypb.Yak/ResetAndInvalidUserData"
 	Yak_CreateYaklangShell_FullMethodName                         = "/ypb.Yak/CreateYaklangShell"
@@ -1040,6 +1041,8 @@ type YakClient interface {
 	GetRequestBodyByHTTPFlowID(ctx context.Context, in *DownloadBodyByHTTPFlowIDRequest, opts ...grpc.CallOption) (*Bytes, error)
 	GetResponseBodyByHTTPFlowID(ctx context.Context, in *DownloadBodyByHTTPFlowIDRequest, opts ...grpc.CallOption) (*Bytes, error)
 	GetHTTPPacketBody(ctx context.Context, in *GetHTTPPacketBodyRequest, opts ...grpc.CallOption) (*Bytes, error)
+	// 从文本或 HTTPFlow 提取 header/body/完整报文并编码；可选落盘
+	EncodeHTTPPacketContent(ctx context.Context, in *EncodeHTTPPacketContentRequest, opts ...grpc.CallOption) (*EncodeHTTPPacketContentResponse, error)
 	// 注册一个 Facades HTTP 响应
 	RegisterFacadesHTTP(ctx context.Context, in *RegisterFacadesHTTPRequest, opts ...grpc.CallOption) (*RegisterFacadesHTTPResponse, error)
 	// 重置到恢复出厂设置
@@ -5025,6 +5028,16 @@ func (c *yakClient) GetHTTPPacketBody(ctx context.Context, in *GetHTTPPacketBody
 	return out, nil
 }
 
+func (c *yakClient) EncodeHTTPPacketContent(ctx context.Context, in *EncodeHTTPPacketContentRequest, opts ...grpc.CallOption) (*EncodeHTTPPacketContentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EncodeHTTPPacketContentResponse)
+	err := c.cc.Invoke(ctx, Yak_EncodeHTTPPacketContent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) RegisterFacadesHTTP(ctx context.Context, in *RegisterFacadesHTTPRequest, opts ...grpc.CallOption) (*RegisterFacadesHTTPResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RegisterFacadesHTTPResponse)
@@ -8913,6 +8926,8 @@ type YakServer interface {
 	GetRequestBodyByHTTPFlowID(context.Context, *DownloadBodyByHTTPFlowIDRequest) (*Bytes, error)
 	GetResponseBodyByHTTPFlowID(context.Context, *DownloadBodyByHTTPFlowIDRequest) (*Bytes, error)
 	GetHTTPPacketBody(context.Context, *GetHTTPPacketBodyRequest) (*Bytes, error)
+	// 从文本或 HTTPFlow 提取 header/body/完整报文并编码；可选落盘
+	EncodeHTTPPacketContent(context.Context, *EncodeHTTPPacketContentRequest) (*EncodeHTTPPacketContentResponse, error)
 	// 注册一个 Facades HTTP 响应
 	RegisterFacadesHTTP(context.Context, *RegisterFacadesHTTPRequest) (*RegisterFacadesHTTPResponse, error)
 	// 重置到恢复出厂设置
@@ -10249,6 +10264,9 @@ func (UnimplementedYakServer) GetResponseBodyByHTTPFlowID(context.Context, *Down
 }
 func (UnimplementedYakServer) GetHTTPPacketBody(context.Context, *GetHTTPPacketBodyRequest) (*Bytes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetHTTPPacketBody not implemented")
+}
+func (UnimplementedYakServer) EncodeHTTPPacketContent(context.Context, *EncodeHTTPPacketContentRequest) (*EncodeHTTPPacketContentResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method EncodeHTTPPacketContent not implemented")
 }
 func (UnimplementedYakServer) RegisterFacadesHTTP(context.Context, *RegisterFacadesHTTPRequest) (*RegisterFacadesHTTPResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RegisterFacadesHTTP not implemented")
@@ -16471,6 +16489,24 @@ func _Yak_GetHTTPPacketBody_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_EncodeHTTPPacketContent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EncodeHTTPPacketContentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).EncodeHTTPPacketContent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_EncodeHTTPPacketContent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).EncodeHTTPPacketContent(ctx, req.(*EncodeHTTPPacketContentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_RegisterFacadesHTTP_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RegisterFacadesHTTPRequest)
 	if err := dec(in); err != nil {
@@ -22452,6 +22488,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetHTTPPacketBody",
 			Handler:    _Yak_GetHTTPPacketBody_Handler,
+		},
+		{
+			MethodName: "EncodeHTTPPacketContent",
+			Handler:    _Yak_EncodeHTTPPacketContent_Handler,
 		},
 		{
 			MethodName: "RegisterFacadesHTTP",
