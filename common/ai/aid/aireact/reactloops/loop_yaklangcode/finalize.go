@@ -28,7 +28,7 @@ func BuildOnPostIterationHook(invoker aicommon.AIInvokeRuntime) reactloops.ReAct
 			return
 		}
 		// 已经 directly_answer 或已总结过的, 不重复投递
-		if last := loop.GetLastAction(); last != nil && last.ActionType == schema.AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER {
+		if last := loop.GetLastValidAction(); last != nil && last.ActionType == schema.AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER {
 			ignoreYaklangMaxIterationError(operator, reason)
 			return
 		}
