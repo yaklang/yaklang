@@ -126,7 +126,7 @@ require (
 	github.com/xuri/excelize/v2 v2.9.0
 	github.com/yaklang/fastgocaptcha v1.0.4
 	github.com/yaklang/go-llvm v0.0.0-20260325033841-7304627dfe8f
-	github.com/yaklang/javajive v0.1.1
+	github.com/yaklang/javajive v0.1.2
 	github.com/yaklang/pcap v1.0.5
 	github.com/ysmood/gson v0.7.3
 	github.com/ysmood/leakless v0.9.0
