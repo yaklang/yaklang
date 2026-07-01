@@ -137,12 +137,12 @@ func TestSSAAutoDetective(t *testing.T) {
 
 	t.Run("weighted detect go over docs js", func(t *testing.T) {
 		tempDir, cleanup := setupTempDirWithFiles(t, map[string]string{
-			"src/main.go":  "package main\nfunc main() {}\n",
-			"docs/a.js":    "console.log(1)\n",
-			"docs/b.js":    "console.log(2)\n",
-			"docs/c.js":    "console.log(3)\n",
-			"docs/d.js":    "console.log(4)\n",
-			"docs/e.js":    "console.log(5)\n",
+			"src/main.go": "package main\nfunc main() {}\n",
+			"docs/a.js":   "console.log(1)\n",
+			"docs/b.js":   "console.log(2)\n",
+			"docs/c.js":   "console.log(3)\n",
+			"docs/d.js":   "console.log(4)\n",
+			"docs/e.js":   "console.log(5)\n",
 		})
 		defer cleanup()
 
@@ -163,6 +163,85 @@ func TestSSAAutoDetective(t *testing.T) {
 		config, err := check(t, tempDir)
 		require.NoError(t, err)
 		require.Equal(t, "java", string(config.GetLanguage()), "src/*.java should win over skipped vendor/*.js")
+	})
+
+	// scoring: a clear java majority + pom.xml must beat a single stray
+	// requirements.txt in a tooling dir (mirrors javacms/core, which used to
+	// mis-detect as python because the requirements.txt marker short-circuited
+	// setLanguage before pom.xml was seen).
+	t.Run("scoring java majority beats stray python marker", func(t *testing.T) {
+		tempDir, cleanup := setupTempDirWithFiles(t, map[string]string{
+			"src/A.java":                        "public class A {}\n",
+			"src/B.java":                        "public class B {}\n",
+			"src/C.java":                        "public class C {}\n",
+			"pom.xml":                           "<project></project>\n",
+			".claude/skills/x/requirements.txt": "requests\n",
+		})
+		defer cleanup()
+		config, err := check(t, tempDir)
+		require.NoError(t, err)
+		require.Equal(t, "java", string(config.GetLanguage()), "3 src/*.java + pom.xml must beat a stray requirements.txt")
+	})
+
+	// scoring: a manifest alone can pin a small/config-only project.
+	t.Run("scoring manifest pins small project", func(t *testing.T) {
+		cases := []struct {
+			name  string
+			want  string
+			files map[string]string
+		}{
+			{"pom + 1 java", "java", map[string]string{"pom.xml": "<project></project>\n", "src/M.java": "public class M {}\n"}},
+			{"composer + 1 php", "php", map[string]string{"composer.json": "{}\n", "index.php": "<?php\n"}},
+			{"go.mod + 1 go", "golang", map[string]string{"go.mod": "module x\ngo 1.20\n", "main.go": "package main\nfunc main(){}\n"}},
+			{"requirements + 1 py", "python", map[string]string{"requirements.txt": "requests\n", "app.py": "print(1)\n"}},
+		}
+		for _, c := range cases {
+			t.Run(c.name, func(t *testing.T) {
+				tempDir, cleanup := setupTempDirWithFiles(t, c.files)
+				defer cleanup()
+				config, err := check(t, tempDir)
+				require.NoError(t, err)
+				require.Equal(t, c.want, string(config.GetLanguage()))
+			})
+		}
+	})
+
+	// scoring: file majority outranks a single foreign manifest.
+	t.Run("scoring file majority outranks foreign manifest", func(t *testing.T) {
+		tempDir, cleanup := setupTempDirWithFiles(t, map[string]string{
+			"requirements.txt": "requests\n",
+			"app/a.py":         "print(1)\n",
+			"app/b.py":         "print(2)\n",
+			"app/c.py":         "print(3)\n",
+			"app/d.py":         "print(4)\n",
+			"app/e.py":         "print(5)\n",
+			"pom.xml":          "<project></project>\n",
+			"src/M.java":       "public class M {}\n",
+			"src/N.java":       "public class N {}\n",
+		})
+		defer cleanup()
+		config, err := check(t, tempDir)
+		require.NoError(t, err)
+		require.Equal(t, "python", string(config.GetLanguage()), "5 *.py + requirements.txt must beat pom.xml + 2 *.java")
+	})
+
+	// scoring: a java majority outranks a single foreign requirements.txt even
+	// with fewer java files than the python-heavy case above.
+	t.Run("scoring java majority outranks foreign python", func(t *testing.T) {
+		tempDir, cleanup := setupTempDirWithFiles(t, map[string]string{
+			"requirements.txt": "requests\n",
+			"util/a.py":        "print(1)\n",
+			"util/b.py":        "print(2)\n",
+			"pom.xml":          "<project></project>\n",
+			"src/A.java":       "public class A {}\n",
+			"src/B.java":       "public class B {}\n",
+			"src/C.java":       "public class C {}\n",
+			"src/D.java":       "public class D {}\n",
+		})
+		defer cleanup()
+		config, err := check(t, tempDir)
+		require.NoError(t, err)
+		require.Equal(t, "java", string(config.GetLanguage()), "4 src/*.java + pom.xml must beat requirements.txt + 2 *.py")
 	})
 }
 
