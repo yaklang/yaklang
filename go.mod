@@ -51,7 +51,7 @@ require (
 	github.com/go-pg/pg/v10 v10.14.0
 	github.com/go-rod/rod v0.116.2
 	github.com/go-sql-driver/mysql v1.5.0
-	github.com/go-viper/mapstructure/v2 v2.2.1
+	github.com/go-viper/mapstructure/v2 v2.4.0
 	github.com/gobwas/glob v0.2.3
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 	github.com/golang/protobuf v1.5.4
@@ -112,7 +112,7 @@ require (
 	github.com/sijms/go-ora/v2 v2.7.19
 	github.com/stacktitan/smb v0.0.0-20190531122847-da9a425dceb8
 	github.com/steambap/captcha v1.4.1
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e
 	github.com/tevino/abool v0.0.0-20170917061928-9b9efcf221b5
 	github.com/tidwall/gjson v1.14.4
@@ -126,6 +126,7 @@ require (
 	github.com/xuri/excelize/v2 v2.9.0
 	github.com/yaklang/fastgocaptcha v1.0.4
 	github.com/yaklang/go-llvm v0.0.0-20260325033841-7304627dfe8f
+	github.com/yaklang/javajive v0.1.0
 	github.com/yaklang/pcap v1.0.5
 	github.com/ysmood/gson v0.7.3
 	github.com/ysmood/leakless v0.9.0
