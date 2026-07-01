@@ -3,6 +3,7 @@ package aireact
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -266,13 +267,6 @@ func (r *ReAct) DirectlyCallTool(ctx context.Context, toolName string, action *a
 		currentTask.SetEmitter(currentTask.GetEmitter().PopEventProcesser())
 	}()
 
-	tool, err := r.resolveToolForCall(ctx, toolName)
-	if err != nil {
-		return nil, false, err
-	}
-
-	log.Infof("preparing direct tool call: %s - %s", tool.Name, tool.Description)
-
 	// Always attach the param-gen builder so fallbackToRequire can reuse this card
 	// and switch to the AI param-generation path.
 	toolCaller, err := r.newToolCallerForCall(ctx, currentTask, true)
@@ -280,7 +274,8 @@ func (r *ReAct) DirectlyCallTool(ctx context.Context, toolName string, action *a
 		return nil, false, err
 	}
 
-	result, directlyAnswer, err := toolCaller.DirectlyCallTool(tool, action, prepare)
+	directlyCallTool := &aitool.Tool{Tool: &mcp.Tool{Name: toolName}}
+	result, directlyAnswer, err := toolCaller.DirectlyCallTool(directlyCallTool, action, prepare)
 	if err != nil {
 		return nil, false, utils.Errorf("tool call failed: %v", err)
 	}
