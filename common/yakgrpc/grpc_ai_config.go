@@ -115,11 +115,11 @@ func (s *Server) GetAIThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Em
 	return &ypb.GetThirdPartyAppConfigTemplateResponse{Templates: templates}, nil
 }
 
-func (s *Server) GetApiKey(ctx context.Context, req *ypb.GetApiKeyRequest) (*ypb.Empty, error) {
+func (s *Server) GetApiKeyByOnline(ctx context.Context, req *ypb.GetApiKeyByOnlineRequest) (*ypb.GetApiKeyByOnlineResponse, error) {
 	cancelCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
-	apiKey, err := client.CreateAIApiKeyByOnline(cancelCtx, req.Token)
+	apiKey, err := client.GetAIApiKeyByOnline(cancelCtx, req.Token)
 	if err != nil {
 		return nil, err
 	}
@@ -135,5 +135,9 @@ func (s *Server) GetApiKey(ctx context.Context, req *ypb.GetApiKeyRequest) (*ypb
 		return nil, utils.Errorf("update apiKey failed: %v", err)
 	}
 
-	return &ypb.Empty{}, nil
+	if err := yakit.ReplaceAPIKeys(s.GetProfileDatabase(), "free-user", apiKey); err != nil {
+		return nil, utils.Errorf("ReplaceAPIKeys failed: %v", err)
+	}
+
+	return &ypb.GetApiKeyByOnlineResponse{ApiKey: apiKey}, nil
 }

@@ -2,6 +2,10 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/bytedance/mockey"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"os"
 	"testing"
 
@@ -130,4 +134,104 @@ func TestAIGlobalConfig_GRPC_Local(t *testing.T) {
 
 	_, err = client.DeleteAIProvider(ctx, &ypb.DeleteAIProviderRequest{Id: selected.GetId()})
 	require.Error(t, err)
+}
+
+func TestGetApiKey_ReplaceAPIKeys(t *testing.T) {
+	if isCI() {
+		t.Skip("skip in CI environment")
+	}
+
+	client, server, err := NewLocalClientAndServerWithTempDatabase(t)
+	require.NoError(t, err)
+	require.NotNil(t, client)
+	require.NotNil(t, server)
+	t.Cleanup(func() {
+		db := server.GetProfileDatabase()
+		if db != nil {
+			_ = yakit.SetKey(db, consts.AI_GLOBAL_CONFIG_KEY, "")
+		}
+		if server.profileDatabase != nil {
+			_ = server.profileDatabase.Close()
+		}
+		if server.projectDatabase != nil {
+			_ = server.projectDatabase.Close()
+		}
+	})
+	ctx := context.Background()
+
+	cfg := &ypb.AIGlobalConfig{
+		Enabled:         true,
+		RoutingPolicy:   "performance",
+		DisableFallback: true,
+		DefaultModelId:  "default-model",
+		GlobalWeight:    0.88,
+		AIPresetPrompt:  "respond in markdown when suitable",
+		IntelligentModels: []*ypb.AIModelConfig{
+			{
+				ModelName: "model-intel",
+				Provider: &ypb.ThirdPartyApplicationConfig{
+					Type:    "aibalance",
+					APIKey:  "free-user",
+					BaseURL: "https://aibalance.yaklang.com/v1",
+				},
+			},
+		},
+		LightweightModels: []*ypb.AIModelConfig{
+			{
+				ModelName: "model-light",
+				Provider: &ypb.ThirdPartyApplicationConfig{
+					Type:    "aibalance",
+					APIKey:  "free-user",
+					BaseURL: "https://aibalance.yaklang.com/v1",
+				},
+			},
+		},
+		VisionModels: []*ypb.AIModelConfig{
+			{
+				ModelName: "model-vision",
+				Provider: &ypb.ThirdPartyApplicationConfig{
+					Type:    "aibalance",
+					APIKey:  "not-free-user", // 不会替换
+					BaseURL: "https://aibalance.yaklang.com/v1",
+				},
+			},
+		},
+	}
+
+	_, err = client.SetAIGlobalConfig(ctx, cfg)
+	require.NoError(t, err)
+
+	mockey.PatchConvey("mock online client", t, func() {
+		newAPIKey := "mf-mock-created-key"
+
+		mockey.Mock((*yaklib.OnlineClient).GetAIApiKeyByOnline).
+			To(func(_ *yaklib.OnlineClient, ctx context.Context, token string) (string, error) {
+				assert.Equal(t, "test-token", token)
+				return newAPIKey, nil
+			}).
+			Build()
+
+		req := &ypb.GetApiKeyRequest{Token: "test-token"}
+		resp, err := server.GetApiKey(context.Background(), req)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, newAPIKey, resp.ApiKey)
+
+		updatedCfg, err := yakit.GetAIGlobalConfig(server.GetProfileDatabase())
+		require.NoError(t, err)
+		require.NotNil(t, updatedCfg)
+
+		// 未替换的
+		for _, m := range updatedCfg.IntelligentModels {
+			assert.Equal(t, newAPIKey, m.Provider.APIKey)
+		}
+		for _, m := range updatedCfg.LightweightModels {
+			assert.Equal(t, newAPIKey, m.Provider.APIKey)
+		}
+		for _, m := range updatedCfg.VisionModels {
+			assert.Equal(t, "not-free-user", m.Provider.APIKey) // 未被替换
+		}
+
+	})
+
 }
