@@ -82,15 +82,10 @@ func TestNestedJar(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("test nested jar filesystem", func(t *testing.T) {
-		jarFs, err := javaclassparser.NewJarFSFromLocal(nestedJarPath)
+		archiveFS, err := javaclassparser.NewExpandedArchiveFileSystemFromLocal(nestedJarPath)
 		require.NoError(t, err)
-
-		// Create ExpandedZipFS to handle nested jars
-		zipFS, err := filesys.NewZipFSFromLocal(nestedJarPath)
-		require.NoError(t, err)
-		defer zipFS.Close()
-
-		expandedFS := javaclassparser.NewExpandedZipFS(jarFs, zipFS)
+		expandedFS, ok := archiveFS.(*javaclassparser.ExpandedZipFS)
+		require.True(t, ok)
 
 		// Test that we can read files from the nested jar
 		// The nested jar (test.jar) should be accessible as a directory
@@ -316,10 +311,10 @@ func Test_Multiple_input(t *testing.T) {
 		zipPath, err := GetZipWithJarFile()
 		require.NoError(t, err)
 
-		zipFS, err := filesys.NewZipFSFromLocal(zipPath)
+		archiveFS, err := javaclassparser.NewExpandedArchiveFileSystemFromLocal(zipPath)
 		require.NoError(t, err)
-
-		expandedFS := javaclassparser.NewExpandedZipFS(zipFS, zipFS)
+		expandedFS, ok := archiveFS.(*javaclassparser.ExpandedZipFS)
+		require.True(t, ok)
 
 		jarPath := "lib/test.jar"
 		jarFS, err := expandedFS.GetJarFS(jarPath)
@@ -355,10 +350,10 @@ func Test_Multiple_input(t *testing.T) {
 		zipPath, err := GetZipWithJarFile()
 		require.NoError(t, err)
 
-		zipFS, err := filesys.NewZipFSFromLocal(zipPath)
+		archiveFS, err := javaclassparser.NewExpandedArchiveFileSystemFromLocal(zipPath)
 		require.NoError(t, err)
-
-		expandedFS := javaclassparser.NewExpandedZipFS(zipFS, zipFS)
+		expandedFS, ok := archiveFS.(*javaclassparser.ExpandedZipFS)
+		require.True(t, ok)
 
 		dirs := make([]string, 0)
 		files := make([]string, 0)
@@ -415,11 +410,10 @@ func TestExpandedZipFS_JarMarkedAsDirectory_Compile(t *testing.T) {
 	zipPath, err := GetZipWithJarFile()
 	require.NoError(t, err)
 
-	zipFS, err := filesys.NewZipFSFromLocal(zipPath)
+	archiveFS, err := javaclassparser.NewExpandedArchiveFileSystemFromLocal(zipPath)
 	require.NoError(t, err)
-	defer zipFS.Close()
-
-	expandedFS := javaclassparser.NewExpandedZipFS(zipFS, zipFS)
+	expandedFS, ok := archiveFS.(*javaclassparser.ExpandedZipFS)
+	require.True(t, ok)
 
 	t.Run("jar file should be marked as directory in Stat", func(t *testing.T) {
 		jarPath := "lib/test.jar"
