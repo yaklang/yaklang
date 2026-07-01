@@ -47,7 +47,7 @@ func newTestInvoker(ctx context.Context) *testInvoker {
 	}
 }
 
-func (t *testInvoker) ExecuteToolRequiredAndCall(ctx context.Context, name string) (*aitool.ToolResult, bool, error) {
+func (t *testInvoker) ExecuteToolRequiredAndCall(ctx context.Context, name string, opt ...aicommon.ToolCallerOption) (*aitool.ToolResult, bool, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.toolCallCalled = true
