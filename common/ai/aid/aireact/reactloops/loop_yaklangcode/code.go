@@ -234,7 +234,13 @@ func init() {
 				reactloops.WithAllowToolCall(true),
 				reactloops.WithInitTask(buildInitTask(r, holder, installCfg)),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
-				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
+				// write_yaklang_code 是"直接写代码"的 focus 模式, 标准工作流为
+				// 选库→搜样例→写代码→修语法→收尾, 本就没有"向用户提问"环节。
+				// 这里显式关闭 ask_for_clarification: 用户已给出编码任务, 即使业务需求
+				// 存在多种合理实现(如"标记敏感数据"可只打 tag / 可落盘 / 可高亮), 也应基于
+				// 最通用合理的默认直接产出可运行代码, 把可调项写进 __DESC__/cli 参数供用户事后切换,
+				// 而不是反复反问用户造成空转。API/签名不确定时用 grep/yakdoc 查, 同样不需要问用户。
+				reactloops.WithAllowUserInteract(false),
 				modSuite.GetAITagOption(),
 				reactloops.WithPersistentContextProvider(func(loop *reactloops.ReActLoop, nonce string) (string, error) {
 					return utils.RenderTemplate(instruction, yaklangPromptRenderMap(loop, nil, nonce))
