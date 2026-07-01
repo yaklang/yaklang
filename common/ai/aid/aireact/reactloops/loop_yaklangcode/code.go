@@ -151,6 +151,12 @@ func yaklangPromptRenderMap(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer
 	if feedbacker != nil {
 		feedbacks = strings.TrimSpace(feedbacker.String())
 	}
+	policy := ClassifyYakScriptRunPolicy(yakCode)
+	runFeedback := strings.TrimSpace(loop.Get(loopVarYakRunLastFeedback))
+	runOk := loop.Get(loopVarYakRunOK)
+	runOutput := loop.Get(loopVarYakRunOutput)
+	scriptKind := string(policy.Kind)
+	needsSelfTest := policy.BlockExitNoSelfTest
 
 	initialSamples := loop.Get("initial_code_samples")
 	hasInitialSamples := loop.Get("init_samples_ready") == "true" || strings.TrimSpace(initialSamples) != ""
@@ -165,6 +171,12 @@ func yaklangPromptRenderMap(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer
 		"IsCreateMode":              editorFilePath == "",
 		"Nonce":                     nonce,
 		"FeedbackMessages":          feedbacks,
+		"RunOk":                     runOk,
+		"RunOutput":                 runOutput,
+		"RunFeedback":               runFeedback,
+		"ScriptKind":                scriptKind,
+		"NeedsSelfTestBlock":        needsSelfTest,
+		"SelfTestHint":              policy.HintForAI,
 		"InitialCodeSamples":        initialSamples,
 		"HasInitialSamples":         hasInitialSamples,
 		"AIKBAvailable":             aikbAvailable,
@@ -226,6 +238,7 @@ func init() {
 				loopinfra.WithFileChanged(func(content string, op *reactloops.LoopActionHandlerOperator) (string, bool) {
 					return checkCodeAndFormatErrors(content)
 				}),
+				loopinfra.WithPostSyntaxCleanHook(buildYaklangPostSyntaxCleanRunHook(r)),
 			)
 
 			// 创建预设选项

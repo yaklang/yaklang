@@ -54,6 +54,10 @@ func NormalizeActionLineNumber(loop *reactloops.ReActLoop, fullCodeVar string, l
 // Returns: (errorMessage string, hasBlockingErrors bool)
 type FileChangedCallback func(content string, operator *reactloops.LoopActionHandlerOperator) (string, bool)
 
+// PostSyntaxCleanHook runs after static lint passes and before the loop may exit on clean syntax.
+// Return (feedback, blockExit): when blockExit is true, feedback is sent to the model and the loop continues.
+type PostSyntaxCleanHook func(loop *reactloops.ReActLoop, op *reactloops.LoopActionHandlerOperator) (feedback string, blockExit bool)
+
 // CodePrettifyCallback is called to prettify AI-generated code (extract line numbers etc.)
 // Returns: (startLine, endLine int, prettifiedCode string, fixed bool)
 type CodePrettifyCallback func(code string) (int, int, string, bool)
@@ -72,8 +76,9 @@ type SingleFileModificationSuiteFactory struct {
 	contentType   string // content type, e.g., "code/yaklang"
 
 	// Callbacks
-	fileChangedCb    FileChangedCallback
-	codePrettifyCb   CodePrettifyCallback
+	fileChangedCb       FileChangedCallback
+	postSyntaxCleanHook PostSyntaxCleanHook
+	codePrettifyCb      CodePrettifyCallback
 	spinDetectionCb  func(loop *reactloops.ReActLoop, startLine, endLine int) (bool, string)
 	reflectionPrompt func(startLine, endLine int, reason string) string
 
@@ -155,6 +160,13 @@ func WithAITagConfig(tagName, variableName, nodeId, contentType string) SingleFi
 func WithFileChanged(cb FileChangedCallback) SingleFileModificationOption {
 	return func(f *SingleFileModificationSuiteFactory) {
 		f.fileChangedCb = cb
+	}
+}
+
+// WithPostSyntaxCleanHook sets a hook invoked after lint passes and before exit-on-clean.
+func WithPostSyntaxCleanHook(hook PostSyntaxCleanHook) SingleFileModificationOption {
+	return func(f *SingleFileModificationSuiteFactory) {
+		f.postSyntaxCleanHook = hook
 	}
 }
 
@@ -243,6 +255,17 @@ func (f *SingleFileModificationSuiteFactory) applySyntaxLintResult(
 	loop.Set(lintStatusVar, "true")
 	// 语法通过状态反馈, 让前端看到从"修复中"到"通过"的状态切换
 	reactloops.EmitStatus(loop, "语法检查通过 / Syntax check passed")
+	if exitOnClean && f.postSyntaxCleanHook != nil {
+		feedback, blockExit := f.postSyntaxCleanHook(loop, op)
+		if blockExit {
+			if feedback != "" {
+				op.Feedback(feedback)
+			}
+			op.DisallowNextLoopExit()
+			op.Continue()
+			return
+		}
+	}
 	if exitOnClean {
 		op.Exit()
 	}
