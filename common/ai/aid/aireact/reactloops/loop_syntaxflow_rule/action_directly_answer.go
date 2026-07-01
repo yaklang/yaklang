@@ -93,7 +93,7 @@ func directlyAnswerSyntaxFlowHandler(loop *reactloops.ReActLoop, action *aicommo
 	invoker.EmitResultAfterStream(payload)
 	userInputPreview := utils.ShrinkTextBlock(loop.GetCurrentTask().GetUserInput(), 200)
 	answerPreview := utils.ShrinkTextBlock(payload, 300)
-	invoker.AddToTimeline("directly_answer", fmt.Sprintf(
+	invoker.AddToTimeline(reactloops.TimelineEntryAssistantOutput, fmt.Sprintf(
 		"user input preview:\n%s\n\nanswer preview:\n%s\n\nanswer file: %s",
 		userInputPreview,
 		answerPreview,

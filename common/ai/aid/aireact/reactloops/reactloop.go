@@ -929,6 +929,21 @@ func (r *ReActLoop) GetLastAction() *ActionRecord {
 	return r.actionHistory[len(r.actionHistory)-1]
 }
 
+// GetLastValidAction 获取最近一次有效 Action 记录，排除 finish
+func (r *ReActLoop) GetLastValidAction() *ActionRecord {
+	r.actionHistoryMutex.Lock()
+	defer r.actionHistoryMutex.Unlock()
+
+	for i := len(r.actionHistory) - 1; i >= 0; i-- {
+		record := r.actionHistory[i]
+		if record == nil || record.ActionType == loopAction_Finish.ActionType {
+			continue
+		}
+		return record
+	}
+	return nil
+}
+
 // GetLastNAction 获取最近 N 次的 Action 记录
 func (r *ReActLoop) GetLastNAction(n int) []*ActionRecord {
 	r.actionHistoryMutex.Lock()

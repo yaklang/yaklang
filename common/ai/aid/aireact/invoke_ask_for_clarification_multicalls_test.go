@@ -146,8 +146,8 @@ LOOP:
 	if !utils.MatchAllOfSubString(tl, `ReAct Iteration Done[5]`) {
 		t.Fatal("iteration count should be 5")
 	}
-	if !utils.MatchAllOfSubString(tl, `ai directly answer`) {
-		t.Fatal("ai directly answer not found")
+	if !utils.MatchAllOfSubString(tl, `assistant output`) {
+		t.Fatal("assistant output not found in timeline")
 	}
 	if ret := strings.Count(tl, `...mocked question...`); ret < 4 {
 		t.Fatal("mocked question found, should be 4 times, got ", ret)
