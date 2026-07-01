@@ -254,12 +254,24 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 			// of callback registration order. Without deferral, this callback might
 			// check ShouldIgnoreError() before a later callback has called IgnoreError().
 			operator.DeferAfterCallbacks(func() {
-				if isDone && reason != nil && !operator.ShouldIgnoreError() {
+				// 收尾表态统一交给纯决策函数 ClassifyLoopFinishEmission (便于单测):
+				//   - IgnoreError -> 静默 (隐藏/内部 loop 自管收尾, 不污染 UI);
+				//   - 迭代上限软中断 -> "自然结束"(success) + 框架层补发中断说明
+				//     (退出原因 = 超出最大迭代 + 未完成 TODO + 下一步; 回复 "继续"
+				//     续跑或开启新话题), 与具体 loop / 专注模式无关;
+				//   - 已结束且带错误 -> 硬失败 fail (携带错误信息, 与软中断形成对比);
+				//   - 其余 -> 成功.
+				// 关键词: max iteration 软中断 自然结束, 框架统一收尾, 补发中断说明
+				maxIterInterrupt := loop != nil && loop.IsMaxIterationInterrupted()
+				switch reactloops.ClassifyLoopFinishEmission(isDone, reason, operator.ShouldIgnoreError(), maxIterInterrupt) {
+				case reactloops.LoopFinishSilent:
+					return
+				case reactloops.LoopFinishSuccessWithInterruptSummary:
+					loop.DeliverMaxIterationInterruptSummary()
+					r.Emitter.EmitReActSuccess("ReAct task execution success")
+				case reactloops.LoopFinishFail:
 					r.Emitter.EmitReActFail(fmt.Sprintf("ReAct task execution failed: %v", utils.InterfaceToString(reason)))
-				} else if !operator.ShouldIgnoreError() {
-					// Only emit success when IgnoreError is not set.
-					// Hidden/internal sub-loops (like loop_intent) that set IgnoreError
-					// should not emit success/fail to avoid confusing UI signals.
+				default:
 					r.Emitter.EmitReActSuccess("ReAct task execution success")
 				}
 			})

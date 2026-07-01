@@ -784,20 +784,24 @@ LOOP:
 		// 关键词: 主循环 tick, lastIterationTickAt
 		r.recordIterationTick()
 		if iterationCount > maxIterations {
-			// 到达迭代上限属于"软性中断", 不再当作硬错误直接 EmitReActFail.
-			// 处理步骤:
+			// 到达迭代上限属于"软性中断", 框架层统一按"自然结束"处理, 不再当作
+			// 硬错误 EmitReActFail. 处理步骤 (与具体 loop / 专注模式无关):
 			//  1. applyMaxIterationSoftInterrupt: 把当前任务仍活跃的 TODO 批量
-			//     标记 SKIP (待办回收) 并广播, 同时在 Timeline 落一次软性中断说明;
-			//  2. finishIterationLoopWithSoftInterrupt: 预先置位 IgnoreError 再跑
-			//     onPostIteration hook, 保证全局 fail 兜底一定观察到 ignore, 由
-			//     loop 的 finalize hook 生成"直接回答", 明确告诉用户哪些没做完 +
-			//     询问下一步 (回复 "继续" 即可续跑);
+			//     标记 SKIP (待办回收) 并广播, 置位软中断标记, 同时在 Timeline
+			//     落一次"退出原因=超出最大迭代"的软性说明;
+			//  2. finishIterationLoopWithError(reason=maxIterErr): 照常跑
+			//     onPostIteration hook. 注意这里不再预置 IgnoreError —— 全局收尾
+			//     兜底 (re-act_mainloop) 会识别 IsMaxIterationInterrupted(), 把它
+			//     当作 EmitReActSuccess (自然结束) 上报, 并补发一段框架层 AI 生成
+			//     的中断说明 (退出原因 + 未完成 TODO + 下一步; 回复 "继续" 续跑或
+			//     开启新话题). 只有当某个隐藏 / 内部 loop 在自己的 finalize 里主动
+			//     IgnoreError 自管收尾时, 才保持静默、不打扰;
 			//  3. 正常 break LOOP -> return nil -> complete(nil), 资源回收由
 			//     ExecuteWithExistedTask 的 defer r.Release() 完成.
-			// 关键词: max iteration 软性中断, downgrade-max-iteration-err, 待办 SKIP
+			// 关键词: max iteration 软性中断, 自然结束, downgrade-max-iteration-err, 待办 SKIP
 			maxIterErr := utils.Errorf("reached max iterations (%d), stopping %s loop", maxIterations, r.loopName)
 			r.applyMaxIterationSoftInterrupt(iterationCount, task, maxIterations)
-			r.finishIterationLoopWithSoftInterrupt(iterationCount, task, maxIterErr)
+			r.finishIterationLoopWithError(iterationCount, task, maxIterErr)
 			log.Infof("Loop soft-exit on max iterations (%d) for %s loop, waiting for user decision", maxIterations, r.loopName)
 			needSummary.SetTo(true)
 			break LOOP
@@ -1329,27 +1333,6 @@ func (r *ReActLoop) applyMaxIterationSoftInterrupt(iterationCount int, task aico
 		)
 		invoker.AddToTimeline("iteration_limit_interrupt", msg)
 	}
-}
-
-// finishIterationLoopWithSoftInterrupt 与 finishIterationLoopWithError 类似, 但
-// 在运行任何 onPostIteration 回调之前就把 operator 标记为 IgnoreError. 这样即使
-// 某个 loop 没有注册专门的 finalize hook (或 finalize hook 因为"答复已下发"而
-// 提前 return 未调用 IgnoreError), ExecuteLoopTask 里注册的全局 fail 兜底
-// (通过 DeferAfterCallbacks 检查 ShouldIgnoreError) 也一定观察到 ignore, 从而
-// 不会把"到达迭代上限"当成任务失败 EmitReActFail 上报.
-//
-// 关键词: 软性中断预置 IgnoreError, 抑制 EmitReActFail, downgrade-max-iteration-err
-func (r *ReActLoop) finishIterationLoopWithSoftInterrupt(current int, task aicommon.AIStatefulTask, err any) *OnPostIterationOperator {
-	operator := newOnPostIterationOperator()
-	operator.IgnoreError() // 预先置位: 软性中断绝不上报 fail
-	if r.onPostIteration != nil {
-		if err != nil {
-			r.callOnPostIteration(current, task, true, utils.Errorf("reason: %v", err), operator)
-		} else {
-			r.callOnPostIteration(current, task, true, nil, operator)
-		}
-	}
-	return operator
 }
 
 func testIsFinished(task aicommon.AIStatefulTask) bool {
