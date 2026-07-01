@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"io"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -419,12 +421,42 @@ Few-shot example 2 (valid directly_call_tool):
 			ctx = t.GetContext()
 		}
 
+		resolveTool := func(name string) (*aitool.Tool, error) {
+			config := loop.GetConfig()
+
+			if buildinaitools.IsMCPToolName(name) && !aicommon.IsMCPServersAllowedConfig(config) {
+				return nil, utils.Errorf("MCP tools are disabled for this runtime")
+			}
+
+			tool, err := config.GetAiToolManager().GetToolByName(name)
+			if err != nil {
+				return nil, utils.Errorf("tool '%s' not found: %v", name, err)
+			}
+
+			// For MCP tools, wait until the background loader replaces the DB stub with a live
+			// tool (or timeout). This avoids TOOL_INITIALIZING failures right after engine start.
+			if buildinaitools.IsMCPToolName(name) && buildinaitools.IsMCPPendingStub(tool) {
+				tool, err = buildinaitools.WaitForMCPLiveTool(
+					ctx, config.GetAiToolManager(), name,
+					buildinaitools.MCPToolInitWaitTimeout,
+					buildinaitools.MCPToolInitPollInterval,
+					func(elapsed time.Duration) {
+						loop.GetEmitter().EmitInfo("still waiting for MCP tool %q (elapsed %v)...", name, elapsed.Round(time.Second))
+					},
+				)
+				if err != nil {
+					return nil, err
+				}
+			}
+			return tool, nil
+		}
+
 		// prepare is the loop-layer callback run AFTER the tool-call card has been
 		// created (loading). It reads the streaming action's params (blocking until
 		// they arrive), normalizes/merges/validates them, streams progress, and either
 		// returns finalized params or signals fallbackToRequire (reusing the same card
 		// and switching to the AI param-generation path).
-		prepare := func(action *aicommon.Action, tool *aitool.Tool) (aitool.InvokeParams, bool, error) {
+		prepare := func(action *aicommon.Action, name string) (aitool.InvokeParams, bool, *aitool.Tool, error) {
 			emitProgress := func(string) {}
 			finishProgress := func(string) {}
 			if emitter := loop.GetEmitter(); emitter != nil && operator.GetTask() != nil {
@@ -448,6 +480,13 @@ Few-shot example 2 (valid directly_call_tool):
 					_, _ = pw.WriteString(msg)
 					_, _ = pw.WriteString("\n")
 				}
+			}
+
+			emitProgress("[解析缓存工具]")
+			tool, err := resolveTool(name)
+			if err != nil {
+				finishProgress("[failed] cached tool resolution failed; falling back to require_tool")
+				return nil, false, nil, err
 			}
 
 			emitProgress("[开始处理参数]")
@@ -487,7 +526,7 @@ Few-shot example 2 (valid direct retry):
 				reportStatus(fmt.Sprintf("auto fallback: switching '%s' from directly_call_tool to @action=require_tool because schema validation failed", toolName))
 				loopInfraStatus(loop, "参数校验失败，切换常规工具调用 / Params Invalid, Falling Back...")
 				operator.Feedback(fmt.Sprintf("directly_call_tool params invalid for '%s': %s; automatically switching to @action=require_tool", toolName, validationSummary))
-				return nil, true, nil
+				return nil, true, tool, nil
 			}
 
 			paramKeys := directlyCallParamKeys(params)
@@ -509,7 +548,7 @@ Few-shot example 2 (valid direct retry):
 			}
 			reportStatus(fmt.Sprintf("calling cached tool '%s'", toolName))
 			loopInfraStatus(loop, "直接工具调用参数已准备 / Direct Tool Params Ready")
-			return params, false, nil
+			return params, false, tool, nil
 		}
 
 		// DirectlyCallTool emits the card (loading) first, then runs prepare (reads
