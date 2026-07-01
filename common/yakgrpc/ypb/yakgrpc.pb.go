@@ -51986,8 +51986,10 @@ type MITMRequest struct {
 	// hijack filter
 	HijackFilterData   *MITMFilterData `protobuf:"bytes,65,opt,name=HijackFilterData,proto3" json:"HijackFilterData,omitempty"`
 	UpdateHijackFilter bool            `protobuf:"varint,66,opt,name=updateHijackFilter,proto3" json:"updateHijackFilter,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// disable built-in TrafficGuard sensitive-info scanning
+	DisableTrafficGuard bool `protobuf:"varint,69,opt,name=DisableTrafficGuard,proto3" json:"DisableTrafficGuard,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *MITMRequest) Reset() {
@@ -52436,6 +52438,13 @@ func (x *MITMRequest) GetHijackFilterData() *MITMFilterData {
 func (x *MITMRequest) GetUpdateHijackFilter() bool {
 	if x != nil {
 		return x.UpdateHijackFilter
+	}
+	return false
+}
+
+func (x *MITMRequest) GetDisableTrafficGuard() bool {
+	if x != nil {
+		return x.DisableTrafficGuard
 	}
 	return false
 }
@@ -67670,9 +67679,11 @@ type MITMV2Request struct {
 	// Additional ports for the MITM listener to bind simultaneously.
 	// When non-empty, the server will listen on Port (primary) and all ExtraPorts.
 	// All ports share the same MITM server instance and configuration.
-	ExtraPorts    []uint32 `protobuf:"varint,57,rep,packed,name=ExtraPorts,proto3" json:"ExtraPorts,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ExtraPorts []uint32 `protobuf:"varint,57,rep,packed,name=ExtraPorts,proto3" json:"ExtraPorts,omitempty"`
+	// disable built-in TrafficGuard sensitive-info scanning
+	DisableTrafficGuard bool `protobuf:"varint,58,opt,name=DisableTrafficGuard,proto3" json:"DisableTrafficGuard,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *MITMV2Request) Reset() {
@@ -68102,6 +68113,13 @@ func (x *MITMV2Request) GetExtraPorts() []uint32 {
 		return x.ExtraPorts
 	}
 	return nil
+}
+
+func (x *MITMV2Request) GetDisableTrafficGuard() bool {
+	if x != nil {
+		return x.DisableTrafficGuard
+	}
+	return false
 }
 
 type MITMV2Response struct {
@@ -75102,7 +75120,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"FilterData\x18\x01 \x01(\v2\x13.ypb.MITMFilterDataR\n" +
 	"FilterData\"\x17\n" +
-	"\x15SetMITMFilterResponse\"\xb1\x13\n" +
+	"\x15SetMITMFilterResponse\"\xe3\x13\n" +
 	"\vMITMRequest\x12\x18\n" +
 	"\arequest\x18\x01 \x01(\fR\arequest\x12\x1a\n" +
 	"\bresponse\x18o \x01(\fR\bresponse\x12\x12\n" +
@@ -75176,7 +75194,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tRandomJA3\x18> \x01(\bR\tRandomJA3\x12@\n" +
 	"\x1bDisableWebsocketCompression\x18@ \x01(\bR\x1bDisableWebsocketCompression\x12?\n" +
 	"\x10HijackFilterData\x18A \x01(\v2\x13.ypb.MITMFilterDataR\x10HijackFilterData\x12.\n" +
-	"\x12updateHijackFilter\x18B \x01(\bR\x12updateHijackFilter\"d\n" +
+	"\x12updateHijackFilter\x18B \x01(\bR\x12updateHijackFilter\x120\n" +
+	"\x13DisableTrafficGuard\x18E \x01(\bR\x13DisableTrafficGuard\"d\n" +
 	"\x0eFilterDataItem\x12 \n" +
 	"\vMatcherType\x18\x01 \x01(\tR\vMatcherType\x12\x14\n" +
 	"\x05Group\x18\x02 \x03(\tR\x05Group\x12\x1a\n" +
@@ -76401,7 +76420,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x14WatchProcessResponse\x12\x16\n" +
 	"\x06Action\x18\x01 \x01(\tR\x06Action\x12*\n" +
 	"\aProcess\x18\x02 \x01(\v2\x10.ypb.ProcessInfoR\aProcess\x125\n" +
-	"\vConnections\x18\x03 \x03(\v2\x13.ypb.ConnectionInfoR\vConnections\"\x86\x14\n" +
+	"\vConnections\x18\x03 \x03(\v2\x13.ypb.ConnectionInfoR\vConnections\"\xb8\x14\n" +
 	"\rMITMV2Request\x12\x12\n" +
 	"\x04Host\x18\x01 \x01(\tR\x04Host\x12\x12\n" +
 	"\x04Port\x18\x02 \x01(\rR\x04Port\x12(\n" +
@@ -76470,7 +76489,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"SNIMapping\x12\x1e\n" +
 	"\n" +
 	"ExtraPorts\x189 \x03(\rR\n" +
-	"ExtraPorts\"\xa5\x05\n" +
+	"ExtraPorts\x120\n" +
+	"\x13DisableTrafficGuard\x18: \x01(\bR\x13DisableTrafficGuard\"\xa5\x05\n" +
 	"\x0eMITMV2Response\x12\x1e\n" +
 	"\n" +
 	"JustFilter\x18\x01 \x01(\bR\n" +

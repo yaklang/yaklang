@@ -7235,6 +7235,9 @@ message MITMRequest {
   // hijack filter
   MITMFilterData HijackFilterData = 65;
   bool updateHijackFilter = 66;
+
+  // disable built-in TrafficGuard sensitive-info scanning
+  bool DisableTrafficGuard = 69;
 }
 
 message FilterDataItem {
@@ -9052,6 +9055,9 @@ message MITMV2Request{
   // When non-empty, the server will listen on Port (primary) and all ExtraPorts.
   // All ports share the same MITM server instance and configuration.
   repeated uint32 ExtraPorts = 57;
+
+  // disable built-in TrafficGuard sensitive-info scanning
+  bool DisableTrafficGuard = 58;
 }
 
 message MITMV2Response {
