@@ -317,6 +317,23 @@ func (v *Value) StringWithRange() string {
 	return v.disasmLine
 }
 
+// StringForDataflowWarn returns a concise, single-line identity for high-volume
+// dataflow warning logs (e.g. "TopDef too many", "CalledBy too many"). It
+// avoids StringWithRange's full disassembly line, which is noisy when a warn
+// fires many times. Format: "<verbose-name>@<start line:col>".
+func (v *Value) StringForDataflowWarn() string {
+	if v.IsNil() {
+		return ""
+	}
+	s := v.GetVerboseName()
+	if r := v.getInstruction().GetRange(); r != nil {
+		if start := r.GetStart(); start != nil {
+			s = fmt.Sprintf("%s@%s", s, start)
+		}
+	}
+	return s
+}
+
 func (v *Value) StringWithSourceCode(msg ...string) string {
 	if v.IsNil() {
 		return ""

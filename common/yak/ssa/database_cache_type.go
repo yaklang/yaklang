@@ -67,7 +67,10 @@ func (s *typeStore) get(id int64) (Type, bool) {
 
 	irType := ssadb.GetIrTypeById(s.db, s.program.GetProgramName(), id)
 	if utils.IsNil(irType) {
-		log.Warnf("GetTypeFromDB: failed type is nil: id: %v", id)
+		// TODO(scan-log): type id not in DB after split-compile flush (resident cleared per
+		// unit); scan dataflow recovers with a nil type. Common on large projects; debug to
+		// avoid 5k+ lines of log noise.
+		log.Debugf("GetTypeFromDB: failed type is nil: id: %v", id)
 		return nil, false
 	}
 
