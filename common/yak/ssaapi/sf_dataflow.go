@@ -494,6 +494,14 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.Values, frame *sfvm.SFF
 		vs = append(vs, v)
 		return nil
 	})
+	// TODO(large-project): on big targets (e.g. moodle, 7733 PHP files) an
+	// `include` like `php-tp-all-extern-variable-param-source` can match >11k
+	// sources here, and the recursive getTopDefs dataflow below runs on each →
+	// heavy rules hang for 20+ min and the scan never finishes. The cross-process
+	// rollback fix (restoring emptyStackHash) removed the implicit early-abort
+	// depth cap that used to bound this. dataflowValueLimit/MaxDepth only bound
+	// per-branch depth, not total work. Add an explicit cap: either truncate `vs`
+	// to N sources (warn) or enforce a per-rule wall-clock budget in ssacli.go.
 
 	var ret = vs
 	var condition []*filterCondition
