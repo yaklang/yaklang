@@ -410,6 +410,17 @@ func GetDefaultYakitAIFocusDir() string {
 	return pt
 }
 
+// GetDefaultYakitOpenAPIDocumentsDir returns the directory for persisted OpenAPI/Swagger documents.
+// Each upload is stored as a subdirectory named by document UUID.
+// Path: ~/yakit-projects/openapi-documents  (or $YAKIT_HOME/openapi-documents)
+func GetDefaultYakitOpenAPIDocumentsDir() string {
+	pt := filepath.Join(GetDefaultYakitBaseDir(), "openapi-documents")
+	if !utils.IsDir(pt) {
+		os.MkdirAll(pt, 0o777)
+	}
+	return pt
+}
+
 // aiSkillSubDirs lists the well-known sub-paths checked for AI skills.
 // Each entry is either user-level (rooted at $HOME) or project-level (rooted at $CWD).
 var aiSkillSubDirs = []struct {

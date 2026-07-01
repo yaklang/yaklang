@@ -124,9 +124,6 @@ func schemaValue(data openapi2.T, i *openapi3.Schema, fieldName ...string) any {
 		return m
 	case "object":
 		m := omap.NewGeneralOrderedMap()
-		if i.Items == nil {
-			return m
-		}
 		for field, pt := range i.Properties {
 			if pt.Ref != "" {
 				m.Set(field, v2_SchemeRefToObject(data, pt.Ref, field))
