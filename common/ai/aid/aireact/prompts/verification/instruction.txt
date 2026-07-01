@@ -114,6 +114,28 @@
 
 ## 输出格式约束（必须遵守）
 
+### @action 唯一性（最高优先级，必须遵守）
+
+本轮是**满意度验收**调用，不是 ReAct 主循环。你的输出**只能**是符合本轮 Schema 的单个 JSON 对象，且：
+
+- **`@action` 必须且只能是 `"verify-satisfaction"`**。这是本轮 Schema 中 `@action` 的唯一合法值。
+- **严禁**输出主循环或其它 caller 的 action，包括但不限于：`directly_answer`、`finish`、`require_tool`、`directly_call_tool`、`tool_compose`、`require_ai_blueprint`、`request_plan`、`loading_skills`、`load_capability` 等。
+- **严禁**在 JSON 之外追加 Markdown 总结、`<|FINAL_ANSWER_...|>`、`answer_payload`、长篇 reasoning 正文，或「先 JSON 再总结」的双段输出。
+- Timeline / 【INPUT】里出现的历史 `directly_answer`、`finish`、工具调用记录**仅供你阅读判断** `user_satisfied`；**不得**模仿历史格式再次直答或收口，必须改用 `verify-satisfaction` JSON 表达验收结论。
+
+正确示例（仅此一种输出形态）：
+```json
+{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "任务未完成：…"}
+```
+
+错误示例（一律禁止）：
+```json
+{"@action": "directly_answer", "answer_payload": "…"}
+```
+```json
+{"@action": "finish"}
+```
+
 - 返回值必须是符合本轮 Schema 的 JSON 对象。
 - 如果最新的步骤执行成功且产生了无可辩驳的证据，证明用户的【最终请求】已经完全解决时，通常应该设置user_satisfied为true。
 - 只有当工具执行完全失败或没有任何相关输出时，才设置user_satisfied为false。
@@ -209,6 +231,8 @@
 6. 禁止把"技能已加载""技能文档已读取""AI 已直接回答"当成执行型安全任务的直接证据
 7. 禁止把未出现在 `output_files`、工具 stdout 或时间线创建记录中的文件路径写成已生成交付物
 8. 禁止在存在"已确认但未经 `cybersecurity-risk` 落库、也未写入 output 文件"的漏洞或安全风险时宣告 `user_satisfied=true`；必须先完成上报/留档（见第 13 条）
+9. 禁止 `@action` 使用 `verify-satisfaction` 以外的任何值（含 `directly_answer`、`finish` 及主循环其它 action）
+10. 禁止在验收 JSON 之外输出 Markdown、FINAL_ANSWER AITAG 或第二段总结来替代 `verify-satisfaction`
 
 错误示例：
 ```json
