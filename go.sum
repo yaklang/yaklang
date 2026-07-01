@@ -569,8 +569,8 @@ github.com/yaklang/go-llvm v0.0.0-20260325033841-7304627dfe8f h1:YuuIpas5z91t2S6
 github.com/yaklang/go-llvm v0.0.0-20260325033841-7304627dfe8f/go.mod h1:L8gVgAxjSL0/ub973fygXVVHoDaYKLC190N6uq+o+tE=
 github.com/yaklang/go-sqlite3 v0.0.1 h1:IXdqvUAct8FygqoQ3XgWBqw8Bh7qQFa0miTl4cM4B+4=
 github.com/yaklang/go-sqlite3 v0.0.1/go.mod h1:RCLoOuANeSNMmFMCABJyusomiGXnZjkLk20oZSAAh5U=
-github.com/yaklang/javajive v0.1.0 h1:FsR8225ZuX4PiCNBLcGgxJWXhKDxrjnxz5cBwPcgO/0=
-github.com/yaklang/javajive v0.1.0/go.mod h1:MP6RfWwjQ40V4J+n4k2NwXH1p5s/dNqzxC3Klx6ckRY=
+github.com/yaklang/javajive v0.1.1 h1:GDvqPOxisqk6tFP9ZSgMsXacnPduLbUflX7KTdEhPRw=
+github.com/yaklang/javajive v0.1.1/go.mod h1:MP6RfWwjQ40V4J+n4k2NwXH1p5s/dNqzxC3Klx6ckRY=
 github.com/yaklang/pcap v1.0.5 h1:LiatV/vG+1uMzBB+gyNg2rxc5v/yrH4jzk8IsG+iSfE=
 github.com/yaklang/pcap v1.0.5/go.mod h1:JDglFyNaXnntS5KmdIVlhnZBAYFc0oEGPrmJlOI3MDg=
 github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d h1:splanxYIlg+5LfHAM6xpdFEAYOk8iySO56hMFq6uLyA=
