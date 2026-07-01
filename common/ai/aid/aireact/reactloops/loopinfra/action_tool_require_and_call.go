@@ -18,6 +18,10 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 			"tool_require_payload",
 			aitool.WithParam_Description(`MUST set in {"@action": "require_tool", ... }. 根据上下文信息，提供你想要申请的工具名，只说明工具名即可，严禁包含参数.`),
 		),
+		aitool.WithStringParam(
+			"tool_call_reason",
+			aitool.WithParam_Description(`Optional. A short, human-readable sentence describing WHY this tool call is needed (the intent/goal, not the params). Omit only when human_readable_thought already states the reason. Shown to the user on the tool-call card.`),
+		),
 	},
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 		payload := action.GetString("tool_require_payload")
@@ -57,7 +61,8 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 		}
 		loopInfraSystemLog(loop, "load_tool", toolLoadMessage)
 
-		result, directly, callErr := invoker.ExecuteToolRequiredAndCall(ctx, toolPayload)
+		reason := resolveToolCallReason(action, "tool_call_reason")
+		result, directly, callErr := invoker.ExecuteToolRequiredAndCall(ctx, toolPayload, aicommon.WithToolCaller_Reason(reason))
 
 		// cache tool on successful execution (before satisfaction check)
 		if callErr == nil && result != nil {
