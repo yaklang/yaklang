@@ -373,6 +373,8 @@ func (prog *Program) Finish() {
 	}
 }
 
+// SearchIndexAndOffsetByOffset binary-searches the sorted offset slice. The
+// caller must hold prog.offsetMu (at least RLock).
 func (prog *Program) SearchIndexAndOffsetByOffset(searchOffset int) (index int, offset int) {
 	index = sort.Search(len(prog.OffsetSortedSlice), func(i int) bool {
 		return prog.OffsetSortedSlice[i] >= searchOffset
@@ -387,6 +389,8 @@ func (prog *Program) SearchIndexAndOffsetByOffset(searchOffset int) (index int, 
 }
 
 func (prog *Program) GetFrontValueByOffset(searchOffset int) (offset int, value Value) {
+	prog.offsetMu.RLock()
+	defer prog.offsetMu.RUnlock()
 	index, offset := prog.SearchIndexAndOffsetByOffset(searchOffset)
 	// 如果二分查找的结果是大于目标值的，那么就需要回退一个
 	if offset > searchOffset {

@@ -187,7 +187,8 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 	}
 	_, codeRange, err := getIRCodeRange(inst.GetProgram(), ir)
 	if err != nil {
-		log.Warnf("instructionFromIrCode: skip range for id=%d: %v", ir.GetIdInt64(), err)
+		// TODO(scan-log): range source editor was released by the split-compile flush; reload skips the range.
+		log.Debugf("instructionFromIrCode: skip range for id=%d: %v", ir.GetIdInt64(), err)
 	} else if codeRange != nil {
 		inst.SetRange(codeRange)
 	}
