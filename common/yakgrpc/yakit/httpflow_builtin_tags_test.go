@@ -11,6 +11,7 @@ func TestIsHTTPFlowBuiltinTag(t *testing.T) {
 	require.True(t, IsHTTPFlowBuiltinTag(HTTPFlowTagAutoFixResponse))
 	require.True(t, IsHTTPFlowBuiltinTag(HTTPFlowTagResend))
 	require.True(t, IsHTTPFlowBuiltinTag(HTTPFlowTagResend+"tag1"))
+	require.True(t, IsHTTPFlowBuiltinTag(HTTPFlowTagWebFuzzer))
 
 	require.False(t, IsHTTPFlowBuiltinTag("webfuzzer"))
 	require.False(t, IsHTTPFlowBuiltinTag("custom-tag"))

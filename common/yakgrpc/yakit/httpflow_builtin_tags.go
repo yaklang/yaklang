@@ -11,6 +11,7 @@ const (
 	HTTPFlowTagResponseDiscarded  = "[响应被丢弃]"
 	HTTPFlowTagAutoFixResponse    = "[自动修复]" // DB Response is fixed; wire is in KV (GetHTTPFlowBare, same as MITM bare).
 	HTTPFlowTagResend             = "[重发]"
+	HTTPFlowTagWebFuzzer          = "[WebFuzzer]" // 流量由 WebFuzzer（含序列）发出，便于从数据库按 tag 筛选
 )
 
 // HTTPFlowBuiltinTags 后端内置 tag；命中则 HTTPFlowsFieldGroup 返回 Builtin=true。
@@ -23,6 +24,7 @@ var HTTPFlowBuiltinTags = map[string]struct{}{
 	HTTPFlowTagResponseDiscarded: {},
 	HTTPFlowTagAutoFixResponse:   {},
 	HTTPFlowTagResend:            {},
+	HTTPFlowTagWebFuzzer:         {},
 }
 
 func IsHTTPFlowBuiltinTag(tag string) bool {
