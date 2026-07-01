@@ -787,15 +787,17 @@ LOOP:
 			// 到达迭代上限属于"软性中断", 框架层统一按"自然结束"处理, 不再当作
 			// 硬错误 EmitReActFail. 处理步骤 (与具体 loop / 专注模式无关):
 			//  1. applyMaxIterationSoftInterrupt: 把当前任务仍活跃的 TODO 批量
-			//     标记 SKIP (待办回收) 并广播, 置位软中断标记, 同时在 Timeline
-			//     落一次"退出原因=超出最大迭代"的软性说明;
+			//     标记 SKIP (待办回收) 并广播, 置位软中断标记, 记录未完成 TODO 快照,
+			//     同时在 Timeline 落一次"退出原因=超出最大迭代 + 可回复继续"的软性说明;
 			//  2. finishIterationLoopWithError(reason=maxIterErr): 照常跑
-			//     onPostIteration hook. 注意这里不再预置 IgnoreError —— 全局收尾
-			//     兜底 (re-act_mainloop) 会识别 IsMaxIterationInterrupted(), 把它
-			//     当作 EmitReActSuccess (自然结束) 上报, 并补发一段框架层 AI 生成
-			//     的中断说明 (退出原因 + 未完成 TODO + 下一步; 回复 "继续" 续跑或
-			//     开启新话题). 只有当某个隐藏 / 内部 loop 在自己的 finalize 里主动
-			//     IgnoreError 自管收尾时, 才保持静默、不打扰;
+			//     onPostIteration hook. 各 loop 已有的 finalize 收尾总结 (loop_default
+			//     的 DirectlyAnswer 总结 / http_flow_analyze 的分析报告等) 会读取上面
+			//     落在 timeline / interrupt store 里的上下文, 因地制宜地 AI 生成一段
+			//     "退出原因 + 未完成 TODO + 下一步(回复 '继续' 续跑或换话题)"的说明,
+			//     框架层不额外再发一次 AI 请求. 全局收尾兜底 (re-act_mainloop) 识别
+			//     IsMaxIterationInterrupted() 后, 即便 reason 带着 maxIterErr 也按
+			//     EmitReActSuccess (自然结束) 上报, 与硬中断报错形成对比; 只有隐藏 /
+			//     内部 loop 在自己的 finalize 里 IgnoreError 自管收尾时才保持静默;
 			//  3. 正常 break LOOP -> return nil -> complete(nil), 资源回收由
 			//     ExecuteWithExistedTask 的 defer r.Release() 完成.
 			// 关键词: max iteration 软性中断, 自然结束, downgrade-max-iteration-err, 待办 SKIP
