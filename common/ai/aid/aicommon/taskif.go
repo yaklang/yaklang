@@ -95,6 +95,9 @@ type AIStatefulTask interface {
 
 	GetFocusMode() string
 	SetFocusMode(mode string)
+
+	IsSubAgent() bool
+	SetSubAgent(isSubAgent bool)
 }
 
 type AIStatefulTaskBase struct {
@@ -129,6 +132,7 @@ type AIStatefulTaskBase struct {
 	asyncDeferCallback func(err error)
 
 	skipTaskStatusChangeEmit bool
+	isSubAgent               bool
 }
 
 func (s *AIStatefulTaskBase) GetFocusMode() string {
@@ -187,6 +191,20 @@ func (s *AIStatefulTaskBase) SetTaskRetrievalInfo(info *AITaskRetrievalInfo) {
 
 func (s *AIStatefulTaskBase) SetFocusMode(mode string) {
 	s.focusMode = mode
+}
+
+func (s *AIStatefulTaskBase) IsSubAgent() bool {
+	if s == nil {
+		return false
+	}
+	return s.isSubAgent
+}
+
+func (s *AIStatefulTaskBase) SetSubAgent(isSubAgent bool) {
+	if s == nil {
+		return
+	}
+	s.isSubAgent = isSubAgent
 }
 
 func (s *AIStatefulTaskBase) GetUUID() string {
@@ -503,6 +521,19 @@ func NewSubTaskBase(
 	userInput string,
 	skipTaskStatusChangeEmit ...bool,
 ) *AIStatefulTaskBase {
+	opts := []StatefulTaskBaseOption{}
+	if len(skipTaskStatusChangeEmit) > 0 && skipTaskStatusChangeEmit[0] {
+		opts = append(opts, WithStatefulTaskBaseSkipTaskStatusChangeEmit())
+	}
+	return NewSubTaskBaseWithOptions(parentTask, subTaskId, userInput, opts...)
+}
+
+func NewSubTaskBaseWithOptions(
+	parentTask AIStatefulTask,
+	subTaskId string,
+	userInput string,
+	opts ...StatefulTaskBaseOption,
+) *AIStatefulTaskBase {
 	var parentCtx context.Context
 	if parentTask != nil {
 		parentCtx = parentTask.GetContext()
@@ -515,7 +546,12 @@ func NewSubTaskBase(
 	if parentTask != nil {
 		emitter = parentTask.GetEmitter()
 	}
-	return NewStatefulTaskBase(subTaskId, userInput, parentCtx, emitter, skipTaskStatusChangeEmit...)
+	baseOpts := []StatefulTaskBaseOption{
+		WithStatefulTaskBaseContext(parentCtx),
+		WithStatefulTaskBaseEmitter(emitter),
+	}
+	baseOpts = append(baseOpts, opts...)
+	return newStatefulTaskBase(subTaskId, userInput, baseOpts...)
 }
 
 func NewStatefulTaskBase(
@@ -525,25 +561,33 @@ func NewStatefulTaskBase(
 	Emitter *Emitter,
 	skipTaskStatusChangeEmit ...bool,
 ) *AIStatefulTaskBase {
-	if ctx == nil {
-		ctx = context.Background()
+	opts := []StatefulTaskBaseOption{
+		WithStatefulTaskBaseContext(ctx),
+		WithStatefulTaskBaseEmitter(Emitter),
 	}
-	ctx, cancel := context.WithCancel(ctx)
+	if len(skipTaskStatusChangeEmit) > 0 && skipTaskStatusChangeEmit[0] {
+		opts = append(opts, WithStatefulTaskBaseSkipTaskStatusChangeEmit())
+	}
+	return newStatefulTaskBase(taskId, userInput, opts...)
+}
 
+func newStatefulTaskBase(taskId string, userInput string, opts ...StatefulTaskBaseOption) *AIStatefulTaskBase {
 	base := &AIStatefulTaskBase{
 		id:                taskId,
 		userInput:         userInput,
-		ctx:               ctx,
-		cancel:            cancel,
 		taskMutex:         &sync.Mutex{},
-		Emitter:           Emitter,
 		status:            AITaskState_Created,
 		createdAt:         time.Now(),
 		toolCallResultIds: omap.NewOrderedMap[int64, *aitool.ToolResult](make(map[int64]*aitool.ToolResult)),
 		uuid:              ksuid.New().String(),
 	}
-	if len(skipTaskStatusChangeEmit) > 0 && skipTaskStatusChangeEmit[0] {
-		base.skipTaskStatusChangeEmit = true
+	for _, opt := range opts {
+		if opt != nil {
+			opt(base)
+		}
+	}
+	if base.ctx == nil {
+		base.ctx, base.cancel = context.WithCancel(context.Background())
 	}
 
 	if base.Emitter != nil {
@@ -558,13 +602,65 @@ func NewStatefulTaskBase(
 			base.Emitter.EmitStructured(
 				"react_task_created",
 				map[string]any{
-					"react_task_status": base.status,
-					"react_user_input":  userInput,
-					"react_task_id":     taskId,
-					"react_task_uuid":   base.GetUUID(),
+					"react_task_status":       base.status,
+					"react_user_input":        userInput,
+					"react_task_id":           taskId,
+					"react_task_uuid":         base.GetUUID(),
+					"react_task_name":         base.GetName(),
+					"react_task_is_sub_agent": base.IsSubAgent(),
 				},
 			)
 		}
 	}
 	return base
+}
+
+type StatefulTaskBaseOption func(*AIStatefulTaskBase)
+
+func WithStatefulTaskBaseContext(ctx context.Context) StatefulTaskBaseOption {
+	return func(task *AIStatefulTaskBase) {
+		if task == nil {
+			return
+		}
+		if ctx == nil {
+			ctx = context.Background()
+		}
+		task.ctx, task.cancel = context.WithCancel(ctx)
+	}
+}
+
+func WithStatefulTaskBaseEmitter(emitter *Emitter) StatefulTaskBaseOption {
+	return func(task *AIStatefulTaskBase) {
+		if task == nil {
+			return
+		}
+		task.Emitter = emitter
+	}
+}
+
+func WithStatefulTaskBaseSkipTaskStatusChangeEmit() StatefulTaskBaseOption {
+	return func(task *AIStatefulTaskBase) {
+		if task == nil {
+			return
+		}
+		task.skipTaskStatusChangeEmit = true
+	}
+}
+
+func WithStatefulTaskBaseName(name string) StatefulTaskBaseOption {
+	return func(task *AIStatefulTaskBase) {
+		if task == nil {
+			return
+		}
+		task.name = name
+	}
+}
+
+func WithStatefulTaskBaseSubAgent() StatefulTaskBaseOption {
+	return func(task *AIStatefulTaskBase) {
+		if task == nil {
+			return
+		}
+		task.isSubAgent = true
+	}
 }
