@@ -284,6 +284,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		overwriteSNI                            = firstReq.GetOverwriteSNI()
 		filterWebSocket                         = utils.NewBool(firstReq.GetFilterWebsocket())
 		pluginConcurrency                       = firstReq.GetPluginConcurrency()
+		disableTrafficGuard                     = firstReq.GetDisableTrafficGuard()
 	)
 
 	if firstReq.GetHost() != "" {
@@ -1516,7 +1517,11 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		// 内置敏感信息检测(TrafficGuard): 在过滤判定之前无条件扫描(不受任何过滤策略影响)。
 		// 命中敏感信息、且本应被过滤的流量, 改以"插件流量"(source_type=scan + FromPlugin)形式保存到插件输出,
 		// 既留存证据, 又不污染 MITM History TAB。一次扫描, 复用结果, 不二次开销。
-		tgFindings := trafficguard.ScanFindings(reqUrl, plainRequest, plainResponse)
+		// 用户可通过 MITMV2Request.DisableTrafficGuard 禁用内置规则。
+		var tgFindings []trafficguard.Finding
+		if !disableTrafficGuard {
+			tgFindings = trafficguard.ScanFindings(reqUrl, plainRequest, plainResponse)
+		}
 		// tgSaveAsPlugin: 本应被过滤、但命中了敏感信息 -> 以插件流量形式保留(不进 MITM TAB)。
 		tgSaveAsPlugin := isFiltered && len(tgFindings) > 0
 

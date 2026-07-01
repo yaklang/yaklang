@@ -248,6 +248,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		disableCACertPage                              = firstReq.GetDisableCACertPage()
 		disableWebsocketCompression                    = firstReq.GetDisableWebsocketCompression()
 		randomJA3                                      = firstReq.GetRandomJA3()
+		disableTrafficGuard                            = firstReq.GetDisableTrafficGuard()
 	)
 
 	if firstReq.GetHost() != "" {
@@ -1634,7 +1635,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		// 与早期实现不同: 命中敏感信息的流量"不再"强制取消过滤进入 MITM History(避免污染 MITM TAB),
 		// 而是当它本应被过滤时, 改以"插件流量"(source_type=scan + FromPlugin)形式保存到插件输出,
 		// 既留存证据, 又不混入手动劫持/镜像列表。一次扫描, 复用结果, 不二次开销。
-		tgFindings := trafficguard.ScanFindings(reqUrl, plainRequest, plainResponse)
+		// 用户可通过 MITMRequest.DisableTrafficGuard 禁用内置规则。
+		var tgFindings []trafficguard.Finding
+		if !disableTrafficGuard {
+			tgFindings = trafficguard.ScanFindings(reqUrl, plainRequest, plainResponse)
+		}
 		// tgSaveAsPlugin: 本应被过滤、但命中了敏感信息 -> 以插件流量形式保留(不进 MITM TAB)。
 		tgSaveAsPlugin := isFiltered && len(tgFindings) > 0
 
