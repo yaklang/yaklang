@@ -256,19 +256,19 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 			operator.DeferAfterCallbacks(func() {
 				// 收尾表态统一交给纯决策函数 ClassifyLoopFinishEmission (便于单测):
 				//   - IgnoreError -> 静默 (隐藏/内部 loop 自管收尾, 不污染 UI);
-				//   - 迭代上限软中断 -> "自然结束"(success) + 框架层补发中断说明
-				//     (退出原因 = 超出最大迭代 + 未完成 TODO + 下一步; 回复 "继续"
-				//     续跑或开启新话题), 与具体 loop / 专注模式无关;
+				//   - 迭代上限软中断 -> "自然结束"(success), 与具体 loop / 专注模式无关.
+				//     迭代上限不是错误 (只是本轮步数用尽), 所以即便 reason 里带着
+				//     maxIterErr 也按成功上报, 与硬中断报错形成对比. 退出原因 / 未完成
+				//     TODO / 下一步建议由各 loop 已有的 finalize 收尾总结承载 —— 框架已把
+				//     这些上下文落在 timeline 与 interrupt store 里 (见 applyMaxIterationSoftInterrupt),
+				//     finalize 总结会读取并因地制宜地 AI 生成, 框架层不再额外发一次 AI 请求;
 				//   - 已结束且带错误 -> 硬失败 fail (携带错误信息, 与软中断形成对比);
 				//   - 其余 -> 成功.
-				// 关键词: max iteration 软中断 自然结束, 框架统一收尾, 补发中断说明
+				// 关键词: max iteration 软中断 自然结束, 框架统一收尾, 不额外发 AI 请求
 				maxIterInterrupt := loop != nil && loop.IsMaxIterationInterrupted()
 				switch reactloops.ClassifyLoopFinishEmission(isDone, reason, operator.ShouldIgnoreError(), maxIterInterrupt) {
 				case reactloops.LoopFinishSilent:
 					return
-				case reactloops.LoopFinishSuccessWithInterruptSummary:
-					loop.DeliverMaxIterationInterruptSummary()
-					r.Emitter.EmitReActSuccess("ReAct task execution success")
 				case reactloops.LoopFinishFail:
 					r.Emitter.EmitReActFail(fmt.Sprintf("ReAct task execution failed: %v", utils.InterfaceToString(reason)))
 				default:
