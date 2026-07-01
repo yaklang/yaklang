@@ -64,6 +64,8 @@ Optional:
   wait-type (string)  "selector", "visible", "ms", "text" or "js" for op=wait
   wait-value(string)  CSS selector, ms value, html body text or js condition for op=wait
   tab-index (string)  Tab index for tab_switch/tab_close
+  exe-path  (string)  Chrome/Chromium executable path. Defaults to yakit "global-chrome-path" config.
+                     When set, this path is used instead of auto-detecting Chrome on the system.
 
 ## JavaScript-First Strategy (RECOMMENDED for Login/Form Pages)
 
@@ -271,6 +273,7 @@ timeoutSeconds = cli.Int("timeout", cli.setRequired(false), cli.setHelp("browser
 waitType = cli.String("wait-type", cli.setRequired(false), cli.setHelp("wait condition: selector/visible/ms/text/js"))
 waitValue = cli.String("wait-value", cli.setRequired(false), cli.setHelp("wait condition value"))
 tabIndex = cli.String("tab-index", cli.setRequired(false), cli.setHelp("tab index for tab_switch/tab_close"))
+exePath = cli.String("exe-path", cli.setRequired(false), cli.setHelp("Chrome/Chromium executable path. Defaults to the yakit-configured global-chrome-path."))
 
 cli.check()
 
@@ -326,8 +329,21 @@ abortIfDialogBlocking = func(page, opName) {
 }
 
 // ========== Browser installation check for open ==========
-if str.ToLower(op) == "open" {
-    if !browser.HaveBrowserInstalled() {
+effectiveExePath = ""
+   if str.ToLower(op) == "open" {
+       // Resolve effective Chrome path: explicit --exe-path > yakit "global-chrome-path" config > auto-detect
+       effectiveExePath = exePath
+       if effectiveExePath == "" {
+           effectiveExePath = db.GetKey("global-chrome-path")
+            // db.GetKey uses strconv.Unquote on the stored value. The frontend stores
+            // JSON.stringify(path) which adds an extra layer of quoting, so the unquoted
+            // result may still have literal double-quote characters around the path.
+            // Strip them so exec.Command gets the real filesystem path.
+            effectiveExePath = str.Trim(effectiveExePath, "\"")
+       }
+       // Only run the auto-detect installation check when no explicit path is configured;
+       // when a path is set (frontend config or --exe-path) let the launcher validate it.
+       if effectiveExePath == "" && !browser.HaveBrowserInstalled() {
         yakit.Error("No Chrome/Chromium browser found on this system. Please install Chrome or Chromium first. On macOS you can download from https://www.google.com/chrome/ or install via: brew install --cask google-chrome")
         return
     }
@@ -343,16 +359,20 @@ case "open":
     }
 
     isHeadless = str.ToLower(headless) != "no"
-    b, err = browser.Open(
+    openOpts = [
         browser.id(session),
         browser.headless(isHeadless),
         browser.timeout(float64(timeoutSeconds)),
-    )
+    ]
+    if effectiveExePath != "" {
+        openOpts = append(openOpts, browser.exePath(effectiveExePath))
+    }
+    b, err = browser.Open(openOpts...)
     if err != nil {
         yakit.Error("failed to open browser: %v", err)
         return
     }
-    yakit.Info("browser opened, session=%v, headless=%v", session, isHeadless)
+    yakit.Info("browser opened, session=%v, headless=%v, exePath=%v", session, isHeadless, effectiveExePath)
 
     page, err = b.Navigate(url)
     if err != nil {

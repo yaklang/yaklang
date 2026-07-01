@@ -224,6 +224,7 @@ Use `@e1` as the `target` for click/fill operations.
 | `wait-type` | string | -             | Wait type: `selector`, `visible`, `ms`. |
 | `wait-value`| string | -             | Wait value: CSS selector or milliseconds. |
 | `tab-index` | string | -             | Tab index for tab_switch/tab_close. |
+| `exe-path`  | string | -             | Chrome/Chromium executable path. Defaults to yakit-configured `global-chrome-path`. |
 
 ---
 
