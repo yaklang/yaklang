@@ -1,70 +1,97 @@
-# SSA Compilation Benchmark Results
+# SSA code-scan Benchmark (cross-process / large-project branch)
+
+Runtime benchmark for `yak code-scan` on
+`enhance/syntaxflow/support_large_project_coress_process`.
+
+This branch layers the **cross-process / scan-log / offset-map fix**
+(commit `e670828b4`) on top of the compile-split refactor
+(`refactor/ssa/compile_step_shrink_ast` @ `bfc2ffd0e`). It is isolated here
+because the deeper dataflow it enables is a SyntaxFlow/large-project concern,
+not a compile-split concern.
 
 ## Environment
-- **Branch**: refactor/ssa/compile_step_shrink_ast
-- **Config**: maxFiles=100, batch-level GC, YAK_SSA_COMPILE_UNIT_WRITER_CACHE=1
-- **Date**: 2026-06-21
 
-## All Projects (12/12 PASS)
+- **Branch**: `enhance/syntaxflow/support_large_project_coress_process`
+  (= `bfc2ffd0e` compile-split + `e670828b4` cross-process/scan-log/offset fix)
+- **yak**: `dev`, go1.22.12 linux/amd64
+- **Machine**: AMD Ryzen 5 7600 (12 threads), 23 GiB RAM, WSL2
+- **Invocation**: `YAKIT_HOME=<worktree-local .db> yak code-scan -t <path>`
+  (default config, info log level, no pprof / no perf logs). Fresh `.db` per
+  project. Wall time from `/usr/bin/time -v`; peak memory = Max RSS.
 
-| Project | Language | Size | Files | Lines | Batches | Time | Lazy Panics | Status |
-|---------|----------|-----:|------:|------:|--------:|-----:|------------:|--------|
-| javacms/core | Java | 1.8G | 7,476 | 1,342,204 | 102 | 66min | 1 | ✅ PASS |
-| PublicCMS | Java | 258M | 1,165 | 132,109 | 23 | 2min | 0 | ✅ PASS |
-| halo | Java | 109M | 1,194 | 111,653 | 16 | 39s | 0 | ✅ PASS |
-| bbs | Java | 106M | 639 | 146,903 | 19 | 4min | 0 | ✅ PASS |
-| skyeye | Java | 435M | 4,204 | 317,548 | 112 | 3min | 0 | ✅ PASS |
-| GoBlog | Go | 6.5M | 228 | 39,908 | 2 | 1min | 0 | ✅ PASS |
-| hugo | Go | 173M | 890 | 219,094 | 11 | 8min | 0 | ✅ PASS |
-| PrestaShop | PHP | 851M | 7,163 | 737,605 | 150 | 66min | 8 | ✅ PASS |
-| joomla-cms | PHP | 422M | 3,254 | 496,363 | 77 | 25min | 2 | ✅ PASS |
-| QloApps | PHP | 237M | 3,440 | 560,996 | 52 | 55min | 6 | ✅ PASS |
-| AngelSword | Python | 3.5M | 461 | 15,613 | 10 | 9s | 0 | ✅ PASS |
-| frappe | Python | 95M | 1,456 | 179,739 | 19 | 2min | 1 | ✅ PASS |
+## Results
 
-## Summary by Language
+| Project | Lang | Files | Wall time | Peak RSS | Exit | Risks | ERRO | WARN | Status |
+|---------|------|------:|----------:|---------:|-----:|------:|-----:|-----:|--------|
+| grav | PHP | 522 | 4m34s | 1.72 GiB | 0 | 63 | 41 | 1046 | ✅ completes all 269 rules |
+| moodle | PHP | 7733 | 138min+ (killed) | n/a (killed) | 137 | 0 | 1590 | 3589 | ❌ hangs on a heavy rule |
+| javacms (Java) | Java | TBD | TBD | TBD | TBD | TBD | TBD | TBD | not run yet |
 
-| Language | Projects | Total Files | Total Lines | All Pass |
-|----------|----------|------------:|------------:|:--------:|
-| Java | 5 | 14,678 | 2,050,417 | ✅ |
-| Go | 2 | 1,118 | 259,002 | ✅ |
-| PHP | 3 | 13,857 | 1,794,964 | ✅ |
-| Python | 2 | 1,917 | 195,352 | ✅ |
-| **Total** | **12** | **31,570** | **4,299,735** | **✅** |
+## grav (small-medium PHP) — works
 
-## Key Metrics
+`yak code-scan -t ~/Target/grav`: 522 PHP files, 4m34s wall, 1.72 GiB peak RSS,
+exit 0, scans all 269 rules, finds 63 risks. Scan-log ERRO dropped from 69
+(pre-fix) to 41 after the cross-process fix; the residual ERRO is pre-existing
+PHP visitor limitations (`unhandled expression` for `match()`,
+`weakLanguage call … not found`).
 
-- **Total files compiled**: 31,570
-- **Total lines of code**: 4.3M
-- **Compilation success rate**: 100% (12/12)
-- **Total lazy builder panics**: 18 (all caught by recover)
-- **Memory**: Heap peak typically 1-3GB per project
-- **Config**: maxFiles=100, batch-level GC
+## moodle (large PHP) — hangs on a heavy rule (WIP, see TODO)
 
-## Panics Breakdown
+`yak code-scan -t ~/Target/moodle`: 7733 PHP files. Compile phase (~95min,
+7398 files) completes, then the scan-rules phase **hangs**:
 
-| Project | Lazy Panics | Root Cause |
-|---------|------------:|------------|
-| javacms/core | 1 | Nil pointer in bouncycastle |
-| PrestaShop | 8 | Nil pointer in PHP visitor |
-| joomla-cms | 2 | Nil pointer in PHP visitor |
-| QloApps | 6 | Nil pointer in PHP visitor |
-| frappe | 1 | Nil pointer in Python visitor |
+- Several heavy rules (`检测PHP不安全的文件上传漏洞`, `检测PHP信息泄露风险`,
+  `检测PHP FTP信息泄露漏洞`, …) all stall at the same state:
+  `get topdef: 11134 values, {include=* & $xxx [sf]}` /
+  `status=native$call include=[{...php-tp-all-extern-variable-param-source...}]`.
+- These rules use the SyntaxFlow `dataflow(include=...)` native call
+  (`nativeCallDataFlow`, `sf_dataflow.go:441`). On moodle the `include` pattern
+  matches **11134 external-variable param sources**; `nativeCallDataFlow`
+  collects all 11134 into `vs` and runs the recursive `getTopDefs` dataflow on
+  each.
 
-All panics are caught by `recover()` and don't prevent compilation from completing.
+### Root cause
 
-## Key Findings
+The cross-process fix (`rollbackCrossProcess` restoring the `emptyStackHash`
+sentinel) is **correct** — it stops the dataflow from aborting early, so grav
+finds more risks. But it removes an **implicit per-source depth cap** that
+existed before (the `BUG:The cross process table is empty` early-abort, which
+fired 40× on grav pre-fix). With the sentinel restored, each of moodle's 11134
+sources now traverses deeply.
 
-1. **maxFiles=100** is optimal - prevents OOM while maintaining good performance
-2. **Batch-level GC** prevents GC thrashing (was 91% CPU in GC)
-3. **Lazy builder panic fix** reduced Java panics from 56 to 0
-4. **Typed nil detection** in GetIds/DeleteInst prevents interface nil gotcha panics
-5. **AggressiveClearMemory** must NOT clear Funcs (lazy builders need them)
+Existing caps do not bound the **total** work:
 
-## Commits
+- `dataflowValueLimit = 100` (`analyze_context.go:28`): caps only a single
+  `getTopDefs` call's breadth (bails >100). Does not cap the 11134-source outer
+  set or total recursion.
+- `errRecursiveDepth` "recursive call is over 10000" (`analyze_context.go:31`):
+  caps per-branch **depth** (fired 538× on moodle). Does not cap
+  11134 sources × branching × depth.
+- `MaxDepth` default 500 (`exclusive_config.go:89`): per-branch depth; fired
+  only 2×.
 
-- `6fd2285`: Move GC from per-file to per-batch
-- `c27b71d`: Reduce maxFiles from 500 to 100
-- `b36f197`: Fix nil pointer panics in PHP compilation
-- `5caf50b`: Handle typed nil values in GetIds and DeleteInst
-- `c420d64`: Add SSA compilation benchmark results
+So: **11134 sources × (now-deep, uncapped-total traversal) = exponential**; each
+heavy rule runs 20+ min and several run concurrently → the scan cannot finish
+in 138min (killed, `Finished=230/269`).
+
+### TODO (this branch)
+
+Add an explicit total-work bound so the deeper (correct) dataflow cannot hang
+on large projects. Candidates:
+
+- Cap the `vs` source set in `nativeCallDataFlow` (`sf_dataflow.go:471`):
+  process at most N sources, warn+truncate beyond that.
+- Per-rule wall-clock budget in the scan runner (`ssacli.go`): bail a rule
+  after T seconds.
+- A tighter effective per-source depth/cost cap (e.g. lower `MaxDepth` for
+  `dataflow()` native calls) so deep traversal is bounded.
+
+Recommended: source-set cap + per-rule time budget. Then re-run moodle + a Java
+medium-large target and fill the javacms row above.
+
+## Note on the isolated commit
+
+`e670828b4` is intentionally on this branch, not on
+`refactor/ssa/compile_step_shrink_ast`. The TODO(scan-log) comments it carries
+trace where split-compile flush + lazy reload surface nil/missing data; the
+OffsetMap mutex guards the scan-time race that the deeper dataflow exposed.
