@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 	"io"
 	"sort"
 	"strings"
@@ -112,7 +113,7 @@ func runForkedSubReactAgentJob(
 	}
 
 	subTaskID := buildSubReactSubTaskID(parentTask, job)
-	subTaskName := job.Identifier
+	subTaskName := job.Goal
 	if subTaskName == "" {
 		subTaskName = subTaskID
 	}
@@ -137,7 +138,13 @@ func runForkedSubReactAgentJob(
 		return nil, err
 	}
 
-	subTask := aicommon.NewSubTaskBase(parentTask, subTaskID, buildSubAgentUserInput(job), false)
+	subTask := aicommon.NewSubTaskBaseWithOptions(
+		parentTask,
+		subTaskID,
+		buildSubAgentUserInput(job),
+		aicommon.WithStatefulTaskBaseName(subTaskName),
+		aicommon.WithStatefulTaskBaseSubAgent(),
+	)
 	childInvoker.SetCurrentTask(subTask)
 	// Restore sub-agent emit: derive the sub-task emitter from the parent config emitter
 	// (via PushEventProcesser) so sub-agent events reach the frontend, stamped with the
@@ -172,6 +179,8 @@ func buildForkedSubReactInvoker(
 		aicommon.WithContext(jobCtx),
 		aicommon.WithEnablePlanAndExec(false),
 		aicommon.WithEmitter(buildSubReactForwardingEmitter(parentCfg.GetEmitter(), subTaskId)),
+		aicommon.WithHotPatchOptionChan(chanx.NewUnlimitedChan[aicommon.ConfigOption](jobCtx, 1)),
+		aicommon.WithAgreeAuto(),
 	)
 
 	childInvoker, err := aicommon.AIRuntimeInvokerGetter(jobCtx, baseOpts...)
