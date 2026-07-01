@@ -32,6 +32,14 @@ import (
 //	directly_answer 改起来很简单
 const loopIntentHintSimpleQuery = "simple_query"
 
+// Timeline 里记录用户可见答复时，不使用 directly_answer 等 action 名，避免 agent
+// 从 timeline 反推出「可随时调用 directly_answer」。
+const (
+	TimelineEntryAssistantOutput     = "assistant_output"
+	TimelineEntryAssistantOutputNote = "assistant_output_note"
+	TimelineAssistantOutputLabel     = "assistant output:"
+)
+
 // ShouldAutoFinishAfterSimpleQueryDirectlyAnswer reports whether a directly_answer
 // on a greeting/status (simple_query) task should terminate the loop immediately
 // after emitting the user-visible answer. No extra LLM round for finish/post-summary.
@@ -66,8 +74,8 @@ func DirectlyAnswerContinue(loop *ReActLoop, action *aicommon.Action, operator *
 	invoker := loop.GetInvoker()
 	if len(aicommon.NormalizeVerifyNextMovements(action)) > 0 {
 		if !utils.IsNil(invoker) {
-			invoker.AddToTimeline("directly_answer_continue",
-				"answer delivered; the loop continues to honor the scheduled next_movements. "+
+			invoker.AddToTimeline(TimelineEntryAssistantOutputNote,
+				"assistant output delivered; the loop continues to honor the scheduled next_movements. "+
 					"Use the 'finish' action to end the task once all work is done.")
 		}
 		operator.Continue()
@@ -76,19 +84,19 @@ func DirectlyAnswerContinue(loop *ReActLoop, action *aicommon.Action, operator *
 	if ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action) {
 		if !utils.IsNil(invoker) {
 			invoker.AddToTimeline(
-				"directly_answer_continue",
+				TimelineEntryAssistantOutputNote,
 				"simple query: greeting reply delivered to the user; CURRENT-TASK has no further work. "+
-					"Terminating the ReAct loop (do not call directly_answer again for the same greeting).",
+					"Terminating the ReAct loop (do not repeat the same greeting reply).",
 			)
 		}
 		operator.Exit()
 		return
 	}
 	if !utils.IsNil(invoker) {
-		invoker.AddToTimeline("directly_answer_continue",
-			"answer delivered; this directly_answer does NOT end the task. "+
+		invoker.AddToTimeline(TimelineEntryAssistantOutputNote,
+			"assistant output delivered; the task is NOT complete yet. "+
 				"When the entire CURRENT-TASK is complete, use the 'finish' action to terminate the ReAct loop. "+
-				"Do not repeat the same directly_answer payload; continue with tools, next_movements, or finish.")
+				"Do not repeat the same answer; continue with tools, next_movements, or finish.")
 	}
 	if items := aicommon.GetBlockingVerificationTodoItems(loop.GetConfig(), loop.GetCurrentTask()); len(items) > 0 {
 		operator.Feedback(buildExitBlockedByTodoMessage("finish", items))

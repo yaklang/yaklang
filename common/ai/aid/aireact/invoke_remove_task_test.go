@@ -23,7 +23,7 @@ import (
 // mockedToolCallingForRemove 模拟AI响应，用于移除测试
 // 去 Exit 化后 directly_answer 只发答复并继续, 任务真正收尾由唯一终结器 finish 完成.
 // 因此每个任务采用 "先 directly_answer 发答复, 再 finish 收口" 两步式: 借助
-// directly_answer 在 timeline 留下的 "ai directly answer" 面包屑做无状态分流,
+// timeline 留下的 "assistant output" 面包屑做无状态分流,
 // 第一轮决策(无面包屑)发 directly_answer, 第二轮(已有面包屑)发 finish.
 // 关键词: directly_answer 永不 Exit, finish 唯一终结器, 答复后追加 finish, 移除任务时序
 func mockedToolCallingForRemove(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
@@ -36,7 +36,7 @@ func mockedToolCallingForRemove(i aicommon.AICallerConfigIf, req *aicommon.AIReq
 	}
 	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
 		rsp := i.NewAIResponse()
-		if strings.Contains(prompt, "ai directly answer") {
+		if strings.Contains(prompt, "assistant output") {
 			rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": {"type": "finish"}, "human_readable_thought": "task completed"}
 `))

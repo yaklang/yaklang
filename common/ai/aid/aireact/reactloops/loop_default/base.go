@@ -43,7 +43,7 @@ const reActPostSummary = `
 func buildDefaultReactiveDataBuilder() reactloops.ReActLoopOption {
 	return reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 		renderMap := map[string]any{
-			"Nonce":           nonce,
+			"Nonce":            nonce,
 			"FeedbackMessages": feedbacker.String(),
 			"IsLastIteration":  loop.GetCurrentIterationIndex()+1 >= loop.GetMaxIterations(),
 		}
@@ -65,13 +65,13 @@ func init() {
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithPersistentInstruction(instruction),
-			reactloops.WithReflectionOutputExample(outputExample),
-			buildDefaultReactiveDataBuilder(),
-			reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
+				reactloops.WithReflectionOutputExample(outputExample),
+				buildDefaultReactiveDataBuilder(),
+				reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
 					if !isDone {
 						return
 					}
-					if loop.GetLastAction().ActionType == schema.AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER {
+					if loop.GetLastValidAction().ActionType == schema.AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER {
 						log.Infof("iteration %d: action is directly answer, exiting loop and returning final answer", iteration)
 						return
 					}
@@ -124,9 +124,9 @@ func init() {
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithPersistentInstruction(instruction),
-			reactloops.WithReflectionOutputExample(outputExample),
-			buildDefaultReactiveDataBuilder(),
-		}
+				reactloops.WithReflectionOutputExample(outputExample),
+				buildDefaultReactiveDataBuilder(),
+			}
 
 			// 检查是否有 GetEnableSelfReflection 方法（向后兼容）
 			if config := r.GetConfig(); config != nil {
