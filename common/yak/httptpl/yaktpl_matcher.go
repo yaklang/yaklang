@@ -108,6 +108,10 @@ type YakMatcher struct {
 
 	Negative bool
 
+	// Internal means this matcher is only used for internal conditions
+	// (e.g. flow control) and should NOT produce a final vulnerability result.
+	Internal bool
+
 	// or / and
 	SubMatcherCondition string
 	SubMatchers         []*YakMatcher
