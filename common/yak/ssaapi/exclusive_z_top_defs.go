@@ -40,7 +40,7 @@ func (i *Value) GetTopDefs(opt ...OperationOption) (ret Values) {
 		ret = actx.untilMatch
 	}
 	if ret.Count() > dataflowValueLimit {
-		log.Warnf("Value TopDef too many: %d:\n\t%s", ret.Count(), i.StringWithRange())
+		log.Warnf("Value TopDef too many: %d: %s", ret.Count(), i.StringForDataflowWarn())
 		return nil
 	}
 	ret = MergeValues(ret)
@@ -491,7 +491,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				call2fun := fun.GetCalledBy()
 				for index, call := range call2fun {
 					if index > dataflowValueLimit {
-						log.Warnf("Function %s CalledBy too many: %d", fun.StringWithRange(), len(call2fun))
+						log.Warnf("Function %s CalledBy too many: %d", fun.StringForDataflowWarn(), len(call2fun))
 						break
 					}
 					val := getActualValueByCall(call)
@@ -527,6 +527,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				} else if binding, ok := calledInstance.Binding[inst.GetName()]; ok && isInner {
 					// Prefer call-site scope (same as formal parameters): binding id refers to
 					// the actual SSA value at the call, which may not resolve on inst alone.
+					// TODO(scan-log): binding id may not reload after split-compile flush (GetValueById miss).
 					actualParam, ok = calledInstance.GetValueById(binding)
 					if !ok {
 						actualParam, ok = inst.GetValueById(binding)
@@ -535,6 +536,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 						}
 					}
 				} else {
+					// TODO(scan-log): PHP free value / closure binding missing at compile or scan time.
 					log.Errorf("free value: %v is not found in binding", inst.GetName())
 					return getMemberCall(i, i.getValue(), actx)
 				}
@@ -562,6 +564,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				}
 			}
 			if utils.IsNil(actualParam) {
+				// TODO(scan-log): arg/binding id not in resident cache or DB (split-compile unit boundary).
 				return getMemberCall(i, i.getValue(), actx)
 			}
 			traced := i.NewValue(actualParam)
@@ -589,7 +592,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				call2fun := fun.GetCalledBy()
 				for index, call := range call2fun {
 					if index > dataflowValueLimit {
-						log.Warnf("Function %s CalledBy too many: %d", fun.StringWithRange(), len(call2fun))
+						log.Warnf("Function %s CalledBy too many: %d", fun.StringForDataflowWarn(), len(call2fun))
 						break
 					}
 					val := getCalledByValue(call, true)

@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"context"
+	"sync"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
@@ -309,6 +310,10 @@ type Program struct {
 	importDeclares *omap.OrderedMap[string, *importDeclareItem]
 
 	// offset
+	// offsetMu guards OffsetMap and OffsetSortedSlice, which are mutated at
+	// compile time but can also be re-populated concurrently at scan time when
+	// lazy instructions reload from the DB and re-assign their variable offsets.
+	offsetMu          sync.RWMutex
 	OffsetMap         map[int]*OffsetItem
 	OffsetSortedSlice []int
 

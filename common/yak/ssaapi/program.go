@@ -241,6 +241,8 @@ func (p *Program) refWithExcludeFiles(name string, excludeFiles []string) Values
 }
 
 func (p *Program) GetAllOffsetItemsBefore(offset int) []*ssa.OffsetItem {
+	p.Program.OffsetRLock()
+	defer p.Program.OffsetRUnlock()
 	offsetSortedSlice := p.Program.OffsetSortedSlice
 	index := sort.SearchInts(offsetSortedSlice, offset)
 	if index < len(offsetSortedSlice) && offsetSortedSlice[index] > offset && index > 0 {
@@ -274,6 +276,11 @@ func (p *Program) NewConstValue(i any, rng ...*memedit.Range) *Value {
 
 // normal from ssa value
 func (v *Value) NewValue(value ssa.Instruction) *Value {
+	if utils.IsNil(value) {
+		// TODO(scan-log): caller should guard; common when GetValueById fails on FromDatabase program.
+		log.Debugf("NewValue: skip nil instruction")
+		return nil
+	}
 	var iv *Value
 	var err error
 	iv, err = v.ParentProgram.NewValue(value)
@@ -286,9 +293,7 @@ func (v *Value) NewValue(value ssa.Instruction) *Value {
 
 func (p *Program) NewValue(inst ssa.Instruction) (*Value, error) {
 	if utils.IsNil(inst) {
-		// var raw = make([]byte, 2048)
-		// runtime.Stack(raw, false)
-		// return nil, utils.Errorf("instruction is nil: %s", string(raw))
+		// TODO(scan-log): split-compile + lazy IR reload can surface nil here during TopDef/BottomUse.
 		return nil, utils.Errorf("instruction is nil")
 	}
 	var v *Value

@@ -82,20 +82,32 @@ func (c *processAnalysisManager) tryCrossProcess(v *Value) (shouldExit bool, rec
 func (c *processAnalysisManager) rollbackCrossProcess() func() {
 	cause := c.popCause()
 	node := c.popNode()
+	if c.crossProcessStack.Len() == 0 {
+		// TODO(scan-log): cross-process stack underflow before rollback; dataflow may abort early.
+		log.Warnf("cross-process rollback skipped: stack already empty")
+		return func() {
+			c.pushNode(node)
+			c.pushCause(cause)
+		}
+	}
 	hash := c.crossProcessStack.Pop()
-	//log.Infof("====> rollback")
+	// TODO(scan-log): emptyStackHash is the sentinel frame; it must always be restored on recover
+	// or getCurrentIntraProcess logs "cross process table is empty" during large-project scan.
 	var intra *intraProcess
-	if hash != "" && hash != emptyStackHash {
+	if hash != "" {
 		intra, _ = c.crossProcessMap.Get(hash)
-		c.crossProcessMap.Delete(hash)
+		if hash != emptyStackHash {
+			c.crossProcessMap.Delete(hash)
+		}
 	}
 	return func() {
-		//log.Infof("<==== recover rollback")
 		c.pushNode(node)
 		c.pushCause(cause)
-		if intra != nil {
+		if hash != "" {
 			c.crossProcessStack.Push(hash)
-			c.crossProcessMap.Set(hash, intra)
+			if intra != nil {
+				c.crossProcessMap.Set(hash, intra)
+			}
 		}
 	}
 }
@@ -118,6 +130,8 @@ func (c *processAnalysisManager) existCrossProcess(current *Value) bool {
 
 func (c *processAnalysisManager) getCurrentIntraProcess() (*intraProcess, bool) {
 	if c.crossProcessStack.Len() == 0 {
+		// TODO(scan-log): still possible if cross-process stack is corrupted; was common on
+		// Grav scan before rollbackCrossProcess restored emptyStackHash.
 		log.Errorf("BUG:The cross process table is empty")
 		return nil, false
 	}
@@ -175,6 +189,7 @@ func (c *processAnalysisManager) getLastCauseCall(typ AnalysisType) (result *Val
 	case *ssa.SideEffect:
 		callSide, ok := ret.GetValueById(ret.CallSite)
 		if !ok {
+			// TODO(scan-log): CallSite id missing after split-compile DB reload → instruction is nil downstream.
 			return nil
 		}
 		result = value.NewValue(callSide)

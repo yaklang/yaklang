@@ -135,6 +135,7 @@ func GetExs[T any](c *ProgramCache, Cover func(Instruction) (T, bool), ids ...in
 		v, ok := Cover(inst)
 		if !ok {
 			if utils.IsNil(inst) {
+				// TODO(scan-log): ir_code id not found after split-compile flush; contributes to scan "instruction is nil".
 				log.Debugf("BUG::: nil instruction %v err: %d", inst, id)
 			} else if IsControlInstruction(inst) {
 				// log.Errorf("BUG::: control instruction %v err: %d", inst, id)
