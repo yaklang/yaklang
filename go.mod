@@ -112,7 +112,7 @@ require (
 	github.com/sijms/go-ora/v2 v2.7.19
 	github.com/stacktitan/smb v0.0.0-20190531122847-da9a425dceb8
 	github.com/steambap/captcha v1.4.1
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.10.0
 	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e
 	github.com/tevino/abool v0.0.0-20170917061928-9b9efcf221b5
 	github.com/tidwall/gjson v1.14.4
