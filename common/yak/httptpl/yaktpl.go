@@ -64,6 +64,10 @@ type YakTemplate struct {
 	TCPRequestSequences  []*YakNetworkBulkConfig
 	HTTPRequestSequences []*YakRequestBulkConfig
 
+	// Flow is the nuclei flow directive (e.g. "http(1) && http(2)")
+	// that controls conditional execution of request sequences.
+	Flow string `json:"flow,omitempty"`
+
 	// placeHolderMap
 	PlaceHolderMap map[string]string
 	Variables      *YakVariables

@@ -7,8 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/google/uuid"
-
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -221,108 +219,10 @@ func (y *YakTemplate) ExecWithUrl(u string, config *Config, opts ...lowhttp.Lowh
 
 	tplConcurrent := config.ConcurrentInTemplates
 	if len(y.HTTPRequestSequences) > 0 {
-		swg := utils.NewSizedWaitGroup(tplConcurrent)
-		for _, reqSeq := range y.GenerateRequestSequences(u, true) {
-			swg.Add()
-			go func(ret *RequestBulk, payload map[string][]string) {
-				session := uuid.New().String()
-				defer swg.Done()
-				rsps, allResult, extracted, reqCount := y.handleRequestSequences(config, ret.RequestConfig, ret.Requests, payload, func(raw []byte, req *requestRaw) (*lowhttp.LowhttpResponse, error) {
-					if config.BeforeSendPackage != nil {
-						raw = config.BeforeSendPackage(raw, req.IsHttps)
-					}
-
-					urlStrIns, _ := lowhttp.ExtractURLFromHTTPRequestRaw(raw, req.IsHttps)
-					urlStr := ""
-					if urlStrIns != nil {
-						urlStr = urlStrIns.String()
-					}
-					if config.mockHTTPRequest != nil {
-						var mockResponseRaw []byte
-						mocked := utils.NewBool(false)
-						config.mockHTTPRequest(req.IsHttps, urlStr, raw, func(rsp interface{}) {
-							rspBytes := utils.InterfaceToBytes(rsp)
-							fixedRsp, _, _ := lowhttp.FixHTTPResponse(rspBytes)
-							if fixedRsp == nil {
-								log.Warnf("failed to fix mock response, using original bytes")
-								fixedRsp = rspBytes
-							}
-							mockResponseRaw = fixedRsp
-							mocked.Set()
-						})
-						if mocked.IsSet() {
-							remoteAddr := ""
-							if urlStrIns != nil {
-								remoteAddr = urlStrIns.Host
-							}
-							return &lowhttp.LowhttpResponse{
-								RawPacket:  mockResponseRaw,
-								RawRequest: raw,
-								Url:        urlStr,
-								RemoteAddr: remoteAddr,
-								Https:      req.IsHttps,
-								Source:     y.Name,
-								RuntimeId:  config.RuntimeId,
-							}, nil
-						}
-					}
-
-					packetOpt := opts
-					redictTimes := 0
-					if ret.RequestConfig.EnableRedirect {
-						redictTimes = ret.RequestConfig.MaxRedirects
-					}
-					packetOpt = append(
-						packetOpt,
-						lowhttp.WithPacketBytes(raw),
-						lowhttp.WithHttps(req.IsHttps),
-						lowhttp.WithSource(y.Name),
-						lowhttp.WithNoFixContentLength(ret.RequestConfig.NoFixContentLength),
-						lowhttp.WithRedirectTimes(redictTimes),
-						lowhttp.WithTimeout(req.Timeout),
-					)
-
-					if req.Origin.CookieInherit {
-						packetOpt = append(packetOpt, lowhttp.WithSession(session))
-					}
-
-					if req.OverrideHost != "" {
-						packetOpt = append(packetOpt, lowhttp.WithHost(req.OverrideHost))
-					}
-
-					if config.Debug && config.DebugRequest {
-						fmt.Printf("--------------REQ---------------\n")
-						fmt.Println(string(raw))
-					}
-
-					utils.Debug(func() {
-						log.Info("nuclei lowhttp.Exec! ")
-						spew.Dump(raw)
-					})
-					rsp, err := lowhttp.HTTP(packetOpt...)
-					if err != nil {
-						// log.Error(err)
-						return nil, err
-					}
-					if config.Debug && config.DebugResponse {
-						fmt.Printf("--------------RSP---------------\n")
-						fmt.Println(string(rsp.RawPacket))
-					}
-					return rsp, nil
-				})
-				result := false
-				for _, b := range allResult {
-					result = result || b
-				}
-				if result {
-					log.Infof("[%v]-[%v] matched", y.Name, y.Id)
-				}
-				atomic.AddInt64(&count, reqCount)
-				config.ExecuteResultCallback(y, ret.RequestConfig, rsps, result, extracted)
-			}(reqSeq, reqSeq.RequestConfig.Payloads.GetData())
+		if y.Flow != "" {
+			return y.execFlowWithUrl(u, config, opts)
 		}
-		swg.Wait()
-		return int(count), nil
+		return y.execConcurrentWithUrl(u, config, opts)
 	} else if len(y.TCPRequestSequences) > 0 {
 		swg := utils.NewSizedWaitGroup(tplConcurrent)
 		for _, tcpReq := range y.TCPRequestSequences {
@@ -382,7 +282,9 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 }
 
 // handleRequestSequences 渲染、发包、匹配、提取
-func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakRequestBulkConfig, reqSeqs []*requestRaw, payload map[string][]string, sender func(raw []byte, req *requestRaw) (*lowhttp.LowhttpResponse, error)) ([]*lowhttp.LowhttpResponse, []bool, map[string]interface{}, int64) {
+func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakRequestBulkConfig, reqSeqs []*requestRaw, payload map[string][]string, sender func(raw []byte, req *requestRaw) (*lowhttp.LowhttpResponse, error)) ([]*lowhttp.LowhttpResponse, []bool, bool, map[string]interface{}, int64) {
+	// The additional bool return value (flowMatched) includes internal matchers
+	// and is used for flow control; matchResults excludes internal matchers.
 	defer func() {
 		if err := recover(); err != nil {
 			log.Error(err)
@@ -392,12 +294,12 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 	var count int64 = 0
 	if reqOrigin == nil {
 		log.Error("request origin cannot be nil")
-		return nil, nil, map[string]interface{}{}, count
+		return nil, nil, false, map[string]interface{}{}, count
 	}
 
 	if reqOrigin.Matcher == nil && len(reqOrigin.Extractor) == 0 {
 		log.Error("request sequence matcher and extractor all empty!")
-		return nil, nil, map[string]interface{}{}, count
+		return nil, nil, false, map[string]interface{}{}, count
 	}
 
 	extracted := make(map[string]interface{})
@@ -415,6 +317,7 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 		}
 	}
 	var matchResults []bool
+	var flowMatched bool // includes internal matchers, used for flow control
 	var responses []*lowhttp.LowhttpResponse
 	var requestPackets [][]byte // store request packets for matcher
 	var requestIsHttps []bool   // store isHttps for each request
@@ -431,7 +334,7 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 		}
 	}
 	matchHelper := func(rsp *lowhttp.LowhttpResponse, index int) bool {
-		var tempMatchersResult []any
+		var flowMatchersResult []any  // flow result: includes all matchers
 		for matcherIndex, matcher := range matchers {
 			if matcher.Id == 0 {
 				var reqPacket []byte
@@ -449,16 +352,16 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 				if err != nil {
 					log.Error("matcher execute failed: ", err)
 				}
-				tempMatchersResult = append(tempMatchersResult, matchResult)
+				flowMatchersResult = append(flowMatchersResult, matchResult)
 			} else {
 				if matcher.Id != index+1 {
 					targetIndex := matcher.Id - 1
 					hashKey := fmt.Sprintf("%v-%v", matcherIndex, targetIndex)
 					if v, ok := cacheRes[hashKey]; ok {
-						tempMatchersResult = append(tempMatchersResult, v)
+						flowMatchersResult = append(flowMatchersResult, v)
 					} else {
 						if targetIndex >= len(responses) {
-							tempMatchersResult = append(tempMatchersResult, false)
+							flowMatchersResult = append(flowMatchersResult, false)
 						} else {
 							var reqPacket []byte
 							var isHttps bool
@@ -475,7 +378,7 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 							if err != nil {
 								log.Error("matcher execute failed: ", err)
 							}
-							tempMatchersResult = append(tempMatchersResult, matchResult)
+							flowMatchersResult = append(flowMatchersResult, matchResult)
 							cacheRes[hashKey] = matchResult
 						}
 					}
@@ -496,21 +399,38 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 				if err != nil {
 					log.Error("matcher execute failed: ", err)
 				}
-				tempMatchersResult = append(tempMatchersResult, matchResult)
+				flowMatchersResult = append(flowMatchersResult, matchResult)
 				hashKey := fmt.Sprintf("%v-%v", matcherIndex, index)
 				cacheRes[hashKey] = matchResult
 			}
 		}
+		// vuln result: skip internal matchers
+		var vulnMatchersResult []any
+		for i := range flowMatchersResult {
+			if !matchers[i].Internal {
+				vulnMatchersResult = append(vulnMatchersResult, flowMatchersResult[i])
+			}
+		}
 		var matchRes bool
-		if len(tempMatchersResult) > 0 {
+		if len(vulnMatchersResult) > 0 {
 			if matchersCondition == "or" {
-				matchRes = funk.Any(tempMatchersResult...)
+				matchRes = funk.Any(vulnMatchersResult...)
 			} else {
-				matchRes = funk.All(tempMatchersResult...)
+				matchRes = funk.All(vulnMatchersResult...)
+			}
+		}
+		// flow result: includes all matchers (for flow control / StopAtFirstMatch)
+		var flowRes bool
+		if len(flowMatchersResult) > 0 {
+			if matchersCondition == "or" {
+				flowRes = funk.Any(flowMatchersResult...)
+			} else {
+				flowRes = funk.All(flowMatchersResult...)
 			}
 		}
 		matchResults = append(matchResults, matchRes)
-		return matchRes
+		flowMatched = flowMatched || flowRes
+		return flowRes
 	}
 	for index, req := range reqSeqs {
 		log.Debugf("sequence exec with Req Index:%v", index)
@@ -573,7 +493,7 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 				matchRes := matchHelper(rsp, index)
 				if matchRes && reqOrigin.StopAtFirstMatch {
 					// 第一次匹配就退出
-					return responses, matchResults, extracted, count
+				return responses, matchResults, flowMatched, extracted, count
 				}
 			}
 		}
@@ -588,7 +508,7 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 			matchHelper(rsp, index)
 		}
 	}
-	return responses, matchResults, extracted, count
+	return responses, matchResults, flowMatched, extracted, count
 }
 
 func (y *YakTemplate) InjectInteractshVar(token string, runtimeID string, vars map[string]any) {

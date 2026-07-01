@@ -159,6 +159,10 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 	yakTemp.Variables = generateYakVariables(rootNode)
 
 	reqs := nodeGetFirstRaw(rootNode, "requests", "http")
+
+	// Parse flow directive (e.g. "http(1) && http(2)")
+	yakTemp.Flow = nodeGetString(rootNode, "flow")
+
 	if reqs == nil || reqs.Kind != yaml.SequenceNode {
 		if networkNode := nodeGetFirstRaw(rootNode, "network", "tcp"); networkNode != nil {
 			if networkNode.Kind != yaml.SequenceNode {
@@ -435,6 +439,7 @@ func generateYakMatcher(rootNode *yaml.Node) (*YakMatcher, error) {
 		match.Negative = nodeGetBool(node, "negative")
 		match.Condition = nodeGetString(node, "condition")
 		match.Id = int(nodeGetFloat64(node, "id"))
+		match.Internal = nodeGetBool(node, "internal")
 
 		// Support both 'scope' (preferred) and 'part' (Nuclei compatible)
 		scopeStr := nodeGetString(node, "scope")
