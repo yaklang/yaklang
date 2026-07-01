@@ -63,6 +63,13 @@ SOLUTION
 // executeLargeUpdate in one pattern. The createStatement() chain keeps
 // the match on java.sql.Statement, so non-SQL execute* calls don't match.
 .createStatement().execute*(,* as $params);
+
+// Connection.prepareStatement(String sql) is also a SQL injection sink:
+// when the SQL string argument is built by concatenating tainted user
+// input, the prepared statement is as vulnerable as an execute* call.
+// prepareStatement is specific enough (no common non-SQL namesakes) to
+// match by method name alone, without a type-narrowing receiver chain.
+.prepareStatement(,* as $params);
 check $params;
 
 // Track StringBuilder.append chains that also feed the sink, so the
