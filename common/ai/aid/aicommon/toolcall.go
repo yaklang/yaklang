@@ -978,6 +978,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 			"tool":             tool.Name,
 			"tool_description": tool.Description,
 			"params":           invokeParams,
+			"reason":           t.reason,
 		}
 		ep.SetReviewMaterials(reqs)
 		err := t.config.SubmitCheckpointRequest(ep.GetCheckpoint(), reqs)
