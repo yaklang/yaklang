@@ -784,17 +784,21 @@ LOOP:
 		// 关键词: 主循环 tick, lastIterationTickAt
 		r.recordIterationTick()
 		if iterationCount > maxIterations {
+			// 到达迭代上限属于"软性中断", 不再当作硬错误直接 EmitReActFail.
+			// 处理步骤:
+			//  1. applyMaxIterationSoftInterrupt: 把当前任务仍活跃的 TODO 批量
+			//     标记 SKIP (待办回收) 并广播, 同时在 Timeline 落一次软性中断说明;
+			//  2. finishIterationLoopWithSoftInterrupt: 预先置位 IgnoreError 再跑
+			//     onPostIteration hook, 保证全局 fail 兜底一定观察到 ignore, 由
+			//     loop 的 finalize hook 生成"直接回答", 明确告诉用户哪些没做完 +
+			//     询问下一步 (回复 "继续" 即可续跑);
+			//  3. 正常 break LOOP -> return nil -> complete(nil), 资源回收由
+			//     ExecuteWithExistedTask 的 defer r.Release() 完成.
+			// 关键词: max iteration 软性中断, downgrade-max-iteration-err, 待办 SKIP
 			maxIterErr := utils.Errorf("reached max iterations (%d), stopping %s loop", maxIterations, r.loopName)
-			postOp := r.finishIterationLoopWithError(iterationCount, task, maxIterErr)
-
-			// 检查 Hook 是否要求忽略错误
-			if postOp.ShouldIgnoreError() {
-				log.Infof("Loop exit with ignored error: max iterations reached (%d)", maxIterations)
-				needSummary.SetTo(true)
-				break LOOP // 正常退出，不返回错误
-			}
-
-			log.Warnf("Reached max iterations (%d), stopping %s loop", maxIterations, r.loopName)
+			r.applyMaxIterationSoftInterrupt(iterationCount, task, maxIterations)
+			r.finishIterationLoopWithSoftInterrupt(iterationCount, task, maxIterErr)
+			log.Infof("Loop soft-exit on max iterations (%d) for %s loop, waiting for user decision", maxIterations, r.loopName)
 			needSummary.SetTo(true)
 			break LOOP
 		}
@@ -1200,6 +1204,144 @@ func (r *ReActLoop) callOnPostIteration(current int, task aicommon.AIStatefulTas
 
 func (r *ReActLoop) finishIterationLoopWithError(current int, task aicommon.AIStatefulTask, err any) *OnPostIterationOperator {
 	operator := newOnPostIterationOperator()
+	if r.onPostIteration != nil {
+		if err != nil {
+			r.callOnPostIteration(current, task, true, utils.Errorf("reason: %v", err), operator)
+		} else {
+			r.callOnPostIteration(current, task, true, nil, operator)
+		}
+	}
+	return operator
+}
+
+const (
+	// maxIterationInterruptFlagKey 标记本次 loop 因为到达迭代上限被软性中断.
+	// finalize / directly-answer hook 用它判断是否要在回答里加"任务中断"框架.
+	// 关键词: max iteration 软中断标记
+	maxIterationInterruptFlagKey = "__max_iteration_interrupted__"
+	// maxIterationInterruptSummaryKey 存储软性中断时"未完成 TODO"的可读快照,
+	// 供 finalize hook 在直接回答里明确告诉用户"哪些事情没来得及做".
+	// 关键词: max iteration 软中断, 未完成 TODO 交接
+	maxIterationInterruptSummaryKey = "__max_iteration_interrupt_summary__"
+)
+
+// IsMaxIterationInterrupted 返回本次 loop 是否因为到达迭代上限被软性中断.
+func (r *ReActLoop) IsMaxIterationInterrupted() bool {
+	if r == nil {
+		return false
+	}
+	b, _ := r.GetVariable(maxIterationInterruptFlagKey).(bool)
+	return b
+}
+
+// GetMaxIterationInterruptSummary 返回软性中断时记录的"未完成 TODO"可读快照.
+// 未发生中断或没有未完成 TODO 时返回空串.
+func (r *ReActLoop) GetMaxIterationInterruptSummary() string {
+	if r == nil {
+		return ""
+	}
+	return r.Get(maxIterationInterruptSummaryKey)
+}
+
+// applyMaxIterationSoftInterrupt 处理到达迭代上限时的"待办回收 + 软性提示":
+//  1. 读取当前任务仍处于 PENDING/DOING 的 TODO, 记录其可读快照供直接回答引用;
+//  2. 复用 ApplyVerificationNextMovementsAndEmit 单源 helper 把这些 TODO 批量
+//     标记为 SKIP (更新 store + 广播 todo_list_update + NEXT_MOVEMENTS timeline);
+//  3. 在 Timeline 追加一条软性中断说明 (非 error 类别), 只报告一次.
+//
+// 该方法只负责"回收 + 提示", 不生成直接回答 — 直接回答交给 loop 的 finalize
+// hook (见各 loop 的 WithOnPostIteraction), 以便复用每个 loop 已有的答复渲染.
+//
+// 关键词: max iteration 软性中断, 待办 SKIP 回收, 单条软提示, 复用单源 helper
+func (r *ReActLoop) applyMaxIterationSoftInterrupt(iterationCount int, task aicommon.AIStatefulTask, maxIterations int) {
+	if r == nil || utils.IsNil(task) {
+		return
+	}
+
+	cfg := r.config
+	scope := aicommon.BuildVerificationTodoScope(task)
+
+	var activeItems []aicommon.VerificationTodoItem
+	if cfg != nil && !scope.IsZero() {
+		activeItems = cfg.ActiveVerificationTodoItemsByScope(scope)
+	}
+
+	// 记录未完成 TODO 的可读快照, 供直接回答引用.
+	var summaryBuilder strings.Builder
+	for _, item := range activeItems {
+		content := strings.TrimSpace(item.Content)
+		if content == "" {
+			continue
+		}
+		summaryBuilder.WriteString("- ")
+		summaryBuilder.WriteString(content)
+		summaryBuilder.WriteString("\n")
+	}
+	r.Set(maxIterationInterruptFlagKey, true)
+	if summary := strings.TrimSpace(summaryBuilder.String()); summary != "" {
+		r.Set(maxIterationInterruptSummaryKey, summary)
+	}
+
+	// 把活跃 TODO 批量 SKIP: 复用与 verification / adjust_todolist / 主循环兜底
+	// 完全一致的单源 helper, 保证 store 更新 + todo_list_update 广播 + timeline
+	// breadcrumb 字节级对齐.
+	if cfg != nil && len(activeItems) > 0 {
+		movements := make([]aicommon.VerifyNextMovement, 0, len(activeItems))
+		for _, item := range activeItems {
+			id := strings.TrimSpace(item.ID)
+			if id == "" {
+				continue
+			}
+			movements = append(movements, aicommon.VerifyNextMovement{
+				Op: "skip",
+				ID: id,
+			})
+		}
+		if len(movements) > 0 {
+			var timelineHook func(category, line string)
+			if invoker := r.GetInvoker(); invoker != nil {
+				timelineHook = func(category, line string) {
+					invoker.AddToTimeline(category, line)
+				}
+			}
+			aicommon.ApplyVerificationNextMovementsAndEmit(
+				cfg,
+				cfg.GetEmitter(),
+				task,
+				scope,
+				iterationCount,
+				false,
+				movements,
+				timelineHook,
+			)
+		}
+	}
+
+	// 软性中断的单条 timeline 说明 (非 error 类别, 只报告一次).
+	if invoker := r.GetInvoker(); invoker != nil {
+		loopName := r.loopName
+		if loopName == "" {
+			loopName = "general-purpose"
+		}
+		msg := fmt.Sprintf(
+			"[%v] reached iteration limit (%d); the task was softly interrupted (NOT a failure). %d unfinished TODO(s) were marked as SKIP. A direct answer will summarize what was left undone; reply \"继续\" to resume, or give a new direction.",
+			loopName, maxIterations, len(activeItems),
+		)
+		invoker.AddToTimeline("iteration_limit_interrupt", msg)
+	}
+}
+
+// finishIterationLoopWithSoftInterrupt 与 finishIterationLoopWithError 类似, 但
+// 在运行任何 onPostIteration 回调之前就把 operator 标记为 IgnoreError. 这样即使
+// 某个 loop 没有注册专门的 finalize hook (或 finalize hook 因为"答复已下发"而
+// 提前 return 未调用 IgnoreError), ExecuteLoopTask 里注册的全局 fail 兜底
+// (通过 DeferAfterCallbacks 检查 ShouldIgnoreError) 也一定观察到 ignore, 从而
+// 不会把"到达迭代上限"当成任务失败 EmitReActFail 上报.
+//
+// 关键词: 软性中断预置 IgnoreError, 抑制 EmitReActFail, downgrade-max-iteration-err
+func (r *ReActLoop) finishIterationLoopWithSoftInterrupt(current int, task aicommon.AIStatefulTask, err any) *OnPostIterationOperator {
+	operator := newOnPostIterationOperator()
+	operator.IgnoreError() // 预先置位: 软性中断绝不上报 fail
 	if r.onPostIteration != nil {
 		if err != nil {
 			r.callOnPostIteration(current, task, true, utils.Errorf("reason: %v", err), operator)
