@@ -3,11 +3,16 @@ package loop_yaklangcode
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/cli"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -22,10 +27,10 @@ const (
 	configYakRunSelfTestTimeout  = "yaklang_run_self_test_timeout_sec"
 	configYakRunSelfTestMaxRetry = "yaklang_run_self_test_max_retries"
 
-	loopVarYakRunOK            = "yak_run_ok"
-	loopVarYakRunOutput        = "yak_run_output"
-	loopVarYakRunLastFeedback  = "yak_run_last_feedback"
-	loopVarYakRunAttempts      = "yak_run_attempts"
+	loopVarYakRunOK           = "yak_run_ok"
+	loopVarYakRunOutput       = "yak_run_output"
+	loopVarYakRunLastFeedback = "yak_run_last_feedback"
+	loopVarYakRunAttempts     = "yak_run_attempts"
 )
 
 // YakRunResult captures stdout/logs from a YAK_MAIN self-test execution.
@@ -34,7 +39,8 @@ type YakRunResult struct {
 	Truncated bool
 }
 
-// RunYakSelfTest executes code with YAK_MAIN=true in an isolated virtual yakit client.
+// RunYakSelfTest executes code with YAK_MAIN=true in an isolated yak subprocess (same as Yakit UI default).
+// Mock CLI flags are injected so cli.check() passes without killing the grpc parent process.
 func RunYakSelfTest(ctx context.Context, code, absPath string, timeoutSec int) (YakRunResult, error) {
 	code = strings.TrimSpace(code)
 	if code == "" {
@@ -50,6 +56,72 @@ func RunYakSelfTest(ctx context.Context, code, absPath string, timeoutSec int) (
 	runCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSec)*time.Second)
 	defer cancel()
 
+	mockArgs := buildSelfTestCLIArgs(code)
+	log.Infof("yaklang self-test mock cli args: %v", mockArgs)
+
+	if _, binErr := resolveYakEngineBinary(); binErr == nil {
+		return runYakSelfTestSubprocess(runCtx, code, absPath, mockArgs)
+	}
+	return runYakSelfTestInProcess(runCtx, code, absPath, mockArgs)
+}
+
+func runYakSelfTestSubprocess(ctx context.Context, code, absPath string, mockArgs []string) (YakRunResult, error) {
+	yakBin, err := resolveYakEngineBinary()
+	if err != nil {
+		return YakRunResult{}, err
+	}
+
+	scriptPath, cleanup, err := writeSelfTestScriptFile(code, absPath)
+	if err != nil {
+		return YakRunResult{}, err
+	}
+	defer cleanup()
+
+	cmdArgs := append([]string{scriptPath}, mockArgs...)
+	cmd := exec.CommandContext(ctx, yakBin, cmdArgs...)
+	cmd.Env = os.Environ()
+	if home := strings.TrimSpace(os.Getenv("YAKIT_HOME")); home != "" {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("YAKIT_HOME=%s", home))
+	}
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	log.Infof("yaklang self-test subprocess: binary=%s args=%v", yakBin, cmdArgs)
+	runErr := cmd.Run()
+
+	var combined strings.Builder
+	if stdout.Len() > 0 {
+		combined.WriteString(stdout.String())
+	}
+	if stderr.Len() > 0 {
+		if combined.Len() > 0 {
+			combined.WriteByte('\n')
+		}
+		combined.WriteString(stderr.String())
+	}
+	out, truncated := truncateYakRunOutput(combined.String())
+	result := YakRunResult{Output: out, Truncated: truncated}
+
+	if runErr != nil {
+		if ctx.Err() != nil {
+			return result, ctx.Err()
+		}
+		if exitErr, ok := runErr.(*exec.ExitError); ok {
+			return result, utils.Errorf("yak self-test exited with code %d", exitErr.ExitCode())
+		}
+		return result, utils.Errorf("yak self-test subprocess failed: %v", runErr)
+	}
+	if ctx.Err() != nil {
+		return result, ctx.Err()
+	}
+	return result, nil
+}
+
+// runYakSelfTestInProcess executes in the current process (test fallback when yak binary unavailable).
+// Uses panic-based cli.check callback and injected mock CLI args — never os.Exit.
+func runYakSelfTestInProcess(ctx context.Context, code, absPath string, mockArgs []string) (YakRunResult, error) {
 	var buf bytes.Buffer
 	yakitClient := yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
 		if ret := yaklib.ConvertExecResultIntoAIToolCallStdoutLog(result); ret != "" {
@@ -59,17 +131,63 @@ func RunYakSelfTest(ctx context.Context, code, absPath string, timeoutSec int) (
 		return nil
 	})
 
+	prevCallback := cli.DefaultCliApp.GetCliCheckCallback()
+	prevArgs := cli.DefaultCliApp.GetArgs()
+	cli.DefaultCliApp.SetCliCheckCallback(func() {
+		panic("cli check fail")
+	})
+	cli.DefaultCliApp.SetArgs(append([]string{}, mockArgs...))
+	defer func() {
+		cli.DefaultCliApp.SetCliCheckCallback(prevCallback)
+		cli.DefaultCliApp.SetArgs(prevArgs)
+	}()
+
 	engine := yak.NewYakitVirtualClientScriptEngine(yakitClient)
-	err := engine.ExecuteMainWithContext(runCtx, code, absPath)
+	err := engine.ExecuteMainWithContext(ctx, code, absPath)
 	out, truncated := truncateYakRunOutput(buf.String())
 	result := YakRunResult{Output: out, Truncated: truncated}
 	if err != nil {
 		return result, err
 	}
-	if runCtx.Err() != nil {
-		return result, runCtx.Err()
+	if ctx.Err() != nil {
+		return result, ctx.Err()
 	}
 	return result, nil
+}
+
+func writeSelfTestScriptFile(code, absPath string) (scriptPath string, cleanup func(), err error) {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return "", func() {}, utils.Error("yak self-test: code is empty")
+	}
+
+	if p := strings.TrimSpace(absPath); p != "" && utils.IsFile(p) {
+		if existing, readErr := os.ReadFile(p); readErr == nil && string(existing) == code {
+			return p, func() {}, nil
+		}
+	}
+
+	dir := os.TempDir()
+	if p := strings.TrimSpace(absPath); p != "" {
+		if d := filepath.Dir(p); d != "" && d != "." {
+			dir = d
+		}
+	}
+	f, err := os.CreateTemp(dir, "yaklang-selftest-*.yak")
+	if err != nil {
+		return "", func() {}, utils.Errorf("create self-test script temp file: %v", err)
+	}
+	if _, err = f.WriteString(code); err != nil {
+		_ = f.Close()
+		_ = os.Remove(f.Name())
+		return "", func() {}, utils.Errorf("write self-test script: %v", err)
+	}
+	if err = f.Close(); err != nil {
+		_ = os.Remove(f.Name())
+		return "", func() {}, utils.Errorf("close self-test script: %v", err)
+	}
+	path := f.Name()
+	return path, func() { _ = os.Remove(path) }, nil
 }
 
 // FormatRunFailureForAI builds AI-facing feedback when self-test fails.
@@ -143,6 +261,7 @@ type aicommonGetter interface {
 func logYakRunSelfTestSkip(reason string) {
 	log.Infof("skip yaklang YAK_MAIN self-test: %s", reason)
 }
+
 func FormatMissingSelfTestFeedback(policy YakScriptRunPolicy) string {
 	var b strings.Builder
 	b.WriteString("语法已通过，但脚本类型需要 YAK_MAIN 自测块才能自动运行验证。\n\n")
