@@ -497,7 +497,7 @@ func TestWriteDispatchSubReactDispatchesDisplayStream_FormatsJobs(t *testing.T) 
 	input := `[{"identifier":"scan_a","goal":"scan service A"},{"identifier":"scan_b","goal":"scan service B","loop_name":"default"}]`
 	var out strings.Builder
 	require.NoError(t, writeDispatchSubReactDispatchesDisplayStream(strings.NewReader(input), &out))
-	assert.Equal(t, "- [scan_a] scan service A\n- [scan_b] scan service B", out.String())
+	assert.Equal(t, "- scan service A\n- scan service B", out.String())
 }
 
 func TestDispatchSubReactAgents_StreamFieldsUseI18nNodeIDs(t *testing.T) {
