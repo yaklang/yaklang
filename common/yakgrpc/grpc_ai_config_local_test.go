@@ -3,7 +3,9 @@ package yakgrpc
 import (
 	"context"
 	"github.com/bytedance/mockey"
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"os"
@@ -145,11 +147,22 @@ func TestGetApiKey_ReplaceAPIKeys(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, client)
 	require.NotNil(t, server)
+
+	db := server.GetProfileDatabase()
+	oldKey := "old-key-for-test"
+	testRecord := &schema.AIThirdPartyConfig{
+		Type:   "openai",
+		APIKey: oldKey,
+		Domain: "api.openai.com",
+	}
+	err = db.Create(testRecord).Error
+	require.NoError(t, err)
+
 	t.Cleanup(func() {
-		db := server.GetProfileDatabase()
-		if db != nil {
-			_ = yakit.SetKey(db, consts.AI_GLOBAL_CONFIG_KEY, "")
+		if testRecord.ID != 0 {
+			db.Delete(&schema.AIThirdPartyConfig{}, testRecord.ID)
 		}
+		_ = yakit.SetKey(db, consts.AI_GLOBAL_CONFIG_KEY, "")
 		if server.profileDatabase != nil {
 			_ = server.profileDatabase.Close()
 		}
@@ -157,6 +170,7 @@ func TestGetApiKey_ReplaceAPIKeys(t *testing.T) {
 			_ = server.projectDatabase.Close()
 		}
 	})
+
 	ctx := context.Background()
 
 	cfg := &ypb.AIGlobalConfig{
@@ -171,7 +185,7 @@ func TestGetApiKey_ReplaceAPIKeys(t *testing.T) {
 				ModelName: "model-intel",
 				Provider: &ypb.ThirdPartyApplicationConfig{
 					Type:    "aibalance",
-					APIKey:  "free-user",
+					APIKey:  oldKey,
 					BaseURL: "https://aibalance.yaklang.com/v1",
 				},
 			},
@@ -181,7 +195,7 @@ func TestGetApiKey_ReplaceAPIKeys(t *testing.T) {
 				ModelName: "model-light",
 				Provider: &ypb.ThirdPartyApplicationConfig{
 					Type:    "aibalance",
-					APIKey:  "free-user",
+					APIKey:  oldKey,
 					BaseURL: "https://aibalance.yaklang.com/v1",
 				},
 			},
@@ -204,6 +218,10 @@ func TestGetApiKey_ReplaceAPIKeys(t *testing.T) {
 	mockey.PatchConvey("mock online client", t, func() {
 		newAPIKey := "mf-mock-created-key"
 
+		mockey.Mock(consts.GetGormProfileDatabase).To(func() *gorm.DB {
+			return db
+		}).Build()
+
 		mockey.Mock((*yaklib.OnlineClient).GetAIApiKeyByOnline).
 			To(func(_ *yaklib.OnlineClient, ctx context.Context, token string) (string, error) {
 				assert.Equal(t, "test-token", token)
@@ -217,7 +235,7 @@ func TestGetApiKey_ReplaceAPIKeys(t *testing.T) {
 		require.NotNil(t, resp)
 		assert.Equal(t, newAPIKey, resp.ApiKey)
 
-		updatedCfg, err := yakit.GetAIGlobalConfig(server.GetProfileDatabase())
+		updatedCfg, err := yakit.GetAIGlobalConfig(db)
 		require.NoError(t, err)
 		require.NotNil(t, updatedCfg)
 
