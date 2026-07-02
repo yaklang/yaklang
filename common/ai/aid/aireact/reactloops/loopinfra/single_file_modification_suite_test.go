@@ -180,3 +180,51 @@ func TestDefaultPrettifyAITagCode_ValidCases(t *testing.T) {
 	})
 }
 
+func TestApplySyntaxLintResult_PostSyntaxCleanHookBlocksExit(t *testing.T) {
+	f := newFactoryForSuiteTest(t,
+		WithLoopVarsPrefix("yak"),
+		WithPostSyntaxCleanHook(func(loop *reactloops.ReActLoop, op *reactloops.LoopActionHandlerOperator) (string, bool) {
+			return "runtime failed", true
+		}),
+	)
+
+	loop, err := reactloops.NewReActLoop("post-syntax-hook-test", mock.NewMockInvoker(context.Background()))
+	require := assert.New(t)
+	require.NoError(err)
+	task := newTestTaskForSingleFile(context.Background())
+
+	op := reactloops.NewActionHandlerOperator(task)
+	postHookBlocked := f.applySyntaxLintResult(loop, op, false, true)
+
+	require.True(op.IsContinued())
+	terminated, termErr := op.IsTerminated()
+	require.False(terminated)
+	require.NoError(termErr)
+	require.True(op.GetDisallowLoopExit())
+	require.Contains(op.GetFeedback().String(), "runtime failed")
+	require.Equal("true", loop.Get("yak_lint_ok"))
+	require.True(postHookBlocked)
+}
+
+func TestApplySyntaxLintResult_PostSyntaxCleanHookAllowsExit(t *testing.T) {
+	f := newFactoryForSuiteTest(t,
+		WithLoopVarsPrefix("yak"),
+		WithPostSyntaxCleanHook(func(loop *reactloops.ReActLoop, op *reactloops.LoopActionHandlerOperator) (string, bool) {
+			return "", false
+		}),
+	)
+
+	loop, err := reactloops.NewReActLoop("post-syntax-hook-exit-test", mock.NewMockInvoker(context.Background()))
+	require := assert.New(t)
+	require.NoError(err)
+	task := newTestTaskForSingleFile(context.Background())
+
+	op := reactloops.NewActionHandlerOperator(task)
+	postHookBlocked := f.applySyntaxLintResult(loop, op, false, true)
+
+	require.False(op.IsContinued())
+	terminated, termErr := op.IsTerminated()
+	require.True(terminated)
+	require.NoError(termErr)
+	require.False(postHookBlocked)
+}

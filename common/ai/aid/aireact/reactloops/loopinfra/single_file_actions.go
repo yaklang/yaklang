@@ -106,7 +106,7 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 
 			// Call file changed callback
 			errMsg, blocking := f.OnFileChanged(code, operator)
-			f.applySyntaxLintResult(loop, operator, blocking, f.ShouldExitAfterWrite() || f.ShouldExitWhenSyntaxClean())
+			runBlocked := f.applySyntaxLintResult(loop, operator, blocking, f.ShouldExitAfterWrite() || f.ShouldExitWhenSyntaxClean())
 
 			msg := utils.ShrinkTextBlock(code, 256)
 			if errMsg != "" {
@@ -117,11 +117,13 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 			}
 			runtime.AddToTimeline("lint-message", msg)
 
-			log.Infof("write_code done: hasBlockingErrors=%v", blocking)
-			loopInfraStatus(loop, "文件写入完成 / File Write Complete")
-			loopInfraActionFinish(loop, loopInfraNodeSingleFileWrite,
-				fmt.Sprintf("文件写入完成: %s (%d bytes) / File Written: %s (%d bytes)", filename, len(code), filename, len(code)),
-				msg)
+			log.Infof("write_code done: hasBlockingErrors=%v runBlocked=%v", blocking, runBlocked)
+			if !blocking && !runBlocked {
+				loopInfraStatus(loop, "文件写入完成 / File Write Complete")
+				loopInfraActionFinish(loop, loopInfraNodeSingleFileWrite,
+					fmt.Sprintf("文件写入完成: %s (%d bytes) / File Written: %s (%d bytes)", filename, len(code), filename, len(code)),
+					msg)
+			}
 			loop.GetEmitter().EmitPinFilename(filename)
 			_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
 				Content:      code,
@@ -276,7 +278,7 @@ GEN_CODE 解析行号：[%d-%d]
 
 			// Call file changed callback
 			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
-			f.applySyntaxLintResult(loop, op, hasBlockingErrors, f.ShouldExitWhenSyntaxClean())
+			runBlocked := f.applySyntaxLintResult(loop, op, hasBlockingErrors, f.ShouldExitWhenSyntaxClean())
 
 			// Check for spinning behavior
 			isSpinning, spinReason := f.DetectSpinning(loop, modifyStartLine, modifyEndLine)
@@ -301,11 +303,13 @@ GEN_CODE 解析行号：[%d-%d]
 				msg += "\n\n--[linter]--\nNo issues found in the modified code segment."
 			}
 			runtime.AddToTimeline("code_modified", msg)
-			log.Infof("modify_code done: hasBlockingErrors=%v", hasBlockingErrors)
-			loopInfraStatus(loop, "文件修改完成 / File Modify Complete")
-			loopInfraActionFinish(loop, loopInfraNodeSingleFileModify,
-				fmt.Sprintf("文件修改完成: %s lines %d-%d / File Modified: %s lines %d-%d", filename, modifyStartLine, modifyEndLine, filename, modifyStartLine, modifyEndLine),
-				msg)
+			log.Infof("modify_code done: hasBlockingErrors=%v runBlocked=%v", hasBlockingErrors, runBlocked)
+			if !hasBlockingErrors && !runBlocked {
+				loopInfraStatus(loop, "文件修改完成 / File Modify Complete")
+				loopInfraActionFinish(loop, loopInfraNodeSingleFileModify,
+					fmt.Sprintf("文件修改完成: %s lines %d-%d / File Modified: %s lines %d-%d", filename, modifyStartLine, modifyEndLine, filename, modifyStartLine, modifyEndLine),
+					msg)
+			}
 			loop.GetEmitter().EmitPinFilename(filename)
 			_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
 				Content:      fullCode,
@@ -405,7 +409,7 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 
 			// Call file changed callback
 			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
-			f.applySyntaxLintResult(loop, op, hasBlockingErrors, f.ShouldExitWhenSyntaxClean())
+			runBlocked := f.applySyntaxLintResult(loop, op, hasBlockingErrors, f.ShouldExitWhenSyntaxClean())
 			msg = utils.ShrinkTextBlock(fmt.Sprintf("inserted at line[%v]:\n", insertLine)+partialCode, 256)
 			if errMsg != "" {
 				msg += "\n\n--[linter]--\nWriting Code Linter Check:\n" + utils.PrefixLines(utils.ShrinkTextBlock(errMsg, 2048), "  ")
@@ -414,11 +418,13 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 				msg += "\n\n--[linter]--\nNo issues found in the inserted code segment."
 			}
 			runtime.AddToTimeline("lines_inserted", msg)
-			log.Infof("insert_lines done: hasBlockingErrors=%v", hasBlockingErrors)
-			loopInfraStatus(loop, "文件插入完成 / File Insert Complete")
-			loopInfraActionFinish(loop, loopInfraNodeSingleFileInsert,
-				fmt.Sprintf("文件插入完成: %s line %d / File Inserted: %s line %d", filename, insertLine, filename, insertLine),
-				msg)
+			log.Infof("insert_lines done: hasBlockingErrors=%v runBlocked=%v", hasBlockingErrors, runBlocked)
+			if !hasBlockingErrors && !runBlocked {
+				loopInfraStatus(loop, "文件插入完成 / File Insert Complete")
+				loopInfraActionFinish(loop, loopInfraNodeSingleFileInsert,
+					fmt.Sprintf("文件插入完成: %s line %d / File Inserted: %s line %d", filename, insertLine, filename, insertLine),
+					msg)
+			}
 			loop.GetEmitter().EmitPinFilename(filename)
 			_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
 				Content:      fullCode,
@@ -541,7 +547,7 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 
 			// Call file changed callback
 			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
-			f.applySyntaxLintResult(loop, op, hasBlockingErrors, f.ShouldExitWhenSyntaxClean())
+			runBlocked := f.applySyntaxLintResult(loop, op, hasBlockingErrors, f.ShouldExitWhenSyntaxClean())
 
 			if deleteEndLine > 0 {
 				msg = fmt.Sprintf("deleted lines[%v-%v]", deleteStartLine, deleteEndLine)
@@ -556,11 +562,13 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 				msg += "\n\n--[linter]--\nNo issues found after code deletion."
 			}
 			runtime.AddToTimeline("lines_deleted", msg)
-			log.Infof("delete_lines done: hasBlockingErrors=%v", hasBlockingErrors)
-			loopInfraStatus(loop, "文件删除完成 / File Delete Complete")
-			loopInfraActionFinish(loop, loopInfraNodeSingleFileDelete,
-				fmt.Sprintf("文件删除完成: %s / File Delete Complete: %s", filename, filename),
-				msg)
+			log.Infof("delete_lines done: hasBlockingErrors=%v runBlocked=%v", hasBlockingErrors, runBlocked)
+			if !hasBlockingErrors && !runBlocked {
+				loopInfraStatus(loop, "文件删除完成 / File Delete Complete")
+				loopInfraActionFinish(loop, loopInfraNodeSingleFileDelete,
+					fmt.Sprintf("文件删除完成: %s / File Delete Complete: %s", filename, filename),
+					msg)
+			}
 			loop.GetEmitter().EmitPinFilename(filename)
 			_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
 				Content:      fullCode,

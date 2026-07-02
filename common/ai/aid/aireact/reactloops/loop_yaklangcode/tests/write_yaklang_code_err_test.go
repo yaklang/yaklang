@@ -61,33 +61,13 @@ func mockedYaklangWritingAndModifyCauseError(t *testing.T, i aicommon.AICallerCo
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, `"grep_yaklang_samples"`, `"require_tool"`, `"write_code"`, `"@action"`) {
-		nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
-		rsp := i.NewAIResponse()
-		if !stat.writeDone {
-			rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "write_code"}
-
-<|GEN_CODE_{{ .nonce }}|>
-println("a")
+	if rsp, ok := mockYaklangModifyCodeResponse(t, i, prompt, stat, `println("modifiedcodecodecode")`); ok {
+		return rsp, nil
+	}
+	if rsp, ok := mockYaklangWriteCodeResponse(t, i, prompt, stat, `println("a")
 for for for
 println("b")
-println("c")
-<|GEN_CODE_END_{{ .nonce }}|>`, map[string]any{
-				"nonce": nonceStr,
-			})))
-			stat.writeDone = true
-		} else {
-			rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "modify_code", "modify_start_line": 2, "modify_end_line": 2}
-
-<|GEN_CODE_{{ .nonce }}|>
-println("modifiedcodecodecode")
-<|GEN_CODE_END_{{ .nonce }}|>`, map[string]any{
-				"nonce": nonceStr,
-			})))
-			stat.modifyDone = true
-		}
-
-		rsp.Close()
+println("c")`); ok {
 		return rsp, nil
 	}
 
@@ -95,6 +75,10 @@ println("modifiedcodecodecode")
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "check-filepath", "create_new_file": true}`))
 		rsp.Close()
+		return rsp, nil
+	}
+
+	if rsp, ok := mockYaklangFinalizeDirectlyAnswer(t, i, prompt); ok {
 		return rsp, nil
 	}
 
@@ -140,7 +124,7 @@ func TestFocusMode_WriteYaklangCodeCauseErrorAndThenModify(t *testing.T) {
 		}
 	}()
 
-	// Syntax-error scenario may never finish the loop; wait for deferred yaklang_code_change instead of disk.
+	// Syntax-error scenario: wait for task terminal status or timeout, then assert modify ran.
 	waitResult := waitForYaklangDeferredEditorSync(out, focusModeWriteYaklangTestTimeout())
 	close(in)
 	ins.Wait()
