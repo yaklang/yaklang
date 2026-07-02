@@ -275,51 +275,6 @@ func directlyCallParamKeys(params aitool.InvokeParams) []string {
 	return keys
 }
 
-func emitDirectlyCallToolParamsNodeStream(
-	loop *reactloops.ReActLoop,
-	action *aicommon.Action,
-	params aitool.InvokeParams,
-	mergedBlockParams []string,
-) {
-	emitter := loop.GetEmitter()
-	if emitter == nil {
-		return
-	}
-
-	taskIndex := ""
-	if task := loop.GetCurrentTask(); task != nil {
-		taskIndex = task.GetIndex()
-	}
-
-	var buf strings.Builder
-	buf.WriteString("[开始处理参数] → ")
-	emitDirectlyCallParamProgress(func(part string) {
-		buf.WriteString(part)
-		buf.WriteString(" → ")
-	}, params, mergedBlockParams)
-	if ce := action.GetString("directly_call_expectations"); strings.TrimSpace(ce) != "" {
-		buf.WriteString("[note] ")
-		buf.WriteString(ce)
-		buf.WriteString(" → ")
-	}
-	buf.WriteString(" [done]")
-
-	event, _ := emitter.EmitDefaultStreamEvent(directlyCallToolParamsNodeID, strings.NewReader(buf.String()), taskIndex)
-	if event == nil {
-		return
-	}
-	streamID := event.GetStreamEventWriterId()
-	if streamID == "" {
-		return
-	}
-	aicommon.EmitAIRequestAndResponseReferenceMaterials(
-		emitter,
-		streamID,
-		loop.Get(directlyCallToolPromptLoopKey),
-		loop.Get(directlyCallToolResponseLoopKey),
-	)
-}
-
 var loopAction_directlyCallTool = &reactloops.LoopAction{
 	ActionType: schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
 	Description: "directly call a recently used tool (skip require & param-generation phases). " +
@@ -461,7 +416,7 @@ Few-shot example 2 (valid directly_call_tool):
 			finishProgress := func(string) {}
 			if emitter := loop.GetEmitter(); emitter != nil && operator.GetTask() != nil {
 				pr, pw := utils.NewPipe()
-				event, _ := emitter.EmitDefaultStreamEvent(directlyCallToolParamsNodeID, pr, operator.GetTask().GetId())
+				event, _ := emitter.EmitDefaultSystemStreamEvent(directlyCallToolParamsNodeID, pr, operator.GetTask().GetId())
 				if event != nil {
 					progressEventID := event.GetStreamEventWriterId()
 					aicommon.EmitAIRequestAndResponseReferenceMaterials(
