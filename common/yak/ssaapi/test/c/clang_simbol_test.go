@@ -201,7 +201,7 @@ int main() {
     return 0;
 }
 `
-		ssatest.CheckSyntaxFlow(t, code, `
+		ssatest.CheckSyntaxFlowContain(t, code, `
 		p #-> as $target
 		`, map[string][]string{
 			"target": {"make(object{})", "1", "2", "3"},

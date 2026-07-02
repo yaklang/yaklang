@@ -63,6 +63,10 @@ func (v *BaseCParserVisitor) VisitCoreExpression(ctx *CoreExpressionContext) int
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseCParserVisitor) VisitComplexCoreExpression(ctx *ComplexCoreExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseCParserVisitor) VisitAssignmentExpression(ctx *AssignmentExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
