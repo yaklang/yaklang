@@ -25,7 +25,10 @@ func parseQueryToRequest(db *gorm.DB, query string) *gorm.DB {
 	if err != nil {
 		return db
 	}
-	return yakit.BuildHTTPFlowQuery(db, &req)
+	// Website tree only needs filter conditions. BuildHTTPFlowQuery also applies
+	// field projection, ordering and pagination defaults that break domain listing
+	// when recent scan/fuzzer traffic dominates the newest records.
+	return yakit.FilterHTTPFlow(db.Model(&schema.HTTPFlow{}), &req)
 }
 
 func (f *websiteFromHttpFlow) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
@@ -94,8 +97,10 @@ func (f *websiteFromHttpFlow) Get(params *ypb.RequestYakURLParams) (*ypb.Request
 			})
 		}
 		return &ypb.RequestYakURLResponse{
-			Page: 1, PageSize: 1000,
+			Page:      1,
+			PageSize:  1000,
 			Resources: res,
+			Total:     int64(len(res)),
 		}, nil
 	}
 
