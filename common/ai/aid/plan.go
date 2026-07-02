@@ -211,7 +211,11 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 					planData := loop.Get(loop_plan.PLAN_DATA_KEY)
 
 					if planData == "" {
-						log.Errorf("plan loop finished without producing plan data (iteration=%d), plan will be incomplete", iteration)
+						log.Errorf(
+							"plan loop finished without producing plan data (iteration=%d), plan will be incomplete, ai_output: %s",
+							iteration,
+							loop.Get(reactloops.LoopVarLastAIDecisionResponse),
+						)
 						return
 					}
 

@@ -94,8 +94,13 @@ recoverStmt: Recover '(' ')';
 
 /*
 if statement syntax
+
+支持 Go 风格的初始化语句：if <init>; <cond> { ... }
+初始化语句可以是赋值、变量声明或普通表达式，其声明的变量作用域覆盖整个 if/elif/else 链，
+但不会泄漏到外部作用域。
 */
-ifStmt: 'if' expression block ('elif' expression block)* elseBlock?;
+ifStmt: 'if' (ifStmtInit ';')? expression block ('elif' expression block)* elseBlock?;
+ifStmtInit: assignExpression | declareVariableExpression | expression;
 elseBlock: 'else' (ifStmt|block);
 
 block: '{' ws* statementList? ws* '}';

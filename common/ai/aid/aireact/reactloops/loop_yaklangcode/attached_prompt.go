@@ -3,6 +3,7 @@ package loop_yaklangcode
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yakdoc/doc"
 )
 
 type yaklangAnalyzeRequirementOptions struct {
@@ -17,6 +18,12 @@ type yaklangAnalyzeRequirementOptions struct {
 
 func buildYaklangAnalyzeRequirementPrompt(opts yaklangAnalyzeRequirementOptions) string {
 	nonce := utils.RandStringBytes(4)
+	// 库选择索引: 仅在需要生成搜索关键字/语义问题时注入, 引导 AI 先选库再定关键字。
+	// 来源 doc.gob.zst 中各库 OverviewShort(由 overviews 首段派生), 未生成时为空, 优雅降级。
+	librarySelectionIndex := ""
+	if opts.hasGrepSearcher || opts.hasRAGSearcher {
+		librarySelectionIndex = doc.BuildLibrarySelectionIndex()
+	}
 	if opts.createMode {
 		return utils.MustRenderTemplate(`
 你的目标是分析用户需求，完成以下任务：
@@ -25,6 +32,13 @@ func buildYaklangAnalyzeRequirementPrompt(opts yaklangAnalyzeRequirementOptions)
 {{ if .workspacePath }}用户工作区目录：{{ .workspacePath }}
 {{ else }}用户未指定目标文件。
 {{ end }}本次任务将生成新 Yak 脚本（任务结束时由系统创建 gen_code_*.yak）；无需判断 create_new_file / existed_filepath，请专注生成代码搜索关键字。
+
+{{ if .librarySelectionIndex }}【库选择索引（先据此选 2-4 个库，再定关键字/语义问题）】
+下面是 Yaklang 标准库的一句话定位。请先根据用户目标，从中挑选最相关的 2-4 个库，把库名填入 core_libraries，再围绕这些库生成 search_patterns / semantic_questions（库名往往就是很好的搜索前缀）：
+
+{{ .librarySelectionIndex }}
+{{ end }}【任务0：选定核心库（core_libraries）】
+据上面的库选择索引，挑出本任务最相关的 2-4 个库名填入 core_libraries（如 poc、fuzz、str、servicescan）。系统会自动把这些库的权威函数签名注入后续提示词，帮助你少犯参数类型/猜名错误。
 
 {{ if .hasGrepSearcher }}【任务1：生成精确代码搜索关键字(Grep模式)】
 根据用户需求，生成 2-4 个搜索模式（search_patterns），用于在 Yaklang 代码样例库中进行精确文本搜索：
@@ -65,6 +79,7 @@ Bad: "端口扫描" - 不完整句式
 			"workspacePath":   opts.workspacePath,
 			"hasGrepSearcher": opts.hasGrepSearcher,
 			"hasRAGSearcher":  opts.hasRAGSearcher,
+			"librarySelectionIndex": librarySelectionIndex,
 		})
 	}
 	if opts.hasAttachedPath {
@@ -76,6 +91,13 @@ Bad: "端口扫描" - 不完整句式
 {{ if .workspacePath }}工作区目录：{{ .workspacePath }}
 {{ end }}文件路径已由前端附件提供，无需再判断 create_new_file / existed_filepath；请专注生成代码搜索关键字。
 
+{{ if .librarySelectionIndex }}【库选择索引（先据此选 2-4 个库，再定关键字/语义问题）】
+下面是 Yaklang 标准库的一句话定位。请先根据用户目标，从中挑选最相关的 2-4 个库，把库名填入 core_libraries，再围绕这些库生成 search_patterns / semantic_questions（库名往往就是很好的搜索前缀）：
+
+{{ .librarySelectionIndex }}
+{{ end }}【任务0：选定核心库（core_libraries）】
+据上面的库选择索引，挑出本任务最相关的 2-4 个库名填入 core_libraries（如 poc、fuzz、str、servicescan）。系统会自动把这些库的权威函数签名注入后续提示词，帮助你少犯参数类型/猜名错误。
+
 {{ if .hasGrepSearcher }}【任务1：生成精确代码搜索关键字(Grep模式)】
 根据用户需求，生成 2-4 个搜索模式（search_patterns），用于在 Yaklang 代码样例库中进行精确文本搜索：
 
@@ -110,12 +132,13 @@ Bad: "端口扫描" - 不完整句式
 {{ .data }}
 <|USER_INPUT_END_{{ .nonce }}|>
 `, map[string]any{
-			"nonce":           nonce,
-			"data":            opts.userInput,
-			"attachedPath":    opts.attachedPath,
-			"workspacePath":   opts.workspacePath,
-			"hasGrepSearcher": opts.hasGrepSearcher,
-			"hasRAGSearcher":  opts.hasRAGSearcher,
+			"nonce":                 nonce,
+			"data":                  opts.userInput,
+			"attachedPath":          opts.attachedPath,
+			"workspacePath":         opts.workspacePath,
+			"hasGrepSearcher":       opts.hasGrepSearcher,
+			"hasRAGSearcher":        opts.hasRAGSearcher,
+			"librarySelectionIndex": librarySelectionIndex,
 		})
 	}
 
@@ -140,6 +163,13 @@ func buildYaklangAnalyzeRequirementToolOptions(opts yaklangAnalyzeRequirementOpt
 			aitool.WithStringArrayParam("semantic_questions", aitool.WithParam_Description("2-4 complete questions for semantic search of Yaklang code examples. Each question must be a complete sentence with subject-predicate-object structure and explicitly mention 'Yaklang'."), aitool.WithParam_Required(true)),
 		)
 	}
+	// core_libraries: AI 据库选择索引挑出的 2-4 个最相关标准库名(可选)。
+	// 用于在 init 阶段 PIN 这些库的核心函数签名到提示词, 从源头减少类型/参数/猜名错误。
+	toolOptions = append(toolOptions,
+		aitool.WithStringArrayParam("core_libraries",
+			aitool.WithParam_Description("2-4 most relevant Yaklang standard library names you will use (e.g. poc, fuzz, str, servicescan). Pick from the library selection index. Used to pin authoritative API signatures."),
+		),
+	)
 	if hasSearcher {
 		toolOptions = append(toolOptions,
 			aitool.WithStringParam("reason", aitool.WithParam_Description("Explain your decision and why these search patterns/questions are chosen."), aitool.WithParam_Required(true)),

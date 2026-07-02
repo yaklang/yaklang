@@ -19,13 +19,11 @@ func compressRAGResults(resultStr string, query string, userContext string, invo
 	return compressSearchResults(resultStr, query, userContext, invoker, op, 10, 3, 15, "【AI智能提取】按重要性排序的代码片段：", false)
 }
 
-var semanticSearchYaklangSamplesAction = func(r aicommon.AIInvokeRuntime, ragSystem *rag.RAGSystem) reactloops.ReActLoopOption {
-	if ragSystem == nil {
-		log.Warnf("semantic_search_yaklang_samples: ragSystem is nil")
-		return func(r *reactloops.ReActLoop) {
-			r.GetInvoker().AddToTimeline("semantic_search_yaklang_samples_error", "Yaklang AIKB RAG 系统未正确初始化或加载失败")
-		}
-	}
+var semanticSearchYaklangSamplesAction = func(r aicommon.AIInvokeRuntime, holder *searcherHolder) reactloops.ReActLoopOption {
+	// 注意: 这里不再因为初始 rag 为 nil 就退化成 no-op action。
+	// rag 搜索器可能在 init task 自动安装 AIKB 后才回填到 holder, 因此始终注册真实 action,
+	// 在 handler 运行时从 holder 读取最新 rag, 为 nil 时优雅降级。
+	// 关键词: semantic_search 始终注册, holder 运行时读取, 自动安装后可用
 	return reactloops.WithRegisterLoopActionWithStreamField(
 		"semantic_search_yaklang_samples",
 		`语义搜索 Yaklang 代码样例库 - 基于向量语义理解搜索真实代码示例
@@ -172,6 +170,9 @@ semantic_search_yaklang_samples(questions=["Yaklang中如何处理错误？", "Y
 			}
 
 			invoker := loop.GetInvoker()
+
+			// 运行时从 holder 读取最新 rag 搜索器(自动安装后会被回填), 避免拿到注册时的 nil 快照
+			ragSystem := holder.getRAG()
 
 			// 构建查询字符串用于重复检测
 			var questionTexts []string
@@ -451,6 +452,7 @@ semantic_search_yaklang_samples(questions=["Yaklang中如何处理错误？", "Y
 			if fullcode != "" {
 				errMsg, hasBlockingErrors := checkCodeAndFormatErrors(fullcode)
 				if hasBlockingErrors {
+					reactloops.EmitStatus(loop, "检测到语法错误，修复中 / Syntax error detected, fixing...")
 					op.DisallowNextLoopExit()
 				}
 				if errMsg != "" {

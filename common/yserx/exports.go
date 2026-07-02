@@ -1,6 +1,6 @@
 package yserx
 
-import "github.com/yaklang/yaklang/common/javaclassparser/jarwar"
+import "github.com/yaklang/javajive/classparser/jarwar"
 
 var Exports = map[string]interface{}{
 	"ToJson":                   ToJson,

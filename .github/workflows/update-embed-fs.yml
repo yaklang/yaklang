@@ -9,7 +9,10 @@ on:
       - 'common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai/**'
       - 'common/aiforge/buildinforge/**'
       - 'common/coreplugin/base-yak-plugin/**'
-      
+
+permissions:
+  contents: write
+
 jobs:
   generate-commit:
     runs-on: ubuntu-22.04
@@ -19,7 +22,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref  }}
           fetch-depth: 0
-          token: ${{ secrets.GH_TOKEN }}
+          token: ${{ secrets.GH_TOKEN || github.token }}
       - name: Check last commit message is bot message
         run: |
           git config --global user.name "github-actions"
@@ -38,7 +41,7 @@ jobs:
         if: ${{env.SKIP_CI != 'true'}}
         uses: actions/setup-go@v6
         with:
-          go-version: '1.21'
+          go-version-file: "./go.mod"
           cache: false
 
       # - name: Cache Go modules

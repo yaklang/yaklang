@@ -51,7 +51,7 @@ require (
 	github.com/go-pg/pg/v10 v10.14.0
 	github.com/go-rod/rod v0.116.2
 	github.com/go-sql-driver/mysql v1.5.0
-	github.com/go-viper/mapstructure/v2 v2.2.1
+	github.com/go-viper/mapstructure/v2 v2.4.0
 	github.com/gobwas/glob v0.2.3
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 	github.com/golang/protobuf v1.5.4
@@ -126,6 +126,7 @@ require (
 	github.com/xuri/excelize/v2 v2.9.0
 	github.com/yaklang/fastgocaptcha v1.0.4
 	github.com/yaklang/go-llvm v0.0.0-20260325033841-7304627dfe8f
+	github.com/yaklang/javajive v0.1.2
 	github.com/yaklang/pcap v1.0.5
 	github.com/ysmood/gson v0.7.3
 	github.com/ysmood/leakless v0.9.0

@@ -1,27 +1,18 @@
-## 代码生成输出格式示例
+## 输出格式示例（只示范"动作 JSON + 代码块"的格式，规则细节见 persistent 指令）
 
-你的工作流程必须遵循以下协议：
+> 一体化提醒：下面示例为方便阅读用了 ```json 围栏，**真实输出时没有围栏**——JSON 那一行后**直接紧跟** `<|GEN_CODE_CURRENT_NONCE|>` 代码块，两者是同一次输出、不可分割。输出完 JSON **不要停**，必须当场把代码块写完整(含 END 标记)。
 
-*   **预先准备**: 在开始编写代码之前，不知道库名时用 `yakdoc_search` 按功能词搜索 API；已知库名后用 `yakdoc_function_details`；语法/用法样例用 `grep_yaklang_samples`（若 Init 已注入预检索样例且已覆盖该主题，则禁止重复 grep）。
-*   **初始编码**: 使用 `write_code` 生成初始代码。
-*   **迭代修改**: 小范围精确替换优先 `modify_code` + old_snippet；行号块修改用 modify_start_line/modify_end_line。
-
-### 诊断优先原则 (Diagnose-Before-Treat Protocol)
-
-1.  在 `modify_code` 后，仔细分析返回的 `lint error`。
-2.  如果错误是 **`ExternLib [...] don't has [...]`**，先阅读 lint 中【已自动附加 YakDocument】的相近 API；信息不足再调 `yakdoc_function_details`，**禁止猜测性 modify_code**。
-3.  如果错误是 **`SyntaxError`** 或 **`TypeCheck error`**，你**必须立即调用 `grep_yaklang_samples`** 搜索正确语法样例。
-4.  只有在获得新信息后，你才能再次调用 `modify_code` 进行修复。
-
-**禁止猜测**: 严禁在不理解错误根源的情况下，连续使用 `modify_code` 进行试探性修复。如果你发现自己正在这么做，立即停下并回到第 3 步。
+### 诊断优先（Diagnose-Before-Treat）
+1. 每次 `modify_code` 后先读返回的 lint，判断错误类型（API 不存在 / SyntaxError / undefined / 参数类型）。
+2. 据类型对症处理：API 不存在→读已附加文档或 `yakdoc_function_details`；SyntaxError/undefined→`grep_yaklang_samples`；参数类型/个数→改实参不换函数名。
+3. 拿到新信息后再 `modify_code` 一次改对。禁止在不懂错因时连续试探。
 
 ---
 
-### 正确示例 1: `write_code` 动作（创建新代码）
+### 1. write_code（创建新代码）—— 必须带 GEN_CODE 代码块
 ```json
-{"@action": "write_code", "human_readable_thought": "创建一个简单的端口扫描脚本"}
+{"@action": "write_code", "human_readable_thought": "创建一个端口扫描脚本"}
 ```
-
 <|GEN_CODE_CURRENT_NONCE|>
 yakit.AutoInitYakit()
 
@@ -31,249 +22,70 @@ cli.check()
 
 results, err := servicescan.Scan(target, ports)
 die(err)
-
 for result in results {
     yakit.Info("Found: %v", result.String())
 }
 <|GEN_CODE_END_CURRENT_NONCE|>
 
-### 正确示例 2: `modify_code` 动作（修改现有代码）
+### 1b. write_code 写热加载脚本 —— 末尾必须带 if YAK_MAIN 自测块
+热加载脚本(定义 mirror*/hijack*/beforeRequest 等 hook)直接运行不触发 hook，必须追加自测块让用户能 `yak x.yak` 测试：
 ```json
-{"@action": "modify_code", "modify_start_line": 18, "modify_end_line": 25, "modify_code_reason": "修正ZIP文件打开方式 ..."}
+{"@action": "write_code", "human_readable_thought": "MITM 新路径探测热加载，附 YAK_MAIN 自测"}
 ```
-
 <|GEN_CODE_CURRENT_NONCE|>
-// 打开ZIP文件
-reader, err := zip.OpenReader(zipFilePath)
-if err != nil {
-    yakit.Error("打开ZIP文件失败: %v", err)
-    return
+DISCOVERED = make(map[string]bool)
+mirrorNewWebsitePath = func(isHttps, url, req, rsp, body) {
+    DISCOVERED[url] = true
+    log.info("new path: %s", url)
 }
-defer reader.Close()
-<|GEN_CODE_END_CURRENT_NONCE|>
 
-### 示例 3: `grep_yaklang_samples` 动作（当 API 不存在时）- 推荐
+func runSelfTest() {
+    req := []byte("GET / HTTP/1.1\r\nHost: target.local\r\n\r\n")
+    rsp := []byte("HTTP/1.1 200 OK\r\n\r\nok")
+    mirrorNewWebsitePath(false, "http://target.local/a", req, rsp, []byte("ok"))
+    mirrorNewWebsitePath(false, "http://target.local/b", req, rsp, []byte("ok"))
+    assert len(DISCOVERED) == 2, "should discover 2 paths"
+    log.info("self test passed")
+}
 
-**场景**: 上一步 `modify_code` 尝试使用 `synscan.timeout(3)`，但收到 `lint error: ExternLib [synscan] don't has [timeout]`。
-
-```json
-{"@action": "grep_yaklang_samples", 
- "pattern": "synscan\\.",
- "context_lines": 20,
- "human_readable_thought": "Linter 报错说 synscan 没有 timeout 方法。我需要立即 grep 搜索 synscan 库的所有可用函数，而不是猜测其他名称"}
-```
-
-**这是最佳做法！** 使用 `grep_yaklang_samples` 直接搜索代码样例，快速找到真实可用的 API。搜索结果会显示：
-```
-找到结果：
-- synscan.Scan(target, ports, ...opts)
-- synscan.concurrent(n) - 并发数
-- synscan.excludeHosts(hosts) - 排除主机
-- 没有 timeout 选项，使用 servicescan.probeTimeout 来设置超时
-```
-
-**注意：`grep_yaklang_samples` 动作不需要 `<|GEN_CODE...|>` 代码块。**
-
-### **备选示例: YakDocument 文档查询（API 权威说明）**
-
-**场景**: synscan API 错误，需要查标准库文档。
-
-```json
-{"@action": "yakdoc_library_details", 
- "library": ["synscan"],
- "human_readable_thought": "列出 synscan 库可用函数"}
-```
-
-```json
-{"@action": "yakdoc_function_details",
- "library": "synscan",
- "function": ["Scan"],
- "human_readable_thought": "查询 Scan 函数签名与参数"}
-```
-
-**区别说明：**
-- `grep_yaklang_samples` - 快速搜索代码样例，看真实用法（语法/D DSL 优先）
-- `yakdoc_function_details` - 查询标准库 API 文档（ExternLib 错误优先）
-
----
-
-### 示例 5: `grep_yaklang_samples` 动作（当遇到语法错误时）
-
-**场景**: AI 尝试编写错误处理，但反复收到 `SyntaxError`。
-
-```json
-{"@action": "grep_yaklang_samples",
- "pattern": "die\\(err\\)|err != nil",
- "context_lines": 10,
- "human_readable_thought": "我遇到语法错误，需要立即 grep 搜索 Yaklang 中正确的错误处理模式，而不是继续猜测"}
-```
-
-**这是正确的做法！** 直接搜索真实代码中的错误处理模式，学习正确的语法。搜索结果会显示：
-```
-找到多个错误处理示例：
-1. die(err) - 致命错误直接退出
-2. if err != nil { yakit.Error(...); return }
-3. result := someFunc()~ - 忽略错误（谨慎使用）
-4. try { ... } catch e { ... }
-```
----
-
-### 示例 6: `rag_search_payload` 动作（当编写代码有疑问的时候）
-
-**场景**: AI 需要实现一个功能：通过 HTTP GET 请求获取一个网站的标题，但不确定具体应该使用哪个库、哪个函数，以及如何从返回结果中解析出标题。
-
-```json
-{"@action": "rag_search_payload", "human_readable_thought": "我需要编写代码来获取一个URL的网页标题。我对Yaklang中处理HTTP请求和HTML解析的库不熟悉。因此，我将使用关键词搜索与HTTP请求和HTML解析相关的函数，并直接提问如何组合它们来实现我的目标。", "keywords": ["http get", "fuzz.http", "html", "title", "获取标题"], "questions": ["如何用Yaklang发送一个HTTP GET请求并获取返回网页的标题？"]}
-```
-
-**注意：`rag_search_payload` 动作也不需要 `<|GEN_CODE...|>` 代码块。**
-
----
-
-## Action 类型总结
-
-### 需要 `<|GEN_CODE...|>` 标签的 Actions：
-- `write_code` - 创建新代码文件
-- `modify_code` - 修改现有代码片段
-- `insert_lines` - 插入新代码行
-
-### 不需要禁止 `<|GEN_CODE...|>` 标签的 Actions：
-- `delete_lines` - 删除代码行（无需生成代码）
-- `grep_yaklang_samples` - 搜索代码样例（查询类操作）
-- `yakdoc_function_details` - 查询标准库函数文档（查询类操作）
-- `rag_search_payload` - RAG搜索（查询类操作）
-
-**记忆口诀**: 只有需要你"生成或提供代码片段"的 actions 才需要 `<|GEN_CODE...|>` 标签！
-
----
-
-## 常见错误示例
-
-### 错误示例 1：包含行号前缀（绝对禁止！）
-```json
-{"@action": "modify_code", "modify_start_line": 18, "modify_end_line": 25}
-```
-
-<|GEN_CODE_CURRENT_NONCE|>
-18 | // 打开ZIP文件
-19 | reader, err := zip.OpenReader(zipFilePath)
-<|GEN_CODE_END_CURRENT_NONCE|>
-
-**这种格式是错误的！包含行号会导致语法解析失败！**
-
-## 完整工作流示例
-
-### 示例 7: grep_yaklang_samples 完整工作流
-
-**场景**: 用户要求编写端口扫描脚本，AI 需要完整实现。
-
-**步骤1：需求分析后立即 grep**
-```json
-{"@action": "grep_yaklang_samples",
- "pattern": "servicescan\\.Scan|端口扫描",
- "context_lines": 25,
- "human_readable_thought": "用户需要端口扫描功能，我先 grep 搜索真实的端口扫描示例，了解正确的 API 用法"}
-```
-
-**步骤2：基于 grep 结果编写代码**
-```json
-{"@action": "write_code",
- "human_readable_thought": "根据 grep 结果，我知道了 servicescan.Scan 的正确用法：target, ports, 加上选项如 concurrent, probeTimeout, onOpen"}
-```
-
-<|GEN_CODE_CURRENT_NONCE|>
-yakit.AutoInitYakit()
-
-target := cli.String("target", cli.setRequired(true))
-ports := cli.String("ports", cli.setDefault("80,443,8080"))
-cli.check()
-
-results, err := servicescan.Scan(
-    target,
-    ports,
-    servicescan.concurrent(50),
-    servicescan.probeTimeout(5),
-    servicescan.onOpen(result => {
-        yakit.Info("发现开放端口: %v", result.String())
-    }),
-)
-die(err)
-
-for result in results {
-    yakit.Info("扫描结果: %v", result.String())
+if YAK_MAIN {
+    runSelfTest()
 }
 <|GEN_CODE_END_CURRENT_NONCE|>
 
-**结果**: [成功] 代码一次成功，没有任何错误！
-
----
-
-### 错误示例 3: 收到 API 错误后仍盲目修改（绝对禁止）
-
-**场景**: 收到 `lint error: ExternLib [synscan] don't has [timeout]`。
-
-**错误做法 - 连续猜测（这会导致失败循环）：**
+### 2. modify_code（精确替换现有代码）—— 必须带 GEN_CODE 代码块
+优先 old_snippet 精确匹配；行号替换用 modify_start_line/modify_end_line。
 ```json
-// 第1次尝试
-{"@action": "modify_code", "modify_start_line": 7, "modify_end_line": 7, 
- "modify_code_reason": "timeout 不对，我试试 set_timeout"}
+{"@action": "modify_code", "modify_start_line": 18, "modify_end_line": 22, "modify_code_reason": "类型不匹配：poc.Split 收 []byte，把 rsp 改为 rsp.RawPacket"}
 ```
-→ 报错：`ExternLib [synscan] don't has [set_timeout]`
-
-```json
-// 第2次尝试  
-{"@action": "modify_code", "modify_start_line": 7, "modify_end_line": 7,
- "modify_code_reason": "set_timeout 也不对，试试 withTimeout"}
-```
-→ 报错：`ExternLib [synscan] don't has [withTimeout]`
-
-```json
-// 第3次尝试
-{"@action": "modify_code", "modify_start_line": 7, "modify_end_line": 7,
- "modify_code_reason": "withTimeout 还不对，试试 setTimeout"}
-```
-→ 报错：`ExternLib [synscan] don't has [setTimeout]`
-
-**这是最典型的错误！** AI 在收到明确的 API 错误提示后，没有选择 `yakdoc_*` 或 `grep_yaklang_samples` 来搜索真实 API，而是继续进行无效的猜测性 `modify_code`，这会陷入死循环并浪费大量时间和资源。**必须禁止这种行为！**
-
----
-
-## 正确做法对比
-
-### 示例 8: 第一次错误后立即 grep
-
-```json
-// 第1次尝试
-{"@action": "modify_code", "modify_start_line": 7, "modify_end_line": 7}
-```
-→ 报错：`ExternLib [synscan] don't has [timeout]`
-
-```json
-// 立即 grep 搜索，不要猜测！
-{"@action": "grep_yaklang_samples",
- "pattern": "synscan\\.",
- "context_lines": 20,
- "human_readable_thought": "synscan.timeout 不存在，我立即 grep 搜索 synscan 库的真实可用函数"}
-```
-→ 找到：synscan.Scan 没有 timeout 选项，返回 channel，使用 servicescan.probeTimeout 设置超时
-
-```json
-// 基于搜索结果精确修改
-{"@action": "modify_code", "modify_start_line": 7, "modify_end_line": 10,
- "modify_code_reason": "根据 grep 结果，synscan 不支持 timeout，改用正确的实现"}
-```
-
 <|GEN_CODE_CURRENT_NONCE|>
-// synscan 返回 channel，没有 timeout 选项
-synChan, err := synscan.Scan(target, ports)
-die(err)
-for result := range synChan {
-    yakit.Info("发现: %v", result.String())
-}
+header, body := poc.Split(rsp.RawPacket)
+yakit.Info("body len: %d", len(body))
 <|GEN_CODE_END_CURRENT_NONCE|>
 
-**结果**: [成功] 修改成功，一次通过！
+### 3. grep_yaklang_samples（查样例）—— 不需要代码块
+```json
+{"@action": "grep_yaklang_samples", "pattern": "synscan\\.", "context_lines": 20, "human_readable_thought": "synscan 没有 timeout，grep 查它的真实可用函数"}
+```
 
-**对比总结：**
-- [错误] 连续猜测：浪费 3+ 次尝试，仍然失败
-- [正确] 立即 grep：1 次搜索 + 1 次精确修改 = 成功
+### 4. yakdoc_function_details（查权威签名）—— 不需要代码块
+```json
+{"@action": "yakdoc_function_details", "library": "poc", "function": ["Split", "GetHTTPPacketBody"], "human_readable_thought": "确认这两个函数的参数类型再改"}
+```
+
+### 5. semantic_search_yaklang_samples（语义检索）—— 不需要代码块
+```json
+{"@action": "semantic_search_yaklang_samples", "questions": [{"question": "Yaklang中如何获取一个URL网页的标题？"}], "top_n": 30, "human_readable_thought": "不确定用哪些库组合，语义检索相关样例"}
+```
+
+---
+
+## Action 与代码块对应关系
+- 需要 `<|GEN_CODE...|>` 代码块：`write_code`、`modify_code`、`insert_code`。
+- 不需要代码块（查询/删除类）：`delete_code`、`grep_yaklang_samples`、`semantic_search_yaklang_samples`、`yakdoc_search`、`yakdoc_function_details`、`yakdoc_library_details`、`yakdoc_module_overview`、`yakdoc_variable_details`。
+
+## 绝对禁止：代码块里带行号前缀
+```
+18 | reader, err := zip.OpenReader(zipFilePath)   // 错误！行号会导致语法解析失败
+```
+生成时只要纯净代码，不带 `行号 |` 前缀。

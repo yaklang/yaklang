@@ -239,6 +239,36 @@ func TestSaveLowHTTPFlow_AfterSaveHandler(t *testing.T) {
 	defer db.Where("id = ?", savedFlow.ID).Delete(&schema.HTTPFlow{})
 }
 
+func TestSaveLowHTTPFlow_WebFuzzerSystemTag(t *testing.T) {
+	db := consts.GetGormProjectDatabase()
+	token := uuid.NewString()
+
+	req := lowhttp.FixHTTPRequest([]byte(fmt.Sprintf("GET /%s HTTP/1.1\r\nHost: example.com\r\n\r\n", token)))
+	rsp := []byte("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nContent-Type: text/plain\r\n\r\nok")
+
+	var savedFlow *schema.HTTPFlow
+	SaveLowHTTPFlow(&lowhttp.LowhttpResponse{
+		RawPacket:  rsp,
+		TraceInfo:  &lowhttp.LowhttpTraceInfo{},
+		Url:        fmt.Sprintf("http://example.com/%s", token),
+		RemoteAddr: "127.0.0.1:80",
+		RawRequest: req,
+		Source:     "webfuzzer",
+		RuntimeId:  "runtime-" + token,
+		AfterSaveHTTPFlowHandler: []func(*schema.HTTPFlow){
+			func(flow *schema.HTTPFlow) {
+				savedFlow = flow
+			},
+		},
+	}, true)
+
+	require.NotNil(t, savedFlow)
+	require.Contains(t, savedFlow.Tags, HTTPFlowTagWebFuzzer)
+	require.Greater(t, int(savedFlow.ID), 0)
+
+	defer db.Where("id = ?", savedFlow.ID).Delete(&schema.HTTPFlow{})
+}
+
 func TestQueryFilterHTTPFlow_SuffixPrecision(t *testing.T) {
 	// 测试后缀过滤的精确性：过滤 .js 不应该过滤 .json 和 .jsp
 	token := utils.RandString(10)

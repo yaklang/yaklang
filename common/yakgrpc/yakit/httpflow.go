@@ -51,6 +51,11 @@ func SaveLowHTTPFlow(r *lowhttp.LowhttpResponse, forceSaveFlowSync bool) {
 	)
 
 	// fix some field
+	// WebFuzzer（含序列）发出的流量统一打上系统 Tag，便于从数据库按 [WebFuzzer] 筛选
+	if strings.EqualFold(reqSource, "webfuzzer") {
+		r.Tags = append(r.Tags, HTTPFlowTagWebFuzzer)
+		tags = r.Tags
+	}
 	if r.HiddenIndex == "" {
 		r.HiddenIndex = uuid.NewString()
 		hiddenIndex = r.HiddenIndex

@@ -183,8 +183,8 @@ github.com/go-sql-driver/mysql v1.5.0/go.mod h1:DCzpHaOWr8IXmIStZouvnhqoel9Qv2LB
 github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0/go.mod h1:fyg7847qk6SyHyPtNmDHnmrv/HOrqktSC+C9fM+CJOE=
 github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 h1:tfuBGBXKqDEevZMzYi5KSi8KkcZtzBcTgAUUtapy0OI=
 github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572/go.mod h1:9Pwr4B2jHnOSGXyyzV8ROjYa2ojvAY6HCGYYfMoC3Ls=
-github.com/go-viper/mapstructure/v2 v2.2.1 h1:ZAaOCxANMuZx5RCeg0mBdEZk7DZasvvZIxtHqx8aGss=
-github.com/go-viper/mapstructure/v2 v2.2.1/go.mod h1:oJDH3BJKyqBA2TXFhDsKDGDTlndYOZ6rGS0BRZIxGhM=
+github.com/go-viper/mapstructure/v2 v2.4.0 h1:EBsztssimR/CONLSZZ04E8qAkxNYq4Qp9LvH92wZUgs=
+github.com/go-viper/mapstructure/v2 v2.4.0/go.mod h1:oJDH3BJKyqBA2TXFhDsKDGDTlndYOZ6rGS0BRZIxGhM=
 github.com/gobwas/glob v0.2.3 h1:A4xDbljILXROh+kObIiy5kIaPYD8e96x1tgBhUI5J+Y=
 github.com/gobwas/glob v0.2.3/go.mod h1:d3Ez4x06l9bZtSvzIay5+Yzi0fmZzPgnTbPcKjJAkT8=
 github.com/goccy/go-json v0.10.3 h1:KZ5WoDbxAIgm2HNbYckL0se1fHD6rz5j4ywS6ebzDqA=
@@ -569,6 +569,10 @@ github.com/yaklang/go-llvm v0.0.0-20260325033841-7304627dfe8f h1:YuuIpas5z91t2S6
 github.com/yaklang/go-llvm v0.0.0-20260325033841-7304627dfe8f/go.mod h1:L8gVgAxjSL0/ub973fygXVVHoDaYKLC190N6uq+o+tE=
 github.com/yaklang/go-sqlite3 v0.0.1 h1:IXdqvUAct8FygqoQ3XgWBqw8Bh7qQFa0miTl4cM4B+4=
 github.com/yaklang/go-sqlite3 v0.0.1/go.mod h1:RCLoOuANeSNMmFMCABJyusomiGXnZjkLk20oZSAAh5U=
+github.com/yaklang/javajive v0.1.1 h1:GDvqPOxisqk6tFP9ZSgMsXacnPduLbUflX7KTdEhPRw=
+github.com/yaklang/javajive v0.1.1/go.mod h1:MP6RfWwjQ40V4J+n4k2NwXH1p5s/dNqzxC3Klx6ckRY=
+github.com/yaklang/javajive v0.1.2 h1:sAE/UruiNqcjCrEK1wyp3E3ooHJPwWHdXnNUbybxHvA=
+github.com/yaklang/javajive v0.1.2/go.mod h1:MP6RfWwjQ40V4J+n4k2NwXH1p5s/dNqzxC3Klx6ckRY=
 github.com/yaklang/pcap v1.0.5 h1:LiatV/vG+1uMzBB+gyNg2rxc5v/yrH4jzk8IsG+iSfE=
 github.com/yaklang/pcap v1.0.5/go.mod h1:JDglFyNaXnntS5KmdIVlhnZBAYFc0oEGPrmJlOI3MDg=
 github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d h1:splanxYIlg+5LfHAM6xpdFEAYOk8iySO56hMFq6uLyA=

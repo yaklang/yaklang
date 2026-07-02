@@ -7,7 +7,7 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/yaklang/yaklang/common/javaclassparser"
+	"github.com/yaklang/javajive/classparser"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -33,13 +33,10 @@ func (c *Config) parseFSFromInfo() (fi.FileSystem, error) {
 			return nil, err
 		}
 	case ssaconfig.CodeSourceJar:
-		zipfs, err := getZipFile(c)
+		jarFS, err := getJarFS(c)
 		if err != nil {
 			return nil, utils.Errorf("jar file error: %v", err)
 		}
-		// 检查是否启用递归解析
-		recursiveParse := c.GetCodeSourceJarRecursiveParse()
-		jarFS := javaclassparser.NewJarFSWithOptions(zipfs, recursiveParse)
 		unifiedFS := filesys.NewUnifiedFS(jarFS,
 			filesys.WithUnifiedFsExtMap(".class", ".java"),
 		)
@@ -79,6 +76,39 @@ func getZipFile(codeSource *Config) (*filesys.ZipFS, error) {
 
 	bytes.NewReader(resp.GetBody())
 	return filesys.NewZipFSRaw(bytes.NewReader(resp.GetBody()), int64(len(resp.GetBody())))
+}
+
+// getJarFS creates a javaclassparser.JarFS from either a local file or a
+// downloaded URL.
+func getJarFS(c *Config) (*javaclassparser.JarFS, error) {
+	// use local
+	if c.GetCodeSourceLocalFile() != "" {
+		return javaclassparser.NewJarFSFromLocalWithOptions(c.GetCodeSourceLocalFile(), c.GetCodeSourceJarRecursiveParse())
+	}
+	if c.GetCodeSourceURL() == "" {
+		return nil, utils.Errorf("url is empty ")
+	}
+	// download file
+	resp, _, err := poc.DoGET(c.GetCodeSourceURL())
+	if err != nil {
+		return nil, err
+	}
+	if resp.GetStatusCode() != 200 {
+		return nil, utils.Errorf("download file error: %v", resp.GetStatusCode())
+	}
+	// Write downloaded bytes to a temp file so we can use NewJarFSFromLocal
+	tmpFile, err := os.CreateTemp("", "yaklang-jar-*.jar")
+	if err != nil {
+		return nil, utils.Errorf("create temp file error: %v", err)
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+	if _, err := tmpFile.Write(resp.GetBody()); err != nil {
+		tmpFile.Close()
+		return nil, utils.Errorf("write temp file error: %v", err)
+	}
+	tmpFile.Close()
+	return javaclassparser.NewJarFSFromLocalWithOptions(tmpPath, c.GetCodeSourceJarRecursiveParse())
 }
 
 func gitFs(codeSource *Config) (fi.FileSystem, error) {

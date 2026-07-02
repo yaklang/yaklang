@@ -85,7 +85,8 @@ NOTE: Even when using the external tag, a foundational Action JSON structure is 
 		markDirectlyAnswered(loop)
 		invoker.EmitFileArtifactWithExt("directly_answer", ".md", payload)
 		invoker.EmitResultAfterStream(payload)
-		invoker.AddToTimeline("directly_answer", "HTTP flow analysis directly answered: "+payload)
+		invoker.AddToTimeline(reactloops.TimelineEntryAssistantOutput,
+			reactloops.TimelineAssistantOutputLabel+"\n"+utils.PrefixLines(payload, "  | "))
 
 		// directly_answer 绝不 Exit: emit 完答复后统一交给 DirectlyAnswerContinue
 		// 追加 timeline + 续跑, 终结只能由显式 finish action 完成. 与 buildin 对齐.

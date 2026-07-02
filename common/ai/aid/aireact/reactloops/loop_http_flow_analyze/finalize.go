@@ -22,17 +22,18 @@ func buildPostIterationHook(invoker aicommon.AIInvokeRuntime) reactloops.ReActLo
 		log.Infof("http_flow_analyze loop done at iteration %d", iteration)
 		collectIterationFindings(loop)
 
+		// 迭代上限的软性中断收尾 (自然结束 + 未完成 TODO 清单 + 询问下一步) 已经
+		// 统一上移到框架层处理 (见 reactloops.(*ReActLoop).DeliverMaxIterationInterruptSummary),
+		// 不再与任何具体 loop 的专注模式绑定. 这里只保留本 loop 常规的"最终分析
+		// 报告"输出, 不再耦合任何中断专用逻辑.
+		// 关键词: http_flow_analyze finalize 常规收尾, 迭代上限交给框架
 		if hasFinalAnswerDelivered(loop) || hasDirectlyAnswered(loop) || getLastAction(loop) == "directly_answer" {
-			log.Infof("http_flow_analyze: skip finalize because answer was already delivered")
+			log.Infof("http_flow_analyze: answer already delivered before finalize")
 			return
 		}
 
 		contextMaterials := collectFinalizeContextMaterials(loop, reason)
 		deliverFinalAnswerFallback(loop, invoker, contextMaterials)
-
-		if reasonErr, ok := reason.(error); ok && strings.Contains(reasonErr.Error(), "max iterations") {
-			operator.IgnoreError()
-		}
 	})
 }
 
@@ -96,6 +97,12 @@ func collectFinalizeContextMaterials(loop *reactloops.ReActLoop, reason any) str
 	if currentFlow := strings.TrimSpace(loop.Get("current_flow")); currentFlow != "" {
 		ctx.WriteString("## Current Flow Detail\n\n")
 		ctx.WriteString(utils.ShrinkTextBlock(currentFlow, 2000))
+		ctx.WriteString("\n\n")
+	}
+
+	if unfinished := strings.TrimSpace(loop.GetMaxIterationInterruptSummary()); unfinished != "" {
+		ctx.WriteString("## Unfinished TODOs (interrupted, marked as SKIP)\n\n")
+		ctx.WriteString(unfinished)
 		ctx.WriteString("\n\n")
 	}
 

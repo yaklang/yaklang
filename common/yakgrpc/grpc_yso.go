@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/javaclassparser"
+	"github.com/yaklang/javajive/classparser"
 	"sort"
 	"strconv"
 	"strings"

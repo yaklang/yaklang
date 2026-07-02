@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"go/ast"
+	"go/build"
 	"go/parser"
 	"go/token"
 	"os"
@@ -34,6 +35,40 @@ func GetProjectPath() string {
 	return projectPath
 }
 
+// shouldSkipDocWalkDir reports whether a directory should be excluded from AST
+// package scanning during documentation generation.
+func shouldSkipDocWalkDir(name string) bool {
+	switch name {
+	case ".git", "vendor", "node_modules", "test", "tests", "testdata":
+		return true
+	}
+	return strings.HasPrefix(name, ".")
+}
+
+func isDocTestSourceFile(name string) bool {
+	return strings.HasSuffix(name, "_test.go")
+}
+
+// shouldSkipDocPackage reports whether a parsed package should be excluded.
+// Go external test packages conventionally use the *_test suffix; their sources
+// are already removed by docParseFileFilter, and this remains as a fallback.
+func shouldSkipDocPackage(name string) bool {
+	return strings.HasSuffix(name, "_test")
+}
+
+// docParseFileFilter returns a ParseDir filter that excludes test sources and
+// files excluded by the current platform's build constraints (e.g. //go:build ignore).
+func docParseFileFilter(dir string) func(os.FileInfo) bool {
+	return func(fi os.FileInfo) bool {
+		name := fi.Name()
+		if !strings.HasSuffix(name, ".go") || isDocTestSourceFile(name) {
+			return false
+		}
+		matched, err := build.Default.MatchFile(dir, name)
+		return err == nil && matched
+	}
+}
+
 func GetProjectAstPackages() (map[string]*ast.Package, *token.FileSet, error) {
 	rootDir := GetProjectPath()
 	fset := token.NewFileSet()
@@ -44,25 +79,30 @@ func GetProjectAstPackages() (map[string]*ast.Package, *token.FileSet, error) {
 			return err
 		}
 
-		if info.IsDir() {
-			pkgs, err := parser.ParseDir(fset, path, nil, parser.ParseComments|parser.AllErrors)
-			if err != nil {
-				log.Errorf("parser package path error:%v", err) // ignore error
-				return nil
+		if !info.IsDir() {
+			return nil
+		}
+
+		if shouldSkipDocWalkDir(info.Name()) {
+			return filepath.SkipDir
+		}
+
+		pkgs, err := parser.ParseDir(fset, path, docParseFileFilter(path), parser.ParseComments|parser.AllErrors)
+		if err != nil {
+			log.Errorf("parser package path error:%v", err) // ignore error
+			return nil
+		}
+		for name, pkg := range pkgs {
+			if shouldSkipDocPackage(name) {
+				continue
 			}
-			for name, pkg := range pkgs {
-				// skip test pkg
-				if strings.HasSuffix(name, "_test") {
-					continue
-				}
-				path, _ = filepath.Rel(rootDir, path)
-				// only path, remove last part, use pkg name instead
-				path, _ = filepath.Split(path)
-				path = filepath.Join(path, name)
-				path = fmt.Sprintf("%s/%s", defaultPackageName, path)
-				path = strings.ReplaceAll(path, string(filepath.Separator), "/")
-				packages[path] = pkg
-			}
+			path, _ = filepath.Rel(rootDir, path)
+			// only path, remove last part, use pkg name instead
+			path, _ = filepath.Split(path)
+			path = filepath.Join(path, name)
+			path = fmt.Sprintf("%s/%s", defaultPackageName, path)
+			path = strings.ReplaceAll(path, string(filepath.Separator), "/")
+			packages[path] = pkg
 		}
 
 		return nil
@@ -299,10 +339,15 @@ func (i *LibInstance) String() string {
 }
 
 type ScriptLib struct {
-	Name        string
-	Instances   map[string]*LibInstance
-	Functions   map[string]*FuncDecl
-	ElementDocs []string
+	Name      string
+	Instances map[string]*LibInstance
+	Functions map[string]*FuncDecl
+	// OverviewShort 是库级一句话定位(由 overviews/<lib>.md 首段在文档生成期派生),
+	// 用于 AI "目标→模块" 的库选择索引。运行时随 doc.gob.zst 一并加载, 不新增 embed。
+	// 旧 gob 数据解出为空字符串(gob 向后兼容), 缺失时优雅降级。
+	// 关键词: OverviewShort, 库选择索引, overviews 首段, gob 向后兼容
+	OverviewShort string
+	ElementDocs   []string
 }
 
 func (l *ScriptLib) String() string {

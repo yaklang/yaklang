@@ -161,7 +161,6 @@ func PrepareLargeHTTPFlowRequest(req *http.Request, fullPacket []byte) []byte {
 		httpctx.SetRequestTooLargeBodyFile(req, res.BodyFile)
 		httpctx.SetRequestTooLargeSize(req, int64(res.OriginalBodyLen))
 		httpctx.SetRequestDisplayPacket(req, res.StoredPacket)
-		httpctx.SetPlainRequestBytes(req, res.StoredPacket)
 	}
 	return res.StoredPacket
 }

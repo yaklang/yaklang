@@ -51,8 +51,8 @@ import (
 
 	"github.com/yaklang/yaklang/common/openapi"
 
-	"github.com/yaklang/yaklang/common/browser"
 	"github.com/yaklang/yaklang/common/binx"
+	"github.com/yaklang/yaklang/common/browser"
 	"github.com/yaklang/yaklang/common/utils/yakgit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
@@ -62,7 +62,6 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/crawler"
 	"github.com/yaklang/yaklang/common/crawlerx"
-	"github.com/yaklang/yaklang/common/utils/webforest"
 	"github.com/yaklang/yaklang/common/cve"
 	"github.com/yaklang/yaklang/common/facades"
 	"github.com/yaklang/yaklang/common/hids"
@@ -79,6 +78,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/comparer"
 	"github.com/yaklang/yaklang/common/utils/htmlquery"
+	"github.com/yaklang/yaklang/common/utils/webforest"
 	"github.com/yaklang/yaklang/common/xhtml"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
@@ -423,9 +423,6 @@ func initYaklangLib() {
 
 	// tcpmitm (TCP MITM framework for hijacking and inspecting TCP connections)
 	yaklang.Import("tcpmitm", tcpmitm.Exports)
-
-	// aibalance - AI traffic forwarding and load balancing
-	// yaklang.Import("aibalance", aibalance.Exports)
 }
 
 type ScriptEngine struct {

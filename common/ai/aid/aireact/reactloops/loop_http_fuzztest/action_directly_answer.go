@@ -91,7 +91,7 @@ var loopActionDirectlyAnswerHTTPFuzztest = &reactloops.LoopAction{
 		var timeline strings.Builder
 		timeline.WriteString("user input:\n")
 		timeline.WriteString(utils.PrefixLines(loop.GetCurrentTask().GetUserInput(), "  > "))
-		timeline.WriteString("\nai directly answer:\n")
+		timeline.WriteString("\n" + reactloops.TimelineAssistantOutputLabel + "\n")
 		timeline.WriteString(utils.PrefixLines(payload, "  | "))
 		if currentSummary := getCurrentRequestSummary(loop); currentSummary != "" {
 			timeline.WriteString("\ncurrent request summary:\n")
@@ -104,7 +104,7 @@ var loopActionDirectlyAnswerHTTPFuzztest = &reactloops.LoopAction{
 		if decision := strings.TrimSpace(loop.Get("request_review_decision")); decision != "" {
 			timeline.WriteString(fmt.Sprintf("\nrequest review decision: %s", decision))
 		}
-		invoker.AddToTimeline("directly_answer", timeline.String())
+		invoker.AddToTimeline(reactloops.TimelineEntryAssistantOutput, timeline.String())
 
 		// directly_answer 绝不 Exit: emit 完答复后统一交给 DirectlyAnswerContinue
 		// 追加 timeline + 续跑, 终结只能由显式 finish action 完成. 与 buildin 对齐.

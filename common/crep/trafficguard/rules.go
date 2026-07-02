@@ -21,7 +21,10 @@ package trafficguard
 //     x-goog-api-key、搜索建议、gstatic、Firebase 遥测等)上的 key/token/通用 api-key 凭证字段与鉴权头
 //     (规则 4/5/19/23/24/25)一律抑制 —— 浏览器自带流量并非泄漏;
 //   - 非真 JWT 的 eyJ base64 块(首段无 alg);
-//   - JS 源码里 password:function(...) 之类的源码型口令字段(值形态收紧)。
+//   - JS 源码里 password:function(...) 之类的源码型口令字段(值形态收紧);
+//   - 登录页/表单的本地化文案与 UI 词(i18n): password:"设置密码" / pwd:"忘记密码" / "请输入密码" /
+//     "Password" / "Login" 之类, 是给人看的标签而非真实口令(用户反馈"访问任意登录页就报 password"的根因),
+//     常规上下文抑制; 但若写在注释里(被注释掉的默认/初始口令)则必须报出。
 // JS 仍会被完整扫描(JS 硬编码与注释里可能藏真实凭证), 残留疑似项交由 Risk 上下文供人工判真假。
 
 // Severity 取值对齐 yaklib risk 体系:

@@ -25,6 +25,20 @@ func (y *YakCompiler) VisitIfStmt(raw yak.IIfStmtContext) interface{} {
 	defer recoverRange()
 	y.writeString("if ")
 
+	// if 初始化语句：if <init>; <cond> { ... }
+	// 初始化语句声明的变量需要在整个 if/elif/else 链中可见，但不能泄漏到外层作用域，
+	// 因此在这里创建一个外层作用域包裹初始化语句以及后续所有分支。
+	// 关键词: if 初始化语句, if init statement, Go 风格 if
+	var initScopeRecover func()
+	if initStmt := i.IfStmtInit(); initStmt != nil {
+		initScopeRecover = y.SwitchSymbolTableInNewScope("if-init", uuid.New().String())
+		y.VisitIfStmtInit(initStmt)
+		y.writeString("; ")
+	}
+	if initScopeRecover != nil {
+		defer initScopeRecover()
+	}
+
 	tableRecover := y.SwitchSymbolTableInNewScope("if", uuid.New().String())
 
 	ifCond := i.Expression(0)
@@ -84,6 +98,45 @@ func (y *YakCompiler) VisitIfStmt(raw yak.IIfStmtContext) interface{} {
 	endCode := y.GetCodeIndex()
 	for _, jmp := range jmpToEnd {
 		jmp.Unary = endCode
+	}
+
+	return nil
+}
+
+// VisitIfStmtInit 编译 if 初始化语句（if <init>; <cond> { ... }）。
+// 初始化语句可以是赋值语句、变量声明或普通表达式。
+// 关键词: if 初始化语句, if init statement
+func (y *YakCompiler) VisitIfStmtInit(raw yak.IIfStmtInitContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*yak.IfStmtInitContext)
+	if i == nil {
+		return nil
+	}
+
+	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	defer recoverRange()
+
+	// 变量声明：if var a = f(); a != nil { ... }
+	if s := i.DeclareVariableExpression(); s != nil {
+		y.VisitDeclareVariableExpression(s)
+		return nil
+	}
+
+	// 赋值语句：if err = f(); err != nil { ... }
+	if s := i.AssignExpression(); s != nil {
+		y.VisitAssignExpression(s)
+		return nil
+	}
+
+	// 普通表达式：if f(); cond { ... }
+	// 表达式求值后会压栈，需要 pop 保持栈平衡
+	if s := i.Expression(); s != nil {
+		y.VisitExpression(s)
+		y.pushOpPop()
+		return nil
 	}
 
 	return nil

@@ -560,14 +560,41 @@ func sanitizeRequestTextForPrompt(raw string) string {
 	if raw == "" {
 		return ""
 	}
+	var sanitized string
 	if !lowhttp.IsMultipartFormDataRequest([]byte(raw)) {
-		return raw
+		sanitized = raw
+	} else {
+		summary, err := parseMultipartUploadSummary([]byte(raw))
+		if err != nil {
+			sanitized = sanitizeHTTPRequestForPrompt([]byte(raw), nil)
+		} else {
+			sanitized = sanitizeHTTPRequestForPrompt([]byte(raw), summary)
+		}
 	}
-	summary, err := parseMultipartUploadSummary([]byte(raw))
-	if err != nil {
-		return sanitizeHTTPRequestForPrompt([]byte(raw), nil)
+	// 统一收敛到 prompt 安全体积，避免异常大的原始请求撑爆 LLM 请求上限。
+	return utils.ShrinkTextBlock(sanitized, loopHTTPFuzzPromptRequestMaxBytes)
+}
+
+// sanitizeResponseTextForPrompt 将 HTTP 响应收敛到 prompt 安全体积，
+// 超长时保留首尾以维持状态行/响应头结构与可读性，避免大响应体直接撑爆 LLM 请求上限。
+func sanitizeResponseTextForPrompt(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
 	}
-	return sanitizeHTTPRequestForPrompt([]byte(raw), summary)
+	return utils.ShrinkTextBlock(raw, loopHTTPFuzzPromptResponseMaxBytes)
+}
+
+// getLoopRepresentativeResponseForPrompt 优先返回已收敛的安全版本，
+// 缺失时（例如会话恢复后）对原始 representative_response 现场收敛，避免向 prompt 注入大响应。
+func getLoopRepresentativeResponseForPrompt(loop *reactloops.ReActLoop) string {
+	if loop == nil {
+		return ""
+	}
+	if safe := strings.TrimSpace(loop.Get(loopHTTPUploadRepresentativeResponseSafeKey)); safe != "" {
+		return safe
+	}
+	return sanitizeResponseTextForPrompt(loop.Get("representative_response"))
 }
 
 func compareRequestsForPrompt(original, modified string) string {

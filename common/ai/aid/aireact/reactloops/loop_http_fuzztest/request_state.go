@@ -290,6 +290,7 @@ func resetLoopHTTPFuzzExecutionState(loop *reactloops.ReActLoop) {
 	loop.Set("diff_result_compressed", "")
 	loop.Set("verification_result", "")
 	loop.Set(loopHTTPUploadRepresentativeSafeKey, "")
+	loop.Set(loopHTTPUploadRepresentativeResponseSafeKey, "")
 }
 
 func firstNonEmptyString(values ...string) string {

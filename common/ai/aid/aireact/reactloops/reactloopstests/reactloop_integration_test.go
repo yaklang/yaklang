@@ -656,6 +656,61 @@ func TestReActLoop_AsyncMode(t *testing.T) {
 	t.Log("Async mode test completed")
 }
 
+// TestReActLoop_AsyncMode_AutoClosesActiveTodos 验证主循环进入 async 时,
+// 当前任务的活跃 TODO 会自动标记为 done.
+func TestReActLoop_AsyncMode_AutoClosesActiveTodos(t *testing.T) {
+	callCount := 0
+	reactIns, err := aireact.NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			callCount++
+			rsp := i.NewAIResponse()
+			if callCount == 1 {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "async_action", "data": "async data"}`))
+			} else {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			}
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct: %v", err)
+	}
+
+	task := aicommon.NewStatefulTaskBase("async-todo-task", "1-1", nil, nil, true)
+	cfg := reactIns.GetConfig()
+	cfg.ApplyVerificationTodoOps(aicommon.BuildVerificationTodoScope(task), false, []aicommon.VerifyNextMovement{
+		{Op: "add", ID: "main_open", Content: "主循环待办"},
+	})
+
+	loop, err := reactloops.NewReActLoop("async-todo-loop", reactIns,
+		reactloops.WithOverrideLoopAction(&reactloops.LoopAction{
+			ActionType:  "async_action",
+			Description: "Async test action",
+			AsyncMode:   true,
+			ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
+				operator.Continue()
+			},
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create loop: %v", err)
+	}
+
+	err = loop.ExecuteWithExistedTask(task)
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	items := cfg.SnapshotVerificationTodoItemsByScope(aicommon.BuildVerificationTodoScope(task))
+	if len(items) != 1 {
+		t.Fatalf("expected 1 todo item, got %d", len(items))
+	}
+	if items[0].Status != aicommon.VerificationTodoStatusDone {
+		t.Fatalf("expected main_open todo to be DONE after async handoff, got %s", items[0].Status)
+	}
+}
+
 // TestReActLoop_ContextCancellation 测试上下文取消
 func TestReActLoop_ContextCancellation(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(

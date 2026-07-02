@@ -203,7 +203,11 @@ func handleDetachedRequestPlan(
 
 	_, err := invoker.ExecuteLoopTaskIF(schema.AI_REACT_LOOP_NAME_PLAN, planTask, opts...)
 	if err != nil {
-		operator.Fail(err)
+		if planLoop != nil {
+			operator.Fail(reactloops.ErrorWithLastAIResponse(planLoop, utils.InterfaceToString(err)))
+		} else {
+			operator.Fail(err)
+		}
 		return
 	}
 
@@ -214,7 +218,7 @@ func handleDetachedRequestPlan(
 
 	planData := planLoop.Get(loop_plan.PLAN_DATA_KEY)
 	if planData == "" {
-		operator.Fail(utils.Error("plan loop finished without producing plan data"))
+		operator.Fail(reactloops.ErrorWithLastAIResponse(planLoop, "plan loop finished without producing plan data"))
 		return
 	}
 

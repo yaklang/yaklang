@@ -5,10 +5,9 @@ import (
 	"path"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/javaclassparser"
+	"github.com/yaklang/javajive/classparser"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -16,11 +15,9 @@ import (
 // ExpandedZipFS may expose decompiled classes as .java via UnifiedFS; the UI
 // should still present .class paths for navigation and decompilation routes.
 func displayEntryName(entry fs.DirEntry) string {
-	if ude, ok := entry.(*filesys.UnifiedDirEntry); ok {
-		orig := ude.DirEntry.Name()
-		if strings.HasSuffix(strings.ToLower(orig), ".class") {
-			return orig
-		}
+	orig := javaclassparser.EntryOriginalName(entry)
+	if strings.HasSuffix(strings.ToLower(orig), ".class") {
+		return orig
 	}
 	return entry.Name()
 }

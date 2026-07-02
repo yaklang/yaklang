@@ -86,6 +86,9 @@ type YaklangParserVisitor interface {
 	// Visit a parse tree produced by YaklangParser#ifStmt.
 	VisitIfStmt(ctx *IfStmtContext) interface{}
 
+	// Visit a parse tree produced by YaklangParser#ifStmtInit.
+	VisitIfStmtInit(ctx *IfStmtInitContext) interface{}
+
 	// Visit a parse tree produced by YaklangParser#elseBlock.
 	VisitElseBlock(ctx *ElseBlockContext) interface{}
 

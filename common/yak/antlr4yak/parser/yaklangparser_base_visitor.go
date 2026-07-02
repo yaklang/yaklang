@@ -112,6 +112,10 @@ func (v *BaseYaklangParserVisitor) VisitIfStmt(ctx *IfStmtContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseYaklangParserVisitor) VisitIfStmtInit(ctx *IfStmtInitContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseYaklangParserVisitor) VisitElseBlock(ctx *ElseBlockContext) interface{} {
 	return v.VisitChildren(ctx)
 }

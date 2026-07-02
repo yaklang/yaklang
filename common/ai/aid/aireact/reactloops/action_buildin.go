@@ -117,11 +117,12 @@ var loopAction_DirectlyAnswer = &LoopAction{
 		// 关键词: directly_answer 永不 Exit, answer-then-continue, finish 唯一终结器
 		invoker.EmitFileArtifactWithExt("directly_answer", ".md", payload)
 		invoker.EmitResultAfterStream(payload)
-		invoker.AddToTimeline("directly_answer", fmt.Sprintf("user input: \n"+
+		invoker.AddToTimeline(TimelineEntryAssistantOutput, fmt.Sprintf("user input: \n"+
 			"%s\n"+
-			"ai directly answer:\n"+
+			"%s\n"+
 			"%v",
 			utils.PrefixLines(loop.GetCurrentTask().GetUserInput(), "  > "),
+			TimelineAssistantOutputLabel,
 			utils.PrefixLines(payload, "  | "),
 		))
 		DirectlyAnswerContinue(loop, action, operator)

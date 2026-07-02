@@ -6,6 +6,8 @@ const (
 	loopHTTPUploadOriginalPromptSafeKey = "original_request_prompt_safe"
 	loopHTTPUploadCurrentPromptSafeKey  = "current_request_prompt_safe"
 	loopHTTPUploadRepresentativeSafeKey = "representative_request_prompt_safe"
+	// representative_response 经 sanitizeResponseTextForPrompt 收敛后的安全版本，专供 prompt 渲染。
+	loopHTTPUploadRepresentativeResponseSafeKey = "representative_response_prompt_safe"
 
 	loopHTTPUploadPartExternalizeThreshold = 16 * 1024
 	loopHTTPUploadBodyExternalizeThreshold = 64 * 1024

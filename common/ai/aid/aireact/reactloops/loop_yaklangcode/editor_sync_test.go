@@ -40,7 +40,11 @@ func (c *editorSyncCapturedEvents) byType(eventType schema.EventType) []*schema.
 	return matched
 }
 
-func TestYaklangDeferredEditorSync_SuppressesUntilLoopDone(t *testing.T) {
+// TestYaklangEditorSync_LiveEmitsForEditDuringLoop verifies that an edit-mode (replace) target is
+// delivered to the editor LIVE: the very first modify_code overwrites the file immediately, without
+// waiting for the loop to finish. The internal filesystem_pin_filename event stays suppressed, and
+// the final flush is a no-op (deduplicated by content).
+func TestYaklangEditorSync_LiveEmitsForEditDuringLoop(t *testing.T) {
 	capture := &editorSyncCapturedEvents{}
 	runtime := mock.NewMockInvoker(context.Background())
 	cfg := runtime.GetConfig().(*mock.MockedAIConfig)
@@ -83,12 +87,10 @@ func TestYaklangDeferredEditorSync_SuppressesUntilLoopDone(t *testing.T) {
 		"modify_code_reason": "replace middle line",
 	}), op)
 
-	assert.Empty(t, capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE))
-	assert.Empty(t, capture.byType(schema.EVENT_TYPE_FILESYSTEM_PIN_FILENAME))
-	flushYaklangDeferredEditorSync(loop)
-
+	// Live delivery: the edit already reached the editor during the loop, before any flush.
 	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
 	require.Len(t, events, 1)
+	assert.Empty(t, capture.byType(schema.EVENT_TYPE_FILESYSTEM_PIN_FILENAME))
 
 	var payload yaklangCodeChangeEvent
 	require.NoError(t, json.Unmarshal(events[0].Content, &payload))
@@ -96,6 +98,15 @@ func TestYaklangDeferredEditorSync_SuppressesUntilLoopDone(t *testing.T) {
 	assert.Equal(t, "a\nnew\nc", payload.Code.Content)
 	assert.Equal(t, filename, payload.Code.Path)
 	assert.Equal(t, "modify_code", payload.SourceAction)
+
+	// Disk is overwritten live as well.
+	disk, readErr := os.ReadFile(filename)
+	require.NoError(t, readErr)
+	assert.Equal(t, "a\nnew\nc", string(disk))
+
+	// The loop-end flush must not re-emit the same content.
+	flushYaklangDeferredEditorSync(loop)
+	assert.Len(t, capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE), 1)
 }
 
 func TestYaklangDeferredEditorSync_CreateModePersistsToCodeDir(t *testing.T) {

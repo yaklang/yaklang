@@ -125,7 +125,7 @@ func TestDirectlyAnswer_EmitsAndContinuesWithOpenTodos(t *testing.T) {
 	assert.Contains(t, op.GetFeedback().String(), "Remaining TODOs")
 	// 不再产生隐式收口拦截标记
 	assert.NotContains(t, invoker.timelineString(), "[DIRECT_ANSWER_BLOCKED_BY_TODO]")
-	assert.Contains(t, invoker.timelineString(), "directly_answer")
+	assert.Contains(t, invoker.timelineString(), TimelineEntryAssistantOutput)
 }
 
 func TestFinish_BlockedByCurrentTaskTodos(t *testing.T) {
@@ -163,7 +163,7 @@ func TestDirectlyAnswer_EmitsAndContinuesWhenTodosClosed(t *testing.T) {
 	require.NoError(t, termErr)
 	require.Len(t, invoker.results, 1)
 	assert.Equal(t, "final", invoker.results[0])
-	assert.Contains(t, invoker.timelineString(), "directly_answer")
+	assert.Contains(t, invoker.timelineString(), TimelineEntryAssistantOutput)
 }
 
 // TestDirectlyAnswer_ContinuesWhenNextMovementsLeaveOpenTodos 验证携带

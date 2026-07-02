@@ -5,6 +5,14 @@
 - **Scope hosts**: {{ .ScopeHosts }}
 - **Workdir**: {{ .WorkDir }}
 - **Pool file**: `recon_api_pool.json`
+{{- if .VerifiedJsDir }}
+- **Verified JS dir** (use `js_static_extract_ai` **dir=**, not paths=): {{ .VerifiedJsDir }}
+{{- end }}
+{{- if .SpinRecoveryHint }}
+
+### SPIN recovery (mandatory)
+{{ .SpinRecoveryHint }}
+{{- end }}
 
 ### API pool summary
 - **Total entries**: {{ .PoolTotal }}

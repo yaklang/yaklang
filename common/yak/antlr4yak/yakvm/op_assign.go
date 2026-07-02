@@ -38,11 +38,25 @@ func (v *Frame) assign(left, right *Value) {
 	if len(rightValueList) == 1 {
 		right := rightValueList[0]
 		if !right.IsIterable() {
-			panic("multi-assign failed: right value is not iterable")
+			// hint-rich message: this is THE most common pitfall for people coming from Go.
+			// Yaklang has no comma-ok form, so `v, ok := m[key]` lands here at runtime.
+			panic(fmt.Sprintf(
+				"multi-assign failed: right value is not iterable (got a single non-iterable value of type %T, "+
+					"but the left side wants %d variables). "+
+					"common cause: Yaklang does NOT support Go's comma-ok form such as `v, ok := m[key]`, "+
+					"`v, ok := obj.field` or `v, ok := arr[i]` -- a map/struct/index read returns exactly ONE value; "+
+					"the same happens when unpacking a single-return function into multiple variables. "+
+					"fix: use single assign `v = m[key]` then `if v == nil { ... }`, or test existence with "+
+					"`if \"key\" in m { ... }`; for functions, match the variable count to the function's real return count.",
+				right.Value, len(leftValueList)))
 		}
 		rightValueLen := right.Len()
 		if rightValueLen != len(leftValueList) {
-			panic(fmt.Sprintf("multi-assign failed: left value length[%d] != right value length[%d]", len(leftValueList), rightValueLen))
+			panic(fmt.Sprintf(
+				"multi-assign failed: left value length[%d] != right value length[%d]. "+
+					"the right side is iterable but its element count differs from the number of variables on the left. "+
+					"fix: make both sides the same length, or assign the whole value to ONE variable (e.g. `arr = theValue`).",
+				len(leftValueList), rightValueLen))
 		}
 		for index, val := range leftValueList {
 			val.Assign(v, NewValue("__assign_middle__", right.CallSliceIndex(index), ""))
@@ -58,7 +72,12 @@ func (v *Frame) assign(left, right *Value) {
 
 	// 左边是 n 个值，右边是 m 个值，都大于一，那么，必须相等才可以，否则挂掉
 	if len(rightValueList) != len(leftValueList) {
-		panic("multi-assign failed: left value length[" + fmt.Sprint(len(leftValueList)) + "] != right value length[" + fmt.Sprint(len(rightValueList)) + "]")
+		panic(fmt.Sprintf(
+			"multi-assign failed: left value length[%d] != right value length[%d]. "+
+				"the number of variables on the left must equal the number of values on the right. "+
+				"fix: align both sides; e.g. `a, b = f()` only works when f returns exactly 2 values, "+
+				"and `a, b, c = x, y` is invalid (3 vs 2).",
+			len(leftValueList), len(rightValueList)))
 	}
 
 	for i := 0; i < len(rightValueList); i++ {

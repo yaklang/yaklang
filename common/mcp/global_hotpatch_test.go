@@ -12,6 +12,7 @@ func TestGlobalHotPatchToolSetRegistered(t *testing.T) {
 		"enable_global_hotpatch",
 		"disable_global_hotpatch",
 		"reset_global_hotpatch_config",
+		"create_global_hotpatch_template",
 		"query_hotpatch_template_list",
 	} {
 		if _, exists := set.Tools[name]; !exists {

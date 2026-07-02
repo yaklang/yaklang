@@ -543,6 +543,38 @@ func (b *astbuilder) buildSwitchStmt(stmt *yak.SwitchStmtContext) {
 
 // if stmt
 func (b *astbuilder) buildIfStmt(stmt *yak.IfStmtContext) {
+	// if <init>; <cond> { ... }
+	// 初始化语句在一个新的语法块作用域中执行，其声明的变量对整个 if 链可见，但不会泄漏到外层作用域
+	if init, ok := stmt.IfStmtInit().(*yak.IfStmtInitContext); ok && init != nil {
+		b.BuildSyntaxBlock(func() {
+			b.buildIfStmtInit(init)
+			b.buildIfStmtInner(stmt)
+		})
+		return
+	}
+	b.buildIfStmtInner(stmt)
+}
+
+// buildIfStmtInit 构建 if 初始化语句（if <init>; <cond> { ... }）
+func (b *astbuilder) buildIfStmtInit(stmt *yak.IfStmtInitContext) {
+	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	defer recoverRange()
+
+	if s, ok := stmt.DeclareVariableExpression().(*yak.DeclareVariableExpressionContext); ok {
+		b.buildDeclareVariableExpression(s)
+		return
+	}
+	if s, ok := stmt.AssignExpression().(*yak.AssignExpressionContext); ok {
+		b.buildAssignExpression(s)
+		return
+	}
+	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
+		b.buildExpression(s)
+		return
+	}
+}
+
+func (b *astbuilder) buildIfStmtInner(stmt *yak.IfStmtContext) {
 	builder := b.CreateIfBuilder()
 
 	var build func(stmt *yak.IfStmtContext) func()

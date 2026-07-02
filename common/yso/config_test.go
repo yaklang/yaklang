@@ -2,7 +2,7 @@ package yso
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/javaclassparser"
+	"github.com/yaklang/javajive/classparser"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yserx"
 	"testing"

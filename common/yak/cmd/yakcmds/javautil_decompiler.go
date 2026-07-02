@@ -13,7 +13,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/urfavecli"
-	"github.com/yaklang/yaklang/common/javaclassparser"
+	"github.com/yaklang/javajive/classparser"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
