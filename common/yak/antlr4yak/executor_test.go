@@ -603,6 +603,102 @@ dump(
 	_formattest(code)
 }
 
+// if 初始化语句: if <init>; <cond> { ... }
+// 关键词: if 初始化语句, if init statement, Go 风格 if
+func TestNewExecutor_IfInitStmt(t *testing.T) {
+	// 赋值初始化: if a = 10; a > 5 { ... }
+	t.Run("assign init", func(t *testing.T) {
+		code := `
+r = 0
+if a = 10; a > 5 {
+	r = a
+}
+assert r == 10, "if init assign failed"
+`
+		_marshallerTest(code)
+		_formattest(code)
+	})
+
+	// 短变量声明初始化: if a := 3; a < 5 { ... }
+	t.Run("short var decl init", func(t *testing.T) {
+		code := `
+r = 0
+if a := 3; a < 5 {
+	r = 1
+} else {
+	r = 2
+}
+assert r == 1, "if init short decl failed"
+`
+		_marshallerTest(code)
+		_formattest(code)
+	})
+
+	// 初始化语句声明的变量在 elif / else 分支中可见
+	t.Run("init var visible in elif", func(t *testing.T) {
+		code := `
+r = 0
+if x := 7; x > 100 {
+	r = 1
+} elif x > 5 {
+	r = x
+} else {
+	r = -1
+}
+assert r == 7, "init var should be visible in elif branch"
+`
+		_marshallerTest(code)
+		_formattest(code)
+	})
+
+	// Go 风格错误处理: if err = f(); err != nil { die(err) }
+	t.Run("go style error handling", func(t *testing.T) {
+		code := `
+f = func() {
+	return "hello", nil
+}
+result = ""
+if v, err = f(); err == nil {
+	result = v
+}
+assert result == "hello", "go style if init error handling failed"
+`
+		_marshallerTest(code)
+		_formattest(code)
+	})
+
+	// 变量声明初始化: if var a = 1; a == 1 { ... }
+	t.Run("var declare init", func(t *testing.T) {
+		code := `
+r = 0
+if var a = 1; a == 1 {
+	r = a
+}
+assert r == 1, "if init var declare failed"
+`
+		_marshallerTest(code)
+		_formattest(code)
+	})
+
+	// 表达式初始化: if f(); cond { ... }
+	t.Run("expression init", func(t *testing.T) {
+		code := `
+count = 0
+add = func() {
+	count = count + 1
+	return count
+}
+r = 0
+if add(); count == 1 {
+	r = count
+}
+assert r == 1, "if init expression failed"
+`
+		_marshallerTest(code)
+		_formattest(code)
+	})
+}
+
 func abc(a string) {
 }
 
