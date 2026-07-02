@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_java_decompiler"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/reactloopstests"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -124,7 +124,7 @@ func TestDecompileJar_RealDecompilation(t *testing.T) {
 	t.Logf("Decompiling %s to %s", testJarPath, outputDir)
 
 	// Create a minimal test runtime
-	runtime := &testRuntime{timeline: make(map[string]string)}
+	runtime := newTestRuntime()
 
 	// Get the actual action option
 	actionOption := loop_java_decompiler.DecompileJarAction(runtime)
@@ -219,7 +219,7 @@ func TestDecompileJar_RealDecompilation(t *testing.T) {
 // TestDecompileJar_MissingJarFile tests error handling for missing JAR
 func TestDecompileJar_MissingJarFile(t *testing.T) {
 	// Create a minimal test runtime
-	runtime := &testRuntime{timeline: make(map[string]string)}
+	runtime := newTestRuntime()
 
 	// Get the actual action option
 	actionOption := loop_java_decompiler.DecompileJarAction(runtime)
@@ -258,7 +258,7 @@ func TestDecompileJar_AutoOutputDirectory(t *testing.T) {
 		t.Fatalf("Failed to write test JAR: %v", err)
 	}
 
-	runtime := &testRuntime{timeline: make(map[string]string)}
+	runtime := newTestRuntime()
 	actionOption := loop_java_decompiler.DecompileJarAction(runtime)
 	framework := reactloopstests.NewActionTestFramework(t, "test-decompile-auto", actionOption)
 
@@ -352,44 +352,17 @@ func TestGenerateDecompilationReport(t *testing.T) {
 
 // testRuntime is a minimal AIInvokeRuntime for testing
 type testRuntime struct {
+	*mock.MockInvoker
 	timeline map[string]string
 }
 
-func (r *testRuntime) AddToTimeline(key, value string) {
-	r.timeline[key] = value
-}
-
-func (r *testRuntime) GetConfig() aicommon.AICallerConfigIf {
-	return nil
-}
-
-func (r *testRuntime) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
-	return "", nil, nil
-}
-
-func (r *testRuntime) AssembleLoopPrompt(tools []*aitool.Tool, input *aicommon.LoopPromptAssemblyInput) (*aicommon.LoopPromptAssemblyResult, error) {
-	_ = tools
-	_ = input
-	return &aicommon.LoopPromptAssemblyResult{
-		Prompt:   "java decompiler test prompt",
-		Sections: nil,
-	}, nil
-}
-
-func (r *testRuntime) ExecuteLoopTaskIF(taskTypeName string, task aicommon.AIStatefulTask, options ...any) (bool, error) {
-	return false, nil
-}
-
-func (r *testRuntime) ExecuteToolRequiredAndCall(ctx context.Context, name string, opt ...aicommon.ToolCallerOption) (*aitool.ToolResult, bool, error) {
-	return nil, false, nil
-}
-
-func (r *testRuntime) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams, opt ...aicommon.ToolCallerOption) (*aitool.ToolResult, bool, error) {
-	return nil, false, nil
-}
-
-func (r *testRuntime) DirectlyCallTool(ctx context.Context, toolName string, action *aicommon.Action, prepare aicommon.DirectlyCallPrepareFunc) (*aitool.ToolResult, bool, error) {
-	return nil, false, nil
+func newTestRuntime() *testRuntime {
+	base := mock.NewMockInvoker(context.Background())
+	base.SetConfig(nil)
+	return &testRuntime{
+		MockInvoker: base,
+		timeline:    make(map[string]string),
+	}
 }
 
 func (r *testRuntime) AskForClarification(ctx context.Context, question string, payloads []string) string {
@@ -399,108 +372,6 @@ func (r *testRuntime) AskForClarification(ctx context.Context, question string, 
 	return ""
 }
 
-func (r *testRuntime) DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool, opts ...any) (string, error) {
-	return "", nil
-}
-
-func (r *testRuntime) CompressLongTextWithDestination(ctx context.Context, i any, destination string, targetByteSize int64) (string, error) {
-	if s, ok := i.(string); ok {
-		return s, nil
-	}
-	return "", nil
-}
-
-func (r *testRuntime) EnhanceKnowledgeAnswer(ctx context.Context, query string) (string, error) {
-	return "", nil
-}
-
-func (r *testRuntime) EnhanceKnowledgeGetter(ctx context.Context, userQuery string, collections ...string) (string, error) {
-	return "", nil
-}
-
-func (r *testRuntime) EnhanceKnowledgeGetterEx(ctx context.Context, userQuery string, enhancePlans []string, collections ...string) (string, error) {
-	return "", nil
-}
-
-func (r *testRuntime) QuickKnowledgeSearch(ctx context.Context, query string, keywords []string, collections ...string) (string, error) {
-	return "", nil
-}
-
-func (r *testRuntime) EnhanceKnowledgeGetRandomN(ctx context.Context, n int, collections ...string) (string, error) {
-	return "", nil
-}
-
-func (r *testRuntime) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (*aicommon.VerifySatisfactionResult, error) {
-	return aicommon.NewVerifySatisfactionResult(true, "", ""), nil
-}
-
-func (r *testRuntime) RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error)) {
-}
-
-func (r *testRuntime) AsyncPlanOnly(ctx context.Context, planPayload string, onFinish func(error)) {
-}
-
-func (r *testRuntime) AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error)) {
-}
-
-func (r *testRuntime) ReviewExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput) (*aicommon.ExecutePlanInput, error) {
-	return input, nil
-}
-
-func (r *testRuntime) ForceReviewExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput) (*aicommon.ExecutePlanInput, error) {
-	return input, nil
-}
-
-func (r *testRuntime) BeginPlanCoordinatorSession(ctx context.Context, input *aicommon.ExecutePlanInput, forceManualReview bool) (aicommon.PlanCoordinatorSession, error) {
-	return nil, nil
-}
-
-func (r *testRuntime) PublishDetachedPlan(ctx context.Context, input *aicommon.ExecutePlanInput, reactTaskID string) (string, error) {
-	return "", nil
-}
-
-func (r *testRuntime) AsyncExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput, onFinish func(error)) {
-}
-
-func (r *testRuntime) AsyncExecuteCod(ctx context.Context, coordinatorID string, onFinish func(error)) {
-}
-
-func (r *testRuntime) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
-	return nil, nil
-}
-
-func (r *testRuntime) InvokeSpeedPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
-	return r.InvokeLiteForge(ctx, actionName, prompt, outputs, opts...)
-}
-
-func (r *testRuntime) InvokeQualityPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
-	return r.InvokeLiteForge(ctx, actionName, prompt, outputs, opts...)
-}
-
-func (r *testRuntime) EmitFileArtifactWithExt(name, ext string, data any) string {
-	return ""
-}
-
-func (r *testRuntime) EmitResultAfterStream(result any) {
-}
-
-func (r *testRuntime) EmitResult(result any) {
-}
-
-func (r *testRuntime) SelectKnowledgeBase(ctx context.Context, originQuery string) (*aicommon.SelectedKnowledgeBaseResult, error) {
-	return aicommon.NewSelectedKnowledgeBaseResult("mock selection", []string{}), nil
-}
-
-func (r *testRuntime) SetCurrentTask(task aicommon.AIStatefulTask) {
-}
-
-func (r *testRuntime) GetCurrentTask() aicommon.AIStatefulTask {
-	return nil
-}
-
-func (r *testRuntime) GetCurrentTaskId() string {
-	return ""
-}
-
-func (r *testRuntime) AddRuntimeTask(task aicommon.AIStatefulTask) {
+func (r *testRuntime) AddToTimeline(key, value string) {
+	r.timeline[key] = value
 }

@@ -110,7 +110,7 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 		return "reactive context", nil
 	})(loop)
 
-	task := &mockSimpleTask{id: "test-task", index: "test-index"}
+	task := newMockSimpleTask("test-task", "test-index")
 	loop.SetCurrentTask(task)
 	operator := NewActionHandlerOperator(task)
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommonmock "github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
@@ -19,6 +20,8 @@ import (
 
 // AdvancedMockInvoker 高级Mock调用器，支持prompt验证和多种返回值
 type AdvancedMockInvoker struct {
+	*aicommonmock.MockInvoker
+
 	ctx              context.Context
 	capturedPrompts  []string
 	capturedActions  []string
@@ -29,6 +32,7 @@ type AdvancedMockInvoker struct {
 
 func NewAdvancedMockInvoker(ctx context.Context) *AdvancedMockInvoker {
 	return &AdvancedMockInvoker{
+		MockInvoker:      aicommonmock.NewMockInvoker(ctx),
 		ctx:              ctx,
 		capturedPrompts:  []string{},
 		capturedActions:  []string{},
@@ -160,66 +164,6 @@ func (m *AdvancedMockInvoker) InvokeLiteForge(ctx context.Context, actionName st
 }
 
 // 实现其他必需的接口方法
-func (m *AdvancedMockInvoker) ExecuteToolRequiredAndCall(ctx context.Context, name string, opt ...aicommon.ToolCallerOption) (*aitool.ToolResult, bool, error) {
-	return nil, false, nil
-}
-
-func (m *AdvancedMockInvoker) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams, opt ...aicommon.ToolCallerOption) (*aitool.ToolResult, bool, error) {
-	return nil, false, nil
-}
-
-func (m *AdvancedMockInvoker) DirectlyCallTool(ctx context.Context, toolName string, action *aicommon.Action, prepare aicommon.DirectlyCallPrepareFunc) (*aitool.ToolResult, bool, error) {
-	return nil, false, nil
-}
-
-func (m *AdvancedMockInvoker) AskForClarification(ctx context.Context, question string, payloads []string) string {
-	return ""
-}
-
-func (m *AdvancedMockInvoker) DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool, r ...any) (string, error) {
-	return "", nil
-}
-
-func (m *AdvancedMockInvoker) CompressLongTextWithDestination(ctx context.Context, i any, destination string, targetByteSize int64) (string, error) {
-	if s, ok := i.(string); ok {
-		return s, nil
-	}
-	return "", nil
-}
-
-func (m *AdvancedMockInvoker) EnhanceKnowledgeAnswer(ctx context.Context, s string) (string, error) {
-	return "", nil
-}
-func (m *AdvancedMockInvoker) EnhanceKnowledgeGetter(ctx context.Context, userQuery string, collections ...string) (string, error) {
-	return "", nil
-}
-func (m *AdvancedMockInvoker) EnhanceKnowledgeGetterEx(ctx context.Context, userQuery string, enhancePlans []string, collections ...string) (string, error) {
-	return "", nil
-}
-func (m *AdvancedMockInvoker) QuickKnowledgeSearch(ctx context.Context, query string, keywords []string, collections ...string) (string, error) {
-	return "", nil
-}
-func (m *AdvancedMockInvoker) EnhanceKnowledgeGetRandomN(ctx context.Context, n int, collections ...string) (string, error) {
-	return "", nil
-}
-
-func (m *AdvancedMockInvoker) ExecuteLoopTaskIF(taskTypeName string, task aicommon.AIStatefulTask, options ...any) (bool, error) {
-	return false, nil
-}
-
-func (m *AdvancedMockInvoker) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (*aicommon.VerifySatisfactionResult, error) {
-	return aicommon.NewVerifySatisfactionResult(true, "", ""), nil
-}
-
-func (m *AdvancedMockInvoker) RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error)) {
-}
-
-func (m *AdvancedMockInvoker) AsyncPlanOnly(ctx context.Context, planPayload string, onFinish func(error)) {
-}
-
-func (m *AdvancedMockInvoker) AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error)) {
-}
-
 func (m *AdvancedMockInvoker) ReviewExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput) (*aicommon.ExecutePlanInput, error) {
 	return input, nil
 }
@@ -242,39 +186,7 @@ func (m *AdvancedMockInvoker) AsyncExecutePlan(ctx context.Context, input *aicom
 func (m *AdvancedMockInvoker) AsyncExecuteCod(ctx context.Context, coordinatorID string, onFinish func(error)) {
 }
 
-func (m *AdvancedMockInvoker) AddToTimeline(entry, content string) {
-}
-
-func (m *AdvancedMockInvoker) GetConfig() aicommon.AICallerConfigIf {
-	return nil
-}
-
-func (m *AdvancedMockInvoker) EmitFileArtifactWithExt(name, ext string, data any) string {
-	return ""
-}
-
-func (m *AdvancedMockInvoker) EmitResultAfterStream(any) {
-}
-
-func (m *AdvancedMockInvoker) EmitResult(any) {
-}
-
 func (m *AdvancedMockInvoker) EmitStreamResult(any) {
-}
-
-func (m *AdvancedMockInvoker) SelectKnowledgeBase(ctx context.Context, originQuery string) (*aicommon.SelectedKnowledgeBaseResult, error) {
-	return aicommon.NewSelectedKnowledgeBaseResult("mock selection", []string{}), nil
-}
-
-func (m *AdvancedMockInvoker) SetCurrentTask(task aicommon.AIStatefulTask) {
-}
-
-func (m *AdvancedMockInvoker) GetCurrentTask() aicommon.AIStatefulTask {
-	return nil
-}
-
-func (m *AdvancedMockInvoker) GetCurrentTaskId() string {
-	return ""
 }
 
 type EmptyEmbedding struct {

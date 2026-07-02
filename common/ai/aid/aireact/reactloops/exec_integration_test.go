@@ -7,11 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/schema"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommonmock "github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -83,10 +80,7 @@ func TestActionRegistration_Integration(t *testing.T) {
 // TestLoopActionOperator 测试操作符行为
 func TestLoopActionOperator(t *testing.T) {
 	// 创建一个简单的 mock task
-	task := &mockSimpleTask{
-		id:    "test-task",
-		index: "test-index",
-	}
+	task := newMockSimpleTask("test-task", "test-index")
 
 	operator := newLoopActionHandlerOperator(task)
 
@@ -199,7 +193,7 @@ func TestActionHandler_SuccessFlow(t *testing.T) {
 	}
 
 	// 创建一个简单的任务和操作符
-	task := &mockSimpleTask{id: "test", index: "test-index"}
+	task := newMockSimpleTask("test", "test-index")
 	operator := newLoopActionHandlerOperator(task)
 
 	// 创建一个简单的 action
@@ -271,182 +265,22 @@ func TestActionVerifier_FailureFlow(t *testing.T) {
 
 // mockSimpleTask 是一个简化的 task 实现，只用于测试不需要完整 runtime 的场景
 type mockSimpleTask struct {
-	id        string
-	index     string
-	status    aicommon.AITaskState
-	reActLoop aicommon.ReActLoopIF
-	info      *aicommon.AITaskRetrievalInfo
+	*aicommonmock.MockStatefulTask
 }
 
-func (s *mockSimpleTask) GetOriginUserInput() string {
-	return ""
-}
-
-func (s *mockSimpleTask) GetFocusMode() string {
-	return ""
-}
-func (s *mockSimpleTask) SetFocusMode(mode string) {
-}
-func (m *mockSimpleTask) GetDB() *gorm.DB {
-	return nil
-}
-
-func (m *mockSimpleTask) SetDB(db *gorm.DB) {
-}
-
-func (m *mockSimpleTask) GetAttachedDatas() []*aicommon.AttachedResource {
-	return []*aicommon.AttachedResource{}
-}
-func (m *mockSimpleTask) SetAttachedDatas(datas []*aicommon.AttachedResource) {
-
-}
-
-func (m *mockSimpleTask) GetRisks() []*schema.Risk {
-	return []*schema.Risk{}
-}
-
-func (m *mockSimpleTask) PushToolCallResult(result *aitool.ToolResult) {
-
-}
-
-func (m *mockSimpleTask) GetAllToolCallResults() []*aitool.ToolResult {
-	return []*aitool.ToolResult{}
-}
-
-func (m *mockSimpleTask) GetSummary() string {
-	return ""
-}
-
-func (m *mockSimpleTask) SetSummary(summary string) {
-}
-
-func (m *mockSimpleTask) GetEmitter() *aicommon.Emitter {
-	return nil
-}
-
-func (m *mockSimpleTask) SetEmitter(emitter *aicommon.Emitter) {
-
-}
-
-func (m *mockSimpleTask) GetId() string {
-	return m.id
-}
-
-func (m *mockSimpleTask) GetIndex() string {
-	return m.index
-}
-
-func (m *mockSimpleTask) GetName() string {
-	return "mock-task"
-}
-
-func (m *mockSimpleTask) GetSemanticIdentifier() string {
-	return "mock_task"
-}
-
-func (m *mockSimpleTask) SetSemanticIdentifier(id string) {
-}
-
-func (m *mockSimpleTask) GetTaskRetrievalInfo() *aicommon.AITaskRetrievalInfo {
-	if m.info == nil {
-		return nil
+func newMockSimpleTask(id, index string) *mockSimpleTask {
+	task := &mockSimpleTask{
+		MockStatefulTask: aicommonmock.NewMockStatefulTask(context.Background(), id, "test input"),
 	}
-	return m.info.Clone()
-}
-
-func (m *mockSimpleTask) SetTaskRetrievalInfo(info *aicommon.AITaskRetrievalInfo) {
-	if info == nil {
-		m.info = nil
-		return
-	}
-	m.info = info.Clone()
-}
-
-func (m *mockSimpleTask) GetInput() string {
-	return "test input"
-}
-
-func (m *mockSimpleTask) GetUserInput() string {
-	return "test input"
-}
-
-func (m *mockSimpleTask) SetUserInput(input string) {
-}
-
-func (m *mockSimpleTask) GetResult() string {
-	return ""
-}
-
-func (m *mockSimpleTask) SetResult(result string) {
-}
-
-func (m *mockSimpleTask) GetStatus() aicommon.AITaskState {
-	return m.status
-}
-
-func (m *mockSimpleTask) SetStatus(status aicommon.AITaskState) {
-	m.status = status
-}
-
-func (m *mockSimpleTask) ForceSetStatus(status aicommon.AITaskState) {
-	m.status = status
-}
-
-func (m *mockSimpleTask) SetAsyncDeferCallback(func(err error)) {
-}
-
-func (m *mockSimpleTask) CallAsyncDeferCallback(err error) {
-}
-
-func (m *mockSimpleTask) GetContext() context.Context {
-	return context.Background()
-}
-
-func (m *mockSimpleTask) Cancel() {
-	m.status = aicommon.AITaskState_Aborted
-}
-
-func (m *mockSimpleTask) IsFinished() bool {
-	return m.status == aicommon.AITaskState_Completed || m.status == aicommon.AITaskState_Aborted
-}
-
-func (m *mockSimpleTask) AppendErrorToResult(err error) {
-}
-
-func (m *mockSimpleTask) GetCreatedAt() time.Time {
-	return time.Now()
-}
-
-func (m *mockSimpleTask) Finish(err error) {
-	if err != nil {
-		m.status = aicommon.AITaskState_Aborted
-	} else {
-		m.status = aicommon.AITaskState_Completed
-	}
-}
-
-func (m *mockSimpleTask) IsAsyncMode() bool {
-	return false
-}
-
-func (m *mockSimpleTask) SetAsyncMode(async bool) {
-}
-
-func (m *mockSimpleTask) GetReActLoop() aicommon.ReActLoopIF {
-	return m.reActLoop
-}
-
-func (m *mockSimpleTask) SetReActLoop(loop aicommon.ReActLoopIF) {
-	m.reActLoop = loop
-}
-
-func (m *mockSimpleTask) GetUUID() string {
-	return m.id
+	task.SetIndex(index)
+	task.SetName("mock-task")
+	task.SetSemanticIdentifier("mock_task")
+	return task
 }
 
 // TestOperatorFail 测试操作符的失败处理
 func TestOperatorFail(t *testing.T) {
-	task := &mockSimpleTask{id: "test", index: "test-index"}
+	task := newMockSimpleTask("test", "test-index")
 	operator := newLoopActionHandlerOperator(task)
 
 	operator.Fail("test failure reason")
@@ -459,7 +293,7 @@ func TestOperatorFail(t *testing.T) {
 
 // TestComplexFeedback 测试复杂反馈场景
 func TestComplexFeedback(t *testing.T) {
-	task := &mockSimpleTask{id: "test", index: "test-index"}
+	task := newMockSimpleTask("test", "test-index")
 	operator := newLoopActionHandlerOperator(task)
 
 	// 多次反馈
@@ -571,11 +405,8 @@ func TestSchemaFormatValidation(t *testing.T) {
 
 // TestLoopStateManagement 测试循环状态管理
 func TestLoopStateManagement(t *testing.T) {
-	task := &mockSimpleTask{
-		id:     "state-test",
-		index:  "state-index",
-		status: aicommon.AITaskState_Created,
-	}
+	task := newMockSimpleTask("state-test", "state-index")
+	task.SetStatus(aicommon.AITaskState_Created)
 
 	// 初始状态
 	if task.GetStatus() != aicommon.AITaskState_Created {
@@ -595,11 +426,8 @@ func TestLoopStateManagement(t *testing.T) {
 	}
 
 	// 失败
-	task2 := &mockSimpleTask{
-		id:     "fail-test",
-		index:  "fail-index",
-		status: aicommon.AITaskState_Created,
-	}
+	task2 := newMockSimpleTask("fail-test", "fail-index")
+	task2.SetStatus(aicommon.AITaskState_Created)
 	task2.Finish(fmt.Errorf("test error"))
 	if task2.GetStatus() != aicommon.AITaskState_Aborted {
 		t.Error("Status should be Aborted after Finish(error)")
@@ -688,7 +516,7 @@ func TestMemorySearch_NoMemories(t *testing.T) {
 		searchMemoryResult: &aicommon.SearchMemoryResult{
 			Memories:      []*aicommon.MemoryEntity{},
 			TotalContent:  "",
-			ContentTokens:  0,
+			ContentTokens: 0,
 			SearchSummary: "no memories found",
 		},
 	}
@@ -724,7 +552,7 @@ func TestMemorySearch_WithMemories(t *testing.T) {
 				},
 			},
 			TotalContent:  "First memory content\nSecond memory content",
-			ContentTokens:  42,
+			ContentTokens: 42,
 			SearchSummary: "found 2 memories",
 		},
 	}
@@ -756,7 +584,7 @@ func TestMemorySearch_WithoutAI(t *testing.T) {
 				},
 			},
 			TotalContent:  "Keyword-based memory",
-			ContentTokens:  21,
+			ContentTokens: 21,
 			SearchSummary: "keyword search result",
 		},
 	}
@@ -788,7 +616,7 @@ func TestMemorySearch_TokenLimit(t *testing.T) {
 				},
 			},
 			TotalContent:  "First part",
-			ContentTokens:  10,
+			ContentTokens: 10,
 			SearchSummary: "limited by tokens",
 		},
 	}
@@ -850,7 +678,7 @@ func TestReActLoop_MemoryIntegration_WithMemory(t *testing.T) {
 				},
 			},
 			TotalContent:  "Important context for user query",
-			ContentTokens:  31,
+			ContentTokens: 31,
 			SearchSummary: "found relevant memory",
 		},
 	}
@@ -889,7 +717,7 @@ func TestReActLoop_MemorySearch_Integration(t *testing.T) {
 				},
 			},
 			TotalContent:  "Context 1\nContext 2",
-			ContentTokens:  20,
+			ContentTokens: 20,
 			SearchSummary: "found 2 contexts",
 		},
 	}
@@ -1056,7 +884,7 @@ func TestMemorySearch_MultipleCallsConsistency(t *testing.T) {
 				{Id: "mem-1", Content: "Consistent memory"},
 			},
 			TotalContent:  "Consistent memory",
-			ContentTokens:  17,
+			ContentTokens: 17,
 			SearchSummary: "consistent result",
 		},
 	}

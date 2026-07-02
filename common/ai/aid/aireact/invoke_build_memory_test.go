@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	aicommonmock "github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/jsonpath"
@@ -341,7 +342,7 @@ func TestReAct_BuildMemoryWithRealMemoryTriage(t *testing.T) {
 	ctx := context.Background()
 
 	// 使用真实的 mock invoker
-	mockInvoker := &mockInvokerForMemoryTest{ctx: ctx}
+	mockInvoker := newMockInvokerForMemoryTest(ctx)
 
 	// 使用真实的测试 memory 创建函数
 	realMemory, err := createTestMemoryForBuildTest(sessionID, mockInvoker)
@@ -463,23 +464,13 @@ LOOP:
 
 // mockInvokerForMemoryTest 是一个用于 memory 测试的简单 mock invoker
 type mockInvokerForMemoryTest struct {
-	ctx    context.Context
-	config aicommon.AICallerConfigIf
+	*aicommonmock.MockInvoker
 }
 
-func (m *mockInvokerForMemoryTest) GetContext() context.Context {
-	return m.ctx
-}
-
-func (m *mockInvokerForMemoryTest) ExecuteLoopTaskIF(loopName string, task aicommon.AIStatefulTask, opts ...any) (bool, error) {
-	return false, nil
-}
-
-func (m *mockInvokerForMemoryTest) GetConfig() aicommon.AICallerConfigIf {
-	if m.config == nil {
-		m.config = aicommon.NewConfig(m.ctx)
+func newMockInvokerForMemoryTest(ctx context.Context) *mockInvokerForMemoryTest {
+	return &mockInvokerForMemoryTest{
+		MockInvoker: aicommonmock.NewMockInvoker(ctx),
 	}
-	return m.config
 }
 
 func (m *mockInvokerForMemoryTest) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
@@ -531,67 +522,6 @@ func (m *mockInvokerForMemoryTest) InvokeLiteForge(ctx context.Context, name str
 	return action, nil
 }
 
-func (m *mockInvokerForMemoryTest) ExecuteToolRequiredAndCall(ctx context.Context, name string, opt ...aicommon.ToolCallerOption) (*aitool.ToolResult, bool, error) {
-	return nil, false, nil
-}
-
-func (m *mockInvokerForMemoryTest) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams, opt ...aicommon.ToolCallerOption) (*aitool.ToolResult, bool, error) {
-	return nil, false, nil
-}
-
-func (m *mockInvokerForMemoryTest) DirectlyCallTool(ctx context.Context, toolName string, action *aicommon.Action, prepare aicommon.DirectlyCallPrepareFunc) (*aitool.ToolResult, bool, error) {
-	return nil, false, nil
-}
-
-func (m *mockInvokerForMemoryTest) AskForClarification(ctx context.Context, question string, payloads []string) string {
-	return ""
-}
-
-func (m *mockInvokerForMemoryTest) DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool, opts ...any) (string, error) {
-	return "", nil
-}
-
-func (m *mockInvokerForMemoryTest) CompressLongTextWithDestination(ctx context.Context, i any, destination string, targetByteSize int64) (string, error) {
-	if s, ok := i.(string); ok {
-		return s, nil
-	}
-	return "", nil
-}
-
-func (m *mockInvokerForMemoryTest) EnhanceKnowledgeAnswer(ctx context.Context, s string) (string, error) {
-	return "", nil
-}
-
-func (m *mockInvokerForMemoryTest) EnhanceKnowledgeGetter(ctx context.Context, userQuery string, collections ...string) (string, error) {
-	return "", nil
-}
-
-func (m *mockInvokerForMemoryTest) EnhanceKnowledgeGetterEx(ctx context.Context, userQuery string, enhancePlans []string, collections ...string) (string, error) {
-	return "", nil
-}
-
-func (m *mockInvokerForMemoryTest) QuickKnowledgeSearch(ctx context.Context, query string, keywords []string, collections ...string) (string, error) {
-	return "", nil
-}
-
-func (m *mockInvokerForMemoryTest) EnhanceKnowledgeGetRandomN(ctx context.Context, n int, collections ...string) (string, error) {
-	return "", nil
-}
-func (m *mockInvokerForMemoryTest) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (*aicommon.VerifySatisfactionResult, error) {
-	return aicommon.NewVerifySatisfactionResult(true, "", ""), nil
-}
-
-func (m *mockInvokerForMemoryTest) RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error)) {
-	// no-op
-}
-
-func (m *mockInvokerForMemoryTest) AsyncPlanOnly(ctx context.Context, planPayload string, onFinish func(error)) {
-}
-
-func (m *mockInvokerForMemoryTest) AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error)) {
-	// no-op
-}
-
 func (m *mockInvokerForMemoryTest) ReviewExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput) (*aicommon.ExecutePlanInput, error) {
 	return input, nil
 }
@@ -612,42 +542,6 @@ func (m *mockInvokerForMemoryTest) AsyncExecutePlan(ctx context.Context, input *
 }
 
 func (m *mockInvokerForMemoryTest) AsyncExecuteCod(ctx context.Context, coordinatorID string, onFinish func(error)) {
-}
-
-func (m *mockInvokerForMemoryTest) AddToTimeline(entry, content string) {
-	// no-op for testing
-}
-
-func (m *mockInvokerForMemoryTest) EmitFileArtifactWithExt(name, ext string, data any) string {
-	return ""
-}
-
-func (m *mockInvokerForMemoryTest) EmitResultAfterStream(any) {
-	// no-op
-}
-
-func (m *mockInvokerForMemoryTest) EmitResult(any) {
-	// no-op
-}
-
-func (m *mockInvokerForMemoryTest) SetCurrentTask(task aicommon.AIStatefulTask) {
-	// no-op for testing
-}
-
-func (m *mockInvokerForMemoryTest) SelectKnowledgeBase(ctx context.Context, originQuery string) (*aicommon.SelectedKnowledgeBaseResult, error) {
-	return aicommon.NewSelectedKnowledgeBaseResult("mock selection", []string{}), nil
-}
-
-func (m *mockInvokerForMemoryTest) GetCurrentTask() aicommon.AIStatefulTask {
-	return nil
-}
-
-func (m *mockInvokerForMemoryTest) GetCurrentTaskId() string {
-	return ""
-}
-
-func (m *mockInvokerForMemoryTest) AddRuntimeTask(task aicommon.AIStatefulTask) {
-	// no-op for testing
 }
 
 // createTestMemoryForBuildTest 创建用于构建测试的 memory 实例（简化版本）
