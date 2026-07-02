@@ -74,6 +74,7 @@ var (
 	CompletionKindMethod   = "Method"
 	CompletionKindClass    = "Class"
 	CompletionKindModule   = "Module"
+	CompletionKindSnippet  = "Snippet"
 )
 
 func getLanguageKeywordSuggestions() []*ypb.SuggestionDescription {
@@ -1097,6 +1098,270 @@ func fixCompletionBeforeParen(suggestions []*ypb.SuggestionDescription, prog *ss
 	return suggestions
 }
 
+// getExpectedParamTypeAtArg 反查「当前正在补全的值 v」所处的函数调用实参位置，
+// 返回该实参位置期望的形参类型。若该形参是变长参数(最后一个)，会解包成元素类型。
+// 典型场景：poc.saveHandler(f) 里补全 f 时，反查出期望类型 func(*lowhttp.LowhttpResponse)。
+// 关键词: 回调函数补全, 实参形参类型推断, 变长参数解包
+func getExpectedParamTypeAtArg(v *ssaapi.Value) (ssa.Type, bool) {
+	if v == nil || v.IsNil() {
+		return nil, false
+	}
+	users := v.GetUsers()
+	if len(users) == 0 {
+		return nil, false
+	}
+	// 取 EndOffset 最大的 user 作为最近的一次使用(最近的调用)
+	sort.SliceStable(users, func(i, j int) bool {
+		return users[i].GetRange().GetEndOffset() < users[j].GetRange().GetEndOffset()
+	})
+	lastUser := users[len(users)-1]
+	if !lastUser.IsCall() {
+		return nil, false
+	}
+	call, ok := ssa.ToCall(lastUser.GetSSAInst())
+	if !ok {
+		return nil, false
+	}
+	method, ok := call.GetValueById(call.Method)
+	if !ok || method == nil {
+		return nil, false
+	}
+	funcTyp, ok := ssa.ToFunctionType(method.GetType())
+	if !ok || funcTyp == nil {
+		return nil, false
+	}
+	// 找到 v 作为实参出现的下标
+	index := -1
+	for i, arg := range call.Args {
+		if arg == v.GetId() {
+			index = i
+		}
+	}
+	if index == -1 {
+		// v 本身就是被调用的函数(光标紧贴左括号、实参尚为空)，按第一个形参处理
+		if call.Method == v.GetId() {
+			index = 0
+		} else {
+			return nil, false
+		}
+	}
+	return getFunctionParamTypeByIndex(funcTyp, index)
+}
+
+// getFunctionParamTypeByIndex 依据形参下标取形参类型；最后一个变长形参会解包成元素类型。
+func getFunctionParamTypeByIndex(funcTyp *ssa.FunctionType, index int) (ssa.Type, bool) {
+	n := len(funcTyp.Parameter)
+	if n == 0 || index < 0 {
+		return nil, false
+	}
+	last := n - 1
+	if index > last {
+		// 超出显式形参数量的实参落在变长形参上
+		if funcTyp.IsVariadic {
+			index = last
+		} else {
+			return nil, false
+		}
+	}
+	paramTyp := funcTyp.Parameter[index]
+	// 变长最后一个形参在 SSA 里以 slice 存储，解包成元素类型
+	if funcTyp.IsVariadic && index == last {
+		if obj, ok := ssa.ToObjectType(paramTyp); ok && obj.Kind == ssa.SliceTypeKind && obj.FieldType != nil {
+			return obj.FieldType, true
+		}
+	}
+	return paramTyp, true
+}
+
+// lowerCamelInitialism 把类型名转成 lowerCamel 变量名，友好处理首字母缩写：
+// HTTPFlow -> httpFlow, URL -> url, ID -> id, ResponseWriter -> responseWriter。
+func lowerCamelInitialism(name string) string {
+	if name == "" {
+		return name
+	}
+	// 统计开头连续的大写字母数量
+	run := 0
+	for _, r := range name {
+		if r >= 'A' && r <= 'Z' {
+			run++
+		} else {
+			break
+		}
+	}
+	switch {
+	case run == 0:
+		return name
+	case run == len(name):
+		// 全大写(如 URL / ID)整体转小写
+		return strings.ToLower(name)
+	case run == 1:
+		return strings.ToLower(name[:1]) + name[1:]
+	default:
+		// 开头是缩写(如 HTTPFlow)：最后一个大写字母作为下一个单词的开头
+		return strings.ToLower(name[:run-1]) + name[run-1:]
+	}
+}
+
+// callbackParamFriendlyName 是「回调形参短类型名 -> 更贴近文档习惯的占位名」注册表。
+// 短类型名 = 去掉包路径与 */[]& 前缀后的类型名(大小写敏感，与 Go 类型一致)。
+// 这样 poc.saveHandler 的回调补出 func(rsp) 而不是 func(lowhttpResponse)。
+// 关键词: 回调形参名映射, 友好占位名, rsp, flow, req
+var callbackParamFriendlyName = map[string]string{
+	"LowhttpResponse": "rsp",
+	"Response":        "rsp",
+	"HTTPFlow":        "flow",
+	"Request":         "req",
+	"ResponseWriter":  "w",
+	"SynScanResult":   "result",
+	"BruteItem":       "item",
+	"BruteItemResult": "result",
+	"tcpConnection":   "conn",
+	"udpConnection":   "conn",
+	"Conn":            "conn",
+	"Client":          "client",
+	"Packet":          "packet",
+	"HTTPFlowT":       "flow",
+}
+
+// friendlyCallbackParamName 依据类型串返回注册表里的友好形参名，未命中返回空串。
+func friendlyCallbackParamName(typStr string) string {
+	t := strings.TrimSpace(typStr)
+	// 常见基础类型的惯用命名(同时规避与关键字/类型名冲突)
+	switch t {
+	case "[]byte", "[]uint8", "bytes":
+		return "data"
+	case "string":
+		return "s"
+	case "bool", "boolean":
+		return "ok"
+	case "error":
+		return "err"
+	}
+	isSlice := strings.HasPrefix(t, "[]")
+	core := strings.TrimLeft(t, "*[]&")
+	if i := strings.LastIndex(core, "."); i != -1 {
+		core = core[i+1:]
+	}
+	if name, ok := callbackParamFriendlyName[core]; ok {
+		if isSlice {
+			// 切片形参用复数，如 reqs / flows
+			return name + "s"
+		}
+		return name
+	}
+	return ""
+}
+
+// callbackParamPlaceholderName 依据形参类型推导一个可读的占位形参名，冲突时追加序号。
+// 优先使用友好名注册表(rsp/flow/req...)，未命中再从类型名推导。
+// 例如 *lowhttp.LowhttpResponse -> rsp; *schema.HTTPFlow -> flow; 未知类型 -> 类型名 lowerCamel。
+func callbackParamPlaceholderName(typStr string, index int, seen map[string]int) string {
+	name := friendlyCallbackParamName(typStr)
+	if name == "" {
+		// 回退：从类型名推导
+		name = typStr
+		// 去掉指针/切片等前缀符号
+		name = strings.TrimLeft(name, "*[]&")
+		// 去掉包路径，只保留最后一段类型名
+		if i := strings.LastIndex(name, "."); i != -1 {
+			name = name[i+1:]
+		}
+		// 只保留合法标识符字符(去掉泛型尖括号等)
+		name = strings.Map(func(r rune) rune {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' {
+				return r
+			}
+			return -1
+		}, name)
+		if name == "" {
+			name = fmt.Sprintf("p%d", index+1)
+		} else {
+			name = lowerCamelInitialism(name)
+		}
+	}
+	// 与 yak 关键字或基础类型名冲突则加后缀，避免生成非法/易混淆代码
+	if utils.StringArrayContains(yakKeywords, name) || utils.StringArrayContains(yakTypes, name) {
+		name += "Param"
+	}
+	// 同名去重
+	if c, ok := seen[name]; ok {
+		seen[name] = c + 1
+		return fmt.Sprintf("%s%d", name, c+1)
+	}
+	seen[name] = 1
+	return name
+}
+
+// buildCallbackFunctionSuggestions 根据回调函数类型生成两种可 tab 展开的字面量补全：
+// func 声明式 `func(params) { }` 与箭头式 `(params) => { }`。
+// 关键词: 回调函数字面量补全, func 声明, 箭头函数
+func buildCallbackFunctionSuggestions(cbTyp *ssa.FunctionType) []*ypb.SuggestionDescription {
+	params := cbTyp.Parameter
+	n := len(params)
+	seen := make(map[string]int)
+	labelParams := make([]string, 0, n)
+	snippetParams := make([]string, 0, n)
+	for i, p := range params {
+		typStr := p.String()
+		if cbTyp.IsVariadic && i == n-1 {
+			// 回调本身也可能是变长，兜底解包元素类型用于命名
+			if obj, ok := ssa.ToObjectType(p); ok && obj.Kind == ssa.SliceTypeKind && obj.FieldType != nil {
+				typStr = obj.FieldType.String()
+			}
+		}
+		name := callbackParamPlaceholderName(typStr, i, seen)
+		labelParams = append(labelParams, name)
+		snippetParams = append(snippetParams, fmt.Sprintf("${%d:%s}", i+1, name))
+	}
+	labelArgs := strings.Join(labelParams, ", ")
+	snippetArgs := strings.Join(snippetParams, ", ")
+
+	desc := "callback " + _getFuncTypeDesc(cbTyp, "")
+	// 无返回值时 ReturnType 会渲染成 " null"，去掉以免文档难看
+	desc = strings.TrimSuffix(desc, " null")
+	funcLabel := fmt.Sprintf("func(%s) {}", labelArgs)
+	arrowLabel := fmt.Sprintf("(%s) => {}", labelArgs)
+
+	// 回调有返回值时，函数体预置 return 骨架，减少用户后续输入
+	body := "\t$0\n"
+	if cbTyp.ReturnType != nil && cbTyp.ReturnType.GetTypeKind() != ssa.NullTypeKind {
+		body = "\treturn $0\n"
+	}
+
+	return []*ypb.SuggestionDescription{
+		{
+			Label:             funcLabel,
+			InsertText:        fmt.Sprintf("func(%s) {\n%s}", snippetArgs, body),
+			Description:       desc,
+			DefinitionVerbose: funcLabel,
+			Kind:              CompletionKindSnippet,
+		},
+		{
+			Label:             arrowLabel,
+			InsertText:        fmt.Sprintf("(%s) => {\n%s}", snippetArgs, body),
+			Description:       desc,
+			DefinitionVerbose: arrowLabel,
+			Kind:              CompletionKindSnippet,
+		},
+	}
+}
+
+// completionCallbackFunctionLiteral 当当前正在补全的实参期望一个函数类型时，
+// 生成回调函数字面量补全(func 声明式 + 箭头式)，便于用户直接 tab 展开成回调骨架。
+// 例如 poc.saveHandler(f) / poc.afterSaveHandler(f) 等以函数为参数的库调用。
+// 关键词: poc.saveHandler 自动补全, 回调函数参数, func 字面量补全
+func completionCallbackFunctionLiteral(v *ssaapi.Value) []*ypb.SuggestionDescription {
+	paramTyp, ok := getExpectedParamTypeAtArg(v)
+	if !ok {
+		return nil
+	}
+	cbTyp, ok := ssa.ToFunctionType(paramTyp)
+	if !ok || cbTyp == nil {
+		return nil
+	}
+	return buildCallbackFunctionSuggestions(cbTyp)
+}
+
 func OnCompletion(
 	prog *ssaapi.Program, word string, containPoint bool, pointSuffix bool,
 	rng *memedit.Range, scriptType string, v *ssaapi.Value,
@@ -1109,6 +1374,8 @@ func OnCompletion(
 		ret = fixCompletionBeforeParen(ret, prog, rng, v)
 	}()
 	if !containPoint {
+		// 当前实参期望函数类型时，优先给出回调函数字面量补全(func 声明式/箭头式)
+		ret = append(ret, completionCallbackFunctionLiteral(v)...)
 		ret = append(ret, completionYakStandardLibrary()...)
 		ret = append(ret, completionYakLanguageKeyword()...)
 		ret = append(ret, completionYakLanguageBasicType()...)
