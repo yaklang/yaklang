@@ -6,10 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	aicommonmock "github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
@@ -43,61 +42,22 @@ func (m *mockMidtermArchiveStore) SearchArchivedBatches(ctx context.Context, que
 }
 
 type midtermQueryTestTask struct {
-	id        string
-	index     string
-	name      string
-	userInput string
-	origin    string
-	summary   string
-	info      *aicommon.AITaskRetrievalInfo
+	*aicommonmock.MockStatefulTask
 }
 
-func (m *midtermQueryTestTask) GetIndex() string                            { return m.index }
-func (m *midtermQueryTestTask) GetName() string                             { return m.name }
-func (m *midtermQueryTestTask) GetSemanticIdentifier() string               { return "midterm_query_task" }
-func (m *midtermQueryTestTask) SetSemanticIdentifier(string)                {}
-func (m *midtermQueryTestTask) PushToolCallResult(*aitool.ToolResult)       {}
-func (m *midtermQueryTestTask) GetAllToolCallResults() []*aitool.ToolResult { return nil }
-func (m *midtermQueryTestTask) GetSummary() string                          { return m.summary }
-func (m *midtermQueryTestTask) SetSummary(summary string)                   { m.summary = summary }
-func (m *midtermQueryTestTask) GetId() string                               { return m.id }
-func (m *midtermQueryTestTask) GetTaskRetrievalInfo() *aicommon.AITaskRetrievalInfo {
-	return m.info.Clone()
+func newMidtermQueryTestTask(id, index, name, userInput, origin, summary string, info *aicommon.AITaskRetrievalInfo) *midtermQueryTestTask {
+	task := &midtermQueryTestTask{
+		MockStatefulTask: aicommonmock.NewMockStatefulTask(context.Background(), id, userInput),
+	}
+	task.SetIndex(index)
+	task.SetName(name)
+	task.SetOriginUserInput(origin)
+	task.SetSummary(summary)
+	task.SetSemanticIdentifier("midterm_query_task")
+	task.SetTaskRetrievalInfo(info)
+	task.SetStatus(aicommon.AITaskState_Processing)
+	return task
 }
-func (m *midtermQueryTestTask) SetTaskRetrievalInfo(info *aicommon.AITaskRetrievalInfo) {
-	m.info = info.Clone()
-}
-func (m *midtermQueryTestTask) SetAsyncDeferCallback(func(error))              {}
-func (m *midtermQueryTestTask) CallAsyncDeferCallback(error)                   {}
-func (m *midtermQueryTestTask) SetResult(string)                               {}
-func (m *midtermQueryTestTask) GetResult() string                              { return "" }
-func (m *midtermQueryTestTask) GetContext() context.Context                    { return context.Background() }
-func (m *midtermQueryTestTask) Cancel()                                        {}
-func (m *midtermQueryTestTask) IsFinished() bool                               { return false }
-func (m *midtermQueryTestTask) GetUserInput() string                           { return m.userInput }
-func (m *midtermQueryTestTask) GetOriginUserInput() string                     { return m.origin }
-func (m *midtermQueryTestTask) SetUserInput(input string)                      { m.userInput = input }
-func (m *midtermQueryTestTask) SetAttachedDatas([]*aicommon.AttachedResource)  {}
-func (m *midtermQueryTestTask) GetAttachedDatas() []*aicommon.AttachedResource { return nil }
-func (m *midtermQueryTestTask) GetStatus() aicommon.AITaskState {
-	return aicommon.AITaskState_Processing
-}
-func (m *midtermQueryTestTask) SetStatus(aicommon.AITaskState)      {}
-func (m *midtermQueryTestTask) ForceSetStatus(aicommon.AITaskState) {}
-func (m *midtermQueryTestTask) AppendErrorToResult(error)           {}
-func (m *midtermQueryTestTask) GetCreatedAt() time.Time            { return time.Now() }
-func (m *midtermQueryTestTask) Finish(error)                       {}
-func (m *midtermQueryTestTask) SetAsyncMode(bool)                  {}
-func (m *midtermQueryTestTask) IsAsyncMode() bool                  { return false }
-func (m *midtermQueryTestTask) GetEmitter() *aicommon.Emitter      { return nil }
-func (m *midtermQueryTestTask) SetEmitter(*aicommon.Emitter)       {}
-func (m *midtermQueryTestTask) SetReActLoop(aicommon.ReActLoopIF)  {}
-func (m *midtermQueryTestTask) GetReActLoop() aicommon.ReActLoopIF { return nil }
-func (m *midtermQueryTestTask) SetDB(*gorm.DB)                     {}
-func (m *midtermQueryTestTask) GetRisks() []*schema.Risk           { return nil }
-func (m *midtermQueryTestTask) GetUUID() string                    { return m.id }
-func (m *midtermQueryTestTask) GetFocusMode() string               { return "" }
-func (m *midtermQueryTestTask) SetFocusMode(string)                {}
 
 func TestBuildMidtermRecallQuery_IncludesCurrentTaskDetails(t *testing.T) {
 	cfg := aicommon.NewConfig(context.Background())
@@ -108,19 +68,19 @@ func TestBuildMidtermRecallQuery_IncludesCurrentTaskDetails(t *testing.T) {
 	}})
 
 	react := &ReAct{config: cfg}
-	react.setCurrentTask(&midtermQueryTestTask{
-		id:        "task-1",
-		index:     "1-2",
-		name:      "verify http flow",
-		userInput: "focus on malformed headers",
-		origin:    "collect and verify malformed header behavior",
-		summary:   "need reproduce with retry",
-		info: &aicommon.AITaskRetrievalInfo{
+	react.setCurrentTask(newMidtermQueryTestTask(
+		"task-1",
+		"1-2",
+		"verify http flow",
+		"focus on malformed headers",
+		"collect and verify malformed header behavior",
+		"need reproduce with retry",
+		&aicommon.AITaskRetrievalInfo{
 			Target:    "http fuzz regression",
 			Questions: []string{"which malformed headers failed"},
 			Tags:      []string{"http", "fuzz"},
 		},
-	})
+	))
 
 	query := buildMidtermRecallQuery(react)
 
@@ -165,14 +125,15 @@ func TestBuildTimelineDumpWithMidtermMemory_UsesPendingPerceptionSummaryOnce(t *
 	cfg.Timeline = timeline
 
 	react := &ReAct{config: cfg}
-	react.setCurrentTask(&midtermQueryTestTask{
-		id:        "task-1",
-		index:     "1-2",
-		name:      "verify http flow",
-		userInput: "focus on malformed headers",
-		origin:    "collect and verify malformed header behavior",
-		summary:   "need reproduce with retry",
-	})
+	react.setCurrentTask(newMidtermQueryTestTask(
+		"task-1",
+		"1-2",
+		"verify http flow",
+		"focus on malformed headers",
+		"collect and verify malformed header behavior",
+		"need reproduce with retry",
+		nil,
+	))
 
 	dumpWithoutPerception := buildTimelineDumpWithMidtermMemory(react, timeline)
 	require.Equal(t, timeline.Dump(), dumpWithoutPerception)
@@ -257,11 +218,15 @@ func TestBuildMidtermTimelinePrefix_UsesPerceptionQueries(t *testing.T) {
 	cfg.TimelineArchiveStore = store
 
 	react := &ReAct{config: cfg}
-	react.setCurrentTask(&midtermQueryTestTask{
-		id:     "task-1",
-		name:   "verify http flow",
-		origin: "collect and verify malformed header behavior",
-	})
+	react.setCurrentTask(newMidtermQueryTestTask(
+		"task-1",
+		"",
+		"verify http flow",
+		"",
+		"collect and verify malformed header behavior",
+		"",
+		nil,
+	))
 
 	prefix, err := buildMidtermTimelinePrefix(react, []midtermTimelineSearchQuery{
 		{Query: "perception summary about malformed headers"},
