@@ -273,7 +273,7 @@ func TestNewReActLoop_OmitsDispatchSubReactAgentsWhenDisabled(t *testing.T) {
 }
 
 func TestBuildSubReactLoopOptions_FiltersDispatchAction(t *testing.T) {
-	opts := buildSubReactLoopOptions(subReactDispatchJob{MaxIterations: 3})
+	opts := buildSubReactLoopOptions()
 	loop, err := reactloops.CreateLoopByName(
 		schema.AI_REACT_LOOP_NAME_DEFAULT,
 		newDispatchSubReactTestInvoker(context.Background()),

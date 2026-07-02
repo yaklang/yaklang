@@ -629,6 +629,18 @@ func WithStatefulTaskBaseContext(ctx context.Context) StatefulTaskBaseOption {
 	}
 }
 
+func WithStatefulTaskBaseContextAndCancel(ctx context.Context, cancel context.CancelFunc) StatefulTaskBaseOption {
+	return func(task *AIStatefulTaskBase) {
+		if task == nil {
+			return
+		}
+		if ctx == nil {
+			ctx = context.Background()
+		}
+		task.ctx, task.cancel = ctx, cancel
+	}
+}
+
 func WithStatefulTaskBaseEmitter(emitter *Emitter) StatefulTaskBaseOption {
 	return func(task *AIStatefulTaskBase) {
 		if task == nil {
