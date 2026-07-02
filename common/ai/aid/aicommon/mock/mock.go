@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -208,6 +209,10 @@ func (c *MockedAIConfig) GetAllowUserInteraction() bool {
 type MockInvoker struct {
 	ctx    context.Context
 	config aicommon.AICallerConfigIf
+
+	mu          sync.RWMutex
+	currentTask aicommon.AIStatefulTask
+	runtimeTask []aicommon.AIStatefulTask
 }
 
 func NewMockInvoker(ctx context.Context) *MockInvoker {
@@ -215,6 +220,22 @@ func NewMockInvoker(ctx context.Context) *MockInvoker {
 		ctx:    ctx,
 		config: NewMockedAIConfig(ctx),
 	}
+}
+
+func (m *MockInvoker) GetContext() context.Context {
+	if m == nil {
+		return nil
+	}
+	return m.ctx
+}
+
+func (m *MockInvoker) SetConfig(config aicommon.AICallerConfigIf) {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.config = config
 }
 
 func (m *MockInvoker) AssembleLoopPrompt(tools []*aitool.Tool, input *aicommon.LoopPromptAssemblyInput) (*aicommon.LoopPromptAssemblyResult, error) {
@@ -491,6 +512,8 @@ func (m *MockInvoker) AddToTimeline(entry, content string) {
 }
 
 func (m *MockInvoker) GetConfig() aicommon.AICallerConfigIf {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return m.config
 }
 
@@ -509,15 +532,44 @@ func (m *MockInvoker) SelectKnowledgeBase(ctx context.Context, originQuery strin
 }
 
 func (m *MockInvoker) SetCurrentTask(task aicommon.AIStatefulTask) {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.currentTask = task
 }
 
 func (m *MockInvoker) GetCurrentTask() aicommon.AIStatefulTask {
-	return nil
+	if m == nil {
+		return nil
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.currentTask
 }
 
 func (m *MockInvoker) GetCurrentTaskId() string {
+	if task := m.GetCurrentTask(); task != nil {
+		return task.GetId()
+	}
 	return ""
 }
 
 func (m *MockInvoker) AddRuntimeTask(task aicommon.AIStatefulTask) {
+	if m == nil || task == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.runtimeTask = append(m.runtimeTask, task)
+}
+
+func (m *MockInvoker) GetRuntimeTasks() []aicommon.AIStatefulTask {
+	if m == nil {
+		return nil
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return append([]aicommon.AIStatefulTask(nil), m.runtimeTask...)
 }
