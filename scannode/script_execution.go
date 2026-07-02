@@ -62,6 +62,7 @@ func (s *ScanNode) executeScriptTask(
 	if reporter.ssaCollector != nil {
 		defer reporter.ssaCollector.Cleanup()
 	}
+	ssaDBEnv := extractSSADatabaseEnv(keyValues)
 	result := &ScriptExecutionResult{}
 	yakitServer := s.createYakitServer(reporter, result)
 	yakitServer.Start()
@@ -80,7 +81,7 @@ func (s *ScanNode) executeScriptTask(
 	if err != nil {
 		return nil, utils.Errorf("fetch node path err: %s", err)
 	}
-	if err := s.executeScript(taskCtx, scanNodePath, scriptFile, params, input.RuntimeID); err != nil {
+	if err := s.executeScript(taskCtx, scanNodePath, scriptFile, params, input.RuntimeID, ssaDBEnv); err != nil {
 		logReporterEventError("final progress checkpoint", reporter.flushLatestJobProgress())
 		return nil, s.handleScriptFailure(err, result, taskID)
 	}
@@ -293,15 +294,18 @@ func (s *ScanNode) executeScript(
 	scriptFile string,
 	params []string,
 	runtimeID string,
+	extraEnv []string,
 ) error {
 	baseCmd := []string{"distyak", scriptFile}
 	log.Infof("yak %v %v", scriptFile, params)
 
 	cmd := exec.CommandContext(ctx, scanNodePath, append(baseCmd, params...)...)
-	cmd.Env = append(os.Environ(),
+	env := append(os.Environ(),
 		fmt.Sprintf("YAKIT_HOME=%v", os.Getenv("YAKIT_HOME")),
 		fmt.Sprintf("YAK_RUNTIME_ID=%v", runtimeID),
 	)
+	env = append(env, extraEnv...)
+	cmd.Env = env
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
