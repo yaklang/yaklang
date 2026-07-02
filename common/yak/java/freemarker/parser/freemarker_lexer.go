@@ -1,13 +1,12 @@
-// Code generated from java-escape by ANTLR 4.11.1. DO NOT EDIT.
+// Code generated from ./FreemarkerLexer.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
 package freemarkerparser
 
 import (
 	"fmt"
+	"github.com/yaklang/antlr/v4"
 	"sync"
 	"unicode"
-
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 )
 
 // Suppress unused import error
@@ -22,29 +21,29 @@ type FreemarkerLexer struct {
 	// TODO: EOF string
 }
 
-var freemarkerlexerLexerStaticData struct {
+var FreemarkerLexerLexerStaticData struct {
 	once                   sync.Once
 	serializedATN          []int32
-	channelNames           []string
-	modeNames              []string
-	literalNames           []string
-	symbolicNames          []string
-	ruleNames              []string
-	predictionContextCache *antlr.PredictionContextCache
+	ChannelNames           []string
+	ModeNames              []string
+	LiteralNames           []string
+	SymbolicNames          []string
+	RuleNames              []string
+	PredictionContextCache *antlr.PredictionContextCache
 	atn                    *antlr.ATN
 	decisionToDFA          []*antlr.DFA
 }
 
 func freemarkerlexerLexerInit() {
-	staticData := &freemarkerlexerLexerStaticData
-	staticData.channelNames = []string{
+	staticData := &FreemarkerLexerLexerStaticData
+	staticData.ChannelNames = []string{
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN",
 	}
-	staticData.modeNames = []string{
+	staticData.ModeNames = []string{
 		"DEFAULT_MODE", "DOUBLE_QUOTE_STRING_MODE", "SINGLE_QUOTE_STRING_MODE",
 		"EXPR_MODE",
 	}
-	staticData.literalNames = []string{
+	staticData.LiteralNames = []string{
 		"", "", "'<#'", "'</#'", "'<@'", "'</@'", "", "", "", "", "", "", "",
 		"", "", "", "'if'", "'else'", "'elseif'", "'assign'", "'as'", "'list'",
 		"'true'", "'false'", "'include'", "'import'", "'macro'", "'nested'",
@@ -53,7 +52,7 @@ func freemarkerlexerLexerInit() {
 		"'!'", "'+'", "'-'", "'*'", "'/'", "'%'", "'('", "')'", "'['", "']'",
 		"'=='", "'='", "'!='", "'&&'", "'||'", "'.'", "','", "':'", "';'",
 	}
-	staticData.symbolicNames = []string{
+	staticData.SymbolicNames = []string{
 		"", "COMMENT", "START_DIRECTIVE_TAG", "END_DIRECTIVE_TAG", "START_USER_DIR_TAG",
 		"END_USER_DIR_TAG", "INLINE_EXPR_START", "CONTENT", "DQS_EXIT", "DQS_ESCAPE",
 		"DQS_ENTER_EXPR", "DQS_CONTENT", "SQS_EXIT", "SQS_ESCAPE", "SQS_ENTER_EXPR",
@@ -69,7 +68,7 @@ func freemarkerlexerLexerInit() {
 		"EXPR_COMPARE_NEQ", "EXPR_LOGICAL_AND", "EXPR_LOGICAL_OR", "EXPR_DOT",
 		"EXPR_COMMA", "EXPR_COLON", "EXPR_SEMICOLON", "EXPR_SYMBOL",
 	}
-	staticData.ruleNames = []string{
+	staticData.RuleNames = []string{
 		"COMMENT", "START_DIRECTIVE_TAG", "END_DIRECTIVE_TAG", "START_USER_DIR_TAG",
 		"END_USER_DIR_TAG", "INLINE_EXPR_START", "CONTENT", "DQS_EXIT", "DQS_ESCAPE",
 		"DQS_ENTER_EXPR", "DQS_CONTENT", "SQS_EXIT", "SQS_ESCAPE", "SQS_ENTER_EXPR",
@@ -86,7 +85,7 @@ func freemarkerlexerLexerInit() {
 		"EXPR_COMMA", "EXPR_COLON", "EXPR_SEMICOLON", "EXPR_SYMBOL", "COMMENT_FRAG",
 		"NUMBER", "SYMBOL",
 	}
-	staticData.predictionContextCache = antlr.NewPredictionContextCache()
+	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
 		4, 0, 67, 443, 6, -1, 6, -1, 6, -1, 6, -1, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2,
 		7, 2, 2, 3, 7, 3, 2, 4, 7, 4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8,
@@ -296,7 +295,7 @@ func freemarkerlexerLexerInit() {
 // NewFreemarkerLexer(). You can call this function if you wish to initialize the static state ahead
 // of time.
 func FreemarkerLexerInit() {
-	staticData := &freemarkerlexerLexerStaticData
+	staticData := &FreemarkerLexerLexerStaticData
 	staticData.once.Do(freemarkerlexerLexerInit)
 }
 
@@ -305,13 +304,13 @@ func NewFreemarkerLexer(input antlr.CharStream) *FreemarkerLexer {
 	FreemarkerLexerInit()
 	l := new(FreemarkerLexer)
 	l.BaseLexer = antlr.NewBaseLexer(input)
-	staticData := &freemarkerlexerLexerStaticData
-	l.Interpreter = antlr.NewLexerATNSimulator(l, staticData.atn, staticData.decisionToDFA, staticData.predictionContextCache)
-	l.channelNames = staticData.channelNames
-	l.modeNames = staticData.modeNames
-	l.RuleNames = staticData.ruleNames
-	l.LiteralNames = staticData.literalNames
-	l.SymbolicNames = staticData.symbolicNames
+	staticData := &FreemarkerLexerLexerStaticData
+	l.Interpreter = antlr.NewLexerATNSimulator(l, staticData.atn, staticData.decisionToDFA, staticData.PredictionContextCache)
+	l.channelNames = staticData.ChannelNames
+	l.modeNames = staticData.ModeNames
+	l.RuleNames = staticData.RuleNames
+	l.LiteralNames = staticData.LiteralNames
+	l.SymbolicNames = staticData.SymbolicNames
 	l.GrammarFileName = "FreemarkerLexer.g4"
 	// TODO: l.EOF = antlr.TokenEOF
 

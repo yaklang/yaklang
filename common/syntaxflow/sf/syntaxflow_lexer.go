@@ -1,13 +1,12 @@
-// Code generated from java-escape by ANTLR 4.11.1. DO NOT EDIT.
+// Code generated from ./SyntaxFlowLexer.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
 package sf
 
 import (
 	"fmt"
+	"github.com/yaklang/antlr/v4"
 	"sync"
 	"unicode"
-
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 )
 
 // Suppress unused import error
@@ -22,28 +21,28 @@ type SyntaxFlowLexer struct {
 	// TODO: EOF string
 }
 
-var syntaxflowlexerLexerStaticData struct {
+var SyntaxFlowLexerLexerStaticData struct {
 	once                   sync.Once
 	serializedATN          []int32
-	channelNames           []string
-	modeNames              []string
-	literalNames           []string
-	symbolicNames          []string
-	ruleNames              []string
-	predictionContextCache *antlr.PredictionContextCache
+	ChannelNames           []string
+	ModeNames              []string
+	LiteralNames           []string
+	SymbolicNames          []string
+	RuleNames              []string
+	PredictionContextCache *antlr.PredictionContextCache
 	atn                    *antlr.ATN
 	decisionToDFA          []*antlr.DFA
 }
 
 func syntaxflowlexerLexerInit() {
-	staticData := &syntaxflowlexerLexerStaticData
-	staticData.channelNames = []string{
+	staticData := &SyntaxFlowLexerLexerStaticData
+	staticData.ChannelNames = []string{
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN",
 	}
-	staticData.modeNames = []string{
+	staticData.ModeNames = []string{
 		"DEFAULT_MODE", "HereDocIdentifier", "CRLFHereDoc", "LFHereDoc",
 	}
-	staticData.literalNames = []string{
+	staticData.LiteralNames = []string{
 		"", "'==>'", "'...'", "'%%'", "'..'", "'<='", "'>='", "'>>'", "'=>'",
 		"'=='", "'=~'", "'!~'", "'&&'", "'||'", "'!='", "'${'", "';'", "'?{'",
 		"'-{'", "'->'", "'}->'", "'-->'", "'#{'", "'#>'", "'#->'", "'>'", "'.'",
@@ -54,7 +53,7 @@ func syntaxflowlexerLexerInit() {
 		"", "'else'", "'type'", "'in'", "'call'", "", "", "'phi'", "", "", "'opcode'",
 		"'have'", "'any'", "'not'", "'for'", "'version_in'", "'r'", "'g'", "'e'",
 	}
-	staticData.symbolicNames = []string{
+	staticData.SymbolicNames = []string{
 		"", "DeepFilter", "Deep", "Percent", "DeepDot", "LtEq", "GtEq", "DoubleGt",
 		"Filter", "EqEq", "RegexpMatch", "NotRegexpMatch", "And", "Or", "NotEq",
 		"DollarBraceOpen", "Semicolon", "ConditionStart", "DeepNextStart", "UseStart",
@@ -73,7 +72,7 @@ func syntaxflowlexerLexerInit() {
 		"CRLFHereDocIdentifierBreak", "LFHereDocIdentifierBreak", "CRLFEndDoc",
 		"CRLFHereDocText", "LFEndDoc", "LFHereDocText",
 	}
-	staticData.ruleNames = []string{
+	staticData.RuleNames = []string{
 		"DeepFilter", "Deep", "Percent", "DeepDot", "LtEq", "GtEq", "DoubleGt",
 		"Filter", "EqEq", "RegexpMatch", "NotRegexpMatch", "And", "Or", "NotEq",
 		"DollarBraceOpen", "Semicolon", "ConditionStart", "DeepNextStart", "UseStart",
@@ -93,7 +92,7 @@ func syntaxflowlexerLexerInit() {
 		"CRLFHereDocText", "LFEndDoc", "LFHereDocText", "NameString", "IdentifierCharStart",
 		"HexDigit", "Digit", "OctalDigit", "RegexpLiteralChar",
 	}
-	staticData.predictionContextCache = antlr.NewPredictionContextCache()
+	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
 		4, 0, 97, 696, 6, -1, 6, -1, 6, -1, 6, -1, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2,
 		7, 2, 2, 3, 7, 3, 2, 4, 7, 4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8,
@@ -420,7 +419,7 @@ func syntaxflowlexerLexerInit() {
 // NewSyntaxFlowLexer(). You can call this function if you wish to initialize the static state ahead
 // of time.
 func SyntaxFlowLexerInit() {
-	staticData := &syntaxflowlexerLexerStaticData
+	staticData := &SyntaxFlowLexerLexerStaticData
 	staticData.once.Do(syntaxflowlexerLexerInit)
 }
 
@@ -429,13 +428,13 @@ func NewSyntaxFlowLexer(input antlr.CharStream) *SyntaxFlowLexer {
 	SyntaxFlowLexerInit()
 	l := new(SyntaxFlowLexer)
 	l.BaseLexer = antlr.NewBaseLexer(input)
-	staticData := &syntaxflowlexerLexerStaticData
-	l.Interpreter = antlr.NewLexerATNSimulator(l, staticData.atn, staticData.decisionToDFA, staticData.predictionContextCache)
-	l.channelNames = staticData.channelNames
-	l.modeNames = staticData.modeNames
-	l.RuleNames = staticData.ruleNames
-	l.LiteralNames = staticData.literalNames
-	l.SymbolicNames = staticData.symbolicNames
+	staticData := &SyntaxFlowLexerLexerStaticData
+	l.Interpreter = antlr.NewLexerATNSimulator(l, staticData.atn, staticData.decisionToDFA, staticData.PredictionContextCache)
+	l.channelNames = staticData.ChannelNames
+	l.modeNames = staticData.ModeNames
+	l.RuleNames = staticData.RuleNames
+	l.LiteralNames = staticData.LiteralNames
+	l.SymbolicNames = staticData.SymbolicNames
 	l.GrammarFileName = "SyntaxFlowLexer.g4"
 	// TODO: l.EOF = antlr.TokenEOF
 
@@ -573,63 +572,48 @@ func (l *SyntaxFlowLexer) Action(localctx antlr.RuleContext, ruleIndex, actionIn
 }
 
 func (l *SyntaxFlowLexer) HereDocIdentifierName_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 0:
-		this.recordHereDocLabel()
+		l.recordHereDocLabel()
 
 	case 1:
-		this.recordHereDocLabel()
+		l.recordHereDocLabel()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *SyntaxFlowLexer) CRLFHereDocIdentifierBreak_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 2:
-		this.recordHereDocLF()
+		l.recordHereDocLF()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *SyntaxFlowLexer) LFHereDocIdentifierBreak_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 3:
-		this.recordHereDocLF()
+		l.recordHereDocLF()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *SyntaxFlowLexer) CRLFEndDoc_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 4:
-		this.DocEndDistribute()
+		l.DocEndDistribute()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *SyntaxFlowLexer) LFEndDoc_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 5:
-		this.DocEndDistribute()
+		l.DocEndDistribute()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
@@ -650,12 +634,9 @@ func (l *SyntaxFlowLexer) Sempred(localctx antlr.RuleContext, ruleIndex, predInd
 }
 
 func (p *SyntaxFlowLexer) LtEq_Sempred(localctx antlr.RuleContext, predIndex int) bool {
-	this := p
-	_ = this
-
 	switch predIndex {
 	case 0:
-		return this.GetInputStream().LA(1) != '='
+		return p.GetInputStream().LA(1) != '='
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -663,12 +644,9 @@ func (p *SyntaxFlowLexer) LtEq_Sempred(localctx antlr.RuleContext, predIndex int
 }
 
 func (p *SyntaxFlowLexer) GtEq_Sempred(localctx antlr.RuleContext, predIndex int) bool {
-	this := p
-	_ = this
-
 	switch predIndex {
 	case 1:
-		return this.GetInputStream().LA(1) != '='
+		return p.GetInputStream().LA(1) != '='
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))

@@ -1,13 +1,12 @@
-// Code generated from java-escape by ANTLR 4.11.1. DO NOT EDIT.
+// Code generated from ./NaslLexer.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
 package parser
 
 import (
 	"fmt"
+	"github.com/yaklang/antlr/v4"
 	"sync"
 	"unicode"
-
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 )
 
 // Suppress unused import error
@@ -22,28 +21,28 @@ type NaslLexer struct {
 	// TODO: EOF string
 }
 
-var nasllexerLexerStaticData struct {
+var NaslLexerLexerStaticData struct {
 	once                   sync.Once
 	serializedATN          []int32
-	channelNames           []string
-	modeNames              []string
-	literalNames           []string
-	symbolicNames          []string
-	ruleNames              []string
-	predictionContextCache *antlr.PredictionContextCache
+	ChannelNames           []string
+	ModeNames              []string
+	LiteralNames           []string
+	SymbolicNames          []string
+	RuleNames              []string
+	PredictionContextCache *antlr.PredictionContextCache
 	atn                    *antlr.ATN
 	decisionToDFA          []*antlr.DFA
 }
 
 func nasllexerLexerInit() {
-	staticData := &nasllexerLexerStaticData
-	staticData.channelNames = []string{
+	staticData := &NaslLexerLexerStaticData
+	staticData.ChannelNames = []string{
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN",
 	}
-	staticData.modeNames = []string{
+	staticData.ModeNames = []string{
 		"DEFAULT_MODE",
 	}
-	staticData.literalNames = []string{
+	staticData.LiteralNames = []string{
 		"", "", "'['", "']'", "'('", "')'", "'{'", "'}'", "';'", "','", "'='",
 		"':'", "'.'", "'++'", "'--'", "'+'", "'-'", "'~'", "'&'", "'^'", "'|'",
 		"'>>'", "'<<'", "'<<<'", "'>>>'", "'!'", "'*'", "'**'", "'/'", "'%'",
@@ -54,7 +53,7 @@ func nasllexerLexerInit() {
 		"'if'", "'function'", "'repeat'", "'while'", "'until'", "", "", "",
 		"", "", "", "'NULL'",
 	}
-	staticData.symbolicNames = []string{
+	staticData.SymbolicNames = []string{
 		"", "SingleLineComment", "OpenBracket", "CloseBracket", "OpenParen",
 		"CloseParen", "OpenBrace", "CloseBrace", "SemiColon", "Comma", "Assign",
 		"Colon", "Dot", "PlusPlus", "MinusMinus", "Plus", "Minus", "BitNot",
@@ -70,7 +69,7 @@ func nasllexerLexerInit() {
 		"BooleanLiteral", "IntegerLiteral", "FloatLiteral", "IpLiteral", "HexLiteral",
 		"NULLLiteral", "Identifier", "WhiteSpaces", "LineTerminator",
 	}
-	staticData.ruleNames = []string{
+	staticData.RuleNames = []string{
 		"SingleLineComment", "OpenBracket", "CloseBracket", "OpenParen", "CloseParen",
 		"OpenBrace", "CloseBrace", "SemiColon", "Comma", "Assign", "Colon",
 		"Dot", "PlusPlus", "MinusMinus", "Plus", "Minus", "BitNot", "BitAnd",
@@ -86,7 +85,7 @@ func nasllexerLexerInit() {
 		"IntegerLiteral", "FloatLiteral", "IpLiteral", "HexLiteral", "NULLLiteral",
 		"Identifier", "WhiteSpaces", "LineTerminator",
 	}
-	staticData.predictionContextCache = antlr.NewPredictionContextCache()
+	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
 		4, 0, 75, 505, 6, -1, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2,
 		4, 7, 4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 2,
@@ -326,7 +325,7 @@ func nasllexerLexerInit() {
 // NewNaslLexer(). You can call this function if you wish to initialize the static state ahead
 // of time.
 func NaslLexerInit() {
-	staticData := &nasllexerLexerStaticData
+	staticData := &NaslLexerLexerStaticData
 	staticData.once.Do(nasllexerLexerInit)
 }
 
@@ -335,13 +334,13 @@ func NewNaslLexer(input antlr.CharStream) *NaslLexer {
 	NaslLexerInit()
 	l := new(NaslLexer)
 	l.BaseLexer = antlr.NewBaseLexer(input)
-	staticData := &nasllexerLexerStaticData
-	l.Interpreter = antlr.NewLexerATNSimulator(l, staticData.atn, staticData.decisionToDFA, staticData.predictionContextCache)
-	l.channelNames = staticData.channelNames
-	l.modeNames = staticData.modeNames
-	l.RuleNames = staticData.ruleNames
-	l.LiteralNames = staticData.literalNames
-	l.SymbolicNames = staticData.symbolicNames
+	staticData := &NaslLexerLexerStaticData
+	l.Interpreter = antlr.NewLexerATNSimulator(l, staticData.atn, staticData.decisionToDFA, staticData.PredictionContextCache)
+	l.channelNames = staticData.ChannelNames
+	l.modeNames = staticData.ModeNames
+	l.RuleNames = staticData.RuleNames
+	l.LiteralNames = staticData.LiteralNames
+	l.SymbolicNames = staticData.SymbolicNames
 	l.GrammarFileName = "NaslLexer.g4"
 	// TODO: l.EOF = antlr.TokenEOF
 

@@ -24,7 +24,7 @@ func (y *YakCompiler) _VisitTryStmt(raw yak.ITryStmtContext) interface{} {
 		identifier                               = i.Identifier()
 	)
 
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	tableRecover := y.SwitchSymbolTable("instanceCode", uuid.New().String())

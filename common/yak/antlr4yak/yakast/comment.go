@@ -10,7 +10,7 @@ func (y *YakCompiler) VisitLineCommentStmt(i *yak.LineCommentStmtContext) interf
 		return nil
 	}
 
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	y.writeString(strings.TrimSpace(i.GetText()))

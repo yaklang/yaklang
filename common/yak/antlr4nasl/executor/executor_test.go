@@ -1,7 +1,7 @@
 package executor
 
 import (
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor/nasl_type"
 	nasl "github.com/yaklang/yaklang/common/yak/antlr4nasl/parser"

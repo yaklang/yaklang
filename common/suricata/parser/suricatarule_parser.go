@@ -1,4 +1,4 @@
-// Code generated from java-escape by ANTLR 4.11.1. DO NOT EDIT.
+// Code generated from ./SuricataRuleParser.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
 package parser // SuricataRuleParser
 
@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 )
 
 // Suppress unused import errors
@@ -19,26 +19,26 @@ type SuricataRuleParser struct {
 	*antlr.BaseParser
 }
 
-var suricataruleparserParserStaticData struct {
+var SuricataRuleParserParserStaticData struct {
 	once                   sync.Once
 	serializedATN          []int32
-	literalNames           []string
-	symbolicNames          []string
-	ruleNames              []string
-	predictionContextCache *antlr.PredictionContextCache
+	LiteralNames           []string
+	SymbolicNames          []string
+	RuleNames              []string
+	PredictionContextCache *antlr.PredictionContextCache
 	atn                    *antlr.ATN
 	decisionToDFA          []*antlr.DFA
 }
 
 func suricataruleparserParserInit() {
-	staticData := &suricataruleparserParserStaticData
-	staticData.literalNames = []string{
+	staticData := &SuricataRuleParserParserStaticData
+	staticData.LiteralNames = []string{
 		"", "'any'", "", "'$'", "'->'", "'<>'", "'*'", "'/'", "'%'", "'&'",
 		"'+'", "'-'", "'^'", "'<'", "'>'", "'<='", "'>='", "", "'::'", "'['",
 		"']'", "'('", "'{'", "'}'", "", "'='", "'~'", "'.'", "", "", "", "",
 		"", "", "", "", "", "", "')'",
 	}
-	staticData.symbolicNames = []string{
+	staticData.SymbolicNames = []string{
 		"", "Any", "Negative", "Dollar", "Arrow", "BothDirect", "Mul", "Div",
 		"Mod", "Amp", "Plus", "Sub", "Power", "Lt", "Gt", "LtEq", "GtEq", "Colon",
 		"DoubleColon", "LBracket", "RBracket", "ParamStart", "LBrace", "RBrace",
@@ -49,14 +49,14 @@ func suricataruleparserParserInit() {
 		"UntilSEPParamWS", "NonQuotedString", "ModeString", "ModeStringEnd",
 		"ANY",
 	}
-	staticData.ruleNames = []string{
+	staticData.RuleNames = []string{
 		"rules", "rule", "action", "protocol", "src_address", "dest_address",
 		"address", "ipv4", "ipv4block", "ipv4mask", "environment_var", "ipv6",
 		"ipv6full", "ipv6compact", "ipv6part", "ipv6block", "ipv6mask", "src_port",
 		"dest_port", "port", "params", "param", "keyword", "setting", "singleSetting",
 		"negative", "settingcontent", "sep",
 	}
-	staticData.predictionContextCache = antlr.NewPredictionContextCache()
+	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
 		4, 1, 51, 242, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
 		4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 2, 10, 7,
@@ -175,7 +175,7 @@ func suricataruleparserParserInit() {
 // NewSuricataRuleParser(). You can call this function if you wish to initialize the static state ahead
 // of time.
 func SuricataRuleParserInit() {
-	staticData := &suricataruleparserParserStaticData
+	staticData := &SuricataRuleParserParserStaticData
 	staticData.once.Do(suricataruleparserParserInit)
 }
 
@@ -184,12 +184,12 @@ func NewSuricataRuleParser(input antlr.TokenStream) *SuricataRuleParser {
 	SuricataRuleParserInit()
 	this := new(SuricataRuleParser)
 	this.BaseParser = antlr.NewBaseParser(input)
-	staticData := &suricataruleparserParserStaticData
-	this.Interpreter = antlr.NewParserATNSimulator(this, staticData.atn, staticData.decisionToDFA, staticData.predictionContextCache)
-	this.RuleNames = staticData.ruleNames
-	this.LiteralNames = staticData.literalNames
-	this.SymbolicNames = staticData.symbolicNames
-	this.GrammarFileName = "java-escape"
+	staticData := &SuricataRuleParserParserStaticData
+	this.Interpreter = antlr.NewParserATNSimulator(this, staticData.atn, staticData.decisionToDFA, staticData.PredictionContextCache)
+	this.RuleNames = staticData.RuleNames
+	this.LiteralNames = staticData.LiteralNames
+	this.SymbolicNames = staticData.SymbolicNames
+	this.GrammarFileName = "SuricataRuleParser.g4"
 
 	return this
 }
@@ -289,20 +289,30 @@ type IRulesContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	EOF() antlr.TerminalNode
+	AllRule_() []IRuleContext
+	Rule_(i int) IRuleContext
+
 	// IsRulesContext differentiates from other interfaces.
 	IsRulesContext()
 }
 
 type RulesContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyRulesContext() *RulesContext {
 	var p = new(RulesContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_rules
 	return p
+}
+
+func InitEmptyRulesContext(p *RulesContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_rules
 }
 
 func (*RulesContext) IsRulesContext() {}
@@ -310,7 +320,7 @@ func (*RulesContext) IsRulesContext() {}
 func NewRulesContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *RulesContext {
 	var p = new(RulesContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_rules
@@ -384,32 +394,16 @@ func (s *RulesContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Rules() (localctx IRulesContext) {
-	this := p
-	_ = this
-
 	localctx = NewRulesContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, SuricataRuleParserRULE_rules)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(57)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for ok := true; ok; ok = _la == SuricataRuleParserID {
@@ -420,14 +414,31 @@ func (p *SuricataRuleParser) Rules() (localctx IRulesContext) {
 
 		p.SetState(59)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
 		p.SetState(61)
 		p.Match(SuricataRuleParserEOF)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IRuleContext is an interface to support dynamic dispatch.
@@ -437,20 +448,36 @@ type IRuleContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Action_() IActionContext
+	Protocol() IProtocolContext
+	Src_address() ISrc_addressContext
+	Src_port() ISrc_portContext
+	Dest_address() IDest_addressContext
+	Dest_port() IDest_portContext
+	Params() IParamsContext
+	Arrow() antlr.TerminalNode
+	BothDirect() antlr.TerminalNode
+
 	// IsRuleContext differentiates from other interfaces.
 	IsRuleContext()
 }
 
 type RuleContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyRuleContext() *RuleContext {
 	var p = new(RuleContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_rule
 	return p
+}
+
+func InitEmptyRuleContext(p *RuleContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_rule
 }
 
 func (*RuleContext) IsRuleContext() {}
@@ -458,7 +485,7 @@ func (*RuleContext) IsRuleContext() {}
 func NewRuleContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *RuleContext {
 	var p = new(RuleContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_rule
@@ -607,28 +634,9 @@ func (s *RuleContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Rule_() (localctx IRuleContext) {
-	this := p
-	_ = this
-
 	localctx = NewRuleContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 2, SuricataRuleParserRULE_rule)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -671,7 +679,17 @@ func (p *SuricataRuleParser) Rule_() (localctx IRuleContext) {
 		p.Params()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IActionContext is an interface to support dynamic dispatch.
@@ -681,20 +699,28 @@ type IActionContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ID() antlr.TerminalNode
+
 	// IsActionContext differentiates from other interfaces.
 	IsActionContext()
 }
 
 type ActionContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyActionContext() *ActionContext {
 	var p = new(ActionContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_action
 	return p
+}
+
+func InitEmptyActionContext(p *ActionContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_action
 }
 
 func (*ActionContext) IsActionContext() {}
@@ -702,7 +728,7 @@ func (*ActionContext) IsActionContext() {}
 func NewActionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ActionContext {
 	var p = new(ActionContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_action
@@ -735,35 +761,29 @@ func (s *ActionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Action_() (localctx IActionContext) {
-	this := p
-	_ = this
-
 	localctx = NewActionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 4, SuricataRuleParserRULE_action)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(72)
 		p.Match(SuricataRuleParserID)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IProtocolContext is an interface to support dynamic dispatch.
@@ -773,20 +793,28 @@ type IProtocolContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ID() antlr.TerminalNode
+
 	// IsProtocolContext differentiates from other interfaces.
 	IsProtocolContext()
 }
 
 type ProtocolContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyProtocolContext() *ProtocolContext {
 	var p = new(ProtocolContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_protocol
 	return p
+}
+
+func InitEmptyProtocolContext(p *ProtocolContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_protocol
 }
 
 func (*ProtocolContext) IsProtocolContext() {}
@@ -794,7 +822,7 @@ func (*ProtocolContext) IsProtocolContext() {}
 func NewProtocolContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ProtocolContext {
 	var p = new(ProtocolContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_protocol
@@ -827,35 +855,29 @@ func (s *ProtocolContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Protocol() (localctx IProtocolContext) {
-	this := p
-	_ = this
-
 	localctx = NewProtocolContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, SuricataRuleParserRULE_protocol)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(74)
 		p.Match(SuricataRuleParserID)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISrc_addressContext is an interface to support dynamic dispatch.
@@ -865,20 +887,28 @@ type ISrc_addressContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Address() IAddressContext
+
 	// IsSrc_addressContext differentiates from other interfaces.
 	IsSrc_addressContext()
 }
 
 type Src_addressContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptySrc_addressContext() *Src_addressContext {
 	var p = new(Src_addressContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_src_address
 	return p
+}
+
+func InitEmptySrc_addressContext(p *Src_addressContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_src_address
 }
 
 func (*Src_addressContext) IsSrc_addressContext() {}
@@ -886,7 +916,7 @@ func (*Src_addressContext) IsSrc_addressContext() {}
 func NewSrc_addressContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *Src_addressContext {
 	var p = new(Src_addressContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_src_address
@@ -931,35 +961,25 @@ func (s *Src_addressContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *SuricataRuleParser) Src_address() (localctx ISrc_addressContext) {
-	this := p
-	_ = this
-
 	localctx = NewSrc_addressContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 8, SuricataRuleParserRULE_src_address)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(76)
 		p.Address()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDest_addressContext is an interface to support dynamic dispatch.
@@ -969,20 +989,28 @@ type IDest_addressContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Address() IAddressContext
+
 	// IsDest_addressContext differentiates from other interfaces.
 	IsDest_addressContext()
 }
 
 type Dest_addressContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyDest_addressContext() *Dest_addressContext {
 	var p = new(Dest_addressContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_dest_address
 	return p
+}
+
+func InitEmptyDest_addressContext(p *Dest_addressContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_dest_address
 }
 
 func (*Dest_addressContext) IsDest_addressContext() {}
@@ -990,7 +1018,7 @@ func (*Dest_addressContext) IsDest_addressContext() {}
 func NewDest_addressContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *Dest_addressContext {
 	var p = new(Dest_addressContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_dest_address
@@ -1035,35 +1063,25 @@ func (s *Dest_addressContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *SuricataRuleParser) Dest_address() (localctx IDest_addressContext) {
-	this := p
-	_ = this
-
 	localctx = NewDest_addressContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 10, SuricataRuleParserRULE_dest_address)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(78)
 		p.Address()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IAddressContext is an interface to support dynamic dispatch.
@@ -1073,20 +1091,38 @@ type IAddressContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Any() antlr.TerminalNode
+	Environment_var() IEnvironment_varContext
+	Ipv4() IIpv4Context
+	Ipv6() IIpv6Context
+	LBracket() antlr.TerminalNode
+	AllAddress() []IAddressContext
+	Address(i int) IAddressContext
+	RBracket() antlr.TerminalNode
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+	Negative() antlr.TerminalNode
+
 	// IsAddressContext differentiates from other interfaces.
 	IsAddressContext()
 }
 
 type AddressContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyAddressContext() *AddressContext {
 	var p = new(AddressContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_address
 	return p
+}
+
+func InitEmptyAddressContext(p *AddressContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_address
 }
 
 func (*AddressContext) IsAddressContext() {}
@@ -1094,7 +1130,7 @@ func (*AddressContext) IsAddressContext() {}
 func NewAddressContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *AddressContext {
 	var p = new(AddressContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_address
@@ -1236,37 +1272,26 @@ func (s *AddressContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Address() (localctx IAddressContext) {
-	this := p
-	_ = this
-
 	localctx = NewAddressContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 12, SuricataRuleParserRULE_address)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(97)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 2, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 2, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(80)
 			p.Match(SuricataRuleParserAny)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 2:
@@ -1295,6 +1320,10 @@ func (p *SuricataRuleParser) Address() (localctx IAddressContext) {
 		{
 			p.SetState(84)
 			p.Match(SuricataRuleParserLBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(85)
@@ -1302,12 +1331,19 @@ func (p *SuricataRuleParser) Address() (localctx IAddressContext) {
 		}
 		p.SetState(90)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == SuricataRuleParserComma {
 			{
 				p.SetState(86)
 				p.Match(SuricataRuleParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(87)
@@ -1316,11 +1352,18 @@ func (p *SuricataRuleParser) Address() (localctx IAddressContext) {
 
 			p.SetState(92)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
 			p.SetState(93)
 			p.Match(SuricataRuleParserRBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 6:
@@ -1328,15 +1371,31 @@ func (p *SuricataRuleParser) Address() (localctx IAddressContext) {
 		{
 			p.SetState(95)
 			p.Match(SuricataRuleParserNegative)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(96)
 			p.Address()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIpv4Context is an interface to support dynamic dispatch.
@@ -1346,20 +1405,33 @@ type IIpv4Context interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllIpv4block() []IIpv4blockContext
+	Ipv4block(i int) IIpv4blockContext
+	AllDot() []antlr.TerminalNode
+	Dot(i int) antlr.TerminalNode
+	Div() antlr.TerminalNode
+	Ipv4mask() IIpv4maskContext
+
 	// IsIpv4Context differentiates from other interfaces.
 	IsIpv4Context()
 }
 
 type Ipv4Context struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyIpv4Context() *Ipv4Context {
 	var p = new(Ipv4Context)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_ipv4
 	return p
+}
+
+func InitEmptyIpv4Context(p *Ipv4Context) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_ipv4
 }
 
 func (*Ipv4Context) IsIpv4Context() {}
@@ -1367,7 +1439,7 @@ func (*Ipv4Context) IsIpv4Context() {}
 func NewIpv4Context(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *Ipv4Context {
 	var p = new(Ipv4Context)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_ipv4
@@ -1465,28 +1537,9 @@ func (s *Ipv4Context) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Ipv4() (localctx IIpv4Context) {
-	this := p
-	_ = this
-
 	localctx = NewIpv4Context(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 14, SuricataRuleParserRULE_ipv4)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -1496,6 +1549,10 @@ func (p *SuricataRuleParser) Ipv4() (localctx IIpv4Context) {
 	{
 		p.SetState(100)
 		p.Match(SuricataRuleParserDot)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(101)
@@ -1504,6 +1561,10 @@ func (p *SuricataRuleParser) Ipv4() (localctx IIpv4Context) {
 	{
 		p.SetState(102)
 		p.Match(SuricataRuleParserDot)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(103)
@@ -1512,6 +1573,10 @@ func (p *SuricataRuleParser) Ipv4() (localctx IIpv4Context) {
 	{
 		p.SetState(104)
 		p.Match(SuricataRuleParserDot)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(105)
@@ -1519,12 +1584,19 @@ func (p *SuricataRuleParser) Ipv4() (localctx IIpv4Context) {
 	}
 	p.SetState(108)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == SuricataRuleParserDiv {
 		{
 			p.SetState(106)
 			p.Match(SuricataRuleParserDiv)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(107)
@@ -1533,7 +1605,17 @@ func (p *SuricataRuleParser) Ipv4() (localctx IIpv4Context) {
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIpv4blockContext is an interface to support dynamic dispatch.
@@ -1543,20 +1625,28 @@ type IIpv4blockContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	INT() antlr.TerminalNode
+
 	// IsIpv4blockContext differentiates from other interfaces.
 	IsIpv4blockContext()
 }
 
 type Ipv4blockContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyIpv4blockContext() *Ipv4blockContext {
 	var p = new(Ipv4blockContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_ipv4block
 	return p
+}
+
+func InitEmptyIpv4blockContext(p *Ipv4blockContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_ipv4block
 }
 
 func (*Ipv4blockContext) IsIpv4blockContext() {}
@@ -1564,7 +1654,7 @@ func (*Ipv4blockContext) IsIpv4blockContext() {}
 func NewIpv4blockContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *Ipv4blockContext {
 	var p = new(Ipv4blockContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_ipv4block
@@ -1597,35 +1687,29 @@ func (s *Ipv4blockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Ipv4block() (localctx IIpv4blockContext) {
-	this := p
-	_ = this
-
 	localctx = NewIpv4blockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 16, SuricataRuleParserRULE_ipv4block)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(110)
 		p.Match(SuricataRuleParserINT)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIpv4maskContext is an interface to support dynamic dispatch.
@@ -1635,20 +1719,28 @@ type IIpv4maskContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	INT() antlr.TerminalNode
+
 	// IsIpv4maskContext differentiates from other interfaces.
 	IsIpv4maskContext()
 }
 
 type Ipv4maskContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyIpv4maskContext() *Ipv4maskContext {
 	var p = new(Ipv4maskContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_ipv4mask
 	return p
+}
+
+func InitEmptyIpv4maskContext(p *Ipv4maskContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_ipv4mask
 }
 
 func (*Ipv4maskContext) IsIpv4maskContext() {}
@@ -1656,7 +1748,7 @@ func (*Ipv4maskContext) IsIpv4maskContext() {}
 func NewIpv4maskContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *Ipv4maskContext {
 	var p = new(Ipv4maskContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_ipv4mask
@@ -1689,35 +1781,29 @@ func (s *Ipv4maskContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Ipv4mask() (localctx IIpv4maskContext) {
-	this := p
-	_ = this
-
 	localctx = NewIpv4maskContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 18, SuricataRuleParserRULE_ipv4mask)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(112)
 		p.Match(SuricataRuleParserINT)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IEnvironment_varContext is an interface to support dynamic dispatch.
@@ -1727,20 +1813,29 @@ type IEnvironment_varContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Dollar() antlr.TerminalNode
+	ID() antlr.TerminalNode
+
 	// IsEnvironment_varContext differentiates from other interfaces.
 	IsEnvironment_varContext()
 }
 
 type Environment_varContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyEnvironment_varContext() *Environment_varContext {
 	var p = new(Environment_varContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_environment_var
 	return p
+}
+
+func InitEmptyEnvironment_varContext(p *Environment_varContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_environment_var
 }
 
 func (*Environment_varContext) IsEnvironment_varContext() {}
@@ -1748,7 +1843,7 @@ func (*Environment_varContext) IsEnvironment_varContext() {}
 func NewEnvironment_varContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *Environment_varContext {
 	var p = new(Environment_varContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_environment_var
@@ -1785,39 +1880,37 @@ func (s *Environment_varContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *SuricataRuleParser) Environment_var() (localctx IEnvironment_varContext) {
-	this := p
-	_ = this
-
 	localctx = NewEnvironment_varContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 20, SuricataRuleParserRULE_environment_var)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(114)
 		p.Match(SuricataRuleParserDollar)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(115)
 		p.Match(SuricataRuleParserID)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIpv6Context is an interface to support dynamic dispatch.
@@ -1827,20 +1920,31 @@ type IIpv6Context interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Ipv6full() IIpv6fullContext
+	Ipv6compact() IIpv6compactContext
+	Div() antlr.TerminalNode
+	Ipv6mask() IIpv6maskContext
+
 	// IsIpv6Context differentiates from other interfaces.
 	IsIpv6Context()
 }
 
 type Ipv6Context struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyIpv6Context() *Ipv6Context {
 	var p = new(Ipv6Context)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_ipv6
 	return p
+}
+
+func InitEmptyIpv6Context(p *Ipv6Context) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_ipv6
 }
 
 func (*Ipv6Context) IsIpv6Context() {}
@@ -1848,7 +1952,7 @@ func (*Ipv6Context) IsIpv6Context() {}
 func NewIpv6Context(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *Ipv6Context {
 	var p = new(Ipv6Context)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_ipv6
@@ -1929,33 +2033,18 @@ func (s *Ipv6Context) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Ipv6() (localctx IIpv6Context) {
-	this := p
-	_ = this
-
 	localctx = NewIpv6Context(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 22, SuricataRuleParserRULE_ipv6)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(119)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 4, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 4, p.GetParserRuleContext()) {
 	case 1:
 		{
 			p.SetState(117)
@@ -1968,15 +2057,24 @@ func (p *SuricataRuleParser) Ipv6() (localctx IIpv6Context) {
 			p.Ipv6compact()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 	p.SetState(123)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == SuricataRuleParserDiv {
 		{
 			p.SetState(121)
 			p.Match(SuricataRuleParserDiv)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(122)
@@ -1985,7 +2083,17 @@ func (p *SuricataRuleParser) Ipv6() (localctx IIpv6Context) {
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIpv6fullContext is an interface to support dynamic dispatch.
@@ -1995,20 +2103,31 @@ type IIpv6fullContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllIpv6block() []IIpv6blockContext
+	Ipv6block(i int) IIpv6blockContext
+	AllColon() []antlr.TerminalNode
+	Colon(i int) antlr.TerminalNode
+
 	// IsIpv6fullContext differentiates from other interfaces.
 	IsIpv6fullContext()
 }
 
 type Ipv6fullContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyIpv6fullContext() *Ipv6fullContext {
 	var p = new(Ipv6fullContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_ipv6full
 	return p
+}
+
+func InitEmptyIpv6fullContext(p *Ipv6fullContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_ipv6full
 }
 
 func (*Ipv6fullContext) IsIpv6fullContext() {}
@@ -2016,7 +2135,7 @@ func (*Ipv6fullContext) IsIpv6fullContext() {}
 func NewIpv6fullContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *Ipv6fullContext {
 	var p = new(Ipv6fullContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_ipv6full
@@ -2094,28 +2213,8 @@ func (s *Ipv6fullContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Ipv6full() (localctx IIpv6fullContext) {
-	this := p
-	_ = this
-
 	localctx = NewIpv6fullContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 24, SuricataRuleParserRULE_ipv6full)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(125)
@@ -2124,6 +2223,10 @@ func (p *SuricataRuleParser) Ipv6full() (localctx IIpv6fullContext) {
 	{
 		p.SetState(126)
 		p.Match(SuricataRuleParserColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(127)
@@ -2132,6 +2235,10 @@ func (p *SuricataRuleParser) Ipv6full() (localctx IIpv6fullContext) {
 	{
 		p.SetState(128)
 		p.Match(SuricataRuleParserColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(129)
@@ -2140,6 +2247,10 @@ func (p *SuricataRuleParser) Ipv6full() (localctx IIpv6fullContext) {
 	{
 		p.SetState(130)
 		p.Match(SuricataRuleParserColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(131)
@@ -2148,6 +2259,10 @@ func (p *SuricataRuleParser) Ipv6full() (localctx IIpv6fullContext) {
 	{
 		p.SetState(132)
 		p.Match(SuricataRuleParserColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(133)
@@ -2156,6 +2271,10 @@ func (p *SuricataRuleParser) Ipv6full() (localctx IIpv6fullContext) {
 	{
 		p.SetState(134)
 		p.Match(SuricataRuleParserColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(135)
@@ -2164,6 +2283,10 @@ func (p *SuricataRuleParser) Ipv6full() (localctx IIpv6fullContext) {
 	{
 		p.SetState(136)
 		p.Match(SuricataRuleParserColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(137)
@@ -2172,13 +2295,27 @@ func (p *SuricataRuleParser) Ipv6full() (localctx IIpv6fullContext) {
 	{
 		p.SetState(138)
 		p.Match(SuricataRuleParserColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(139)
 		p.Ipv6block()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIpv6compactContext is an interface to support dynamic dispatch.
@@ -2188,20 +2325,30 @@ type IIpv6compactContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllIpv6part() []IIpv6partContext
+	Ipv6part(i int) IIpv6partContext
+	DoubleColon() antlr.TerminalNode
+
 	// IsIpv6compactContext differentiates from other interfaces.
 	IsIpv6compactContext()
 }
 
 type Ipv6compactContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyIpv6compactContext() *Ipv6compactContext {
 	var p = new(Ipv6compactContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_ipv6compact
 	return p
+}
+
+func InitEmptyIpv6compactContext(p *Ipv6compactContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_ipv6compact
 }
 
 func (*Ipv6compactContext) IsIpv6compactContext() {}
@@ -2209,7 +2356,7 @@ func (*Ipv6compactContext) IsIpv6compactContext() {}
 func NewIpv6compactContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *Ipv6compactContext {
 	var p = new(Ipv6compactContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_ipv6compact
@@ -2283,28 +2430,8 @@ func (s *Ipv6compactContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *SuricataRuleParser) Ipv6compact() (localctx IIpv6compactContext) {
-	this := p
-	_ = this
-
 	localctx = NewIpv6compactContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 26, SuricataRuleParserRULE_ipv6compact)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(141)
@@ -2313,13 +2440,27 @@ func (p *SuricataRuleParser) Ipv6compact() (localctx IIpv6compactContext) {
 	{
 		p.SetState(142)
 		p.Match(SuricataRuleParserDoubleColon)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(143)
 		p.ipv6part(0)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIpv6partContext is an interface to support dynamic dispatch.
@@ -2329,20 +2470,30 @@ type IIpv6partContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Ipv6block() IIpv6blockContext
+	Ipv6part() IIpv6partContext
+	Colon() antlr.TerminalNode
+
 	// IsIpv6partContext differentiates from other interfaces.
 	IsIpv6partContext()
 }
 
 type Ipv6partContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyIpv6partContext() *Ipv6partContext {
 	var p = new(Ipv6partContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_ipv6part
 	return p
+}
+
+func InitEmptyIpv6partContext(p *Ipv6partContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_ipv6part
 }
 
 func (*Ipv6partContext) IsIpv6partContext() {}
@@ -2350,7 +2501,7 @@ func (*Ipv6partContext) IsIpv6partContext() {}
 func NewIpv6partContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *Ipv6partContext {
 	var p = new(Ipv6partContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_ipv6part
@@ -2419,52 +2570,40 @@ func (p *SuricataRuleParser) Ipv6part() (localctx IIpv6partContext) {
 }
 
 func (p *SuricataRuleParser) ipv6part(_p int) (localctx IIpv6partContext) {
-	this := p
-	_ = this
-
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
+
 	_parentState := p.GetState()
 	localctx = NewIpv6partContext(p, p.GetParserRuleContext(), _parentState)
 	var _prevctx IIpv6partContext = localctx
 	var _ antlr.ParserRuleContext = _prevctx // TODO: To prevent unused variable warning.
 	_startState := 28
 	p.EnterRecursionRule(localctx, 28, SuricataRuleParserRULE_ipv6part, _p)
-
-	defer func() {
-		p.UnrollRecursionContexts(_parentctx)
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(147)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 6, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 6, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(146)
 			p.Ipv6block()
 		}
 
+	} else if p.HasError() { // JIM
+		goto errorExit
 	}
 
 	p.GetParserRuleContext().SetStop(p.GetTokenStream().LT(-1))
 	p.SetState(154)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 7, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 7, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			if p.GetParseListeners() != nil {
@@ -2476,11 +2615,16 @@ func (p *SuricataRuleParser) ipv6part(_p int) (localctx IIpv6partContext) {
 			p.SetState(149)
 
 			if !(p.Precpred(p.GetParserRuleContext(), 1)) {
-				panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 1)", ""))
+				p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 1)", ""))
+				goto errorExit
 			}
 			{
 				p.SetState(150)
 				p.Match(SuricataRuleParserColon)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(151)
@@ -2490,10 +2634,26 @@ func (p *SuricataRuleParser) ipv6part(_p int) (localctx IIpv6partContext) {
 		}
 		p.SetState(156)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 7, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 7, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.UnrollRecursionContexts(_parentctx)
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIpv6blockContext is an interface to support dynamic dispatch.
@@ -2503,20 +2663,29 @@ type IIpv6blockContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	HEX() antlr.TerminalNode
+	INT() antlr.TerminalNode
+
 	// IsIpv6blockContext differentiates from other interfaces.
 	IsIpv6blockContext()
 }
 
 type Ipv6blockContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyIpv6blockContext() *Ipv6blockContext {
 	var p = new(Ipv6blockContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_ipv6block
 	return p
+}
+
+func InitEmptyIpv6blockContext(p *Ipv6blockContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_ipv6block
 }
 
 func (*Ipv6blockContext) IsIpv6blockContext() {}
@@ -2524,7 +2693,7 @@ func (*Ipv6blockContext) IsIpv6blockContext() {}
 func NewIpv6blockContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *Ipv6blockContext {
 	var p = new(Ipv6blockContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_ipv6block
@@ -2561,28 +2730,9 @@ func (s *Ipv6blockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Ipv6block() (localctx IIpv6blockContext) {
-	this := p
-	_ = this
-
 	localctx = NewIpv6blockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 30, SuricataRuleParserRULE_ipv6block)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -2597,7 +2747,17 @@ func (p *SuricataRuleParser) Ipv6block() (localctx IIpv6blockContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IIpv6maskContext is an interface to support dynamic dispatch.
@@ -2607,20 +2767,28 @@ type IIpv6maskContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	INT() antlr.TerminalNode
+
 	// IsIpv6maskContext differentiates from other interfaces.
 	IsIpv6maskContext()
 }
 
 type Ipv6maskContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyIpv6maskContext() *Ipv6maskContext {
 	var p = new(Ipv6maskContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_ipv6mask
 	return p
+}
+
+func InitEmptyIpv6maskContext(p *Ipv6maskContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_ipv6mask
 }
 
 func (*Ipv6maskContext) IsIpv6maskContext() {}
@@ -2628,7 +2796,7 @@ func (*Ipv6maskContext) IsIpv6maskContext() {}
 func NewIpv6maskContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *Ipv6maskContext {
 	var p = new(Ipv6maskContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_ipv6mask
@@ -2661,35 +2829,29 @@ func (s *Ipv6maskContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Ipv6mask() (localctx IIpv6maskContext) {
-	this := p
-	_ = this
-
 	localctx = NewIpv6maskContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 32, SuricataRuleParserRULE_ipv6mask)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(159)
 		p.Match(SuricataRuleParserINT)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISrc_portContext is an interface to support dynamic dispatch.
@@ -2699,20 +2861,28 @@ type ISrc_portContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Port() IPortContext
+
 	// IsSrc_portContext differentiates from other interfaces.
 	IsSrc_portContext()
 }
 
 type Src_portContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptySrc_portContext() *Src_portContext {
 	var p = new(Src_portContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_src_port
 	return p
+}
+
+func InitEmptySrc_portContext(p *Src_portContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_src_port
 }
 
 func (*Src_portContext) IsSrc_portContext() {}
@@ -2720,7 +2890,7 @@ func (*Src_portContext) IsSrc_portContext() {}
 func NewSrc_portContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *Src_portContext {
 	var p = new(Src_portContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_src_port
@@ -2765,35 +2935,25 @@ func (s *Src_portContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Src_port() (localctx ISrc_portContext) {
-	this := p
-	_ = this
-
 	localctx = NewSrc_portContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 34, SuricataRuleParserRULE_src_port)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(161)
 		p.Port()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IDest_portContext is an interface to support dynamic dispatch.
@@ -2803,20 +2963,28 @@ type IDest_portContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Port() IPortContext
+
 	// IsDest_portContext differentiates from other interfaces.
 	IsDest_portContext()
 }
 
 type Dest_portContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyDest_portContext() *Dest_portContext {
 	var p = new(Dest_portContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_dest_port
 	return p
+}
+
+func InitEmptyDest_portContext(p *Dest_portContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_dest_port
 }
 
 func (*Dest_portContext) IsDest_portContext() {}
@@ -2824,7 +2992,7 @@ func (*Dest_portContext) IsDest_portContext() {}
 func NewDest_portContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *Dest_portContext {
 	var p = new(Dest_portContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_dest_port
@@ -2869,35 +3037,25 @@ func (s *Dest_portContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Dest_port() (localctx IDest_portContext) {
-	this := p
-	_ = this
-
 	localctx = NewDest_portContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 36, SuricataRuleParserRULE_dest_port)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(163)
 		p.Port()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IPortContext is an interface to support dynamic dispatch.
@@ -2907,20 +3065,39 @@ type IPortContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Any() antlr.TerminalNode
+	Environment_var() IEnvironment_varContext
+	AllINT() []antlr.TerminalNode
+	INT(i int) antlr.TerminalNode
+	Colon() antlr.TerminalNode
+	LBracket() antlr.TerminalNode
+	AllPort() []IPortContext
+	Port(i int) IPortContext
+	RBracket() antlr.TerminalNode
+	AllComma() []antlr.TerminalNode
+	Comma(i int) antlr.TerminalNode
+	Negative() antlr.TerminalNode
+
 	// IsPortContext differentiates from other interfaces.
 	IsPortContext()
 }
 
 type PortContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyPortContext() *PortContext {
 	var p = new(PortContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_port
 	return p
+}
+
+func InitEmptyPortContext(p *PortContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_port
 }
 
 func (*PortContext) IsPortContext() {}
@@ -2928,7 +3105,7 @@ func (*PortContext) IsPortContext() {}
 func NewPortContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *PortContext {
 	var p = new(PortContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_port
@@ -3050,37 +3227,26 @@ func (s *PortContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Port() (localctx IPortContext) {
-	this := p
-	_ = this
-
 	localctx = NewPortContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 38, SuricataRuleParserRULE_port)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(190)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 10, p.GetParserRuleContext()) {
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 10, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(165)
 			p.Match(SuricataRuleParserAny)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 2:
@@ -3095,6 +3261,10 @@ func (p *SuricataRuleParser) Port() (localctx IPortContext) {
 		{
 			p.SetState(167)
 			p.Match(SuricataRuleParserINT)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 4:
@@ -3102,19 +3272,34 @@ func (p *SuricataRuleParser) Port() (localctx IPortContext) {
 		{
 			p.SetState(168)
 			p.Match(SuricataRuleParserINT)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(169)
 			p.Match(SuricataRuleParserColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(171)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == SuricataRuleParserINT {
 			{
 				p.SetState(170)
 				p.Match(SuricataRuleParserINT)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
@@ -3124,10 +3309,18 @@ func (p *SuricataRuleParser) Port() (localctx IPortContext) {
 		{
 			p.SetState(173)
 			p.Match(SuricataRuleParserColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(174)
 			p.Match(SuricataRuleParserINT)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 6:
@@ -3135,10 +3328,18 @@ func (p *SuricataRuleParser) Port() (localctx IPortContext) {
 		{
 			p.SetState(175)
 			p.Match(SuricataRuleParserINT)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(176)
 			p.Match(SuricataRuleParserColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 7:
@@ -3146,6 +3347,10 @@ func (p *SuricataRuleParser) Port() (localctx IPortContext) {
 		{
 			p.SetState(177)
 			p.Match(SuricataRuleParserLBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(178)
@@ -3153,12 +3358,19 @@ func (p *SuricataRuleParser) Port() (localctx IPortContext) {
 		}
 		p.SetState(183)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == SuricataRuleParserComma {
 			{
 				p.SetState(179)
 				p.Match(SuricataRuleParserComma)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 			{
 				p.SetState(180)
@@ -3167,11 +3379,18 @@ func (p *SuricataRuleParser) Port() (localctx IPortContext) {
 
 			p.SetState(185)
 			p.GetErrorHandler().Sync(p)
+			if p.HasError() {
+				goto errorExit
+			}
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
 			p.SetState(186)
 			p.Match(SuricataRuleParserRBracket)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case 8:
@@ -3179,15 +3398,31 @@ func (p *SuricataRuleParser) Port() (localctx IPortContext) {
 		{
 			p.SetState(188)
 			p.Match(SuricataRuleParserNegative)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(189)
 			p.Port()
 		}
 
+	case antlr.ATNInvalidAltNumber:
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IParamsContext is an interface to support dynamic dispatch.
@@ -3197,20 +3432,33 @@ type IParamsContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ParamStart() antlr.TerminalNode
+	AllParam() []IParamContext
+	Param(i int) IParamContext
+	ParamEnd() antlr.TerminalNode
+	AllSep() []ISepContext
+	Sep(i int) ISepContext
+
 	// IsParamsContext differentiates from other interfaces.
 	IsParamsContext()
 }
 
 type ParamsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyParamsContext() *ParamsContext {
 	var p = new(ParamsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_params
 	return p
+}
+
+func InitEmptyParamsContext(p *ParamsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_params
 }
 
 func (*ParamsContext) IsParamsContext() {}
@@ -3218,7 +3466,7 @@ func (*ParamsContext) IsParamsContext() {}
 func NewParamsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ParamsContext {
 	var p = new(ParamsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_params
@@ -3337,28 +3585,9 @@ func (s *ParamsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Params() (localctx IParamsContext) {
-	this := p
-	_ = this
-
 	localctx = NewParamsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 40, SuricataRuleParserRULE_params)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	var _alt int
 
@@ -3366,6 +3595,10 @@ func (p *SuricataRuleParser) Params() (localctx IParamsContext) {
 	{
 		p.SetState(192)
 		p.Match(SuricataRuleParserParamStart)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
 		p.SetState(193)
@@ -3373,8 +3606,13 @@ func (p *SuricataRuleParser) Params() (localctx IParamsContext) {
 	}
 	p.SetState(199)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 11, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 11, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
@@ -3389,10 +3627,19 @@ func (p *SuricataRuleParser) Params() (localctx IParamsContext) {
 		}
 		p.SetState(201)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 11, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 11, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 	p.SetState(203)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == SuricataRuleParserParamSep || _la == SuricataRuleParserUntilSepSettingEnd {
@@ -3405,9 +3652,23 @@ func (p *SuricataRuleParser) Params() (localctx IParamsContext) {
 	{
 		p.SetState(205)
 		p.Match(SuricataRuleParserParamEnd)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IParamContext is an interface to support dynamic dispatch.
@@ -3417,20 +3678,30 @@ type IParamContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Keyword() IKeywordContext
+	ParamColon() antlr.TerminalNode
+	Setting() ISettingContext
+
 	// IsParamContext differentiates from other interfaces.
 	IsParamContext()
 }
 
 type ParamContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyParamContext() *ParamContext {
 	var p = new(ParamContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_param
 	return p
+}
+
+func InitEmptyParamContext(p *ParamContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_param
 }
 
 func (*ParamContext) IsParamContext() {}
@@ -3438,7 +3709,7 @@ func (*ParamContext) IsParamContext() {}
 func NewParamContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ParamContext {
 	var p = new(ParamContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_param
@@ -3503,28 +3774,9 @@ func (s *ParamContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Param() (localctx IParamContext) {
-	this := p
-	_ = this
-
 	localctx = NewParamContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 42, SuricataRuleParserRULE_param)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -3533,12 +3785,19 @@ func (p *SuricataRuleParser) Param() (localctx IParamContext) {
 	}
 	p.SetState(210)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == SuricataRuleParserParamColon {
 		{
 			p.SetState(208)
 			p.Match(SuricataRuleParserParamColon)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(209)
@@ -3547,7 +3806,17 @@ func (p *SuricataRuleParser) Param() (localctx IParamContext) {
 
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // IKeywordContext is an interface to support dynamic dispatch.
@@ -3557,20 +3826,28 @@ type IKeywordContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ParamCommonString() antlr.TerminalNode
+
 	// IsKeywordContext differentiates from other interfaces.
 	IsKeywordContext()
 }
 
 type KeywordContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyKeywordContext() *KeywordContext {
 	var p = new(KeywordContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_keyword
 	return p
+}
+
+func InitEmptyKeywordContext(p *KeywordContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_keyword
 }
 
 func (*KeywordContext) IsKeywordContext() {}
@@ -3578,7 +3855,7 @@ func (*KeywordContext) IsKeywordContext() {}
 func NewKeywordContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *KeywordContext {
 	var p = new(KeywordContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_keyword
@@ -3611,35 +3888,29 @@ func (s *KeywordContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Keyword() (localctx IKeywordContext) {
-	this := p
-	_ = this
-
 	localctx = NewKeywordContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 44, SuricataRuleParserRULE_keyword)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(212)
 		p.Match(SuricataRuleParserParamCommonString)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISettingContext is an interface to support dynamic dispatch.
@@ -3649,20 +3920,31 @@ type ISettingContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	AllSingleSetting() []ISingleSettingContext
+	SingleSetting(i int) ISingleSettingContext
+	AllParamComma() []antlr.TerminalNode
+	ParamComma(i int) antlr.TerminalNode
+
 	// IsSettingContext differentiates from other interfaces.
 	IsSettingContext()
 }
 
 type SettingContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptySettingContext() *SettingContext {
 	var p = new(SettingContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_setting
 	return p
+}
+
+func InitEmptySettingContext(p *SettingContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_setting
 }
 
 func (*SettingContext) IsSettingContext() {}
@@ -3670,7 +3952,7 @@ func (*SettingContext) IsSettingContext() {}
 func NewSettingContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SettingContext {
 	var p = new(SettingContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_setting
@@ -3748,28 +4030,9 @@ func (s *SettingContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Setting() (localctx ISettingContext) {
-	this := p
-	_ = this
-
 	localctx = NewSettingContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 46, SuricataRuleParserRULE_setting)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -3778,12 +4041,19 @@ func (p *SuricataRuleParser) Setting() (localctx ISettingContext) {
 	}
 	p.SetState(219)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == SuricataRuleParserParamComma {
 		{
 			p.SetState(215)
 			p.Match(SuricataRuleParserParamComma)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(216)
@@ -3792,10 +4062,23 @@ func (p *SuricataRuleParser) Setting() (localctx ISettingContext) {
 
 		p.SetState(221)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISingleSettingContext is an interface to support dynamic dispatch.
@@ -3805,20 +4088,30 @@ type ISingleSettingContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	Settingcontent() ISettingcontentContext
+	Negative() INegativeContext
+	NonQuotedString() antlr.TerminalNode
+
 	// IsSingleSettingContext differentiates from other interfaces.
 	IsSingleSettingContext()
 }
 
 type SingleSettingContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptySingleSettingContext() *SingleSettingContext {
 	var p = new(SingleSettingContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_singleSetting
 	return p
+}
+
+func InitEmptySingleSettingContext(p *SingleSettingContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_singleSetting
 }
 
 func (*SingleSettingContext) IsSingleSettingContext() {}
@@ -3826,7 +4119,7 @@ func (*SingleSettingContext) IsSingleSettingContext() {}
 func NewSingleSettingContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SingleSettingContext {
 	var p = new(SingleSettingContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_singleSetting
@@ -3891,37 +4184,24 @@ func (s *SingleSettingContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *SuricataRuleParser) SingleSetting() (localctx ISingleSettingContext) {
-	this := p
-	_ = this
-
 	localctx = NewSingleSettingContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 48, SuricataRuleParserRULE_singleSetting)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(227)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case SuricataRuleParserParamNegative, SuricataRuleParserParamCommonString, SuricataRuleParserModeStringStart:
 		p.EnterOuterAlt(localctx, 1)
 		p.SetState(223)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == SuricataRuleParserParamNegative {
@@ -3941,13 +4221,28 @@ func (p *SuricataRuleParser) SingleSetting() (localctx ISingleSettingContext) {
 		{
 			p.SetState(226)
 			p.Match(SuricataRuleParserNonQuotedString)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // INegativeContext is an interface to support dynamic dispatch.
@@ -3957,20 +4252,28 @@ type INegativeContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ParamNegative() antlr.TerminalNode
+
 	// IsNegativeContext differentiates from other interfaces.
 	IsNegativeContext()
 }
 
 type NegativeContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyNegativeContext() *NegativeContext {
 	var p = new(NegativeContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_negative
 	return p
+}
+
+func InitEmptyNegativeContext(p *NegativeContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_negative
 }
 
 func (*NegativeContext) IsNegativeContext() {}
@@ -3978,7 +4281,7 @@ func (*NegativeContext) IsNegativeContext() {}
 func NewNegativeContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *NegativeContext {
 	var p = new(NegativeContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_negative
@@ -4011,35 +4314,29 @@ func (s *NegativeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Negative() (localctx INegativeContext) {
-	this := p
-	_ = this
-
 	localctx = NewNegativeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 50, SuricataRuleParserRULE_negative)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(229)
 		p.Match(SuricataRuleParserParamNegative)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISettingcontentContext is an interface to support dynamic dispatch.
@@ -4049,20 +4346,31 @@ type ISettingcontentContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ParamCommonString() antlr.TerminalNode
+	ModeStringStart() antlr.TerminalNode
+	ModeStringEnd() antlr.TerminalNode
+	ModeString() antlr.TerminalNode
+
 	// IsSettingcontentContext differentiates from other interfaces.
 	IsSettingcontentContext()
 }
 
 type SettingcontentContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptySettingcontentContext() *SettingcontentContext {
 	var p = new(SettingcontentContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_settingcontent
 	return p
+}
+
+func InitEmptySettingcontentContext(p *SettingcontentContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_settingcontent
 }
 
 func (*SettingcontentContext) IsSettingcontentContext() {}
@@ -4070,7 +4378,7 @@ func (*SettingcontentContext) IsSettingcontentContext() {}
 func NewSettingcontentContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SettingcontentContext {
 	var p = new(SettingcontentContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_settingcontent
@@ -4115,31 +4423,15 @@ func (s *SettingcontentContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *SuricataRuleParser) Settingcontent() (localctx ISettingcontentContext) {
-	this := p
-	_ = this
-
 	localctx = NewSettingcontentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 52, SuricataRuleParserRULE_settingcontent)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(237)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case SuricataRuleParserParamCommonString:
@@ -4147,6 +4439,10 @@ func (p *SuricataRuleParser) Settingcontent() (localctx ISettingcontentContext) 
 		{
 			p.SetState(231)
 			p.Match(SuricataRuleParserParamCommonString)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case SuricataRuleParserModeStringStart:
@@ -4154,28 +4450,54 @@ func (p *SuricataRuleParser) Settingcontent() (localctx ISettingcontentContext) 
 		{
 			p.SetState(232)
 			p.Match(SuricataRuleParserModeStringStart)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		p.SetState(234)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == SuricataRuleParserModeString {
 			{
 				p.SetState(233)
 				p.Match(SuricataRuleParserModeString)
+				if p.HasError() {
+					// Recognition error - abort rule
+					goto errorExit
+				}
 			}
 
 		}
 		{
 			p.SetState(236)
 			p.Match(SuricataRuleParserModeStringEnd)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 // ISepContext is an interface to support dynamic dispatch.
@@ -4185,20 +4507,29 @@ type ISepContext interface {
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
+	// Getter signatures
+	ParamSep() antlr.TerminalNode
+	UntilSepSettingEnd() antlr.TerminalNode
+
 	// IsSepContext differentiates from other interfaces.
 	IsSepContext()
 }
 
 type SepContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptySepContext() *SepContext {
 	var p = new(SepContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = SuricataRuleParserRULE_sep
 	return p
+}
+
+func InitEmptySepContext(p *SepContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_sep
 }
 
 func (*SepContext) IsSepContext() {}
@@ -4206,7 +4537,7 @@ func (*SepContext) IsSepContext() {}
 func NewSepContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SepContext {
 	var p = new(SepContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = SuricataRuleParserRULE_sep
@@ -4243,28 +4574,9 @@ func (s *SepContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Sep() (localctx ISepContext) {
-	this := p
-	_ = this
-
 	localctx = NewSepContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 54, SuricataRuleParserRULE_sep)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -4279,7 +4591,17 @@ func (p *SuricataRuleParser) Sep() (localctx ISepContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
 	return localctx
+	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
 func (p *SuricataRuleParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int) bool {
@@ -4297,9 +4619,6 @@ func (p *SuricataRuleParser) Sempred(localctx antlr.RuleContext, ruleIndex, pred
 }
 
 func (p *SuricataRuleParser) Ipv6part_Sempred(localctx antlr.RuleContext, predIndex int) bool {
-	this := p
-	_ = this
-
 	switch predIndex {
 	case 0:
 		return p.Precpred(p.GetParserRuleContext(), 1)

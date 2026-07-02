@@ -1,13 +1,12 @@
-// Code generated from java-escape by ANTLR 4.11.1. DO NOT EDIT.
+// Code generated from ./JSPLexer.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
 package jspparser
 
 import (
 	"fmt"
+	"github.com/yaklang/antlr/v4"
 	"sync"
 	"unicode"
-
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 )
 
 // Suppress unused import error
@@ -22,34 +21,34 @@ type JSPLexer struct {
 	// TODO: EOF string
 }
 
-var jsplexerLexerStaticData struct {
+var JSPLexerLexerStaticData struct {
 	once                   sync.Once
 	serializedATN          []int32
-	channelNames           []string
-	modeNames              []string
-	literalNames           []string
-	symbolicNames          []string
-	ruleNames              []string
-	predictionContextCache *antlr.PredictionContextCache
+	ChannelNames           []string
+	ModeNames              []string
+	LiteralNames           []string
+	SymbolicNames          []string
+	RuleNames              []string
+	PredictionContextCache *antlr.PredictionContextCache
 	atn                    *antlr.ATN
 	decisionToDFA          []*antlr.DFA
 }
 
 func jsplexerLexerInit() {
-	staticData := &jsplexerLexerStaticData
-	staticData.channelNames = []string{
+	staticData := &JSPLexerLexerStaticData
+	staticData.ChannelNames = []string{
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN",
 	}
-	staticData.modeNames = []string{
+	staticData.ModeNames = []string{
 		"DEFAULT_MODE", "IN_DTD", "JSP_BLOB", "TAG", "SCRIPT", "STYLE", "ATTVALUE",
 		"ATTVALUE_SINGLE_QUOTE", "ATTVALUE_DOUBLE_QUOTE", "EL_EXPR_MODE",
 	}
-	staticData.literalNames = []string{
+	staticData.LiteralNames = []string{
 		"", "", "", "", "", "", "'<!DOCTYPE'", "", "", "", "'<?xml'", "", "",
 		"", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "'PUBLIC'",
 		"'SYSTEM'", "", "", "", "", "", "':'", "", "", "", "'/'",
 	}
-	staticData.symbolicNames = []string{
+	staticData.SymbolicNames = []string{
 		"", "JSP_COMMENT", "JSP_SCRIPT_COMMENT", "JSP_CONDITIONAL_COMMENT",
 		"SCRIPT_OPEN", "STYLE_OPEN", "DTD", "CDATA", "JSP_INCLUDE_DIRECTIVE_SKIP",
 		"WHITESPACES", "XML_DECLARATION", "WHITESPACE_SKIP", "CLOSE_TAG_BEGIN",
@@ -62,7 +61,7 @@ func jsplexerLexerInit() {
 		"TAG_WHITESPACE", "SCRIPT_BODY", "SCRIPT_SHORT_BODY", "STYLE_BODY",
 		"STYLE_SHORT_BODY", "ATTVAL_WHITESPACE_SKIP", "ATTVAL_EL_EXPR", "EL_EXPR_CONTENT",
 	}
-	staticData.ruleNames = []string{
+	staticData.RuleNames = []string{
 		"JSP_COMMENT", "JSP_SCRIPT_COMMENT", "JSP_CONDITIONAL_COMMENT", "SCRIPT_OPEN",
 		"STYLE_OPEN", "DTD", "CDATA", "JSP_INCLUDE_DIRECTIVE_SKIP", "WHITESPACES",
 		"XML_DECLARATION", "WHITESPACE_SKIP", "CLOSE_TAG_BEGIN", "TAG_BEGIN",
@@ -93,7 +92,7 @@ func jsplexerLexerInit() {
 		"ESCAPED_SINGLE_QUOTE", "EQUALS_CHAR", "ESCAPED_DOUBLE_QUOTE", "EL_EXPR_END_EX",
 		"EL_EXPR_CONTENT",
 	}
-	staticData.predictionContextCache = antlr.NewPredictionContextCache()
+	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
 		4, 0, 49, 961, 6, -1, 6, -1, 6, -1, 6, -1, 6, -1, 6, -1, 6, -1, 6, -1,
 		6, -1, 6, -1, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
@@ -534,7 +533,7 @@ func jsplexerLexerInit() {
 // NewJSPLexer(). You can call this function if you wish to initialize the static state ahead
 // of time.
 func JSPLexerInit() {
-	staticData := &jsplexerLexerStaticData
+	staticData := &JSPLexerLexerStaticData
 	staticData.once.Do(jsplexerLexerInit)
 }
 
@@ -543,13 +542,13 @@ func NewJSPLexer(input antlr.CharStream) *JSPLexer {
 	JSPLexerInit()
 	l := new(JSPLexer)
 	l.BaseLexer = antlr.NewBaseLexer(input)
-	staticData := &jsplexerLexerStaticData
-	l.Interpreter = antlr.NewLexerATNSimulator(l, staticData.atn, staticData.decisionToDFA, staticData.predictionContextCache)
-	l.channelNames = staticData.channelNames
-	l.modeNames = staticData.modeNames
-	l.RuleNames = staticData.ruleNames
-	l.LiteralNames = staticData.literalNames
-	l.SymbolicNames = staticData.symbolicNames
+	staticData := &JSPLexerLexerStaticData
+	l.Interpreter = antlr.NewLexerATNSimulator(l, staticData.atn, staticData.decisionToDFA, staticData.PredictionContextCache)
+	l.channelNames = staticData.ChannelNames
+	l.modeNames = staticData.ModeNames
+	l.RuleNames = staticData.RuleNames
+	l.LiteralNames = staticData.LiteralNames
+	l.SymbolicNames = staticData.SymbolicNames
 	l.GrammarFileName = "JSPLexer.g4"
 	// TODO: l.EOF = antlr.TokenEOF
 
@@ -633,15 +632,12 @@ func (l *JSPLexer) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int)
 }
 
 func (p *JSPLexer) JSP_STATIC_CONTENT_CHAR_Sempred(localctx antlr.RuleContext, predIndex int) bool {
-	this := p
-	_ = this
-
 	switch predIndex {
 	case 0:
-		return this.GetInputStream().LA(1) != '{'
+		return p.GetInputStream().LA(1) != '{'
 
 	case 1:
-		return this.GetInputStream().LA(1) != '{'
+		return p.GetInputStream().LA(1) != '{'
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))

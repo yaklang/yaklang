@@ -1,6 +1,6 @@
 package visitors
 
-import "github.com/antlr/antlr4/runtime/Go/antlr/v4"
+import "github.com/yaklang/antlr/v4"
 
 type ErrorListener struct {
 	handler func(msg string)

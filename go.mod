@@ -19,7 +19,6 @@ require (
 	github.com/andybalholm/brotli v1.0.6
 	github.com/antchfx/xmlquery v1.3.1
 	github.com/antchfx/xpath v1.3.6
-	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20220911224424-aa1f1f12a846
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
 	github.com/aymanbagabas/go-pty v0.2.2
 	github.com/bcicen/jstream v0.0.0-20190220045926-16c1f8af81c2
@@ -246,6 +245,7 @@ require (
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xuri/efp v0.0.0-20240408161823-9ad904a10d6d // indirect
 	github.com/xuri/nfp v0.0.0-20240318013403-ab9948c2c4a7 // indirect
+	github.com/yaklang/antlr/v4 v4.0.0-20260701084525-3ba6848a4c8c
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
 	github.com/ysmood/fetchup v0.2.3 // indirect
 	github.com/ysmood/goob v0.4.0 // indirect

@@ -14,7 +14,7 @@ func (y *YakCompiler) VisitMemberCall(raw parser.IMemberCallContext) interface{}
 		return nil
 	}
 	i := memberCallContext
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
+	recoverRange := y.SetRange(&i.BaseParserRuleContext)
 	defer recoverRange()
 
 	y.writeString(".")

@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
 	config2 "github.com/yaklang/yaklang/common/suricata/config"
 	rule "github.com/yaklang/yaklang/common/suricata/parser"

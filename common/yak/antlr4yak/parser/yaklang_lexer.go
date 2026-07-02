@@ -1,13 +1,12 @@
-// Code generated from java-escape by ANTLR 4.11.1. DO NOT EDIT.
+// Code generated from ./YaklangLexer.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
 package parser
 
 import (
 	"fmt"
+	"github.com/yaklang/antlr/v4"
 	"sync"
 	"unicode"
-
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 )
 
 // Suppress unused import error
@@ -22,29 +21,29 @@ type YaklangLexer struct {
 	// TODO: EOF string
 }
 
-var yaklanglexerLexerStaticData struct {
+var YaklangLexerLexerStaticData struct {
 	once                   sync.Once
 	serializedATN          []int32
-	channelNames           []string
-	modeNames              []string
-	literalNames           []string
-	symbolicNames          []string
-	ruleNames              []string
-	predictionContextCache *antlr.PredictionContextCache
+	ChannelNames           []string
+	ModeNames              []string
+	LiteralNames           []string
+	SymbolicNames          []string
+	RuleNames              []string
+	PredictionContextCache *antlr.PredictionContextCache
 	atn                    *antlr.ATN
 	decisionToDFA          []*antlr.DFA
 }
 
 func yaklanglexerLexerInit() {
-	staticData := &yaklanglexerLexerStaticData
-	staticData.channelNames = []string{
+	staticData := &YaklangLexerLexerStaticData
+	staticData.ChannelNames = []string{
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN",
 	}
-	staticData.modeNames = []string{
+	staticData.ModeNames = []string{
 		"DEFAULT_MODE", "TEMPLATE_SINGLE_QUOTE_MODE", "TEMPLATE_DOUBLE_QUOTE_MODE",
 		"TEMPLATE_BACKTICK_MODE", "HereDocIdentifier", "CRLFHereDoc", "LFHereDoc",
 	}
-	staticData.literalNames = []string{
+	staticData.LiteralNames = []string{
 		"", "'panic'", "'recover'", "'if'", "'elif'", "'else'", "'switch'",
 		"'case'", "'default'", "'for'", "'continue'", "'break'", "'return'",
 		"'include'", "'try'", "'catch'", "'finally'", "'importmod'", "'as'",
@@ -58,7 +57,7 @@ func yaklanglexerLexerInit() {
 		"'<<='", "'>>='", "'&='", "'|='", "'&^='", "';'", "'...'", "'=>'", "'<>'",
 		"'!'", "'.'", "", "'/*'", "'*/'", "'`'", "", "'<<<'", "", "'\\n'",
 	}
-	staticData.symbolicNames = []string{
+	staticData.SymbolicNames = []string{
 		"", "Panic", "Recover", "If", "Elif", "Else", "Switch", "Case", "Default",
 		"For", "Continue", "Break", "Return", "Include", "Try", "Catch", "Finally",
 		"Importmod", "As", "Export", "Defer", "Go", "Range", "Func", "Map",
@@ -82,7 +81,7 @@ func yaklanglexerLexerInit() {
 		"TemplateBackTickStringStartExpression", "HereDocIdentifierName", "HereDocIdentifierBreak",
 		"CRLFEndDoc", "CRLFHereDocText", "LFEndDoc", "LFHereDocText",
 	}
-	staticData.ruleNames = []string{
+	staticData.RuleNames = []string{
 		"Panic", "Recover", "If", "Elif", "Else", "Switch", "Case", "Default",
 		"For", "Continue", "Break", "Return", "Include", "Try", "Catch", "Finally",
 		"Importmod", "As", "Export", "Defer", "Go", "Range", "Func", "Map",
@@ -113,7 +112,7 @@ func yaklanglexerLexerInit() {
 		"DoubleQuoteStringLiteral", "SingleQuoteStringLiteral", "BackTickStringLiteral",
 		"HexStringLiteral", "StringLiteralPrefix",
 	}
-	staticData.predictionContextCache = antlr.NewPredictionContextCache()
+	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
 		4, 0, 123, 1127, 6, -1, 6, -1, 6, -1, 6, -1, 6, -1, 6, -1, 6, -1, 2, 0,
 		7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7, 4, 2, 5, 7, 5, 2, 6,
@@ -654,7 +653,7 @@ func yaklanglexerLexerInit() {
 // NewYaklangLexer(). You can call this function if you wish to initialize the static state ahead
 // of time.
 func YaklangLexerInit() {
-	staticData := &yaklanglexerLexerStaticData
+	staticData := &YaklangLexerLexerStaticData
 	staticData.once.Do(yaklanglexerLexerInit)
 }
 
@@ -663,13 +662,13 @@ func NewYaklangLexer(input antlr.CharStream) *YaklangLexer {
 	YaklangLexerInit()
 	l := new(YaklangLexer)
 	l.BaseLexer = antlr.NewBaseLexer(input)
-	staticData := &yaklanglexerLexerStaticData
-	l.Interpreter = antlr.NewLexerATNSimulator(l, staticData.atn, staticData.decisionToDFA, staticData.predictionContextCache)
-	l.channelNames = staticData.channelNames
-	l.modeNames = staticData.modeNames
-	l.RuleNames = staticData.ruleNames
-	l.LiteralNames = staticData.literalNames
-	l.SymbolicNames = staticData.symbolicNames
+	staticData := &YaklangLexerLexerStaticData
+	l.Interpreter = antlr.NewLexerATNSimulator(l, staticData.atn, staticData.decisionToDFA, staticData.PredictionContextCache)
+	l.channelNames = staticData.ChannelNames
+	l.modeNames = staticData.ModeNames
+	l.RuleNames = staticData.RuleNames
+	l.LiteralNames = staticData.LiteralNames
+	l.SymbolicNames = staticData.SymbolicNames
 	l.GrammarFileName = "YaklangLexer.g4"
 	// TODO: l.EOF = antlr.TokenEOF
 
@@ -851,126 +850,96 @@ func (l *YaklangLexer) Action(localctx antlr.RuleContext, ruleIndex, actionIndex
 }
 
 func (l *YaklangLexer) TemplateSingleQuoteStringStart_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 0:
-		this.IncreaseTemplateDepth()
+		l.IncreaseTemplateDepth()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *YaklangLexer) TemplateDoubleQuoteStringStart_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 1:
-		this.IncreaseTemplateDepth()
+		l.IncreaseTemplateDepth()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *YaklangLexer) TemplateBackTickStringStart_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 2:
-		this.IncreaseTemplateDepth()
+		l.IncreaseTemplateDepth()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *YaklangLexer) TemplateSingleQuoteStringCharacterStringEnd_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 3:
-		this.DecreaseTemplateDepth()
+		l.DecreaseTemplateDepth()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *YaklangLexer) TemplateDoubleQuoteStringCharacterStringEnd_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 4:
-		this.DecreaseTemplateDepth()
+		l.DecreaseTemplateDepth()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *YaklangLexer) TemplateBackTickStringCharacterStringEnd_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 5:
-		this.DecreaseTemplateDepth()
+		l.DecreaseTemplateDepth()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *YaklangLexer) HereDocIdentifierName_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 6:
-		this.recordHereDocLabel()
+		l.recordHereDocLabel()
 
 	case 7:
-		this.recordHereDocLabel()
+		l.recordHereDocLabel()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *YaklangLexer) HereDocIdentifierBreak_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 8:
-		this.recordHereDocLF()
+		l.recordHereDocLF()
 
 	case 9:
-		this.hereDocModeDistribute()
+		l.hereDocModeDistribute()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *YaklangLexer) CRLFEndDoc_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 10:
-		this.DocEndDistribute()
+		l.DocEndDistribute()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *YaklangLexer) LFEndDoc_Action(localctx antlr.RuleContext, actionIndex int) {
-	this := l
-	_ = this
-
 	switch actionIndex {
 	case 11:
-		this.DocEndDistribute()
+		l.DocEndDistribute()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
@@ -988,12 +957,9 @@ func (l *YaklangLexer) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex 
 }
 
 func (p *YaklangLexer) TemplateCloseBrace_Sempred(localctx antlr.RuleContext, predIndex int) bool {
-	this := p
-	_ = this
-
 	switch predIndex {
 	case 0:
-		return this.IsInTemplateString()
+		return p.IsInTemplateString()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))

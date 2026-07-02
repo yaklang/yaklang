@@ -1,15 +1,15 @@
 package phpparser
 
-import "github.com/antlr/antlr4/runtime/Go/antlr/v4"
+import "github.com/yaklang/antlr/v4"
 
 func GetPHPParserSerializedATN() []int32 {
 	PHPParserInit()
-	return phpparserParserStaticData.serializedATN
+	return PHPParserParserStaticData.serializedATN
 }
 
 func GetPHPLexerSerializedATN() []int32 {
 	PHPLexerInit()
-	return phplexerLexerStaticData.serializedATN
+	return PHPLexerLexerStaticData.serializedATN
 }
 
 func (l *PHPLexer) SetInterpreter(atn *antlr.ATN, decisionToDFA []*antlr.DFA, predictionContextCache *antlr.PredictionContextCache) {

@@ -20,7 +20,7 @@ func (b *astbuilder) buildBoolLiteral(name string) ssa.Value {
 }
 
 func (b *astbuilder) buildLiteral(exp *gol.LiteralContext) ssa.Value {
-	recoverRange := b.SetRange(exp.BaseParserRuleContext)
+	recoverRange := b.SetRange(&exp.BaseParserRuleContext)
 	defer recoverRange()
 
 	if lit := exp.BasicLit(); lit != nil {
@@ -40,7 +40,7 @@ func (b *astbuilder) buildLiteral(exp *gol.LiteralContext) ssa.Value {
 }
 
 func (b *astbuilder) buildFunctionLit(exp *gol.FunctionLitContext) ssa.Value {
-	recoverRange := b.SetRange(exp.BaseParserRuleContext)
+	recoverRange := b.SetRange(&exp.BaseParserRuleContext)
 	defer recoverRange()
 
 	newFunc := b.NewFunc("")
@@ -67,7 +67,7 @@ func (b *astbuilder) buildFunctionLit(exp *gol.FunctionLitContext) ssa.Value {
 	}
 
 	{
-		recoverRange := b.SetRange(exp.BaseParserRuleContext)
+		recoverRange := b.SetRange(&exp.BaseParserRuleContext)
 		b.FunctionBuilder = b.PushFunction(newFunc)
 		b.SupportClosure = true
 		b.SetForceCapture(true)
@@ -136,7 +136,7 @@ func inferUnknownCompositeLiteralType(kvs []keyValue) ssa.Type {
 }
 
 func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
-	recoverRange := b.SetRange(exp.BaseParserRuleContext)
+	recoverRange := b.SetRange(&exp.BaseParserRuleContext)
 	defer recoverRange()
 
 	var kvs []keyValue
@@ -398,7 +398,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 }
 
 func (b *astbuilder) buildLiteralValue(exp *gol.LiteralValueContext, iscreate bool) (ret []keyValue) {
-	recoverRange := b.SetRange(exp.BaseParserRuleContext)
+	recoverRange := b.SetRange(&exp.BaseParserRuleContext)
 	defer recoverRange()
 
 	if list := exp.ElementList(); list != nil {
@@ -412,7 +412,7 @@ func (b *astbuilder) buildLiteralValue(exp *gol.LiteralValueContext, iscreate bo
 }
 
 func (b *astbuilder) buildKeyedElement(exp *gol.KeyedElementContext, iscreate bool) (ret keyValue) {
-	recoverRange := b.SetRange(exp.BaseParserRuleContext)
+	recoverRange := b.SetRange(&exp.BaseParserRuleContext)
 	defer recoverRange()
 	var keys ssa.Value
 	var kvs []keyValue
@@ -435,7 +435,7 @@ func (b *astbuilder) buildKeyedElement(exp *gol.KeyedElementContext, iscreate bo
 }
 
 func (b *astbuilder) buildKey(exp *gol.KeyContext, iscreate bool) ssa.Value {
-	recoverRange := b.SetRange(exp.BaseParserRuleContext)
+	recoverRange := b.SetRange(&exp.BaseParserRuleContext)
 	defer recoverRange()
 
 	if e := exp.Expression(); e != nil {
@@ -467,7 +467,7 @@ func (b *astbuilder) buildKey(exp *gol.KeyContext, iscreate bool) ssa.Value {
 }
 
 func (b *astbuilder) buildElement(exp *gol.ElementContext, iscreate bool) (ret []keyValue) {
-	recoverRange := b.SetRange(exp.BaseParserRuleContext)
+	recoverRange := b.SetRange(&exp.BaseParserRuleContext)
 	defer recoverRange()
 
 	if e := exp.Expression(); e != nil {
@@ -490,7 +490,7 @@ func (b *astbuilder) buildElement(exp *gol.ElementContext, iscreate bool) (ret [
 }
 
 func (b *astbuilder) buildLiteralType(stmt *gol.LiteralTypeContext) ssa.Type {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if name := stmt.TypeName(); name != nil {
@@ -526,7 +526,7 @@ func (b *astbuilder) buildLiteralType(stmt *gol.LiteralTypeContext) ssa.Type {
 }
 
 func (b *astbuilder) buildTypeLit(stmt *gol.TypeLitContext) ssa.Type {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	text := stmt.GetText()
 
@@ -596,7 +596,7 @@ func (b *astbuilder) buildTypeLit(stmt *gol.TypeLitContext) ssa.Type {
 }
 
 func (b *astbuilder) buildFunctionTypeLiteral(stmt *gol.FunctionTypeContext) ssa.Type {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if signature := stmt.Signature(); signature != nil {
@@ -609,7 +609,7 @@ func (b *astbuilder) buildFunctionTypeLiteral(stmt *gol.FunctionTypeContext) ssa
 }
 
 func (b *astbuilder) buildInterfaceTypeLiteral(stmt *gol.InterfaceTypeContext) ssa.Type {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	interfacetyp := ssa.NewInterfaceType("", "")
@@ -635,7 +635,7 @@ func (b *astbuilder) buildInterfaceTypeLiteral(stmt *gol.InterfaceTypeContext) s
 }
 
 func (b *astbuilder) buildChanTypeLiteral(stmt *gol.ChannelTypeContext) ssa.Type {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	if etyp := stmt.ElementType(); etyp != nil {
@@ -650,7 +650,7 @@ func (b *astbuilder) buildChanTypeLiteral(stmt *gol.ChannelTypeContext) ssa.Type
 }
 
 func (b *astbuilder) buildMapTypeLiteral(stmt *gol.MapTypeContext) ssa.Type {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	var keyTyp ssa.Type
@@ -672,7 +672,7 @@ func (b *astbuilder) buildMapTypeLiteral(stmt *gol.MapTypeContext) ssa.Type {
 }
 
 func (b *astbuilder) buildSliceTypeLiteral(stmt *gol.SliceTypeContext) ssa.Type {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	var ssatyp ssa.Type
@@ -688,7 +688,7 @@ func (b *astbuilder) buildSliceTypeLiteral(stmt *gol.SliceTypeContext) ssa.Type 
 }
 
 func (b *astbuilder) buildSliceTypeELiteral(stmt *gol.LiteralTypeContext) ssa.Type {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	var ssatyp ssa.Type
@@ -701,7 +701,7 @@ func (b *astbuilder) buildSliceTypeELiteral(stmt *gol.LiteralTypeContext) ssa.Ty
 }
 
 func (b *astbuilder) buildArrayTypeLiteral(stmt *gol.ArrayTypeContext) ssa.Type {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	var value ssa.Value
@@ -723,7 +723,7 @@ func (b *astbuilder) buildArrayTypeLiteral(stmt *gol.ArrayTypeContext) ssa.Type 
 }
 
 func (b *astbuilder) buildStructTypeLiteral(stmt *gol.StructTypeContext) ssa.Type {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	structTyp := ssa.NewStructType()
@@ -734,7 +734,7 @@ func (b *astbuilder) buildStructTypeLiteral(stmt *gol.StructTypeContext) ssa.Typ
 }
 
 func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.ObjectType) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	var ssatyp ssa.Type = nil
@@ -781,7 +781,7 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 }
 
 func (b *astbuilder) buildBasicLit(exp *gol.BasicLitContext) ssa.Value {
-	recoverRange := b.SetRange(exp.BaseParserRuleContext)
+	recoverRange := b.SetRange(&exp.BaseParserRuleContext)
 	defer recoverRange()
 
 	if lit := exp.Integer(); lit != nil {
@@ -831,7 +831,7 @@ func (b *astbuilder) buildStringLiteral(stmt *gol.String_Context) ssa.Value {
 }
 
 func (b *astbuilder) buildCharLiteral(stmt *gol.Char_Context) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	lit := stmt.GetText()
@@ -856,7 +856,7 @@ func (b *astbuilder) buildCharLiteral(stmt *gol.Char_Context) ssa.Value {
 }
 
 func (b *astbuilder) buildIntegerLiteral(stmt *gol.IntegerContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
 	lit := stmt.GetText()
