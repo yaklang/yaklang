@@ -8,6 +8,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
@@ -20,6 +21,7 @@ var DistYakCommand = cli.Command{
 	Action: func(c *cli.Context) error {
 		ctx, stop := newDistYakContext()
 		defer stop()
+		applySSADatabaseFromEnv()
 		runtimeID := os.Getenv("YAK_RUNTIME_ID")
 		args := c.Args()
 		if len(args) > 0 {
@@ -45,6 +47,19 @@ var DistYakCommand = cli.Command{
 
 func newDistYakContext() (context.Context, context.CancelFunc) {
 	return signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+}
+
+// applySSADatabaseFromEnv reads the SSA IR DB DSN from the process
+// environment and forwards it to the shared consts package before any script
+// execution can lazily initialize the SSA DB. The legion scheduler injects
+// SSA_DATABASE_RAW as a per-task env var so that compile jobs persist IR to a
+// shared Postgres and scan jobs reload it via NewProgramFromDB. Without this
+// call the global SSA_PROJECT_DB_RAW stays at the default SQLite path and the
+// env var is silently ignored.
+func applySSADatabaseFromEnv() {
+	if envRaw := consts.GetSSADatabaseInfoFromEnv(); envRaw != "" {
+		consts.SetSSADatabaseInfo(envRaw)
+	}
 }
 
 func runDistYakFile(parent context.Context, file string, runtimeID string) error {

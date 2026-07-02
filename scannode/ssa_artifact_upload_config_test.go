@@ -1,8 +1,11 @@
 package scannode
 
 import (
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
 )
 
 func TestExtractSSAArtifactUploadConfigSTS(t *testing.T) {
@@ -59,4 +62,58 @@ func TestSSAArtifactUploadConfigNeedSTSRefresh(t *testing.T) {
 	if cfg.NeedSTSRefresh(600) {
 		t.Fatal("expected no refresh when token is still valid")
 	}
+}
+
+func TestExtractSSADatabaseEnv(t *testing.T) {
+	t.Run("returns DSN env when database_raw present", func(t *testing.T) {
+		const dsn = "postgres://legion:legion@127.0.0.1:5436/ssa_ir?sslmode=disable"
+		env := extractSSADatabaseEnv(map[string]interface{}{
+			scannodeSSADatabaseRawParamKey: dsn,
+			scannodeSSASkipMigrateParamKey: true,
+		})
+		if len(env) < 1 {
+			t.Fatalf("expected at least 1 env entry, got %d", len(env))
+		}
+		if !strings.Contains(env[0], consts.ENV_SSA_DATABASE_RAW+"="+dsn) {
+			t.Fatalf("expected SSA_DATABASE_RAW env, got %v", env)
+		}
+		var foundSkip bool
+		for _, e := range env {
+			if strings.Contains(e, consts.ENV_SSA_DB_SKIP_MIGRATE+"=1") {
+				foundSkip = true
+				break
+			}
+		}
+		if !foundSkip {
+			t.Fatalf("expected SSA_DB_SKIP_MIGRATE=1 in env, got %v", env)
+		}
+	})
+
+	t.Run("returns nil when database_raw absent", func(t *testing.T) {
+		env := extractSSADatabaseEnv(map[string]interface{}{
+			"_scannode_ssa_object_key": "ssa/tasks/t1/result.ndjson.zst",
+		})
+		if env != nil {
+			t.Fatalf("expected nil env when no DSN, got %v", env)
+		}
+	})
+
+	t.Run("returns nil for empty params", func(t *testing.T) {
+		env := extractSSADatabaseEnv(nil)
+		if env != nil {
+			t.Fatalf("expected nil for empty params, got %v", env)
+		}
+	})
+
+	t.Run("omits skip_migrate when false", func(t *testing.T) {
+		env := extractSSADatabaseEnv(map[string]interface{}{
+			scannodeSSADatabaseRawParamKey: "postgres://x@y/db",
+			scannodeSSASkipMigrateParamKey: false,
+		})
+		for _, e := range env {
+			if strings.Contains(e, consts.ENV_SSA_DB_SKIP_MIGRATE) {
+				t.Fatalf("did not expect skip_migrate env, got %v", env)
+			}
+		}
+	})
 }
