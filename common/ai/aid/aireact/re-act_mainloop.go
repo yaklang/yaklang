@@ -97,7 +97,7 @@ func (r *ReAct) processReActFromQueue() {
 		return
 	}
 
-	r.addRuntimeTask(nextTask)
+	r.AddRuntimeTask(nextTask)
 	r.setCurrentTask(nextTask)
 	r.persistTaskUserInput(nextTask)
 	nextTask.SetStatus(aicommon.AITaskState_Processing)

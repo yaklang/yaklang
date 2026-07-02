@@ -275,6 +275,8 @@ type AIInvokeRuntime interface {
 	SetCurrentTask(task AIStatefulTask)
 	GetCurrentTask() AIStatefulTask
 	GetCurrentTaskId() string
+	// AddRuntimeTask appends a task to the runtime task list in a thread-safe manner.
+	AddRuntimeTask(task AIStatefulTask)
 
 	ExecuteToolRequiredAndCall(ctx context.Context, name string) (*aitool.ToolResult, bool, error)
 	ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams) (*aitool.ToolResult, bool, error)

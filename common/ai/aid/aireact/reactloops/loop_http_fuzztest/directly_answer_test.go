@@ -66,6 +66,9 @@ func (i *httpFuzztestTestInvoker) GetCurrentTaskId() string {
 	return i.currentTask.GetIndex()
 }
 
+func (i *httpFuzztestTestInvoker) AddRuntimeTask(task aicommon.AIStatefulTask) {
+}
+
 func (i *httpFuzztestTestInvoker) GetConfig() aicommon.AICallerConfigIf {
 	return i.config
 }
