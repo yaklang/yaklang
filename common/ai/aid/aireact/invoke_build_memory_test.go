@@ -646,6 +646,10 @@ func (m *mockInvokerForMemoryTest) GetCurrentTaskId() string {
 	return ""
 }
 
+func (m *mockInvokerForMemoryTest) AddRuntimeTask(task aicommon.AIStatefulTask) {
+	// no-op for testing
+}
+
 // createTestMemoryForBuildTest 创建用于构建测试的 memory 实例（简化版本）
 func createTestMemoryForBuildTest(sessionID string, invoker aicommon.AIInvokeRuntime) (*aimem.AIMemoryTriage, error) {
 	// 这个函数在真实测试中应该创建真实的 memory，但为了简化，我们返回 nil

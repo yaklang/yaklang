@@ -57,7 +57,7 @@ func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 	return r.enqueueReTask(event)
 }
 
-func (r *ReAct) addRuntimeTask(task aicommon.AIStatefulTask) {
+func (r *ReAct) AddRuntimeTask(task aicommon.AIStatefulTask) {
 	r.UpdateRuntimeTaskMutex.Lock()
 	defer r.UpdateRuntimeTaskMutex.Unlock()
 	r.RuntimeTasks = append(r.RuntimeTasks, task)
