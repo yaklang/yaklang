@@ -329,9 +329,9 @@ func (b *astbuilder) buildCallExpr(stmt *yak.CallExprContext) (c *ssa.Call) {
 		if ic, ok := expr.InstanceCode().(*yak.InstanceCodeContext); ok && ic != nil {
 			return b.buildInstanceCode(ic)
 		}
-		// 顶层不是 functionCall / instanceCode（如不完整输入 `defer m.`）：
-		// 无法作为 go/defer 的调用目标，但仍需构造子表达式，以便语言服务的
-		// 补全/悬浮提示能解析出 `m` 的类型；返回 nil 表示没有可 emit 的调用。
+		// 不完整输入（如 `defer m.` / `go x.`）：expr 还不是一个函数调用，无法构造 *ssa.Call。
+		// 但仍需构建该子表达式，把其中引用的用户变量与成员访问登记进 SSA，
+		// 否则语言服务在这些语句里做成员补全时找不到目标变量（extern 库能解析、用户变量不能）。
 		b.buildExpression(expr)
 		b.NewError(ssa.Error, TAG, "expected a function call expression")
 		return nil
@@ -349,9 +349,9 @@ func (b *astbuilder) buildDeferStmt(stmt *yak.DeferStmtContext) {
 	var i ssa.Instruction
 	var alreadyEmit bool
 	if s, ok := stmt.CallExpr().(*yak.CallExprContext); ok {
-		// buildCallExpr 返回具体类型 *ssa.Call，输入不完整时（如 `defer m.`）会返回 nil 指针。
-		// 若直接赋值给 interface，会得到 typed-nil，后续 EmitDefer 触发空指针 panic，
-		// 因此这里显式判空后再赋值。
+		// 注意：buildCallExpr 返回具体类型 *ssa.Call，对不完整输入（如 `defer m.`）会返回
+		// 类型化 nil。若直接赋给接口变量 i，则 i != nil 为真，后续 EmitDefer 会对 nil
+		// 接收者解引用导致 panic。因此这里必须先用具体类型判空，再赋给接口。
 		if c := b.buildCallExpr(s); c != nil {
 			i = c
 			alreadyEmit = true
@@ -484,7 +484,15 @@ func (b *astbuilder) buildForRangeStmt(stmt *yak.ForRangeStmtContext) {
 	loop := b.CreateLoopBuilder()
 	var value ssa.Value
 	loop.SetFirst(func() []ssa.Value {
-		value = b.buildExpression(stmt.Expression().(*yak.ExpressionContext))
+		if expr, ok := stmt.Expression().(*yak.ExpressionContext); ok {
+			value = b.buildExpression(expr)
+		}
+		// 用户动态输入未完成时(如 `for item := range poc.`)，range 目标表达式
+		// 可能构建不出有效的值(nil)。此处兜底为 undefined，避免后续 EmitNext
+		// 对 nil 迭代器取 GetId() 造成空指针 panic，从而保证补全可以继续工作。
+		if utils.IsNil(value) {
+			value = b.EmitUndefined("")
+		}
 		return []ssa.Value{value}
 	})
 
