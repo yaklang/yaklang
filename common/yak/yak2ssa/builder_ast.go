@@ -329,6 +329,10 @@ func (b *astbuilder) buildCallExpr(stmt *yak.CallExprContext) (c *ssa.Call) {
 		if ic, ok := expr.InstanceCode().(*yak.InstanceCodeContext); ok && ic != nil {
 			return b.buildInstanceCode(ic)
 		}
+		// 顶层不是 functionCall / instanceCode（如不完整输入 `defer m.`）：
+		// 无法作为 go/defer 的调用目标，但仍需构造子表达式，以便语言服务的
+		// 补全/悬浮提示能解析出 `m` 的类型；返回 nil 表示没有可 emit 的调用。
+		b.buildExpression(expr)
 		b.NewError(ssa.Error, TAG, "expected a function call expression")
 		return nil
 	} else if instanceCodeStmt, ok := stmt.InstanceCode().(*yak.InstanceCodeContext); ok {
@@ -345,8 +349,13 @@ func (b *astbuilder) buildDeferStmt(stmt *yak.DeferStmtContext) {
 	var i ssa.Instruction
 	var alreadyEmit bool
 	if s, ok := stmt.CallExpr().(*yak.CallExprContext); ok {
-		i = b.buildCallExpr(s)
-		alreadyEmit = true
+		// buildCallExpr 返回具体类型 *ssa.Call，输入不完整时（如 `defer m.`）会返回 nil 指针。
+		// 若直接赋值给 interface，会得到 typed-nil，后续 EmitDefer 触发空指针 panic，
+		// 因此这里显式判空后再赋值。
+		if c := b.buildCallExpr(s); c != nil {
+			i = c
+			alreadyEmit = true
+		}
 	} else if s, ok := stmt.RecoverStmt().(*yak.RecoverStmtContext); ok {
 		i = b.buildRecoverStmt(s)
 	} else if s, ok := stmt.PanicStmt().(*yak.PanicStmtContext); ok {
