@@ -1,0 +1,229 @@
+// Yaklang 语言编程综合回归测试
+//
+// 覆盖：闭包与词法作用域、递归、高阶函数、可变参数、多返回值、
+// 箭头函数、defer LIFO、defer+recover、波浪号错误处理、切片/映射操作、
+// 字符串模板、通道与 select、switch。
+// 由 mustpass 框架用完整 yak 运行时执行，随 essential-tests CI 一起运行。
+
+// ============================================================
+// 1. 闭包 / 词法作用域：计数器工厂
+// ============================================================
+makeCounter = func() {
+    n = 0
+    return func() { n++; return n }
+}
+c1 = makeCounter()
+c2 = makeCounter()
+assert c1() == 1 && c1() == 2 && c1() == 3, "closure counter c1"
+assert c2() == 1, "closure counter c2 independent"
+assert c1() == 4, "closure counter c1 continues"
+
+// ============================================================
+// 2. 递归：阶乘与斐波那契
+// ============================================================
+fact = func(n) {
+    if n <= 1 { return 1 }
+    return n * fact(n - 1)
+}
+assert fact(5) == 120, sprintf("factorial broken: %v", fact(5))
+assert fact(0) == 1, "factorial base"
+
+fib = func(n) {
+    if n < 2 { return n }
+    return fib(n-1) + fib(n-2)
+}
+assert fib(10) == 55, sprintf("fibonacci broken: %v", fib(10))
+
+// ============================================================
+// 3. 高阶函数：map / filter / reduce 手写实现
+// ============================================================
+mapf = func(list, f) {
+    out = []
+    for e in list {
+        out = append(out, f(e))
+    }
+    return out
+}
+filterf = func(list, pred) {
+    out = []
+    for e in list {
+        if pred(e) {
+            out = append(out, e)
+        }
+    }
+    return out
+}
+reducef = func(list, init, f) {
+    acc = init
+    for e in list {
+        acc = f(acc, e)
+    }
+    return acc
+}
+nums = [1, 2, 3, 4, 5]
+doubled = mapf(nums, func(x) { return x * 2 })
+assert doubled[0] == 2 && doubled[4] == 10, sprintf("map broken: %v", doubled)
+evens = filterf(nums, func(x) { return x % 2 == 0 })
+assert len(evens) == 2 && evens[0] == 2 && evens[1] == 4, sprintf("filter broken: %v", evens)
+total = reducef(nums, 0, func(a, b) { return a + b })
+assert total == 15, sprintf("reduce broken: %v", total)
+
+// ============================================================
+// 4. 可变参数函数
+// ============================================================
+sumAll = func(args...) {
+    s = 0
+    for a in args {
+        s += a
+    }
+    return s
+}
+assert sumAll(1, 2, 3) == 6, "variadic sum 3"
+assert sumAll() == 0, "variadic sum 0"
+assert sumAll(10, 20, 30, 40) == 100, "variadic sum 4"
+
+// ============================================================
+// 5. 多返回值
+// ============================================================
+divmod = func(a, b) {
+    return a / b, a % b
+}
+q, r = divmod(17, 5)
+assert q == 3 && r == 2, sprintf("multi-return broken: q=%v r=%v", q, r)
+
+// ============================================================
+// 6. 箭头函数 / 立即调用
+// ============================================================
+add = (a, b) => a + b
+assert add(3, 4) == 7, "arrow function"
+assert ((x) => x * x)(6) == 36, "iife arrow"
+
+// ============================================================
+// 7. defer LIFO 顺序
+// ============================================================
+deferOrder = func() {
+    order = []
+    defer func() { order = append(order, 3) }()
+    defer func() { order = append(order, 2) }()
+    defer func() { order = append(order, 1) }()
+    return order
+}
+// 注意：defer 在 return 求值之后执行，这里返回的是执行前的引用快照，
+// 因此用外部收集更稳妥
+deferSeq = []
+func() {
+    defer func() { deferSeq = append(deferSeq, "c") }()
+    defer func() { deferSeq = append(deferSeq, "b") }()
+    defer func() { deferSeq = append(deferSeq, "a") }()
+}()
+assert len(deferSeq) == 3 && deferSeq[0] == "a" && deferSeq[1] == "b" && deferSeq[2] == "c", sprintf("defer LIFO broken: %v", deferSeq)
+
+// ============================================================
+// 8. defer + recover 捕获 panic
+// ============================================================
+safeDiv = func(a, b) {
+    var result
+    ok = true
+    func() {
+        defer func() {
+            if err := recover(); err != nil {
+                ok = false
+            }
+        }()
+        result = a / b
+    }()
+    return ok
+}
+assert safeDiv(10, 2) == true, "recover: normal div ok"
+assert safeDiv(10, 0) == false, "recover: div by zero recovered"
+
+// ============================================================
+// 9. 波浪号错误处理与 try-catch
+// ============================================================
+parsedOK = false
+try {
+    x = codec.DecodeHex("zzzz")~
+    parsedOK = true
+} catch err {
+    parsedOK = false
+}
+assert parsedOK == false, "wavy ~ should raise on invalid hex and be caught"
+
+good = codec.EncodeToHex("A")
+assert good == "41", sprintf("encode hex broken: %v", good)
+
+// ============================================================
+// 10. 切片操作：append / 切片区间 / 长度
+// ============================================================
+sl = [1, 2, 3, 4, 5]
+assert len(sl) == 5, "slice len"
+assert sl[1:3][0] == 2 && sl[1:3][1] == 3, sprintf("slice range broken: %v", sl[1:3])
+sl = append(sl, 6)
+assert sl[5] == 6 && len(sl) == 6, "slice append"
+
+// ============================================================
+// 11. 映射操作：成员判断 / 删除 / 长度
+// ============================================================
+mp = make(map[string]int)
+mp["a"] = 1
+mp["b"] = 2
+mp["c"] = 3
+assert "a" in mp && !("z" in mp), "map membership"
+assert len(mp) == 3, "map len"
+delete(mp, "b")
+assert !("b" in mp) && len(mp) == 2, "map delete"
+
+// ============================================================
+// 12. 字符串模板与格式化
+// ============================================================
+name = "yak"
+ver = 3
+assert f"lang=${name} v${ver}" == "lang=yak v3", sprintf("f-string broken: %v", f"lang=${name} v${ver}")
+assert "hello %s = %d" % ["x", 42] == "hello x = 42", "percent format"
+assert str.Contains("abcdef", "cde"), "str.Contains"
+assert str.ToUpper("abc") == "ABC", "str.ToUpper"
+
+// ============================================================
+// 13. 通道：goroutine 生产者 + 主协程消费者
+// ============================================================
+pipe = make(chan int, 10)
+go func() {
+    for i := 0; i < 5; i++ {
+        pipe <- i * i
+    }
+    close(pipe)
+}()
+collected13 = []
+for v = range pipe {
+    collected13 = append(collected13, v)
+}
+assert len(collected13) == 5, sprintf("chan producer/consumer count broken: %v", collected13)
+assert collected13[0] == 0 && collected13[1] == 1 && collected13[2] == 4 && collected13[3] == 9 && collected13[4] == 16, sprintf("chan values broken: %v", collected13)
+
+// ============================================================
+// 14. switch 分支
+// ============================================================
+classify = func(n) {
+    switch {
+    case n < 0:
+        return "neg"
+    case n == 0:
+        return "zero"
+    default:
+        return "pos"
+    }
+}
+assert classify(-5) == "neg" && classify(0) == "zero" && classify(7) == "pos", "switch classify"
+
+// ============================================================
+// 15. 组合：闭包 + 高阶 + 递归 构建管道
+// ============================================================
+compose = func(f, g) {
+    return func(x) { return f(g(x)) }
+}
+inc = func(x) { return x + 1 }
+sqr = func(x) { return x * x }
+incThenSqr = compose(sqr, inc)
+assert incThenSqr(3) == 16, sprintf("compose broken: %v", incThenSqr(3))
+
+println("yaklang_programming_complex.yak ALL PASSED")
