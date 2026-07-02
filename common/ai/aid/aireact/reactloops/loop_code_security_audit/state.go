@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
 
 // --------- Finding（扫描阶段产出）---------
@@ -102,6 +104,10 @@ type AuditState struct {
 	// WorkDir 是 AI workdir，所有审计输出文件（audit/）都写入此目录下
 	WorkDir string `json:"work_dir,omitempty"`
 
+	// 前端附件聚焦（directory_path / file_path / selected）
+	FocusFilePath string                            `json:"focus_file_path,omitempty"`
+	Selection     *aicommon.AttachedCodeSelection `json:"-"`
+
 	// Phase 1 产出：简要摘要（常驻内存，注入每轮 reactive data）
 	TechStack     string `json:"tech_stack,omitempty"`
 	EntryPoints   string `json:"entry_points,omitempty"`
@@ -158,6 +164,34 @@ func (s *AuditState) SetProjectInfo(path, name string) {
 	if name != "" {
 		s.ProjectName = name
 	}
+}
+
+func (s *AuditState) SetFrontendFocus(filePath string, selection *aicommon.AttachedCodeSelection) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.FocusFilePath = filePath
+	if selection != nil {
+		copied := *selection
+		s.Selection = &copied
+	} else {
+		s.Selection = nil
+	}
+}
+
+func (s *AuditState) GetFocusFilePath() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.FocusFilePath
+}
+
+func (s *AuditState) GetSelection() *aicommon.AttachedCodeSelection {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.Selection == nil {
+		return nil
+	}
+	copied := *s.Selection
+	return &copied
 }
 
 func (s *AuditState) SetReconResult(techStack, entryPoints, authMechanism string) {

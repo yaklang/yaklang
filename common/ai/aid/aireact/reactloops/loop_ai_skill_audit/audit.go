@@ -36,6 +36,10 @@ const auditReactiveDataTpl = `## 当前审计状态
 [路径规范] 所有工具调用必须使用绝对路径
 
 **Skill 路径**: {{ .SkillPath }}
+{{ if .HasSelectionFocus }}**用户选中片段**（Phase2 第一优先级，必须先分析）:
+{{ .Selection }}
+{{ else if .HasOpenFileFocus }}**前端打开文件**: {{ .FocusFilePath }}（优先审计此文件及其关联脚本）
+{{ end }}
 **审计进度**: 已执行 {{ .IterationCount }} 次操作
 {{ if .NoteFiles }}**已写出审计笔记文件（{{ .NoteFileCount }} 个）**:
 {{ .NoteFiles }}{{ else }}尚未写出任何审计笔记（建议先写 skill_audit_notes.md）{{ end }}
@@ -47,8 +51,10 @@ const auditReactiveDataTpl = `## 当前审计状态
 
 [终止规则] complete_skill_audit 是本 loop 退出的唯一合法方式。调用前必须：
 1. 已用 read_file 读取 SKILL.md
-2. 已完成全部 6 个检测类别的 grep 扫描
-3. 已用 write_file 写出至少一个审计笔记文件`
+{{ if .HasSelectionFocus }}2. 已重点分析用户选中的代码片段（文件: {{ .FocusFilePath }}）
+3. 已完成全部 6 个检测类别的 grep 扫描
+4. 已用 write_file 写出至少一个审计笔记文件{{ else }}2. 已完成全部 6 个检测类别的 grep 扫描
+3. 已用 write_file 写出至少一个审计笔记文件{{ end }}`
 
 // BuildSkillAuditLoop constructs the orchestrator loop for AI Skill security auditing.
 // It runs three phases sequentially inside InitTask:
@@ -77,6 +83,19 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *SkillAuditStat
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, op *reactloops.InitTaskOperator) {
 		userInput := task.GetUserInput()
 
+		ws := reactloops.InitWorkspaceAttachedContext(r, loop, task, AttachedResourceKeySkillAuditTargetPath)
+		reactloops.RecordWorkspaceAttachedTimeline(r, ws, "SKILL_AUDIT")
+		if ws != nil {
+			var sel *aicommon.AttachedCodeSelection
+			if ws.Selection != nil {
+				copied := *ws.Selection
+				sel = &copied
+			}
+			if ws.FilePath != "" || sel != nil {
+				state.SetFrontendFocus(ws.FilePath, sel)
+			}
+		}
+
 		reactloops.EmitStatus(loop, "AI Skill 安全审计启动 / Starting AI Skill security audit")
 		r.AddToTimeline("[SKILL_AUDIT_START]", "AI Skill 安全审计开始，用户输入: "+utils.ShrinkTextBlock(userInput, 300))
 
@@ -94,11 +113,28 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *SkillAuditStat
 		}
 
 		reconFilePath := filepath.Join(auditDirPath, "recon_notes.md")
+		exploreOpts := []reactloops.ReActLoopOption{
+			reactloops.WithVar("output_report_path", reconFilePath),
+			reactloops.WithVar("explore_work_dir", auditDirPath),
+		}
+		if ws != nil {
+			if scanPath := ws.ResolveAttachedScanDirectory(); scanPath != "" {
+				if err := reactloops.ValidateAttachedDirectoryTarget(scanPath); err != nil {
+					log.Warnf("[SkillAudit] attached target path not accessible: %q: %v", scanPath, err)
+					op.Failed(fmt.Errorf(
+						"[SkillAudit] %s",
+						reactloops.FormatAttachedDirectoryValidationError(scanPath, AttachedResourceKeySkillAuditTargetPath, err)))
+					return
+				}
+				exploreOpts = reactloops.WithExploreTargetPath(exploreOpts, scanPath)
+				log.Infof("[SkillAudit] Phase1 using attached scan target: %s", scanPath)
+				reactloops.RecordExploreTargetTimeline(r, ws, scanPath, "SKILL_AUDIT")
+			}
+		}
 		exploreLoop, err := reactloops.CreateLoopByName(
 			schema.AI_REACT_LOOP_NAME_DIR_EXPLORE,
 			r,
-			reactloops.WithVar("output_report_path", reconFilePath),
-			reactloops.WithVar("explore_work_dir", auditDirPath),
+			exploreOpts...,
 		)
 		if err != nil {
 			log.Errorf("[SkillAudit] Failed to create dir_explore loop: %v", err)
@@ -176,6 +212,7 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *SkillAuditStat
 		r.AddToTimeline("[PHASE3_START]", "Phase 3：安全报告生成")
 
 		reportPath := filepath.Join(auditDirPath, "skill_security_report.md")
+		canonicalReport := composeSkillSecurityReport(state)
 		reportLoop, err := reactloops.CreateLoopByName(
 			schema.AI_REACT_LOOP_NAME_REPORT_GENERATING,
 			r,
@@ -183,12 +220,12 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *SkillAuditStat
 			reactloops.WithAllowUserInteract(false),
 			reactloops.WithInitTask(func(innerLoop *reactloops.ReActLoop, _ aicommon.AIStatefulTask, innerOp *reactloops.InitTaskOperator) {
 				innerLoop.Set("report_filename", reportPath)
-				innerLoop.Set("full_report_code", "")
-				innerLoop.Set("user_requirements", buildReportPrompt(state, reportPath))
+				innerLoop.Set("full_report_code", canonicalReport)
+				innerLoop.Set("user_requirements", buildReportPromptWithCanonical(state, reportPath, canonicalReport))
 				innerLoop.Set("available_files", buildAvailableFilesHint(state))
 				innerLoop.Set("available_knowledge_bases", "")
 				innerLoop.Set("collected_references", "")
-				innerLoop.Set("is_modify_mode", "false")
+				innerLoop.Set("is_modify_mode", "true")
 				innerOp.Continue()
 			}),
 		)
@@ -201,23 +238,14 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *SkillAuditStat
 			log.Warnf("[SkillAudit] Phase 3 returned error: %v (continuing)", err)
 		}
 
-		// Fallback: generate basic report if Phase 3 produced nothing
-		if state.GetFinalReport() == "" {
-			log.Warnf("[SkillAudit] Phase 3 did not produce report, generating fallback")
-			fallback := generateFallbackReport(state)
-			state.SetFinalReport(fallback)
-			savePath := filepath.Join(auditDirPath, "skill_security_report.md")
-			if err := reactloops.SaveAndPinFile(loop, savePath, []byte(fallback)); err != nil {
-				log.Warnf("[SkillAudit] Failed to write fallback report: %v", err)
-			} else {
-				state.SetFinalReportPath(savePath)
-				log.Infof("[SkillAudit] Fallback report saved: %s", savePath)
-				r.AddToTimeline("[REPORT_FALLBACK]", "已自动生成基础审计报告: "+savePath)
-			}
+		finalReport := finalizeSkillAuditReport(state, reportPath)
+		if err := reactloops.SaveAndPinFile(loop, reportPath, []byte(finalReport)); err != nil {
+			log.Warnf("[SkillAudit] Failed to pin final report: %v", err)
 		}
 
-		if state.FinalReportPath != "" {
-			reportPath = state.FinalReportPath
+		reportPath = state.FinalReportPath
+		if reportPath == "" {
+			reportPath = filepath.Join(auditDirPath, "skill_security_report.md")
 		}
 		reactloops.EmitStatus(loop, "审计完成 / Audit complete")
 		reactloops.EmitActionLog(loop, skillAuditReportNodeID,
@@ -266,13 +294,17 @@ func buildPhase2StaticAnalysisLoop(r aicommon.AIInvokeRuntime, state *SkillAudit
 
 		// Persistent instruction injected each round
 		reactloops.WithPersistentContextProvider(func(loop *reactloops.ReActLoop, nonce string) (string, error) {
-			return utils.RenderTemplate(auditInstruction, map[string]any{
+			vars := map[string]any{
 				"Nonce":         nonce,
 				"SkillPath":     state.SkillPath,
 				"AuditWorkDir":  auditWorkDir,
 				"TechStack":     state.TechStack,
 				"ReconFilePath": state.ReconFilePath,
-			})
+			}
+			for k, v := range reactloops.FocusPromptVars(state.GetFocusFilePath(), state.GetSelection()) {
+				vars[k] = v
+			}
+			return utils.RenderTemplate(auditInstruction, vars)
 		}),
 		reactloops.WithReflectionOutputExample(auditOutputExample),
 
@@ -283,19 +315,35 @@ func buildPhase2StaticAnalysisLoop(r aicommon.AIInvokeRuntime, state *SkillAudit
 			for _, f := range noteFiles {
 				noteFilesList += "  - " + f + "\n"
 			}
-			return utils.RenderTemplate(auditReactiveDataTpl, map[string]any{
+			vars := map[string]any{
 				"Nonce":            nonce,
 				"SkillPath":        state.SkillPath,
 				"IterationCount":   iterCount,
 				"NoteFiles":        noteFilesList,
 				"NoteFileCount":    len(noteFiles),
 				"FeedbackMessages": feedbacker.String(),
-			})
+			}
+			for k, v := range reactloops.FocusPromptVars(state.GetFocusFilePath(), state.GetSelection()) {
+				vars[k] = v
+			}
+			return utils.RenderTemplate(auditReactiveDataTpl, vars)
 		}),
 
 		reactloops.WithInitTask(func(loop *reactloops.ReActLoop, _ aicommon.AIStatefulTask, op *reactloops.InitTaskOperator) {
-			reactloops.EmitStatus(loop, "静态安全分析就绪 / Static security analysis ready")
-			log.Infof("[SkillAudit/Phase2] Static analysis started. skill_path=%s", state.SkillPath)
+			if state.HasFrontendFocus() {
+				focusPath := reactloops.ResolveFocusFilePath(state.GetFocusFilePath(), state.GetSelection())
+				if state.GetSelection() != nil && strings.TrimSpace(state.GetSelection().Content) != "" {
+					reactloops.EmitStatus(loop, "选中片段优先分析 / Selection-first static analysis")
+					r.AddToTimeline("[SKILL_AUDIT_FOCUS]",
+						fmt.Sprintf("Phase2 选中片段优先: %s", utils.ShrinkTextBlock(state.GetSelection().Content, 200)))
+				} else if focusPath != "" {
+					reactloops.EmitStatus(loop, "打开文件优先审计 / Open-file focused analysis")
+					r.AddToTimeline("[SKILL_AUDIT_FOCUS]", "Phase2 优先审计打开文件: "+focusPath)
+				}
+			} else {
+				reactloops.EmitStatus(loop, "静态安全分析就绪 / Static security analysis ready")
+			}
+			log.Infof("[SkillAudit/Phase2] Static analysis started. skill_path=%s focus=%v", state.SkillPath, state.HasFrontendFocus())
 			op.Continue()
 		}),
 	}
@@ -345,7 +393,7 @@ func buildPhase2StaticAnalysisLoop(r aicommon.AIInvokeRuntime, state *SkillAudit
 			skillName := action.GetString("skill_name")
 			riskLevel := action.GetString("risk_level")
 			alignmentTable := action.GetString("alignment_table")
-			findingsSummary := action.GetString("findings_summary")
+			findingsSummary := resolveFindingsSummaryFromCompleteAction(loop, action)
 
 			if skillName == "" {
 				skillName = state.SkillName
@@ -355,7 +403,12 @@ func buildPhase2StaticAnalysisLoop(r aicommon.AIInvokeRuntime, state *SkillAudit
 			}
 
 			state.SetProjectInfo(state.SkillPath, skillName)
-			state.SetAuditResult(riskLevel, findingsSummary)
+			state.SetAuditResult(riskLevel, alignmentTable, findingsSummary)
+
+			if detailPath := persistFindingsDetail(auditWorkDir, findingsSummary); detailPath != "" {
+				addNoteFile(detailPath)
+				log.Infof("[SkillAudit/Phase2] Findings detail saved: %s (%d bytes)", detailPath, len(findingsSummary))
+			}
 
 			auditResultPath := filepath.Join(auditWorkDir, "audit_result.md")
 			auditContent := fmt.Sprintf("# AI Skill 安全审计结果\n\n"+
@@ -473,6 +526,17 @@ func buildAvailableFilesHint(state *SkillAuditState) string {
 
 // buildReportPrompt constructs the writing task description for the report_generating loop.
 func buildReportPrompt(state *SkillAuditState, outputPath string) string {
+	focusSection := ""
+	if state.HasFrontendFocus() {
+		focusPath := reactloops.ResolveFocusFilePath(state.GetFocusFilePath(), state.GetSelection())
+		focusSection = fmt.Sprintf(`
+## 前端聚焦上下文
+- **优先审计文件**: %s
+%s
+报告 Findings 章节必须包含对上述聚焦内容/analysis 的结论（如有发现）。
+`, focusPath, reactloops.FormatAttachedCodeSelection(state.GetSelection()))
+	}
+
 	return fmt.Sprintf(`请根据以下 AI Skill 安全审计结果生成结构化的 Markdown 安全报告。
 
 ## Skill 信息
@@ -480,7 +544,7 @@ func buildReportPrompt(state *SkillAuditState, outputPath string) string {
 - **Skill 路径**: %s
 - **技术栈**: %s
 - **整体风险等级**: %s
-
+%s
 ## 审计结论与漏洞详情
 %s
 
@@ -501,7 +565,8 @@ func buildReportPrompt(state *SkillAuditState, outputPath string) string {
 		state.SkillPath,
 		state.TechStack,
 		state.RiskLevel,
-		state.FindingsSummary,
+		focusSection,
+		state.GetFindingsSummary(),
 		outputPath,
 	)
 }
@@ -530,9 +595,9 @@ func generateFallbackReport(state *SkillAuditState) string {
 	}
 	sb.WriteString(fmt.Sprintf("## 执行摘要\n\n**整体风险等级**: **%s**\n\n", riskLevel))
 
-	if state.FindingsSummary != "" {
+	if state.GetFindingsSummary() != "" {
 		sb.WriteString("## 审计结论与漏洞详情\n\n")
-		sb.WriteString(state.FindingsSummary + "\n")
+		sb.WriteString(state.GetFindingsSummary() + "\n")
 	} else {
 		sb.WriteString("## 漏洞发现\n\nNo findings above Medium threshold detected.\n")
 	}

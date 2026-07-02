@@ -8,6 +8,17 @@
 
 **Skill 路径**: {{ .SkillPath }}
 **工作目录（写入审计笔记至此）**: {{ .AuditWorkDir }}
+{{ if .HasSelectionFocus }}
+## 前端选中片段（最高优先级）
+
+用户从 IDE 选中了以下代码，**必须作为 Phase2 第一步**重点分析（read_file 读取完整文件 + 结合上下文追踪数据流）：
+
+{{ .Selection }}
+
+> 完成选中片段分析后，再按常规流程读取 SKILL.md 并执行全目录扫描。
+{{ else if .HasOpenFileFocus }}
+**前端打开文件**: {{ .FocusFilePath }}（优先审计此文件，再扩展至整个 Skill 目录）
+{{ end }}
 {{ if .TechStack }}**技术栈**: {{ .TechStack }}{{ end }}
 {{ if .ReconFilePath }}**侦察报告**: {{ .ReconFilePath }}（可用 read_file 读取）{{ end }}
 
@@ -16,6 +27,17 @@
 ---
 
 ## 审计流程（按序执行）
+
+{{ if .HasSelectionFocus }}
+### Step 0：分析用户选中片段（强制优先）
+
+1. 调用 `read_file` 读取 `{{ .FocusFilePath }}` 完整内容
+2. 重点分析选中行（见上方片段）的数据流、网络/执行 Sink、与 SKILL.md 声明是否一致
+3. 用 `grep` 在该文件及同目录关联脚本中搜索相同模式
+4. 将结论写入 `skill_audit_notes.md`（至少记录选中片段分析小节）
+
+完成 Step 0 后再执行 Step 1。
+{{ end }}
 
 ### Step 1：读取 SKILL.md 元数据
 

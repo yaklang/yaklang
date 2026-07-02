@@ -145,6 +145,13 @@ const phase2ReactiveDataTpl = `## 当前扫描任务
 **技术栈**: {{ .TechStack }}
 **入口点摘要**: {{ .EntryPoints }}
 
+{{ if .HasSelectionFocus }}
+**[优先] 用户选中片段**（必须先覆盖文件 {{ .FocusFilePath }}）:
+{{ .Selection }}
+{{ else if .HasOpenFileFocus }}
+**[优先] 前端打开文件**: {{ .FocusFilePath }}
+{{ end }}
+
 > [路径规则] 所有文件路径参数必须使用用户指定的项目绝对路径，禁止使用相对路径。
 {{ if .ReconOutline }}
 **项目背景报告章节大纲**（包含路由列表、数据访问模式、认证机制等）:
@@ -214,12 +221,16 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *AuditState, 
 		}),
 
 		reactloops.WithPersistentContextProvider(func(loop *reactloops.ReActLoop, nonce string) (string, error) {
-			return utils.RenderTemplate(phase2ScanInstruction, map[string]any{
+			vars := map[string]any{
 				"Nonce":       nonce,
 				"ReconFile":   state.GetReconFilePath(),
 				"TechStack":   state.TechStack,
 				"EntryPoints": state.EntryPoints,
-			})
+			}
+			for k, v := range reactloops.FocusPromptVars(state.GetFocusFilePath(), state.GetSelection()) {
+				vars[k] = v
+			}
+			return utils.RenderTemplate(phase2ScanInstruction, vars)
 		}),
 		reactloops.WithReflectionOutputExample(phase2OutputExample),
 
@@ -250,7 +261,7 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *AuditState, 
 			if len(remaining) == 0 && !isSearchPhase {
 				remainingFilesSB.WriteString("  （全部文件已审计完毕，请调用 complete_scan）\n")
 			}
-			reactivePrompt, err := utils.RenderTemplate(phase2ReactiveDataTpl, map[string]any{
+			reactivePrompt, err := utils.RenderTemplate(phase2ReactiveDataTpl, mergePhase2ReactiveVars(map[string]any{
 				"Nonce":               nonce,
 				"CategoryID":          category.ID,
 				"CategoryName":        category.Name,
@@ -269,11 +280,20 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *AuditState, 
 				"FeedbackMessages":    feedbacker.String(),
 				"FindingsCount":       len(state.GetFindings()),
 				"IterationCount":      iterCount,
-			})
+			}, state))
 			return reactivePrompt, err
 		}),
 
 		reactloops.WithInitTask(func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, op *reactloops.InitTaskOperator) {
+			if focusPath := reactloops.ResolveFocusFilePath(state.GetFocusFilePath(), state.GetSelection()); focusPath != "" {
+				added, total := scan.AddTargetFiles([]string{focusPath})
+				log.Infof("[CodeAudit/Phase2/%s] Pre-seeded focus file: %s (added=%d total=%d)", category.ID, focusPath, added, total)
+				if state.GetSelection() != nil {
+					r.AddToTimeline("[CODE_AUDIT_FOCUS]", fmt.Sprintf("Phase2/%s 选中片段优先: %s", category.ID, focusPath))
+				} else {
+					r.AddToTimeline("[CODE_AUDIT_FOCUS]", fmt.Sprintf("Phase2/%s 优先审计文件: %s", category.ID, focusPath))
+				}
+			}
 			reactloops.EmitStatus(loop, fmt.Sprintf("扫描类别 %s / Scanning category %s", category.Name, category.ID))
 			log.Infof("[CodeAudit/Phase2] Category '%s' scan started", category.ID)
 			op.Continue()
@@ -821,4 +841,11 @@ func buildPrevFindingsSummary(state *AuditState, currentCategoryID string) strin
 			f.Severity, f.ID, f.Category, f.File, f.Line, f.Title))
 	}
 	return sb.String()
+}
+
+func mergePhase2ReactiveVars(base map[string]any, state *AuditState) map[string]any {
+	for k, v := range reactloops.FocusPromptVars(state.GetFocusFilePath(), state.GetSelection()) {
+		base[k] = v
+	}
+	return base
 }
