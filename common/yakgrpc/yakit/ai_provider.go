@@ -1,7 +1,9 @@
 package yakit
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
 	"hash/fnv"
 	"math"
 	"sort"
@@ -399,4 +401,32 @@ func providerIDFromHash(hash string) int64 {
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(hash))
 	return int64(h.Sum64() & math.MaxInt64)
+}
+
+func ReplaceAPIKeys(db *gorm.DB, oldKey, newKey string) error {
+	cfg, err := GetAIGlobalConfig(db)
+	if err != nil {
+		return err
+	}
+	if cfg == nil {
+		return nil
+	}
+
+	for _, models := range [][]*ypb.AIModelConfig{
+		cfg.IntelligentModels,
+		cfg.LightweightModels,
+		cfg.VisionModels,
+	} {
+		for _, model := range models {
+			if model != nil && model.Provider != nil && model.Provider.APIKey == oldKey {
+				model.Provider.APIKey = newKey
+			}
+		}
+	}
+
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	return SetKey(db, consts.AI_GLOBAL_CONFIG_KEY, string(data))
 }
