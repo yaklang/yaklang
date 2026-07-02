@@ -380,11 +380,15 @@ func (r *testRuntime) ExecuteLoopTaskIF(taskTypeName string, task aicommon.AISta
 	return false, nil
 }
 
-func (r *testRuntime) ExecuteToolRequiredAndCall(ctx context.Context, name string) (*aitool.ToolResult, bool, error) {
+func (r *testRuntime) ExecuteToolRequiredAndCall(ctx context.Context, name string, opt ...aicommon.ToolCallerOption) (*aitool.ToolResult, bool, error) {
 	return nil, false, nil
 }
 
-func (r *testRuntime) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams) (*aitool.ToolResult, bool, error) {
+func (r *testRuntime) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams, opt ...aicommon.ToolCallerOption) (*aitool.ToolResult, bool, error) {
+	return nil, false, nil
+}
+
+func (r *testRuntime) DirectlyCallTool(ctx context.Context, toolName string, action *aicommon.Action, prepare aicommon.DirectlyCallPrepareFunc) (*aitool.ToolResult, bool, error) {
 	return nil, false, nil
 }
 

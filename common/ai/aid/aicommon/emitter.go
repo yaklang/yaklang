@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -495,6 +496,20 @@ func (r *Emitter) EmitToolCallStart(callToolId string, tool *aitool.Tool, startT
 		data["start_time_ms"] = startTime[0].UnixMilli()
 	}
 	return r.EmitJSON(schema.EVENT_TOOL_CALL_START, callToolId, data)
+}
+
+// EmitToolCallReason emits the human-readable reason of a tool call, bound to the
+// same call_tool_id as EmitToolCallStart. It is emitted independently of the start
+// card so that card creation is never blocked on reason parsing — the card can be
+// shown in loading state first, and the reason streams in once available.
+func (r *Emitter) EmitToolCallReason(callToolId string, reason string) (*schema.AiOutputEvent, error) {
+	if strings.TrimSpace(reason) == "" {
+		return nil, nil
+	}
+	return r.EmitJSON(schema.EVENT_TOOL_CALL_REASON, callToolId, map[string]any{
+		"call_tool_id": callToolId,
+		"reason":       reason,
+	})
 }
 
 func (r *Emitter) EmitToolCallStatus(callToolId string, status string) (*schema.AiOutputEvent, error) {

@@ -16,17 +16,43 @@ import (
 
 type directlyCallTestInvoker struct {
 	*testInvoker
+	tool                  *aitool.Tool
 	withoutRequiredName   string
 	withoutRequiredParams aitool.InvokeParams
 }
 
-func (t *directlyCallTestInvoker) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams) (*aitool.ToolResult, bool, error) {
+func (t *directlyCallTestInvoker) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams, opt ...aicommon.ToolCallerOption) (*aitool.ToolResult, bool, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.withoutRequiredName = toolName
 	t.withoutRequiredParams = make(aitool.InvokeParams)
 	for key, value := range params {
 		t.withoutRequiredParams[key] = value
+	}
+	return t.toolCallResult, t.toolCallDirectly, t.toolCallErr
+}
+
+// DirectlyCallTool mirrors aicommon.ToolCaller.DirectlyCallTool for tests: it
+// runs the loop-layer prepare callback (which normalizes/validates params and
+// emits progress), records the finalized preset params, and on fallbackToRequire
+// delegates to the require path (ExecuteToolRequiredAndCall) — reusing the same
+// card semantics as the real implementation.
+func (t *directlyCallTestInvoker) DirectlyCallTool(ctx context.Context, toolName string, action *aicommon.Action, prepare aicommon.DirectlyCallPrepareFunc) (*aitool.ToolResult, bool, error) {
+	if prepare != nil && t.tool != nil {
+		params, fallback, _, err := prepare(action, toolName)
+		if err != nil {
+			return nil, false, err
+		}
+		if fallback {
+			return t.ExecuteToolRequiredAndCall(ctx, toolName)
+		}
+		t.mu.Lock()
+		t.withoutRequiredName = toolName
+		t.withoutRequiredParams = make(aitool.InvokeParams)
+		for k, v := range params {
+			t.withoutRequiredParams[k] = v
+		}
+		t.mu.Unlock()
 	}
 	return t.toolCallResult, t.toolCallDirectly, t.toolCallErr
 }
@@ -77,6 +103,7 @@ func TestDirectlyCallTool_Handler_NormalizesWrappedParamsAndStreamsProgress(t *t
 	cfg.GetAiToolManager().AddRecentlyUsedTool(testTool)
 
 	invoker := &directlyCallTestInvoker{testInvoker: newTestInvoker(ctx)}
+	invoker.tool = testTool
 	invoker.toolCallResult = &aitool.ToolResult{Success: true, Data: "ok"}
 	invoker.verifySatisfactionResult = aicommon.NewVerifySatisfactionResult(true, "done", "")
 
@@ -131,6 +158,7 @@ func TestDirectlyCallTool_Handler_MergesAITagParams(t *testing.T) {
 	cfg.GetAiToolManager().AddRecentlyUsedTool(testTool)
 
 	invoker := &directlyCallTestInvoker{testInvoker: newTestInvoker(ctx)}
+	invoker.tool = testTool
 	invoker.toolCallResult = &aitool.ToolResult{Success: true, Data: "ok"}
 	invoker.verifySatisfactionResult = aicommon.NewVerifySatisfactionResult(true, "done", "")
 
@@ -170,6 +198,7 @@ func TestDirectlyCallTool_Verifier_AllowsEmptyParamsForParamlessTool(t *testing.
 	cfg.GetAiToolManager().AddRecentlyUsedTool(testTool)
 
 	invoker := &directlyCallTestInvoker{testInvoker: newTestInvoker(ctx)}
+	invoker.tool = testTool
 	invoker.toolCallResult = &aitool.ToolResult{Success: true, Data: "ok"}
 	invoker.verifySatisfactionResult = aicommon.NewVerifySatisfactionResult(true, "done", "")
 
@@ -206,6 +235,7 @@ func TestDirectlyCallTool_Handler_RequiredParamMismatchAddsLatestFewShot(t *test
 	cfg.GetAiToolManager().AddRecentlyUsedTool(testTool)
 
 	invoker := &directlyCallTestInvoker{testInvoker: newTestInvoker(ctx)}
+	invoker.tool = testTool
 	invoker.toolCallResult = &aitool.ToolResult{Success: true, Data: "ok"}
 	invoker.verifySatisfactionResult = aicommon.NewVerifySatisfactionResult(true, "done", "")
 

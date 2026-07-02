@@ -70,12 +70,16 @@ func (i *httpFuzztestTestInvoker) GetConfig() aicommon.AICallerConfigIf {
 	return i.config
 }
 
-func (i *httpFuzztestTestInvoker) ExecuteToolRequiredAndCall(ctx context.Context, name string) (*aitool.ToolResult, bool, error) {
-	return i.base.ExecuteToolRequiredAndCall(ctx, name)
+func (i *httpFuzztestTestInvoker) ExecuteToolRequiredAndCall(ctx context.Context, name string, opt ...aicommon.ToolCallerOption) (*aitool.ToolResult, bool, error) {
+	return i.base.ExecuteToolRequiredAndCall(ctx, name, opt...)
 }
 
-func (i *httpFuzztestTestInvoker) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams) (*aitool.ToolResult, bool, error) {
-	return i.base.ExecuteToolRequiredAndCallWithoutRequired(ctx, toolName, params)
+func (i *httpFuzztestTestInvoker) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams, opt ...aicommon.ToolCallerOption) (*aitool.ToolResult, bool, error) {
+	return i.base.ExecuteToolRequiredAndCallWithoutRequired(ctx, toolName, params, opt...)
+}
+
+func (i *httpFuzztestTestInvoker) DirectlyCallTool(ctx context.Context, toolName string, action *aicommon.Action, prepare aicommon.DirectlyCallPrepareFunc) (*aitool.ToolResult, bool, error) {
+	return i.base.DirectlyCallTool(ctx, toolName, action, prepare)
 }
 
 func (i *httpFuzztestTestInvoker) AskForClarification(ctx context.Context, question string, payloads []string) string {

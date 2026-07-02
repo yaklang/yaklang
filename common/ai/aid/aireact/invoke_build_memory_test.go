@@ -531,11 +531,15 @@ func (m *mockInvokerForMemoryTest) InvokeLiteForge(ctx context.Context, name str
 	return action, nil
 }
 
-func (m *mockInvokerForMemoryTest) ExecuteToolRequiredAndCall(ctx context.Context, name string) (*aitool.ToolResult, bool, error) {
+func (m *mockInvokerForMemoryTest) ExecuteToolRequiredAndCall(ctx context.Context, name string, opt ...aicommon.ToolCallerOption) (*aitool.ToolResult, bool, error) {
 	return nil, false, nil
 }
 
-func (m *mockInvokerForMemoryTest) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams) (*aitool.ToolResult, bool, error) {
+func (m *mockInvokerForMemoryTest) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams, opt ...aicommon.ToolCallerOption) (*aitool.ToolResult, bool, error) {
+	return nil, false, nil
+}
+
+func (m *mockInvokerForMemoryTest) DirectlyCallTool(ctx context.Context, toolName string, action *aicommon.Action, prepare aicommon.DirectlyCallPrepareFunc) (*aitool.ToolResult, bool, error) {
 	return nil, false, nil
 }
 

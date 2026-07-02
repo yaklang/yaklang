@@ -3,6 +3,7 @@ package loopinfra
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -10,6 +11,22 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+// resolveToolCallReason extracts the human-readable reason for a tool call from
+// the action: it prefers the action-specific reason field (e.g. tool_call_reason)
+// and falls back to human_readable_thought when the AI omitted the dedicated
+// reason field. Used by require_tool; directly_call_tool reads its reason inside
+// aicommon.ToolCaller.DirectlyCallTool (so the card is emitted before the reason
+// streams in).
+func resolveToolCallReason(action *aicommon.Action, reasonKey string) string {
+	if action == nil {
+		return ""
+	}
+	if r := strings.TrimSpace(action.GetString(reasonKey)); r != "" {
+		return r
+	}
+	return strings.TrimSpace(action.GetString("human_readable_thought"))
+}
 
 // handleToolCallResult processes the result returned by ExecuteToolRequiredAndCall
 // or ExecuteToolRequiredAndCallWithoutRequired. It is shared by require_tool and

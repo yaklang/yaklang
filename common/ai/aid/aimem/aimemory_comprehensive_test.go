@@ -160,11 +160,15 @@ func (m *AdvancedMockInvoker) InvokeLiteForge(ctx context.Context, actionName st
 }
 
 // 实现其他必需的接口方法
-func (m *AdvancedMockInvoker) ExecuteToolRequiredAndCall(ctx context.Context, name string) (*aitool.ToolResult, bool, error) {
+func (m *AdvancedMockInvoker) ExecuteToolRequiredAndCall(ctx context.Context, name string, opt ...aicommon.ToolCallerOption) (*aitool.ToolResult, bool, error) {
 	return nil, false, nil
 }
 
-func (m *AdvancedMockInvoker) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams) (*aitool.ToolResult, bool, error) {
+func (m *AdvancedMockInvoker) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams, opt ...aicommon.ToolCallerOption) (*aitool.ToolResult, bool, error) {
+	return nil, false, nil
+}
+
+func (m *AdvancedMockInvoker) DirectlyCallTool(ctx context.Context, toolName string, action *aicommon.Action, prepare aicommon.DirectlyCallPrepareFunc) (*aitool.ToolResult, bool, error) {
 	return nil, false, nil
 }
 

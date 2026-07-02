@@ -148,7 +148,24 @@ const (
 	EVENT_TOOL_CALL_RESULT      = "tool_call_result"      // tool call result event, used to emit the tool call result information
 	EVENT_TOOL_CALL_PARAM       = "tool_call_param"       // tool call param event, used to emit the final invoke params bound to call tool id
 	EVENT_TOOL_CALL_LOG_DIR     = "tool_call_log_dir"     // tool call log dir event, used to emit the tool call log dir information
+	EVENT_TOOL_CALL_REASON      = "tool_call_reason"      // tool call reason event, used to emit the human-readable reason of this tool call
+)
 
+// ToolCallStatus is the in-progress status carried by EVENT_TOOL_CALL_STATUS (json field "status").
+// Terminal or special outcomes use dedicated event types (done / error / user_cancel) instead.
+
+const (
+	// TOOL_CALL_STATUS_RUNNING is the default in-progress state for a normal tool execution flow.
+	TOOL_CALL_STATUS_RUNNING string = "running"
+	// TOOL_CALL_STATUS_PROCESSING_PARAMS indicates invoke parameters are being generated or resolved.
+	TOOL_CALL_STATUS_PROCESSING_PARAMS string = "processing_params"
+	// TOOL_CALL_STATUS_DONE marks a successful completion (also emitted via EVENT_TOOL_CALL_DONE).
+	TOOL_CALL_STATUS_DONE string = "done"
+	// TOOL_CALL_STATUS_CANCELLED marks a user-initiated cancellation (also emitted via EVENT_TOOL_CALL_USER_CANCEL).
+	TOOL_CALL_STATUS_CANCELLED string = "cancelled"
+)
+
+const (
 	EVENT_TYPE_START_PLAN_AND_EXECUTION    EventType = "start_plan_and_execution"
 	EVENT_TYPE_FAIL_PLAN_AND_EXECUTION     EventType = "fail_plan_and_execution"
 	EVENT_TYPE_FAIL_REACT                  EventType = "fail_react_task"

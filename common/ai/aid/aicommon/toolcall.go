@@ -231,6 +231,7 @@ type ToolCaller struct {
 	done       *sync.Once
 	callToolId string
 	startTime  time.Time // Track tool call start time
+	reason     string    // human-readable reason for this tool call, emitted with the start card
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -261,6 +262,17 @@ type ToolCallerOption func(tc *ToolCaller)
 func WithToolCaller_CallExpectations(expectations string) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.callExpectations = expectations
+	}
+}
+
+// WithToolCaller_Reason sets the human-readable reason for this tool call. The
+// reason is emitted via EmitToolCallReason alongside the start card so the
+// frontend can show why the tool is being invoked. EmitToolCallReason may be
+// called again later (e.g. with the AI's thinking during param generation) to
+// update the reason on the card.
+func WithToolCaller_Reason(reason string) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.reason = reason
 	}
 }
 
@@ -440,6 +452,116 @@ func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, dir
 	return t.CallToolWithExistedParams(tool, false, make(aitool.InvokeParams))
 }
 
+// emitStart records the start time, binds the emitter via onCallToolStart, and
+// emits EmitToolCallStart (the tool-call card) — and EmitToolCallReason when a
+// reason was preset via WithToolCaller_Reason. It is invoked through t.start
+// (a sync.Once) so the card is emitted exactly once even when the caller triggers
+// start early (e.g. DirectlyCallTool) and CallToolWithExistedParams runs later.
+func (t *ToolCaller) emitStart(tool *aitool.Tool) {
+	t.m.Lock()
+	defer t.m.Unlock()
+	t.startTime = time.Now() // Record start time
+	if t.onCallToolStart != nil {
+		t.onCallToolStart(t.callToolId)
+	}
+	// should emit after call tool start callback, this call will bind call tool id for emitter
+	t.emitter.EmitToolCallStart(t.callToolId, tool, t.startTime)
+	if t.reason != "" {
+		t.emitter.EmitToolCallReason(t.callToolId, t.reason)
+	}
+}
+
+// DirectlyCallPrepareFunc is the loop-layer callback that prepares the final
+// invoke params for a directly_call_tool action AFTER the tool-call card has been
+// created. It receives the streaming *Action (whose field getters block until
+// each field has streamed in) and the resolved tool. It returns the finalized
+// params, whether to fall back to the AI param-generation (require) path (e.g.
+// on schema-validation failure), or an error.
+type DirectlyCallPrepareFunc func(action *Action, toolName string) (finalParams aitool.InvokeParams, fallbackToRequire bool, tool *aitool.Tool, err error)
+
+// DirectlyCallTool handles the "card already created" flow for a
+// directly_call_tool action: it emits the tool-call card (loading) FIRST, then
+// reads the reason and params from the streaming action (blocking per-field until
+// they arrive), then invokes the tool. Because Action is an async streaming
+// structure, the card appears immediately and reason/params stream in afterwards
+// — card creation is never blocked on reason/params parsing.
+//
+// On fallbackToRequire the same card is reused and execution switches to the AI
+// param-generation path (CallToolWithExistedParams with skipRequire=false).
+func (t *ToolCaller) DirectlyCallTool(nominalTool *aitool.Tool, action *Action, prepare DirectlyCallPrepareFunc) (*aitool.ToolResult, bool, error) {
+	if t.emitter == nil {
+		emitter := t.config.GetEmitter()
+		if emitter == nil {
+			return nil, false, fmt.Errorf("no emitter found in ToolCaller")
+		}
+		t.emitter = emitter
+	}
+
+	// 1. emit start card first (loading). sync.Once guards the later CallToolWithExistedParams.
+	t.start.Do(func() { t.emitStart(nominalTool) })
+
+	// 2. read reason from the streaming action (blocks until reason streams in),
+	//    fallback to human_readable_thought, emit as a separate event so the card
+	//    is never blocked on reason parsing.
+	if action != nil {
+		reason := action.GetString("directly_call_reason")
+		if strings.TrimSpace(reason) == "" {
+			reason = action.GetString("human_readable_thought")
+		}
+		if strings.TrimSpace(reason) != "" {
+			t.emitter.EmitToolCallReason(t.callToolId, reason)
+		}
+	}
+
+	// 3. prepare params via loop-layer callback (reads action fields, blocks until streamed).
+	finalParams := make(aitool.InvokeParams)
+	fallback := false
+	var tool *aitool.Tool
+	if prepare != nil {
+		var fp aitool.InvokeParams
+		var err error
+		var fb bool
+		t.emitter.EmitToolCallStatus(t.callToolId, schema.TOOL_CALL_STATUS_PROCESSING_PARAMS)
+		fp, fb, tool, err = prepare(action, nominalTool.Name)
+		t.emitter.EmitToolCallStatus(t.callToolId, schema.TOOL_CALL_STATUS_RUNNING)
+		if err != nil {
+			// close the card on prepare error (we never reach CallToolWithExistedParams' defers)
+			t.done.Do(func() {
+				t.m.Lock()
+				defer t.m.Unlock()
+				endTime := time.Now()
+				t.emitter.EmitToolCallError(t.callToolId, err, endTime, t.startTime, 0)
+				if t.onCallToolEnd != nil {
+					t.onCallToolEnd(t.callToolId)
+				}
+			})
+			return nil, false, err
+		}
+		finalParams = fp
+		fallback = fb
+	}
+
+	// 4. run the post-card flow. sync.Once ensures start is not re-emitted.
+	if fallback {
+		return t.CallToolWithExistedParams(tool, false, nil)
+	}
+	if finalParams == nil {
+		finalParams = make(aitool.InvokeParams)
+	}
+	return t.CallToolWithExistedParams(tool, true, finalParams)
+}
+
+// EmitReason emits (or updates) the human-readable reason for this tool call on
+// the current tool-call card. It may be called multiple times — e.g. with the
+// AI's thinking streamed during param generation — so the frontend can update
+// the reason shown on the card.
+func (t *ToolCaller) EmitReason(reason string) {
+	if t.emitter == nil {
+		return
+	}
+	t.emitter.EmitToolCallReason(t.callToolId, reason)
+}
+
 // GenerateParamsResult contains the result of generateParams including params and identifier
 type GenerateParamsResult struct {
 	Params           aitool.InvokeParams
@@ -451,6 +573,9 @@ type GenerateParamsResult struct {
 
 func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) (*GenerateParamsResult, error) {
 	emitter := t.emitter
+
+	t.emitter.EmitToolCallStatus(t.callToolId, schema.TOOL_CALL_STATUS_PROCESSING_PARAMS)
+	defer t.emitter.EmitToolCallStatus(t.callToolId, schema.TOOL_CALL_STATUS_RUNNING)
 
 	// Try to use the new builder with metadata first (for AITAG support)
 	var paramsPrompt string
@@ -484,6 +609,15 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 		return t.ai.CallAI(request)
 	}, func(rsp *AIResponse) error {
 		boundEmitter := rsp.BindEmitter(emitter)
+		// Stream the model's thinking as the tool-call reason (updating the card)
+		// during param generation. EmitToolCallReason may be called many times;
+		// the frontend updates the reason shown on the card.
+		rsp.SetOnReasonChunk(func(b []byte) {
+			if len(b) == 0 {
+				return
+			}
+			boundEmitter.EmitToolCallReason(t.callToolId, string(b))
+		})
 		pr, pw := utils.NewPipe()
 
 		stream := rsp.GetOutputStreamReader("call-tools", true, emitter)
@@ -509,7 +643,7 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 			log.Debugf("registered AITAG handlers for tool[%s] params: %v with nonce: %s", tool.Name, promptMeta.ParamNames, promptMeta.Nonce)
 		}
 
-		event, err := boundEmitter.EmitDefaultStreamEvent("generating-tool-call-params", pr, t.task.GetIndex())
+		event, err := boundEmitter.EmitDefaultSystemStreamEvent("generating-tool-call-params", pr, t.task.GetIndex())
 		if err != nil {
 			boundEmitter.EmitError("error emit default stream event for tool[%s] params: %v", tool.Name, err)
 		}
@@ -690,6 +824,9 @@ func SanitizeTaskName(name string) string {
 	return str
 }
 
+// CallToolWithExistedParams is the normal require/preset tool-call flow (param
+// generation/review/invoke/done). DirectlyCallTool delegates here for the actual
+// invoke after emitting the card and running the prepare callback.
 func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams bool, presetInvokeParams aitool.InvokeParams) (result *aitool.ToolResult, directlyAnswer bool, err error) {
 	if t.emitter == nil {
 		emitter := t.config.GetEmitter()
@@ -709,15 +846,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	toolResult := &aitool.ToolResult{}
 	defer t.emitter.EmitToolCallSummary(t.callToolId, SummaryRank(t.task, toolResult))
 
-	t.start.Do(func() {
-		t.m.Lock()
-		defer t.m.Unlock()
-		t.startTime = time.Now() // Record start time
-		if t.onCallToolStart != nil {
-			t.onCallToolStart(callToolId)
-		}
-		t.emitter.EmitToolCallStart(callToolId, tool, t.startTime) // should emit after call tool start callback , this call will bind call tool id for emitter
-	})
+	t.start.Do(func() { t.emitStart(tool) })
 
 	t.emitter.EmitInfo("start to generate tool[%v] params in task: %v", tool.Name, t.task.GetName())
 	// pluginInvokeStartTime: 纯插件执行起点（从真正进入 t.invoke 前开始计时）。
@@ -747,7 +876,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 			t.m.Lock()
 			defer t.m.Unlock()
 			endTime := time.Now() // Record end time
-			t.emitter.EmitToolCallStatus(t.callToolId, "done")
+			t.emitter.EmitToolCallStatus(t.callToolId, schema.TOOL_CALL_STATUS_DONE)
 			t.emitter.EmitToolCallDone(callToolId, endTime, t.startTime, getPurePluginDuration(endTime))
 			if t.onCallToolEnd != nil {
 				t.onCallToolEnd(callToolId)
@@ -760,7 +889,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 			t.m.Lock()
 			defer t.m.Unlock()
 			endTime := time.Now() // Record end time
-			t.emitter.EmitToolCallStatus(t.callToolId, fmt.Sprintf("cancelled by reason: %v", reason))
+			t.emitter.EmitToolCallStatus(t.callToolId, fmt.Sprintf("%s by reason: %v", schema.TOOL_CALL_STATUS_CANCELLED, reason))
 			t.emitter.EmitToolCallUserCancel(callToolId, endTime, t.startTime, getPurePluginDuration(endTime))
 
 			if t.onCallToolEnd != nil {
@@ -858,6 +987,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 			"tool":             tool.Name,
 			"tool_description": tool.Description,
 			"params":           invokeParams,
+			"reason":           t.reason,
 		}
 		ep.SetReviewMaterials(reqs)
 		err := t.config.SubmitCheckpointRequest(ep.GetCheckpoint(), reqs)
@@ -965,6 +1095,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	}
 
 	t.emitter.EmitInfo("start to invoke tool: %v", tool.Name)
+	t.emitter.EmitToolCallStatus(callToolId, schema.TOOL_CALL_STATUS_RUNNING)
 	t.m.Lock()
 	// Measure pure plugin execution time from real invoke start to invoke return.
 	pluginInvokeStartTime = time.Now()
