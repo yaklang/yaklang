@@ -103,11 +103,15 @@ func NewDebugSession(conn net.Conn, config *DAPServerConfig) *DebugSession {
 }
 
 func (ds *DebugSession) send(message dap.Message) {
+	// 整个发送过程（含用于日志的 Marshal 与实际写入）都在锁内串行化，
+	// 避免多个协程（请求处理协程、调试回调协程、异步 go 协程）并发读取
+	// message 引用的共享状态或并发写连接。
+	ds.sendingMu.Lock()
+	defer ds.sendingMu.Unlock()
+
 	jsonmsg, _ := json.Marshal(message)
 	log.Debugf("[-> to client] %v", string(jsonmsg))
 
-	ds.sendingMu.Lock()
-	defer ds.sendingMu.Unlock()
 	err := dap.WriteProtocolMessage(ds.conn, message)
 	if err != nil {
 		log.Debug(err)

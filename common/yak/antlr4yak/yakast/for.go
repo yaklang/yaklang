@@ -12,6 +12,17 @@ type forContext struct {
 	continueScopeCounter int
 	breakScopeCounter    int
 	forRangeMode         bool
+	// loopVarBindings 记录三段式 for 中 `:=` 声明的循环变量在
+	// 外层 for-legacy 作用域与本次迭代 block 作用域中的符号对应关系，
+	// 用于在 block 正常结束与 continue 时把 block 内的值写回外层符号
+	// （Go 1.22 语义：下一轮迭代的新变量从上一轮结束时的值初始化）。
+	loopVarBindings []loopVarBinding
+}
+
+type loopVarBinding struct {
+	name    string
+	outerID int
+	bodyID  int
 }
 
 func (y *YakCompiler) enterForContext(start int) {
@@ -84,6 +95,12 @@ func (y *YakCompiler) VisitForStmt(raw yak.IForStmtContext) interface{} {
 
 	f := y.SwitchSymbolTableInNewScope("for-legacy", uuid.New().String())
 
+	// Go 1.22 语义：仅当初始化语句用 `:=` 声明循环变量时，每次迭代隐式创建
+	// 独立的同名变量（块内使用），块结束/continue 时把值写回外层符号，
+	// 供条件、第三条语句以及下一轮迭代复制使用。
+	// `for i = 0; ...`（赋值）与循环外声明的变量保持共享旧行为，与 Go 一致。
+	var loopVars []loopVarBinding
+
 	var toEnds []*yakvm.Code
 	var conditionSymbol int
 	if e := i.Expression(); e != nil {
@@ -94,6 +111,7 @@ func (y *YakCompiler) VisitForStmt(raw yak.IForStmtContext) interface{} {
 		condIns := cond.(*yak.ForStmtCondContext)
 		if entry := condIns.ForFirstExpr(); entry != nil {
 			y.VisitForFirstExpr(entry)
+			loopVars = y.collectColonAssignLoopVars(entry)
 		}
 		y.writeString("; ")
 
@@ -117,7 +135,36 @@ func (y *YakCompiler) VisitForStmt(raw yak.IForStmtContext) interface{} {
 	// for 执行体结束之后应该无条件跳转回开头，重新判断
 	// 但是三语句 for ;; 应该是 block 执行解释后执行第三条语句
 	recoverFormatBufferFunc := y.switchFormatBuffer()
-	y.VisitBlock(i.Block())
+	if len(loopVars) > 0 {
+		forCtx := y.peekForContext()
+		y.VisitBlockWithCallbacks(i.Block(), func(y *YakCompiler) {
+			// 进入本次迭代的 block 作用域：为每个 `:=` 循环变量建立独立拷贝
+			bindings := make([]loopVarBinding, 0, len(loopVars))
+			for _, lv := range loopVars {
+				bodyID, err := y.currentSymtbl.NewSymbolWithReturn(lv.name)
+				if err != nil {
+					y.panicCompilerError(forceCreateSymbolFailed, lv.name)
+				}
+				y.pushRef(lv.outerID)
+				y.pushListWithLen(1)
+				y.pushLeftRef(bodyID)
+				y.pushListWithLen(1)
+				y.pushOperator(yakvm.OpAssign)
+				bindings = append(bindings, loopVarBinding{name: lv.name, outerID: lv.outerID, bodyID: bodyID})
+			}
+			if forCtx != nil {
+				forCtx.loopVarBindings = bindings
+			}
+		}, func(y *YakCompiler) {
+			// block 正常结束（未 continue/break）：把本次迭代的值写回外层符号
+			y.emitLoopVarCopyBack(forCtx)
+			if forCtx != nil {
+				forCtx.loopVarBindings = nil
+			}
+		})
+	} else {
+		y.VisitBlock(i.Block())
+	}
 	buf := recoverFormatBufferFunc()
 
 	// continue index
@@ -232,6 +279,29 @@ func (y *YakCompiler) VisitForRangeStmt(raw yak.IForRangeStmtContext) interface{
 		}
 	}
 	y.pushOperator(yakvm.OpAssign) // 赋值给左边的变量
+
+	// Go 1.22 for-range 语义：循环变量按迭代独立绑定。
+	// 这里收集具名的循环变量(标识符左值，跳过 `_` 与成员/下标左值)及其在
+	// 外层 for 作用域中的符号 id，稍后在每次迭代的 block 作用域内建立同名拷贝，
+	// 使 `go func(){...}` / defer / 闭包捕获到的是"本次迭代"的值，而非所有迭代
+	// 共享的同一个外层符号（旧版本需要手写 `val := val` 规避，现在默认即安全）。
+	var loopVarNames []string
+	var loopVarOuterIDs []int
+	if n > 0 {
+		if l, ok := i.LeftExpressionList().(*yak.LeftExpressionListContext); ok && l != nil {
+			for _, le := range l.AllLeftExpression() {
+				name, ok := leftExpressionIdentifierName(le)
+				if !ok || name == "" || name == "_" {
+					continue
+				}
+				if id, ok := y.currentSymtbl.GetSymbolByVariableName(name); ok {
+					loopVarNames = append(loopVarNames, name)
+					loopVarOuterIDs = append(loopVarOuterIDs, id)
+				}
+			}
+		}
+	}
+
 	if op, op2 := i.In(), i.Range(); op != nil || op2 != nil {
 		if op != nil {
 			y.writeStringWithWhitespace(op.GetText())
@@ -246,7 +316,29 @@ func (y *YakCompiler) VisitForRangeStmt(raw yak.IForRangeStmtContext) interface{
 		}
 	}
 	y.writeString(buf + " ")
-	y.VisitBlock(i.Block())
+	if len(loopVarNames) > 0 {
+		y.VisitBlockWithCallback(i.Block(), func(y *YakCompiler) {
+			// 进入本次迭代的 block 作用域后立即执行，为每个具名循环变量在
+			// block 作用域内建立一份独立拷贝并遮蔽外层同名符号。
+			// 只发射 opcode，不写格式化文本，避免影响 yakfmt 输出。
+			for idx, name := range loopVarNames {
+				outerID := loopVarOuterIDs[idx]
+				// 右值：读取外层(本次迭代)循环变量的当前值
+				y.pushRef(outerID)
+				y.pushListWithLen(1)
+				// 左值：在 block 符号表中新建同名符号（遮蔽外层）
+				newID, err := y.currentSymtbl.NewSymbolWithReturn(name)
+				if err != nil {
+					y.panicCompilerError(forceCreateSymbolFailed, name)
+				}
+				y.pushLeftRef(newID)
+				y.pushListWithLen(1)
+				y.pushOperator(yakvm.OpAssign)
+			}
+		})
+	} else {
+		y.VisitBlock(i.Block())
+	}
 
 	exitFR := y.GetNextCodeIndex()
 	// exit for-range
@@ -272,6 +364,74 @@ func (y *YakCompiler) VisitForRangeStmt(raw yak.IForRangeStmtContext) interface{
 	//  	预期为 for range 4 { println(1) } 将会打印 4 个 1\n，等价于 for range [0,1,2,3] {}...
 
 	return nil
+}
+
+// collectColonAssignLoopVars 检查三段式 for 的初始化语句是否为 `:=` 声明，
+// 若是则收集其中裸标识符循环变量的名字与其在当前(for-legacy)作用域中的符号 id。
+// 仅 `:=` 声明触发 Go 1.22 每迭代独立变量语义；`=` 赋值保持共享行为。
+func (y *YakCompiler) collectColonAssignLoopVars(raw yak.IForFirstExprContext) []loopVarBinding {
+	i, _ := raw.(*yak.ForFirstExprContext)
+	if i == nil {
+		return nil
+	}
+	ae, _ := i.AssignExpression().(*yak.AssignExpressionContext)
+	if ae == nil || ae.ColonAssignEq() == nil {
+		return nil
+	}
+	l, _ := ae.LeftExpressionList().(*yak.LeftExpressionListContext)
+	if l == nil {
+		return nil
+	}
+	var result []loopVarBinding
+	for _, le := range l.AllLeftExpression() {
+		name, ok := leftExpressionIdentifierName(le)
+		if !ok || name == "" || name == "_" {
+			continue
+		}
+		if id, ok := y.currentSymtbl.GetSymbolByVariableName(name); ok {
+			result = append(result, loopVarBinding{name: name, outerID: id})
+		}
+	}
+	return result
+}
+
+// emitLoopVarCopyBack 发射把本次迭代 block 内循环变量值写回外层符号的 opcode。
+// 在 block 正常结束与 continue 语句处调用，保证条件/第三条语句与下一轮迭代
+// 能看到本轮 body 对循环变量的修改（与 Go 1.22 规范一致）。
+func (y *YakCompiler) emitLoopVarCopyBack(forCtx *forContext) {
+	if forCtx == nil {
+		return
+	}
+	for _, b := range forCtx.loopVarBindings {
+		y.pushRef(b.bodyID)
+		y.pushListWithLen(1)
+		y.pushLeftRef(b.outerID)
+		y.pushListWithLen(1)
+		y.pushOperator(yakvm.OpAssign)
+	}
+}
+
+// leftExpressionIdentifierName 从一个 leftExpression 中提取"裸标识符"名字。
+// 仅当左值是纯标识符（如 `val`）时返回其名字；成员/下标等复杂左值返回 false。
+// 语法为 `leftExpression: Identifier | expression`，因此需同时兼容两种情形。
+func leftExpressionIdentifierName(raw yak.ILeftExpressionContext) (string, bool) {
+	le, ok := raw.(*yak.LeftExpressionContext)
+	if !ok || le == nil {
+		return "", false
+	}
+	if id := le.Identifier(); id != nil {
+		return id.GetText(), true
+	}
+	expr, ok := le.Expression().(*yak.ExpressionContext)
+	if !ok || expr == nil {
+		return "", false
+	}
+	// 兜底：expression 顶层恰好是裸标识符
+	if id := expr.Identifier(); id != nil && len(expr.AllExpression()) == 0 &&
+		expr.MemberCall() == nil && expr.SliceCall() == nil && expr.FunctionCall() == nil {
+		return id.GetText(), true
+	}
+	return "", false
 }
 
 func (y *YakCompiler) VisitForThirdExpr(raw yak.IForThirdExprContext) interface{} {

@@ -109,45 +109,65 @@ VM 编译器落地在 `yakast/visitor.go`：
 整体约 **38% 提速**。对能走 SLL 快路径的脚本（本集合中 32/52），单文件语法分析可获得
 **30~80 倍** 的加速（见第 2 节 `parse(LL)` vs `parse(SLL)`）。
 
-## 6. 已知局限：部分脚本仍会回退到 LL
+## 6. 语法消歧：让全部 coreplugin 都命中 SLL
 
-`TestPerf_SLLBailDiagnostic` 显示，52 个 coreplugin 中有 **20 个会 bail 回退到 LL**，
-其中包含体积最大的 `启发式SQL注入检测.yak`。这类脚本仍会付出 LL 的高成本
-（并额外浪费一次 SLL 尝试），因此它们的单文件编译时间在开关前后基本持平。
+早期版本中 `TestPerf_SLLBailDiagnostic` 显示 52 个 coreplugin 里有 **20 个会 bail 回退到 LL**，
+其中包含体积最大的 `启发式SQL注入检测.yak`。经定位，全部 bail 都来自两处**共享前缀 + 后缀
+自我重叠**的语法歧义（同一类问题），现已通过语法消歧解决，**52 / 52 全部命中 SLL，bail=0**。
 
-回退的根因是**赋值语句左值为下标/切片/映射访问**这一常见写法触发了 SLL 无法判定的歧义，
-最小复现（`TestPerf_SLLMinimalRepro`）：
+### 6.1 赋值左值（下标/切片/映射）
 
-```
-OK    "a = 1"          // 普通标识符赋值，SLL 可解析
-OK    "a.b = 1"        // 成员赋值，SLL 可解析
-OK    "a := 1"
-BAIL  "a[0] = 1"       // 下标赋值 -> 回退 LL
-BAIL  "m[k] = v"       // 映射/下标赋值 -> 回退 LL
-BAIL  "a[0] := 1"
-BAIL  "a[0], b = 1, 2"
-BAIL  "a[i] = a[i] + 1"
-```
-
-对应语法：
+历史语法：
 
 ```
-assignExpression : leftExpressionList ('=' | ':=') expressionList | ... ;
-leftExpressionList : leftExpression (',' leftExpression)* ;
 leftExpression : expression (leftMemberCall | leftSliceCall) | Identifier ;
+leftSliceCall  : '[' expression ']' ;   // 与 expression 的 sliceCall 单下标形式完全重叠
 ```
 
-对 `a[0] = 1`，`a[0]` 既能作为独立表达式语句（`expression sliceCall`），
-又能作为赋值左值（`leftExpression = expression + leftSliceCall`），两者共享前缀，
-真正的判别符是其后的 `=`。SLL 的单一上下文近似在此会先选择表达式语句分支、
-消费完 `a[0]` 后在 `=` 处报 “no viable alternative at input '='”，从而 bail 回退到 LL；
-LL 借助全上下文能正确预测为赋值语句。这是该语法固有的 SLL 弱点，两阶段策略在此表现为
-“安全回退”，行为正确但拿不到 SLL 的加速。
+对 `a[0] = 1`，`a[0]` 既能作为独立表达式语句（`expression sliceCall`），又能作为赋值左值
+（`expression` + `leftSliceCall`），两者共享前缀，真正的判别符是其后的 `=`。SLL 的单一（合并）
+上下文近似无法穿过左递归 `expression` 的优先级循环看到 `=`，于是先选表达式语句分支、消费完
+`a[0]` 后在 `=` 处报 no viable alternative，bail 回退 LL。成员赋值 `a.b = 1` 不受影响，是因为
+`memberCall` 只有单一形式，而 `sliceCall` 的多个 `:` 备选把 SLL 的嵌套判定进一步拖垮。
 
-要让这类脚本也走上 SLL 快路径，需要对 `leftExpression` / `assignExpression` 这组规则做
-消歧重构（例如让左值不再递归整个 `expression`）。该改动会牵动生成代码与紧耦合的
-visitor 逻辑及大量既有测试，属于更大范围、更高风险的独立工作，本次不纳入，
-以免破坏现有架构与核心测试。
+消歧：让左值直接复用通用 `expression`，与右值走完全相同的 ATN 路径，判别点后移到
+`expression` 结束后的单个 token：
+
+```
+leftExpression : Identifier | expression ;
+```
+
+`Identifier` 作为首选备选，保证裸标识符（如 `for i in x`）不会被 `expression` 贪婪吞掉后缀，
+从而与 for-range 等规则保持既有行为。左值是否可赋值改由 visitor 依据 expression 子树判定
+（成员 / 单下标 / 标识符），非法左值（`1 = 2`、`a[1:2] = x`）在语义阶段报错。
+
+### 6.2 `go` / `defer` 的函数调用
+
+历史语法 `functionCallExpr : expression functionCall ;` 与 expression 自身的 functionCall 后缀
+重叠：对 `go f()` / `defer f()`，`f()` 既能被 `expression` 整体吞掉，又能拆成 `expression=f` +
+外层 `functionCall=()`，同样是共享前缀 + 后缀自我重叠，SLL bail。消歧同样复用通用 `expression`：
+
+```
+functionCallExpr : expression ;
+```
+
+顶层是否为合法调用由 visitor 判定。注意 SSA 前端刻意“只构造不 emit”，由 `go`/`defer` 决定
+emit 时机，因此从 expression 子树取出顶层 `functionCall` 再走 `buildFunctionCall`，而非直接
+`buildExpression`（后者会 `EmitCall`，会导致重复发射）。
+
+### 6.3 影响面
+
+VM 编译器（`yakast`）与 SSA 前端（`yak2ssa`）的 visitor 已同步适配新的 `leftExpression` /
+`functionCallExpr` 结构；“SLL 未 bail 时解析树必须与 LL 逐字符一致”的不变式仍然成立；
+`common/yak/antlr4yak` 全量测试与 `yak2ssa` 测试通过，运行时行为（下标/映射/成员赋值、`++`、
+`go`、`defer`、for-range）经源码引擎冒烟验证无回归。
+
+> 历史备注：下述最小复现在旧语法下会 bail，现已全部 OK：
+>
+> ```
+> a[0] = 1 / m[k] = v / a[0] := 1 / a[0], b = 1, 2 / a[i] = a[i] + 1
+> go f() / defer f()
+> ```
 
 ## 7. 如何复现基准
 

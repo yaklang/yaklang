@@ -180,14 +180,6 @@ func (v *BaseYaklangParserVisitor) VisitLeftExpression(ctx *LeftExpressionContex
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseYaklangParserVisitor) VisitLeftMemberCall(ctx *LeftMemberCallContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseYaklangParserVisitor) VisitLeftSliceCall(ctx *LeftSliceCallContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseYaklangParserVisitor) VisitExpression(ctx *ExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }

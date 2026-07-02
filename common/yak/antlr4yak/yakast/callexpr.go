@@ -33,8 +33,10 @@ func (y *YakCompiler) VisitFunctionCallExpr(raw yak.IFunctionCallExprContext) in
 		return nil
 	}
 
+	// functionCallExpr: expression
+	// 表达式本身即为调用（如 f() / a.b() / func(){}() / fn{...}），
+	// expression 的后缀调用逻辑会生成末尾的 OpCall，交由 go/defer 等语句按需转换。
 	y.VisitExpression(i.Expression())
-	y.VisitFunctionCall(i.FunctionCall())
 
 	return nil
 }

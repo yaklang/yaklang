@@ -2633,7 +2633,8 @@ for i = range 3 {
 }
 sleep(0.2)
 dump(ss)
-assert len(ss) != 3, "got %v" % len(ss)
+// Go 1.22 for-range 语义：循环变量每次迭代独立绑定，闭包捕获到各自迭代的值
+assert len(ss) == 3, "got %v" % len(ss)
 for i = range 3 {
 }
 go print("finished\n")
@@ -2694,6 +2695,79 @@ assert c(1, 23) == 1
 assert ccc == undefined
 assert dddd == 123
 assert eeee != 123
+`
+	_marshallerTest(code)
+	_formattest(code)
+}
+
+// TestForLoopVar_Go122Semantics 覆盖 Go 1.22 循环变量语义在 Yaklang 中的实现：
+//   - 三段式 for 用 `:=` 声明的循环变量每轮独立绑定（闭包捕获各自迭代值）；
+//   - 三段式 for 用 `=` 赋值（或变量循环外声明）保持共享旧行为；
+//   - body 内对循环变量的修改（含 continue 前）写回，供条件与下一轮迭代使用；
+//   - for-range / for-in 无论 `:=` 还是 `=` 一律每轮独立绑定。
+func TestForLoopVar_Go122Semantics(t *testing.T) {
+	code := `
+// 1. for + := 每轮独立，闭包捕获各自迭代值
+m1 = make(map[int]int)
+for i := 0; i < 3; i++ {
+    go func() { m1[i] = i }()
+}
+sleep(0.3)
+assert len(m1) == 3, "for := per-iteration binding broken, got %v" % len(m1)
+
+// 2. for + = （循环外声明）共享同一变量，与 Go 一致
+j = 0
+m2 = make(map[int]int)
+for j = 0; j < 3; j++ {
+    go func() { m2[j] = j }()
+}
+sleep(0.3)
+assert j == 3, "for = outer var should be 3, got %v" % j
+
+// 3. body 内修改循环变量必须写回下一轮
+count = 0
+for i := 0; i < 10; i++ {
+    i += 2
+    count++
+}
+assert count == 4, "body modification must carry to next iteration, count=%v" % count
+
+// 4. continue 前修改也写回
+visited = make(map[int]int)
+vcount = 0
+for i := 0; i < 6; i++ {
+    if i == 2 { i = 4; continue }
+    visited[i] = i
+    vcount++
+}
+assert vcount == 3 && visited[0] == 0 && visited[1] == 1 && visited[5] == 5, "continue copy-back broken, got %v" % visited
+
+// 5. for-range 用 = 也每轮独立
+m5 = make(map[int]int)
+for _, v = range [7, 8, 9] {
+    go func() { m5[v] = v }()
+}
+sleep(0.3)
+assert len(m5) == 3, "for-range = should bind per-iteration, got %v" % len(m5)
+
+// 6. for-in 每轮独立
+m6 = make(map[int]int)
+for v in [4, 5, 6] {
+    go func() { m6[v] = v }()
+}
+sleep(0.3)
+assert len(m6) == 3, "for-in per-iteration binding broken, got %v" % len(m6)
+
+// 7. 嵌套 for，continue 只影响最近层
+pairs = make(map[int]int)
+for i := 0; i < 2; i++ {
+    for k := 0; k < 3; k++ {
+        if k == 1 { continue }
+        go func() { pairs[i * 10 + k] = 1 }()
+    }
+}
+sleep(0.3)
+assert len(pairs) == 4, "nested loops broken, got %v" % len(pairs)
 `
 	_marshallerTest(code)
 	_formattest(code)
