@@ -110,9 +110,39 @@ $req.getParameter() as $directParam;
 $req -{
   hook: `*.getParameter() as $indirectParam`
 }->;
+// Additional Servlet user-input APIs. The original rule only hooked
+// getParameter/getInputStream/getSession, which left many securibench-micro
+// cases (Aliasing6 getParameterValues, Basic35 getQueryString/getProtocol,
+// Basic31 getCookies, getHeader*) as false negatives: the downstream vuln
+// rules include `$source` but $source never matched, so no risk fired.
+// Each family is hooked both on the bound `$req` and on any receiver whose
+// declared type is HttpServletRequest, so interprocedural cases where the
+// request is passed in as a ServletRequest-typed parameter are still caught.
+$req.getParameterValues() as $paramValues;
+*.getParameterValues()?{<getCallee><getObjectType>?{have:'HttpServletRequest'}} as $indirectParamValues;
+$req.getParameterMap() as $paramMap;
+*.getParameterMap()?{<getCallee><getObjectType>?{have:'HttpServletRequest'}} as $indirectParamMap;
+$req.getParameterNames() as $paramNames;
+*.getParameterNames()?{<getCallee><getObjectType>?{have:'HttpServletRequest'}} as $indirectParamNames;
+$req.getQueryString() as $queryString;
+*.getQueryString()?{<getCallee><getObjectType>?{have:'HttpServletRequest'}} as $indirectQueryString;
+$req.getHeader() as $header;
+$req -{
+  hook: `*.getHeader() as $indirectHeader`
+}->;
+$req.getHeaders() as $headers;
+$req.getHeaderNames() as $headerNames;
+$req.getCookies() as $cookies;
+*.getCookies()?{<getCallee><getObjectType>?{have:'HttpServletRequest'}} as $indirectCookies;
+$req.getProtocol() as $protocol;
+*.getProtocol()?{<getCallee><getObjectType>?{have:'HttpServletRequest'}} as $indirectProtocol;
+$req.getScheme() as $scheme;
+*.getScheme()?{<getCallee><getObjectType>?{have:'HttpServletRequest'}} as $indirectScheme;
+$req.getAuthType() as $authType;
+*.getAuthType()?{<getCallee><getObjectType>?{have:'HttpServletRequest'}} as $indirectAuthType;
 .getInputStream?{<getObject><typeName>?{have: *Http*Request*}}() as $getInputStream;
 .getSession?{<getObject><typeName>?{have: *Http*Request*}}() as $getSession;
-$directParam + $indirectParam + $getInputStream +$getSession as $output;
+$directParam + $indirectParam + $paramValues + $indirectParamValues + $paramMap + $indirectParamMap + $paramNames + $indirectParamNames + $queryString + $indirectQueryString + $header + $indirectHeader + $headers + $headerNames + $cookies + $indirectCookies + $protocol + $indirectProtocol + $scheme + $indirectScheme + $authType + $indirectAuthType + $getInputStream + $getSession as $output;
 alert $output for {
 	title: "Audit Java Servlet User Input",
 	title_zh: "审计Java Servlet用户输入",
