@@ -36,7 +36,13 @@ func init() {
 		reactloops.WithLoopDescriptionZh("代码安全审计模式：四阶段流水线（项目探索→结构化扫描→逐 finding 验证→报告生成）。"),
 		reactloops.WithVerboseName("Code Security Audit"),
 		reactloops.WithVerboseNameZh("代码安全审计"),
-		reactloops.WithLoopUsagePrompt(`当用户需要使用 AI 独立对整个代码项目进行安全审计时使用此流程。流程分四阶段：Phase 1 项目探索 → Phase 2 结构化 Finding 扫描 → Phase 3 逐 Finding 验证 → Phase 4 Markdown 报告生成。`),
+		reactloops.WithLoopUsagePrompt(`当用户需要使用 AI 独立对整个代码项目进行安全审计时使用此流程。流程分四阶段：Phase 1 项目探索 → Phase 2 结构化 Finding 扫描 → Phase 3 逐 Finding 验证 → Phase 4 Markdown 报告生成。
+
+前端 AttachedResourceInfo 与 ai_skill_audit 完全相同（仅 FocusModeLoop 不同）：
+- Type=file, Key=directory_path — 扫描根目录
+- Type=file, Key=file_path — 当前打开文件（Phase2 聚焦）
+- Type=selected, Key=content — 选中代码片段 JSON（Phase2 聚焦）
+旧版兼容 Key：code_audit_target_path（新前端无需传递）`),
 		reactloops.WithLoopOutputExample(`
 * 当需要进行项目级别的代码安全审计时：
   {"@action": "code_security_audit", "human_readable_thought": "需要对项目进行全面的安全审计"}

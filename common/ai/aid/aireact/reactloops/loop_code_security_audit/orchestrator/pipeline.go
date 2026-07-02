@@ -46,6 +46,19 @@ func BuildInitTask(r aicommon.AIInvokeRuntime, state *model.AuditState) func(loo
 		reactloops.EmitStatus(loop, "代码安全审计启动 / Starting code security audit")
 		r.AddToTimeline("[AUDIT_START]", "代码安全审计开始，用户输入: "+utils.ShrinkTextBlock(userInput, 300))
 
+		ws := reactloops.InitWorkspaceAttachedContext(r, loop, task, AttachedResourceKeyCodeAuditTargetPath)
+		reactloops.RecordWorkspaceAttachedTimeline(r, ws, "CODE_AUDIT")
+		if ws != nil {
+			var sel *aicommon.AttachedCodeSelection
+			if ws.Selection != nil {
+				copied := *ws.Selection
+				sel = &copied
+			}
+			if ws.FilePath != "" || sel != nil {
+				state.SetFrontendFocus(ws.FilePath, sel)
+			}
+		}
+
 		auditDirPath := util.AuditDir(state)
 		if err := os.MkdirAll(auditDirPath, 0o755); err != nil {
 			log.Warnf("[CodeAudit] Failed to create audit dir %s: %v", auditDirPath, err)
@@ -55,7 +68,7 @@ func BuildInitTask(r aicommon.AIInvokeRuntime, state *model.AuditState) func(loo
 		log.Infof("[CodeAudit] Audit dir ready: %s", auditDirPath)
 		r.AddToTimeline("[AUDIT_DIR]", "审计输出目录: "+auditDirPath)
 
-		runPhase1(loop, r, task, state, auditDirPath, op)
+		runPhase1(loop, r, task, state, auditDirPath, ws, op)
 		if failed, _ := op.IsFailed(); failed {
 			return
 		}
@@ -87,7 +100,7 @@ func BuildInitTask(r aicommon.AIInvokeRuntime, state *model.AuditState) func(loo
 }
 
 // runPhase1 leverage dir_explore loop to generate an outline for the target project
-func runPhase1(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask, state *model.AuditState, auditDirPath string, op *reactloops.InitTaskOperator) {
+func runPhase1(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask, state *model.AuditState, auditDirPath string, ws *reactloops.WorkspaceAttachedContext, op *reactloops.InitTaskOperator) {
 	log.Infof("[CodeAudit] Starting Phase 1 (Recon via dir_explore)")
 	reactloops.EmitStatus(loop, "Phase 1：项目探索中 / Phase 1: Project exploration...")
 	r.AddToTimeline("[PHASE1_START]", "开始 Phase 1：项目探索（使用 dir_explore loop）")
@@ -97,25 +110,22 @@ func runPhase1(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, task aico
 		reactloops.WithVar("output_report_path", reconFilePath),
 		reactloops.WithVar("explore_work_dir", auditDirPath),
 	}
-	scanPath := ScanTargetPathFromTask(task)
+	scanPath := ""
+	if ws != nil {
+		scanPath = ws.ResolveAttachedScanDirectory()
+	}
 	emit.ReconStart(loop, scanPath)
 	if scanPath != "" {
-		if st, err := os.Stat(scanPath); err != nil {
+		if err := reactloops.ValidateAttachedDirectoryTarget(scanPath); err != nil {
 			log.Warnf("[CodeAudit] attached target path not accessible: %q: %v", scanPath, err)
 			op.Failed(fmt.Sprintf(
-				"[CodeAudit] 附件指定的扫描目录无效: %q（%v）。请确认 Type=%q、Key=%q、Value 为存在的目录绝对路径。",
-				scanPath, err, AttachedResourceTypeFile, AttachedResourceKeyCodeAuditTargetPath))
-			return
-		} else if !st.IsDir() {
-			log.Warnf("[CodeAudit] attached target path is not a directory: %q", scanPath)
-			op.Failed(fmt.Sprintf(
-				"[CodeAudit] 附件指定的路径不是目录: %q。请为 Key=%q 提供项目根目录。",
-				scanPath, AttachedResourceKeyCodeAuditTargetPath))
+				"[CodeAudit] %s",
+				reactloops.FormatAttachedDirectoryValidationError(scanPath, AttachedResourceKeyCodeAuditTargetPath, err)))
 			return
 		}
-		exploreOpts = append(exploreOpts, reactloops.WithVar("target_path", scanPath))
+		exploreOpts = reactloops.WithExploreTargetPath(exploreOpts, scanPath)
 		log.Infof("[CodeAudit] Phase1 using attached scan target: %s", scanPath)
-		r.AddToTimeline("[CODE_AUDIT_TARGET]", "扫描目标目录(附件): "+scanPath)
+		reactloops.RecordExploreTargetTimeline(r, ws, scanPath, "CODE_AUDIT")
 	}
 	exploreLoop, err := reactloops.CreateLoopByName(schema.AI_REACT_LOOP_NAME_DIR_EXPLORE, r, exploreOpts...)
 	if err != nil {
