@@ -26,6 +26,17 @@ Phase 2 的目标是**尽可能广地覆盖可疑点并提交 finding**；精确
 {{ if .TechStack }}- **技术栈**: {{ .TechStack }}{{ end }}
 {{ if .EntryPoints }}- **入口点**: {{ .EntryPoints }}{{ end }}
 {{ if .ReconFile }}- **项目背景报告**（包含路由列表、数据访问模式、认证机制等详细信息）: {{ .ReconFile }}（调用 read_recon_notes 读取全文）{{ end }}
+{{ if .HasSelectionFocus }}
+## 前端选中片段（优先审计）
+
+用户从 IDE 选中了以下代码，grep/逐文件审计时**必须优先**覆盖该文件及选中行上下文：
+
+{{ .Selection }}
+{{ else if .HasOpenFileFocus }}
+## 前端打开文件（优先审计）
+
+**优先审计文件**: {{ .FocusFilePath }}（阶段A grep 与阶段B read_file 均优先覆盖此文件）
+{{ end }}
 
 ## 路径规范（必须遵守）
 
