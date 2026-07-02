@@ -217,15 +217,15 @@ func (y *YakCompiler) Compiler(code string) bool {
 	lexer.RemoveErrorListeners()
 	lexer.AddErrorListener(y.lexerErrorListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
-	parser := yak.NewYaklangParser(tokenStream)
 	y.AntlrTokenStream = tokenStream
-	parser.RemoveErrorListeners()
-	parser.AddErrorListener(y.parserErrorListener)
-	parser.SetErrorHandler(NewErrorStrategy())
-	y.Init(lexer, parser)
 	y.sourceCodePointer = &code
 	y.codes = []*yakvm.Code{}
-	raw := y.parser.Program()
+
+	// 两阶段解析：优先用 SLL 快速解析，失败再回退 LL，显著提升大脚本解析性能
+	// 关键词: 两阶段解析, two-stage parsing, SLL, LL fallback, parser performance
+	parser, raw := y.parseProgramTwoStage(tokenStream)
+	y.Init(lexer, parser)
+
 	parseErrors := antlr4util.NewSourceCodeErrors(y.GetLexerErrors(), y.GetParserErrors())
 	if len(*parseErrors) > 0 {
 		return false
@@ -271,6 +271,69 @@ func (y *YakCompiler) Compiler(code string) bool {
 		return false
 	}
 	return true
+}
+
+// parseProgramTwoStage 使用两阶段解析策略解析 program，兼顾性能与正确性。
+//
+// 背景：ANTLR 默认使用 LL(全上下文) 预测模式，对本语法中深度左递归、备选分支众多的
+// expression 规则会触发大量昂贵的 AdaptivePredict 全上下文计算，导致大脚本(几百K)解析
+// 时间达到数百毫秒甚至数秒。而 SLL 预测模式速度可快数十倍。
+//
+// 策略(ANTLR 官方推荐的 two-stage parsing)：
+//  1. 阶段一：SLL 预测模式 + BailErrorStrategy，一旦出现任何解析歧义/错误立即中止(panic)。
+//     绝大多数合法脚本都能被 SLL 正确解析，走这条快路径。
+//  2. 阶段二：仅当 SLL 失败时，回退到 LL 全上下文预测 + 正常错误恢复策略与错误监听器，
+//     重新解析。这样既保证了性能，又保证了对真正语法错误的精确报告以及对极少数
+//     SLL 无法判定的歧义的正确处理。
+//
+// 由于生成的 parser 复用全局静态 DFA(decisionToDFA)，阶段二新建 parser 不会有冷启动开销；
+// 复用同一个已缓冲的 tokenStream(Seek(0) 回绕) 也避免了重复词法分析与重复报告词法错误。
+//
+// 关键词: 两阶段解析, two-stage parsing, SLL, LL fallback, AdaptivePredict, parser performance
+func (y *YakCompiler) parseProgramTwoStage(tokenStream *antlr.CommonTokenStream) (*yak.YaklangParser, yak.IProgramContext) {
+	// 阶段二(LL 全上下文解析)：恢复正常错误监听与错误恢复策略，用于精确报错与错误恢复。
+	// 该闭包同时作为 SLL 关闭时的唯一解析路径(与旧行为完全一致)。
+	newLLParser := func() (*yak.YaklangParser, yak.IProgramContext) {
+		tokenStream.Seek(0)
+		llParser := yak.NewYaklangParser(tokenStream)
+		llParser.RemoveErrorListeners()
+		llParser.AddErrorListener(y.parserErrorListener)
+		llParser.SetErrorHandler(NewErrorStrategy())
+		llParser.GetInterpreter().SetPredictionMode(antlr.PredictionModeLL)
+		return llParser, llParser.Program()
+	}
+
+	// 允许通过环境变量 YAK_ANTLR_SLL_FIRST=0 关闭 SLL 快路径(与 SSA 前端共用同一开关)，
+	// 关闭时直接走纯 LL，保持与历史行为一致，便于排查问题。
+	if !antlr4util.SLLFirstEnabled() {
+		return newLLParser()
+	}
+
+	// 阶段一：SLL 快速解析 + BailErrorStrategy，一旦出错立即中止(panic ParseCancellationException)。
+	sllParser := yak.NewYaklangParser(tokenStream)
+	sllParser.RemoveErrorListeners()
+	sllParser.SetErrorHandler(antlr.NewBailErrorStrategy())
+	sllParser.GetInterpreter().SetPredictionMode(antlr.PredictionModeSLL)
+
+	raw, ok := func() (raw yak.IProgramContext, ok bool) {
+		defer func() {
+			if r := recover(); r != nil {
+				// 仅在 SLL 无法判定/存在语法错误时回退 LL；其他 panic 继续向上抛出
+				if _, isCancel := r.(*antlr.ParseCancellationException); isCancel {
+					ok = false
+					return
+				}
+				panic(r)
+			}
+		}()
+		return sllParser.Program(), true
+	}()
+	if ok {
+		return sllParser, raw
+	}
+
+	// 阶段二：回退到 LL 全上下文解析
+	return newLLParser()
 }
 
 func (y *YakCompiler) VisitProgram(raw yak.IProgramContext, inline ...bool) interface{} {
