@@ -169,6 +169,46 @@ func TestYaklangBasic_Variable_InIf(t *testing.T) {
 			"phi(a)[2,1]",
 		}, t)
 	})
+	// if 初始化语句: if <init>; <cond> { ... }
+	// 关键词: if 初始化语句, if init statement
+	t.Run("test if init statement visible in body", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+		if a := 10; a > 5 {
+			println(a)
+		}
+		`, []string{
+			"10",
+		}, t)
+	})
+
+	t.Run("test if init statement not leak to outer scope", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+		if a := 10; a > 5 {
+			println(a)
+		}
+		println(a)
+		`, []string{
+			"10",
+			"Undefined-a",
+		}, t)
+	})
+
+	t.Run("test if init var visible in elif and else", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+		if a := 10; a > 100 {
+			println(a)
+		} elif a > 5 {
+			println(a)
+		} else {
+			println(a)
+		}
+		`, []string{
+			"10",
+			"10",
+			"10",
+		}, t)
+	})
+
 	t.Run("test simple if with local vairable", func(t *testing.T) {
 		test.CheckPrintlnValue(`
 		a = 1
