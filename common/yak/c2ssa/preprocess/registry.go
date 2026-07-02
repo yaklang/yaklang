@@ -9,32 +9,22 @@ import (
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
-// HeaderKind classifies indexed header sources.
-type HeaderKind int
-
-const (
-	HeaderStatic HeaderKind = iota
-	HeaderHInTemplate
-)
-
 // HeaderEntry is a registered header file.
 type HeaderEntry struct {
 	Path    string
 	Content []byte
-	Kind    HeaderKind
 }
 
-// HeaderRegistry indexes project headers for include resolution.
+// HeaderRegistry indexes project .h headers for include resolution.
 type HeaderRegistry struct {
-	byPath   map[string]*HeaderEntry
-	hInAlias map[string]string // virtual .h path -> stored .h.in path
+	byPath map[string]*HeaderEntry
 }
 
-// BuildHeaderRegistry walks fs and indexes .h and .h.in files.
+// BuildHeaderRegistry walks fs and indexes .h files.
+// .h.in templates are build inputs only and are intentionally excluded.
 func BuildHeaderRegistry(filesystem fi.FileSystem) *HeaderRegistry {
 	reg := &HeaderRegistry{
-		byPath:   make(map[string]*HeaderEntry),
-		hInAlias: make(map[string]string),
+		byPath: make(map[string]*HeaderEntry),
 	}
 	_ = filesys.Recursive(".", filesys.WithFileSystem(filesystem), filesys.WithFileStat(func(filePath string, info fs.FileInfo) error {
 		if info.IsDir() {
@@ -48,34 +38,26 @@ func BuildHeaderRegistry(filesystem fi.FileSystem) *HeaderRegistry {
 
 func (r *HeaderRegistry) indexPath(filesystem fi.FileSystem, filePath string) {
 	name := path.Base(filePath)
-	rel := normalizeSlash(trimDot(filePath))
 	if strings.HasSuffix(name, ".h.in") {
-		data, err := filesystem.ReadFile(filePath)
-		if err != nil {
-			return
-		}
-		r.registerEntry(rel, data, HeaderHInTemplate)
-		virtual := strings.TrimSuffix(rel, ".in")
-		r.hInAlias[virtual] = rel
-		r.registerAliasKeys(virtual, rel)
 		return
 	}
-	if filesystem.Ext(name) == ".h" {
-		data, err := filesystem.ReadFile(filePath)
-		if err != nil {
-			return
-		}
-		r.registerEntry(rel, data, HeaderStatic)
-		r.registerAliasKeys(rel, rel)
+	if filesystem.Ext(name) != ".h" {
+		return
 	}
+	rel := normalizeSlash(trimDot(filePath))
+	data, err := filesystem.ReadFile(filePath)
+	if err != nil {
+		return
+	}
+	r.registerEntry(rel, data)
+	r.registerAliasKeys(rel, rel)
 }
 
-func (r *HeaderRegistry) registerEntry(storedPath string, content []byte, kind HeaderKind) {
+func (r *HeaderRegistry) registerEntry(storedPath string, content []byte) {
 	storedPath = normalizeSlash(storedPath)
 	r.byPath[storedPath] = &HeaderEntry{
 		Path:    storedPath,
 		Content: content,
-		Kind:    kind,
 	}
 }
 
@@ -108,14 +90,28 @@ func (r *HeaderRegistry) ResolveStoredPath(requested string) (string, bool) {
 	if e, ok := r.byPath[requested]; ok && e != nil {
 		return e.Path, true
 	}
-	if alt, ok := r.hInAlias[requested]; ok {
-		return alt, true
-	}
 	base := path.Base(requested)
 	if e, ok := r.byPath[base]; ok && e != nil {
 		return e.Path, true
 	}
 	return "", false
+}
+
+// UniqueEntries returns each indexed header once.
+func (r *HeaderRegistry) UniqueEntries() []*HeaderEntry {
+	if r == nil {
+		return nil
+	}
+	seen := make(map[string]bool)
+	var out []*HeaderEntry
+	for _, e := range r.byPath {
+		if e == nil || seen[e.Path] {
+			continue
+		}
+		seen[e.Path] = true
+		out = append(out, e)
+	}
+	return out
 }
 
 func trimDot(p string) string {

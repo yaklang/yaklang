@@ -20,7 +20,6 @@ func BuildProject(fs fi.FileSystem, config PreprocessConfig) *CPreprocessProject
 	if config.Defines == nil {
 		config.Defines = make(map[string]string)
 	}
-	config.Defines = mergeBootstrapDefines(config.Defines)
 	if config.MaxIncludeDepth == 0 {
 		config.MaxIncludeDepth = 64
 	}

@@ -40,6 +40,20 @@ int result = CONCAT(var_, 10);
 	require.Contains(t, out, "var_10")
 }
 
+func TestExpandFunctionMacros_TokenPasteWithSpaces(t *testing.T) {
+	src := `
+#define CONCAT(a, b) a ## b
+#define bmap_cat(a, b) bmap_cat_impl(a, b)
+#define bmap_cat_impl(a, b) a ## b
+int result = CONCAT(var_, 10);
+bmap_cat(tglist, _impl) x;
+`
+	out, err := ExpandFunctionMacros(src)
+	require.NoError(t, err)
+	require.Contains(t, out, "var_10")
+	require.Contains(t, out, "tglist_impl x")
+}
+
 func TestExpandFunctionMacros_Variadic(t *testing.T) {
 	src := `
 #define LOG(fmt, ...) printf(fmt, __VA_ARGS__)
