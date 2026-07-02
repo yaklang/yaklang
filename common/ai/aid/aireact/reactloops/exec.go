@@ -336,17 +336,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 						log.Debugf("stream handler started for field [%s]", key)
 						r.loadingStatus(fmt.Sprintf("处理流字段 [%s] / Processing Stream Field [%s]", key, key))
 
-						preparedReader, readable, readableErr := waitReadableStream(utils.JSONStringReader(reader))
-						if readableErr != nil {
-							log.Warnf("stream handler for field [%s] failed waiting first byte: %v", key, readableErr)
-							done()
-							return
-						}
-						if !readable {
-							log.Debugf("stream handler for field [%s] got empty stream, skipping empty emit", key)
-							done()
-							return
-						}
+						jsonReader := utils.JSONStringReader(reader)
 
 						fieldIns, ok := streamFields.Get(key)
 						if !ok {
@@ -363,13 +353,13 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 								log.Debugf("stream copy goroutine for field [%s] completed, took %v", key, time.Since(copyStartTime))
 							}()
 							if field.StreamHandler != nil {
-								field.StreamHandler(preparedReader, pw)
+								field.StreamHandler(jsonReader, pw)
 								return
 							}
 							if field.Prefix != "" {
 								pw.WriteString(field.Prefix + ": ")
 							}
-							n, copyErr := io.Copy(pw, preparedReader)
+							n, copyErr := io.Copy(pw, jsonReader)
 							if copyErr != nil {
 								log.Warnf("stream copy for field [%s] error: %v (copied %d bytes)", key, copyErr, n)
 							} else {
@@ -381,10 +371,21 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 						if fieldIns.AINodeId != "" {
 							defaultNodeId = fieldIns.AINodeId
 						}
+						preparedReader, readable, readableErr := waitReadableStream(pr)
+						if readableErr != nil {
+							log.Warnf("stream handler for field [%s] failed waiting first byte: %v", key, readableErr)
+							done()
+							return
+						}
+						if !readable {
+							log.Debugf("stream handler for field [%s] got empty stream, skipping empty emit", key)
+							done()
+							return
+						}
 
 						event, emitErr := boundEmitter.EmitStreamEventWithContentTypeEx(
 							defaultNodeId,
-							pr,
+							preparedReader,
 							resp.GetTaskIndex(),
 							fieldIns.ContentType,
 							fieldIns.IsSystem,
