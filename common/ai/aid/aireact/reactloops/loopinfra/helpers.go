@@ -21,6 +21,7 @@ const (
 	loopInfraNodeQueryMCPServers     = "query_mcp_servers"
 	loopInfraNodeQueryMCPTools       = "query_mcp_tools"
 	loopInfraNodeDispatchSubReact    = "dispatch_sub_react_agents"
+	loopInfraNodeSubReactReport      = "sub_react_agents_report"
 	loopInfraNodeDispatchConcurrency = "dispatch_sub_react_concurrency"
 )
 
