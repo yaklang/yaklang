@@ -163,6 +163,11 @@ castExpression
 coreExpression
     : assignmentExpression
     | castExpression
+    | complexCoreExpression
+    ;
+
+complexCoreExpression
+    : expression
     ;
 
 assignmentExpression
@@ -211,6 +216,7 @@ expression
     | expression AndAnd eos* expression
     | expression OrOr eos* expression
     | '(' eos* expression eos* ')'
+    | '(' eos* coreExpressions eos* ')'
     | expression ('?' eos* expression ':' eos* expression)
     | castExpression
     | assignmentExpression

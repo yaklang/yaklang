@@ -182,14 +182,11 @@ func expandMacroBody(body []macroToken, argMap map[string][]macroToken) []macroT
 				}
 			}
 		}
-		// token pasting: lhs ## rhs
-		if body[i].kind == macroTokPunct && body[i].text == "##" {
-			i++
-			continue
-		}
-		if i+1 < len(body) && body[i+1].kind == macroTokPunct && body[i+1].text == "##" {
+		// token pasting: lhs ## rhs (whitespace around ## is ignored, as in ISO C)
+		hashPos := skipWhitespaceTokens(body, i+1)
+		if hashPos < len(body) && body[hashPos].kind == macroTokPunct && body[hashPos].text == "##" {
 			left := resolveBodyToken(body[i], argMap)
-			k := skipWhitespaceTokens(body, i+2)
+			k := skipWhitespaceTokens(body, hashPos+1)
 			if k < len(body) {
 				right := resolveBodyToken(body[k], argMap)
 				merged := pasteMacroTokens(left, right)

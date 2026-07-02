@@ -14,10 +14,10 @@ func TestApplyDefineLineObject(t *testing.T) {
 	require.Equal(t, "1", tables.Object["A"])
 }
 
-func TestCollectObjectMacroFromInclude(t *testing.T) {
+func TestCollectObjectMacroFromProjectHeaders(t *testing.T) {
 	fs := filesys.NewVirtualFs()
 	require.NoError(t, fs.WriteFile("include/a.h", []byte("#define A 1\n"), 0o644))
-	require.NoError(t, fs.WriteFile("apps/foo.c", []byte("#include \"a.h\"\n"), 0o644))
+	require.NoError(t, fs.WriteFile("apps/foo.c", []byte("int x = A;\n"), 0o644))
 	cfg := DefaultConfig()
 	cfg.IncludeDirs = []string{"include"}
 	project := BuildProject(fs, cfg)
@@ -25,14 +25,14 @@ func TestCollectObjectMacroFromInclude(t *testing.T) {
 	require.Equal(t, "1", tables.Object["A"])
 }
 
-func TestRegistry_HInAlias(t *testing.T) {
+func TestRegistry_IgnoresHInTemplate(t *testing.T) {
 	fs := filesys.NewVirtualFs()
 	require.NoError(t, fs.WriteFile("include/openssl/safestack.h.in", []byte("#define STACK_OF(type) struct stack_st_##type\n"), 0o644))
 	reg := BuildHeaderRegistry(fs)
 	_, ok := reg.Lookup("include/openssl/safestack.h")
-	require.True(t, ok)
+	require.False(t, ok)
 	_, ok = reg.Lookup("openssl/safestack.h")
-	require.True(t, ok)
+	require.False(t, ok)
 }
 
 func TestResolver_QuotedInclude(t *testing.T) {
@@ -47,9 +47,9 @@ func TestResolver_QuotedInclude(t *testing.T) {
 	require.Contains(t, stored, "apps.h")
 }
 
-func TestResolver_AngleInclude_HIn(t *testing.T) {
+func TestResolver_AngleInclude(t *testing.T) {
 	fs := filesys.NewVirtualFs()
-	require.NoError(t, fs.WriteFile("include/openssl/safestack.h.in", []byte("#define STACK_OF(type) struct stack_st_##type\n"), 0o644))
+	require.NoError(t, fs.WriteFile("include/openssl/safestack.h", []byte("#define STACK_OF(type) struct stack_st_##type\n"), 0o644))
 	cfg := DefaultConfig()
 	cfg.IncludeDirs = []string{"include", "include/openssl"}
 	reg := BuildHeaderRegistry(fs)
@@ -99,10 +99,9 @@ int has_srp = 1;
 	require.NotContains(t, out, "has_srp")
 }
 
-func TestMacroEnv_IncludeOrder(t *testing.T) {
+func TestMacroEnv_IncludeSilentlyDropped(t *testing.T) {
 	fs := filesys.NewVirtualFs()
 	require.NoError(t, fs.WriteFile("include/a.h", []byte("#define A 1\n"), 0o644))
-	require.NoError(t, fs.WriteFile("include/b.h", []byte("#define B 2\n"), 0o644))
 	require.NoError(t, fs.WriteFile("apps/foo.c", []byte(`
 #include "a.h"
 int x = A;
@@ -112,8 +111,8 @@ int x = A;
 	project := BuildProject(fs, cfg)
 	out, err := project.PreprocessTU("apps/foo.c", ppMustRead(fs, "apps/foo.c"))
 	require.NoError(t, err)
+	require.NotContains(t, out, `#include "a.h"`)
 	require.Contains(t, strings.ReplaceAll(out, " ", ""), "x=1")
-	require.NotContains(t, out, "B")
 }
 
 func TestTU_PreservesMultilineComment(t *testing.T) {
@@ -161,36 +160,30 @@ int f(int c) {
 
 func TestTU_StackOf(t *testing.T) {
 	fs := filesys.NewVirtualFs()
-	require.NoError(t, fs.WriteFile("include/openssl/safestack.h.in", []byte("#define STACK_OF(type) struct stack_st_##type\n"), 0o644))
-	require.NoError(t, fs.WriteFile("apps/foo.c", []byte(`
-#include <openssl/safestack.h>
-STACK_OF(X)* p;
-`), 0o644))
+	require.NoError(t, fs.WriteFile("include/openssl/safestack.h", []byte("#define STACK_OF(type) struct stack_st_##type\n"), 0o644))
+	require.NoError(t, fs.WriteFile("apps/foo.c", []byte("STACK_OF(X)* p;\n"), 0o644))
 	cfg := DefaultConfig()
 	cfg.IncludeDirs = []string{"include", "include/openssl"}
 	project := BuildProject(fs, cfg)
 	out, err := project.PreprocessTU("apps/foo.c", ppMustRead(fs, "apps/foo.c"))
 	require.NoError(t, err)
 	require.Contains(t, out, "struct stack_st_X")
-	require.Contains(t, out, "#include <openssl/safestack.h>")
 }
 
-// TestTU_ConfigutlPattern mimics configutl.c: conf.h include chain + STACK_OF in function body.
+// TestTU_ConfigutlPattern: STACK_OF expands from project headers without #include in the .c file.
 func TestTU_ConfigutlPattern(t *testing.T) {
 	fs := filesys.NewVirtualFs()
-	require.NoError(t, fs.WriteFile("include/openssl/safestack.h.in", []byte(`#ifndef OPENSSL_SAFESTACK_H
+	require.NoError(t, fs.WriteFile("include/openssl/safestack.h", []byte(`#ifndef OPENSSL_SAFESTACK_H
 #define OPENSSL_SAFESTACK_H
 #define STACK_OF(type) struct stack_st_##type
 #endif
 `), 0o644))
-	require.NoError(t, fs.WriteFile("include/openssl/conf.h.in", []byte(`#ifndef OPENSSL_CONF_H
+	require.NoError(t, fs.WriteFile("include/openssl/conf.h", []byte(`#ifndef OPENSSL_CONF_H
 #define OPENSSL_CONF_H
 #include <openssl/safestack.h>
 #endif
 `), 0o644))
-	src := `#include <openssl/conf.h>
-#include <openssl/safestack.h>
-static void print_section(void) {
+	src := `static void print_section(void) {
     STACK_OF(CONF_VALUE) *values;
 }
 `
@@ -206,21 +199,21 @@ static void print_section(void) {
 
 func TestCollect_ConfigutlPatternHasStackOf(t *testing.T) {
 	fs := filesys.NewVirtualFs()
-	require.NoError(t, fs.WriteFile("include/openssl/safestack.h.in", []byte("#define STACK_OF(type) struct stack_st_##type\n"), 0o644))
-	require.NoError(t, fs.WriteFile("include/openssl/conf.h.in", []byte("#include <openssl/safestack.h>\n"), 0o644))
-	src := "#include <openssl/conf.h>\n"
+	require.NoError(t, fs.WriteFile("include/openssl/safestack.h", []byte("#define STACK_OF(type) struct stack_st_##type\n"), 0o644))
+	require.NoError(t, fs.WriteFile("include/openssl/conf.h", []byte("#include <openssl/safestack.h>\n"), 0o644))
+	src := "static void f(void) {}\n"
 	require.NoError(t, fs.WriteFile("apps/configutl.c", []byte(src), 0o644))
 	cfg := DefaultConfig()
 	cfg.IncludeDirs = []string{"include", "include/openssl"}
 	project := BuildProject(fs, cfg)
 	tables := project.collectMacroEnvironment("apps/configutl.c", src)
 	_, ok := tables.Function["STACK_OF"]
-	require.True(t, ok, "STACK_OF must be collected via conf.h -> safestack.h chain")
+	require.True(t, ok, "STACK_OF must be collected from all project headers")
 }
 
 func TestResolver_SystemIncludeIncludePrefix(t *testing.T) {
 	fs := filesys.NewVirtualFs()
-	require.NoError(t, fs.WriteFile("include/openssl/safestack.h.in", []byte("#define X 1\n"), 0o644))
+	require.NoError(t, fs.WriteFile("include/openssl/safestack.h", []byte("#define X 1\n"), 0o644))
 	cfg := DefaultConfig()
 	cfg.IncludeDirs = []string{"include"}
 	reg := BuildHeaderRegistry(fs)

@@ -10,6 +10,13 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+func (b *astbuilder) ensureValue(v ssa.Value) ssa.Value {
+	if utils.IsNil(v) {
+		return b.EmitConstInst(0)
+	}
+	return v
+}
+
 func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext, isLeft bool) (ssa.Value, *ssa.Variable) {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
@@ -22,7 +29,7 @@ func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext, isLeft bool
 		ifb := b.CreateIfBuilder()
 		ifb.AppendItem(
 			func() ssa.Value {
-				return cond(id)
+				return b.ensureValue(cond(id))
 			},
 			func() {
 				v := trueExpr()
@@ -159,9 +166,18 @@ func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext, isLeft bool
 		return left, nil
 	}
 
-	// 7. 括号表达式: '(' expression ')'
-	if ast.LeftParen() != nil && ast.Expression(0) != nil && ast.RightParen() != nil {
-		return b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext), false)
+	// 7. 括号表达式
+	if ast.LeftParen() != nil && ast.RightParen() != nil {
+		if ce := ast.CoreExpressions(); ce != nil {
+			vals := b.buildCoreExpressions(ce.(*cparser.CoreExpressionsContext))
+			if len(vals) > 0 {
+				return vals[len(vals)-1], nil
+			}
+			return b.EmitConstInst(0), nil
+		}
+		if ast.Expression(0) != nil {
+			return b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext), false)
+		}
 	}
 
 	// 8. 三元表达式: expression ('?' expression ':' expression)
@@ -211,17 +227,24 @@ func (b *astbuilder) buildCoreExpression(ast *cparser.CoreExpressionContext) ssa
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
-	var right ssa.Value
 	if u := ast.CastExpression(); u != nil {
-		right, _ = b.buildCastExpression(u.(*cparser.CastExpressionContext), false)
-	} else if a := ast.AssignmentExpression(); a != nil {
-		right = b.buildAssignmentExpression(a.(*cparser.AssignmentExpressionContext))
+		v, _ := b.buildCastExpression(u.(*cparser.CastExpressionContext), false)
+		if !utils.IsNil(v) {
+			return v
+		}
 	}
-
-	if utils.IsNil(right) {
-		right = b.EmitConstInst(0)
+	if a := ast.AssignmentExpression(); a != nil {
+		return b.buildAssignmentExpression(a.(*cparser.AssignmentExpressionContext))
 	}
-	return right
+	if c := ast.ComplexCoreExpression(); c != nil {
+		if e := c.(*cparser.ComplexCoreExpressionContext).Expression(); e != nil {
+			v, _ := b.buildExpression(e.(*cparser.ExpressionContext), false)
+			if !utils.IsNil(v) {
+				return v
+			}
+		}
+	}
+	return b.EmitConstInst(0)
 }
 
 func (b *astbuilder) buildAssignmentExpression(ast *cparser.AssignmentExpressionContext) ssa.Value {
@@ -236,7 +259,11 @@ func (b *astbuilder) buildAssignmentExpression(ast *cparser.AssignmentExpression
 				_, left := b.buildLeftExpression(leftExpr.(*cparser.LeftExpressionContext), true)
 				newRight, _ := b.buildExpression(e.(*cparser.ExpressionContext), false)
 				if utils.IsNil(newRight) {
-					newRight = b.EmitUndefined(left.GetName())
+					if left != nil {
+						newRight = b.EmitUndefined(left.GetName())
+					} else {
+						newRight = b.EmitConstInst(0)
+					}
 				}
 
 				if left != nil {
@@ -727,18 +754,23 @@ func (b *astbuilder) buildPostfixSuffixLvalue(ast *cparser.PostfixSuffixLvalueCo
 	if ast.LeftBracket() != nil && ast.RightBracket() != nil {
 		if e := ast.Expression(); e != nil {
 			index, _ := b.buildExpression(e.(*cparser.ExpressionContext), false)
+			obj := right
 			RefParameterIndex := -1
-			if p, ok := ssa.ToParameter(right); ok && !p.IsFreeValue {
+			if p, ok := ssa.ToParameter(obj); ok && !p.IsFreeValue {
 				RefParameterIndex = p.FormalParameterIndex
-			} else if p, ok := ssa.ToParameterMember(right); ok {
+			} else if p, ok := ssa.ToParameterMember(obj); ok {
 				RefParameterIndex = p.FormalParameterIndex
 			}
 
-			right = b.ReadMemberCallValue(right, index)
-			if isLeft && left != nil {
-				left = b.CreateMemberCallVariable(b.ReadValue(left.GetName()), index)
+			right = b.ReadMemberCallValue(obj, index)
+			if isLeft {
+				if left != nil {
+					left = b.CreateMemberCallVariable(b.ReadValue(left.GetName()), index)
+				} else if obj != nil {
+					left = b.CreateMemberCallVariable(obj, index)
+				}
 			}
-			if RefParameterIndex != -1 {
+			if RefParameterIndex != -1 && left != nil {
 				b.ReferenceParameter(left.GetName(), RefParameterIndex, ssa.PointerSideEffect)
 			}
 			return right, left, false
@@ -750,43 +782,49 @@ func (b *astbuilder) buildPostfixSuffixLvalue(ast *cparser.PostfixSuffixLvalueCo
 		isPointer := ast.Arrow() != nil
 		if id := ast.Identifier(); id != nil {
 			key := id.GetText()
-			if right != nil {
-				if t := right.GetType(); isPointer && t != nil && t.GetTypeKind() == ssa.PointerKind {
-					right = b.GetOriginValue(right)
-				}
-				right = b.ReadMemberCallValue(right, b.EmitConstInst(key))
-			}
+			memberKey := b.EmitConstInst(key)
+
+			var member ssa.Value
 			if left != nil {
-				member := b.PeekValue(left.GetName())
+				member = b.PeekValue(left.GetName())
+			} else if right != nil {
+				member = right
+			}
 
-				checkParameter := func(target string) {
-					RefParameterIndex := -1
-					if p, ok := ssa.ToParameter(member); ok && !p.IsFreeValue {
-						RefParameterIndex = p.FormalParameterIndex
-					} else if p, ok := ssa.ToParameterMember(member); ok {
-						RefParameterIndex = p.FormalParameterIndex
-					}
-
-					if ref, ok := b.RefParameter[member.GetName()]; ok {
-						RefParameterIndex = ref.Index
-						delete(b.RefParameter, member.GetName())
-					}
-
-					if RefParameterIndex != -1 {
-						b.ReferenceParameter(target, RefParameterIndex, ssa.PointerSideEffect)
-					}
+			checkParameter := func(target string) {
+				if member == nil {
+					return
+				}
+				RefParameterIndex := -1
+				if p, ok := ssa.ToParameter(member); ok && !p.IsFreeValue {
+					RefParameterIndex = p.FormalParameterIndex
+				} else if p, ok := ssa.ToParameterMember(member); ok {
+					RefParameterIndex = p.FormalParameterIndex
 				}
 
+				if ref, ok := b.RefParameter[member.GetName()]; ok {
+					RefParameterIndex = ref.Index
+					delete(b.RefParameter, member.GetName())
+				}
+
+				if RefParameterIndex != -1 {
+					b.ReferenceParameter(target, RefParameterIndex, ssa.PointerSideEffect)
+				}
+			}
+
+			if member != nil {
 				if t := member.GetType(); isPointer && t != nil && t.GetTypeKind() == ssa.PointerKind {
 					member = b.GetOriginValue(member)
 					setReference = true
 				}
 
-				left = b.CreateMemberCallVariable(member, b.EmitConstInst(key))
+				right = b.ReadMemberCallValue(member, memberKey)
+				if isLeft {
+					left = b.CreateMemberCallVariable(member, memberKey)
+				}
 
-				if setReference {
+				if setReference && left != nil {
 					checkParameter(left.GetName())
-					setReference = true
 				}
 			}
 		}

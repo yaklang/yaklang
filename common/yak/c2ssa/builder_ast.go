@@ -1468,7 +1468,7 @@ func (b *astbuilder) buildIfStatement(ast *cparser.SelectionStatementContext) {
 					recoverRange()
 
 					right, _ := b.buildExpression(expression.(*cparser.ExpressionContext), false)
-					return right
+					return b.ensureValue(right)
 				},
 				func() {
 					if s, ok := ast.Statement(0).(*cparser.StatementContext); ok {
