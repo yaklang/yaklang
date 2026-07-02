@@ -48,5 +48,5 @@ func TestFindMatchingParen(t *testing.T) {
 	s := `cli.String("t", cli.setHelp("hello (world)"), cli.setRequired(true))`
 	close := findMatchingParen(s, strings.Index(s, "("))
 	assert.Greater(t, close, 0)
-	assert.Equal(t, ')', s[close])
+	assert.Equal(t, byte(')'), s[close])
 }

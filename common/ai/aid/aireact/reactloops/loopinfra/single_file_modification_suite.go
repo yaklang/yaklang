@@ -236,25 +236,30 @@ func (f *SingleFileModificationSuiteFactory) ShouldDeferDiskWrite() bool {
 	return f.deferDiskWrite
 }
 
+// applySyntaxLintResult runs static verification, then optional postSyntaxCleanHook (e.g. YAK_MAIN self-test).
+// Returns true when postSyntaxCleanHook blocked loop exit (runtime/self-test failure).
 func (f *SingleFileModificationSuiteFactory) applySyntaxLintResult(
 	loop *reactloops.ReActLoop,
 	op *reactloops.LoopActionHandlerOperator,
 	hasBlockingErrors bool,
 	exitOnClean bool,
-) {
+) (postHookBlocked bool) {
 	lintStatusVar := f.GetLintStatusVariableName()
+	reactloops.EmitActionLog(loop, loopInfraNodeCodeVerify, "开始静态分析与语法检查 / Starting static analysis and syntax check...")
+	reactloops.EmitStatus(loop, "验证代码中 / Verifying code...")
+
 	if hasBlockingErrors {
 		loop.Set(lintStatusVar, "false")
-		// 修复节点状态反馈: 检测到语法错误, 阻止本轮退出并提示前端进入修复
-		// 关键词: EmitStatus, 语法错误, 修复节点, DisallowNextLoopExit
-		reactloops.EmitStatus(loop, "检测到语法错误，修复中 / Syntax error detected, fixing...")
+		reactloops.EmitActionLog(loop, loopInfraNodeCodeVerify, "验证失败: 语法/静态分析错误 / Verification failed: syntax or static analysis errors")
+		reactloops.EmitStatus(loop, "验证代码失败，修复中 / Code verification failed, fixing...")
 		op.DisallowNextLoopExit()
 		op.Continue()
-		return
+		return false
 	}
 	loop.Set(lintStatusVar, "true")
-	// 语法通过状态反馈, 让前端看到从"修复中"到"通过"的状态切换
-	reactloops.EmitStatus(loop, "语法检查通过 / Syntax check passed")
+	reactloops.EmitActionLog(loop, loopInfraNodeCodeVerify, "验证通过 / Code verification passed")
+	reactloops.EmitStatus(loop, "验证代码通过 / Code verification passed")
+
 	if exitOnClean && f.postSyntaxCleanHook != nil {
 		feedback, blockExit := f.postSyntaxCleanHook(loop, op)
 		if blockExit {
@@ -263,12 +268,13 @@ func (f *SingleFileModificationSuiteFactory) applySyntaxLintResult(
 			}
 			op.DisallowNextLoopExit()
 			op.Continue()
-			return
+			return true
 		}
 	}
 	if exitOnClean {
 		op.Exit()
 	}
+	return false
 }
 
 // CommitAfterCodeEdit persists code, runs lint, and records yaklang code change state.
@@ -286,7 +292,7 @@ func (f *SingleFileModificationSuiteFactory) CommitAfterCodeEdit(
 	loop.Set(f.GetFullCodeVariableName(), fullCode)
 
 	errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
-	f.applySyntaxLintResult(loop, op, hasBlockingErrors, f.ShouldExitWhenSyntaxClean())
+	_ = f.applySyntaxLintResult(loop, op, hasBlockingErrors, f.ShouldExitWhenSyntaxClean())
 
 	loop.GetEmitter().EmitPinFilename(filename)
 	_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{

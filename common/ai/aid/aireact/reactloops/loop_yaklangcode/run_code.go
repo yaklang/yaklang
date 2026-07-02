@@ -21,16 +21,13 @@ import (
 const (
 	yakRunOutputMaxBytes       = 8 * 1024
 	defaultYakRunSelfTestSec   = 30
-	defaultYakRunSelfTestRetry = 3
 
 	configYakRunSelfTestDisabled = "yaklang_auto_run_self_test_disabled"
 	configYakRunSelfTestTimeout  = "yaklang_run_self_test_timeout_sec"
-	configYakRunSelfTestMaxRetry = "yaklang_run_self_test_max_retries"
 
 	loopVarYakRunOK           = "yak_run_ok"
 	loopVarYakRunOutput       = "yak_run_output"
 	loopVarYakRunLastFeedback = "yak_run_last_feedback"
-	loopVarYakRunAttempts     = "yak_run_attempts"
 )
 
 // YakRunResult captures stdout/logs from a YAK_MAIN self-test execution.
@@ -131,14 +128,13 @@ func runYakSelfTestInProcess(ctx context.Context, code, absPath string, mockArgs
 		return nil
 	})
 
-	prevCallback := cli.DefaultCliApp.GetCliCheckCallback()
 	prevArgs := cli.DefaultCliApp.GetArgs()
 	cli.DefaultCliApp.SetCliCheckCallback(func() {
 		panic("cli check fail")
 	})
 	cli.DefaultCliApp.SetArgs(append([]string{}, mockArgs...))
 	defer func() {
-		cli.DefaultCliApp.SetCliCheckCallback(prevCallback)
+		cli.DefaultCliApp.SetCliCheckCallback(nil)
 		cli.DefaultCliApp.SetArgs(prevArgs)
 	}()
 
@@ -236,13 +232,6 @@ func yakRunSelfTestTimeoutSec(config aicommonGetter) int {
 		return defaultYakRunSelfTestSec
 	}
 	return config.GetConfigInt(configYakRunSelfTestTimeout, defaultYakRunSelfTestSec)
-}
-
-func yakRunSelfTestMaxRetries(config aicommonGetter) int {
-	if config == nil {
-		return defaultYakRunSelfTestRetry
-	}
-	return config.GetConfigInt(configYakRunSelfTestMaxRetry, defaultYakRunSelfTestRetry)
 }
 
 func yakRunSelfTestDisabled(config aicommonGetter) bool {
