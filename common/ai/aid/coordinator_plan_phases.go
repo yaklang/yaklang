@@ -32,6 +32,12 @@ func (c *Coordinator) runPlanPhaseThroughReview() error {
 		c.EmitError("invoke planRequest failed(first): %v", err)
 		return utils.Errorf("coordinator: invoke planRequest failed: %v", err)
 	}
+	rsp, err = planReq.ensurePlanExecutableDAG(rsp)
+	if err != nil {
+		c.planLoadingStatus("任务规划依赖校验失败 / Plan DAG Validation Failed")
+		c.EmitError("validate generated plan executable DAG failed: %v", err)
+		return err
+	}
 
 	c.planLoadingStatus("任务规划等待用户审查 / Waiting User to Review Plan...")
 	ep := c.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
@@ -54,6 +60,12 @@ func (c *Coordinator) runPlanPhaseThroughReview() error {
 		c.planLoadingStatus("处理审查结果失败 / Review Processing Failed")
 		c.EmitError("handle review plan response failed: %v", err)
 		return utils.Errorf("coordinator: handle review plan response failed: %v", err)
+	}
+	rsp, err = planReq.ensurePlanExecutableDAG(rsp)
+	if err != nil {
+		c.planLoadingStatus("任务规划依赖校验失败 / Plan DAG Validation Failed")
+		c.EmitError("validate reviewed plan executable DAG failed: %v", err)
+		return err
 	}
 
 	if rsp.RootTask == nil {
@@ -131,6 +143,9 @@ func (c *Coordinator) tryRecoverAndExecute(startTaskIndex string) (bool, error) 
 	}
 	if err != nil {
 		c.planLoadingStatus("恢复执行失败 / Recovery Failed")
+		if isPlanExecutableDAGValidationError(err) {
+			c.recordPlanDAGValidationFailure(err, 0)
+		}
 		c.EmitError("recover plan-and-exec failed: %v", err)
 		return false, utils.Errorf("coordinator: recover plan-and-exec failed: %v", err)
 	}
@@ -205,6 +220,11 @@ func (c *Coordinator) RunExecuteApprovedPlan() error {
 		c.planLoadingStatus("无有效子任务 / No Valid Subtasks")
 		c.EmitError("no subtasks found, this task is not a valid task")
 		return utils.Errorf("coordinator: no subtasks found")
+	}
+	if err := c.validatePlanExecutableDAG(c.rootTask); err != nil {
+		c.planLoadingStatus("任务规划依赖校验失败 / Plan DAG Validation Failed")
+		c.recordPlanDAGValidationFailure(err, 0)
+		return utils.Errorf("coordinator: approved plan executable DAG validation failed: %v", err)
 	}
 
 	if err := c.runExecuteRoot(""); err != nil {

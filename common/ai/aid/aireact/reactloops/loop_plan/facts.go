@@ -570,7 +570,7 @@ func hasValidPlan(loop *reactloops.ReActLoop) bool {
 
 func shouldAutoFactsForAction(actionType string) bool {
 	switch actionType {
-	case "", "output_facts":
+	case "", "output_facts", "generate_direct_plan", "begin_deep_planning", "finish_exploration":
 		return false
 	default:
 		return true
@@ -591,6 +591,9 @@ func buildPlanPostIterationHook(r aicommon.AIInvokeRuntime) reactloops.ReActLoop
 	_ = r
 	return reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
 		lastAction := loop.GetLastAction()
+		if lastAction != nil {
+			trackPlanModeFromAction(loop, lastAction)
+		}
 		if lastAction != nil && shouldAutoFactsForAction(lastAction.ActionType) {
 			incoming := ""
 			if lastAction.ActionParams != nil {
@@ -610,18 +613,23 @@ func buildPlanPostIterationHook(r aicommon.AIInvokeRuntime) reactloops.ReActLoop
 
 		if strings.TrimSpace(loop.Get(PLAN_FACTS_KEY)) == "" {
 			bootstrapFacts := autoGenerateFacts(loop, task, "bootstrap", lastAction)
+			if bootstrapFacts == "" && task != nil && isSimplePlanMode(loop) {
+				bootstrapFacts = bootstrapFactsFromUserInput(task.GetUserInput())
+			}
 			if _, changed := appendPlanFacts(loop, bootstrapFacts); changed {
 				log.Infof("plan loop: generated bootstrap facts at finalization")
 			}
 		}
 
-		document := generateGuidanceDocument(loop, task)
-		if document != "" {
-			loop.Set(PLAN_DOCUMENT_KEY, document)
-			log.Infof("plan loop: generated guidance document at finalization")
-		}
+		ensureDirectPlanOnFinalize(loop, task)
 
-		if !hasValidPlan(loop) {
+		if !hasValidPlan(loop) && !isSimplePlanMode(loop) {
+			document := generateGuidanceDocument(loop, task)
+			if document != "" {
+				loop.Set(PLAN_DOCUMENT_KEY, document)
+				log.Infof("plan loop: generated guidance document at finalization")
+			}
+
 			planData := generatePlanFromDocument(loop, task)
 			if planData != "" {
 				loop.Set(PLAN_DATA_KEY, planData)

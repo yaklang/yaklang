@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
@@ -55,6 +56,7 @@ func TestPublishDetachedPlan_PersistsSessionAndEmitsEvent(t *testing.T) {
 	require.NotNil(t, record)
 	require.Equal(t, sessionID, record.SessionID)
 	require.Contains(t, record.TaskTree, "test-plan")
+	require.False(t, aicommon.ShouldExposePlanExecTaskRecord(record.TaskProgress))
 
 	var detachedEvent *ypb.AIOutputEvent
 	for evt := range out {
@@ -68,6 +70,64 @@ func TestPublishDetachedPlan_PersistsSessionAndEmitsEvent(t *testing.T) {
 	require.NoError(t, json.Unmarshal(evtContent(detachedEvent), &payload))
 	require.Equal(t, true, payload["detached"])
 	require.Equal(t, coordinatorID, payload["coordinator_id"])
+
+	timelineText := collectTimelineText(reactIns)
+	require.Contains(t, timelineText, "[DETACHED_PLAN]")
+	require.Contains(t, timelineText, coordinatorID)
+	require.Contains(t, timelineText, "step-1")
+	require.Contains(t, timelineText, "do something")
+	require.Contains(t, timelineText, "plan_data")
+}
+
+func TestFormatDetachedPlanTimelineContent_IncludesNestedTasks(t *testing.T) {
+	root := &aid.AiTask{
+		Name: "main-plan",
+		Goal: "main goal",
+		Subtasks: []*aid.AiTask{
+			{
+				Name: "parent-task",
+				Goal: "parent goal",
+				Subtasks: []*aid.AiTask{
+					{Name: "child-task", Goal: "child goal"},
+				},
+			},
+		},
+	}
+	content := formatDetachedPlanTimelineContent(
+		"coord-1",
+		"session-1",
+		"react-task-1",
+		root,
+		&aicommon.ExecutePlanInput{
+			PlanPayload:  "user query",
+			PlanData:     `{"@action":"plan","main_task":"main-plan"}`,
+			PlanFacts:    "facts",
+			PlanDocument: "document",
+		},
+	)
+	require.Contains(t, content, "coordinator_id: coord-1")
+	require.Contains(t, content, "# main-plan")
+	require.Contains(t, content, "- parent-task")
+	require.Contains(t, content, "- child-task")
+	require.Contains(t, content, "## plan_facts")
+	require.Contains(t, content, "## plan_document")
+	require.Contains(t, content, "## plan_data")
+}
+
+func collectTimelineText(reactIns *ReAct) string {
+	if reactIns == nil || reactIns.config == nil || reactIns.config.Timeline == nil {
+		return ""
+	}
+	items := reactIns.config.Timeline.GetTimelineOutput()
+	var sb strings.Builder
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		sb.WriteString(item.Content)
+		sb.WriteRune('\n')
+	}
+	return sb.String()
 }
 
 func TestHandleSyncTypeExecuteDetachedPlanEvent_UsesRecoveryPath(t *testing.T) {
@@ -120,6 +180,12 @@ func TestHandleSyncTypeExecuteDetachedPlanEvent_UsesRecoveryPath(t *testing.T) {
 		SyncJsonInput: string(syncPayload),
 		SyncID:        uuid.NewString(),
 	}))
+
+	record, err := yakit.GetAISessionPlanAndExecByCoordinatorID(db, coordinatorID)
+	require.NoError(t, err)
+	require.NotNil(t, record)
+	require.Contains(t, record.TaskProgress, `"phase":"NotCompleted"`)
+	require.True(t, aicommon.ShouldExposePlanExecTaskRecord(record.TaskProgress))
 
 	var sawRecoveryTask bool
 	deadline := time.After(10 * time.Second)

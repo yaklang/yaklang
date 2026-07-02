@@ -8,7 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
-const requestPlanDetachedDescriptionSnippet = "detached review panel"
+const requestPlanDescriptionSnippet = "planning system produces a plan for user review"
 
 func TestRequestPlanAndExecutionAction_IsRegistered(t *testing.T) {
 	action, ok := reactloops.GetLoopAction(schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION)
@@ -16,12 +16,12 @@ func TestRequestPlanAndExecutionAction_IsRegistered(t *testing.T) {
 	require.NotNil(t, action)
 	require.Equal(t, schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION, action.ActionType)
 	require.False(t, action.AsyncMode)
-	require.Contains(t, action.Description, requestPlanDetachedDescriptionSnippet)
+	require.Contains(t, action.Description, requestPlanDescriptionSnippet)
 }
 
 func TestRequestPlanAlias_IsRegistered(t *testing.T) {
 	action, ok := reactloops.GetLoopAction(schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN)
 	require.True(t, ok)
 	require.Equal(t, schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN, action.ActionType)
-	require.Contains(t, action.Description, requestPlanDetachedDescriptionSnippet)
+	require.Contains(t, action.Description, requestPlanDescriptionSnippet)
 }

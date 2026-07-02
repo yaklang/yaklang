@@ -293,6 +293,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "任务计划",
 		En: "Task Plan",
 	},
+	"plan-mode": {
+		Zh: "规划模式",
+		En: "Plan Mode",
+	},
 	"plan-evidence": {
 		Zh: "证据",
 		En: "Plan Evidence",

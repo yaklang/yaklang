@@ -641,6 +641,8 @@ func localizeTaskGraphReason(reason string) string {
 		return "深入思考后子任务已更新"
 	case "dynamic plan updated":
 		return "动态规划已更新"
+	case "plan DAG validation repaired":
+		return "任务依赖 DAG 校验失败后已自动修正"
 	case "task appended":
 		return "已追加新任务"
 	default:

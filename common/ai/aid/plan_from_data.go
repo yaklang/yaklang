@@ -78,6 +78,10 @@ func (c *Coordinator) CommitApprovedPlan(root *AiTask, facts, document string) e
 	if len(root.Subtasks) <= 0 {
 		return utils.Error("plan has no subtasks")
 	}
+	if err := c.validatePlanExecutableDAG(root); err != nil {
+		c.recordPlanDAGValidationFailure(err, 0)
+		return utils.Errorf("coordinator: approved plan executable DAG validation failed: %v", err)
+	}
 
 	c.rootTask = root
 	if c.ContextProvider != nil {
@@ -134,6 +138,10 @@ func (c *Coordinator) ReviewPlanThroughUser(ctx context.Context, planPayload str
 	}
 	if len(approved.RootTask.Subtasks) <= 0 {
 		return nil, utils.Error("approved plan has no subtasks")
+	}
+	approved, err = planReq.ensurePlanExecutableDAG(approved)
+	if err != nil {
+		return nil, err
 	}
 	c.standardizeTaskTreeAndNotify(approved.RootTask, "plan review approved")
 	return approved, nil
