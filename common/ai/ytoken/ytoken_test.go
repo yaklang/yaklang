@@ -121,7 +121,7 @@ func TestRoundtrip_Numbers(t *testing.T) {
 }
 
 func TestRoundtrip_Punctuation(t *testing.T) {
-	assertRoundtrip(t, `!@#$%^&*()_+-=[]{}|;':",.<>?/~` + "`")
+	assertRoundtrip(t, `!@#$%^&*()_+-=[]{}|;':",.<>?/~`+"`")
 }
 
 func TestRoundtrip_Unicode(t *testing.T) {
@@ -414,7 +414,7 @@ journalctl --no-pager -n 20 2>/dev/null || tail -20 /var/log/syslog 2>/dev/null 
 		{"real_prompt_verification", "chinese", "common/ai/aid/aireact/prompts/verification/verification.txt"},
 		{"real_prompt_tool_params", "mixed", "common/ai/aid/aireact/prompts/tool-params/tool-params.txt"},
 		{"real_prompt_interval_review", "english", "common/ai/aid/aireact/prompts/tool/interval-review.txt"},
-		{"real_prompt_security_audit", "chinese", "common/ai/aid/aireact/reactloops/loop_code_security_audit/prompts/phase2_scan_instruction.txt"},
+		{"real_prompt_security_audit", "chinese", "common/ai/aid/aireact/reactloops/loop_code_security_audit/phase2/prompts/scan_instruction.txt"},
 	}
 	for _, pf := range promptFiles {
 		content := loadPromptFile(t, pf.relPath)
@@ -431,14 +431,14 @@ journalctl --no-pager -n 20 2>/dev/null || tail -20 /var/log/syslog 2>/dev/null 
 }
 
 type ratioResult struct {
-	name           string
-	category       string
-	byteCount      int
-	runeCount      int
-	tokenCount     int
-	bytesPerToken  float64
-	runesPerToken  float64
-	tokensPerRune  float64
+	name          string
+	category      string
+	byteCount     int
+	runeCount     int
+	tokenCount    int
+	bytesPerToken float64
+	runesPerToken float64
+	tokensPerRune float64
 }
 
 func TestTokenBytesRatio(t *testing.T) {
@@ -462,14 +462,14 @@ func TestTokenBytesRatio(t *testing.T) {
 			runeLen := utf8.RuneCountInString(tc.text)
 
 			r := ratioResult{
-				name:           tc.name,
-				category:       tc.category,
-				byteCount:      byteLen,
-				runeCount:      runeLen,
-				tokenCount:     tokens,
-				bytesPerToken:  float64(byteLen) / float64(tokens),
-				runesPerToken:  float64(runeLen) / float64(tokens),
-				tokensPerRune:  float64(tokens) / float64(runeLen),
+				name:          tc.name,
+				category:      tc.category,
+				byteCount:     byteLen,
+				runeCount:     runeLen,
+				tokenCount:    tokens,
+				bytesPerToken: float64(byteLen) / float64(tokens),
+				runesPerToken: float64(runeLen) / float64(tokens),
+				tokensPerRune: float64(tokens) / float64(runeLen),
 			}
 			results = append(results, r)
 
@@ -638,7 +638,7 @@ func TestRealPrompt_IntervalReview(t *testing.T) {
 }
 
 func TestRealPrompt_SecurityAudit(t *testing.T) {
-	text := loadPromptFile(t, "common/ai/aid/aireact/reactloops/loop_code_security_audit/prompts/phase2_scan_instruction.txt")
+	text := loadPromptFile(t, "common/ai/aid/aireact/reactloops/loop_code_security_audit/phase2/prompts/scan_instruction.txt")
 	tokens := CalcTokenCount(text)
 	assertRoundtrip(t, text)
 	t.Logf("phase2_scan_instruction.txt: %d bytes, %d runes, %d tokens, B/T=%.2f, R/T=%.2f",

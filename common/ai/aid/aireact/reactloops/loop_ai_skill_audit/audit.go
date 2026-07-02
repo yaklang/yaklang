@@ -12,6 +12,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -348,12 +349,11 @@ func buildPhase2StaticAnalysisLoop(r aicommon.AIInvokeRuntime, state *SkillAudit
 		}),
 	}
 
-	// ─── Register FS tools ───
-	preset = append(preset, buildFSToolAction(r, "tree", nil))
-	preset = append(preset, buildFSToolAction(r, "read_file", nil))
-	preset = append(preset, buildFSToolAction(r, "grep", nil))
-	preset = append(preset, buildFSToolAction(r, "find_file", nil))
-	preset = append(preset, buildFSToolAction(r, "write_file", func(action *aicommon.Action) {
+	// ─── Register builtin FS tools ───
+	for _, toolName := range []string{"tree", "read_file", "grep", "find_file"} {
+		preset = append(preset, loopinfra.RegisterBuiltinFSToolLoopAction(r, "SkillAudit", toolName, nil))
+	}
+	preset = append(preset, loopinfra.RegisterBuiltinFSToolLoopAction(r, "SkillAudit", "write_file", func(action *aicommon.Action) {
 		if filePath := action.GetString("file"); filePath != "" {
 			addNoteFile(filePath)
 			log.Infof("[SkillAudit/Phase2] Audit note written: %s", filePath)
@@ -437,59 +437,6 @@ func buildPhase2StaticAnalysisLoop(r aicommon.AIInvokeRuntime, state *SkillAudit
 	))
 
 	return reactloops.NewReActLoop("skill_audit_static_analysis", r, preset...)
-}
-
-// buildFSToolAction registers a file-system tool as a loop action.
-// It mirrors the implementation in loop_dir_explore to avoid cross-package coupling.
-func buildFSToolAction(r aicommon.AIInvokeRuntime, toolName string, onAction func(action *aicommon.Action)) reactloops.ReActLoopOption {
-	toolMgr := r.GetConfig().GetAiToolManager()
-	if toolMgr == nil {
-		log.Warnf("[SkillAudit] tool manager not available, skip %q action", toolName)
-		return func(r *reactloops.ReActLoop) {}
-	}
-	tool, err := toolMgr.GetToolByName(toolName)
-	if err != nil || tool == nil {
-		log.Warnf("[SkillAudit] tool %q not found: %v", toolName, err)
-		return func(r *reactloops.ReActLoop) {}
-	}
-
-	return reactloops.WithRegisterLoopAction(
-		toolName,
-		tool.GetDescription(),
-		tool.BuildParamsOptions(),
-		nil,
-		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
-			invoker := loop.GetInvoker()
-			ctx := loop.GetConfig().GetContext()
-			if task := loop.GetCurrentTask(); task != nil && !utils.IsNil(task.GetContext()) {
-				ctx = task.GetContext()
-			}
-
-			params := action.GetParams()
-			result, _, err := invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, toolName, params)
-			if err != nil {
-				log.Warnf("[SkillAudit] tool %q failed: %v", toolName, err)
-				op.Feedback(fmt.Sprintf("[工具执行失败] %s: %v，请尝试其他方法。", toolName, err))
-				op.Continue()
-				return
-			}
-
-			content := ""
-			if result != nil {
-				content = utils.InterfaceToString(result.Data)
-			}
-			summary, _ := reactloops.SpillLongContent(loop, toolName, content)
-			invoker.AddToTimeline(fmt.Sprintf("[%s]", toolName),
-				fmt.Sprintf("%s 完成: %d bytes\n%s", toolName, len(content), summary))
-
-			op.Feedback(fmt.Sprintf("[%s 完成] %d bytes\n%s", toolName, len(content), summary))
-			op.Continue()
-
-			if onAction != nil {
-				onAction(action)
-			}
-		},
-	)
 }
 
 // skillAuditDir returns the output directory for audit artifacts.

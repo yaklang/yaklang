@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/log"
@@ -68,7 +69,7 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 	}
 
 	// Only the require path needs AI to generate params; the preset path skips it.
-	toolCaller, err := r.newToolCallerForCall(ctx, currentTask, !skipRequire, opt...)
+	toolCaller, err := r.newToolCallerForCall(ctx, currentTask, toolName, !skipRequire, opt...)
 	if err != nil {
 		return nil, false, err
 	}
@@ -77,6 +78,12 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 	var result *aitool.ToolResult
 	var directlyAnswer bool
 	if skipRequire {
+		if currentLoop := r.GetCurrentLoop(); currentLoop != nil {
+			if allow, guardMsg := reactloops.CheckToolInvokeGuard(currentLoop, toolName, params); !allow {
+				return nil, false, utils.Error(guardMsg)
+			}
+			params = reactloops.ApplyToolInvokeParamsMutators(currentLoop, toolName, params)
+		}
 		// Call with preset parameters, skipping the require phase
 		result, directlyAnswer, err = toolCaller.CallToolWithExistedParams(tool, true, params)
 	} else {
@@ -125,7 +132,7 @@ func (r *ReAct) resolveToolForCall(ctx context.Context, toolName string) (*aitoo
 // binding, review handlers, interval review). withParamGenBuilder controls
 // whether the AI param-generation builder is attached (required for the require
 // path). opt is appended (e.g. WithToolCaller_Reason, WithToolCaller_CallToolID).
-func (r *ReAct) newToolCallerForCall(ctx context.Context, currentTask aicommon.AIStatefulTask, withParamGenBuilder bool, opt ...aicommon.ToolCallerOption) (*aicommon.ToolCaller, error) {
+func (r *ReAct) newToolCallerForCall(ctx context.Context, currentTask aicommon.AIStatefulTask, toolName string, withParamGenBuilder bool, opt ...aicommon.ToolCallerOption) (*aicommon.ToolCaller, error) {
 	var toolCaller *aicommon.ToolCaller
 
 	var toolCallerOptions []aicommon.ToolCallerOption
@@ -141,6 +148,19 @@ func (r *ReAct) newToolCallerForCall(ctx context.Context, currentTask aicommon.A
 		toolCallerOptions = append(toolCallerOptions, aicommon.WithToolCaller_Task(currentTask))
 	} else {
 		toolCallerOptions = append(toolCallerOptions, aicommon.WithToolCaller_Task(r.config.DefaultTask))
+	}
+
+	if currentLoop := r.GetCurrentLoop(); currentLoop != nil {
+		if allow, guardMsg := reactloops.CheckToolInvokeGuard(currentLoop, toolName, nil); !allow {
+			return nil, utils.Error(guardMsg)
+		}
+		if withParamGenBuilder {
+			toolCallerOptions = append(toolCallerOptions,
+				aicommon.WithToolCaller_ParamAugment(func(invokeParams aitool.InvokeParams) aitool.InvokeParams {
+					return reactloops.ApplyToolInvokeParamsMutators(currentLoop, toolName, invokeParams)
+				}),
+			)
+		}
 	}
 
 	// Add callback handlers
@@ -269,7 +289,7 @@ func (r *ReAct) DirectlyCallTool(ctx context.Context, toolName string, action *a
 
 	// Always attach the param-gen builder so fallbackToRequire can reuse this card
 	// and switch to the AI param-generation path.
-	toolCaller, err := r.newToolCallerForCall(ctx, currentTask, true)
+	toolCaller, err := r.newToolCallerForCall(ctx, currentTask, toolName, true)
 	if err != nil {
 		return nil, false, err
 	}

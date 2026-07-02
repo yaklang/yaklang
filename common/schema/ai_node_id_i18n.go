@@ -249,6 +249,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "验证代码",
 		En: "Verify Code",
 	},
+	"code-audit-recon": {
+		Zh: "项目探索",
+		En: "Project Recon",
+	},
 	"code-audit-scan": {
 		Zh: "代码审计扫描",
 		En: "Code Audit Scan",
