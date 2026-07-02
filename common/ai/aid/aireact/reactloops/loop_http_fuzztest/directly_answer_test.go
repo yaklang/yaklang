@@ -11,171 +11,47 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 type httpFuzztestTestInvoker struct {
-	base           *mock.MockInvoker
-	config         aicommon.AICallerConfigIf
-	currentTask    aicommon.AIStatefulTask
-	resultPayloads []string
-	timelineEvents []string
+	*mock.MockInvoker
 	mu             sync.Mutex
+	resultPayloads []string
 }
 
 func newHTTPFuzztestAICallbackInvoker(t *testing.T, cb aicommon.AICallbackType) *httpFuzztestTestInvoker {
 	t.Helper()
 	ctx := context.Background()
-	return &httpFuzztestTestInvoker{
-		base: mock.NewMockInvoker(ctx),
-		config: aicommon.NewConfig(
-			ctx,
-			aicommon.WithAICallback(cb),
-			aicommon.WithEnableSelfReflection(false),
-			aicommon.WithDisallowMCPServers(true),
-			aicommon.WithDisableSessionTitleGeneration(true),
-			aicommon.WithDisableIntentRecognition(true),
-			aicommon.WithDisableAutoSkills(true),
-			aicommon.WithGenerateReport(false),
-			aicommon.WithDisableDynamicPlanning(true),
-		),
-	}
-}
-
-func (i *httpFuzztestTestInvoker) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
-	return i.base.GetBasicPromptInfo(tools)
-}
-
-func (i *httpFuzztestTestInvoker) AssembleLoopPrompt(tools []*aitool.Tool, input *aicommon.LoopPromptAssemblyInput) (*aicommon.LoopPromptAssemblyResult, error) {
-	return i.base.AssembleLoopPrompt(tools, input)
-}
-
-func (i *httpFuzztestTestInvoker) SetCurrentTask(task aicommon.AIStatefulTask) {
-	i.currentTask = task
-}
-
-func (i *httpFuzztestTestInvoker) GetCurrentTask() aicommon.AIStatefulTask {
-	return i.currentTask
+	base := mock.NewMockInvoker(ctx)
+	base.SetConfig(aicommon.NewConfig(
+		ctx,
+		aicommon.WithAICallback(cb),
+		aicommon.WithEnableSelfReflection(false),
+		aicommon.WithDisallowMCPServers(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithGenerateReport(false),
+		aicommon.WithDisableDynamicPlanning(true),
+	))
+	return &httpFuzztestTestInvoker{MockInvoker: base}
 }
 
 func (i *httpFuzztestTestInvoker) GetCurrentTaskId() string {
-	if i.currentTask == nil {
+	if i == nil {
 		return ""
 	}
-	return i.currentTask.GetIndex()
-}
-
-func (i *httpFuzztestTestInvoker) GetConfig() aicommon.AICallerConfigIf {
-	return i.config
-}
-
-func (i *httpFuzztestTestInvoker) ExecuteToolRequiredAndCall(ctx context.Context, name string) (*aitool.ToolResult, bool, error) {
-	return i.base.ExecuteToolRequiredAndCall(ctx, name)
-}
-
-func (i *httpFuzztestTestInvoker) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams) (*aitool.ToolResult, bool, error) {
-	return i.base.ExecuteToolRequiredAndCallWithoutRequired(ctx, toolName, params)
-}
-
-func (i *httpFuzztestTestInvoker) AskForClarification(ctx context.Context, question string, payloads []string) string {
-	return i.base.AskForClarification(ctx, question, payloads)
-}
-
-func (i *httpFuzztestTestInvoker) DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool, opts ...any) (string, error) {
-	return i.base.DirectlyAnswer(ctx, query, tools, opts...)
-}
-
-func (i *httpFuzztestTestInvoker) CompressLongTextWithDestination(ctx context.Context, input any, destination string, targetByteSize int64) (string, error) {
-	return i.base.CompressLongTextWithDestination(ctx, input, destination, targetByteSize)
-}
-
-func (i *httpFuzztestTestInvoker) EnhanceKnowledgeGetterEx(ctx context.Context, userQuery string, enhancePlans []string, collections ...string) (string, error) {
-	return i.base.EnhanceKnowledgeGetterEx(ctx, userQuery, enhancePlans, collections...)
-}
-
-func (i *httpFuzztestTestInvoker) QuickKnowledgeSearch(ctx context.Context, query string, keywords []string, collections ...string) (string, error) {
-	return i.base.QuickKnowledgeSearch(ctx, query, keywords, collections...)
-}
-
-func (i *httpFuzztestTestInvoker) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (*aicommon.VerifySatisfactionResult, error) {
-	return i.base.VerifyUserSatisfaction(ctx, query, isToolCall, payload)
-}
-
-func (i *httpFuzztestTestInvoker) RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error)) {
-	i.base.RequireAIForgeAndAsyncExecute(ctx, forgeName, onFinish)
-}
-
-func (i *httpFuzztestTestInvoker) AsyncPlanOnly(ctx context.Context, planPayload string, onFinish func(error)) {
-	i.base.AsyncPlanOnly(ctx, planPayload, onFinish)
-}
-
-func (i *httpFuzztestTestInvoker) AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error)) {
-	i.base.AsyncPlanAndExecute(ctx, planPayload, onFinish)
-}
-
-func (i *httpFuzztestTestInvoker) ReviewExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput) (*aicommon.ExecutePlanInput, error) {
-	return i.base.ReviewExecutePlan(ctx, input)
-}
-
-func (i *httpFuzztestTestInvoker) ForceReviewExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput) (*aicommon.ExecutePlanInput, error) {
-	return i.base.ForceReviewExecutePlan(ctx, input)
-}
-
-func (i *httpFuzztestTestInvoker) BeginPlanCoordinatorSession(ctx context.Context, input *aicommon.ExecutePlanInput, forceManualReview bool) (aicommon.PlanCoordinatorSession, error) {
-	return i.base.BeginPlanCoordinatorSession(ctx, input, forceManualReview)
-}
-
-func (i *httpFuzztestTestInvoker) PublishDetachedPlan(ctx context.Context, input *aicommon.ExecutePlanInput, reactTaskID string) (string, error) {
-	return i.base.PublishDetachedPlan(ctx, input, reactTaskID)
-}
-
-func (i *httpFuzztestTestInvoker) AsyncExecutePlan(ctx context.Context, input *aicommon.ExecutePlanInput, onFinish func(error)) {
-	i.base.AsyncExecutePlan(ctx, input, onFinish)
-}
-
-func (i *httpFuzztestTestInvoker) AsyncExecuteCod(ctx context.Context, coordinatorID string, onFinish func(error)) {
-	i.base.AsyncExecuteCod(ctx, coordinatorID, onFinish)
-}
-
-func (i *httpFuzztestTestInvoker) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
-	return i.base.InvokeLiteForge(ctx, actionName, prompt, outputs, opts...)
-}
-
-func (i *httpFuzztestTestInvoker) InvokeSpeedPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
-	return i.base.InvokeSpeedPriorityLiteForge(ctx, actionName, prompt, outputs, opts...)
-}
-
-func (i *httpFuzztestTestInvoker) InvokeQualityPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
-	return i.base.InvokeQualityPriorityLiteForge(ctx, actionName, prompt, outputs, opts...)
-}
-
-func (i *httpFuzztestTestInvoker) SelectKnowledgeBase(ctx context.Context, originQuery string) (*aicommon.SelectedKnowledgeBaseResult, error) {
-	return i.base.SelectKnowledgeBase(ctx, originQuery)
-}
-
-func (i *httpFuzztestTestInvoker) ExecuteLoopTaskIF(taskTypeName string, task aicommon.AIStatefulTask, options ...any) (bool, error) {
-	return i.base.ExecuteLoopTaskIF(taskTypeName, task, options...)
-}
-
-func (i *httpFuzztestTestInvoker) AddToTimeline(entry, content string) {
-	i.mu.Lock()
-	defer i.mu.Unlock()
-	i.timelineEvents = append(i.timelineEvents, entry)
-}
-
-func (i *httpFuzztestTestInvoker) EmitFileArtifactWithExt(name, ext string, data any) string {
-	return i.base.EmitFileArtifactWithExt(name, ext, data)
+	if task := i.GetCurrentTask(); task != nil {
+		return task.GetIndex()
+	}
+	return ""
 }
 
 func (i *httpFuzztestTestInvoker) EmitResultAfterStream(v any) {
 	i.mu.Lock()
 	i.resultPayloads = append(i.resultPayloads, strings.TrimSpace(utils.InterfaceToString(v)))
 	i.mu.Unlock()
-}
-
-func (i *httpFuzztestTestInvoker) EmitResult(v any) {
-	i.base.EmitResult(v)
 }
 
 func newHTTPFuzztestLoopForDirectAnswerTest(t *testing.T) *reactloops.ReActLoop {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 	"io"
 	"sort"
 	"strings"
@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -24,13 +25,9 @@ const (
 	dispatchSubReactJobsLoopKey        = "dispatch_sub_react_jobs"
 	dispatchSubReactConcurrencyLoopKey = "dispatch_sub_react_concurrency"
 
-	maxDispatchSubReactJobs       = 8
-	defaultDispatchConcurrency    = 3
-	maxDispatchConcurrency        = 5
-	defaultSubAgentMaxIterations  = 6
-	maxSubAgentMaxIterations      = 20
-	defaultSubAgentTimeoutSeconds = 0
-	maxSubAgentTimeoutSeconds     = 600
+	maxDispatchSubReactJobs    = 30
+	defaultDispatchConcurrency = 5
+	maxDispatchConcurrency     = 10
 )
 
 type subReactDispatchJob struct {
@@ -39,8 +36,6 @@ type subReactDispatchJob struct {
 	Goal           string `json:"goal"`
 	LoopName       string `json:"loop_name"`
 	ResultContract string `json:"result_contract"`
-	MaxIterations  int    `json:"max_iterations"`
-	TimeoutSeconds int    `json:"timeout_seconds"`
 }
 
 type subReactProcessStats struct {
@@ -113,7 +108,7 @@ func runForkedSubReactAgentJob(
 	}
 
 	subTaskID := buildSubReactSubTaskID(parentTask, job)
-	subTaskName := job.Identifier
+	subTaskName := job.Goal
 	if subTaskName == "" {
 		subTaskName = subTaskID
 	}
@@ -126,33 +121,42 @@ func runForkedSubReactAgentJob(
 		return nil, utils.Error("failed to create timeline fork for sub react agent")
 	}
 
-	jobCtx := parentTask.GetContext()
-	if job.TimeoutSeconds > 0 {
-		var cancel context.CancelFunc
-		jobCtx, cancel = context.WithTimeout(jobCtx, time.Duration(job.TimeoutSeconds)*time.Second)
-		defer cancel()
-	}
+	// No per-job timeout: sub agents inherit the parent task context and run
+	// until they finish naturally. Previously each job could carry a
+	// timeout_seconds that the AI often underestimated, cutting sub agents off
+	// mid-task; that param is gone, so there is nothing to clamp here.
+	jobCtx, jobCancel := context.WithCancel(parentTask.GetContext())
 
-	childInvoker, err := buildForkedSubReactInvoker(parentCfg, fork, jobCtx)
+	childInvoker, err := buildForkedSubReactInvoker(parentCfg, fork, jobCtx, subTaskID)
 	if err != nil {
 		return nil, err
 	}
 
-	subTask := aicommon.NewSubTaskBase(parentTask, subTaskID, buildSubAgentUserInput(job), true)
+	subTask := aicommon.NewSubTaskBaseWithOptions(
+		parentTask,
+		subTaskID,
+		buildSubAgentUserInput(job),
+		aicommon.WithStatefulTaskBaseName(subTaskName),
+		aicommon.WithStatefulTaskBaseSubAgent(),
+		aicommon.WithStatefulTaskBaseContextAndCancel(jobCtx, jobCancel),
+	)
+	parentInvoker.AddRuntimeTask(subTask)
 	childInvoker.SetCurrentTask(subTask)
-	subTask.SetEmitter(aicommon.NewEmitter(uuid.NewString(), func(event *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
-		return event, nil // temporary discard emitter
-	}))
+	// Restore sub-agent emit: derive the sub-task emitter from the parent config emitter
+	// (via PushEventProcesser) so sub-agent events reach the frontend, stamped with the
+	// sub-task id as the aggregation marker. This replaces the temporary discard emitter
+	// that suppressed sub-agent output while waiting for the frontend to support
+	// aggregating sub-agent messages.
+	subTask.SetEmitter(buildSubReactForwardingEmitter(parentCfg.GetEmitter(), subTaskID))
 	branchMarker := fmt.Sprintf("sub-react-branch-marker-%s", subTaskID)
 	fork.Branch.PushText(parentCfg.AcquireId(), branchMarker)
 
-	subLoop, err := reactloops.CreateLoopByName(job.LoopName, childInvoker, buildSubReactLoopOptions(job)...)
+	subLoop, err := reactloops.CreateLoopByName(job.LoopName, childInvoker, buildSubReactLoopOptions()...)
 	if err != nil {
 		result, _ := buildSubReactJobResult(job, startedAt, subTask, nil, fork, err)
 		return result, nil
 	}
-
-	reactloops.EmitActionLog(parentLoop, loopInfraNodeDispatchSubReact, job.Goal)
+	subTask.SetStatus(aicommon.AITaskState_Processing)
 	execErr := subLoop.ExecuteWithExistedTask(subTask)
 	result, _ := buildSubReactJobResult(job, startedAt, subTask, subLoop, fork, execErr)
 	return result, nil
@@ -162,15 +166,16 @@ func buildForkedSubReactInvoker(
 	parentCfg *aicommon.Config,
 	fork *aicommon.TimelineFork,
 	jobCtx context.Context,
+	subTaskId string,
 ) (aicommon.AITaskInvokeRuntime, error) {
 	baseOpts := aicommon.ConvertConfigToOptions(parentCfg)
 	baseOpts = append(baseOpts,
 		aicommon.WithTimeline(fork.Branch),
 		aicommon.WithContext(jobCtx),
 		aicommon.WithEnablePlanAndExec(false),
-		aicommon.WithEmitter(aicommon.NewEmitter(uuid.NewString(), func(event *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
-			return event, nil
-		})),
+		aicommon.WithEmitter(buildSubReactForwardingEmitter(parentCfg.GetEmitter(), subTaskId)),
+		aicommon.WithHotPatchOptionChan(chanx.NewUnlimitedChan[aicommon.ConfigOption](jobCtx, 1)),
+		aicommon.WithAgreeAuto(),
 	)
 
 	childInvoker, err := aicommon.AIRuntimeInvokerGetter(jobCtx, baseOpts...)
@@ -180,13 +185,40 @@ func buildForkedSubReactInvoker(
 	return childInvoker, nil
 }
 
-func buildSubReactLoopOptions(job subReactDispatchJob) []reactloops.ReActLoopOption {
-	maxIter := job.MaxIterations
-	if maxIter <= 0 {
-		maxIter = defaultSubAgentMaxIterations
+// buildSubReactForwardingEmitter derives a sub-agent emitter from the parent emitter
+// via PushEventProcesser (same pattern used by coordinator_invoker.go and taskif.go for
+// stamping task identity onto events). The derived emitter shares the parent's frontend
+// sink (its baseEmitter), so sub-agent status/action-log/answer events reach the frontend,
+// while a processor stamps every event's TaskId with the sub-task id — the marker the
+// frontend uses to aggregate sub-agent messages.
+//
+// It derives from the parent *config* emitter (empty processor stack) rather than the
+// parent *task* emitter on purpose: ForeachStack runs top-to-bottom, so deriving from the
+// task emitter would let the parent task's own TaskId stamp (pushed earlier, lower in the
+// stack) overwrite this sub-task stamp. Deriving from the config emitter leaves only this
+// stamp in the stack, so the sub-task id wins.
+//
+// A nil parentEmitter (e.g. some test configs) degrades to a no-op dummy emitter so
+// callers never panic.
+func buildSubReactForwardingEmitter(parentEmitter *aicommon.Emitter, subTaskId string) *aicommon.Emitter {
+	if parentEmitter == nil {
+		return aicommon.NewDummyEmitter()
 	}
+	return parentEmitter.PushEventProcesser(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
+		if event != nil && subTaskId != "" {
+			event.TaskId = subTaskId
+		}
+		return event
+	})
+}
+
+// buildSubReactLoopOptions returns the loop options applied to every forked
+// sub-react agent. Notably it no longer sets WithMaxIterations: sub agents
+// inherit the ReActLoop's own default iteration ceiling (soft-interrupt,
+// not a hard close) instead of a per-job cap the parent AI could
+// misestimate. There is also no per-job timeout — see runForkedSubReactAgentJob.
+func buildSubReactLoopOptions() []reactloops.ReActLoopOption {
 	return []reactloops.ReActLoopOption{
-		reactloops.WithMaxIterations(maxIter),
 		reactloops.WithVar(subAgentDepthLoopVar, 1),
 		reactloops.WithNoEndLoadingStatus(true),
 		reactloops.WithAllowPlanAndExec(false),
@@ -378,8 +410,6 @@ func parseSubReactDispatchJobsFromArray(raw []aitool.InvokeParams) ([]subReactDi
 			Goal:           strings.TrimSpace(item.GetString("goal")),
 			LoopName:       strings.TrimSpace(item.GetString("loop_name")),
 			ResultContract: strings.TrimSpace(item.GetString("result_contract")),
-			MaxIterations:  int(item.GetInt("max_iterations")),
-			TimeoutSeconds: int(item.GetInt("timeout_seconds")),
 		})
 	}
 	return normalizeSubReactDispatchJobs(jobs)
@@ -409,18 +439,6 @@ func normalizeSubReactDispatchJobs(jobs []subReactDispatchJob) ([]subReactDispat
 		jobs[i].Identifier = strings.TrimSpace(jobs[i].Identifier)
 		if jobs[i].Identifier == "" {
 			jobs[i].Identifier = fmt.Sprintf("sub_agent_%d", jobs[i].Order)
-		}
-		if jobs[i].MaxIterations <= 0 {
-			jobs[i].MaxIterations = defaultSubAgentMaxIterations
-		}
-		if jobs[i].MaxIterations > maxSubAgentMaxIterations {
-			return nil, utils.Errorf("dispatches[%d].max_iterations exceeds limit %d", i, maxSubAgentMaxIterations)
-		}
-		if jobs[i].TimeoutSeconds < 0 {
-			return nil, utils.Errorf("dispatches[%d].timeout_seconds must be >= 0", i)
-		}
-		if jobs[i].TimeoutSeconds > maxSubAgentTimeoutSeconds {
-			return nil, utils.Errorf("dispatches[%d].timeout_seconds exceeds limit %d", i, maxSubAgentTimeoutSeconds)
 		}
 	}
 	return jobs, nil
@@ -523,7 +541,7 @@ func handleDispatchSubReactAgents(
 		len(results), successCount, len(results)-successCount,
 	)
 	invoker.AddToTimeline("[DISPATCH_SUB_REACT_AGENTS_DONE]", summary)
-	loopInfraActionFinish(loop, loopInfraNodeDispatchSubReact, summary)
+	loopInfraActionFinish(loop, loopInfraNodeSubReactReport, summary)
 
 	operator.Feedback(summary + "\n\n" + strings.Join(feedbackLines, "\n"))
 	operator.Continue()
@@ -642,14 +660,7 @@ func formatDispatchSubReactJobDisplayLine(job subReactDispatchJob) string {
 	if identifier == "" && goal == "" {
 		return ""
 	}
-	if identifier == "" {
-		if job.Order > 0 {
-			identifier = fmt.Sprintf("sub_agent_%d", job.Order)
-		} else {
-			identifier = "sub_agent"
-		}
-	}
-	line := fmt.Sprintf("- [%s] %s", identifier, goal)
+	line := fmt.Sprintf("- %s", goal)
 	if loopName := strings.TrimSpace(job.LoopName); loopName != "" && loopName != schema.AI_REACT_LOOP_NAME_DEFAULT {
 		line += fmt.Sprintf(" (loop: %s)", loopName)
 	}
@@ -664,25 +675,15 @@ func dispatchSubReactDispatchesStreamHandler(fieldReader io.Reader, emitWriter i
 }
 
 func writeDispatchSubReactDispatchesDisplayStream(reader io.Reader, writer io.Writer) error {
-	decoder := json.NewDecoder(reader)
-	token, err := decoder.Token()
-	if err != nil {
-		return err
-	}
-	delim, ok := token.(json.Delim)
-	if !ok || delim != '[' {
-		return utils.Error("dispatches is not a JSON array")
-	}
-
+	// Stream each dispatch object as soon as it completes in the JSON array,
+	// instead of buffering the whole array via encoding/json. The structured
+	// streaming extractor invokes the object callback inline in parse order, so
+	// goals are emitted one-by-one as they arrive.
 	firstLine := true
-	for decoder.More() {
-		var job subReactDispatchJob
-		if err := decoder.Decode(&job); err != nil {
-			return err
-		}
-		line := formatDispatchSubReactJobDisplayLine(job)
+	order := 0
+	emitLine := func(line string) error {
 		if strings.TrimSpace(line) == "" {
-			continue
+			return nil
 		}
 		if !firstLine {
 			if _, err := writer.Write([]byte("\n")); err != nil {
@@ -690,11 +691,34 @@ func writeDispatchSubReactDispatchesDisplayStream(reader io.Reader, writer io.Wr
 			}
 		}
 		firstLine = false
-		if _, err := io.WriteString(writer, line); err != nil {
-			return err
-		}
+		_, err := io.WriteString(writer, line)
+		return err
 	}
-	_, err = decoder.Token()
+
+	err := jsonextractor.ExtractStructuredJSONFromStream(reader,
+		jsonextractor.WithObjectCallback(func(data map[string]any) {
+			params := aitool.InvokeParams(data)
+			goal := strings.TrimSpace(params.GetString("goal"))
+			// Skip objects without a goal: they are either incomplete stream
+			// fragments or nested maps that are not dispatch jobs.
+			if goal == "" {
+				return
+			}
+			order++
+			job := subReactDispatchJob{
+				Order:      order,
+				Identifier: strings.TrimSpace(params.GetString("identifier")),
+				Goal:       goal,
+				LoopName:   strings.TrimSpace(params.GetString("loop_name")),
+			}
+			if e := emitLine(formatDispatchSubReactJobDisplayLine(job)); e != nil {
+				log.Debugf("dispatch_sub_react_agents: dispatches display stream write failed: %v", e)
+			}
+		}),
+		jsonextractor.WithStreamErrorCallback(func(err error) {
+			log.Debugf("dispatch_sub_react_agents: dispatches display stream parse error: %v", err)
+		}),
+	)
 	return err
 }
 
@@ -724,12 +748,6 @@ var loopAction_DispatchSubReactAgents = &reactloops.LoopAction{
 			aitool.WithStringParam("result_contract",
 				aitool.WithParam_Description("Optional output format or acceptance criteria for the sub agent result."),
 			),
-			aitool.WithIntegerParam("max_iterations",
-				aitool.WithParam_Description(fmt.Sprintf("Maximum sub loop iterations. Default %d, max %d.", defaultSubAgentMaxIterations, maxSubAgentMaxIterations)),
-			),
-			aitool.WithIntegerParam("timeout_seconds",
-				aitool.WithParam_Description(fmt.Sprintf("Per-job timeout in seconds. 0 inherits parent task context. Max %d.", maxSubAgentTimeoutSeconds)),
-			),
 		),
 		aitool.WithIntegerParam(
 			"concurrency",
@@ -741,7 +759,7 @@ var loopAction_DispatchSubReactAgents = &reactloops.LoopAction{
 			FieldName:     "dispatches",
 			AINodeId:      loopInfraNodeDispatchSubReact,
 			StreamHandler: dispatchSubReactDispatchesStreamHandler,
-			IsSystem:      true,
+			ContentType:   aicommon.TypeTextMarkdown,
 		},
 		{
 			FieldName: "concurrency",

@@ -273,7 +273,7 @@ func TestNewReActLoop_OmitsDispatchSubReactAgentsWhenDisabled(t *testing.T) {
 }
 
 func TestBuildSubReactLoopOptions_FiltersDispatchAction(t *testing.T) {
-	opts := buildSubReactLoopOptions(subReactDispatchJob{MaxIterations: 3})
+	opts := buildSubReactLoopOptions()
 	loop, err := reactloops.CreateLoopByName(
 		schema.AI_REACT_LOOP_NAME_DEFAULT,
 		newDispatchSubReactTestInvoker(context.Background()),
@@ -497,7 +497,7 @@ func TestWriteDispatchSubReactDispatchesDisplayStream_FormatsJobs(t *testing.T) 
 	input := `[{"identifier":"scan_a","goal":"scan service A"},{"identifier":"scan_b","goal":"scan service B","loop_name":"default"}]`
 	var out strings.Builder
 	require.NoError(t, writeDispatchSubReactDispatchesDisplayStream(strings.NewReader(input), &out))
-	assert.Equal(t, "- [scan_a] scan service A\n- [scan_b] scan service B", out.String())
+	assert.Equal(t, "- scan service A\n- scan service B", out.String())
 }
 
 func TestDispatchSubReactAgents_StreamFieldsUseI18nNodeIDs(t *testing.T) {
@@ -510,4 +510,265 @@ func TestDispatchSubReactAgents_StreamFieldsUseI18nNodeIDs(t *testing.T) {
 	require.NotNil(t, zh)
 	assert.Equal(t, "下发子 Agent", zh.Zh)
 	assert.Equal(t, "Dispatch Sub Agents", zh.En)
+}
+
+// subReactEmitterCapture wraps a capturing baseEmitter so tests can observe every
+// AiOutputEvent that reaches the parent sink, which is exactly what the frontend sees.
+type subReactEmitterCapture struct {
+	mu     sync.Mutex
+	events []*schema.AiOutputEvent
+}
+
+func newCapturingSubReactEmitter(id string) (*aicommon.Emitter, *subReactEmitterCapture) {
+	c := &subReactEmitterCapture{}
+	emitter := aicommon.NewEmitter(id, func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		c.mu.Lock()
+		c.events = append(c.events, e)
+		c.mu.Unlock()
+		return e, nil
+	})
+	return emitter, c
+}
+
+func (c *subReactEmitterCapture) snapshot() []*schema.AiOutputEvent {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	out := make([]*schema.AiOutputEvent, len(c.events))
+	copy(out, c.events)
+	return out
+}
+
+// TestBuildSubReactForwardingEmitter_ForwardsEventsToParentAndStampsTaskId verifies the
+// core dispatch contract: a sub-agent emitter forwards its events to the parent emitter
+// (so they reach the frontend) and stamps every event's TaskId with the sub-task id, which
+// is the marker the frontend uses to aggregate sub-agent messages.
+func TestBuildSubReactForwardingEmitter_ForwardsEventsToParentAndStampsTaskId(t *testing.T) {
+	parentEmitter, capture := newCapturingSubReactEmitter("parent")
+	const subTaskId = "sub-agent-xyz"
+	subEmitter := buildSubReactForwardingEmitter(parentEmitter, subTaskId)
+	require.NotNil(t, subEmitter)
+	require.NotSame(t, parentEmitter, subEmitter, "sub-agent must get its own derived emitter")
+
+	_, err := subEmitter.EmitStatus("fuzz-status", "running")
+	require.NoError(t, err)
+	_, err = subEmitter.EmitSchema("sub-react-node", map[string]any{"k": "v"})
+	require.NoError(t, err)
+
+	events := capture.snapshot()
+	require.Len(t, events, 2, "sub-agent events must be forwarded to the parent emitter")
+	for _, e := range events {
+		assert.Equal(t, subTaskId, e.TaskId, "every forwarded event must carry the sub-task id as aggregation marker")
+	}
+}
+
+// TestBuildSubReactForwardingEmitter_DistinguishesSubAgentsByTaskId verifies that
+// multiple sub agents sharing one parent emitter stay distinguishable: each event is
+// tagged with the id of the sub agent that produced it.
+func TestBuildSubReactForwardingEmitter_DistinguishesSubAgentsByTaskId(t *testing.T) {
+	parentEmitter, capture := newCapturingSubReactEmitter("parent")
+	subA := buildSubReactForwardingEmitter(parentEmitter, "sub-A")
+	subB := buildSubReactForwardingEmitter(parentEmitter, "sub-B")
+	require.NotNil(t, subA)
+	require.NotNil(t, subB)
+
+	_, _ = subA.EmitSchema("agent-a-node", map[string]any{"i": 1})
+	_, _ = subB.EmitSchema("agent-b-node", map[string]any{"i": 2})
+	_, _ = subA.EmitSchema("agent-a-node", map[string]any{"i": 3})
+
+	events := capture.snapshot()
+	require.Len(t, events, 3)
+	var aCount, bCount int
+	for _, e := range events {
+		switch e.TaskId {
+		case "sub-A":
+			aCount++
+		case "sub-B":
+			bCount++
+		default:
+			t.Fatalf("unexpected TaskId %q: sub-agent events must be tagged with their own sub-task id", e.TaskId)
+		}
+	}
+	assert.Equal(t, 2, aCount)
+	assert.Equal(t, 1, bCount)
+}
+
+// TestBuildSubReactForwardingEmitter_OverridesPreExistingTaskId verifies the sub-task id
+// stamp is authoritative: even events that already carry a stale (e.g. parent) TaskId end
+// up tagged with the sub-task id, so the frontend never mis-aggregates them under the parent.
+func TestBuildSubReactForwardingEmitter_OverridesPreExistingTaskId(t *testing.T) {
+	parentEmitter, capture := newCapturingSubReactEmitter("parent")
+	sub := buildSubReactForwardingEmitter(parentEmitter, "sub-fresh")
+	require.NotNil(t, sub)
+
+	_, err := sub.Emit(&schema.AiOutputEvent{NodeId: "raw", TaskId: "stale-parent-id"})
+	require.NoError(t, err)
+
+	events := capture.snapshot()
+	require.Len(t, events, 1)
+	assert.Equal(t, "sub-fresh", events[0].TaskId, "sub-task id must override any pre-existing TaskId")
+}
+
+// TestBuildSubReactForwardingEmitter_RunsParentProcessorsOnForwardedEvents verifies the
+// forwarded emitter threads events through the parent emitter's processor chain (not just
+// the sink), so parent-level metadata (i18n, AI info, process association, ...) still applies
+// to sub-agent events.
+func TestBuildSubReactForwardingEmitter_RunsParentProcessorsOnForwardedEvents(t *testing.T) {
+	capture := &subReactEmitterCapture{}
+	parentEmitter := aicommon.NewEmitter("parent", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		capture.mu.Lock()
+		capture.events = append(capture.events, e)
+		capture.mu.Unlock()
+		return e, nil
+	})
+	// parent processor that tags metadata, like the coordinator's stamp / AIInfo provider do.
+	parentEmitter = parentEmitter.PushEventProcesser(func(e *schema.AiOutputEvent) *schema.AiOutputEvent {
+		if e != nil {
+			e.AIService = "parent-meta"
+		}
+		return e
+	})
+
+	sub := buildSubReactForwardingEmitter(parentEmitter, "sub-X")
+	_, err := sub.EmitSchema("node", map[string]any{"k": 1})
+	require.NoError(t, err)
+
+	events := capture.snapshot()
+	require.Len(t, events, 1)
+	assert.Equal(t, "sub-X", events[0].TaskId, "sub-task id stamp must still be applied")
+	assert.Equal(t, "parent-meta", events[0].AIService, "forwarded events must still pass through the parent emitter's processors")
+}
+
+// TestBuildSubReactForwardingEmitter_DoesNotStampParentOwnEvents verifies PushEventProcesser
+// returns a copy and does not mutate the parent: the parent's own emits keep their original
+// TaskId, so the sub-agent marker never leaks onto parent traffic.
+func TestBuildSubReactForwardingEmitter_DoesNotStampParentOwnEvents(t *testing.T) {
+	parentEmitter, capture := newCapturingSubReactEmitter("parent")
+	sub := buildSubReactForwardingEmitter(parentEmitter, "sub-Z")
+	require.NotNil(t, sub)
+
+	_, err := parentEmitter.EmitSchema("parent-node", map[string]any{"k": 1})
+	require.NoError(t, err)
+	_, err = sub.EmitSchema("sub-node", map[string]any{"k": 2})
+	require.NoError(t, err)
+
+	events := capture.snapshot()
+	require.Len(t, events, 2)
+	assert.Equal(t, "", events[0].TaskId, "parent's own emits must keep their original TaskId, not the sub-agent marker")
+	assert.Equal(t, "sub-Z", events[1].TaskId, "sub-agent emits must be tagged with the sub-task id")
+}
+
+// TestBuildSubReactForwardingEmitter_NilParentIsSafe verifies a nil parent emitter (e.g.
+// some test configs) degrades gracefully instead of panicking.
+func TestBuildSubReactForwardingEmitter_NilParentIsSafe(t *testing.T) {
+	sub := buildSubReactForwardingEmitter(nil, "sub-nil")
+	require.NotNil(t, sub)
+	require.NotPanics(t, func() {
+		_, err := sub.EmitStatus("status", "x")
+		require.NoError(t, err)
+		_, err = sub.Emit(&schema.AiOutputEvent{NodeId: "raw"})
+		require.NoError(t, err)
+	})
+}
+
+// TestBuildForkedSubReactInvoker_ChildEmitterForwardsAndStampsTaskId verifies the dispatch
+// wiring (buildForkedSubReactInvoker) actually hands the child invoker an emitter that
+// forwards to the parent and stamps the sub-task id — i.e. dispatch correctly "下发 emitter".
+// AIRuntimeInvokerGetter is swapped so we can build a real child config from the options
+// without a live AI runtime.
+func TestBuildForkedSubReactInvoker_ChildEmitterForwardsAndStampsTaskId(t *testing.T) {
+	capture := &subReactEmitterCapture{}
+	captureEmitter := aicommon.NewEmitter("parent", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		capture.mu.Lock()
+		capture.events = append(capture.events, e)
+		capture.mu.Unlock()
+		return e, nil
+	})
+	parentCfg := aicommon.NewConfig(
+		context.Background(),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithEmitter(captureEmitter),
+	)
+	require.True(t, parentCfg.GetEmitter() == captureEmitter, "test setup: parent config must carry the capturing emitter")
+
+	parentTimeline := aicommon.NewTimeline(nil, nil)
+	parentTimeline.PushText(1, "parent-seed")
+	fork, err := parentTimeline.ForkForTask("sub", "sub", parentCfg, parentCfg)
+	require.NoError(t, err)
+	require.NotNil(t, fork)
+
+	origGetter := aicommon.AIRuntimeInvokerGetter
+	defer func() { aicommon.AIRuntimeInvokerGetter = origGetter }()
+	aicommon.AIRuntimeInvokerGetter = func(ctx context.Context, opts ...aicommon.ConfigOption) (aicommon.AITaskInvokeRuntime, error) {
+		cfg := aicommon.NewConfig(ctx, opts...)
+		return &configBackedDispatchInvoker{
+			dispatchSubReactTestInvoker: newDispatchSubReactTestInvoker(ctx),
+			cfg:                         cfg,
+		}, nil
+	}
+
+	const subTaskId = "sub-agent-42"
+	childInvoker, err := buildForkedSubReactInvoker(parentCfg, fork, context.Background(), subTaskId)
+	require.NoError(t, err)
+	require.NotNil(t, childInvoker)
+
+	childEmitter := childInvoker.GetConfig().GetEmitter()
+	require.NotNil(t, childEmitter)
+	require.NotSame(t, captureEmitter, childEmitter, "child must receive its own derived emitter, not the parent's")
+
+	_, err = childEmitter.EmitStatus("dispatch-status", "running")
+	require.NoError(t, err)
+	_, err = childEmitter.EmitSchema("sub-node", map[string]any{"k": "v"})
+	require.NoError(t, err)
+
+	events := capture.snapshot()
+	require.Len(t, events, 2, "child invoker emitter must forward events to the parent emitter (dispatch下发emitter)")
+	for _, e := range events {
+		assert.Equal(t, subTaskId, e.TaskId, "dispatched child events must be tagged with the sub-agent task id")
+	}
+}
+
+// TestRunForkedSubReactAgentJob_SubTaskEmitterForwardsAndStampsTaskId replicates the exact
+// emitter wiring runForkedSubReactAgentJob applies to the sub-task (NewSubTaskBase +
+// SetEmitter(buildSubReactForwardingEmitter(...))) and verifies the sub-task's emitter —
+// which is the effective emitter the sub loop runs through — forwards to the parent and
+// stamps the sub-task id. This avoids executing the sub loop's AI while still covering the
+// sub-task emitter wiring path.
+func TestRunForkedSubReactAgentJob_SubTaskEmitterForwardsAndStampsTaskId(t *testing.T) {
+	capture := &subReactEmitterCapture{}
+	captureEmitter := aicommon.NewEmitter("parent", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		capture.mu.Lock()
+		capture.events = append(capture.events, e)
+		capture.mu.Unlock()
+		return e, nil
+	})
+	parentCfg := aicommon.NewConfig(
+		context.Background(),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithEmitter(captureEmitter),
+	)
+
+	parentTask := aicommon.NewStatefulTaskBase(
+		"parent-task", "parent input", context.Background(), parentCfg.GetEmitter(), true,
+	)
+	require.NotNil(t, parentTask.GetEmitter())
+
+	const subTaskId = "sub-agent-77"
+	// Mirror runForkedSubReactAgentJob lines: create sub-task, then override its emitter
+	// with the forwarding emitter derived from the parent config emitter.
+	subTask := aicommon.NewSubTaskBase(parentTask, subTaskId, "sub input", true)
+	subTask.SetEmitter(buildSubReactForwardingEmitter(parentCfg.GetEmitter(), subTaskId))
+	require.NotEqual(t, captureEmitter, subTask.GetEmitter(), "sub-task must use the derived forwarding emitter, not the inherited parent emitter")
+
+	subEmitter := subTask.GetEmitter()
+	require.NotNil(t, subEmitter)
+	_, err := subEmitter.EmitStatus("sub-status", "running")
+	require.NoError(t, err)
+	_, err = subEmitter.EmitSchema("sub-node", map[string]any{"k": "v"})
+	require.NoError(t, err)
+
+	events := capture.snapshot()
+	require.Len(t, events, 2, "sub-task emitter must forward events to the parent emitter")
+	for _, e := range events {
+		assert.Equal(t, subTaskId, e.TaskId, "sub-task events must be tagged with the sub-task id aggregation marker")
+	}
 }
