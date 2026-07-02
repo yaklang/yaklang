@@ -202,6 +202,16 @@ func (a *anInstruction) GetFunc() *Function {
 	return nil
 }
 
+// GetCachedFunc returns the cached function pointer without accessing the instruction cache.
+// Used by shouldDelayInstructionEviction to avoid deadlock (cache mutex reentrance).
+func (a *anInstruction) GetCachedFunc() *Function {
+	if a.fun == nil {
+		return nil
+	}
+	f, _ := ToFunction(a.fun)
+	return f
+}
+
 func (a *anInstruction) GetProgram() *Program {
 	return a.prog
 }

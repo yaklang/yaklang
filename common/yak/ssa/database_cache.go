@@ -1,11 +1,13 @@
 package ssa
 
 import (
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"go.uber.org/atomic"
@@ -28,6 +30,9 @@ type ProgramCache struct {
 	types        *typeStore
 	sources      *sourceStore
 	indexes      *indexStore
+
+	// Track last flush statistics for telemetry
+	lastReleasedEditors int
 }
 
 func NewDBCache(cfg *ssaconfig.Config, prog *Program, databaseKind ProgramCacheKind, fileSize int) *ProgramCache {
@@ -88,6 +93,13 @@ func (c *ProgramCache) IsInstructionSpillDisabled() bool {
 		return false
 	}
 	return c.instructions.IsSpillDisabled()
+}
+
+func (c *ProgramCache) IsClosed() bool {
+	if c == nil || c.instructions == nil {
+		return false
+	}
+	return c.instructions.IsClosed()
 }
 
 func (c *ProgramCache) SetInstruction(inst Instruction) {
@@ -199,6 +211,100 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) error {
 		},
 	}
 	return c.diagnosticsTrackErr("ssa.ProgramCache.SaveToDatabase", steps...)
+}
+
+func (c *ProgramCache) FlushCompileUnit(unitKey string) {
+	if c == nil || !c.HaveDatabaseBackend() {
+		return
+	}
+	releasedEditors := 0
+	c.diagnosticsTrack("ssa.ProgramCache.FlushCompileUnit",
+		func() error {
+			if c.instructions != nil {
+				c.instructions.Flush()
+			}
+			return nil
+		},
+		func() error {
+			if c.indexes != nil {
+				c.indexes.Flush()
+			}
+			return nil
+		},
+		func() error {
+			if c.types != nil {
+				c.types.flush()
+			}
+			return nil
+		},
+		func() error {
+			if c.sources != nil {
+				c.sources.Flush()
+				releasedEditors = c.sources.ReleasePersistedEditors()
+			}
+			return nil
+		},
+	)
+	c.lastReleasedEditors = releasedEditors
+
+	// Clear auxiliary stores (types/sources) to release memory. The instruction
+	// store is NOT cleared here: flushCompileUnitWriter already flushed ordinary
+	// instructions while keeping function/parameter/free-value boundary
+	// instructions resident for later cross-unit calls.
+	clearedItems := c.flushAuxStores()
+
+	// Release program-level state for completed units (function bodies plus
+	// program caches the flush path no longer needs).
+	releasedFuncs := 0
+	if c.program != nil {
+		releasedFuncs = c.program.ReleaseCompletedUnitMemory(strings.Split(unitKey, ","))
+	}
+
+	// Single GC at unit-run end to reclaim the released resident memory.
+	runtime.GC()
+
+	if instructionCacheDebugEnabled() {
+		var m runtime.MemStats
+		runtime.ReadMemStats(&m)
+		log.Debugf("[ssa-ir-cache-flush] program=%s unit=%s mode=%s cleared=%d released_funcs=%d heap=%.1fMB resident=%d persisted=%d released_editors=%d",
+			c.program.GetProgramName(), unitKey, c.InstructionCacheMode(), clearedItems, releasedFuncs, float64(m.HeapInuse)/(1024*1024), c.CountInstruction(), c.InstructionPersistedCount(), releasedEditors)
+	}
+}
+
+func (c *ProgramCache) CountReleasedEditors() int {
+	if c == nil {
+		return 0
+	}
+	return c.lastReleasedEditors
+}
+
+// flushAuxStores clears only the non-instruction stores (types, sources) after
+// a compile-unit flush. The instruction store is not touched: its
+// compile-unit-split flush path already persisted ordinary instructions while
+// keeping function/parameter/free-value boundary instructions resident for
+// later cross-unit calls.
+func (c *ProgramCache) flushAuxStores() int {
+	if c == nil {
+		return 0
+	}
+	cleared := 0
+
+	if c.types != nil && c.types.resident != nil {
+		c.types.resident = utils.NewSafeMapWithKey[int64, Type]()
+		cleared += 100
+	}
+	if c.sources != nil {
+		c.sources.mu.Lock()
+		beforeSize := len(c.sources.payloads) + len(c.sources.editors)
+		c.sources.payloads = make(map[string]*ssadb.IrSource)
+		c.sources.persisted = make(map[string]struct{})
+		c.sources.editors = make(map[string]*memedit.MemEditor)
+		c.sources.editorsByURL = make(map[string]*memedit.MemEditor)
+		c.sources.visitedURLs = make(map[string]*memedit.MemEditor)
+		c.sources.mu.Unlock()
+		cleared += beforeSize
+	}
+	return cleared
 }
 
 func (c *ProgramCache) CountInstruction() int {

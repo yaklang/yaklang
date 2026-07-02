@@ -341,15 +341,23 @@ func (c *Config) peephole() (Programs, error) {
 		filesys.WithPeepholeSize(c.GetCompilePeepholeSize()),
 		filesys.WithPeepholeContext(c.ctx),
 		filesys.WithPeepholeCallback(func(count, totalCount int, system filesys_interface.FileSystem) {
+			if c.isStop() {
+				errs = utils.JoinErrors(errs, ErrContextCancel)
+				return
+			}
 			totalCount = totalCount + 1
 			baseProcess := float64(count-1) / float64(totalCount)
 			prog, err := c.parseProjectWithFS(system, func(f float64, s string, a ...any) {
-				c.Processf(baseProcess+f/float64(totalCount), s, a)
+				c.Processf(baseProcess+f/float64(totalCount), s, a...)
 			})
-			process := float64(count) / float64(totalCount) // max is 99%
-			c.Processf(process, "finish peephole filesystem")
 			// if no err just append and return
 			if err == nil {
+				if c.isStop() {
+					errs = utils.JoinErrors(errs, ErrContextCancel)
+					return
+				}
+				process := float64(count) / float64(totalCount) // max is 99%
+				c.Processf(process, "finish peephole filesystem")
 				progs = append(progs, prog)
 				return
 			}
@@ -361,6 +369,9 @@ func (c *Config) peephole() (Programs, error) {
 			errs = utils.JoinErrors(errs, err)
 		}),
 	)
+	if c.isStop() && errs == nil {
+		errs = ErrContextCancel
+	}
 	return progs, errs
 }
 

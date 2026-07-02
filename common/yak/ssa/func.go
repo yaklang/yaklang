@@ -132,6 +132,11 @@ func (f *Function) GetFunc() *Function {
 	return f
 }
 
+// GetCachedFunc returns self (Function already has the pointer, no cache access needed).
+func (f *Function) GetCachedFunc() *Function {
+	return f
+}
+
 func (f *Function) addAnonymous(anon *Function) {
 	f.ChildFuncs = append(f.ChildFuncs, anon.GetId())
 	anon.parent = f.GetId()

@@ -175,6 +175,13 @@ func (s *sourceStore) Close() {
 		return
 	}
 	defer s.releaseEditors()
+	s.Flush()
+}
+
+func (s *sourceStore) Flush() {
+	if s == nil || s.mode != ProgramCacheDBWrite || s.db == nil {
+		return
+	}
 
 	sources, hashes := s.collectRegisteredSources()
 	if len(sources) == 0 {
@@ -228,6 +235,32 @@ func (s *sourceStore) Close() {
 		return
 	}
 	s.markPersisted(savedHashes...)
+}
+
+func (s *sourceStore) ReleasePersistedEditors() int {
+	if s == nil {
+		return 0
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	released := 0
+	for hash := range s.persisted {
+		editor, ok := s.editors[hash]
+		if !ok || editor == nil {
+			continue
+		}
+		delete(s.editors, hash)
+		url := editor.GetUrl()
+		if url != "" {
+			delete(s.editorsByURL, url)
+			if _, visited := s.visitedURLs[url]; visited {
+				s.visitedURLs[url] = nil
+			}
+		}
+		released++
+	}
+	return released
 }
 
 func (s *sourceStore) collectRegisteredSources() ([]*ssadb.IrSource, []string) {
@@ -333,6 +366,9 @@ func (s *sourceStore) GetVisitedEditorByURL(url string) (*memedit.MemEditor, boo
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	editor, ok := s.visitedURLs[url]
+	if editor == nil {
+		return nil, false
+	}
 	return editor, ok
 }
 

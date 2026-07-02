@@ -34,11 +34,16 @@ type instructionStore struct {
 
 	flushResidentOnClose bool
 	saveSize             int
+	// residentCache drives the adaptive DB-write fast path: all instructions
+	// stay resident until Close, with synchronous incremental batched flush.
+	residentCache *dbcache.ResidentFlushCache[int64, Instruction, *instructionPersistRecord]
 
 	persistedCount atomic.Int64
 
 	progressMu sync.RWMutex
 	progressFn func(int)
+
+	compileUnitSplit bool
 }
 
 // instructionPersistRecord is the persisted form of a single instruction save
@@ -67,6 +72,8 @@ func newInstructionStore(
 		db:         db,
 		nextID:     atomic.NewInt64(0),
 		progressFn: func(int) {},
+
+		compileUnitSplit: cfg.GetCompileUnitSplit(),
 	}
 
 	switch mode {
@@ -90,9 +97,14 @@ func newInstructionStore(
 		store.reader = reader
 	case ProgramCacheDBWrite:
 		if useAdaptiveInstructionFastPath(cfg) {
-			store.resident = utils.NewSafeMapWithKey[int64, Instruction]()
 			store.flushResidentOnClose = true
 			store.saveSize = min(max(saveSize*20, 5000), maxSaveSize)
+			store.residentCache = dbcache.NewResidentFlushCache[int64, Instruction, *instructionPersistRecord](
+				store.saveSize,
+				store.marshalResidentRecord,
+				store.saveInstructionPersistRecords,
+			)
+			store.resident = store.residentCache.Map()
 			return store
 		}
 
@@ -110,7 +122,9 @@ func newInstructionStore(
 			dbcache.WithSaveTimeout(saveTime),
 			dbcache.WithName("Instruction"),
 			dbcache.WithSkipEviction(func(inst Instruction) bool {
-				return shouldKeepInstructionResident(inst) || shouldDelayInstructionEviction(inst)
+				return shouldKeepInstructionResident(inst) ||
+					(store.compileUnitSplit && shouldKeepCompileUnitBoundaryResident(inst)) ||
+					shouldDelayInstructionEviction(inst)
 			}),
 		)
 	}
@@ -225,6 +239,46 @@ func (s *instructionStore) TrackFunctionFinish(function *Function) {
 	s.writer.Track(ids)
 }
 
+func (s *instructionStore) Flush() {
+	if s == nil || s.mode != ProgramCacheDBWrite {
+		return
+	}
+	switch {
+	case s.writer != nil:
+		if s.compileUnitSplit {
+			s.flushCompileUnitWriter()
+		} else {
+			s.writer.Flush(utils.EvictionReasonCapacityReached)
+		}
+	case s.residentCache != nil:
+		if err := s.residentCache.Flush(false); err != nil {
+			log.Errorf("flush resident instructions failed: %v", err)
+		}
+	}
+}
+
+func (s *instructionStore) flushCompileUnitWriter() {
+	if s == nil || s.writer == nil {
+		return
+	}
+	items := s.writer.GetAll()
+	ids := make([]int64, 0, len(items))
+	for id, inst := range items {
+		if shouldKeepCompileUnitBoundaryResident(inst) {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	// Flush to DB - this already evicts from cache internally during async save
+	// The FlushKeys operation will remove entries from the writer cache as they're persisted
+	s.writer.FlushKeys(ids, utils.EvictionReasonCapacityReached)
+
+	// Note: We don't explicitly Delete after FlushKeys because:
+	// 1. FlushKeys already evicts entries during its async save process
+	// 2. Calling Delete immediately after can cause WaitGroup reuse panic
+	// 3. The writer cache's async save mechanism handles memory release
+}
+
 func (s *instructionStore) GetAllResident() map[int64]Instruction {
 	if s == nil {
 		return nil
@@ -262,6 +316,20 @@ func (s *instructionStore) IsSpillDisabled() bool {
 	return s.writer.IsSaveDisabled()
 }
 
+func (s *instructionStore) IsClosed() bool {
+	if s == nil {
+		return false
+	}
+	switch {
+	case s.writer != nil:
+		return s.writer.IsClosed()
+	case s.reader != nil:
+		return s.reader.IsClosed()
+	default:
+		return false
+	}
+}
+
 func (s *instructionStore) Stats() dbcache.CacheStats {
 	if s == nil {
 		return dbcache.CacheStats{}
@@ -278,6 +346,24 @@ func (s *instructionStore) Stats() dbcache.CacheStats {
 	}
 }
 
+func (s *instructionStore) ModeName() string {
+	if s == nil {
+		return "none"
+	}
+	switch {
+	case s.writer != nil:
+		return "writer"
+	case s.reader != nil:
+		return "reader"
+	case s.flushResidentOnClose:
+		return "resident-fast-path"
+	case s.resident != nil:
+		return "resident"
+	default:
+		return "none"
+	}
+}
+
 func (s *instructionStore) Close(progress func(int)) error {
 	if s == nil {
 		return nil
@@ -289,51 +375,37 @@ func (s *instructionStore) Close(progress func(int)) error {
 		if err := s.writer.Close(); err != nil {
 			return err
 		}
-	case s.flushResidentOnClose:
-		if err := s.flushResidentOnCloseOnly(); err != nil {
+	case s.residentCache != nil:
+		if err := s.residentCache.Flush(true); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (s *instructionStore) flushResidentOnCloseOnly() error {
-	if s == nil || s.resident == nil || s.db == nil {
-		return nil
+// marshalResidentRecord is the marshal callback for the adaptive fast-path
+// residentCache. It turns an instruction into a persist record for the close
+// flush (EvictionReasonDeleted). ok=false means the item has no DB row to
+// write (e.g. an empty instruction) and is silently skipped; err is a marshal
+// failure to accumulate and return. updateExisting is the cache's per-Flush
+// decision: true on a close flush that follows an incremental flush (upsert),
+// false otherwise (insert).
+func (s *instructionStore) marshalResidentRecord(inst Instruction, updateExisting bool) (*instructionPersistRecord, bool, error) {
+	irCode, err := s.marshalIrCodeWithReason(inst, utils.EvictionReasonDeleted)
+	if err != nil {
+		log.Errorf("marshal ir code failed: %v", err)
+		return nil, false, err
 	}
-
-	saveBatch := saveInstructionIrCodesFast(s.program, s.db, s.notifyProgress)
-	batch := make([]*ssadb.IrCode, 0, s.saveSize)
-	var flushErr error
-	flush := func() {
-		if len(batch) == 0 {
-			return
-		}
-		if err := saveBatch(batch); err != nil {
-			log.Errorf("save ir code batch fast path failed: %v", err)
-			flushErr = utils.JoinErrors(flushErr, err)
-		}
-		batch = make([]*ssadb.IrCode, 0, s.saveSize)
+	if irCode == nil {
+		return nil, false, nil
 	}
-
-	s.resident.ForEach(func(_ int64, inst Instruction) bool {
-		irCode, err := s.marshalIrCodeWithReason(inst, utils.EvictionReasonDeleted)
-		if err != nil {
-			log.Errorf("marshal ir code failed: %v", err)
-			flushErr = utils.JoinErrors(flushErr, err)
-			return true
-		}
-		if irCode == nil {
-			return true
-		}
-		batch = append(batch, irCode)
-		if len(batch) >= s.saveSize {
-			flush()
-		}
-		return true
-	})
-	flush()
-	return flushErr
+	return &instructionPersistRecord{
+		IrCode:         irCode,
+		Opcode:         inst.GetOpcode(),
+		Reason:         utils.EvictionReasonDeleted,
+		UpdateExisting: updateExisting,
+		CodeID:         inst.GetId(),
+	}, true, nil
 }
 
 func (s *instructionStore) PreloadByIDsFast(ids []int64) {
@@ -507,41 +579,6 @@ func (s *instructionStore) notifyProgress(size int) {
 	}
 }
 
-func saveInstructionIrCodesFast(prog *Program, db *gorm.DB, notify func(int)) dbcache.SaveFunc[*ssadb.IrCode] {
-	return func(records []*ssadb.IrCode) error {
-		if len(records) == 0 {
-			return nil
-		}
-		var saveErr error
-		saveStep := func() error {
-			saveErr = utils.GormTransaction(db, func(tx *gorm.DB) error {
-				for _, irCode := range records {
-					if irCode == nil {
-						continue
-					}
-					if err := tx.Save(irCode).Error; err != nil {
-						return err
-					}
-				}
-				return nil
-			})
-			return saveErr
-		}
-		if prog != nil {
-			prog.DiagnosticsTrack("ssa.Database.SaveIrCodeBatchFastPath", saveStep)
-		} else {
-			saveStep()
-		}
-		if saveErr != nil {
-			return saveErr
-		}
-		if notify != nil {
-			notify(len(records))
-		}
-		return nil
-	}
-}
-
 func instructionLocationIDs(inst Instruction) (funcID, blockID int64) {
 	if utils.IsNil(inst) {
 		return 0, 0
@@ -617,4 +654,11 @@ func (c *ProgramCache) InstructionPersistedCount() int {
 		return 0
 	}
 	return int(c.instructions.PersistedCount())
+}
+
+func (c *ProgramCache) InstructionCacheMode() string {
+	if c == nil || c.instructions == nil {
+		return "none"
+	}
+	return c.instructions.ModeName()
 }

@@ -79,6 +79,10 @@ func (s *typeStore) get(id int64) (Type, bool) {
 }
 
 func (s *typeStore) close() {
+	s.flush()
+}
+
+func (s *typeStore) flush() {
 	if s == nil || s.mode != ProgramCacheDBWrite || s.db == nil {
 		return
 	}
@@ -245,7 +249,7 @@ func saveIrType(prog *Program, db *gorm.DB) func([]*ssadb.IrType) error {
 					if irType == nil {
 						continue
 					}
-					if err := tx.Save(irType).Error; err != nil {
+					if err := ssadb.UpsertIrType(tx, irType); err != nil {
 						return err
 					}
 				}

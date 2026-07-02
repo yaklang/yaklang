@@ -100,15 +100,15 @@ func (i *anInstruction) GetBasicBlockByID(id int64) (*BasicBlock, bool) {
 }
 
 func (v Values) GetIds() []int64 {
-	ret := make([]int64, 0)
-	for _, v := range v {
-		if utils.IsNil(v) {
-			continue
+	ret := make([]int64, 0, len(v))
+	for _, val := range v {
+		if val != nil && !utils.IsNil(val) {
+			ret = append(ret, val.GetId())
 		}
-		ret = append(ret, v.GetId())
 	}
 	return ret
 }
+
 func GetEx[T any](c *ProgramCache, Cover func(Instruction) (T, bool), id int64) (T, bool) {
 	var zero T
 	if c == nil {

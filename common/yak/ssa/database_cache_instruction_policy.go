@@ -4,7 +4,7 @@ import (
 	"os"
 	"time"
 
-	yaklog "github.com/yaklang/yaklang/common/log"
+	stdlog "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
@@ -22,8 +22,8 @@ const (
 	// Persist limit stays >= 4x batch so dbcache eviction backpressure matches writer.
 	largeProjectInstructionSave = 4096
 	largeProjectPersistLimit    = 32768
-	largeProjectAuxiliarySave    = 512
-	largeProjectTypeSave         = 256
+	largeProjectAuxiliarySave   = 512
+	largeProjectTypeSave        = 256
 )
 
 var hotInstructionOpcodeBlacklist = map[Opcode]struct{}{
@@ -35,7 +35,7 @@ var hotInstructionOpcodeBlacklist = map[Opcode]struct{}{
 }
 
 func instructionCacheDebugEnabled() bool {
-	return yaklog.GetLevel() >= yaklog.DebugLevel
+	return log.Level >= stdlog.DebugLevel
 }
 
 func instructionCacheEventDebugEnabled() bool {
@@ -54,19 +54,51 @@ func shouldKeepInstructionResident(inst Instruction) bool {
 	return ok
 }
 
+func shouldKeepCompileUnitBoundaryResident(inst Instruction) bool {
+	if utils.IsNil(inst) {
+		return false
+	}
+	switch inst.GetOpcode() {
+	case SSAOpcodeFunction,
+		SSAOpcodeParameter,
+		SSAOpcodeFreeValue,
+		SSAOpcodeParameterMember,
+		SSAOpcodeSideEffect,
+		SSAOpcodeExternLib:
+		return true
+	default:
+		return false
+	}
+}
+
 func shouldDelayInstructionEviction(inst Instruction) bool {
 	if utils.IsNil(inst) {
 		return true
 	}
-	fn := inst.GetFunc()
-	if utils.IsNil(fn) {
-		return true
+	// Check if instruction has a cached function pointer (fast path, no cache access).
+	// We MUST NOT call GetFunc() here because this runs inside the cache eviction callback
+	// which holds the cache mutex. Calling GetFunc() -> resolveFunctionByID() -> GetInstruction()
+	// would try to re-acquire the same mutex, causing a deadlock.
+	type funGetter interface {
+		GetCachedFunc() *Function
 	}
-	return !fn.IsFinished()
+	if fg, ok := inst.(funGetter); ok {
+		if fn := fg.GetCachedFunc(); fn != nil {
+			return !fn.IsFinished()
+		}
+	}
+	// No cached function pointer available without re-entering the cache mutex.
+	// Evict rather than pin: instructions without a resolvable owning function
+	// (e.g. reloaded lazy instructions whose owning function already finished)
+	// should be eligible for eviction so dirty state writes back to the DB.
+	return false
 }
 
 func useAdaptiveInstructionFastPath(cfg *ssaconfig.Config) bool {
 	cfg = ensureProgramConfig(cfg)
+	if cfg.GetCompileUnitSplit() {
+		return false
+	}
 	ttl, maxEntries := resolveInstructionCacheSettings(cfg)
 	return ttl == 0 &&
 		maxEntries == 0 &&
@@ -107,7 +139,7 @@ func resolveInstructionCacheSettings(cfg *ssaconfig.Config) (time.Duration, int)
 	cfg = ensureProgramConfig(cfg)
 	ttl := cfg.GetCompileIrCacheTTL()
 	maxEntries := cfg.GetCompileIrCacheMax()
-	if ttl == time.Second && maxEntries == 5000 && cfg.GetCompileProjectBytes() > 0 && cfg.GetCompileProjectBytes() <= fastPathProjectByteThreshold {
+	if ttl == time.Second && maxEntries == 5000 && !cfg.GetCompileUnitSplit() && cfg.GetCompileProjectBytes() > 0 && cfg.GetCompileProjectBytes() <= fastPathProjectByteThreshold {
 		return 0, 0
 	}
 	if ttl == time.Second && maxEntries == 5000 && cfg.GetCompileProjectBytes() >= largeProjectByteThreshold {

@@ -335,6 +335,10 @@ type SSACompileConfig struct {
 	// tuning. It reflects the total source bytes that will enter the compile
 	// stage and is intentionally excluded from JSON persistence.
 	CompileProjectBytes int64 `json:"-"`
+	// CompileUnitSplit is runtime-only. Unit-split compilation persists IR at
+	// SCC boundaries, so the IR cache must keep reload support instead of using
+	// the resident-only fast path for small projects.
+	CompileUnitSplit bool `json:"-"`
 }
 
 // --- 编译配置 Get/Set 方法 ---
@@ -531,6 +535,23 @@ func (c *Config) SetCompileProjectBytes(size int64) {
 		c.SSACompile = defaultSSACompileConfig()
 	}
 	c.SSACompile.CompileProjectBytes = size
+}
+
+func (c *Config) GetCompileUnitSplit() bool {
+	if c == nil || c.SSACompile == nil {
+		return false
+	}
+	return c.SSACompile.CompileUnitSplit
+}
+
+func (c *Config) SetCompileUnitSplit(enable bool) {
+	if c == nil {
+		return
+	}
+	if c.SSACompile == nil {
+		c.SSACompile = defaultSSACompileConfig()
+	}
+	c.SSACompile.CompileUnitSplit = enable
 }
 
 func (c *Config) GetCompileFilePerformanceLog() bool {

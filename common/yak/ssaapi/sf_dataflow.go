@@ -1,8 +1,12 @@
 package ssaapi
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -10,6 +14,24 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
+
+// dataflowTimeoutEnv is the env var for the per-dataflow-call wall-clock budget
+// (seconds). 0 disables. Default 5min. This is a temporary guard so a
+// dataflow() rule on a large project (thousands of sources × deep recursion)
+// cannot hang the scan; the proper total-work fix is on another branch.
+const dataflowTimeoutEnv = "YAK_SSA_DATAFLOW_TIMEOUT"
+
+func loadDataflowTimeout() time.Duration {
+	raw := strings.TrimSpace(os.Getenv(dataflowTimeoutEnv))
+	if raw == "" {
+		return 5 * time.Minute
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 0 {
+		return 5 * time.Minute
+	}
+	return time.Duration(n) * time.Second
+}
 
 const (
 	Predecessors_TopDefLabel    = "dataflow_topdef"
@@ -120,7 +142,7 @@ func normalizeTopDefReachSymbol(raw string) string {
 	return s
 }
 
-// parseTopDefReachSymbolFromItem reads the value from a RecursiveConfigItem (plain identifier or `` `$cfg` `` filter text).
+// parseTopDefReachSymbolFromItem reads the value from a RecursiveConfigItem (plain identifier or “ `$cfg` “ filter text).
 func parseTopDefReachSymbolFromItem(item *sf.RecursiveConfigItem) string {
 	if item == nil {
 		return ""
@@ -427,7 +449,7 @@ func DataFlowWithSFConfig(
 	resolvedReach := resolveTopDefReachAnchors(sfResult, inputProg, topDefReachParsed)
 	reachMergeHook := buildTopDefReachMergeHook(sfResult, inputProg, inputProgErr, resolvedReach, reachOpt)
 
-	ret = dataFlowFilter(ret, sfResult, config, nil, nil, reachMergeHook, filterCondition...)
+	ret = dataFlowFilter(config.GetContext(), ret, sfResult, config, nil, nil, reachMergeHook, filterCondition...)
 	if len(resolvedReach) > 0 {
 		ret = filterTopDefResultsByReachAnchors(ret, resolvedReach, reachOpt)
 	}
@@ -505,7 +527,24 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.Values, frame *sfvm.SFF
 		}
 	}
 
-	ret = dataFlowFilter(ret, contextResult, frame.GetVM().GetConfig(), end, pathReach, reachMergeHook, condition...)
+	// Per-dataflow wall-clock budget: a dataflow() rule on a large project
+	// can match thousands of sources and the for-each-source loop in
+	// dataFlowFilter has no total-work cap. Wrap the call context with a
+	// deadline; dataFlowFilter checks ctx.Done() on each source so the loop
+	// unwinds cleanly and returns partial results instead of hanging.
+	dataflowTimeout := loadDataflowTimeout()
+	dataflowCtx := frame.GetVM().GetConfig().GetContext()
+	var dataflowCancel context.CancelFunc
+	if dataflowTimeout > 0 {
+		dataflowCtx, dataflowCancel = context.WithTimeout(dataflowCtx, dataflowTimeout)
+	}
+	defer func() {
+		if dataflowCancel != nil {
+			dataflowCancel()
+		}
+	}()
+
+	ret = dataFlowFilter(dataflowCtx, ret, contextResult, frame.GetVM().GetConfig(), end, pathReach, reachMergeHook, condition...)
 
 	// Post-mode: same anchor pipeline as # { only_reachable: `$cfg` } -> (resolveTopDefReachAnchors + filterTopDefResultsByReachAnchors).
 	if len(reachSym) > 0 && reachMode == "post" {
@@ -543,6 +582,7 @@ type dataflowPathReachFilter struct {
 }
 
 func dataFlowFilter(
+	ctx context.Context,
 	vs Values,
 	contextResult *sf.SFFrameResult, config *sf.Config,
 	end sfvm.Values,
@@ -609,6 +649,14 @@ func dataFlowFilter(
 
 	var ret []*Value
 	for _, v := range vs {
+		// Check the dataflow budget on each source so a large source set cannot
+		// hang the scan. When the deadline fires, return partial results.
+		select {
+		case <-ctx.Done():
+			log.Warnf("dataflow timed out (%s), returning partial results: %d/%d sources checked", ctx.Err(), len(ret), len(vs))
+			return ret
+		default:
+		}
 		flag := false
 		for _, path := range enumeratePaths(v) {
 			if checkMatch(path) {

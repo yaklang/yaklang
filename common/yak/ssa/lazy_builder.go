@@ -8,7 +8,7 @@ import (
 	"go.uber.org/atomic"
 )
 
-// lazyTask 将任务逻辑和任务数据分离开
+// lazyTask is the unit of deferred work queued in a LazyBuilder.
 type lazyTask func()
 
 // LazyBuilder 是一个并发安全、内存安全的延迟执行器
@@ -37,7 +37,6 @@ func (l *LazyBuilder) AddLazyBuilder(work func(), async ...bool) {
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-
 	l.tasks = append(l.tasks, lazyTask(work))
 }
 

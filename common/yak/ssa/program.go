@@ -77,6 +77,10 @@ func NewProgram(
 	return prog
 }
 
+// Compile-unit lifecycle (BeginCompileUnit/EndCompileUnit/CurrentCompileUnit),
+// ReleaseCompletedUnitMemory, CheckMemoryPressure and helpers live in
+// program_unit.go.
+
 func NewTmpProgram(ProgramName string) *Program {
 	prog := &Program{
 		Name:                    ProgramName,
@@ -184,6 +188,7 @@ func cloneProgramConfig(base *ssaconfig.Config, programName string) *ssaconfig.C
 	}
 	if base != nil {
 		ret.SetCompileProjectBytes(base.GetCompileProjectBytes())
+		ret.SetCompileUnitSplit(base.GetCompileUnitSplit())
 	}
 	return ret
 }

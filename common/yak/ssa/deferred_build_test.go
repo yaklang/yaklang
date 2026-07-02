@@ -56,6 +56,51 @@ func TestRunDeferredBuildsDrainsTasksRegisteredDuringBuild(t *testing.T) {
 	require.Equal(t, []string{"first", "second"}, ran)
 }
 
+func TestRunDeferredBuildsForUnitsOnlyDrainsMatchingUnit(t *testing.T) {
+	prog := newDeferredBuildTestProgram(t, "deferred-build-unit-drain")
+
+	var ran []string
+	prog.BeginCompileUnit("unit-a")
+	prog.RegisterDeferredBuild(DeferredBuildKindFile, "a", func() {
+		ran = append(ran, "a")
+	})
+	prog.EndCompileUnit()
+
+	prog.BeginCompileUnit("unit-b")
+	prog.RegisterDeferredBuild(DeferredBuildKindFile, "b", func() {
+		ran = append(ran, "b")
+	})
+	prog.EndCompileUnit()
+
+	require.True(t, prog.RunDeferredBuildsForUnits([]string{"unit-a"}, nil))
+	require.Equal(t, []string{"a"}, ran)
+
+	prog.RunDeferredBuilds()
+	require.Equal(t, []string{"a", "b"}, ran)
+}
+
+func TestRunDeferredBuildsForUnitsRestoresUnitDuringTask(t *testing.T) {
+	prog := newDeferredBuildTestProgram(t, "deferred-build-unit-context")
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	var ran []string
+	prog.BeginCompileUnit("unit-a")
+	prog.RegisterDeferredBuild(DeferredBuildKindFile, "a", func() {
+		require.Equal(t, "unit-a", prog.CurrentCompileUnit())
+		builder.Function.AddLazyBuilder(func() {
+			ran = append(ran, "nested")
+		})
+	})
+	prog.EndCompileUnit()
+
+	require.True(t, prog.RunDeferredBuildsForUnits([]string{"unit-a"}, nil))
+	require.Equal(t, "", prog.CurrentCompileUnit())
+	require.Empty(t, ran)
+
+	prog.LazyBuild()
+	require.Equal(t, []string{"nested"}, ran)
+}
+
 func TestFinishAllowsLazyLibraryExpansion(t *testing.T) {
 	prog := newDeferredBuildTestProgram(t, "finish-expansion")
 	editor := prog.CreateEditor([]byte("package main"), "/tmp/project/main.go")

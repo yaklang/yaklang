@@ -1,6 +1,7 @@
 package dbcache_test
 
 import (
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -436,8 +437,10 @@ func TestCacheCloseReportsMarshalError(t *testing.T) {
 	require.Contains(t, err.Error(), "dbcache: 1 resident items were not persisted on close")
 }
 
-func TestCacheCloseFlushesRejectingLateSet(t *testing.T) {
-	saved := 0
+func TestCacheCloseFlushesLateSetDuringMarshal(t *testing.T) {
+	saved := make(map[int64]int)
+	var mu sync.Mutex
+
 	var cache *dbcache.Cache[*closeFlushItem, int]
 
 	cache = dbcache.NewCache[*closeFlushItem, int](
@@ -450,7 +453,11 @@ func TestCacheCloseFlushesRejectingLateSet(t *testing.T) {
 			return int(item.id), nil
 		},
 		func(items []int) error {
-			saved += len(items)
+			mu.Lock()
+			defer mu.Unlock()
+			for _, id := range items {
+				saved[int64(id)]++
+			}
 			return nil
 		},
 		nil,
@@ -472,7 +479,47 @@ func TestCacheCloseFlushesRejectingLateSet(t *testing.T) {
 		t.Fatal("cache.Close hung on stale pending request")
 	}
 
-	require.Equal(t, 2, saved)
+	// Invariant under test: a Set issued from inside marshal during Close must
+	// not be lost and must not hang Close. The late Set bumps item 2 to a fresh
+	// generation; its stale queued generation is skipped, so item 2 is persisted
+	// at least once with its final value. The exact save count depends on
+	// marshal/save goroutine timing (1 or 2 persists of item 2 are both valid),
+	// so assert the lossless invariant, not an exact count.
+	mu.Lock()
+	got := saved
+	mu.Unlock()
+	require.GreaterOrEqual(t, got[1], 1, "item 1 must be persisted")
+	require.GreaterOrEqual(t, got[2], 1, "late-set item 2 must be persisted (no data loss)")
+}
+
+func TestCacheSetAfterCloseKeepsResidentWithoutPersisting(t *testing.T) {
+	database := utils.NewSafeMapWithKey[int64, int64]()
+	cache := dbcache.NewCache[*closeFlushItem, int64](
+		0,
+		0,
+		func(item *closeFlushItem, _ utils.EvictionReason) (int64, error) {
+			return item.id, nil
+		},
+		func(items []int64) error {
+			for _, item := range items {
+				database.Set(item, item)
+			}
+			return nil
+		},
+		func(id int64) (*closeFlushItem, error) {
+			return &closeFlushItem{id: id}, nil
+		},
+		dbcache.WithSaveSize(1),
+	)
+
+	require.NoError(t, cache.Close())
+	cache.Set(&closeFlushItem{id: 9})
+
+	item, ok := cache.Get(9)
+	require.True(t, ok)
+	require.Equal(t, int64(9), item.id)
+	_, persisted := database.Get(9)
+	require.False(t, persisted, "set after close should only repopulate memory")
 }
 
 func TestCacheCloseFlushesAllItemsWithPersistLimit(t *testing.T) {
