@@ -218,7 +218,7 @@ func (r *ReAct) AsyncRecoverPlanAndExecute(ctx context.Context, coordinatorID st
 	startupBarrier := cb.CreateBarrier("startup")
 
 	recoveryTask := newRecoveryPlanExecTask(ctx, r.Emitter, coordinatorID)
-	r.addRuntimeTask(recoveryTask)
+	r.AddRuntimeTask(recoveryTask)
 
 	taskDone := make(chan struct{})
 	go func() {

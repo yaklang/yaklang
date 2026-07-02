@@ -501,3 +501,6 @@ func (r *testRuntime) GetCurrentTask() aicommon.AIStatefulTask {
 func (r *testRuntime) GetCurrentTaskId() string {
 	return ""
 }
+
+func (r *testRuntime) AddRuntimeTask(task aicommon.AIStatefulTask) {
+}

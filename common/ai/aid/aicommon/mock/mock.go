@@ -482,10 +482,10 @@ type mockPlanCoordinatorSession struct {
 	input *aicommon.ExecutePlanInput
 }
 
-func (m *mockPlanCoordinatorSession) CoordinatorID() string { return "mock-coordinator-id" }
-func (m *mockPlanCoordinatorSession) ReviewPlan(ctx context.Context) error { return nil }
+func (m *mockPlanCoordinatorSession) CoordinatorID() string                         { return "mock-coordinator-id" }
+func (m *mockPlanCoordinatorSession) ReviewPlan(ctx context.Context) error          { return nil }
 func (m *mockPlanCoordinatorSession) ApprovedPlanInput() *aicommon.ExecutePlanInput { return m.input }
-func (m *mockPlanCoordinatorSession) Close() {}
+func (m *mockPlanCoordinatorSession) Close()                                        {}
 
 func (m *MockInvoker) AddToTimeline(entry, content string) {
 }
@@ -517,4 +517,7 @@ func (m *MockInvoker) GetCurrentTask() aicommon.AIStatefulTask {
 
 func (m *MockInvoker) GetCurrentTaskId() string {
 	return ""
+}
+
+func (m *MockInvoker) AddRuntimeTask(task aicommon.AIStatefulTask) {
 }
