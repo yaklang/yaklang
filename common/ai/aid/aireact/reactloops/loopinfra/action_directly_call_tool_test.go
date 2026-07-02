@@ -39,7 +39,7 @@ func (t *directlyCallTestInvoker) ExecuteToolRequiredAndCallWithoutRequired(ctx 
 // card semantics as the real implementation.
 func (t *directlyCallTestInvoker) DirectlyCallTool(ctx context.Context, toolName string, action *aicommon.Action, prepare aicommon.DirectlyCallPrepareFunc) (*aitool.ToolResult, bool, error) {
 	if prepare != nil && t.tool != nil {
-		params, fallback, err := prepare(action, t.tool)
+		params, fallback, _, err := prepare(action, toolName)
 		if err != nil {
 			return nil, false, err
 		}
