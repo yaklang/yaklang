@@ -72,8 +72,8 @@ type ReActLoop struct {
 	allowPlanAndExec   func() bool
 	planExecActionType string
 	allowRAG           func() bool
-	allowToolCall     func() bool
-	allowUserInteract func() bool
+	allowToolCall      func() bool
+	allowUserInteract  func() bool
 
 	// allowSkill... are the internal getter for the skills context manager
 	// don't use them directly, use GetSkillsContextManager() instead
@@ -218,6 +218,9 @@ type ReActLoop struct {
 	// 关键词: scenario tool whitelist, focus mode pull back scenario,
 	//        VisibilityScenario, Tool Inventory render-time only
 	scenarioToolWhitelist []string
+
+	toolInvokeGuards         []ToolInvokeGuard
+	toolInvokeParamsMutators []ToolInvokeParamsMutator
 
 	// Perception layer: continuous awareness of what the user is doing,
 	// producing Topics/Keywords/Summary that dynamically adjust the

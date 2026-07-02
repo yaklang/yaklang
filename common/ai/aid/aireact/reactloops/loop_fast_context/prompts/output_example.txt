@@ -1,0 +1,28 @@
+## FastContext 输出示例
+
+## 示例：grep_files_batch（并行多个已知 grep 模式）
+
+```json
+{
+  "@action": "grep_files_batch",
+  "human_readable_thought": "并行 grep 多个 sink 模式",
+  "searches": [
+    {"path": "/abs/project", "pattern": "db\\.Exec", "include-ext": "go"},
+    {"path": "/abs/project", "pattern": "\\.Raw\\(", "include-ext": "go"}
+  ]
+}
+```
+
+提交结构化结果（唯一合法退出）：
+
+```json
+{
+  "@action": "submit_fast_context_result",
+  "human_readable_thought": "已定位核心路由注册逻辑",
+  "summary": "路由定义集中在 router 包的两个文件中。",
+  "locations": [
+    {"path": "/abs/project/router/http.go", "start_line": 40, "end_line": 88, "reason": "HTTP 路由注册"},
+    {"path": "/abs/project/router/middleware.go", "start_line": 12, "end_line": 35, "reason": "鉴权中间件链"}
+  ]
+}
+```

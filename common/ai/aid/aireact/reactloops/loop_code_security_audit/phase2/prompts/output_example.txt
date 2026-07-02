@@ -1,0 +1,220 @@
+## Phase 2 Action 输出示例
+
+以下示例对应当前两阶段工作流：阶段A 搜索收集 → 阶段B 逐文件审计。不要使用 submit_hypothesis / add_evidence 等已废弃 action。
+
+---
+
+## fast_context 示例（阶段A，首选）
+
+```json
+{
+  "@action": "fast_context",
+  "identifier": "sql_sink_parallel_search",
+  "human_readable_thought": "并行搜索本类别全部 SQL Sink 模式",
+  "query": "定位与 SQL 执行相关的 sink 与数据流代码，覆盖 ORM Raw、原生 query、字符串拼接等写法"
+}
+```
+
+收到 feedback 中的候选列表后，**优先** read→lock；也可批量 lock 多个路径，或 `done=true` 自动纳入剩余候选。
+
+---
+
+## add_finding 示例（阶段B，广度优先）
+
+每发现一个**可疑**数据流立即调用；不确定时用 confidence 4–5，Phase3 会验证。
+
+### 高置信度（清晰拼接）
+
+```json
+{
+  "@action": "add_finding",
+  "identifier": "finding_sql_admin_clear",
+  "human_readable_thought": "admin.inc.php SQL 注入，POST logins 无过滤拼接进 mysqli_query",
+  "module": "用户数据清理",
+  "file": "includes/admin.inc.php",
+  "line": 557,
+  "severity": "HIGH",
+  "title": "用户数据清理功能 SQL 注入",
+  "description": "clear_userdata 将 $_POST['logins'] 未经处理直接拼接进 mysqli_query。",
+  "data_flow": "POST body.logins → admin.inc.php:554 $_POST['logins'] → admin.inc.php:557 mysqli_query(..., 'WHERE logins <= '.$logins)",
+  "exploit_scenario": "POST logins=' OR 1=1-- 可绕过条件删除用户数据。",
+  "recommendation": "改用参数化查询：prepare + bind_param。",
+  "confidence": 8
+}
+```
+
+### 待 Phase3 复核（有过滤但可疑）
+
+```json
+{
+  "@action": "add_finding",
+  "identifier": "finding_exec_medium_blacklist",
+  "human_readable_thought": "medium.php 黑名单过滤可能可绕过，先提交待验证",
+  "module": "Command Execution (Medium)",
+  "file": "vulnerabilities/exec/source/medium.php",
+  "line": 12,
+  "severity": "MEDIUM",
+  "title": "命令注入（黑名单过滤可疑）",
+  "description": "str_replace 仅过滤部分字符，ip 参数进入 shell_exec 拼接。",
+  "data_flow": "POST ip → medium.php $_REQUEST['ip'] → shell_exec 拼接",
+  "exploit_scenario": "尝试 | 或 & 等未过滤分隔符（待 Phase3 确认）。",
+  "recommendation": "使用 escapeshellarg 或参数数组形式调用。",
+  "confidence": 5
+}
+```
+
+---
+
+## grep 示例（阶段A，手动扩搜）
+
+直接调用 `grep` action（**不要**使用 require_tool / directly_call_tool）：
+
+```json
+{
+  "@action": "grep",
+  "identifier": "grep_mysqli_query",
+  "human_readable_thought": "files_with_matches 搜索 mysqli_query",
+  "pattern": "mysqli_query",
+  "path": "/abs/project",
+  "output-mode": "files_with_matches"
+}
+```
+
+务必包含：`output-mode=files_with_matches`、`path=<项目根绝对路径>`。
+
+---
+
+## read_file 示例（阶段A 抽查候选）
+
+```json
+{
+  "@action": "read_file",
+  "identifier": "spot_check_admin_inc",
+  "human_readable_thought": "抽查 fast_context 候选是否含真实 SQL sink",
+  "file": "/abs/project/includes/admin.inc.php",
+  "offset": 1,
+  "lines": 80,
+  "mode": "lines"
+}
+```
+
+**阶段A 必须**带 `offset` + `lines`（≤80）。阶段A 禁止 `lines=0` / `mode=auto` 全文件读取（运行时会自动截断为 80 行）。
+
+---
+
+## lock_target_files 示例（阶段A）
+
+### 纳入筛选结果，继续扩搜
+
+```json
+{
+  "@action": "lock_target_files",
+  "identifier": "lock_sql_candidates_round1",
+  "human_readable_thought": "read 确认 3 个文件含 SQL sink，纳入目标",
+  "target_files": [
+    "/abs/project/includes/admin.inc.php",
+    "/abs/project/api/user.php",
+    "/abs/project/models/order.go"
+  ],
+  "done": false,
+  "reason": "fast_context 候选经 read 确认，首轮纳入 3 个文件"
+}
+```
+
+### 搜索完成，进入阶段B
+
+```json
+{
+  "@action": "lock_target_files",
+  "identifier": "commit_audit_phase",
+  "human_readable_thought": "目标收集完毕，进入逐文件审计",
+  "target_files": [],
+  "done": true,
+  "reason": "共累积 15 个目标文件，开始阶段B"
+}
+```
+
+`done=true` 时 `target_files` 可为空数组；若仍有未 lock 的 fast_context 候选，系统会**自动纳入**后进阶段B。
+
+---
+
+## mark_file_done 示例（阶段B）
+
+```json
+{
+  "@action": "mark_file_done",
+  "identifier": "done_admin_inc",
+  "human_readable_thought": "admin.inc.php 审计完成，已 add_finding",
+  "file_path": "/abs/project/includes/admin.inc.php",
+  "disposition": "finding",
+  "audit_summary": "发现 1 处 SQL 注入（已 add_finding）"
+}
+```
+
+无漏洞时：
+
+```json
+{
+  "@action": "mark_file_done",
+  "identifier": "done_impossible",
+  "human_readable_thought": "impossible.php 本类别无漏洞",
+  "file_path": "/abs/project/vulnerabilities/exec/source/impossible.php",
+  "disposition": "not_vul",
+  "audit_summary": "已采用白名单校验，本类别无命令注入"
+}
+```
+
+`file_path` 使用**绝对路径**（与 read_file 一致）。
+
+---
+
+## complete_scan 示例（阶段B 结束，必须调用）
+
+```json
+{
+  "@action": "complete_scan",
+  "identifier": "category_scan_complete",
+  "human_readable_thought": "本类别全部目标文件已 mark_file_done，结束扫描",
+  "coverage_summary": "阶段A：fast_context + grep 共纳入 15 个文件。阶段B：逐文件审计 15 个，发现 1 个 SQL 注入（admin.inc.php:557），其余文件无本类别漏洞。"
+}
+```
+
+---
+
+## 典型完整工作流
+
+```
+阶段A（广度优先，可循环）:
+  1. fast_context(query=...)  →  候选路径
+  2. （可选）read_file 抽查高优先级候选
+  3. lock_target_files(target_files=[...多个路径...], done=false) 批量纳入
+  4. grep / 再次 fast_context 扩搜
+  5. lock_target_files(target_files=[], done=true)  → 自动纳入剩余候选，进入阶段B
+
+阶段B:
+  7. read_file(file=/abs/project/第一个待审文件)
+  8. grep(content 模式溯源)  ← 可选
+  9. add_finding(confidence≥4)  ← 可疑即提交
+ 10. mark_file_done(disposition=finding|not_vul)   ← 必填 disposition
+ 11. 对 RemainingFilesList 重复 7–10
+ 12. complete_scan（代码校验每个 lock 文件均已归属）
+```
+
+## 反模式（勿用）
+
+```json
+// 错误：在阶段B 用 files_with_matches 扩库（discovery 模式，运行时会拒绝）
+{"@action":"grep","pattern":"mysqli_query","path":"/abs/project","output-mode":"files_with_matches"}
+
+// 错误：使用 require_tool / directly_call_tool（本 loop 已禁用通用工具通道）
+{"@action":"require_tool","tool_require_payload":"grep"}
+
+// 错误：用 cybersecurity-risk 代替 add_finding（不会进入扫描流水线）
+{"@action":"cybersecurity-risk", ...}
+
+// 错误：用 next_movements 假装完成，却不调用 mark_file_done
+{"@action":"read_file","file":"/abs/project/foo.go","next_movements":[{"id":"audit_foo","op":"done"}]}
+
+// 正确：读完后显式 mark；漏洞用 add_finding
+{"@action":"mark_file_done","file_path":"/abs/project/foo.go","audit_summary":"无本类别漏洞"}
+```

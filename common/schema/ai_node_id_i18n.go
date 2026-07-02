@@ -241,6 +241,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "删除文件内容",
 		En: "Delete File Content",
 	},
+	"code-audit-recon": {
+		Zh: "项目探索",
+		En: "Project Recon",
+	},
 	"code-audit-scan": {
 		Zh: "代码审计扫描",
 		En: "Code Audit Scan",

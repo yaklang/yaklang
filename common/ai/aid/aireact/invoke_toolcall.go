@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/log"
@@ -106,6 +107,19 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 		toolCallerOptions = append(toolCallerOptions, aicommon.WithToolCaller_Task(r.config.DefaultTask))
 	}
 
+	if currentLoop := r.GetCurrentLoop(); currentLoop != nil {
+		if allow, guardMsg := reactloops.CheckToolInvokeGuard(currentLoop, toolName, nil); !allow {
+			return nil, false, utils.Error(guardMsg)
+		}
+		if !skipRequire {
+			toolCallerOptions = append(toolCallerOptions,
+				aicommon.WithToolCaller_ParamAugment(func(invokeParams aitool.InvokeParams) aitool.InvokeParams {
+					return reactloops.ApplyToolInvokeParamsMutators(currentLoop, toolName, invokeParams)
+				}),
+			)
+		}
+	}
+
 	// Add callback handlers
 	toolCallerOptions = append(toolCallerOptions,
 		aicommon.WithToolCaller_OnStart(func(callToolId string) {
@@ -154,6 +168,12 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 	var result *aitool.ToolResult
 	var directlyAnswer bool
 	if skipRequire {
+		if currentLoop := r.GetCurrentLoop(); currentLoop != nil {
+			if allow, guardMsg := reactloops.CheckToolInvokeGuard(currentLoop, toolName, params); !allow {
+				return nil, false, utils.Error(guardMsg)
+			}
+			params = reactloops.ApplyToolInvokeParamsMutators(currentLoop, toolName, params)
+		}
 		// Call with preset parameters, skipping the require phase
 		result, directlyAnswer, err = toolCaller.CallToolWithExistedParams(tool, true, params)
 	} else {
