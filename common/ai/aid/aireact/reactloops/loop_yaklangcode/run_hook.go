@@ -60,15 +60,6 @@ func buildYaklangPostSyntaxCleanRunHook(r aicommon.AIInvokeRuntime) loopinfra.Po
 			return "", false
 		}
 
-		attempts := loop.GetInt(loopVarYakRunAttempts) + 1
-		loop.Set(loopVarYakRunAttempts, fmt.Sprint(attempts))
-		maxRetries := yakRunSelfTestMaxRetries(cfg)
-		if attempts > maxRetries {
-			log.Warnf("yaklang self-test exceeded max retries (%d), allowing loop exit", maxRetries)
-			loop.Set(loopVarYakRunOK, "false")
-			return "", false
-		}
-
 		absPath := resolveYakRunAbsPath(loop.Get("editor_file_path"), loop.Get("filename"))
 		timeoutSec := yakRunSelfTestTimeoutSec(cfg)
 		emitYaklangRunStart(loop, absPath, policy)
@@ -79,10 +70,10 @@ func buildYaklangPostSyntaxCleanRunHook(r aicommon.AIInvokeRuntime) loopinfra.Po
 			loop.Set(loopVarYakRunOK, "true")
 			loop.Set(loopVarYakRunOutput, result.Output)
 			loop.Set(loopVarYakRunLastFeedback, "")
-			loop.Set(loopVarYakRunAttempts, "0")
 			msg := fmt.Sprintf("YAK_MAIN self-test passed (%d bytes log)", len(result.Output))
 			r.AddToTimeline("run_passed", msg)
 			log.Infof("yaklang self-test passed: path=%s log_bytes=%d", absPath, len(result.Output))
+			reactloops.EmitStatus(loop, "运行自测通过 / Self-test passed")
 			return "", false
 		}
 
@@ -91,7 +82,7 @@ func buildYaklangPostSyntaxCleanRunHook(r aicommon.AIInvokeRuntime) loopinfra.Po
 		loop.Set(loopVarYakRunOutput, result.Output)
 		loop.Set(loopVarYakRunLastFeedback, feedback)
 		r.AddToTimeline("run_failed", utils.ShrinkTextBlock(feedback, 512))
-		log.Warnf("yaklang self-test failed (attempt %d/%d): %v", attempts, maxRetries, err)
+		log.Warnf("yaklang self-test failed: %v", err)
 		return feedback, true
 	}
 }
@@ -109,7 +100,7 @@ func emitYaklangRunStart(loop *reactloops.ReActLoop, absPath string, policy YakS
 		absPath, kind, absPath, kind,
 	)
 	reactloops.EmitActionLog(loop, yaklangNodeRunSelfTest, startLine)
-	reactloops.EmitStatus(loop, "运行代码中 / Running code...")
+	reactloops.EmitStatus(loop, "运行自测中 / Running self-test...")
 }
 
 func emitYaklangRunFinish(loop *reactloops.ReActLoop, absPath string, result YakRunResult, runErr error) {
@@ -141,7 +132,7 @@ func emitYaklangRunFinish(loop *reactloops.ReActLoop, absPath string, result Yak
 	if runErr == nil {
 		reactloops.EmitStatus(loop, "YAK_MAIN 自测通过 / Self-test passed")
 	} else {
-		reactloops.EmitStatus(loop, "YAK_MAIN 自测失败，修复中 / Self-test failed, fixing...")
+		reactloops.EmitStatus(loop, "运行自测失败，修复中 / Self-test failed, fixing...")
 	}
 }
 

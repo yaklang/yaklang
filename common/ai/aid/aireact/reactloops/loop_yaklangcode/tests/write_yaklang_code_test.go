@@ -29,10 +29,30 @@ type yaklangDeferredEditorSyncWaitResult struct {
 	codeChangeEvents []*ypb.AIOutputEvent
 	filenames        []string
 	taskFailed       bool
+	taskCompleted    bool
 }
 
-// waitForYaklangDeferredEditorSync collects output until the loop finishes and emits
-// the single deferred yaklang_code_change (or the task reaches a terminal status).
+func isYaklangReactTaskTerminalStatus(content string) (failed, completed bool) {
+	status := strings.ToLower(strings.TrimSpace(utils.InterfaceToString(jsonpath.FindFirst(content, "$..react_task_now_status"))))
+	switch status {
+	case "aborted", "failed":
+		return true, false
+	case "completed", "skipped":
+		return false, true
+	}
+	if strings.Contains(content, "Aborted") || strings.Contains(content, "Failed") {
+		return true, false
+	}
+	if strings.Contains(content, `"react_task_now_status":"completed"`) ||
+		strings.Contains(content, `"react_task_now_status": "completed"`) {
+		return false, true
+	}
+	return false, false
+}
+
+// waitForYaklangDeferredEditorSync collects output until the focus-mode task finishes.
+// Terminal signal: react task status (completed/failed). code_change events are collected
+// for assertions but must not end the wait — replace-mode live edits would race modify.
 func waitForYaklangDeferredEditorSync(out <-chan *ypb.AIOutputEvent, timeout time.Duration) yaklangDeferredEditorSyncWaitResult {
 	deadline := time.After(timeout)
 	var result yaklangDeferredEditorSyncWaitResult
@@ -52,22 +72,82 @@ func waitForYaklangDeferredEditorSync(out <-chan *ypb.AIOutputEvent, timeout tim
 			}
 			if e.GetNodeId() == "react_task_status_changed" {
 				content := string(e.GetContent())
-				if strings.Contains(content, "Aborted") || strings.Contains(content, "Failed") {
+				if failed, completed := isYaklangReactTaskTerminalStatus(content); failed {
 					result.taskFailed = true
 					return result
-				}
-				if strings.Contains(content, `"react_task_now_status":"completed"`) ||
-					strings.Contains(content, `"react_task_now_status": "completed"`) {
+				} else if completed {
+					result.taskCompleted = true
 					return result
 				}
-			}
-			if len(result.codeChangeEvents) > 0 {
-				return result
 			}
 		case <-deadline:
 			return result
 		}
 	}
+}
+
+func mockYaklangFinalizeDirectlyAnswer(t *testing.T, i aicommon.AICallerConfigIf, prompt string) (*aicommon.AIResponse, bool) {
+	if !strings.Contains(prompt, "AI_CACHE_SYSTEM") {
+		return nil, false
+	}
+	if !(strings.Contains(prompt, "Yaklang") || strings.Contains(prompt, "代码生成") || strings.Contains(prompt, "write_yaklang_code")) {
+		return nil, false
+	}
+	nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
+	rsp := i.NewAIResponse()
+	rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "directly_answer"}
+
+<|FINAL_ANSWER_{{ .nonce }}|>
+代码生成完成。
+<|FINAL_ANSWER_END_{{ .nonce }}|>`, map[string]any{
+		"nonce": nonceStr,
+	})))
+	rsp.Close()
+	return rsp, true
+}
+
+func mockYaklangModifyCodeResponse(t *testing.T, i aicommon.AICallerConfigIf, prompt string, stat *mockStats_forWriteAndModify, modifyBody string) (*aicommon.AIResponse, bool) {
+	if stat == nil || !stat.writeDone || stat.modifyDone {
+		return nil, false
+	}
+	if !utils.MatchAllOfSubString(prompt, `"modify_code"`, `"require_tool"`, `"@action"`) {
+		return nil, false
+	}
+	nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
+	rsp := i.NewAIResponse()
+	rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "modify_code", "modify_start_line": 2, "modify_end_line": 2, "modify_code_reason": "replace line b"}
+
+<|GEN_CODE_{{ .nonce }}|>
+{{ .body }}
+<|GEN_CODE_END_{{ .nonce }}|>`, map[string]any{
+		"nonce": nonceStr,
+		"body":  modifyBody,
+	})))
+	stat.modifyDone = true
+	rsp.Close()
+	return rsp, true
+}
+
+func mockYaklangWriteCodeResponse(t *testing.T, i aicommon.AICallerConfigIf, prompt string, stat *mockStats_forWriteAndModify, writeBody string) (*aicommon.AIResponse, bool) {
+	if stat == nil || stat.writeDone {
+		return nil, false
+	}
+	if !utils.MatchAllOfSubString(prompt, `"grep_yaklang_samples"`, `"require_tool"`, `"write_code"`, `"@action"`) {
+		return nil, false
+	}
+	nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
+	rsp := i.NewAIResponse()
+	rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "write_code"}
+
+<|GEN_CODE_{{ .nonce }}|>
+{{ .body }}
+<|GEN_CODE_END_{{ .nonce }}|>`, map[string]any{
+		"nonce": nonceStr,
+		"body":  writeBody,
+	})))
+	stat.writeDone = true
+	rsp.Close()
+	return rsp, true
 }
 
 func findGenCodeFilename(filenames []string) string {
@@ -154,6 +234,10 @@ func mockedYaklangWriting(t *testing.T, i aicommon.AICallerConfigIf, req *aicomm
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "check-filepath", "create_new_file": true}`))
 		rsp.Close()
+		return rsp, nil
+	}
+
+	if rsp, ok := mockYaklangFinalizeDirectlyAnswer(t, i, prompt); ok {
 		return rsp, nil
 	}
 
@@ -266,32 +350,10 @@ func mockedYaklangWritingAndModify(t *testing.T, i aicommon.AICallerConfigIf, re
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, `"grep_yaklang_samples"`, `"require_tool"`, `"write_code"`, `"@action"`) {
-		nonceStr := aicommon.MustExtractDynamicSectionNonce(t, prompt)
-		rsp := i.NewAIResponse()
-		if !stat.writeDone {
-			rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "write_code"}
-
-<|GEN_CODE_{{ .nonce }}|>
-// line a
-for for for
-// line c
-<|GEN_CODE_END_{{ .nonce }}|>`, map[string]any{
-				"nonce": nonceStr,
-			})))
-			stat.writeDone = true
-		} else {
-			rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "modify_code", "modify_start_line": 2, "modify_end_line": 2, "modify_code_reason": "replace line b"}
-
-<|GEN_CODE_{{ .nonce }}|>
-// modifiedcodecodecode
-<|GEN_CODE_END_{{ .nonce }}|>`, map[string]any{
-				"nonce": nonceStr,
-			})))
-			stat.modifyDone = true
-		}
-
-		rsp.Close()
+	if rsp, ok := mockYaklangModifyCodeResponse(t, i, prompt, stat, "// modifiedcodecodecode"); ok {
+		return rsp, nil
+	}
+	if rsp, ok := mockYaklangWriteCodeResponse(t, i, prompt, stat, "// line a\nfor for for\n// line c"); ok {
 		return rsp, nil
 	}
 
@@ -299,6 +361,10 @@ for for for
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "check-filepath", "create_new_file": true}`))
 		rsp.Close()
+		return rsp, nil
+	}
+
+	if rsp, ok := mockYaklangFinalizeDirectlyAnswer(t, i, prompt); ok {
 		return rsp, nil
 	}
 

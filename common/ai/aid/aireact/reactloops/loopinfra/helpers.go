@@ -17,6 +17,7 @@ const (
 	loopInfraNodeSingleFileModify    = "infra-file-modify"
 	loopInfraNodeSingleFileInsert    = "infra-file-insert"
 	loopInfraNodeSingleFileDelete    = "infra-file-delete"
+	loopInfraNodeCodeVerify          = "infra-code-verify"
 	loopInfraNodeQueryMCPServers     = "query_mcp_servers"
 	loopInfraNodeQueryMCPTools       = "query_mcp_tools"
 	loopInfraNodeDispatchSubReact    = "dispatch_sub_react_agents"

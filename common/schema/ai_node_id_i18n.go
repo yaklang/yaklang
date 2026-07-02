@@ -245,6 +245,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "删除文件内容",
 		En: "Delete File Content",
 	},
+	"infra-code-verify": {
+		Zh: "验证代码",
+		En: "Verify Code",
+	},
 	"code-audit-scan": {
 		Zh: "代码审计扫描",
 		En: "Code Audit Scan",
@@ -410,8 +414,8 @@ var nodeIdMapper = map[string]*I18n{
 		En: "Init Sample Search",
 	},
 	"yaklang-run-self-test": {
-		Zh: "运行代码",
-		En: "Run Code",
+		Zh: "运行自测",
+		En: "Run Self-Test",
 	},
 	"batch-compress": {
 		Zh: "记忆压缩",

@@ -194,7 +194,7 @@ func TestApplySyntaxLintResult_PostSyntaxCleanHookBlocksExit(t *testing.T) {
 	task := newTestTaskForSingleFile(context.Background())
 
 	op := reactloops.NewActionHandlerOperator(task)
-	f.applySyntaxLintResult(loop, op, false, true)
+	postHookBlocked := f.applySyntaxLintResult(loop, op, false, true)
 
 	require.True(op.IsContinued())
 	terminated, termErr := op.IsTerminated()
@@ -203,6 +203,7 @@ func TestApplySyntaxLintResult_PostSyntaxCleanHookBlocksExit(t *testing.T) {
 	require.True(op.GetDisallowLoopExit())
 	require.Contains(op.GetFeedback().String(), "runtime failed")
 	require.Equal("true", loop.Get("yak_lint_ok"))
+	require.True(postHookBlocked)
 }
 
 func TestApplySyntaxLintResult_PostSyntaxCleanHookAllowsExit(t *testing.T) {
@@ -219,11 +220,11 @@ func TestApplySyntaxLintResult_PostSyntaxCleanHookAllowsExit(t *testing.T) {
 	task := newTestTaskForSingleFile(context.Background())
 
 	op := reactloops.NewActionHandlerOperator(task)
-	f.applySyntaxLintResult(loop, op, false, true)
+	postHookBlocked := f.applySyntaxLintResult(loop, op, false, true)
 
 	require.False(op.IsContinued())
 	terminated, termErr := op.IsTerminated()
 	require.True(terminated)
 	require.NoError(termErr)
+	require.False(postHookBlocked)
 }
-

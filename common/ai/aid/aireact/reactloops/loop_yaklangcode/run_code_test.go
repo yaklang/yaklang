@@ -10,12 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestShouldAutoRunYakSelfTest(t *testing.T) {
-	assert.False(t, ShouldAutoRunYakSelfTest("yakit.AutoInitYakit()\ncli.check()"))
-	assert.True(t, ShouldAutoRunYakSelfTest("if YAK_MAIN { runSelfTest() }"))
-	assert.True(t, ShouldAutoRunYakSelfTest("YAK_MAIN && runSelfTest()"))
-}
-
 func TestRunYakSelfTest_Success(t *testing.T) {
 	code := `
 func runSelfTest() {
