@@ -284,9 +284,26 @@ func ScanAuto(items any, opt ...interface{}) {
 
 func _scanStream(ch chan any, opt ...interface{}) {
 	config, _, _ := toConfig(opt...)
+	scanCtx := config.Ctx
+	if scanCtx == nil {
+		scanCtx = context.Background()
+	}
 
 	var tplCount uint64
 	swg := utils.NewSizedWaitGroup(config.ConcurrentTarget)
+	addScanTask := func(fn func()) bool {
+		if scanCtx.Err() != nil {
+			return false
+		}
+		if err := swg.AddWithContext(scanCtx); err != nil {
+			return false
+		}
+		go func() {
+			defer swg.Done()
+			fn()
+		}()
+		return true
+	}
 	handleData := func(data any) {
 		defer func() {
 			if err := recover(); err != nil {
@@ -299,25 +316,17 @@ func _scanStream(ch chan any, opt ...interface{}) {
 		for _, methodPrefix := range []string{"GET", "POST", "HEAD", "OPTIONS", "PUT", "DELETE", "TRACE", "CONNECT"} {
 			methodPrefix := methodPrefix
 			if strings.HasPrefix(rawStr, methodPrefix+" ") {
-				swg.Add()
-				go func() {
-					defer func() {
-						swg.Done()
-					}()
+				addScanTask(func() {
 					atomic.AddUint64(&tplCount, ScanPacket([]byte(rawStr), opt...))
-				}()
+				})
 				return
 			}
 		}
 
 		if strings.HasPrefix(rawStr, "http://") || strings.HasPrefix(rawStr, "https://") {
-			swg.Add()
-			go func() {
-				defer func() {
-					swg.Done()
-				}()
+			addScanTask(func() {
 				atomic.AddUint64(&tplCount, ScanUrl(rawStr, opt...))
-			}()
+			})
 			return
 		}
 
@@ -327,18 +336,17 @@ func _scanStream(ch chan any, opt ...interface{}) {
 				continue
 			}
 			u := u
-			swg.Add()
-			go func() {
-				defer func() {
-					swg.Done()
-				}()
+			addScanTask(func() {
 				atomic.AddUint64(&tplCount, ScanUrl(u, opt...))
-			}()
+			})
 		}
 	}
 
 	count := 0
 	for data := range ch {
+		if scanCtx.Err() != nil {
+			break
+		}
 		count++
 		handleData(data)
 	}

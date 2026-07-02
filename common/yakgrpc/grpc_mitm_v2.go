@@ -385,6 +385,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		return utils.Errorf("create mitm plugin manager failed: %s", err)
 	}
 	mitmPluginCaller.SetFeedback(execFeedback)
+	mitmPluginCaller.SetCtx(streamCtx)
 	mitmPluginCaller.SetDividedContext(true)
 	mitmPluginCaller.SetConcurrent(int(pluginConcurrency))
 	mitmPluginCaller.SetLoadPluginTimeout(consts.GetGlobalCallerLoadPluginTimeout())
@@ -393,6 +394,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	mitmPluginCallerGlobal = mitmPluginCaller
 	mitmPluginCallerNotifyChan = make(chan struct{})
 	defer func() {
+		mitmPluginCaller.Cancel()
 		close(mitmPluginCallerNotifyChan)
 		mitmPluginCallerGlobal = nil
 	}()
@@ -412,6 +414,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			return nil, err
 		}
 		caller.SetFeedback(execFeedback)
+		caller.SetCtx(streamCtx)
 		caller.SetDividedContext(true)
 		caller.SetConcurrent(int(pluginConcurrency))
 		caller.SetLoadPluginTimeout(consts.GetGlobalCallerLoadPluginTimeout())

@@ -318,12 +318,47 @@ type YakToCallerManager struct {
 	ContextCancelFuncs *sync.Map
 	Err                error
 
+	// 管理器级 context，用于在调用方停止时取消插件执行
+	rootCtx context.Context
+
+	// 当前 Call 的 runtime context，供 Handler 与插件加载 context 合并
+	activeCallCtxMu sync.Mutex
+	activeCallCtx   context.Context
+
 	// 插件执行跟踪器
 	executionTracker *PluginExecutionTracker
 	enableTracing    bool
 
 	// 插件长时间运行阈值（秒），用于 trace 推送判断
 	longRunningThreshold int
+}
+
+// mergeCancelContexts 合并多个 context，任一 parent 取消时 merged 也会取消。
+func mergeCancelContexts(ctxs ...context.Context) (context.Context, context.CancelFunc) {
+	filtered := make([]context.Context, 0, len(ctxs))
+	for _, c := range ctxs {
+		if c != nil {
+			filtered = append(filtered, c)
+		}
+	}
+	switch len(filtered) {
+	case 0:
+		return context.Background(), func() {}
+	case 1:
+		return filtered[0], func() {}
+	}
+	merged, cancel := context.WithCancel(filtered[0])
+	for _, c := range filtered[1:] {
+		c := c
+		go func() {
+			select {
+			case <-c.Done():
+				cancel()
+			case <-merged.Done():
+			}
+		}()
+	}
+	return merged, cancel
 }
 
 // NewYakToCallerManager 创建一个插件回调管理器（导出名为 hook.NewManager）
@@ -366,6 +401,60 @@ func (y *YakToCallerManager) SetCallPluginTimeout(i float64) {
 
 func (y *YakToCallerManager) SetDividedContext(b bool) {
 	y.dividedContext = b
+}
+
+// SetContext 设置管理器级 context，Call 默认会使用它；取消该 context 可停止后续插件调用。
+func (y *YakToCallerManager) SetContext(ctx context.Context) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	y.rootCtx = ctx
+}
+
+// Context 返回管理器级 context。
+func (y *YakToCallerManager) Context() context.Context {
+	if y.rootCtx != nil {
+		return y.rootCtx
+	}
+	return context.Background()
+}
+
+func (y *YakToCallerManager) setActiveCallCtx(ctx context.Context) {
+	y.activeCallCtxMu.Lock()
+	defer y.activeCallCtxMu.Unlock()
+	y.activeCallCtx = ctx
+}
+
+func (y *YakToCallerManager) clearActiveCallCtx() {
+	y.setActiveCallCtx(nil)
+}
+
+func (y *YakToCallerManager) getActiveCallCtx() context.Context {
+	y.activeCallCtxMu.Lock()
+	defer y.activeCallCtxMu.Unlock()
+	return y.activeCallCtx
+}
+
+func (y *YakToCallerManager) getExecutionContext(pluginCtx context.Context) (context.Context, context.CancelFunc) {
+	return mergeCancelContexts(y.Context(), y.getActiveCallCtx(), pluginCtx)
+}
+
+// CancelAllPlugins 取消所有已加载插件的 divided context，并取消正在跟踪的执行。
+func (y *YakToCallerManager) CancelAllPlugins() {
+	if y == nil {
+		return
+	}
+	if y.ContextCancelFuncs != nil {
+		y.ContextCancelFuncs.Range(func(_, value interface{}) bool {
+			if cancelFunc, ok := value.(context.CancelFunc); ok {
+				cancelFunc()
+			}
+			return true
+		})
+	}
+	if y.enableTracing && y.executionTracker != nil {
+		y.CancelAllExecutionTraces()
+	}
 }
 
 // SetLongRunningThreshold 设置插件长时间运行阈值（秒）
@@ -883,11 +972,11 @@ func (y *YakToCallerManager) CallPluginKeyByNameSyncWithCallback(pluginId string
 }
 
 func (y *YakToCallerManager) SyncCallPluginKeyByNameEx(pluginId string, name string, callback func(), itemsFuncs ...func() interface{}) {
-	y.CallPluginKeyByNameExWithAsync(context.Background(), true, pluginId, name, callback, itemsFuncs...)
+	y.CallPluginKeyByNameExWithAsync(y.Context(), true, pluginId, name, callback, itemsFuncs...)
 }
 
 func (y *YakToCallerManager) CallPluginKeyByNameEx(pluginId string, name string, callback func(), itemsFuncs ...func() interface{}) {
-	y.CallPluginKeyByNameExWithAsync(context.Background(), false, pluginId, name, callback, itemsFuncs...)
+	y.CallPluginKeyByNameExWithAsync(y.Context(), false, pluginId, name, callback, itemsFuncs...)
 }
 
 func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(runtimeCtx context.Context, forceSync bool, pluginId string, name string, callback func(), itemsFuncs ...func() interface{}) {
@@ -914,6 +1003,9 @@ func (y *YakToCallerManager) Call(name string, opts ...CallOpt) (results []any) 
 		items      = config.items
 		itemsFuncs = config.itemFuncs
 	)
+	if runtimeCtx == nil {
+		runtimeCtx = y.Context()
+	}
 	if len(itemsFuncs) == 0 && len(items) > 0 {
 		itemsFuncs = lo.Map(items, func(i any, _ int) func() any {
 			return func() any {
@@ -976,17 +1068,22 @@ func (y *YakToCallerManager) Call(name string, opts ...CallOpt) (results []any) 
 				items = append(items, i())
 			}
 
+			currentCallCtx := runtimeCtx
+
 			// 如果启用了执行跟踪，为每次调用创建新的跟踪记录
 			var trace *PluginExecutionTrace
 			if y.enableTracing {
 				// 为每次调用创建新的跟踪记录
-				trace = y.executionTracker.CreateTrace(i.Id, name, runtimeCtx)
+				trace = y.executionTracker.CreateTrace(i.Id, name, currentCallCtx)
 				// 开始执行
 				y.executionTracker.StartExecution(trace.TraceID, items)
 				// 使用跟踪的上下文替换原始上下文
-				runtimeCtx = trace.RuntimeCtx
+				currentCallCtx = trace.RuntimeCtx
 				log.Debugf("创建新的插件执行跟踪: 插件[%s], Hook[%s], TraceID[%s]", i.Id, name, trace.TraceID)
 			}
+
+			y.setActiveCallCtx(currentCallCtx)
+			defer y.clearActiveCallCtx()
 
 			log.Debugf("call %v.%v(params...)", i.Id, name)
 
@@ -1022,8 +1119,8 @@ func (y *YakToCallerManager) Call(name string, opts ...CallOpt) (results []any) 
 
 				// 检查是否被取消
 				select {
-				case <-runtimeCtx.Done():
-					execErr = runtimeCtx.Err()
+				case <-currentCallCtx.Done():
+					execErr = currentCallCtx.Err()
 					if trace != nil {
 						y.executionTracker.UpdateTraceStatus(trace.TraceID, PluginStatusCancelled, nil, execErr)
 					}
@@ -1263,27 +1360,28 @@ func (y *YakToCallerManager) fetchFunctionFromSourceCode(pluginContext *YakitPlu
 		nIns := ins
 		fTable[funcName] = &YakFunctionCaller{
 			Handler: func(callback func(*yakvm.Frame), args ...any) any {
-				subCtx, cancel := context.WithTimeout(pluginContext.Ctx, y.callTimeout)
+				execCtx, execCancel := y.getExecutionContext(pluginContext.Ctx)
+				defer execCancel()
+				subCtx, cancel := context.WithTimeout(execCtx, y.callTimeout)
 				defer cancel()
 				if callArgHook, ok := callArgumentHooks[funcName]; ok {
 					args = callArgHook(funcName, numIn, args)
 				}
 
-				errCh := make(chan error)
-				valueCh := make(chan any)
+				errCh := make(chan error, 1)
+				valueCh := make(chan any, 1)
+				done := make(chan struct{})
 				go func() {
+					defer close(done)
 					defer func() {
 						if err := recover(); err != nil {
 							fmtErr := utils.Errorf("call hook function `%v` of `%v` plugin failed: %s", funcName, scriptName, err)
 							y.Err = fmtErr
-							//log.Error(fmtErr)
-							//fmt.Println()
 							errCh <- fmtErr
 							if os.Getenv("YAK_IN_TERMINAL_MODE") == "" {
 								utils.PrintCurrentGoroutineRuntimeStack()
 							}
 						}
-						close(errCh)
 					}()
 					value, err := nIns.CallYakFunctionNativeWithFrameCallback(subCtx, callback, f, args...)
 					if err != nil {
@@ -1297,13 +1395,10 @@ func (y *YakToCallerManager) fetchFunctionFromSourceCode(pluginContext *YakitPlu
 				case value := <-valueCh:
 					return value
 				case err := <-errCh:
-					//if err != nil && !errors.Is(err, context.Canceled) {
-					//	log.Errorf("call YakFunction (DividedCTX) error: \n%v", err)
-					//}
-					// 重要：抛出错误而不是返回nil，这样Call方法就能捕获到错误
 					panic(err)
 				case <-subCtx.Done():
 					err := subCtx.Err()
+					<-done
 					if errors.Is(err, context.DeadlineExceeded) {
 						log.Errorf("call %s YakFunction timeout after %v seconds", scriptName, y.callTimeout)
 					} else if errors.Is(err, context.Canceled) {
@@ -1311,7 +1406,6 @@ func (y *YakToCallerManager) fetchFunctionFromSourceCode(pluginContext *YakitPlu
 					} else {
 						log.Errorf("call %s YakFunction done by unknown error: %v", scriptName, err)
 					}
-					// 重要：抛出超时或取消错误
 					panic(err)
 				}
 				return nil

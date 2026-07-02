@@ -195,6 +195,8 @@ var (
 
 type MixPluginCaller struct {
 	ctx context.Context // 整个 mix plugin caller 的上下文
+	ctxCancel context.CancelFunc
+	ownedCancel bool
 
 	websiteFilter       filter.Filterable
 	websitePathFilter   filter.Filterable
@@ -225,7 +227,40 @@ func (m *MixPluginCaller) SetCache(b bool) {
 }
 
 func (m *MixPluginCaller) SetCtx(ctx context.Context) {
+	if m == nil {
+		return
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if m.ownedCancel {
+		m.ownedCancel = false
+		m.ctxCancel = nil
+	}
 	m.ctx = ctx
+	if m.callers != nil {
+		m.callers.SetContext(ctx)
+	}
+}
+
+func (m *MixPluginCaller) getCtx() context.Context {
+	if m == nil || m.ctx == nil {
+		return context.Background()
+	}
+	return m.ctx
+}
+
+// Cancel 取消所有已加载插件与进行中的调用；若 caller 持有自建 context，也会一并取消。
+func (m *MixPluginCaller) Cancel() {
+	if m == nil {
+		return
+	}
+	if m.callers != nil {
+		m.callers.CancelAllPlugins()
+	}
+	if m.ownedCancel && m.ctxCancel != nil {
+		m.ctxCancel()
+	}
 }
 
 func (m *MixPluginCaller) SetRuntimeId(s string) {
@@ -358,7 +393,11 @@ func NewMixPluginCaller() (*MixPluginCaller, error) {
 	yaklib.AutoInitYakit()
 	webFilter := filter.NewCuckooFilter()
 	callerFilter := filter.NewMapFilter()
+	ctx, cancel := context.WithCancel(context.Background())
 	c := &MixPluginCaller{
+		ctx:                 ctx,
+		ctxCancel:           cancel,
+		ownedCancel:         true,
 		websiteFilter:       webFilter,
 		websitePathFilter:   webFilter,
 		websiteParamsFilter: webFilter,
@@ -369,8 +408,8 @@ func NewMixPluginCaller() (*MixPluginCaller, error) {
 		feedbackHandler: func(result *ypb.ExecResult) error {
 			return fmt.Errorf("feedback handler not set")
 		},
-		ctx: context.Background(),
 	}
+	c.callers.SetContext(ctx)
 	c.SetLoadPluginTimeout(consts.GetGlobalCallerLoadPluginTimeout())
 	c.SetCallPluginTimeout(consts.GetGlobalCallerCallPluginTimeout())
 	c.swg = utils.NewSizedWaitGroup(30)
@@ -397,7 +436,11 @@ func NewMixPluginCallerWithFilter(webFilter filter.Filterable) (*MixPluginCaller
 	defer resetFilterLock.Unlock()
 	yaklib.AutoInitYakit()
 	callerFilter := filter.NewMapFilter()
+	ctx, cancel := context.WithCancel(context.Background())
 	c := &MixPluginCaller{
+		ctx:                 ctx,
+		ctxCancel:           cancel,
+		ownedCancel:         true,
 		websiteFilter:       webFilter,
 		websitePathFilter:   webFilter,
 		websiteParamsFilter: webFilter,
@@ -407,8 +450,8 @@ func NewMixPluginCallerWithFilter(webFilter filter.Filterable) (*MixPluginCaller
 		feedbackHandler: func(result *ypb.ExecResult) error {
 			return fmt.Errorf("feedback handler not set")
 		},
-		ctx: context.Background(),
 	}
+	c.callers.SetContext(ctx)
 	c.SetLoadPluginTimeout(consts.GetGlobalCallerLoadPluginTimeout())
 	c.SetCallPluginTimeout(consts.GetGlobalCallerCallPluginTimeout())
 	c.swg = utils.NewSizedWaitGroup(30)
@@ -466,7 +509,7 @@ func (c *MixPluginCaller) Wait() {
 		log.Debugf("native caller all done")
 	}()
 	select {
-	case <-c.ctx.Done():
+	case <-c.getCtx().Done():
 	case <-waitChan:
 	}
 }
@@ -612,20 +655,14 @@ func (c *MixPluginCaller) loadHotPatch(ctx context.Context, params []*ypb.ExecPa
 }
 
 func (m *MixPluginCaller) LoadPlugin(scriptName string, params ...*ypb.ExecParamItem) error {
-	if m.ctx == nil {
-		m.ctx = context.Background()
-	}
-	return m.LoadPluginByName(m.ctx, scriptName, params)
+	return m.LoadPluginByName(m.getCtx(), scriptName, params)
 }
 
 // LoadPluginByID loads a plugin by its database ID or UUID
 // Supports various integer types (int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64)
 // as database ID, or string as UUID
 func (m *MixPluginCaller) LoadPluginByID(id interface{}, params ...*ypb.ExecParamItem) error {
-	if m.ctx == nil {
-		m.ctx = context.Background()
-	}
-	return m.LoadPluginByIDContext(m.ctx, id, params...)
+	return m.LoadPluginByIDContext(m.getCtx(), id, params...)
 }
 
 // LoadPluginByIDContext loads a plugin by its database ID or UUID with context
@@ -677,9 +714,6 @@ func (m *MixPluginCaller) LoadPluginEx(ctx context.Context, script *schema.YakSc
 	if script.ForceInteractive {
 		log.Infof("script[%v] is interactive, skip load", script.ScriptName)
 		return nil
-	}
-	if m.ctx == nil {
-		m.ctx = context.Background()
 	}
 	var (
 		paramMap    = make(map[string]any)
@@ -996,7 +1030,7 @@ func (m *MixPluginCaller) MirrorHTTPFlow(
 	isHttps bool, u string, req, rsp, body []byte,
 	filters ...bool,
 ) {
-	m.mirrorHTTPFlow(context.Background(), false, true, isHttps, u, req, rsp, body, filters...)
+	m.mirrorHTTPFlow(m.getCtx(), false, true, isHttps, u, req, rsp, body, filters...)
 }
 
 func (m *MixPluginCaller) MirrorHTTPFlowEx(
@@ -1004,7 +1038,7 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 	isHttps bool, u string, req, rsp, body []byte,
 	filters ...bool,
 ) {
-	m.mirrorHTTPFlow(context.Background(), false, scanPort, isHttps, u, req, rsp, body, filters...)
+	m.mirrorHTTPFlow(m.getCtx(), false, scanPort, isHttps, u, req, rsp, body, filters...)
 }
 
 func (m *MixPluginCaller) MirrorHTTPFlowExSync(
@@ -1012,7 +1046,7 @@ func (m *MixPluginCaller) MirrorHTTPFlowExSync(
 	isHttps bool, u string, req, rsp, body []byte,
 	filters ...bool,
 ) {
-	m.mirrorHTTPFlow(context.Background(), true, scanPort, isHttps, u, req, rsp, body, filters...)
+	m.mirrorHTTPFlow(m.getCtx(), true, scanPort, isHttps, u, req, rsp, body, filters...)
 }
 
 func (m *MixPluginCaller) mirrorHTTPFlow(
@@ -1022,6 +1056,9 @@ func (m *MixPluginCaller) mirrorHTTPFlow(
 	isHttps bool, u string, req, rsp, body []byte,
 	filters ...bool,
 ) {
+	if runtimeCtx != nil && runtimeCtx.Err() != nil {
+		return
+	}
 	if !m.IsPassed(u) {
 		log.Infof("call MirrorHTTPFlow error: url[%v] not passed", u)
 		return
@@ -1235,6 +1272,10 @@ func (m *MixPluginCaller) HandleServiceScanResult(r *fp.MatchResult) {
 			log.Errorf("panic from port-scan plugin: %s", err)
 		}
 	}()
+	runtimeCtx := m.getCtx()
+	if runtimeCtx.Err() != nil {
+		return
+	}
 	callers := m.callers
 	wg := new(sync.WaitGroup)
 	if callers.ShouldCallByName(HOOK_PortScanHandle) {
@@ -1246,7 +1287,11 @@ func (m *MixPluginCaller) HandleServiceScanResult(r *fp.MatchResult) {
 					log.Errorf("HandleServiceScanResult call HOOK_PortScanHandle failed: %v", err)
 				}
 			}()
-			callers.CallByName(HOOK_PortScanHandle, r)
+			callers.Call(
+				HOOK_PortScanHandle,
+				WithCallConfigRuntimeCtx(runtimeCtx),
+				WithCallConfigItems(r),
+			)
 		}()
 	}
 	if callers.ShouldCallByName(HOOK_NucleiScanHandle) {
@@ -1258,7 +1303,11 @@ func (m *MixPluginCaller) HandleServiceScanResult(r *fp.MatchResult) {
 					log.Errorf("HandleServiceScanResult call HOOK_NucleiScanHandle failed: %v", err)
 				}
 			}()
-			callers.CallByName(HOOK_NucleiScanHandle, utils.HostPort(r.Target, r.Port))
+			callers.Call(
+				HOOK_NucleiScanHandle,
+				WithCallConfigRuntimeCtx(runtimeCtx),
+				WithCallConfigItems(utils.HostPort(r.Target, r.Port)),
+			)
 		}()
 	}
 	if callers.ShouldCallByName(HOOK_NaslScanHandle) {
@@ -1270,7 +1319,11 @@ func (m *MixPluginCaller) HandleServiceScanResult(r *fp.MatchResult) {
 					log.Errorf("HandleServiceScanResult call HOOK_NaslScanHandle failed: %v", err)
 				}
 			}()
-			callers.CallByName(HOOK_NaslScanHandle, utils.HostPort(r.Target, r.Port))
+			callers.Call(
+				HOOK_NaslScanHandle,
+				WithCallConfigRuntimeCtx(runtimeCtx),
+				WithCallConfigItems(utils.HostPort(r.Target, r.Port)),
+			)
 		}()
 	}
 	wg.Wait()

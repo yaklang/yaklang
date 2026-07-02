@@ -349,6 +349,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		return utils.Errorf("create mitm plugin manager failed: %s", err)
 	}
 	mitmPluginCaller.SetFeedback(execFeedback)
+	mitmPluginCaller.SetCtx(streamCtx)
 	mitmPluginCaller.SetDividedContext(true)
 	mitmPluginCaller.SetConcurrent(20)
 	mitmPluginCaller.SetLoadPluginTimeout(consts.GetGlobalCallerLoadPluginTimeout())
@@ -356,6 +357,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	if downstreamProxy != nil {
 		mitmPluginCaller.SetProxy(downstreamProxy...)
 	}
+	defer mitmPluginCaller.Cancel()
 
 	buildGlobalHotPatchCaller := func() (*yak.MixPluginCaller, error) {
 		caller, err := yak.NewMixPluginCaller()
@@ -363,6 +365,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			return nil, err
 		}
 		caller.SetFeedback(execFeedback)
+		caller.SetCtx(streamCtx)
 		caller.SetDividedContext(true)
 		caller.SetConcurrent(20)
 		caller.SetLoadPluginTimeout(consts.GetGlobalCallerLoadPluginTimeout())
