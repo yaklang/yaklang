@@ -117,6 +117,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "加载能力",
 		En: "Loading Capabilities",
 	},
+	"sub_react_agents_report": {
+		Zh: "子 Agent 执行汇报",
+		En: "Sub Agents Execution Report",
+	},
 	"dispatch_sub_react_agents": {
 		Zh: "下发子 Agent",
 		En: "Dispatch Sub Agents",

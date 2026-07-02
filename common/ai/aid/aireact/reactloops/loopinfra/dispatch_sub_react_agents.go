@@ -25,13 +25,9 @@ const (
 	dispatchSubReactJobsLoopKey        = "dispatch_sub_react_jobs"
 	dispatchSubReactConcurrencyLoopKey = "dispatch_sub_react_concurrency"
 
-	maxDispatchSubReactJobs       = 30
-	defaultDispatchConcurrency    = 5
-	maxDispatchConcurrency        = 10
-	defaultSubAgentMaxIterations  = 50
-	maxSubAgentMaxIterations      = 100
-	defaultSubAgentTimeoutSeconds = 0
-	maxSubAgentTimeoutSeconds     = 600
+	maxDispatchSubReactJobs    = 30
+	defaultDispatchConcurrency = 5
+	maxDispatchConcurrency     = 10
 )
 
 type subReactDispatchJob struct {
@@ -40,8 +36,6 @@ type subReactDispatchJob struct {
 	Goal           string `json:"goal"`
 	LoopName       string `json:"loop_name"`
 	ResultContract string `json:"result_contract"`
-	MaxIterations  int    `json:"max_iterations"`
-	TimeoutSeconds int    `json:"timeout_seconds"`
 }
 
 type subReactProcessStats struct {
@@ -127,12 +121,11 @@ func runForkedSubReactAgentJob(
 		return nil, utils.Error("failed to create timeline fork for sub react agent")
 	}
 
-	jobCtx := parentTask.GetContext()
-	if job.TimeoutSeconds > 0 {
-		var cancel context.CancelFunc
-		jobCtx, cancel = context.WithTimeout(jobCtx, time.Duration(job.TimeoutSeconds)*time.Second)
-		defer cancel()
-	}
+	// No per-job timeout: sub agents inherit the parent task context and run
+	// until they finish naturally. Previously each job could carry a
+	// timeout_seconds that the AI often underestimated, cutting sub agents off
+	// mid-task; that param is gone, so there is nothing to clamp here.
+	jobCtx, jobCancel := context.WithCancel(parentTask.GetContext())
 
 	childInvoker, err := buildForkedSubReactInvoker(parentCfg, fork, jobCtx, subTaskID)
 	if err != nil {
@@ -145,7 +138,7 @@ func runForkedSubReactAgentJob(
 		buildSubAgentUserInput(job),
 		aicommon.WithStatefulTaskBaseName(subTaskName),
 		aicommon.WithStatefulTaskBaseSubAgent(),
-		aicommon.WithStatefulTaskBaseContext(jobCtx),
+		aicommon.WithStatefulTaskBaseContextAndCancel(jobCtx, jobCancel),
 	)
 	parentInvoker.AddRuntimeTask(subTask)
 	childInvoker.SetCurrentTask(subTask)
@@ -158,7 +151,7 @@ func runForkedSubReactAgentJob(
 	branchMarker := fmt.Sprintf("sub-react-branch-marker-%s", subTaskID)
 	fork.Branch.PushText(parentCfg.AcquireId(), branchMarker)
 
-	subLoop, err := reactloops.CreateLoopByName(job.LoopName, childInvoker, buildSubReactLoopOptions(job)...)
+	subLoop, err := reactloops.CreateLoopByName(job.LoopName, childInvoker, buildSubReactLoopOptions()...)
 	if err != nil {
 		result, _ := buildSubReactJobResult(job, startedAt, subTask, nil, fork, err)
 		return result, nil
@@ -219,13 +212,13 @@ func buildSubReactForwardingEmitter(parentEmitter *aicommon.Emitter, subTaskId s
 	})
 }
 
-func buildSubReactLoopOptions(job subReactDispatchJob) []reactloops.ReActLoopOption {
-	maxIter := job.MaxIterations
-	if maxIter <= 0 {
-		maxIter = defaultSubAgentMaxIterations
-	}
+// buildSubReactLoopOptions returns the loop options applied to every forked
+// sub-react agent. Notably it no longer sets WithMaxIterations: sub agents
+// inherit the ReActLoop's own default iteration ceiling (soft-interrupt,
+// not a hard close) instead of a per-job cap the parent AI could
+// misestimate. There is also no per-job timeout — see runForkedSubReactAgentJob.
+func buildSubReactLoopOptions() []reactloops.ReActLoopOption {
 	return []reactloops.ReActLoopOption{
-		reactloops.WithMaxIterations(maxIter),
 		reactloops.WithVar(subAgentDepthLoopVar, 1),
 		reactloops.WithNoEndLoadingStatus(true),
 		reactloops.WithAllowPlanAndExec(false),
@@ -417,8 +410,6 @@ func parseSubReactDispatchJobsFromArray(raw []aitool.InvokeParams) ([]subReactDi
 			Goal:           strings.TrimSpace(item.GetString("goal")),
 			LoopName:       strings.TrimSpace(item.GetString("loop_name")),
 			ResultContract: strings.TrimSpace(item.GetString("result_contract")),
-			MaxIterations:  int(item.GetInt("max_iterations")),
-			TimeoutSeconds: int(item.GetInt("timeout_seconds")),
 		})
 	}
 	return normalizeSubReactDispatchJobs(jobs)
@@ -448,18 +439,6 @@ func normalizeSubReactDispatchJobs(jobs []subReactDispatchJob) ([]subReactDispat
 		jobs[i].Identifier = strings.TrimSpace(jobs[i].Identifier)
 		if jobs[i].Identifier == "" {
 			jobs[i].Identifier = fmt.Sprintf("sub_agent_%d", jobs[i].Order)
-		}
-		if jobs[i].MaxIterations <= 0 {
-			jobs[i].MaxIterations = defaultSubAgentMaxIterations
-		}
-		if jobs[i].MaxIterations > maxSubAgentMaxIterations {
-			return nil, utils.Errorf("dispatches[%d].max_iterations exceeds limit %d", i, maxSubAgentMaxIterations)
-		}
-		if jobs[i].TimeoutSeconds < 0 {
-			return nil, utils.Errorf("dispatches[%d].timeout_seconds must be >= 0", i)
-		}
-		if jobs[i].TimeoutSeconds > maxSubAgentTimeoutSeconds {
-			return nil, utils.Errorf("dispatches[%d].timeout_seconds exceeds limit %d", i, maxSubAgentTimeoutSeconds)
 		}
 	}
 	return jobs, nil
@@ -562,7 +541,7 @@ func handleDispatchSubReactAgents(
 		len(results), successCount, len(results)-successCount,
 	)
 	invoker.AddToTimeline("[DISPATCH_SUB_REACT_AGENTS_DONE]", summary)
-	loopInfraActionFinish(loop, loopInfraNodeDispatchSubReact, summary)
+	loopInfraActionFinish(loop, loopInfraNodeSubReactReport, summary)
 
 	operator.Feedback(summary + "\n\n" + strings.Join(feedbackLines, "\n"))
 	operator.Continue()
@@ -768,12 +747,6 @@ var loopAction_DispatchSubReactAgents = &reactloops.LoopAction{
 			),
 			aitool.WithStringParam("result_contract",
 				aitool.WithParam_Description("Optional output format or acceptance criteria for the sub agent result."),
-			),
-			aitool.WithIntegerParam("max_iterations",
-				aitool.WithParam_Description(fmt.Sprintf("Maximum sub loop iterations. Default %d, max %d.", defaultSubAgentMaxIterations, maxSubAgentMaxIterations)),
-			),
-			aitool.WithIntegerParam("timeout_seconds",
-				aitool.WithParam_Description(fmt.Sprintf("Per-job timeout in seconds. 0 inherits parent task context. Max %d.", maxSubAgentTimeoutSeconds)),
 			),
 		),
 		aitool.WithIntegerParam(
