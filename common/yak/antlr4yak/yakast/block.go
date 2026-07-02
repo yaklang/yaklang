@@ -21,6 +21,13 @@ func (y *YakCompiler) PreviewProgram(raw yak.IProgramContext) (int, *yak.Stateme
 }
 
 func (y *YakCompiler) VisitBlockWithCallback(raw yak.IBlockContext, callback func(*YakCompiler), inlineOpt ...bool) interface{} {
+	return y.VisitBlockWithCallbacks(raw, callback, nil, inlineOpt...)
+}
+
+// VisitBlockWithCallbacks 编译 block，并允许在进入 block 作用域后（statements 之前）
+// 与离开 block 作用域前（statements 之后、OpScopeEnd 之前）分别注入 opcode。
+// 回调只应发射 opcode，不应写格式化文本。
+func (y *YakCompiler) VisitBlockWithCallbacks(raw yak.IBlockContext, preCallback, postCallback func(*YakCompiler), inlineOpt ...bool) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -66,12 +73,15 @@ func (y *YakCompiler) VisitBlockWithCallback(raw yak.IBlockContext, callback fun
 	recoverSymbolTableAndScope := y.SwitchSymbolTableInNewScope("block", uuid.New().String())
 	recoverFormatBufferFunc := y.switchFormatBuffer()
 
-	if callback != nil {
-		callback(y)
+	if preCallback != nil {
+		preCallback(y)
 	}
 	//y.PreviewProgram()
 	//y.VisitProgram()
 	y.VisitStatementList(i.StatementList(), inline)
+	if postCallback != nil {
+		postCallback(y)
+	}
 	buf := recoverFormatBufferFunc()
 	recoverSymbolTableAndScope()
 	buf = strings.Trim(buf, "\n")

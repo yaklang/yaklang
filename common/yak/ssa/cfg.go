@@ -353,6 +353,12 @@ func (i *IfBuilder) Build() *IfBuilder {
 		// create if-false block
 		// falseBlock := SSABuilder.NewBasicBlock(IfFalse)
 		SSABuilder.CurrentBlock = IfStatementBlock
+		// when the condition expression failed to build (e.g. syntax error
+		// recovery produced a broken AST), fall back to a nil constant so the
+		// If instruction stays well-formed instead of dereferencing a nil Value.
+		if utils.IsNil(condition) {
+			condition = SSABuilder.EmitConstInstNil()
+		}
 		// create if-instruction in IfStatementBlock
 		ifStmt := SSABuilder.EmitIf()
 		ifStmt.AddTrue(trueBlock)

@@ -1,0 +1,208 @@
+// Go 1.22 循环变量语义在 Yaklang 中的完整回归测试
+//
+// 规则约定（与 Go 1.22 对齐，for-range/in 更宽松）：
+//   - 三段式 for 用 `:=` 声明的循环变量：每轮独立绑定；
+//   - 三段式 for 用 `=` 赋值（或循环外声明）：全程共享同一变量；
+//   - body 内对循环变量的修改（含 continue 前）写回，供条件/第三段/下一轮使用；
+//   - for-range / for-in 无论 `:=` 还是 `=`：一律每轮独立绑定。
+//
+// 该文件由 mustpass 框架用完整 yak 运行时执行，随 essential-tests CI 一起运行。
+
+// ============================================================
+// 1. 三段式 for + := ：闭包按迭代独立捕获（同步、可确定）
+// ============================================================
+fns1 = []
+for i := 0; i < 3; i++ {
+    fns1 = append(fns1, func() { return i })
+}
+assert fns1[0]() == 0 && fns1[1]() == 1 && fns1[2]() == 2, sprintf("case1 for := per-iter closure broken: %v %v %v", fns1[0](), fns1[1](), fns1[2]())
+
+// ============================================================
+// 2. 三段式 for + = （循环外声明）：闭包共享同一变量
+// ============================================================
+fns2 = []
+k = 0
+for k = 0; k < 3; k++ {
+    fns2 = append(fns2, func() { return k })
+}
+assert fns2[0]() == 3 && fns2[1]() == 3 && fns2[2]() == 3, sprintf("case2 for = shared closure broken: %v %v %v", fns2[0](), fns2[1](), fns2[2]())
+assert k == 3, sprintf("case2 outer k should be 3, got %v", k)
+
+// ============================================================
+// 3. 每轮独立变量可被闭包各自修改，互不影响
+// ============================================================
+counters = []
+for i := 0; i < 3; i++ {
+    counters = append(counters, func() { i++; return i })
+}
+assert counters[0]() == 1, "case3 counter0 first call"
+assert counters[0]() == 2, "case3 counter0 second call"
+assert counters[1]() == 2, "case3 counter1"
+assert counters[2]() == 3, "case3 counter2"
+
+// ============================================================
+// 4. body 内修改循环变量必须写回下一轮（copy-back）
+// ============================================================
+count4 = 0
+for i := 0; i < 10; i++ {
+    i += 2
+    count4++
+}
+// i: 0->(+2)2->(++)3 ; 3->5->6 ; 6->8->9 ; 9->11->12 退出 => 4 轮
+assert count4 == 4, sprintf("case4 body mutation copy-back broken, count=%v", count4)
+
+// ============================================================
+// 5. continue 前修改循环变量也要写回
+// ============================================================
+visited5 = make(map[int]int)
+vcount5 = 0
+for i := 0; i < 6; i++ {
+    if i == 2 {
+        i = 4
+        continue
+    }
+    visited5[i] = i
+    vcount5++
+}
+// 0,1 正常；i=2 改成 4 并 continue，post ++ -> 5，记录 5；post ++ -> 6 退出
+assert vcount5 == 3 && visited5[0] == 0 && visited5[1] == 1 && visited5[5] == 5, sprintf("case5 continue copy-back broken, got %v", visited5)
+
+// ============================================================
+// 6. 多变量 := 声明：a、b 均每轮独立，b 在 body 内自增写回
+// ============================================================
+fns6 = []
+for a, b := 0, 100; a < 3; a++ {
+    fns6 = append(fns6, func() { return [a, b] })
+    b++
+}
+r60 = fns6[0](); r61 = fns6[1](); r62 = fns6[2]()
+assert r60[0] == 0 && r61[0] == 1 && r62[0] == 2, sprintf("case6 multi-var a broken: %v %v %v", r60, r61, r62)
+// b: iter0 100->(++)101 ; iter1 从上轮写回值 101->(++)102 ; iter2 102->(++)103
+assert r60[1] == 101 && r61[1] == 102 && r62[1] == 103, sprintf("case6 multi-var b broken: %v %v %v", r60, r61, r62)
+
+// ============================================================
+// 7. for-range 用 := ：每轮独立
+// ============================================================
+fns7 = []
+for _, v := range [10, 20, 30] {
+    fns7 = append(fns7, func() { return v })
+}
+assert fns7[0]() == 10 && fns7[1]() == 20 && fns7[2]() == 30, sprintf("case7 for-range := broken: %v %v %v", fns7[0](), fns7[1](), fns7[2]())
+
+// ============================================================
+// 8. for-range 用 = ：yak 约定同样每轮独立（比 Go 更宽松）
+// ============================================================
+fns8 = []
+for _, v = range [10, 20, 30] {
+    fns8 = append(fns8, func() { return v })
+}
+assert fns8[0]() == 10 && fns8[1]() == 20 && fns8[2]() == 30, sprintf("case8 for-range = broken: %v %v %v", fns8[0](), fns8[1](), fns8[2]())
+
+// ============================================================
+// 9. for-in ：每轮独立
+// ============================================================
+fns9 = []
+for v in [10, 20, 30] {
+    fns9 = append(fns9, func() { return v })
+}
+assert fns9[0]() == 10 && fns9[1]() == 20 && fns9[2]() == 30, sprintf("case9 for-in broken: %v %v %v", fns9[0](), fns9[1](), fns9[2]())
+
+// ============================================================
+// 10. range 整数：每轮独立
+// ============================================================
+fns10 = []
+for i := range 3 {
+    fns10 = append(fns10, func() { return i })
+}
+assert fns10[0]() == 0 && fns10[1]() == 1 && fns10[2]() == 2, sprintf("case10 range int broken: %v %v %v", fns10[0](), fns10[1](), fns10[2]())
+
+// ============================================================
+// 11. range map：每个闭包捕获各自的 key（顺序无关，用集合校验）
+// ============================================================
+fns11 = []
+for mk := range {"a": 1, "b": 2, "c": 3} {
+    fns11 = append(fns11, func() { return mk })
+}
+got11 = make(map[string]bool)
+for f in fns11 {
+    got11[f()] = true
+}
+assert len(got11) == 3 && got11["a"] && got11["b"] && got11["c"], sprintf("case11 range map key capture broken: %v", got11)
+
+// ============================================================
+// 12. 嵌套 for：内外层各自独立绑定，闭包组合正确
+// ============================================================
+fns12 = []
+for i := 0; i < 2; i++ {
+    for j := 0; j < 2; j++ {
+        fns12 = append(fns12, func() { return i * 10 + j })
+    }
+}
+got12 = make(map[int]bool)
+for f in fns12 {
+    got12[f()] = true
+}
+assert len(got12) == 4 && got12[0] && got12[1] && got12[10] && got12[11], sprintf("case12 nested loop capture broken: %v", got12)
+
+// ============================================================
+// 13. goroutine 捕获（用户真实场景）：for-range channel + go func
+// ============================================================
+ch13 = make(chan int, 3)
+ch13 <- 10
+ch13 <- 20
+ch13 <- 30
+close(ch13)
+results13 = make(chan int, 3)
+wg13 = sync.NewWaitGroup()
+for val := range ch13 {
+    wg13.Add()
+    go func() {
+        defer wg13.Done()
+        results13 <- val
+    }()
+}
+wg13.Wait()
+close(results13)
+sum13 = 0
+got13 = make(map[int]bool)
+for v = range results13 {
+    sum13 += v
+    got13[v] = true
+}
+assert sum13 == 60 && len(got13) == 3 && got13[10] && got13[20] && got13[30], sprintf("case13 goroutine chan-range capture broken: sum=%v got=%v", sum13, got13)
+
+// ============================================================
+// 14. goroutine 捕获：三段式 for + := ，写入受锁保护的 map
+// ============================================================
+seen14 = make(map[int]bool)
+lock14 = sync.NewLock()
+wg14 = sync.NewWaitGroup()
+for i := 0; i < 5; i++ {
+    wg14.Add()
+    go func() {
+        defer wg14.Done()
+        lock14.Lock()
+        defer lock14.Unlock()
+        seen14[i] = true
+    }()
+}
+wg14.Wait()
+assert len(seen14) == 5, sprintf("case14 for := goroutine per-iter binding broken, got %v", seen14)
+for want in [0, 1, 2, 3, 4] {
+    assert seen14[want], sprintf("case14 missing value %v in %v", want, seen14)
+}
+
+// ============================================================
+// 15. break 语义正常，且 := 声明的循环变量不泄漏到外层作用域
+// ============================================================
+leak15 = 0
+for iter15 := 0; iter15 < 100; iter15++ {
+    if iter15 == 3 {
+        leak15 = iter15
+        break
+    }
+}
+assert leak15 == 3, sprintf("case15 break broken, leak15=%v", leak15)
+assert iter15 == undefined, "case15 loop var should not leak out of for scope"
+
+println("forloopvar_go122.yak ALL PASSED")

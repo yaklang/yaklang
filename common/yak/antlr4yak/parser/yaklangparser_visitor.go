@@ -137,12 +137,6 @@ type YaklangParserVisitor interface {
 	// Visit a parse tree produced by YaklangParser#leftExpression.
 	VisitLeftExpression(ctx *LeftExpressionContext) interface{}
 
-	// Visit a parse tree produced by YaklangParser#leftMemberCall.
-	VisitLeftMemberCall(ctx *LeftMemberCallContext) interface{}
-
-	// Visit a parse tree produced by YaklangParser#leftSliceCall.
-	VisitLeftSliceCall(ctx *LeftSliceCallContext) interface{}
-
 	// Visit a parse tree produced by YaklangParser#expression.
 	VisitExpression(ctx *ExpressionContext) interface{}
 
