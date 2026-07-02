@@ -1,0 +1,15 @@
+## 当前探索状态
+<|FASTCONTEXT_STATUS_{{ .Nonce }}|>
+**查询**: {{ .Query }}
+**工作目录**: {{ .WorkDir }}
+**迭代**: {{ .Iteration }} / {{ .MaxIterations }}
+**搜索轮次**: {{ .SearchRounds }}
+**已定位文件数**: {{ .LocationCount }}
+
+{{ if .FeedbackMessages }}
+### 上步反馈
+{{ .FeedbackMessages }}
+{{ end }}
+<|FASTCONTEXT_STATUS_END_{{ .Nonce }}|>
+
+完成探索后调用 `submit_fast_context_result`；多 pattern 时优先用 `grep_files_batch` 并行搜索。

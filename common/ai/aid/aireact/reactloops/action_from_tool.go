@@ -13,6 +13,7 @@ import (
 func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 	// Use the built-in BuildParamsOptions method to extract tool parameters
 	options := tool.BuildParamsOptions()
+	aitagParamNames := ToolParamAITagNames(tool)
 
 	// extractToolParams extracts the actual tool parameters from the action,
 	// removing metadata fields like @action, tool, etc.
@@ -65,6 +66,7 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 		ActionVerifier: func(loop *ReActLoop, action *aicommon.Action) error {
 			// Extract clean tool parameters
 			params := extractToolParams(action)
+			params = MergeLoopActionToolParams(action, params, aitagParamNames)
 
 			// Use AITool's built-in validation
 			valid, validationErrors := tool.ValidateParams(params)
@@ -128,6 +130,8 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 					}
 				}
 			}
+
+			invokeParams = MergeLoopActionToolParams(action, invokeParams, aitagParamNames)
 
 			callExpectations := action.GetString("call_expectations")
 			if callExpectations != "" {

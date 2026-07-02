@@ -219,6 +219,9 @@ type ReActLoop struct {
 	//        VisibilityScenario, Tool Inventory render-time only
 	scenarioToolWhitelist []string
 
+	toolInvokeGuards         []ToolInvokeGuard
+	toolInvokeParamsMutators []ToolInvokeParamsMutator
+
 	// Perception layer: continuous awareness of what the user is doing,
 	// producing Topics/Keywords/Summary that dynamically adjust the
 	// possibility space throughout the loop lifecycle.

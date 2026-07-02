@@ -121,7 +121,8 @@ func WithToolsGetter(getter func() []*aitool.Tool) ReActLoopOption {
 // 中永远丢弃, whitelist 不参与 hidden 决策).
 //
 // 关键词: WithScenarioToolWhitelist, focus mode pull back, scenario tools,
-//        last-write-wins, hidden never returns
+//
+//	last-write-wins, hidden never returns
 func WithScenarioToolWhitelist(names []string) ReActLoopOption {
 	return func(r *ReActLoop) {
 		if r == nil {
@@ -163,6 +164,12 @@ func WithRegisterLoopAction(actionName string, desc string, opts []aitool.ToolOp
 // WithRegisterLoopActionFromTool converts an aitool.Tool to a LoopAction and registers it.
 // This is a convenience wrapper around ConvertAIToolToLoopAction.
 func WithRegisterLoopActionFromTool(tool *aitool.Tool) ReActLoopOption {
+	return WithRegisterLoopActionFromToolCustomized(tool, nil)
+}
+
+// WithRegisterLoopActionFromToolCustomized converts an aitool.Tool to a LoopAction,
+// optionally customizes it (e.g. replace ActionHandler), then registers TOOL_PARAM AITAG fields.
+func WithRegisterLoopActionFromToolCustomized(tool *aitool.Tool, customize func(*LoopAction)) ReActLoopOption {
 	return func(r *ReActLoop) {
 		if tool == nil {
 			return
@@ -173,7 +180,13 @@ func WithRegisterLoopActionFromTool(tool *aitool.Tool) ReActLoopOption {
 			return
 		}
 		action := ConvertAIToolToLoopAction(tool)
+		if customize != nil {
+			customize(action)
+		}
 		r.actions.Set(name, action)
+		if aitagParamNames := ToolParamAITagNames(tool); len(aitagParamNames) > 0 {
+			r.syncRecentToolParamAITagFields(aitagParamNames)
+		}
 	}
 }
 
@@ -466,6 +479,15 @@ func WithSameLogicSpinThreshold(threshold int) ReActLoopOption {
 func WithMaxConsecutiveSpinWarnings(max int) ReActLoopOption {
 	return func(r *ReActLoop) {
 		r.maxConsecutiveSpinWarnings = max
+	}
+}
+
+// WithToolParamAITagFields registers TOOL_PARAM_* AITAG parsers for loop-action
+// tool parameters (e.g. write_file "content"). Required when FS tools are
+// registered as loop actions instead of require_tool / directly_call_tool.
+func WithToolParamAITagFields(paramNames ...string) ReActLoopOption {
+	return func(r *ReActLoop) {
+		r.syncRecentToolParamAITagFields(paramNames)
 	}
 }
 

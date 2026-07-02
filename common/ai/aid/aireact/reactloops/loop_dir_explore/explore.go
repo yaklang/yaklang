@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -218,7 +218,7 @@ func BuildDirExploreLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoo
 			}
 			exploreWorkDir := getOrCreateExploreWorkDir(r, loop)
 			hasFiles := len(noteFileList) > 0
-			needMoreFiles := hasFiles && len(noteFileList) < 3 && iterCount >= 10
+			needMoreFiles := hasFiles && len(noteFileList) < 3
 			return utils.RenderTemplate(exploreReactiveDataTpl, map[string]any{
 				"Nonce":            nonce,
 				"TargetPath":       state.TargetPath,
@@ -232,12 +232,11 @@ func BuildDirExploreLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoo
 		}),
 	}
 
-	// 注册文件系统工具
-	preset = append(preset, buildFSToolAction(r, "tree", nil))
-	preset = append(preset, buildFSToolAction(r, "read_file", nil))
-	preset = append(preset, buildFSToolAction(r, "grep", nil))
-	preset = append(preset, buildFSToolAction(r, "find_file", nil))
-	preset = append(preset, buildFSToolAction(r, "write_file", func(action *aicommon.Action) {
+	// Register builtin FS tools via ConvertAIToolToLoopAction with explore-style feedback.
+	for _, toolName := range []string{"tree", "read_file", "grep", "find_file"} {
+		preset = append(preset, loopinfra.RegisterBuiltinFSToolLoopAction(r, "DirExplore", toolName, nil))
+	}
+	preset = append(preset, loopinfra.RegisterBuiltinFSToolLoopAction(r, "DirExplore", "write_file", func(action *aicommon.Action) {
 		filePath := action.GetString("file")
 		if filePath != "" {
 			state.addNoteFile(filePath)
@@ -373,125 +372,6 @@ func getOrCreateExploreWorkDir(r aicommon.AIInvokeRuntime, loop *reactloops.ReAc
 		loop.Set("explore_work_dir", dir)
 	}
 	return dir
-}
-
-// buildFSToolAction 直接用 WithRegisterLoopAction 注册文件系统工具。
-// 在 handler 里手动调用 invoker.ExecuteToolRequiredAndCallWithoutRequired，
-// 执行完后直接 op.Continue()，不经过 ConvertAIToolToLoopAction，
-// 因此完全绕开了 VerifyUserSatisfaction 退出逻辑。
-// onAction 是可选的执行后回调，用于记录副作用（如 write_file 记录路径）。
-func buildFSToolAction(r aicommon.AIInvokeRuntime, toolName string, onAction func(action *aicommon.Action)) reactloops.ReActLoopOption {
-	toolMgr := r.GetConfig().GetAiToolManager()
-	if toolMgr == nil {
-		log.Warnf("[DirExplore] tool manager not available, skip %q action", toolName)
-		return func(r *reactloops.ReActLoop) {}
-	}
-	tool, err := toolMgr.GetToolByName(toolName)
-	if err != nil || tool == nil {
-		log.Warnf("[DirExplore] tool %q not found: %v", toolName, err)
-		return func(r *reactloops.ReActLoop) {}
-	}
-
-	return reactloops.WithRegisterLoopAction(
-		toolName,
-		tool.GetDescription(),
-		tool.BuildParamsOptions(),
-		nil,
-		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
-			invoker := loop.GetInvoker()
-			ctx := loop.GetConfig().GetContext()
-			if task := loop.GetCurrentTask(); task != nil && !utils.IsNil(task.GetContext()) {
-				ctx = task.GetContext()
-			}
-
-			params := action.GetParams()
-			result, _, err := invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, toolName, params)
-			if err != nil {
-				log.Warnf("[DirExplore] tool %q failed: %v", toolName, err)
-				op.Feedback(fmt.Sprintf("[工具执行失败] %s: %v，请尝试其他方法。", toolName, err))
-				op.Continue()
-				return
-			}
-
-			content := ""
-			if result != nil {
-				content = utils.InterfaceToString(result.Data)
-			}
-			invoker.AddToTimeline(fmt.Sprintf("[%s]", toolName),
-				utils.ShrinkString(content, 2048))
-
-			// 对 grep 工具做额外的空结果检测：
-			// 如果输出只含 [info] 行而无任何匹配行，说明搜索范围太大或模式有误，
-			// 给出明确提示引导 AI 缩小范围重试。
-			if toolName == "grep" {
-				if isGrepEmptyResult(content) {
-					searchPath := action.GetString("path")
-					pattern := action.GetString("pattern")
-					hint := fmt.Sprintf(
-						"[grep 结果为空] 在路径 %q 中未找到模式 %q 的匹配。可能原因：\n"+
-							"  1. 搜索范围太大导致超时（仓库根目录不适合直接 grep）\n"+
-							"  2. 文件扩展名未过滤，扫描了大量无关文件\n"+
-							"建议措施：\n"+
-							"  - 用 find_file 先定位包含入口的文件，再对具体文件/小目录 grep\n"+
-							"  - 添加 include-ext 参数（如 include-ext=\".go\" 或 \".java\"）\n"+
-							"  - 缩小 path 范围（如改为 %q/cmd 或 %q/src）\n"+
-							"  - 检查 pattern 是否正确（如 Go 应用 \"func main()\" 而不是 \"main()\"）",
-						searchPath, pattern, searchPath, searchPath,
-					)
-					log.Infof("[DirExplore] grep returned empty results for path=%q pattern=%q", searchPath, pattern)
-					invoker.AddToTimeline("[GREP_EMPTY_RESULT]", hint)
-					op.Feedback(hint)
-					op.Continue()
-					return
-				}
-			}
-
-			op.Feedback(fmt.Sprintf("[%s 完成] 输出 %d 字节", toolName, len(content)))
-			op.Continue()
-
-			if onAction != nil {
-				onAction(action)
-			}
-		},
-	)
-}
-
-// isGrepEmptyResult 判断 grep 工具的输出是否为空结果（只有 [info] 头信息，无实际匹配行）。
-// grep 工具有匹配时每行格式为 "filepath:lineNo: content"，无匹配时只输出 [info] 行。
-// 通过 JSON 结构解析 stdout 字段来判断。
-func isGrepEmptyResult(content string) bool {
-	if content == "" {
-		return true
-	}
-	// content 是 JSON 格式 {"stdout": "..."}，解析其中的 stdout
-	var parsed map[string]any
-	if err := json.Unmarshal([]byte(content), &parsed); err != nil {
-		// 非 JSON，直接检查字符串
-		return isGrepStdoutEmpty(content)
-	}
-	stdout, _ := parsed["stdout"].(string)
-	return isGrepStdoutEmpty(stdout)
-}
-
-// isGrepStdoutEmpty 检查 grep stdout 是否只有 info 行（即没有实际匹配结果）。
-func isGrepStdoutEmpty(stdout string) bool {
-	if stdout == "" {
-		return true
-	}
-	for _, line := range strings.Split(stdout, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		// 实际匹配行不以 [info] 或 [warn] 或 [error] 开头
-		if !strings.HasPrefix(line, "[info]") &&
-			!strings.HasPrefix(line, "[warn]") &&
-			!strings.HasPrefix(line, "[error]") &&
-			!strings.HasPrefix(line, "[debug]") {
-			return false // 有非 info 行，说明有匹配结果
-		}
-	}
-	return true // 全是 info/warn/error 行，视为空结果
 }
 
 // buildAvailableFilesHint 构造报告生成器可见的参考文件列表提示
