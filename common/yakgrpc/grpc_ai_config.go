@@ -128,14 +128,14 @@ func (s *Server) GetApiKeyByOnline(ctx context.Context, req *ypb.GetApiKeyByOnli
 	if err := consts.GetGormProfileDatabase().First(&aiThirdPartyConfig).Error; err != nil {
 		return nil, utils.Errorf("get aiThirdPartyConfig failed: %v", err)
 	}
-
+	oldKey := aiThirdPartyConfig.APIKey
 	aiThirdPartyConfig.APIKey = apiKey
 
 	if err := consts.GetGormProfileDatabase().Save(&aiThirdPartyConfig).Error; err != nil {
 		return nil, utils.Errorf("update apiKey failed: %v", err)
 	}
 
-	if err := yakit.ReplaceAPIKeys(s.GetProfileDatabase(), "free-user", apiKey); err != nil {
+	if err := yakit.ReplaceAPIKeys(s.GetProfileDatabase(), oldKey, apiKey); err != nil {
 		return nil, utils.Errorf("ReplaceAPIKeys failed: %v", err)
 	}
 
