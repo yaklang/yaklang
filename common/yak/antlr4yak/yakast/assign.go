@@ -136,6 +136,15 @@ func (y *YakCompiler) VisitLeftExpressionList(forceNewSymbol bool, raw yak.ILeft
 	return len(allExpr)
 }
 
+// VisitLeftExpression 处理赋值左值。
+//
+// 语法已消歧为 `leftExpression: Identifier | expression`（见 YaklangParser.g4），
+// 因此左值可能是：
+//   - 裸标识符（Identifier 备选）：a = 1
+//   - 成员访问表达式（expression 备选，顶层为 memberCall）：a.b = 1 / a.$x = 1
+//   - 下标访问表达式（expression 备选，顶层为单下标 sliceCall）：a[0] = 1
+//
+// 其余表达式（如字面量、函数调用、切片区间 a[1:2]）不是合法左值，在此报编译错误。
 func (y *YakCompiler) VisitLeftExpression(forceNewSymbol bool, raw yak.ILeftExpressionContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
@@ -148,88 +157,107 @@ func (y *YakCompiler) VisitLeftExpression(forceNewSymbol bool, raw yak.ILeftExpr
 	recoverRange := y.SetRange(i.BaseParserRuleContext)
 	defer recoverRange()
 
+	// Identifier 备选：裸标识符左值
 	if id := i.Identifier(); id != nil {
-		// 左值中的 identifier 要创建符号
-		idName := id.GetText()
-		y.writeString(idName)
-		if forceNewSymbol {
-			id, err := y.currentSymtbl.NewSymbolWithReturn(idName)
-			if err != nil {
-				y.panicCompilerError(forceCreateSymbolFailed, idName)
-			}
-			y.pushLeftRef(id)
-			return nil
-		}
-		var sym, ok = y.currentSymtbl.GetSymbolByVariableName(idName)
-		if !ok {
-			var err error
-			sym, err = y.currentSymtbl.NewSymbolWithReturn(idName)
-			if err != nil {
-				y.panicCompilerError(autoCreateSymbolFailed, idName)
-			}
-		}
-		y.pushLeftRef(sym)
+		y.visitLeftIdentifier(forceNewSymbol, id.GetText())
 		return nil
 	}
 
-	if e := i.Expression(); e != nil {
-		y.VisitExpression(e)
-
-		/*
-			a[1] = 1
-
-			push 1
-			list 1
-
-			push slice
-			push index
-			list 2  // 组合 slice[index] 放入栈
-			list 1
-
-			assign
-		*/
-		if s := i.LeftSliceCall(); s != nil {
-			y.VisitLeftSliceCall(s)
-			// 这里复用 list 的操作，由 assign 判断后续的值
-			// list 2 可以把上述两个值组合成一个可以被赋值的操作
-			// 一定小心，不要乱改
-			y.pushListWithLen(2)
-			return nil
-		}
-
-		if m := i.LeftMemberCall(); m != nil {
-			y.VisitLeftMemberCall(m)
-			y.pushListWithLen(2)
-			return nil
-		}
+	expr, ok := i.Expression().(*yak.ExpressionContext)
+	if !ok || expr == nil {
+		y.panicCompilerError(compileError, "invalid left expression")
 		return nil
 	}
 
+	// 兜底：expression 顶层就是裸标识符（正常会被 Identifier 备选优先命中）
+	if id := expr.Identifier(); id != nil && len(expr.AllExpression()) == 0 &&
+		expr.MemberCall() == nil && expr.SliceCall() == nil && expr.FunctionCall() == nil {
+		y.visitLeftIdentifier(forceNewSymbol, id.GetText())
+		return nil
+	}
+
+	// 成员赋值 a.b = ... / a.$x = ...
+	if m, ok := expr.MemberCall().(*yak.MemberCallContext); ok && m != nil {
+		base, ok := expr.Expression(0).(*yak.ExpressionContext)
+		if !ok || base == nil {
+			y.panicCompilerError(compileError, "invalid left member expression")
+			return nil
+		}
+		y.VisitExpression(base)
+		y.visitLeftMemberCallKey(m)
+		y.pushListWithLen(2)
+		return nil
+	}
+
+	// 下标赋值 a[0] = ...（仅单下标 [expr] 形式可作为左值）
+	/*
+		a[1] = 1
+
+		push slice
+		push index
+		list 2  // 组合 slice[index] 放入栈，由 assign 判断后续的值
+		一定小心，不要乱改
+	*/
+	if s, ok := expr.SliceCall().(*yak.SliceCallContext); ok && s != nil {
+		base, ok := expr.Expression(0).(*yak.ExpressionContext)
+		if !ok || base == nil {
+			y.panicCompilerError(compileError, "invalid left slice expression")
+			return nil
+		}
+		// 只有单下标 [expr]（无冒号且恰好一个下标表达式）可作为左值
+		if len(s.AllColon()) != 0 || len(s.AllExpression()) != 1 {
+			y.panicCompilerError(compileError, "cannot assign to slice range expression")
+			return nil
+		}
+		y.VisitExpression(base)
+		y.writeString("[")
+		y.VisitExpression(s.Expression(0))
+		y.writeString("]")
+		y.pushListWithLen(2)
+		return nil
+	}
+
+	y.panicCompilerError(compileError, "invalid left expression")
 	return nil
 }
 
-func (y *YakCompiler) VisitLeftMemberCall(raw yak.ILeftMemberCallContext) interface{} {
-	if y == nil || raw == nil {
-		return nil
+// visitLeftIdentifier 处理裸标识符左值的符号创建与格式化输出
+func (y *YakCompiler) visitLeftIdentifier(forceNewSymbol bool, idName string) {
+	y.writeString(idName)
+	if forceNewSymbol {
+		id, err := y.currentSymtbl.NewSymbolWithReturn(idName)
+		if err != nil {
+			y.panicCompilerError(forceCreateSymbolFailed, idName)
+		}
+		y.pushLeftRef(id)
+		return
 	}
+	sym, ok := y.currentSymtbl.GetSymbolByVariableName(idName)
+	if !ok {
+		var err error
+		sym, err = y.currentSymtbl.NewSymbolWithReturn(idName)
+		if err != nil {
+			y.panicCompilerError(autoCreateSymbolFailed, idName)
+		}
+	}
+	y.pushLeftRef(sym)
+}
 
-	i, _ := raw.(*yak.LeftMemberCallContext)
-	if i == nil {
-		return nil
-	}
+// visitLeftMemberCallKey 将成员访问的 key 压栈（.id 压字符串常量，.$var 压变量引用）
+func (y *YakCompiler) visitLeftMemberCallKey(i *yak.MemberCallContext) {
 	recoverRange := y.SetRange(i.BaseParserRuleContext)
 	defer recoverRange()
 
 	y.writeString(".")
-	if i := i.Identifier(); i != nil {
-		idName := i.GetText()
+	if id := i.Identifier(); id != nil {
+		idName := id.GetText()
 		y.writeString(idName)
 		y.pushString(idName, idName)
-		return nil
+		return
 	}
 
-	if i := i.IdentifierWithDollar(); i != nil {
-		varName := i.GetText()
+	if id := i.IdentifierWithDollar(); id != nil {
+		varName := id.GetText()
 		y.writeString(varName)
 		for strings.HasPrefix(varName, "$") {
 			varName = varName[1:]
@@ -239,31 +267,10 @@ func (y *YakCompiler) VisitLeftMemberCall(raw yak.ILeftMemberCallContext) interf
 			y.panicCompilerError(notFoundDollarVariable, varName)
 		}
 		y.pushRef(symbolId)
-		return nil
+		return
 	}
 
 	y.panicCompilerError(bugMembercall)
-	return nil
-
-}
-
-func (y *YakCompiler) VisitLeftSliceCall(raw yak.ILeftSliceCallContext) interface{} {
-	if y == nil || raw == nil {
-		return nil
-	}
-
-	i, _ := raw.(*yak.LeftSliceCallContext)
-	if i == nil {
-		return nil
-	}
-	recoverRange := y.SetRange(i.BaseParserRuleContext)
-	defer recoverRange()
-
-	y.writeString("[")
-	y.VisitExpression(i.Expression())
-	y.writeString("]")
-
-	return nil
 }
 
 func (y *YakCompiler) VisitDeclareVariableExpression(raw yak.IDeclareVariableExpressionContext) interface{} {

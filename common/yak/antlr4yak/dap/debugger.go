@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/go-dap"
@@ -29,10 +30,12 @@ type DAPDebugger struct {
 
 	selectFrame *yakvm.Frame // 选择的frame
 
-	finished   bool          // 是否程序已经结束
-	restart    bool          // 是否需要重启
+	// finished/restart/inCallback 会被请求处理协程与调试回调协程并发读写，
+	// 统一用 atomic.Bool 保证内存可见性与无数据竞争。
+	finished   atomic.Bool   // 是否程序已经结束
+	restart    atomic.Bool   // 是否需要重启
 	timeout    time.Duration // 超时时间
-	inCallback bool          // 是否在回调状态
+	inCallback atomic.Bool   // 是否在回调状态
 	continueCh chan struct{} // 继续执行
 
 	source *Source // 源码相关
@@ -53,7 +56,7 @@ func (d *DAPDebugger) WaitProgramStart() {
 
 func (d *DAPDebugger) Continue() {
 	// 如果在回调状态则写入continueCh,使callback立即返回,程序继续执行
-	if d.inCallback {
+	if d.inCallback.Load() {
 		log.Debugf("[dap debugger] continue")
 		go func() {
 			d.continueCh <- struct{}{}
@@ -165,15 +168,15 @@ func (d *DAPDebugger) CurrentFrameID() int {
 }
 
 func (d *DAPDebugger) IsFinished() bool {
-	return d.finished
+	return d.finished.Load()
 }
 
 func (d *DAPDebugger) Restart() bool {
-	return d.restart
+	return d.restart.Load()
 }
 
 func (d *DAPDebugger) SetRestart(b bool) {
-	d.restart = b
+	d.restart.Store(b)
 }
 
 func (d *DAPDebugger) SetDescription(desc string) {
@@ -181,19 +184,19 @@ func (d *DAPDebugger) SetDescription(desc string) {
 }
 
 func (d *DAPDebugger) InCallbackState() {
-	d.inCallback = true
+	d.inCallback.Store(true)
 }
 
 func (d *DAPDebugger) OutCallbackState() {
-	d.inCallback = false
+	d.inCallback.Store(false)
 }
 
 func (d *DAPDebugger) Halt() error {
 	// 如果已经处在回调状态则直接返回
-	if d.inCallback {
+	if d.inCallback.Load() {
 		return nil
 	}
-	if d.finished {
+	if d.finished.Load() {
 		return errors.New("program finished")
 	}
 
@@ -242,10 +245,9 @@ func (d *DAPDebugger) CallBack() func(g *yakvm.Debugger) {
 			session.send(event)
 		}
 
-		if isNormallyFinished && !d.finished {
-			d.finished = true
+		if isNormallyFinished && d.finished.CompareAndSwap(false, true) {
 			// 程序正常结束且不需要重启,发送terminated事件(真实client不需要发送,因为不想让client退出)
-			if !d.restart && !d.session.isRealClient {
+			if !d.restart.Load() && !d.session.isRealClient {
 				d.session.send(&dap.TerminatedEvent{Event: *newEvent("terminated")})
 			}
 			return

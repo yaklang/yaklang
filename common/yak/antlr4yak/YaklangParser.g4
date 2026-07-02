@@ -60,7 +60,19 @@ continueStmt: 'continue';
 returnStmt: 'return' expressionList?;
 
 callExpr: functionCallExpr | instanceCode;
-functionCallExpr: expression functionCall;
+/*
+functionCallExpr 消歧说明：
+
+历史写法 `expression functionCall` 与 expression 自身的 `expression functionCall` 后缀
+重叠：对 `f()`，expression 既能整体吞掉 `f()`（表达式后缀调用），又能只取 `f` 再由外层
+functionCall 取 `()`，二者共享前缀，SLL 无法在合并上下文中判定，导致 `go f()`/`defer f()`
+这类语句 bail 回退 LL。
+
+现在直接复用通用 `expression`（其顶层通常为 `expression functionCall` 或 instanceCode），
+判别完全交给 expression 自身的左递归消解，SLL 即可命中。是否为合法调用（顶层为 functionCall
+或 instanceCode）由 visitor 判定。
+*/
+functionCallExpr: expression;
 
 /*
 for statement
@@ -171,12 +183,26 @@ a[1] = 1
 a.abc = 1
 a.$a = 1
 */
+/*
+leftExpression 消歧说明：
+
+历史写法 `expression (leftMemberCall | leftSliceCall) | Identifier` 会与
+`expressionStmt` 中的 `expression sliceCall/memberCall` 共享前缀，且 `leftSliceCall`
+的 `'[' expression ']'` 与 `sliceCall` 的单下标形式完全重叠，导致 SLL（单一合并上下文）
+无法在消费完 `a[0]` 后判定其后是赋值 `=` 还是普通表达式语句，从而 bail 回退到 LL。
+
+现在直接复用通用 `expression`：左值前缀与右值前缀走完全相同的 ATN 路径，判别点后移到
+`expression` 结束后的单个 token（`=`/`:=`/`++`/`--`/复合赋值 或 eos），SLL 即可命中。
+`Identifier` 作为首选备选，保证裸标识符（如 `for i in x`）不会被 `expression` 贪婪吞掉
+`in`/后缀，从而与 for-range 等规则保持既有行为。
+
+左值是否可赋值（成员/下标/标识符）改由 visitor 依据 expression 子树判定，非法左值（如
+`1 = 2`、`f() = 2`）在语义阶段报错，而非语法阶段。
+*/
 leftExpression
-    : expression (leftMemberCall | leftSliceCall)
-    | Identifier
+    : Identifier
+    | expression
     ;
-leftMemberCall: '.' (Identifier | IdentifierWithDollar);
-leftSliceCall: '[' expression ']';
 
 expression
     // 单目运算

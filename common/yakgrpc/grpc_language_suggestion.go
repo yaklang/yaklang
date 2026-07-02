@@ -1289,11 +1289,11 @@ func fuzztagCompletion(fuzztagCode string, hotPatchCode string) []*ypb.Suggestio
 func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.YaklangLanguageSuggestionRequest) (*ypb.YaklangLanguageSuggestionResponse, error) {
 	// check syntaxflow
 	if resp, match := SyntaxFlowServer(req); match {
-		return resp, nil
+		return applyExampleFenceToResponse(resp), nil
 	}
 
 	if resp, match := FuzztagServer(req); match {
-		return resp, nil
+		return applyExampleFenceToResponse(resp), nil
 	}
 
 	scriptType := req.GetYakScriptType()
@@ -1324,7 +1324,8 @@ func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.Yaklang
 	case SIGNATURE:
 		ret.SuggestionMessage = OnSignature(prog, word, containPoint, ssaRange, v)
 	}
-	return ret, nil
+	// 发送给前端展示前的最后一刻：把文档里的 <|EXAMPLE...|> 标记渲染成代码围栏
+	return applyExampleFenceToResponse(ret), nil
 }
 
 func (s *Server) FuzzTagSuggestion(ctx context.Context, req *ypb.FuzzTagSuggestionRequest) (*ypb.YaklangLanguageSuggestionResponse, error) {
@@ -1334,5 +1335,5 @@ func (s *Server) FuzzTagSuggestion(ctx context.Context, req *ypb.FuzzTagSuggesti
 	} else if req.GetInspectType() == COMPLETION {
 		ret.SuggestionMessage = append(ret.SuggestionMessage, fuzztagCompletion(req.GetFuzztagCode(), req.GetHotPatchCode())...)
 	}
-	return ret, nil
+	return applyExampleFenceToResponse(ret), nil
 }

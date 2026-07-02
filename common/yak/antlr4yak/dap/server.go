@@ -4,6 +4,7 @@ import (
 	"io"
 	"net"
 	"strings"
+	"sync"
 
 	"github.com/google/go-dap"
 	"github.com/yaklang/yaklang/common/log"
@@ -12,8 +13,22 @@ import (
 
 type DAPServer struct {
 	listener net.Listener
-	session  *DebugSession
-	config   *DAPServerConfig
+	// session 由 handleConnection 协程写入、Stop 协程读取，用 sessionMu 保护避免数据竞争。
+	sessionMu sync.Mutex
+	session   *DebugSession
+	config    *DAPServerConfig
+}
+
+func (s *DAPServer) setSession(session *DebugSession) {
+	s.sessionMu.Lock()
+	defer s.sessionMu.Unlock()
+	s.session = session
+}
+
+func (s *DAPServer) getSession() *DebugSession {
+	s.sessionMu.Lock()
+	defer s.sessionMu.Unlock()
+	return s.session
 }
 
 func (s *DAPServer) Start() {
@@ -42,10 +57,11 @@ func (s *DAPServer) Stop() {
 		s.listener.Close()
 	}
 
-	if s.session == nil {
+	session := s.getSession()
+	if session == nil {
 		return
 	}
-	s.session.Close()
+	session.Close()
 }
 
 func NewDAPServer(config *DAPServerConfig) *DAPServer {
@@ -83,7 +99,7 @@ func (s *DAPServer) handleConnection(conn net.Conn) {
 	defer conn.Close()
 
 	session := NewDebugSession(conn, s.config)
-	s.session = session
+	s.setSession(session)
 
 	for {
 		request, err := dap.ReadProtocolMessage(session.rw.Reader)

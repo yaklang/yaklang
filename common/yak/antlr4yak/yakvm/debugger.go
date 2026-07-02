@@ -92,6 +92,15 @@ type Debugger struct {
 	StackTraces      map[int]*vmstack.Stack // threadID -> stacktraces
 	ThreadStackTrace map[int]*DebuggerState // 每个线程对应的当前的stackTrace
 
+	// pausedThreads 记录当前真正挂起在断点/单步回调中的线程集合。
+	// 由于每个协程执行首条 opcode 时就会在 StackTraces 中登记 threadID，
+	// 多协程并发时 StackTraces 会包含大量"跑过一次但并未停在断点"的线程，
+	// 导致上报给客户端的线程数不确定。这里只把"当前确实停住"的线程 + 根线程
+	// 视为可见线程，保证 threads 列表与"程序已停止(AllThreadsStopped)"语义一致且稳定。
+	pausedThreads map[int]struct{}
+	pausedMu      sync.Mutex
+	rootThreadID  int
+
 	// Reference,用于存储帧,作用域,变量引用的信息
 	Reference *Reference
 
@@ -141,6 +150,8 @@ func NewDebugger(vm *VirtualMachine, sourceCode string, codes []*Code, init, cal
 		finished:         false,
 		StackTraces:      map[int]*vmstack.Stack{int(vm.ThreadIDCount): vmstack.New()},
 		ThreadStackTrace: make(map[int]*DebuggerState, 0),
+		pausedThreads:    make(map[int]struct{}),
+		rootThreadID:     int(vm.ThreadIDCount),
 		vm:               vm,
 		startWG:          sync.WaitGroup{},
 		wg:               sync.WaitGroup{},
@@ -545,6 +556,11 @@ func (g *Debugger) GetStackTraces() map[int]*StackTraces {
 	ret := make(map[int]*StackTraces, len(g.StackTraces))
 
 	for threadID, stack := range g.StackTraces {
+		// 只上报当前真正停住的线程(以及根线程)，跳过那些"执行过 opcode 已登记、
+		// 但此刻并未停在断点/单步回调"的并发协程，保证线程列表稳定。
+		if !g.isThreadVisible(threadID) {
+			continue
+		}
 
 		ret[threadID] = &StackTraces{
 			ThreadID: threadID,
@@ -1017,10 +1033,42 @@ func (g *Debugger) ShouldCallback(frame *Frame) {
 	}
 }
 
+// markThreadPaused/markThreadResumed 维护当前真正停在回调里的线程集合。
+func (g *Debugger) markThreadPaused(threadID int) {
+	g.pausedMu.Lock()
+	g.pausedThreads[threadID] = struct{}{}
+	g.pausedMu.Unlock()
+}
+
+func (g *Debugger) markThreadResumed(threadID int) {
+	g.pausedMu.Lock()
+	delete(g.pausedThreads, threadID)
+	g.pausedMu.Unlock()
+}
+
+func (g *Debugger) isThreadVisible(threadID int) bool {
+	// 根线程(主协程)始终可见；其余线程仅在当前挂起于回调时可见。
+	if threadID == g.rootThreadID {
+		return true
+	}
+	g.pausedMu.Lock()
+	_, ok := g.pausedThreads[threadID]
+	g.pausedMu.Unlock()
+	return ok
+}
+
 func (g *Debugger) Callback() {
 	g.Add()
 	defer g.WaitGroupDone()
 	defer g.ResetStopReason()
+
+	// 记录当前线程为"已挂起",回调返回(继续执行)时移除。
+	// 这样上报给客户端的线程列表只包含真正停住的线程，避免并发协程造成数目抖动。
+	if g.frame != nil {
+		threadID := g.frame.ThreadID
+		g.markThreadPaused(threadID)
+		defer g.markThreadResumed(threadID)
+	}
 
 	// 处理stopOnEntry的情况
 	if !g.started {

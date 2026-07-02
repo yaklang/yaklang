@@ -132,6 +132,9 @@ func (y *YakCompiler) VisitStatement(i *yak.StatementContext) (newLine bool) {
 				y.pushOperator(yakvm.OpStopCatchError)
 			}
 		}
+		// continue 跳过 block 剩余部分直接进入下一轮，需要先把 `:=` 循环变量
+		// 的本轮值写回外层符号（Go 1.22 语义：下一轮变量从本轮结束值初始化）
+		y.emitLoopVarCopyBack(y.peekForContext())
 		y.pushContinue()
 		return true
 	}

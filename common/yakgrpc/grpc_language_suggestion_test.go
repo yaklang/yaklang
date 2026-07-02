@@ -1233,7 +1233,9 @@ e.Delete
 
 	funcDecl := getFuncDeclByName("poc", "HTTP")
 	pocLabel := getFuncDeclLabel(nil, funcDecl)
-	pocDesc := funcDecl.Document
+	// 文档里的 <|EXAMPLE...|> 标记在发送给前端前会被渲染成代码围栏，
+	// 因此这里的期望值也要经过同样的渲染，保持与实际返回一致。
+	pocDesc := RenderExampleMarkersForMarkdown(funcDecl.Document)
 
 	t.Run("standard library function signature", func(t *testing.T) {
 		t.Parallel()
