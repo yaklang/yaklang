@@ -53,3 +53,40 @@ func TestGetHTTPFlowDomainsByDomainSuffix_SimplifiedQuery(t *testing.T) {
 	require.Equal(t, 1, mp["http://foo.com:8080"].Count)
 }
 
+func TestGetHTTPFlowDomainsByDomainSuffix_NotAffectedByRecentTrafficOrder(t *testing.T) {
+	db := consts.GetGormProjectDatabase()
+	require.NotNil(t, db)
+
+	token := uuid.NewString()
+	hostA := "http://127.0.0.1:8787"
+	hostB := "https://www.example.com"
+
+	records := []schema.HTTPFlow{
+		{Url: hostB + "/" + token + "/legacy", Path: "/legacy", SourceType: schema.HTTPFlow_SourceType_MITM},
+	}
+	for i := 0; i < 1200; i++ {
+		records = append(records, schema.HTTPFlow{
+			Url:        hostA + "/" + token + "/scan-" + uuid.NewString(),
+			Path:       "/scan",
+			SourceType: schema.HTTPFlow_SourceType_SCAN,
+		})
+	}
+
+	for i := range records {
+		require.NoError(t, db.Create(&records[i]).Error)
+		defer db.Delete(&records[i])
+	}
+
+	query := db.Where("url LIKE ?", "%"+token+"%").Order("updated_at desc").Limit(1000)
+	res := GetHTTPFlowDomainsByDomainSuffix(query, "")
+	require.NotNil(t, res)
+
+	domains := make(map[string]struct{}, len(res))
+	for _, item := range res {
+		domains[item.NextPart] = struct{}{}
+	}
+
+	require.Contains(t, domains, hostA)
+	require.Contains(t, domains, hostB)
+}
+

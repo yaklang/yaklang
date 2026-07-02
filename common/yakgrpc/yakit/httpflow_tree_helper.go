@@ -47,8 +47,11 @@ func trimPathWithOneSlash(path string) string {
 
 func GetHTTPFlowDomainsByDomainSuffix(db *gorm.DB, domainSuffix string) []*WebsiteNextPart {
 	db = FilterHTTPFlowByDomain(db, domainSuffix)
-	// 简化 SQL，避免深度嵌套表达式树：只取 url，在 Go 中解析
-	db = db.Select("DISTINCT url").Table("http_flows").Limit(1000) //.Debug()
+	// 简化 SQL，避免深度嵌套表达式树：只取 url，在 Go 中解析。
+	// Drop inherited ORDER BY / LIMIT from HTTP flow list queries; otherwise
+	// recent scan/fuzzer traffic can hide other domains in the website tree.
+	db = db.Order("", true).Limit(nil).Offset(nil)
+	db = db.Select("DISTINCT url").Table("http_flows") //.Debug()
 
 	rows, err := db.Rows()
 	if err != nil {
@@ -179,6 +182,7 @@ func GetHTTPFlowNextPartPathByPathPrefix(db *gorm.DB, originPathPrefix string) [
 	//	return r == '/'
 	//}), "/")
 	pathPrefix := strings.TrimLeft(originPathPrefix, "/")
+	db = db.Order("", true).Limit(nil).Offset(nil)
 	db = db.Select("url").Table("http_flows").Where("url LIKE ?", `%`+pathPrefix+`%`).Limit(1000) //.Debug()
 	urlsMap := make(map[string]bool)
 	var urls []string
