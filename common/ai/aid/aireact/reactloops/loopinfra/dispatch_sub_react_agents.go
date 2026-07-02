@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -161,7 +162,6 @@ func runForkedSubReactAgentJob(
 		return result, nil
 	}
 
-	reactloops.EmitActionLog(parentLoop, loopInfraNodeDispatchSubReact, job.Goal)
 	execErr := subLoop.ExecuteWithExistedTask(subTask)
 	result, _ := buildSubReactJobResult(job, startedAt, subTask, subLoop, fork, execErr)
 	return result, nil
@@ -679,14 +679,7 @@ func formatDispatchSubReactJobDisplayLine(job subReactDispatchJob) string {
 	if identifier == "" && goal == "" {
 		return ""
 	}
-	if identifier == "" {
-		if job.Order > 0 {
-			identifier = fmt.Sprintf("sub_agent_%d", job.Order)
-		} else {
-			identifier = "sub_agent"
-		}
-	}
-	line := fmt.Sprintf("- [%s] %s", identifier, goal)
+	line := fmt.Sprintf("- %s", goal)
 	if loopName := strings.TrimSpace(job.LoopName); loopName != "" && loopName != schema.AI_REACT_LOOP_NAME_DEFAULT {
 		line += fmt.Sprintf(" (loop: %s)", loopName)
 	}
@@ -701,25 +694,15 @@ func dispatchSubReactDispatchesStreamHandler(fieldReader io.Reader, emitWriter i
 }
 
 func writeDispatchSubReactDispatchesDisplayStream(reader io.Reader, writer io.Writer) error {
-	decoder := json.NewDecoder(reader)
-	token, err := decoder.Token()
-	if err != nil {
-		return err
-	}
-	delim, ok := token.(json.Delim)
-	if !ok || delim != '[' {
-		return utils.Error("dispatches is not a JSON array")
-	}
-
+	// Stream each dispatch object as soon as it completes in the JSON array,
+	// instead of buffering the whole array via encoding/json. The structured
+	// streaming extractor invokes the object callback inline in parse order, so
+	// goals are emitted one-by-one as they arrive.
 	firstLine := true
-	for decoder.More() {
-		var job subReactDispatchJob
-		if err := decoder.Decode(&job); err != nil {
-			return err
-		}
-		line := formatDispatchSubReactJobDisplayLine(job)
+	order := 0
+	emitLine := func(line string) error {
 		if strings.TrimSpace(line) == "" {
-			continue
+			return nil
 		}
 		if !firstLine {
 			if _, err := writer.Write([]byte("\n")); err != nil {
@@ -727,11 +710,34 @@ func writeDispatchSubReactDispatchesDisplayStream(reader io.Reader, writer io.Wr
 			}
 		}
 		firstLine = false
-		if _, err := io.WriteString(writer, line); err != nil {
-			return err
-		}
+		_, err := io.WriteString(writer, line)
+		return err
 	}
-	_, err = decoder.Token()
+
+	err := jsonextractor.ExtractStructuredJSONFromStream(reader,
+		jsonextractor.WithObjectCallback(func(data map[string]any) {
+			params := aitool.InvokeParams(data)
+			goal := strings.TrimSpace(params.GetString("goal"))
+			// Skip objects without a goal: they are either incomplete stream
+			// fragments or nested maps that are not dispatch jobs.
+			if goal == "" {
+				return
+			}
+			order++
+			job := subReactDispatchJob{
+				Order:      order,
+				Identifier: strings.TrimSpace(params.GetString("identifier")),
+				Goal:       goal,
+				LoopName:   strings.TrimSpace(params.GetString("loop_name")),
+			}
+			if e := emitLine(formatDispatchSubReactJobDisplayLine(job)); e != nil {
+				log.Debugf("dispatch_sub_react_agents: dispatches display stream write failed: %v", e)
+			}
+		}),
+		jsonextractor.WithStreamErrorCallback(func(err error) {
+			log.Debugf("dispatch_sub_react_agents: dispatches display stream parse error: %v", err)
+		}),
+	)
 	return err
 }
 
@@ -778,7 +784,7 @@ var loopAction_DispatchSubReactAgents = &reactloops.LoopAction{
 			FieldName:     "dispatches",
 			AINodeId:      loopInfraNodeDispatchSubReact,
 			StreamHandler: dispatchSubReactDispatchesStreamHandler,
-			IsSystem:      true,
+			ContentType:   aicommon.TypeTextMarkdown,
 		},
 		{
 			FieldName: "concurrency",
