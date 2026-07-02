@@ -41,7 +41,13 @@ func init() {
 		reactloops.WithLoopDescriptionZh("代码安全审计模式：四阶段流水线（项目探索→结构化扫描→逐 finding 验证→报告生成）。"),
 		reactloops.WithVerboseName("Code Security Audit"),
 		reactloops.WithVerboseNameZh("代码安全审计"),
-		reactloops.WithLoopUsagePrompt(`当用户需要使用 AI 独立对整个代码项目进行安全审计时使用此流程。流程分四阶段：Phase 1 项目探索 → Phase 2 结构化 Finding 扫描 → Phase 3 逐 Finding 验证 → Phase 4 Markdown 报告生成。`),
+		reactloops.WithLoopUsagePrompt(`当用户需要使用 AI 独立对整个代码项目进行安全审计时使用此流程。流程分四阶段：Phase 1 项目探索 → Phase 2 结构化 Finding 扫描 → Phase 3 逐 Finding 验证 → Phase 4 Markdown 报告生成。
+
+前端 AttachedResourceInfo 与 ai_skill_audit 完全相同（仅 FocusModeLoop 不同）：
+- Type=file, Key=directory_path — 扫描根目录
+- Type=file, Key=file_path — 当前打开文件（Phase2 聚焦）
+- Type=selected, Key=content — 选中代码片段 JSON（Phase2 聚焦）
+旧版兼容 Key：code_audit_target_path（新前端无需传递）`),
 		reactloops.WithLoopOutputExample(`
 * 当需要进行代码安全审计时：
   {"@action": "code_security_audit", "human_readable_thought": "需要对项目进行全面的安全审计"}
@@ -145,6 +151,19 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *AuditState) fu
 		reactloops.EmitStatus(loop, "代码安全审计启动 / Starting code security audit")
 		r.AddToTimeline("[AUDIT_START]", "代码安全审计开始，用户输入: "+utils.ShrinkTextBlock(userInput, 300))
 
+		ws := reactloops.InitWorkspaceAttachedContext(r, loop, task, AttachedResourceKeyCodeAuditTargetPath)
+		reactloops.RecordWorkspaceAttachedTimeline(r, ws, "CODE_AUDIT")
+		if ws != nil {
+			var sel *aicommon.AttachedCodeSelection
+			if ws.Selection != nil {
+				copied := *ws.Selection
+				sel = &copied
+			}
+			if ws.FilePath != "" || sel != nil {
+				state.SetFrontendFocus(ws.FilePath, sel)
+			}
+		}
+
 		// 提前创建 audit 输出目录
 		auditDirPath := auditDir(state)
 		if err := os.MkdirAll(auditDirPath, 0o755); err != nil {
@@ -166,23 +185,19 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *AuditState) fu
 			reactloops.WithVar("output_report_path", reconFilePath),
 			reactloops.WithVar("explore_work_dir", auditDirPath),
 		}
-		if scanPath := scanTargetPathFromTask(task); scanPath != "" {
-			if st, err := os.Stat(scanPath); err != nil {
-				log.Warnf("[CodeAudit] attached target path not accessible: %q: %v", scanPath, err)
-				op.Failed(fmt.Sprintf(
-					"[CodeAudit] 附件指定的扫描目录无效: %q（%v）。请确认 Type=%q、Key=%q、Value 为存在的目录绝对路径。",
-					scanPath, err, AttachedResourceTypeFile, AttachedResourceKeyCodeAuditTargetPath))
-				return
-			} else if !st.IsDir() {
-				log.Warnf("[CodeAudit] attached target path is not a directory: %q", scanPath)
-				op.Failed(fmt.Sprintf(
-					"[CodeAudit] 附件指定的路径不是目录: %q。请为 Key=%q 提供项目根目录。",
-					scanPath, AttachedResourceKeyCodeAuditTargetPath))
-				return
+		if ws != nil {
+			if scanPath := ws.ResolveAttachedScanDirectory(); scanPath != "" {
+				if err := reactloops.ValidateAttachedDirectoryTarget(scanPath); err != nil {
+					log.Warnf("[CodeAudit] attached target path not accessible: %q: %v", scanPath, err)
+					op.Failed(fmt.Sprintf(
+						"[CodeAudit] %s",
+						reactloops.FormatAttachedDirectoryValidationError(scanPath, AttachedResourceKeyCodeAuditTargetPath, err)))
+					return
+				}
+				exploreOpts = reactloops.WithExploreTargetPath(exploreOpts, scanPath)
+				log.Infof("[CodeAudit] Phase1 using attached scan target: %s", scanPath)
+				reactloops.RecordExploreTargetTimeline(r, ws, scanPath, "CODE_AUDIT")
 			}
-			exploreOpts = append(exploreOpts, reactloops.WithVar("target_path", scanPath))
-			log.Infof("[CodeAudit] Phase1 using attached scan target: %s", scanPath)
-			r.AddToTimeline("[CODE_AUDIT_TARGET]", "扫描目标目录(附件): "+scanPath)
 		}
 		exploreLoop, err := reactloops.CreateLoopByName(
 			schema.AI_REACT_LOOP_NAME_DIR_EXPLORE,

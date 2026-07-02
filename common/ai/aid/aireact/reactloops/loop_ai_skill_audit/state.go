@@ -1,7 +1,10 @@
 package loop_ai_skill_audit
 
 import (
+	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
 
 // SkillAuditState holds shared state across all phases of the AI Skill audit.
@@ -10,6 +13,10 @@ type SkillAuditState struct {
 
 	WorkDir   string
 	SkillPath string
+
+	// Frontend attachment focus (directory_path / file_path / selected)
+	FocusFilePath string
+	Selection     *aicommon.AttachedCodeSelection
 
 	// Populated after Phase 1 (dir_explore)
 	SkillName      string
@@ -21,7 +28,8 @@ type SkillAuditState struct {
 	// Populated after Phase 2 (static analysis)
 	// RiskLevel is one of: "Clean", "Medium", "High", "Critical"
 	RiskLevel       string
-	FindingsSummary string // Markdown-formatted findings detail
+	AlignmentTable  string
+	FindingsSummary string // full FINDINGS AITag markdown
 	AuditNoteFiles  []string
 
 	// Populated after Phase 3 (report_generating)
@@ -39,6 +47,43 @@ func (s *SkillAuditState) SetProjectInfo(skillPath, skillName string) {
 	defer s.mu.Unlock()
 	s.SkillPath = skillPath
 	s.SkillName = skillName
+}
+
+func (s *SkillAuditState) SetFrontendFocus(filePath string, selection *aicommon.AttachedCodeSelection) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.FocusFilePath = filePath
+	if selection != nil {
+		copied := *selection
+		s.Selection = &copied
+	} else {
+		s.Selection = nil
+	}
+}
+
+func (s *SkillAuditState) GetFocusFilePath() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.FocusFilePath
+}
+
+func (s *SkillAuditState) GetSelection() *aicommon.AttachedCodeSelection {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.Selection == nil {
+		return nil
+	}
+	copied := *s.Selection
+	return &copied
+}
+
+func (s *SkillAuditState) HasFrontendFocus() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if strings.TrimSpace(s.FocusFilePath) != "" {
+		return true
+	}
+	return s.Selection != nil && strings.TrimSpace(s.Selection.Content) != ""
 }
 
 func (s *SkillAuditState) SetReconResult(techStack, entryPoints string) {
@@ -77,11 +122,24 @@ func (s *SkillAuditState) AddAuditNoteFile(path string) {
 }
 
 // SetAuditResult stores the outcome of Phase 2 static analysis.
-func (s *SkillAuditState) SetAuditResult(riskLevel, findingsSummary string) {
+func (s *SkillAuditState) SetAuditResult(riskLevel, alignmentTable, findingsSummary string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.RiskLevel = riskLevel
+	s.AlignmentTable = alignmentTable
 	s.FindingsSummary = findingsSummary
+}
+
+func (s *SkillAuditState) GetAlignmentTable() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.AlignmentTable
+}
+
+func (s *SkillAuditState) GetFindingsSummary() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.FindingsSummary
 }
 
 func (s *SkillAuditState) SetFinalReport(report string) {
