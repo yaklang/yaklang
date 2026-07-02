@@ -123,22 +123,33 @@ func (m *BrowserManager) Open(opts ...BrowserOption) (*BrowserInstance, error) {
 	id := config.id
 
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	if inst, ok := m.browsers[id]; ok && !inst.IsClosed() {
 		if err := inst.healthCheck(); err != nil {
 			log.Warnf("browser instance %q unhealthy (%v), recreating", id, err)
 			delete(m.browsers, id)
+			m.mu.Unlock()
 			_ = inst.Close()
 		} else {
+			m.mu.Unlock()
 			log.Infof("reusing existing browser instance %q", id)
 			return inst, nil
 		}
+	} else {
+		m.mu.Unlock()
 	}
 
 	inst, err := newBrowserInstance(id, config)
 	if err != nil {
 		return nil, fmt.Errorf("open browser %q: %w", id, err)
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if existing, ok := m.browsers[id]; ok && !existing.IsClosed() {
+		_ = inst.Close()
+		log.Infof("reusing existing browser instance %q", id)
+		return existing, nil
 	}
 
 	m.browsers[id] = inst
@@ -180,40 +191,50 @@ func (m *BrowserManager) CloseByID(opts ...BrowserOption) error {
 	id := config.id
 
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	inst, ok := m.browsers[id]
 	if !ok {
+		m.mu.Unlock()
 		return fmt.Errorf("browser instance %q not found", id)
 	}
-
-	err := inst.Close()
 	delete(m.browsers, id)
-	return err
+	m.mu.Unlock()
+
+	return inst.Close()
 }
 
 // Evict removes a browser instance from the manager and closes it.
 // Used when CDP is dead but IsClosed() is still false (zombie instance).
 func (m *BrowserManager) Evict(id string) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	inst, ok := m.browsers[id]
 	if !ok {
+		m.mu.Unlock()
 		return
 	}
 	delete(m.browsers, id)
+	m.mu.Unlock()
+
 	log.Warnf("evicting broken browser instance %q from manager", id)
 	_ = inst.Close()
 }
 
 func (m *BrowserManager) CloseAll() {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	for id, inst := range m.browsers {
-		if err := inst.Close(); err != nil {
-			log.Errorf("close browser instance %q: %v", id, err)
-		}
+	instances := make([]*BrowserInstance, 0, len(m.browsers))
+	for _, inst := range m.browsers {
+		instances = append(instances, inst)
+	}
+	for id := range m.browsers {
 		delete(m.browsers, id)
+	}
+	m.mu.Unlock()
+
+	for _, inst := range instances {
+		if inst == nil {
+			continue
+		}
+		if err := inst.Close(); err != nil {
+			log.Errorf("close browser instance %q: %v", inst.ID(), err)
+		}
 	}
 }

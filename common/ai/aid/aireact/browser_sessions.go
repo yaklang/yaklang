@@ -72,11 +72,11 @@ func (r *ReAct) CloseBrowserSession(id string) error {
 	if id == "" {
 		return nil
 	}
-	if err := browser.CloseByID(browser.WithID(id)); err != nil {
-		return err
-	}
+	closeErr := browser.CloseByID(browser.WithID(id))
+	// Always untrack so session_snapshot background_processes stay in sync with UI close requests,
+	// even when the underlying browser instance is already gone.
 	r.removeBrowserSessionTracking(id)
-	return nil
+	return closeErr
 }
 
 // CloseTrackedBrowserSessions closes all browser instances tracked for this ReAct session.

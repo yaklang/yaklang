@@ -147,8 +147,14 @@ func (inst *BrowserInstance) ControlURL() string {
 }
 
 func (inst *BrowserInstance) Navigate(urlStr string) (*BrowserPage, error) {
+	evictAfter := false
 	inst.mu.Lock()
-	defer inst.mu.Unlock()
+	defer func() {
+		inst.mu.Unlock()
+		if evictAfter {
+			globalManager.Evict(inst.id)
+		}
+	}()
 
 	if inst.closed {
 		return nil, fmt.Errorf("browser instance %q is closed", inst.id)
@@ -157,7 +163,7 @@ func (inst *BrowserInstance) Navigate(urlStr string) (*BrowserPage, error) {
 	page, err := inst.browser.Page(proto.TargetCreateTarget{URL: "about:blank"})
 	if err != nil {
 		if isBrokenCDPError(err) {
-			globalManager.Evict(inst.id)
+			evictAfter = true
 		}
 		return nil, fmt.Errorf("create page: %w", err)
 	}
@@ -167,7 +173,7 @@ func (inst *BrowserInstance) Navigate(urlStr string) (*BrowserPage, error) {
 	if err != nil {
 		_ = page.Close()
 		if isBrokenCDPError(err) {
-			globalManager.Evict(inst.id)
+			evictAfter = true
 		}
 		return nil, err
 	}
