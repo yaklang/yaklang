@@ -49,6 +49,9 @@ type CParserVisitor interface {
 	// Visit a parse tree produced by CParser#coreExpression.
 	VisitCoreExpression(ctx *CoreExpressionContext) interface{}
 
+	// Visit a parse tree produced by CParser#complexCoreExpression.
+	VisitComplexCoreExpression(ctx *ComplexCoreExpressionContext) interface{}
+
 	// Visit a parse tree produced by CParser#assignmentExpression.
 	VisitAssignmentExpression(ctx *AssignmentExpressionContext) interface{}
 
