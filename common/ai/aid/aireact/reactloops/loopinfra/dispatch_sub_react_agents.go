@@ -156,7 +156,7 @@ func runForkedSubReactAgentJob(
 		result, _ := buildSubReactJobResult(job, startedAt, subTask, nil, fork, err)
 		return result, nil
 	}
-
+	subTask.SetStatus(aicommon.AITaskState_Processing)
 	execErr := subLoop.ExecuteWithExistedTask(subTask)
 	result, _ := buildSubReactJobResult(job, startedAt, subTask, subLoop, fork, execErr)
 	return result, nil
