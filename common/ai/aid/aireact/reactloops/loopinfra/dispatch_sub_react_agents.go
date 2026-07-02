@@ -25,11 +25,11 @@ const (
 	dispatchSubReactJobsLoopKey        = "dispatch_sub_react_jobs"
 	dispatchSubReactConcurrencyLoopKey = "dispatch_sub_react_concurrency"
 
-	maxDispatchSubReactJobs       = 8
-	defaultDispatchConcurrency    = 3
-	maxDispatchConcurrency        = 5
-	defaultSubAgentMaxIterations  = 6
-	maxSubAgentMaxIterations      = 20
+	maxDispatchSubReactJobs       = 30
+	defaultDispatchConcurrency    = 5
+	maxDispatchConcurrency        = 10
+	defaultSubAgentMaxIterations  = 50
+	maxSubAgentMaxIterations      = 100
 	defaultSubAgentTimeoutSeconds = 0
 	maxSubAgentTimeoutSeconds     = 600
 )
