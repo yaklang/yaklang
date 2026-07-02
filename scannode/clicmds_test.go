@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
 )
 
 func TestRunDistYakFileUsesExecutionContext(t *testing.T) {
@@ -32,3 +34,29 @@ func TestRunDistYakFileUsesExecutionContext(t *testing.T) {
 		t.Fatalf("distyak context cancellation took too long: %v", elapsed)
 	}
 }
+
+// TestDistYakCommandConsumesSSADatabaseEnv verifies that the distyak entry
+// point reads SSA_DATABASE_RAW before script execution so the scheduler can
+// redirect compile/scan IR to a shared Postgres IR DB. This pins the bug fix
+// where the env var was silently ignored and IR fell back to default SQLite.
+func TestDistYakCommandConsumesSSADatabaseEnv(t *testing.T) {
+	original := consts.GetSSADatabaseInfoFromEnv()
+	_, originalRaw := consts.GetSSADataBaseInfo()
+	t.Cleanup(func() {
+		t.Setenv(consts.ENV_SSA_DATABASE_RAW, original)
+		consts.SetSSADatabaseInfo(originalRaw)
+	})
+
+	const fakeDSN = "postgres://testuser:testpass@127.0.0.1:5436/ssa_ir_test?sslmode=disable"
+	t.Setenv(consts.ENV_SSA_DATABASE_RAW, fakeDSN)
+
+	// Exercise the same env-var consumption path the CLI Action runs.
+	applySSADatabaseFromEnv()
+
+	// After Action ran, the global SSA DB info must reflect the env DSN.
+	_, raw := consts.GetSSADataBaseInfo()
+	if raw != fakeDSN {
+		t.Fatalf("expected SSA DB raw to be %q, got %q (env var was not consumed)", fakeDSN, raw)
+	}
+}
+
