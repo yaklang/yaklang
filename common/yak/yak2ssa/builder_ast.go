@@ -307,9 +307,30 @@ func (b *astbuilder) buildCallExpr(stmt *yak.CallExprContext) (c *ssa.Call) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
+	// functionCallExpr: expression（见 YaklangParser.g4）。这里刻意“只构造不 emit”，
+	// 由 go/defer 语句决定 emit 时机（异步调用 / defer 调用），因此不能直接走 buildExpression
+	// （后者会 EmitCall），而是从 expression 子树取出顶层 functionCall / instanceCode 再构造。
 	if funcCallExprStmt, ok := stmt.FunctionCallExpr().(*yak.FunctionCallExprContext); ok {
-		v := b.buildExpression(funcCallExprStmt.Expression().(*yak.ExpressionContext))
-		c = b.buildFunctionCall(funcCallExprStmt.FunctionCall().(*yak.FunctionCallContext), v)
+		expr, ok := funcCallExprStmt.Expression().(*yak.ExpressionContext)
+		if !ok || expr == nil {
+			return nil
+		}
+		if fc, ok := expr.FunctionCall().(*yak.FunctionCallContext); ok && fc != nil {
+			base, ok := expr.Expression(0).(*yak.ExpressionContext)
+			if !ok || base == nil {
+				b.NewError(ssa.Error, TAG, "call target is nil")
+				return nil
+			}
+			if v := b.buildExpression(base); v != nil {
+				c = b.buildFunctionCall(fc, v)
+			}
+			return c
+		}
+		if ic, ok := expr.InstanceCode().(*yak.InstanceCodeContext); ok && ic != nil {
+			return b.buildInstanceCode(ic)
+		}
+		b.NewError(ssa.Error, TAG, "expected a function call expression")
+		return nil
 	} else if instanceCodeStmt, ok := stmt.InstanceCode().(*yak.InstanceCodeContext); ok {
 		c = b.buildInstanceCode(instanceCodeStmt)
 	}
@@ -986,46 +1007,83 @@ func (b *astbuilder) buildLeftExpressionList(forceAssign bool, stmt *yak.LeftExp
 }
 
 // buildLeftExpression build left expression
+//
+// 语法已消歧为 `leftExpression: Identifier | expression`（见 YaklangParser.g4）：
+//   - 裸标识符（Identifier 备选）：a = 1
+//   - 成员访问（expression 备选，顶层为 memberCall）：a.b = 1 / a.$x = 1
+//   - 单下标访问（expression 备选，顶层为单下标 sliceCall）：a[0] = 1
+//
+// 其余表达式不是合法左值，报错返回 nil。
 func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpressionContext) *ssa.Variable {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
-	if s := stmt.Identifier(); s != nil {
-		text := s.GetText()
+
+	createVar := func(text string) *ssa.Variable {
 		if forceAssign {
 			return b.CreateLocalVariable(text)
-		} else {
-			return b.CreateVariable(text)
 		}
+		return b.CreateVariable(text)
 	}
-	// TODO: this is member call
-	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
-		var ret *ssa.Variable
-		expr := b.buildExpression(s)
 
-		if s, ok := stmt.LeftSliceCall().(*yak.LeftSliceCallContext); ok {
-			recoverRange := b.SetRange(s.BaseParserRuleContext)
-			if s, ok := s.Expression().(*yak.ExpressionContext); ok {
-				index := b.buildExpression(s)
-				ret = b.CreateMemberCallVariable(expr, index)
-			}
-			recoverRange()
-		}
-
-		if s, ok := stmt.LeftMemberCall().(*yak.LeftMemberCallContext); ok {
-			recoverRange := b.SetRange(s.BaseParserRuleContext)
-			if id := s.Identifier(); id != nil {
-				idText := id.GetText()
-				callee := b.EmitConstInstPlaceholder(idText)
-				ret = b.CreateMemberCallVariable(expr, callee)
-			} else if id := s.IdentifierWithDollar(); id != nil {
-				key := b.ReadValue(id.GetText()[1:])
-				ret = b.CreateMemberCallVariable(expr, key)
-			}
-			recoverRange()
-		}
-		return ret
-
+	// Identifier 备选：裸标识符左值
+	if s := stmt.Identifier(); s != nil {
+		return createVar(s.GetText())
 	}
+
+	expr, ok := stmt.Expression().(*yak.ExpressionContext)
+	if !ok || expr == nil {
+		b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
+		return nil
+	}
+
+	// 兜底：expression 顶层就是裸标识符（正常会被 Identifier 备选优先命中）
+	if id := expr.Identifier(); id != nil && len(expr.AllExpression()) == 0 &&
+		expr.MemberCall() == nil && expr.SliceCall() == nil && expr.FunctionCall() == nil {
+		return createVar(id.GetText())
+	}
+
+	// 成员赋值 a.b = ... / a.$x = ...
+	if m, ok := expr.MemberCall().(*yak.MemberCallContext); ok && m != nil {
+		base, ok := expr.Expression(0).(*yak.ExpressionContext)
+		if !ok || base == nil {
+			b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
+			return nil
+		}
+		obj := b.buildExpression(base)
+		recoverRange := b.SetRange(m.BaseParserRuleContext)
+		defer recoverRange()
+		if id := m.Identifier(); id != nil {
+			callee := b.EmitConstInstPlaceholder(id.GetText())
+			return b.CreateMemberCallVariable(obj, callee)
+		} else if id := m.IdentifierWithDollar(); id != nil {
+			key := b.ReadValue(id.GetText()[1:])
+			return b.CreateMemberCallVariable(obj, key)
+		}
+		return nil
+	}
+
+	// 下标赋值 a[0] = ...（仅单下标 [expr] 形式可作为左值）
+	if s, ok := expr.SliceCall().(*yak.SliceCallContext); ok && s != nil {
+		base, ok := expr.Expression(0).(*yak.ExpressionContext)
+		if !ok || base == nil {
+			b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
+			return nil
+		}
+		if len(s.AllColon()) != 0 || len(s.AllExpression()) != 1 {
+			b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
+			return nil
+		}
+		obj := b.buildExpression(base)
+		recoverRange := b.SetRange(s.BaseParserRuleContext)
+		defer recoverRange()
+		if idx, ok := s.Expression(0).(*yak.ExpressionContext); ok {
+			index := b.buildExpression(idx)
+			return b.CreateMemberCallVariable(obj, index)
+		}
+		return nil
+	}
+
+	b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
 	return nil
 }
 
