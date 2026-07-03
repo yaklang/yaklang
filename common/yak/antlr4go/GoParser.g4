@@ -194,30 +194,28 @@ statement
 
 simpleStmt
     : sendStmt
-    | incDecStmt
-    | assignment
-    | expressionStmt
     | shortVarDecl
+    | exprSimpleStmt
     ;
 
-assignment
-    : expressionList assign_op ws* expressionList
+/*
+exprSimpleStmt 消歧 (SLL):
+assignment / expressionStmt / incDecStmt 共享 expressionList 前缀，
+判别点后移到 expressionList 之后的 assign_op / ++ / -- / eos。
+*/
+exprSimpleStmt
+    : expressionList (
+        assign_op ws* expressionList
+        | (PLUS_PLUS | MINUS_MINUS)
+      )?
     ;
 
 assign_op
     : (PLUS | MINUS | OR | CARET | STAR | DIV | MOD | LSHIFT | RSHIFT | AMPERSAND | BIT_CLEAR)? ASSIGN
     ;
 
-expressionStmt
-    : expression
-    ;
-
 sendStmt
     : channel = expression RECEIVE data = expression
-    ;
-
-incDecStmt
-    : expression (PLUS_PLUS | MINUS_MINUS)
     ;
 
 shortVarDecl

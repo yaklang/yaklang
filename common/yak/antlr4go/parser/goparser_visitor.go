@@ -94,20 +94,14 @@ type GoParserVisitor interface {
 	// Visit a parse tree produced by GoParser#simpleStmt.
 	VisitSimpleStmt(ctx *SimpleStmtContext) interface{}
 
-	// Visit a parse tree produced by GoParser#assignment.
-	VisitAssignment(ctx *AssignmentContext) interface{}
+	// Visit a parse tree produced by GoParser#exprSimpleStmt.
+	VisitExprSimpleStmt(ctx *ExprSimpleStmtContext) interface{}
 
 	// Visit a parse tree produced by GoParser#assign_op.
 	VisitAssign_op(ctx *Assign_opContext) interface{}
 
-	// Visit a parse tree produced by GoParser#expressionStmt.
-	VisitExpressionStmt(ctx *ExpressionStmtContext) interface{}
-
 	// Visit a parse tree produced by GoParser#sendStmt.
 	VisitSendStmt(ctx *SendStmtContext) interface{}
-
-	// Visit a parse tree produced by GoParser#incDecStmt.
-	VisitIncDecStmt(ctx *IncDecStmtContext) interface{}
 
 	// Visit a parse tree produced by GoParser#shortVarDecl.
 	VisitShortVarDecl(ctx *ShortVarDeclContext) interface{}

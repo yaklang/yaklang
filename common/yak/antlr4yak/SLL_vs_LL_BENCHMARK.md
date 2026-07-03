@@ -189,3 +189,33 @@ go test ./common/yak/antlr4yak/ -run TestPerf_SLLBailDiagnostic -v -count=1
 ```
 
 > 注：以上耗时为特定机器上的相对参考值，绝对数字会因硬件而异，重点看 LL 与 SLL 的**倍数关系**。
+
+---
+
+## 8. Go Parser（antlr4go / go2ssa）
+
+### 8.1 Runtime
+
+Go SSA 前端 [`go2ssa/builder.go`](common/yak/go2ssa/builder.go) 的 `Frontend()` 已使用 `antlr4util.ParseASTWithSLLFirst`，与 Yaklang SSA 共用 `YAK_ANTLR_SLL_FIRST` 开关。
+
+### 8.2 语法消歧：`exprSimpleStmt`
+
+[`GoParser.g4`](common/yak/antlr4go/GoParser.g4) 将 `assignment` / `expressionStmt` / `incDecStmt` 合并为 `exprSimpleStmt`（与 Yaklang §6.1 同类思路）：左值/表达式前缀走同一条 ATN 路径，判别点后移到 `assign_op` / `++` / `--` / eos。
+
+`go2ssa/builder_ast.go` 通过 `buildExprSimpleStmt` 适配新 AST 形状。
+
+### 8.3 SLL bail 现状（go2ssa fixture 84 个）
+
+`TestGo_SLLBailDiagnostic` 守卫：**SLL 未 bail 时解析树必须与 LL 逐字符一致**；当前 **12/84** fixture 仍会 SLL bail（主要是 `if`/`for` 控制流与多行表达式中的共享前缀歧义），两阶段解析自动回退 LL，Frontend 与 SSA 构建仍正确。
+
+已知 bail fixture 示例：`foreachStmts.go`（`for range`）、`multiline_logical_expr.go`、`if_condition_comments.go` 等。
+
+### 8.4 复现命令
+
+```bash
+# 正确性守卫（CI 应始终跑）
+go test ./common/yak/go2ssa/test/ -run "TestGo_SLL|TestAllSyntaxForGo" -count=1 -v
+
+# 性能基准（可选）
+GO_PARSER_BENCH=1 go test ./common/yak/go2ssa/test/ -run TestGo_LexerVsParser -count=1 -v
+```
