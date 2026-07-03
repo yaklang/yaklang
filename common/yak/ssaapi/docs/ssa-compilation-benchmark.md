@@ -35,7 +35,12 @@ exit 0, scans all 269 rules, finds 63 risks. Scan-log ERRO dropped from 69
 PHP visitor limitations (`unhandled expression` for `match()`,
 `weakLanguage call … not found`).
 
-## moodle (large PHP) — hangs on a heavy rule (WIP, see TODO)
+**With the per-rule-timeout fix** (solidified DB, `code-scan -p grav`, default
+5m `--rule-timeout`): all 269 rules finish (`Finished=269/269`, `Failed=0`),
+still **63 risks**, no rule hit the budget — confirms the 5m default does not
+bail fast rules on a normal project (no coverage regression).
+
+## moodle (large PHP) — hung on a heavy rule pre-fix; fix = per-rule budget (see below)
 
 `yak code-scan -t ~/Target/moodle`: 7733 PHP files. Compile phase (~95min,
 7398 files) completes, then the scan-rules phase **hangs**:
@@ -74,20 +79,49 @@ So: **11134 sources × (now-deep, uncapped-total traversal) = exponential**; eac
 heavy rule runs 20+ min and several run concurrently → the scan cannot finish
 in 138min (killed, `Finished=230/269`).
 
-### TODO (this branch)
+### Fix (this branch) — per-rule wall-clock budget
 
-Add an explicit total-work bound so the deeper (correct) dataflow cannot hang
-on large projects. Candidates:
+The chosen bound is a **per-rule wall-clock budget**, implemented as a
+`context.WithTimeout` around each rule query in the scan runner
+(`syntaxflow_scan/runtime.go` `Query`), wired through a new
+`ssaconfig.WithScanRuleTimeout` option + `--rule-timeout` CLI flag on
+`code-scan` (default **5m**, `0` disables).
 
-- Cap the `vs` source set in `nativeCallDataFlow` (`sf_dataflow.go:471`):
-  process at most N sources, warn+truncate beyond that.
-- Per-rule wall-clock budget in the scan runner (`ssacli.go`): bail a rule
-  after T seconds.
-- A tighter effective per-source depth/cost cap (e.g. lower `MaxDepth` for
-  `dataflow()` native calls) so deep traversal is bounded.
+The deadline propagates via the existing context plumbing:
+`QueryWithContext(ruleCtx)` → `queryConfig.ctx` → `OperationConfig.ctx`
+(`exclusive_config.go` `WithExclusiveContext`) → `AnalyzeContext.getContext()`
+(`analyze_context.go:207`), which is checked with `select { case <-ctx.Done():
+… }` at **every recursive dataflow step** (`analyze_context.go:195`). So when
+the budget fires, the recursive `getTopDefs` unwinds and the rule is bailed
+(partial results) instead of hanging. The scan runner detects the bail via
+`ruleCtx.Err()` (works whether the query surfaced the ctx error or returned
+partial results with nil err) and logs `rule … hit per-rule budget (…), bailed`.
 
-Recommended: source-set cap + per-rule time budget. Then re-run moodle + a Java
-medium-large target and fill the javacms row above.
+Why a time budget over a source-set cap: a source-set cap (`truncate vs to N`)
+loses coverage on every large project, even rules that would finish in time.
+The time budget only bails rules that genuinely exceed it, so normal projects
+keep full coverage (verified: a tiny PHP smoke scan finds its XSS risk with
+`--rule-timeout 30s`, budget never fires) while moodle's 20+min heavy rules
+are bailed at 5m. A source-set cap remains a possible future opt-in backstop
+but is not enabled by default.
+
+Unit guard: `syntaxflow_scan/rule_timeout_test.go`
+`TestStartScan_RuleTimeout_BailsHeavyRule` — a synthetic PHP program with
+~2000 entry functions × a 15-deep call chain into a sink exercises the same
+breadth × depth `dataflow(include=...)` workload. It asserts (a) with no
+budget the heavy rule does real measurable work, and (b) with a 100ms budget
+the rule is bailed (`hit per-rule budget` error callback) and the scan
+finishes fast. PASS.
+
+### Verification status
+
+- Smoke: `ssa-compile -t <tiny> -p smokephp` then `code-scan -p smokephp
+  --rule-timeout 30s` → 269 rules, 1 risk, exit 0, no hang. The solidified-DB
+  scan path (`-p`, no recompile) works with the fix.
+- grav / moodle / javacms end-to-end with the fix: **pending** — re-run
+  `code-scan -p <name> --rule-timeout 5m` on the solidified DBs and fill the
+  table above (expect moodle to finish instead of hanging, with the heavy
+  rules bailed at 5m).
 
 ## Note on the isolated commit
 

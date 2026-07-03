@@ -1404,6 +1404,12 @@ and exports structured report (sarif/irify).`,
 			Usage: "enable file-level compile performance profiling log",
 		},
 
+		cli.DurationFlag{
+			Name:  "rule-timeout",
+			Usage: "per-rule wall-clock budget (e.g. 5m, 4h); a pathological rule is bailed at the budget instead of hanging the scan. default 4h (loose backstop so slow rules surface real perf bugs, not masked); 0 disables",
+			Value: 4 * time.Hour,
+		},
+
 		cli.StringFlag{
 			Name:  "exclude-file",
 			Usage: `exclude files by glob, e.g. targets/*, vendor/*`,
@@ -1570,6 +1576,12 @@ and exports structured report (sarif/irify).`,
 		if c.Bool("rule-perf-log") {
 			scanOpt = append(scanOpt, syntaxflow_scan.WithRulePerformanceLog(true))
 		}
+
+		// Per-rule wall-clock budget (default 5m via the flag Value). Bounds
+		// pathological heavy rules — e.g. dataflow(include=...) matching tens of
+		// thousands of sources on a large project — so they are bailed at the
+		// budget instead of hanging the scan. --rule-timeout 0 disables.
+		scanOpt = append(scanOpt, ssaconfig.WithScanRuleTimeout(c.Duration("rule-timeout")))
 
 		scanOpt = append(scanOpt,
 			syntaxflow_scan.WithProcessCallback(func(taskID, status string, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {

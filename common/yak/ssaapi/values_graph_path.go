@@ -1,14 +1,27 @@
 package ssaapi
 
 import (
+	"context"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/graph"
 )
 
 func (v *Value) GetDataflowPath(end ...*Value) []Values {
+	return v.GetDataflowPathWithContext(context.Background(), end...)
+}
+
+// GetDataflowPathWithContext is like [GetDataflowPath] but the DFS respects ctx:
+// when ctx is cancelled the path enumeration bails early (see graph.GraphPathEx /
+// DeepFirstPath.deepFirst). This is what lets the per-rule wall-clock budget
+// (syntaxflow_scan/runtime.go Query -> QueryWithContext -> sfvm.Config.ctx) reach
+// the heavy path enumeration that dataflow(include=...) triggers on large
+// projects. Without this, GraphPathWithKey used context.Background() and the
+// per-rule deadline never fired — heavy rules ran for hours.
+func (v *Value) GetDataflowPathWithContext(ctx context.Context, end ...*Value) []Values {
 	var paths []Values
-	effectPath := v.GetEffectOnPath(end...)
-	dependPath := v.GetDependOnPath(end...)
+	effectPath := v.GetEffectOnPathWithContext(ctx, end...)
+	dependPath := v.GetDependOnPathWithContext(ctx, end...)
 	addPath := func(effect, depend Values) {
 		path := make(Values, 0, len(effect)+len(depend)+1)
 		path = append(path, effect...)
@@ -36,13 +49,19 @@ func (v *Value) GetDataflowPath(end ...*Value) []Values {
 }
 
 func (v *Value) GetEffectOnPath(end ...*Value) []Values {
-	return v.getPathWithDirection(nil, func(node *Value) Values {
+	return v.GetEffectOnPathWithContext(context.Background(), end...)
+}
+func (v *Value) GetEffectOnPathWithContext(ctx context.Context, end ...*Value) []Values {
+	return v.getPathWithDirectionWithContext(ctx, nil, func(node *Value) Values {
 		return node.GetEffectOn()
 	}, end...)
 }
 
 func (v *Value) GetDependOnPath(end ...*Value) []Values {
-	return v.getPathWithDirection(nil, func(node *Value) Values {
+	return v.GetDependOnPathWithContext(context.Background(), end...)
+}
+func (v *Value) GetDependOnPathWithContext(ctx context.Context, end ...*Value) []Values {
+	return v.getPathWithDirectionWithContext(ctx, nil, func(node *Value) Values {
 		return node.GetDependOn()
 	}, end...)
 }
@@ -50,22 +69,31 @@ func (v *Value) GetDependOnPath(end ...*Value) []Values {
 // GetEffectOnPathWithEdgeFilter is like [GetEffectOnPath] but drops edges (from→to) when
 // edgeFilter returns false. A nil edgeFilter disables filtering.
 func (v *Value) GetEffectOnPathWithEdgeFilter(edgeFilter func(from, to *Value) bool, end ...*Value) []Values {
-	return v.getPathWithDirection(edgeFilter, func(node *Value) Values {
+	return v.GetEffectOnPathWithEdgeFilterWithContext(context.Background(), edgeFilter, end...)
+}
+func (v *Value) GetEffectOnPathWithEdgeFilterWithContext(ctx context.Context, edgeFilter func(from, to *Value) bool, end ...*Value) []Values {
+	return v.getPathWithDirectionWithContext(ctx, edgeFilter, func(node *Value) Values {
 		return node.GetEffectOn()
 	}, end...)
 }
 
 // GetDependOnPathWithEdgeFilter is like [GetDependOnPath] but drops edges when edgeFilter returns false.
 func (v *Value) GetDependOnPathWithEdgeFilter(edgeFilter func(from, to *Value) bool, end ...*Value) []Values {
-	return v.getPathWithDirection(edgeFilter, func(node *Value) Values {
+	return v.GetDependOnPathWithEdgeFilterWithContext(context.Background(), edgeFilter, end...)
+}
+func (v *Value) GetDependOnPathWithEdgeFilterWithContext(ctx context.Context, edgeFilter func(from, to *Value) bool, end ...*Value) []Values {
+	return v.getPathWithDirectionWithContext(ctx, edgeFilter, func(node *Value) Values {
 		return node.GetDependOn()
 	}, end...)
 }
 
 func (v *Value) GetDataflowPathWithEdgeFilter(edgeFilter func(from, to *Value) bool, end ...*Value) []Values {
+	return v.GetDataflowPathWithEdgeFilterWithContext(context.Background(), edgeFilter, end...)
+}
+func (v *Value) GetDataflowPathWithEdgeFilterWithContext(ctx context.Context, edgeFilter func(from, to *Value) bool, end ...*Value) []Values {
 	var paths []Values
-	effectPath := v.GetEffectOnPathWithEdgeFilter(edgeFilter, end...)
-	dependPath := v.GetDependOnPathWithEdgeFilter(edgeFilter, end...)
+	effectPath := v.GetEffectOnPathWithEdgeFilterWithContext(ctx, edgeFilter, end...)
+	dependPath := v.GetDependOnPathWithEdgeFilterWithContext(ctx, edgeFilter, end...)
 	addPath := func(effect, depend Values) {
 		path := make(Values, 0, len(effect)+len(depend)+1)
 		path = append(path, effect...)
@@ -92,8 +120,13 @@ func (v *Value) GetDataflowPathWithEdgeFilter(edgeFilter func(from, to *Value) b
 	return paths
 }
 
-func (this *Value) getPathWithDirection(edgeFilter func(from, to *Value) bool, next func(*Value) Values, end ...*Value) []Values {
-	ret := graph.GraphPathWithKey[int64, *Value](
+// getPathWithDirectionWithContext drives the DFS with ctx. GraphPathEx already
+// checks ctx.Done() at every node (DeepFirstPath.deepFirst), so a cancelled
+// rule ctx stops the enumeration. GraphPathWithKey (the old caller) hard-coded
+// context.Background(), which is why the per-rule budget never bounded it.
+func (this *Value) getPathWithDirectionWithContext(ctx context.Context, edgeFilter func(from, to *Value) bool, next func(*Value) Values, end ...*Value) []Values {
+	ret := graph.GraphPathEx[int64, *Value, *Value](
+		ctx,
 		this,
 		func(node *Value) []*Value { // next
 			if ValueContain(node, end...) {
@@ -113,6 +146,9 @@ func (this *Value) getPathWithDirection(edgeFilter func(from, to *Value) bool, n
 		},
 		func(node *Value) int64 { // getKey
 			return node.GetId()
+		},
+		func(t *Value) *Value { // getValue
+			return t
 		},
 	)
 	paths := make([]Values, 0, len(ret))

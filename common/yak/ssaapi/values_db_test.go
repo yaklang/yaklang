@@ -73,7 +73,7 @@ func TestValuesDB_Save_Audit_Node(t *testing.T) {
 
 		value3_1.Predecessors = []*ssaapi.PredecessorValue{{
 			Node: value1,
-			Info: &sfvm.AnalysisContext{
+			Info: sfvm.AnalysisContext{
 				Step:  -1,
 				Label: "dataflow_topdef",
 			},

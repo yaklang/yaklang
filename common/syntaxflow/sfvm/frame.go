@@ -324,7 +324,15 @@ func (s *SFFrame) WithPredecessorContext(label string) AnalysisContextOption {
 
 func (s *SFFrame) ProcessCallback(msg string, args ...any) {
 	if s.config.processCallback != nil {
-		s.config.processCallback(s.idx, fmt.Sprintf(msg, args...))
+		// Avoid fmt.Sprintf when there are no args: it still allocates a new
+		// string (and parses the format verb). ProcessCallback is called per
+		// opcode from execRule, so this is a hot path (Sprintf via
+		// ProcessCallback was ~32% of fmt.Sprintf allocs on large projects).
+		if len(args) == 0 {
+			s.config.processCallback(s.idx, msg)
+		} else {
+			s.config.processCallback(s.idx, fmt.Sprintf(msg, args...))
+		}
 	}
 }
 func (s *SFFrame) exec(feedValue Values) (ret error) {
@@ -369,13 +377,20 @@ func (s *SFFrame) execRule(feedValue Values) error {
 		}
 	}
 	for {
-		var msg string
-		if s.idx < len(s.Codes) {
-			msg = s.Codes[s.idx].String()
-		} else {
-			msg = "exec rule finished"
+		// Only build the per-opcode progress message when a progress callback is
+		// actually registered. s.Codes[s.idx].String() formats a debug string with
+		// fmt.Sprintf on EVERY opcode iteration; with no callback that string is
+		// discarded — pure allocation (SFI.String was ~27% of fmt.Sprintf allocs /
+		// ~200M calls on large projects, a top GC driver).
+		if s.config.processCallback != nil {
+			var msg string
+			if s.idx < len(s.Codes) {
+				msg = s.Codes[s.idx].String()
+			} else {
+				msg = "exec rule finished"
+			}
+			s.ProcessCallback(msg)
 		}
-		s.ProcessCallback(msg)
 		if s.idx >= len(s.Codes) {
 			break
 		}

@@ -1045,6 +1045,16 @@ func init() {
 				vals = append(vals, vx)
 			}
 			v.Recursive(func(operator sfvm.ValueOperator) error {
+				// <typeName> on a large project matches a huge value set (e.g. every
+				// call/instruction); addVals -> AppendPredecessor per element is the
+				// dominant CPU/alloc cost (see pprof: AppendPredecessor/ValueCompare).
+				// Re-check the per-rule ctx here so the --rule-timeout budget bails
+				// this loop instead of the rule running for hours inside one opcode.
+				select {
+				case <-frame.GetContext().Done():
+					return utils.Errorf("context done")
+				default:
+				}
 				switch val := operator.(type) {
 				case *Value:
 					typ := val.GetType()

@@ -8,8 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 
-	"golang.org/x/exp/slices"
-
 	"github.com/samber/lo"
 
 	"github.com/gobwas/glob"
@@ -163,13 +161,14 @@ func (v *Value) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.Values, [
 	if v == nil || comparator == nil {
 		return nil, []bool{false}
 	}
-	checkOp := func(opcode ssa.Opcode) bool {
-		return v.getOpcode() == opcode
-	}
-	checkBinOrUnaryOp := func(binOp string) bool {
-		ops := []string{v.GetBinaryOperator(), v.GetUnaryOperator()}
-		return slices.Contains(ops, binOp)
-	}
+	// Hoist the per-value op strings once (was inside the check closure, which
+	// allocated []string{...} + slices.Contains on EVERY comparator call → N
+	// values × K registered binOps = N*K slice allocations, a major GC driver).
+	vOpcode := v.getOpcode()
+	vBinOp := v.GetBinaryOperator()
+	vUnaryOp := v.GetUnaryOperator()
+	checkOp := func(opcode ssa.Opcode) bool { return vOpcode == opcode }
+	checkBinOrUnaryOp := func(op string) bool { return op == vBinOp || op == vUnaryOp }
 	return sfvm.ValuesOf(v), []bool{comparator.AllSatisfy(checkOp, checkBinOrUnaryOp)}
 }
 
@@ -280,29 +279,47 @@ func (v *Value) AppendPredecessor(operator sfvm.ValueOperator, opts ...sfvm.Anal
 	if !ok {
 		return nil
 	}
-	ctx := sfvm.NewDefaultAnalysisContext()
+	// Build the analysis context as a stack value (no heap allocation); it is
+	// inlined into the PredecessorValue below. The old code did
+	// `ctx := sfvm.NewDefaultAnalysisContext()` (a heap alloc) on every call,
+	// which was the #1 allocator and drove GC to ~66% of CPU on large projects.
+	ctx := sfvm.AnalysisContext{Step: -1, Label: ""}
 	for _, opt := range opts {
-		opt(ctx)
+		opt(&ctx)
 	}
-	for _, pred := range v.Predecessors {
-		if pred == nil || pred.Node == nil {
-			continue
-		}
-		if !ValueCompare(pred.Node, result) {
-			continue
-		}
-		if pred.Info == nil {
-			if ctx.Label == "" && ctx.Step == -1 {
+	// The dedup scan is O(len(Predecessors)) per append, so appending N distinct
+	// nodes to one value is O(N^2) ValueCompare calls. On a large project a single
+	// <typeName> const-value can collect thousands of distinct callers (each a
+	// distinct node, so the scan never finds a match — pure waste), which made
+	// heavy rules spend hours in one AppendPredecessor and hang the scan (see
+	// pprof: AppendPredecessor/ValueCompare dominated). Cap the scan: when a value
+	// already has many predecessors, skip the linear dedup and just append. Dups
+	// beyond the cap are redundant (not incorrect), and this bounds AppendPredecessor
+	// to O(predecessorDedupCap) instead of O(N).
+	const predecessorDedupCap = 256
+	if len(v.Predecessors) <= predecessorDedupCap {
+		for _, pred := range v.Predecessors {
+			if pred == nil || pred.Node == nil {
+				continue
+			}
+			if !ValueCompare(pred.Node, result) {
+				continue
+			}
+			// Info is now a value type (never nil). A predecessor with the default
+			// context {Step:-1, Label:""} matches a new default context.
+			if pred.Info.Label == ctx.Label && pred.Info.Step == ctx.Step {
 				return nil
 			}
-			continue
-		}
-		if pred.Info.Label == ctx.Label && pred.Info.Step == ctx.Step {
-			return nil
 		}
 	}
-	if len(v.Predecessors) > 30 {
-		log.Warnf("Value %s Predecessors too many: %d", v.StringWithRange(), len(v.Predecessors))
+	// "Predecessors too many" used to fire a log.Warnf (fmt.Sprintf + IO) on EVERY
+	// append past 30 — for a <typeName> value with thousands of callers that was
+	// thousands of warnings, and the Warnf Sprintf was ~44% of AppendPredecessor's
+	// allocation (AppendPredecessor was ~12% of all allocs). Only log the transition
+	// into the "too many" regime (31) so a pathological value is reported once, not
+	// once per append.
+	if len(v.Predecessors) == 31 {
+		log.Warnf("Value %s Predecessors too many (>=31), further appends skip dedup", v.StringWithRange())
 	}
 	v.Predecessors = append(v.Predecessors, &PredecessorValue{Node: result, Info: ctx})
 	return nil
