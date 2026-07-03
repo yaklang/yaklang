@@ -25,7 +25,7 @@ const (
 	PostgresPort          = 5435
 	PostgresUser          = "palm-user"
 	PostgresContainerName = "palm-postgres"
-	PostgresImageName     = "postgres:12.4"
+	PostgresImageName     = "postgres:16"
 )
 
 // PALM_POSTGRES_HOST

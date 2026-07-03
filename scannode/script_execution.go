@@ -63,6 +63,10 @@ func (s *ScanNode) executeScriptTask(
 		defer reporter.ssaCollector.Cleanup()
 	}
 	ssaDBEnv := extractSSADatabaseEnv(keyValues)
+	expectedIRSchemaVersion := extractExpectedIRSchemaVersion(keyValues)
+	if err := s.checkIRSchemaVersion(taskCtx, ssaDBEnv, expectedIRSchemaVersion, reporter); err != nil {
+		return nil, err
+	}
 	result := &ScriptExecutionResult{}
 	yakitServer := s.createYakitServer(reporter, result)
 	yakitServer.Start()

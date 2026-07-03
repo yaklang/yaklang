@@ -1,0 +1,3850 @@
+{
+  "tables": [
+    "audit_edges",
+    "audit_nodes",
+    "audit_results",
+    "ir_codes",
+    "ir_indices_v1",
+    "ir_name_pool_v1",
+    "ir_offsets",
+    "ir_programs",
+    "ir_sources",
+    "ir_types",
+    "project_general_storages",
+    "report_records",
+    "ssa_diff_results",
+    "ssa_report_record_files",
+    "ssa_report_records",
+    "ssa_risk_disposals",
+    "ssa_risks",
+    "syntax_flow_scan_tasks"
+  ],
+  "columns": [
+    {
+      "table": "audit_edges",
+      "column": "id",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "NO",
+      "default": "nextval('audit_edges_id_seq'::regclass)",
+      "position": 1
+    },
+    {
+      "table": "audit_edges",
+      "column": "created_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 2
+    },
+    {
+      "table": "audit_edges",
+      "column": "updated_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 3
+    },
+    {
+      "table": "audit_edges",
+      "column": "deleted_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 4
+    },
+    {
+      "table": "audit_edges",
+      "column": "task_id",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 5
+    },
+    {
+      "table": "audit_edges",
+      "column": "result_id",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 6
+    },
+    {
+      "table": "audit_edges",
+      "column": "from_node",
+      "data_type": "character",
+      "udt_name": "bpchar",
+      "char_max_len": 26,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 7
+    },
+    {
+      "table": "audit_edges",
+      "column": "to_node",
+      "data_type": "character",
+      "udt_name": "bpchar",
+      "char_max_len": 26,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 8
+    },
+    {
+      "table": "audit_edges",
+      "column": "program_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 9
+    },
+    {
+      "table": "audit_edges",
+      "column": "edge_type",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 10
+    },
+    {
+      "table": "audit_edges",
+      "column": "analysis_step",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 11
+    },
+    {
+      "table": "audit_edges",
+      "column": "analysis_label",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 12
+    },
+    {
+      "table": "audit_nodes",
+      "column": "id",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "NO",
+      "default": "nextval('audit_nodes_id_seq'::regclass)",
+      "position": 1
+    },
+    {
+      "table": "audit_nodes",
+      "column": "created_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 2
+    },
+    {
+      "table": "audit_nodes",
+      "column": "updated_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 3
+    },
+    {
+      "table": "audit_nodes",
+      "column": "deleted_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 4
+    },
+    {
+      "table": "audit_nodes",
+      "column": "task_id",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 5
+    },
+    {
+      "table": "audit_nodes",
+      "column": "result_id",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 6
+    },
+    {
+      "table": "audit_nodes",
+      "column": "result_variable",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 7
+    },
+    {
+      "table": "audit_nodes",
+      "column": "result_index",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 8
+    },
+    {
+      "table": "audit_nodes",
+      "column": "risk_hash",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 9
+    },
+    {
+      "table": "audit_nodes",
+      "column": "rule_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 10
+    },
+    {
+      "table": "audit_nodes",
+      "column": "rule_title",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 11
+    },
+    {
+      "table": "audit_nodes",
+      "column": "program_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 12
+    },
+    {
+      "table": "audit_nodes",
+      "column": "is_entry_node",
+      "data_type": "boolean",
+      "udt_name": "bool",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 13
+    },
+    {
+      "table": "audit_nodes",
+      "column": "ir_code_id",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 14
+    },
+    {
+      "table": "audit_nodes",
+      "column": "node_id",
+      "data_type": "character",
+      "udt_name": "bpchar",
+      "char_max_len": 26,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 15
+    },
+    {
+      "table": "audit_nodes",
+      "column": "tmp_value",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 16
+    },
+    {
+      "table": "audit_nodes",
+      "column": "tmp_value_file_hash",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 17
+    },
+    {
+      "table": "audit_nodes",
+      "column": "tmp_start_offset",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 18
+    },
+    {
+      "table": "audit_nodes",
+      "column": "tmp_end_offset",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 19
+    },
+    {
+      "table": "audit_nodes",
+      "column": "verbose_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 20
+    },
+    {
+      "table": "audit_results",
+      "column": "id",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "NO",
+      "default": "nextval('audit_results_id_seq'::regclass)",
+      "position": 1
+    },
+    {
+      "table": "audit_results",
+      "column": "created_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 2
+    },
+    {
+      "table": "audit_results",
+      "column": "updated_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 3
+    },
+    {
+      "table": "audit_results",
+      "column": "deleted_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 4
+    },
+    {
+      "table": "audit_results",
+      "column": "task_id",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 5
+    },
+    {
+      "table": "audit_results",
+      "column": "rule_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 6
+    },
+    {
+      "table": "audit_results",
+      "column": "rule_title",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 7
+    },
+    {
+      "table": "audit_results",
+      "column": "rule_title_zh",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 8
+    },
+    {
+      "table": "audit_results",
+      "column": "rule_purpose",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 9
+    },
+    {
+      "table": "audit_results",
+      "column": "rule_severity",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 10
+    },
+    {
+      "table": "audit_results",
+      "column": "rule_desc",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 11
+    },
+    {
+      "table": "audit_results",
+      "column": "rule_content",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 12
+    },
+    {
+      "table": "audit_results",
+      "column": "alert_desc",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 13
+    },
+    {
+      "table": "audit_results",
+      "column": "program_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 14
+    },
+    {
+      "table": "audit_results",
+      "column": "language",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 15
+    },
+    {
+      "table": "audit_results",
+      "column": "kind",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 16
+    },
+    {
+      "table": "audit_results",
+      "column": "risk_count",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 17
+    },
+    {
+      "table": "audit_results",
+      "column": "risk_hashs",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 18
+    },
+    {
+      "table": "audit_results",
+      "column": "check_msg",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 19
+    },
+    {
+      "table": "audit_results",
+      "column": "errors",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 20
+    },
+    {
+      "table": "audit_results",
+      "column": "un_value_variable",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 21
+    },
+    {
+      "table": "ir_codes",
+      "column": "id",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "NO",
+      "default": "nextval('ir_codes_id_seq'::regclass)",
+      "position": 1
+    },
+    {
+      "table": "ir_codes",
+      "column": "created_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 2
+    },
+    {
+      "table": "ir_codes",
+      "column": "updated_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 3
+    },
+    {
+      "table": "ir_codes",
+      "column": "deleted_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 4
+    },
+    {
+      "table": "ir_codes",
+      "column": "code_id",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 5
+    },
+    {
+      "table": "ir_codes",
+      "column": "program_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 6
+    },
+    {
+      "table": "ir_codes",
+      "column": "version",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 7
+    },
+    {
+      "table": "ir_codes",
+      "column": "source_code_start_offset",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 8
+    },
+    {
+      "table": "ir_codes",
+      "column": "source_code_end_offset",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 9
+    },
+    {
+      "table": "ir_codes",
+      "column": "source_code_hash",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 10
+    },
+    {
+      "table": "ir_codes",
+      "column": "opcode",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 11
+    },
+    {
+      "table": "ir_codes",
+      "column": "opcode_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 12
+    },
+    {
+      "table": "ir_codes",
+      "column": "opcode_operator",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 13
+    },
+    {
+      "table": "ir_codes",
+      "column": "name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 14
+    },
+    {
+      "table": "ir_codes",
+      "column": "verbose_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 15
+    },
+    {
+      "table": "ir_codes",
+      "column": "short_verbose_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 16
+    },
+    {
+      "table": "ir_codes",
+      "column": "string",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 17
+    },
+    {
+      "table": "ir_codes",
+      "column": "readable_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 18
+    },
+    {
+      "table": "ir_codes",
+      "column": "readable_name_short",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 19
+    },
+    {
+      "table": "ir_codes",
+      "column": "current_block",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 20
+    },
+    {
+      "table": "ir_codes",
+      "column": "current_function",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 21
+    },
+    {
+      "table": "ir_codes",
+      "column": "is_function",
+      "data_type": "boolean",
+      "udt_name": "bool",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 22
+    },
+    {
+      "table": "ir_codes",
+      "column": "formal_args",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 23
+    },
+    {
+      "table": "ir_codes",
+      "column": "free_values",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 24
+    },
+    {
+      "table": "ir_codes",
+      "column": "member_call_args",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 25
+    },
+    {
+      "table": "ir_codes",
+      "column": "side_effects",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 26
+    },
+    {
+      "table": "ir_codes",
+      "column": "is_variadic",
+      "data_type": "boolean",
+      "udt_name": "bool",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 27
+    },
+    {
+      "table": "ir_codes",
+      "column": "return_codes",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 28
+    },
+    {
+      "table": "ir_codes",
+      "column": "is_external",
+      "data_type": "boolean",
+      "udt_name": "bool",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 29
+    },
+    {
+      "table": "ir_codes",
+      "column": "code_blocks",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 30
+    },
+    {
+      "table": "ir_codes",
+      "column": "enter_block",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 31
+    },
+    {
+      "table": "ir_codes",
+      "column": "exit_block",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 32
+    },
+    {
+      "table": "ir_codes",
+      "column": "defer_block",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 33
+    },
+    {
+      "table": "ir_codes",
+      "column": "children_function",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 34
+    },
+    {
+      "table": "ir_codes",
+      "column": "parent_function",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 35
+    },
+    {
+      "table": "ir_codes",
+      "column": "is_block",
+      "data_type": "boolean",
+      "udt_name": "bool",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 36
+    },
+    {
+      "table": "ir_codes",
+      "column": "pred_block",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 37
+    },
+    {
+      "table": "ir_codes",
+      "column": "succ_block",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 38
+    },
+    {
+      "table": "ir_codes",
+      "column": "phis",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 39
+    },
+    {
+      "table": "ir_codes",
+      "column": "has_defs",
+      "data_type": "boolean",
+      "udt_name": "bool",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 40
+    },
+    {
+      "table": "ir_codes",
+      "column": "users",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 41
+    },
+    {
+      "table": "ir_codes",
+      "column": "occulatation",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 42
+    },
+    {
+      "table": "ir_codes",
+      "column": "is_object",
+      "data_type": "boolean",
+      "udt_name": "bool",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 43
+    },
+    {
+      "table": "ir_codes",
+      "column": "object_members",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 44
+    },
+    {
+      "table": "ir_codes",
+      "column": "is_object_member",
+      "data_type": "boolean",
+      "udt_name": "bool",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 45
+    },
+    {
+      "table": "ir_codes",
+      "column": "object_parent",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 46
+    },
+    {
+      "table": "ir_codes",
+      "column": "object_key",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 47
+    },
+    {
+      "table": "ir_codes",
+      "column": "masked_codes",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 48
+    },
+    {
+      "table": "ir_codes",
+      "column": "is_masked",
+      "data_type": "boolean",
+      "udt_name": "bool",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 49
+    },
+    {
+      "table": "ir_codes",
+      "column": "variable",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 50
+    },
+    {
+      "table": "ir_codes",
+      "column": "program_compile_hash",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 51
+    },
+    {
+      "table": "ir_codes",
+      "column": "type_id",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 52
+    },
+    {
+      "table": "ir_codes",
+      "column": "point",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 53
+    },
+    {
+      "table": "ir_codes",
+      "column": "pointer",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 54
+    },
+    {
+      "table": "ir_codes",
+      "column": "extra_information",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 55
+    },
+    {
+      "table": "ir_codes",
+      "column": "const_type",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 56
+    },
+    {
+      "table": "ir_indices_v1",
+      "column": "id",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "NO",
+      "default": "nextval('ir_indices_v1_id_seq'::regclass)",
+      "position": 1
+    },
+    {
+      "table": "ir_indices_v1",
+      "column": "created_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 2
+    },
+    {
+      "table": "ir_indices_v1",
+      "column": "updated_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 3
+    },
+    {
+      "table": "ir_indices_v1",
+      "column": "deleted_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 4
+    },
+    {
+      "table": "ir_indices_v1",
+      "column": "program_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "NO",
+      "default": "",
+      "position": 5
+    },
+    {
+      "table": "ir_indices_v1",
+      "column": "value_id",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "NO",
+      "default": "",
+      "position": 6
+    },
+    {
+      "table": "ir_indices_v1",
+      "column": "variable_id",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 7
+    },
+    {
+      "table": "ir_indices_v1",
+      "column": "class_id",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 8
+    },
+    {
+      "table": "ir_indices_v1",
+      "column": "field_id",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 9
+    },
+    {
+      "table": "ir_indices_v1",
+      "column": "scope_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 10
+    },
+    {
+      "table": "ir_indices_v1",
+      "column": "owner_value_id",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 11
+    },
+    {
+      "table": "ir_indices_v1",
+      "column": "version_id",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 12
+    },
+    {
+      "table": "ir_name_pool_v1",
+      "column": "program_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "NO",
+      "default": "",
+      "position": 1
+    },
+    {
+      "table": "ir_name_pool_v1",
+      "column": "name_id",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "NO",
+      "default": "nextval('ir_name_pool_v1_name_id_seq'::regclass)",
+      "position": 2
+    },
+    {
+      "table": "ir_name_pool_v1",
+      "column": "name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "NO",
+      "default": "",
+      "position": 3
+    },
+    {
+      "table": "ir_offsets",
+      "column": "id",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "NO",
+      "default": "nextval('ir_offsets_id_seq'::regclass)",
+      "position": 1
+    },
+    {
+      "table": "ir_offsets",
+      "column": "created_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 2
+    },
+    {
+      "table": "ir_offsets",
+      "column": "updated_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 3
+    },
+    {
+      "table": "ir_offsets",
+      "column": "deleted_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 4
+    },
+    {
+      "table": "ir_offsets",
+      "column": "program_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 5
+    },
+    {
+      "table": "ir_offsets",
+      "column": "file_hash",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 6
+    },
+    {
+      "table": "ir_offsets",
+      "column": "start_offset",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 7
+    },
+    {
+      "table": "ir_offsets",
+      "column": "end_offset",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 8
+    },
+    {
+      "table": "ir_offsets",
+      "column": "variable_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 9
+    },
+    {
+      "table": "ir_offsets",
+      "column": "value_id",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 10
+    },
+    {
+      "table": "ir_programs",
+      "column": "id",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "NO",
+      "default": "nextval('ir_programs_id_seq'::regclass)",
+      "position": 1
+    },
+    {
+      "table": "ir_programs",
+      "column": "created_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 2
+    },
+    {
+      "table": "ir_programs",
+      "column": "updated_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 3
+    },
+    {
+      "table": "ir_programs",
+      "column": "deleted_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 4
+    },
+    {
+      "table": "ir_programs",
+      "column": "program_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 5
+    },
+    {
+      "table": "ir_programs",
+      "column": "project_id",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 6
+    },
+    {
+      "table": "ir_programs",
+      "column": "description",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 7
+    },
+    {
+      "table": "ir_programs",
+      "column": "version",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 8
+    },
+    {
+      "table": "ir_programs",
+      "column": "engine_version",
+      "data_type": "character varying",
+      "udt_name": "varchar",
+      "char_max_len": 255,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 9
+    },
+    {
+      "table": "ir_programs",
+      "column": "language",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 10
+    },
+    {
+      "table": "ir_programs",
+      "column": "program_kind",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 11
+    },
+    {
+      "table": "ir_programs",
+      "column": "up_stream",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 12
+    },
+    {
+      "table": "ir_programs",
+      "column": "down_stream",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 13
+    },
+    {
+      "table": "ir_programs",
+      "column": "file_list",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 14
+    },
+    {
+      "table": "ir_programs",
+      "column": "line_count",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "0",
+      "position": 15
+    },
+    {
+      "table": "ir_programs",
+      "column": "extra_file",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 16
+    },
+    {
+      "table": "ir_programs",
+      "column": "config_input",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 17
+    },
+    {
+      "table": "ir_programs",
+      "column": "peephole_size",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 18
+    },
+    {
+      "table": "ir_programs",
+      "column": "base_program_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 19
+    },
+    {
+      "table": "ir_programs",
+      "column": "file_hash_map",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 20
+    },
+    {
+      "table": "ir_programs",
+      "column": "is_overlay",
+      "data_type": "boolean",
+      "udt_name": "bool",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 21
+    },
+    {
+      "table": "ir_programs",
+      "column": "overlay_layers",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 22
+    },
+    {
+      "table": "ir_sources",
+      "column": "program_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 1
+    },
+    {
+      "table": "ir_sources",
+      "column": "source_code_hash",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 2
+    },
+    {
+      "table": "ir_sources",
+      "column": "folder_path",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 3
+    },
+    {
+      "table": "ir_sources",
+      "column": "file_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 4
+    },
+    {
+      "table": "ir_sources",
+      "column": "quoted_code",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 5
+    },
+    {
+      "table": "ir_sources",
+      "column": "is_big_file",
+      "data_type": "boolean",
+      "udt_name": "bool",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 6
+    },
+    {
+      "table": "ir_types",
+      "column": "id",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "NO",
+      "default": "nextval('ir_types_id_seq'::regclass)",
+      "position": 1
+    },
+    {
+      "table": "ir_types",
+      "column": "created_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 2
+    },
+    {
+      "table": "ir_types",
+      "column": "updated_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 3
+    },
+    {
+      "table": "ir_types",
+      "column": "deleted_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 4
+    },
+    {
+      "table": "ir_types",
+      "column": "type_id",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 5
+    },
+    {
+      "table": "ir_types",
+      "column": "kind",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 6
+    },
+    {
+      "table": "ir_types",
+      "column": "program_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 7
+    },
+    {
+      "table": "ir_types",
+      "column": "string",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 8
+    },
+    {
+      "table": "ir_types",
+      "column": "extra_information",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 9
+    },
+    {
+      "table": "project_general_storages",
+      "column": "id",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "NO",
+      "default": "nextval('project_general_storages_id_seq'::regclass)",
+      "position": 1
+    },
+    {
+      "table": "project_general_storages",
+      "column": "created_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 2
+    },
+    {
+      "table": "project_general_storages",
+      "column": "updated_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 3
+    },
+    {
+      "table": "project_general_storages",
+      "column": "deleted_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 4
+    },
+    {
+      "table": "project_general_storages",
+      "column": "key",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 5
+    },
+    {
+      "table": "project_general_storages",
+      "column": "value",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 6
+    },
+    {
+      "table": "project_general_storages",
+      "column": "expired_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 7
+    },
+    {
+      "table": "project_general_storages",
+      "column": "process_env",
+      "data_type": "boolean",
+      "udt_name": "bool",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 8
+    },
+    {
+      "table": "project_general_storages",
+      "column": "verbose",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 9
+    },
+    {
+      "table": "project_general_storages",
+      "column": "group",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 10
+    },
+    {
+      "table": "report_records",
+      "column": "id",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "NO",
+      "default": "nextval('report_records_id_seq'::regclass)",
+      "position": 1
+    },
+    {
+      "table": "report_records",
+      "column": "created_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 2
+    },
+    {
+      "table": "report_records",
+      "column": "updated_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 3
+    },
+    {
+      "table": "report_records",
+      "column": "deleted_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 4
+    },
+    {
+      "table": "report_records",
+      "column": "title",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 5
+    },
+    {
+      "table": "report_records",
+      "column": "published_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 6
+    },
+    {
+      "table": "report_records",
+      "column": "hash",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 7
+    },
+    {
+      "table": "report_records",
+      "column": "owner",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 8
+    },
+    {
+      "table": "report_records",
+      "column": "from",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 9
+    },
+    {
+      "table": "report_records",
+      "column": "quoted_json",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 10
+    },
+    {
+      "table": "ssa_diff_results",
+      "column": "id",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "NO",
+      "default": "nextval('ssa_diff_results_id_seq'::regclass)",
+      "position": 1
+    },
+    {
+      "table": "ssa_diff_results",
+      "column": "created_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 2
+    },
+    {
+      "table": "ssa_diff_results",
+      "column": "updated_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 3
+    },
+    {
+      "table": "ssa_diff_results",
+      "column": "deleted_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 4
+    },
+    {
+      "table": "ssa_diff_results",
+      "column": "base_line",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 5
+    },
+    {
+      "table": "ssa_diff_results",
+      "column": "compare",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 6
+    },
+    {
+      "table": "ssa_diff_results",
+      "column": "rule_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 7
+    },
+    {
+      "table": "ssa_diff_results",
+      "column": "base_line_risk_hash",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 8
+    },
+    {
+      "table": "ssa_diff_results",
+      "column": "compare_risk_hash",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 9
+    },
+    {
+      "table": "ssa_diff_results",
+      "column": "status",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 10
+    },
+    {
+      "table": "ssa_diff_results",
+      "column": "compare_type",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 11
+    },
+    {
+      "table": "ssa_diff_results",
+      "column": "diff_result_kind",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 12
+    },
+    {
+      "table": "ssa_diff_results",
+      "column": "hash",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 13
+    },
+    {
+      "table": "ssa_report_record_files",
+      "column": "id",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "NO",
+      "default": "nextval('ssa_report_record_files_id_seq'::regclass)",
+      "position": 1
+    },
+    {
+      "table": "ssa_report_record_files",
+      "column": "created_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 2
+    },
+    {
+      "table": "ssa_report_record_files",
+      "column": "updated_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 3
+    },
+    {
+      "table": "ssa_report_record_files",
+      "column": "deleted_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 4
+    },
+    {
+      "table": "ssa_report_record_files",
+      "column": "report_record_id",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 5
+    },
+    {
+      "table": "ssa_report_record_files",
+      "column": "format",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 6
+    },
+    {
+      "table": "ssa_report_record_files",
+      "column": "file_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 7
+    },
+    {
+      "table": "ssa_report_record_files",
+      "column": "object_key",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 8
+    },
+    {
+      "table": "ssa_report_record_files",
+      "column": "bucket",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 9
+    },
+    {
+      "table": "ssa_report_record_files",
+      "column": "content_type",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 10
+    },
+    {
+      "table": "ssa_report_record_files",
+      "column": "size_bytes",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 11
+    },
+    {
+      "table": "ssa_report_record_files",
+      "column": "sha256",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 12
+    },
+    {
+      "table": "ssa_report_record_files",
+      "column": "status",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 13
+    },
+    {
+      "table": "ssa_report_record_files",
+      "column": "created_by",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 14
+    },
+    {
+      "table": "ssa_report_record_files",
+      "column": "generation_error",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 15
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "id",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "NO",
+      "default": "nextval('ssa_report_records_id_seq'::regclass)",
+      "position": 1
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "created_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 2
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "updated_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 3
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "deleted_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 4
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "title",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 5
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "published_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 6
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "hash",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 7
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "owner",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 8
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "from",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 9
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "report_type",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 10
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "scope_type",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 11
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "scope_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 12
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "project_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 13
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "program_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 14
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "task_id",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 15
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "task_count",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 16
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "scan_batch",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 17
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "risk_total",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 18
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "risk_critical",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 19
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "risk_high",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 20
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "risk_medium",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 21
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "risk_low",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 22
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "source_finished_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 23
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "source_request_json",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 24
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "snapshot_json",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 25
+    },
+    {
+      "table": "ssa_report_records",
+      "column": "preview_json",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 26
+    },
+    {
+      "table": "ssa_risk_disposals",
+      "column": "id",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "NO",
+      "default": "nextval('ssa_risk_disposals_id_seq'::regclass)",
+      "position": 1
+    },
+    {
+      "table": "ssa_risk_disposals",
+      "column": "created_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 2
+    },
+    {
+      "table": "ssa_risk_disposals",
+      "column": "updated_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 3
+    },
+    {
+      "table": "ssa_risk_disposals",
+      "column": "deleted_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 4
+    },
+    {
+      "table": "ssa_risk_disposals",
+      "column": "task_id",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 5
+    },
+    {
+      "table": "ssa_risk_disposals",
+      "column": "ssa_risk_id",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 6
+    },
+    {
+      "table": "ssa_risk_disposals",
+      "column": "risk_feature_hash",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "NO",
+      "default": "",
+      "position": 7
+    },
+    {
+      "table": "ssa_risk_disposals",
+      "column": "status",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 8
+    },
+    {
+      "table": "ssa_risk_disposals",
+      "column": "comment",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 9
+    },
+    {
+      "table": "ssa_risks",
+      "column": "id",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "NO",
+      "default": "nextval('ssa_risks_id_seq'::regclass)",
+      "position": 1
+    },
+    {
+      "table": "ssa_risks",
+      "column": "created_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 2
+    },
+    {
+      "table": "ssa_risks",
+      "column": "updated_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 3
+    },
+    {
+      "table": "ssa_risks",
+      "column": "deleted_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 4
+    },
+    {
+      "table": "ssa_risks",
+      "column": "hash",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 5
+    },
+    {
+      "table": "ssa_risks",
+      "column": "title",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 6
+    },
+    {
+      "table": "ssa_risks",
+      "column": "title_verbose",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 7
+    },
+    {
+      "table": "ssa_risks",
+      "column": "description",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 8
+    },
+    {
+      "table": "ssa_risks",
+      "column": "solution",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 9
+    },
+    {
+      "table": "ssa_risks",
+      "column": "risk_type",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 10
+    },
+    {
+      "table": "ssa_risks",
+      "column": "details",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 11
+    },
+    {
+      "table": "ssa_risks",
+      "column": "severity",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 12
+    },
+    {
+      "table": "ssa_risks",
+      "column": "language",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 13
+    },
+    {
+      "table": "ssa_risks",
+      "column": "is_potential",
+      "data_type": "boolean",
+      "udt_name": "bool",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 14
+    },
+    {
+      "table": "ssa_risks",
+      "column": "cve",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 15
+    },
+    {
+      "table": "ssa_risks",
+      "column": "cwe",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 16
+    },
+    {
+      "table": "ssa_risks",
+      "column": "is_read",
+      "data_type": "boolean",
+      "udt_name": "bool",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 17
+    },
+    {
+      "table": "ssa_risks",
+      "column": "ignore",
+      "data_type": "boolean",
+      "udt_name": "bool",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 18
+    },
+    {
+      "table": "ssa_risks",
+      "column": "upload_online",
+      "data_type": "boolean",
+      "udt_name": "bool",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 19
+    },
+    {
+      "table": "ssa_risks",
+      "column": "cve_access_vector",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 20
+    },
+    {
+      "table": "ssa_risks",
+      "column": "cve_access_complexity",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 21
+    },
+    {
+      "table": "ssa_risks",
+      "column": "tags",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 22
+    },
+    {
+      "table": "ssa_risks",
+      "column": "from_rule",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 23
+    },
+    {
+      "table": "ssa_risks",
+      "column": "program_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 24
+    },
+    {
+      "table": "ssa_risks",
+      "column": "code_source_url",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 25
+    },
+    {
+      "table": "ssa_risks",
+      "column": "code_range",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 26
+    },
+    {
+      "table": "ssa_risks",
+      "column": "code_fragment",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 27
+    },
+    {
+      "table": "ssa_risks",
+      "column": "function_name",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 28
+    },
+    {
+      "table": "ssa_risks",
+      "column": "line",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 29
+    },
+    {
+      "table": "ssa_risks",
+      "column": "runtime_id",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 30
+    },
+    {
+      "table": "ssa_risks",
+      "column": "result_id",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 31
+    },
+    {
+      "table": "ssa_risks",
+      "column": "variable",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 32
+    },
+    {
+      "table": "ssa_risks",
+      "column": "index",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 33
+    },
+    {
+      "table": "ssa_risks",
+      "column": "latest_disposal_status",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "'not_set'::text",
+      "position": 34
+    },
+    {
+      "table": "ssa_risks",
+      "column": "risk_feature_hash",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 35
+    },
+    {
+      "table": "ssa_risks",
+      "column": "ssa_project_id",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 36
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "column": "id",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "num_precision": 32,
+      "num_scale": 0,
+      "is_nullable": "NO",
+      "default": "nextval('syntax_flow_scan_tasks_id_seq'::regclass)",
+      "position": 1
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "column": "created_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 2
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "column": "updated_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 3
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "column": "deleted_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 4
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "column": "task_id",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 5
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "column": "programs",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 6
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "column": "project_id",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 7
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "column": "rules_count",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 8
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "column": "status",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 9
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "column": "reason",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 10
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "column": "kind",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 11
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "column": "scan_batch",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 12
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "column": "failed_query",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 13
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "column": "skip_query",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 14
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "column": "success_query",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 15
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "column": "risk_count",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 16
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "column": "info_count",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 17
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "column": "low_count",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 18
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "column": "warning_count",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 19
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "column": "critical_count",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 20
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "column": "high_count",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 21
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "column": "total_query",
+      "data_type": "bigint",
+      "udt_name": "int8",
+      "num_precision": 64,
+      "num_scale": 0,
+      "is_nullable": "YES",
+      "default": "",
+      "position": 22
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "column": "config",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "default": "",
+      "position": 23
+    }
+  ],
+  "constraints": [
+    {
+      "name": "audit_edges_pkey",
+      "type": "p",
+      "table": "audit_edges",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "audit_nodes_pkey",
+      "type": "p",
+      "table": "audit_nodes",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "audit_results_pkey",
+      "type": "p",
+      "table": "audit_results",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "ir_codes_pkey",
+      "type": "p",
+      "table": "ir_codes",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "ir_indices_v1_pkey",
+      "type": "p",
+      "table": "ir_indices_v1",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "ir_name_pool_v1_pkey",
+      "type": "p",
+      "table": "ir_name_pool_v1",
+      "def": "PRIMARY KEY (name_id)"
+    },
+    {
+      "name": "ir_offsets_pkey",
+      "type": "p",
+      "table": "ir_offsets",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "ir_programs_pkey",
+      "type": "p",
+      "table": "ir_programs",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "ir_types_pkey",
+      "type": "p",
+      "table": "ir_types",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "project_general_storages_pkey",
+      "type": "p",
+      "table": "project_general_storages",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "report_records_pkey",
+      "type": "p",
+      "table": "report_records",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "ssa_diff_results_pkey",
+      "type": "p",
+      "table": "ssa_diff_results",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "ssa_report_record_files_pkey",
+      "type": "p",
+      "table": "ssa_report_record_files",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "ssa_report_records_pkey",
+      "type": "p",
+      "table": "ssa_report_records",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "ssa_risk_disposals_pkey",
+      "type": "p",
+      "table": "ssa_risk_disposals",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "ssa_risks_pkey",
+      "type": "p",
+      "table": "ssa_risks",
+      "def": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "syntax_flow_scan_tasks_pkey",
+      "type": "p",
+      "table": "syntax_flow_scan_tasks",
+      "def": "PRIMARY KEY (id)"
+    }
+  ],
+  "defaults": [
+    {
+      "table": "audit_edges",
+      "attnum": 1,
+      "expr": "nextval('audit_edges_id_seq'::regclass)"
+    },
+    {
+      "table": "audit_nodes",
+      "attnum": 1,
+      "expr": "nextval('audit_nodes_id_seq'::regclass)"
+    },
+    {
+      "table": "audit_results",
+      "attnum": 1,
+      "expr": "nextval('audit_results_id_seq'::regclass)"
+    },
+    {
+      "table": "ir_codes",
+      "attnum": 1,
+      "expr": "nextval('ir_codes_id_seq'::regclass)"
+    },
+    {
+      "table": "ir_indices_v1",
+      "attnum": 1,
+      "expr": "nextval('ir_indices_v1_id_seq'::regclass)"
+    },
+    {
+      "table": "ir_name_pool_v1",
+      "attnum": 2,
+      "expr": "nextval('ir_name_pool_v1_name_id_seq'::regclass)"
+    },
+    {
+      "table": "ir_offsets",
+      "attnum": 1,
+      "expr": "nextval('ir_offsets_id_seq'::regclass)"
+    },
+    {
+      "table": "ir_programs",
+      "attnum": 1,
+      "expr": "nextval('ir_programs_id_seq'::regclass)"
+    },
+    {
+      "table": "ir_programs",
+      "attnum": 15,
+      "expr": "0"
+    },
+    {
+      "table": "ir_types",
+      "attnum": 1,
+      "expr": "nextval('ir_types_id_seq'::regclass)"
+    },
+    {
+      "table": "project_general_storages",
+      "attnum": 1,
+      "expr": "nextval('project_general_storages_id_seq'::regclass)"
+    },
+    {
+      "table": "report_records",
+      "attnum": 1,
+      "expr": "nextval('report_records_id_seq'::regclass)"
+    },
+    {
+      "table": "ssa_diff_results",
+      "attnum": 1,
+      "expr": "nextval('ssa_diff_results_id_seq'::regclass)"
+    },
+    {
+      "table": "ssa_report_record_files",
+      "attnum": 1,
+      "expr": "nextval('ssa_report_record_files_id_seq'::regclass)"
+    },
+    {
+      "table": "ssa_report_records",
+      "attnum": 1,
+      "expr": "nextval('ssa_report_records_id_seq'::regclass)"
+    },
+    {
+      "table": "ssa_risk_disposals",
+      "attnum": 1,
+      "expr": "nextval('ssa_risk_disposals_id_seq'::regclass)"
+    },
+    {
+      "table": "ssa_risks",
+      "attnum": 1,
+      "expr": "nextval('ssa_risks_id_seq'::regclass)"
+    },
+    {
+      "table": "ssa_risks",
+      "attnum": 34,
+      "expr": "'not_set'::text"
+    },
+    {
+      "table": "syntax_flow_scan_tasks",
+      "attnum": 1,
+      "expr": "nextval('syntax_flow_scan_tasks_id_seq'::regclass)"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "audit_edges_pkey",
+      "def": "CREATE UNIQUE INDEX audit_edges_pkey ON public.audit_edges USING btree (id)"
+    },
+    {
+      "name": "audit_nodes_pkey",
+      "def": "CREATE UNIQUE INDEX audit_nodes_pkey ON public.audit_nodes USING btree (id)"
+    },
+    {
+      "name": "audit_results_pkey",
+      "def": "CREATE UNIQUE INDEX audit_results_pkey ON public.audit_results USING btree (id)"
+    },
+    {
+      "name": "idx_audit_edges_deleted_at",
+      "def": "CREATE INDEX idx_audit_edges_deleted_at ON public.audit_edges USING btree (deleted_at)"
+    },
+    {
+      "name": "idx_audit_edges_edge_type",
+      "def": "CREATE INDEX idx_audit_edges_edge_type ON public.audit_edges USING btree (edge_type)"
+    },
+    {
+      "name": "idx_audit_edges_from_node",
+      "def": "CREATE INDEX idx_audit_edges_from_node ON public.audit_edges USING btree (from_node)"
+    },
+    {
+      "name": "idx_audit_edges_program_name",
+      "def": "CREATE INDEX idx_audit_edges_program_name ON public.audit_edges USING btree (program_name)"
+    },
+    {
+      "name": "idx_audit_edges_result_id",
+      "def": "CREATE INDEX idx_audit_edges_result_id ON public.audit_edges USING btree (result_id)"
+    },
+    {
+      "name": "idx_audit_edges_task_id",
+      "def": "CREATE INDEX idx_audit_edges_task_id ON public.audit_edges USING btree (task_id)"
+    },
+    {
+      "name": "idx_audit_edges_to_node",
+      "def": "CREATE INDEX idx_audit_edges_to_node ON public.audit_edges USING btree (to_node)"
+    },
+    {
+      "name": "idx_audit_nodes_deleted_at",
+      "def": "CREATE INDEX idx_audit_nodes_deleted_at ON public.audit_nodes USING btree (deleted_at)"
+    },
+    {
+      "name": "idx_audit_nodes_is_entry_node",
+      "def": "CREATE INDEX idx_audit_nodes_is_entry_node ON public.audit_nodes USING btree (is_entry_node)"
+    },
+    {
+      "name": "idx_audit_nodes_node_id",
+      "def": "CREATE INDEX idx_audit_nodes_node_id ON public.audit_nodes USING btree (node_id)"
+    },
+    {
+      "name": "idx_audit_nodes_program_name",
+      "def": "CREATE INDEX idx_audit_nodes_program_name ON public.audit_nodes USING btree (program_name)"
+    },
+    {
+      "name": "idx_audit_nodes_result_id",
+      "def": "CREATE INDEX idx_audit_nodes_result_id ON public.audit_nodes USING btree (result_id)"
+    },
+    {
+      "name": "idx_audit_nodes_result_index",
+      "def": "CREATE INDEX idx_audit_nodes_result_index ON public.audit_nodes USING btree (result_index)"
+    },
+    {
+      "name": "idx_audit_nodes_result_variable",
+      "def": "CREATE INDEX idx_audit_nodes_result_variable ON public.audit_nodes USING btree (result_variable)"
+    },
+    {
+      "name": "idx_audit_nodes_rule_name",
+      "def": "CREATE INDEX idx_audit_nodes_rule_name ON public.audit_nodes USING btree (rule_name)"
+    },
+    {
+      "name": "idx_audit_nodes_task_id",
+      "def": "CREATE INDEX idx_audit_nodes_task_id ON public.audit_nodes USING btree (task_id)"
+    },
+    {
+      "name": "idx_audit_results_deleted_at",
+      "def": "CREATE INDEX idx_audit_results_deleted_at ON public.audit_results USING btree (deleted_at)"
+    },
+    {
+      "name": "idx_audit_results_kind",
+      "def": "CREATE INDEX idx_audit_results_kind ON public.audit_results USING btree (kind)"
+    },
+    {
+      "name": "idx_audit_results_program_name",
+      "def": "CREATE INDEX idx_audit_results_program_name ON public.audit_results USING btree (program_name)"
+    },
+    {
+      "name": "idx_audit_results_task_id",
+      "def": "CREATE INDEX idx_audit_results_task_id ON public.audit_results USING btree (task_id)"
+    },
+    {
+      "name": "idx_ir_codes_code_id",
+      "def": "CREATE INDEX idx_ir_codes_code_id ON public.ir_codes USING btree (code_id)"
+    },
+    {
+      "name": "idx_ir_codes_const_type",
+      "def": "CREATE INDEX idx_ir_codes_const_type ON public.ir_codes USING btree (const_type)"
+    },
+    {
+      "name": "idx_ir_codes_deleted_at",
+      "def": "CREATE INDEX idx_ir_codes_deleted_at ON public.ir_codes USING btree (deleted_at)"
+    },
+    {
+      "name": "idx_ir_codes_program_code",
+      "def": "CREATE INDEX idx_ir_codes_program_code ON public.ir_codes USING btree (program_name, code_id)"
+    },
+    {
+      "name": "idx_ir_codes_program_compile_hash",
+      "def": "CREATE INDEX idx_ir_codes_program_compile_hash ON public.ir_codes USING btree (program_compile_hash)"
+    },
+    {
+      "name": "idx_ir_codes_program_name",
+      "def": "CREATE INDEX idx_ir_codes_program_name ON public.ir_codes USING btree (program_name)"
+    },
+    {
+      "name": "idx_ir_codes_program_opcode",
+      "def": "CREATE INDEX idx_ir_codes_program_opcode ON public.ir_codes USING btree (program_name, opcode)"
+    },
+    {
+      "name": "idx_ir_codes_version",
+      "def": "CREATE INDEX idx_ir_codes_version ON public.ir_codes USING btree (version)"
+    },
+    {
+      "name": "idx_ir_indices_program_value",
+      "def": "CREATE INDEX idx_ir_indices_program_value ON public.ir_indices_v1 USING btree (program_name, value_id)"
+    },
+    {
+      "name": "idx_ir_indices_v1_class_id",
+      "def": "CREATE INDEX idx_ir_indices_v1_class_id ON public.ir_indices_v1 USING btree (class_id)"
+    },
+    {
+      "name": "idx_ir_indices_v1_deleted_at",
+      "def": "CREATE INDEX idx_ir_indices_v1_deleted_at ON public.ir_indices_v1 USING btree (deleted_at)"
+    },
+    {
+      "name": "idx_ir_indices_v1_field_id",
+      "def": "CREATE INDEX idx_ir_indices_v1_field_id ON public.ir_indices_v1 USING btree (field_id)"
+    },
+    {
+      "name": "idx_ir_indices_v1_owner_value_id",
+      "def": "CREATE INDEX idx_ir_indices_v1_owner_value_id ON public.ir_indices_v1 USING btree (owner_value_id)"
+    },
+    {
+      "name": "idx_ir_indices_v1_program_name",
+      "def": "CREATE INDEX idx_ir_indices_v1_program_name ON public.ir_indices_v1 USING btree (program_name)"
+    },
+    {
+      "name": "idx_ir_indices_v1_scope_name",
+      "def": "CREATE INDEX idx_ir_indices_v1_scope_name ON public.ir_indices_v1 USING btree (scope_name)"
+    },
+    {
+      "name": "idx_ir_indices_v1_value_id",
+      "def": "CREATE INDEX idx_ir_indices_v1_value_id ON public.ir_indices_v1 USING btree (value_id)"
+    },
+    {
+      "name": "idx_ir_indices_v1_variable_id",
+      "def": "CREATE INDEX idx_ir_indices_v1_variable_id ON public.ir_indices_v1 USING btree (variable_id)"
+    },
+    {
+      "name": "idx_ir_indices_v1_version_id",
+      "def": "CREATE INDEX idx_ir_indices_v1_version_id ON public.ir_indices_v1 USING btree (version_id)"
+    },
+    {
+      "name": "idx_ir_name_pool_program_name_name",
+      "def": "CREATE INDEX idx_ir_name_pool_program_name_name ON public.ir_name_pool_v1 USING btree (program_name, name)"
+    },
+    {
+      "name": "idx_ir_name_pool_v1_name",
+      "def": "CREATE INDEX idx_ir_name_pool_v1_name ON public.ir_name_pool_v1 USING btree (name)"
+    },
+    {
+      "name": "idx_ir_name_pool_v1_program_name",
+      "def": "CREATE INDEX idx_ir_name_pool_v1_program_name ON public.ir_name_pool_v1 USING btree (program_name)"
+    },
+    {
+      "name": "idx_ir_offsets_deleted_at",
+      "def": "CREATE INDEX idx_ir_offsets_deleted_at ON public.ir_offsets USING btree (deleted_at)"
+    },
+    {
+      "name": "idx_ir_offsets_end_offset",
+      "def": "CREATE INDEX idx_ir_offsets_end_offset ON public.ir_offsets USING btree (end_offset)"
+    },
+    {
+      "name": "idx_ir_offsets_file_hash",
+      "def": "CREATE INDEX idx_ir_offsets_file_hash ON public.ir_offsets USING btree (file_hash)"
+    },
+    {
+      "name": "idx_ir_offsets_program_name",
+      "def": "CREATE INDEX idx_ir_offsets_program_name ON public.ir_offsets USING btree (program_name)"
+    },
+    {
+      "name": "idx_ir_offsets_start_offset",
+      "def": "CREATE INDEX idx_ir_offsets_start_offset ON public.ir_offsets USING btree (start_offset)"
+    },
+    {
+      "name": "idx_ir_offsets_value_id",
+      "def": "CREATE INDEX idx_ir_offsets_value_id ON public.ir_offsets USING btree (value_id)"
+    },
+    {
+      "name": "idx_ir_offsets_variable_name",
+      "def": "CREATE INDEX idx_ir_offsets_variable_name ON public.ir_offsets USING btree (variable_name)"
+    },
+    {
+      "name": "idx_ir_programs_base_program_name",
+      "def": "CREATE INDEX idx_ir_programs_base_program_name ON public.ir_programs USING btree (base_program_name)"
+    },
+    {
+      "name": "idx_ir_programs_deleted_at",
+      "def": "CREATE INDEX idx_ir_programs_deleted_at ON public.ir_programs USING btree (deleted_at)"
+    },
+    {
+      "name": "idx_ir_programs_is_overlay",
+      "def": "CREATE INDEX idx_ir_programs_is_overlay ON public.ir_programs USING btree (is_overlay)"
+    },
+    {
+      "name": "idx_ir_programs_language",
+      "def": "CREATE INDEX idx_ir_programs_language ON public.ir_programs USING btree (language)"
+    },
+    {
+      "name": "idx_ir_programs_program_kind",
+      "def": "CREATE INDEX idx_ir_programs_program_kind ON public.ir_programs USING btree (program_kind)"
+    },
+    {
+      "name": "idx_ir_programs_version",
+      "def": "CREATE INDEX idx_ir_programs_version ON public.ir_programs USING btree (version)"
+    },
+    {
+      "name": "idx_ir_sources_program_name",
+      "def": "CREATE INDEX idx_ir_sources_program_name ON public.ir_sources USING btree (program_name)"
+    },
+    {
+      "name": "idx_ir_sources_source_code_hash",
+      "def": "CREATE INDEX idx_ir_sources_source_code_hash ON public.ir_sources USING btree (source_code_hash)"
+    },
+    {
+      "name": "idx_ir_types_deleted_at",
+      "def": "CREATE INDEX idx_ir_types_deleted_at ON public.ir_types USING btree (deleted_at)"
+    },
+    {
+      "name": "idx_ir_types_program_type",
+      "def": "CREATE INDEX idx_ir_types_program_type ON public.ir_types USING btree (program_name, type_id)"
+    },
+    {
+      "name": "idx_ir_types_type_id",
+      "def": "CREATE INDEX idx_ir_types_type_id ON public.ir_types USING btree (type_id)"
+    },
+    {
+      "name": "idx_project_general_storages_deleted_at",
+      "def": "CREATE INDEX idx_project_general_storages_deleted_at ON public.project_general_storages USING btree (deleted_at)"
+    },
+    {
+      "name": "idx_report_records_deleted_at",
+      "def": "CREATE INDEX idx_report_records_deleted_at ON public.report_records USING btree (deleted_at)"
+    },
+    {
+      "name": "idx_ssa_diff_results_deleted_at",
+      "def": "CREATE INDEX idx_ssa_diff_results_deleted_at ON public.ssa_diff_results USING btree (deleted_at)"
+    },
+    {
+      "name": "idx_ssa_report_record_files_created_by",
+      "def": "CREATE INDEX idx_ssa_report_record_files_created_by ON public.ssa_report_record_files USING btree (created_by)"
+    },
+    {
+      "name": "idx_ssa_report_record_files_deleted_at",
+      "def": "CREATE INDEX idx_ssa_report_record_files_deleted_at ON public.ssa_report_record_files USING btree (deleted_at)"
+    },
+    {
+      "name": "idx_ssa_report_record_files_format",
+      "def": "CREATE INDEX idx_ssa_report_record_files_format ON public.ssa_report_record_files USING btree (format)"
+    },
+    {
+      "name": "idx_ssa_report_record_files_report_record_id",
+      "def": "CREATE INDEX idx_ssa_report_record_files_report_record_id ON public.ssa_report_record_files USING btree (report_record_id)"
+    },
+    {
+      "name": "idx_ssa_report_record_files_sha256",
+      "def": "CREATE INDEX idx_ssa_report_record_files_sha256 ON public.ssa_report_record_files USING btree (sha256)"
+    },
+    {
+      "name": "idx_ssa_report_record_files_status",
+      "def": "CREATE INDEX idx_ssa_report_record_files_status ON public.ssa_report_record_files USING btree (status)"
+    },
+    {
+      "name": "idx_ssa_report_records_deleted_at",
+      "def": "CREATE INDEX idx_ssa_report_records_deleted_at ON public.ssa_report_records USING btree (deleted_at)"
+    },
+    {
+      "name": "idx_ssa_report_records_from",
+      "def": "CREATE INDEX idx_ssa_report_records_from ON public.ssa_report_records USING btree (\"from\")"
+    },
+    {
+      "name": "idx_ssa_report_records_owner",
+      "def": "CREATE INDEX idx_ssa_report_records_owner ON public.ssa_report_records USING btree (owner)"
+    },
+    {
+      "name": "idx_ssa_report_records_program_name",
+      "def": "CREATE INDEX idx_ssa_report_records_program_name ON public.ssa_report_records USING btree (program_name)"
+    },
+    {
+      "name": "idx_ssa_report_records_project_name",
+      "def": "CREATE INDEX idx_ssa_report_records_project_name ON public.ssa_report_records USING btree (project_name)"
+    },
+    {
+      "name": "idx_ssa_report_records_published_at",
+      "def": "CREATE INDEX idx_ssa_report_records_published_at ON public.ssa_report_records USING btree (published_at)"
+    },
+    {
+      "name": "idx_ssa_report_records_report_type",
+      "def": "CREATE INDEX idx_ssa_report_records_report_type ON public.ssa_report_records USING btree (report_type)"
+    },
+    {
+      "name": "idx_ssa_report_records_scan_batch",
+      "def": "CREATE INDEX idx_ssa_report_records_scan_batch ON public.ssa_report_records USING btree (scan_batch)"
+    },
+    {
+      "name": "idx_ssa_report_records_scope_type",
+      "def": "CREATE INDEX idx_ssa_report_records_scope_type ON public.ssa_report_records USING btree (scope_type)"
+    },
+    {
+      "name": "idx_ssa_report_records_source_finished_at",
+      "def": "CREATE INDEX idx_ssa_report_records_source_finished_at ON public.ssa_report_records USING btree (source_finished_at)"
+    },
+    {
+      "name": "idx_ssa_report_records_task_id",
+      "def": "CREATE INDEX idx_ssa_report_records_task_id ON public.ssa_report_records USING btree (task_id)"
+    },
+    {
+      "name": "idx_ssa_risk_disposals_deleted_at",
+      "def": "CREATE INDEX idx_ssa_risk_disposals_deleted_at ON public.ssa_risk_disposals USING btree (deleted_at)"
+    },
+    {
+      "name": "idx_ssa_risk_disposals_risk_feature_hash",
+      "def": "CREATE INDEX idx_ssa_risk_disposals_risk_feature_hash ON public.ssa_risk_disposals USING btree (risk_feature_hash)"
+    },
+    {
+      "name": "idx_ssa_risk_disposals_ssa_risk_id",
+      "def": "CREATE INDEX idx_ssa_risk_disposals_ssa_risk_id ON public.ssa_risk_disposals USING btree (ssa_risk_id)"
+    },
+    {
+      "name": "idx_ssa_risk_disposals_status",
+      "def": "CREATE INDEX idx_ssa_risk_disposals_status ON public.ssa_risk_disposals USING btree (status)"
+    },
+    {
+      "name": "idx_ssa_risk_disposals_task_id",
+      "def": "CREATE INDEX idx_ssa_risk_disposals_task_id ON public.ssa_risk_disposals USING btree (task_id)"
+    },
+    {
+      "name": "idx_ssa_risks_code_source_url",
+      "def": "CREATE INDEX idx_ssa_risks_code_source_url ON public.ssa_risks USING btree (code_source_url)"
+    },
+    {
+      "name": "idx_ssa_risks_deleted_at",
+      "def": "CREATE INDEX idx_ssa_risks_deleted_at ON public.ssa_risks USING btree (deleted_at)"
+    },
+    {
+      "name": "idx_ssa_risks_function_name",
+      "def": "CREATE INDEX idx_ssa_risks_function_name ON public.ssa_risks USING btree (function_name)"
+    },
+    {
+      "name": "idx_ssa_risks_latest_disposal_status",
+      "def": "CREATE INDEX idx_ssa_risks_latest_disposal_status ON public.ssa_risks USING btree (latest_disposal_status)"
+    },
+    {
+      "name": "idx_ssa_risks_line",
+      "def": "CREATE INDEX idx_ssa_risks_line ON public.ssa_risks USING btree (line)"
+    },
+    {
+      "name": "idx_ssa_risks_program_name",
+      "def": "CREATE INDEX idx_ssa_risks_program_name ON public.ssa_risks USING btree (program_name)"
+    },
+    {
+      "name": "idx_ssa_risks_risk_feature_hash",
+      "def": "CREATE INDEX idx_ssa_risks_risk_feature_hash ON public.ssa_risks USING btree (risk_feature_hash)"
+    },
+    {
+      "name": "idx_ssa_risks_runtime_id",
+      "def": "CREATE INDEX idx_ssa_risks_runtime_id ON public.ssa_risks USING btree (runtime_id)"
+    },
+    {
+      "name": "idx_ssa_risks_severity",
+      "def": "CREATE INDEX idx_ssa_risks_severity ON public.ssa_risks USING btree (severity)"
+    },
+    {
+      "name": "idx_ssa_risks_ssa_project_id",
+      "def": "CREATE INDEX idx_ssa_risks_ssa_project_id ON public.ssa_risks USING btree (ssa_project_id)"
+    },
+    {
+      "name": "idx_syntax_flow_scan_tasks_deleted_at",
+      "def": "CREATE INDEX idx_syntax_flow_scan_tasks_deleted_at ON public.syntax_flow_scan_tasks USING btree (deleted_at)"
+    },
+    {
+      "name": "idx_syntax_flow_scan_tasks_programs",
+      "def": "CREATE INDEX idx_syntax_flow_scan_tasks_programs ON public.syntax_flow_scan_tasks USING btree (programs)"
+    },
+    {
+      "name": "idx_syntax_flow_scan_tasks_project_id",
+      "def": "CREATE INDEX idx_syntax_flow_scan_tasks_project_id ON public.syntax_flow_scan_tasks USING btree (project_id)"
+    },
+    {
+      "name": "idx_syntax_flow_scan_tasks_scan_batch",
+      "def": "CREATE INDEX idx_syntax_flow_scan_tasks_scan_batch ON public.syntax_flow_scan_tasks USING btree (scan_batch)"
+    },
+    {
+      "name": "ir_codes_pkey",
+      "def": "CREATE UNIQUE INDEX ir_codes_pkey ON public.ir_codes USING btree (id)"
+    },
+    {
+      "name": "ir_indices_v1_pkey",
+      "def": "CREATE UNIQUE INDEX ir_indices_v1_pkey ON public.ir_indices_v1 USING btree (id)"
+    },
+    {
+      "name": "ir_name_pool_v1_pkey",
+      "def": "CREATE UNIQUE INDEX ir_name_pool_v1_pkey ON public.ir_name_pool_v1 USING btree (name_id)"
+    },
+    {
+      "name": "ir_offsets_pkey",
+      "def": "CREATE UNIQUE INDEX ir_offsets_pkey ON public.ir_offsets USING btree (id)"
+    },
+    {
+      "name": "ir_programs_pkey",
+      "def": "CREATE UNIQUE INDEX ir_programs_pkey ON public.ir_programs USING btree (id)"
+    },
+    {
+      "name": "ir_types_pkey",
+      "def": "CREATE UNIQUE INDEX ir_types_pkey ON public.ir_types USING btree (id)"
+    },
+    {
+      "name": "project_general_storages_pkey",
+      "def": "CREATE UNIQUE INDEX project_general_storages_pkey ON public.project_general_storages USING btree (id)"
+    },
+    {
+      "name": "report_records_pkey",
+      "def": "CREATE UNIQUE INDEX report_records_pkey ON public.report_records USING btree (id)"
+    },
+    {
+      "name": "ssa_diff_results_pkey",
+      "def": "CREATE UNIQUE INDEX ssa_diff_results_pkey ON public.ssa_diff_results USING btree (id)"
+    },
+    {
+      "name": "ssa_report_record_files_pkey",
+      "def": "CREATE UNIQUE INDEX ssa_report_record_files_pkey ON public.ssa_report_record_files USING btree (id)"
+    },
+    {
+      "name": "ssa_report_records_pkey",
+      "def": "CREATE UNIQUE INDEX ssa_report_records_pkey ON public.ssa_report_records USING btree (id)"
+    },
+    {
+      "name": "ssa_risk_disposals_pkey",
+      "def": "CREATE UNIQUE INDEX ssa_risk_disposals_pkey ON public.ssa_risk_disposals USING btree (id)"
+    },
+    {
+      "name": "ssa_risks_pkey",
+      "def": "CREATE UNIQUE INDEX ssa_risks_pkey ON public.ssa_risks USING btree (id)"
+    },
+    {
+      "name": "syntax_flow_scan_tasks_pkey",
+      "def": "CREATE UNIQUE INDEX syntax_flow_scan_tasks_pkey ON public.syntax_flow_scan_tasks USING btree (id)"
+    },
+    {
+      "name": "uix_ir_programs_program_name",
+      "def": "CREATE UNIQUE INDEX uix_ir_programs_program_name ON public.ir_programs USING btree (program_name)"
+    },
+    {
+      "name": "uix_project_general_storages_key",
+      "def": "CREATE UNIQUE INDEX uix_project_general_storages_key ON public.project_general_storages USING btree (key)"
+    },
+    {
+      "name": "uix_report_records_hash",
+      "def": "CREATE UNIQUE INDEX uix_report_records_hash ON public.report_records USING btree (hash)"
+    },
+    {
+      "name": "uix_ssa_report_record_files_object_key",
+      "def": "CREATE UNIQUE INDEX uix_ssa_report_record_files_object_key ON public.ssa_report_record_files USING btree (object_key)"
+    },
+    {
+      "name": "uix_ssa_report_records_hash",
+      "def": "CREATE UNIQUE INDEX uix_ssa_report_records_hash ON public.ssa_report_records USING btree (hash)"
+    },
+    {
+      "name": "uix_ssa_risks_hash",
+      "def": "CREATE UNIQUE INDEX uix_ssa_risks_hash ON public.ssa_risks USING btree (hash)"
+    },
+    {
+      "name": "uix_syntax_flow_scan_tasks_task_id",
+      "def": "CREATE UNIQUE INDEX uix_syntax_flow_scan_tasks_task_id ON public.syntax_flow_scan_tasks USING btree (task_id)"
+    }
+  ],
+  "sequences": [
+    {
+      "name": "audit_edges_id_seq",
+      "start": 1,
+      "increment": 1,
+      "min": 1,
+      "max": 2147483647,
+      "cache": 1,
+      "cycle": false
+    },
+    {
+      "name": "audit_nodes_id_seq",
+      "start": 1,
+      "increment": 1,
+      "min": 1,
+      "max": 2147483647,
+      "cache": 1,
+      "cycle": false
+    },
+    {
+      "name": "audit_results_id_seq",
+      "start": 1,
+      "increment": 1,
+      "min": 1,
+      "max": 2147483647,
+      "cache": 1,
+      "cycle": false
+    },
+    {
+      "name": "ir_codes_id_seq",
+      "start": 1,
+      "increment": 1,
+      "min": 1,
+      "max": 2147483647,
+      "cache": 1,
+      "cycle": false
+    },
+    {
+      "name": "ir_indices_v1_id_seq",
+      "start": 1,
+      "increment": 1,
+      "min": 1,
+      "max": 2147483647,
+      "cache": 1,
+      "cycle": false
+    },
+    {
+      "name": "ir_name_pool_v1_name_id_seq",
+      "start": 1,
+      "increment": 1,
+      "min": 1,
+      "max": 9223372036854775807,
+      "cache": 1,
+      "cycle": false
+    },
+    {
+      "name": "ir_offsets_id_seq",
+      "start": 1,
+      "increment": 1,
+      "min": 1,
+      "max": 2147483647,
+      "cache": 1,
+      "cycle": false
+    },
+    {
+      "name": "ir_programs_id_seq",
+      "start": 1,
+      "increment": 1,
+      "min": 1,
+      "max": 2147483647,
+      "cache": 1,
+      "cycle": false
+    },
+    {
+      "name": "ir_types_id_seq",
+      "start": 1,
+      "increment": 1,
+      "min": 1,
+      "max": 2147483647,
+      "cache": 1,
+      "cycle": false
+    },
+    {
+      "name": "project_general_storages_id_seq",
+      "start": 1,
+      "increment": 1,
+      "min": 1,
+      "max": 2147483647,
+      "cache": 1,
+      "cycle": false
+    },
+    {
+      "name": "report_records_id_seq",
+      "start": 1,
+      "increment": 1,
+      "min": 1,
+      "max": 2147483647,
+      "cache": 1,
+      "cycle": false
+    },
+    {
+      "name": "ssa_diff_results_id_seq",
+      "start": 1,
+      "increment": 1,
+      "min": 1,
+      "max": 2147483647,
+      "cache": 1,
+      "cycle": false
+    },
+    {
+      "name": "ssa_report_record_files_id_seq",
+      "start": 1,
+      "increment": 1,
+      "min": 1,
+      "max": 2147483647,
+      "cache": 1,
+      "cycle": false
+    },
+    {
+      "name": "ssa_report_records_id_seq",
+      "start": 1,
+      "increment": 1,
+      "min": 1,
+      "max": 2147483647,
+      "cache": 1,
+      "cycle": false
+    },
+    {
+      "name": "ssa_risk_disposals_id_seq",
+      "start": 1,
+      "increment": 1,
+      "min": 1,
+      "max": 2147483647,
+      "cache": 1,
+      "cycle": false
+    },
+    {
+      "name": "ssa_risks_id_seq",
+      "start": 1,
+      "increment": 1,
+      "min": 1,
+      "max": 2147483647,
+      "cache": 1,
+      "cycle": false
+    },
+    {
+      "name": "syntax_flow_scan_tasks_id_seq",
+      "start": 1,
+      "increment": 1,
+      "min": 1,
+      "max": 2147483647,
+      "cache": 1,
+      "cycle": false
+    }
+  ],
+  "enums": null
+}

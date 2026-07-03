@@ -71,8 +71,8 @@ func TestExtractSSADatabaseEnv(t *testing.T) {
 			scannodeSSADatabaseRawParamKey: dsn,
 			scannodeSSASkipMigrateParamKey: true,
 		})
-		if len(env) < 1 {
-			t.Fatalf("expected at least 1 env entry, got %d", len(env))
+		if len(env) < 2 {
+			t.Fatalf("expected at least 2 env entries (DSN + unconditional skip_migrate), got %d", len(env))
 		}
 		if !strings.Contains(env[0], consts.ENV_SSA_DATABASE_RAW+"="+dsn) {
 			t.Fatalf("expected SSA_DATABASE_RAW env, got %v", env)
@@ -105,15 +105,47 @@ func TestExtractSSADatabaseEnv(t *testing.T) {
 		}
 	})
 
-	t.Run("omits skip_migrate when false", func(t *testing.T) {
+	t.Run("always sets skip_migrate regardless of param value (governance design)", func(t *testing.T) {
+		// scannode NEVER runs DDL on the shared IR DB; SSA_DB_SKIP_MIGRATE=1
+		// is unconditional for both compile and scan (supersedes the prior
+		// Track B compile=skip_migrate:false transitional state). The
+		// skip_migrate param is now ignored.
 		env := extractSSADatabaseEnv(map[string]interface{}{
 			scannodeSSADatabaseRawParamKey: "postgres://x@y/db",
 			scannodeSSASkipMigrateParamKey: false,
 		})
+		var foundSkip bool
 		for _, e := range env {
-			if strings.Contains(e, consts.ENV_SSA_DB_SKIP_MIGRATE) {
-				t.Fatalf("did not expect skip_migrate env, got %v", env)
+			if strings.Contains(e, consts.ENV_SSA_DB_SKIP_MIGRATE+"=1") {
+				foundSkip = true
+				break
 			}
 		}
+		if !foundSkip {
+			t.Fatalf("expected unconditional SSA_DB_SKIP_MIGRATE=1 in env (governance design), got %v", env)
+		}
 	})
+
+	t.Run("extractExpectedIRSchemaVersion parses injected version", func(t *testing.T) {
+		if got := extractExpectedIRSchemaVersion(map[string]interface{}{
+			scannodeSSAExpectedIRSchemaVersionParamKey: int64(2),
+		}); got != 2 {
+			t.Fatalf("expected 2, got %d", got)
+		}
+		if got := extractExpectedIRSchemaVersion(nil); got != 0 {
+			t.Fatalf("expected 0 for absent param, got %d", got)
+		}
+	})
+}
+
+func TestIRDSNFromEnv(t *testing.T) {
+	if got := irDSNFromEnv([]string{"SSA_DATABASE_RAW=postgres://x@y/z", "SSA_DB_SKIP_MIGRATE=1"}); got != "postgres://x@y/z" {
+		t.Fatalf("got %q", got)
+	}
+	if got := irDSNFromEnv([]string{"OTHER=v"}); got != "" {
+		t.Fatalf("expected empty, got %q", got)
+	}
+	if got := irDSNFromEnv(nil); got != "" {
+		t.Fatalf("expected empty for nil, got %q", got)
+	}
 }

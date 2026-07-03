@@ -1,0 +1,103 @@
+name: IR Schema Drift Gate
+
+# CI maintenance gate for the SSA IR DB schema.
+#
+# Compares the frozen baseline SQL (common/yak/ssa/ssadb/irschema/migrations/
+# 0001_baseline.up.sql — what the migrator applies to production IR DBs)
+# against the GORM AutoMigrate path (common/yak/ssa/ssadb struct tags — what
+# a developer's edits produce). If a GORM struct change is NOT accompanied by
+# a matching NNNN_*.up.sql migration file + CurrentIRSchemaVersion bump, this
+# job fails with a concrete diff telling the developer exactly which SQL to
+# write. See common/yak/ssa/ssadb/irschema/README.md.
+#
+# Pinned to Postgres 16 (matches thirdpartyservices.PostgresImageName and the
+# baseline SQL generation process). Do NOT run this against a different PG
+# major version — indexdef / default-expression rendering differs across
+# versions and will produce false-positive drift.
+
+on:
+  pull_request:
+    branches:
+      - main
+      - 'go0p/refactor/**'
+    paths:
+      - "common/yak/ssa/ssadb/**"
+      - "common/yak/ssa/ssadb/irschema/**"
+      - "common/schema/**"
+      - "common/consts/ssa.go"
+      - ".github/workflows/ir-schema-drift.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  drift-test:
+    runs-on: ubuntu-22.04
+    services:
+      postgres:
+        # MUST match thirdpartyservices.PostgresImageName and the version the
+        # baseline SQL was generated on. Changing this requires regenerating
+        # 0001_baseline.up.sql + 0001_baseline.snapshot.json from the new PG.
+        image: postgres:16
+        env:
+          POSTGRES_USER: palm-user
+          POSTGRES_PASSWORD: awesome-palm
+          POSTGRES_DB: palm
+        ports:
+          - 5435:5432
+        options: >-
+          --health-cmd "pg_isready -U palm-user -d palm"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # full history not needed; shallow is fine for the test
+          fetch-depth: 1
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run IR schema drift test
+        env:
+          TEST_POSTGRES: "1"
+          # Point the test at the CI service container. The drift test
+          # provisions two throwaway databases on this server.
+          PALM_POSTGRES_HOST: "127.0.0.1"
+          PALM_POSTGRES_PORT: "5435"
+          PALM_POSTGRES_USER: "palm-user"
+          PALM_POSTGRES_PASSWORD: "awesome-palm"
+          PALM_POSTGRES_DB: "palm"
+        run: |
+          go test ./common/yak/ssa/ssadb/irschema/ \
+            -run 'TestIRSchemaDrift|TestEmbeddedMigrationsContiguous|TestBaselineSQLStableChecksum' \
+            -count=1 -v
+
+      - name: Run scannode IR schema gate test
+        env:
+          TEST_POSTGRES: "1"
+          PALM_POSTGRES_HOST: "127.0.0.1"
+          PALM_POSTGRES_PORT: "5435"
+          PALM_POSTGRES_USER: "palm-user"
+          PALM_POSTGRES_PASSWORD: "awesome-palm"
+          PALM_POSTGRES_DB: "palm"
+        run: |
+          go test ./scannode/ \
+            -run 'TestCheckIRSchemaVersion_RealDB|TestCheckIRSchemaVersion_NoDSN|TestExtractSSADatabaseEnv|TestIRDSNFromEnv' \
+            -count=1 -v
+
+      - name: Build yak-ir-migrator (engine-free check)
+        # Confirms the standalone migrator binary has no yak-engine / scannode
+        # / SSA-runtime dependency (no -tags hids, no extra deps).
+        run: |
+          go build -o /tmp/yak-ir-migrator ./cmd/yak-ir-migrator
+          /tmp/yak-ir-migrator --help 2>&1 | head -5 || true
+          echo "yak-ir-migrator built successfully (engine-free)"

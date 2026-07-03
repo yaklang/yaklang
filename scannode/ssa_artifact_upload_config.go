@@ -15,13 +15,23 @@ const scannodeInternalParamPrefix = "_scannode_"
 // injects these into the script input JSON; scannode extracts them and
 // forwards as env vars to the distyak child process.
 const (
-	scannodeSSADatabaseRawParamKey = "_scannode_ssa_database_raw"
-	scannodeSSASkipMigrateParamKey = "_scannode_ssa_skip_migrate"
+	scannodeSSADatabaseRawParamKey           = "_scannode_ssa_database_raw"
+	scannodeSSASkipMigrateParamKey           = "_scannode_ssa_skip_migrate"
+	scannodeSSAExpectedIRSchemaVersionParamKey = "_scannode_ssa_expected_ir_schema_version"
 )
 
-// extractSSADatabaseEnv reads the shared SSA IR DB DSN and skip_migrate flag
-// from the scheduler-injected hidden params and returns them as "KEY=VALUE"
-// env var entries suitable for appending to a child process cmd.Env.
+// extractSSADatabaseEnv reads the shared SSA IR DB DSN from the scheduler-injected
+// hidden params and returns "KEY=VALUE" env var entries for the distyak child
+// process.
+//
+// As of the SSA IR DB migration governance design (see
+// docs/design-docs/ssa-ir-db-migration-governance.md), scannode NEVER runs DDL
+// on the IR DB. SSA_DB_SKIP_MIGRATE=1 is set unconditionally whenever a DSN is
+// injected — for both compile and scan workloads. The migrator
+// (cmd/yak-ir-migrator) is the sole DDL authority; scannode holds only a
+// DML-only role (ir_dml_user) and a per-task irschema.Check version gate
+// (see script_execution.go).
+//
 // Returns nil if no DSN was injected (legacy/unconfigured mode).
 func extractSSADatabaseEnv(params map[string]interface{}) []string {
 	if len(params) == 0 {
@@ -31,13 +41,25 @@ func extractSSADatabaseEnv(params map[string]interface{}) []string {
 	if dsn == "" {
 		return nil
 	}
+	// Unconditional skip_migrate — supersedes the prior compile=skip_migrate:false
+	// transitional state (Track B). scannode never runs DDL on the shared IR DB.
 	env := []string{
 		fmt.Sprintf("%s=%s", consts.ENV_SSA_DATABASE_RAW, dsn),
-	}
-	if toBool(params[scannodeSSASkipMigrateParamKey]) {
-		env = append(env, fmt.Sprintf("%s=1", consts.ENV_SSA_DB_SKIP_MIGRATE))
+		fmt.Sprintf("%s=1", consts.ENV_SSA_DB_SKIP_MIGRATE),
 	}
 	return env
+}
+
+// extractExpectedIRSchemaVersion reads the scheduler-injected expected IR
+// schema version. scannode uses it as a cheap short-circuit: if the scheduler
+// is still configured for an older schema than this binary expects, the task
+// is rejected before even opening the IR DB. Returns 0 if not injected
+// (legacy mode — the per-task irschema.Check gate still runs against the DB).
+func extractExpectedIRSchemaVersion(params map[string]interface{}) int64 {
+	if len(params) == 0 {
+		return 0
+	}
+	return toInt64(params[scannodeSSAExpectedIRSchemaVersionParamKey])
 }
 
 func extractSSAArtifactUploadConfig(params map[string]interface{}) *SSAArtifactUploadConfig {
