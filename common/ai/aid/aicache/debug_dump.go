@@ -15,11 +15,12 @@ import (
 // dumpBaseDir 是调试落盘的基础目录，单进程内只解析一次
 // 关键词: aicache, dumpBaseDir, 调试目录
 var (
-	dumpBaseDir     string
-	dumpBaseDirOnce sync.Once
-	dumpBaseDirErr  error
-	dumpSessionId   string
-	dumpMu          sync.Mutex
+	dumpBaseDir    string
+	dumpBaseDirErr error
+	dumpSessionId  string
+	dumpInitMu     sync.Mutex // 保护懒初始化与测试 reset，避免并发 reset sync.Once 导致 panic
+	dumpInited     bool
+	dumpMu         sync.Mutex // 保护落盘文件名序号
 )
 
 // resolveDumpBaseDir 解析并创建调试落盘根目录
@@ -27,20 +28,25 @@ var (
 // sessionId 形如 20260503-100123-12345
 // 关键词: aicache, resolveDumpBaseDir
 func resolveDumpBaseDir() (string, error) {
-	dumpBaseDirOnce.Do(func() {
-		base := consts.GetDefaultYakitBaseTempDir()
-		if base == "" {
-			base = os.TempDir()
-		}
-		dumpSessionId = fmt.Sprintf("%s-%d", time.Now().Format("20060102-150405"), os.Getpid())
-		full := filepath.Join(base, "aicache", dumpSessionId)
-		if err := os.MkdirAll(full, 0o755); err != nil {
-			dumpBaseDirErr = err
-			return
-		}
-		dumpBaseDir = full
-		log.Infof("aicache debug dump dir: %s", dumpBaseDir)
-	})
+	dumpInitMu.Lock()
+	defer dumpInitMu.Unlock()
+	if dumpInited {
+		return dumpBaseDir, dumpBaseDirErr
+	}
+	base := consts.GetDefaultYakitBaseTempDir()
+	if base == "" {
+		base = os.TempDir()
+	}
+	dumpSessionId = fmt.Sprintf("%s-%d", time.Now().Format("20060102-150405"), os.Getpid())
+	full := filepath.Join(base, "aicache", dumpSessionId)
+	if err := os.MkdirAll(full, 0o755); err != nil {
+		dumpBaseDirErr = err
+		dumpInited = true
+		return dumpBaseDir, dumpBaseDirErr
+	}
+	dumpBaseDir = full
+	dumpInited = true
+	log.Infof("aicache debug dump dir: %s", dumpBaseDir)
 	return dumpBaseDir, dumpBaseDirErr
 }
 
@@ -53,7 +59,7 @@ func SessionId() string {
 
 // SessionDir 返回当前进程 aicache 调试落盘根目录的绝对路径，
 // 供脚本侧（cachebench / 离线分析等）一行直接拿到 dump 目录路径，无需重做 mtime 扫描。
-// 第一次调用时会触发懒初始化（与 SessionId 共享 sync.Once），之后稳定返回同一路径。
+// 第一次调用时会触发懒初始化（与 SessionId 共享 dumpInitMu），之后稳定返回同一路径。
 // 关键词: aicache, SessionDir, 脚本可读 dump 路径
 // 参数:
 //   - 无

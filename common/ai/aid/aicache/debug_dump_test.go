@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -76,11 +75,10 @@ func TestDumpDebug_WritesFile(t *testing.T) {
 // resetDumpStateForTest 重置落盘相关的全局状态，仅供 _test 文件使用
 // 关键词: aicache, test helper, reset dump
 func resetDumpStateForTest() {
-	dumpMu.Lock()
-	defer dumpMu.Unlock()
+	dumpInitMu.Lock()
+	defer dumpInitMu.Unlock()
 	dumpBaseDir = ""
 	dumpBaseDirErr = nil
 	dumpSessionId = ""
-	// 重置 sync.Once，使用赋零值
-	dumpBaseDirOnce = sync.Once{}
+	dumpInited = false
 }
