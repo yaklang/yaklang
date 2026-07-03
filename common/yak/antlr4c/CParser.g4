@@ -98,10 +98,12 @@ genericAssociation
 
 // --- Postfix/Unary/Cast Expressions ---
 // Optimized: Use postfixSuffix to support chained operations and reduce recursion depth
+/*
+postfixExpression 消歧 (SLL):
+后缀 ++/-- 并入 postfixSuffix，与 primary+postfixSuffix* 走同一条 ATN 路径。
+*/
 postfixExpression
     : (primaryExpression | '__extension__'? '(' typeName ')' '{' initializerList ','? '}') postfixSuffix*
-    | leftExpression '++'
-    | leftExpression '--'
     ;
 
 // Postfix suffix operations: supports chained operations like func()[0].field
@@ -111,6 +113,8 @@ postfixSuffix
     : '[' eos* expression eos* ']'
     | '(' eos* argumentExpressionList? eos* ')'
     | ('.' | '->') Identifier
+    | PlusPlus
+    | MinusMinus
     ;
 
 // Postfix expression that can be used as lvalue (excluding function calls)
@@ -160,10 +164,18 @@ castExpression
     ;
 
 // --- Binary Expressions ---
+/*
+coreExpression 消歧 (SLL):
+assignPrefix 统一 cast 与 *cast 左值前缀，判别点后移到 assignmentOperator。
+*/
 coreExpression
-    : assignmentExpression
-    | castExpression
+    : assignPrefix (assignmentOperator eos* expression)?
     | complexCoreExpression
+    ;
+
+assignPrefix
+    : '*' eos* castExpression
+    | castExpression
     ;
 
 complexCoreExpression
@@ -584,8 +596,21 @@ iterationStatement
     | 'for' '(' eos* forCondition eos* ')' eos* statement
     ;
 
+/*
+forCondition 消歧 (SLL):
+for init 合并为 forInitClause，声明与赋值表达式共享 castExpression 前缀路径。
+*/
 forCondition
-    : (forDeclarations | assignmentExpressions?) Semi forExpression? Semi forExpression?
+    : forInitClause? Semi forExpression? Semi forExpression?
+    ;
+
+forInitClause
+    : forInitItem (',' eos* forInitItem)*
+    ;
+
+forInitItem
+    : forDeclaration
+    | castExpression (assignmentOperator eos* expression)?
     ;
 
 coreExpressions

@@ -1329,18 +1329,11 @@ func (b *astbuilder) buildIterationStatement(ast *cparser.IterationStatementCont
 			return condition
 		})
 	} else if condition, ok := ast.ForCondition().(*cparser.ForConditionContext); ok {
-		if first, ok := condition.ForDeclarations().(*cparser.ForDeclarationsContext); ok {
-			// first expression is initialization, in enter block
+		if init, ok := condition.ForInitClause().(*cparser.ForInitClauseContext); ok {
 			loop.SetFirst(func() []ssa.Value {
-				recoverRange := b.SetRange(first.BaseParserRuleContext)
+				recoverRange := b.SetRange(init.BaseParserRuleContext)
 				defer recoverRange()
-				return b.buildForDeclarations(first)
-			})
-		} else if first, ok := condition.AssignmentExpressions().(*cparser.AssignmentExpressionsContext); ok {
-			loop.SetFirst(func() []ssa.Value {
-				recoverRange := b.SetRange(first.BaseParserRuleContext)
-				defer recoverRange()
-				return b.buildAssignmentExpressions(first)
+				return b.buildForInitClause(init)
 			})
 		}
 		if expr, ok := condition.ForExpression(0).(*cparser.ForExpressionContext); ok {
@@ -1382,6 +1375,34 @@ func (b *astbuilder) buildIterationStatement(ast *cparser.IterationStatementCont
 		}
 	})
 	loop.Finish()
+}
+
+func (b *astbuilder) buildForInitClause(ast *cparser.ForInitClauseContext) ssa.Values {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+	var ret ssa.Values
+	for _, item := range ast.AllForInitItem() {
+		ret = append(ret, b.buildForInitItem(item.(*cparser.ForInitItemContext))...)
+	}
+	return ret
+}
+
+func (b *astbuilder) buildForInitItem(ast *cparser.ForInitItemContext) ssa.Values {
+	if d := ast.ForDeclaration(); d != nil {
+		return b.buildForDeclaration(d.(*cparser.ForDeclarationContext))
+	}
+	if c := ast.CastExpression(); c != nil {
+		castCtx := c.(*cparser.CastExpressionContext)
+		if op := ast.AssignmentOperator(); op != nil && ast.Expression() != nil {
+			return ssa.Values{b.applyAssignmentFromCast(castCtx, op.(*cparser.AssignmentOperatorContext), ast.Expression().(*cparser.ExpressionContext))}
+		}
+		val, _ := b.buildCastExpression(castCtx, false)
+		if utils.IsNil(val) {
+			val = b.EmitConstInst(0)
+		}
+		return ssa.Values{val}
+	}
+	return nil
 }
 
 func (b *astbuilder) buildForDeclarations(ast *cparser.ForDeclarationsContext) ssa.Values {

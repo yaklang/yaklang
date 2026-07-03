@@ -219,3 +219,39 @@ go test ./common/yak/go2ssa/test/ -run "TestGo_SLL|TestAllSyntaxForGo" -count=1 
 # 性能基准（可选）
 GO_PARSER_BENCH=1 go test ./common/yak/go2ssa/test/ -run TestGo_LexerVsParser -count=1 -v
 ```
+
+---
+
+## 9. C Parser（antlr4c / c2ssa）
+
+### 9.1 Runtime
+
+C SSA 前端 [`c2ssa/builder.go`](common/yak/c2ssa/builder.go) 的 `Frontend()` 已使用 `antlr4util.ParseASTWithSLLFirst`，与 Go/Yaklang SSA 共用 `YAK_ANTLR_SLL_FIRST` 开关。
+
+### 9.2 语法消歧
+
+[`CParser.g4`](common/yak/antlr4c/CParser.g4) 按「共享前缀 + 后缀判别」做了 C 专用消歧（不照搬 Go 的 `exprSimpleStmt`）：
+
+| 规则 | 改动 |
+| --- | --- |
+| `postfixSuffix` | 后缀 `++`/`--` 并入 `postfixSuffix*`，去掉 `postfixExpression` 并列的 `leftExpression '++'/'--'` 分支 |
+| `coreExpression` | `assignPrefix (assignmentOperator expression)?`；`assignPrefix` 为 `* castExpression \| castExpression` |
+| `forCondition` | 合并为 `forInitClause?` + `forInitItem`（声明或 `castExpression` 赋值前缀） |
+
+`c2ssa/builder_express.go` / `builder_ast.go` 已适配新 AST（含 `*cast` 赋值、成员左值 side-effect）。
+
+### 9.3 SLL bail 现状（c2ssa fixture 42 个）
+
+优化前 **17/42** bail → 优化后 **12/42**。`TestC_SLLBailDiagnostic` 守卫：**SLL 未 bail 时解析树必须与 LL 逐字符一致**。
+
+仍 bail 的 fixture 主要是 `sizeof_*`、`complex_declarations.c`、`TypeCast.c` 等 cast/类型/声明歧义；两阶段解析自动回退 LL，Frontend 与 SSA 构建仍正确。
+
+### 9.4 复现命令
+
+```bash
+# 正确性守卫（CI 应始终跑）
+go test ./common/yak/c2ssa/test/ -run "TestC_SLL|TestAllSyntaxForC" -count=1 -v
+
+# 性能基准（可选）
+C_PARSER_BENCH=1 go test ./common/yak/c2ssa/test/ -run TestC_LexerVsParser -count=1 -v
+```
