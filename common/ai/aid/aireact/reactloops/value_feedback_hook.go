@@ -42,11 +42,11 @@ func buildValueFeedbackPostIteration() func(loop *ReActLoop, iteration int, task
 // 工具 (高价值客观信号) 时才提交, 减弱逐轮提交带来的低价值噪声与额外开销.
 func (r *ReActLoop) submitValueFeedbackRecord(iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
 	if isDone {
-		r.submitValueFeedbackWithTrigger(aicommon.ValueFeedbackTriggerLoopEnd, task)
+		r.submitValueFeedbackWithTrigger(aicommon.ValueFeedbackTriggerLoopEnd, task, iteration)
 		return
 	}
 	if r.iterationExecutedTool(iteration) {
-		r.submitValueFeedbackWithTrigger(aicommon.ValueFeedbackTriggerIterationEnd, task)
+		r.submitValueFeedbackWithTrigger(aicommon.ValueFeedbackTriggerIterationEnd, task, iteration)
 	}
 }
 
@@ -73,11 +73,14 @@ func (r *ReActLoop) submitValueFeedbackSignal(trigger string) {
 			return
 		}
 	}()
-	r.submitValueFeedbackWithTrigger(trigger, r.GetCurrentTask())
+	r.submitValueFeedbackWithTrigger(trigger, r.GetCurrentTask(), r.GetCurrentIterationIndex())
 }
 
 // submitValueFeedbackWithTrigger 组装并提交一条价值评估记录 (统一装配逻辑).
-func (r *ReActLoop) submitValueFeedbackWithTrigger(trigger string, task aicommon.AIStatefulTask) {
+//
+// iteration 是本条记录对应的轮次序号; 核心 trace 用完整 timeline dump (而非 diff),
+// 保证每条记录都能被后端独立复盘 "到底发生了什么".
+func (r *ReActLoop) submitValueFeedbackWithTrigger(trigger string, task aicommon.AIStatefulTask, iteration int) {
 	cfg, ok := r.config.(*aicommon.Config)
 	if !ok || cfg == nil {
 		return
@@ -91,8 +94,14 @@ func (r *ReActLoop) submitValueFeedbackWithTrigger(trigger string, task aicommon
 		FocusMode:        r.loopName,
 		TriggerCondition: trigger,
 		ExecutionPolicy:  cfg.AgreePolicy,
-		TimelineDiff:     r.GetTimelineDiffWithoutUpdate(),
 		SessionID:        cfg.PersistentSessionId,
+		IterationIndex:   iteration,
+	}
+	// 核心 trace: 完整 timeline dump. Timeline 缺失时退化为 diff, 保证不空手而归.
+	if cfg.Timeline != nil {
+		record.TimelineDump = cfg.Timeline.Dump()
+	} else {
+		record.TimelineDump = r.GetTimelineDiffWithoutUpdate()
 	}
 
 	actions := r.GetAllExistedActionRecord()
@@ -119,7 +128,63 @@ func (r *ReActLoop) submitValueFeedbackWithTrigger(trigger string, task aicommon
 
 	if !isNilTask(task) {
 		record.TaskID = task.GetId()
+		record.UserQuery = task.GetUserInput()
 	}
+
+	aicommon.SubmitValueFeedback(cfg, record)
+}
+
+// SubmitRiskFeedback 在 AI 报出漏洞 (risk) 之后提交一条 risk_feedback 价值评估记录,
+// 交由价值评估小模型判定该漏洞是否为误报 (AI 自判路径, source=model_judge). 记录携带
+// 完整 timeline dump 作为核心 trace, 以便后端复盘该误报判定的上下文.
+//
+// 人工确认路径 (未来接入, 本次不实现, 也不改任何前端): 当前端在漏洞报出后提供
+// "是真漏洞 / 是误报" 的确认交互时, 应在拿到用户判定后同样组装一条
+// aicommon.ValueFeedbackRecord, 设 RiskFeedback.Source = aicommon.RiskFeedbackSourceHuman
+// 且 IsFalsePositive 为用户的明确判定 (true/false), 再调 aicommon.SubmitValueFeedback
+// 提交. 人工确认是最高价值的误报信号, 后端可据 source 区分 AI 弱标签与人工终判.
+//
+// 全程 recover + 非阻塞投递, 绝不影响主循环.
+func (r *ReActLoop) SubmitRiskFeedback(riskIDs []string, riskType, severity string) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			return
+		}
+	}()
+	if len(riskIDs) == 0 {
+		return
+	}
+	cfg, ok := r.config.(*aicommon.Config)
+	if !ok || cfg == nil {
+		return
+	}
+
+	record := &aicommon.ValueFeedbackRecord{
+		MainModel: aicommon.ModelEndpoint{
+			ModelName:  cfg.AiModelName,
+			ServerName: cfg.AiServerName,
+		},
+		FocusMode:        r.loopName,
+		TriggerCondition: aicommon.ValueFeedbackTriggerRiskFeedback,
+		ExecutionPolicy:  cfg.AgreePolicy,
+		SessionID:        cfg.PersistentSessionId,
+		IterationIndex:   r.GetCurrentIterationIndex(),
+		RiskFeedback: &aicommon.ValueFeedbackRiskFeedback{
+			RiskIDs:  riskIDs,
+			RiskType: riskType,
+			Severity: severity,
+			Source:   aicommon.RiskFeedbackSourceModelJudge,
+			// IsFalsePositive 留空 (nil): AI 自判路径由小模型在价值评估请求里回填.
+		},
+	}
+	if cfg.Timeline != nil {
+		record.TimelineDump = cfg.Timeline.Dump()
+	}
+	if task := r.GetCurrentTask(); !isNilTask(task) {
+		record.TaskID = task.GetId()
+		record.UserQuery = task.GetUserInput()
+	}
+	record.WhatHappenedSummary = summarizeValueFeedbackActions(r.GetAllExistedActionRecord())
 
 	aicommon.SubmitValueFeedback(cfg, record)
 }

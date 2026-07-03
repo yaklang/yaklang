@@ -86,6 +86,18 @@ var generateRiskAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 			loop.Set("generated_risk_ids", strings.Join(riskIDs, ","))
 			loop.Set("generated_risk_summary", summary)
 			recordLoopHTTPFuzzMetaAction(loop, "generate_risk", fmt.Sprintf("count=%d; risk_ids=%s", len(riskIDs), strings.Join(riskIDs, ",")), summary)
+
+			// 价值评估埋点: AI 报出漏洞后提交一条 risk_feedback 记录, 交由小模型判定是否误报
+			// (AI 自判). riskType/severity 取首个 spec 作为代表, riskIDs 覆盖全部本次生成的
+			// risk. 非阻塞 + recover, 绝不影响主流程. 人工误报确认路径见 SubmitRiskFeedback 注释.
+			riskFeedbackType := ""
+			riskFeedbackSeverity := ""
+			if len(specs) > 0 {
+				riskFeedbackType = strings.TrimSpace(specs[0].RiskType)
+				riskFeedbackSeverity = strings.TrimSpace(specs[0].Severity)
+			}
+			loop.SubmitRiskFeedback(riskIDs, riskFeedbackType, riskFeedbackSeverity)
+
 			reactloops.EmitActionLog(loop, loopHTTPFuzzActionLogNodeGenerateRisk, fmt.Sprintf("生成 %d 个 Risk / Generated %d Risks", len(riskIDs), len(riskIDs)), summary)
 			reactloops.EmitStatus(loop, "完成 / Complete")
 			r.AddToTimeline("generate_risk", summary)

@@ -37,6 +37,10 @@ const (
 	ValueFeedbackTriggerSpinDetected   = "spin_detected"
 	ValueFeedbackTriggerSelfReflection = "self_reflection"
 	ValueFeedbackTriggerVerification   = "verification"
+	// ValueFeedbackTriggerRiskFeedback 在 AI 报出漏洞 (risk) 之后触发, 收集
+	// "该漏洞是否为误报" 的反馈. 误报信号可来自 AI 自判 (source=model_judge) 或
+	// 人工确认 (source=human), 由 RiskFeedback.Source 区分.
+	ValueFeedbackTriggerRiskFeedback = "risk_feedback"
 )
 
 // ValueFeedbackAction 是一次动作的轻量表示 (避免 aicommon 反向依赖 reactloops
@@ -111,6 +115,36 @@ type ValueFeedbackOutcome struct {
 	Detail       string `json:"detail,omitempty"`
 }
 
+// 漏洞误报反馈来源枚举. 与审批 approval.source 分离, 语义是 "谁判定了误报".
+const (
+	// RiskFeedbackSourceModelJudge 表示由小模型 (model_judge) 自动判定是否误报.
+	RiskFeedbackSourceModelJudge = "model_judge"
+	// RiskFeedbackSourceHuman 表示由真人在漏洞报出后确认是否误报 (最高价值, 目前
+	// 前端确认交互尚未接入, 该来源留待后续实现).
+	RiskFeedbackSourceHuman = "human"
+)
+
+// ValueFeedbackRiskFeedback 描述 "AI 报出漏洞之后" 的误报反馈事实.
+//
+// 设计: 与审批 (Approval) 一样只记录事实, 不预先下终态标签. IsFalsePositive 为
+// 三态 (nil=尚未判定 / true=误报 / false=真实漏洞), 由 Source 指明判定来源.
+// AI 自判路径下 IsFalsePositive 通常留空 (nil), 交由小模型在价值评估请求里回填;
+// 人工确认路径 (未来接入) 则直接携带 Source=human 与明确的 IsFalsePositive.
+type ValueFeedbackRiskFeedback struct {
+	// RiskIDs 是本次反馈关联的 risk 记录 ID 列表 (yakit risk 主键).
+	RiskIDs []string `json:"risk_ids,omitempty"`
+	// RiskType 是漏洞类型 (如 sqli / xss / ssrf), 便于按类型聚合误报率.
+	RiskType string `json:"risk_type,omitempty"`
+	// Severity 是漏洞严重级别 (critical/high/warning/medium/low/info).
+	Severity string `json:"severity,omitempty"`
+	// Source 取 model_judge / human, 指明误报判定来源.
+	Source string `json:"source,omitempty"`
+	// IsFalsePositive 三态: nil 未判定, true 误报, false 真实漏洞.
+	IsFalsePositive *bool `json:"is_false_positive,omitempty"`
+	// Reason 是误报判定的简要理由 (如有).
+	Reason string `json:"reason,omitempty"`
+}
+
 // ValueFeedbackRecord 是一次价值评估提交的完整上下文 (纯数据).
 //
 // ID 与 Signature 在提交时由 aive 计算: ID 唯一标识本次提交; Signature 对稳定
@@ -126,20 +160,33 @@ type ValueFeedbackRecord struct {
 	FocusMode        string `json:"focus_mode"`
 	TriggerCondition string `json:"trigger_condition"`
 
+	// UserQuery 是本次会话/任务的原始用户诉求 (任务目标), 用于快速复盘 "用户要什么".
+	UserQuery string `json:"user_query,omitempty"`
+	// Attachments 是用户随任务提交的附件/资源标识 (文件路径 / 目录 / 选区标记等), 可空.
+	Attachments []string `json:"attachments,omitempty"`
+
 	WhatHappenedSummary string                `json:"what_happened_summary"`
 	Actions             []ValueFeedbackAction `json:"actions,omitempty"`
 
 	ExecutionPolicy AgreePolicyType        `json:"execution_policy,omitempty"`
 	Approval        *ValueFeedbackApproval `json:"approval,omitempty"`
 
+	// RiskFeedback 仅在 trigger_condition=risk_feedback 时存在, 记录 AI 报出漏洞后
+	// 的误报反馈事实 (来源 / 是否误报).
+	RiskFeedback *ValueFeedbackRiskFeedback `json:"risk_feedback,omitempty"`
+
+	// TimelineDump 是本次记录的核心 trace: 完整的 timeline 轨迹, 后端据此复盘
+	// "到底发生了什么". 每条记录都应携带.
 	TimelineDump string `json:"timeline_dump,omitempty"`
-	TimelineDiff string `json:"timeline_diff,omitempty"`
 
 	Outcome *ValueFeedbackOutcome `json:"outcome,omitempty"`
 
 	SessionID string `json:"session_id,omitempty"`
 	TaskID    string `json:"task_id,omitempty"`
-	Timestamp int64  `json:"timestamp"`
+	// IterationIndex 是本条记录对应的轮次序号 (loop iteration), 便于按会话/任务
+	// 内部时序还原发生顺序; 无轮次概念的记录 (如审批) 为 0.
+	IterationIndex int   `json:"iteration_index,omitempty"`
+	Timestamp      int64 `json:"timestamp"`
 }
 
 // ValueFeedbackSubmitter 由 aive 实现并注册. 实现必须是非阻塞的 (内部有界队列),
@@ -306,11 +353,28 @@ func (c *Config) submitReviewValueFeedback(ep *Endpoint, focusMode, reviewQuesti
 		ExecutionPolicy:  c.AgreePolicy,
 		Approval:         approval,
 		SessionID:        c.PersistentSessionId,
+		// TaskID 从运行时当前任务解析器取, 保证审批类记录也能按任务聚合复盘;
+		// UserQuery 从用户输入历史首条回填, 记录 "用户最初要什么".
+		TaskID:    c.resolveHotpatchCurrentTaskId(),
+		UserQuery: c.firstUserQuery(),
 	}
 	if c.Timeline != nil {
 		record.TimelineDump = c.Timeline.Dump()
 	}
 	SubmitValueFeedback(c, record)
+}
+
+// firstUserQuery 返回本会话的原始用户诉求 (用户输入历史里第一条). 无历史时返回空串.
+// 用于价值评估记录的 UserQuery 字段, 便于后端快速复盘 "用户最初要什么".
+func (c *Config) firstUserQuery() string {
+	if c == nil {
+		return ""
+	}
+	history := c.GetUserInputHistory()
+	if len(history) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(history[0].UserInput)
 }
 
 // classifyReviewSuggestion 把审批响应里的原始 suggestion 归一化为 decision, 并给出
