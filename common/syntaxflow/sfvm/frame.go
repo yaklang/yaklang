@@ -377,12 +377,16 @@ func (s *SFFrame) execRule(feedValue Values) error {
 		}
 	}
 	for {
-		// Only build the per-opcode progress message when a progress callback is
-		// actually registered. s.Codes[s.idx].String() formats a debug string with
-		// fmt.Sprintf on EVERY opcode iteration; with no callback that string is
-		// discarded — pure allocation (SFI.String was ~27% of fmt.Sprintf allocs /
-		// ~200M calls on large projects, a top GC driver).
-		if s.config.processCallback != nil {
+		// Throttle the per-opcode progress callback: s.Codes[s.idx].String()
+		// formats a debug string with fmt.Sprintf on EVERY opcode, and the scan
+		// runner always registers a progress callback, so this fired on every
+		// opcode (~5% of all allocations / ~117M calls on large projects). The
+		// progress consumer (UpdateRuleStatus) only needs a recent opcode label,
+		// not every one — emit every Nth iteration (and always at the final
+		// "finished" step). N=64 keeps the label fresh while cutting SFI.String +
+		// ProcessCallback Sprintf ~64x.
+		const progressCallbackEvery = 64
+		if s.config.processCallback != nil && (s.idx%progressCallbackEvery == 0 || s.idx >= len(s.Codes)) {
 			var msg string
 			if s.idx < len(s.Codes) {
 				msg = s.Codes[s.idx].String()
