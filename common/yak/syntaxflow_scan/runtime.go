@@ -1,6 +1,7 @@
 package syntaxflow_scan
 
 import (
+	"context"
 	"fmt"
 	"sync/atomic"
 	"time"
@@ -90,12 +91,26 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 	// 检查是否启用规则级别的详细性能监控
 	enableRulePerf := m.Config.IsEnableRulePerformanceLog()
 
+	// Per-rule wall-clock budget: derive a deadline context so a pathological
+	// rule (e.g. dataflow(include=...) matching tens of thousands of sources on
+	// a large project) is bailed at the budget instead of hanging the scan. The
+	// deadline propagates via QueryWithContext -> OperationConfig.ctx ->
+	// AnalyalyzeContext, which checks ctx.Done() at every recursive dataflow
+	// step (analyze_context.go). 0 means no budget (legacy behavior).
+	ruleTimeout := m.Config.GetScanRuleTimeout()
+	ruleCtx := m.ctx
+	if ruleTimeout > 0 {
+		var ruleCancel context.CancelFunc
+		ruleCtx, ruleCancel = context.WithTimeout(m.ctx, ruleTimeout)
+		defer ruleCancel()
+	}
+
 	// 将查询逻辑包装到函数中
 	f := func() error {
 		var ruleRecorder *diagnostics.Recorder
 		option := []ssaapi.QueryOption{}
 		option = append(option,
-			ssaapi.QueryWithContext(m.ctx),
+			ssaapi.QueryWithContext(ruleCtx),
 			ssaapi.QueryWithTaskID(m.taskID),
 			ssaapi.QueryWithProcessCallback(func(f float64, info string) {
 				m.processMonitor.UpdateRuleStatus(prog.GetProgramName(), rule.RuleName, f, info)
@@ -120,14 +135,31 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 			res, err = prog.SyntaxFlowRule(rule, option...)
 		}
 
+		// Detect a per-rule budget bail. ruleCtx.Err() is non-nil once the
+		// deadline fired, regardless of whether the query surfaced the ctx error
+		// or returned partial/empty results with a nil err — so this catches both.
+		bailedByBudget := ruleTimeout > 0 && ruleCtx.Err() != nil
+
 		if err == nil {
 			m.StatusTask(res)
 			m.markRuleSuccess()
+			if bailedByBudget {
+				log.Warnf("rule %s on program %s hit per-rule budget (%s), returned partial results",
+					rule.RuleName, prog.GetProgramName(), ruleTimeout)
+			}
 		} else {
 			m.processMonitor.UpdateRuleError(prog.GetProgramName(), rule.RuleName, err)
 			m.StatusTask(nil)
 			m.markRuleFailed()
-			m.errorCallback("program %s exc rule %s failed: %s", prog.GetProgramName(), rule.RuleName, err)
+			if bailedByBudget {
+				log.Warnf("rule %s on program %s hit per-rule budget (%s), bailed: %s",
+					rule.RuleName, prog.GetProgramName(), ruleTimeout, err)
+				m.errorCallback("program %s exc rule %s hit per-rule budget (%s), bailed",
+					prog.GetProgramName(), rule.RuleName, ruleTimeout)
+			} else {
+				m.errorCallback("program %s exc rule %s failed: %s",
+					prog.GetProgramName(), rule.RuleName, err)
+			}
 		}
 
 		// 在规则执行完成后输出性能日志
