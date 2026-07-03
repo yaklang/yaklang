@@ -488,14 +488,6 @@ func (b *astbuilder) buildArgumentsExpression(arg *gol.ArgumentsContext) []ssa.V
 	return args
 }
 
-func (b *astbuilder) buildExpressionStmt(stmt *gol.ExpressionStmtContext) []ssa.Value {
-	var rightv ssa.Value
-	if exp := stmt.Expression(); exp != nil {
-		rightv, _ = b.buildExpression(exp.(*gol.ExpressionContext), false)
-	}
-	return []ssa.Value{rightv}
-}
-
 func (b *astbuilder) buildOperandExpression(exp *gol.OperandContext, IslValue bool) (ssa.Value, *ssa.Variable) {
 	recoverRange := b.SetRange(exp.BaseParserRuleContext)
 	defer recoverRange()

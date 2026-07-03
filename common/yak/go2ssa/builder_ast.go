@@ -1772,31 +1772,24 @@ func (b *astbuilder) buildTypeSwitchStmt(stmt *gol.TypeSwitchStmtContext) {
 func (b *astbuilder) buildForStmt(stmt *gol.ForStmtContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
-	// current := f.currentBlock
 	loop := b.CreateLoopBuilder()
 
-	// var cond ssa.Value
 	if e, ok := stmt.Expression().(*gol.ExpressionContext); ok {
-		// if only expression; just build expression in header;
 		cond := e
 		loop.SetCondition(func() ssa.Value {
 			var condition ssa.Value
 			if utils.IsNil(cond) {
 				condition = b.EmitConstInst(true)
 			} else {
-				// recoverRange := b.SetRange(cond.BaseParserRuleContext)
-				// defer recoverRange()
 				condition, _ = b.buildExpression(cond, false)
 			}
 			if utils.IsNil(condition) {
 				condition = b.EmitConstInst(true)
-				// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
 			}
 			return condition
 		})
 	} else if condition, ok := stmt.ForClause().(*gol.ForClauseContext); ok {
 		if first, ok := condition.GetInitStmt().(*gol.SimpleStmtContext); ok {
-			// first expression is initialization, in enter block
 			loop.SetFirst(func() []ssa.Value {
 				recoverRange := b.SetRange(first.BaseParserRuleContext)
 				defer recoverRange()
@@ -1804,20 +1797,16 @@ func (b *astbuilder) buildForStmt(stmt *gol.ForStmtContext) {
 			})
 		}
 		if expr, ok := condition.Expression().(*gol.ExpressionContext); ok {
-			// build expression in header
 			cond := expr
 			loop.SetCondition(func() ssa.Value {
 				var condition ssa.Value
 				if utils.IsNil(cond) {
 					condition = b.EmitConstInst(true)
 				} else {
-					// recoverRange := b.SetRange(cond.BaseParserRuleContext)
-					// defer recoverRange()
 					condition, _ = b.buildExpression(cond, false)
 				}
 				if utils.IsNil(condition) {
 					condition = b.EmitConstInst(true)
-					// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
 				}
 				return condition
 			})
@@ -1828,9 +1817,7 @@ func (b *astbuilder) buildForStmt(stmt *gol.ForStmtContext) {
 		}
 
 		if third, ok := condition.GetPostStmt().(*gol.SimpleStmtContext); ok {
-			// build latch
 			loop.SetThird(func() []ssa.Value {
-				// build third expression in loop.latch
 				recoverRange := b.SetRange(third.BaseParserRuleContext)
 				defer recoverRange()
 				return b.buildSimpleStmt(third)
@@ -1840,12 +1827,10 @@ func (b *astbuilder) buildForStmt(stmt *gol.ForStmtContext) {
 	} else if rangec, ok := stmt.RangeClause().(*gol.RangeClauseContext); ok {
 		b.buildForRangeStmt(rangec, loop)
 	} else {
-		// for range
 		loop.SetCondition(func() ssa.Value {
 			return b.EmitConstInst(true)
 		})
 	}
-	//  build body
 	loop.SetBody(func() {
 		if block, ok := stmt.Block().(*gol.BlockContext); ok {
 			b.buildBlock(block, false)
@@ -1981,20 +1966,12 @@ func (b *astbuilder) buildSimpleStmt(stmt *gol.SimpleStmtContext) []ssa.Value {
 	defer recoverRange()
 	var rightv []ssa.Value
 
-	if s, ok := stmt.ExpressionStmt().(*gol.ExpressionStmtContext); ok {
-		rightv = b.buildExpressionStmt(s)
+	if s, ok := stmt.ExprSimpleStmt().(*gol.ExprSimpleStmtContext); ok {
+		rightv = b.buildExprSimpleStmt(s)
 	}
 
 	if s, ok := stmt.ShortVarDecl().(*gol.ShortVarDeclContext); ok {
 		rightv = b.buildShortVarDecl(s)
-	}
-
-	if s, ok := stmt.Assignment().(*gol.AssignmentContext); ok {
-		rightv = b.buildAssignment(s)
-	}
-
-	if s, ok := stmt.IncDecStmt().(*gol.IncDecStmtContext); ok {
-		rightv = b.buildIncDecStmt(s)
 	}
 
 	if s, ok := stmt.SendStmt().(*gol.SendStmtContext); ok {
@@ -2004,37 +1981,58 @@ func (b *astbuilder) buildSimpleStmt(stmt *gol.SimpleStmtContext) []ssa.Value {
 	return rightv
 }
 
-func (b *astbuilder) buildIncDecStmt(stmt *gol.IncDecStmtContext) []ssa.Value {
+func (b *astbuilder) buildExprSimpleStmt(stmt *gol.ExprSimpleStmtContext) []ssa.Value {
+	if stmt == nil {
+		return nil
+	}
+	if stmt.Assign_op() != nil {
+		return b.buildAssignment(stmt)
+	}
+	if stmt.PLUS_PLUS() != nil || stmt.MINUS_MINUS() != nil {
+		return b.buildIncDecStmt(stmt)
+	}
+	leftList := stmt.ExpressionList(0).(*gol.ExpressionListContext).AllExpression()
+	if len(leftList) == 0 {
+		return nil
+	}
+	rightv, _ := b.buildExpression(leftList[0].(*gol.ExpressionContext), false)
+	return []ssa.Value{rightv}
+}
+
+func (b *astbuilder) buildIncDecStmt(stmt *gol.ExprSimpleStmtContext) []ssa.Value {
 	var values []ssa.Value
 
-	if exp := stmt.Expression(); exp != nil {
-		rightv, _ := b.buildExpression(exp.(*gol.ExpressionContext), false)
-		_, leftv := b.buildExpression(exp.(*gol.ExpressionContext), true)
-		// TODO(go2ssa): recover a precise writable lvalue for cases like `(*p)++`
-		// and update the pointed storage instead of silently computing a value-only fallback.
-		baseValue := rightv
-		if leftv != nil {
-			if current := b.ReadValueByVariable(leftv); current != nil {
-				baseValue = current
-			}
+	leftList := stmt.ExpressionList(0).(*gol.ExpressionListContext).AllExpression()
+	if len(leftList) == 0 {
+		return values
+	}
+	exp := leftList[0].(*gol.ExpressionContext)
+	rightv, _ := b.buildExpression(exp, false)
+	_, leftv := b.buildExpression(exp, true)
+	// TODO(go2ssa): recover a precise writable lvalue for cases like `(*p)++`
+	// and update the pointed storage instead of silently computing a value-only fallback.
+	baseValue := rightv
+	if leftv != nil {
+		if current := b.ReadValueByVariable(leftv); current != nil {
+			baseValue = current
 		}
-		if baseValue == nil {
-			baseValue = b.EmitConstInstPlaceholder(0)
-		}
+	}
+	if baseValue == nil {
+		baseValue = b.EmitConstInstPlaceholder(0)
+	}
 
-		if stmt.PLUS_PLUS() != nil {
-			value := b.EmitBinOp(ssa.OpAdd, baseValue, b.EmitConstInst(1))
-			if leftv != nil {
-				b.AssignVariable(leftv, value)
-			}
-			values = []ssa.Value{value}
-		} else if stmt.MINUS_MINUS() != nil {
-			value := b.EmitBinOp(ssa.OpSub, baseValue, b.EmitConstInst(1))
-			if leftv != nil {
-				b.AssignVariable(leftv, value)
-			}
-			values = []ssa.Value{value}
+	if stmt.PLUS_PLUS() != nil {
+		value := b.EmitBinOp(ssa.OpAdd, baseValue, b.EmitConstInst(1))
+		if leftv != nil {
+			b.AssignVariable(leftv, value)
 		}
+		values = []ssa.Value{value}
+	} else if stmt.MINUS_MINUS() != nil {
+		value := b.EmitBinOp(ssa.OpSub, baseValue, b.EmitConstInst(1))
+		if leftv != nil {
+			b.AssignVariable(leftv, value)
+		}
+		values = []ssa.Value{value}
 	}
 
 	return values
@@ -2068,7 +2066,7 @@ func (b *astbuilder) buildShortVarDecl(stmt *gol.ShortVarDeclContext) []ssa.Valu
 	return rightvl
 }
 
-func (b *astbuilder) buildAssignment(stmt *gol.AssignmentContext) []ssa.Value {
+func (b *astbuilder) buildAssignment(stmt *gol.ExprSimpleStmtContext) []ssa.Value {
 	var leftvl []*ssa.Variable
 	var rightvl []ssa.Value
 	var ssaop ssa.BinaryOpcode

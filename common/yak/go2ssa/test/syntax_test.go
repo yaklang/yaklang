@@ -93,6 +93,9 @@ func validateSource(t *testing.T, filename string, src string) {
 
 		stats := antlr4util.SLLFirstCountersSnapshot()
 		t.Logf("go fixture=%s parse=%s sll_attempts=%d fallbacks=%d cancelled=%d errors=%d", name, parseDur, stats.SLLAttempts, stats.Fallbacks, stats.FallbackCancelled, stats.FallbackError)
+		if stats.Fallbacks > 0 {
+			t.Logf("note: %s used LL fallback (SLL bail); end result still validated via Frontend+SSA", name)
+		}
 
 		validateBuildFromSource(t, filename, src)
 	})
