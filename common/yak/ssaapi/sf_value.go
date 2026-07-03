@@ -110,6 +110,13 @@ func (v *Value) GetAnchorBitVector() *utils.BitVector {
 	return v.anchorBits
 }
 
+// SetAnchorBitVector stores the anchor bitvector WITHOUT a defensive clone.
+// Callers must pass an exclusive (freshly created/already-cloned) BitVector;
+// the stored pointer is used directly to avoid the per-call allocation that
+// dominated GC on large projects (BitVector.Clone was ~15% of allocations; the
+// anchor-scope merge/restore paths already Clone before calling, so Set's
+// second clone was pure waste). Callers passing a SHARED bitvector (e.g. another
+// value's GetAnchorBitVector) MUST Clone it themselves before calling.
 func (v *Value) SetAnchorBitVector(bits *utils.BitVector) {
 	if v == nil {
 		return
@@ -118,7 +125,7 @@ func (v *Value) SetAnchorBitVector(bits *utils.BitVector) {
 		v.anchorBits = nil
 		return
 	}
-	v.anchorBits = bits.Clone()
+	v.anchorBits = bits
 }
 
 func (v *Value) ExactMatch(ctx context.Context, mod ssadb.MatchMode, want string) (bool, sfvm.Values, error) {
