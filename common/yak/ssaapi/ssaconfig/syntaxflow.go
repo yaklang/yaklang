@@ -1,6 +1,8 @@
 package ssaconfig
 
 import (
+	"time"
+
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -33,6 +35,14 @@ type SyntaxFlowScanConfig struct {
 	Concurrency    uint32     `json:"concurrency"`
 	ControlMode    string     `json:"control_mode"`   // 控制模式 "start" "pause" "resume" "status"
 	ResumeTaskId   string     `json:"resume_task_id"` // 恢复任务ID
+	// RuleTimeout is the per-rule wall-clock budget for a single rule execution
+	// over a single program. When > 0, each rule query runs under a
+	// context.WithTimeout derived from the scan context, so a pathological rule
+	// (e.g. a dataflow(include=...) matching tens of thousands of sources on a
+	// large project) is bailed at the budget instead of hanging the whole scan.
+	// 0 means no per-rule budget (legacy behavior). See nativeCallDataFlow and
+	// the scan runner Query in syntaxflow_scan/runtime.go.
+	RuleTimeout time.Duration `json:"rule_timeout"`
 }
 
 // --- SyntaxFlow 配置 Get/Set 方法 ---
@@ -121,6 +131,14 @@ func (c *Config) GetScanConcurrency() uint32 {
 	return c.SyntaxFlowScan.Concurrency
 }
 
+// GetScanRuleTimeout returns the per-rule wall-clock budget. 0 means no budget.
+func (c *Config) GetScanRuleTimeout() time.Duration {
+	if c == nil || c.SyntaxFlowScan == nil {
+		return 0
+	}
+	return c.SyntaxFlowScan.RuleTimeout
+}
+
 func (c *Config) GetScanIgnoreLanguage() bool {
 	if c == nil || c.SyntaxFlowScan == nil {
 		return false
@@ -193,6 +211,30 @@ func WithScanConcurrencyDefault(concurrency uint32) Option {
 		if c.SyntaxFlowScan.Concurrency <= 0 {
 			c.SyntaxFlowScan.Concurrency = concurrency
 		}
+		return nil
+	}
+}
+
+// WithScanRuleTimeout sets the per-rule wall-clock budget for a single rule
+// execution over a single program (导出名为 syntaxflow.withScanRuleTimeout).
+// When > 0, each rule query runs under a context.WithTimeout so a pathological
+// rule (e.g. dataflow(include=...) matching tens of thousands of sources on a
+// large project) is bailed at the budget instead of hanging the scan. 0 disables.
+//
+// 参数:
+//   - timeout: 单规则单程序执行的最大墙钟时间；<=0 表示不限制（兼容旧行为）
+//
+// Example:
+// ```
+// opt = syntaxflow.withScanRuleTimeout(300 * time.Second)
+// println(opt)
+// ```
+func WithScanRuleTimeout(timeout time.Duration) Option {
+	return func(c *Config) error {
+		if err := c.ensureSyntaxFlowScan("Scan Rule Timeout"); err != nil {
+			return err
+		}
+		c.SyntaxFlowScan.RuleTimeout = timeout
 		return nil
 	}
 }

@@ -47,7 +47,14 @@ type Value struct {
 
 type PredecessorValue struct {
 	Node *Value
-	Info *sfvm.AnalysisContext
+	// Info is a value type (not a pointer) so a PredecessorValue is a single
+	// heap allocation instead of two. AppendPredecessor is called per matched
+	// value in hot native calls (e.g. <typeName>), so avoiding the separate
+	// AnalysisContext allocation roughly halves the allocation pressure that was
+	// driving GC to ~66% of CPU on large projects. Info is always set at creation
+	// (NewDefaultAnalysisContext: Step=-1, Label=""), so the old `pred.Info == nil`
+	// defensive branch never fired in practice.
+	Info sfvm.AnalysisContext
 }
 
 func (v *Value) getInstruction() ssa.Instruction {
@@ -1097,7 +1104,7 @@ func (v *Value) GetPredecessors() []*PredecessorValue {
 				if p != nil {
 					preds = append(preds, &PredecessorValue{
 						Node: p,
-						Info: &sfvm.AnalysisContext{
+						Info: sfvm.AnalysisContext{
 							Step:  int(edge.AnalysisStep),
 							Label: edge.AnalysisLabel,
 						},

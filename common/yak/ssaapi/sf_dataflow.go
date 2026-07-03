@@ -494,14 +494,28 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.Values, frame *sfvm.SFF
 		vs = append(vs, v)
 		return nil
 	})
-	// TODO(large-project): on big targets (e.g. moodle, 7733 PHP files) an
+	// NOTE(large-project): on big targets (e.g. moodle, 7733 PHP files) an
 	// `include` like `php-tp-all-extern-variable-param-source` can match >11k
 	// sources here, and the recursive getTopDefs dataflow below runs on each →
-	// heavy rules hang for 20+ min and the scan never finishes. The cross-process
-	// rollback fix (restoring emptyStackHash) removed the implicit early-abort
-	// depth cap that used to bound this. dataflowValueLimit/MaxDepth only bound
-	// per-branch depth, not total work. Add an explicit cap: either truncate `vs`
-	// to N sources (warn) or enforce a per-rule wall-clock budget in ssacli.go.
+	// heavy rules can run for 20+ min and the scan never finishes. The
+	// cross-process rollback fix (restoring emptyStackHash) removed the implicit
+	// early-abort depth cap that used to bound this; dataflowValueLimit/MaxDepth
+	// only bound per-branch depth, not total work.
+	//
+	// This is now bounded by a per-rule wall-clock budget in the scan runner
+	// (syntaxflow_scan/runtime.go Query -> context.WithTimeout, propagated via
+	// QueryWithContext -> sfvm.Config.ctx -> config.GetContext() here). Two heavy
+	// paths now honor the rule ctx:
+	//   - getTopDefs/getBottomUses (DataFlowWithSFConfig, line ~414
+	//     WithExclusiveContext) -> AnalyzeContext.check() ctx.Done() (analyze_context.go).
+	//   - the dataflow path enumeration here (dataFlowFilter -> enumeratePaths ->
+	//     GetDataflowPathWithContext -> getPathWithDirectionWithContext ->
+	//     graph.GraphPathEx, which checks ctx.Done() at every DFS node). The old
+	//     GraphPathWithKey used context.Background(), so the deadline never fired
+	//     here — that was the real reason heavy rules ran for hours even after the
+	//     per-rule timeout was added.
+	// `yak code-scan` defaults the budget to 5m (--rule-timeout, 0 disables); a
+	// rule that exceeds it is bailed (partial results) instead of hanging.
 
 	var ret = vs
 	var condition []*filterCondition
@@ -627,6 +641,13 @@ func dataFlowFilter(
 		return pathCheck.CheckMatch(ToSFVMValues(path))
 	}
 
+	// Drive the path-enumeration DFS with the rule ctx so the per-rule
+	// wall-clock budget (syntaxflow_scan/runtime.go Query -> QueryWithContext
+	// -> sfvm.Config.ctx, read here via config.GetContext()) can bail it. The
+	// DFS (graph.GraphPathEx / DeepFirstPath.deepFirst) checks ctx.Done() at
+	// every node; without passing ctx it ran under context.Background() and the
+	// per-rule deadline never fired — heavy rules ran for hours on large projects.
+	pathCtx := config.GetContext()
 	var enumeratePaths func(v *Value) []Values
 	if pathReach != nil && pathReach.prog != nil && pathReach.targetCfg != nil && !pathReach.targetCfg.IsEmpty() {
 		memo := make(map[int64]*CfgCtxValue)
@@ -642,26 +663,30 @@ func dataFlowFilter(
 		}
 		enumeratePaths = func(v *Value) []Values {
 			if end != nil {
-				return v.GetDataflowPathWithEdgeFilter(edgeFilter, FromSFVMValues(end)...)
+				return v.GetDataflowPathWithEdgeFilterWithContext(pathCtx, edgeFilter, FromSFVMValues(end)...)
 			}
-			return v.GetDataflowPathWithEdgeFilter(edgeFilter)
+			return v.GetDataflowPathWithEdgeFilterWithContext(pathCtx, edgeFilter)
 		}
 	} else {
 		enumeratePaths = func(v *Value) []Values {
 			if end != nil {
-				return v.GetDataflowPath(FromSFVMValues(end)...)
+				return v.GetDataflowPathWithContext(pathCtx, FromSFVMValues(end)...)
 			}
-			return v.GetDataflowPath()
+			return v.GetDataflowPathWithContext(pathCtx)
 		}
 	}
 
 	var ret []*Value
 	for _, v := range vs {
-		// Check the dataflow budget on each source so a large source set cannot
-		// hang the scan. When the deadline fires, return partial results.
+		// Honor the rule ctx in the outer per-source loop. On a large project `vs`
+		// can hold tens of thousands of sources (e.g. every servlet/spring param
+		// for an include, or every call site reaching a sink for an exclude-only
+		// dataflow); enumeratePaths is fast per-source but the outer loop itself
+		// never re-checked the per-rule deadline, so a heavy rule kept feeding
+		// sources long after its budget fired. Bailing here returns the partial
+		// matches found so far.
 		select {
-		case <-ctx.Done():
-			log.Warnf("dataflow timed out (%s), returning partial results: %d/%d sources checked", ctx.Err(), len(ret), len(vs))
+		case <-pathCtx.Done():
 			return ret
 		default:
 		}
