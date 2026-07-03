@@ -33,7 +33,7 @@ func getReSelectTool(
 		aitool.WithParam_Raw("x-rules", rules),
 	))
 	opts = append(opts, aitool.WithStringParam("tool", aitool.WithParam_Description("Your tool that will be used.")))
-	opts = append(opts, aitool.WithStringParam("abandon_reason", aitool.WithParam_Description("If you choose 'abandon', please provide a brief reason for abandoning the tool usage.")))
+	opts = append(opts, aitool.WithStringParam("reason", aitool.WithParam_Description("provide a brief reason for your action.")))
 
 	if allowAskForClarification {
 		opts = append(opts, aitool.WithStructParam(

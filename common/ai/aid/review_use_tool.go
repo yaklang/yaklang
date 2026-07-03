@@ -2,6 +2,7 @@ package aid
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -102,11 +103,11 @@ type HandleToolUseNext string
 //	}
 //}
 
-func (t *AiTask) toolReviewPolicy_wrongTool(ctx context.Context, oldTool *aitool.Tool, suggestionToolName string, suggestionKeyword string) (*aitool.Tool, bool, error) {
+func (t *AiTask) toolReviewPolicy_wrongTool(ctx context.Context, oldTool *aitool.Tool, suggestionToolName string, suggestionKeyword string) (*aitool.Tool, bool, string, error) {
 	// Check context at the beginning
 	select {
 	case <-ctx.Done():
-		return nil, false, ctx.Err()
+		return nil, false, "", ctx.Err()
 	default:
 	}
 
@@ -139,7 +140,7 @@ func (t *AiTask) toolReviewPolicy_wrongTool(ctx context.Context, oldTool *aitool
 	}
 
 	if len(tools) <= 0 {
-		return oldTool, true, utils.Error("tool not found via user prompt")
+		return oldTool, true, "no tool found via user prompt", utils.Error("tool not found via user prompt")
 	}
 
 	prompt, err := t.quickBuildTaskPrompt(__prompt_toolReSelect, map[string]any{
@@ -147,7 +148,7 @@ func (t *AiTask) toolReviewPolicy_wrongTool(ctx context.Context, oldTool *aitool
 		"ToolList": tools,
 	})
 	if err != nil {
-		return oldTool, true, err
+		return oldTool, true, "failed to build tool re-select prompt", err
 	}
 
 	var selecteddTool *aitool.Tool
@@ -185,12 +186,15 @@ func (t *AiTask) toolReviewPolicy_wrongTool(ctx context.Context, oldTool *aitool
 		return nil
 	}, aicommon.WithAIRequest_CallerLabel("tool-select"))
 	if transErr != nil {
-		return oldTool, true, transErr
+		return oldTool, true, "AI transaction for tool re-select failed", transErr
 	}
 	if selecteddTool == nil {
-		return oldTool, directlyAnswer, nil
+		if directlyAnswer {
+			return oldTool, directlyAnswer, "AI abandoned tool selection, no tool will be used", nil
+		}
+		return oldTool, directlyAnswer, "no tool was selected", nil
 	}
-	return selecteddTool, directlyAnswer, nil
+	return selecteddTool, directlyAnswer, fmt.Sprintf("AI selected tool: %s", selecteddTool.Name), nil
 }
 
 func (t *AiTask) toolReviewPolicy_wrongParam(ctx context.Context, tool *aitool.Tool, oldParam aitool.InvokeParams, suggestion string) (aitool.InvokeParams, error) {

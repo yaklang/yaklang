@@ -38,14 +38,14 @@ func mockedToolCallingWrongTool_Abandon(i aicommon.AICallerConfigIf, req *aicomm
 
 	if strings.Contains(prompt, "你在此前选择了工具") && strings.Contains(prompt, "require-tool") && strings.Contains(prompt, "abandon") {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "abandon", "abandon_reason": "[mocked] cannot found proper tool, abandon it"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "abandon", "reason": "[mocked] cannot found proper tool, abandon it"}`))
 		rsp.Close()
 		return rsp, nil
 	}
 
 	if utils.MatchAllOfSubString(prompt, "require-tool", "abandon") {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "abandon", "abandon_reason": "[mocked] cannot found proper tool, abandon it"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "abandon", "reason": "[mocked] cannot found proper tool, abandon it"}`))
 		rsp.Close()
 		return rsp, nil
 	}

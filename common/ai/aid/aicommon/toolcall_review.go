@@ -83,19 +83,25 @@ func (t *ToolCaller) review(
 			e.EmitError("no review wrong tool handler defined")
 			return targetTool, param, nil, HandleToolUseNext_Default, nil
 		}
-		newTool, directlyAnswer, err := t.reviewWrongToolHandler(
+		newTool, directlyAnswer, reason, err := t.reviewWrongToolHandler(
 			t.ctx,
 			targetTool,
 			userInput.GetString("suggestion_tool"),
 			userInput.GetString("suggestion_tool_keyword"),
 		)
+		t.reason = reason
+		t.EmitReason(reason)
 		if err != nil {
 			userCancelHandler(fmt.Sprintf("tool directly answer for review-wrong-tool failed: %v", err))
 			e.EmitError("error handling tool review: %v", err)
 			return targetTool, param, nil, HandleToolUseNext_DirectlyAnswer, nil
 		}
 		if directlyAnswer {
-			userCancelHandler("tool directly answer (user 's choice)")
+			cancelReason := "tool directly answer (user 's choice)"
+			if strings.TrimSpace(reason) != "" {
+				cancelReason = fmt.Sprintf("%s: %s", cancelReason, reason)
+			}
+			userCancelHandler(cancelReason)
 			return targetTool, param, nil, HandleToolUseNext_DirectlyAnswer, nil
 		}
 

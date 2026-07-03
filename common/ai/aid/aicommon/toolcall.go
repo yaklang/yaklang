@@ -246,7 +246,7 @@ type ToolCaller struct {
 	intervalReviewHandler  func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte, callExpectations string) (bool, error)
 	intervalReviewDuration time.Duration // interval duration for review, default is 20 seconds
 
-	reviewWrongToolHandler  func(ctx context.Context, tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, bool, error)
+	reviewWrongToolHandler  func(ctx context.Context, tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, bool, string, error)
 	reviewWrongParamHandler func(ctx context.Context, tool *aitool.Tool, oldParam aitool.InvokeParams, suggestion string) (aitool.InvokeParams, error)
 
 	paramAugment func(aitool.InvokeParams) aitool.InvokeParams // optional merge before tool execution
@@ -277,7 +277,7 @@ func WithToolCaller_Reason(reason string) ToolCallerOption {
 }
 
 func WithToolCaller_ReviewWrongTool(
-	handler func(ctx context.Context, tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, bool, error),
+	handler func(ctx context.Context, tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, bool, string, error),
 ) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.reviewWrongToolHandler = handler

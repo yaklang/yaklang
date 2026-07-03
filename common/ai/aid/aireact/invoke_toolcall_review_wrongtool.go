@@ -10,11 +10,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (r *ReAct) _invokeToolCall_ReviewWrongTool(ctx context.Context, oldTool *aitool.Tool, suggestionToolName, suggestionKeyword string) (*aitool.Tool, bool, error) {
+func (r *ReAct) _invokeToolCall_ReviewWrongTool(ctx context.Context, oldTool *aitool.Tool, suggestionToolName, suggestionKeyword string) (*aitool.Tool, bool, string, error) {
 	// Check context at the beginning
 	select {
 	case <-ctx.Done():
-		return nil, false, ctx.Err()
+		return nil, false, "", ctx.Err()
 	default:
 	}
 
@@ -53,25 +53,26 @@ func (r *ReAct) _invokeToolCall_ReviewWrongTool(ctx context.Context, oldTool *ai
 
 	if len(tools) <= 0 {
 		r.AddToTimeline("re-select-tool", "No tools available for selection, no enabled tools, skip tool re-selection.")
-		return nil, true, nil
+		return nil, true, "no enabled tools available, skip tool re-selection", nil
 	}
 
 	var redo bool
 	var selectedTool *aitool.Tool
 	var answerDirectly bool
+	var aiReason string
 	noUserInteract := r.config.AllowRequireForUserInteract
 REDO:
 	// Check context before each iteration
 	select {
 	case <-ctx.Done():
-		return nil, false, ctx.Err()
+		return nil, false, "", ctx.Err()
 	default:
 	}
 
 	redo = false
 	prompt, err := r.promptManager.GenerateToolReSelectPrompt(noUserInteract, oldTool, tools)
 	if err != nil {
-		return oldTool, true, err
+		return oldTool, true, "failed to generate tool re-select prompt", err
 	}
 	transErr := aicommon.CallAITransaction(r.config, prompt, r.config.CallAI,
 		func(rsp *aicommon.AIResponse) error {
@@ -82,6 +83,10 @@ REDO:
 			if err != nil {
 				return err
 			}
+			// AI provides a brief reason for its action via the "reason" field
+			// (see getReSelectTool schema). Capture it so the caller can surface
+			// why the tool was re-selected / abandoned.
+			aiReason = action.GetString("reason")
 			switch action.ActionType() {
 			case "ask-for-clarification":
 				payloads := action.GetInvokeParams(`clarification_payload`)
@@ -108,15 +113,14 @@ REDO:
 				}
 				r.AddToTimeline("re-select-tool", fmt.Sprintf("AI Auto Re-Selected tool: %s", toolName))
 			case "abandon":
-				reason := action.GetString("abandon_reason")
 				r.AddToTimeline(
 					"re-select-tool-abandoned",
 					fmt.Sprintf(
 						"AI Abandoned tool selection, no tool will be used. \nReason: %v",
-						reason,
+						aiReason,
 					),
 				)
-				r.EmitInfo("AI Abandoned tool selection, no tool will be used. Reason: %v", reason)
+				r.EmitInfo("AI Abandoned tool selection, no tool will be used. Reason: %v", aiReason)
 				answerDirectly = true
 				return nil
 			default:
@@ -126,7 +130,7 @@ REDO:
 		},
 		aicommon.WithAIRequest_CallerLabel("toolcall-review-wrongtool"))
 	if transErr != nil {
-		return oldTool, true, transErr
+		return oldTool, true, "AI transaction for tool re-select failed", transErr
 	}
 
 	if redo {
@@ -135,7 +139,7 @@ REDO:
 	}
 
 	if selectedTool == nil {
-		return oldTool, answerDirectly, nil
+		return oldTool, answerDirectly, aiReason, nil
 	}
-	return selectedTool, answerDirectly, nil
+	return selectedTool, answerDirectly, aiReason, nil
 }
