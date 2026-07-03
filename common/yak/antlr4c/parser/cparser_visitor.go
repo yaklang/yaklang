@@ -49,6 +49,9 @@ type CParserVisitor interface {
 	// Visit a parse tree produced by CParser#coreExpression.
 	VisitCoreExpression(ctx *CoreExpressionContext) interface{}
 
+	// Visit a parse tree produced by CParser#assignPrefix.
+	VisitAssignPrefix(ctx *AssignPrefixContext) interface{}
+
 	// Visit a parse tree produced by CParser#complexCoreExpression.
 	VisitComplexCoreExpression(ctx *ComplexCoreExpressionContext) interface{}
 
@@ -264,6 +267,12 @@ type CParserVisitor interface {
 
 	// Visit a parse tree produced by CParser#forCondition.
 	VisitForCondition(ctx *ForConditionContext) interface{}
+
+	// Visit a parse tree produced by CParser#forInitClause.
+	VisitForInitClause(ctx *ForInitClauseContext) interface{}
+
+	// Visit a parse tree produced by CParser#forInitItem.
+	VisitForInitItem(ctx *ForInitItemContext) interface{}
 
 	// Visit a parse tree produced by CParser#coreExpressions.
 	VisitCoreExpressions(ctx *CoreExpressionsContext) interface{}

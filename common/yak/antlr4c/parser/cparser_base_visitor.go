@@ -63,6 +63,10 @@ func (v *BaseCParserVisitor) VisitCoreExpression(ctx *CoreExpressionContext) int
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseCParserVisitor) VisitAssignPrefix(ctx *AssignPrefixContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseCParserVisitor) VisitComplexCoreExpression(ctx *ComplexCoreExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -348,6 +352,14 @@ func (v *BaseCParserVisitor) VisitIterationStatement(ctx *IterationStatementCont
 }
 
 func (v *BaseCParserVisitor) VisitForCondition(ctx *ForConditionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCParserVisitor) VisitForInitClause(ctx *ForInitClauseContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCParserVisitor) VisitForInitItem(ctx *ForInitItemContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
