@@ -932,19 +932,24 @@ func TestSpinThresholdNoLongerForcesExit(t *testing.T) {
 	}
 }
 
-// TestSelfReflectionThenSpin 测试自我反思出现之后，然后再出现 SPIN，并且 SPIN 被检测成功，
-// 再次触发自我反思，终结状态时，在 SPIN 触发的自我反思中可以看到 AddToTimeline 的内容，东西发生了变更
+// TestSelfReflectionThenSpin 测试单次 Execute 内连续相同 action 触发 SPIN 后，
+// 异步自我反思完成写入 reflection history 与 logic_spin_warning timeline 条目。
 func TestSelfReflectionThenSpin(t *testing.T) {
 	var reflectionCallCount int
 	var spinReflectionCallCount int
 	var aiCallCount int
+	var mu sync.Mutex
 	var timelineBeforeSpin []string
 	var timelineAfterSpin []string
 	testActionName := "test_reflection_then_spin_action"
 
 	// 定义 AI callback，用于检测自我反思调用和 SPIN 检测
 	aiCallback := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		mu.Lock()
 		aiCallCount++
+		callNum := aiCallCount
+		mu.Unlock()
+
 		prompt := req.GetPrompt()
 
 		// 检查是否是自我反思的调用
@@ -988,9 +993,16 @@ func TestSelfReflectionThenSpin(t *testing.T) {
 			return rsp, nil
 		}
 
-		// 其他调用返回我们注册的 action（让循环继续）
 		rsp := i.NewAIResponse()
-		actionJSON := fmt.Sprintf(`{"@action": "%s", "iteration": %d}`, testActionName, aiCallCount)
+		// 前 6 次返回相同 action（超过 SPIN 阈值 3，且 iteration > 5 时触发反思）
+		if callNum <= 6 {
+			actionJSON := fmt.Sprintf(`{"@action": "%s", "iteration": %d}`, testActionName, callNum)
+			rsp.EmitOutputStream(strings.NewReader(actionJSON))
+			rsp.Close()
+			return rsp, nil
+		}
+
+		actionJSON := `{"@action": "finish", "answer": "Test completed"}`
 		rsp.EmitOutputStream(strings.NewReader(actionJSON))
 		rsp.Close()
 		return rsp, nil
@@ -1007,88 +1019,62 @@ func TestSelfReflectionThenSpin(t *testing.T) {
 		[]aicommon.ConfigOption{
 			aicommon.WithAICallback(aiCallback),
 			aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
-			aicommon.WithAIAutoRetry(1),            // 减少重试次数以加快测试
-			aicommon.WithAITransactionAutoRetry(1), // 减少事务重试次数
+			aicommon.WithAIAutoRetry(1),
+			aicommon.WithAITransactionAutoRetry(1),
 		},
 	)
 
 	loop := framework.GetLoop()
 	reactIns := framework.reactInstance
 
+	getTimelineContents := func() []string {
+		var contents []string
+		if react, ok := reactIns.(*aireact.ReAct); ok {
+			config := react.GetConfig()
+			if config != nil {
+				if cfg, ok := config.(interface{ GetTimeline() *aicommon.Timeline }); ok {
+					timeline := cfg.GetTimeline()
+					if timeline != nil {
+						outputs := timeline.ToTimelineItemOutputLastN(50)
+						for _, output := range outputs {
+							contents = append(contents, output.Content)
+						}
+					}
+				}
+			}
+		}
+		return contents
+	}
+
+	var actionCallCount int
 	// 注册一个测试 action
 	framework.RegisterTestAction(
 		testActionName,
 		"Test action for reflection then spin",
 		nil,
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+			actionCallCount++
+			// 第 5 次 action 执行时尚未触发 SPIN 反思（需 iteration > 5）
+			if actionCallCount == 5 {
+				timelineBeforeSpin = getTimelineContents()
+			}
 			op.Continue()
 		},
 	)
 
-	// 第一步：执行几次 action，建立 action 历史
-	// 注意：由于每次 ExecuteAction 创建新任务，迭代计数会重置
-	// 但 action 历史会保留在 loop 中
-	// 设置较短的超时时间，确保测试在 10 秒内完成
-	for i := 0; i < 3; i++ {
-		err := framework.ExecuteActionWithTimeout(testActionName, map[string]interface{}{
-			"iteration": i + 1,
-		}, 2*time.Second)
-		if err != nil {
-			// 如果是超时错误，可能是正常的（循环在继续执行）
-			if strings.Contains(err.Error(), "context canceled") || strings.Contains(err.Error(), "deadline exceeded") || strings.Contains(err.Error(), "context deadline exceeded") {
-				t.Logf("ExecuteAction timed out at iteration %d (this may be expected): %v", i+1, err)
-				break
-			}
-			t.Fatalf("ExecuteAction failed at iteration %d: %v", i+1, err)
-		}
+	// 单次 Execute 内连续执行相同 action，确保 iteration 能超过 5 并触发 SPIN 反思
+	ctx, cancel := context.WithTimeout(context.Background(), 9*time.Second)
+	defer cancel()
+
+	err := loop.Execute("test-reflection-then-spin", ctx, "Testing reflection then SPIN detection")
+	if err != nil && err != context.DeadlineExceeded {
+		t.Fatalf("Execute failed: %v", err)
 	}
 
-	// 记录第一次自我反思后的 Timeline 状态
-	if react, ok := reactIns.(*aireact.ReAct); ok {
-		config := react.GetConfig()
-		if config != nil {
-			if cfg, ok := config.(interface{ GetTimeline() *aicommon.Timeline }); ok {
-				timeline := cfg.GetTimeline()
-				if timeline != nil {
-					outputs := timeline.ToTimelineItemOutputLastN(50)
-					for _, output := range outputs {
-						timelineBeforeSpin = append(timelineBeforeSpin, output.Content)
-					}
-				}
-			}
-		}
-	}
+	// 等待异步 SPIN 反思完成后再断言
+	loop.WaitForInflightReflections()
 
-	// 第二步：继续执行相同的 action，触发 SPIN 检测
-	// 再执行 1 次，这样总共 4 次，应该触发 SPIN（连续 3 次相同，阈值是 3）
-	// 设置较短的超时时间，确保测试在 10 秒内完成
-	err := framework.ExecuteActionWithTimeout(testActionName, map[string]interface{}{
-		"iteration": 4,
-	}, 2*time.Second)
-	if err != nil {
-		// 如果是超时错误，可能是正常的（循环在继续执行）
-		if strings.Contains(err.Error(), "deadline exceeded") || strings.Contains(err.Error(), "context deadline exceeded") || strings.Contains(err.Error(), "context canceled") {
-			t.Logf("ExecuteAction timed out at iteration 4 (this may be expected): %v", err)
-		} else {
-			t.Fatalf("ExecuteAction failed at iteration 4: %v", err)
-		}
-	}
-
-	// 记录 SPIN 触发后的 Timeline 状态
-	if react, ok := reactIns.(*aireact.ReAct); ok {
-		config := react.GetConfig()
-		if config != nil {
-			if cfg, ok := config.(interface{ GetTimeline() *aicommon.Timeline }); ok {
-				timeline := cfg.GetTimeline()
-				if timeline != nil {
-					outputs := timeline.ToTimelineItemOutputLastN(50)
-					for _, output := range outputs {
-						timelineAfterSpin = append(timelineAfterSpin, output.Content)
-					}
-				}
-			}
-		}
-	}
+	timelineAfterSpin = getTimelineContents()
 
 	// 验证自我反思被调用了
 	if reflectionCallCount == 0 {
@@ -1143,8 +1129,7 @@ func TestSelfReflectionThenSpin(t *testing.T) {
 		if foundInBefore {
 			t.Error("SPIN warning was found in timeline before SPIN was triggered, which is unexpected")
 		} else {
-			// 可能 Timeline 还没有更新，或者需要等待
-			t.Log("Note: SPIN warning not found in timeline, but this might be expected if timeline update is async")
+			t.Error("Expected logic_spin_warning in timeline after SPIN reflection, but not found")
 			t.Logf("Timeline entries before SPIN: %d", len(timelineBeforeSpin))
 			t.Logf("Timeline entries after SPIN: %d", len(timelineAfterSpin))
 		}
