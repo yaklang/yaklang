@@ -258,10 +258,15 @@ func (s *SSEServer) handleSSE(w http.ResponseWriter, r *http.Request) {
 		endpointBase,
 		sessionID,
 	)
+	// Register the session before sending the endpoint event to the client.
+	// The client extracts the sessionId from this event and may immediately POST
+	// its first JSON-RPC request (e.g. "initialize") to /message. If the session
+	// is stored only after flushing, a fast round-trip can reach handleMessage
+	// before the session exists, producing an intermittent
+	// "Invalid session ID" rejection.
+	s.sessions.Store(sessionID, session)
 	fmt.Fprintf(w, "event: endpoint\ndata: %s\r\n\r\n", messageEndpoint)
 	flusher.Flush()
-
-	s.sessions.Store(sessionID, session)
 	defer s.sessions.Delete(sessionID)
 
 	// Send periodic SSE keep-alive comments to prevent client body timeouts.
