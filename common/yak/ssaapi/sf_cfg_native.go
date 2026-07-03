@@ -107,7 +107,7 @@ func expandValuesToCfgCtxList(v sfvm.Values) ([]sfvm.ValueOperator, *Program, er
 			BlockID: blk.GetId(),
 			InstID:  instID,
 		}
-		ctx.SetAnchorBitVector(op.GetAnchorBitVector())
+		ctx.SetAnchorBitVector(op.GetAnchorBitVector().Clone())
 		outs = append(outs, ctx)
 		return nil
 	})
@@ -199,7 +199,7 @@ func nativeCallGetCFG(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCal
 		if inst.GetId() != blk.GetId() {
 			bv.cfgSiteInstID = inst.GetId()
 		}
-		bv.SetAnchorBitVector(op.GetAnchorBitVector())
+		bv.SetAnchorBitVector(op.GetAnchorBitVector().Clone())
 		outs = append(outs, bv)
 		return nil
 	})
@@ -306,7 +306,9 @@ func allCfgCtxFromSymbolValues(vals sfvm.Values) ([]*CfgCtxValue, error) {
 // parseCfgTargetParam 从 frame 中解析 cfg* 的 target 指向的符号名与值（cfgDominates / cfgReachable / reachabilityGuard 等共用）。
 //
 // 与命名参数等价：第一个位置参数（编译为 key "0"）与 target / var / against 命名参数表达同一含义，例如
-//   <cfgDominates("$input")> 与 <cfgDominates(target: "$input")>
+//
+//	<cfgDominates("$input")> 与 <cfgDominates(target: "$input")>
+//
 // 均解析为符号 input（见 sfvm.NativeCallActualParams.GetString(0, "target", "var", "against")）。
 func parseCfgTargetParam(frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (targetVar string, targetVals sfvm.Values, err error) {
 	if frame == nil {
@@ -385,7 +387,7 @@ func mapCfgCtxAgainstTarget(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.Nat
 		// `?{ *<cfgDominates...> }` and other filter sub-expressions can buildFilterMask
 		// (see sfvm/condition_exec.go buildFilterMask).
 		if ab := op.GetAnchorBitVector(); ab != nil && !ab.IsEmpty() && val != nil {
-			val.SetAnchorBitVector(ab)
+			val.SetAnchorBitVector(ab.Clone())
 		}
 		out = append(out, val)
 		return nil
@@ -596,7 +598,9 @@ func computeCfgGuardsPredicates(prog *Program, fn *ssa.Function, sinkCtx *CfgCtx
 }
 
 // parseCfgGuardsOpcodeFilter reads optional native args for cfgGuards:
-//   <cfgGuards(opcode: return)>  or  <cfgGuards(return)>  (first positional == opcode key)
+//
+//	<cfgGuards(opcode: return)>  or  <cfgGuards(return)>  (first positional == opcode key)
+//
 // Token names match ?{opcode: ...} (sfvm.ParseSSAOpcodeFromSyntaxFlowName).
 func parseCfgGuardsOpcodeFilter(params *sfvm.NativeCallActualParams) ([]ssa.Opcode, error) {
 	if params == nil {
@@ -668,7 +672,7 @@ func nativeCallCFGGuards(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.Native
 			if g == nil || g.IsEmpty() {
 				continue
 			}
-			g.SetAnchorBitVector(op.GetAnchorBitVector())
+			g.SetAnchorBitVector(op.GetAnchorBitVector().Clone())
 			*out = append(*out, g)
 		}
 	})
@@ -1333,7 +1337,7 @@ func buildReachabilityGuardValues(prog *Program, anchor *Value, vals []*Value) [
 			continue
 		}
 		if ab != nil && !ab.IsEmpty() {
-			val.SetAnchorBitVector(ab)
+			val.SetAnchorBitVector(ab.Clone())
 		}
 		out = append(out, val)
 	}
