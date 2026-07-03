@@ -47,12 +47,14 @@ int main() {
 
 		results, err := p.SyntaxFlowWithError(`
 			strncpy(* #-> as $target)
-		`, ssaapi.QueryWithEnableDebug())
-		results.Show()
+		`)
 		require.Nil(t, err)
 		require.NotNil(t, results)
 
 		ent := results.GetValues("target")
+		check(t, ent, []string{
+			"4:5 - 4:22: char buffer[512];"},
+			ssa.ToMake)
 		check(t, ent, []string{
 			"6:21 - 6:42: \"aaaaaaaaaaaaaaaaaaa\"",
 			"6:44 - 6:47: 512",
@@ -94,24 +96,24 @@ int main() {
 			max #-> as $max
 			min #-> as $min
 			result #-> as $result
-		`, ssaapi.QueryWithEnableDebug())
+		`)
 		require.Nil(t, err)
 		require.NotNil(t, results)
 
 		max := results.GetValues("max")
 		check(t, max, []string{
-			"5:15 - 5:19: 1024"},
+			"4:15 - 4:19: 1024"},
 			ssa.ToConstInst)
 
 		min := results.GetValues("min")
 		check(t, min, []string{
-			"6:15 - 6:18: 128"},
+			"5:15 - 5:18: 128"},
 			ssa.ToConstInst)
 
 		result := results.GetValues("result")
 		check(t, result, []string{
-			"5:15 - 5:19: 1024",
-			"6:15 - 6:18: 128"},
+			"4:15 - 4:19: 1024",
+			"5:15 - 5:18: 128"},
 			ssa.ToConstInst)
 	})
 
@@ -152,25 +154,23 @@ int main() {
 
 		p, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.C))
 		require.Nil(t, err)
-		p.Show()
 
 		results, err := p.SyntaxFlowWithError(`
 			factor #-> as $factor
 			size #-> as $size
-		`, ssaapi.QueryWithEnableDebug())
+		`)
 		require.Nil(t, err)
 		require.NotNil(t, results)
-		results.Show()
 
 		factor := results.GetValues("factor")
 		check(t, factor, []string{
-			"5:18 - 5:19: 4"},
+			"4:18 - 4:19: 4"},
 			ssa.ToConstInst)
 
 		size := results.GetValues("size")
 		check(t, size, []string{
-			"5:18 - 5:19: 4",
-			"6:16 - 6:18: 64"},
+			"4:18 - 4:19: 4",
+			"5:16 - 5:18: 64"},
 			ssa.ToConstInst)
 	})
 
@@ -218,16 +218,15 @@ int main() {
 
 		results, err := p.SyntaxFlowWithError(`
 			value #-> as $value
-		`, ssaapi.QueryWithEnableDebug())
+		`)
 		require.Nil(t, err)
 		require.NotNil(t, results)
-		results.Show()
 
 		value := results.GetValues("value")
 		check(t, value, []string{
-			"5:17 - 5:19: 10",
-			"5:22 - 5:24: 20",
-			"5:27 - 5:28: 5"},
+			"4:17 - 4:19: 10",
+			"4:22 - 4:24: 20",
+			"4:27 - 4:28: 5"},
 			ssa.ToConstInst)
 	})
 
@@ -258,14 +257,13 @@ int main() {
 
 		results, err := p.SyntaxFlowWithError(`
 			value #-> as $value
-		`, ssaapi.QueryWithEnableDebug())
+		`)
 		require.Nil(t, err)
 		require.NotNil(t, results)
-		results.Show()
 
 		value := results.GetValues("value")
 		check(t, value, []string{
-			"5:17 - 5:18: 7"},
+			"4:17 - 4:18: 7"},
 			ssa.ToConstInst)
 	})
 

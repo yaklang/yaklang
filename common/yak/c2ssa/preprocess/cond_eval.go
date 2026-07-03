@@ -112,7 +112,7 @@ func replaceDefinedTokens(tokens []ifTok, env *ppExprEnv) []ifTok {
 	return out
 }
 
-// EvalPreprocessorCondition evaluates a #if/#elif expression (tinycpp-style token eval).
+// EvalPreprocessorCondition evaluates a #if/#elif expression.
 func EvalPreprocessorCondition(expr string, local, global *MacroEnvironment, defs map[string]string) bool {
 	expr = normalizeLineEndings(expr)
 	env := newPPExprEnv(local, global, defs)
