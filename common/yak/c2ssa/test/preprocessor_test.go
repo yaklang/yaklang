@@ -12,12 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
-// skipArithmeticIfPreprocess skips #if tests requiring full arithmetic expression evaluation.
-func skipArithmeticIfPreprocess(t *testing.T) {
-	t.Helper()
-	t.Skip("skipped: #if arithmetic expressions not yet supported")
-}
-
 func TestPreprocess_SimpleMacro(t *testing.T) {
 	t.Run("simple define", func(t *testing.T) {
 		code := `
@@ -213,7 +207,6 @@ int main() {
 	})
 
 	t.Run("if condition", func(t *testing.T) {
-		skipArithmeticIfPreprocess(t)
 		code := `
 #define VERSION 2
 
