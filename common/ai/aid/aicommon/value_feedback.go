@@ -2,12 +2,14 @@ package aicommon
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 // value_feedback.go 是"价值评估"采集的瘦注册缝 (零额外重依赖).
@@ -357,6 +359,89 @@ func (c *Config) submitReviewValueFeedback(ep *Endpoint, focusMode, reviewQuesti
 		// UserQuery 从用户输入历史首条回填, 记录 "用户最初要什么".
 		TaskID:    c.resolveHotpatchCurrentTaskId(),
 		UserQuery: c.firstUserQuery(),
+	}
+	if c.Timeline != nil {
+		record.TimelineDump = c.Timeline.Dump()
+	}
+	SubmitValueFeedback(c, record)
+}
+
+// SubmitToolRiskFeedback 是 "工具报出漏洞后" 的通用价值评估埋点入口.
+//
+// 背景: 漏洞 (risk) 主要不是在 loop 途中直接产生, 而是由 cybersecurity-risk 等
+// yak 插件工具调用产生的 —— 工具执行结束后, risk 已被绑定到该次工具调用的 runtime.
+// 本方法就在 "工具调用结束、runtime 绑定漏洞之后" 被调用, 把这批 risk 组装成一条
+// trigger_condition=risk_feedback 的记录, 异步 (非阻塞投递) 交小模型判定是否误报
+// (AI 自判, source=model_judge). 与 loop_http_fuzztest 的 generate_risk 动作路径
+// 互补 —— 后者不走工具调用, 由 loop 侧单独埋点.
+//
+// focusMode 传产生该 risk 的工具名 (如 cybersecurity-risk), 便于后端区分漏洞来源.
+// risks 为本次工具调用实际 emit / 绑定到 runtime 的 risk 列表. 全程 recover, 绝不
+// 影响主流程.
+//
+// 人工确认路径 (未来接入, 本次不改前端): 当前端在漏洞报出后提供 "是真漏洞 / 是误报"
+// 确认交互时, 应组装 RiskFeedback.Source=RiskFeedbackSourceHuman 且 IsFalsePositive
+// 明确 (true/false) 的记录再调 SubmitValueFeedback 提交, 此处仅预留说明不落地代码.
+func (c *Config) SubmitToolRiskFeedback(focusMode string, risks []*schema.Risk) {
+	if c == nil || len(risks) == 0 {
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			log.Warnf("SubmitToolRiskFeedback recovered panic: %v", r)
+		}
+	}()
+
+	// 按 risk 主键去重 (同一次工具调用可能重复 emit 同一条 risk), 首个非空
+	// RiskType / Severity 作为该批漏洞的代表值, 便于后端按类型/级别聚合误报率.
+	seen := make(map[string]struct{}, len(risks))
+	riskIDs := make([]string, 0, len(risks))
+	riskType := ""
+	severity := ""
+	for _, rk := range risks {
+		if rk == nil {
+			continue
+		}
+		id := fmt.Sprintf("%d", rk.ID)
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		riskIDs = append(riskIDs, id)
+		if riskType == "" {
+			riskType = rk.RiskType
+		}
+		if severity == "" {
+			severity = rk.Severity
+		}
+	}
+	if len(riskIDs) == 0 {
+		return
+	}
+	if focusMode == "" {
+		focusMode = ReviewFocusModeGeneric
+	}
+
+	record := &ValueFeedbackRecord{
+		MainModel: ModelEndpoint{
+			ModelName:  c.AiModelName,
+			ServerName: c.AiServerName,
+		},
+		FocusMode:        focusMode,
+		TriggerCondition: ValueFeedbackTriggerRiskFeedback,
+		ExecutionPolicy:  c.AgreePolicy,
+		SessionID:        c.PersistentSessionId,
+		// TaskID / UserQuery 与审批记录保持一致的取法, 保证 risk_feedback 记录也能
+		// 按任务聚合复盘, 并携带 "用户最初要什么".
+		TaskID:    c.resolveHotpatchCurrentTaskId(),
+		UserQuery: c.firstUserQuery(),
+		RiskFeedback: &ValueFeedbackRiskFeedback{
+			RiskIDs:  riskIDs,
+			RiskType: riskType,
+			Severity: severity,
+			// AI 自判通路: IsFalsePositive 留空 (nil), 由小模型在价值评估里回填.
+			Source: RiskFeedbackSourceModelJudge,
+		},
 	}
 	if c.Timeline != nil {
 		record.TimelineDump = c.Timeline.Dump()
