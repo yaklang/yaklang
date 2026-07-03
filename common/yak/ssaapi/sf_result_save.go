@@ -217,7 +217,16 @@ func (r *SyntaxFlowResult) saveValue(ctx context.Context, result *ssadb.AuditRes
 		opts = append(opts, OptionSaveValue_Diagnostics(r.program.config.DiagnosticsRecorder()))
 	}
 	saveVariable := func(name string, values Values) {
-		opts := append(opts, OptionSaveValue_ResultVariable(name))
+		// Build a FRESH opts slice per variable. The outer `opts` is shared by
+		// every saveVariable call; `append(opts, ...)` reuses its backing array
+		// when it has capacity, so concurrent saveVariable calls (the scan runner
+		// queries rules in multiple goroutines, and ForEach below can recurse)
+		// raced on the shared backing array and panicked with
+		// "index out of range" (observed on javacms-core scan). Copying the
+		// per-variable prefix into a new slice makes each call independent.
+		varOpts := make([]SaveValueOption, len(opts), len(opts)+2)
+		copy(varOpts, opts)
+		varOpts = append(varOpts, OptionSaveValue_ResultVariable(name))
 
 		// save no value variable
 		if len(values) == 0 {
@@ -242,12 +251,16 @@ func (r *SyntaxFlowResult) saveValue(ctx context.Context, result *ssadb.AuditRes
 
 		// save variable that has value
 		for index, v := range values {
+			// Per-value opts, derived from the per-variable varOpts so index/hash
+			// don't leak across values. Build a fresh slice each iteration
+			// (SaveValue consumes opts and the loop reuses varOpts otherwise).
+			valueOpts := varOpts
 			hash := r.SaveRisk(name, index, v, true)
 			if hash != "" {
-				opts = append(opts, OptionSaveValue_ResultRiskHash(hash))
+				valueOpts = append(valueOpts, OptionSaveValue_ResultRiskHash(hash))
 			}
-			opts = append(opts, OptionSaveValue_ResultIndex(uint(index)))
-			e := SaveValue(v, opts...)
+			valueOpts = append(valueOpts, OptionSaveValue_ResultIndex(uint(index)))
+			e := SaveValue(v, valueOpts...)
 			err = utils.JoinErrors(err, e)
 		}
 	}
