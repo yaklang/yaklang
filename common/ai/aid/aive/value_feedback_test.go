@@ -38,7 +38,7 @@ func TestComputeSignatureDeterministic(t *testing.T) {
 	}
 }
 
-// TestBuildPromptContainsContext 验证 prompt 携带主模型/小模型/触发条件等上下文.
+// TestBuildPromptContainsContext 验证 prompt 携带主模型/小模型/触发条件/用户诉求等上下文.
 func TestBuildPromptContainsContext(t *testing.T) {
 	record := &aicommon.ValueFeedbackRecord{
 		ID:               "rid-1",
@@ -47,13 +47,37 @@ func TestBuildPromptContainsContext(t *testing.T) {
 		SmallModel:       aicommon.ModelEndpoint{ModelName: forcedSmallModelName},
 		FocusMode:        "http_fuzztest",
 		TriggerCondition: aicommon.ValueFeedbackTriggerVerification,
+		UserQuery:        "帮我测试订单接口越权",
+		IterationIndex:   3,
 		Actions: []aicommon.ValueFeedbackAction{
 			{ActionType: "directly_call_tool", ToolName: "httpfuzzer", IterationIndex: 1},
 		},
 		WhatHappenedSummary: "directly_call_tool(httpfuzzer)",
 	}
 	prompt := buildValueFeedbackPrompt(record)
-	for _, want := range []string{"qwen-max", forcedSmallModelName, "http_fuzztest", "verification", "httpfuzzer", "rid-1", "sig-1"} {
+	for _, want := range []string{"qwen-max", forcedSmallModelName, "http_fuzztest", "verification", "httpfuzzer", "rid-1", "sig-1", "帮我测试订单接口越权", "iteration_index=3"} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("prompt missing %q\nprompt=%s", want, prompt)
+		}
+	}
+}
+
+// TestBuildPromptRiskFeedback 验证 risk_feedback 触发的记录会渲染误报反馈上下文与判定指引.
+func TestBuildPromptRiskFeedback(t *testing.T) {
+	record := &aicommon.ValueFeedbackRecord{
+		ID:               "rid-fp",
+		MainModel:        aicommon.ModelEndpoint{ModelName: "qwen-max", ServerName: "openai"},
+		FocusMode:        "http_fuzztest",
+		TriggerCondition: aicommon.ValueFeedbackTriggerRiskFeedback,
+		RiskFeedback: &aicommon.ValueFeedbackRiskFeedback{
+			RiskIDs:  []string{"101", "102"},
+			RiskType: "sqli",
+			Severity: "high",
+			Source:   aicommon.RiskFeedbackSourceModelJudge,
+		},
+	}
+	prompt := buildValueFeedbackPrompt(record)
+	for _, want := range []string{"risk_feedback", "sqli", "101,102", "model_judge", "false_positive_hint", "is_false_positive=unjudged"} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("prompt missing %q\nprompt=%s", want, prompt)
 		}

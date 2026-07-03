@@ -280,13 +280,11 @@ func emitValueFeedbackResult(ctx context.Context, cfg *aicommon.Config, record *
 			"annotator_type": "model_judge",
 			"annotator_name": forcedSmallModelName,
 			"labels": map[string]any{
-				"value_score":   action.GetInt("value_score"),
-				"sft_candidate": action.GetBool("sft_candidate"),
-				"dpo_candidate": action.GetBool("dpo_candidate"),
+				"value_score":       action.GetInt("value_score"),
+				"is_false_positive": action.GetBool("is_false_positive"),
 			},
-			"annotation_confidence": action.GetFloat("annotation_confidence"),
-			"confidence_basis":      "model_judge_only",
-			"reason":                action.GetString("reason"),
+			"confidence_basis": "model_judge_only",
+			"reason":           action.GetString("reason"),
 		},
 		"timestamp": time.Now().Unix(),
 	}
@@ -320,27 +318,25 @@ func emitValueFeedbackResult(ctx context.Context, cfg *aicommon.Config, record *
 }
 
 // buildValueFeedbackOutputs 定义价值评估输出 schema 的字段.
+//
 // 这些是小模型 (model_judge) 产出的"弱标签", 由 aibalance mirror 脚本收进
 // annotations[annotator_type=model_judge]; 生产侧不直接当成终态标签.
-// label_quality 易被误解为"经人工高质量验证", 改为 annotation_confidence (0-1) +
-// confidence_basis (固定 model_judge_only, 在脚本侧补充).
+//
+// 已按 "只记事实、不预先下训练标签" 的原则移除 sft_candidate / dpo_candidate /
+// annotation_confidence: 这些由免费小模型自评的训练标签价值低且易误导下游, 训练
+// 样本的取舍应交给后端结合人工/规则信号离线决定. 仅保留 value_score 作为唯一弱标签,
+// 并新增 is_false_positive (仅 risk_feedback 触发时有意义).
 func buildValueFeedbackOutputs() []any {
 	return []any{
 		aitool.WithIntegerParam("value_score",
 			aitool.WithParam_Description("training value score in range 0-10, higher means more valuable as a training sample"),
 			aitool.WithParam_Required(),
 		),
-		aitool.WithBoolParam("sft_candidate",
-			aitool.WithParam_Description("whether this trajectory is a good supervised fine-tuning candidate"),
-		),
-		aitool.WithBoolParam("dpo_candidate",
-			aitool.WithParam_Description("whether this trajectory provides a preference pair signal for DPO"),
-		),
-		aitool.WithNumberParam("annotation_confidence",
-			aitool.WithParam_Description("your self-estimated confidence of this weak-label judgement, a float in range 0.0-1.0"),
+		aitool.WithBoolParam("is_false_positive",
+			aitool.WithParam_Description("ONLY meaningful when trigger=risk_feedback: whether the reported vulnerability (risk) is a false positive. true means it is a false positive, false means it is a real risk. Ignore this field for other triggers."),
 		),
 		aitool.WithStringParam("reason",
-			aitool.WithParam_Description("concise reason explaining the value judgement, in English"),
+			aitool.WithParam_Description("concise reason explaining the value judgement (and the false-positive judgement when trigger=risk_feedback), in English"),
 			aitool.WithParam_Required(),
 		),
 	}
@@ -356,9 +352,16 @@ func buildValueFeedbackPrompt(record *aicommon.ValueFeedbackRecord) string {
 		emptyTo(record.MainModel.ModelName, "unknown"), emptyTo(record.MainModel.ServerName, "unknown")))
 	sb.WriteString(fmt.Sprintf("small_model: name=%s\n",
 		emptyTo(record.SmallModel.ModelName, forcedSmallModelName)))
-	sb.WriteString(fmt.Sprintf("focus_mode=%s trigger=%s\n", emptyTo(record.FocusMode, "unknown"), emptyTo(record.TriggerCondition, "unknown")))
+	sb.WriteString(fmt.Sprintf("focus_mode=%s trigger=%s iteration_index=%d\n",
+		emptyTo(record.FocusMode, "unknown"), emptyTo(record.TriggerCondition, "unknown"), record.IterationIndex))
 	if record.ExecutionPolicy != "" {
 		sb.WriteString(fmt.Sprintf("execution_policy=%s\n", record.ExecutionPolicy))
+	}
+	if record.UserQuery != "" {
+		sb.WriteString(fmt.Sprintf("user_query: %s\n", record.UserQuery))
+	}
+	if len(record.Attachments) > 0 {
+		sb.WriteString(fmt.Sprintf("attachments: %s\n", strings.Join(record.Attachments, ", ")))
 	}
 	if record.WhatHappenedSummary != "" {
 		sb.WriteString(fmt.Sprintf("what_happened: %s\n", record.WhatHappenedSummary))
@@ -398,13 +401,28 @@ func buildValueFeedbackPrompt(record *aicommon.ValueFeedbackRecord) string {
 			sb.WriteString(fmt.Sprintf("approval_comment: %s\n", ap.Comment))
 		}
 	}
+	if record.RiskFeedback != nil {
+		rf := record.RiskFeedback
+		fp := "unjudged"
+		if rf.IsFalsePositive != nil {
+			if *rf.IsFalsePositive {
+				fp = "true"
+			} else {
+				fp = "false"
+			}
+		}
+		sb.WriteString(fmt.Sprintf("risk_feedback: risk_ids=%s type=%s severity=%s source=%s is_false_positive=%s\n",
+			emptyTo(strings.Join(rf.RiskIDs, ","), "-"), emptyTo(rf.RiskType, "-"), emptyTo(rf.Severity, "-"),
+			emptyTo(rf.Source, "-"), fp))
+		if rf.Reason != "" {
+			sb.WriteString(fmt.Sprintf("risk_feedback_reason: %s\n", rf.Reason))
+		}
+		// 误报判定指引: 报出漏洞后需要判断是否误报. 只有当证据不足 / 与目标行为不符 /
+		// 属正常业务响应时才判 true (误报); 有明确可复现的漏洞证据则判 false (真实漏洞).
+		sb.WriteString("false_positive_hint: for trigger=risk_feedback, set is_false_positive=true ONLY when the reported risk lacks solid reproducible evidence or is a normal/expected response; set false when the trajectory shows clear exploit evidence.\n")
+	}
 	if record.Outcome != nil {
 		sb.WriteString(fmt.Sprintf("objective_outcome: %s\n", formatOutcome(record.Outcome)))
-	}
-	if record.TimelineDiff != "" {
-		sb.WriteString("timeline_diff:\n")
-		sb.WriteString(utils.PrefixLines(record.TimelineDiff, "  "))
-		sb.WriteString("\n")
 	}
 	if record.TimelineDump != "" {
 		sb.WriteString("timeline_trajectory:\n")
