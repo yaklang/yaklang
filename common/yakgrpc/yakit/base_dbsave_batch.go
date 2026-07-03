@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	dbSaveBatchMaxSize        = 48
-	dbSaveBatchCoalesceWait   = 10 * time.Millisecond
-	dbSaveSlowInsertThreshold = 3 * time.Second
+	dbSaveBatchMaxSize      = 48
+	dbSaveBatchCoalesceWait = 10 * time.Millisecond
+	// 慢插入判定阈值统一取自 SlowInsertSQLThreshold，避免与广播逻辑割裂
+	dbSaveSlowInsertThreshold = SlowInsertSQLThreshold
 )
 
 // drainDBSaveBatch pulls more queued writers when the channel is busy.
