@@ -155,7 +155,37 @@ func RunValueOperatorPipeline(values Values, opts ValuePipelineOptions, f func(V
 		_, _, propagateAnchors = opts.Frame.ActiveAnchorScope()
 	}
 
+	// Inline fast path for small value sets. The pipe path creates an UnlimitedChan
+	// per call, which does context.WithCancel + spawns goroutines (see chanx), so
+	// per-opcode pipe creation was the #2 allocator (~18% / ~1GB of cancelCtx+Done
+	// channels) and a major GC driver on large projects. For small sets the
+	// concurrency is worthless and the channel/cancelCtx/goroutine overhead
+	// dominates, so process inline (single loop, no allocation).
+	const inlinePipelineThreshold = 256
 	size := len(values)
+	if size <= inlinePipelineThreshold {
+		out := make([]ValueOperator, 0, size)
+		var firstErr error
+		_ = values.Recursive(func(operator ValueOperator) error {
+			value, err := f(operator)
+			if err != nil {
+				if firstErr == nil {
+					firstErr = err
+				}
+				return err
+			}
+			if opts.PredecessorLabel != "" && opts.Frame != nil {
+				_ = value.AppendPredecessor(operator, opts.Frame.WithPredecessorContext(opts.PredecessorLabel))
+			}
+			if propagateAnchors {
+				MergeAnchor(operator, value...)
+			}
+			out = append(out, value...)
+			return nil
+		})
+		return NewValues(out), firstErr
+	}
+
 	pipe := pipeline.NewPipe(ctx, size, func(operator ValueOperator) (Values, error) {
 		value, err := f(operator)
 		if err != nil {
@@ -317,6 +347,41 @@ func (v Values) FileFilter(path string, mode string, rule1 map[string]string, ru
 	})
 }
 
+// dedupKey is the key type used by the value-set dedup maps (MergeValues /
+// RemoveValues / IntersectValues). It avoids allocating a string per element
+// (the old valueCollectionKey did `fmt.Sprintf("id:%d", id)` on every element
+// of every value set on every opcode — ~22% of all allocations / ~480M calls
+// on a large project, a top GC driver).
+//
+// Layout:
+//   - kind == 1: numeric id fast path (the overwhelmingly common case — every
+//     ssaapi.Value implements ssa.GetIdIF). No string allocation.
+//   - kind == 2: a stable hash string (ValueOperators implementing Hash()).
+//   - kind == 3: type+pointer fallback (the rare nil-id case), string kept.
+type dedupKey struct {
+	kind byte
+	id   int64
+	str  string
+}
+
+// valueDedupKey computes the dedup key for a value. It mirrors the old
+// valueCollectionKey precedence (id → hash → type:%p) but returns a value type
+// instead of a formatted string.
+func valueDedupKey(value ValueOperator) (dedupKey, bool) {
+	if utils.IsNil(value) {
+		return dedupKey{}, false
+	}
+	if id, ok := fetchId(value); ok {
+		return dedupKey{kind: 1, id: id}, true
+	}
+	if hasher, ok := value.(interface{ Hash() (string, bool) }); ok {
+		if hash, ok := hasher.Hash(); ok {
+			return dedupKey{kind: 2, str: hash}, true
+		}
+	}
+	return dedupKey{kind: 3, str: fmt.Sprintf("%T:%p", value, value)}, true
+}
+
 func MergeValues(groups ...Values) Values {
 	if len(groups) == 0 {
 		return NewEmptyValues()
@@ -326,13 +391,16 @@ func MergeValues(groups ...Values) Values {
 	}
 
 	result := make(Values, 0)
-	indexByKey := make(map[string]int)
+	indexByKey := make(map[dedupKey]int)
 	for _, group := range groups {
 		for _, value := range group {
 			if utils.IsNil(value) || value.IsEmpty() {
 				continue
 			}
-			key := valueCollectionKey(value)
+			key, ok := valueDedupKey(value)
+			if !ok {
+				continue
+			}
 			if idx, ok := indexByKey[key]; ok {
 				if merger, ok := result[idx].(provenanceMerger); ok {
 					merger.MergeProvenanceFrom(value)
@@ -351,13 +419,15 @@ func RemoveValues(base Values, removed ...Values) Values {
 	if base.IsEmpty() {
 		return NewEmptyValues()
 	}
-	removedSet := make(map[string]struct{})
+	removedSet := make(map[dedupKey]struct{})
 	for _, group := range removed {
 		for _, value := range group {
 			if utils.IsNil(value) {
 				continue
 			}
-			removedSet[valueCollectionKey(value)] = struct{}{}
+			if key, ok := valueDedupKey(value); ok {
+				removedSet[key] = struct{}{}
+			}
 		}
 	}
 	result := make(Values, 0, len(base))
@@ -365,7 +435,12 @@ func RemoveValues(base Values, removed ...Values) Values {
 		if utils.IsNil(value) {
 			continue
 		}
-		if _, ok := removedSet[valueCollectionKey(value)]; ok {
+		key, ok := valueDedupKey(value)
+		if !ok {
+			result = append(result, value)
+			continue
+		}
+		if _, ok := removedSet[key]; ok {
 			continue
 		}
 		result = append(result, value)
@@ -377,19 +452,25 @@ func IntersectValues(left Values, right Values) Values {
 	if left.IsEmpty() || right.IsEmpty() {
 		return NewEmptyValues()
 	}
-	rightIndex := make(map[string]ValueOperator, len(right))
+	rightIndex := make(map[dedupKey]ValueOperator, len(right))
 	for _, value := range right {
 		if utils.IsNil(value) {
 			continue
 		}
-		rightIndex[valueCollectionKey(value)] = value
+		if key, ok := valueDedupKey(value); ok {
+			rightIndex[key] = value
+		}
 	}
 	result := make(Values, 0)
 	for _, value := range left {
 		if utils.IsNil(value) {
 			continue
 		}
-		matched, ok := rightIndex[valueCollectionKey(value)]
+		key, ok := valueDedupKey(value)
+		if !ok {
+			continue
+		}
+		matched, ok := rightIndex[key]
 		if !ok {
 			continue
 		}

@@ -11,4 +11,5 @@ var Exports = map[string]any{
 	"withScanResultCallback":  WithScanResultCallback,
 	"withScanPrograms":        withPrograms,
 	"withScanConcurrency":     ssaconfig.WithScanConcurrency,
+	"withScanRuleTimeout":     ssaconfig.WithScanRuleTimeout,
 }
