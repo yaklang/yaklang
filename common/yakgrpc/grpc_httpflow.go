@@ -267,8 +267,8 @@ func (s *Server) QueryHTTPFlows(ctx context.Context, req *ypb.QueryHTTPFlowReque
 	paging, data, err := yakit.QueryHTTPFlow(db, req)
 	queryElapsed := time.Since(queryStart)
 
-	// 如果查询超过2秒，记录慢查询
-	if queryElapsed > 2*time.Second {
+	// 查询耗时超过阈值才记录为慢查询（阈值集中定义于 yakit.SlowQuerySQLThreshold）
+	if queryElapsed > yakit.SlowQuerySQLThreshold {
 		// 收集慢查询信息（此处为 project DB，在此设置 dbpath）
 		now := time.Now()
 		slowQueryItem := &yakit.LongSQLDescription{

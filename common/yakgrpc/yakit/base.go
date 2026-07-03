@@ -73,6 +73,22 @@ type initializingCallback struct {
 	Fn   func() error
 }
 
+const (
+	// SlowInsertSQLThreshold 单次写入耗时超过该阈值，才计为一次"慢插入"。
+	// 背景：扫描/爆破等高并发写入时，SQLite 因 MaxOpenConns(1) 串行写，单条写入偶发排队几秒属正常，
+	// 阈值过低（此前 3s）会把用户无感知的抖动误报为"数据库偏大"，与真实体验割裂，故上调。
+	SlowInsertSQLThreshold = 5 * time.Second
+
+	// SlowQuerySQLThreshold 单次查询耗时超过该阈值，才计为一次"慢查询"。
+	// 与写入同理：偶发 2~3s 的分页查询用户往往无感，阈值应设在用户能明显感知卡顿的量级。
+	SlowQuerySQLThreshold = 5 * time.Second
+
+	// SlowSQLBroadcastMinCount 在一个广播窗口（约 2s，见对应 throttle）内累计达到该次数，
+	// 才向前端弹出性能提示。单次慢 SQL 通常是偶发抖动，直接弹红色告警会造成误导，
+	// 只有窗口内密集出现慢 SQL（数据库确实吃力）才提示，避免"止血通知"反而制造困扰。
+	SlowSQLBroadcastMinCount = 3
+)
+
 var (
 	__initializingDatabase    []*initializingCallback
 	__mutexForInit            = new(sync.Mutex)
@@ -152,6 +168,12 @@ func triggerSlowInsertSQLCallback() {
 		return
 	}
 
+	// 未达到广播窗口内的最小累计次数，视为偶发抖动，丢弃不提示，避免误报
+	if len(items) < SlowSQLBroadcastMinCount {
+		log.Infof("skip slow insert SQL broadcast: only %d slow item(s) in window, need >= %d", len(items), SlowSQLBroadcastMinCount)
+		return
+	}
+
 	// 计算平均耗时
 	var totalDuration time.Duration
 	for _, item := range items {
@@ -181,6 +203,12 @@ func triggerSlowQuerySQLCallback() {
 	slowQuerySQLItemsMutex.Unlock()
 
 	if len(items) == 0 {
+		return
+	}
+
+	// 未达到广播窗口内的最小累计次数，视为偶发抖动，丢弃不提示，避免误报
+	if len(items) < SlowSQLBroadcastMinCount {
+		log.Infof("skip slow query SQL broadcast: only %d slow item(s) in window, need >= %d", len(items), SlowSQLBroadcastMinCount)
 		return
 	}
 
@@ -214,28 +242,27 @@ func RegisterHTTPFlowSlowQueryCallback(callback HTTPFlowSQLCallback) {
 // MockHTTPFlowSlowInsertSQL 模拟一次慢插入 SQL 执行，用于测试
 // duration 指定模拟的 SQL 执行耗时
 func MockHTTPFlowSlowInsertSQL(duration time.Duration) {
-	if duration < 2*time.Second {
-		duration = 2*time.Second + 100*time.Millisecond // 确保超过阈值
+	if duration < SlowInsertSQLThreshold {
+		duration = SlowInsertSQLThreshold + 100*time.Millisecond // 确保超过阈值
 	}
 
-	// 创建一个模拟的慢插入 SQL 项（模拟 project DB，在此设置 dbpath）
-	now := time.Now()
-	slowSQLItem := &LongSQLDescription{
-		Duration:      duration,
-		DurationMs:    duration.Milliseconds(),
-		DurationStr:   duration.String(),
-		FuncName:      "yakit.MockHTTPFlowSlowInsertSQL",
-		FuncPtr:       "mock",
-		QueueLen:      len(DBSaveAsyncChannel),
-		LastSQL:       "MOCK SQL: INSERT INTO http_flows ...",
-		Timestamp:     now,
-		TimestampUnix: now.Unix(),
-		DatabasePath:  consts.GetCurrentProjectDatabasePath(),
-	}
-
-	// 添加到收集列表
+	// 一次性注入达到广播门槛的慢插入项，确保 mock/调试能真实走到广播路径
 	slowInsertSQLItemsMutex.Lock()
-	slowInsertSQLItems = append(slowInsertSQLItems, slowSQLItem)
+	for i := 0; i < SlowSQLBroadcastMinCount; i++ {
+		now := time.Now()
+		slowInsertSQLItems = append(slowInsertSQLItems, &LongSQLDescription{
+			Duration:      duration,
+			DurationMs:    duration.Milliseconds(),
+			DurationStr:   duration.String(),
+			FuncName:      "yakit.MockHTTPFlowSlowInsertSQL",
+			FuncPtr:       "mock",
+			QueueLen:      len(DBSaveAsyncChannel),
+			LastSQL:       "MOCK SQL: INSERT INTO http_flows ...",
+			Timestamp:     now,
+			TimestampUnix: now.Unix(),
+			DatabasePath:  consts.GetCurrentProjectDatabasePath(),
+		})
+	}
 	slowInsertSQLItemsMutex.Unlock()
 
 	// 异步触发回调
@@ -259,27 +286,26 @@ func TriggerSlowQuerySQLCallbackThrottled() {
 // MockHTTPFlowSlowQuerySQL 模拟一次慢查询 SQL 执行，用于测试
 // duration 指定模拟的 SQL 执行耗时
 func MockHTTPFlowSlowQuerySQL(duration time.Duration) {
-	if duration < 2*time.Second {
-		duration = 2*time.Second + 100*time.Millisecond // 确保超过阈值
+	if duration < SlowQuerySQLThreshold {
+		duration = SlowQuerySQLThreshold + 100*time.Millisecond // 确保超过阈值
 	}
 
-	// 创建一个模拟的慢查询 SQL 项（模拟 project DB，在此设置 dbpath）
-	now := time.Now()
-	slowSQLItem := &LongSQLDescription{
-		Duration:      duration,
-		DurationMs:    duration.Milliseconds(),
-		DurationStr:   duration.String(),
-		FuncName:      "yakit.MockHTTPFlowSlowQuerySQL",
-		FuncPtr:       "mock",
-		QueueLen:      0, // 查询操作没有队列
-		LastSQL:       "MOCK SQL: SELECT * FROM http_flows ...",
-		Timestamp:     now,
-		TimestampUnix: now.Unix(),
-		DatabasePath:  consts.GetCurrentProjectDatabasePath(),
+	// 一次性注入达到广播门槛的慢查询项，确保 mock/调试能真实走到广播路径
+	for i := 0; i < SlowSQLBroadcastMinCount; i++ {
+		now := time.Now()
+		AddSlowQuerySQLItem(&LongSQLDescription{
+			Duration:      duration,
+			DurationMs:    duration.Milliseconds(),
+			DurationStr:   duration.String(),
+			FuncName:      "yakit.MockHTTPFlowSlowQuerySQL",
+			FuncPtr:       "mock",
+			QueueLen:      0, // 查询操作没有队列
+			LastSQL:       "MOCK SQL: SELECT * FROM http_flows ...",
+			Timestamp:     now,
+			TimestampUnix: now.Unix(),
+			DatabasePath:  consts.GetCurrentProjectDatabasePath(),
+		})
 	}
-
-	// 添加到收集列表
-	AddSlowQuerySQLItem(slowSQLItem)
 
 	// 使用节流机制触发回调
 	TriggerSlowQuerySQLCallbackThrottled()
