@@ -17,6 +17,13 @@ type sfCheck struct {
 	matchItem []*checkItem
 	untilItem []*checkItem
 
+	// compiledFrames memoizes sub-rule text -> compiled frame within this
+	// sfCheck (see compiledFrame). dataflow include=/exclude= sub-rules are
+	// recompiled once per sfCheck without this; the same text appears across
+	// every rule in a scan, so this avoids the regexp-compile allocation that
+	// showed up at ~10GB on large projects.
+	compiledFrames map[string]*sf.SFFrame
+
 	// beforeMergeHook runs on a child SFFrameResult before MergeByResult (e.g. dataflow
 	// only_reachable post-mode pruning include-rule captures). parent is the accumulated
 	// context result before this child merge.
@@ -82,7 +89,7 @@ func (c *sfCheck) AppendItems(items ...*sf.RecursiveConfigItem) {
 		if item == nil {
 			continue
 		}
-		frame, err := c.vm.Compile(item.Value)
+		frame, err := c.compiledFrame(item.Value)
 		if err != nil {
 			keyName := recursiveCheckKeyLabel(item.Key)
 			// 暴露编译错误，添加到结果中以便前端可以获取
@@ -104,6 +111,32 @@ func (c *sfCheck) AppendItems(items ...*sf.RecursiveConfigItem) {
 			c.untilItem = append(c.untilItem, checkItem)
 		}
 	}
+}
+
+// compiledFrame returns a compiled *sf.SFFrame for the given sub-rule text,
+// memoized within this sfCheck. dataflow(include=/exclude=) sub-rules are
+// appended once per native-call sfCheck but the SAME text (e.g.
+// `* & $params as $__next__`) is recompiled across every rule in a scan —
+// driving regexp compile to ~10GB on large projects. Memoizing per-sfCheck
+// (a) dedupes when the same text is appended more than once, and
+// (b) bounds the VM's `s.frames` slice (vm.go Compile appends without limit).
+// Lifetime is the sfCheck's (one dataflow native call), so no unbounded
+// growth and no cross-rule contention.
+func (c *sfCheck) compiledFrame(text string) (*sf.SFFrame, error) {
+	if c.compiledFrames != nil {
+		if f, ok := c.compiledFrames[text]; ok {
+			return f, nil
+		}
+	}
+	frame, err := c.vm.Compile(text)
+	if err != nil {
+		return nil, err
+	}
+	if c.compiledFrames == nil {
+		c.compiledFrames = make(map[string]*sf.SFFrame, 4)
+	}
+	c.compiledFrames[text] = frame
+	return frame, nil
 }
 
 func CreateCheckFromNativeCallParam(

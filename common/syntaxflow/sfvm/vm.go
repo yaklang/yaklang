@@ -3,6 +3,7 @@ package sfvm
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/schema"
@@ -22,6 +23,20 @@ type SyntaxFlowVirtualMachine struct {
 	debug      bool
 	frameMutex *sync.Mutex
 	frames     []*SFFrame
+
+	// compileCount is a test-only counter incremented on every real Compile
+	// (not memoized lookup). Production code never reads it; ssaapi's sfCheck
+	// memoization test asserts N duplicate texts -> +1 compile.
+	compileCount int64
+}
+
+// CompileCount returns the test-only count of real Compile invocations on this
+// VM. Production code never reads it.
+func (s *SyntaxFlowVirtualMachine) CompileCount() int64 { return atomic.LoadInt64(&s.compileCount) }
+
+// ResetCompileCount zeros the test-only compile counter and returns the previous value.
+func (s *SyntaxFlowVirtualMachine) ResetCompileCount() int64 {
+	return atomic.SwapInt64(&s.compileCount, 0)
 }
 
 func NewSyntaxFlowVirtualMachine(opts ...Option) *SyntaxFlowVirtualMachine {
@@ -105,6 +120,7 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 	if text == "" {
 		return nil, utils.Errorf("SyntaxFlow compile error: text is nil")
 	}
+	atomic.AddInt64(&s.compileCount, 1)
 	defer func() {
 		if err := recover(); err != nil {
 			ret = utils.Wrapf(utils.Error(err), "Panic for SyntaxFlow compile")
