@@ -179,6 +179,15 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 				log.Debugf("Rule Performance: %s - no performance data recorded", rule.RuleName)
 			}
 		}
+
+		// Release this rule's analysis-local accumulators before the next rule
+		// reuses the program. ResetInterRuleState is a no-op unless the cache
+		// exceeds its threshold (heavy rules), so small rules keep DB-read reuse
+		// while heavy rules' Values don't carry Predecessors/anchorBits into the
+		// next rule and don't bloat retained memory. See Program.ResetInterRuleState.
+		if prog != nil {
+			prog.ResetInterRuleState()
+		}
 		return nil
 	}
 
