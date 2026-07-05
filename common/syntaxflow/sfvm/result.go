@@ -50,6 +50,13 @@ func (s *SFFrameResult) GetRule() *schema.SyntaxFlowRule {
 }
 
 func (s *SFFrameResult) MergeByResult(result *SFFrameResult) {
+	s.MergeByResultLocked(result)
+}
+
+// MergeByResultLocked is MergeByResult for callers that already hold whatever
+// serialization protects s/result (e.g. sfCheck.config.Mutex). It does NOT take
+// any lock itself.
+func (s *SFFrameResult) MergeByResultLocked(result *SFFrameResult) {
 	result.SymbolTable.ForEach(func(i string, v Values) bool {
 		if value, ok := s.SymbolTable.Get(i); ok {
 			s.SymbolTable.Set(i, MergeValues(value, v))
@@ -65,6 +72,17 @@ func (s *SFFrameResult) MergeByResult(result *SFFrameResult) {
 	//for k, v := range result.AlertDesc {
 	//	s.AlertDesc[k] = v
 	//}
+	s.CheckParams = append(s.CheckParams, result.CheckParams...)
+	s.Errors = append(s.Errors, result.Errors...)
+}
+
+// MergeByResultMetaLocked propagates only the cheap metadata (CheckParams,
+// Errors) without touching the symbol/alert tables. Used by sfCheck.clearup
+// when the child result has no mergeable named symbol (the common case for
+// dataflow include=/exclude= sub-rules that bind only $__next__ or nothing),
+// so the expensive MergeValues dedup loops are skipped entirely while compile
+// errors / check params still surface. Caller MUST hold the config mutex.
+func (s *SFFrameResult) MergeByResultMetaLocked(result *SFFrameResult) {
 	s.CheckParams = append(s.CheckParams, result.CheckParams...)
 	s.Errors = append(s.Errors, result.Errors...)
 }
