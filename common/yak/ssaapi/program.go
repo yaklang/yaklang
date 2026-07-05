@@ -4,6 +4,7 @@ import (
 	"context"
 	"sort"
 	"strconv"
+	goatomic "sync/atomic"
 	"time"
 
 	"go.uber.org/atomic"
@@ -33,6 +34,81 @@ type Program struct {
 	nodeId2ValueCache *utils.CacheWithKey[string, *Value]
 	id                *atomic.Int64
 	overlay           *ProgramOverLay
+
+	// interRuleStateThreshold is the nodeId2ValueCache entry count above which
+	// ResetInterRuleState clears the cache (and nils out cached Values' analysis
+	// accumulators) at rule boundaries. Below it the 8s TTL handles eviction,
+	// trading some retained state for DB read reuse. Tuned for large projects
+	// where one rule can materialize hundreds of thousands of Values.
+	interRuleStateThreshold int64
+
+	// interRuleResetCount is a test-only counter of how many times
+	// ResetInterRuleState actually cleared the cache. Production code never
+	// reads it; tests assert it moved between rules.
+	InterRuleResetCount int64
+}
+
+// resetInterRuleStateCacheThreshold is the default nodeId2ValueCache entry
+// count that triggers ResetInterRuleState between rules. Calibrated against
+// the javacms-core scan: heavy rules add ~tens of thousands of cached Values
+// per rule; clearing above 50k keeps the heavy-rule case bounded without
+// forcing DB re-reads on the common small-rule case.
+const resetInterRuleStateCacheThreshold = 50000
+
+// ResetInterRuleState clears analysis-local accumulators that the scan reuses
+// the same *Value objects for across rules. After a heavy rule, a cached Value
+// can carry the previous rule's Predecessors / EffectOn / DependOn / anchorBits
+// (built lazily during getTopDefs/getBottomUses), which (a) inflates memory and
+// (b) leaks rule N's analysis into rule N+1. Reset nils those fields and clears
+// the nodeId2ValueCache so the next rule re-fetches clean Values from DB.
+//
+// Only the analysis-local accumulators are touched; IR text / overlay / compile
+// state is untouched. The fields being released are NOT part of the ssadb risk
+// model (save goes through AuditNode/AuditResult), so a concurrent result
+// callback holding a *Value still has a valid object — only its analysis caches
+// get dropped, which the next rule rebuilds lazily.
+//
+// guardThreshold: only does work when the cache exceeds the threshold; small
+// rules leave the cache alone for DB-read reuse.
+func (p *Program) ResetInterRuleState() {
+	if p == nil || utils.IsNil(p) {
+		return
+	}
+	if p.nodeId2ValueCache == nil {
+		return
+	}
+	if int64(p.nodeId2ValueCache.Count()) < p.interRuleStateThreshold {
+		return
+	}
+	// Snapshot the entries, drop the cache, then release accumulators on the
+	// snapshot. Order matters: clear first so concurrent GetOrLoad callers
+	// don't observe a half-niled Value mid-reset.
+	entries := p.nodeId2ValueCache.GetAll()
+	p.nodeId2ValueCache.Purge()
+	goatomic.AddInt64(&p.InterRuleResetCount, 1)
+	for _, v := range entries {
+		if v == nil {
+			continue
+		}
+		v.Predecessors = nil
+		v.EffectOn = nil
+		v.DependOn = nil
+		v.anchorBits = nil
+		v.users = nil
+		v.operands = nil
+	}
+}
+
+// SetInterRuleStateThreshold sets the nodeId2ValueCache entry-count threshold that
+// triggers ResetInterRuleState. Exposed for tests to force the heavy-rule path
+// on small synthetic inputs (the default 50k is calibrated for real projects,
+// far above what a synthetic VirtualFs program materializes). Production code
+// should not call this.
+func (p *Program) SetInterRuleStateThreshold(n int64) {
+	if p == nil {
+		return
+	}
+	p.interRuleStateThreshold = n
 }
 
 type Programs []*Program
@@ -154,9 +230,10 @@ func (p *Program) GetConfig() *Config {
 
 func NewProgram(prog *ssa.Program, config *Config) *Program {
 	p := &Program{
-		Program:           prog,
-		nodeId2ValueCache: utils.NewTTLCacheWithKey[string, *Value](8 * time.Second),
-		id:                atomic.NewInt64(0),
+		Program:                 prog,
+		nodeId2ValueCache:       utils.NewTTLCacheWithKey[string, *Value](8 * time.Second),
+		id:                      atomic.NewInt64(0),
+		interRuleStateThreshold: resetInterRuleStateCacheThreshold,
 	}
 	if config != nil {
 		p.config = config
@@ -181,11 +258,12 @@ func NewProgram(prog *ssa.Program, config *Config) *Program {
 
 func NewTmpProgram(name string) *Program {
 	p := &Program{
-		Program:           ssa.NewTmpProgram(name),
-		config:            &Config{},
-		enableDatabase:    false,
-		nodeId2ValueCache: utils.NewTTLCacheWithKey[string, *Value](8 * time.Second),
-		id:                atomic.NewInt64(0),
+		Program:                 ssa.NewTmpProgram(name),
+		config:                  &Config{},
+		enableDatabase:          false,
+		nodeId2ValueCache:       utils.NewTTLCacheWithKey[string, *Value](8 * time.Second),
+		id:                      atomic.NewInt64(0),
+		interRuleStateThreshold: resetInterRuleStateCacheThreshold,
 	}
 	return p
 }
