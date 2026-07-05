@@ -10,19 +10,24 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-// These tests document SSA taint-propagation gaps discovered while triaging
-// irify-benchmark securibench-micro false negatives (Aliasing3 / Aliasing5).
+// These tests document SSA taint-propagation behaviour observed while triaging
+// irify-benchmark securibench-micro XSS false negatives (Aliasing3 / Aliasing5).
 //
 // Context: the XSS rule fires correctly on direct getParameter -> println
 // flows (confirmed via end-to-end `go run common/yak/cmd/yak.go code-scan`).
-// The gaps below are NOT rule problems — both source and sink match — but the
-// taint fails to propagate across certain SSA constructs, so the rule's
-// `include: * & $source` filter never reaches the sink.
+// Each case below isolates one aliasing shape and states what the SSA/SyntaxFlow
+// pipeline *should* do for it.
 //
-// They are t.Skip'd so the suite stays green, but kept as executable evidence
-// for future SSA propagation improvements. To close the corresponding
-// benchmark FNs, unskip after improving taint propagation in
-// common/yak/ssa and confirm each case fires a risk.
+// Classification (verified against Java semantics):
+//   - DirectPropagation        : true vuln, must fire.    (control)
+//   - ParameterValuesIndex     : true vuln, must fire.    (no special handling
+//                                needed; SSA folds names[0] into the array
+//                                value and the rule's include-filter matches)
+//   - ArrayElementSwap         : NOT a real vuln, must NOT fire. (Java value
+//                                semantics: str is bound to the array's value
+//                                at read time, before the tainted write)
+//   - InterproceduralAlias     : true vuln, currently does NOT fire. Real SSA
+//                                gap — interprocedural mutator side-effect.
 
 // servletXSSPropagationRule mirrors the shape of the real java-servlet-xss.sf
 // rule but stripped to the minimum needed to exercise propagation. It binds a
@@ -61,12 +66,31 @@ func runPropagationCase(t *testing.T, src string) {
 	}
 }
 
+// assertNoPropagation is the inverse of runPropagationCase: it asserts that
+// $tainted does NOT fire, i.e. the SSA pipeline correctly concludes there is
+// no taint flow. Used for shapes that look dangerous but are safe by language
+// semantics.
+func assertNoPropagation(t *testing.T, src string) {
+	t.Helper()
+	prog, err := ssaapi.Parse(strings.TrimSpace(src),
+		ssaapi.WithLanguage(ssaconfig.JAVA))
+	require.NoError(t, err)
+	res, err := prog.SyntaxFlowWithError(servletXSSPropagationRule)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	if tainted := res.GetValues("tainted"); len(tainted) != 0 {
+		t.Fatalf("expected NO taint flow but $tainted fired %d time(s) — false positive", len(tainted))
+	}
+}
+
 // skipPropagation marks a test as a known SSA propagation gap.
 func skipPropagation(t *testing.T, reason string) {
 	t.Helper()
 	t.Skipf("SSA taint-propagation gap (benchmark FN evidence): %s\n"+
 		"Unskip after improving taint propagation in common/yak/ssa.", reason)
 }
+
+var _ = skipPropagation // retained for future gap tests; currently unused
 
 // TestServletXSS_DirectPropagation is the control case: getParameter result
 // flows directly to println. Must pass — it proves the rule + source lib are
@@ -88,15 +112,25 @@ class C {
 	runPropagationCase(t, src)
 }
 
-// TestServletXSS_ArrayElementSwapPropagation documents that taint does not
-// survive an array-element write-then-read swap.
+// TestServletXSS_ArrayElementSwapPropagation is the Aliasing3 shape. It is NOT
+// a real XSS vuln under Java value semantics:
 //
-// Reproduces securibench-micro Aliasing3: `a[5] = name; name = str;` where
-// `str` was read from `a[5]` before the assignment. Element-sensitive
-// propagation in SSA does not track that the post-swap value of str carries
-// the original taint of name. Real scan: Risk=0.
+//	String name = req.getParameter("name");   // tainted
+//	String[] a  = new String[10];             // a[*] == null
+//	String str  = a[5];                        // str := null  (value copied NOW)
+//	a[5] = name;                              // mutates a[5] only, not str
+//	name = str;                                // tainted value of name is dropped
+//	writer.println(str);                       // prints null — no taint reaches sink
+//
+// The earlier read of `a[5]` is not affected by the later write: Java arrays
+// hold values, and `str = a[5]` snapshots the element. SSA correctly folds
+// `str` to the array's default value (nil), so no taint flows to println.
+//
+// securibench-micro labels this `vuln_count=1` and marks the println `BAD`,
+// which is a ground-truth annotation error (or a deliberately misleading
+// sample). The SSA/SyntaxFlow pipeline must NOT alert here — alerting would
+// be a false positive. We assert no propagation instead of skipping.
 func TestServletXSS_ArrayElementSwapPropagation(t *testing.T) {
-	skipPropagation(t, "array element write `a[i] = tainted` does not propagate taint to a later read of a[i]")
 	const src = `
 package x;
 import java.io.PrintWriter;
@@ -114,7 +148,7 @@ class C {
     }
 }
 `
-	runPropagationCase(t, src)
+	assertNoPropagation(t, src)
 }
 
 // TestServletXSS_InterproceduralAliasPropagation documents that taint does not
@@ -150,16 +184,23 @@ class C {
 	runPropagationCase(t, src)
 }
 
-// TestServletXSS_ParameterValuesIndexPropagation was meant as the control for
-// the source-lib fix (getParameterValues hook added in the same change-set).
-// It turns out to ALSO be a propagation gap: the source is recognised (the
-// end-to-end code-scan fires a risk on the same shape), but the SyntaxFlow
-// include-filter does not propagate taint through `names[0]` index reads in
-// the unit-test rule shape. The end-to-end rule (java-servlet-xss.sf) has
-// additional sink matching that bridges this; the minimal rule here does not.
-// Kept skipped to document the index-read propagation gap.
+// TestServletXSS_ParameterValuesIndex covers the `getParameterValues()[i]`
+// shape (securibench-micro Aliasing6 family). A true vuln: the array itself
+// is the source, and any index read carries taint.
+//
+// Earlier this was t.Skip'd as a "suspected index-read propagation gap", but
+// the gap did not reproduce once the rule's source is hooked to
+// getParameterValues (the source-lib fix in the same change-set). SSA does
+// not emit a distinct index-read instruction here — it keeps `names` as the
+// tainted value and the rule's include-filter (`* & $source`) matches because
+// the println argument is dominated by the tainted array. So this case now
+// passes unconditionally.
+//
+// Note: the surrounding servletXSSPropagationRule uses `$req.getParameter()`
+// as $source, which does not match this sample (it uses getParameterValues).
+// We run a rule variant below that hooks the correct source so the assertion
+// reflects the real scenario.
 func TestServletXSS_ParameterValuesIndexPropagation(t *testing.T) {
-	skipPropagation(t, "index-read `arr[i]` from a tainted array (getParameterValues()[0]) is not propagated through the minimal include-filter, though the full rule fires end-to-end")
 	const src = `
 package x;
 import java.io.PrintWriter;
@@ -173,5 +214,20 @@ class C {
     }
 }
 `
-	runPropagationCase(t, src)
+	// Variant rule: source = getParameterValues instead of getParameter.
+	rule := strings.NewReplacer("\t", " ").Replace(strings.TrimSpace(`
+*?{opcode:param}?{<typeName>?{have:'HttpServletRequest'}} as $req;
+$req.getParameterValues() as $source;
+*.getWriter()?{<getCallee><typeName>?{have:'HttpServletResponse'}} as $out;
+$out.println(,* as $sink);
+$sink#{include: "* & $source"}-> as $tainted;
+alert $tainted
+`))
+	prog, err := ssaapi.Parse(strings.TrimSpace(src),
+		ssaapi.WithLanguage(ssaconfig.JAVA))
+	require.NoError(t, err)
+	res, err := prog.SyntaxFlowWithError(rule)
+	require.NoError(t, err)
+	require.NotEmpty(t, res.GetValues("tainted"),
+		"getParameterValues()[i] must reach sink: $tainted empty")
 }
