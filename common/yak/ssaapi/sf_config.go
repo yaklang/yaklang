@@ -2,9 +2,11 @@ package ssaapi
 
 import (
 	"strings"
+	"sync/atomic"
 
 	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 type sfCheck struct {
@@ -174,6 +176,17 @@ func (r *sfCheck) check(
 		QueryWithInitVar(r.contextResult.SymbolTable),
 		QueryWithValues(path),
 	}
+	// Snapshot the parent SymbolTable keys BEFORE any child query runs. Child
+	// queries inherit the parent SymbolTable (QueryWithInitVar), so a child
+	// result contains the inherited parent vars ($params/$source/$high/...) in
+	// addition to whatever the sub-rule itself binds. clearup must distinguish
+	// "inherited from parent" (re-merging those is the N×M waste) from "newly
+	// produced by this sub-rule" (the rare `as $vuln` case that must merge).
+	// parentKeySet is the inherited set; a child key in this set is NOT a reason
+	// to merge. Captured once per check() call (per path) under the config lock.
+	r.config.Mutex.Lock()
+	parentKeySet := snapshotSymbolKeys(r.contextResult.SymbolTable)
+	r.config.Mutex.Unlock()
 	for _, it := range items {
 		res, err := it.check(path, opt...)
 		if err != nil {
@@ -182,11 +195,27 @@ func (r *sfCheck) check(
 		}
 
 		match := isMatch(res)
-		r.clearup(res.GetSFResult())
+		r.clearup(res.GetSFResult(), parentKeySet)
 		if !fn(it.Key, match) {
 			return
 		}
 	}
+}
+
+// snapshotSymbolKeys returns the set of non-empty symbol keys currently in the
+// table. Caller MUST hold the config mutex.
+func snapshotSymbolKeys(table *omap.OrderedMap[string, sf.Values]) map[string]struct{} {
+	set := make(map[string]struct{}, 16)
+	if table == nil {
+		return set
+	}
+	table.ForEach(func(key string, _ sf.Values) bool {
+		if key != "" {
+			set[key] = struct{}{}
+		}
+		return true
+	})
+	return set
 }
 
 func (item *checkItem) check(value sf.Values, opt ...QueryOption) (*SyntaxFlowResult, error) {
@@ -204,13 +233,100 @@ func (item *checkItem) check(value sf.Values, opt ...QueryOption) (*SyntaxFlowRe
 	return res, nil
 }
 
-func (r *sfCheck) clearup(sfres *sf.SFFrameResult) {
+func (r *sfCheck) clearup(sfres *sf.SFFrameResult, parentKeySet map[string]struct{}) {
 	if sfres == nil {
 		return
 	}
 	r.sanitizeChildResult(sfres)
 	r.runBeforeMergeHook(sfres)
-	r.mergeChildResult(sfres)
+	// CheckMatch/CheckUntil only consume isMatch(res) (a bool); the merge into
+	// the shared contextResult is a side effect. Child queries inherit the parent
+	// SymbolTable (QueryWithInitVar), so the child result re-contains every
+	// parent var; merging re-runs MergeValues on those inherited keys once per
+	// path × per source — the #1 alloc driver on large projects (MergeValues
+	// ~463GB / 27% of alloc_space).
+	//
+	// Skip the symbol/alert merge when the child produced no NEW named key: i.e.
+	// no key that is (a) non-empty, (b) not `__`-prefixed (magic/internal), and
+	// (c) NOT in the parentKeySet snapshot (inherited). Only genuinely new named
+	// outputs (the rare `as $vuln`/`as $mid`/`as $number` consumed by a later
+	// alert) force a merge. Errors/CheckParams always propagate.
+	r.config.Mutex.Lock()
+	mergeable := sfresHasNewMergeableSymbol(sfres, parentKeySet)
+	if mergeable {
+		clearupMergeSkipCounter.addMerge()
+		r.contextResult.MergeByResultLocked(sfres)
+	} else {
+		clearupMergeSkipCounter.addSkip()
+		r.contextResult.MergeByResultMetaLocked(sfres)
+	}
+	r.config.Mutex.Unlock()
+}
+
+// clearupMergeSkipCounter is a test-only counter for how many clearup calls
+// skipped vs performed the symbol merge. Production code never reads it; the
+// atomic ops are the only cost (one per clearup, negligible vs the merge work).
+// Tests read it to assert Opt A actually skips the useless merges deterministically
+// (alloc-profile-based assertions are too noisy on small synthetic inputs).
+var clearupMergeSkipCounter mergeSkipCounter
+
+type mergeSkipCounter struct {
+	skip  int64
+	merge int64
+}
+
+func (m *mergeSkipCounter) addSkip()  { atomic.AddInt64(&m.skip, 1) }
+func (m *mergeSkipCounter) addMerge() { atomic.AddInt64(&m.merge, 1) }
+
+// ResetClearupMergeCounters zeros the test-only counters. Returns previous values.
+func ResetClearupMergeCounters() (skip, merge int64) {
+	prevSkip := atomic.SwapInt64(&clearupMergeSkipCounter.skip, 0)
+	prevMerge := atomic.SwapInt64(&clearupMergeSkipCounter.merge, 0)
+	return prevSkip, prevMerge
+}
+
+// ClearupMergeCounters returns the current test-only (skip, merge) counts.
+func ClearupMergeCounters() (skip, merge int64) {
+	return atomic.LoadInt64(&clearupMergeSkipCounter.skip), atomic.LoadInt64(&clearupMergeSkipCounter.merge)
+}
+
+// sfresHasNewMergeableSymbol reports whether the child result has at least one
+// named (non-empty, non-`__`-prefixed) symbol/alert key that is NOT in the
+// parentKeySet snapshot (i.e. genuinely produced by this sub-rule, not
+// inherited). Caller MUST hold the config mutex.
+func sfresHasNewMergeableSymbol(sfres *sf.SFFrameResult, parentKeySet map[string]struct{}) bool {
+	if sfres == nil {
+		return false
+	}
+	isNew := func(key string) bool {
+		if key == "" || strings.HasPrefix(key, "__") {
+			return false
+		}
+		if _, inherited := parentKeySet[key]; inherited {
+			return false
+		}
+		return true
+	}
+	mergeable := false
+	if sfres.SymbolTable != nil {
+		sfres.SymbolTable.ForEach(func(key string, _ sf.Values) bool {
+			if isNew(key) {
+				mergeable = true
+				return false // stop
+			}
+			return true
+		})
+	}
+	if !mergeable && sfres.AlertSymbolTable != nil {
+		sfres.AlertSymbolTable.ForEach(func(key string, _ sf.Values) bool {
+			if isNew(key) {
+				mergeable = true
+				return false // stop
+			}
+			return true
+		})
+	}
+	return mergeable
 }
 
 func (r *sfCheck) sanitizeChildResult(sfres *sf.SFFrameResult) {
@@ -232,7 +348,7 @@ func (r *sfCheck) runBeforeMergeHook(sfres *sf.SFFrameResult) {
 
 func (r *sfCheck) mergeChildResult(sfres *sf.SFFrameResult) {
 	r.config.Mutex.Lock()
-	r.contextResult.MergeByResult(sfres)
+	r.contextResult.MergeByResultLocked(sfres)
 	r.config.Mutex.Unlock()
 }
 
