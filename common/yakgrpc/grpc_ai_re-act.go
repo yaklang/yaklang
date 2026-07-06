@@ -43,6 +43,7 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 	if i == nil {
 		return opts
 	}
+	enableMultiAgent, goalModeEnabled, goalMinIterations := resolveAIExecutionStrategy(i)
 	if i.DisallowRequireForUserPrompt {
 		opts = append(opts, aicommon.WithAllowRequireForUserInteract(false))
 	} else {
@@ -58,7 +59,11 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 	}
 
 	if i.ReActMaxIteration > 0 {
-		opts = append(opts, aicommon.WithMaxIterationCount(int64(int(i.ReActMaxIteration))))
+		maxIterations := i.GetReActMaxIteration()
+		if goalModeEnabled {
+			maxIterations = aicommon.EnsureGoalModeMaxIterations(maxIterations, goalMinIterations)
+		}
+		opts = append(opts, aicommon.WithMaxIterationCount(maxIterations))
 	}
 
 	if i.GetTimelineContentSizeLimit() > 0 {
@@ -74,6 +79,9 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 	}
 	if i.GetEnableAISearchTool() {
 		opts = append(opts, aid.WithAiToolsSearchTool())
+	}
+	if enableMultiAgent {
+		opts = append(opts, aicommon.WithEnableMultiAgentMode(true))
 	}
 	if len(i.GetExcludeToolNames()) > 0 {
 		opts = append(opts, aicommon.WithDisableToolsName(i.GetExcludeToolNames()...))
@@ -108,6 +116,12 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 	if i.GetSyncPerceptionTrigger() {
 		opts = append(opts, aicommon.WithSyncPerceptionTrigger(true))
 	}
+	if goalModeEnabled {
+		opts = append(opts,
+			aicommon.WithEnableGoalMode(true),
+			aicommon.WithGoalMinIterations(goalMinIterations),
+		)
+	}
 
 	if i.GetUserPresetPrompt() != "" {
 		opts = append(opts, aicommon.WithUserPresetPrompt(i.GetUserPresetPrompt()))
@@ -130,6 +144,19 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 	}
 
 	return opts
+}
+
+func resolveAIExecutionStrategy(i *ypb.AIStartParams) (enableMultiAgent bool, enableGoalMode bool, goalMinIterations int64) {
+	if i == nil {
+		return false, false, aicommon.DefaultGoalMinIterations
+	}
+	if strategy := i.GetStrategy(); strategy != nil {
+		enableMultiAgent = strategy.GetEnableMultiAgent()
+		enableGoalMode = strategy.GetEnableGoalMode()
+		goalMinIterations = strategy.GetGoalMinIterations()
+	}
+	goalMinIterations = aicommon.NormalizeGoalMinIterations(goalMinIterations)
+	return
 }
 
 func resolveAISessionStartParams(db *gorm.DB, sessionID string, request *ypb.AIStartParams, preferCached bool) (*ypb.AIStartParams, error) {
