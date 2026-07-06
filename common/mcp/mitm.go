@@ -72,10 +72,12 @@ func init() {
 
 		WithTool(mcp.NewTool("set_current_rules",
 			mcp.WithDescription("Set currently active MITM replacer rules"),
-			mcp.WithStruct("rules", []mcp.PropertyOption{
+			mcp.WithStructArray("rules", []mcp.PropertyOption{
 				mcp.Description("MITM content replacers"),
-				mcp.Required(),
-			}),
+			},
+				mcp.WithString("rule", mcp.Description("Match rule")),
+				mcp.WithString("result", mcp.Description("Replacement result")),
+			),
 		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.MITMContentReplacers) (any, error) {
 			_, err := s.grpcClient.SetCurrentRules(ctx, req)
 			if err != nil {
@@ -92,10 +94,8 @@ func init() {
 
 		WithTool(mcp.NewTool("import_mitm_replacer_rules",
 			mcp.WithDescription("Import MITM replacer rules"),
-			mcp.WithStruct("request", []mcp.PropertyOption{
-				mcp.Description("Import payload with rules data"),
-				mcp.Required(),
-			}),
+			mcp.WithString("jsonRaw", mcp.Description("Rules JSON (or base64-encoded JSON)")),
+			mcp.WithBool("replaceAll", mcp.Description("Replace all existing rules")),
 		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.ImportMITMReplacerRulesRequest) (any, error) {
 			_, err := s.grpcClient.ImportMITMReplacerRules(ctx, req)
 			if err != nil {
@@ -131,7 +131,9 @@ func init() {
 
 		WithTool(mcp.NewTool("query_mitm_rule_extracted_data",
 			mcp.WithDescription("Query MITM rule extracted data records"),
-			mcp.WithStruct("request", []mcp.PropertyOption{mcp.Description("Extracted data query parameters")}),
+			mcp.WithPaging("pagination", []string{"id", "created_at", "updated_at"},
+				mcp.Description("Pagination settings")),
+			mcp.WithStruct("filter", []mcp.PropertyOption{mcp.Description("Extracted data filter")}),
 		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.QueryMITMRuleExtractedDataRequest) (any, error) {
 			return s.grpcClient.QueryMITMRuleExtractedData(ctx, req)
 		}, "failed to query mitm rule extracted data")),

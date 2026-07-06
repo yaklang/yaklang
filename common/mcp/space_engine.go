@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -29,10 +30,11 @@ func init() {
 
 		WithTool(mcp.NewTool("fetch_port_asset_from_space_engine",
 			mcp.WithDescription("Fetch port assets from space engine (runs in background)"),
-			mcp.WithStruct("request", []mcp.PropertyOption{
-				mcp.Description("Fetch request with engine type and query"),
-				mcp.Required(),
-			}),
+			mcp.WithString("type", mcp.Description("Engine type: fofa / hunter / quake / zoomeye")),
+			mcp.WithString("filter", mcp.Description("Search query/filter"), mcp.Required()),
+			mcp.WithNumber("maxPage", mcp.Description("Max pages to fetch"), mcp.Default(1)),
+			mcp.WithNumber("maxRecord", mcp.Description("Max records to fetch")),
+			mcp.WithNumber("pageSize", mcp.Description("Page size")),
 		), handleFetchPortAssetFromSpaceEngine),
 	)
 }
@@ -42,6 +44,9 @@ func handleFetchPortAssetFromSpaceEngine(s *MCPServer) server.ToolHandlerFunc {
 		var req ypb.FetchPortAssetFromSpaceEngineRequest
 		if err := decodeYakRequest(request.Params.Arguments, &req); err != nil {
 			return nil, err
+		}
+		if req.GetFilter() == "" {
+			return nil, utils.Errorf("filter is required")
 		}
 		summary := map[string]any{
 			"type": req.GetType(),

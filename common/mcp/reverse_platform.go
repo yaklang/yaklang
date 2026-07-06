@@ -27,25 +27,20 @@ func init() {
 
 		WithTool(mcp.NewTool("get_tunnel_server_external_ip",
 			mcp.WithDescription("Get external IP of the Yak Bridge tunnel server"),
-			mcp.WithString("addr", mcp.Description("Bridge server address"), mcp.Required()),
-			mcp.WithString("secret", mcp.Description("Bridge server secret"), mcp.Required()),
-		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.GetTunnelServerExternalIPParams) (any, error) {
-			return s.grpcClient.GetTunnelServerExternalIP(ctx, req)
-		}, "failed to get tunnel server external ip")),
+			mcp.WithString("addr", mcp.Description("Bridge server address (auto-filled from bridge config if omitted)")),
+			mcp.WithString("secret", mcp.Description("Bridge server secret (auto-filled from bridge config if omitted)")),
+		), handleGetTunnelServerExternalIP),
 
 		WithTool(mcp.NewTool("verify_tunnel_server_domain",
 			mcp.WithDescription("Verify that a domain resolves to the tunnel server external IP"),
 			mcp.WithString("domain", mcp.Description("Domain to verify"), mcp.Required()),
 			mcp.WithStruct("connectParams", []mcp.PropertyOption{
-				mcp.Description("Bridge connection parameters"),
-				mcp.Required(),
+				mcp.Description("Bridge connection parameters (addr auto-filled if omitted)"),
 			},
-				mcp.WithString("addr", mcp.Description("Bridge server address"), mcp.Required()),
-				mcp.WithString("secret", mcp.Description("Bridge server secret"), mcp.Required()),
+				mcp.WithString("addr", mcp.Description("Bridge server address")),
+				mcp.WithString("secret", mcp.Description("Bridge server secret")),
 			),
-		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.VerifyTunnelServerDomainParams) (any, error) {
-			return s.grpcClient.VerifyTunnelServerDomain(ctx, req)
-		}, "failed to verify tunnel server domain")),
+		), handleVerifyTunnelServerDomain),
 
 		WithTool(mcp.NewTool("require_dnslog_domain",
 			mcp.WithDescription("Request a DNSLog subdomain and token for out-of-band detection"),
@@ -54,9 +49,7 @@ func init() {
 			mcp.WithString("dnsLogAddr", mcp.Description("Remote DNSLog bridge address")),
 			mcp.WithString("dnsLogAddrSecret", mcp.Description("Remote DNSLog bridge secret")),
 			mcp.WithString("dnsMode", mcp.Description("DNS mode")),
-		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.YakDNSLogBridgeAddr) (any, error) {
-			return s.grpcClient.RequireDNSLogDomain(ctx, req)
-		}, "failed to require dnslog domain")),
+		), handleRequireDNSLogDomain),
 
 		WithTool(mcp.NewTool("query_dnslog_by_token",
 			mcp.WithDescription("Query DNSLog events by token"),
@@ -65,9 +58,7 @@ func init() {
 			mcp.WithBool("useRemote", mcp.Description("Use remote DNSLog via bridge")),
 			mcp.WithString("dnsLogAddr", mcp.Description("Remote DNSLog bridge address")),
 			mcp.WithString("dnsMode", mcp.Description("DNS mode")),
-		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.QueryDNSLogByTokenRequest) (any, error) {
-			return s.grpcClient.QueryDNSLogByToken(ctx, req)
-		}, "failed to query dnslog by token")),
+		), handleQueryDNSLogByToken),
 
 		WithTool(mcp.NewTool("require_random_port_token",
 			mcp.WithDescription("Request a random port reverse connection token and address"),
@@ -77,10 +68,8 @@ func init() {
 
 		WithTool(mcp.NewTool("query_random_port_trigger",
 			mcp.WithDescription("Query random port reverse connection trigger events by token"),
-			mcp.WithString("token", mcp.Description("Random port token"), mcp.Required()),
-		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.QueryRandomPortTriggerRequest) (any, error) {
-			return s.grpcClient.QueryRandomPortTrigger(ctx, req)
-		}, "failed to query random port trigger")),
+			mcp.WithString("token", mcp.Description("Random port token (auto-requested if omitted)")),
+		), handleQueryRandomPortTrigger),
 
 		WithTool(mcp.NewTool("get_bridge_log_server",
 			mcp.WithDescription("Get current Yak Bridge public reverse server configuration"),
@@ -101,9 +90,7 @@ func init() {
 			mcp.WithNumber("httpFlowId", mcp.Description("HTTP flow ID to serve as response")),
 			mcp.WithString("url", mcp.Description("Target URL path for the facades resource")),
 			mcp.WithString("httpResponse", mcp.Description("Raw HTTP response content")),
-		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.RegisterFacadesHTTPRequest) (any, error) {
-			return s.grpcClient.RegisterFacadesHTTP(ctx, req)
-		}, "failed to register facades http")),
+		), handleRegisterFacadesHTTP),
 
 		WithTool(mcp.NewTool("apply_class_to_facades",
 			mcp.WithDescription("Generate a YSO class and apply it to the facades server"),
@@ -216,24 +203,6 @@ func handleStartFacades(s *MCPServer) server.ToolHandlerFunc {
 		}
 		return startBackgroundExecStream(s, "start_facades", summary, func(bgCtx context.Context) (execResultReceiver, error) {
 			return s.grpcClient.StartFacades(bgCtx, &req)
-		})
-	}
-}
-
-func handleStartFacadesWithYso(s *MCPServer) server.ToolHandlerFunc {
-	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		var req ypb.StartFacadesWithYsoParams
-		if err := decodeYakRequest(request.Params.Arguments, &req); err != nil {
-			return nil, err
-		}
-		summary := map[string]any{
-			"reverseHost": req.GetReverseHost(),
-			"reversePort": req.GetReversePort(),
-			"token":       req.GetToken(),
-			"isRemote":    req.GetIsRemote(),
-		}
-		return startBackgroundExecStream(s, "start_facades_with_yso", summary, func(bgCtx context.Context) (execResultReceiver, error) {
-			return s.grpcClient.StartFacadesWithYsoObject(bgCtx, &req)
 		})
 	}
 }

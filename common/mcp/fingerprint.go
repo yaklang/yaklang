@@ -20,20 +20,28 @@ func init() {
 
 		WithTool(mcp.NewTool("create_fingerprint",
 			mcp.WithDescription("Create a new service fingerprint rule"),
-			mcp.WithStruct("fingerprint", []mcp.PropertyOption{
-				mcp.Description("Fingerprint rule data"),
+			mcp.WithStruct("rule", []mcp.PropertyOption{
+				mcp.Description("Fingerprint rule data (ruleName and matchExpression required)"),
 				mcp.Required(),
-			}),
+			},
+				mcp.WithString("ruleName", mcp.Description("Rule name"), mcp.Required()),
+				mcp.WithString("matchExpression", mcp.Description("Match expression"), mcp.Required()),
+				mcp.WithString("webPath", mcp.Description("Web path")),
+			),
 		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.CreateFingerprintRequest) (any, error) {
 			return s.grpcClient.CreateFingerprint(ctx, req)
 		}, "failed to create fingerprint")),
 
 		WithTool(mcp.NewTool("update_fingerprint",
 			mcp.WithDescription("Update an existing fingerprint rule"),
-			mcp.WithStruct("fingerprint", []mcp.PropertyOption{
+			mcp.WithNumber("id", mcp.Description("Fingerprint rule ID")),
+			mcp.WithString("ruleName", mcp.Description("Rule name")),
+			mcp.WithStruct("rule", []mcp.PropertyOption{
 				mcp.Description("Fingerprint update data"),
-				mcp.Required(),
-			}),
+			},
+				mcp.WithString("ruleName", mcp.Description("Rule name")),
+				mcp.WithString("matchExpression", mcp.Description("Match expression")),
+			),
 		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.UpdateFingerprintRequest) (any, error) {
 			return s.grpcClient.UpdateFingerprint(ctx, req)
 		}, "failed to update fingerprint")),

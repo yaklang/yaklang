@@ -233,7 +233,10 @@ func ClearGeneralRule(db *gorm.DB) {
 func InsertBuiltinGeneralRules(db *gorm.DB) error {
 	builtinRule, err := embed.Asset("data/fp-general-rule.json.gz")
 	if err != nil {
-		return err
+		return utils.Wrapf(err, "load builtin fingerprint rules asset failed")
+	}
+	if len(builtinRule) == 0 {
+		return utils.Error("builtin fingerprint rules asset is empty")
 	}
 	var rules []*schema.GeneralRule
 	err = json.Unmarshal(builtinRule, &rules)

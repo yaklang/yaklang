@@ -419,6 +419,12 @@ func QueryExistedDNSLogEventsByLocalEx(token, mode string, timeout ...float64) (
 	}
 
 	broker, _ := dnslogbrokers.Get(mode)
+	if broker == nil {
+		if mode == "" {
+			mode = "*"
+		}
+		return nil, utils.Errorf("get dnslog broker by local failed: dnsbroker [%s] no existed", mode)
+	}
 
 	count := 0
 	for {
