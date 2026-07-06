@@ -89,7 +89,7 @@ func collectCompileTargets(
 func (c *Config) parseProjectWithFSUnits(
 	filesystem filesys_interface.FileSystem,
 	processCallback func(float64, string, ...any),
-) (*Program, error) {
+) (result *Program, err error) {
 	var calculateTime, preHandlerTime, parseTime, finishTime, saveTime time.Duration
 	overallStart := time.Now()
 	defer func() {
@@ -103,6 +103,7 @@ func (c *Config) parseProjectWithFSUnits(
 	}()
 	defer func() {
 		if r := recover(); r != nil {
+			err = utils.Errorf("parse project panic: %v", r)
 			log.Errorf("parse project error: %s", r)
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
@@ -154,6 +155,9 @@ func (c *Config) parseProjectWithFSUnits(
 	}
 	calculateTime = time.Since(start)
 	c.Config.SetCompileProjectBytes(scanResult.HandlerBytes)
+	if restoreGC := c.applyLargeProjectGCPercent(); restoreGC != nil {
+		defer restoreGC()
+	}
 
 	plan := buildCompileUnitPlan(c.LanguageBuilder, c.GetLanguage(), filesystem, preHandlerFiles)
 	if len(plan.Order) == 0 {
@@ -569,7 +573,7 @@ func (c *Config) parseProjectWithFS(
 func (c *Config) parseProjectWithFSLegacy(
 	filesystem filesys_interface.FileSystem,
 	processCallback func(float64, string, ...any),
-) (*Program, error) {
+) (result *Program, err error) {
 	var calculateTime, preHandlerTime, parseTime, finishTime, saveTime time.Duration
 	overallStart := time.Now()
 	defer func() {
@@ -584,7 +588,7 @@ func (c *Config) parseProjectWithFSLegacy(
 
 	defer func() {
 		if r := recover(); r != nil {
-			//err = utils.Errorf("parse [%s] error %v  ", path, r)
+			err = utils.Errorf("parse project panic: %v", r)
 			log.Errorf("parse project error: %s", r)
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
