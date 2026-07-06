@@ -1,7 +1,6 @@
 package consts
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"path/filepath"
 )
 
@@ -16,5 +15,5 @@ import (
 // println(dir)
 // ```
 func GetNucleiTemplatesDir() string {
-	return filepath.Join(utils.GetHomeDirDefault("."), "nuclei-templates/")
+	return filepath.Join(GetDefaultBaseHomeDir(), "nuclei-templates")
 }

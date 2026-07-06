@@ -10,6 +10,7 @@ on:
         options:
           - windows
           - windows7
+          - windows-arm64
           - darwin-amd64 
           - darwin-arm64
           - linux-amd64
@@ -30,7 +31,7 @@ on:
         required: true
         type: string
       build_type:
-        description: "Build type: full, yakit, or irify"
+        description: "Build type: full, yakit, irify, or yakslim"
         required: false
         type: string
         default: full
@@ -92,6 +93,10 @@ jobs:
               BUILD_TAGS="gzip_embed,irify_exclude"
               OUTPUT_NAME_PREFIX="yaklang_yakit_"
               ;;
+            yakslim)
+              BUILD_TAGS="gzip_embed,irify_exclude"
+              OUTPUT_NAME_PREFIX="yak-slim_"
+              ;;
             irify)
               BUILD_TAGS="gzip_embed,yakit_exclude"
               OUTPUT_NAME_PREFIX="yaklang_irify_"
@@ -137,10 +142,13 @@ jobs:
           OUTPUT_NAME_PREFIX: ${{ env.OUTPUT_NAME_PREFIX }}
         run: |
           $env:GOOS = "windows"
-          $env:GOARCH = "amd64"
-          
-          # 根据构建类型确定输出文件名
-          $baseName = if ("${{ inputs.os }}" -eq "windows7") { "windows_legacy_amd64.exe" } else { "windows_amd64.exe" }
+          if ("${{ inputs.os }}" -eq "windows-arm64") {
+            $env:GOARCH = "arm64"
+            $baseName = "windows_arm64.exe"
+          } else {
+            $env:GOARCH = "amd64"
+            $baseName = if ("${{ inputs.os }}" -eq "windows7") { "windows_legacy_amd64.exe" } else { "windows_amd64.exe" }
+          }
           $outputName = "${{ env.OUTPUT_NAME_PREFIX }}" + $baseName
           
           Write-Host "Building with tags: ${{ env.BUILD_TAGS }}"

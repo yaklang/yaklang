@@ -1,3 +1,5 @@
+//go:build !irify_exclude
+
 package yakgrpc
 
 import (

@@ -69,6 +69,7 @@ jobs:
         os:
           - windows
           - windows7
+          - windows-arm64
           # macos amd64
           - macos-15-intel
           # macos arm64
@@ -82,6 +83,11 @@ jobs:
           - os: windows7
             binary: yak_windows_legacy_amd64.exe
             env: $env:GITHUB_ENV
+          - os: windows-arm64
+            binary: yak_windows_arm64.exe
+            env: $env:GITHUB_ENV
+            GOOS: windows
+            GOARCH: arm64
           - os: macos-15-intel
             binary: yak_darwin_amd64
             env: $GITHUB_ENV
@@ -548,9 +554,81 @@ jobs:
           name: ${{ env.SHA256 }}
           path: ./${{ env.SHA256 }}
 
+  build_slim_binaries:
+    needs: check_commit_msg
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows
+          - windows-arm64
+          - darwin-amd64
+          - darwin-arm64
+          - linux-amd64
+          - linux-arm64
+    uses: ./.github/workflows/reuse-build.yml
+    with:
+      os: ${{ matrix.os }}
+      build_type: yakslim
+      ee: false
+      sign: ${{ matrix.os == 'windows' || matrix.os == 'windows-arm64' }}
+    secrets: inherit
+
+  upload_slim_binaries_to_oss:
+    needs: [check_commit_msg, build_slim_binaries]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Download slim binaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: yak-slim_*
+          merge-multiple: true
+          path: ./slim-binaries
+
+      - name: Download Yak operator binary
+        run: |
+          wget -q -O './yak' https://yaklang.oss-accelerate.aliyuncs.com/yak/ci/yak_linux_amd64
+          chmod +x ./yak
+
+      - name: Get Repo tags
+        shell: bash
+        run: |
+          ./yak repos-tag -o tags.txt
+          echo "YAK_TAG=$(cat tags.txt)" >> $GITHUB_ENV
+
+      - name: Generate checksums and upload to OSS
+        shell: bash
+        run: |
+          cd slim-binaries
+          ls -lh
+          UPLOAD_FILES=""
+          for bin in yak-slim_*; do
+            if [[ ! -f "$bin" ]] || [[ "$bin" == *.sha256.txt ]]; then
+              continue
+            fi
+            ../yak sha256 -f "$bin"
+            sha_file="${bin}.sha256.txt"
+            if [[ -z "$UPLOAD_FILES" ]]; then
+              UPLOAD_FILES="${bin}:/yak/${YAK_TAG}/${bin};${sha_file}:/yak/${YAK_TAG}/${sha_file}"
+            else
+              UPLOAD_FILES="${UPLOAD_FILES};${bin}:/yak/${YAK_TAG}/${bin};${sha_file}:/yak/${YAK_TAG}/${sha_file}"
+            fi
+          done
+          echo "Uploading: $UPLOAD_FILES"
+          ../yak upload-oss --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f "$UPLOAD_FILES"
+
+      - name: Upload slim binary artifacts for release
+        uses: actions/upload-artifact@v4
+        with:
+          name: yak-slim-release-bundle
+          path: ./slim-binaries
+
   check_version_and_github_release:
     runs-on: ubuntu-22.04
-    needs: build_and_upload_to_oss
+    needs: [build_and_upload_to_oss, build_slim_binaries]
     steps:
       - uses: actions/checkout@v2
 
@@ -606,18 +684,38 @@ jobs:
           # Generate file list using heredoc for multiline output
           {
             echo "${PREFIX}windows_amd64.exe"
+            echo "${PREFIX}windows_arm64.exe"
             echo "${PREFIX}windows_legacy_amd64.exe"
             echo "${PREFIX}linux_amd64"
             echo "${PREFIX}linux_arm64"
             echo "${PREFIX}darwin_amd64"
             echo "${PREFIX}darwin_arm64"
             echo "${PREFIX}windows_amd64.exe.sha256.txt"
+            echo "${PREFIX}windows_arm64.exe.sha256.txt"
             echo "${PREFIX}windows_legacy_amd64.exe.sha256.txt"
             echo "${PREFIX}linux_amd64.sha256.txt"
             echo "${PREFIX}linux_arm64.sha256.txt"
             echo "${PREFIX}darwin_amd64.sha256.txt"
             echo "${PREFIX}darwin_arm64.sha256.txt"
           } > file_list.txt
+          
+          # Standard releases also ship yak-slim alongside full binaries
+          if [[ "$PREFIX" == "yak_" ]]; then
+            {
+              echo "yak-slim_windows_amd64.exe"
+              echo "yak-slim_windows_arm64.exe"
+              echo "yak-slim_linux_amd64"
+              echo "yak-slim_linux_arm64"
+              echo "yak-slim_darwin_amd64"
+              echo "yak-slim_darwin_arm64"
+              echo "yak-slim_windows_amd64.exe.sha256.txt"
+              echo "yak-slim_windows_arm64.exe.sha256.txt"
+              echo "yak-slim_linux_amd64.sha256.txt"
+              echo "yak-slim_linux_arm64.sha256.txt"
+              echo "yak-slim_darwin_amd64.sha256.txt"
+              echo "yak-slim_darwin_arm64.sha256.txt"
+            } >> file_list.txt
+          fi
           
           echo "Generated file list:"
           cat file_list.txt

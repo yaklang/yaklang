@@ -15,6 +15,7 @@ jobs:
         os:
           - windows
           - windows7
+          - windows-arm64
           - darwin-amd64
           - darwin-arm64
           - linux-amd64

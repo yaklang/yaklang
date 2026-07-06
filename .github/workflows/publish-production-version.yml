@@ -42,7 +42,14 @@ jobs:
             ["linux_amd64"]="yak_linux_amd64"
             ["linux_arm64"]="yak_linux_arm64"
             ["windows_amd64"]="yak_windows_amd64.exe"
+            ["windows_arm64"]="yak_windows_arm64.exe"
             ["windows_legacy_amd64"]="yak_windows_legacy_amd64.exe"
+            ["slim_windows_amd64"]="yak-slim_windows_amd64.exe"
+            ["slim_windows_arm64"]="yak-slim_windows_arm64.exe"
+            ["slim_darwin_amd64"]="yak-slim_darwin_amd64"
+            ["slim_darwin_arm64"]="yak-slim_darwin_arm64"
+            ["slim_linux_amd64"]="yak-slim_linux_amd64"
+            ["slim_linux_arm64"]="yak-slim_linux_arm64"
           )
           
           # Base URL for downloads
@@ -79,22 +86,50 @@ jobs:
           bucket="yaklang"
           ./yak upload-oss -b $bucket --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f 'version.txt:/yak/latest/version.txt'
           ./yak upload-oss -b $bucket --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f 'previous_version.txt:/yak/previous/previous_version.txt'
+          echo '${{ env.YAK_VERSION }}' > yak-slim-version.txt
+          ./yak upload-oss -b $bucket --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f 'yak-slim-version.txt:/yak/latest/yak-slim-version.txt'
 
       - name: Upload Yak Binary Version
         run: |
           bucket="yaklang"
-          for arch in darwin_amd64 darwin_arm64 linux_amd64 linux_arm64 windows_amd64.exe windows_legacy_amd64.exe; do
+          for arch in darwin_amd64 darwin_arm64 linux_amd64 linux_arm64 windows_amd64.exe windows_arm64.exe windows_legacy_amd64.exe; do
             file_path="yak_${arch}:/yak/latest/yak_${arch}"
             file_hash_path="yak_${arch}.sha256.txt:/yak/latest/yak_${arch}.sha256.txt"
             
             echo "Start to upload $file_path"
-            ./yak upload-oss -b $bucket --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f $file_path
+            if [[ -f "yak_${arch}" ]]; then
+              ./yak upload-oss -b $bucket --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f $file_path
+            else
+              echo "File yak_${arch} not found, skipping upload."
+            fi
           
             # Check if SHA256 file exists before uploading
-            if [[ -f "${file_hash_path%%:*}" ]]; then
+            if [[ -f "yak_${arch}.sha256.txt" ]]; then
               echo "Start to upload $file_hash_path"
               ./yak upload-oss -b $bucket --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f $file_hash_path
             else
-              echo "SHA256 file ${file_hash_path%%:*} not found, skipping upload."
+              echo "SHA256 file yak_${arch}.sha256.txt not found, skipping upload."
+            fi
+          done
+
+      - name: Upload Yak-Slim Binary Version
+        run: |
+          bucket="yaklang"
+          for arch in windows_amd64.exe windows_arm64.exe darwin_amd64 darwin_arm64 linux_amd64 linux_arm64; do
+            file_path="yak-slim_${arch}:/yak/latest/yak-slim_${arch}"
+            file_hash_path="yak-slim_${arch}.sha256.txt:/yak/latest/yak-slim_${arch}.sha256.txt"
+
+            echo "Start to upload $file_path"
+            if [[ -f "yak-slim_${arch}" ]]; then
+              ./yak upload-oss -b $bucket --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f $file_path
+            else
+              echo "File yak-slim_${arch} not found, skipping upload."
+            fi
+
+            if [[ -f "yak-slim_${arch}.sha256.txt" ]]; then
+              echo "Start to upload $file_hash_path"
+              ./yak upload-oss -b $bucket --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f $file_hash_path
+            else
+              echo "SHA256 file yak-slim_${arch}.sha256.txt not found, skipping upload."
             fi
           done

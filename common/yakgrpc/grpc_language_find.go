@@ -1,5 +1,3 @@
-//go:build !irify_exclude
-
 package yakgrpc
 
 import (
@@ -171,16 +169,6 @@ func OnFindDefinition(prog *ssaapi.Program, word string, containPoint bool, ssaR
 
 func OnFindReferences(prog *ssaapi.Program, word string, containPoint bool, ssaRange *memedit.Range, v *ssaapi.Value) []*memedit.Range {
 	return onFind(prog, word, containPoint, ssaRange, v, true)
-}
-
-func RangeIfToGrpcRange(rng *memedit.Range) *ypb.Range {
-	start, end := rng.GetStart(), rng.GetEnd()
-	return &ypb.Range{
-		StartLine:   int64(start.GetLine()),
-		StartColumn: int64(start.GetColumn()),
-		EndLine:     int64(end.GetLine()),
-		EndColumn:   int64(end.GetColumn()),
-	}
 }
 
 func (s *Server) YaklangLanguageFind(ctx context.Context, req *ypb.YaklangLanguageSuggestionRequest) (*ypb.YaklangLanguageFindResponse, error) {
