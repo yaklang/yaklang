@@ -10,7 +10,6 @@ on:
         options:
           - windows
           - windows7
-          - windows-arm64
           - darwin-amd64 
           - darwin-arm64
           - linux-amd64
@@ -158,13 +157,8 @@ jobs:
           OUTPUT_NAME_PREFIX: ${{ env.OUTPUT_NAME_PREFIX }}
         run: |
           $env:GOOS = "windows"
-          if ("${{ inputs.os }}" -eq "windows-arm64") {
-            $env:GOARCH = "arm64"
-            $baseName = "windows_arm64.exe"
-          } else {
-            $env:GOARCH = "amd64"
-            $baseName = if ("${{ inputs.os }}" -eq "windows7") { "windows_legacy_amd64.exe" } else { "windows_amd64.exe" }
-          }
+          $env:GOARCH = "amd64"
+          $baseName = if ("${{ inputs.os }}" -eq "windows7") { "windows_legacy_amd64.exe" } else { "windows_amd64.exe" }
           $outputName = "${{ env.OUTPUT_NAME_PREFIX }}" + $baseName
           
           Write-Host "Building with tags: ${{ env.BUILD_TAGS }}"
