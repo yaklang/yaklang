@@ -6,6 +6,7 @@ import (
 	"net"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/gorm/dialects/postgres"
@@ -28,6 +29,45 @@ type ScannerAgentReporter struct {
 	progressCheckpoint attemptProgressCheckpoint
 	ssaCollector       *SSAArtifactCollector
 	ssaUploadCfg       *SSAArtifactUploadConfig
+
+	// currentPhase is the SSA scan phase surfaced by the yak script via
+	// `yakit.StatusCard("ssa-phase", phase)`. It is forwarded as the stage
+	// on progress events so the server can derive the correct phase label
+	// (e.g. "compile" / "scan") instead of the generic "yak_script".
+	phaseMu      sync.RWMutex
+	currentPhase string
+}
+
+// setSSAScanPhase records the current SSA scan phase reported by the yak
+// script through the `ssa-phase` status card. The phase is forwarded as the
+// stage on subsequent progress events.
+func (r *ScannerAgentReporter) setSSAScanPhase(phase string) {
+	if r == nil {
+		return
+	}
+	trimmed := strings.TrimSpace(phase)
+	if trimmed == "" {
+		return
+	}
+	r.phaseMu.Lock()
+	r.currentPhase = trimmed
+	r.phaseMu.Unlock()
+}
+
+// currentStage returns the stage label to attach to progress events. It
+// prefers the SSA scan phase reported by the yak script, falling back to
+// "yak_script" when no phase has been surfaced yet.
+func (r *ScannerAgentReporter) currentStage() string {
+	if r == nil {
+		return "yak_script"
+	}
+	r.phaseMu.RLock()
+	phase := r.currentPhase
+	r.phaseMu.RUnlock()
+	if phase == "" {
+		return "yak_script"
+	}
+	return phase
 }
 
 // convertRawToString 将原始数据转换为字符串，处理 JSON 反序列化后的各种数据格式
