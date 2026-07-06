@@ -434,6 +434,13 @@ func DataFlowWithSFConfig(
 	}
 
 	options = append(options, WithExclusiveContext(config.GetContext()))
+	// Propagate the per-rule total-work budget into the recursive descent so
+	// AnalyzeContext.check() increments it per node across all sources (the
+	// per-source recursiveCounter cap resets each GetTopDefs call; this shared
+	// budget is what bounds N-sources × depth total work).
+	if budget := config.GetWorkBudget(); budget != nil {
+		options = append(options, WithExclusiveWorkBudget(budget))
+	}
 	var dataflowRecursiveFunc func(options ...OperationOption) Values
 	if analysisType == TopDefAnalysis {
 		dataflowRecursiveFunc = value.GetTopDefs
@@ -678,17 +685,20 @@ func dataFlowFilter(
 
 	var ret []*Value
 	for _, v := range vs {
-		// Honor the rule ctx in the outer per-source loop. On a large project `vs`
-		// can hold tens of thousands of sources (e.g. every servlet/spring param
-		// for an include, or every call site reaching a sink for an exclude-only
-		// dataflow); enumeratePaths is fast per-source but the outer loop itself
-		// never re-checked the per-rule deadline, so a heavy rule kept feeding
-		// sources long after its budget fired. Bailing here returns the partial
-		// matches found so far.
+		// Honor the rule ctx + total-work budget in the outer per-source loop. On
+		// a large project `vs` can hold tens of thousands of sources (e.g. every
+		// servlet/spring param for an include, or every call site reaching a sink
+		// for an exclude-only dataflow); enumeratePaths is fast per-source but the
+		// outer loop itself never re-checked the per-rule deadline, so a heavy
+		// rule kept feeding sources long after its budget fired. Bailing here
+		// returns the partial matches found so far.
 		select {
 		case <-pathCtx.Done():
 			return ret
 		default:
+		}
+		if config.EnterWork() {
+			return ret
 		}
 		flag := false
 		for _, path := range enumeratePaths(v) {

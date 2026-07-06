@@ -1048,12 +1048,16 @@ func init() {
 				// <typeName> on a large project matches a huge value set (e.g. every
 				// call/instruction); addVals -> AppendPredecessor per element is the
 				// dominant CPU/alloc cost (see pprof: AppendPredecessor/ValueCompare).
-				// Re-check the per-rule ctx here so the --rule-timeout budget bails
-				// this loop instead of the rule running for hours inside one opcode.
+				// Re-check the per-rule ctx + total-work budget here so the
+				// --rule-timeout / --rule-work-limit budgets bail this loop instead
+				// of the rule running for hours inside one opcode.
 				select {
 				case <-frame.GetContext().Done():
 					return utils.Errorf("context done")
 				default:
+				}
+				if frame.GetConfig().EnterWork() {
+					return utils.Errorf("work budget exceeded")
 				}
 				switch val := operator.(type) {
 				case *Value:

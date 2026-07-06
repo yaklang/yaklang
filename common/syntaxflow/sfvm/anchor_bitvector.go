@@ -164,7 +164,18 @@ func mergeAnchorBits(dst ValueOperator, sourceBits *utils.BitVector) {
 	}
 	dstBits := dst.GetAnchorBitVector()
 	if dstBits == nil || dstBits.IsEmpty() {
-		dst.SetAnchorBitVector(sourceBits.Clone())
+		// COW: store sourceBits directly without cloning. This was the #1
+		// allocator on large projects (BitVector.Clone ~355GB / 35% of alloc,
+		// 99% from this branch via <typeName>/<getReturns>/... per-element
+		// MergeAnchor into fresh const/derived values). It is safe because the
+		// anchor-bits invariant holds across the codebase: anchor bits are NEVER
+		// mutated in place — every mutation site (the 2nd branch below,
+		// applyScopedAnchorBits, buildSlotAnchorBitVectors, the sf_cfg_native
+		// SetAnchorBitVector call sites) clones before Or/Set. So a later merge
+		// into this dst takes the 2nd branch, clones dstBits (== sourceBits)
+		// before Or'ing, and sourceBits is never corrupted. See the contract on
+		// ssaapi.Value.SetAnchorBitVector.
+		dst.SetAnchorBitVector(sourceBits)
 		return
 	}
 	merged := dstBits.Clone()

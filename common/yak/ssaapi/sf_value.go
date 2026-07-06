@@ -111,12 +111,23 @@ func (v *Value) GetAnchorBitVector() *utils.BitVector {
 }
 
 // SetAnchorBitVector stores the anchor bitvector WITHOUT a defensive clone.
-// Callers must pass an exclusive (freshly created/already-cloned) BitVector;
-// the stored pointer is used directly to avoid the per-call allocation that
-// dominated GC on large projects (BitVector.Clone was ~15% of allocations; the
-// anchor-scope merge/restore paths already Clone before calling, so Set's
-// second clone was pure waste). Callers passing a SHARED bitvector (e.g. another
-// value's GetAnchorBitVector) MUST Clone it themselves before calling.
+// The stored pointer is used directly to avoid the per-call allocation that
+// dominated GC on large projects (BitVector.Clone was ~15% of allocations from
+// Set alone; the anchor-scope merge/restore paths already Clone before calling,
+// so Set's second clone was pure waste).
+//
+// ANCHOR-BITS INVARIANT (load-bearing for COW in sfvm.mergeAnchorBits): anchor
+// bits are NEVER mutated in place. Every mutation site clones before Or/Set:
+//   - sfvm.mergeAnchorBits 2nd branch: merged := dstBits.Clone() before Or.
+//   - sfvm.applyScopedAnchorBits: merged := localBits.Clone() before Or.
+//   - sfvm.buildSlotAnchorBitVectors: bits = existed.Clone() or NewBitVector.
+//   - sf_cfg_native.go SetAnchorBitVector call sites: op.GetAnchorBitVector().Clone().
+//
+// Because of this invariant, a SHARED bitvector (e.g. another value's
+// GetAnchorBitVector, as stored by mergeAnchorBits' COW first branch) is safe
+// to pass here: any future mutation of the recipient's bits goes through a
+// clone-first path, so the shared source is never corrupted. New call sites
+// that need to mutate bits in place MUST Clone first.
 func (v *Value) SetAnchorBitVector(bits *utils.BitVector) {
 	if v == nil {
 		return
