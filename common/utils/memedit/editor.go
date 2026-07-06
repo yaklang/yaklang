@@ -43,6 +43,13 @@ type MemEditor struct {
 	lineStartOffsetMap []int
 	lineMappingsReady  bool
 	cursor             int // 模拟光标位置（指针功能）
+
+	// runeOffsetMap is the memoized rune→byte-offset map for the current
+	// safeSourceCode. FileFilter (sf_prog.go) used to rebuild this per call
+	// (NewRuneOffsetMap over the full source each time = ~71GB/20% of alloc on
+	// javacms-core). Built lazily by GetRuneOffsetMap; nil'd by
+	// invalidateSourceCodeState so a pushed/edited source rebuilds it.
+	runeOffsetMap *RuneOffsetMap
 }
 
 // NewMemEditorByBytes reuses the provided byte slice without copying it.
@@ -106,6 +113,28 @@ func (ve *MemEditor) invalidateSourceCodeState() {
 	}
 	ve.ResetSourceCodeHash()
 	ve.invalidateLineMappings()
+	ve.runeOffsetMap = nil
+}
+
+// GetRuneOffsetMap returns the memoized rune→byte-offset map for the current
+// source, building it lazily on first call. Use this instead of
+// NewRuneOffsetMap(me.GetSourceCode()) in hot paths (e.g. FileFilter) so a
+// file scanned N times pays the O(sourceLen) build once, not N times. The map
+// is invalidated (nil'd) by invalidateSourceCodeState (which fires on actual
+// source edits); PushSourceCodeContext only changes the hash salt, not the
+// source bytes, so rune offsets stay valid across a push.
+func (ve *MemEditor) GetRuneOffsetMap() *RuneOffsetMap {
+	if ve == nil {
+		return nil
+	}
+	if ve.runeOffsetMap != nil {
+		return ve.runeOffsetMap
+	}
+	// GetSourceCodeUnsafe aliases safeSourceCode.bytes (zero-copy); the map
+	// only reads it during build and stores offsets + length, not the string,
+	// so we don't retain the alias beyond this call.
+	ve.runeOffsetMap = NewRuneOffsetMap(ve.GetSourceCodeUnsafe())
+	return ve.runeOffsetMap
 }
 
 func (ve *MemEditor) CodeLength() int {
