@@ -20,7 +20,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 
@@ -437,139 +436,30 @@ func (s *SFFrame) execRule(feedValue Values) error {
 
 		i := s.Codes[s.idx]
 		s.idx++
-		name := "sfvm.op:" + i.OpCode.String()
-		if ruleLabel != "" {
-			name += ":" + ruleLabel
-		}
-
-		type opFlow int
-		const (
-			opContinue opFlow = iota
-			opReturn
-		)
-		flow := opContinue
-
-		execOpcode := func() error {
-			// special handler this exist opcode, because this shuold pop then debugLog it
-			if i.OpCode == OpExitStatement {
-				ctx := s.errorSkipStack.Pop()
-				checkLen := ctx.stackDepth
-				s.debugLog("%s\t|stack %d", i.String(), s.stack.Len())
-				if s.stack.Len() != checkLen {
-					err := utils.Errorf("filter statement stack unbalanced: %v vs want(%v)", s.stack.Len(), checkLen)
-					s.debugSubLog("exit statement error:%v", err)
-					if s.config.debug {
-						return err
-					}
-					s.stack.PopN(s.stack.Len() - checkLen)
-				}
-
-				// Error-skip can jump over scope-end opcodes; unwind scopes created in this statement.
-				//
-				// Each anchor scope start temporarily overwrites anchor bits on the current
-				// source list (see OpAnchorScopeStart). If we skip past OpAnchorScopeEnd
-				// we MUST restore those overwritten bits, otherwise anchor provenance would leak
-				// across statements and break subsequent mask alignment.
-				for s.anchorScope.Len() > ctx.scopeDepth {
-					scope := s.anchorScope.Pop()
-					s.restoreAnchorScope(scope)
-				}
-				for s.conditionStack.Len() > ctx.condDepth {
-					s.conditionStack.Pop()
-				}
-				return nil
+		// Diagnostics (rule-perf profiling) is OFF by default for code-scan
+		// (QueryWithRuleDiagnosticsRecorder only when enableRulePerf). When off,
+		// run the opcode directly — no closure, no "sfvm.op:..." name string
+		// concat, no diagnostics.TrackLow variadic slice. Those used to allocate
+		// per opcode (~117M opcodes on large projects) for zero benefit when
+		// profiling was off — a top churn driver attributed through execRule/
+		// execSyntaxFlowOp in pprof. When on (rare, profiling), build the label
+		// and wrap in recorder.Track so the profile records per-opcode timing.
+		recorder := s.GetDiagnosticsRecorder()
+		var flow opFlow
+		var err error
+		if recorder != nil {
+			name := "sfvm.op:" + i.OpCode.String()
+			if ruleLabel != "" {
+				name += ":" + ruleLabel
 			}
-
-			s.debugLog("%s\t|stack %d", i.String(), s.stack.Len())
-
-			switch i.OpCode {
-			case OpCheckStackTop:
-				if s.stack.Len() == 0 {
-					s.debugSubLog(">> stack top is nil (push input)")
-					s.pushStack(feedValue)
-				}
-			case OpAnchorScopeStart:
-				if s.stack.Len() == 0 {
-					return utils.Wrap(CriticalError, "anchor scope start failed: stack top is empty")
-				}
-				// Anchor scopes always enable anchor bookkeeping so that derived values can map
-				// back to their originating source slots via AnchorBitVector.
-				//
-				// For the current scope source list (stack top) with width = len(source):
-				// - We reserve a disjoint bit-range [anchorBase, anchorBase+anchorWidth) for this scope.
-				// - For each source slot i: localBits(i) = {anchorBase + i}.
-				// - We write: source[i].bits = localBits(i) OR oldBits, and remember oldBits in anchorRestore.
-				//
-				// Nested scopes stack their ranges by shifting anchorBase = parent.base + parent.width
-				// so inner scopes can add local provenance without overwriting outer provenance.
-				sourceValues := s.stack.Peek()
-				s.anchorScope.Push(s.beginAnchorScope(sourceValues))
-			case OpAnchorScopeEnd:
-				if s.anchorScope.Len() == 0 {
-					break
-				}
-				scopeState := s.anchorScope.Pop()
-				// Restore anchor bits overwritten at scope start so they don't leak to outer scopes
-				// and other statements.
-				s.restoreAnchorScope(scopeState)
-				if s.stack.Len() != scopeState.stackDepth {
-					return utils.Wrapf(
-						CriticalError,
-						"anchor scope stack unbalanced: %d vs want(%d)",
-						s.stack.Len(),
-						scopeState.stackDepth,
-					)
-				}
-				scopeLen := scopeState.conditionDepth
-				if s.conditionStack.Len() <= scopeLen {
-					break
-				}
-				beforeLen := s.conditionStack.Len()
-				latest := s.conditionStack.Pop()
-				dropped := 0
-				for s.conditionStack.Len() > scopeLen {
-					s.conditionStack.Pop()
-					dropped++
-				}
-				if dropped > 0 {
-					s.debugSubLog(
-						"anchor scope end: dropped %d extra condition entries (before=%d wantDepth=%d)",
-						dropped,
-						beforeLen,
-						scopeLen,
-					)
-				}
-				s.conditionStack.Push(latest)
-			case OpEnterStatement:
-				s.errorSkipStack.Push(&errorSkipContext{
-					start:      s.idx,
-					end:        i.UnaryInt,
-					stackDepth: s.stack.Len(),
-					condDepth:  s.conditionStack.Len(),
-					scopeDepth: s.anchorScope.Len(),
-				})
-
-			default:
-				if err := s.execStatement(i); err != nil {
-					s.debugSubLog("execStatement error: %v", err)
-					if errors.Is(err, AbortError) {
-						flow = opReturn
-						return nil
-					}
-					if errors.Is(err, CriticalError) {
-						return err
-					}
-					// go to expression end
-					if result := s.errorSkipStack.Peek(); result != nil {
-						s.idx = result.end
-						return nil
-					}
-					return err
-				}
-			}
-			return nil
+			err = recorder.Track(name, func() error {
+				f, e := s.execOneOpcode(i, feedValue)
+				flow = f
+				return e
+			})
+		} else {
+			flow, err = s.execOneOpcode(i, feedValue)
 		}
-		err := diagnostics.TrackLow(name, execOpcode)
 		if err != nil {
 			return err
 		}
@@ -578,6 +468,140 @@ func (s *SFFrame) execRule(feedValue Values) error {
 		}
 	}
 	return nil
+}
+
+// opFlow is the per-opcode control signal returned by execOneOpcode.
+// Declared at package scope (was inside the execRule loop, redeclared each
+// iteration). opContinue = proceed to next opcode; opReturn = stop the rule.
+type opFlow int
+
+const (
+	opContinue opFlow = iota
+	opReturn
+)
+
+// execOneOpcode runs one SFI in the rule-execution loop. Extracted from the
+// in-loop closure so the no-diagnostics path (the default code-scan case) is
+// a plain method call with zero closure/name/TrackLow allocation; only the
+// diagnostics-on path wraps it in recorder.Track (see execRule).
+func (s *SFFrame) execOneOpcode(i *SFI, feedValue Values) (opFlow, error) {
+	// special handler this exist opcode, because this shuold pop then debugLog it
+	if i.OpCode == OpExitStatement {
+		ctx := s.errorSkipStack.Pop()
+		checkLen := ctx.stackDepth
+		s.debugLog("%s\t|stack %d", i.String(), s.stack.Len())
+		if s.stack.Len() != checkLen {
+			err := utils.Errorf("filter statement stack unbalanced: %v vs want(%v)", s.stack.Len(), checkLen)
+			s.debugSubLog("exit statement error:%v", err)
+			if s.config.debug {
+				return opContinue, err
+			}
+			s.stack.PopN(s.stack.Len() - checkLen)
+		}
+
+		// Error-skip can jump over scope-end opcodes; unwind scopes created in this statement.
+		//
+		// Each anchor scope start temporarily overwrites anchor bits on the current
+		// source list (see OpAnchorScopeStart). If we skip past OpAnchorScopeEnd
+		// we MUST restore those overwritten bits, otherwise anchor provenance would leak
+		// across statements and break subsequent mask alignment.
+		for s.anchorScope.Len() > ctx.scopeDepth {
+			scope := s.anchorScope.Pop()
+			s.restoreAnchorScope(scope)
+		}
+		for s.conditionStack.Len() > ctx.condDepth {
+			s.conditionStack.Pop()
+		}
+		return opContinue, nil
+	}
+
+	s.debugLog("%s\t|stack %d", i.String(), s.stack.Len())
+
+	switch i.OpCode {
+	case OpCheckStackTop:
+		if s.stack.Len() == 0 {
+			s.debugSubLog(">> stack top is nil (push input)")
+			s.pushStack(feedValue)
+		}
+	case OpAnchorScopeStart:
+		if s.stack.Len() == 0 {
+			return opContinue, utils.Wrap(CriticalError, "anchor scope start failed: stack top is empty")
+		}
+		// Anchor scopes always enable anchor bookkeeping so that derived values can map
+		// back to their originating source slots via AnchorBitVector.
+		//
+		// For the current scope source list (stack top) with width = len(source):
+		// - We reserve a disjoint bit-range [anchorBase, anchorBase+anchorWidth) for this scope.
+		// - For each source slot i: localBits(i) = {anchorBase + i}.
+		// - We write: source[i].bits = localBits(i) OR oldBits, and remember oldBits in anchorRestore.
+		//
+		// Nested scopes stack their ranges by shifting anchorBase = parent.base + parent.width
+		// so inner scopes can add local provenance without overwriting outer provenance.
+		sourceValues := s.stack.Peek()
+		s.anchorScope.Push(s.beginAnchorScope(sourceValues))
+	case OpAnchorScopeEnd:
+		if s.anchorScope.Len() == 0 {
+			break
+		}
+		scopeState := s.anchorScope.Pop()
+		// Restore anchor bits overwritten at scope start so they don't leak to outer scopes
+		// and other statements.
+		s.restoreAnchorScope(scopeState)
+		if s.stack.Len() != scopeState.stackDepth {
+			return opContinue, utils.Wrapf(
+				CriticalError,
+				"anchor scope stack unbalanced: %d vs want(%d)",
+				s.stack.Len(),
+				scopeState.stackDepth,
+			)
+		}
+		scopeLen := scopeState.conditionDepth
+		if s.conditionStack.Len() <= scopeLen {
+			break
+		}
+		beforeLen := s.conditionStack.Len()
+		latest := s.conditionStack.Pop()
+		dropped := 0
+		for s.conditionStack.Len() > scopeLen {
+			s.conditionStack.Pop()
+			dropped++
+		}
+		if dropped > 0 {
+			s.debugSubLog(
+				"anchor scope end: dropped %d extra condition entries (before=%d wantDepth=%d)",
+				dropped,
+				beforeLen,
+				scopeLen,
+			)
+		}
+		s.conditionStack.Push(latest)
+	case OpEnterStatement:
+		s.errorSkipStack.Push(&errorSkipContext{
+			start:      s.idx,
+			end:        i.UnaryInt,
+			stackDepth: s.stack.Len(),
+			condDepth:  s.conditionStack.Len(),
+			scopeDepth: s.anchorScope.Len(),
+		})
+
+	default:
+		if err := s.execStatement(i); err != nil {
+			s.debugSubLog("execStatement error: %v", err)
+			if errors.Is(err, AbortError) {
+				return opReturn, nil
+			}
+			if errors.Is(err, CriticalError) {
+				return opContinue, err
+			}
+			// go to expression end
+			if result := s.errorSkipStack.Peek(); result != nil {
+				s.idx = result.end
+				return opContinue, nil
+			}
+			return opContinue, err
+		}
+	}
+	return opContinue, nil
 }
 
 var CriticalError = utils.Error("CriticalError(Immediately Abort)")

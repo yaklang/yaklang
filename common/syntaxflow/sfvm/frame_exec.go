@@ -27,7 +27,6 @@ import (
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
@@ -1198,43 +1197,25 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 				ruleLabel = s.rule.RuleName
 			}
 		}
-		name := "sfvm.nativecall:" + i.UnaryStr
-		if ruleLabel != "" {
-			name += ":" + ruleLabel
+		// Diagnostics off (default code-scan): direct call, no name/closure/
+		// TrackLow alloc. On (profiling): build label + wrap in recorder.Track.
+		var ret Values
+		var nerr error
+		if recorder := s.GetDiagnosticsRecorder(); recorder != nil {
+			name := "sfvm.nativecall:" + i.UnaryStr
+			if ruleLabel != "" {
+				name += ":" + ruleLabel
+			}
+			nerr = recorder.Track(name, func() error {
+				r, e := s.execNativeCall(i)
+				ret = r
+				return e
+			})
+		} else {
+			ret, nerr = s.execNativeCall(i)
 		}
-		var (
-			value Values
-			ret   Values
-			ok    bool
-		)
-		if trackErr := diagnostics.TrackLow(name, func() error {
-			s.debugSubLog(">> pop")
-			value = s.stack.Pop()
-			if value == nil {
-				return utils.Wrap(CriticalError, "native call failed: stack top is empty")
-			}
-
-			s.debugSubLog("native call: [%v]", i.UnaryStr)
-			call, err := GetNativeCall(i.UnaryStr)
-			if err != nil {
-				s.debugSubLog("Err: %v", err)
-				log.Errorf("native call failed, not an existed native call[%v]: %v", i.UnaryStr, err)
-				s.pushStack(NewEmptyValues())
-				return utils.Errorf("get native call failed: %v", err)
-			}
-
-			ok, ret, err = call(value, s, NewNativeCallActualParams(i.SyntaxFlowConfig...))
-			if err != nil || !ok {
-				s.debugSubLog("No Result in [%v]", i.UnaryStr)
-				s.pushStack(NewEmptyValues())
-				if errors.Is(err, CriticalError) {
-					return err
-				}
-				return utils.Errorf("get native call failed: %v", err)
-			}
-			return nil
-		}); trackErr != nil {
-			return true, trackErr
+		if nerr != nil {
+			return true, nerr
 		}
 		s.debugSubLog("<< push: %v", ValuesLen(ret))
 		s.pushStack(ret)
@@ -1345,4 +1326,37 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 	default:
 		return false, nil
 	}
+}
+
+// execNativeCall runs the OpNativeCall opcode body. Extracted from the in-case
+// closure so the no-diagnostics path (default code-scan) is a plain method call
+// with zero name/closure/TrackLow allocation; the diagnostics-on path wraps it
+// in recorder.Track (see the OpNativeCall case). On failure it pushes an empty
+// Values (preserving the original closure's behavior) and returns the error.
+func (s *SFFrame) execNativeCall(i *SFI) (Values, error) {
+	s.debugSubLog(">> pop")
+	value := s.stack.Pop()
+	if value == nil {
+		return nil, utils.Wrap(CriticalError, "native call failed: stack top is empty")
+	}
+
+	s.debugSubLog("native call: [%v]", i.UnaryStr)
+	call, err := GetNativeCall(i.UnaryStr)
+	if err != nil {
+		s.debugSubLog("Err: %v", err)
+		log.Errorf("native call failed, not an existed native call[%v]: %v", i.UnaryStr, err)
+		s.pushStack(NewEmptyValues())
+		return nil, utils.Errorf("get native call failed: %v", err)
+	}
+
+	ok, ret, err := call(value, s, NewNativeCallActualParams(i.SyntaxFlowConfig...))
+	if err != nil || !ok {
+		s.debugSubLog("No Result in [%v]", i.UnaryStr)
+		s.pushStack(NewEmptyValues())
+		if errors.Is(err, CriticalError) {
+			return nil, err
+		}
+		return nil, utils.Errorf("get native call failed: %v", err)
+	}
+	return ret, nil
 }
