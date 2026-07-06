@@ -1,6 +1,11 @@
 {{ if .TaskInstruction }}<|PERSISTENT|>
 {{ .TaskInstruction }}
 <|PERSISTENT_END|>{{ end }}
+{{ if .ExecutionPolicy }}
+
+<|EXECUTION_POLICY|>
+{{ .ExecutionPolicy }}
+<|EXECUTION_POLICY_END|>{{ end }}
 {{ if .Schema }}
 
 响应格式输出JSON和<|TAG...|>，请遵守如下Schema ：

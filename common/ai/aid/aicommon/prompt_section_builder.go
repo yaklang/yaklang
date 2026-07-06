@@ -30,7 +30,7 @@ var SharedPlanAndExecHighStaticTemplate string
 var SharedSemiDynamic1Template string
 
 // SharedTaskInstructionSchemaExampleTemplate 复用 aireact 的
-// TaskInstruction -> Schema -> OutputExample 半动态槽位顺序。
+// TaskInstruction -> ExecutionPolicy -> Schema -> OutputExample 半动态槽位顺序。
 //
 //go:embed prompts/prefix/semi_dynamic_2_section.txt
 var SharedTaskInstructionSchemaExampleTemplate string

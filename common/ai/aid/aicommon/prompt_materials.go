@@ -17,6 +17,7 @@ type PromptMaterials struct {
 	HasLoadCapability bool
 
 	TaskInstruction string
+	ExecutionPolicy string
 	Schema          string
 	OutputExample   string
 
@@ -98,13 +99,15 @@ func (m *PromptMaterials) SemiDynamic1Data() map[string]any {
 	return m.SemiDynamicData()
 }
 
-// SemiDynamic2Data 供 TaskInstruction -> Schema -> OutputExample 半动态段消费。
+// SemiDynamic2Data 供 TaskInstruction -> ExecutionPolicy -> Schema ->
+// OutputExample 半动态段消费。
 func (m *PromptMaterials) SemiDynamic2Data() map[string]any {
 	if m == nil {
 		return map[string]any{}
 	}
 	return map[string]any{
 		"TaskInstruction": m.TaskInstruction,
+		"ExecutionPolicy": m.ExecutionPolicy,
 		"Schema":          m.Schema,
 		"OutputExample":   m.OutputExample,
 	}
