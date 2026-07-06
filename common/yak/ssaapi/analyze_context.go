@@ -172,6 +172,18 @@ func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
 		return
 	}
 	a.enterRecursive()
+	// Per-rule total-work budget: bounds cumulative node visits across ALL
+	// sources in one dataflow analysis (shared via OperationConfig.workBudget,
+	// threaded from sfvm.Config by DataFlowWithSFConfig). Unlike
+	// recursiveCounter (per-source, checked next), this is the cross-source
+	// bound that prevents N-sources × 5000 node visits on heavy rules. When
+	// exceeded it also cancels the rule ctx (budget.cancel) so execRule / other
+	// native loops bail via their existing ctx.Done() checks.
+	if a.config.workBudget != nil && a.config.workBudget.EnterWork() {
+		log.Warnf("work budget exceeded, stop dataflow descent")
+		a.reachedDepthLimited = true
+		return
+	}
 	// 1w recursive call check
 	// if !utils.InGithubActions() {
 	if a.IsRecursiveLimit() {

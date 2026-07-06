@@ -71,6 +71,12 @@ type SFFrame struct {
 
 	idx            int     // current opcode index
 	currentProcess float64 // current process
+	// callbackEvery is the per-opcode progress-callback emission period, scaled
+	// to len(Codes) at exec start (exec) so a rule emits ~64 callbacks max. 1 for
+	// short rules (preserve mid-rule cancel-at-threshold callers), total/64 for
+	// long rules (cut SFI.String/Sprintf ~64x). Set in exec(); 0 = no callback
+	// configured.
+	callbackEvery int
 
 	stack          *utils.Stack[Values]           // for filter
 	conditionStack *utils.Stack[ConditionEntry]   // for condition
@@ -341,6 +347,23 @@ func (s *SFFrame) exec(feedValue Values) (ret error) {
 		s.predCounter = 0
 	}()
 
+	// Scale the per-opcode progress-callback emission period to the rule size:
+	// ~64 callbacks max per rule. Short rules (<=64 opcodes) emit every opcode
+	// so a caller cancelling mid-execution from a progress threshold
+	// (Test_Context cancels at >=0.5) sees the mid-rule progress step; long
+	// rules emit every (total/64) opcodes, cutting SFI.String/Sprintf ~64x on
+	// the large-project hot path. 1 (not 0) so the modulo never divides by zero
+	// and the first opcode always emits.
+	const targetCallbacks = 64
+	if total := len(s.Codes); total > targetCallbacks {
+		s.callbackEvery = total / targetCallbacks
+		if s.callbackEvery < 1 {
+			s.callbackEvery = 1
+		}
+	} else {
+		s.callbackEvery = 1
+	}
+
 	// clear
 	s.Flush()
 
@@ -379,14 +402,22 @@ func (s *SFFrame) execRule(feedValue Values) error {
 	for {
 		// Throttle the per-opcode progress callback: s.Codes[s.idx].String()
 		// formats a debug string with fmt.Sprintf on EVERY opcode, and the scan
-		// runner always registers a progress callback, so this fired on every
-		// opcode (~5% of all allocations / ~117M calls on large projects). The
+		// runner always registers a progress callback, so per-opcode emission
+		// fired ~117M times on large projects (~5% of all allocations). The
 		// progress consumer (UpdateRuleStatus) only needs a recent opcode label,
-		// not every one — emit every Nth iteration (and always at the final
-		// "finished" step). N=64 keeps the label fresh while cutting SFI.String +
-		// ProcessCallback Sprintf ~64x.
-		const progressCallbackEvery = 64
-		if s.config.processCallback != nil && (s.idx%progressCallbackEvery == 0 || s.idx >= len(s.Codes)) {
+		// not every one. Scale the emission period to the rule size so we emit a
+		// BOUNDED number of callbacks per rule (~64) regardless of opcode count:
+		//   - short rules (<=64 opcodes): every opcode — preserves callers that
+		//     cancel mid-execution from the callback at a progress threshold
+		//     (e.g. Test_Context cancels at >=0.5; with few opcodes each one is a
+		//     large progress step, so a mid-rule callback must fire to let it).
+		//   - long rules (>64 opcodes): every (total/64) opcodes — cuts
+		//     SFI.String + ProcessCallback Sprintf ~64x on the large-project hot
+		// path. The final "finished" step always emits.
+		//
+		// The ctx.Done() check (below) still runs on EVERY opcode so a cancelled
+		// rule ctx is honored quickly; only the label formatting is throttled.
+		if s.config.processCallback != nil && (s.idx%s.callbackEvery == 0 || s.idx >= len(s.Codes)) {
 			var msg string
 			if s.idx < len(s.Codes) {
 				msg = s.Codes[s.idx].String()
