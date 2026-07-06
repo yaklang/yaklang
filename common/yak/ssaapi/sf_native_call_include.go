@@ -84,8 +84,19 @@ func nativeCallInclude(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCa
 	}
 
 	config := frame.GetConfig()
+	// Run the included sub-rule under the PARENT rule's ctx + total-work budget.
+	// QueryWithSFConfig (WithConfig) already copies ctx + workBudget, but pass
+	// them explicitly too so the sub-rule's dataflow descent (AnalyzeContext.check
+	// -> ctx.Done()/EnterWork) and per-element native loops (<typeName> etc.)
+	// honor the parent's --rule-timeout / --rule-work-limit and BAIL instead of
+	// hanging the whole rule (a heavy <include> lib rule like
+	// java-write-filename-sink runs <typeName> over tens of thousands of calls;
+	// without the parent deadline a single <include> could run 30min+ past the
+	// rule budget and exhaust memory building the edge graph).
 	result, err := QuerySyntaxflow(
 		QueryWithSFConfig(config),
+		QueryWithContext(config.GetContext()),
+		QueryWithWorkBudget(config.GetWorkBudget()),
 		QueryWithProgram(parent),
 		QueryWithInitInputValues(queryValue),
 		QueryWithRule(rule),
