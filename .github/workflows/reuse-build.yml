@@ -118,6 +118,8 @@ jobs:
 
       - name: Slim gate test (irify_exclude)
         if: contains(env.BUILD_TAGS, 'irify_exclude')
+        env:
+          MOCKEY_CHECK_GCFLAGS: "false"
         run: go test -tags irify_exclude -run TestSlimGate_YaklangLanguageSuggestion -timeout 3m ./common/yakgrpc
 
       - name: Go module download (Linux)
