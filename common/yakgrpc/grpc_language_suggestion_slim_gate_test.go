@@ -12,7 +12,7 @@ import (
 // TestSlimGate_YaklangLanguageSuggestion is the CI gate for irify_exclude builds:
 // Yak script completion must return non-empty suggestions (not Unimplemented).
 func TestSlimGate_YaklangLanguageSuggestion(t *testing.T) {
-	local, err := NewLocalClient()
+	local, err := NewLocalClient(true)
 	require.NoError(t, err)
 
 	id := uuid.NewString()

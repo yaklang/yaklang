@@ -242,6 +242,8 @@ jobs:
           cache: false
 
       - name: Slim gate test (irify_exclude)
+        env:
+          MOCKEY_CHECK_GCFLAGS: "false"
         run: go test -tags irify_exclude -run TestSlimGate_YaklangLanguageSuggestion -timeout 3m ./common/yakgrpc
 
   prepare-yakgrpc:
