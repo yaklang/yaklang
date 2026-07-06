@@ -23,6 +23,16 @@ on:
         type: boolean
         description: whether to sign windows executable
         default: false
+      build_type:
+        description: "Build type: full, yakit, irify, or yakslim (workflow_call also supports this)"
+        required: false
+        type: choice
+        options:
+          - full
+          - yakit
+          - irify
+          - yakslim
+        default: full
   
   workflow_call:
     inputs:
@@ -105,6 +115,10 @@ jobs:
           
           echo "BUILD_TAGS=$BUILD_TAGS" >> "$GITHUB_ENV"
           echo "OUTPUT_NAME_PREFIX=$OUTPUT_NAME_PREFIX" >> "$GITHUB_ENV" 
+
+      - name: Slim gate test (irify_exclude)
+        if: contains(env.BUILD_TAGS, 'irify_exclude')
+        run: go test -tags irify_exclude -run TestSlimGate_YaklangLanguageSuggestion -timeout 3m ./common/yakgrpc
 
       - name: Go module download (Linux)
         if: startsWith(inputs.os, 'linux')
