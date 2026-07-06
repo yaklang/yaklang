@@ -171,11 +171,23 @@ func (s *ScanNode) handleStatusCardLog(
 	}
 
 	var card yaklib.YakitStatusCard
-	if err := json.Unmarshal([]byte(info), &card); err == nil && card.Id == "ssa-scan-detail" {
+	if err := json.Unmarshal([]byte(info), &card); err != nil {
+		return
+	}
+	switch card.Id {
+	case "ssa-scan-detail":
 		if reporter != nil {
 			if pubErr := reporter.PublishScanDetail("rule-detail", card.Data); pubErr != nil {
 				log.Warnf("publish scan detail failed: %v", pubErr)
 			}
+		}
+	case "ssa-phase":
+		// Surface the SSA scan phase (e.g. "compile" / "scan") reported by
+		// the yak script so subsequent progress events carry it as their
+		// stage. This lets the server expose the active phase on the scan
+		// record instead of the generic "yak_script" stage.
+		if reporter != nil {
+			reporter.setSSAScanPhase(card.Data)
 		}
 	}
 }
