@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 )
 
 func (m *scanManager) StartQuerySF(startIndex ...int64) error {
@@ -99,10 +100,29 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 	// step (analyze_context.go). 0 means no budget (legacy behavior).
 	ruleTimeout := m.Config.GetScanRuleTimeout()
 	ruleCtx := m.ctx
+	var ruleCancel context.CancelFunc
+	// A per-rule cancelable ctx is ALWAYS created (even when ruleTimeout==0) so
+	// the total-work budget below has a per-rule cancel to trip without
+	// affecting the whole scan ctx. The deadline still propagates via
+	// QueryWithContext -> OperationConfig.ctx -> AnalyzeContext.check ctx.Done().
 	if ruleTimeout > 0 {
-		var ruleCancel context.CancelFunc
 		ruleCtx, ruleCancel = context.WithTimeout(m.ctx, ruleTimeout)
-		defer ruleCancel()
+	} else {
+		ruleCtx, ruleCancel = context.WithCancel(m.ctx)
+	}
+	defer ruleCancel()
+
+	// Per-rule total-work budget: bounds cumulative fanout work (per
+	// <typeName>/<getReturns>/.../dataflow source element) across the rule's
+	// opcodes so a heavy rule bails at N operations instead of doing tens of
+	// millions of per-element MergeAnchor(Clone)+AppendPredecessor ops that hang
+	// for hours even within the wall-clock budget. Exceeding it cancels ruleCtx
+	// (via ruleCancel) so the existing ctx-bail path surfaces partial results.
+	// 0 means no work budget (only the wall-clock RuleTimeout applies).
+	workLimit := m.Config.GetScanRuleWorkLimit()
+	var workBudget *sf.RuleWorkBudget
+	if workLimit > 0 {
+		workBudget = sf.NewRuleWorkBudget(workLimit, ruleCancel)
 	}
 
 	// 将查询逻辑包装到函数中
@@ -118,6 +138,9 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 			ssaapi.QueryWithSave(m.kind),
 			ssaapi.QueryWithProjectId(m.Config.GetProjectID()),
 		)
+		if workBudget != nil {
+			option = append(option, ssaapi.QueryWithWorkBudget(workBudget))
+		}
 		if m.Config.GetSyntaxFlowMemory() {
 			option = append(option, ssaapi.QueryWithMemory())
 		}
@@ -136,30 +159,45 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 		}
 
 		// Detect a per-rule budget bail. ruleCtx.Err() is non-nil once the
-		// deadline fired, regardless of whether the query surfaced the ctx error
-		// or returned partial/empty results with a nil err — so this catches both.
-		bailedByBudget := ruleTimeout > 0 && ruleCtx.Err() != nil
+		// deadline fired OR the total-work budget cancelled ruleCtx, regardless
+		// of whether the query surfaced the ctx error or returned partial/empty
+		// results with a nil err — so this catches both. workBudget.Exceeded()
+		// covers the work-budget case even when ruleTimeout==0 (no wall-clock
+		// deadline, so ruleCtx.Err() alone wouldn't flag it).
+		bailedByBudget := (ruleTimeout > 0 && ruleCtx.Err() != nil) || (workBudget != nil && workBudget.Exceeded())
+		bailReason := ""
+		switch {
+		case workBudget != nil && workBudget.Exceeded():
+			bailReason = fmt.Sprintf("work-limit=%d", workLimit)
+		case ruleTimeout > 0:
+			bailReason = ruleTimeout.String()
+		}
 
-		if err == nil {
+		if bailedByBudget {
+			// A per-rule budget bail (wall-clock RuleTimeout or total-work
+			// RuleWorkLimit) is a CONTROLLED PARTIAL: the rule produced what it
+			// could before the budget fired. Count it as success so heavy rules
+			// don't surface as spurious failures on large projects; the warn +
+			// error callback record the bail reason. The query may surface the
+			// ctx cancellation as err (e.g. "context done") — that's the expected
+			// bail signal, not a real rule failure.
+			if res != nil {
+				m.StatusTask(res)
+			}
+			m.markRuleSuccess()
+			log.Warnf("rule %s on program %s hit per-rule budget (%s), returned partial results",
+				rule.RuleName, prog.GetProgramName(), bailReason)
+			m.errorCallback("program %s exc rule %s hit per-rule budget (%s), bailed",
+				prog.GetProgramName(), rule.RuleName, bailReason)
+		} else if err == nil {
 			m.StatusTask(res)
 			m.markRuleSuccess()
-			if bailedByBudget {
-				log.Warnf("rule %s on program %s hit per-rule budget (%s), returned partial results",
-					rule.RuleName, prog.GetProgramName(), ruleTimeout)
-			}
 		} else {
 			m.processMonitor.UpdateRuleError(prog.GetProgramName(), rule.RuleName, err)
 			m.StatusTask(nil)
 			m.markRuleFailed()
-			if bailedByBudget {
-				log.Warnf("rule %s on program %s hit per-rule budget (%s), bailed: %s",
-					rule.RuleName, prog.GetProgramName(), ruleTimeout, err)
-				m.errorCallback("program %s exc rule %s hit per-rule budget (%s), bailed",
-					prog.GetProgramName(), rule.RuleName, ruleTimeout)
-			} else {
-				m.errorCallback("program %s exc rule %s failed: %s",
-					prog.GetProgramName(), rule.RuleName, err)
-			}
+			m.errorCallback("program %s exc rule %s failed: %s",
+				prog.GetProgramName(), rule.RuleName, err)
 		}
 
 		// 在规则执行完成后输出性能日志

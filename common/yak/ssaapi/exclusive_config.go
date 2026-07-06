@@ -1,6 +1,10 @@
 package ssaapi
 
-import "context"
+import (
+	"context"
+
+	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+)
 
 type OperationConfig struct {
 	// 限制递归深度，每一次递归核心函数，计数器都会加一
@@ -13,6 +17,14 @@ type OperationConfig struct {
 	UntilNode            func(*Value) bool
 	AllowIgnoreCallStack bool
 	ctx                  context.Context
+
+	// workBudget bounds total node visits across ALL sources in one dataflow
+	// analysis (getTopDefs/getBottomUses). Unlike recursiveCounter (per-source,
+	// reset each GetTopDefs call), this is shared across the per-source loop in
+	// Values.GetTopDefs so a heavy rule matching tens of thousands of sources
+	// can't do N×5000 node visits. Set via WithExclusiveWorkBudget from
+	// DataFlowWithSFConfig (which reads it off the sfvm.Config). nil = no budget.
+	workBudget *sf.RuleWorkBudget
 
 	//用来记录上一次的值
 	lastValue *Value
@@ -81,6 +93,16 @@ func WithExclusiveContext(ctx context.Context) OperationOption {
 		if operationConfig.ctx != nil {
 			operationConfig.ctx = ctx
 		}
+	}
+}
+
+// WithExclusiveWorkBudget attaches the per-rule total-work budget to the
+// dataflow OperationConfig so AnalyzeContext.check() can increment it per node
+// visited across all sources (Values.GetTopDefs per-source loop shares one
+// budget). nil budget is a no-op.
+func WithExclusiveWorkBudget(b *sf.RuleWorkBudget) OperationOption {
+	return func(operationConfig *OperationConfig) {
+		operationConfig.workBudget = b
 	}
 }
 
