@@ -277,7 +277,7 @@ func TestSourceStoreCloseDoesNotDuplicateRows(t *testing.T) {
 	require.Equal(t, 0, prog.Cache.sources.EditorCount(), "close should release resident editors even when the row already exists")
 }
 
-func TestFlushCompileUnitReleasesPersistedEditors(t *testing.T) {
+func TestFlushCompileUnitKeepsSourceEditorsResident(t *testing.T) {
 	programName := uuid.NewString()
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 
@@ -288,13 +288,27 @@ func TestFlushCompileUnitReleasesPersistedEditors(t *testing.T) {
 	prog.SaveEditor(editor)
 
 	require.Equal(t, 1, prog.Cache.sources.EditorCount())
+	// FlushCompileUnit flushes instructions only — it intentionally does NOT
+	// flush the source store. Flushing sources mid-project breaks cross-unit
+	// resolution (SyntaxFlow `#->` over-resolves imported symbols; see
+	// TestImportClass). Sources stay resident across batches and are
+	// persisted/released by the final SaveToDatabase / Close flush.
 	prog.Cache.FlushCompileUnit("unit-a")
-	require.Equal(t, 0, prog.Cache.sources.EditorCount(), "compile-unit source flush should release resident source text")
+	require.Equal(t, 1, prog.Cache.sources.EditorCount(), "compile-unit flush must keep resident source editors for cross-unit resolution")
 
+	// The editor is still resolvable from the resident set after the flush.
 	got, ok := prog.GetEditorByHash(hash)
-	require.True(t, ok, "flushed editors should reload from the persisted source row")
+	require.True(t, ok)
 	require.NotNil(t, got)
 	require.Equal(t, editor.GetSourceCode(), got.GetSourceCode())
+
+	// Close is what releases resident source editors (and persists them).
+	prog.Cache.sources.Close()
+	require.Equal(t, 0, prog.Cache.sources.EditorCount(), "close should release resident source text")
+	got2, ok2 := prog.GetEditorByHash(hash)
+	require.True(t, ok2, "flushed editors should reload from the persisted source row after close")
+	require.NotNil(t, got2)
+	require.Equal(t, editor.GetSourceCode(), got2.GetSourceCode())
 }
 
 func TestLazyInstructionSaveAgain(t *testing.T) {
