@@ -321,6 +321,94 @@ func WithDisableGlobalHotPatchToolSet() McpServerOption {
 	return WithDisableToolSet("global_hotpatch")
 }
 
+func WithEnableReversePlatformToolSet() McpServerOption {
+	return WithEnableToolSet("reverse_platform")
+}
+
+func WithDisableReversePlatformToolSet() McpServerOption {
+	return WithDisableToolSet("reverse_platform")
+}
+
+func WithEnableRiskToolSet() McpServerOption {
+	return WithEnableToolSet("risk")
+}
+
+func WithDisableRiskToolSet() McpServerOption {
+	return WithDisableToolSet("risk")
+}
+
+func WithEnableYSOToolSet() McpServerOption {
+	return WithEnableToolSet("yso")
+}
+
+func WithDisableYSOToolSet() McpServerOption {
+	return WithDisableToolSet("yso")
+}
+
+func WithEnableSyntaxFlowToolSet() McpServerOption {
+	return WithEnableToolSet("syntaxflow")
+}
+
+func WithDisableSyntaxFlowToolSet() McpServerOption {
+	return WithDisableToolSet("syntaxflow")
+}
+
+func WithEnableMITMToolSet() McpServerOption {
+	return WithEnableToolSet("mitm")
+}
+
+func WithDisableMITMToolSet() McpServerOption {
+	return WithDisableToolSet("mitm")
+}
+
+func WithEnableFingerprintToolSet() McpServerOption {
+	return WithEnableToolSet("fingerprint")
+}
+
+func WithDisableFingerprintToolSet() McpServerOption {
+	return WithDisableToolSet("fingerprint")
+}
+
+func WithEnableSpaceEngineToolSet() McpServerOption {
+	return WithEnableToolSet("space_engine")
+}
+
+func WithDisableSpaceEngineToolSet() McpServerOption {
+	return WithDisableToolSet("space_engine")
+}
+
+func WithEnableReportToolSet() McpServerOption {
+	return WithEnableToolSet("report")
+}
+
+func WithDisableReportToolSet() McpServerOption {
+	return WithDisableToolSet("report")
+}
+
+func WithEnablePluginEnvToolSet() McpServerOption {
+	return WithEnableToolSet("plugin_env")
+}
+
+func WithDisablePluginEnvToolSet() McpServerOption {
+	return WithDisableToolSet("plugin_env")
+}
+
+func WithEnableHTTPBuilderToolSet() McpServerOption {
+	return WithEnableToolSet("http_builder")
+}
+
+func WithDisableHTTPBuilderToolSet() McpServerOption {
+	return WithDisableToolSet("http_builder")
+}
+
+func WithEnableChaosMakerToolSet() McpServerOption {
+	return WithEnableToolSet("chaos_maker")
+}
+
+func WithDisableChaosMakerToolSet() McpServerOption {
+	return WithDisableToolSet("chaos_maker")
+}
+
 // WithGRPCClient pins the MCP server to a specific gRPC client (integration tests).
 func WithGRPCClient(client YakClientInterface) McpServerOption {
 	return func(cfg *MCPServerConfig) error {

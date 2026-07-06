@@ -28,6 +28,7 @@ import (
 
 func init() {
 	yakit.CallPostInitDatabase()
+	registerExtendedLegacyToolCases()
 }
 
 type legacyToolCase struct {
@@ -967,12 +968,97 @@ afterRequest = func(isHttps, originReq, req, originRsp, rsp) { return rsp }
 	},
 }
 
+func legacyNoPanicEmptyCase() legacyToolCase {
+	return legacyToolCase{
+		name:    "empty_args_should_not_panic",
+		args:    map[string]any{},
+		timeout: 3 * time.Second,
+		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+			require.NotNil(t, result)
+		},
+	}
+}
+
+func registerExtendedLegacyToolCases() {
+	noPanic := legacyNoPanicEmptyCase()
+
+	extendedTools := []string{
+		"get_global_reverse_server", "available_local_addr", "get_bridge_log_server",
+		"get_tunnel_server_external_ip", "verify_tunnel_server_domain",
+		"require_dnslog_domain", "query_dnslog_by_token", "require_random_port_token",
+		"query_random_port_trigger", "set_bridge_log_server", "register_facades_http",
+		"apply_class_to_facades", "config_global_reverse", "start_facades", "start_facades_with_yso",
+		"query_risks", "query_risk", "delete_risk", "query_new_risks", "new_risk_read",
+		"set_tag_for_risk", "query_risk_tags", "risk_field_group",
+		"query_available_risk_type", "query_available_risk_level",
+		"get_all_yso_gadget_options", "get_all_yso_class_options", "get_all_yso_class_generater_options",
+		"generate_yso_code", "generate_yso_bytes", "yso_dump",
+		"query_syntaxflow_rule", "create_syntaxflow_rule", "update_syntaxflow_rule",
+		"delete_syntaxflow_rule", "query_syntaxflow_result", "query_syntaxflow_scan_task",
+		"delete_syntaxflow_scan_task", "syntaxflow_scan",
+		"get_mitm_filter", "set_mitm_filter", "reset_mitm_filter",
+		"get_mitm_hijack_filter", "set_mitm_hijack_filter", "reset_mitm_hijack_filter",
+		"query_mitm_replacer_rules", "get_current_rules", "set_current_rules",
+		"export_mitm_replacer_rules", "import_mitm_replacer_rules",
+		"download_mitm_cert", "download_mitm_gm_cert", "install_mitm_certificate",
+		"query_mitm_extracted_aggregate", "query_mitm_rule_extracted_data",
+		"delete_mitm_rule_extracted_data", "start_mitm_v2",
+		"query_fingerprint", "create_fingerprint", "update_fingerprint", "delete_fingerprint",
+		"get_all_fingerprint_group", "create_fingerprint_group", "rename_fingerprint_group",
+		"delete_fingerprint_group", "batch_update_fingerprint_to_group", "recover_builtin_fingerprint",
+		"get_space_engine_status", "get_space_engine_account_status_v2", "fetch_port_asset_from_space_engine",
+		"query_reports", "query_report", "delete_report", "generate_ssa_report",
+		"get_all_plugin_env", "query_plugin_env", "set_plugin_env", "create_plugin_env", "delete_plugin_env",
+		"http_request_builder", "debug_plugin",
+		"query_chaos_maker_rule", "import_chaos_maker_rules", "delete_chaos_maker_rule_by_id",
+		"execute_chaos_maker_rule",
+	}
+
+	for _, name := range extendedTools {
+		if _, ok := legacyToolIntegrationCases[name]; !ok {
+			c := noPanic
+			c.skipIfErrContains = []string{
+				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
+				"dnslog", "reverse", "panic",
+			}
+			legacyToolIntegrationCases[name] = []legacyToolCase{c}
+		}
+	}
+	legacyToolIntegrationCases["delete_fingerprint"] = []legacyToolCase{{
+		name:    "empty_filter_should_not_panic",
+		args:    map[string]any{"filter": map[string]any{}},
+		timeout: 3 * time.Second,
+		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+			require.NotNil(t, result)
+		},
+	}}
+	pagingArgs := map[string]any{"pagination": map[string]any{"page": 1, "limit": 1, "orderBy": "id", "order": "desc"}}
+	for _, name := range []string{
+		"query_syntaxflow_rule", "query_syntaxflow_result", "query_syntaxflow_scan_task",
+		"query_chaos_maker_rule", "query_fingerprint", "query_mitm_replacer_rules",
+		"query_risks", "query_reports",
+	} {
+		legacyToolIntegrationCases[name] = []legacyToolCase{{
+			name:    "minimal_pagination_should_not_panic",
+			args:    pagingArgs,
+			timeout: 5 * time.Second,
+			skipIfErrContains: []string{
+				"context deadline", "failed", "invalid",
+			},
+			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+				require.NotNil(t, result)
+			},
+		}}
+	}
+}
+
 func TestLegacyBuiltinToolSetsRegistered(t *testing.T) {
 	expectedSets := []string{
 		"codec", "cve", "httpflow", "hybrid_scan", "payload", "port_scan",
-		"yak_document", "yak_script", "reverse_shell", "http_fuzzer", "brute",
-		"subdomain", "crawler", "dynamic", "ssa", "project_database", "global_hotpatch",
-		"system_proxy",
+		"yak_document", "yak_script", "reverse_shell", "reverse_platform", "http_fuzzer", "brute",
+		"subdomain", "crawler", "dynamic", "ssa", "syntaxflow", "risk", "yso", "mitm",
+		"fingerprint", "space_engine", "report", "plugin_env", "http_builder", "chaos_maker",
+		"project_database", "global_hotpatch", "system_proxy",
 	}
 	registered := mcp.GlobalToolSetList()
 	for _, setName := range expectedSets {
