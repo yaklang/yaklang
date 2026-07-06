@@ -43,6 +43,17 @@ type SyntaxFlowScanConfig struct {
 	// 0 means no per-rule budget (legacy behavior). See nativeCallDataFlow and
 	// the scan runner Query in syntaxflow_scan/runtime.go.
 	RuleTimeout time.Duration `json:"rule_timeout"`
+	// RuleWorkLimit is the per-rule total-work budget: the max number of fanout
+	// elements (per <typeName>/<getReturns>/<getCallee>/.../dataflow source
+	// iterations) one rule execution may process across all its opcodes. When > 0,
+	// the scan runner attaches a sfvm.RuleWorkBudget to the rule; once exceeded the
+	// rule ctx is cancelled and the rule bails with partial results (same partial
+	// path as RuleTimeout) instead of doing tens of millions of per-element
+	// MergeAnchor(Clone)+AppendPredecessor ops that hang for hours. This bounds
+	// the within-opcode fanout that RuleTimeout (a wall-clock backstop) only
+	// catches after the fact. 0 means no work budget (legacy: only RuleTimeout).
+	// Default in `yak code-scan` is loose (4M); tune via --rule-work-limit.
+	RuleWorkLimit int64 `json:"rule_work_limit"`
 }
 
 // --- SyntaxFlow 配置 Get/Set 方法 ---
@@ -137,6 +148,15 @@ func (c *Config) GetScanRuleTimeout() time.Duration {
 		return 0
 	}
 	return c.SyntaxFlowScan.RuleTimeout
+}
+
+// GetScanRuleWorkLimit returns the per-rule total-work budget (max fanout
+// elements per rule). 0 means no work budget (only RuleTimeout applies).
+func (c *Config) GetScanRuleWorkLimit() int64 {
+	if c == nil || c.SyntaxFlowScan == nil {
+		return 0
+	}
+	return c.SyntaxFlowScan.RuleWorkLimit
 }
 
 func (c *Config) GetScanIgnoreLanguage() bool {
@@ -235,6 +255,32 @@ func WithScanRuleTimeout(timeout time.Duration) Option {
 			return err
 		}
 		c.SyntaxFlowScan.RuleTimeout = timeout
+		return nil
+	}
+}
+
+// WithScanRuleWorkLimit sets the per-rule total-work budget: the max number of
+// fanout elements one rule execution may process across all its opcodes
+// (导出名为 syntaxflow.withScanRuleWorkLimit). When > 0, the scan runner
+// attaches a sfvm.RuleWorkBudget to the rule; exceeding it cancels the rule ctx
+// and the rule bails with partial results (same path as WithScanRuleTimeout)
+// instead of hanging for hours on huge value-set fanout. 0 disables (only the
+// wall-clock RuleTimeout applies).
+//
+// 参数:
+//   - limit: 单规则单程序执行的最大 fanout 元素数；<=0 表示不限制
+//
+// Example:
+// ```
+// opt = syntaxflow.withScanRuleWorkLimit(4_000_000)
+// println(opt)
+// ```
+func WithScanRuleWorkLimit(limit int64) Option {
+	return func(c *Config) error {
+		if err := c.ensureSyntaxFlowScan("Scan Rule Work Limit"); err != nil {
+			return err
+		}
+		c.SyntaxFlowScan.RuleWorkLimit = limit
 		return nil
 	}
 }

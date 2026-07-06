@@ -6,7 +6,6 @@ import (
 
 	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 type sfCheck struct {
@@ -28,6 +27,15 @@ type sfCheck struct {
 	// only_reachable post-mode pruning include-rule captures). parent is the accumulated
 	// context result before this child merge.
 	beforeMergeHook func(parent *sf.SFFrameResult, child *sf.SFFrameResult)
+
+	// originalSnapshot captures the contextResult's named-symbol state at
+	// CreateCheck time (before any path/query runs). clearup uses it to decide
+	// whether a child result produced NEW named output (merge) or only re-
+	// contains inherited parent vars + magic vars (skip — the Opt A 463GB
+	// saving). Snapshotting once (not per-path) is what makes the across-path
+	// case correct: a key merged by path 1 is NOT in this snapshot, so path 2's
+	// re-bind is correctly seen as new and merged. See sfvm.SymbolSnapshot.
+	originalSnapshot *sf.SymbolSnapshot
 }
 
 type checkItem struct {
@@ -71,6 +79,13 @@ func CreateCheck(
 	}
 	contextResult.AlertSymbolTable.Delete(sf.RecursiveMagicVariable)
 	contextResult.SymbolTable.Delete(sf.RecursiveMagicVariable)
+	// Snapshot the parent's named-symbol state ONCE here (before any path/query
+	// runs) so clearup can detect child NEW named output without re-merging
+	// inherited parent vars. Taken under the config mutex (contextResult is
+	// mutated under it during merges).
+	config.Mutex.Lock()
+	res.originalSnapshot = sf.TakeSymbolSnapshot(contextResult.SymbolTable)
+	config.Mutex.Unlock()
 	res.vm.SetConfig(config)
 	res.AppendItems(configItems...)
 	return res
@@ -209,17 +224,19 @@ func (r *sfCheck) check(
 		QueryWithInitVar(r.contextResult.SymbolTable),
 		QueryWithValues(path),
 	}
-	// Snapshot the parent SymbolTable keys BEFORE any child query runs. Child
-	// queries inherit the parent SymbolTable (QueryWithInitVar), so a child
-	// result contains the inherited parent vars ($params/$source/$high/...) in
-	// addition to whatever the sub-rule itself binds. clearup must distinguish
-	// "inherited from parent" (re-merging those is the N×M waste) from "newly
-	// produced by this sub-rule" (the rare `as $vuln` case that must merge).
-	// parentKeySet is the inherited set; a child key in this set is NOT a reason
-	// to merge. Captured once per check() call (per path) under the config lock.
-	r.config.Mutex.Lock()
-	parentKeySet := snapshotSymbolKeys(r.contextResult.SymbolTable)
-	r.config.Mutex.Unlock()
+	// Propagate the per-rule total-work budget into the sub-query so dataflow
+	// include/exclude/hook/until sub-rules share the parent's fanout budget
+	// (cumulative across the whole rule, not just the top-level opcodes). The
+	// budget is on r.config (the frame's sfvm.Config); nil when no budget is
+	// set (QueryWithWorkBudget is a no-op then).
+	if budget := r.config.GetWorkBudget(); budget != nil {
+		opt = append(opt, QueryWithWorkBudget(budget))
+	}
+	// The parent named-symbol state was snapshotted once at CreateCheck
+	// (r.originalSnapshot); clearup uses it to detect the child's NEW named
+	// output. No per-path re-snapshot — re-snapshotting per path is what made
+	// Opt A over-skip (a key merged by an earlier path looked "inherited" to a
+	// later path, so the later path's re-bind of it was skipped).
 	for _, it := range items {
 		res, err := it.check(path, opt...)
 		if err != nil {
@@ -228,27 +245,11 @@ func (r *sfCheck) check(
 		}
 
 		match := isMatch(res)
-		r.clearup(res.GetSFResult(), parentKeySet)
+		r.clearup(res.GetSFResult())
 		if !fn(it.Key, match) {
 			return
 		}
 	}
-}
-
-// snapshotSymbolKeys returns the set of non-empty symbol keys currently in the
-// table. Caller MUST hold the config mutex.
-func snapshotSymbolKeys(table *omap.OrderedMap[string, sf.Values]) map[string]struct{} {
-	set := make(map[string]struct{}, 16)
-	if table == nil {
-		return set
-	}
-	table.ForEach(func(key string, _ sf.Values) bool {
-		if key != "" {
-			set[key] = struct{}{}
-		}
-		return true
-	})
-	return set
 }
 
 func (item *checkItem) check(value sf.Values, opt ...QueryOption) (*SyntaxFlowResult, error) {
@@ -266,7 +267,7 @@ func (item *checkItem) check(value sf.Values, opt ...QueryOption) (*SyntaxFlowRe
 	return res, nil
 }
 
-func (r *sfCheck) clearup(sfres *sf.SFFrameResult, parentKeySet map[string]struct{}) {
+func (r *sfCheck) clearup(sfres *sf.SFFrameResult) {
 	if sfres == nil {
 		return
 	}
@@ -279,13 +280,18 @@ func (r *sfCheck) clearup(sfres *sf.SFFrameResult, parentKeySet map[string]struc
 	// path × per source — the #1 alloc driver on large projects (MergeValues
 	// ~463GB / 27% of alloc_space).
 	//
-	// Skip the symbol/alert merge when the child produced no NEW named key: i.e.
-	// no key that is (a) non-empty, (b) not `__`-prefixed (magic/internal), and
-	// (c) NOT in the parentKeySet snapshot (inherited). Only genuinely new named
-	// outputs (the rare `as $vuln`/`as $mid`/`as $number` consumed by a later
-	// alert) force a merge. Errors/CheckParams always propagate.
+	// Skip the symbol/alert merge when the child produced no NEW named output:
+	// no new named key, AND no new value (by dedupKey) for an existing key.
+	// r.originalSnapshot was taken ONCE at CreateCheck (before any path), so a
+	// key/value merged by an earlier path is NOT in the snapshot — a later path's
+	// re-bind of it is correctly seen as NEW and merged (this is the Opt A
+	// over-skip fix; the per-path re-snapshot treated earlier paths' merges as
+	// "inherited" and skipped later paths' re-binds, losing them). A child that
+	// only re-contains inherited parent vars (unchanged) + magic ($__) vars has
+	// no new named output → skip (the 463GB saving). Errors/CheckParams always
+	// propagate.
 	r.config.Mutex.Lock()
-	mergeable := sfresHasNewMergeableSymbol(sfres, parentKeySet)
+	mergeable := r.originalSnapshot.HasNewNamedValue(sfres)
 	if mergeable {
 		clearupMergeSkipCounter.addMerge()
 		r.contextResult.MergeByResultLocked(sfres)
@@ -321,45 +327,6 @@ func ResetClearupMergeCounters() (skip, merge int64) {
 // ClearupMergeCounters returns the current test-only (skip, merge) counts.
 func ClearupMergeCounters() (skip, merge int64) {
 	return atomic.LoadInt64(&clearupMergeSkipCounter.skip), atomic.LoadInt64(&clearupMergeSkipCounter.merge)
-}
-
-// sfresHasNewMergeableSymbol reports whether the child result has at least one
-// named (non-empty, non-`__`-prefixed) symbol/alert key that is NOT in the
-// parentKeySet snapshot (i.e. genuinely produced by this sub-rule, not
-// inherited). Caller MUST hold the config mutex.
-func sfresHasNewMergeableSymbol(sfres *sf.SFFrameResult, parentKeySet map[string]struct{}) bool {
-	if sfres == nil {
-		return false
-	}
-	isNew := func(key string) bool {
-		if key == "" || strings.HasPrefix(key, "__") {
-			return false
-		}
-		if _, inherited := parentKeySet[key]; inherited {
-			return false
-		}
-		return true
-	}
-	mergeable := false
-	if sfres.SymbolTable != nil {
-		sfres.SymbolTable.ForEach(func(key string, _ sf.Values) bool {
-			if isNew(key) {
-				mergeable = true
-				return false // stop
-			}
-			return true
-		})
-	}
-	if !mergeable && sfres.AlertSymbolTable != nil {
-		sfres.AlertSymbolTable.ForEach(func(key string, _ sf.Values) bool {
-			if isNew(key) {
-				mergeable = true
-				return false // stop
-			}
-			return true
-		})
-	}
-	return mergeable
 }
 
 func (r *sfCheck) sanitizeChildResult(sfres *sf.SFFrameResult) {

@@ -372,6 +372,22 @@ func QueryWithContext(ctx context.Context) QueryOption {
 	}
 }
 
+// QueryWithWorkBudget attaches a per-rule total-work budget to the SyntaxFlow
+// query's sfvm.Config. The budget bounds cumulative fanout work (per
+// <typeName>/<getReturns>/.../dataflow source element) across the rule's
+// opcodes; exceeding it cancels the rule ctx (budget.cancel) so the rule bails
+// with partial results instead of hanging for hours on huge value-set fanout.
+// The scan runner creates the budget alongside the rule ctx and passes it here;
+// cancel should be the rule ctx's CancelFunc. nil budget = no limit.
+func QueryWithWorkBudget(b *sfvm.RuleWorkBudget) QueryOption {
+	return func(c *queryConfig) {
+		if b == nil {
+			return
+		}
+		c.opts = append(c.opts, sfvm.WithWorkBudget(b))
+	}
+}
+
 // QueryWithProcessCallback 为 SyntaxFlow 查询设置进度回调（导出名为 syntaxflow.withProcess）
 // 参数:
 //   - cb: 进度回调函数，参数为 (progress 浮点进度, message 进度消息)

@@ -1410,6 +1410,12 @@ and exports structured report (sarif/irify).`,
 			Value: 4 * time.Hour,
 		},
 
+		cli.Int64Flag{
+			Name:  "rule-work-limit",
+			Usage: "per-rule total-work budget: max fanout elements (per <typeName>/<getReturns>/.../dataflow source/descent node) one rule may process across all opcodes; a heavy rule is bailed at the budget (partial results) instead of hanging for hours. default 4000000 (loose); 0 disables (only --rule-timeout applies)",
+			Value: 4_000_000,
+		},
+
 		cli.StringFlag{
 			Name:  "exclude-file",
 			Usage: `exclude files by glob, e.g. targets/*, vendor/*`,
@@ -1577,11 +1583,21 @@ and exports structured report (sarif/irify).`,
 			scanOpt = append(scanOpt, syntaxflow_scan.WithRulePerformanceLog(true))
 		}
 
-		// Per-rule wall-clock budget (default 5m via the flag Value). Bounds
+		// Per-rule wall-clock budget (default 4h via the flag Value). Bounds
 		// pathological heavy rules — e.g. dataflow(include=...) matching tens of
 		// thousands of sources on a large project — so they are bailed at the
 		// budget instead of hanging the scan. --rule-timeout 0 disables.
 		scanOpt = append(scanOpt, ssaconfig.WithScanRuleTimeout(c.Duration("rule-timeout")))
+
+		// Per-rule total-work budget: max fanout elements (per
+		// <typeName>/<getReturns>/.../dataflow source/dataflow descent node)
+		// processed in one rule, across all opcodes. Bounds the within-opcode
+		// fanout that the wall-clock budget only catches after the fact, so heavy
+		// rules bail at N operations (partial results) instead of doing tens of
+		// millions of per-element MergeAnchor(Clone)+AppendPredecessor ops that
+		// hang for hours. Default 4M (loose; tune via --rule-work-limit); 0
+		// disables (only --rule-timeout applies).
+		scanOpt = append(scanOpt, ssaconfig.WithScanRuleWorkLimit(c.Int64("rule-work-limit")))
 
 		scanOpt = append(scanOpt,
 			syntaxflow_scan.WithProcessCallback(func(taskID, status string, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
