@@ -5,8 +5,6 @@ import (
 	"strings"
 
 	stdlog "github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/memedit"
-	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 // BeginCompileUnit marks the start of a compile unit: subsequent lazy/deferred
@@ -126,63 +124,12 @@ func (prog *Program) ReleaseCompletedUnitMemory(unitKeys []string) int {
 		return true
 	})
 
-	// Drop program-level caches accumulated during this unit's build that the
-	// flush path has already persisted or that subsequent units rebuild.
-	prog.clearCompletedUnitProgramState()
-
 	if compileUnitMemoryDebugEnabled() {
 		log.Debugf("[split-compile] release summary checked=%d released=%d skipped_public=%d skipped_nomatch=%d blocks=%d",
 			checkedFuncs, releasedFuncs, skippedPublic, skippedNoMatch, releasedBlocks)
 	}
 
 	return releasedFuncs
-}
-
-// clearCompletedUnitProgramState drops program-level caches accumulated during
-// a unit's build that the per-unit flush no longer needs. It does not touch
-// Funcs (lazy cross-unit builders need earlier units' functions) nor
-// CurrentIncludingStack (needed by lazy builders that may run after cleanup).
-func (prog *Program) clearCompletedUnitProgramState() {
-	if prog == nil {
-		return
-	}
-
-	prog.cacheExternInstance = make(map[string]Value)
-	prog.externType = make(map[string]Type)
-	prog.ExternInstance = make(map[string]any)
-	prog.ExternLib = make(map[string]map[string]any)
-
-	// Clear offset map (can be rebuilt if needed)
-	prog.OffsetMap = make(map[int]*OffsetItem)
-	prog.OffsetSortedSlice = make([]int, 0)
-
-	// Keep only GlobalVariables blueprint; drop the rest.
-	globalVars, _ := prog.Blueprint.Get("__GlobalVariables__")
-	prog.Blueprint = omap.NewEmptyOrderedMap[string, *Blueprint]()
-	if globalVars != nil {
-		prog.Blueprint.Set("__GlobalVariables__", globalVars)
-	}
-
-	// Clear UpStream dependencies
-	prog.UpStream = omap.NewEmptyOrderedMap[string, *Program]()
-	prog.DownStream = make(map[string]*Program)
-
-	// Constants and exports accumulate heavily across units.
-	prog.Consts = make(map[string]Value)
-	prog.ExportValue = make(map[string]Value)
-	prog.ExportType = make(map[string]Type)
-
-	prog.deferredBuilds = omap.NewEmptyOrderedMap[string, *deferredBuildTask]()
-
-	// Clear editor stack - holds file content
-	prog.editorStack = omap.NewEmptyOrderedMap[string, *memedit.MemEditor]()
-
-	// Diagnostics recorder accumulates trace steps heavily; drop it.
-	prog.diagnosticsRecorder = nil
-
-	// File hash mappings
-	prog.FileList = make(map[string]string)
-	prog.LibraryFile = make(map[string][]string)
 }
 
 func compileUnitMemoryDebugEnabled() bool {
