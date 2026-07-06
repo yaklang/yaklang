@@ -248,15 +248,7 @@ func saveIrType(prog *Program, db *gorm.DB) func([]*ssadb.IrType) error {
 		var saveErr error
 		saveStep := func() error {
 			saveErr = utils.GormTransaction(db, func(tx *gorm.DB) error {
-				for _, irType := range types {
-					if irType == nil {
-						continue
-					}
-					if err := ssadb.UpsertIrType(tx, irType); err != nil {
-						return err
-					}
-				}
-				return nil
+				return ssadb.SaveIrTypeBatch(tx, types)
 			})
 			return saveErr
 		}

@@ -154,6 +154,62 @@ the path-traversal rule's `<include('java-write-filename-sink')>` (which runs
 `<typeName>` over tens of thousands of File calls) previously ran 30min+
 past the rule budget; it now bails at the work-limit like any other opcode.
 
+## dbcache final-flush stall (recompile `-t` path) — fixed 2026-07-07
+
+The scan-stage fixes above (Fix 1–8) landed on the **solidified-DB** scan path
+(`-p <program>`, no `-t`), which is what produced the 15m22s / 8711-risk
+completion. The **recompile-from-target** path (`-l java -t <target> -p <name>`)
+additionally runs the full SSA compile + a final `SaveToDatabase` flush; on
+javacms-core that final flush **stalled**: all IrIndex/IrOffset/IrType rows
+piled into async dbcache savers and were drained only at the end via per-row
+`db.Create` / `db.Save` / `FirstOrCreate`, so the savers' `FeedBlock` blocked
+5–7 s/item and the scan stage never started (1 h+, then killed; 0 risks).
+Root cause was `338cf67c0`, which disabled per-batch `FlushCompileUnit` to pass
+two suites (it spilled BasicBlocks → nil-Variable on lazy reload; and
+`flushAuxStores` cleared resident maps → TestImportClass over-resolved).
+
+Fix (this commit):
+- **`ProgramCache.FlushAuxSavers()`** (`common/yak/ssa/database_cache.go`) —
+  per-batch drain of index/offset/type async savers ONLY. It spills no
+  instructions and clears no resident maps, so the two suites above stay green;
+  cross-unit resolution keeps using the resident maps and BasicBlocks stay
+  resident. Called once per batch in `parseProjectWithFSUnits`
+  (`common/yak/ssaapi/ssa_compile_fs.go`).
+- **`SaveIrIndexBatch` / new `SaveIrOffsetBatch` / new `SaveIrTypeBatch`** →
+  chunked multi-row INSERT (chunk = `floor(900/cols)`: IrIndex 100, IrOffset
+  150, IrType 150). IrType is a delete-then-insert upsert (delete
+  `(program_name, type_id)` chunked at 999, then bulk INSERT) to preserve the
+  idempotent-update semantics of `TestTypeFlushUpsertsExistingTypeRows` (a
+  later flush of the same type_id overwrites the row with the merged value,
+  not a duplicate). ir_types/ir_indices/ir_offsets have no UNIQUE constraint
+  and recompile deletes the program's rows first (`DeleteProgramIrCode`), so
+  pure INSERT is correct.
+- **`WithName("IrIndex")` / `WithName("IrOffset")`** on the two savers —
+  previously the `dbcache save blocked` log had an empty name and could not
+  identify which saver stalled.
+
+Result (javacms-core recompile-scan, `yak code-scan -l java -t
+/home/wlz/Target/javacms/core -p javacms-core --rule-timeout 10m
+--rule-work-limit 200000`, worktree-local YAKIT_HOME, 24 GB RAM):
+
+| stage | before (stuck) | after (fix) |
+|---|---|---|
+| compile (102/102 batch) | ~4 min | ~9.5 min (incl. per-batch aux flush) |
+| final flush | **stall ~1 h, killed** | **~16 min** (type 4.3 + instruction 12) |
+| scan (269 rules) | **never started** | 269/269 done |
+| **risk** | **0** (killed) | **9149** |
+| `dbcache save blocked` | 5 (5–7 s each) | **0** |
+| peak RSS / swap | 21 GB RSS + swap 32 GB (thrash) | 21.5 GB RSS, swap < 900 MB (no thrash) |
+| total wall | >1 h (killed) | 54 min |
+
+pprof + the next optimization targets are in
+`build/pprof/javacms-auxflush2/summary.md` (instruction-store final flush is
+the new bottleneck: ~60–70 % CPU in GC scanning a 21 GB resident heap;
+`saveInstructionPersistRecords` is still per-row `tx.Save`/`UpsertIrCode`;
+`fullTypeNameAdd` 2.1 GB + `ssadb.EmptyIrCode` 1.75 GB stay resident during
+flush). Those are follow-ups — the recompile path now completes instead of
+hanging/OOM-killing.
+
 ## Note on the isolated commit
 
 `e670828b4` is intentionally on this branch, not on
