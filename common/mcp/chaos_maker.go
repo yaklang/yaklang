@@ -19,10 +19,8 @@ func init() {
 
 		WithTool(mcp.NewTool("import_chaos_maker_rules",
 			mcp.WithDescription("Import ChaosMaker rules"),
-			mcp.WithStruct("request", []mcp.PropertyOption{
-				mcp.Description("Import request with rules content"),
-				mcp.Required(),
-			}),
+			mcp.WithString("content", mcp.Description("Rule content (YAML/JSON)"), mcp.Required()),
+			mcp.WithString("ruleType", mcp.Description("Rule type: suricata / http-request / icmp")),
 		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.ImportChaosMakerRulesRequest) (any, error) {
 			_, err := s.grpcClient.ImportChaosMakerRules(ctx, req)
 			if err != nil {

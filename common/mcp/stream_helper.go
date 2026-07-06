@@ -20,6 +20,7 @@ import (
 )
 
 func decodeYakRequest(arguments map[string]any, req any) error {
+	arguments = normalizeMCPArguments(arguments)
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		DecodeHook: decodeHook,
 		Result:     req,

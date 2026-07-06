@@ -22,20 +22,30 @@ func init() {
 
 		WithTool(mcp.NewTool("create_syntaxflow_rule",
 			mcp.WithDescription("Create a new SyntaxFlow rule"),
-			mcp.WithStruct("rule", []mcp.PropertyOption{
-				mcp.Description("SyntaxFlow rule content"),
+			mcp.WithStruct("syntaxFlowInput", []mcp.PropertyOption{
+				mcp.Description("SyntaxFlow rule content (ruleName, language, content required)"),
 				mcp.Required(),
-			}),
+			},
+				mcp.WithString("ruleName", mcp.Description("Rule name"), mcp.Required()),
+				mcp.WithString("language", mcp.Description("Target language"), mcp.Required()),
+				mcp.WithString("content", mcp.Description("SyntaxFlow rule body")),
+				mcp.WithString("description", mcp.Description("Rule description")),
+			),
 		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.CreateSyntaxFlowRuleRequest) (any, error) {
 			return s.grpcClient.CreateSyntaxFlowRuleEx(ctx, req)
 		}, "failed to create syntaxflow rule")),
 
 		WithTool(mcp.NewTool("update_syntaxflow_rule",
 			mcp.WithDescription("Update an existing SyntaxFlow rule"),
-			mcp.WithStruct("rule", []mcp.PropertyOption{
+			mcp.WithStruct("syntaxFlowInput", []mcp.PropertyOption{
 				mcp.Description("SyntaxFlow rule update payload"),
 				mcp.Required(),
-			}),
+			},
+				mcp.WithString("ruleName", mcp.Description("Rule name"), mcp.Required()),
+				mcp.WithString("language", mcp.Description("Target language")),
+				mcp.WithString("content", mcp.Description("SyntaxFlow rule body")),
+				mcp.WithString("description", mcp.Description("Rule description")),
+			),
 		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.UpdateSyntaxFlowRuleRequest) (any, error) {
 			return s.grpcClient.UpdateSyntaxFlowRuleEx(ctx, req)
 		}, "failed to update syntaxflow rule")),

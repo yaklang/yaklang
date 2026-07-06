@@ -41,10 +41,9 @@ func init() {
 
 		WithTool(mcp.NewTool("generate_ssa_report",
 			mcp.WithDescription("Generate an SSA static analysis report"),
-			mcp.WithStruct("request", []mcp.PropertyOption{
-				mcp.Description("SSA report generation parameters"),
-				mcp.Required(),
-			}),
+			mcp.WithString("taskID", mcp.Description("SSA scan task ID")),
+			mcp.WithString("reportName", mcp.Description("Report name")),
+			mcp.WithStruct("filter", []mcp.PropertyOption{mcp.Description("Risk filter for report content")}),
 		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.GenerateSSAReportRequest) (any, error) {
 			return s.grpcClient.GenerateSSAReport(ctx, req)
 		}, "failed to generate ssa report")),
