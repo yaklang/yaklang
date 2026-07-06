@@ -178,10 +178,17 @@ func TimeoutContextSeconds(d float64) context.Context {
 	return TimeoutContext(FloatSecondDuration(d))
 }
 
+func getMachineIdFilePath() string {
+	if home := os.Getenv("YAKIT_HOME"); home != "" {
+		return filepath.Join(filepath.Dir(home), ".ym-id")
+	}
+	return filepath.Join(GetHomeDirDefault("."), ".ym-id")
+}
+
 func GetMachineCode() string {
 	mid, err := GetSystemMachineCode()
 	if err != nil {
-		fileName := filepath.Join(GetHomeDirDefault("."), ".ym-id")
+		fileName := getMachineIdFilePath()
 		raw, _ := ioutil.ReadFile(fileName)
 		if raw != nil {
 			mid = EscapeInvalidUTF8Byte(raw)

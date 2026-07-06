@@ -252,6 +252,16 @@ func trimSourceCodeHelper(sourceCode string) (code string, containPoint bool, po
 	return strings.TrimSpace(sourceCode), containPoint, pointSuffix
 }
 
+func RangeIfToGrpcRange(rng *memedit.Range) *ypb.Range {
+	start, end := rng.GetStart(), rng.GetEnd()
+	return &ypb.Range{
+		StartLine:   int64(start.GetLine()),
+		StartColumn: int64(start.GetColumn()),
+		EndLine:     int64(end.GetLine()),
+		EndColumn:   int64(end.GetColumn()),
+	}
+}
+
 func GrpcRangeToSSARange(sourceCode string, r *ypb.Range) *memedit.Range {
 	e := memedit.NewMemEditor(sourceCode)
 	return e.GetRangeByPosition(

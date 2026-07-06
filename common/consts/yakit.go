@@ -1,6 +1,8 @@
 package consts
 
 import (
+	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -146,6 +148,14 @@ func initializeYakitDirectories() {
 	GetDefaultYakitPprofDir()    // yakit-projects/pprof-log
 	GetDefaultYakitBaseTempDir() // yakit-projects/temp
 	GetDefaultAISkillsDir()      // yakit-projects/ai-skills
+
+	utils.RegisterTempFileOpener(func(name string) (*os.File, error) {
+		dir := GetDefaultYakitBaseTempDir()
+		if !utils.IsDir(dir) {
+			_ = os.MkdirAll(dir, 0o755)
+		}
+		return os.OpenFile(filepath.Join(dir, name), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o644)
+	})
 
 	log.Debug("yakit directories initialized")
 }

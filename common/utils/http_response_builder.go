@@ -57,9 +57,15 @@ func ReadHTTPResponseFromBufioReader(reader io.Reader, req *http.Request) (*http
 type FileOpenerType func(s string) (*os.File, error)
 
 var (
-	tempFileOpener    FileOpenerType
-	constsTempFileDir = filepath.Join(GetHomeDirDefault("."), "yakit-projects", "temp")
+	tempFileOpener FileOpenerType
 )
+
+func getDefaultTempFileDir() string {
+	if home := os.Getenv("YAKIT_HOME"); home != "" {
+		return filepath.Join(home, "temp")
+	}
+	return filepath.Join(GetHomeDirDefault("."), "yakit-projects", "temp")
+}
 
 func RegisterTempFileOpener(dialer FileOpenerType) {
 	tempFileOpener = dialer
@@ -70,10 +76,11 @@ func OpenTempFile(s string) (*os.File, error) {
 		return tempFileOpener(s)
 	}
 
-	if !IsDir(constsTempFileDir) {
-		_ = os.MkdirAll(constsTempFileDir, 0o755)
+	tempDir := getDefaultTempFileDir()
+	if !IsDir(tempDir) {
+		_ = os.MkdirAll(tempDir, 0o755)
 	}
-	return os.OpenFile(filepath.Join(constsTempFileDir, s), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o644)
+	return os.OpenFile(filepath.Join(tempDir, s), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o644)
 }
 
 func ReadHTTPResponseFromBufioReaderConn(reader io.Reader, conn net.Conn, req *http.Request) (*http.Response, error) {
