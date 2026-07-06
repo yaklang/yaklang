@@ -24,8 +24,8 @@ not a compile-split concern.
 | Project | Lang | Files | Wall time | Peak RSS | Exit | Risks | ERRO | WARN | Status |
 |---------|------|------:|----------:|---------:|-----:|------:|-----:|-----:|--------|
 | grav | PHP | 522 | 4m34s | 1.72 GiB | 0 | 63 | 41 | 1046 | ✅ completes all 269 rules |
-| moodle | PHP | 7733 | 138min+ (killed) | n/a (killed) | 137 | 0 | 1590 | 3589 | ❌ hangs on a heavy rule |
-| javacms (Java) | Java | TBD | TBD | TBD | TBD | TBD | TBD | TBD | not run yet |
+| moodle | PHP | 7733 | 138min+ (killed) | n/a (killed) | 137 | 0 | 1590 | 3589 | ❌ hangs on a heavy rule (pre-budget) |
+| javacms (Java) | Java | 1.8G | **15m22s** | ~21 GB + ~16 GB swap (24 GB RAM machine) | 0 | 8711 | 1 SAXParserFactory (pre-existing) | — | ✅ **completes all 270 rules** (Fix 1–8, `--rule-work-limit 200000 --rule-timeout 10m`) |
 
 ## grav (small-medium PHP) — works
 
@@ -118,10 +118,41 @@ finishes fast. PASS.
 - Smoke: `ssa-compile -t <tiny> -p smokephp` then `code-scan -p smokephp
   --rule-timeout 30s` → 269 rules, 1 risk, exit 0, no hang. The solidified-DB
   scan path (`-p`, no recompile) works with the fix.
-- grav / moodle / javacms end-to-end with the fix: **pending** — re-run
-  `code-scan -p <name> --rule-timeout 5m` on the solidified DBs and fill the
-  table above (expect moodle to finish instead of hanging, with the heavy
-  rules bailed at 5m).
+- **javacms (Java, 1.8G, solidified DB)**: `code-scan -p javacms-core
+  --rule-timeout 10m --rule-work-limit 200000` → **all 270 rules finish in
+  15m22s**, 127 success / 1 failed (SAXParserFactory "condition failed" —
+  pre-existing, same on optABC/main), **8711 risks**, exit 0. Peak RSS ~21 GB
+  + ~16 GB swap on a 24 GB-RAM machine (heavy rules bail at the work-limit,
+  54 partial bails). This is the first javacms run that COMPLETED instead of
+  OOM-killing — see the memory-optimization section below.
+- grav / moodle end-to-end with the work budget: **pending** — re-run on the
+  solidified DBs with the new default `--rule-work-limit 200000`.
+
+## Memory-optimization layer (Fix 1–8)
+
+On top of the per-rule budget, a pprof-driven pass cut allocation churn and
+bounded live memory so javacms finishes within 24 GB instead of OOM-killing
+at 24 GB RAM + 32 GB swap. Measured on the final scan
+(`build/pprof/javacms-F78b/heap_before_gc.pb.gz`, alloc_space):
+
+| Hotspot | optABC (pre-fix) | Fix 1–8 | Fix |
+|---|---|---|---|
+| NewRuneOffsetMap (FileFilter per-file rebuild) | 71 GB / 20% | 8.5 GB / 8% | Fix 3: memoize on MemEditor |
+| execRule/TrackLow churn (off-path closure+name) | 124 GB cum | gone | Fix 4: off-path = direct call |
+| BitVector.Clone (mergeAnchorBits) | 355 GB / 35% | 2.4 GB / 2% | Fix 2: COW |
+| SafeMapWithKey.Set live (DependOn/EffectOn edge graph) | 2.3 GB live, unbounded | bounded | Fix 8: per-value 256 + per-descent 200k caps |
+| MergeValues churn (clearup inherited-var re-merge) | 463 GB / 27% | gone | Opt A (snapshot-once, fixed over-skip) |
+
+Net: cumulative alloc 1686 GB → ~105 GB (−94%); live heap peak 49 GB →
+~16 GB (within 24 GB RAM); BitVector.Clone and MergeValues dropped out of
+the top. Remaining top (`Program.NewValue` 11 GB, `TakeSymbolSnapshot` 12 GB)
+are the Fix 6 (snapshot frequency) and Fix 5 (instruction-id Value cache)
+targets — follow-ups, not needed for javacms to complete.
+
+`<include>` lib rules now honor the parent rule's ctx + work budget (Fix 7):
+the path-traversal rule's `<include('java-write-filename-sink')>` (which runs
+`<typeName>` over tens of thousands of File calls) previously ran 30min+
+past the rule budget; it now bails at the work-limit like any other opcode.
 
 ## Note on the isolated commit
 

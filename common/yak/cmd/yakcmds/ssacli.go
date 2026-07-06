@@ -1412,8 +1412,8 @@ and exports structured report (sarif/irify).`,
 
 		cli.Int64Flag{
 			Name:  "rule-work-limit",
-			Usage: "per-rule total-work budget: max fanout elements (per <typeName>/<getReturns>/.../dataflow source/descent node) one rule may process across all opcodes; a heavy rule is bailed at the budget (partial results) instead of hanging for hours. default 4000000 (loose); 0 disables (only --rule-timeout applies)",
-			Value: 4_000_000,
+			Usage: "per-rule total-work budget: max fanout elements (per <typeName>/<getReturns>/.../dataflow source/descent node) one rule may process across all opcodes; a heavy rule is bailed at the budget (partial results) instead of accumulating an unbounded edge graph that OOMs on large projects. default 200000 (calibrated for javacms-core: 5-concurrent scan completes in ~15min within 24GB, vs hang/OOM at 4M); 0 disables (only --rule-timeout applies)",
+			Value: 200_000,
 		},
 
 		cli.StringFlag{
