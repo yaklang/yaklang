@@ -8,10 +8,12 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// Environment knobs for compile-unit batching and the writer-cache mode. All
-// are opt-in; defaults keep small/medium projects on the resident fast path.
+// Environment knobs for compile-unit batching. Step mode (per-batch flush +
+// CompileUnitSplit) is the DEFAULT for every project size; only
+// YAK_SSA_COMPILE_UNIT_LEGACY opts back into the monolithic compat compile
+// path (no per-unit flush, resident IR).
 const (
-	compileUnitWriterCacheEnv   = "YAK_SSA_COMPILE_UNIT_WRITER_CACHE"
+	compileUnitLegacyEnv        = "YAK_SSA_COMPILE_UNIT_LEGACY"
 	compileUnitHoldSCCIREnv     = "YAK_SSA_COMPILE_UNIT_HOLD_SCC_IR"
 	compileUnitBatchMinFilesEnv = "YAK_SSA_COMPILE_UNIT_BATCH_MIN_FILES"
 	compileUnitBatchMinBytesEnv = "YAK_SSA_COMPILE_UNIT_BATCH_MIN_BYTES"
@@ -25,10 +27,6 @@ const (
 	defaultCompileUnitBatchMinFiles = 32
 	defaultCompileUnitBatchMinBytes = 256 * 1024
 	defaultCompileUnitBatchMaxFiles = 100
-	// Keep in sync with the SSA IR cache resident fast-path threshold. Below
-	// this size a single compile-unit batch is cheaper in resident mode than
-	// forcing the async writer cache.
-	compileUnitResidentFastPathMaxBytes = 2 * 1024 * 1024
 )
 
 // compileUnitExecutionBatch is a contiguous run of SCCs from the unit plan that
@@ -242,18 +240,4 @@ func compileUnitBatchReady(batch compileUnitExecutionBatch, minFiles int, minByt
 		return true
 	}
 	return false
-}
-
-// compileUnitWriterCacheEnabled decides whether the compile-unit run uses the
-// async writer cache. It requires the caller to opt in via
-// YAK_SSA_COMPILE_UNIT_WRITER_CACHE; it then enables the writer for multi-batch
-// projects or for single-batch projects above the resident fast-path size.
-func compileUnitWriterCacheEnabled(requested bool, batches []compileUnitExecutionBatch, projectBytes int64) bool {
-	if !requested {
-		return false
-	}
-	if len(batches) > 1 {
-		return true
-	}
-	return projectBytes > compileUnitResidentFastPathMaxBytes
 }

@@ -162,10 +162,13 @@ func (c *Config) parseProjectWithFSUnits(
 	}
 	batchMinFiles, batchMinBytes := compileUnitBatchThresholds()
 	batches := buildCompileUnitExecutionBatches(plan.Order, batchMinFiles, batchMinBytes)
-	writerCacheRequested := envFlagEnabled(compileUnitWriterCacheEnv)
-	writerCacheEnabled := compileUnitWriterCacheEnabled(writerCacheRequested, batches, scanResult.HandlerBytes)
-	c.Config.SetCompileUnitSplit(writerCacheEnabled)
-	if writerCacheRequested && !writerCacheEnabled && len(batches) <= 1 {
+	// Step mode (per-batch FlushCompileUnit + CompileUnitSplit) is the DEFAULT
+	// for any project size. YAK_SSA_COMPILE_UNIT_LEGACY opts back into the
+	// monolithic legacy/compat compile path (no per-unit flush, resident IR).
+	writerCacheRequested := true
+	writerCacheEnabled := true
+	if envFlagEnabled(compileUnitLegacyEnv) {
+		c.Config.SetCompileUnitSplit(false)
 		payload := buildCompileUnitPlanLog(
 			programName,
 			fmt.Sprintf("%v", c.GetLanguage()),
@@ -173,20 +176,21 @@ func (c *Config) parseProjectWithFSUnits(
 			batches,
 			batchMinFiles,
 			batchMinBytes,
-			"legacy-fallback",
+			"legacy-opt-out",
 			"resident-fast-path",
 			writerCacheRequested,
 			writerCacheEnabled,
 		)
 		if target, err := writeCompileUnitPlanLogFile(os.Getenv("YAK_SSA_COMPILE_UNIT_LOG_DIR"), payload); err != nil {
-			processCallback(0, "[f0_scan] compile unit single-batch fallback plan write failed: %v", err)
+			processCallback(0, "[f0_scan] compile unit legacy opt-out plan write failed: %v", err)
 		} else if target != "" {
-			processCallback(0, "[f0_scan] compile unit single-batch fallback wrote plan: %s", target)
+			processCallback(0, "[f0_scan] compile unit legacy opt-out wrote plan: %s", target)
 		}
-		processCallback(0, "[f0_scan] compile unit graph built units=%d edges=%d scc=%d batches=%d; fallback to legacy compile because writer cache is not needed",
-			len(plan.Units), len(plan.Edges), len(plan.Order), len(batches))
+		processCallback(0, "[f0_scan] compile unit graph built units=%d edges=%d scc=%d batches=%d; legacy compile mode requested via %s",
+			len(plan.Units), len(plan.Edges), len(plan.Order), len(batches), compileUnitLegacyEnv)
 		return c.parseProjectWithFSLegacy(sourceFilesystem, processCallback)
 	}
+	c.Config.SetCompileUnitSplit(true)
 
 	prog, builder, err := c.init(filesystem, handlerTotal)
 	if err != nil {
@@ -397,10 +401,10 @@ func (c *Config) parseProjectWithFSUnits(
 		}) {
 			return nil, ErrContextCancel
 		}
-	if c.isStop() {
-		return nil, ErrContextCancel
-	}
-	// Capture pre-flush metrics for comparison
+		if c.isStop() {
+			return nil, ErrContextCancel
+		}
+		// Capture pre-flush metrics for comparison
 		preFlushIR := 0
 		preFlushPersisted := 0
 		preFlushFuncs := 0
@@ -417,7 +421,7 @@ func (c *Config) parseProjectWithFSUnits(
 		}
 		preFlushHeap := captureHeapMetrics()
 
-		if prog.Cache != nil && writerCacheEnabled {
+		if prog.Cache != nil {
 			prog.Cache.FlushCompileUnit(strings.Join(unitKeys, ","))
 
 			// Check memory pressure after flush
@@ -454,45 +458,7 @@ func (c *Config) parseProjectWithFSUnits(
 				prog.UpStream.Len(),
 				time.Since(unitBuildStart),
 			)
-	} else if prog.Cache != nil {
-		// Writer cache not enabled: do NOT flush/clear stores or program-level
-		// structures here. Sources/instructions/editors are still needed for
-		// index building, Ref() lookups, GetEditorByHash, and
-		// Show().ForEachAllFile after compile; they persist to DB via the normal
-		// TTL/eviction path and the final SaveToDatabase flush. The per-unit
-		// flush path (FlushCompileUnit -> ReleaseCompletedUnitMemory) only runs
-		// in the writer-cache branch above; running it here would drop
-		// un-persisted state (editorStack/UpStream/deferredBuilds) and break
-		// downstream FromDatabase/Ref/Show.
-		preFlushIR := prog.Cache.CountInstruction()
-		preFlushHeap := captureHeapMetrics()
-
-		clearedItems := 0
-		releasedFuncs := 0
-
-		postFlushHeap := captureHeapMetrics()
-
-		prog.ProcessInfof(
-			"compile unit batch(%d/%d) non-writer cleared scc=%d-%d units=%s mode=%s writer_enabled=%v cleared=%d released_funcs=%d resident_ir=%d funcs=%d blueprints=%d heap_mb=%.1f→%.1f(Δ%+.1f) upstreams=%d cost=%v",
-			batchIndex+1,
-			len(batches),
-			batch.startSCC+1,
-			batch.endSCC+1,
-			strings.Join(unitKeys, ","),
-			prog.Cache.InstructionCacheMode(),
-			writerCacheEnabled,
-			clearedItems,
-			releasedFuncs,
-			preFlushIR,
-			prog.Funcs.Len(),
-			prog.Blueprint.Len(),
-			preFlushHeap,
-			postFlushHeap,
-			postFlushHeap-preFlushHeap,
-			prog.UpStream.Len(),
-			time.Since(unitBuildStart),
-		)
-	}
+		}
 		if compileUnitLogEnabled() {
 			prog.ProcessInfof("compile unit batch(%d/%d) build+flush finished units=%s cost=%v", batchIndex+1, len(batches), strings.Join(unitKeys, ","), time.Since(unitBuildStart))
 		}
