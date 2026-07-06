@@ -1,9 +1,11 @@
 package aicommon
 
 import (
+	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"strings"
 
 	"sync/atomic"
 )
@@ -134,4 +136,64 @@ func (c *Config) GetEnableSelfReflection() bool {
 
 func (c *Config) GetToolCallIntervalReviewExtraPrompt() string {
 	return c.ToolCallIntervalReviewExtraPrompt
+}
+
+func (c *Config) GetPreferDispatchSubReactAgents() bool {
+	if c == nil {
+		return false
+	}
+	return c.PreferDispatchSubReactAgents
+}
+
+func (c *Config) GetEnableGoalMode() bool {
+	if c == nil {
+		return false
+	}
+	return c.EnableGoalMode
+}
+
+func (c *Config) GetGoalMinIterations() int64 {
+	if c == nil {
+		return DefaultGoalMinIterations
+	}
+	return NormalizeGoalMinIterations(c.GoalMinIterations)
+}
+
+func NormalizeGoalMinIterations(n int64) int64 {
+	if n <= 0 {
+		return DefaultGoalMinIterations
+	}
+	return n
+}
+
+func (c *Config) GetExecutionPolicy() string {
+	if c == nil {
+		return ""
+	}
+	lines := make([]string, 0, 4)
+	if c.GetPreferDispatchSubReactAgents() {
+		lines = append(lines,
+			"- Multi-agent mode is enabled: if the task can be decomposed into 2+ mostly independent workstreams, prefer dispatch_sub_react_agents instead of doing everything serially yourself.",
+			"- When dispatching, write a crisp goal for each sub agent and use result_contract to define the expected output shape whenever possible.",
+		)
+	}
+	if c.GetEnableGoalMode() {
+		lines = append(lines,
+			fmt.Sprintf("- Goal mode is enabled: do not use finish before iteration %d.", c.GetGoalMinIterations()),
+			"- Before the finish gate opens, only emit progress updates via directly_answer when necessary; keep pushing execution forward instead of wrapping up early.",
+		)
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+func EnsureGoalModeMaxIterations(maxIterations, goalMinIterations int64) int64 {
+	goalMinIterations = NormalizeGoalMinIterations(goalMinIterations)
+	if maxIterations <= 0 {
+		return maxIterations
+	}
+	minRequired := goalMinIterations + GoalModeIterationBuffer
+	if maxIterations < minRequired {
+		return minRequired
+	}
+	return maxIterations
 }

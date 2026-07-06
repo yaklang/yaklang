@@ -38,6 +38,8 @@ import (
 // reactloops/docs/16-verification-frequency-experiment.md.
 // 关键词: DefaultPeriodicVerificationInterval 6, iter 门基础节拍, verification 节流
 const DefaultPeriodicVerificationInterval = 6
+const DefaultGoalMinIterations = 6
+const GoalModeIterationBuffer = 2
 
 type ConfigOption func(*Config) error
 
@@ -239,6 +241,7 @@ type Config struct {
 	DisableWebSearch             bool // disable enhanced web search tool, default false (enabled)
 	DisallowMCPServers           bool // 禁用 MCP Servers，默认为 false（即默认启用）
 	EnableDispatchSubReactAgents bool // Enable dispatching sub ReAct agents for parallel execution of subtasks (default: false, disabled)
+	PreferDispatchSubReactAgents bool // Bias the top-level loop toward dispatch_sub_react_agents for parallelizable work.
 
 	// ExtraMCPServers 会话级显式挂载的 MCP server（不读 profile DB、不进全局列表）。
 	// 仅在本字段非空时激活，默认 nil，对现有流程零影响。
@@ -343,6 +346,8 @@ type Config struct {
 
 	// iteration limit
 	MaxIterationCount int64
+	EnableGoalMode    bool
+	GoalMinIterations int64
 
 	// task config
 	EnhanceKnowledgeManager            *EnhanceKnowledgeManager
@@ -660,6 +665,7 @@ func newConfig(ctx context.Context) *Config {
 		MemoryPool:                         omap.NewOrderedMap(make(map[string]*MemoryEntity)),
 		MaxTaskContinue:                    3,
 		PeriodicVerificationInterval:       DefaultPeriodicVerificationInterval,
+		GoalMinIterations:                  DefaultGoalMinIterations,
 		GenerateReport:                     true,
 		DisallowMCPServers:                 false, // 默认启用 MCP Servers
 		MemoryTriageId:                     "default",
@@ -1690,6 +1696,27 @@ func WithEnableDispatchSubReactAgent(enable bool) ConfigOption {
 	}
 }
 
+func WithPreferDispatchSubReactAgents(enable bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		defer c.m.Unlock()
+		c.PreferDispatchSubReactAgents = enable
+		return nil
+	}
+}
+
+func WithEnableMultiAgentMode(enable bool) ConfigOption {
+	return func(c *Config) error {
+		if err := WithEnableDispatchSubReactAgent(enable)(c); err != nil {
+			return err
+		}
+		return WithPreferDispatchSubReactAgents(enable)(c)
+	}
+}
+
 // ExtraMCPServer 描述一个会话级显式挂载的 MCP server。
 // AllowedTools 非空时，client 侧只保留名字在白名单内的工具，server 多暴露的一律丢弃。
 type ExtraMCPServer struct {
@@ -2282,6 +2309,36 @@ func WithMaxIterationCount(n int64) ConfigOption {
 		}
 		c.m.Lock()
 		c.MaxIterationCount = n
+		c.m.Unlock()
+		return nil
+	}
+}
+
+func WithEnableGoalMode(enable bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.EnableGoalMode = enable
+		c.m.Unlock()
+		return nil
+	}
+}
+
+func WithGoalMinIterations(n int64) ConfigOption {
+	return func(c *Config) error {
+		if n < 0 {
+			return utils.Error("goal min iterations must be >= 0")
+		}
+		if n == 0 {
+			n = DefaultGoalMinIterations
+		}
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.GoalMinIterations = n
 		c.m.Unlock()
 		return nil
 	}
@@ -3898,6 +3955,8 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	opts = append(opts, WithGenerateReport(i.GenerateReport))
 	// EnableDispatchSubReactAgents is intentionally omitted: only the top-level
 	// ReAct agent may dispatch sub ReAct agents; forked child configs must not inherit it.
+	// PreferDispatchSubReactAgents / GoalMode 也只对顶层 agent 生效，避免子 agent
+	// 被错误地强制并行偏好或最小轮数约束。
 
 	// Retry / limits
 	if i.AiTransactionAutoRetry > 0 {
