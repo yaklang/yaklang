@@ -59,23 +59,19 @@ func newIndexStore(cfg *ssaconfig.Config, prog *Program, mode ProgramCacheKind, 
 	},
 		dbcache.WithSaveSize(saveSize),
 		dbcache.WithSaveTimeout(saveTime),
+		dbcache.WithName("IrIndex"),
 	)
 	store.offsetSaver = dbcache.NewSave(func(offsets []*ssadb.IrOffset) {
 		saveStep := func() error {
 			return utils.GormTransaction(db, func(tx *gorm.DB) error {
-				for _, offset := range offsets {
-					if offset == nil {
-						continue
-					}
-					ssadb.SaveIrOffset(tx, offset)
-				}
-				return nil
+				return ssadb.SaveIrOffsetBatch(tx, offsets)
 			})
 		}
 		store.diagnosticsTrack("ssa.Database.SaveIrOffsetBatch", saveStep)
 	},
 		dbcache.WithSaveSize(saveSize),
 		dbcache.WithSaveTimeout(saveTime),
+		dbcache.WithName("IrOffset"),
 	)
 	return store
 }
