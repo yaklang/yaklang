@@ -879,8 +879,6 @@ func (r *ReActLoop) TriggerPerception(reason string, force bool) *PerceptionStat
 	action, err := invoker.InvokeSpeedPriorityLiteForge(
 		ctx, "perception", prompt, perceptionOutputSchema,
 		aicommon.WithGeneralConfigStreamableFieldWithNodeId("perception", "summary"),
-		aicommon.WithGeneralConfigStreamableFieldWithNodeId("perception", "topics"),
-		aicommon.WithGeneralConfigStreamableFieldWithNodeId("perception", "keywords"),
 	)
 	setWorkspaceDebugDuration(r, perceptionDebugAIDurationKey, time.Since(aiStart))
 	if err != nil {

@@ -52,7 +52,7 @@ func makeFinalizeEnrichmentAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 		toolOpts,
 		[]*reactloops.LoopStreamField{
 			{AINodeId: "intent", FieldName: "intent_summary", StreamHandler: intentSummaryStreamHandler},
-			{AINodeId: "intent", FieldName: "recommended_capabilities", StreamHandler: recommendedCapabilitiesStreamHandler},
+			{AINodeId: "intent", FieldName: "recommended_capabilities", IsSystem: true, StreamHandler: recommendedCapabilitiesStreamHandler},
 		},
 		// Verifier
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {

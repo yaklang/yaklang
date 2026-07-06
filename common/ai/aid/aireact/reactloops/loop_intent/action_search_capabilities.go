@@ -63,7 +63,7 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 		desc,
 		toolOpts,
 		[]*reactloops.LoopStreamField{
-			{FieldName: "search_query", AINodeId: "intent"},
+			{FieldName: "search_query", IsSystem: true, AINodeId: "intent"},
 		},
 		// Verifier
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {

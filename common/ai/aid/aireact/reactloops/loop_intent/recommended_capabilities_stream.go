@@ -81,7 +81,7 @@ func recommendedCapabilitiesStreamCallback(invoker aicommon.AIInvokeRuntime) aic
 		if emitter == nil {
 			return
 		}
-		_, err = emitter.EmitDefaultStreamEvent(
+		_, err = emitter.EmitDefaultSystemStreamEvent(
 			"intent",
 			strings.NewReader(display),
 			invoker.GetCurrentTaskId(),
