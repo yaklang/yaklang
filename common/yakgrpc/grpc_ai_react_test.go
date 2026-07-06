@@ -36,6 +36,7 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 	disableToolIntervalReview := rand.Intn(2) == 1
 	syncPerceptionTrigger := rand.Intn(2) == 1
 	enableDetachedPlan := rand.Intn(2) == 1
+	goalMinIterations := int64(maxIter + 2)
 
 	start := &ypb.AIStartParams{
 		DisallowRequireForUserPrompt: disallowRequire,
@@ -53,8 +54,13 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 		UserPresetPrompt:             presetPrompt,
 		UserPlanPrompt:               userPlanPrompt,
 		DisableToolIntervalReview:    disableToolIntervalReview,
-		SyncPerceptionTrigger:  syncPerceptionTrigger,
-		EnableDetachedPlan:     enableDetachedPlan,
+		SyncPerceptionTrigger:        syncPerceptionTrigger,
+		EnableDetachedPlan:           enableDetachedPlan,
+		Strategy: &ypb.AIExecutionStrategy{
+			EnableMultiAgent:  true,
+			EnableGoalMode:    true,
+			GoalMinIterations: goalMinIterations,
+		},
 		EnabledCapabilities: []*ypb.AIEnabledCapability{
 			{Name: "read_file", Type: "tool"},
 		},
@@ -73,7 +79,10 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 	require.Equal(t, expectedAllow, cfg.AllowRequireForUserInteract)
 	require.Equal(t, aicommon.AgreePolicyYOLO, cfg.AgreePolicy)
 	require.Equal(t, start.AIReviewRiskControlScore, cfg.AgreeAIScoreMiddle)
-	require.Equal(t, int64(start.ReActMaxIteration), cfg.MaxIterationCount)
+	require.Equal(t,
+		aicommon.EnsureGoalModeMaxIterations(int64(start.ReActMaxIteration), goalMinIterations),
+		cfg.MaxIterationCount,
+	)
 	require.Equal(t, int(start.TimelineContentSizeLimit), cfg.TimelineContentSizeLimit)
 	require.Equal(t, int64(start.UserInteractLimit), cfg.PlanUserInteractMaxCount)
 	require.Equal(t, start.DisableToolUse, cfg.DisableToolUse)
@@ -85,6 +94,10 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 	require.Equal(t, start.SyncPerceptionTrigger, cfg.GetSyncPerceptionTrigger())
 	require.Equal(t, start.GetEnablePlan(), cfg.GetEnablePlanAndExec())
 	require.Equal(t, start.GetEnableDetachedPlan(), cfg.GetEnableDetachedPlan())
+	require.True(t, cfg.EnableDispatchSubReactAgents)
+	require.True(t, cfg.GetPreferDispatchSubReactAgents())
+	require.True(t, cfg.GetEnableGoalMode())
+	require.Equal(t, goalMinIterations, cfg.GetGoalMinIterations())
 	require.Equal(t, []aicommon.EnabledCapability{
 		{Name: "read_file", Type: aicommon.EnabledCapabilityTypeTool},
 	}, cfg.GetEnabledCapabilities())
@@ -123,8 +136,8 @@ func TestResolveAISessionStartParams(t *testing.T) {
 	require.Equal(t, "hello", got.GetUserQuery())
 
 	_, err = yakit.CreateOrUpdateAISessionMetaStartParams(db, "cached-session", &ypb.AIStartParams{
-		AIService:   "cached-service",
-		AIModelName: "cached-model",
+		AIService:    "cached-service",
+		AIModelName:  "cached-model",
 		ReviewPolicy: "ai",
 	})
 	require.NoError(t, err)

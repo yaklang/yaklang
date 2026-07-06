@@ -362,6 +362,9 @@ func OverlayAISessionStartParams(base, patch *ypb.AIStartParams) *ypb.AIStartPar
 	if patch.GetEnableDetachedPlan() {
 		next.EnableDetachedPlan = true
 	}
+	if patch.GetStrategy() != nil {
+		next.Strategy = overlayAIExecutionStrategy(base.GetStrategy(), patch.GetStrategy())
+	}
 	if patch.GetPreferSessionCachedConfig() {
 		next.PreferSessionCachedConfig = true
 	}
@@ -403,6 +406,29 @@ func overlayEnabledCapabilities(base, patch *ypb.AIStartParams) []*ypb.AIEnabled
 		appendCap(item)
 	}
 	return merged
+}
+
+func overlayAIExecutionStrategy(base, patch *ypb.AIExecutionStrategy) *ypb.AIExecutionStrategy {
+	if base == nil && patch == nil {
+		return nil
+	}
+	if base == nil {
+		return proto.Clone(patch).(*ypb.AIExecutionStrategy)
+	}
+	if patch == nil {
+		return proto.Clone(base).(*ypb.AIExecutionStrategy)
+	}
+	next := proto.Clone(base).(*ypb.AIExecutionStrategy)
+	if patch.GetEnableMultiAgent() {
+		next.EnableMultiAgent = true
+	}
+	if patch.GetEnableGoalMode() {
+		next.EnableGoalMode = true
+	}
+	if patch.GetGoalMinIterations() > 0 {
+		next.GoalMinIterations = patch.GetGoalMinIterations()
+	}
+	return next
 }
 
 func GetAISessionMetaBySessionID(db *gorm.DB, sessionID string) (*schema.AISession, error) {

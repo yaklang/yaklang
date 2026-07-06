@@ -286,6 +286,7 @@ func TestOverlayAISessionStartParams(t *testing.T) {
 		AIService:            "deepseek",
 		AIModelName:          "model-a",
 		EnablePlan:           true,
+		Strategy:             &ypb.AIExecutionStrategy{EnableMultiAgent: true},
 		UserInteractLimit:    9,
 		TimelineSessionID:    "sess-1",
 		DisableToolUse:       true,
@@ -297,6 +298,7 @@ func TestOverlayAISessionStartParams(t *testing.T) {
 		AIModelName:       "model-b",
 		ReviewPolicy:      "ai",
 		UserInteractLimit: 3,
+		Strategy:          &ypb.AIExecutionStrategy{EnableGoalMode: true, GoalMinIterations: 8},
 	}
 
 	next := OverlayAISessionStartParams(base, patch)
@@ -305,6 +307,10 @@ func TestOverlayAISessionStartParams(t *testing.T) {
 	require.Equal(t, "ai", next.GetReviewPolicy())
 	require.Equal(t, int64(3), next.GetUserInteractLimit())
 	require.True(t, next.GetEnablePlan())
+	strategy := next.GetStrategy()
+	require.True(t, strategy.GetEnableMultiAgent())
+	require.True(t, strategy.GetEnableGoalMode())
+	require.Equal(t, int64(8), strategy.GetGoalMinIterations())
 	require.True(t, next.GetDisableToolUse())
 	require.True(t, next.GetDisableAISearchForge())
 	require.Equal(t, "cached", next.GetUserPresetPrompt())
