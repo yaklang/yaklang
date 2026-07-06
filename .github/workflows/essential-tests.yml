@@ -223,6 +223,27 @@ jobs:
           retention-days: 1
           compression-level: 0
 
+  slim-gate:
+    needs: [check-wip, prepare-yak]
+    if: needs.check-wip.outputs.should_run_tests == 'true' && needs.prepare-yak.result == 'success'
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ needs.prepare-yak.outputs.fork_repo || github.repository }}
+          ref: ${{ needs.prepare-yak.outputs.target_ref || github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "./go.mod"
+          cache: false
+
+      - name: Slim gate test (irify_exclude)
+        run: go test -tags irify_exclude -run TestSlimGate_YaklangLanguageSuggestion -timeout 3m ./common/yakgrpc
+
   prepare-yakgrpc:
     needs: prepare-yak
     if: needs.prepare-yak.result == 'success'

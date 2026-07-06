@@ -11,6 +11,7 @@ on:
         options:
           - windows
           - windows7
+          - windows-arm64
       sign:
         description: "Sign the built .exe with Azure Key Vault"
         required: true
