@@ -597,7 +597,10 @@ func (p *Program) FileFilter(path string, match string, rule map[string]string, 
 		if me == nil {
 			return true
 		}
-		offsetMap := memedit.NewRuneOffsetMap(me.GetSourceCode())
+		// Memoized on the editor: a file matched by N rules / N filter calls
+		// pays the rune-offset build once, not N times (was ~71GB/20% of alloc
+		// on javacms-core from rebuilding NewRuneOffsetMap(full source) here).
+		offsetMap := me.GetRuneOffsetMap()
 		if filter.matchFile(s) {
 			matchFile = true
 			if filter.matchContent != nil {
