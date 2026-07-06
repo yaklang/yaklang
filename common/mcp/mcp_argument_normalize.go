@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"encoding/base64"
 	"maps"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -58,6 +59,15 @@ func normalizeMCPArguments(arguments map[string]any) map[string]any {
 			args["jsonRaw"] = []byte(v)
 		case []any:
 			args["jsonRaw"] = utils.InterfaceToBytes(v)
+		}
+	}
+
+	if data, ok := args["data"]; ok {
+		switch v := data.(type) {
+		case string:
+			if raw, err := base64.StdEncoding.DecodeString(v); err == nil && len(raw) > 0 {
+				args["data"] = raw
+			}
 		}
 	}
 
