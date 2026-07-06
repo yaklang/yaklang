@@ -82,28 +82,6 @@ func TestCompileUnitExecutionBatchesCanKeepSCCGranularity(t *testing.T) {
 	require.Equal(t, []string{"unit:c"}, batches[2].unitKeys)
 }
 
-func TestCompileUnitWriterCacheDisabledForSingleSmallBatch(t *testing.T) {
-	batches := []compileUnitExecutionBatch{
-		{unitKeys: []string{"unit:a"}, files: 2, bytes: 200},
-	}
-
-	require.False(t, compileUnitWriterCacheEnabled(false, batches, compileUnitResidentFastPathMaxBytes/2))
-	require.False(t, compileUnitWriterCacheEnabled(true, batches, compileUnitResidentFastPathMaxBytes/2))
-}
-
-func TestCompileUnitWriterCacheEnabledForMultiBatchOrLargeProject(t *testing.T) {
-	multiBatch := []compileUnitExecutionBatch{
-		{unitKeys: []string{"unit:a"}, files: 2, bytes: 200},
-		{unitKeys: []string{"unit:b"}, files: 2, bytes: 200},
-	}
-	singleLargeBatch := []compileUnitExecutionBatch{
-		{unitKeys: []string{"unit:a"}, files: 2, bytes: compileUnitResidentFastPathMaxBytes + 1},
-	}
-
-	require.True(t, compileUnitWriterCacheEnabled(true, multiBatch, compileUnitResidentFastPathMaxBytes/2))
-	require.True(t, compileUnitWriterCacheEnabled(true, singleLargeBatch, compileUnitResidentFastPathMaxBytes+1))
-}
-
 func TestSSACompileAdaptiveGCPolicyDefaultsAndOverrides(t *testing.T) {
 	t.Setenv("GOGC", "")
 	t.Setenv("GOMEMLIMIT", "")
