@@ -1,6 +1,7 @@
 package aicommon
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -28,6 +29,156 @@ func TestVerificationTodoStore_ApplyAndRender(t *testing.T) {
 	require.Contains(t, rendered, "- [x]: [id: collect_signal]: 收集页面响应信号")
 	require.Contains(t, rendered, "- [DELETED]: [id: fix_title]: 修正标题")
 	require.Contains(t, rendered, "- [ ]: [id: replay_payload]: 使用新 payload 复测")
+}
+
+// TestVerificationTodoStore_Apply_ReportsSuccessPerOp 验证 Apply 现在为每个
+// movement 返回一个 result 条目 (而非仅失败), 成功的 op Success=true, 失败的
+// op Success=false 并带 Reason. 让调用方可以做统一的 per-op 结果输出.
+func TestVerificationTodoStore_Apply_ReportsSuccessPerOp(t *testing.T) {
+	store := NewVerificationTodoStore()
+	results := store.Apply(VerificationTodoScope{}, false, []VerifyNextMovement{
+		{Op: "add", ID: "ok_todo", Content: "成功 add"},
+		{Op: "done", ID: "missing_todo"},
+	})
+	require.Len(t, results, 2)
+
+	require.True(t, results[0].Success)
+	require.Empty(t, results[0].Reason)
+	require.Equal(t, "add", results[0].Movement.Op)
+	require.Equal(t, "ok_todo", results[0].Movement.ID)
+
+	require.False(t, results[1].Success)
+	require.NotEmpty(t, results[1].Reason)
+	require.Equal(t, "done", results[1].Movement.Op)
+	require.Equal(t, "missing_todo", results[1].Movement.ID)
+}
+
+// TestVerificationTodoStore_Apply_RedundantUpdateIsFailure 验证"冗余更新"被
+// 视为失败: 当一个 op 应用前后 TODO 的 status / content 完全不变时, 返回
+// Success=false 并给出 redundant reason, 且不推进 UpdatedAt. 覆盖重复 add /
+// 重复 done / 重复 delete / 重复 skip / 重复 doing 等典型空转场景.
+//
+// 关键词: 冗余更新即失败, 重复添加, 重复标记完成, 空转轮次识别
+func TestVerificationTodoStore_Apply_RedundantUpdateIsFailure(t *testing.T) {
+	t.Run("redundant add same content", func(t *testing.T) {
+		store := NewVerificationTodoStore()
+		store.Apply(VerificationTodoScope{}, false, []VerifyNextMovement{
+			{Op: "add", ID: "dup", Content: "重复任务"},
+		})
+		before := store.findItemByID("dup")
+		require.NotNil(t, before)
+		beforeUpdated := before.UpdatedAt
+
+		results := store.Apply(VerificationTodoScope{}, false, []VerifyNextMovement{
+			{Op: "add", ID: "dup", Content: "重复任务"},
+		})
+		require.Len(t, results, 1)
+		require.False(t, results[0].Success)
+		require.Contains(t, results[0].Reason, "redundant add")
+
+		after := store.findItemByID("dup")
+		require.Equal(t, beforeUpdated, after.UpdatedAt, "redundant add must not bump UpdatedAt")
+		require.Equal(t, VerificationTodoStatusPending, after.Status)
+	})
+
+	t.Run("add same id different content is not redundant", func(t *testing.T) {
+		store := NewVerificationTodoStore()
+		store.Apply(VerificationTodoScope{}, false, []VerifyNextMovement{
+			{Op: "add", ID: "rename", Content: "旧内容"},
+		})
+		results := store.Apply(VerificationTodoScope{}, false, []VerifyNextMovement{
+			{Op: "add", ID: "rename", Content: "新内容"},
+		})
+		require.Len(t, results, 1)
+		require.True(t, results[0].Success)
+		require.Equal(t, "新内容", store.findItemByID("rename").Content)
+	})
+
+	t.Run("redundant done", func(t *testing.T) {
+		store := NewVerificationTodoStore()
+		store.Apply(VerificationTodoScope{}, false, []VerifyNextMovement{
+			{Op: "add", ID: "x", Content: "x"},
+			{Op: "done", ID: "x"},
+		})
+		results := store.Apply(VerificationTodoScope{}, false, []VerifyNextMovement{
+			{Op: "done", ID: "x"},
+		})
+		require.Len(t, results, 1)
+		require.False(t, results[0].Success)
+		require.Contains(t, results[0].Reason, "redundant done")
+		require.Equal(t, VerificationTodoStatusDone, store.findItemByID("x").Status)
+	})
+
+	t.Run("redundant delete", func(t *testing.T) {
+		store := NewVerificationTodoStore()
+		store.Apply(VerificationTodoScope{}, false, []VerifyNextMovement{
+			{Op: "add", ID: "x", Content: "x"},
+			{Op: "delete", ID: "x"},
+		})
+		results := store.Apply(VerificationTodoScope{}, false, []VerifyNextMovement{
+			{Op: "delete", ID: "x"},
+		})
+		require.Len(t, results, 1)
+		require.False(t, results[0].Success)
+		require.Contains(t, results[0].Reason, "redundant delete")
+	})
+
+	t.Run("redundant skip", func(t *testing.T) {
+		store := NewVerificationTodoStore()
+		store.Apply(VerificationTodoScope{}, false, []VerifyNextMovement{
+			{Op: "add", ID: "x", Content: "x"},
+			{Op: "skip", ID: "x"},
+		})
+		results := store.Apply(VerificationTodoScope{}, false, []VerifyNextMovement{
+			{Op: "skip", ID: "x"},
+		})
+		require.Len(t, results, 1)
+		require.False(t, results[0].Success)
+		require.Contains(t, results[0].Reason, "redundant skip")
+	})
+
+	t.Run("redundant doing", func(t *testing.T) {
+		store := NewVerificationTodoStore()
+		store.Apply(VerificationTodoScope{}, false, []VerifyNextMovement{
+			{Op: "add", ID: "x", Content: "x"},
+			{Op: "doing", ID: "x"},
+		})
+		results := store.Apply(VerificationTodoScope{}, false, []VerifyNextMovement{
+			{Op: "doing", ID: "x"},
+		})
+		require.Len(t, results, 1)
+		require.False(t, results[0].Success)
+		require.Contains(t, results[0].Reason, "redundant doing")
+	})
+
+	t.Run("doing with new content is not redundant", func(t *testing.T) {
+		store := NewVerificationTodoStore()
+		store.Apply(VerificationTodoScope{}, false, []VerifyNextMovement{
+			{Op: "add", ID: "x", Content: "x"},
+			{Op: "doing", ID: "x"},
+		})
+		results := store.Apply(VerificationTodoScope{}, false, []VerifyNextMovement{
+			{Op: "doing", ID: "x", Content: "更新后的内容"},
+		})
+		require.Len(t, results, 1)
+		require.True(t, results[0].Success)
+		require.Equal(t, "更新后的内容", store.findItemByID("x").Content)
+	})
+
+	t.Run("done then doing is not redundant (status changes)", func(t *testing.T) {
+		store := NewVerificationTodoStore()
+		store.Apply(VerificationTodoScope{}, false, []VerifyNextMovement{
+			{Op: "add", ID: "x", Content: "x"},
+			{Op: "done", ID: "x"},
+		})
+		// 把已完成的 TODO 重新拉回 DOING 是真实状态变化, 不算冗余.
+		results := store.Apply(VerificationTodoScope{}, false, []VerifyNextMovement{
+			{Op: "doing", ID: "x"},
+		})
+		require.Len(t, results, 1)
+		require.True(t, results[0].Success)
+		require.Equal(t, VerificationTodoStatusDoing, store.findItemByID("x").Status)
+	})
 }
 
 // TestVerificationTodoStore_ApplySatisfiedDoesNotAutoSkip 验证旧"satisfied
@@ -421,12 +572,13 @@ func TestVerificationTodoStore_Apply_ReportsCrossScopeMutationFailure(t *testing
 		{Op: "add", ID: "sibling_todo", Content: "兄弟任务 TODO"},
 	})
 
-	errors := store.Apply(currentScope, false, []VerifyNextMovement{
+	results := store.Apply(currentScope, false, []VerifyNextMovement{
 		{Op: "done", ID: "sibling_todo"},
 	})
-	require.Len(t, errors, 1)
-	require.Contains(t, errors[0].Reason, "another task scope")
-	require.Contains(t, errors[0].Reason, "task-sibling")
+	require.Len(t, results, 1)
+	require.False(t, results[0].Success)
+	require.Contains(t, results[0].Reason, "another task scope")
+	require.Contains(t, results[0].Reason, "task-sibling")
 
 	siblingItems := store.SnapshotItemsByScope(siblingScope)
 	require.Len(t, siblingItems, 1)
@@ -435,21 +587,25 @@ func TestVerificationTodoStore_Apply_ReportsCrossScopeMutationFailure(t *testing
 
 func TestVerificationTodoStore_Apply_ReportsValidationFailures(t *testing.T) {
 	store := NewVerificationTodoStore()
-	errors := store.Apply(VerificationTodoScope{}, false, []VerifyNextMovement{
+	results := store.Apply(VerificationTodoScope{}, false, []VerifyNextMovement{
 		{Op: "add", Content: "missing id"},
 		{Op: "add", ID: "empty_content"},
 		{Op: "noop", ID: "x"},
 	})
-	require.Len(t, errors, 3)
-	require.Contains(t, errors[0].Reason, "missing id")
-	require.Contains(t, errors[1].Reason, "non-empty content")
-	require.Contains(t, errors[2].Reason, "unsupported op")
+	require.Len(t, results, 3)
+	for _, r := range results {
+		require.False(t, r.Success)
+	}
+	require.Contains(t, results[0].Reason, "missing id")
+	require.Contains(t, results[1].Reason, "non-empty content")
+	require.Contains(t, results[2].Reason, "unsupported op")
 }
 
 func TestFormatVerificationTodoApplyErrors_RendersFailures(t *testing.T) {
-	got := FormatVerificationTodoApplyErrors([]VerificationTodoApplyError{
+	got := FormatVerificationTodoApplyErrors([]VerificationTodoApplyResult{
 		{
 			Movement: VerifyNextMovement{Op: "done", ID: "sibling_todo"},
+			Success:  false,
 			Reason:   "todo belongs to another task scope (task_id=task-sibling, task_index=2-2)",
 		},
 	})
@@ -457,6 +613,25 @@ func TestFormatVerificationTodoApplyErrors_RendersFailures(t *testing.T) {
 		"FAILED DONE[sibling_todo]: todo belongs to another task scope (task_id=task-sibling, task_index=2-2)",
 		got,
 	)
+}
+
+func TestFormatVerificationTodoApplyErrors_FiltersSuccessfulResults(t *testing.T) {
+	got := FormatVerificationTodoApplyErrors([]VerificationTodoApplyResult{
+		{Movement: VerifyNextMovement{Op: "add", ID: "ok_todo"}, Success: true},
+		{Movement: VerifyNextMovement{Op: "done", ID: "bad_todo"}, Success: false, Reason: "todo not found"},
+	})
+	require.Equal(t, "FAILED DONE[bad_todo]: todo not found", got)
+}
+
+func TestFormatVerificationTodoApplyResults_RendersSuccessAndFailure(t *testing.T) {
+	got := FormatVerificationTodoApplyResults([]VerificationTodoApplyResult{
+		{Movement: VerifyNextMovement{Op: "add", ID: "ok_todo"}, Success: true},
+		{Movement: VerifyNextMovement{Op: "done", ID: "bad_todo"}, Success: false, Reason: "todo not found"},
+	})
+	require.Equal(t, []string{
+		"OK ADD[ok_todo]",
+		"FAILED DONE[bad_todo]: todo not found",
+	}, strings.Split(got, "\n"))
 }
 
 func TestVerificationTodoStore_MutationCanClaimLegacyItemIntoScope(t *testing.T) {

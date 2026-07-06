@@ -46,15 +46,13 @@ func (r *ReAct) AppendVerificationHistory(result *aicommon.VerifySatisfactionRes
 	if r.config == nil {
 		return
 	}
-	applyErrors := r.config.ApplyVerificationTodoOps(
+	applyResults := r.config.ApplyVerificationTodoOps(
 		aicommon.BuildVerificationTodoScope(r.GetCurrentTask()),
 		result.Satisfied,
 		result.NextMovements,
 	)
-	if len(applyErrors) > 0 {
-		if line := aicommon.FormatVerificationTodoApplyErrors(applyErrors); line != "" {
-			r.AddToTimeline("[NEXT_MOVEMENTS_ERROR]", line)
-		}
+	if line := aicommon.FormatVerificationTodoApplyErrors(applyResults); line != "" {
+		r.AddToTimeline("[NEXT_MOVEMENTS_ERROR]", line)
 	}
 }
 

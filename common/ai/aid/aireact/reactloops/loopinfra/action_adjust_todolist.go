@@ -178,7 +178,7 @@ func applyAdjustTodolistMovements(
 
 	aicommon.ApplyVerificationNextMovementsAndEmit(
 		cfg,
-		cfg.GetEmitter(),
+		loop.GetEmitter(),
 		task,
 		scope,
 		iterationIndex,

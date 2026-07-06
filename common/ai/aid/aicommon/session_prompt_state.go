@@ -231,11 +231,12 @@ func (s *SessionPromptState) SetVerificationTodo(todoJSON string) {
 
 // ApplyVerificationTodoOps applies one verification round's next_movements
 // operations (and the round's satisfied flag) to the persisted TODO store,
-// then re-serializes back to todoJSON. Returns any ops that could not be
-// applied under the supplied scope.
+// then re-serializes back to todoJSON. Returns one per-op result entry for
+// every movement (successful or not), so callers can render a uniform result
+// summary; failures carry a non-empty Reason.
 //
-// 关键词: ApplyVerificationTodoOps, 增量更新, satisfied -> SKIPPED, DB 持久化
-func (s *SessionPromptState) ApplyVerificationTodoOps(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) []VerificationTodoApplyError {
+// 关键词: ApplyVerificationTodoOps, 增量更新, satisfied -> SKIPPED, DB 持久化, per-op 结果
+func (s *SessionPromptState) ApplyVerificationTodoOps(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) []VerificationTodoApplyResult {
 	if s == nil {
 		return nil
 	}
@@ -243,9 +244,9 @@ func (s *SessionPromptState) ApplyVerificationTodoOps(scope VerificationTodoScop
 	defer s.m.Unlock()
 
 	store := UnmarshalVerificationTodoStore(s.todoJSON)
-	applyErrors := store.Apply(scope, satisfied, movements)
+	results := store.Apply(scope, satisfied, movements)
 	s.todoJSON = store.Marshal()
-	return applyErrors
+	return results
 }
 
 // GetVerificationTodoRendered returns the plain-text TODO snapshot ready for

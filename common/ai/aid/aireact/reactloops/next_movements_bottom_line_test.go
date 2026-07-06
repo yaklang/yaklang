@@ -34,7 +34,7 @@ type nextMovementsTrackableConfig struct {
 	snapshotStats   aicommon.VerificationTodoStats
 }
 
-func (c *nextMovementsTrackableConfig) ApplyVerificationTodoOps(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) []aicommon.VerificationTodoApplyError {
+func (c *nextMovementsTrackableConfig) ApplyVerificationTodoOps(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) []aicommon.VerificationTodoApplyResult {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.applyCalls++

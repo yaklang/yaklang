@@ -108,27 +108,81 @@ func (s *VerificationTodoStore) Clone() *VerificationTodoStore {
 	return cloned
 }
 
-// VerificationTodoApplyError reports one next_movements op that could not be
-// applied under the supplied task scope.
-type VerificationTodoApplyError struct {
+// VerificationTodoApplyResult reports the outcome of applying one
+// next_movements op under the supplied task scope. Every movement yields a
+// result entry — successful or not — so callers can render a uniform per-op
+// summary instead of only seeing the failures. When Success is false, Reason
+// carries the human-readable failure explanation.
+//
+// 关键词: VerificationTodoApplyResult, Success, per-op 结果, 方便结果输出
+type VerificationTodoApplyResult struct {
 	Movement VerifyNextMovement
+	Success  bool
 	Reason   string
 }
 
-// FormatVerificationTodoApplyErrors renders apply failures for timeline /
-// feedback consumers. Empty input yields an empty string.
-func FormatVerificationTodoApplyErrors(errors []VerificationTodoApplyError) string {
-	if len(errors) == 0 {
+// FormatVerificationTodoApplyResults renders every apply result (success and
+// failure) for timeline / feedback consumers, one line per op. Empty input
+// yields an empty string. Successful ops render as `OK <op>[<id>]`, failed
+// ops render as `FAILED <op>[<id>]: <reason>`.
+func FormatVerificationTodoApplyResults(results []VerificationTodoApplyResult) string {
+	if len(results) == 0 {
 		return ""
 	}
-	lines := make([]string, 0, len(errors))
-	for _, e := range errors {
-		op := strings.ToUpper(strings.TrimSpace(e.Movement.Op))
+	lines := make([]string, 0, len(results))
+	for _, r := range results {
+		op := strings.ToUpper(strings.TrimSpace(r.Movement.Op))
 		if op == "" {
 			op = "UNKNOWN"
 		}
-		id := strings.TrimSpace(e.Movement.ID)
-		reason := strings.TrimSpace(e.Reason)
+		id := strings.TrimSpace(r.Movement.ID)
+		if r.Success {
+			if id != "" {
+				lines = append(lines, fmt.Sprintf("OK %s[%s]", op, id))
+			} else {
+				lines = append(lines, fmt.Sprintf("OK %s", op))
+			}
+			continue
+		}
+		reason := strings.TrimSpace(r.Reason)
+		switch {
+		case id != "" && reason != "":
+			lines = append(lines, fmt.Sprintf("FAILED %s[%s]: %s", op, id, reason))
+		case id != "":
+			lines = append(lines, fmt.Sprintf("FAILED %s[%s]", op, id))
+		case reason != "":
+			lines = append(lines, fmt.Sprintf("FAILED %s: %s", op, reason))
+		default:
+			lines = append(lines, fmt.Sprintf("FAILED %s", op))
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// FormatVerificationTodoApplyErrors renders only the failed apply results for
+// the timeline [NEXT_MOVEMENTS_ERROR] category. Successful results are
+// filtered out. Empty input (or no failures) yields an empty string.
+func FormatVerificationTodoApplyErrors(results []VerificationTodoApplyResult) string {
+	if len(results) == 0 {
+		return ""
+	}
+	failed := make([]VerificationTodoApplyResult, 0, len(results))
+	for _, r := range results {
+		if !r.Success {
+			failed = append(failed, r)
+		}
+	}
+	if len(failed) == 0 {
+		return ""
+	}
+	lines := make([]string, 0, len(failed))
+	for _, r := range failed {
+		op := strings.ToUpper(strings.TrimSpace(r.Movement.Op))
+		if op == "" {
+			op = "UNKNOWN"
+		}
+		id := strings.TrimSpace(r.Movement.ID)
+		reason := strings.TrimSpace(r.Reason)
 		switch {
 		case id != "" && reason != "":
 			lines = append(lines, fmt.Sprintf("FAILED %s[%s]: %s", op, id, reason))
@@ -157,11 +211,19 @@ func FormatVerificationTodoApplyErrors(errors []VerificationTodoApplyError) stri
 // 每一个 TODO. satisfied 形参保留是为了接口稳定 (DB 反序列化 + 兼容旧
 // 调用方), 但不再触发任何状态变更.
 //
-// 无法应用的 op (跨作用域修改、缺失 id/content、未知 op 等) 会收集到返回值,
-// 由上层写入 timeline 的 [NEXT_MOVEMENTS_ERROR] 类别, 不再静默吞掉.
+// 无法应用的 op (跨作用域修改、缺失 id/content、未知 op 等) 会以 Success=false
+// 的结果条目返回, 由上层写入 timeline 的 [NEXT_MOVEMENTS_ERROR] 类别, 不再静默
+// 吞掉. 成功应用的 op 以 Success=true 的结果条目返回, 让调用方可以做统一的
+// per-op 结果输出 (见 FormatVerificationTodoApplyResults).
 //
-// 关键词: Apply 取消自动翻 SKIPPED, 显式关闭, AI 主动 done/delete/skip
-func (s *VerificationTodoStore) Apply(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) []VerificationTodoApplyError {
+// 冗余更新视为失败: 当一个 op 应用前后 TODO 的状态 (status / content) 完全
+// 不变时, 视为冗余更新, 返回 Success=false 并给出 "redundant <op>: ..." 的
+// Reason, 不推进 UpdatedAt. 典型场景: 重复 add 同 id 同 content 的 PENDING
+// 任务、对已经 DONE 的 TODO 再次 done、对已经 DELETED / SKIPPED 的 TODO 再次
+// delete / skip. 这让调用方可以识别"AI 没有实际推进 TODO"的空转轮次.
+//
+// 关键词: Apply 取消自动翻 SKIPPED, 显式关闭, AI 主动 done/delete/skip, per-op 结果, 冗余更新即失败
+func (s *VerificationTodoStore) Apply(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) []VerificationTodoApplyResult {
 	if s == nil {
 		return nil
 	}
@@ -170,93 +232,124 @@ func (s *VerificationTodoStore) Apply(scope VerificationTodoScope, satisfied boo
 	roundIndex := s.Counter
 	scope = scope.normalize()
 
-	var applyErrors []VerificationTodoApplyError
-	appendApplyError := func(movement VerifyNextMovement, reason string) {
-		applyErrors = append(applyErrors, VerificationTodoApplyError{
-			Movement: movement,
-			Reason:   reason,
-		})
-	}
-
+	results := make([]VerificationTodoApplyResult, 0, len(movements))
 	for _, movement := range movements {
 		id := strings.TrimSpace(movement.ID)
 		if id == "" {
-			appendApplyError(movement, "missing id")
+			results = append(results, todoApplyFailure(movement, "missing id"))
 			continue
 		}
 		op := strings.ToLower(strings.TrimSpace(movement.Op))
+		var result VerificationTodoApplyResult
 		switch op {
 		case "add":
-			content := strings.TrimSpace(movement.Content)
-			if content == "" {
-				appendApplyError(movement, "add requires non-empty content")
-				continue
-			}
-			item := s.findExactScopedItem(scope, id)
-			if item == nil {
-				item = &VerificationTodoItem{ID: id, CreatedAt: roundIndex}
-				item.applyScope(scope)
-				s.Items = append(s.Items, item)
-			} else {
-				item.applyScope(scope)
-			}
-			item.Content = content
-			item.Status = VerificationTodoStatusPending
-			item.UpdatedAt = roundIndex
+			result = s.applyAdd(movement, scope, id, roundIndex)
 		case "doing", "pending":
-			item := s.findItemForMutation(scope, id)
-			if item == nil {
-				appendApplyError(movement, s.mutationFailureReason(scope, id))
-				continue
-			}
-			item.claimLegacyScope(scope)
-			if content := strings.TrimSpace(movement.Content); content != "" {
-				item.Content = content
-			}
-			item.Status = VerificationTodoStatusDoing
-			item.UpdatedAt = roundIndex
+			result = s.applyStatusMutation(movement, scope, id, VerificationTodoStatusDoing, true, roundIndex)
 		case "done":
-			item := s.findItemForMutation(scope, id)
-			if item == nil {
-				appendApplyError(movement, s.mutationFailureReason(scope, id))
-				continue
-			}
-			item.claimLegacyScope(scope)
-			item.Status = VerificationTodoStatusDone
-			item.UpdatedAt = roundIndex
+			result = s.applyStatusMutation(movement, scope, id, VerificationTodoStatusDone, false, roundIndex)
 		case "delete":
-			item := s.findItemForMutation(scope, id)
-			if item == nil {
-				appendApplyError(movement, s.mutationFailureReason(scope, id))
-				continue
-			}
-			item.claimLegacyScope(scope)
-			if content := strings.TrimSpace(movement.Content); content != "" {
-				item.Content = content
-			}
-			item.Status = VerificationTodoStatusDeleted
-			item.UpdatedAt = roundIndex
+			result = s.applyStatusMutation(movement, scope, id, VerificationTodoStatusDeleted, true, roundIndex)
 		case "skip":
 			// 显式跳过: AI 主动声明"这个 TODO 暂不做, 但也不算删除".
 			// 与 delete 的区别在于语义层面 — delete 表示"不再需要", skip 表
 			// 示"本次任务范围内不做". 状态上都是终态, 不再算 active TODO.
 			// 关键词: 显式 skip op, 主动跳过, 终态状态
-			item := s.findItemForMutation(scope, id)
-			if item == nil {
-				appendApplyError(movement, s.mutationFailureReason(scope, id))
-				continue
-			}
-			item.claimLegacyScope(scope)
-			if content := strings.TrimSpace(movement.Content); content != "" {
-				item.Content = content
-			}
-			item.Status = VerificationTodoStatusSkipped
-			item.UpdatedAt = roundIndex
+			result = s.applyStatusMutation(movement, scope, id, VerificationTodoStatusSkipped, true, roundIndex)
 		default:
-			appendApplyError(movement, fmt.Sprintf("unsupported op %q; allowed: add, doing, pending, done, delete, skip", op))
+			result = todoApplyFailure(movement, fmt.Sprintf("unsupported op %q; allowed: add, doing, pending, done, delete, skip", op))
 		}
+		results = append(results, result)
 	}
-	return applyErrors
+	return results
+}
+
+// todoApplySuccess / todoApplyFailure are the two constructors for the per-op
+// result entries recorded by Apply. Centralizing them keeps the apply branches
+// one line each.
+func todoApplySuccess(movement VerifyNextMovement) VerificationTodoApplyResult {
+	return VerificationTodoApplyResult{Movement: movement, Success: true}
+}
+
+func todoApplyFailure(movement VerifyNextMovement, reason string) VerificationTodoApplyResult {
+	return VerificationTodoApplyResult{Movement: movement, Success: false, Reason: reason}
+}
+
+// redundantTodoMutationReason renders the "redundant <op>: todo already <state>"
+// message for a mutation that would leave status / content unchanged. The op
+// label is derived from the target status so doing/pending both report "doing".
+func redundantTodoMutationReason(target VerificationTodoStatus) string {
+	op, suffix := "doing", "doing"
+	switch target {
+	case VerificationTodoStatusDone:
+		op, suffix = "done", "done"
+	case VerificationTodoStatusDeleted:
+		op, suffix = "delete", "deleted"
+	case VerificationTodoStatusSkipped:
+		op, suffix = "skip", "skipped"
+	}
+	return fmt.Sprintf("redundant %s: todo already %s", op, suffix)
+}
+
+// applyAdd handles the "add" op. A missing item creates a fresh PENDING entry;
+// an existing same-id PENDING item with unchanged content is a redundant add
+// (failure); otherwise the content is (re)set to PENDING.
+func (s *VerificationTodoStore) applyAdd(movement VerifyNextMovement, scope VerificationTodoScope, id string, roundIndex int) VerificationTodoApplyResult {
+	content := strings.TrimSpace(movement.Content)
+	if content == "" {
+		return todoApplyFailure(movement, "add requires non-empty content")
+	}
+	item := s.findExactScopedItem(scope, id)
+	if item == nil {
+		item = &VerificationTodoItem{ID: id, CreatedAt: roundIndex}
+		item.applyScope(scope)
+		item.Content = content
+		item.Status = VerificationTodoStatusPending
+		item.UpdatedAt = roundIndex
+		s.Items = append(s.Items, item)
+		return todoApplySuccess(movement)
+	}
+	// 冗余 add: 同作用域下已存在相同 id 的 PENDING TODO 且 content 不变 → 失败.
+	// 关键词: 冗余 add, 重复添加相同任务, 状态未变即失败
+	if item.Status == VerificationTodoStatusPending && item.Content == content {
+		return todoApplyFailure(movement, "redundant add: todo already pending with same content")
+	}
+	item.Content = content
+	item.Status = VerificationTodoStatusPending
+	item.UpdatedAt = roundIndex
+	return todoApplySuccess(movement)
+}
+
+// applyStatusMutation is the shared path for doing/pending/done/delete/skip.
+// It looks the item up under scope, rejects redundant (no-op) transitions,
+// optionally applies a content override (only when allowContent is true; done
+// never carries content), then stamps the target status + UpdatedAt.
+func (s *VerificationTodoStore) applyStatusMutation(
+	movement VerifyNextMovement,
+	scope VerificationTodoScope,
+	id string,
+	target VerificationTodoStatus,
+	allowContent bool,
+	roundIndex int,
+) VerificationTodoApplyResult {
+	item := s.findItemForMutation(scope, id)
+	if item == nil {
+		return todoApplyFailure(movement, s.mutationFailureReason(scope, id))
+	}
+	newContent := strings.TrimSpace(movement.Content)
+	contentUnchanged := !allowContent || newContent == "" || newContent == item.Content
+	// 冗余: 目标状态已是 target 且 content 未变更 → 失败, 不推进 UpdatedAt.
+	// 关键词: 冗余 doing/done/delete/skip, 空转轮次识别
+	if item.Status == target && contentUnchanged {
+		return todoApplyFailure(movement, redundantTodoMutationReason(target))
+	}
+	item.claimLegacyScope(scope)
+	if allowContent && newContent != "" {
+		item.Content = newContent
+	}
+	item.Status = target
+	item.UpdatedAt = roundIndex
+	return todoApplySuccess(movement)
 }
 
 func (i *VerificationTodoItem) scope() VerificationTodoScope {

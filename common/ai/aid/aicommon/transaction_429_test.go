@@ -90,7 +90,7 @@ func (t *transactionTestConfig) ApplySessionEvidenceOps([]EvidenceOperation) {}
 func (t *transactionTestConfig) GetVerificationTodoRendered(_ VerificationTodoScope) string {
 	return ""
 }
-func (t *transactionTestConfig) ApplyVerificationTodoOps(VerificationTodoScope, bool, []VerifyNextMovement) []VerificationTodoApplyError {
+func (t *transactionTestConfig) ApplyVerificationTodoOps(VerificationTodoScope, bool, []VerifyNextMovement) []VerificationTodoApplyResult {
 	return nil
 }
 func (t *transactionTestConfig) GetVerificationTodoMarkdownDelta(VerificationTodoScope, bool, []VerifyNextMovement) string {

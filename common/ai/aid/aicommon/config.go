@@ -3237,7 +3237,7 @@ func (c *Config) GetVerificationTodoRendered(currentScope VerificationTodoScope)
 // later — for now this only updates the in-memory SessionPromptState).
 //
 // 关键词: ApplyVerificationTodoOps, Verify 写入, SessionPromptState 同步
-func (c *Config) ApplyVerificationTodoOps(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) []VerificationTodoApplyError {
+func (c *Config) ApplyVerificationTodoOps(scope VerificationTodoScope, satisfied bool, movements []VerifyNextMovement) []VerificationTodoApplyResult {
 	if c == nil {
 		return nil
 	}
