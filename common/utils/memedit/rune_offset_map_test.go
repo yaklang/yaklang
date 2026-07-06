@@ -156,3 +156,41 @@ func TestRuneOffsetMap(t *testing.T) {
 		})
 	}
 }
+
+// TestMemEditor_GetRuneOffsetMap_Memoize asserts the rune-offset map is
+// memoized on the editor (built once, reused) and invalidated when the source
+// changes. Before memoization, FileFilter rebuilt NewRuneOffsetMap over the
+// full source on every call — ~71GB/20% of alloc on javacms-core.
+func TestMemEditor_GetRuneOffsetMap_Memoize(t *testing.T) {
+	ed := memedit.NewMemEditor("Hello, 世界")
+
+	// Two calls return the SAME map pointer (memoized, not rebuilt).
+	first := ed.GetRuneOffsetMap()
+	if first == nil {
+		t.Fatal("GetRuneOffsetMap() returned nil")
+	}
+	second := ed.GetRuneOffsetMap()
+	if first != second {
+		t.Fatalf("GetRuneOffsetMap() rebuilt the map: first=%p second=%p (should be memoized)", first, second)
+	}
+	// Correctness on the memoized map (multi-byte): "Hello, 世界" — byte 7 = 世.
+	if r, ok := first.ByteOffsetToRuneIndex(7); !ok || r != 7 {
+		t.Errorf("ByteOffsetToRuneIndex(7) = (%v,%v), want (7,true)", r, ok)
+	}
+
+	// After a source edit (which invalidates), the map is rebuilt — new pointer.
+	if err := ed.InsertAtPosition(memedit.NewPosition(1, 1), "X"); err != nil {
+		t.Fatalf("InsertAtPosition: %v", err)
+	}
+	third := ed.GetRuneOffsetMap()
+	if third == nil {
+		t.Fatal("GetRuneOffsetMap() returned nil after source edit")
+	}
+	if third == first {
+		t.Fatalf("GetRuneOffsetMap() returned stale map after source edit (should rebuild): first=%p third=%p", first, third)
+	}
+	// And the rebuilt map reflects the new source.
+	if r, ok := third.ByteOffsetToRuneIndex(0); !ok || r != 0 {
+		t.Errorf("ByteOffsetToRuneIndex(0) on rebuilt map = (%v,%v), want (0,true)", r, ok)
+	}
+}
