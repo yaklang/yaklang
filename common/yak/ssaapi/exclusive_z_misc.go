@@ -59,6 +59,19 @@ func (v *Value) SetContextValue(i ContextID, values *Value) *Value {
 	return v
 }
 
+// maxDataflowEdgesPerValue caps the DependOn/EffectOn edge count stored on a
+// single *Value. The edge graph is built by saveDataflowPath purely for path
+// DISPLAY (GetDependOn/GetEffectOn -> PrevDataflowPath); it's best-effort UI
+// data, not the taint result. On a heavy rule a single hub value (e.g. a
+// widely-used param) can accumulate millions of edges, which is what made
+// SafeMapWithKey.Set the #1 LIVE allocator (3.6GB inuse on javacms-core,
+// retained for the whole rule because Opt C only clears between rules). Capping
+// per-value bounds the live graph regardless of rule duration; the first
+// maxDataflowEdgesPerValue edges are kept (enough for path display), the rest
+// are dropped. The taint match/alert result is unaffected (it's computed from
+// the opcode value-sets, not the edge graph).
+const maxDataflowEdgesPerValue = 256
+
 func (i *Value) AppendDependOn(v *Value) (ret *Value) {
 	ret = i
 	if i == nil {
@@ -72,8 +85,15 @@ func (i *Value) AppendDependOn(v *Value) (ret *Value) {
 	}
 	if i.hasDependOn(v) {
 		return
-	} else {
-		i.setDependOn(v)
+	}
+	// Bound the edge graph: once this value's DependOn is full, stop adding
+	// (path display truncates; taint result unaffected). See maxDataflowEdgesPerValue.
+	if i.DependOn != nil && i.DependOn.Count() >= maxDataflowEdgesPerValue {
+		return
+	}
+	i.setDependOn(v)
+	// v.setEffectOn(i) would add the reverse edge; bound it too.
+	if v.EffectOn == nil || v.EffectOn.Count() < maxDataflowEdgesPerValue {
 		v.setEffectOn(i)
 	}
 	return i
@@ -91,9 +111,13 @@ func (i *Value) AppendEffectOn(v *Value) (ret *Value) {
 		return
 	}
 	if i.hasEffectOn(v) {
-
-	} else {
-		i.setEffectOn(v)
+		return
+	}
+	if i.EffectOn != nil && i.EffectOn.Count() >= maxDataflowEdgesPerValue {
+		return
+	}
+	i.setEffectOn(v)
+	if v.DependOn == nil || v.DependOn.Count() < maxDataflowEdgesPerValue {
 		v.setDependOn(i)
 	}
 	return i

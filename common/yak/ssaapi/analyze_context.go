@@ -49,6 +49,12 @@ type AnalyzeContext struct {
 	// Use for recursive depth limit
 	recursiveCounter int64
 
+	// savedPathEdges counts saveDataflowPath calls in this descent; SavePath
+	// stops building the edge graph once it reaches maxSavedPathEdges. Bounds
+	// the live DependOn/EffectOn graph for a long/heavy rule (path display is
+	// best-effort; taint result unaffected).
+	savedPathEdges int64
+
 	// savedPath map[*Value]struct{}
 	recursiveStatusIsLeaf *utils.Stack[node]
 }
@@ -90,8 +96,22 @@ func saveDataflowPath(direct AnalysisType, from, to *Value) {
 	}
 }
 
+// maxSavedPathEdges caps the TOTAL dataflow-path edges one AnalyzeContext
+// (one getTopDefs/getBottomUses descent) will record via saveDataflowPath. The
+// per-Value cap (maxDataflowEdgesPerValue) bounds a single hub; this caps the
+// whole descent so a rule that explores millions of nodes can't accumulate an
+// unbounded edge graph (the #1 live allocator on javacms-core, retained for
+// the whole rule). Path display is best-effort; the taint result is unaffected.
+const maxSavedPathEdges = 200000
+
 func (a *AnalyzeContext) SavePath(result Values) {
 	if a.recursiveStatusIsLeaf.Len() > 1000 {
+		return
+	}
+	// Total-edge cap: stop building the path edge graph once the descent has
+	// recorded maxSavedPathEdges. Path display truncates; the rule's match/alert
+	// result (computed from opcode value-sets, not the edge graph) is unaffected.
+	if a.savedPathEdges >= maxSavedPathEdges {
 		return
 	}
 	shouldSave := func() bool {
@@ -112,6 +132,7 @@ func (a *AnalyzeContext) SavePath(result Values) {
 					prev := a.recursiveStatusIsLeaf.PeekN(i).node //
 					// log.Errorf("Value[%v] prev [%v]", current, prev)
 					saveDataflowPath(a.direct, prev, current)
+					a.savedPathEdges++
 					current = prev
 				}
 			}
