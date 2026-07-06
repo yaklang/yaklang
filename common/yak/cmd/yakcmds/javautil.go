@@ -7,7 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/yserx"
 )
 
-var JavaUtils = []*cli.Command{
+var JavaUtils = append([]*cli.Command{
 	{
 		Name:    "serialdumper",
 		Usage:   "Java SerialDumper in Yaklang/Golang Implemented",
@@ -24,6 +24,4 @@ var JavaUtils = []*cli.Command{
 			}
 		},
 	},
-	JavaDecompilerCommand,
-	JavaDecompilerSelfChecking,
-}
+}, javaDecompilerCommands()...)

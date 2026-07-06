@@ -1,3 +1,5 @@
+//go:build !irify_exclude
+
 package yakcmds
 
 import (
@@ -451,4 +453,8 @@ func jarAction(multiMode bool, jarPath string, c *cli.Context) error {
 		return err
 	}
 	return nil
+}
+
+func javaDecompilerCommands() []*cli.Command {
+	return []*cli.Command{JavaDecompilerCommand, JavaDecompilerSelfChecking}
 }

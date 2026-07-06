@@ -554,8 +554,37 @@ jobs:
           name: ${{ env.SHA256 }}
           path: ./${{ env.SHA256 }}
 
-  build_slim_binaries:
+  resolve_slim_build:
     needs: check_commit_msg
+    runs-on: ubuntu-22.04
+    outputs:
+      build_slim: ${{ steps.detect.outputs.build_slim }}
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "./go.mod"
+          cache: false
+
+      - name: Detect whether to build yak-slim
+        id: detect
+        shell: bash
+        run: |
+          go run common/yak/cmd/yak.go repos-tag -o tags.txt
+          YAK_TAG=$(cat tags.txt)
+          echo "YAK_TAG=$YAK_TAG"
+          if [[ "$YAK_TAG" == *"-yakit-"* ]] || [[ "$YAK_TAG" == *"-irify-"* ]]; then
+            echo "Skip yak-slim build for variant tag: $YAK_TAG"
+            echo "build_slim=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "build_slim=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build_slim_binaries:
+    needs: [check_commit_msg, resolve_slim_build]
+    if: needs.resolve_slim_build.outputs.build_slim == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -575,8 +604,8 @@ jobs:
     secrets: inherit
 
   upload_slim_binaries_to_oss:
-    needs: [check_commit_msg, build_slim_binaries]
-    if: github.event_name != 'pull_request'
+    needs: [check_commit_msg, resolve_slim_build, build_slim_binaries]
+    if: github.event_name != 'pull_request' && needs.resolve_slim_build.outputs.build_slim == 'true'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
@@ -617,6 +646,15 @@ jobs:
               UPLOAD_FILES="${UPLOAD_FILES};${bin}:/yak/${YAK_TAG}/${bin};${sha_file}:/yak/${YAK_TAG}/${sha_file}"
             fi
           done
+
+          YAK_VERSION="${YAK_TAG#v}"
+          echo "$YAK_VERSION" > ../yak-slim-version.txt
+          UPLOAD_FILES="${UPLOAD_FILES};../yak-slim-version.txt:/yak/${YAK_TAG}/yak-slim-version.txt"
+
+          if [[ "$YAK_TAG" != *"-yakit-"* ]] && [[ "$YAK_TAG" != *"-irify-"* ]]; then
+            UPLOAD_FILES="${UPLOAD_FILES};../yak-slim-version.txt:/yak/latest/yak-slim-version.txt"
+          fi
+
           echo "Uploading: $UPLOAD_FILES"
           ../yak upload-oss --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f "$UPLOAD_FILES"
 
@@ -628,7 +666,8 @@ jobs:
 
   check_version_and_github_release:
     runs-on: ubuntu-22.04
-    needs: [build_and_upload_to_oss, build_slim_binaries]
+    needs: [build_and_upload_to_oss, resolve_slim_build, build_slim_binaries]
+    if: always() && needs.build_and_upload_to_oss.result == 'success' && (needs.build_slim_binaries.result == 'success' || needs.build_slim_binaries.result == 'skipped')
     steps:
       - uses: actions/checkout@v2
 
