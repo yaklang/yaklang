@@ -25,6 +25,14 @@ func buildExitBlockedByTodoMessage(actionName string, items []aicommon.Verificat
 	)
 }
 
+func buildFinishBlockedByGoalModeMessage(currentIteration, goalMinIterations int) string {
+	return fmt.Sprintf(
+		"goal mode is enabled; finish is blocked until iteration %d. current iteration: %d. Keep executing the task and only use directly_answer for progress updates before the minimum iteration gate is reached.",
+		goalMinIterations,
+		currentIteration,
+	)
+}
+
 var loopAction_Finish = &LoopAction{
 	ActionType: "finish",
 	Description: "Mark the current task as finished and exit the loop IMMEDIATELY. " +
@@ -38,6 +46,13 @@ var loopAction_Finish = &LoopAction{
 		"(it delivers the answer but does NOT end the task), then call 'finish'. " +
 		"Add 'human_readable_thought' only if a brief closing note is needed.",
 	ActionHandler: func(loop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {
+		if loop.ShouldBlockFinishAtIteration(loop.GetCurrentIterationIndex()) {
+			msg := buildFinishBlockedByGoalModeMessage(loop.GetCurrentIterationIndex(), loop.GetGoalMinIterations())
+			loop.invoker.AddToTimeline("[GOAL_MODE_FINISH_BLOCKED]", msg)
+			operator.Feedback(msg)
+			operator.Continue()
+			return
+		}
 		if items := aicommon.GetBlockingVerificationTodoItems(loop.GetConfig(), loop.GetCurrentTask()); len(items) > 0 {
 			msg := buildExitBlockedByTodoMessage("finish", items)
 			loop.invoker.AddToTimeline("[FINISH_BLOCKED_BY_TODO]", msg)

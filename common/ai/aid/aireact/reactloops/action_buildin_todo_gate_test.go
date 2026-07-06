@@ -17,14 +17,28 @@ import (
 type todoGateTestConfig struct {
 	*mock.MockedAIConfig
 
-	mu           sync.Mutex
-	activeByTask map[string][]aicommon.VerificationTodoItem
+	mu                sync.Mutex
+	activeByTask      map[string][]aicommon.VerificationTodoItem
+	enableGoalMode    bool
+	goalMinIterations int64
 }
 
 func (c *todoGateTestConfig) ActiveVerificationTodoItemsByScope(scope aicommon.VerificationTodoScope) []aicommon.VerificationTodoItem {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return append([]aicommon.VerificationTodoItem(nil), c.activeByTask[scope.TaskID]...)
+}
+
+func (c *todoGateTestConfig) GetEnableGoalMode() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.enableGoalMode
+}
+
+func (c *todoGateTestConfig) GetGoalMinIterations() int64 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return aicommon.NormalizeGoalMinIterations(c.goalMinIterations)
 }
 
 type todoGateTestInvoker struct {
@@ -143,6 +157,23 @@ func TestFinish_BlockedByCurrentTaskTodos(t *testing.T) {
 	assert.Contains(t, op.GetFeedback().String(), "finish cannot exit")
 	assert.Contains(t, invoker.timelineString(), "[FINISH_BLOCKED_BY_TODO]")
 	assert.Contains(t, invoker.timelineString(), "write_summary")
+}
+
+func TestFinish_BlockedByGoalMode(t *testing.T) {
+	loop, invoker, cfg, task := newTodoGateTestLoop(t, nil)
+	cfg.enableGoalMode = true
+	cfg.goalMinIterations = 6
+	loop.currentIterationIndex = 3
+
+	op := NewActionHandlerOperator(task)
+	loopAction_Finish.ActionHandler(loop, nil, op)
+
+	require.True(t, op.IsContinued())
+	terminated, termErr := op.IsTerminated()
+	require.False(t, terminated)
+	require.NoError(t, termErr)
+	assert.Contains(t, op.GetFeedback().String(), "goal mode is enabled")
+	assert.Contains(t, invoker.timelineString(), "[GOAL_MODE_FINISH_BLOCKED]")
 }
 
 // TestDirectlyAnswer_EmitsAndContinuesWhenTodosClosed 验证无 open TODO 时

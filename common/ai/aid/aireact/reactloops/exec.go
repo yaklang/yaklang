@@ -724,6 +724,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 	}
 
 	var operator = newLoopActionHandlerOperator(task)
+	r.ApplyGoalModeNextIterationGate(operator, 1)
 	defer func() {
 		if finalError != nil {
 			abort(finalError)
@@ -953,6 +954,7 @@ LOOP:
 				operator.SetReflectionData("rejected_action", actionName)
 				operator.SetReflectionData("rejected_reason", "task_already_async")
 				operator.Continue()
+				r.ApplyGoalModeNextIterationGate(operator, iterationCount+1)
 				continueIter := func() {
 					r.GetInvoker().AddToTimeline("iteration", fmt.Sprintf("[%v]ReAct Iteration Done[%v] max:%v continue to next iteration", loopName, iterationCount, maxIterations))
 				}
@@ -1164,6 +1166,7 @@ LOOP:
 
 		// 非异步模式，继续下一次循环
 		if operator.IsContinued() {
+			r.ApplyGoalModeNextIterationGate(operator, iterationCount+1)
 			continueIter()
 			utils.Debug(func() {
 				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
@@ -1181,6 +1184,7 @@ LOOP:
 		}
 
 		// 如果既没有调用 Exit/Fail 也没有调用 Continue，默认继续
+		r.ApplyGoalModeNextIterationGate(operator, iterationCount+1)
 		continueIter()
 		utils.Debug(func() {
 			fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")

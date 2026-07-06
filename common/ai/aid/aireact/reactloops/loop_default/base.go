@@ -40,6 +40,20 @@ const reActPostSummary = `
 
 `
 
+func defaultLoopMaxIterations(cfg aicommon.AICallerConfigIf) int {
+	if cfg == nil {
+		return 100
+	}
+	maxIterations := cfg.GetMaxIterationCount()
+	if typedCfg, ok := cfg.(*aicommon.Config); ok && typedCfg.GetEnableGoalMode() {
+		maxIterations = aicommon.EnsureGoalModeMaxIterations(maxIterations, typedCfg.GetGoalMinIterations())
+	}
+	if maxIterations <= 0 {
+		return 100
+	}
+	return int(maxIterations)
+}
+
 func buildDefaultReactiveDataBuilder() reactloops.ReActLoopOption {
 	return reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 		renderMap := map[string]any{
@@ -63,7 +77,7 @@ func init() {
 				reactloops.WithPlanExecActionType(schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION),
 				reactloops.WithInitTask(buildInitTask(r)),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
-				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
+				reactloops.WithMaxIterations(defaultLoopMaxIterations(r.GetConfig())),
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
 				buildDefaultReactiveDataBuilder(),
