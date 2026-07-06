@@ -110,6 +110,27 @@ func TestConfig_EnableDispatchSubReactAgentsNotPropagated(t *testing.T) {
 		"EnableDispatchSubReactAgents must not propagate via ConvertConfigToOptions; only top-level ReAct may dispatch sub-agents")
 }
 
+func TestConfig_EnableMultiAgentMode(t *testing.T) {
+	cfg := NewConfig(context.Background(), WithEnableMultiAgentMode(true))
+	require.True(t, cfg.EnableDispatchSubReactAgents)
+	require.True(t, cfg.GetPreferDispatchSubReactAgents())
+}
+
+func TestConfig_GoalModeNotPropagated(t *testing.T) {
+	parent := NewConfig(
+		context.Background(),
+		WithEnableGoalMode(true),
+		WithGoalMinIterations(9),
+	)
+	require.True(t, parent.GetEnableGoalMode())
+	require.Equal(t, int64(9), parent.GetGoalMinIterations())
+
+	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
+	require.False(t, child.GetEnableGoalMode(),
+		"Goal mode must remain a top-level only behavior and must not propagate to forked child configs")
+	require.Equal(t, int64(DefaultGoalMinIterations), child.GetGoalMinIterations())
+}
+
 func TestConfig_IntervalReviewConfigPropagation(t *testing.T) {
 	parent := NewConfig(
 		context.Background(),
