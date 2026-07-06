@@ -2,10 +2,24 @@ package ssadb
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 )
+
+// irIndexInsertColumns are the IrIndex application columns written by the
+// batched multi-row INSERT below. The gorm.Model fields (id/created_at/
+// updated_at/deleted_at) are left to SQLite autoincrement / defaults, matching
+// the previous per-row db.Create behavior (which also did not set them).
+var irIndexInsertColumns = []string{
+	"program_name", "value_id", "variable_id", "class_id", "field_id",
+	"scope_name", "owner_value_id", "version_id",
+}
+
+// irIndexBatchChunk bounds the rows per multi-row INSERT so the bind-parameter
+// count stays under SQLite's ~999 host-parameter limit: 100 rows * 8 cols = 800.
+const irIndexBatchChunk = 100
 
 // IrIndex is the database model for index entries (normalized with IDs).
 type IrIndex struct {
@@ -50,13 +64,23 @@ func SaveIrIndexBatch(db *gorm.DB, items []*IrIndex) {
 	if db == nil || len(items) == 0 {
 		return
 	}
+	clean := make([]*IrIndex, 0, len(items))
+	for _, it := range items {
+		if it != nil {
+			clean = append(clean, it)
+		}
+	}
+	if len(clean) == 0 {
+		return
+	}
 
 	err := diagnostics.TrackLow("Database.SaveIRIndexBatch", func() error {
-		for _, item := range items {
-			if item == nil {
-				continue
+		for start := 0; start < len(clean); start += irIndexBatchChunk {
+			end := start + irIndexBatchChunk
+			if end > len(clean) {
+				end = len(clean)
 			}
-			if err := db.Create(item).Error; err != nil {
+			if err := bulkInsertIrIndex(db, clean[start:end]); err != nil {
 				return err
 			}
 		}
@@ -65,6 +89,34 @@ func SaveIrIndexBatch(db *gorm.DB, items []*IrIndex) {
 	if err != nil {
 		fmt.Printf("SaveIrIndexBatch failed: %v\n", err)
 	}
+}
+
+// bulkInsertIrIndex issues a single multi-row INSERT for one chunk. There is no
+// UNIQUE constraint on ir_indices_v1 (only a non-unique index), and recompile
+// deletes the program's rows first (ssadb.DeleteProgramIrCode), so this is a
+// pure INSERT — never an upsert — matching the prior per-row db.Create path.
+func bulkInsertIrIndex(db *gorm.DB, items []*IrIndex) error {
+	if len(items) == 0 {
+		return nil
+	}
+	const cols = 8
+	placeholder := "(" + strings.Repeat("?,", cols-1) + "?)"
+	values := make([]string, 0, len(items))
+	args := make([]interface{}, 0, len(items)*cols)
+	for _, it := range items {
+		values = append(values, placeholder)
+		args = append(args,
+			it.ProgramName, it.ValueID, it.VariableID, it.ClassID, it.FieldID,
+			it.ScopeName, it.OwnerValueID, it.VersionID,
+		)
+	}
+	sql := fmt.Sprintf(
+		"INSERT INTO %s (%s) VALUES %s",
+		TableIrIndices,
+		strings.Join(irIndexInsertColumns, ","),
+		strings.Join(values, ","),
+	)
+	return db.Exec(sql, args...).Error
 }
 
 type IrVariable struct {

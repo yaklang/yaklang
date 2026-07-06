@@ -266,6 +266,31 @@ func (c *ProgramCache) CountReleasedEditors() int {
 	return c.lastReleasedEditors
 }
 
+// FlushAuxSavers drains the auxiliary async/resident DB savers (index, offset,
+// type). It does NOT spill instructions and does NOT clear any resident maps
+// (index variable/member/class/consts, type resident), so it is safe to call
+// between compile batches: cross-unit SyntaxFlow resolution keeps using the
+// resident maps (TestImportClass), and BasicBlocks stay resident
+// (TestPython_ImportWithInit, TestJsp_To_Java_Range). typeStore.flush marshals
+// and persists resident types but leaves them resident so later-units / lazy
+// builds / cross-unit queries still resolve. It exists to spread IrIndex/
+// IrOffset/IrType writes across the whole compile instead of one giant final
+// SaveToDatabase flush, which on a large project (javacms) backed up the async
+// saver's FeedBlock and stalled the compile for >1h, and on javacms-core made
+// the type-store flush (per-row UpsertIrType + json.Marshal) dominate the final
+// flush CPU (~86%).
+func (c *ProgramCache) FlushAuxSavers() {
+	if c == nil || !c.HaveDatabaseBackend() {
+		return
+	}
+	if c.indexes != nil {
+		c.indexes.Flush() // indexStore.Flush -> indexSaver.Flush + offsetSaver.Flush
+	}
+	if c.types != nil {
+		c.types.flush() // typeStore.flush: marshal+batch-INSERT resident types, keeps resident map
+	}
+}
+
 // flushAuxStores clears only the non-instruction stores (types, sources) after
 // a compile-unit flush. The instruction store is not touched: its
 // compile-unit-split flush path already persisted ordinary instructions while

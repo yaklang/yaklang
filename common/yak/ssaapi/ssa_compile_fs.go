@@ -426,7 +426,15 @@ func (c *Config) parseProjectWithFSUnits(
 		// across batches and are persisted by the final SaveToDatabase flush.
 		// FlushCompileUnit (instruction-only, blocks resident) is retained for
 		// re-enable once the FeedBlock + cross-unit bugs are fixed.
+		//
+		// FlushAuxSavers, by contrast, is safe per-batch: it only drains the
+		// index/offset async DB-saver channels — it spills no instructions and
+		// clears no resident maps, so the two suites above stay green. Spreading
+		// IrIndex/IrOffset writes across batches prevents the millions-of-rows
+		// final-SaveToDatabase flush that backed up FeedBlock and stalled the
+		// compile for >1h on javacms (see build/scan-logs/javacms-e2e-java.log).
 		if prog.Cache != nil {
+			prog.Cache.FlushAuxSavers()
 			prog.CheckMemoryPressure(batchIndex+1, len(batches))
 		}
 		if compileUnitLogEnabled() {
