@@ -166,9 +166,16 @@ func (c *Config) parseProjectWithFSUnits(
 	}
 	batchMinFiles, batchMinBytes := compileUnitBatchThresholds()
 	batches := buildCompileUnitExecutionBatches(plan.Order, batchMinFiles, batchMinBytes)
-	// Step mode (per-batch FlushCompileUnit + CompileUnitSplit) is the DEFAULT
-	// for any project size. YAK_SSA_COMPILE_UNIT_LEGACY opts back into the
-	// monolithic legacy/compat compile path (no per-unit flush, resident IR).
+	// Step mode (compile-unit batching) is the DEFAULT for any project size.
+	// YAK_SSA_COMPILE_UNIT_LEGACY opts back into the monolithic legacy/compat
+	// compile path (no batching).
+	//
+	// Per-batch FlushCompileUnit is disabled (see the batch loop below): every
+	// flush path breaks a suite, and the function-body release it gates is a
+	// no-op. CompileUnitSplit (instruction spill) is left false for the same
+	// reason. Both are re-enable targets once the dbcache FeedBlock + cross-
+	// unit resolution bugs are fixed; shouldKeepCompileUnitBoundaryResident
+	// already keeps BasicBlocks resident for that future path.
 	writerCacheRequested := true
 	writerCacheEnabled := true
 	if envFlagEnabled(compileUnitLegacyEnv) {
@@ -194,7 +201,7 @@ func (c *Config) parseProjectWithFSUnits(
 			len(plan.Units), len(plan.Edges), len(plan.Order), len(batches), compileUnitLegacyEnv)
 		return c.parseProjectWithFSLegacy(sourceFilesystem, processCallback)
 	}
-	c.Config.SetCompileUnitSplit(true)
+	c.Config.SetCompileUnitSplit(false)
 
 	prog, builder, err := c.init(filesystem, handlerTotal)
 	if err != nil {
@@ -408,63 +415,22 @@ func (c *Config) parseProjectWithFSUnits(
 		if c.isStop() {
 			return nil, ErrContextCancel
 		}
-		// Capture pre-flush metrics for comparison
-		preFlushIR := 0
-		preFlushPersisted := 0
-		preFlushFuncs := 0
-		preFlushBlueprints := 0
+		// Per-batch FlushCompileUnit is intentionally NOT called: every
+		// per-batch flush path breaks a suite (flushing instructions closes the
+		// dbcache async-save channel → FeedBlock panic on Python lazy reload;
+		// flushing stores breaks cross-unit SyntaxFlow resolution →
+		// TestImportClass over-resolves). The function-body release the flush
+		// gates is also a no-op (extractUnitKeyFromFunctionKey never matches
+		// bare function keys). So per-batch flushing gives no memory benefit
+		// today and only breaks tests; instructions + stores stay resident
+		// across batches and are persisted by the final SaveToDatabase flush.
+		// FlushCompileUnit (instruction-only, blocks resident) is retained for
+		// re-enable once the FeedBlock + cross-unit bugs are fixed.
 		if prog.Cache != nil {
-			preFlushIR = prog.Cache.CountInstruction()
-			preFlushPersisted = prog.Cache.InstructionPersistedCount()
-		}
-		if prog.Funcs != nil {
-			preFlushFuncs = prog.Funcs.Len()
-		}
-		if prog.Blueprint != nil {
-			preFlushBlueprints = prog.Blueprint.Len()
-		}
-		preFlushHeap := captureHeapMetrics()
-
-		if prog.Cache != nil {
-			prog.Cache.FlushCompileUnit(strings.Join(unitKeys, ","))
-
-			// Check memory pressure after flush
 			prog.CheckMemoryPressure(batchIndex+1, len(batches))
-
-			// Measure post-flush to verify release
-			postFlushIR := prog.Cache.CountInstruction()
-			postFlushPersisted := prog.Cache.InstructionPersistedCount()
-			postFlushFuncs := 0
-			postFlushBlueprints := 0
-			if prog.Funcs != nil {
-				postFlushFuncs = prog.Funcs.Len()
-			}
-			if prog.Blueprint != nil {
-				postFlushBlueprints = prog.Blueprint.Len()
-			}
-			postFlushHeap := captureHeapMetrics()
-			releasedEditors := prog.Cache.CountReleasedEditors()
-
-			prog.ProcessInfof(
-				"compile unit batch(%d/%d) cache flushed scc=%d-%d units=%s mode=%s resident_ir=%d→%d(Δ%+d) persisted_ir=%d→%d(Δ%+d) heap_mb=%.1f→%.1f(Δ%+.1f) funcs=%d→%d(Δ%+d) blueprints=%d→%d(Δ%+d) editors_released=%d upstreams=%d cost=%v",
-				batchIndex+1,
-				len(batches),
-				batch.startSCC+1,
-				batch.endSCC+1,
-				strings.Join(unitKeys, ","),
-				prog.Cache.InstructionCacheMode(),
-				preFlushIR, postFlushIR, postFlushIR-preFlushIR,
-				preFlushPersisted, postFlushPersisted, postFlushPersisted-preFlushPersisted,
-				preFlushHeap, postFlushHeap, postFlushHeap-preFlushHeap,
-				preFlushFuncs, postFlushFuncs, postFlushFuncs-preFlushFuncs,
-				preFlushBlueprints, postFlushBlueprints, postFlushBlueprints-preFlushBlueprints,
-				releasedEditors,
-				prog.UpStream.Len(),
-				time.Since(unitBuildStart),
-			)
 		}
 		if compileUnitLogEnabled() {
-			prog.ProcessInfof("compile unit batch(%d/%d) build+flush finished units=%s cost=%v", batchIndex+1, len(batches), strings.Join(unitKeys, ","), time.Since(unitBuildStart))
+			prog.ProcessInfof("compile unit batch(%d/%d) build finished units=%s cost=%v", batchIndex+1, len(batches), strings.Join(unitKeys, ","), time.Since(unitBuildStart))
 		}
 		parseTime += time.Since(unitBuildStart)
 		logPhaseHeap(fmt.Sprintf("unit_batch_%03d", batchIndex+1))

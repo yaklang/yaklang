@@ -217,7 +217,20 @@ func (c *ProgramCache) FlushCompileUnit(unitKey string) {
 	if c == nil || !c.HaveDatabaseBackend() {
 		return
 	}
-	releasedEditors := 0
+	// Per-batch flush bounds memory by spilling ORDINARY instructions to DB
+	// (flushCompileUnitWriter keeps BasicBlocks + Function/Parameter/FreeValue
+	// boundary instructions resident, so block ScopeTable survives for lazy
+	// builds). Stores (indexes/types/sources) are intentionally NOT flushed
+	// per batch: flushing them mid-project breaks cross-unit resolution
+	// (SyntaxFlow `#->` over-resolves imported symbols — see TestImportClass).
+	// They stay resident and are persisted by the final SaveToDatabase flush.
+	//
+	// NOTE: FlushCompileUnit is currently NOT called from the batch loop in
+	// ssa_compile_fs.go because the per-batch instruction flush exposes two
+	// deeper bugs (dbcache async-save channel lifetime → FeedBlock panic on
+	// lazy reload; cross-unit store flush). It is retained here for re-enable
+	// once those are fixed; shouldKeepCompileUnitBoundaryResident already
+	// keeps BasicBlocks resident for that future path.
 	c.diagnosticsTrack("ssa.ProgramCache.FlushCompileUnit",
 		func() error {
 			if c.instructions != nil {
@@ -225,33 +238,8 @@ func (c *ProgramCache) FlushCompileUnit(unitKey string) {
 			}
 			return nil
 		},
-		func() error {
-			if c.indexes != nil {
-				c.indexes.Flush()
-			}
-			return nil
-		},
-		func() error {
-			if c.types != nil {
-				c.types.flush()
-			}
-			return nil
-		},
-		func() error {
-			if c.sources != nil {
-				c.sources.Flush()
-				releasedEditors = c.sources.ReleasePersistedEditors()
-			}
-			return nil
-		},
 	)
-	c.lastReleasedEditors = releasedEditors
-
-	// Clear auxiliary stores (types/sources) to release memory. The instruction
-	// store is NOT cleared here: flushCompileUnitWriter already flushed ordinary
-	// instructions while keeping function/parameter/free-value boundary
-	// instructions resident for later cross-unit calls.
-	clearedItems := c.flushAuxStores()
+	c.lastReleasedEditors = 0
 
 	// Release program-level state for completed units (function bodies plus
 	// program caches the flush path no longer needs).
@@ -266,8 +254,8 @@ func (c *ProgramCache) FlushCompileUnit(unitKey string) {
 	if instructionCacheDebugEnabled() {
 		var m runtime.MemStats
 		runtime.ReadMemStats(&m)
-		log.Debugf("[ssa-ir-cache-flush] program=%s unit=%s mode=%s cleared=%d released_funcs=%d heap=%.1fMB resident=%d persisted=%d released_editors=%d",
-			c.program.GetProgramName(), unitKey, c.InstructionCacheMode(), clearedItems, releasedFuncs, float64(m.HeapInuse)/(1024*1024), c.CountInstruction(), c.InstructionPersistedCount(), releasedEditors)
+		log.Debugf("[ssa-ir-cache-flush] program=%s unit=%s mode=%s released_funcs=%d heap=%.1fMB resident=%d persisted=%d",
+			c.program.GetProgramName(), unitKey, c.InstructionCacheMode(), releasedFuncs, float64(m.HeapInuse)/(1024*1024), c.CountInstruction(), c.InstructionPersistedCount())
 	}
 }
 
@@ -283,11 +271,14 @@ func (c *ProgramCache) CountReleasedEditors() int {
 // compile-unit-split flush path already persisted ordinary instructions while
 // keeping function/parameter/free-value boundary instructions resident for
 // later cross-unit calls.
-func (c *ProgramCache) flushAuxStores() int {
+//
+// Currently unused: FlushCompileUnit no longer clears aux stores (that broke
+// cross-unit resolution). Retained for the future re-enable of full per-batch
+// flush once the dbcache FeedBlock + cross-unit bugs are fixed.
+func (c *ProgramCache) flushAuxStores() (cleared int) {
 	if c == nil {
 		return 0
 	}
-	cleared := 0
 
 	if c.types != nil && c.types.resident != nil {
 		c.types.resident = utils.NewSafeMapWithKey[int64, Type]()

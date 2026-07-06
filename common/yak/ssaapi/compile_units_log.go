@@ -26,12 +26,6 @@ func envFlagEnabled(name string) bool {
 	return value != "" && value != "0" && value != "false" && value != "no" && value != "off" && value != "disable" && value != "disabled"
 }
 
-func captureHeapMetrics() float64 {
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-	return float64(m.HeapInuse) / (1024 * 1024)
-}
-
 func logPhaseHeap(tag string) {
 	profileDir := heapProfileDir()
 	if !heapLogEnabled && profileDir == "" {

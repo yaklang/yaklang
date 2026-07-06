@@ -66,6 +66,14 @@ func shouldKeepCompileUnitBoundaryResident(inst Instruction) bool {
 		SSAOpcodeSideEffect,
 		SSAOpcodeExternLib:
 		return true
+	case SSAOpcodeBasicBlock:
+		// BasicBlocks carry the ScopeTable that FunctionBuilder relies on for
+		// CreateVariable/NewParam during lazy/deferred builds. The scope is not
+		// restored when a spilled block is reloaded from DB, so a reloaded block
+		// has a nil ScopeTable and the next NewParam panics (nil Variable). Keep
+		// blocks resident under compile-unit split; they are small (metadata +
+		// scope) compared to the instruction stream that the split path spills.
+		return true
 	default:
 		return false
 	}
