@@ -53,11 +53,12 @@ func handleVerifyTunnelServerDomain(s *MCPServer) server.ToolHandlerFunc {
 		if err := decodeYakRequest(request.Params.Arguments, &req); err != nil {
 			return nil, err
 		}
-		if req.ConnectParams != nil {
-			req.ConnectParams.Addr, req.ConnectParams.Secret = fillBridgeFromConfig(
-				ctx, s, req.ConnectParams.GetAddr(), req.ConnectParams.GetSecret(),
-			)
+		if req.ConnectParams == nil {
+			req.ConnectParams = &ypb.GetTunnelServerExternalIPParams{}
 		}
+		req.ConnectParams.Addr, req.ConnectParams.Secret = fillBridgeFromConfig(
+			ctx, s, req.ConnectParams.GetAddr(), req.ConnectParams.GetSecret(),
+		)
 		rsp, err := s.grpcClient.VerifyTunnelServerDomain(ctx, &req)
 		if err != nil {
 			return nil, utils.Wrap(err, "failed to verify tunnel server domain")

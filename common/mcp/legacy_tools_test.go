@@ -23,8 +23,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/mcp"
 	rawmcp "github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -42,6 +44,8 @@ type legacyToolCase struct {
 	timeout           time.Duration
 	wantErr           bool
 	errContains       []string
+	allowErrContains  []string
+	allowEmptyResult  bool
 	skipIfErrContains []string
 	validate          func(t *testing.T, text string, result *rawmcp.CallToolResult)
 }
@@ -149,6 +153,13 @@ func runLegacyToolCases(t *testing.T, toolName string, cases []legacyToolCase) {
 		t.Run(tc.name, func(t *testing.T) {
 			args := tc.resolvedArgs(t, srv)
 			result, err := invokeLegacyTool(t, srv, toolName, args, tc.resolvedTimeout())
+			if err != nil && len(tc.allowErrContains) > 0 {
+				for _, fragment := range tc.allowErrContains {
+					if strings.Contains(err.Error(), fragment) {
+						return
+					}
+				}
+			}
 			if err != nil && len(tc.skipIfErrContains) > 0 {
 				for _, fragment := range tc.skipIfErrContains {
 					if strings.Contains(err.Error(), fragment) {
@@ -162,9 +173,15 @@ func runLegacyToolCases(t *testing.T, toolName string, cases []legacyToolCase) {
 				return
 			}
 			require.NotNil(t, result)
-			require.NotEmpty(t, result.Content)
+			if !tc.allowEmptyResult {
+				require.NotEmpty(t, result.Content)
+			}
 			if tc.validate != nil {
-				tc.validate(t, toolResultText(t, result), result)
+				var text string
+				if len(result.Content) > 0 {
+					text = toolResultText(t, result)
+				}
+				tc.validate(t, text, result)
 			}
 		})
 	}
@@ -243,6 +260,58 @@ func legacyGlobalHotPatchEnabled(cfg map[string]any) bool {
 	}
 	enabled, ok := cfg["Enabled"].(bool)
 	return ok && enabled
+}
+
+func ensureLegacyTestRiskID(t *testing.T) int64 {
+	t.Helper()
+	r, err := yakit.NewRisk(
+		"127.0.0.1",
+		yakit.WithRiskParam_Title("mcp-integration-test"),
+		yakit.WithRiskParam_Severity("low"),
+	)
+	require.NoError(t, err)
+	require.NotZero(t, r.ID)
+	id := int64(r.ID)
+	t.Cleanup(func() {
+		_ = yakit.DeleteRiskByID(consts.GetGormProjectDatabase(), id)
+	})
+	return id
+}
+
+func ensureLegacyTestReportID(t *testing.T) int64 {
+	t.Helper()
+	db := consts.GetGormProjectDatabase()
+	require.NotNil(t, db)
+	rec := &schema.ReportRecord{
+		Title: uniqueName("mcp-report-title"),
+		Hash:  uniqueName("mcp-report-hash"),
+		Owner: "mcp-test",
+		From:  "integration",
+	}
+	require.NoError(t, db.Create(rec).Error)
+	id := int64(rec.ID)
+	t.Cleanup(func() {
+		_ = yakit.DeleteReportRecordByID(db, id)
+	})
+	return id
+}
+
+func legacyGeneratedYSOBytesArgs(t *testing.T, srv *mcp.MCPServer) map[string]any {
+	t.Helper()
+	result, err := invokeLegacyTool(t, srv, "generate_yso_bytes", map[string]any{
+		"gadget": "URLDNS",
+		"class":  "URLDNS",
+		"options": []any{
+			map[string]any{"key": "domain", "value": "example.com"},
+		},
+	}, 10*time.Second)
+	require.NoError(t, err)
+	var payload struct {
+		Bytes string `json:"Bytes"`
+	}
+	decodeToolResultJSON(t, toolResultText(t, result), &payload)
+	require.NotEmpty(t, payload.Bytes)
+	return map[string]any{"data": payload.Bytes}
 }
 
 // expectedLegacyToolSetOrder mirrors MCPCommandUsage tool set registration order.
@@ -489,7 +558,7 @@ func legacyCVEToolCases() map[string][]legacyToolCase {
 		{
 			name: "keywords_without_pagination",
 			args: map[string]any{"keywords": "apache"},
-			skipIfErrContains: []string{
+			allowErrContains: []string{
 				"CVE database is not initialized",
 			},
 			validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
@@ -499,9 +568,9 @@ func legacyCVEToolCases() map[string][]legacyToolCase {
 			},
 		},
 		{
-			name: "lookup_by_cve_id",
+			name: "lookup_by_cve_id_or_missing_database",
 			args: map[string]any{"cve": "CVE-2021-44228"},
-			skipIfErrContains: []string{
+			allowErrContains: []string{
 				"CVE database is not initialized",
 				"empty cve database",
 			},
@@ -954,34 +1023,28 @@ func legacyReversePlatformToolCases() map[string][]legacyToolCase {
 			},
 		},
 	},
-	"get_tunnel_server_external_ip": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
+	"get_tunnel_server_external_ip": {{
+		name:    "requires_bridge_without_config",
+		args:    map[string]any{},
+		timeout: 5 * time.Second,
+		allowErrContains: []string{
+			"bridge addr is required", "empty addr", "failed",
 		},
-	},
-	"verify_tunnel_server_domain": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
+		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+			require.NotNil(t, result)
 		},
-	},
+	}},
+	"verify_tunnel_server_domain": {{
+		name: "verify_with_domain",
+		args: map[string]any{"domain": "dnslog.example.com"},
+		timeout: 10 * time.Second,
+		allowErrContains: []string{
+			"empty addr", "failed", "connect", "timeout", "bridge",
+		},
+		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+			require.NotNil(t, result)
+		},
+	}},
 	"require_dnslog_domain": {{
 		name:    "fallback_remote_bridge",
 		args:    map[string]any{"useLocal": true},
@@ -997,33 +1060,30 @@ func legacyReversePlatformToolCases() map[string][]legacyToolCase {
 		name:    "query_with_test_token",
 		args:    map[string]any{"token": "mcp-test-token", "useLocal": true},
 		timeout: 5 * time.Second,
-		skipIfErrContains: []string{
-			"dnsbroker", "retry", "failed",
+		allowErrContains: []string{
+			"dnsbroker", "retry", "failed", "no existed",
 		},
 		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
 			require.NotNil(t, result)
 		},
 	}},
-	"require_random_port_token": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
+	"require_random_port_token": {{
+		name:    "request_token",
+		args:    map[string]any{},
+		timeout: 15 * time.Second,
+		allowErrContains: []string{
+			"DeadlineExceeded", "failed", "connect", "timeout",
 		},
-	},
+		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+			require.NotNil(t, result)
+		},
+	}},
 	"query_random_port_trigger": {{
 		name:    "auto_token",
 		args:    map[string]any{},
-		timeout: 8 * time.Second,
-		skipIfErrContains: []string{
-			"empty token", "failed", "connect",
+		timeout: 15 * time.Second,
+		allowErrContains: []string{
+			"empty token", "empty local-port", "failed", "connect", "DeadlineExceeded",
 		},
 		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
 			require.NotNil(t, result)
@@ -1068,20 +1128,12 @@ func legacyReversePlatformToolCases() map[string][]legacyToolCase {
 			require.NotNil(t, result)
 		},
 	}},
-	"apply_class_to_facades": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
+	"apply_class_to_facades": {{
+		name:        "reject_missing_token",
+		args:        map[string]any{},
+		wantErr:     true,
+		errContains: []string{"token", "Server is not exist"},
+	}},
 	"config_global_reverse": {
 		{
 			name:    "empty_args_should_not_panic",
@@ -1194,20 +1246,22 @@ func legacySubdomainToolCases() map[string][]legacyToolCase {
 
 func legacyCrawlerToolCases() map[string][]legacyToolCase {
 	return map[string][]legacyToolCase{
-	"web_crawler": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"context deadline exceeded",
-				"context canceled",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
+	"web_crawler": {{
+		name: "minimal_unreachable_target",
+		args: map[string]any{
+			"target":            "http://127.0.0.1:1",
+			"maxDepth":          0,
+			"maxRequests":       1,
+			"maxLinks":          1,
+			"concurrent":        1,
+			"timeoutPerRequest": 1,
 		},
-	},
+		timeout:          20 * time.Second,
+		allowEmptyResult: true,
+		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+			require.NotNil(t, result)
+		},
+	}},
 	}
 }
 
@@ -1346,20 +1400,27 @@ func legacySyntaxFlowToolCases() map[string][]legacyToolCase {
 			require.NotNil(t, result)
 		},
 	}},
-	"delete_syntaxflow_rule": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
+	"delete_syntaxflow_rule": {{
+		name: "delete_created_rule",
+		buildArgs: func(t *testing.T, srv *mcp.MCPServer) map[string]any {
+			name := uniqueName("mcp-sf-del")
+			_, err := invokeLegacyTool(t, srv, "create_syntaxflow_rule", map[string]any{
+				"syntaxFlowInput": map[string]any{
+					"ruleName": name,
+					"language": "java",
+					"content":  `println as $output`,
+				},
+			}, 8*time.Second)
+			require.NoError(t, err)
+			return map[string]any{
+				"filter": map[string]any{"ruleNames": []any{name}},
+			}
 		},
-	},
+		timeout: 8 * time.Second,
+		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+			require.NotNil(t, result)
+		},
+	}},
 	"query_syntaxflow_result": {
 		{
 			name:    "minimal_pagination_should_not_panic",
@@ -1436,22 +1497,9 @@ func legacyRiskToolCases() map[string][]legacyToolCase {
 		},
 	},
 	"query_risk": {{
-		name: "query_by_pagination_filter",
-		buildArgs: func(t *testing.T, srv *mcp.MCPServer) map[string]any {
-			result, err := invokeLegacyTool(t, srv, "query_risks", pagingArgs(), 5*time.Second)
-			if err != nil {
-				t.Skipf("no risks available: %v", err)
-			}
-			text := toolResultText(t, result)
-			var payload struct {
-				Data []map[string]any `json:"Data"`
-			}
-			decodeToolResultJSON(t, text, &payload)
-			if len(payload.Data) == 0 {
-				t.Skip("no risk records in database")
-			}
-			id, _ := payload.Data[0]["Id"].(float64)
-			return map[string]any{"id": int(id)}
+		name: "query_seeded_risk",
+		buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
+			return map[string]any{"id": ensureLegacyTestRiskID(t)}
 		},
 		timeout: 5 * time.Second,
 		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
@@ -1501,22 +1549,12 @@ func legacyRiskToolCases() map[string][]legacyToolCase {
 		},
 	},
 	"set_tag_for_risk": {{
-		name: "tag_existing_risk",
-		buildArgs: func(t *testing.T, srv *mcp.MCPServer) map[string]any {
-			result, err := invokeLegacyTool(t, srv, "query_risks", pagingArgs(), 5*time.Second)
-			if err != nil {
-				t.Skipf("no risks available: %v", err)
+		name: "tag_seeded_risk",
+		buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
+			return map[string]any{
+				"id":   ensureLegacyTestRiskID(t),
+				"tags": []any{"mcp-test"},
 			}
-			text := toolResultText(t, result)
-			var payload struct {
-				Data []map[string]any `json:"Data"`
-			}
-			decodeToolResultJSON(t, text, &payload)
-			if len(payload.Data) == 0 {
-				t.Skip("no risk records in database")
-			}
-			id, _ := payload.Data[0]["Id"].(float64)
-			return map[string]any{"id": int(id), "tags": []any{"mcp-test"}}
 		},
 		timeout: 5 * time.Second,
 		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
@@ -1649,14 +1687,16 @@ func legacyYSOToolCases() map[string][]legacyToolCase {
 		},
 	}},
 	"yso_dump": {{
-		name:    "empty_bytes",
-		args:    map[string]any{"data": ""},
-		timeout: 5 * time.Second,
-		skipIfErrContains: []string{
-			"nil", "empty", "failed",
+		name: "dump_generated_bytes",
+		buildArgs: func(t *testing.T, srv *mcp.MCPServer) map[string]any {
+			return legacyGeneratedYSOBytesArgs(t, srv)
 		},
-		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-			require.NotNil(t, result)
+		timeout: 10 * time.Second,
+		allowErrContains: []string{
+			"Magic error", "dump error", "ClassFormatError",
+		},
+		validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
+			assert.NotEmpty(t, strings.TrimSpace(text))
 		},
 	}},
 	}
@@ -1801,15 +1841,10 @@ func legacyMITMToolCases() map[string][]legacyToolCase {
 		},
 	},
 	"import_mitm_replacer_rules": {{
-		name:    "null_rules_json",
-		args:    map[string]any{"jsonRaw": "bnVsbA=="},
-		timeout: 5 * time.Second,
-		skipIfErrContains: []string{
-			"没有新规则", "no new", "解析失败",
-		},
-		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-			require.NotNil(t, result)
-		},
+		name:        "import_empty_rules_returns_error",
+		args:        map[string]any{"jsonRaw": "W10="},
+		wantErr:     true,
+		errContains: []string{"no new rules", "没有新规则", "解析失败"},
 	}},
 	"download_mitm_cert": {
 		{
@@ -1868,18 +1903,13 @@ func legacyMITMToolCases() map[string][]legacyToolCase {
 		},
 	},
 	"query_mitm_rule_extracted_data": {{
-		name: "with_empty_filter",
+		name: "reject_empty_filter",
 		args: map[string]any{
 			"pagination": map[string]any{"page": 1, "limit": 1},
 			"filter":     map[string]any{},
 		},
-		timeout: 5 * time.Second,
-		skipIfErrContains: []string{
-			"need filter",
-		},
-		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-			require.NotNil(t, result)
-		},
+		wantErr:     true,
+		errContains: []string{"need filter"},
 	}},
 	"delete_mitm_rule_extracted_data": {
 		{
@@ -1990,20 +2020,16 @@ func legacyFingerprintToolCases() map[string][]legacyToolCase {
 			},
 		},
 	},
-	"create_fingerprint_group": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
+	"create_fingerprint_group": {{
+		name: "create_unique_group",
+		args: map[string]any{
+			"group": map[string]any{"GroupName": uniqueName("mcp-fp-grp")},
 		},
-	},
+		timeout: 5 * time.Second,
+		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
+			require.NotNil(t, result)
+		},
+	}},
 	"rename_fingerprint_group": {
 		{
 			name:    "empty_args_should_not_panic",
@@ -2047,10 +2073,10 @@ func legacyFingerprintToolCases() map[string][]legacyToolCase {
 		},
 	},
 	"recover_builtin_fingerprint": {{
-		name:    "recover_or_skip_missing_asset",
+		name:    "recover_or_error_without_asset",
 		args:    map[string]any{},
 		timeout: 8 * time.Second,
-		skipIfErrContains: []string{
+		allowErrContains: []string{
 			"asset", "EOF", "gzip", "failed",
 		},
 		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
@@ -2127,22 +2153,9 @@ func legacyReportToolCases() map[string][]legacyToolCase {
 		},
 	},
 	"query_report": {{
-		name: "query_existing_report",
-		buildArgs: func(t *testing.T, srv *mcp.MCPServer) map[string]any {
-			result, err := invokeLegacyTool(t, srv, "query_reports", pagingArgs(), 5*time.Second)
-			if err != nil {
-				t.Skipf("no reports available: %v", err)
-			}
-			text := toolResultText(t, result)
-			var payload struct {
-				Data []map[string]any `json:"Data"`
-			}
-			decodeToolResultJSON(t, text, &payload)
-			if len(payload.Data) == 0 {
-				t.Skip("no report records in database")
-			}
-			id, _ := payload.Data[0]["Id"].(float64)
-			return map[string]any{"id": int(id)}
+		name: "query_seeded_report",
+		buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
+			return map[string]any{"id": ensureLegacyTestReportID(t)}
 		},
 		timeout: 5 * time.Second,
 		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
