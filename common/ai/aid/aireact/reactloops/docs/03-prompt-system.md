@@ -39,7 +39,7 @@ flowchart TD
 **两层渲染**的含义：
 
 1. **第一层**：`PersistentInstruction`、`OutputExample`、`ReactiveData` 自身可以是 Go template 字符串，使用 `getRenderValues()` 提供的变量渲染。
-2. **第二层**：上一步渲染出的字符串通过 `WithPersistentInstruction` / `WithReflectionOutputExample` / `WithReactiveDataBuilder` 注入到 `PromptMaterials` 对应字段，再由 `aicommon.PromptPrefixBuilder` 把它们落到 semi-dynamic-2 与 dynamic 段。
+2. **第二层**：上一步渲染出的字符串通过 `WithPersistentInstruction` / `WithReflectionOutputExample` / `WithReactiveDataBuilder` 注入到 `PromptMaterials` 对应字段；`ExecutionPolicy` 这类稳定策略则由 `Config.GetExecutionPolicy()` 提供，再由 `aicommon.PromptPrefixBuilder` 把它们落到 semi-dynamic-2 与 dynamic 段。
 
 这样 loop 编写者可以在自己的 prompt 里用 `{{ .CurrentTime }}`、`{{ .OSArch }}` 这些通用变量。
 
@@ -52,7 +52,7 @@ flowchart TD
 | HighStatic | [high_static_section.txt](../../../aicommon/prompts/prefix/high_static_section.txt) | 跨 caller / 跨 turn 字节恒定 | TRAITS + 方法论协议 + 能力系统介绍（完全无变量） |
 | FrozenBlock | [frozen_block_section.txt](../../../aicommon/prompts/prefix/frozen_block_section.txt) | 整体字节稳定（被 `<\|AI_CACHE_FROZEN_*\|>` 包裹） | Tool Inventory + Forge Inventory + Timeline-frozen |
 | SemiDynamic1 | [semi_dynamic_1_section.txt](../../../aicommon/prompts/prefix/semi_dynamic_1_section.txt) | caller-specific 稳定（被 `<\|AI_CACHE_SEMI_*\|>` 包裹） | SkillsContext + Cache Tool Call |
-| SemiDynamic2 | [semi_dynamic_2_section.txt](../../../aicommon/prompts/prefix/semi_dynamic_2_section.txt) | caller-specific 稳定（被 `<\|AI_CACHE_SEMI2_*\|>` 包裹） | TaskInstruction + Schema + OutputExample |
+| SemiDynamic2 | [semi_dynamic_2_section.txt](../../../aicommon/prompts/prefix/semi_dynamic_2_section.txt) | caller-specific 稳定（被 `<\|AI_CACHE_SEMI2_*\|>` 包裹） | TaskInstruction + ExecutionPolicy + Schema + OutputExample |
 | TimelineOpen | [timeline_open_section.txt](../../../aicommon/prompts/prefix/timeline_open_section.txt) | 易变尾段，落在所有 cache 边界外 | Timeline 末桶 + SessionEvidence + Todo + Workspace + UserHistory + Current Time + PlanContext |
 
 最后由 `dynamic_section.txt`（loop 自己的 dynamic 段）渲染 UserQuery / AutoContext / ExtraCapabilities / REFLECTION / InjectedMemory，与前 5 段一起经 `buildTaggedPromptSections` 拼成完整 prompt。
@@ -190,6 +190,21 @@ reactloops.WithReflectionOutputExample(outputExample)
 - 子 loop 的示例（在它们的 `LoopMetadata.OutputExamplePrompt` 或 `LoopAction.OutputExamples` 中）会自动被合并
 
 源码 [options.go:222-256](../options.go)。
+
+## 3.6.1 `ExecutionPolicy`：稳定执行策略
+
+**用途**：放“如何选 action”的稳定规则，例如多 agent 拆分偏好、goal mode 的 finish 约束、以及特定 loop 的执行策略。
+
+**位置**：与 `TaskInstruction` / `Schema` / `OutputExample` 同处 **SemiDynamic2**，渲染到 `<|EXECUTION_POLICY|>` ... `<|EXECUTION_POLICY_END|>`。
+
+**最小用法**：
+
+```go
+cfg.GetExecutionPolicy()
+// "- Prefer dispatch_sub_react_agents for parallelizable subtasks."
+```
+
+这类信息**不应该**塞进 `ReactiveData`，因为它不是“上一轮反馈”或“本轮状态”，而是稳定的 action 选择策略。
 
 ## 3.7 `Schema`：动态 JSON Schema
 
