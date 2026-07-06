@@ -105,7 +105,7 @@ func (m *MockedAIConfig) GetVerificationTodoRendered(_ aicommon.VerificationTodo
 	return ""
 }
 
-func (m *MockedAIConfig) ApplyVerificationTodoOps(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) []aicommon.VerificationTodoApplyError {
+func (m *MockedAIConfig) ApplyVerificationTodoOps(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) []aicommon.VerificationTodoApplyResult {
 	return nil
 }
 

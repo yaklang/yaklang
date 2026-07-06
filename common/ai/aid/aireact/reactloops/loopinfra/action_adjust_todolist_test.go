@@ -40,7 +40,7 @@ type adjustTodolistTestConfig struct {
 	markdownLastOps []aicommon.VerifyNextMovement
 }
 
-func (c *adjustTodolistTestConfig) ApplyVerificationTodoOps(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) []aicommon.VerificationTodoApplyError {
+func (c *adjustTodolistTestConfig) ApplyVerificationTodoOps(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) []aicommon.VerificationTodoApplyResult {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.applyCalls++

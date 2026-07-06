@@ -73,6 +73,14 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "待办事项",
 		En: "TODO List",
 	},
+	"todo_added": {
+		Zh: "TODO 增加",
+		En: "TODO Added",
+	},
+	"todo_completed": {
+		Zh: "TODO 完成",
+		En: "TODO Completed",
+	},
 	"task-dependency": {
 		Zh: "任务依赖",
 		En: "Task Dependency",
@@ -280,10 +288,6 @@ var nodeIdMapper = map[string]*I18n{
 	"human_readable_result": {
 		Zh: "结果摘要",
 		En: "Human Readable Result",
-	},
-	"next_movements": {
-		Zh: "下一步行动",
-		En: "Next Movements",
 	},
 	"next_movements_snapshot": {
 		Zh: "待办",
