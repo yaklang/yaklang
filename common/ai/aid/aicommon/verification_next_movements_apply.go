@@ -135,21 +135,18 @@ func ApplyVerificationNextMovementsAndEmit(
 		// 冗余更新等) 没有真正改变 store, 不应该作为 "新增 / 完成" 计数展示给前端,
 		// 否则会出现"流里显示完成 N 条, 但 TODO 列表没变"的口径不一致.
 		emitter.EmitNextMovementsSplitStreams(
-			"todo_added", "todo_completed",
+			"todo_added", "todo_doing", "todo_completed",
 			SuccessfulVerifyNextMovements(applyResults),
 			scope.TaskIndex,
 		)
 	}
 
-	//// 3. timeline breadcrumb: delta-only 一行一个 op, 与 verification 路径
-	////    共用同一个 NEXT_MOVEMENTS 类别, 消费者无需区分来源即可还原 TODO
-	////    时间线. timelineHook 为 nil 时跳过 (例如脱离 invoker 的纯单元测试).
-	//if timelineHook != nil {
-	//	if line := FormatNextMovementsBreadcrumb(movements); line != "" {
-	//		timelineHook("NEXT_MOVEMENTS", line)
-	//	}
-	//	emitVerificationTodoApplyErrors(timelineHook, applyResults)
-	//}
+	// 3. timeline breadcrumb: delta-only 一行一个 op, 与 verification 路径
+	//    共用同一个 NEXT_MOVEMENTS 类别, 消费者无需区分来源即可还原 TODO
+	//    时间线. timelineHook 为 nil 时跳过 (例如脱离 invoker 的纯单元测试).
+	if timelineHook != nil {
+		emitVerificationTodoApplyErrors(timelineHook, applyResults)
+	}
 }
 
 // SuccessfulVerifyNextMovements collects the movements from a slice of

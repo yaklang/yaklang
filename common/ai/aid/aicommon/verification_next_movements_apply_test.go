@@ -35,9 +35,8 @@ func TestApplyVerificationNextMovementsAndEmit_WritesApplyErrorsToTimeline(t *te
 		timelineHook,
 	)
 
-	require.Len(t, timelineEntries, 2)
-	require.Contains(t, timelineEntries[0], "NEXT_MOVEMENTS:")
-	require.Contains(t, timelineEntries[1], "[NEXT_MOVEMENTS_ERROR]:")
+	require.Len(t, timelineEntries, 1)
+	require.Contains(t, timelineEntries[0], "[NEXT_MOVEMENTS_ERROR]:")
 	require.Contains(t, strings.Join(timelineEntries, "\n"), "FAILED DONE[sibling_todo]:")
 	require.Contains(t, strings.Join(timelineEntries, "\n"), "another task scope")
 
