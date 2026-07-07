@@ -136,6 +136,28 @@ func GetDefaultMITMCAAndPrivForGM() (*gmx509.Certificate, *sm2.PrivateKey, error
 	return caCert, privKey, nil
 }
 
+// generateDefaultMITMRootCA generates the MITM root CA certificate/key bytes,
+// picking a signature algorithm appropriate for the current OS.
+//
+// On legacy Windows (7 / Server 2008 R2 and older) the system crypto stack
+// cannot reliably validate SHA-256 signed root certificates unless KB3033929 is
+// installed, which is often missing on the old machines this tool runs on. To
+// keep MITM usable there we deliberately downgrade the root signature to SHA-1
+// and log a warning. Everywhere else the modern SHA-256 default is kept.
+//
+// Note: this only governs fresh generation. An already-persisted CA loaded from
+// disk is reused as-is, so existing installs are never silently re-keyed.
+func generateDefaultMITMRootCA() ([]byte, []byte, error) {
+	if isLegacyWindowsWithoutSHA256RootSupport() {
+		log.Warn("detected legacy Windows (7 or older) without reliable SHA-256 root certificate support; generating MITM root CA with SHA-1 signature for compatibility (install KB3033929 to enable stronger hashing)")
+		return tlsutils.GenerateSelfSignedCertKeyWithSignatureAlgorithm(
+			"Yakit MITM Root CA", "Yakit MITM Root CA", "mitmserver",
+			nil, nil, nil, false, x509.SHA1WithRSA,
+		)
+	}
+	return tlsutils.GenerateSelfSignedCertKey("mitmserver", nil, nil)
+}
+
 func InitMITMCert() {
 	defaultCA, _ = ioutil.ReadFile(defaultCAFile)
 	defaultKey, _ = ioutil.ReadFile(defaultKeyFile)
@@ -162,7 +184,7 @@ func InitMITMCert() {
 
 	if defaultCA == nil || defaultKey == nil {
 		var err error
-		defaultCA, defaultKey, err = tlsutils.GenerateSelfSignedCertKey("mitmserver", nil, nil)
+		defaultCA, defaultKey, err = generateDefaultMITMRootCA()
 		if err != nil {
 			log.Errorf("generate default ca/key failed: %s", err)
 			return

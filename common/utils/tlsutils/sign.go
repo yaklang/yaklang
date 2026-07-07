@@ -22,6 +22,13 @@ type SelfSignConfig struct {
 	AlternativeDNS []string
 	AlternativeIP  []string
 	Org            string
+	// SignatureAlgorithm forces a specific signature algorithm on the generated
+	// certificate. Leave as the zero value (x509.UnknownSignatureAlgorithm) to
+	// let Go pick the default (SHA-256 for RSA keys). Set to x509.SHA1WithRSA to
+	// mint a SHA-1 signed root for legacy Windows (7/2008R2) compatibility, where
+	// the system crypto stack cannot reliably validate SHA-256 roots without
+	// KB3033929.
+	SignatureAlgorithm x509.SignatureAlgorithm
 }
 
 type SelfSignConfigOpt func(*SelfSignConfig)
@@ -58,6 +65,16 @@ func WithSelfSign_Organization(s string) SelfSignConfigOpt {
 func WithSelfSign_EnableAuth(b bool) SelfSignConfigOpt {
 	return func(c *SelfSignConfig) {
 		c.EnableAuth = b
+	}
+}
+
+// WithSelfSign_SignatureAlgorithm forces a specific signature algorithm on the
+// generated certificate. Pass x509.UnknownSignatureAlgorithm (0) to keep the Go
+// default. This is used to emit SHA-1 signed roots for legacy Windows
+// (7/2008R2) compatibility where SHA-256 roots are not validated reliably.
+func WithSelfSign_SignatureAlgorithm(algo x509.SignatureAlgorithm) SelfSignConfigOpt {
+	return func(c *SelfSignConfig) {
+		c.SignatureAlgorithm = algo
 	}
 }
 
@@ -108,7 +125,8 @@ func SelfSignCACertificateAndPrivateKey(common string, opts ...SelfSignConfigOpt
 
 	var notBeforeYear = time.Now().Add(-20 * 24 * time.Hour)
 	template := x509.Certificate{
-		SerialNumber: sid,
+		SerialNumber:       sid,
+		SignatureAlgorithm: config.SignatureAlgorithm,
 		Subject: pkix.Name{
 			Country:            []string{config.Org},
 			Province:           []string{config.Org},

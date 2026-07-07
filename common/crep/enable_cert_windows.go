@@ -9,10 +9,12 @@ import (
 	"path/filepath"
 	"unicode/utf8"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/privileged"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"golang.org/x/sys/windows"
 )
 
 // AddMITMRootCertIntoSystem 将 MITM 根证书添加到 Windows 系统信任库
@@ -30,16 +32,24 @@ func AddMITMRootCertIntoSystem() error {
 		return utils.Errorf("failed to get MITM root certificate: %v", err)
 	}
 
-	// 创建临时文件保存证书
-	tmpFile := filepath.Join(os.TempDir(), "yaklang-mitm-ca.crt")
+	// 创建临时文件保存证书。
+	// 使用 Yakit 自己管理的基础临时目录而非 os.TempDir()：os.TempDir() 可能
+	// 指向含非 ASCII（如中文用户名）或被自定义过的路径，在中文 Win7 的 GBK
+	// 代码页下，把这些路径写进批处理脚本时会出现 UTF-8/GBK 编码错乱。
+	tmpFile := filepath.Join(consts.GetDefaultYakitBaseTempDir(), "yaklang-mitm-ca.crt")
 	err = os.WriteFile(tmpFile, ca, 0644)
 	if err != nil {
 		return utils.Errorf("failed to write certificate to temp file: %v", err)
 	}
 	defer os.Remove(tmpFile)
 
+	// 将证书路径转换为 8.3 短路径（纯 ASCII），避免批处理脚本里的非 ASCII 路径
+	// 在 cmd 的 OEM 代码页下被错误解码，导致 certutil 找不到证书文件。这是
+	// best-effort：若卷上禁用了 8.3 短文件名生成则回退到原始长路径。
+	certPathForScript := windowsShortPath(tmpFile)
+
 	// 构建安装脚本
-	script := buildWindowsInstallCertScript(tmpFile)
+	script := buildWindowsInstallCertScript(certPathForScript)
 
 	log.Info("installing MITM root certificate into Windows system trust store")
 	output, err := executor.Execute(ctx, script,
@@ -82,9 +92,7 @@ func WithdrawMITMRootCertFromSystem() error {
 // buildWindowsInstallCertScript 构建 Windows 证书安装脚本
 // 使用 certutil 和 PowerShell 来操作证书
 func buildWindowsInstallCertScript(certPath string) string {
-	// Windows 路径需要反斜杠
-	certPath = filepath.ToSlash(certPath)
-
+	// certPath 已是 8.3 短路径（纯 ASCII），保留 Windows 原生反斜杠直接使用。
 	script := fmt.Sprintf(`@echo off
 REM MITM Root Certificate Installation Script for Windows
 setlocal enabledelayedexpansion
@@ -210,4 +218,38 @@ func decodeWindowsConsoleOutput(output []byte) string {
 		return string(output)
 	}
 	return string(decoded)
+}
+
+// windowsShortPath returns the 8.3 short path form of path. Short paths are
+// pure ASCII, which sidesteps the UTF-8/GBK codepage mismatch between Go's
+// UTF-8 file paths and cmd.exe's OEM codepage on localized (e.g. Chinese)
+// Windows 7: non-ASCII bytes embedded in a batch file (user profile dir, temp
+// dir, ...) get mis-decoded by cmd and break certutil.
+//
+// It is best-effort: if 8.3 name generation is disabled on the volume (via
+// fsutil / NtfsDisable8dot3NameCreation) the original long path is returned
+// unchanged. The caller must ensure the path exists, since GetShortPathName
+// resolves an existing path.
+func windowsShortPath(path string) string {
+	if path == "" {
+		return path
+	}
+	long, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return path
+	}
+	n, err := windows.GetShortPathName(long, nil, 0)
+	if err != nil || n == 0 {
+		return path
+	}
+	buf := make([]uint16, n)
+	n, err = windows.GetShortPathName(long, &buf[0], uint32(len(buf)))
+	if err != nil || n == 0 {
+		return path
+	}
+	short := windows.UTF16ToString(buf[:n])
+	if short == "" {
+		return path
+	}
+	return short
 }

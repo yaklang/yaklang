@@ -255,6 +255,37 @@ func GenerateSelfSignedCertKeyWithCommonNameEx(commonName, org, host string, alt
 	return SelfSignCACertificateAndPrivateKey(commonName, WithSelfSign_SignTo(hosts...), WithSelfSign_EnableAuth(auth), WithSelfSign_PrivateKey(priv), WithSelfSign_Organization(org))
 }
 
+// GenerateSelfSignedCertKeyWithSignatureAlgorithm is like
+// GenerateSelfSignedCertKeyWithCommonNameEx but forces a specific signature
+// algorithm on the generated self-signed CA certificate. Pass
+// x509.UnknownSignatureAlgorithm (0) to keep the Go default. It exists
+// primarily to mint SHA-1 signed root certificates for legacy Windows
+// versions (7 / Server 2008 R2 and older) that cannot reliably validate
+// SHA-256 roots in the system trust store without KB3033929.
+func GenerateSelfSignedCertKeyWithSignatureAlgorithm(commonName, org, host string, alternateIPs []net.IP, alternateDNS []string, priv *rsa.PrivateKey, auth bool, sigAlgo x509.SignatureAlgorithm) ([]byte, []byte, error) {
+	var hosts []string
+	if host != "" {
+		hosts = append(hosts, host)
+	}
+	for _, i := range alternateDNS {
+		if i != "" {
+			hosts = append(hosts, i)
+		}
+	}
+	for _, i := range alternateIPs {
+		if i != nil {
+			hosts = append(hosts, i.String())
+		}
+	}
+	return SelfSignCACertificateAndPrivateKey(commonName,
+		WithSelfSign_SignTo(hosts...),
+		WithSelfSign_EnableAuth(auth),
+		WithSelfSign_PrivateKey(priv),
+		WithSelfSign_Organization(org),
+		WithSelfSign_SignatureAlgorithm(sigAlgo),
+	)
+}
+
 // SignX509ServerCertAndKey 根据给定的 CA 证书和私钥，生成带客户端认证的服务器证书和密钥
 // 参数:
 //   - ca: PEM 格式的 CA 证书
