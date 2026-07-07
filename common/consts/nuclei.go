@@ -15,5 +15,5 @@ import (
 // println(dir)
 // ```
 func GetNucleiTemplatesDir() string {
-	return filepath.Join(GetDefaultBaseHomeDir(), "nuclei-templates")
+	return filepath.Join(GetDefaultYakitBaseDir(), "nuclei-templates")
 }

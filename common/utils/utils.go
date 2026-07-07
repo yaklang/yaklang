@@ -180,9 +180,14 @@ func TimeoutContextSeconds(d float64) context.Context {
 
 func getMachineIdFilePath() string {
 	if home := os.Getenv("YAKIT_HOME"); home != "" {
-		return filepath.Join(filepath.Dir(home), ".ym-id")
+		return filepath.Join(home, ".ym-id")
 	}
 	return filepath.Join(GetHomeDirDefault("."), ".ym-id")
+}
+
+// GetMachineIdFilePath returns the persisted machine-id file path (respects YAKIT_HOME).
+func GetMachineIdFilePath() string {
+	return getMachineIdFilePath()
 }
 
 func GetMachineCode() string {

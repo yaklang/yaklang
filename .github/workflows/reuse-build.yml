@@ -119,7 +119,7 @@ jobs:
         if: contains(env.BUILD_TAGS, 'irify_exclude')
         env:
           MOCKEY_CHECK_GCFLAGS: "false"
-        run: go test -tags irify_exclude -run TestSlimGate_YaklangLanguageSuggestion -timeout 3m ./common/yakgrpc
+        run: go test -tags irify_exclude -run '^TestSlimGate_' -timeout 5m ./common/yakgrpc
 
       - name: Go module download (Linux)
         if: startsWith(inputs.os, 'linux')
