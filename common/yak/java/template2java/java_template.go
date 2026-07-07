@@ -2,16 +2,18 @@ package template2java
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/yakunquote"
-	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 	"path/filepath"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
+	"github.com/yaklang/yaklang/common/yak/java/templateconst"
+	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 )
 
 const (
-	JAVA_REQUEST_PATH          = "javax.servlet.http"
-	JAVA_UNESCAPE_OUTPUT_PRINT = "print"
+	JAVA_REQUEST_PATH          = templateconst.JAVA_REQUEST_PATH
+	JAVA_UNESCAPE_OUTPUT_PRINT = templateconst.JAVA_UNESCAPE_OUTPUT_PRINT
 )
 
 var _ tl.TemplateRender = (*JavaTemplate)(nil)

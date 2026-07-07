@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
-	"github.com/yaklang/yaklang/common/yak/java/template2java"
+	"github.com/yaklang/yaklang/common/yak/java/templateconst"
 
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
@@ -697,8 +697,8 @@ func init() {
 		var res []sfvm.ValueOperator
 
 		// 模板语言输出的标志位
-		flag := template2java.JAVA_REQUEST_PATH
-		unEscapeKey := template2java.JAVA_UNESCAPE_OUTPUT_PRINT
+		flag := templateconst.JAVA_REQUEST_PATH
+		unEscapeKey := templateconst.JAVA_UNESCAPE_OUTPUT_PRINT
 
 		checkUnEscape := func(value *Value) bool {
 			t := value.GetType()
