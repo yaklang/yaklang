@@ -76,9 +76,9 @@ var HomeDoctorCommand = &cli.Command{
 				{Name: "engine", Path: consts.GetDefaultYakitEngineDir(), UnderHome: isUnderYakitHome(consts.GetDefaultYakitEngineDir(), yakitHome)},
 				{Name: "projects", Path: consts.GetDefaultYakitProjectsDir(), UnderHome: isUnderYakitHome(consts.GetDefaultYakitProjectsDir(), yakitHome)},
 				{Name: "payloads", Path: consts.GetDefaultYakitPayloadsDir(), UnderHome: isUnderYakitHome(consts.GetDefaultYakitPayloadsDir(), yakitHome)},
-				{Name: "nuclei_templates", Path: consts.GetNucleiTemplatesDir(), UnderHome: isUnderYakitHome(consts.GetNucleiTemplatesDir(), yakitHome), Intentional: true, Note: "under base_home sibling to yakit_home"},
+				{Name: "nuclei_templates", Path: consts.GetNucleiTemplatesDir(), UnderHome: isUnderYakitHome(consts.GetNucleiTemplatesDir(), yakitHome)},
 				{Name: "open_temp_file_dir", Path: openTempDir, UnderHome: isUnderYakitHome(openTempDir, yakitHome)},
-				{Name: "machine_id", Path: filepath.Join(baseHome, ".ym-id"), UnderHome: isUnderYakitHome(filepath.Join(baseHome, ".ym-id"), yakitHome), Intentional: true, Note: "stored under base_home"},
+				{Name: "machine_id", Path: utils.GetMachineIdFilePath(), UnderHome: isUnderYakitHome(utils.GetMachineIdFilePath(), yakitHome)},
 			},
 		}
 
