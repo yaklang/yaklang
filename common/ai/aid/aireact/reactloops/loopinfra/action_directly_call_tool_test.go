@@ -65,6 +65,26 @@ func buildDirectlyCallAction(payload string) *aicommon.Action {
 	return action
 }
 
+func TestFormatDirectlyCallToolParamsTimeline(t *testing.T) {
+	params := aitool.InvokeParams{
+		"title":   "test title",
+		"payload": "line1\nline2\nline3",
+		"target":  "https://example.com",
+	}
+	got := formatDirectlyCallToolParamsTimeline("cybersecurity-risk", params, nil)
+	assert.Contains(t, got, "直接调用工具cybersecurity-risk生成的参数为：")
+	assert.Contains(t, got, "[title]: test title")
+	assert.Contains(t, got, "[target]: https://example.com")
+	assert.Contains(t, got, "[payload]:\nline1\nline2\nline3")
+
+	blockGot := formatDirectlyCallToolParamsTimeline("bash", aitool.InvokeParams{
+		"command": "#!/bin/bash\necho hello",
+		"timeout": 20,
+	}, []string{"command"})
+	assert.Contains(t, blockGot, "[command(BLOCK)]:\n#!/bin/bash\necho hello")
+	assert.Contains(t, blockGot, "[timeout]: 20")
+}
+
 func TestNormalizeDirectlyCallToolParams_LegacyWrappedString(t *testing.T) {
 	params, notes := normalizeDirectlyCallToolParams(`{"@action":"call-tool","tool":"sleep_test","params":{"seconds":0.1,"__DEFAULT__":"ignore"}}`, nil)
 	require.Len(t, params, 1)
@@ -138,9 +158,11 @@ func TestDirectlyCallTool_Handler_NormalizesWrappedParamsAndStreamsProgress(t *t
 	assert.Contains(t, op.GetFeedback().String(), "Prepared directly_call_tool params for 'sleep_test': 1 fields [seconds]")
 
 	timeline := invoker.getTimelineString()
-	assert.Contains(t, timeline, "preparing directly_call_tool params for 'sleep_test'")
-	assert.Contains(t, timeline, "unwrapped legacy params wrapper")
-	assert.Contains(t, timeline, "normalized 1 param fields: seconds")
+	assert.Contains(t, timeline, "直接调用工具sleep_test生成的参数为：")
+	assert.Contains(t, timeline, "[seconds]: 0.1")
+	assert.NotContains(t, timeline, "preparing directly_call_tool params")
+	assert.NotContains(t, timeline, "normalized 1 param fields")
+	assert.NotContains(t, timeline, "calling cached tool")
 
 }
 
@@ -183,7 +205,11 @@ func TestDirectlyCallTool_Handler_MergesAITagParams(t *testing.T) {
 	assert.Equal(t, 20.0, invoker.withoutRequiredParams.GetFloat("timeout"))
 	assert.Equal(t, "#!/bin/bash\necho hello", invoker.withoutRequiredParams.GetString("command"))
 	assert.Contains(t, op.GetFeedback().String(), "Prepared directly_call_tool params for 'bash_test': 2 fields [command(BLOCK), timeout]")
-	assert.Contains(t, invoker.getTimelineString(), "merged 1 AITAG block params: command")
+	timeline := invoker.getTimelineString()
+	assert.Contains(t, timeline, "直接调用工具bash_test生成的参数为：")
+	assert.Contains(t, timeline, "[command(BLOCK)]:\n#!/bin/bash\necho hello")
+	assert.Contains(t, timeline, "[timeout]: 20")
+	assert.NotContains(t, timeline, "merged 1 AITAG block params")
 }
 
 func TestDirectlyCallTool_Verifier_AllowsEmptyParamsForParamlessTool(t *testing.T) {

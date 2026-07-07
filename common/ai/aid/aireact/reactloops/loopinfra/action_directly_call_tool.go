@@ -53,6 +53,35 @@ func buildDirectlyCallParamFeedbackItems(params aitool.InvokeParams, blockParamN
 	return items
 }
 
+func formatDirectlyCallToolParamsTimeline(toolName string, params aitool.InvokeParams, blockParamNames []string) string {
+	blockSet := make(map[string]struct{}, len(blockParamNames))
+	for _, name := range blockParamNames {
+		blockSet[name] = struct{}{}
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("直接调用工具%s生成的参数为：", toolName))
+	for _, key := range directlyCallParamKeys(params) {
+		if key == aicommon.ReservedKeyIdentifier || key == aicommon.ReservedKeyCallExpectations {
+			continue
+		}
+		displayKey := key
+		if _, ok := blockSet[key]; ok {
+			displayKey = key + "(BLOCK)"
+		}
+		value := strings.TrimRight(utils.InterfaceToString(params[key]), "\r\n")
+		sb.WriteString("\n")
+		if strings.Contains(value, "\n") {
+			sb.WriteString(fmt.Sprintf("[%s]:", displayKey))
+			sb.WriteString("\n")
+			sb.WriteString(value)
+		} else {
+			sb.WriteString(fmt.Sprintf("[%s]: %s", displayKey, value))
+		}
+	}
+	return sb.String()
+}
+
 func emitDirectlyCallParamProgress(emit func(string), params aitool.InvokeParams, blockParamNames []string) {
 	blockSet := make(map[string]struct{}, len(blockParamNames))
 	for _, name := range blockParamNames {
@@ -445,19 +474,12 @@ Few-shot example 2 (valid directly_call_tool):
 			}
 
 			emitProgress("[开始处理参数]")
-			reportStatus(fmt.Sprintf("preparing directly_call_tool params for '%s'", toolName))
 			raw, objParams := getDirectlyCallToolParamPayload(action)
-			params, notes := normalizeDirectlyCallToolParams(raw, objParams)
+			params, _ := normalizeDirectlyCallToolParams(raw, objParams)
 			if params == nil {
 				params = make(aitool.InvokeParams)
 			}
 			mergedBlockParams := aicommon.MergeActionAITagParams(action, params, getDirectlyCallToolParamNames(loop, toolName))
-			if len(mergedBlockParams) > 0 {
-				notes = append(notes, fmt.Sprintf("merged %d AITAG block params: %s", len(mergedBlockParams), strings.Join(mergedBlockParams, ", ")))
-			}
-			for _, note := range notes {
-				reportStatus(note)
-			}
 
 			valid, validationErrors := tool.ValidateParams(params)
 			if !valid {
@@ -484,10 +506,9 @@ Few-shot example 2 (valid direct retry):
 				return nil, true, tool, nil
 			}
 
-			paramKeys := directlyCallParamKeys(params)
 			feedbackItems := buildDirectlyCallParamFeedbackItems(params, mergedBlockParams)
-			reportStatus(fmt.Sprintf("normalized %d param fields: %s", len(paramKeys), strings.Join(paramKeys, ", ")))
 			operator.Feedback(fmt.Sprintf("Prepared directly_call_tool params for '%s': %d fields [%s]", toolName, len(feedbackItems), strings.Join(feedbackItems, ", ")))
+			reportStatus(formatDirectlyCallToolParamsTimeline(toolName, params, mergedBlockParams))
 			emitDirectlyCallParamProgress(emitProgress, params, mergedBlockParams)
 			if ce := action.GetString("directly_call_expectations"); strings.TrimSpace(ce) != "" {
 				emitProgress("[note] " + ce)
@@ -501,7 +522,6 @@ Few-shot example 2 (valid direct retry):
 			if ce := action.GetString("directly_call_expectations"); ce != "" {
 				params[aicommon.ReservedKeyCallExpectations] = ce
 			}
-			reportStatus(fmt.Sprintf("calling cached tool '%s'", toolName))
 			loopInfraStatus(loop, "直接工具调用参数已准备 / Direct Tool Params Ready")
 			return params, false, tool, nil
 		}
