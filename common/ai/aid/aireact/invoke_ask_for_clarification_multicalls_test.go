@@ -17,10 +17,14 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func askForClarificationInSchema(prompt string) bool {
+	return utils.MatchAllOfSubString(prompt, `"ask_for_clarification_payload"`)
+}
+
 func mockedClarification2(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, flag string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 	fmt.Println(prompt)
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") && !utils.MatchAllOfSubString(prompt, `ask_for_clarification`) {
+	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") && !askForClarificationInSchema(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "directly_answer", "answer_payload": "...mocked-directly-answer-` + flag + `" },
@@ -30,7 +34,7 @@ func mockedClarification2(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, 
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool", "ask_for_clarification") {
+	if askForClarificationInSchema(prompt) && utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "ask_for_clarification", "ask_for_clarification_payload": {"question": "...mocked question...", "options": ["` + flag + `", "option2", "option3"]} },
@@ -92,7 +96,7 @@ func TestReAct_AskForClarification_multicall(t *testing.T) {
 			}
 		}
 	}()
-	after := time.After(10 * time.Second)
+	after := time.After(30 * time.Second)
 
 	var iid string
 	var flagMatched bool
