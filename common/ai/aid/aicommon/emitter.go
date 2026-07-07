@@ -754,6 +754,87 @@ func (r *Emitter) EmitDefaultStreamEvent(nodeId string, reader io.Reader, taskIn
 	})
 }
 
+// EmitNextMovementsSplitSystemStreams splits an already-parsed next_movements
+// slice by op into an "added" channel (add / doing) and a "completed" channel
+// (done / delete / skip), and emits each non-empty channel as a system stream
+// event under nodeIdAdded / nodeIdCompleted.
+//
+// Each channel emits exactly ONE summary line — a count of that direction's
+// ops this round (e.g. "新增 2 条" / "完成 3 条") — rather than a per-item
+// list. The card title (i18n via the NodeId) already labels the direction, so
+// the content only carries the count.
+//
+// An empty channel (no ops of that direction this round) produces no event —
+// the frontend never sees an empty card. The caller is expected to have parsed
+// the AI output already; this helper does no JSON decoding.
+//
+// Returns the successfully emitted events in emission order so the caller can
+// capture a reference-materials anchor from whichever channel fired first.
+//
+// 关键词: EmitNextMovementsSplitStreams, next_movements 双通道,
+//
+//	added / completed  流, 每类一条计数摘要, 空通道跳过, 解析后 emit
+func (r *Emitter) EmitNextMovementsSplitStreams(
+	nodeIdAdded, nodeIdCompleted string,
+	movements []VerifyNextMovement,
+	taskIndex string,
+) ([]*schema.AiOutputEvent, error) {
+	if r == nil || len(movements) == 0 {
+		return nil, nil
+	}
+	var addedCount, completedCount int
+	var addedLines, completedLines []string
+	for _, m := range movements {
+		if IsNextMovementAddedOp(m.Op) {
+			addedCount++
+			if m.Content != "" {
+				addedLines = append(addedLines, m.Content)
+			}
+		} else {
+			completedCount++
+			if m.Content != "" {
+				completedLines = append(completedLines, m.Content)
+			}
+		}
+	}
+
+	var (
+		events   []*schema.AiOutputEvent
+		firstErr error
+	)
+	emitOne := func(nodeId string, count int, lines []string, label string) {
+		if count <= 0 {
+			return
+		}
+		event, err := r.EmitDefaultStreamEvent(
+			nodeId,
+			strings.NewReader(fmt.Sprintf("%s 待办 %d 条", label, count)),
+			taskIndex,
+			func() {},
+		)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+				log.Errorf("failed to emit %s stream event: %v", nodeId, err)
+			}
+			return
+		}
+		if event != nil {
+			events = append(events, event)
+		}
+		if len(lines) > 0 && event != nil {
+			r.EmitTextReferenceMaterial(event.GetStreamEventWriterId(), strings.Join(lines, "\n"))
+		}
+	}
+	emitOne(nodeIdAdded, addedCount, addedLines, "新增")
+	emitOne(nodeIdCompleted, completedCount, completedLines, "完成")
+
+	if firstErr != nil && len(events) == 0 {
+		return nil, firstErr
+	}
+	return events, firstErr
+}
+
 func (r *Emitter) EmitStreamEventWithContentTypeEx(nodeId string, reader io.Reader, taskIndex string, contentType string, isSystem bool, finishCallback ...func()) (*schema.AiOutputEvent, error) {
 	return r.emitStreamEvent(&streamEvent{
 		disableMarkdown:    true,

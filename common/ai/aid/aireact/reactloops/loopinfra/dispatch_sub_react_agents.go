@@ -172,10 +172,12 @@ func buildForkedSubReactInvoker(
 	baseOpts = append(baseOpts,
 		aicommon.WithTimeline(fork.Branch),
 		aicommon.WithContext(jobCtx),
+		aicommon.WithAICallbacks(parentCfg.GetRawAICallbacks()),
 		aicommon.WithEnablePlanAndExec(false),
 		aicommon.WithEmitter(buildSubReactForwardingEmitter(parentCfg.GetEmitter(), subTaskId)),
 		aicommon.WithHotPatchOptionChan(chanx.NewUnlimitedChan[aicommon.ConfigOption](jobCtx, 1)),
 		aicommon.WithAgreeAuto(),
+		aicommon.WithSessionPromptState(parentCfg.SessionPromptState.ForkForSubAgent()),
 	)
 
 	childInvoker, err := aicommon.AIRuntimeInvokerGetter(jobCtx, baseOpts...)

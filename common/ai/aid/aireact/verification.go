@@ -191,47 +191,6 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 						captureReferenceAnchor(event)
 					},
 				),
-				aicommon.WithActionFieldStreamHandler(
-					[]string{"next_movements"},
-					func(key string, rd io.Reader) {
-						trimmedReader := utils.NewTrimLeftReader(utils.UTF8Reader(rd))
-						peekedReader := utils.NewPeekableReader(trimmedReader)
-						firstByte, err := peekedReader.Peek(1)
-						if err != nil && len(firstByte) == 0 {
-							log.Infof("no next_movements provided in verification result, skipping next_movements stream handling")
-							return
-						}
-
-						var displayReader io.Reader
-						if len(firstByte) > 0 && firstByte[0] == '[' {
-							pr, pw := utils.NewBufPipe(nil)
-							go func() {
-								defer pw.Close()
-								if err := writeNextMovementsDisplayStream(peekedReader, pw); err != nil {
-									log.Errorf("failed to stream next_movements display: %v", err)
-								}
-							}()
-							displayReader = pr
-						} else {
-							displayReader = peekedReader
-						}
-
-						var out bytes.Buffer
-						var outputReader = io.TeeReader(displayReader, &out)
-						var event *schema.AiOutputEvent
-						event, err = boundEmitter.EmitDefaultStreamEvent(
-							"next_movements",
-							outputReader,
-							rsp.GetTaskIndex(),
-							func() {},
-						)
-						if err != nil {
-							log.Errorf("failed to emit next_movements stream event: %v", err)
-							return
-						}
-						captureReferenceAnchor(event)
-					},
-				),
 			)
 			if err != nil {
 				return utils.Errorf("failed to extract verification action: %v, need ...\"@action\":\"verify-satisfaction\" ", err)

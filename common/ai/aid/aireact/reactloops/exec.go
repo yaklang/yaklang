@@ -1323,7 +1323,7 @@ func (r *ReActLoop) applyMaxIterationSoftInterrupt(iterationCount int, task aico
 			}
 			aicommon.ApplyVerificationNextMovementsAndEmit(
 				cfg,
-				cfg.GetEmitter(),
+				r.GetEmitter(),
 				task,
 				scope,
 				iterationCount,

@@ -29,6 +29,28 @@ func NewSessionEvidenceRenderState() *SessionEvidenceRenderState {
 	}
 }
 
+// Fork returns a deep copy of the render state so a forked sub agent can keep
+// an independent evidence snapshot without racing against the parent. A nil
+// receiver stays nil.
+func (s *SessionEvidenceRenderState) Fork() *SessionEvidenceRenderState {
+	if s == nil {
+		return nil
+	}
+	forked := &SessionEvidenceRenderState{
+		LastFrozenTimeUnix: s.LastFrozenTimeUnix,
+		LastFrozenRendered: s.LastFrozenRendered,
+		FrozenItems:        make(map[string]EvidenceItemSnapshot, len(s.FrozenItems)),
+	}
+	for k, v := range s.FrozenItems {
+		forked.FrozenItems[k] = v
+	}
+	if len(s.FrozenOrder) > 0 {
+		forked.FrozenOrder = make([]string, len(s.FrozenOrder))
+		copy(forked.FrozenOrder, s.FrozenOrder)
+	}
+	return forked
+}
+
 func RenderSessionEvidenceFrozenOpen(
 	state *SessionEvidenceRenderState,
 	store *EvidenceStore,

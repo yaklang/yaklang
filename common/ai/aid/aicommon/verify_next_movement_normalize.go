@@ -198,6 +198,21 @@ func WriteNextMovementsDisplayStream(reader io.Reader, writer io.Writer) error {
 	return err
 }
 
+// IsNextMovementAddedOp reports whether the supplied op should be routed to the
+// "TODO 增加" channel of the split stream. add (new item) and doing (marking an
+// existing item as in-progress) are both "adding work to the active list" in
+// direction, so they share the added channel. pending is normalised to doing
+// upstream by NormalizeVerifyNextMovements, so it is not matched here.
+//
+// 关键词: IsNextMovementAddedOp, op 归类, 增加 通道
+func IsNextMovementAddedOp(op string) bool {
+	switch strings.ToLower(strings.TrimSpace(op)) {
+	case "add", "doing":
+		return true
+	}
+	return false
+}
+
 // FormatNextMovementsBreadcrumb renders a compact one-line-per-op summary of
 // the supplied next_movements slice. The output is the same breadcrumb the
 // verification path writes to the timeline under the "NEXT_MOVEMENTS" key,
