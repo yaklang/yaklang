@@ -3,9 +3,10 @@ package bizhelper
 import (
 	"testing"
 
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/consts"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 type TestModelUInt64 struct {
@@ -15,9 +16,9 @@ type TestModelUInt64 struct {
 }
 
 func TestExactQueryMultipleUInt64ArrayOr(t *testing.T) {
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	db.AutoMigrate(&TestModelUInt64{})
 

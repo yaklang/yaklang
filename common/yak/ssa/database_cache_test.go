@@ -1096,7 +1096,7 @@ func TestInstructionCache_TTLUpsertsDirtyLazyInstruction(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		var ir ssadb.IrCode
-		var count int
+		var count int64
 		countErr := ssadb.GetDB().Model(&ssadb.IrCode{}).
 			Where("program_name = ? AND code_id = ?", programName, instID).
 			Count(&count).Error
@@ -1133,7 +1133,7 @@ func TestInstructionCache_SaveDeduplicatesSourcesWithinBatch(t *testing.T) {
 	prog.UpdateToDatabase()
 	_ = prog.Cache.SaveToDatabase()
 
-	var count int
+	var count int64
 	err := ssadb.GetDB().Model(&ssadb.IrSource{}).
 		Where("program_name = ? AND source_code_hash = ?", programName, editor.GetIrSourceHash()).
 		Count(&count).Error

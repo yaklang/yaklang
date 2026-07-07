@@ -1,10 +1,11 @@
 package utils
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func TestCooldownFetcher(t *testing.T) {

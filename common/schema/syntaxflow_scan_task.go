@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 const (
@@ -27,7 +27,7 @@ const (
 
 type SyntaxFlowScanTask struct {
 	gorm.Model
-	TaskId   string `gorm:"unique_index"`
+	TaskId   string `gorm:"uniqueIndex"`
 	Programs string `gorm:"index"`
 	//ProjectName string `gorm:"index"`
 	ProjectId uint64 `gorm:"index"`

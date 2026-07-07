@@ -9,10 +9,11 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 // SQLTraceLogger 用于捕获最后一条 SQL 日志（gorm v1）
@@ -31,6 +32,24 @@ func (l *SQLTraceLogger) Last() string {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.last
+}
+
+// LogMode 实现 gorm.io/gorm/logger.Interface
+func (l *SQLTraceLogger) LogMode(level logger.LogLevel) logger.Interface {
+	return l
+}
+
+// Info / Warn / Error 实现 gorm.io/gorm/logger.Interface（无需输出）
+func (l *SQLTraceLogger) Info(ctx context.Context, msg string, data ...interface{})  {}
+func (l *SQLTraceLogger) Warn(ctx context.Context, msg string, data ...interface{})  {}
+func (l *SQLTraceLogger) Error(ctx context.Context, msg string, data ...interface{}) {}
+
+// Trace 实现 gorm.io/gorm/logger.Interface，用于捕获最近执行的 SQL
+func (l *SQLTraceLogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
+	sql, _ := fc()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.last = utils.ShrinkString(sql, 512)
 }
 
 // sqlTraceLogger 用于内部使用（保持向后兼容）

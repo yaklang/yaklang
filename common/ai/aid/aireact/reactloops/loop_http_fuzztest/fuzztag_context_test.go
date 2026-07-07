@@ -3,12 +3,14 @@ package loop_http_fuzztest
 import (
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func TestGetLoopHTTPFuzzFuzztagReference_LoadsSourceDocument(t *testing.T) {
@@ -21,11 +23,11 @@ func TestGetLoopHTTPFuzzFuzztagReference_LoadsSourceDocument(t *testing.T) {
 }
 
 func TestBuildLoopHTTPFuzzPayloadGroupsReference_UsesCurrentDBGroups(t *testing.T) {
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
+	t.Cleanup(func() { _ = consts.CloseGormDB(db) })
 
-	require.NoError(t, db.AutoMigrate(&schema.Payload{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.Payload{}))
 	require.NoError(t, yakit.SavePayloadGroup(db, "pass_top25", []string{"admin", "root"}))
 	require.NoError(t, yakit.SavePayloadGroup(db, "usernames_default", []string{"admin", "guest"}))
 

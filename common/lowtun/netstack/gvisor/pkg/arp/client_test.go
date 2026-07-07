@@ -1,12 +1,13 @@
 package arp
 
 import (
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/netstackvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
-	"testing"
 )
 
 func TestArpClient(t *testing.T) {

@@ -1,9 +1,10 @@
 package dnsutil
 
 import (
-	"github.com/davecgh/go-spew/spew"
 	"testing"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 func TestQueryIP(t *testing.T) {

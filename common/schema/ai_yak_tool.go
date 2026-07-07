@@ -1,15 +1,15 @@
 package schema
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 type AIYakTool struct {
 	gorm.Model
 
-	Name string `json:"name" gorm:"unique_index"`
+	Name string `json:"name" gorm:"uniqueIndex"`
 	// 展示给用户的名称
 	VerboseName string `json:"verbose_name"`
 	Description string `json:"description" gorm:"type:text;index"`

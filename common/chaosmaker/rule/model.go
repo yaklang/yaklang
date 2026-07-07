@@ -13,7 +13,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/schema"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
@@ -23,6 +22,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 type Storage struct {
@@ -43,7 +43,7 @@ type Storage struct {
 	ClassType   string `json:"class_type"`
 	ClassTypeZh string `json:"class_type_zh"`
 	Group       string `json:"group"`
-	Hash        string `json:"hash" gorm:"unique_index"`
+	Hash        string `json:"hash" gorm:"uniqueIndex"`
 
 	Keywords      string `json:"keywords"`
 	KeywordsZh    string `json:"keywords_zh"`
@@ -438,7 +438,7 @@ func ImportRulesFromFile(db *gorm.DB, fileName string) error {
 			continue
 		}
 		rule.ID = 0
-		rule.DeletedAt = nil
+		rule.DeletedAt = gorm.DeletedAt{}
 		rule.CreatedAt = time.Now()
 		rule.UpdatedAt = time.Now()
 		if err := UpsertRule(db, rule.Hash, rule); err != nil {

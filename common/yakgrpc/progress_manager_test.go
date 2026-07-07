@@ -2,11 +2,12 @@ package yakgrpc
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
-	"time"
 )
 
 func TestGRPC_SaveCancelSimpleDetect(t *testing.T) {

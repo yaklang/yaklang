@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/bytedance/mockey"
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"gorm.io/gorm"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"

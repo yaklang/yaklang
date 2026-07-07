@@ -13,10 +13,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/gmsm/sm4"
 	"github.com/yaklang/yaklang/common/gmsm/sm4/padding"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 const (

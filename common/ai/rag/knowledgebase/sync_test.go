@@ -17,7 +17,7 @@ func TestSyncFunctionality(t *testing.T) {
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
 	db, err := vectorstore.NewVectorStoreDatabase(path)
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 创建知识库，使用 mock 嵌入器
 	kb, err := NewKnowledgeBase(
@@ -123,7 +123,7 @@ func TestBatchSyncEntries(t *testing.T) {
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
 	db, err := vectorstore.NewVectorStoreDatabase(path)
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 创建知识库，使用 mock 嵌入器
 	kb, err := NewKnowledgeBase(
@@ -176,7 +176,7 @@ func TestTransactionOperations(t *testing.T) {
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
 	db, err := vectorstore.NewVectorStoreDatabase(path)
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 创建知识库，使用 mock 嵌入器
 	kb, err := NewKnowledgeBase(

@@ -3,14 +3,15 @@ package tests
 import (
 	_ "embed"
 	"fmt"
+	"net/http"
+	"testing"
+	"time"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
-	"net/http"
-	"testing"
-	"time"
 )
 
 //go:embed image.pcapng

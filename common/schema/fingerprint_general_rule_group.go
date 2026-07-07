@@ -1,13 +1,13 @@
 package schema
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 type GeneralRuleGroup struct {
 	gorm.Model
-	GroupName string         `json:"group_name" gorm:"unique_index"`
+	GroupName string         `json:"group_name" gorm:"uniqueIndex"`
 	Rules     []*GeneralRule `gorm:"many2many:general_rule_and_group;"`
 }
 

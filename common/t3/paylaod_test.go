@@ -2,12 +2,13 @@ package t3
 
 import (
 	"fmt"
-	utils2 "github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io/ioutil"
 	"net"
 	"testing"
 	"time"
+
+	utils2 "github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func TestGenPyaload(t *testing.T) {

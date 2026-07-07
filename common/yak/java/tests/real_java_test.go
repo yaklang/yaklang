@@ -14,7 +14,6 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -54,7 +53,7 @@ func TestCodeCompile(t *testing.T) {
 	path := `/Users/wlz/Developer/Target/yakssaExample/java-sec-code`
 	// path := `/Users/wlz/Developer/Target/yakssaExample/spring-boot`
 
-	db, err := gorm.Open(consts.SQLiteExtend, "file::memory:?cache=shared")
+	db, err := consts.OpenDatabaseByDriver(consts.SQLiteExtend, "file::memory:?cache=shared")
 	if err != nil {
 		log.Errorf("failed to open gorm database: %v", err)
 		panic(utils.Errorf("failt open memory database "))
@@ -64,10 +63,11 @@ func TestCodeCompile(t *testing.T) {
 	consts.SetGormSSAProjectDatabase(db)
 	schema.AutoMigrate(db, schema.KEY_SCHEMA_SSA_DATABASE)
 	// reference: https://stackoverflow.com/questions/35804884/sqlite-concurrent-writing-performance
-	db.DB().SetConnMaxLifetime(time.Hour)
-	db.DB().SetMaxIdleConns(10)
+	sqlDB, _ := db.DB()
+	sqlDB.SetConnMaxLifetime(time.Hour)
+	sqlDB.SetMaxIdleConns(10)
 	// set MaxOpenConns to disable connections pool, for write speed and "database is locked" error
-	db.DB().SetMaxOpenConns(1)
+	sqlDB.SetMaxOpenConns(1)
 
 	// relfs := filesys.NewRelLocalFs(path)
 	// filesys.Recursive(

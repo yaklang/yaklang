@@ -1,9 +1,9 @@
 package schema
 
-import "github.com/jinzhu/gorm"
+import "gorm.io/gorm"
 
 type PluginEnv struct {
 	gorm.Model
-	Key   string `gorm:"unique_index"`
+	Key   string `gorm:"uniqueIndex"`
 	Value string
 }

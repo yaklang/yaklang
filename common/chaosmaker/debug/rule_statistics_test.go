@@ -2,13 +2,14 @@ package debug
 
 import (
 	"fmt"
+	"strings"
+	"testing"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/chaosmaker"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/log"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
-	"strings"
-	"testing"
 )
 
 func TestRuleStatistics(t *testing.T) {

@@ -1,8 +1,8 @@
 package scannode
 
 import (
-	"github.com/jinzhu/gorm"
-	"github.com/jinzhu/gorm/dialects/postgres"
+	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 type VulnTargetType string
@@ -25,13 +25,13 @@ type Vuln struct {
 
 	// url
 	Target     string
-	TargetRaw  postgres.Jsonb
+	TargetRaw  utils.JSONB
 	TargetType VulnTargetType
 
 	// xray: plugin
 	Plugin string
 
-	Detail postgres.Jsonb
+	Detail utils.JSONB
 
 	Hash string `gorm:"index"`
 

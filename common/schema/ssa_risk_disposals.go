@@ -3,8 +3,8 @@ package schema
 import (
 	"errors"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 type SSARiskDisposals struct {

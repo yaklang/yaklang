@@ -1,8 +1,9 @@
 package iotdevfp
 
 import (
-	"github.com/davecgh/go-spew/spew"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 func TestIotDevRule_Match(t *testing.T) {

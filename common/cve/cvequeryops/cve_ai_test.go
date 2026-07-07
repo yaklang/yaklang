@@ -134,7 +134,7 @@ func TestCVEExportImport(t *testing.T) {
 		}
 
 		// Check if there are any CVEs in the database
-		var count int
+		var count int64
 		db.Model(&cveresources.CVE{}).Count(&count)
 		if count == 0 {
 			t.Skip("No CVE entries in database")
@@ -304,7 +304,7 @@ func TestCVEAICompleteFields_Integration(t *testing.T) {
 		t.Skip("CVE database not available")
 	}
 
-	var count int
+	var count int64
 	db.Model(&cveresources.CVE{}).Count(&count)
 	if count == 0 {
 		t.Skip("No CVE entries in database")

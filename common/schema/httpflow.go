@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 const COLORPREFIX = "YAKIT_COLOR_"
@@ -27,7 +27,7 @@ type HTTPFlow struct {
 
 	HiddenIndex        string `gorm:"index" json:"hidden_index,omitempty"`
 	NoFixContentLength bool   `json:"no_fix_content_length" json:"no_fix_content_length,omitempty"`
-	Hash               string `gorm:"unique_index" json:"unique_index,omitempty"`
+	Hash               string `gorm:"uniqueIndex" json:"uniqueIndex,omitempty"`
 	IsHTTPS            bool   `json:"is_https,omitempty"`
 	Url                string `gorm:"index" json:"url,omitempty"`
 	Path               string `json:"path,omitempty"`

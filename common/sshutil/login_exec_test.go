@@ -1,10 +1,11 @@
 package sshutil
 
 import (
-	"github.com/stretchr/testify/assert"
-	"golang.org/x/crypto/ssh"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/crypto/ssh"
 )
 
 func TestLoginExec(t *testing.T) {

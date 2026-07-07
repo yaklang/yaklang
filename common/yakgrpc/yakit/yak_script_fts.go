@@ -4,11 +4,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"gorm.io/gorm"
 )
 
 const yakScriptAIFTSTable = "yak_scripts_ai_fts"
@@ -82,7 +82,7 @@ func RebuildYakScriptAIFTS(db *gorm.DB) error {
 	if db == nil || !schema.IsSQLite(db) {
 		return nil
 	}
-	if !db.HasTable(yakScriptAIFTSTable) {
+	if !db.Migrator().HasTable(yakScriptAIFTSTable) {
 		return nil
 	}
 	return bizhelper.SQLiteFTS5Rebuild(db, defaultYakScriptForAIFTS5)
@@ -134,7 +134,7 @@ func SearchYakScriptForAIBM25(db *gorm.DB, filter *YakScriptForAIFilter, limit, 
 		}
 	}
 
-	if maxLen < 3 || !schema.IsSQLite(db) || !db.HasTable(yakScriptAIFTSTable) {
+	if maxLen < 3 || !schema.IsSQLite(db) || !db.Migrator().HasTable(yakScriptAIFTSTable) {
 		var res []*schema.YakScript
 		if err := FilterYakScriptForAI(db, filter).Limit(limit).Offset(offset).Find(&res).Error; err != nil {
 			return nil, err

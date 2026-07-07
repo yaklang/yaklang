@@ -3,12 +3,13 @@ package parser
 import (
 	_ "embed"
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/log"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/ast"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/core"

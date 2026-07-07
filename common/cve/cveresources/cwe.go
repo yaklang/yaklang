@@ -5,15 +5,15 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 type CWE struct {
-	Id     int    `json:"id" gorm:"primary_key"`
+	Id     int    `json:"id" gorm:"primaryKey"`
 	IdStr  string `json:"id_str" gorm:"uniqueIndex"`
 	Name   string
 	NameZh string

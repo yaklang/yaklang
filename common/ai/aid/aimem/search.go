@@ -4,10 +4,10 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 // SearchBySemanticsMemoryIDs 仅执行语义检索并返回命中的 memory_id（不加载数据库实体）

@@ -1,7 +1,7 @@
 package schema
 
 import (
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 )
 
 // AIMemoryCollection 存储AI记忆的HNSW索引信息
@@ -9,7 +9,7 @@ type AIMemoryCollection struct {
 	gorm.Model
 
 	// 会话ID，每个会话有一个独立的HNSW索引
-	SessionID string `json:"session_id" gorm:"unique_index;not null"`
+	SessionID string `json:"session_id" gorm:"uniqueIndex;not null"`
 
 	// HNSW Graph 的二进制序列化数据
 	GraphBinary []byte `json:"graph_binary" gorm:"type:blob"`

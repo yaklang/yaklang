@@ -1,10 +1,11 @@
 package debug
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 type Rule struct {
@@ -13,7 +14,7 @@ type Rule struct {
 
 func DelInvalidRules() {
 	dbPath := "root:123456@tcp(127.0.0.1:3306)/suricata_rules?charset=utf8mb4&parseTime=True&loc=Local"
-	db, err := gorm.Open(`mysql`, dbPath)
+	db, err := gorm.Open(mysql.Open(dbPath), &gorm.Config{})
 	if err != nil {
 		log.Errorf("open db failed: %v", err)
 		return
@@ -31,7 +32,7 @@ func DelInvalidRules() {
 }
 func GetAllRules() []string {
 	dbPath := "root:123456@tcp(127.0.0.1:3306)/suricata_rules?charset=utf8mb4&parseTime=True&loc=Local"
-	db, err := gorm.Open(`mysql`, dbPath)
+	db, err := gorm.Open(mysql.Open(dbPath), &gorm.Config{})
 	if err != nil {
 		log.Errorf("open db failed: %v", err)
 		return []string{}

@@ -8,13 +8,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/lib/pq"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"gorm.io/gorm"
 )
 
 type DataFlowPath struct {
@@ -384,7 +384,7 @@ func insertAuditNodesMultiValues(db *gorm.DB, items []*ssadb.AuditNode, batchSiz
 		batchSize = 500
 	}
 
-	table := db.NewScope(&ssadb.AuditNode{}).TableName()
+	table := schema.GormTableName(db, &ssadb.AuditNode{})
 	cols := []string{
 		"created_at",
 		"updated_at",
@@ -473,7 +473,7 @@ func insertAuditEdgesMultiValues(db *gorm.DB, items []*ssadb.AuditEdge, batchSiz
 		batchSize = 500
 	}
 
-	table := db.NewScope(&ssadb.AuditEdge{}).TableName()
+	table := schema.GormTableName(db, &ssadb.AuditEdge{})
 	cols := []string{
 		"created_at",
 		"updated_at",
@@ -545,8 +545,11 @@ func insertAuditNodesCopyIn(db *gorm.DB, table string, cols []string, items []*s
 	if batchSize <= 0 {
 		batchSize = 500
 	}
-	common := db.CommonDB()
-	if common == nil {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return utils.Errorf("get underlying sql.DB failed: %s", err)
+	}
+	if sqlDB == nil {
 		return utils.Errorf("nil CommonDB")
 	}
 	// COPY is significantly faster than multi-values INSERT for large batches.
@@ -556,7 +559,7 @@ func insertAuditNodesCopyIn(db *gorm.DB, table string, cols []string, items []*s
 			j = len(items)
 		}
 		batch := items[i:j]
-		stmt, err := common.Prepare(pq.CopyIn(table, cols...))
+		stmt, err := sqlDB.Prepare(pq.CopyIn(table, cols...))
 		if err != nil {
 			return err
 		}
@@ -607,8 +610,11 @@ func insertAuditEdgesCopyIn(db *gorm.DB, table string, cols []string, items []*s
 	if batchSize <= 0 {
 		batchSize = 500
 	}
-	common := db.CommonDB()
-	if common == nil {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return utils.Errorf("get underlying sql.DB failed: %s", err)
+	}
+	if sqlDB == nil {
 		return utils.Errorf("nil CommonDB")
 	}
 	for i := 0; i < len(items); i += batchSize {
@@ -617,7 +623,7 @@ func insertAuditEdgesCopyIn(db *gorm.DB, table string, cols []string, items []*s
 			j = len(items)
 		}
 		batch := items[i:j]
-		stmt, err := common.Prepare(pq.CopyIn(table, cols...))
+		stmt, err := sqlDB.Prepare(pq.CopyIn(table, cols...))
 		if err != nil {
 			return err
 		}

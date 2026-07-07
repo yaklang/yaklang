@@ -1,10 +1,11 @@
 package ja3
 
 import (
-	"github.com/davecgh/go-spew/spew"
 	"io"
 	"net/http"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 // Cobalt Strike win10-x64 stageless beacon JA3

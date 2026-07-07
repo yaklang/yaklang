@@ -2,9 +2,10 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/davecgh/go-spew/spew"
 	"testing"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"

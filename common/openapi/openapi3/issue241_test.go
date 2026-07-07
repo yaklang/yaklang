@@ -2,9 +2,10 @@ package openapi3_test
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/openapi/openapi3"
 	"os"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/openapi/openapi3"
 
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"

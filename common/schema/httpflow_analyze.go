@@ -1,8 +1,8 @@
 package schema
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 type AnalyzedHTTPFlow struct {

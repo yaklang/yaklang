@@ -7,13 +7,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	_ "github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"gorm.io/gorm"
 	"gotest.tools/v3/assert"
 )
 
@@ -23,7 +23,7 @@ func createTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("create temp test database: %v", err)
 	}
-	err = tempDB.AutoMigrate(&schema.YakScript{}, &schema.AIYakTool{}).Error
+	err = tempDB.AutoMigrate(&schema.YakScript{}, &schema.AIYakTool{})
 	if err != nil {
 		t.Fatalf("auto migrate failed: %v", err)
 	}

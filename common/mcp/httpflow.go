@@ -7,12 +7,12 @@ import (
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 var filterHTTPFlowToolOptions = []mcp.ToolOption{
@@ -250,9 +250,9 @@ func ypbHTTPFlowToFriendlyHTTPFlow(f *ypb.HTTPFlow) *schema.HTTPFlow {
 		IsTooLargeResponse:         f.IsTooLargeResponse,
 		TooLargeResponseBodyFile:   string(f.TooLargeResponseBodyFile),
 		TooLargeResponseHeaderFile: string(f.TooLargeResponseHeaderFile),
-		IsTooLargeRequest:         f.IsTooLargeRequest,
-		TooLargeRequestBodyFile:   string(f.TooLargeRequestBodyFile),
-		TooLargeRequestHeaderFile: string(f.TooLargeRequestHeaderFile),
+		IsTooLargeRequest:          f.IsTooLargeRequest,
+		TooLargeRequestBodyFile:    string(f.TooLargeRequestBodyFile),
+		TooLargeRequestHeaderFile:  string(f.TooLargeRequestHeaderFile),
 	}
 
 	flow.Response = strconv.Quote(string(f.Response))

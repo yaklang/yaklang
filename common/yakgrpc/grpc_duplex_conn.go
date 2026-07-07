@@ -9,7 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 
 	uuid "github.com/google/uuid"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
@@ -17,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 // SlowSQLBroadcastPayload 慢 SQL 推送给前端的完整 payload（insert/query 共用）
@@ -241,8 +241,8 @@ func isDatabaseQueryable(db *gorm.DB) bool {
 	if db == nil {
 		return false
 	}
-	sqlDB := db.DB()
-	if sqlDB == nil {
+	sqlDB, err := db.DB()
+	if err != nil || sqlDB == nil {
 		return false
 	}
 	return sqlDB.Ping() == nil

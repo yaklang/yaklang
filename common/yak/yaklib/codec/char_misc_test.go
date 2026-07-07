@@ -3,13 +3,14 @@ package codec
 import (
 	"bytes"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/log"
 	"strconv"
 	"strings"
 	"testing"
 	"unicode/utf8"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func TestZhEncoding(t *testing.T) {

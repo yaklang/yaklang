@@ -2,11 +2,12 @@ package match
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/gopacket/gopacket"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
-	"testing"
 )
 
 // Group's testcase

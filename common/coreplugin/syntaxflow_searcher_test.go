@@ -267,20 +267,20 @@ funcA(222);
 
 	t.Run("check all funcA", func(t *testing.T) {
 		s.SearchAndCheck(t, "all", "funcA", false, map[string][]string{
-			"Function-funcA":           {"function funcA(){}"},
-			"Undefined-funcA":          {"funcA"},
-			"Function-funcA(111)":      {"funcA(111)"},
-			"Undefined-funcA(222)":     {"funcA(222)"},
+			"Function-funcA":       {"function funcA(){}"},
+			"Undefined-funcA":      {"funcA"},
+			"Function-funcA(111)":  {"funcA(111)"},
+			"Undefined-funcA(222)": {"funcA(222)"},
 			syntaxflowFileResourceName(s.progName, "/var/www/html/funcA.php"): {code3},
 		})
 		s.SearchAndCheck(t, "all", "funcA", true, map[string][]string{
-			"Function-funcA":           {"function funcA(){}"},
-			"Function-funcAxxxx":       {"function funcAxxxx() {}"},
-			"Function-yyyyfuncAxxxx":   {"function yyyyfuncAxxxx() {}"},
-			"Undefined-funcA":          {"funcA"},
-			`"funcA("`:                 {"funcA("},
-			"Function-funcA(111)":      {"funcA(111)"},
-			"Undefined-funcA(222)":     {"funcA(222)"},
+			"Function-funcA":         {"function funcA(){}"},
+			"Function-funcAxxxx":     {"function funcAxxxx() {}"},
+			"Function-yyyyfuncAxxxx": {"function yyyyfuncAxxxx() {}"},
+			"Undefined-funcA":        {"funcA"},
+			`"funcA("`:               {"funcA("},
+			"Function-funcA(111)":    {"funcA(111)"},
+			"Undefined-funcA(222)":   {"funcA(222)"},
 			syntaxflowFileResourceName(s.progName, "/var/www/html/funcA.php"): {code3},
 		})
 	})
@@ -358,13 +358,13 @@ funcA(222);
 
 	// check all
 	s.Check(t, "all", result, map[string][]string{
-		"Function-funcA":           {"function funcA(){}"},
-		"Function-funcAxxxx":       {"function funcAxxxx() {}"},
-		"Function-yyyyfuncAxxxx":   {"function yyyyfuncAxxxx() {}"},
-		"Undefined-funcA":          {"funcA"},
-		`"funcA("`:                 {"funcA("},
-		"Function-funcA(111)":      {"funcA(111)"},
-		"Undefined-funcA(222)":     {"funcA(222)"},
+		"Function-funcA":         {"function funcA(){}"},
+		"Function-funcAxxxx":     {"function funcAxxxx() {}"},
+		"Function-yyyyfuncAxxxx": {"function yyyyfuncAxxxx() {}"},
+		"Undefined-funcA":        {"funcA"},
+		`"funcA("`:               {"funcA("},
+		"Function-funcA(111)":    {"funcA(111)"},
+		"Undefined-funcA(222)":   {"funcA(222)"},
 		syntaxflowFileResourceName(s.progName, "/var/www/html/funcA.php"): {code3},
 	})
 

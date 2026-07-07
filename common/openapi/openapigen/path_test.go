@@ -2,12 +2,13 @@ package openapigen
 
 import (
 	"fmt"
+	"strings"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/openapi/openapiyaml"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
-	"testing"
 )
 
 func TestExtractQueryParams(t *testing.T) {

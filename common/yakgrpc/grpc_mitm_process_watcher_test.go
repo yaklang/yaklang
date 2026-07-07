@@ -2,12 +2,13 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestMITMProcessWatcher(t *testing.T) {

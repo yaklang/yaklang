@@ -2,11 +2,12 @@ package jsonpath
 
 import (
 	"encoding/json"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var goessner = []byte(`{

@@ -262,11 +262,11 @@ func cloneHTTPHeadersForAIConfig(headers []*ypb.KVPair) []*ypb.KVPair {
 }
 
 const (
-	RoutingPolicyAuto        = string(PolicyAuto)
-	RoutingPolicyPerformance = string(PolicyPerformance)
-	RoutingPolicyCost        = string(PolicyCost)
-	RoutingPolicyBalance     = string(PolicyBalance)
-	DefaultRoutingPolicy     = RoutingPolicyBalance
-	ModelExtraParamKey       = "model"
-	BuildinModelExtraParamKey       = "isBuildin"
+	RoutingPolicyAuto         = string(PolicyAuto)
+	RoutingPolicyPerformance  = string(PolicyPerformance)
+	RoutingPolicyCost         = string(PolicyCost)
+	RoutingPolicyBalance      = string(PolicyBalance)
+	DefaultRoutingPolicy      = RoutingPolicyBalance
+	ModelExtraParamKey        = "model"
+	BuildinModelExtraParamKey = "isBuildin"
 )

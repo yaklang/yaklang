@@ -2,8 +2,9 @@ package netx
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestIsTLSService(t *testing.T) {

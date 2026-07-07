@@ -19,12 +19,12 @@ func init() {
 	// Drop the table first so that any stale schema from a previous run
 	// (e.g. leftover full_name NOT NULL column from MCPServerToolConfig) does
 	// not interfere. AutoMigrate re-creates it with the correct structure.
-	db.DropTableIfExists(&schema.MCPClientToolConfig{})
+	db.Migrator().DropTable(&schema.MCPClientToolConfig{})
 	if err := db.AutoMigrate(
 		&schema.MCPServer{},
 		&schema.MCPServerToolConfig{},
 		&schema.MCPClientToolConfig{},
-	).Error; err != nil {
+	); err != nil {
 		panic(err)
 	}
 }
@@ -85,14 +85,14 @@ func TestSeedMCPServer_CleanupRemovesMCPServerToolConfigs(t *testing.T) {
 		},
 	}))
 
-	var before int
+	var before int64
 	require.NoError(t, db.Model(&schema.MCPServerToolConfig{}).
 		Where("server_name = ?", srvName).Count(&before).Error)
 	require.Equal(t, 1, before)
 
 	cleanup()
 
-	var after int
+	var after int64
 	require.NoError(t, db.Model(&schema.MCPServerToolConfig{}).
 		Where("server_name = ?", srvName).Count(&after).Error)
 	assert.Equal(t, 0, after)

@@ -3,9 +3,10 @@ package lowhttp
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestCookiesToString(t *testing.T) {

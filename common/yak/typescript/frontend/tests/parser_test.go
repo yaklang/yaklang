@@ -4,13 +4,14 @@ import (
 	"embed"
 	_ "embed"
 	"fmt"
+	"io/fs"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/ast"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/core"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/parser"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/scanner"
 	"gotest.tools/v3/assert"
-	"io/fs"
-	"testing"
 )
 
 //go:embed testdata/*

@@ -2,8 +2,9 @@ package yaktest
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestMisc_NUCLEI(t *testing.T) {

@@ -1,8 +1,9 @@
 package limitedmap
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestReadOnlyMap_Append(t *testing.T) {

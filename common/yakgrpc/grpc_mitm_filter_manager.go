@@ -10,11 +10,11 @@ import (
 	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"gorm.io/gorm"
 )
 
 type MITMFilterManager struct { // legacy
@@ -255,7 +255,7 @@ func getInitFilterManager(db *gorm.DB, key string) (*MITMFilter, error) {
 		return nil, utils.Error("no database")
 	}
 	serializedFilter := ""
-	if db.HasTable(&schema.ProjectGeneralStorage{}) {
+	if db.Migrator().HasTable(&schema.ProjectGeneralStorage{}) {
 		serializedFilter = yakit.GetProjectKey(db, key)
 	} else {
 		serializedFilter = yakit.GetKey(db, key)
@@ -347,7 +347,7 @@ func (m *MITMFilter) SaveToDb(keys ...string) error {
 		return err
 	}
 	// project first
-	if db.HasTable(&schema.ProjectGeneralStorage{}) {
+	if db.Migrator().HasTable(&schema.ProjectGeneralStorage{}) {
 		err = yakit.SetProjectKey(db, key, string(result))
 	} else {
 		err = yakit.SetKey(db, key, string(result))

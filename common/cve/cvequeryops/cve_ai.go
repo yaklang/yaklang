@@ -11,13 +11,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 
 	// import aiforge to register liteforge callback
 	_ "github.com/yaklang/yaklang/common/aiforge"
@@ -124,7 +124,7 @@ func CVEAICompleteFields(opts ...any) error {
 	}
 
 	// Count total CVEs to process
-	var totalCount int
+	var totalCount int64
 	if err := db.Model(&cveresources.CVE{}).Count(&totalCount).Error; err != nil {
 		return utils.Errorf("count CVE entries failed: %v", err)
 	}

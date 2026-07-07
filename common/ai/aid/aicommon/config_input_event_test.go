@@ -2,10 +2,11 @@ package aicommon
 
 import (
 	"context"
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/schema"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )

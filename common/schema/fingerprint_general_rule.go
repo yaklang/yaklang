@@ -5,8 +5,8 @@ import (
 	"github.com/samber/lo"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 type CPE struct {
@@ -49,7 +49,7 @@ func (c *CPE) String() string {
 type GeneralRule struct {
 	gorm.Model
 	*CPE
-	RuleName        string `json:"指纹名称" gorm:"unique_index"`
+	RuleName        string `json:"指纹名称" gorm:"uniqueIndex"`
 	WebPath         string `json:"web路径"`
 	ExtInfo         string
 	MatchExpression string              `json:"指纹规则"`

@@ -1,9 +1,10 @@
 package memedit_test
 
 import (
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"testing"
 	"unicode/utf8"
+
+	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
 func TestRuneOffsetMap(t *testing.T) {

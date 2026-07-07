@@ -30,7 +30,7 @@ func TestNewKnowledgeBase(t *testing.T) {
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
 	db, err := vectorstore.NewVectorStoreDatabase(path)
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 创建知识库，使用 mock 嵌入器
 	kb, err := NewKnowledgeBase(
@@ -82,7 +82,7 @@ func TestCreateKnowledgeBase(t *testing.T) {
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
 	db, err := vectorstore.NewVectorStoreDatabase(path)
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 创建全新知识库
 	kb, err := CreateKnowledgeBase(
@@ -121,7 +121,7 @@ func TestLoadKnowledgeBase(t *testing.T) {
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
 	db, err := vectorstore.NewVectorStoreDatabase(path)
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 先创建一个知识库
 	kb1, err := NewKnowledgeBase(
@@ -159,7 +159,7 @@ func TestKnowledgeBaseOperations(t *testing.T) {
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
 	db, err := vectorstore.NewVectorStoreDatabase(path)
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 创建知识库
 	kb, err := NewKnowledgeBase(
@@ -214,7 +214,7 @@ func TestAddLargeDocument(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	db.AutoMigrate(&schema.KnowledgeBaseEntry{}, &schema.KnowledgeBaseInfo{}, &schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 创建知识库
 	kb, err := NewKnowledgeBase(

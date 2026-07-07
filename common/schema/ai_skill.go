@@ -1,7 +1,7 @@
 package schema
 
 import (
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 )
 
 // AISkill represents a registered AI skill in the profile database.
@@ -10,7 +10,7 @@ type AISkill struct {
 	gorm.Model
 
 	// Name is the unique identifier for this skill (from SKILL.md frontmatter).
-	Name string `json:"name" gorm:"unique_index"`
+	Name string `json:"name" gorm:"uniqueIndex"`
 
 	// Description describes what the skill does (from SKILL.md frontmatter).
 	Description string `json:"description" gorm:"type:text;index"`

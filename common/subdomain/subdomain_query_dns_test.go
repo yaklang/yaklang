@@ -2,11 +2,12 @@ package subdomain
 
 import (
 	"fmt"
-	"github.com/miekg/dns"
 	"math/rand"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/miekg/dns"
 )
 
 type testDomainServerHandler func(writer dns.ResponseWriter, msg *dns.Msg)

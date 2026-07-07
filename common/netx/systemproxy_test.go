@@ -1,10 +1,11 @@
 package netx
 
 import (
-	"github.com/davecgh/go-spew/spew"
 	"os/exec"
 	"runtime"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 func TestSet(t *testing.T) {

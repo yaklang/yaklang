@@ -9,13 +9,14 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 func TestImportAISkillsToDB(t *testing.T) {
 	db := newSearchTestDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 	loader, err := NewAutoSkillLoader(WithAutoLoad_FileSystem(buildNestedTestVFS()))
 	if err != nil {
 		t.Fatalf("NewAutoSkillLoader failed: %v", err)
@@ -41,7 +42,7 @@ func TestImportAISkillsToDB(t *testing.T) {
 
 func TestImportAISkillsFromLocalDirToDB(t *testing.T) {
 	db := newSearchTestDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	baseDir := t.TempDir()
 	if err := createLocalSkillFixture(baseDir); err != nil {
@@ -59,7 +60,7 @@ func TestImportAISkillsFromLocalDirToDB(t *testing.T) {
 
 func TestImportAISkillsFromZipFileToDB(t *testing.T) {
 	db := newSearchTestDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	baseDir := t.TempDir()
 	if err := createLocalSkillFixture(baseDir); err != nil {
@@ -95,7 +96,7 @@ func TestImportAISkillsFromArchiveFileToDB(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			db := newSearchTestDB(t)
-			defer db.Close()
+			defer consts.CloseGormDB(db)
 
 			baseDir := t.TempDir()
 			if err := createLocalSkillFixture(baseDir); err != nil {

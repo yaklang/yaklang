@@ -12,8 +12,8 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"gorm.io/gorm"
 
 	"github.com/yaklang/yaklang/common/log"
 

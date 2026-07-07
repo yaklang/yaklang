@@ -6,10 +6,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 )
 
 type ftsDoc struct {
-	ID    int64  `gorm:"primary_key;column:id"`
+	ID    int64  `gorm:"primaryKey;column:id"`
 	Title string `gorm:"column:title"`
 	Body  string `gorm:"column:body"`
 }
@@ -17,7 +18,7 @@ type ftsDoc struct {
 func (ftsDoc) TableName() string { return "test_fts_docs" }
 
 type conditionalFTSDoc struct {
-	ID      int64  `gorm:"primary_key;column:id"`
+	ID      int64  `gorm:"primaryKey;column:id"`
 	Title   string `gorm:"column:title"`
 	Body    string `gorm:"column:body"`
 	Enabled bool   `gorm:"column:enabled"`
@@ -28,9 +29,9 @@ func (conditionalFTSDoc) TableName() string { return "test_conditional_fts_docs"
 func TestSQLiteFTS5SetupAndBM25Match(t *testing.T) {
 	db, err := createTempTestDatabase()
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
+	t.Cleanup(func() { _ = consts.CloseGormDB(db) })
 
-	require.NoError(t, db.AutoMigrate(&ftsDoc{}).Error)
+	require.NoError(t, db.AutoMigrate(&ftsDoc{}))
 
 	// Seed base table.
 	d1 := &ftsDoc{Title: "hello world", Body: "yaklang is great"}
@@ -87,9 +88,9 @@ func TestSQLiteFTS5SetupAndBM25Match(t *testing.T) {
 func TestSQLiteFTS5Config_BaseTableFromModel(t *testing.T) {
 	db, err := createTempTestDatabase()
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
+	t.Cleanup(func() { _ = consts.CloseGormDB(db) })
 
-	require.NoError(t, db.AutoMigrate(&ftsDoc{}).Error)
+	require.NoError(t, db.AutoMigrate(&ftsDoc{}))
 
 	cfg := &SQLiteFTS5Config{
 		BaseModel: &ftsDoc{},
@@ -113,9 +114,9 @@ func TestSQLiteFTS5Config_BaseTableFromModel(t *testing.T) {
 func TestSQLiteFTS5BM25Match_MultiTermsDefaultOR(t *testing.T) {
 	db, err := createTempTestDatabase()
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
+	t.Cleanup(func() { _ = consts.CloseGormDB(db) })
 
-	require.NoError(t, db.AutoMigrate(&ftsDoc{}).Error)
+	require.NoError(t, db.AutoMigrate(&ftsDoc{}))
 
 	d1 := &ftsDoc{Title: "doc1", Body: "yaklang is great"}
 	d2 := &ftsDoc{Title: "doc2", Body: "sqlite fts5 works"}
@@ -164,9 +165,9 @@ func TestSQLiteFTS5BM25Match_MultiTermsDefaultOR(t *testing.T) {
 func TestSQLiteFTS5BM25Match_PreservesCallerFilters(t *testing.T) {
 	db, err := createTempTestDatabase()
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
+	t.Cleanup(func() { _ = consts.CloseGormDB(db) })
 
-	require.NoError(t, db.AutoMigrate(&ftsDoc{}).Error)
+	require.NoError(t, db.AutoMigrate(&ftsDoc{}))
 
 	d1 := &ftsDoc{Title: "hello world", Body: "yaklang is great"}
 	d2 := &ftsDoc{Title: "other", Body: "nothing to see here"}
@@ -202,9 +203,9 @@ func TestSQLiteFTS5BM25Match_PreservesCallerFilters(t *testing.T) {
 func TestSQLiteFTS5BM25MatchYield_PreservesCallerFilters(t *testing.T) {
 	db, err := createTempTestDatabase()
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
+	t.Cleanup(func() { _ = consts.CloseGormDB(db) })
 
-	require.NoError(t, db.AutoMigrate(&ftsDoc{}).Error)
+	require.NoError(t, db.AutoMigrate(&ftsDoc{}))
 
 	d1 := &ftsDoc{Title: "hello world", Body: "yaklang is great"}
 	d2 := &ftsDoc{Title: "other", Body: "nothing to see here"}
@@ -245,9 +246,9 @@ func TestSQLiteFTS5BM25MatchYield_PreservesCallerFilters(t *testing.T) {
 func TestSQLiteFTS5Drop_IdempotentAndCleansArtifacts(t *testing.T) {
 	db, err := createTempTestDatabase()
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
+	t.Cleanup(func() { _ = consts.CloseGormDB(db) })
 
-	require.NoError(t, db.AutoMigrate(&ftsDoc{}).Error)
+	require.NoError(t, db.AutoMigrate(&ftsDoc{}))
 	require.NoError(t, db.Create(&ftsDoc{Title: "hello", Body: "yaklang"}).Error)
 
 	cfg := &SQLiteFTS5Config{
@@ -273,7 +274,7 @@ func TestSQLiteFTS5Drop_IdempotentAndCleansArtifacts(t *testing.T) {
 	}
 
 	// Drop base table first; triggers will be removed by SQLite automatically.
-	db.DropTableIfExists(&ftsDoc{})
+	db.Migrator().DropTable(&ftsDoc{})
 
 	// Drop artifacts should still work and remove the orphan FTS table.
 	require.NoError(t, SQLiteFTS5Drop(db, cfg))
@@ -291,9 +292,9 @@ func TestSQLiteFTS5Drop_IdempotentAndCleansArtifacts(t *testing.T) {
 func TestSQLiteFTS5Setup_ConditionalIndexing(t *testing.T) {
 	db, err := createTempTestDatabase()
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
+	t.Cleanup(func() { _ = consts.CloseGormDB(db) })
 
-	require.NoError(t, db.AutoMigrate(&conditionalFTSDoc{}).Error)
+	require.NoError(t, db.AutoMigrate(&conditionalFTSDoc{}))
 
 	enabledDoc := &conditionalFTSDoc{Title: "hello world", Body: "visible to fts", Enabled: true}
 	disabledDoc := &conditionalFTSDoc{Title: "hidden world", Body: "not indexed yet", Enabled: false}

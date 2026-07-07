@@ -1,10 +1,11 @@
 package mustpass
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
-	"testing"
 )
 
 func TestDisabledDomain(t *testing.T) {

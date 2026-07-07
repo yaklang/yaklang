@@ -1,12 +1,13 @@
 package fingerprint
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/parsers"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/cartesian"
-	"testing"
 )
 
 func newTestGenerateRule(exp string) *schema.GeneralRule {

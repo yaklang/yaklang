@@ -21,7 +21,7 @@ import (
 func TestPublishDetachedPlan_PersistsSessionAndEmitsEvent(t *testing.T) {
 	sessionID := uuid.NewString()
 	db := consts.GetGormProjectDatabase()
-	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}))
 
 	out := make(chan *ypb.AIOutputEvent, 8)
 	reactIns, err := NewTestReAct(
@@ -133,7 +133,7 @@ func collectTimelineText(reactIns *ReAct) string {
 func TestHandleSyncTypeExecuteDetachedPlanEvent_UsesRecoveryPath(t *testing.T) {
 	sessionID := uuid.NewString()
 	db := consts.GetGormProjectDatabase()
-	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}))
 
 	out := make(chan *ypb.AIOutputEvent, 32)
 	reactIns, err := NewTestReAct(

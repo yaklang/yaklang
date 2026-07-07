@@ -11,12 +11,21 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/go-connections/nat"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 
 	"github.com/docker/docker/client"
 )
+
+func closeGormDB(db *gorm.DB) error {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.Close()
+}
 
 const (
 	PostgresPassword      = "awesome-palm"
@@ -102,10 +111,10 @@ func StartPostgres(pgdir string) error {
 	dbname := PostgresDatabaseName
 
 	log.Info("detecting database connecting... pgdir=%v", pgdir)
-	d, err := gorm.Open("postgres", param)
+	d, err := gorm.Open(postgres.Open(param), &gorm.Config{})
 	if err == nil {
 		log.Info("detected exsited database.")
-		_ = d.Close()
+		_ = closeGormDB(d)
 		return nil
 	} else {
 		log.Warnf("open database failed: %v", err)
@@ -201,13 +210,13 @@ func StartPostgres(pgdir string) error {
 		select {
 		case <-ticker:
 			count++
-			conn, err := gorm.Open("postgres", param)
+			conn, err := gorm.Open(postgres.Open(param), &gorm.Config{})
 			if err != nil {
 				log.Warningf("try %v times... waiting for the postgres starting up...", err)
 				continue
 			}
 
-			_ = conn.Close()
+			_ = closeGormDB(conn)
 			return nil
 		}
 	}

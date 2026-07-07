@@ -47,9 +47,9 @@ func (s *Server) SetCurrentProject(ctx context.Context, req *ypb.SetCurrentProje
 	if req.GetId() <= 0 {
 		switch req.GetType() {
 		case yakit.TypeProject:
-			consts.GetGormProjectDatabase().Close()
+			consts.CloseGormDB(consts.GetGormProjectDatabase())
 		case yakit.TypeSSAProject:
-			consts.GetGormSSAProjectDataBase().Close()
+			consts.CloseGormDB(consts.GetGormSSAProjectDataBase())
 		default:
 			return nil, utils.Errorf("invalid project type: %s", req.GetType())
 		}
@@ -607,9 +607,9 @@ func (s *Server) DeleteProject(ctx context.Context, req *ypb.DeleteProjectReques
 	// close current program
 	switch req.GetType() {
 	case yakit.TypeProject:
-		consts.GetGormProjectDatabase().Close()
+		consts.CloseGormDB(consts.GetGormProjectDatabase())
 	case yakit.TypeSSAProject:
-		consts.GetGormSSAProjectDataBase().Close()
+		consts.CloseGormDB(consts.GetGormSSAProjectDataBase())
 	}
 
 	// set default to current

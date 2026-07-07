@@ -2,16 +2,17 @@ package yakit
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 func init() {
@@ -25,7 +26,7 @@ func init() {
 		if !schema.IsSQLite(db) {
 			return
 		}
-		if !db.HasTable((&schema.MCPServerToolConfig{}).TableName()) {
+		if !db.Migrator().HasTable((&schema.MCPServerToolConfig{}).TableName()) {
 			// Base table not yet created; AutoMigrate will run next, skip for now.
 			return
 		}
@@ -115,7 +116,7 @@ func SearchMCPServerToolsBM25(db *gorm.DB, keyword string, limit int) ([]*schema
 		}
 	}
 	ftsTable := MCPServerToolConfigFTSTableName()
-	if maxLen < 3 || !schema.IsSQLite(db) || !db.HasTable(ftsTable) {
+	if maxLen < 3 || !schema.IsSQLite(db) || !db.Migrator().HasTable(ftsTable) {
 		return likeSearchMCPTools(baseQ, matches, limit)
 	}
 
@@ -201,7 +202,7 @@ func CreateOrUpdateMCPServer(db *gorm.DB, server *schema.MCPServer) error {
 	// 检查名称是否已存在
 	var existing schema.MCPServer
 	if err := db.Model(&schema.MCPServer{}).Where("name = ?", server.Name).First(&existing).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// 不存在则创建
 			// 保存Enable的原始值，因为Create后可能会被数据库默认值覆盖
 			enableValue := server.Enable
@@ -348,7 +349,7 @@ func UpdateMCPServer(db *gorm.DB, id int64, server *schema.MCPServer) error {
 		if qErr == nil {
 			return utils.Errorf("mcp server name %q already exists", server.Name)
 		}
-		if !gorm.IsRecordNotFoundError(qErr) {
+		if !errors.Is(qErr, gorm.ErrRecordNotFound) {
 			return utils.Errorf("check mcp server name conflict failed: %s", qErr)
 		}
 	}
@@ -422,7 +423,7 @@ func GetMCPServer(db *gorm.DB, id int64) (*schema.MCPServer, error) {
 
 	var server schema.MCPServer
 	if err := db.Model(&schema.MCPServer{}).Where("id = ?", id).First(&server).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, utils.Errorf("mcp server not found")
 		}
 		return nil, utils.Errorf("query mcp server failed: %s", err)
@@ -438,7 +439,7 @@ func GetMCPServerByName(db *gorm.DB, name string) (*schema.MCPServer, error) {
 
 	var server schema.MCPServer
 	if err := db.Model(&schema.MCPServer{}).Where("name = ?", name).First(&server).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, utils.Errorf("mcp server not found")
 		}
 		return nil, utils.Errorf("query mcp server failed: %s", err)
@@ -519,7 +520,7 @@ func GetMCPServerToolConfig(db *gorm.DB, serverName, toolName string) (*schema.M
 		Where("server_name = ? AND tool_name = ?", serverName, toolName).
 		First(&cfg).Error
 	if err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// No override stored; return default values.
 			return &schema.MCPServerToolConfig{
 				ServerName: serverName,
@@ -571,7 +572,7 @@ func upsertMCPServerToolConfigFields(db *gorm.DB, serverName, toolName string, f
 		Where("server_name = ? AND tool_name = ?", serverName, toolName).
 		First(&existing).Error
 	if err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			cfg := &schema.MCPServerToolConfig{
 				ServerName: serverName,
 				ToolName:   toolName,
@@ -803,7 +804,7 @@ func GetMCPServerToolConfigByFullName(db *gorm.DB, fullName string) (*schema.MCP
 	if err := db.Model(&schema.MCPServerToolConfig{}).
 		Where("full_name = ?", fullName).
 		First(&cfg).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, utils.Errorf("mcp tool config not found for full name: %s", fullName)
 		}
 		return nil, utils.Errorf("query mcp tool config by full name failed: %s", err)

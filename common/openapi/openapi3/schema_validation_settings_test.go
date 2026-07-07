@@ -2,6 +2,7 @@ package openapi3_test
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/openapi/openapi3"
 )
 

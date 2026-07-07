@@ -2,10 +2,11 @@ package yso
 
 import (
 	"fmt"
-	"github.com/yaklang/javajive/classparser"
+	"testing"
+
+	javaclassparser "github.com/yaklang/javajive/classparser"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yserx"
-	"testing"
 )
 
 // TestGetConfig assert config is valid, test load serialized payload and class payload

@@ -3,17 +3,18 @@ package aireact
 import (
 	"bytes"
 	"fmt"
+	"regexp"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"regexp"
-	"strings"
-	"sync/atomic"
-	"testing"
-	"time"
 )
 
 func mockedFreeInputOutput(config aicommon.AICallerConfigIf, flag string) (*aicommon.AIResponse, error) {

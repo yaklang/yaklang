@@ -1,12 +1,13 @@
 package jsonpath
 
 import (
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type replaceTestCase struct {

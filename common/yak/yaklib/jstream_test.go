@@ -3,9 +3,10 @@ package yaklib
 import (
 	"bytes"
 	"encoding/json"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestJsonToMapNestedStructure(t *testing.T) {

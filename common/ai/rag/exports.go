@@ -1,9 +1,9 @@
 package rag
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 // CollectionIsExists 检查知识库是否存在，别名

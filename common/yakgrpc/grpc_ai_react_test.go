@@ -2,13 +2,14 @@ package yakgrpc
 
 import (
 	"context"
+	"math/rand"
+	"testing"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"math/rand"
-	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -121,7 +122,7 @@ func TestConvertYPBAIStartParams_EnablePlanAppliedAfterDisableAISearchForge(t *t
 func TestResolveAISessionStartParams(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	request := &ypb.AIStartParams{
 		AIService:   "request-service",

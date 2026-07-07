@@ -1,9 +1,9 @@
 package schema
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 	"strconv"
 	"time"
 )
@@ -11,9 +11,9 @@ import (
 type ExecHistory struct {
 	gorm.Model
 
-	Hash string `gorm:"unique_index"`
+	Hash string `gorm:"uniqueIndex"`
 
-	RuntimeId     string `json:"runtime_id" gorm:"unique_index"`
+	RuntimeId     string `json:"runtime_id" gorm:"uniqueIndex"`
 	Script        string `json:"script"`
 	ScriptId      string `json:"script_id" gorm:"index"`
 	TimestampNano int64  `json:"timestamp"`

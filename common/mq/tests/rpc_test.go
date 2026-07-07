@@ -2,12 +2,13 @@ package tests
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/mq"
 	"github.com/yaklang/yaklang/common/thirdpartyservices"
-	"testing"
-	"time"
 )
 
 type HealthInfo struct {

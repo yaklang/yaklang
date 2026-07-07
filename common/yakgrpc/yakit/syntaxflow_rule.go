@@ -4,7 +4,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
@@ -12,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 const (
@@ -282,10 +282,10 @@ func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.S
 	updateRule.NeedUpdate = true
 
 	groups := sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), rule.GetGroupNames())
-	if err := db.Model(&schema.SyntaxFlowRule{}).Update(&updateRule).Error; err != nil {
+	if err := db.Model(&schema.SyntaxFlowRule{}).Updates(&updateRule).Error; err != nil {
 		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
 	}
-	if err := db.Model(&updateRule).Association("Groups").Replace(groups).Error; err != nil {
+	if err := db.Model(&updateRule).Association("Groups").Replace(groups); err != nil {
 		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
 	}
 	return updateRule, nil

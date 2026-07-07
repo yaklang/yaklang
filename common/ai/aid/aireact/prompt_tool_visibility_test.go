@@ -30,7 +30,8 @@ func mkVisToolWithDesc(name, desc string) *aitool.Tool {
 // block 文本里不能出现这些工具名.
 //
 // 关键词: TestPromptManager_ToolInventory_ExcludesHiddenAndScenario_Default,
-//        default inventory filter, amap excluded, ssa- excluded
+//
+//	default inventory filter, amap excluded, ssa- excluded
 func TestPromptManager_ToolInventory_ExcludesHiddenAndScenario_Default(t *testing.T) {
 	react, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {

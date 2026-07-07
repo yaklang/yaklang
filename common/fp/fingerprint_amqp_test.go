@@ -102,7 +102,7 @@ func TestAMQPDetectionOnNonStandardPort(t *testing.T) {
 	// Using ProbesMax=10 is sufficient to detect AMQP while keeping test execution time reasonable
 	config := NewConfig(
 		WithActiveMode(true),
-		WithProbesMax(10), // Reduced to speed up tests while still detecting AMQP
+		WithProbesMax(10),               // Reduced to speed up tests while still detecting AMQP
 		WithProbeTimeout(1*time.Second), // Reduced to speed up tests
 		WithDisableWebFingerprint(true), // Disable web fingerprint to avoid interference
 	)

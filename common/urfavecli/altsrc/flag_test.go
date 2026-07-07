@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 )
 
 type testApplyInputSource struct {

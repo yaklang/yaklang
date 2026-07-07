@@ -295,8 +295,8 @@ func TestSkillsContextManager_RenderStable_AvailableSectionByteStable(t *testing
 	}
 
 	endTag := "<|SKILLS_CONTEXT_END_skills_context|>"
-	zeroAvailableSection := zeroLoaded[zeroAvailableIdx : strings.Index(zeroLoaded, endTag)]
-	withLoadedAvailableSection := withLoaded[withLoadedAvailableIdx : strings.Index(withLoaded, endTag)]
+	zeroAvailableSection := zeroLoaded[zeroAvailableIdx:strings.Index(zeroLoaded, endTag)]
+	withLoadedAvailableSection := withLoaded[withLoadedAvailableIdx:strings.Index(withLoaded, endTag)]
 
 	if zeroAvailableSection != withLoadedAvailableSection {
 		t.Fatalf("Available Skills section must be byte-stable across 0->1 load.\nzero:\n%s\nwith:\n%s",

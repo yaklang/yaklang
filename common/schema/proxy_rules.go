@@ -3,13 +3,13 @@ package schema
 import (
 	"encoding/json"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 type ProxyEndpoint struct {
 	gorm.Model
-	ExternalID string `gorm:"column:external_id;unique_index"`
+	ExternalID string `gorm:"column:external_id;uniqueIndex"`
 	Name       string `gorm:"column:name"`
 	URL        string `gorm:"column:url"`
 	Username   string `gorm:"column:username"`
@@ -33,7 +33,7 @@ func (p *ProxyEndpoint) ToProto() *ypb.ProxyEndpoint {
 
 type ProxyRoute struct {
 	gorm.Model
-	ExternalID   string `gorm:"column:external_id;unique_index"`
+	ExternalID   string `gorm:"column:external_id;uniqueIndex"`
 	Name         string `gorm:"column:name"`
 	PatternsRaw  string `gorm:"column:patterns;type:text"`
 	EndpointsRaw string `gorm:"column:endpoint_ids;type:text"`

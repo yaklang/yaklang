@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/aiforge"
@@ -22,6 +21,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils/permutil"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func checkAndTryFixDatabase(path string) error {
@@ -61,7 +62,7 @@ func NewTestWebLogEventDB(path string) (*gorm.DB, error) {
 		return nil, err
 	}
 	path = fmt.Sprintf("%s?cache=shared&mode=rwc", path)
-	db, err := gorm.Open("sqlite3", path)
+	db, err := gorm.Open(sqlite.Open(path), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}

@@ -1,9 +1,10 @@
 package ssaapi_test
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"

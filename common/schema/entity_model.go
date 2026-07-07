@@ -10,15 +10,15 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 type EntityRepository struct {
 	gorm.Model
 
 	RAGID          string `gorm:"index"`
-	Uuid           string `gorm:"unique_index"`
+	Uuid           string `gorm:"uniqueIndex"`
 	EntityBaseName string `gorm:"index"`
 	Description    string
 }
@@ -49,7 +49,7 @@ type ERModelEntity struct {
 
 	RepositoryUUID    string      `gorm:"index"`
 	EntityName        string      `gorm:"index"`
-	Uuid              string      `gorm:"unique_index"`
+	Uuid              string      `gorm:"uniqueIndex"`
 	Description       string      // 对该实体的简要描述
 	EntityType        string      // 实体的类型或类别
 	EntityTypeVerbose string      // 实体类型的详细描述
@@ -182,7 +182,7 @@ func (e *ERModelEntity) Dump() string {
 type ERModelRelationship struct {
 	gorm.Model
 
-	Uuid           string `gorm:"unique_index"`
+	Uuid           string `gorm:"uniqueIndex"`
 	RepositoryUUID string `gorm:"index"`
 
 	SourceEntityID uint
@@ -192,7 +192,7 @@ type ERModelRelationship struct {
 	TargetEntityIndex       string
 	RelationshipType        string
 	RelationshipTypeVerbose string
-	Hash                    string      `gorm:"unique_index"`
+	Hash                    string      `gorm:"uniqueIndex"`
 	Attributes              MetadataMap `gorm:"type:text" json:"attributes"`
 
 	RuntimeID string

@@ -1,11 +1,12 @@
 package license
 
 import (
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
-	"testing"
-	"time"
 )
 
 func TestNewMachine(t *testing.T) {

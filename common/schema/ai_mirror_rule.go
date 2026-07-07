@@ -3,7 +3,7 @@ package schema
 import (
 	"time"
 
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 )
 
 // AiMirrorRule represents a mirror rule used by aibalance to forward a snapshot
@@ -13,10 +13,10 @@ import (
 //
 // 触发条件 (ConditionType):
 //   - "action_eq":           解析响应主输出 (不含 reason) 中 yaklang JSON 协议
-//                            字段 @action, 等于 ActionName 时触发
+//     字段 @action, 等于 ActionName 时触发
 //   - "any_toolcall":        响应中累积过任意 OpenAI 原生 tool_calls 时触发
 //   - "action_call_tool_eq": @action ∈ {call-tool, directly_call_tool, require_tool}
-//                            且 payload 中 tool 字段等于 ToolName 时触发
+//     且 payload 中 tool 字段等于 ToolName 时触发
 //   - "always":              永真, 每次成功请求都触发
 //
 // 计数器 (TotalTriggered / TotalSuccess / TotalFailed / TotalDropped) 由后台 worker

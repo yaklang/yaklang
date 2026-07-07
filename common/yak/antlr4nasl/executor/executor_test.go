@@ -1,13 +1,14 @@
 package executor
 
 import (
+	"testing"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor/nasl_type"
 	nasl "github.com/yaklang/yaklang/common/yak/antlr4nasl/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/visitors"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"testing"
 )
 
 func TestCode(t *testing.T) {

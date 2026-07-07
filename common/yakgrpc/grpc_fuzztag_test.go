@@ -3,9 +3,10 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
 )
 
 func TestGetAllFuzztagInfo(t *testing.T) {

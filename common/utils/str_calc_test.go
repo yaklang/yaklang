@@ -1,10 +1,11 @@
 package utils
 
 import (
-	"github.com/davecgh/go-spew/spew"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSimilarityHash(t *testing.T) {

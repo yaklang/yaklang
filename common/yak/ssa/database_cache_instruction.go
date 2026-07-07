@@ -4,12 +4,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dbcache"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"go.uber.org/atomic"
+	"gorm.io/gorm"
 )
 
 // instructionStore owns instruction residency for exactly one mode.

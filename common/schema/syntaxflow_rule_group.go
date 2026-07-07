@@ -1,8 +1,8 @@
 package schema
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 //// SyntaxFlowRuleGroup Syntax Flow规则和组的关系表
@@ -11,7 +11,7 @@ import (
 //	RuleName  string `json:"rule_name" gorm:"index"`
 //	GroupName string `json:"group_name" gorm:"index"`
 //	IsBuildIn bool   `json:"is_build_in"`
-//	Hash      string `json:"hash" gorm:"unique_index"`
+//	Hash      string `json:"hash" gorm:"uniqueIndex"`
 //}
 //
 //func (s *SyntaxFlowRuleGroup) BeforeSave() error {
@@ -26,7 +26,7 @@ import (
 
 type SyntaxFlowGroup struct {
 	gorm.Model
-	GroupName string            `json:"group_name" gorm:"unique_index"`
+	GroupName string            `json:"group_name" gorm:"uniqueIndex"`
 	IsBuildIn bool              `json:"is_build_in" gorm:"index"`
 	Rules     []*SyntaxFlowRule `gorm:"many2many:syntax_flow_rule_and_group;"`
 }

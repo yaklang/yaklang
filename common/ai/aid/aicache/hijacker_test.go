@@ -936,10 +936,11 @@ func TestHijack_FrozenBoundary_TimelineDumpFormat(t *testing.T) {
 // hijacker 切成 4 段消息: [system+cc, user1+cc, user2+cc, user3].
 //
 // 端到端 prompt 形态:
-//   SYSTEM (high-static)        -> system + cc
-//   AI_CACHE_FROZEN ... END     -> user1 + cc
-//   AI_CACHE_SEMI   ... END     -> user2 + cc (内含 PROMPT_SECTION_semi-dynamic + 内容)
-//   timeline-open + dynamic     -> user3 (无 cc)
+//
+//	SYSTEM (high-static)        -> system + cc
+//	AI_CACHE_FROZEN ... END     -> user1 + cc
+//	AI_CACHE_SEMI   ... END     -> user2 + cc (内含 PROMPT_SECTION_semi-dynamic + 内容)
+//	timeline-open + dynamic     -> user3 (无 cc)
 //
 // 关键词: TestHijack_SemiBoundary, 4 段切分, P1 双 cache 边界, 双 cc 主路径
 func TestHijack_SemiBoundary_HappyPath4Segments(t *testing.T) {

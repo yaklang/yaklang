@@ -1,8 +1,8 @@
 package schema
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 type ScreenRecorder struct {
@@ -12,7 +12,7 @@ type ScreenRecorder struct {
 	Filename  string
 	NoteInfo  string
 	Project   string
-	Hash      string `json:"hash" gorm:"unique_index"`
+	Hash      string `json:"hash" gorm:"uniqueIndex"`
 	VideoName string
 	Cover     string `gorm:"type:longtext"`
 	Duration  string

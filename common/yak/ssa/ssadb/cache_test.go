@@ -3,14 +3,15 @@ package ssadb
 import (
 	"testing"
 
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/consts"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func setupTestDB() *gorm.DB {
 	// 使用临时内存数据库进行测试
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
 		panic("failed to connect database")
 	}
@@ -54,7 +55,7 @@ func TestGetIrTypeCache(t *testing.T) {
 
 func TestGetIrCodeById(t *testing.T) {
 	db := setupTestDB()
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	progName := "test_program"
 
@@ -94,7 +95,7 @@ func TestGetIrCodeById(t *testing.T) {
 
 func TestGetIrTypeById(t *testing.T) {
 	db := setupTestDB()
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	progName := "test_program"
 
@@ -133,7 +134,7 @@ func TestGetIrTypeById(t *testing.T) {
 
 func TestCacheIsolation(t *testing.T) {
 	db := setupTestDB()
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	progName1 := "program1"
 	progName2 := "program2"
@@ -192,7 +193,7 @@ func TestDbKeyFunction(t *testing.T) {
 
 func TestCacheConcurrency(t *testing.T) {
 	db := setupTestDB()
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	progName := "test_program"
 

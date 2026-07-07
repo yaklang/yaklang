@@ -1,9 +1,9 @@
 package schema
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
+	"gorm.io/gorm"
 )
 
 var (

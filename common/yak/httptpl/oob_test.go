@@ -1,11 +1,12 @@
 package httptpl
 
 import (
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"testing"
 )
 
 func TestOOB(t *testing.T) {

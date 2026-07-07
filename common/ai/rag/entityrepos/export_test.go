@@ -5,11 +5,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"gorm.io/gorm"
 )
 
 func createTempTestDatabase() (*gorm.DB, error) {

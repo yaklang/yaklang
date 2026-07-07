@@ -155,7 +155,7 @@ func TestMergeBeautificationResults_RuleIDFromDescParams(t *testing.T) {
 func TestMergeBeautificationResultsForYak(t *testing.T) {
 	merged, err := MergeBeautificationResultsForYak(map[string]any{
 		"title": "Beautified", "title_zh": "美化标题",
-		"desc": "美化后的描述内容，用于验证 Yak 导出合并路径是否正常工作。",
+		"desc":     "美化后的描述内容，用于验证 Yak 导出合并路径是否正常工作。",
 		"solution": "none",
 	}, map[string]any{
 		"alert": []any{map[string]any{"name": "sink", "title_zh": "告警"}},
@@ -206,4 +206,3 @@ alert $sink for {
 		t.Fatalf("expected title updated despite broken body, got:\n%s", merged)
 	}
 }
-

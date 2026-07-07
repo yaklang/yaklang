@@ -1,14 +1,14 @@
 package schema
 
 import (
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 	"time"
 )
 
 type ProjectGeneralStorage struct {
 	gorm.Model
 
-	Key string `json:"key" gorm:"unique_index"`
+	Key string `json:"key" gorm:"uniqueIndex"`
 
 	// 经过 JSON + Strconv
 	Value string `json:"value"`

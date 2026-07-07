@@ -4,10 +4,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"gorm.io/gorm"
 )
 
 var aiToolSearchASCIITermRegexp = regexp.MustCompile(`[A-Za-z0-9_]{3,}`)
@@ -67,7 +67,7 @@ var defaultAIYakToolFTS5 = &bizhelper.SQLiteFTS5Config{
 //			return
 //		}
 //		baseTable := (&schema.AIYakTool{}).TableName()
-//		if !db.HasTable(baseTable) {
+//		if !db.Migrator().HasTable(baseTable) {
 //			// Base table is gone, but the FTS virtual table may remain; clean it up.
 //			if err := bizhelper.SQLiteFTS5Drop(db, defaultAIYakToolFTS5); err != nil {
 //				log.Warnf("failed to drop orphan ai_yak_tools fts5 index: %v", err)
@@ -134,7 +134,7 @@ func SearchAIYakToolBM25(db *gorm.DB, filter *AIYakToolFilter, limit, offset int
 			maxLen = len(m)
 		}
 	}
-	if maxLen < 3 || !schema.IsSQLite(db) || !db.HasTable(defaultAIYakToolFTS5.FTSTable) {
+	if maxLen < 3 || !schema.IsSQLite(db) || !db.Migrator().HasTable(defaultAIYakToolFTS5.FTSTable) {
 		if err := FilterAIYakTools(db, cloneAIYakToolFilterWithKeywords(filter, matches)).Limit(limit).Offset(offset).Find(&res).Error; err != nil {
 			return nil, err
 		}

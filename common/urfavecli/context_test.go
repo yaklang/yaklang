@@ -184,13 +184,13 @@ func TestContext_IsSet(t *testing.T) {
 
 func TestContext_IsSet_ShortAndFull_FlagNames(t *testing.T) {
 	var (
-		numberIsSet, nIsSet bool
-		tempIsSet, tIsSet bool
+		numberIsSet, nIsSet   bool
+		tempIsSet, tIsSet     bool
 		usernameIsSet, uIsSet bool
-		debugIsSet, dIsSet bool
+		debugIsSet, dIsSet    bool
 	)
 
-	a := App {
+	a := App{
 		Flags: []Flag{
 			IntFlag{Name: "number, n"},
 			Float64Flag{Name: "temp, t"},
@@ -211,7 +211,7 @@ func TestContext_IsSet_ShortAndFull_FlagNames(t *testing.T) {
 	}
 
 	tests := []struct {
-		args[]string
+		args []string
 	}{
 		{args: []string{"", "--number", "5", "--temp", "5.2", "--username", "ajitem", "--debug"}},
 		{args: []string{"", "-n", "5", "-t", "5.2", "-u", "ajitem", "-d"}},
@@ -577,8 +577,8 @@ func TestCheckRequiredFlags(t *testing.T) {
 			parseInput: []string{"-n", "asd", "-n", "qwe"},
 		},
 		{
-			testCase: "required_flag_with_short_alias_not_printed_on_error",
-			expectedAnError: true,
+			testCase:              "required_flag_with_short_alias_not_printed_on_error",
+			expectedAnError:       true,
 			expectedErrorContents: []string{"Required flag \"names\" not set"},
 			flags: []Flag{
 				StringSliceFlag{Name: "names, n", Required: true},

@@ -3,22 +3,24 @@ package yakit
 import (
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func newYakScriptTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
+	t.Cleanup(func() { _ = consts.CloseGormDB(db) })
 
-	require.NoError(t, db.AutoMigrate(&schema.YakScript{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.YakScript{}))
 	return db
 }
 
@@ -51,9 +53,9 @@ func TestCreateOrUpdateYakScriptByName_CreatesAndUpdatesSingleRecord(t *testing.
 	require.Equal(t, "print('v2')", got.Content)
 	require.Equal(t, "second version", got.Help)
 
-	var count int
+	var count int64
 	require.NoError(t, db.Model(&schema.YakScript{}).Where("script_name = ?", scriptName).Count(&count).Error)
-	require.Equal(t, 1, count)
+	require.Equal(t, int64(1), count)
 }
 
 func TestCreateOrUpdateYakScriptByName_CreatePreservesProtectedFields(t *testing.T) {

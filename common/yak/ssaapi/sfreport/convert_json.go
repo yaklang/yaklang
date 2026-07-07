@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"gorm.io/gorm"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"

@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/ysmood/leakless/pkg/utils"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 type SqliteManager struct {
@@ -26,7 +26,7 @@ func GetManager(path string, forceCreates ...bool) *SqliteManager {
 	}
 
 	if utils.FileExists(path) && !forceCreate {
-		db, err = gorm.Open(consts.SQLite, path)
+		db, err = gorm.Open(sqlite.Open(path), &gorm.Config{})
 	} else {
 		db, err = consts.CreateCVEDatabase(path)
 	}

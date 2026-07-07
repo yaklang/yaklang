@@ -1,8 +1,9 @@
 package parsers
 
 import (
-	"github.com/yaklang/yaklang/common/schema"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 func newTestGenerateRule(exp string) *schema.GeneralRule {

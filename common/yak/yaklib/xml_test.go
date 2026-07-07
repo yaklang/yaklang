@@ -2,8 +2,9 @@ package yaklib
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/yakxml/xml-tools"
 	"testing"
+
+	xml_tools "github.com/yaklang/yaklang/common/utils/yakxml/xml-tools"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"

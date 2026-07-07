@@ -1,8 +1,9 @@
 package yserx
 
 import (
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func TestNewJavaString(t *testing.T) {

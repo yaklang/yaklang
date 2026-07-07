@@ -3,6 +3,8 @@ package bin_parser
 import (
 	"bytes"
 	"errors"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/bin-parser/parser"
@@ -11,7 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"gopkg.in/yaml.v2"
-	"testing"
 )
 
 func TestCHAPMessage(t *testing.T) {

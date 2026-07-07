@@ -11,8 +11,8 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 type AIAgentRuntimeType string
@@ -26,7 +26,7 @@ const (
 type AIAgentRuntime struct {
 	gorm.Model
 
-	Uuid              string `json:"uuid" gorm:"unique_index"`
+	Uuid              string `json:"uuid" gorm:"uniqueIndex"`
 	PersistentSession string `gorm:"index"`
 	Name              string `json:"name"`
 	Seq               int64  `json:"seq" gorm:"index"`
@@ -164,7 +164,7 @@ type AiCheckpoint struct {
 	ResponseQuotedJson string           `json:"response_quoted_json"`
 	Finished           bool             `json:"finished"`
 
-	Hash string `json:"hash" gorm:"unique_index"`
+	Hash string `json:"hash" gorm:"uniqueIndex"`
 }
 
 func (c *AiCheckpoint) CalcHash() string {
@@ -199,7 +199,7 @@ type AIMemoryEntity struct {
 	gorm.Model
 
 	// 记忆条目唯一标识
-	MemoryID string `json:"memory_id" gorm:"unique_index;not null"`
+	MemoryID string `json:"memory_id" gorm:"uniqueIndex;not null"`
 
 	// 会话ID，关联到特定的AI会话
 	SessionID string `json:"session_id" gorm:"index;not null"`

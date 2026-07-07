@@ -4,10 +4,10 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 func setupTestDB(t *testing.T) *gorm.DB {
@@ -26,7 +26,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 		&schema.ERModelRelationship{},
 		&schema.KnowledgeBaseInfo{},
 		&schema.KnowledgeBaseEntry{},
-	).Error)
+	))
 	return db
 }
 

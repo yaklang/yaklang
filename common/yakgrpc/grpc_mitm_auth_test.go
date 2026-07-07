@@ -3,6 +3,11 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/netx"
@@ -10,10 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/http"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestGRPCMUSTPASS_MITM_AUTH(t *testing.T) {

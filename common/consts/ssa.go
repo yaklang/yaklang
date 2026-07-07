@@ -8,13 +8,10 @@ import (
 
 	"github.com/google/uuid"
 
-	_ "github.com/jinzhu/gorm/dialects/mysql"
-	_ "github.com/jinzhu/gorm/dialects/postgres"
-
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 )
 
 const EmbedSfBuildInRuleKey = "e18179b8cbbea727589cd210c8204306"

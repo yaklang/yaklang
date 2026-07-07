@@ -2,8 +2,9 @@ package codec
 
 import (
 	"bytes"
-	"github.com/davecgh/go-spew/spew"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 func TestCmac(t *testing.T) {

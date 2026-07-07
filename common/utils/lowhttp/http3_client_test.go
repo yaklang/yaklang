@@ -2,8 +2,9 @@ package lowhttp
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 var reqPacket1_1 = []byte(`GET /test HTTP/1.1

@@ -10,10 +10,10 @@ import (
 	"testing"
 
 	"github.com/bytedance/mockey"
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"google.golang.org/grpc"
+	"gorm.io/gorm"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"

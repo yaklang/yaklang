@@ -3,9 +3,9 @@ package schema
 import (
 	"fmt"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 const (
@@ -15,7 +15,7 @@ const (
 type SSARisk struct {
 	gorm.Model
 
-	Hash string `json:"hash" gorm:"unique_index"`
+	Hash string `json:"hash" gorm:"uniqueIndex"`
 
 	// risk info
 	Title        string             `json:"title"`

@@ -4,8 +4,9 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
-	"github.com/google/pprof/profile"
 	"testing"
+
+	"github.com/google/pprof/profile"
 )
 
 //go:embed cpu-pprof.prof

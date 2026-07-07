@@ -3,7 +3,6 @@ package utils
 import (
 	"context"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"io"
 	"net"
 	"net/http"
@@ -11,6 +10,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/yaklang/yaklang/common/log"
 )

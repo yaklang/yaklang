@@ -2,11 +2,12 @@ package utils
 
 import (
 	"fmt"
+	"net/http"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
-	"net/http"
-	"testing"
 )
 
 func TestHTTPRequestReaderWithBareBytes_1(t *testing.T) {

@@ -65,7 +65,7 @@ func TestGetAllToolsDynamically(t *testing.T) {
 	}
 
 	// 迁移数据库表结构
-	err = tempDB.AutoMigrate(&schema.AIYakTool{}).Error
+	err = tempDB.AutoMigrate(&schema.AIYakTool{})
 	if err != nil {
 		t.Fatalf("auto migrate failed: %v", err)
 	}

@@ -2,9 +2,10 @@ package fingerprint
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/schema"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/parsers"

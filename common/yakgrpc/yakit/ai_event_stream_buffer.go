@@ -1,15 +1,16 @@
 package yakit
 
 import (
+	"errors"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"gorm.io/gorm"
 )
 
 // streamEventBuffer coalesces frequent stream-delta updates to reduce sqlite write-lock contention.
@@ -344,7 +345,7 @@ func (b *streamEventBuffer) appendDirect(outDb *gorm.DB, event *schema.AiOutputE
 	// Fallback to the original read-modify-write behavior.
 	var existingEvent schema.AiOutputEvent
 	if err := outDb.Where("event_uuid = ?", event.EventUUID).First(&existingEvent).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return saveAIEvent(outDb, event)
 		}
 		return err
@@ -357,7 +358,7 @@ func ensureStreamEventBase(outDb *gorm.DB, event *schema.AiOutputEvent) (created
 	// Use FirstOrCreate pattern without transaction to avoid "database is locked" errors.
 	var existingEvent schema.AiOutputEvent
 	if err := outDb.Where("event_uuid = ?", event.EventUUID).First(&existingEvent).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return true, saveAIEvent(outDb, event)
 		}
 		return false, err
@@ -371,8 +372,8 @@ func appendStreamDelta(db *gorm.DB, eventUUID string, delta []byte) error {
 	}
 
 	// Optimized atomic append for sqlite (project DB). Fallback to read-modify-write on other dialects.
-	if db != nil && db.Dialect() != nil {
-		switch db.Dialect().GetName() {
+	if db != nil && db.Dialector != nil {
+		switch db.Dialector.Name() {
 		case "sqlite3":
 			// X'' is an empty BLOB literal in SQLite.
 			r := db.Model(&schema.AiOutputEvent{}).

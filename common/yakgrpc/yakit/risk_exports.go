@@ -920,7 +920,7 @@ func HaveReverseRisk(token string) bool {
 	retryCount := 0
 	for {
 		retryCount++
-		var count int
+		var count int64
 		if db := db.Model(&schema.Risk{}).Where(
 			"reverse_token LIKE ?", "%"+token+"%",
 		).Where("waiting_verified = ?", false).Count(&count); db.Error != nil {

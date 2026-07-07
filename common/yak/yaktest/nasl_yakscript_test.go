@@ -2,10 +2,11 @@ package yaktest
 
 import (
 	"context"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
-	"testing"
 )
 
 func init() {

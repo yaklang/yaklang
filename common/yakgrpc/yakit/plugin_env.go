@@ -1,9 +1,11 @@
 package yakit
 
 import (
-	"github.com/jinzhu/gorm"
+	"errors"
+
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"gorm.io/gorm"
 )
 
 func CreatePluginEnv(db *gorm.DB, key string, value string) error {
@@ -22,7 +24,7 @@ func UpdatePluginEnv(db *gorm.DB, key string, value string) error {
 
 func CreateOrUpdatePluginEnv(db *gorm.DB, key string, value string) error {
 	if findDb := db.Where("key = ?", key).Find(&schema.PluginEnv{}); findDb.Error != nil {
-		if !findDb.RecordNotFound() {
+		if !errors.Is(findDb.Error, gorm.ErrRecordNotFound) {
 			return findDb.Error
 		}
 		if db := db.Create(&schema.PluginEnv{Key: key, Value: value}); db.Error != nil {

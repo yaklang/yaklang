@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 type CVE struct {
@@ -286,7 +286,7 @@ type BaseMetricV3 struct {
 }
 
 type ProductsTable struct {
-	Product string `gorm:"primary_key"`
+	Product string `gorm:"primaryKey"`
 	Vendor  string
 }
 

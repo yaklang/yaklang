@@ -2,8 +2,9 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 //func TestServer_DownloadOnlinePluginAll(t *testing.T) {

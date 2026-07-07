@@ -3,23 +3,24 @@ package ssadb
 import (
 	"testing"
 
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func setupNameCacheDB(t *testing.T) (*gorm.DB, func()) {
 	t.Helper()
 
 	oldDB := GetDB()
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&IrNamePool{}).Error)
+	require.NoError(t, db.AutoMigrate(&IrNamePool{}))
 	SetDB(db)
 
 	cleanup := func() {
 		SetDB(oldDB)
-		_ = db.Close()
+		_ = consts.CloseGormDB(db)
 	}
 	return db, cleanup
 }
@@ -74,13 +75,13 @@ func TestNameCachePreloadWhenDBBecomesAvailable(t *testing.T) {
 	SetDB(nil)
 	cache := NewNameCache("progA")
 
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
 	defer func() {
 		SetDB(oldDB)
-		_ = db.Close()
+		_ = consts.CloseGormDB(db)
 	}()
-	require.NoError(t, db.AutoMigrate(&IrNamePool{}).Error)
+	require.NoError(t, db.AutoMigrate(&IrNamePool{}))
 	SetDB(db)
 
 	require.NoError(t, db.Create(&IrNamePool{ProgramName: "progA", Name: "late"}).Error)

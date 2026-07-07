@@ -1,13 +1,13 @@
 package ssaapi
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"gorm.io/gorm"
 )
 
 // ======================================== All Value/Variable ========================================

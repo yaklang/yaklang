@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
+	"gorm.io/gorm"
 )
 
 type MCPServer struct {

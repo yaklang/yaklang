@@ -12,14 +12,15 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-
-	_ "github.com/go-sql-driver/mysql"
-	"github.com/jinzhu/gorm"
 	"github.com/mattn/go-sqlite3"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/permutil"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 const (
@@ -45,11 +46,6 @@ func DeleteDatabaseFile(path string) error {
 }
 
 func registerDriver() {
-	{
-		sqlDialect, _ := gorm.GetDialect(SQLite)
-		gorm.RegisterDialect(SQLiteExtend, sqlDialect)
-	}
-
 	regex := func(re, s string) (bool, error) {
 		return regexp.MatchString(re, s)
 	}
@@ -80,6 +76,12 @@ func registerDriver() {
 		})
 }
 
+// OpenDatabaseByDriver opens a database with gorm v2 using the same DSN
+// formatting and optimization settings used throughout the project.
+func OpenDatabaseByDriver(driver string, source string) (*gorm.DB, error) {
+	return createAndConfigDatabase(source, driver)
+}
+
 func GetTempTestDatabase() (string, *gorm.DB, error) {
 	dbPath := filepath.Join(GetDefaultYakitBaseTempDir(), fmt.Sprintf("temp-yaktest-%s.db", uuid.NewString()))
 	db, err := createAndConfigDatabase(dbPath, SQLiteExtend)
@@ -93,13 +95,12 @@ func createAndConfigDatabase(path string, drivers ...string) (*gorm.DB, error) {
 	if path == "" {
 		return nil, utils.Errorf("database path is empty")
 	}
-	// register sql-extend driver
+	// register sql-extend driver (custom md5/regexp/sleep functions)
 	RegisterDriverOnce.Do(registerDriver)
 
 	driver := DEFAULT_DRIVER
 	if len(drivers) > 0 {
 		driver = drivers[0]
-	} else {
 	}
 
 	purePath := path
@@ -111,14 +112,29 @@ func createAndConfigDatabase(path string, drivers ...string) (*gorm.DB, error) {
 	default:
 	}
 
-	db, err := gorm.Open(driver, path)
+	var dialector gorm.Dialector
+	switch driver {
+	case SQLiteExtend:
+		// Use the custom database/sql driver that registers md5/regexp/sleep.
+		dialector = sqlite.New(sqlite.Config{DriverName: SQLiteExtend, DSN: path})
+	case SQLite:
+		dialector = sqlite.Open(path)
+	case MySQL:
+		dialector = mysql.Open(path)
+	case Postgres:
+		dialector = postgres.Open(path)
+	default:
+		return nil, utils.Errorf("unsupported database driver: %s", driver)
+	}
+
+	db, err := gorm.Open(dialector, &gorm.Config{})
 	if err != nil && (driver == SQLite || driver == SQLiteExtend) {
 		log.Warnf("open database[%s] with driver[%s] failed: %s, try to check and fix it", purePath, driver, err)
 		err = checkAndTryFixDatabase(purePath)
 		if err != nil {
 			return nil, err
 		}
-		db, err = gorm.Open(driver, path)
+		db, err = gorm.Open(dialector, &gorm.Config{})
 	}
 	if err != nil {
 		return nil, err
@@ -127,17 +143,35 @@ func createAndConfigDatabase(path string, drivers ...string) (*gorm.DB, error) {
 	return db, nil
 }
 
+// CloseGormDB closes the underlying *sql.DB of a *gorm.DB.
+// gorm v2 no longer exposes db.Close() directly.
+func CloseGormDB(db *gorm.DB) error {
+	if db == nil {
+		return nil
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.Close()
+}
+
 func configureAndOptimizeDB(drive string, db *gorm.DB) {
 	// reference: https://stackoverflow.com/questions/35804884/sqlite-concurrent-writing-performance
-	db.DB().SetConnMaxLifetime(time.Hour)
-	db.DB().SetMaxIdleConns(10)
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Warnf("get underlying sql.DB failed: %s", err)
+		return
+	}
+	sqlDB.SetConnMaxLifetime(time.Hour)
+	sqlDB.SetMaxIdleConns(10)
 	// SQLite must keep a single writer connection to avoid "database is locked" under concurrent writes.
 	// For server databases (MySQL/Postgres), allow a small pool for throughput.
 	switch drive {
 	case SQLiteExtend, SQLite:
-		db.DB().SetMaxOpenConns(1)
+		sqlDB.SetMaxOpenConns(1)
 	default:
-		db.DB().SetMaxOpenConns(20)
+		sqlDB.SetMaxOpenConns(20)
 	}
 
 	if drive == SQLiteExtend || drive == SQLite {

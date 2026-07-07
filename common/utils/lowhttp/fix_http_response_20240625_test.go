@@ -2,9 +2,10 @@ package lowhttp
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"testing"
 )
 
 func TestFixHTTPResponse_20240626_GZJS(t *testing.T) {

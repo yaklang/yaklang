@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 const (
@@ -32,7 +32,7 @@ type ReportRecord struct {
 
 	Title       string
 	PublishedAt time.Time `json:"published_at"`
-	Hash        string    `json:"hash" gorm:"unique_index"`
+	Hash        string    `json:"hash" gorm:"uniqueIndex"`
 	Owner       string    `json:"owner"`
 	From        string    `json:"from"`
 	QuotedJson  string    `json:"quoted_json"`

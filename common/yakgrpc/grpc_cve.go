@@ -112,8 +112,8 @@ func (s *Server) IsCVEDatabaseReady(ctx context.Context, req *ypb.IsCVEDatabaseR
 		}, nil
 	}
 
-	if !db.HasTable("cves") {
-		db.Close()
+	if !db.Migrator().HasTable("cves") {
+		consts.CloseGormDB(db)
 		consts.SetGormCVEDatabase(nil)
 		return &ypb.IsCVEDatabaseReadyResponse{
 			Ok:     false,
@@ -249,7 +249,7 @@ func (s *Server) UpdateCVEDatabase(req *ypb.UpdateCVEDatabaseRequest, stream ypb
 
 	if db := consts.GetGormCVEDatabase(); db != nil {
 		info(0, "开始清理旧的 CVE 数据库: Start to clean old CVE Database")
-		db.Close()
+		consts.CloseGormDB(db)
 	}
 
 	os.RemoveAll(consts.GetCVEDatabaseGzipPath())

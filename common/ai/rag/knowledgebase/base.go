@@ -5,12 +5,12 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 // KnowledgeBase 知识库结构体，提供对知识库的操作接口
@@ -30,7 +30,7 @@ func (kb *KnowledgeBase) GetKnowledgeBaseInfo() *schema.KnowledgeBaseInfo {
 }
 
 func AutoMigrate(db *gorm.DB) error {
-	return db.AutoMigrate(&schema.KnowledgeBaseInfo{}, &schema.KnowledgeBaseEntry{}, &schema.VectorStoreDocument{}, &schema.VectorStoreCollection{}).Error
+	return db.AutoMigrate(&schema.KnowledgeBaseInfo{}, &schema.KnowledgeBaseEntry{}, &schema.VectorStoreDocument{}, &schema.VectorStoreCollection{})
 }
 
 func NewKnowledgeBaseWithVectorStore(db *gorm.DB, name, description, kbType string, kbTags []string, vectorStore *vectorstore.SQLiteVectorStoreHNSW) (*KnowledgeBase, error) {

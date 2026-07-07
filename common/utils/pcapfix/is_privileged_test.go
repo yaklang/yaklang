@@ -1,8 +1,9 @@
 package pcapfix
 
 import (
-	"github.com/davecgh/go-spew/spew"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 func TestIsPrivilegedForNetRaw(t *testing.T) {

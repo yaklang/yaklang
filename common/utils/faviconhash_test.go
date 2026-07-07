@@ -1,9 +1,10 @@
 package utils
 
 import (
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestFaviconURL(t *testing.T) {

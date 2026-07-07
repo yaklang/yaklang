@@ -1,13 +1,14 @@
 package yakit
 
 import (
+	"errors"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	bizhelper "github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 // parseMCPClientToolSources splits the Source filter into one or more source values.
@@ -59,7 +60,7 @@ func GetOrCreateMCPClientToolConfigWithDefaultEnable(db *gorm.DB, toolName, sour
 	if err == nil {
 		return cfg, nil
 	}
-	if !gorm.IsRecordNotFoundError(err) {
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, utils.Errorf("query mcp_client_tool_configs failed: %s", err)
 	}
 	cfg = &schema.MCPClientToolConfig{
@@ -232,7 +233,7 @@ func MigrateMCPClientBridgeToolConfigsServerName(db *gorm.DB, oldServerName, new
 		if qErr == nil {
 			return utils.Errorf("bridge tool name %q already exists", newToolName)
 		}
-		if !gorm.IsRecordNotFoundError(qErr) {
+		if !errors.Is(qErr, gorm.ErrRecordNotFound) {
 			return utils.Errorf("check bridge tool name conflict failed: %s", qErr)
 		}
 
@@ -299,7 +300,7 @@ func GetMCPClientToolConfigByName(db *gorm.DB, toolName string) (*schema.MCPClie
 	cfg := &schema.MCPClientToolConfig{}
 	err := db.Where("tool_name = ?", toolName).First(cfg).Error
 	if err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, utils.Errorf("mcp client tool %q not found", toolName)
 		}
 		return nil, utils.Errorf("query mcp_client_tool_config %q failed: %s", toolName, err)

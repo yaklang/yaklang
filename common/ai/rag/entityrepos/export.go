@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"gorm.io/gorm"
 )
 
 type ExportEntityRepositoryOptions struct {
@@ -329,7 +330,7 @@ func ImportEntityRepository(ctx context.Context, db *gorm.DB, reader io.Reader, 
 	// 检查实体仓库是否已存在
 	var existingRepos schema.EntityRepository
 	err = db.Model(&schema.EntityRepository{}).Where("entity_base_name = ?", finalReposName).First(&existingRepos).Error
-	isNotFound := err != nil && (gorm.IsRecordNotFoundError(err) || utils.StringContainsAnyOfSubString(err.Error(), []string{"record not found"}))
+	isNotFound := err != nil && (errors.Is(err, gorm.ErrRecordNotFound) || utils.StringContainsAnyOfSubString(err.Error(), []string{"record not found"}))
 
 	if err != nil && !isNotFound {
 		return utils.Wrap(err, "check existing entity repository")

@@ -263,7 +263,7 @@ func TestConfig_ConvertConfigToOptions_PropagatesBrowserSessionTracker(t *testin
 func TestConfig_CreateOrUpdateRuntimeRecord(t *testing.T) {
 	runtimeUUID := uuid.NewString()
 	config := NewConfig(context.Background(), WithID(runtimeUUID))
-	require.NoError(t, config.GetDB().AutoMigrate(&schema.AIAgentRuntime{}).Error)
+	require.NoError(t, config.GetDB().AutoMigrate(&schema.AIAgentRuntime{}))
 	t.Cleanup(func() {
 		require.NoError(t, config.GetDB().Unscoped().Where("uuid = ?", runtimeUUID).Delete(&schema.AIAgentRuntime{}).Error)
 	})
@@ -285,7 +285,7 @@ func TestConfig_CreateOrUpdateRuntimeRecord(t *testing.T) {
 func TestConfig_CreateOrUpdateRuntimeRecord_Disabled(t *testing.T) {
 	runtimeUUID := uuid.NewString()
 	config := NewConfig(context.Background(), WithID(runtimeUUID))
-	require.NoError(t, config.GetDB().AutoMigrate(&schema.AIAgentRuntime{}).Error)
+	require.NoError(t, config.GetDB().AutoMigrate(&schema.AIAgentRuntime{}))
 	t.Cleanup(func() {
 		require.NoError(t, config.GetDB().Unscoped().Where("uuid = ?", runtimeUUID).Delete(&schema.AIAgentRuntime{}).Error)
 	})
@@ -299,7 +299,7 @@ func TestConfig_CreateOrUpdateRuntimeRecord_Disabled(t *testing.T) {
 	require.Zero(t, config.DatabaseRecordID)
 	require.Zero(t, runtime.ID)
 
-	var count int
+	var count int64
 	require.NoError(t, config.GetDB().Model(&schema.AIAgentRuntime{}).Where("uuid = ?", runtimeUUID).Count(&count).Error)
 	require.Zero(t, count)
 }

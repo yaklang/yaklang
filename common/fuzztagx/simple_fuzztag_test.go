@@ -2,13 +2,14 @@ package fuzztagx
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
-	"strconv"
-	"strings"
-	"testing"
 )
 
 func TestSimpleFuzzTag_Exec(t *testing.T) {

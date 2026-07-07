@@ -1,7 +1,10 @@
 package tests
 
-import "testing"
-import "github.com/stretchr/testify/require"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestComplex_ObjectFactor_MethodCall(t *testing.T) {
 	check(t, `

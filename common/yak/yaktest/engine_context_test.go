@@ -3,13 +3,14 @@ package yaktest
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak"
 	"os"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak"
 )
 
 func testScriptWithTimeout(duration time.Duration, t *testing.T, code string, expectErrorInfo string) {

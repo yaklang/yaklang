@@ -9,8 +9,6 @@ import (
 	"sync"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
-	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
@@ -18,7 +16,10 @@ import (
 	"github.com/yaklang/yaklang/common/cve/cvequeryops"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -136,7 +137,7 @@ var CVEUtilCommands = []*cli.Command{
 				_, _ = consts.InitializeCVEDescriptionDatabase()
 				descDBPath = consts.GetCVEDescriptionDatabasePath()
 			}
-			descDB, err := gorm.Open("sqlite3", descDBPath)
+			descDB, err := gorm.Open(sqlite.Open(descDBPath), &gorm.Config{})
 			if err != nil {
 				log.Warnf("cannot found sqlite3 cve description: %v", err)
 			}
@@ -144,11 +145,11 @@ var CVEUtilCommands = []*cli.Command{
 			if c.Bool("cwe") {
 				cveDB := outputDB
 				// merge cwe
-				if descDB != nil && descDB.HasTable("cwes") && cveDB != nil {
+				if descDB != nil && descDB.Migrator().HasTable("cwes") && cveDB != nil {
 					log.Info("cve-description database is detected, merge cve db")
-					if cveDB.HasTable("cwes") {
-						if db := cveDB.DropTable("cwes"); db.Error != nil {
-							log.Errorf("drop cwe table failed: %s", db.Error)
+					if cveDB.Migrator().HasTable("cwes") {
+						if err := cveDB.Migrator().DropTable("cwes"); err != nil {
+							log.Errorf("drop cwe table failed: %s", err)
 						}
 					}
 					log.Infof("start to migrate cwe for cvedb")
@@ -193,7 +194,7 @@ var CVEUtilCommands = []*cli.Command{
 				defer wg.Done()
 
 				log.Infof("using description database: %s", descDBPath)
-				db, err := gorm.Open("sqlite3", descDBPath)
+				db, err := gorm.Open(sqlite.Open(descDBPath), &gorm.Config{})
 				if err != nil {
 					log.Errorf("sqlite3 failed: %s", err)
 					return
@@ -238,11 +239,11 @@ var CVEUtilCommands = []*cli.Command{
 		},
 		Action: func(c *cli.Context) error {
 			log.Info("start to cve description and origin database")
-			desc, err := gorm.Open("sqlite3", c.String("desc-db"))
+			desc, err := gorm.Open(sqlite.Open(c.String("desc-db")), &gorm.Config{})
 			if err != nil {
 				return err
 			}
-			cvedb, err := gorm.Open("sqlite3", c.String("db"))
+			cvedb, err := gorm.Open(sqlite.Open(c.String("db")), &gorm.Config{})
 			if err != nil {
 				return err
 			}
@@ -263,7 +264,7 @@ var CVEUtilCommands = []*cli.Command{
 				if descIns.ChineseTitle != "" {
 					/*
 						type CVEDescription struct {
-							CVE                string `json:"cve" gorm:"unique_index"`
+							CVE                string `json:"cve" gorm:"uniqueIndex"`
 							Title              string
 							ChineseTitle       string
 							Description        string
@@ -280,8 +281,8 @@ var CVEUtilCommands = []*cli.Command{
 			}
 			_ = cvedb
 			log.Info("count: ", count, "updated: ", updateCount)
-			desc.Close()
-			cvedb.Close()
+			consts.CloseGormDB(desc)
+			consts.CloseGormDB(cvedb)
 
 			// update cve gzip
 			existedGzipCVE := c.String("db") + ".gzip"

@@ -2,10 +2,11 @@ package pingutil
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/utils"
 	"math/rand"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestTraceroute(t *testing.T) {

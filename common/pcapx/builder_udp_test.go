@@ -2,9 +2,10 @@ package pcapx
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
-	"testing"
 )
 
 func TestSmoking_UDP(t *testing.T) {

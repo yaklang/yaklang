@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -27,7 +27,7 @@ type IrType struct {
 	ProgramName      string `json:"program_name"`
 	String           string `json:"string" gorm:"type:text"`
 	ExtraInformation string `json:"extra_information" gorm:"type:text"`
-	// Hash             string `json:"hash" gorm:"unique_index"`
+	// Hash             string `json:"hash" gorm:"uniqueIndex"`
 }
 
 func (*IrType) TableName() string {

@@ -85,7 +85,7 @@ func TestRecovery_SkipCompletedTasks(t *testing.T) {
 	abortedTask.SetSummary("aborted task should be retried")
 
 	db := consts.GetGormProjectDatabase()
-	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}))
 	t.Cleanup(func() {
 		_ = db.Unscoped().
 			Where("session_id = ?", sessionID).
@@ -287,7 +287,7 @@ func TestRecovery_StartFromSpecifiedTask(t *testing.T) {
 	root.GenerateIndex()
 
 	db := consts.GetGormProjectDatabase()
-	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}))
 	t.Cleanup(func() {
 		_ = db.Unscoped().
 			Where("session_id = ?", sessionID).
@@ -466,7 +466,7 @@ func TestRecovery_StartEarlierThanPreviousCursorResetsCompletedTasks(t *testing.
 	fourthTask.SetStatus(aicommon.AITaskState_Aborted)
 
 	db := consts.GetGormProjectDatabase()
-	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}))
 	t.Cleanup(func() {
 		_ = db.Unscoped().
 			Where("session_id = ?", sessionID).
@@ -639,7 +639,7 @@ func TestRecovery_CancelledTaskPersistsAbortedState(t *testing.T) {
 	root.GenerateIndex()
 
 	db := consts.GetGormProjectDatabase()
-	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}))
 	t.Cleanup(func() {
 		_ = db.Unscoped().
 			Where("session_id = ?", sessionID).

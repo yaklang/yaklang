@@ -3,12 +3,13 @@
 package crawlerx
 
 import (
-	"github.com/go-rod/rod"
-	"github.com/yaklang/yaklang/common/log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/go-rod/rod"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 const invalidUrlTestHtml = `<html>

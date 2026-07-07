@@ -2,10 +2,11 @@ package fuzztagx
 
 import (
 	"fmt"
-	parser "github.com/yaklang/yaklang/common/fuzztagx/parser"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 	"testing"
+
+	parser "github.com/yaklang/yaklang/common/fuzztagx/parser"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 var methods = []*parser.TagMethod{}

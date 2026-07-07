@@ -204,8 +204,8 @@ func TestCallAITransaction_FailureEmit_ConnectionRefused(t *testing.T) {
 
 func TestCallAITransaction_FailureEmit_StreamTimeoutWithPartialBody(t *testing.T) {
 	const (
-		partialMarker  = "PARTIAL_STREAM_CHUNK"
-		timeoutSeconds = 2.0
+		partialMarker   = "PARTIAL_STREAM_CHUNK"
+		timeoutSeconds  = 2.0
 		streamHangAfter = 30 * time.Second
 	)
 

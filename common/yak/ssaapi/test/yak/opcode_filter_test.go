@@ -1,10 +1,11 @@
 package ssaapi
 
 import (
+	"testing"
+
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestOpcodeFilterTest(t *testing.T) {

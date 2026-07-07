@@ -3,11 +3,11 @@ package integration
 import (
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 	"gotest.tools/v3/assert"
 
 	_ "github.com/yaklang/yaklang/common/ai/rag/plugins_rag"

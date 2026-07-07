@@ -1,8 +1,9 @@
 package tests
 
 import (
-	"github.com/yaklang/yaklang/common/yak/java/freemarker"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/java/freemarker"
 )
 
 func TestGetAST(t *testing.T) {

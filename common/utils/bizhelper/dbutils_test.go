@@ -3,9 +3,10 @@ package bizhelper
 import (
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 type testData struct {
@@ -18,10 +19,11 @@ func TestGroupColumn(t *testing.T) {
 	db, err := createTempTestDatabase()
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		db.Close()
+		consts.CloseGormDB(db)
 	})
 
-	db = db.Debug().AutoMigrate(&testData{}).Model(&testData{})
+	require.NoError(t, db.Debug().AutoMigrate(&testData{}))
+	db = db.Model(&testData{})
 
 	token1, token2, token3 := utils.RandStringBytes(10), utils.RandStringBytes(10), utils.RandStringBytes(10)
 	for i := 1; i < 6; i++ {
@@ -64,7 +66,7 @@ func TestFuzzSearchNotEx(t *testing.T) {
 	db, err := createTempTestDatabase()
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		db.Close()
+		consts.CloseGormDB(db)
 	})
 
 	type testSearchData struct {
@@ -74,7 +76,8 @@ func TestFuzzSearchNotEx(t *testing.T) {
 		Path    string
 	}
 
-	db = db.AutoMigrate(&testSearchData{}).Model(&testSearchData{})
+	require.NoError(t, db.AutoMigrate(&testSearchData{}))
+	db = db.Model(&testSearchData{})
 
 	// 创建测试数据
 	testCases := []struct {

@@ -1,9 +1,10 @@
 package numrange
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
-	"testing"
 )
 
 func TestParseNumRange(t *testing.T) {

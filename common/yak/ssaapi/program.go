@@ -9,8 +9,8 @@ import (
 
 	"go.uber.org/atomic"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"gorm.io/gorm"
 
 	"github.com/samber/lo"
 

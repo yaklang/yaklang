@@ -2,15 +2,16 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"testing"
 	"time"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem"
+
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 func TestAIMemoryEntity_CRUD_DBOnly(t *testing.T) {

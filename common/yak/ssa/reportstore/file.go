@@ -1,6 +1,6 @@
 package reportstore
 
-import "github.com/jinzhu/gorm"
+import "gorm.io/gorm"
 
 const (
 	SSAReportRecordFileTableName = "ssa_report_record_files"
@@ -16,7 +16,7 @@ type SSAReportRecordFile struct {
 	ReportRecordID  uint   `json:"report_record_id" gorm:"index"`
 	Format          string `json:"format" gorm:"index"`
 	FileName        string `json:"file_name"`
-	ObjectKey       string `json:"object_key" gorm:"unique_index"`
+	ObjectKey       string `json:"object_key" gorm:"uniqueIndex"`
 	Bucket          string `json:"bucket"`
 	ContentType     string `json:"content_type"`
 	SizeBytes       int64  `json:"size_bytes"`

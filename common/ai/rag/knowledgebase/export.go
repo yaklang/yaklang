@@ -3,15 +3,16 @@ package knowledgebase
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"gorm.io/gorm"
 )
 
 type ExportKnowledgeBaseOptions struct {
@@ -277,7 +278,7 @@ func ImportKnowledgeBase(ctx context.Context, db *gorm.DB, reader io.Reader, opt
 
 	// 检查知识库是否已存在
 	existingKB, err := yakit.GetKnowledgeBaseByName(db, finalKbName)
-	isNotFound := err != nil && (gorm.IsRecordNotFoundError(err) || utils.StringContainsAnyOfSubString(err.Error(), []string{"record not found"}))
+	isNotFound := err != nil && (errors.Is(err, gorm.ErrRecordNotFound) || utils.StringContainsAnyOfSubString(err.Error(), []string{"record not found"}))
 
 	if err != nil && !isNotFound {
 		return utils.Wrap(err, "check existing knowledge base")

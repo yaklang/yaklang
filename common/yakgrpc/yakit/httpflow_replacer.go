@@ -15,7 +15,6 @@ import (
 
 	regexp2 "github.com/VillanCh/go-pcre2-lite/regexp2"
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -28,6 +27,7 @@ import (
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 type Rules []*MITMReplaceRule

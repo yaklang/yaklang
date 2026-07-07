@@ -89,7 +89,7 @@ func newRecoveryHistoryTestConfig(t *testing.T, ctx context.Context, handler fun
 
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AiOutputEvent{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AiOutputEvent{}))
 
 	cfg := NewTestConfig(ctx,
 		WithID("coord-1"),
@@ -344,7 +344,7 @@ func TestHandleSyncUpdataConfigEvent_PersistSessionStartParams(t *testing.T) {
 	c := NewTestConfig(ctx,
 		WithPersistentSessionId("session-sync-config"),
 	)
-	require.NoError(t, c.GetDB().AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, c.GetDB().AutoMigrate(&schema.AISession{}))
 	_, err := yakit.CreateOrUpdateAISessionMetaStartParams(c.GetDB(), "session-sync-config", &ypb.AIStartParams{
 		AIService:         "old-service",
 		AIModelName:       "old-model",
@@ -357,9 +357,9 @@ func TestHandleSyncUpdataConfigEvent_PersistSessionStartParams(t *testing.T) {
 	err = c.HandleSyncUpdataConfigEvent(&ypb.AIInputEvent{
 		SyncID: uuid.NewString(),
 		Params: &ypb.AIStartParams{
-			AIService:     "new-service",
-			AIModelName:   "new-model",
-			ReviewPolicy:  "ai",
+			AIService:    "new-service",
+			AIModelName:  "new-model",
+			ReviewPolicy: "ai",
 		},
 	})
 	require.NoError(t, err)

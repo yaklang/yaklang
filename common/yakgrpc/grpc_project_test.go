@@ -10,7 +10,6 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
@@ -18,6 +17,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func TestServer_UpdateProject_DuplicateName(t *testing.T) {
@@ -228,7 +229,7 @@ func TestServer_Project_ExportAndImportProject(t *testing.T) {
 			yakit.DeleteProjectByProjectName(consts.GetGormProfileDatabase(), newProjectName)
 		}()
 
-		_, err = gorm.Open(consts.SQLite, newProject.DatabasePath) // check db whether it is damaged
+		_, err = gorm.Open(sqlite.Open(newProject.DatabasePath), &gorm.Config{}) // check db whether it is damaged
 		require.NoError(t, err)
 	})
 
@@ -279,7 +280,7 @@ func TestServer_Project_ExportAndImportProject(t *testing.T) {
 			yakit.DeleteProjectByProjectName(consts.GetGormProfileDatabase(), newProjectName)
 		}()
 
-		_, err = gorm.Open(consts.SQLite, newProject.DatabasePath) // check db whether it is damaged
+		_, err = gorm.Open(sqlite.Open(newProject.DatabasePath), &gorm.Config{}) // check db whether it is damaged
 		require.NoError(t, err)
 	})
 
@@ -312,7 +313,7 @@ func TestServer_Project_ExportAndImportProject(t *testing.T) {
 			yakit.DeleteProjectByProjectName(consts.GetGormProfileDatabase(), newProjectName)
 		}()
 
-		_, err = gorm.Open(consts.SQLite, newProject.DatabasePath) // check db whether it is damaged
+		_, err = gorm.Open(sqlite.Open(newProject.DatabasePath), &gorm.Config{}) // check db whether it is damaged
 		require.NoError(t, err)
 	})
 

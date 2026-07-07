@@ -2,9 +2,10 @@ package memedit
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestPromptContext(t *testing.T) {

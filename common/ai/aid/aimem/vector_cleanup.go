@@ -4,11 +4,11 @@ import (
 	"context"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"gorm.io/gorm"
 )
 
 // DeleteMemoryVectorArtifacts removes HNSW graph nodes and RAG documents for the given entities.

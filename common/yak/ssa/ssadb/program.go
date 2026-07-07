@@ -1,9 +1,9 @@
 package ssadb
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"gorm.io/gorm"
 )
 
 type ProgramKind string
@@ -16,7 +16,7 @@ const (
 type IrProgram struct {
 	gorm.Model
 
-	ProgramName string `json:"program_name" gorm:"unique_index"`
+	ProgramName string `json:"program_name" gorm:"uniqueIndex"`
 	// ProjectName string `json:"project_name" gorm:"index"`
 	ProjectID uint64 `json:"project_id" gorm:"index,not null,default:0"`
 
@@ -137,7 +137,7 @@ func UpdateProgramWithError(prog *IrProgram) error {
 		Where("id = ?", prog.ID).
 		Where("program_name = ?", prog.ProgramName).
 		Where("program_kind = ?", prog.ProgramKind).
-		Update(prog).Error
+		Updates(prog).Error
 }
 
 func UpdateProgram(prog *IrProgram) {

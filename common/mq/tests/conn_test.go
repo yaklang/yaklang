@@ -1,16 +1,17 @@
 package tests
 
 import (
+	"io/ioutil"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mq"
 	"github.com/yaklang/yaklang/common/thirdpartyservices"
 	"github.com/yaklang/yaklang/common/utils"
-	"io/ioutil"
-	"strings"
-	"testing"
-	"time"
 )
 
 func Test_Conn(t *testing.T) {

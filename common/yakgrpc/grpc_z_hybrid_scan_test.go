@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"strings"
+	"testing"
+
 	"github.com/google/uuid"
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/schema"
-	"io/ioutil"
-	"os"
-	"strings"
-	"testing"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
@@ -220,7 +221,7 @@ func TestGRPCMUSTPASS_HybridScan_HTTPFlow_At_Least(t *testing.T) {
 		runtimeID = rsp.HybridScanTaskId
 		spew.Dump(rsp)
 	}
-	var count int
+	var count int64
 	consts.GetGormProjectDatabase().Model(&schema.HTTPFlow{}).Where("runtime_id = ?", runtimeID).Count(&count)
 	require.GreaterOrEqual(t, count, 1, "count not match")
 	spew.Dump(count)

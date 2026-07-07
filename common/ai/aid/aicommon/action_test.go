@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
@@ -317,7 +318,8 @@ func TestSupperAction_TagToKeyStream(t *testing.T) {
 //     和 "[current-nonce]" 两个 callback, 字面量分支命中
 //
 // 关键词: TestActionMaker, ExtraNonces, [current-nonce] 字面照抄,
-//        CACHE_TOOL_CALL, 双注册兜底
+//
+//	CACHE_TOOL_CALL, 双注册兜底
 func TestActionMaker_ExtraNonces_LLMUsesStableLiteral(t *testing.T) {
 	turnNonce := uuid.NewString()
 	stableNonce := "[current-nonce]"

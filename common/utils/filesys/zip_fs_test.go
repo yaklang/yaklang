@@ -3,11 +3,12 @@ package filesys
 import (
 	_ "embed"
 	"fmt"
+	"os"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
-	"os"
-	"testing"
 )
 
 //go:embed testdata.zip

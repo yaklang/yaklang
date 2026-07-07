@@ -11,10 +11,11 @@ import (
 	"time"
 	_ "unsafe"
 
-	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 const (
@@ -326,7 +327,7 @@ func installYakScriptStressProfileDatabase(t *testing.T, db *gorm.DB) {
 		constsProfileDatabase = oldProfileDB
 		constsCurrentProfileDatabasePath = oldProfilePath
 		constsInitYakitDatabaseOnce = oldInitOnce
-		_ = db.Close()
+		_ = consts.CloseGormDB(db)
 	})
 }
 

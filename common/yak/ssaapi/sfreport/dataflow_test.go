@@ -6,10 +6,10 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"gorm.io/gorm"
 )
 
 func cleanupByRiskHash(t *testing.T, db *gorm.DB, riskHash string) {
@@ -22,18 +22,18 @@ func cleanupByRiskHash(t *testing.T, db *gorm.DB, riskHash string) {
 }
 
 func countNodes(db *gorm.DB, riskHash string) int {
-	var c int
+	var c int64
 	db.Model(&ssadb.AuditNode{}).Where("risk_hash = ?", riskHash).Count(&c)
-	return c
+	return int(c)
 }
 
 func countEdgesByNodes(db *gorm.DB, nodeIDs []string) int {
 	if len(nodeIDs) == 0 {
 		return 0
 	}
-	var c int
+	var c int64
 	db.Model(&ssadb.AuditEdge{}).Where("from_node IN (?) OR to_node IN (?)", nodeIDs, nodeIDs).Count(&c)
-	return c
+	return int(c)
 }
 
 func queryNodes(db *gorm.DB, riskHash string) []*ssadb.AuditNode {

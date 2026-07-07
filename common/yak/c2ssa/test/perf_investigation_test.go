@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	cparser "github.com/yaklang/yaklang/common/yak/antlr4c/parser"
+	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"github.com/yaklang/yaklang/common/yak/c2ssa"
 )
 

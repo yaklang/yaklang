@@ -1,11 +1,12 @@
 package bruteutils
 
 import (
-	"github.com/yaklang/yaklang/common/log"
-	"golang.org/x/crypto/ssh"
 	"io"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"golang.org/x/crypto/ssh"
 )
 
 func TestSSHClientConnecting(t *testing.T) {

@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/ai/aid/aicache"
 	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicache"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"

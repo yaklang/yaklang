@@ -2,12 +2,13 @@ package yakgrpc
 
 import (
 	"bytes"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
 )
 
 func TestReplaceString(t *testing.T) {

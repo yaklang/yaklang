@@ -294,10 +294,10 @@ func TestApplyTaskDeltas_MixedOperations(t *testing.T) {
 	currentTask := subs[0] // task-A
 
 	deltas := []aid.TaskDelta{
-		{Op: aid.TaskDeltaRemove, RefTaskIndex: "1-3"},                                                                        // remove task-C
-		{Op: aid.TaskDeltaModify, RefTaskIndex: "1-4", UpdatedName: "task-D-mod", UpdatedGoal: "modified D goal"},              // modify task-D
+		{Op: aid.TaskDeltaRemove, RefTaskIndex: "1-3"},                                                                                              // remove task-C
+		{Op: aid.TaskDeltaModify, RefTaskIndex: "1-4", UpdatedName: "task-D-mod", UpdatedGoal: "modified D goal"},                                   // modify task-D
 		{Op: aid.TaskDeltaInsertAfter, RefTaskIndex: "1-2", Tasks: []aid.TaskDeltaNewTask{{SubtaskName: "task-INS", SubtaskGoal: "inserted goal"}}}, // insert after task-B
-		{Op: aid.TaskDeltaAppend, Tasks: []aid.TaskDeltaNewTask{{SubtaskName: "task-END", SubtaskGoal: "appended goal"}}},      // append at end
+		{Op: aid.TaskDeltaAppend, Tasks: []aid.TaskDeltaNewTask{{SubtaskName: "task-END", SubtaskGoal: "appended goal"}}},                           // append at end
 	}
 
 	err := currentTask.ApplyTaskDeltas(deltas)
@@ -409,8 +409,8 @@ func TestParseTaskDeltas(t *testing.T) {
 			map[string]interface{}{
 				"op":             "modify",
 				"ref_task_index": "1-4",
-				"updated_name":  "modified-name",
-				"updated_goal":  "modified-goal",
+				"updated_name":   "modified-name",
+				"updated_goal":   "modified-goal",
 			},
 		},
 	}

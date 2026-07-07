@@ -3,11 +3,12 @@ package pingutil
 import (
 	"context"
 	"errors"
-	"github.com/yaklang/yaklang/common/netx"
 	"math"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/netx"
 )
 
 type pingTestCase struct {

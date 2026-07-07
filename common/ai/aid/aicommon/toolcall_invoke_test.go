@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"gorm.io/gorm"
 )
 
 func TestHandleHTTPFlowMessage(t *testing.T) {
@@ -135,7 +135,7 @@ func setupToolCallInvokeTestProjectDB(t *testing.T) *gorm.DB {
 		&schema.Risk{},
 		&schema.AiOutputEvent{},
 		&schema.AiCheckpoint{},
-	).Error)
+	))
 	return db
 }
 

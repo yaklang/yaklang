@@ -3,10 +3,11 @@ package test
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/ai/aid"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )

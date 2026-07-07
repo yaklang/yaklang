@@ -1,9 +1,9 @@
 package yakit
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 func DropAIAgentRuntimeTable(db *gorm.DB) error {

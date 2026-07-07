@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 const (
@@ -165,7 +165,7 @@ type VectorStoreCollection struct {
 	gorm.Model
 
 	// 集合名称，在系统中唯一
-	Name string `gorm:"unique_index;" json:"name"`
+	Name string `gorm:"uniqueIndex;" json:"name"`
 
 	// 集合描述信息
 	Description string `gorm:"type:text" json:"description"`
@@ -330,7 +330,7 @@ type KnowledgeBaseInfo struct {
 
 	RAGID string `gorm:"index"`
 	// 知识库名称(唯一)
-	KnowledgeBaseName string `gorm:"unique_index;not null" json:"knowledge_base_name"`
+	KnowledgeBaseName string `gorm:"uniqueIndex;not null" json:"knowledge_base_name"`
 
 	// 知识库描述
 	KnowledgeBaseDescription string `gorm:"type:text" json:"knowledge_base_description"`
@@ -397,7 +397,7 @@ type KnowledgeBaseEntry struct {
 	PotentialQuestionsVector FloatArray `gorm:"type:text" json:"potential_questions_vector"`
 
 	// 唯一标识符，用于在向量索引中唯一标识该知识条目
-	HiddenIndex string `gorm:"unique_index"`
+	HiddenIndex string `gorm:"uniqueIndex"`
 
 	// HasQuestionIndex 标记该知识条目是否已经生成了问题索引
 	HasQuestionIndex bool `gorm:"index" json:"has_question_index"`

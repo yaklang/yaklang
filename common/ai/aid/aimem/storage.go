@@ -6,11 +6,11 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 // SaveMemoryEntities 保存记忆条目到数据库并索引到RAG系统和HNSW。

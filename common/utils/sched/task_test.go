@@ -2,12 +2,13 @@ package sched
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/tevino/abool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"testing"
-	"time"
 )
 
 func TestTask(t *testing.T) {

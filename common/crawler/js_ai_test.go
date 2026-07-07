@@ -88,9 +88,9 @@ func TestRunAIJSExtract_RawFallbackWhenDirectFeedDisabled(t *testing.T) {
 	}
 
 	cfg := NewAIJSExtractConfig(
-		WithAIJS_SmallInputBytes(0),       // disable direct-feed
-		WithAIJS_SmallInputTokens(0),      // (both must be disabled together)
-		WithAIJS_SkipBelowBytes(1<<20),    // huge => always under threshold
+		WithAIJS_SmallInputBytes(0),    // disable direct-feed
+		WithAIJS_SmallInputTokens(0),   // (both must be disabled together)
+		WithAIJS_SkipBelowBytes(1<<20), // huge => always under threshold
 	)
 	var got []string
 	var mu sync.Mutex
@@ -193,7 +193,7 @@ func TestRunAIJSExtract_LargeInputSlicedAndFolded(t *testing.T) {
 	src := b.String()
 
 	cfg := NewAIJSExtractConfig(
-		WithAIJS_ChunkBytes(64*1024),  // small chunks to force multiple slices
+		WithAIJS_ChunkBytes(64*1024), // small chunks to force multiple slices
 		WithAIJS_OverlapBytes(1024),
 		WithAIJS_SkipBelowBytes(1024),
 		WithAIJS_Concurrency(2),
@@ -424,8 +424,8 @@ func TestRunAIJSExtract_DropsBoundaryMarkerLeaks(t *testing.T) {
 	}
 
 	var (
-		mu       sync.Mutex
-		emitted  []string
+		mu      sync.Mutex
+		emitted []string
 	)
 	collect := func(p string) {
 		mu.Lock()
@@ -899,7 +899,7 @@ func TestRunAIJSExtract_DirectFeedDisabledWhenAboveThreshold(t *testing.T) {
 	}
 
 	cfg := NewAIJSExtractConfig(
-		WithAIJS_SmallInputBytes(64*1024),  // 64KB direct-feed cap
+		WithAIJS_SmallInputBytes(64*1024), // 64KB direct-feed cap
 		WithAIJS_SmallInputTokens(20*1024),
 		WithAIJS_ChunkBytes(32*1024),
 		WithAIJS_OverlapBytes(0),
@@ -919,4 +919,3 @@ func TestRunAIJSExtract_DirectFeedDisabledWhenAboveThreshold(t *testing.T) {
 			"reducer-path payload %d must wrap matches in candidate windows", i)
 	}
 }
-

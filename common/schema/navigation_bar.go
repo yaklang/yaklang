@@ -1,15 +1,15 @@
 package schema
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 type NavigationBar struct {
 	gorm.Model
 	Group         string `json:"group" `
 	YakScriptName string `json:"yak_script_name"`
-	Hash          string `json:"-" gorm:"unique_index"`
+	Hash          string `json:"-" gorm:"uniqueIndex"`
 	Mode          string `json:"mode"`
 	VerboseSort   int64  `json:"verbose_sort"`
 	GroupSort     int64  `json:"group_sort"`

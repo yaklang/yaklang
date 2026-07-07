@@ -2,11 +2,12 @@ package yakgit
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/utils"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestBlame(t *testing.T) {

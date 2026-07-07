@@ -312,10 +312,10 @@ func TestForgeFactory_DatabaseConnection(t *testing.T) {
 		db := consts.GetGormProfileDatabase()
 
 		// 检查表是否存在
-		assert.True(t, db.HasTable(&schema.AIForge{}), "AIForge table should exist")
+		assert.True(t, db.Migrator().HasTable(&schema.AIForge{}), "AIForge table should exist")
 
 		// 尝试查询一些数据（PostInit 应该已经插入了一些数据）
-		var count int
+		var count int64
 		err := db.Model(&schema.AIForge{}).Count(&count).Error
 		assert.NoError(t, err, "should be able to count AIForge records")
 

@@ -3,19 +3,20 @@ package entityrepos
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
 	"path/filepath"
 	"runtime"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/yaklang/yaklang/common/consts"
+
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func setupTestDB(t *testing.T) *gorm.DB {
@@ -23,16 +24,17 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	tmpDir := consts.GetDefaultYakitBaseTempDir()
 	dbFile := filepath.Join(tmpDir, uuid.NewString()+".db")
 
-	db, err := gorm.Open("sqlite3", dbFile)
+	db, err := gorm.Open(sqlite.Open(dbFile), &gorm.Config{})
 	require.NoError(t, err)
 
 	// 自动迁移表结构
-	err = db.AutoMigrate(&schema.EntityRepository{}, &schema.ERModelEntity{}, &schema.ERModelRelationship{}, &schema.VectorStoreCollection{}, &schema.VectorStoreDocument{}).Error
+	err = db.AutoMigrate(&schema.EntityRepository{}, &schema.ERModelEntity{}, &schema.ERModelRelationship{}, &schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
 	require.NoError(t, err, "Failed to auto migrate tables")
 
 	// 设置数据库连接池和超时
-	db.DB().SetMaxOpenConns(1)
-	db.DB().SetMaxIdleConns(1)
+	sqlDB, _ := db.DB()
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
 
 	return db
 }

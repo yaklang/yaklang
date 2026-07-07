@@ -1,8 +1,9 @@
 package hids
 
 import (
-	"github.com/davecgh/go-spew/spew"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 func TestSystemHealthStats(t *testing.T) {

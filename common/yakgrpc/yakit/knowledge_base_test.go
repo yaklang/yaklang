@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -15,7 +16,7 @@ func TestMUSTPASS_CreateKnowledgeBase(t *testing.T) {
 	// 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 自动迁移数据库表结构
 	db.AutoMigrate(&schema.KnowledgeBaseInfo{})
@@ -45,7 +46,7 @@ func TestMUSTPASS_CreateKnowledgeBaseDuplicate(t *testing.T) {
 	// 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 自动迁移数据库表结构
 	db.AutoMigrate(&schema.KnowledgeBaseInfo{})
@@ -74,7 +75,7 @@ func TestMUSTPASS_GetKnowledgeBase(t *testing.T) {
 	// 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 自动迁移数据库表结构
 	db.AutoMigrate(&schema.KnowledgeBaseInfo{})
@@ -106,7 +107,7 @@ func TestMUSTPASS_QueryKnowledgeBasePaging(t *testing.T) {
 	// 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 自动迁移数据库表结构
 	db.AutoMigrate(&schema.KnowledgeBaseInfo{})
@@ -136,7 +137,7 @@ func TestMUSTPASS_UpdateKnowledgeBaseInfo(t *testing.T) {
 	// 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 自动迁移数据库表结构
 	db.AutoMigrate(&schema.KnowledgeBaseInfo{})
@@ -176,7 +177,7 @@ func TestMUSTPASS_DeleteKnowledgeBase(t *testing.T) {
 	// 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 自动迁移数据库表结构
 	db.AutoMigrate(&schema.KnowledgeBaseInfo{}, &schema.KnowledgeBaseEntry{})
@@ -225,7 +226,7 @@ func TestMUSTPASS_GetKnowledgeBaseNameList(t *testing.T) {
 	// 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 自动迁移数据库表结构
 	db.AutoMigrate(&schema.KnowledgeBaseInfo{})
@@ -268,7 +269,7 @@ func TestMUSTPASS_CreateKnowledgeBaseEntry(t *testing.T) {
 	// 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 自动迁移数据库表结构
 	db.AutoMigrate(&schema.KnowledgeBaseInfo{}, &schema.KnowledgeBaseEntry{})
@@ -314,7 +315,7 @@ func TestMUSTPASS_GetKnowledgeBaseEntryById(t *testing.T) {
 	// 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 自动迁移数据库表结构
 	db.AutoMigrate(&schema.KnowledgeBaseInfo{}, &schema.KnowledgeBaseEntry{})
@@ -361,7 +362,7 @@ func TestMUSTPASS_UpdateKnowledgeBaseEntry(t *testing.T) {
 	// 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 自动迁移数据库表结构
 	db.AutoMigrate(&schema.KnowledgeBaseInfo{}, &schema.KnowledgeBaseEntry{})
@@ -413,7 +414,7 @@ func TestMUSTPASS_DeleteKnowledgeBaseEntry(t *testing.T) {
 	// 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 自动迁移数据库表结构
 	db.AutoMigrate(&schema.KnowledgeBaseInfo{}, &schema.KnowledgeBaseEntry{})
@@ -456,7 +457,7 @@ func TestMUSTPASS_SearchKnowledgeBaseEntry(t *testing.T) {
 	// 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 自动迁移数据库表结构
 	db.AutoMigrate(&schema.KnowledgeBaseInfo{}, &schema.KnowledgeBaseEntry{})
@@ -547,7 +548,7 @@ func TestMUSTPASS_GetKnowledgeBaseEntryByFilter(t *testing.T) {
 	// 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 自动迁移数据库表结构
 	db.AutoMigrate(&schema.KnowledgeBaseInfo{}, &schema.KnowledgeBaseEntry{})
@@ -735,7 +736,7 @@ func TestMUSTPASS_QueryKnowledgeBaseByCreatedFromUI(t *testing.T) {
 	// 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 自动迁移数据库表结构
 	db.AutoMigrate(&schema.KnowledgeBaseInfo{}, &schema.KnowledgeBaseEntry{})
@@ -862,7 +863,7 @@ func TestMUSTPASS_KnowledgeBaseCompleteWorkflow(t *testing.T) {
 	// 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 自动迁移数据库表结构
 	db.AutoMigrate(&schema.KnowledgeBaseInfo{}, &schema.KnowledgeBaseEntry{})

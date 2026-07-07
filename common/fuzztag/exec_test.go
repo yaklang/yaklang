@@ -2,13 +2,14 @@ package fuzztag
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"strconv"
-	"strings"
-	"testing"
 )
 
 func TestExecuteWithRam(t *testing.T) {

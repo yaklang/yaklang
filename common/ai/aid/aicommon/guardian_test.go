@@ -3,10 +3,11 @@ package aicommon
 import (
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/schema"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils/chanx"

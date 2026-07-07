@@ -15,7 +15,7 @@ import (
 func TestCleanupAISpaceWorkDirsForSessions_RemovesReferencedDirs(t *testing.T) {
 	projectDB, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, projectDB.AutoMigrate(&schema.AIAgentRuntime{}).Error)
+	require.NoError(t, projectDB.AutoMigrate(&schema.AIAgentRuntime{}))
 
 	sessionID := "sess-" + uuid.NewString()
 	workDir := filepath.Join(consts.GetDefaultAISpaceDir(), "test-delete-"+uuid.NewString())

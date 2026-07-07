@@ -1,8 +1,8 @@
 package consts
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
+	"gorm.io/gorm"
 )
 
 func CreateVulinboxDatabase(path string) (*gorm.DB, error) {

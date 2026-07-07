@@ -1,9 +1,10 @@
 package crawler
 
 import (
+	"testing"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"testing"
 )
 
 func TestReq_IsLoginForm(t *testing.T) {

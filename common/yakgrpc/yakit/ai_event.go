@@ -6,12 +6,12 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 type AIEventRecoveryHistoryResult struct {
@@ -316,7 +316,7 @@ func DeleteAIEventBySessionID(db *gorm.DB, sessionId string) (int64, error) {
 	var deletedEvents int64
 	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
 		// Delete associations in-DB to avoid loading huge UUID lists into memory.
-		eventTable := tx.NewScope(&schema.AiOutputEvent{}).TableName()
+		eventTable := schema.GormTableName(tx, &schema.AiOutputEvent{})
 		if r := tx.Model(&schema.AiProcessAndAiEvent{}).
 			Where(fmt.Sprintf("event_id IN (SELECT event_uuid FROM %s WHERE session_id = ?)", eventTable), sessionId).
 			Delete(&schema.AiProcessAndAiEvent{}); r.Error != nil {

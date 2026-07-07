@@ -348,7 +348,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_ResultDelete(t *testing.T) {
 		deleteAllResult(true)
 		require.Equal(t, len(query()), 0)
 
-		riskCount := 0
+		riskCount := int64(0)
 		err = consts.GetGormProjectDatabase().Model(&schema.Risk{}).Where("result_id = ?", resultID1).Count(&riskCount).Error
 		require.NoError(t, err)
 		require.Equal(t, 0, riskCount)

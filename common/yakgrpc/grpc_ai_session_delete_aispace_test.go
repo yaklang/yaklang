@@ -25,7 +25,7 @@ func TestServer_DeleteAISession_RemovesAISpaceWorkDir(t *testing.T) {
 		&schema.AiCheckpoint{},
 		&schema.AiOutputEvent{},
 		&schema.AiProcessAndAiEvent{},
-	).Error)
+	))
 
 	sessionID := "sess-" + uuid.NewString()
 	workDir := filepath.Join(consts.GetDefaultAISpaceDir(), "grpc-delete-"+uuid.NewString())

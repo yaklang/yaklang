@@ -21,12 +21,12 @@ import (
 // 不依赖总条数(用户本地启用的被动扫描插件会额外生成 source_type=scan 的镜像副本)。
 func countFlowByTokenAndPlugin(token, plugin string) int {
 	db := consts.GetGormProjectDatabase()
-	var count int
+	var count int64
 	db.Model(&schema.HTTPFlow{}).
 		Where("(request LIKE ?) OR (url LIKE ?)", "%"+token+"%", "%"+token+"%").
 		Where("from_plugin = ?", plugin).
 		Count(&count)
-	return count
+	return int(count)
 }
 
 // TestGRPCMUSTPASS_MITM_TrafficGuard_FilteredVsNotFiltered 验证内置敏感信息检测(TrafficGuard)

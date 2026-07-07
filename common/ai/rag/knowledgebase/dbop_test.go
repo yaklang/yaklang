@@ -21,7 +21,7 @@ func TestDeleteKnowledgeBase_Success(t *testing.T) {
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
 	db, err := vectorstore.NewVectorStoreDatabase(path)
 	require.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 创建知识库
 	kbName := "test-kb-delete-" + uuid.New().String()
@@ -92,7 +92,7 @@ func TestDeleteKnowledgeBase_NotFound(t *testing.T) {
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
 	db, err := vectorstore.NewVectorStoreDatabase(path)
 	require.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 尝试删除不存在的知识库
 	kbName := "non-existent-kb-" + uuid.New().String()
@@ -107,7 +107,7 @@ func TestDeleteKnowledgeBase_WithMultipleEntries(t *testing.T) {
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
 	db, err := vectorstore.NewVectorStoreDatabase(path)
 	require.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 创建知识库
 	kbName := "test-kb-multi-" + uuid.New().String()
@@ -157,7 +157,7 @@ func TestDeleteKnowledgeBase_WithDocuments(t *testing.T) {
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
 	db, err := vectorstore.NewVectorStoreDatabase(path)
 	require.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 创建知识库
 	kbName := "test-kb-docs-" + uuid.New().String()
@@ -212,7 +212,7 @@ func TestDeleteKnowledgeBase_Transaction(t *testing.T) {
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
 	db, err := vectorstore.NewVectorStoreDatabase(path)
 	require.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 创建知识库
 	kbName := "test-kb-txn-" + uuid.New().String()
@@ -248,7 +248,7 @@ func TestExportImportKnowledgeBase_WithExtraData(t *testing.T) {
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
 	db, err := vectorstore.NewVectorStoreDatabase(path)
 	require.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 创建知识库
 	kbName := "test-kb-extra-data-" + uuid.New().String()
@@ -295,7 +295,7 @@ func TestExportImportKnowledgeBase_WithExtraData(t *testing.T) {
 	path2 := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
 	db2, err := vectorstore.NewVectorStoreDatabase(path2)
 	require.NoError(t, err)
-	defer db2.Close()
+	defer consts.CloseGormDB(db2)
 
 	// 用于存储导入的额外数据
 	var importedExtraData []byte
@@ -341,7 +341,7 @@ func TestExportImportKnowledgeBase_WithoutExtraData(t *testing.T) {
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
 	db, err := vectorstore.NewVectorStoreDatabase(path)
 	require.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 创建知识库
 	kbName := "test-kb-no-extra-" + uuid.New().String()
@@ -375,7 +375,7 @@ func TestExportImportKnowledgeBase_WithoutExtraData(t *testing.T) {
 	path2 := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
 	db2, err := vectorstore.NewVectorStoreDatabase(path2)
 	require.NoError(t, err)
-	defer db2.Close()
+	defer consts.CloseGormDB(db2)
 
 	// 标记额外数据处理器是否被调用
 	handlerCalled := false

@@ -2,15 +2,29 @@ package schema
 
 import (
 	"strings"
+	"sync"
 
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
+	"gorm.io/gorm/schema"
 )
 
 func IsSQLite(db *gorm.DB) bool {
-	if db == nil || db.Dialect() == nil {
+	if db == nil || db.Dialector == nil {
 		return false
 	}
-	return strings.Contains(strings.ToLower(db.Dialect().GetName()), "sqlite")
+	return db.Dialector.Name() == "sqlite"
+}
+
+// GormTableName 通过 GORM V2 的 Statement 解析 model 对应的表名，替代 V1 的 db.NewScope(model).TableName()。
+func GormTableName(db *gorm.DB, model interface{}) string {
+	if db == nil {
+		return ""
+	}
+	stmt := &gorm.Statement{DB: db}
+	if err := stmt.Parse(model); err != nil {
+		return ""
+	}
+	return stmt.Table
 }
 
 // ResetSQLiteSequence 仅重置 SQLite 自增序列（表名需与 SQLITE_SEQUENCE 中一致）。非 SQLite、无表记录或 sqlite_sequence 表不存在时忽略。
@@ -31,13 +45,16 @@ func DropRecreateTable(db *gorm.DB, model interface{}) error {
 		return nil
 	}
 	// 表名从 model 的 struct/TableName() 取得，与表是否已存在无关，需在 Drop 前拿到供后续重置序列用
-	tableName := db.NewScope(model).TableName()
-	db.DropTableIfExists(model)
-	if err := db.Error; err != nil {
+	parsed, err := schema.Parse(model, &sync.Map{}, schema.NamingStrategy{})
+	if err != nil {
+		return err
+	}
+	tableName := parsed.Table
+	if err := db.Migrator().DropTable(model); err != nil {
 		return err
 	}
 	if err := ResetSQLiteSequence(db, tableName); err != nil {
 		return err
 	}
-	return db.AutoMigrate(model).Error
+	return db.Migrator().AutoMigrate(model)
 }

@@ -5,12 +5,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 func DeleteSSARiskBySFResult(DB *gorm.DB, resultIDs []int64) error {
@@ -149,7 +149,7 @@ func filterSSARiskByIncremental(db *gorm.DB, runtimeId ...string) *gorm.DB {
 	if len(runtimeId) == 0 {
 		// 查询所有未处置的漏洞
 		var disposedFeatureHashes []string
-		err := db.New().Model(&schema.SSARiskDisposals{}).
+		err := db.Session(&gorm.Session{}).Model(&schema.SSARiskDisposals{}).
 			Pluck("DISTINCT risk_feature_hash", &disposedFeatureHashes).Error
 		if err != nil {
 			log.Errorf("Failed to query disposed feature hashes: %v", err)
@@ -159,7 +159,7 @@ func filterSSARiskByIncremental(db *gorm.DB, runtimeId ...string) *gorm.DB {
 		return db
 	} else if len(runtimeId) == 1 {
 		var baseTask schema.SyntaxFlowScanTask
-		if err := db.New().Where("task_id = ?", runtimeId).First(&baseTask).Error; err != nil {
+		if err := db.Session(&gorm.Session{}).Where("task_id = ?", runtimeId).First(&baseTask).Error; err != nil {
 			return db
 		}
 		var validFeatureHashes []string
@@ -172,7 +172,7 @@ func filterSSARiskByIncremental(db *gorm.DB, runtimeId ...string) *gorm.DB {
 			  AND base_task.scan_batch <= ?
 		)
 	`
-		err := db.New().
+		err := db.Session(&gorm.Session{}).
 			Model(&schema.SSARisk{}).
 			Where(riskTable+".runtime_id = ? AND "+riskTable+".risk_feature_hash != ''", runtimeId).
 			Where(subWhere, baseTask.ScanBatch).
@@ -191,7 +191,7 @@ func filterSSARiskByCompare(db *gorm.DB, baselineTaskID, compareTaskID string) *
 		return db
 	}
 	var compareHash []string
-	db.New().Model(&schema.SSARisk{}).
+	db.Session(&gorm.Session{}).Model(&schema.SSARisk{}).
 		Where("runtime_id = ?", compareTaskID).
 		Where("risk_feature_hash != ''").
 		Pluck("risk_feature_hash", &compareHash)
@@ -322,9 +322,9 @@ func NewSSARiskReadRequest(db *gorm.DB, filter *ypb.SSARisksFilter) error {
 func QuerySSARiskCount(DB *gorm.DB, filter *ypb.SSARisksFilter) (int, error) {
 	db := DB.Model(&schema.SSARisk{})
 	db = FilterSSARisk(db, filter)
-	var count int
+	var count int64
 	db = db.Count(&count)
-	return count, db.Error
+	return int(count), db.Error
 }
 
 func QuerySSARiskByRiskHash(db *gorm.DB, riskHash string) (*schema.SSARisk, error) {

@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func TestRuntimeScopedBroadcast_MultiSubscriberAndThrottle(t *testing.T) {

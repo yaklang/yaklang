@@ -7,8 +7,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 // SSAProject 用于配置SSA的项目信息，包括项目名称、源码获取方式以及编译、扫描选项等
@@ -22,7 +22,7 @@ type SSAProject struct {
 	URL         string             `json:"url,omitempty" gorm:"index"`
 	// 配置选项
 	Config []byte `json:"config"`
-	Hash   string `json:"hash" gorm:"unique_index"`
+	Hash   string `json:"hash" gorm:"uniqueIndex"`
 }
 
 func (p *SSAProject) GetTagsList() []string {

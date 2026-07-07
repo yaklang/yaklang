@@ -10,13 +10,13 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/jinzhu/gorm"
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 type RAGSearchPluginIdsCallback func(db *gorm.DB, pagination *ypb.Paging, key string) (*bizhelper.Paginator, []string, error)

@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/ai/rag/generate_index_tool"
+	"github.com/yaklang/yaklang/common/urfavecli"
 )
 
 // searchCommand search 命令处理函数
@@ -13,7 +13,7 @@ func searchCommand(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer closeGormDB(db)
 
 	collectionName := c.String("collection")
 	query := c.String("query")

@@ -46,9 +46,9 @@ func mustPlainZip(t *testing.T, files map[string]string) []byte {
 
 func TestZipFS_PasswordReadFile(t *testing.T) {
 	files := map[string]string{
-		"a.txt":     "alpha",
-		"b/c.txt":   "deep",
-		"top.json":  "{\"k\":1}",
+		"a.txt":    "alpha",
+		"b/c.txt":  "deep",
+		"top.json": "{\"k\":1}",
 	}
 	password := "fs-pwd"
 	data := mustEncryptedZip(t, files, password, zip.AES256Encryption)

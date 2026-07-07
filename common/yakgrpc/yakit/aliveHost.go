@@ -3,10 +3,10 @@ package yakit
 import (
 	"context"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"gorm.io/gorm"
 )
 
 func CreateOrUpdateAliveHost(db *gorm.DB, hash string, i interface{}) error {

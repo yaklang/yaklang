@@ -3,9 +3,9 @@ package yakit
 import (
 	"errors"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 func CreateOrUpdateCodecFlow(db *gorm.DB, flow *schema.CodecFlow) error {

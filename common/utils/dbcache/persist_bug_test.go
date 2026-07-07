@@ -28,7 +28,7 @@ func TestPersistLimitCloseWithExistingPending(t *testing.T) {
 	var started atomic.Bool
 
 	cache := NewCache[*bugItem, int](
-		5*time.Millisecond,  // short TTL — trigger evictions quickly
+		5*time.Millisecond, // short TTL — trigger evictions quickly
 		0,
 		func(item *bugItem, _ utils.EvictionReason) (int, error) {
 			return int(item.id), nil

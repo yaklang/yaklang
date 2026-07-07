@@ -2,8 +2,9 @@ package imageutils
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestPage2ImageExtractor(t *testing.T) {

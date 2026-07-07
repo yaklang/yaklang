@@ -1,8 +1,9 @@
 package yakgrpc
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestGRPCMUSTPASS_COMMON_ChannelControlTest(t *testing.T) {

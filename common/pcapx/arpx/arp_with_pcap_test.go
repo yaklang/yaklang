@@ -2,8 +2,9 @@ package arpx
 
 import (
 	"context"
-	"github.com/davecgh/go-spew/spew"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 func TestArpWithPcap(t *testing.T) {

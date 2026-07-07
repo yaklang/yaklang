@@ -1,10 +1,11 @@
 package comparer
 
 import (
-	"github.com/davecgh/go-spew/spew"
 	"io/ioutil"
 	"net/http"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 func TestCompareHtml(t *testing.T) {

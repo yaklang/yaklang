@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
 	"github.com/yaklang/yaklang/common/ai/rag"
@@ -16,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 const AIToolVectorIndexName = "AI_TOOL_VECTOR_INDEX"

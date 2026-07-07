@@ -1,14 +1,15 @@
 package sfreport
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"gorm.io/gorm"
 )
 
 type File struct {
@@ -38,7 +39,7 @@ func (f *File) SaveToDB(db *gorm.DB, programName string) error {
 			if existing.QuotedCode != "" && existing.QuotedCode != "\"\"" {
 				return nil
 			}
-		} else if !gorm.IsRecordNotFoundError(err) {
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return utils.Wrapf(err, "Save File to DB failed")
 		}
 	}

@@ -5,12 +5,12 @@ import (
 
 	"github.com/yaklang/yaklang/common/schema"
 
-	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 const mitmPluginTestCode = `yakit.AutoInitYakit()

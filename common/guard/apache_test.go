@@ -2,9 +2,10 @@ package guard
 
 import (
 	"context"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestApache(t *testing.T) {

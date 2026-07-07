@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 
-	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 func TestQueryYakScriptRiskDetailByCWE(t *testing.T) {
@@ -610,7 +610,7 @@ func TestQueryYakScript(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.filedKeywords, func(t *testing.T) {
-			var count int
+			var count int64
 			db := consts.GetGormProfileDatabase().Model(&schema.YakScript{})
 			db = yakit.FilterYakScript(db, &ypb.QueryYakScriptRequest{
 				FieldKeywords: tc.filedKeywords,

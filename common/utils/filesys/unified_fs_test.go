@@ -1,12 +1,13 @@
 package filesys
 
 import (
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/require"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnifiedFS_Base(t *testing.T) {

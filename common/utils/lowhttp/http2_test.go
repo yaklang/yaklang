@@ -2,12 +2,13 @@ package lowhttp
 
 import (
 	"bytes"
+	"net/http"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
-	"net/http"
-	"testing"
 )
 
 func TestHpack(t *testing.T) {

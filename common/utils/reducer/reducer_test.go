@@ -2,9 +2,10 @@ package reducer
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
-	"testing"
 )
 
 func TestReducer(t *testing.T) {

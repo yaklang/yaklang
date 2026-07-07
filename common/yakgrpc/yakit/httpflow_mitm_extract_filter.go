@@ -3,10 +3,10 @@ package yakit
 import (
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/protobuf/proto"
+	"gorm.io/gorm"
 )
 
 // HTTPFlowRequestHasNonEmptyFilter is true when r has any filter field other than pagination.
@@ -43,14 +43,14 @@ func filterHTTPFlowByMITMExtractAggregateRows(db *gorm.DB, rows []*ypb.MITMExtra
 	if len(ors) == 0 {
 		return db
 	}
-	edTable := db.NewScope(&schema.ExtractedData{}).TableName()
-	hfTable := db.NewScope(&schema.HTTPFlow{}).TableName()
+	edTable := schema.GormTableName(db, &schema.ExtractedData{})
+	hfTable := schema.GormTableName(db, &schema.HTTPFlow{})
 	cond := strings.Join(ors, " OR ")
-	sub := db.New().Table(hfTable+" AS hf").
+	sub := db.Session(&gorm.Session{}).Table(hfTable+" AS hf").
 		Select("DISTINCT hf.id").
 		Joins("INNER JOIN "+edTable+" AS ed ON ed.trace_id = hf.hidden_index").
 		Where("ed.trace_id != ?", "").
 		Where("hf.hidden_index != ?", "").
 		Where(cond, args...)
-	return db.Where("id IN (?)", sub.QueryExpr())
+	return db.Where("id IN (?)", sub)
 }

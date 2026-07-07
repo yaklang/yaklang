@@ -11,10 +11,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"gorm.io/gorm"
 )
 
 // SyntaxFlowRulePurposeType 规则用途类型
@@ -278,7 +278,7 @@ type SyntaxFlowRule struct {
 
 	// RuleId 规则唯一标识符（UUID）
 	// 用于全局唯一标识一个规则，支持跨数据库/跨平台同步
-	RuleId string `gorm:"unique_index"`
+	RuleId string `gorm:"uniqueIndex"`
 
 	// Version 规则版本号
 	// 用于版本管理和更新检测，格式如 "1.0.0"、"2.1.3" 等
@@ -288,14 +288,14 @@ type SyntaxFlowRule struct {
 	// Hash 规则内容哈希值
 	// 基于 RuleId、RuleName、Content、Tag 计算（不包含 OpCodes，因为 OpCodes 是编译后的派生数据）
 	// 用于快速检测规则内容是否变化，确保数据一致性
-	Hash string `json:"hash" gorm:"unique_index"`
+	Hash string `json:"hash" gorm:"uniqueIndex"`
 
 	// ============ 基本信息 ============
 
 	// RuleName 规则名称（唯一）
 	// 用于标识和查询规则，如 "java-sql-injection"、"runtime-command-exec"
 	// 必须唯一，不可重复
-	RuleName string `gorm:"unique_index"`
+	RuleName string `gorm:"uniqueIndex"`
 
 	// Title 规则标题（英文）
 	// 简短描述规则用途，如 "SQL Injection Detection"

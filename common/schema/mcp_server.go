@@ -3,8 +3,8 @@ package schema
 import (
 	"fmt"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 // MCPServer MCP服务器配置模型

@@ -6,8 +6,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func FilterHTTPFlowBySchema(db *gorm.DB, schema string) *gorm.DB {
@@ -50,7 +51,7 @@ func GetHTTPFlowDomainsByDomainSuffix(db *gorm.DB, domainSuffix string) []*Websi
 	// 简化 SQL，避免深度嵌套表达式树：只取 url，在 Go 中解析。
 	// Drop inherited ORDER BY / LIMIT from HTTP flow list queries; otherwise
 	// recent scan/fuzzer traffic can hide other domains in the website tree.
-	db = db.Order("", true).Limit(nil).Offset(nil)
+	db = db.Order(clause.OrderBy{}).Limit(-1).Offset(-1)
 	db = db.Select("DISTINCT url").Table("http_flows") //.Debug()
 
 	rows, err := db.Rows()
@@ -182,7 +183,7 @@ func GetHTTPFlowNextPartPathByPathPrefix(db *gorm.DB, originPathPrefix string) [
 	//	return r == '/'
 	//}), "/")
 	pathPrefix := strings.TrimLeft(originPathPrefix, "/")
-	db = db.Order("", true).Limit(nil).Offset(nil)
+	db = db.Order(clause.OrderBy{}).Limit(-1).Offset(-1)
 	db = db.Select("url").Table("http_flows").Where("url LIKE ?", `%`+pathPrefix+`%`).Limit(1000) //.Debug()
 	urlsMap := make(map[string]bool)
 	var urls []string

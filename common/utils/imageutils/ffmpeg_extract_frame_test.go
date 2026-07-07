@@ -3,8 +3,9 @@ package imageutils
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestExtractVideoFrameContext(t *testing.T) {

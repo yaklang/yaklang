@@ -2,11 +2,12 @@ package yakgrpc
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
-	"testing"
 )
 
 func TestGRPCMUSTPASS_MUTATE_MUTATE_NEG(T *testing.T) {

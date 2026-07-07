@@ -117,7 +117,8 @@ func TestStallHeartbeat_StopReleasesGoroutine(t *testing.T) {
 // 本测试是 hard abort 兜底机制的核心回归用例.
 //
 // 关键词: hard abort 兜底, [LOOP_STALL_HARD_ABORT], task.Cancel,
-//   主循环硬卡死自救
+//
+//	主循环硬卡死自救
 func TestStallHeartbeat_HardAbortsAfterLongStall(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

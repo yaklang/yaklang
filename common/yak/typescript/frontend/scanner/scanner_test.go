@@ -2,9 +2,10 @@ package scanner
 
 import (
 	_ "embed"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/core"
-	"testing"
 )
 
 //go:embed testdata/large.js

@@ -15,7 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"google.golang.org/grpc"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
@@ -24,6 +23,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"gopkg.in/yaml.v3"
+	"gorm.io/gorm"
 )
 
 //go:embed grpc_http_request_builder_scripts.yak

@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -13,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 func (r *EntityRepository) YieldEntities(ctx context.Context, filter *ypb.EntityFilter) chan *schema.ERModelEntity {
@@ -37,7 +37,7 @@ func (r *EntityRepository) GetRelationshipsByEntityUUID(ctx context.Context, ent
 
 	err := utils.GormTransaction(r.db, func(tx *gorm.DB) error {
 		db := tx.Model(&schema.ERModelRelationship{})
-		log.Debugf("Querying relationships for entity %s, table name: %s", entityUUID, db.NewScope(&schema.ERModelRelationship{}).TableName())
+		log.Debugf("Querying relationships for entity %s, table name: %s", entityUUID, schema.GormTableName(db, &schema.ERModelRelationship{}))
 		db = db.Where("repository_uuid = ? AND (source_entity_index = ? OR target_entity_index = ?)", r.info.Uuid, entityUUID, entityUUID)
 		return db.Find(&relationships).Error
 	})
@@ -55,7 +55,7 @@ func (r *EntityRepository) GetEntityByUUID(entityUUID string) (*schema.ERModelEn
 
 	err := utils.GormTransaction(r.db, func(tx *gorm.DB) error {
 		db := tx.Model(&schema.ERModelEntity{})
-		log.Debugf("Querying entity %s, table name: %s", entityUUID, db.NewScope(&schema.ERModelEntity{}).TableName())
+		log.Debugf("Querying entity %s, table name: %s", entityUUID, schema.GormTableName(db, &schema.ERModelEntity{}))
 		return db.Where("repository_uuid = ? AND uuid = ?", r.info.Uuid, entityUUID).First(&entity).Error
 	})
 

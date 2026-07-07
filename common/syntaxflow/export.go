@@ -3,12 +3,12 @@ package syntaxflow
 import (
 	"context"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"gorm.io/gorm"
 )
 
 // ExecRule 在已编译的程序上执行一条 SyntaxFlow 规则（导出名为 syntaxflow.ExecRule）
@@ -103,14 +103,14 @@ func withSearch() ssaapi.QueryOption {
 }
 
 var Exports = map[string]any{
-	"ExecRule":       ExecRule,
-	"withExecTaskID": ssaapi.QueryWithTaskID,
-	"withExecDebug":  ssaapi.QueryWithEnableDebug,
-	"withProcess":    ssaapi.QueryWithProcessCallback,
-	"withContext":    ssaapi.QueryWithContext,
-	"withCache":      ssaapi.QueryWithUseCache,
-	"withSave":   withSave,
-	"withSearch": withSearch,
+	"ExecRule":                   ExecRule,
+	"withExecTaskID":             ssaapi.QueryWithTaskID,
+	"withExecDebug":              ssaapi.QueryWithEnableDebug,
+	"withProcess":                ssaapi.QueryWithProcessCallback,
+	"withContext":                ssaapi.QueryWithContext,
+	"withCache":                  ssaapi.QueryWithUseCache,
+	"withSave":                   withSave,
+	"withSearch":                 withSearch,
 	"QuerySyntaxFlowRules":       QuerySyntaxFlowRules,
 	"MergeBeautificationResults": MergeBeautificationResultsForYak,
 	// 扫描任务 / 项目核对导出统一收敛到高层聚合入口。

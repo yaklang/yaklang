@@ -10,13 +10,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"gorm.io/gorm"
 )
 
 // AutoSkillLoader discovers and loads skills by recursively traversing multiple
@@ -198,11 +198,11 @@ func getDatabaseSkillCount(db *gorm.DB) (int, error) {
 	if db == nil {
 		return 0, utils.Error("db is nil")
 	}
-	var count int
+	var count int64
 	if err := db.Model(&schema.AIForge{}).Where("forge_type = ?", schema.FORGE_TYPE_SkillMD).Count(&count).Error; err != nil {
 		return 0, utils.Wrap(err, "count skillmd forges failed")
 	}
-	return count, nil
+	return int(count), nil
 }
 
 func (l *AutoSkillLoader) attachDatabase(db *gorm.DB) error {

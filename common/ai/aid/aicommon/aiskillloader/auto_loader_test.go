@@ -232,7 +232,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -274,7 +274,7 @@ func buildNestedTestVFS() *filesys.VirtualFS {
 
 func newTestMemDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:")
 	if err != nil {
 		t.Fatalf("failed to create in-memory DB: %v", err)
 	}
@@ -842,7 +842,7 @@ func TestSearchByAI_LimitsTo5(t *testing.T) {
 		t.Fatalf("should not error: %v", err)
 	}
 	if len(results) != 5 {
-		t.Fatalf("expected max 5 results, got %d", len(results))
+		t.Fatalf("expected max 5 results, got %d", len(results)), &gorm.Config{})
 	}
 }
 */

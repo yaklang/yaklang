@@ -2,10 +2,10 @@ package aiforge
 
 import (
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
 	"github.com/yaklang/yaklang/common/consts"
+	"gorm.io/gorm"
 )
 
 type RefineConfig struct {

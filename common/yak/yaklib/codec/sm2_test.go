@@ -104,7 +104,6 @@ func TestGenerateSM2PrivateKey(t *testing.T) {
 
 }
 
-
 func TestSM2DecryptFixed(t *testing.T) {
 	// 原始问题数据
 	privateKeyHex := "9A309F38F0C11A78EE5DC012E76C0A728FDBFD87A2E48837CAC7D2D028176815"

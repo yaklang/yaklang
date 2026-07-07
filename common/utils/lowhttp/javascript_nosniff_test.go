@@ -2,10 +2,11 @@ package lowhttp
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/saintfish/chardet"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"testing"
 )
 
 func TestResponseJavaScriptNoSniff(t *testing.T) {

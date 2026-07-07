@@ -5,12 +5,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/protobuf/proto"
+	"gorm.io/gorm"
 )
 
 const mitmAggregateTraceConcatMaxLen = 4096
@@ -103,8 +103,8 @@ func mitmExtractAggregateBaseDB(db *gorm.DB, req *ypb.QueryMITMExtractedAggregat
 			Where("("+expr+") LIKE ?", mitmExtractRuleGroupSep, fmt.Sprintf("%%%s%%", gkw))
 	}
 	if hf := req.GetHttpFlowFilter(); yakit.HTTPFlowRequestHasNonEmptyFilter(hf) {
-		flowQ := yakit.FilterHTTPFlow(db.New(), hf).Select("id")
-		q = q.Where("hf.id IN (?)", flowQ.QueryExpr())
+		flowQ := yakit.FilterHTTPFlow(db.Session(&gorm.Session{}), hf).Select("id")
+		q = q.Where("hf.id IN (?)", flowQ)
 	}
 	return q
 }
@@ -178,7 +178,10 @@ func QueryMITMExtractedAggregate(db *gorm.DB, req *ypb.QueryMITMExtractedAggrega
 		Group("ed.rule_verbose, ed.data")
 
 	var total int64
-	if err := db.Raw("SELECT COUNT(*) FROM (?) AS _mitm_agg", keySub.QueryExpr()).Row().Scan(&total); err != nil {
+	keySubSQL := keySub.ToSQL(func(tx *gorm.DB) *gorm.DB {
+		return keySub.Find(&[]map[string]interface{}{})
+	})
+	if err := db.Raw("SELECT COUNT(*) FROM (" + keySubSQL + ") AS _mitm_agg").Row().Scan(&total); err != nil {
 		return nil, nil, nil, utils.Errorf("aggregate count: %v", err)
 	}
 

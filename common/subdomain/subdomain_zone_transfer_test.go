@@ -3,13 +3,14 @@ package subdomain
 import (
 	"context"
 	"fmt"
-	"github.com/miekg/dns"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"math/rand"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/miekg/dns"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestAXFR(t *testing.T) {

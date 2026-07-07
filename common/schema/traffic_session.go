@@ -1,6 +1,6 @@
 package schema
 
-import "github.com/jinzhu/gorm"
+import "gorm.io/gorm"
 
 type TrafficSession struct {
 	gorm.Model

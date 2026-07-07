@@ -3,9 +3,10 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
 )
 
 type forceHttpsTestCases struct {

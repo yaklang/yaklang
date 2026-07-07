@@ -39,7 +39,7 @@ func (s *Server) ExportFingerprint(req *ypb.ExportFingerprintRequest, stream ypb
 		}
 	})
 
-	ruleCount, handled := 0, 0
+	ruleCount, handled := int64(0), 0
 	progress := 0.0
 	if ruleDB := ruleDB.Count(&ruleCount); ruleDB.Error != nil {
 		return utils.Wrap(ruleDB.Error, "get fingerprint rule count failed")
@@ -87,7 +87,7 @@ func (s *Server) ExportFingerprint(req *ypb.ExportFingerprintRequest, stream ypb
 }
 
 func (s *Server) ImportFingerprint(req *ypb.ImportFingerprintRequest, stream ypb.Yak_ImportFingerprintServer) error {
-	ruleCount, handled := 0, 0
+	ruleCount, handled := int64(0), 0
 	progress := 0.0
 	db := s.GetProfileDatabase()
 
@@ -109,7 +109,7 @@ func (s *Server) ImportFingerprint(req *ypb.ImportFingerprintRequest, stream ypb
 		if len(commonRules) == 0 {
 			return utils.Error("no fingerprint rule found in json")
 		}
-		ruleCount = len(commonRules)
+		ruleCount = int64(len(commonRules))
 		for _, rule := range commonRules {
 			err := yakit.CreateOrUpdateGeneralRule(db, rule)
 			if err != nil {
@@ -128,7 +128,7 @@ func (s *Server) ImportFingerprint(req *ypb.ImportFingerprintRequest, stream ypb
 
 		opts = append(opts, bizhelper.WithMetaDataHandler(func(m bizhelper.MetaData) error {
 			metadata = m
-			ruleCount = utils.InterfaceToInt(metadata["count"])
+			ruleCount = int64(utils.InterfaceToInt(metadata["count"]))
 			if ruleCount == 0 {
 				return utils.Error("metadata: invalid rule count")
 			}

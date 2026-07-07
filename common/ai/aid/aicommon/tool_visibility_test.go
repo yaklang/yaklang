@@ -114,14 +114,15 @@ func TestToolVisibility_PrefixFallback(t *testing.T) {
 // 顺序应保持稳定 (与入参顺序一致).
 //
 // 关键词: FilterToolsByVisibility default behavior, drop hidden and scenario,
-//        stable order
+//
+//	stable order
 func TestToolVisibility_FilterDropsHiddenAndScenarioByDefault(t *testing.T) {
 	tools := []*aitool.Tool{
-		mkVisTool("do_http_request"),  // normal
-		mkVisTool("walking_plan"),     // hidden (amap)
-		mkVisTool("ssa-grep"),         // scenario
-		mkVisTool("grep"),             // normal
-		mkVisTool("ssa-newcomer"),     // scenario (prefix)
+		mkVisTool("do_http_request"),     // normal
+		mkVisTool("walking_plan"),        // hidden (amap)
+		mkVisTool("ssa-grep"),            // scenario
+		mkVisTool("grep"),                // normal
+		mkVisTool("ssa-newcomer"),        // scenario (prefix)
 		mkVisTool("url_content_summary"), // hidden
 	}
 
@@ -143,7 +144,8 @@ func TestToolVisibility_FilterDropsHiddenAndScenarioByDefault(t *testing.T) {
 // 仍然被过滤掉; whitelist 命中 hidden 不能让 hidden 复活 (语义: hidden 永远禁用).
 //
 // 关键词: FilterToolsByVisibility scenario whitelist, hidden never returns,
-//        focus mode pull back scenario
+//
+//	focus mode pull back scenario
 func TestToolVisibility_FilterKeepsWhitelistedScenario(t *testing.T) {
 	tools := []*aitool.Tool{
 		mkVisTool("do_http_request"),

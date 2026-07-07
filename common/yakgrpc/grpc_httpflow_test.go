@@ -22,7 +22,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 
 	"github.com/yaklang/yaklang/common/har"
 	"github.com/yaklang/yaklang/common/schema"
@@ -932,7 +932,7 @@ func TestGRPCMUSTPASS_Delete_HTTPFlow(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	var count int
+	var count int64
 	yakit.FilterHTTPFlow(db, &ypb.QueryHTTPFlowRequest{Keyword: token1}).Count(&count)
 	require.Equal(t, 0, count, "delete token1 fail")
 

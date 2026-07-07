@@ -4,18 +4,20 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func TestSearchAIForgeBM25_SQLiteFTS5(t *testing.T) {
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
+	t.Cleanup(func() { _ = consts.CloseGormDB(db) })
 
-	require.NoError(t, db.AutoMigrate(&schema.AIForge{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AIForge{}))
 
 	if err := EnsureAIForgeFTS5(db); err != nil {
 		if strings.Contains(err.Error(), "no such module: fts5") {
@@ -118,11 +120,11 @@ func TestSearchAIForgeBM25_SQLiteFTS5(t *testing.T) {
 }
 
 func TestEnsureAIForgeFTS5_Idempotent(t *testing.T) {
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
+	t.Cleanup(func() { _ = consts.CloseGormDB(db) })
 
-	require.NoError(t, db.AutoMigrate(&schema.AIForge{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AIForge{}))
 
 	// Call twice to verify idempotency
 	err = EnsureAIForgeFTS5(db)
@@ -139,11 +141,11 @@ func TestEnsureAIForgeFTS5_Idempotent(t *testing.T) {
 }
 
 func TestFilterAIForgeForSearch(t *testing.T) {
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
+	t.Cleanup(func() { _ = consts.CloseGormDB(db) })
 
-	require.NoError(t, db.AutoMigrate(&schema.AIForge{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AIForge{}))
 
 	require.NoError(t, db.Create(&schema.AIForge{
 		ForgeName:        "test_forge",

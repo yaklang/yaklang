@@ -2,9 +2,10 @@ package yserx
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"os"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func TestParseJavaSerializedEx(t *testing.T) {

@@ -1,9 +1,10 @@
 package utils
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"sync"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func TestNewStringRoundRobinSelector(t *testing.T) {

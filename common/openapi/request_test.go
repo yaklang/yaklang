@@ -2,8 +2,9 @@ package openapi
 
 import (
 	_ "embed"
-	"github.com/yaklang/yaklang/common/schema"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 //go:embed openapi2/testdata/swagger.json

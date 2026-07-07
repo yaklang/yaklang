@@ -6,9 +6,10 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 var defaultYieldSize = 1024
@@ -72,7 +73,7 @@ func YieldModel[T any](ctx context.Context, db *gorm.DB, opts ...YieldModelOpts)
 	if rv := reflect.ValueOf(t); rv.IsValid() && rv.Kind() == reflect.Ptr && rv.IsNil() {
 		t = reflect.New(rv.Type().Elem()).Interface().(T)
 	}
-	db = db.Table(db.NewScope(t).TableName())
+	db = db.Table(schema.GormTableName(db, t))
 
 	cfg := NewYieldModelConfig()
 	for _, opt := range opts {
@@ -154,10 +155,10 @@ func YieldModelToMap(ctx context.Context, db *gorm.DB) (chan map[string]any, err
 }
 
 func YieldModelToMapEx(ctx context.Context, db *gorm.DB, countCallback func(int)) (chan map[string]any, error) {
-	var count int
+	var count int64
 	if countCallback != nil {
 		if db := db.Count(&count); db.Error == nil {
-			countCallback(count)
+			countCallback(int(count))
 		}
 	}
 

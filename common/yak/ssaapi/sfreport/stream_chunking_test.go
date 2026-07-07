@@ -474,17 +474,17 @@ func TestRoundtripJSONIntegrity(t *testing.T) {
 
 func TestFileStreaming(t *testing.T) {
 	tests := []struct {
-		name      string
-		content   []byte
-		codec     string
-		chunkSize int
-		inlineMax int
+		name       string
+		content    []byte
+		codec      string
+		chunkSize  int
+		inlineMax  int
 		wantInline bool
 	}{
 		{"small_inline", []byte("package main\n"), "gzip", 256 * 1024, 16 * 1024, true},
 		{"large_gzip_chunked", makeTextData(100 * 1024), "gzip", 256, 64, false},
 		{"none_50k", makeTextData(50 * 1024), "", 16 * 1024, 4 * 1024, false},
-		{"gzip_50k", makeTextData(50 * 1024), "gzip", 16 * 1024, 4 * 1024, true},  // compresses well → inline
+		{"gzip_50k", makeTextData(50 * 1024), "gzip", 16 * 1024, 4 * 1024, true}, // compresses well → inline
 		{"zstd_50k", makeTextData(50 * 1024), "zstd", 16 * 1024, 4 * 1024, true},
 		{"snappy_50k", makeTextData(50 * 1024), "snappy", 16 * 1024, 4 * 1024, true},
 	}

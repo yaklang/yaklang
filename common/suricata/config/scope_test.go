@@ -1,12 +1,13 @@
 package config
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/utils"
 	"math/rand"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func parseScopeExp(exp string) *scope {

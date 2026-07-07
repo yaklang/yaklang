@@ -131,7 +131,7 @@ func TestWatchDatabaseTableMeta_ClosedDB(t *testing.T) {
 	db, err := consts.CreateProjectDatabase(path)
 	require.NoError(t, err)
 	defer os.Remove(path)
-	require.NoError(t, db.Close())
+	require.NoError(t, consts.CloseGormDB(db))
 
 	last, changed := WatchDatabaseTableMeta(db, 42, context.Background(), "http_flows")
 	require.False(t, changed)

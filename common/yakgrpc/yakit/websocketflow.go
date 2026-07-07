@@ -4,12 +4,12 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"gorm.io/gorm"
 )
 
 func SaveToServerWebsocketFlow(db *gorm.DB, owner string, index int, data []byte) error {
@@ -106,12 +106,12 @@ func GetWebsocketFlow(db *gorm.DB, id int64) (*schema.WebsocketFlow, error) {
 
 func SearchWebsocketFlow(keyword string) int {
 	db := consts.GetGormProjectDatabase()
-	var count int
+	var count int64
 	db.Model(&schema.WebsocketFlow{}).Where(
 		"quoted_data like ?",
 		"%"+keyword+"%",
 	).Count(&count)
-	return count
+	return int(count)
 }
 
 func QueryWebsocketFlowByWebsocketHash(db *gorm.DB, hash string, page int, limit int) (*bizhelper.Paginator, []*schema.WebsocketFlow, error) {
@@ -216,7 +216,7 @@ func UpdateWebSocketFlowTags(db *gorm.DB, i *schema.WebsocketFlow) error {
 		}
 	} else if i.WebsocketRequestHash != "" {
 		i.Hash = i.CalcHash()
-		if db = db.Where("hidden_index = ?", i.WebsocketRequestHash).UpdateColumn(schema.WebsocketFlow{Hash: i.Hash, Tags: tags}); db.Error != nil {
+		if db = db.Where("hidden_index = ?", i.WebsocketRequestHash).UpdateColumns(schema.WebsocketFlow{Hash: i.Hash, Tags: tags}); db.Error != nil {
 			log.Errorf("update tags(by request hash) failed: %s", db.Error)
 			return db.Error
 		}

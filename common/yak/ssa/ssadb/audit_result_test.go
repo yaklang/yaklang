@@ -37,13 +37,13 @@ c = b + 3
 	require.NotZero(t, id)
 
 	// Verify records exist before deletion
-	var nodeCount, edgeCount int
+	var nodeCount, edgeCount int64
 	db := ssadb.GetDB()
 	db.Model(&ssadb.AuditNode{}).Where("result_id = ?", id).Count(&nodeCount)
-	require.Greater(t, nodeCount, 0, "should have audit nodes")
+	require.Greater(t, nodeCount, int64(0), "should have audit nodes")
 
 	db.Model(&ssadb.AuditEdge{}).Where("result_id = ?", id).Count(&edgeCount)
-	require.Greater(t, edgeCount, 0, "should have audit edges")
+	require.Greater(t, edgeCount, int64(0), "should have audit edges")
 
 	// Delete the result
 	_, err = ssadb.DeleteResultByID(id)
@@ -55,8 +55,8 @@ c = b + 3
 	require.Error(t, err, "result should be deleted")
 
 	db.Model(&ssadb.AuditNode{}).Where("result_id = ?", id).Count(&nodeCount)
-	require.Equal(t, 0, nodeCount, "all nodes should be deleted")
+	require.Equal(t, int64(0), nodeCount, "all nodes should be deleted")
 
 	db.Model(&ssadb.AuditEdge{}).Where("result_id = ?", id).Count(&edgeCount)
-	require.Equal(t, 0, edgeCount, "all edges should be deleted")
+	require.Equal(t, int64(0), edgeCount, "all edges should be deleted")
 }

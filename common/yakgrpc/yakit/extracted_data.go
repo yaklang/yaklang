@@ -9,11 +9,11 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 
 	regexp2 "github.com/VillanCh/go-pcre2-lite/regexp2"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 type PacketInfo struct {
@@ -108,7 +108,7 @@ func DeduplicateExtractedData(db *gorm.DB, traceIds ...string) (int64, error) {
 // DeduplicateExtractedDataByFilter 按 ExtractedDataFilter 先过滤数据，再对过滤结果按
 // (trace_id, rule_verbose, data) 去重，每组保留 id 最小的一条。
 func DeduplicateExtractedDataByFilter(db *gorm.DB, dataFilter *ypb.ExtractedDataFilter) (int64, error) {
-	if err := db.AutoMigrate(&schema.ExtractedData{}).Error; err != nil {
+	if err := db.AutoMigrate(&schema.ExtractedData{}); err != nil {
 		return 0, err
 	}
 	db = db.Model(&schema.ExtractedData{})
@@ -213,11 +213,11 @@ func QueryExtractedDataPagination(db *gorm.DB, req *ypb.QueryMITMRuleExtractedDa
 func CountExtractedData(db *gorm.DB, filter *ypb.ExtractedDataFilter) (float64, error) {
 	db = db.Model(&schema.ExtractedData{})
 	db = FilterExtractedData(db, filter)
-	var count float64
+	var count int64
 	if db := db.Count(&count); db.Error != nil {
 		return 0, db.Error
 	}
-	return count, nil
+	return float64(count), nil
 }
 
 func ExtractedDataFromHTTPFlow(hiddenIndex string, ruleName string, res *MatchResult, regexpStr ...string) *schema.ExtractedData {

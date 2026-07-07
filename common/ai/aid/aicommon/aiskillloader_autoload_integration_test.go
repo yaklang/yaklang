@@ -5,12 +5,14 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 // --- helpers ---
@@ -42,7 +44,7 @@ func buildAutoloadVFS() *filesys.VirtualFS {
 
 func newAutoloadTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("failed to create test DB: %v", err)
 	}
@@ -155,7 +157,7 @@ func TestAutoSkillLoader_Integration_FoldingWithManySkills(t *testing.T) {
 
 func TestAutoSkillLoader_Integration_DBAndContextManager(t *testing.T) {
 	db := newAutoloadTestDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	vfs := buildAutoloadVFS()
 	sourceLoader, err := aiskillloader.NewAutoSkillLoader(aiskillloader.WithAutoLoad_FileSystem(vfs))
@@ -203,7 +205,7 @@ func TestAutoSkillLoader_Integration_DBAndContextManager(t *testing.T) {
 
 func TestAutoSkillLoader_Integration_BM25ResultsInContext(t *testing.T) {
 	db := newAutoloadTestDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	vfs := buildAutoloadVFS()
 	sourceLoader, _ := aiskillloader.NewAutoSkillLoader(

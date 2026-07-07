@@ -3,12 +3,13 @@ package netstackvm_test
 import (
 	"context"
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/icmp"
 	"github.com/yaklang/yaklang/common/netstackvm"
-	"testing"
-	"time"
 )
 
 func TestNewSystemNetStackVM(t *testing.T) {

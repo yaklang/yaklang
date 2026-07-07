@@ -1,9 +1,10 @@
 package fp
 
 import (
+	"testing"
+
 	log "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"testing"
 )
 
 func TestParseNmapProbe(t *testing.T) {

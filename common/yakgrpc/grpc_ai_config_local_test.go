@@ -2,14 +2,15 @@ package yakgrpc
 
 import (
 	"context"
+	"os"
+	"testing"
+
 	"github.com/bytedance/mockey"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"os"
-	"testing"
+	"gorm.io/gorm"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -45,10 +46,10 @@ func TestAIGlobalConfig_GRPC_Local(t *testing.T) {
 	require.NotNil(t, server)
 	t.Cleanup(func() {
 		if server.profileDatabase != nil {
-			_ = server.profileDatabase.Close()
+			_ = consts.CloseGormDB(server.profileDatabase)
 		}
 		if server.projectDatabase != nil {
-			_ = server.projectDatabase.Close()
+			_ = consts.CloseGormDB(server.projectDatabase)
 		}
 	})
 	ctx := context.Background()
@@ -164,10 +165,10 @@ func TestGetApiKey_ReplaceAPIKeys(t *testing.T) {
 		}
 		_ = yakit.SetKey(db, consts.AI_GLOBAL_CONFIG_KEY, "")
 		if server.profileDatabase != nil {
-			_ = server.profileDatabase.Close()
+			_ = consts.CloseGormDB(server.profileDatabase)
 		}
 		if server.projectDatabase != nil {
-			_ = server.projectDatabase.Close()
+			_ = consts.CloseGormDB(server.projectDatabase)
 		}
 	})
 

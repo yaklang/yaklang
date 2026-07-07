@@ -3,18 +3,19 @@ package schema
 import (
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 // Test that PacketPairs (httpflow_id + url + request/response snapshot) is persisted to and loaded from the database.
 func TestRiskPacketPairsPersisted(t *testing.T) {
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	defer db.Close()
+	defer closeGormDB(db)
 
-	require.NoError(t, db.AutoMigrate(&Risk{}).Error)
+	require.NoError(t, db.AutoMigrate(&Risk{}))
 
 	orig := &Risk{
 		Title: "packet-pairs-test",

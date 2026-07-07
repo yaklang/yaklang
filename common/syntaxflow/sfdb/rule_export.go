@@ -6,12 +6,12 @@ import (
 	"io"
 	"os"
 
-	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/tidwall/sjson"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"gorm.io/gorm"
 )
 
 // =============================================================================
@@ -106,9 +106,11 @@ func ExportRulesToZip(ctx context.Context, db *gorm.DB, targetPath string, opts 
 
 	// 获取规则数量
 	var ruleCount int
-	if err := db.Count(&ruleCount).Error; err != nil {
+	var rawCount int64
+	if err := db.Count(&rawCount).Error; err != nil {
 		return nil, utils.Wrap(err, "get syntax flow rule count failed")
 	}
+	ruleCount = int(rawCount)
 	if ruleCount == 0 {
 		return nil, utils.Error("no syntax flow rule found")
 	}
@@ -310,7 +312,7 @@ func restoreRuleGroups(db *gorm.DB, metadata bizhelper.MetaData) error {
 
 		if len(groups) > 0 && len(rules) > 0 {
 			for _, rule := range rules {
-				if err := db.Model(rule).Association("Groups").Append(groups).Error; err != nil {
+				if err := db.Model(rule).Association("Groups").Append(groups); err != nil {
 					return utils.Wrapf(err, "append groups to rule %s failed", ruleId)
 				}
 			}

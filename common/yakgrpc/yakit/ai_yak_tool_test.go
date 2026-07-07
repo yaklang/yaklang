@@ -3,21 +3,23 @@ package yakit
 import (
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func newAIYakToolTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
+	t.Cleanup(func() { _ = consts.CloseGormDB(db) })
 
-	require.NoError(t, db.AutoMigrate(&schema.AIYakTool{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AIYakTool{}))
 	return db
 }
 

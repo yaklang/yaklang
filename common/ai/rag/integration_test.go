@@ -188,7 +188,7 @@ func TestAddAndQuery(t *testing.T) {
 			var collection schema.VectorStoreCollection
 
 			// 检查表是否存在
-			if !tempDB.HasTable(&collection) {
+			if !tempDB.Migrator().HasTable(&collection) {
 				t.Fatal("VectorStoreCollection表不存在")
 			}
 
@@ -231,7 +231,7 @@ func TestAddAndQuery(t *testing.T) {
 			var document schema.VectorStoreDocument
 
 			// 检查表是否存在
-			if !tempDB.HasTable(&document) {
+			if !tempDB.Migrator().HasTable(&document) {
 				t.Fatal("VectorStoreDocument表不存在")
 			}
 

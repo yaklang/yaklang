@@ -3,15 +3,16 @@ package fp
 import (
 	"bytes"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
+	"io/ioutil"
+	"regexp"
+	"testing"
+
 	regexp2 "github.com/VillanCh/go-pcre2-lite/regexp2"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	utils2 "github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
-	"io/ioutil"
-	"regexp"
-	"testing"
 )
 
 func TestRDPRegexp2MatchFailed(t *testing.T) {

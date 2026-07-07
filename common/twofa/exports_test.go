@@ -3,6 +3,9 @@ package twofa
 import (
 	"context"
 	"fmt"
+	"strings"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -10,8 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"strings"
-	"testing"
 )
 
 func TestNewTOTPConfig(t *testing.T) {

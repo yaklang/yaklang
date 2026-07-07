@@ -18,11 +18,11 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/jinzhu/gorm"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"gopkg.in/yaml.v2"
+	"gorm.io/gorm"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"

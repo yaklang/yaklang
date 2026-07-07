@@ -6,11 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 type KV struct {
@@ -35,14 +36,14 @@ func TestFastPaginator(t *testing.T) {
 	})
 
 	// Open the database
-	db, err := gorm.Open("sqlite3", tempFile.Name())
+	db, err := gorm.Open(sqlite.Open(tempFile.Name()), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("failed to connect database: %v", err)
 	}
 
 	// Migrate the schema
 
-	if err = db.AutoMigrate(&KV{}).Error; err != nil {
+	if err = db.AutoMigrate(&KV{}); err != nil {
 		t.Fatalf("failed to migrate database: %v", err)
 	}
 
@@ -123,7 +124,7 @@ func TestFastPaginatorVSCommonPaginator(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
 
-	if err = db.AutoMigrate(&KV{}).Error; err != nil {
+	if err = db.AutoMigrate(&KV{}); err != nil {
 		t.Fatalf("failed to migrate database: %v", err)
 	}
 

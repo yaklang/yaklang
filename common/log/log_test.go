@@ -1,9 +1,10 @@
 package log
 
 import (
+	"testing"
+
 	"github.com/kataras/golog"
 	"github.com/stretchr/testify/suite"
-	"testing"
 )
 
 func TestLog(t *testing.T) { suite.Run(t, &LogTest{}) }

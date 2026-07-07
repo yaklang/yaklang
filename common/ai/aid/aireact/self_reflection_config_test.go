@@ -2,8 +2,9 @@ package aireact
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"

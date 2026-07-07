@@ -93,7 +93,7 @@ func createTestPlugins(t *testing.T) {
 	db.Create(portScanPlugin)
 
 	// 验证插件已创建
-	var count int
+	var count int64
 	db.Model(&schema.YakScript{}).Where("script_name LIKE ?", "test_rag_plugin%").Count(&count)
 	assert.Equal(t, 3, count, "应该创建3个测试插件")
 }

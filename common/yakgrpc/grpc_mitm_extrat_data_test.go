@@ -20,7 +20,7 @@ func init() {
 	consts.GetGormProjectDatabase()
 	_ = yakit.CallPostInitDatabase()
 	// 确保 extracted_data 表存在（单独运行测试时可能未迁移）
-	_ = consts.GetGormProjectDatabase().AutoMigrate(&schema.ExtractedData{}).Error
+	_ = consts.GetGormProjectDatabase().AutoMigrate(&schema.ExtractedData{})
 }
 
 func TestMUSTPASS_MITM_Extracted(t *testing.T) {
@@ -224,7 +224,7 @@ func TestMUSTPASS_MITM_Deduplicate_Extracted(t *testing.T) {
 	require.NoError(t, err)
 	db := srv.GetProjectDatabase()
 	require.NotNil(t, db, "project database not initialized")
-	require.NoError(t, db.AutoMigrate(&schema.ExtractedData{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.ExtractedData{}))
 
 	traceID1 := uuid.NewString()
 	traceID2 := uuid.NewString()

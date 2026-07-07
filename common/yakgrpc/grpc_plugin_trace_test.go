@@ -3,10 +3,11 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
 	"io"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

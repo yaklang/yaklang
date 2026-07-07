@@ -1,6 +1,6 @@
 package schema
 
-import "github.com/jinzhu/gorm"
+import "gorm.io/gorm"
 
 type TrafficTCPReassembledFrame struct {
 	gorm.Model

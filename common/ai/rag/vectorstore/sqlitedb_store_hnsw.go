@@ -13,14 +13,14 @@ import (
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/yaklang/yaklang/common/ai/embedding"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw/hnswspec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	_ "gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 // SQLiteVectorStore 是一个基于 SQLite 的向量存储实现
@@ -215,15 +215,15 @@ func CreateCollectionRecord(db *gorm.DB, name string, description string, opts .
 	err := db.Unscoped().Model(&schema.VectorStoreCollection{}).Where("name = ?", name).First(&existingCollection).Error
 	if err == nil {
 		// 记录已存在
-		if existingCollection.DeletedAt != nil {
+		if existingCollection.DeletedAt.Valid {
 			// 如果是软删除的记录，恢复它
-			if updateErr := db.Unscoped().Model(&existingCollection).Update("deleted_at", nil).Error; updateErr != nil {
+			if updateErr := db.Unscoped().Model(&existingCollection).Update("deleted_at", gorm.DeletedAt{}).Error; updateErr != nil {
 				return nil, utils.Errorf("恢复已删除的集合失败: %v", updateErr)
 			}
 		}
 		return &existingCollection, nil
 	}
-	if !gorm.IsRecordNotFoundError(err) {
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, utils.Errorf("查询集合失败: %v", err)
 	}
 
@@ -778,21 +778,21 @@ func (s *SQLiteVectorStoreHNSW) Count() (int, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	var count int
+	var count int64
 	if err := s.db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", s.collection.ID).Where("document_id <> ?", DocumentTypeCollectionInfo).Count(&count).Error; err != nil {
 		return 0, utils.Errorf("计算文档数量失败: %v", err)
 	}
 
-	return count, nil
+	return int(count), nil
 }
 
 func (s *SQLiteVectorStoreHNSW) UnSafeCount() (int, error) {
-	var count int
+	var count int64
 	if err := s.db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", s.collection.ID).Where("document_id <> ?", DocumentTypeCollectionInfo).Count(&count).Error; err != nil {
 		return 0, utils.Errorf("计算文档数量失败: %v", err)
 	}
 
-	return count, nil
+	return int(count), nil
 }
 
 func (s *SQLiteVectorStoreHNSW) SampleDocuments(n int) ([]*Document, error) {

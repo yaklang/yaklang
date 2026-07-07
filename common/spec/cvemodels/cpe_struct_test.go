@@ -1,13 +1,11 @@
 package cvemodels
 
 import (
+	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
-	"testing"
-)
-
-import (
-	"fmt"
 )
 
 func TestCPEStruct(t *testing.T) {

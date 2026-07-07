@@ -2,9 +2,10 @@ package mailutil
 
 import (
 	"context"
-	"gopkg.in/gomail.v2"
 	"os"
 	"testing"
+
+	"gopkg.in/gomail.v2"
 )
 
 func TestNewSMTPMailSender(t *testing.T) {

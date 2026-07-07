@@ -82,7 +82,7 @@ func TestRuleTagsOf(t *testing.T) {
 	}
 	want := map[string]bool{
 		ruleTagPrefix + "AWS 访问密钥 ID 泄漏(AKIA/ASIA)": true,
-		ruleTagPrefix + "Google API Key 泄漏":           true,
+		ruleTagPrefix + "Google API Key 泄漏":         true,
 	}
 	for _, tg := range tags {
 		if !want[tg] {

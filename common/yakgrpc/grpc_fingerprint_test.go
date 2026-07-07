@@ -2,6 +2,9 @@ package yakgrpc
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
@@ -11,8 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
-	"time"
 )
 
 func TestGRPC_FingerprintCURD_Base(t *testing.T) {

@@ -2,11 +2,12 @@ package openapi3
 
 import (
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 
 	"github.com/stretchr/testify/require"
 )

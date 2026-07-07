@@ -3,12 +3,12 @@ package yakit
 import (
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 func newToolConfigDB(t *testing.T) *gorm.DB {
@@ -233,7 +233,7 @@ func TestDeleteMCPClientToolConfigsByServerAndNames(t *testing.T) {
 
 		require.NoError(t, DeleteMCPClientToolConfigsByServerAndNames(db, srvRecycle, map[string]struct{}{}))
 
-		var ghostCount int
+		var ghostCount int64
 		require.NoError(t, db.Unscoped().Model(&schema.MCPClientToolConfig{}).
 			Where("tool_name = ?", toolName).Count(&ghostCount).Error)
 		assert.Equal(t, 0, ghostCount)

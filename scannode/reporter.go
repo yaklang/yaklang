@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/jinzhu/gorm/dialects/postgres"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/spec"
@@ -111,14 +110,14 @@ func (r *ScannerAgentReporter) ReportWeakPassword(result interface{}) error {
 			Port:         port,
 			IsPrivateNet: utils.IsPrivateIP(net.ParseIP(host)),
 			Target:       ret.Target,
-			TargetRaw: postgres.Jsonb{RawMessage: utils.Jsonify(map[string]interface{}{
+			TargetRaw: utils.JSONB{RawMessage: utils.Jsonify(map[string]interface{}{
 				"target": ret.Target, "host": host, "port": port,
 			})},
 			TargetType: targetType,
 			Plugin: strings.Join([]string{
 				"weakpassword", strings.ToLower(ret.Type),
 			}, "/"),
-			Detail: postgres.Jsonb{RawMessage: utils.Jsonify(ret)},
+			Detail: utils.JSONB{RawMessage: utils.Jsonify(ret)},
 		}
 		res, err := NewVulnResult(vul)
 		if err != nil {
@@ -146,7 +145,7 @@ func (r *ScannerAgentReporter) ReportRisk(
 
 	vul := &Vuln{
 		Target: target,
-		TargetRaw: postgres.Jsonb{RawMessage: utils.Jsonify(map[string]interface{}{
+		TargetRaw: utils.JSONB{RawMessage: utils.Jsonify(map[string]interface{}{
 			"target": target, "title": title,
 		})},
 		TargetType: VulnTargetType_Risk,
@@ -210,7 +209,7 @@ func (r *ScannerAgentReporter) ReportRisk(
 		vul.Hash = utils.MapGetString(v, "Hash")
 		vul.FromThreatAnalysisRuntimeId = utils.MapGetString(v, "RuntimeId")
 		vul.FromThreatAnalysisTaskId = r.TaskId
-		vul.Detail = postgres.Jsonb{RawMessage: utils.Jsonify(lib)}
+		vul.Detail = utils.JSONB{RawMessage: utils.Jsonify(lib)}
 		vul.Payload = utils.MapGetString(v, "Payload")
 		vul.RiskTypeVerbose = utils.MapGetString(v, "RiskTypeVerbose")
 		vul.RiskType = utils.MapGetString(v, "RiskType")
@@ -264,10 +263,10 @@ func (r *ScannerAgentReporter) ReportVul(i interface{}) error {
 			Port:         ret.Port,
 			IsPrivateNet: utils.IsPrivateIP(net.ParseIP(ret.IP)),
 			Target:       ret.Target,
-			TargetRaw:    postgres.Jsonb{RawMessage: targetRaw},
+			TargetRaw:    utils.JSONB{RawMessage: targetRaw},
 			TargetType:   targetType,
 			Plugin:       fmt.Sprintf("palm-poc-invoker/%v/%v", ret.Source, ret.PocName),
-			Detail:       postgres.Jsonb{RawMessage: raw},
+			Detail:       utils.JSONB{RawMessage: raw},
 		})
 		if err != nil {
 			return err

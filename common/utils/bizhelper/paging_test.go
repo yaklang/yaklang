@@ -3,8 +3,9 @@ package bizhelper
 import (
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
+	"gorm.io/gorm"
 )
 
 type paginationTestItem struct {
@@ -15,9 +16,9 @@ type paginationTestItem struct {
 func TestNewPaginationReturnsQueryError(t *testing.T) {
 	db, err := createTempTestDatabase()
 	require.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
-	require.NoError(t, db.AutoMigrate(&paginationTestItem{}).Error)
+	require.NoError(t, db.AutoMigrate(&paginationTestItem{}))
 	require.NoError(t, db.Create(&paginationTestItem{Name: "alpha"}).Error)
 
 	var items []paginationTestItem

@@ -2,13 +2,14 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"math/rand"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"

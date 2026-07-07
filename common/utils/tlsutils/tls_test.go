@@ -4,14 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/tls"
-	"github.com/yaklang/yaklang/common/log"
-	"sync"
-	"time"
-)
-
-import (
 	"net"
+	"sync"
 	"testing"
+	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func TestRevokeCert(t *testing.T) {

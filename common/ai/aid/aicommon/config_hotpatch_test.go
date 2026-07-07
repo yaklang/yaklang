@@ -79,7 +79,7 @@ func TestConfigHotpatch_PersistSessionStartParams(t *testing.T) {
 
 	sessionID := "session-hotpatch-persist"
 	c := NewTestConfig(ctx, WithPersistentSessionId(sessionID))
-	require.NoError(t, c.GetDB().AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, c.GetDB().AutoMigrate(&schema.AISession{}))
 	_, err := yakit.CreateOrUpdateAISessionMetaStartParams(c.GetDB(), sessionID, &ypb.AIStartParams{
 		EnablePlan:            false,
 		SyncPerceptionTrigger: false,

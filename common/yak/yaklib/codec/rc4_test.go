@@ -1,10 +1,11 @@
 package codec
 
 import (
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
-	"testing"
 )
 
 func TestRC4EncAndDec(t *testing.T) {

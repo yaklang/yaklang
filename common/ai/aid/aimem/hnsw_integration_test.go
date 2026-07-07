@@ -1,9 +1,10 @@
 package aimem
 
 import (
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/schema"

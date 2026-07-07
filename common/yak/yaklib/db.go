@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"gorm.io/gorm"
 
 	"github.com/yaklang/yaklang/common/schema"
 
@@ -187,8 +187,10 @@ func saveHTTPFlowFromRawWithType(url string, req, rsp []byte, typeStr string) er
 // req = []byte(f"GET /admin HTTP/1.1\r\nHost: ${host}\r\n\r\n")
 // rsp = []byte("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nadmin")
 // db.SaveHTTPFlowFromRawWithOption(
-//     "http://"+host+"/admin", req, rsp,
-//     db.saveHTTPFlowWithTags("suspicious|admin-panel"),
+//
+//	"http://"+host+"/admin", req, rsp,
+//	db.saveHTTPFlowWithTags("suspicious|admin-panel"),
+//
 // )~
 //
 // found = 0
@@ -248,10 +250,10 @@ var DatabaseExports = map[string]interface{}{
 	"SaveYakitPlugin":               saveYakitPlugin,
 
 	// HTTP
-	"QueryUrlsByKeyword":      queryUrlsByKeyword,
-	"QueryUrlsAll":            queryAllUrls,
-	"QueryHTTPFlowsByKeyword": queryHTTPFlowByKeyword,
-	"QueryHTTPFlowsAll": dbQueryHTTPFlowsAll,
+	"QueryUrlsByKeyword":          queryUrlsByKeyword,
+	"QueryUrlsAll":                queryAllUrls,
+	"QueryHTTPFlowsByKeyword":     queryHTTPFlowByKeyword,
+	"QueryHTTPFlowsAll":           dbQueryHTTPFlowsAll,
 	"QueryPortsByUpdatedAt":       queryPortsByUpdatedAt,
 	"QueryPortsByTaskName":        queryPortsByTaskName,
 	"QueryPortsByRuntimeId":       queryPortsByRuntimeId,
@@ -267,12 +269,12 @@ var DatabaseExports = map[string]interface{}{
 	"GetAllPayloadGroupsName":     getAllPayloadGroupsName,
 	"DeletePayloadByGroup":        deletePayloadByGroup,
 	"YieldPayload":                YieldPayload,
-	"GetProjectKey": dbGetProjectKey,
-	"SetProjectKey": dbSetProjectKey,
-	"SetKey":        dbSetKey,
-	"SetKeyWithTTL": dbSetKeyWithTTL,
-	"GetKey":        dbGetKey,
-	"DelKey":        dbDelKey,
+	"GetProjectKey":               dbGetProjectKey,
+	"SetProjectKey":               dbSetProjectKey,
+	"SetKey":                      dbSetKey,
+	"SetKeyWithTTL":               dbSetKeyWithTTL,
+	"GetKey":                      dbGetKey,
+	"DelKey":                      dbDelKey,
 
 	"GetYakitPluginByName": queryYakitPluginByName,
 	"GetYakitPluginByID":   getYakitPluginByID,
@@ -395,9 +397,11 @@ func dbSetKeyWithTTL(k, v any, ttl int) error {
 // Example:
 // ```
 // // 读取已存在的值，并对“首次运行”做默认值兜底
-// if db.GetKey("scan-round") == "" {
-//     db.SetKey("scan-round", "1")            // 首次运行初始化
-// }
+//
+//	if db.GetKey("scan-round") == "" {
+//	    db.SetKey("scan-round", "1")            // 首次运行初始化
+//	}
+//
 // round = atoi(db.GetKey("scan-round"))~
 // db.SetKey("scan-round", sprint(round + 1))  // 每次运行自增
 // println(round >= 1)   // OUT: true
@@ -494,10 +498,12 @@ func dbGetProjectKey(k any) string {
 // ```
 // // 遍历数据库中已保存的全部 HTTP 流量
 // count = 0
-// for flow in db.QueryHTTPFlowsAll() {
-//     count++
-//     if count > 5 { break }
-// }
+//
+//	for flow in db.QueryHTTPFlowsAll() {
+//	    count++
+//	    if count > 5 { break }
+//	}
+//
 // println("scanned http flows")
 // ```
 func dbQueryHTTPFlowsAll() chan *schema.HTTPFlow {
@@ -516,9 +522,11 @@ func dbQueryHTTPFlowsAll() chan *schema.HTTPFlow {
 // Example:
 // ```
 // // runtimeId 来自某次扫描任务（示意性示例）
-// for host in db.QueryAliveHost("example-runtime-id") {
-//     println(host.IP)
-// }
+//
+//	for host in db.QueryAliveHost("example-runtime-id") {
+//	    println(host.IP)
+//	}
+//
 // ```
 func dbQueryAliveHost(runtimeId string) chan *schema.AliveHost {
 	return yakit.YieldAliveHostRuntimeId(consts.GetGormProjectDatabase(), context.Background(), runtimeId)
@@ -572,9 +580,11 @@ func dbSaveAIYakScript(tool *schema.AIYakTool) error {
 //
 // Example:
 // ```
-// for tool in db.YieldAllAITools() {
-//     println(tool.Name)
-// }
+//
+//	for tool in db.YieldAllAITools() {
+//	    println(tool.Name)
+//	}
+//
 // ```
 func dbYieldAllAITools() chan *schema.AIYakTool {
 	db := consts.GetGormProfileDatabase()
@@ -592,9 +602,11 @@ func dbYieldAllAITools() chan *schema.AIYakTool {
 //
 // Example:
 // ```
-// for forge in db.YieldAllAIForges() {
-//     println(forge.ForgeName)
-// }
+//
+//	for forge in db.YieldAllAIForges() {
+//	    println(forge.ForgeName)
+//	}
+//
 // ```
 func dbYieldAllAIForges() chan *schema.AIForge {
 	db := consts.GetGormProfileDatabase()
@@ -612,9 +624,11 @@ func dbYieldAllAIForges() chan *schema.AIForge {
 //
 // Example:
 // ```
-// for server in db.YieldAllMCPServers() {
-//     println(server.Name)
-// }
+//
+//	for server in db.YieldAllMCPServers() {
+//	    println(server.Name)
+//	}
+//
 // ```
 func dbYieldAllMCPServers() chan *schema.MCPServer {
 	db := consts.GetGormProfileDatabase()
@@ -652,11 +666,7 @@ func dbYieldAllMCPServers() chan *schema.MCPServer {
 // // mysqlConn = db.OpenDatabase("mysql", "root:123456@tcp(127.0.0.1:3306)/test?charset=utf8mb4")~
 // ```
 func OpenDatabase(dialect string, source string) (*gorm.DB, error) {
-	db, err := gorm.Open(dialect, source)
-	if err != nil {
-		return nil, err
-	}
-	return db, nil
+	return consts.OpenDatabaseByDriver(dialect, source)
 }
 
 // OpenSqliteDatabase 打开（不存在时自动创建）一个 SQLite 数据库文件（导出名为 db.OpenSqliteDatabase）
@@ -715,8 +725,10 @@ func OpenSqliteDatabase(path string) (*gorm.DB, error) {
 // defer conn.Close()
 // conn.Exec(`CREATE TABLE ports(host TEXT, port INTEGER, service TEXT)`)
 // records = [
-//     ["10.0.0.1", 80, "http"], ["10.0.0.1", 443, "https"],
-//     ["10.0.0.2", 22, "ssh"],  ["10.0.0.2", 80, "http"],
+//
+//	["10.0.0.1", 80, "http"], ["10.0.0.1", 443, "https"],
+//	["10.0.0.2", 22, "ssh"],  ["10.0.0.2", 80, "http"],
+//
 // ]
 // for r in records { conn.Exec("INSERT INTO ports VALUES (?, ?, ?)", r[0], r[1], r[2]) }
 //
@@ -830,10 +842,12 @@ func _deleteYakScriptByName(i string) error {
 // ```
 // // 统计本地插件按类型的分布，并用饼图展示（遍历->统计->可视化 联动）
 // byType = {}
-// for script in db.YieldYakScriptAll() {
-//     t = script.Type
-//     if t in byType { byType[t] = byType[t] + 1 } else { byType[t] = 1 }
-// }
+//
+//	for script in db.YieldYakScriptAll() {
+//	    t = script.Type
+//	    if t in byType { byType[t] = byType[t] + 1 } else { byType[t] = 1 }
+//	}
+//
 // pie = yakit.NewPieGraph("plugin types")
 // for t, c in byType { pie.Add(t, c) }
 // yakit.Output(pie)

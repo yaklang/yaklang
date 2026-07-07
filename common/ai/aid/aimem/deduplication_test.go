@@ -2,10 +2,11 @@ package aimem
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"

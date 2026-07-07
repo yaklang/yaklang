@@ -3,13 +3,14 @@ package yaktest
 import (
 	"crypto/tls"
 	"fmt"
+	"net/http"
+	"testing"
+	"time"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
-	"net/http"
-	"testing"
-	"time"
 )
 
 //func TestHttp2ClientManual(t *testing.T) {

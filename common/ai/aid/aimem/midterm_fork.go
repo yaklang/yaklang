@@ -5,12 +5,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 const (
@@ -297,12 +297,12 @@ func cloneAIMemoryCollectionGraph(db *gorm.DB, parentSessionID, branchSessionID 
 		return utils.Errorf("load branch midterm collection failed: %v", err)
 	default:
 		return db.Model(&existing).Updates(map[string]interface{}{
-			"graph_binary":  branchCol.GraphBinary,
-			"m":             branchCol.M,
-			"ml":            branchCol.Ml,
-			"ef_search":     branchCol.EfSearch,
-			"ef_construct":  branchCol.EfConstruct,
-			"dimension":     branchCol.Dimension,
+			"graph_binary": branchCol.GraphBinary,
+			"m":            branchCol.M,
+			"ml":           branchCol.Ml,
+			"ef_search":    branchCol.EfSearch,
+			"ef_construct": branchCol.EfConstruct,
+			"dimension":    branchCol.Dimension,
 		}).Error
 	}
 }

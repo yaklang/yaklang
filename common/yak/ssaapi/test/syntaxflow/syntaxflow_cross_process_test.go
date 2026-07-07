@@ -1,8 +1,9 @@
 package syntaxflow
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestMultiDataFlow_CrossProcess(t *testing.T) {

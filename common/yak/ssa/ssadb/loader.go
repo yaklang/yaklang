@@ -4,11 +4,11 @@ import (
 	"context"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/glob"
+	"gorm.io/gorm"
 )
 
 func YieldIrCode(DB *gorm.DB, ctx context.Context, progName string) <-chan *IrCode {
@@ -152,7 +152,7 @@ func searchVariableWithExcludeFiles(db *gorm.DB, ctx context.Context, progName s
 			// - SQLite: "REGEXP" via the registered regexp() function in sqlite3_extended driver.
 			// - MySQL:  "REGEXP"
 			// - Postgres: "~"
-			dialect := db.Dialect().GetName()
+			dialect := db.Dialector.Name()
 			switch dialect {
 			case "postgres", "postgresql":
 				query = query.Where("string ~ ?", value)
@@ -265,7 +265,7 @@ func getConcatExpression(db *gorm.DB) string {
 	if db == nil {
 		db = GetDB()
 	}
-	dialect := db.Dialect().GetName()
+	dialect := db.Dialector.Name()
 	switch dialect {
 	case "sqlite3", "sqlite":
 		// SQLite uses || operator

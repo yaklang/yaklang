@@ -5,13 +5,15 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func TestGlobalHotPatchConfigCRUD(t *testing.T) {
@@ -113,23 +115,23 @@ func newLiteYakServerForHotPatchTests(t *testing.T) (*Server, error) {
 	profileDBPath := filepath.Join(tmpDir, "profile.db")
 	projectDBPath := filepath.Join(tmpDir, "project.db")
 
-	profileDB, err := gorm.Open("sqlite3", profileDBPath)
+	profileDB, err := gorm.Open(sqlite.Open(profileDBPath), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
-	projectDB, err := gorm.Open("sqlite3", projectDBPath)
+	projectDB, err := gorm.Open(sqlite.Open(projectDBPath), &gorm.Config{})
 	if err != nil {
-		_ = profileDB.Close()
+		_ = consts.CloseGormDB(profileDB)
 		return nil, err
 	}
 
 	t.Cleanup(func() {
-		_ = profileDB.Close()
-		_ = projectDB.Close()
+		_ = consts.CloseGormDB(profileDB)
+		_ = consts.CloseGormDB(projectDB)
 	})
 
-	if db := profileDB.AutoMigrate(&schema.GeneralStorage{}, &schema.HotPatchTemplate{}); db.Error != nil {
-		return nil, db.Error
+	if err := profileDB.AutoMigrate(&schema.GeneralStorage{}, &schema.HotPatchTemplate{}); err != nil {
+		return nil, err
 	}
 
 	return &Server{

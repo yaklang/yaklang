@@ -4,25 +4,25 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 func setupAIGlobalConfigTestDB(t *testing.T) *gorm.DB {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.GeneralStorage{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.GeneralStorage{}))
 	return db
 }
 
 func TestSetAndGetAIGlobalConfig(t *testing.T) {
 	db := setupAIGlobalConfigTestDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	cfg := &ypb.AIGlobalConfig{
 		Enabled:         true,
@@ -82,7 +82,7 @@ func TestSetAndGetAIGlobalConfig(t *testing.T) {
 
 func TestGetAIGlobalConfig_MigratesLegacyBaseURL(t *testing.T) {
 	db := setupAIGlobalConfigTestDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	cfg := &ypb.AIGlobalConfig{
 		Enabled:       true,
@@ -117,7 +117,7 @@ func TestGetAIGlobalConfig_MigratesLegacyBaseURL(t *testing.T) {
 
 func TestSetAIGlobalConfig_UpdateProxyNoHttpsDomain(t *testing.T) {
 	db := setupAIGlobalConfigTestDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	first := &ypb.AIGlobalConfig{
 		Enabled:       true,
@@ -178,7 +178,7 @@ func TestSetAIGlobalConfig_UpdateProxyNoHttpsDomain(t *testing.T) {
 
 func TestSetAIGlobalConfig_MultipleProvidersOrderAndUpdate(t *testing.T) {
 	db := setupAIGlobalConfigTestDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	first := &ypb.AIGlobalConfig{
 		Enabled:       true,
@@ -304,7 +304,7 @@ func TestApplyAIGlobalConfig(t *testing.T) {
 	})
 
 	db := setupAIGlobalConfigTestDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	cfg := &ypb.AIGlobalConfig{
 		Enabled:         true,
@@ -369,7 +369,7 @@ func TestApplyAIGlobalConfig(t *testing.T) {
 
 func TestSetAIGlobalConfigRequiresProvider(t *testing.T) {
 	db := setupAIGlobalConfigTestDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	cfg := &ypb.AIGlobalConfig{
 		Enabled:       true,
@@ -388,8 +388,8 @@ func TestSetAIGlobalConfigRequiresProvider(t *testing.T) {
 func TestGetAIGlobalConfig_RecoversDeprecatedProviders(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	defer db.Close()
-	require.NoError(t, db.AutoMigrate(&schema.GeneralStorage{}, &schema.AIThirdPartyConfig{}).Error)
+	defer consts.CloseGormDB(db)
+	require.NoError(t, db.AutoMigrate(&schema.GeneralStorage{}, &schema.AIThirdPartyConfig{}))
 
 	legacy := &schema.AIThirdPartyConfig{
 		Type:   "openai",
@@ -433,8 +433,8 @@ func TestGetAIGlobalConfig_RecoversDeprecatedProviders(t *testing.T) {
 func TestGetAIGlobalConfig_RecoversOnlyWhenProviderInfoMissing(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	defer db.Close()
-	require.NoError(t, db.AutoMigrate(&schema.GeneralStorage{}, &schema.AIThirdPartyConfig{}).Error)
+	defer consts.CloseGormDB(db)
+	require.NoError(t, db.AutoMigrate(&schema.GeneralStorage{}, &schema.AIThirdPartyConfig{}))
 
 	legacy := &schema.AIThirdPartyConfig{
 		Type:   "openai",

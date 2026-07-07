@@ -6,16 +6,16 @@ import (
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 type YakScript struct {
 	gorm.Model
 
-	ScriptName string `json:"script_name" gorm:"unique_index"`
+	ScriptName string `json:"script_name" gorm:"uniqueIndex"`
 	Type       string `json:"type" gorm:"index"`
 	Content    string `json:"content"`
 	Level      string `json:"level"`

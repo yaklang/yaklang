@@ -1,12 +1,13 @@
 package yakit
 
 import (
+	"errors"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"gorm.io/gorm"
 )
 
 // AISkillVTableName returns the FTS5 virtual table name for AISkill.
@@ -93,7 +94,7 @@ func SearchAISkillBM25(db *gorm.DB, filter *AISkillSearchFilter, limit, offset i
 
 	var res = make([]*schema.AISkill, 0)
 	// Short keywords or non-SQLite or no FTS table: fall back to LIKE search
-	if len(match) < 3 || !schema.IsSQLite(db) || !db.HasTable(defaultAISkillFTS5.FTSTable) {
+	if len(match) < 3 || !schema.IsSQLite(db) || !db.Migrator().HasTable(defaultAISkillFTS5.FTSTable) {
 		if err := FilterAISkillForSearch(db, filter).Limit(limit).Offset(offset).Find(&res).Error; err != nil {
 			return nil, err
 		}
@@ -120,7 +121,7 @@ func CreateOrUpdateAISkill(db *gorm.DB, skill *schema.AISkill) error {
 
 	var existing schema.AISkill
 	if err := db.Where("name = ?", skill.Name).First(&existing).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return db.Create(skill).Error
 		}
 		return err

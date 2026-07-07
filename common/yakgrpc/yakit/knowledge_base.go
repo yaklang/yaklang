@@ -1,11 +1,11 @@
 package yakit
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 // CreateKnowledgeBase 创建知识库
@@ -124,7 +124,7 @@ func GetKnowledgeBaseNameList(db *gorm.DB) ([]string, error) {
 
 func UpdateKnowledgeBaseEntryByHiddenIndex(db *gorm.DB, hiddenIndex string, knowledgeBase *schema.KnowledgeBaseEntry) error {
 	db = db.Model(&schema.KnowledgeBaseEntry{})
-	count := 0
+	var count int64
 	db.Where("hidden_index = ?", hiddenIndex).Count(&count)
 	if count == 0 {
 		return utils.Errorf("knowledge base entry not found")

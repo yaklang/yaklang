@@ -1,10 +1,11 @@
 package lowhttp
 
 import (
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestConvertHTTPRequestToFuzzTag(t *testing.T) {

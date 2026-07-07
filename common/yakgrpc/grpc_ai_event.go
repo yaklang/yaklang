@@ -4,12 +4,12 @@ import (
 	"context"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 
-	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 func (s *Server) QueryAIEvent(ctx context.Context, req *ypb.AIEventQueryRequest) (*ypb.AIEventQueryResponse, error) {

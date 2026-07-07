@@ -1,9 +1,10 @@
 package protocol_impl
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"testing"
 )
 
 func TestNtlmMessage(t *testing.T) {

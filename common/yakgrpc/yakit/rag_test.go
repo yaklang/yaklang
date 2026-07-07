@@ -3,11 +3,12 @@ package yakit
 import (
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 // setupTestDB 设置测试数据库
@@ -18,7 +19,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	}
 
 	// 自动迁移数据库表结构
-	err = db.AutoMigrate(&schema.VectorStoreCollection{}).Error
+	err = db.AutoMigrate(&schema.VectorStoreCollection{})
 	require.NoError(t, err, "数据库表结构迁移失败")
 
 	return db
@@ -47,7 +48,7 @@ func createTestCollection(t *testing.T, db *gorm.DB, name string) *schema.Vector
 // TestQueryRAGCollectionByName 测试根据名称查询 RAG 集合
 func TestQueryRAGCollectionByName(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 创建测试数据
 	testName := "test_collection_by_name"
@@ -75,7 +76,7 @@ func TestQueryRAGCollectionByName(t *testing.T) {
 // TestQueryRAGCollectionByID 测试根据ID查询 RAG 集合
 func TestQueryRAGCollectionByID(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 创建测试数据
 	originalCollection := createTestCollection(t, db, "test_collection_by_id")
@@ -101,7 +102,7 @@ func TestQueryRAGCollectionByID(t *testing.T) {
 // TestGetAllRAGCollectionNames 测试获取所有 RAG 集合名称
 func TestGetAllRAGCollectionNames(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 创建测试数据
 	createTestCollection(t, db, "collection_1")
@@ -120,7 +121,7 @@ func TestGetAllRAGCollectionNames(t *testing.T) {
 // TestGetAllRAGCollectionInfos 测试获取所有 RAG 集合信息
 func TestGetAllRAGCollectionInfos(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 创建测试数据
 	collection1 := createTestCollection(t, db, "info_collection_1")
@@ -148,7 +149,7 @@ func TestGetAllRAGCollectionInfos(t *testing.T) {
 // TestSelectRAGCollectionCoreFields 测试核心字段选择功能
 func TestSelectRAGCollectionCoreFields(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 创建测试数据
 	createTestCollection(t, db, "core_fields_test")
@@ -170,7 +171,7 @@ func TestSelectRAGCollectionCoreFields(t *testing.T) {
 // TestEmptyDatabase 测试空数据库的情况
 func TestEmptyDatabase(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 测试在空数据库中查询
 	t.Run("空数据库查询集合名称", func(t *testing.T) {

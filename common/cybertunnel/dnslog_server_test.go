@@ -3,13 +3,14 @@ package cybertunnel
 import (
 	"context"
 	"fmt"
+	"strings"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
-	"testing"
 )
 
 func TestDNSLogServer(t *testing.T) {

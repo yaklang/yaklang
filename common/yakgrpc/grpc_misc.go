@@ -31,10 +31,10 @@ func (s *Server) ResetAndInvalidUserData(ctx context.Context, req *ypb.ResetAndI
 	// 原有行为：清理临时目录、删除所有表并退出进程
 	os.RemoveAll(consts.GetDefaultYakitBaseTempDir())
 	for _, table := range YakitAllTables {
-		s.GetProjectDatabase().Unscoped().DropTableIfExists(table)
+		_ = s.GetProjectDatabase().Migrator().DropTable(table)
 	}
 	for _, table := range YakitProfileTables {
-		s.GetProfileDatabase().Unscoped().DropTableIfExists(table)
+		_ = s.GetProfileDatabase().Migrator().DropTable(table)
 	}
 	os.Exit(1)
 	return &ypb.Empty{}, nil

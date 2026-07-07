@@ -2,6 +2,13 @@ package cvequeryops
 
 import (
 	"bytes"
+	"io/ioutil"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+	"testing"
+
 	"github.com/antchfx/xmlquery"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
@@ -9,12 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/ziputil"
-	"io/ioutil"
-	"path/filepath"
-	"regexp"
-	"strconv"
-	"strings"
-	"testing"
 )
 
 func TestCWE_Download2(t *testing.T) {

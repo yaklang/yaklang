@@ -3,10 +3,10 @@ package aisessioncleanup
 import (
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 // 中期 timeline 记忆在同一 persistent session id 下使用两套独立命名：

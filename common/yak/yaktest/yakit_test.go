@@ -2,9 +2,10 @@ package yaktest
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"os"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestMisc_YAKIT(t *testing.T) {

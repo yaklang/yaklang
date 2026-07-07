@@ -4,8 +4,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 const SSAReportRecordTableName = "ssa_report_records"
@@ -15,7 +15,7 @@ type SSAReportRecord struct {
 
 	Title             string
 	PublishedAt       time.Time  `json:"published_at" gorm:"index"`
-	Hash              string     `json:"hash" gorm:"unique_index"`
+	Hash              string     `json:"hash" gorm:"uniqueIndex"`
 	Owner             string     `json:"owner" gorm:"index"`
 	From              string     `json:"from" gorm:"index"`
 	ReportType        string     `json:"report_type" gorm:"index"`

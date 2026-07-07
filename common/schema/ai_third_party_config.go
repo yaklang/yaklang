@@ -7,9 +7,9 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 const aiThirdPartyConfigTableName = "ai_third_party_configs"
@@ -18,30 +18,30 @@ const aiThirdPartyConfigTableName = "ai_third_party_configs"
 type AIThirdPartyConfig struct {
 	gorm.Model
 
-	Hash           string          `json:"hash" gorm:"unique_index"`
-	Type           string          `json:"type" gorm:"index"`
-	APIKey         string          `json:"api_key"`
-	UserIdentifier string          `json:"user_identifier"`
-	UserSecret     string          `json:"user_secret"`
-	Namespace      string          `json:"namespace"`
-	Domain         string          `json:"domain"`
-	BaseURL        string          `json:"base_url"`
-	Endpoint       string          `json:"endpoint"`
-	EnableEndpoint bool            `json:"enable_endpoint" gorm:"default:false"`
-	EnableThinking bool            `json:"enable_thinking" gorm:"default:false"`
+	Hash           string `json:"hash" gorm:"uniqueIndex"`
+	Type           string `json:"type" gorm:"index"`
+	APIKey         string `json:"api_key"`
+	UserIdentifier string `json:"user_identifier"`
+	UserSecret     string `json:"user_secret"`
+	Namespace      string `json:"namespace"`
+	Domain         string `json:"domain"`
+	BaseURL        string `json:"base_url"`
+	Endpoint       string `json:"endpoint"`
+	EnableEndpoint bool   `json:"enable_endpoint" gorm:"default:false"`
+	EnableThinking bool   `json:"enable_thinking" gorm:"default:false"`
 	// 以下为可选模型参数（nil 表示未配置）
-	MaxTokens          *int64   `json:"max_tokens,omitempty" gorm:"column:max_tokens"`
-	Temperature        *float64 `json:"temperature,omitempty" gorm:"column:temperature"`
-	TopP               *float64 `json:"top_p,omitempty" gorm:"column:top_p"`
-	TopK               *int64   `json:"top_k,omitempty" gorm:"column:top_k"`
-	FrequencyPenalty   *float64 `json:"frequency_penalty,omitempty" gorm:"column:frequency_penalty"`
-	ReasoningEffort    string   `json:"reasoning_effort,omitempty" gorm:"column:reasoning_effort"`
-	WebhookURL         string   `json:"webhook_url"`
-	ExtraParams    MapStringString `json:"extra_params" gorm:"type:text"`
-	APIType        string          `json:"api_type"`
-	Disabled       bool            `json:"disabled" gorm:"default:false"`
-	Proxy          string          `json:"proxy"`
-	NoHttps        bool            `json:"no_https" gorm:"default:false"`
+	MaxTokens        *int64          `json:"max_tokens,omitempty" gorm:"column:max_tokens"`
+	Temperature      *float64        `json:"temperature,omitempty" gorm:"column:temperature"`
+	TopP             *float64        `json:"top_p,omitempty" gorm:"column:top_p"`
+	TopK             *int64          `json:"top_k,omitempty" gorm:"column:top_k"`
+	FrequencyPenalty *float64        `json:"frequency_penalty,omitempty" gorm:"column:frequency_penalty"`
+	ReasoningEffort  string          `json:"reasoning_effort,omitempty" gorm:"column:reasoning_effort"`
+	WebhookURL       string          `json:"webhook_url"`
+	ExtraParams      MapStringString `json:"extra_params" gorm:"type:text"`
+	APIType          string          `json:"api_type"`
+	Disabled         bool            `json:"disabled" gorm:"default:false"`
+	Proxy            string          `json:"proxy"`
+	NoHttps          bool            `json:"no_https" gorm:"default:false"`
 }
 
 func (c *AIThirdPartyConfig) CalcHash() string {

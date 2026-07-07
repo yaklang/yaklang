@@ -7,10 +7,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
-)
 
-// Ensure yaklang stdlib registration matches compile-time dispatch resolution.
-import _ "github.com/yaklang/yaklang/common/yak"
+	// Ensure yaklang stdlib registration matches compile-time dispatch resolution.
+	_ "github.com/yaklang/yaklang/common/yak"
+)
 
 func TestYaklibDispatch_CodecUsesGenericYaklibPath(t *testing.T) {
 	code := `check = () => { return len(codec.EncodeToHex("ab")) }`

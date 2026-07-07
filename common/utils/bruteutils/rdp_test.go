@@ -1,8 +1,9 @@
 package bruteutils
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func TestRdpClient_Login(t *testing.T) {

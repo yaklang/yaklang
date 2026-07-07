@@ -1333,8 +1333,8 @@ func TestFlagFromFile(t *testing.T) {
 
 func TestSliceFlag_WithDefaults(t *testing.T) {
 	tests := []struct {
-		args   []string
-		app    *App
+		args []string
+		app  *App
 	}{
 		{
 			args: []string{""},

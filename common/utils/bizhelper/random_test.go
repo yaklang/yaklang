@@ -4,25 +4,30 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/jinzhu/gorm"
-	_ "github.com/mattn/go-sqlite3"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 type Item struct {
-	ID   uint `gorm:"primary_key"`
+	ID   uint `gorm:"primaryKey"`
 	Name string
 }
 
 func setupDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("failed to open sqlite in-memory db: %v", err)
 	}
-	db.LogMode(false)
-	if err := db.AutoMigrate(&Item{}).Error; err != nil {
+	if err := db.AutoMigrate(&Item{}); err != nil {
 		t.Fatalf("auto migrate failed: %v", err)
 	}
 	return db
+}
+func closeGormDB(db *gorm.DB) {
+	sqlDB, _ := db.DB()
+	if sqlDB != nil {
+		sqlDB.Close()
+	}
 }
 
 func seedItems(t *testing.T, db *gorm.DB, n int) {
@@ -37,7 +42,7 @@ func seedItems(t *testing.T, db *gorm.DB, n int) {
 func TestRandomQuery_EdgeCases(t *testing.T) {
 	t.Run("empty table", func(t *testing.T) {
 		db := setupDB(t)
-		defer db.Close()
+		defer closeGormDB(db)
 
 		var out []Item
 		total, err := RandomQuery(db.Model(&Item{}), 5, &out)
@@ -54,7 +59,7 @@ func TestRandomQuery_EdgeCases(t *testing.T) {
 
 	t.Run("total less than limit", func(t *testing.T) {
 		db := setupDB(t)
-		defer db.Close()
+		defer closeGormDB(db)
 		seedItems(t, db, 3)
 
 		var out []Item
@@ -72,7 +77,7 @@ func TestRandomQuery_EdgeCases(t *testing.T) {
 
 	t.Run("total equals limit", func(t *testing.T) {
 		db := setupDB(t)
-		defer db.Close()
+		defer closeGormDB(db)
 		seedItems(t, db, 5)
 
 		var out []Item
@@ -90,7 +95,7 @@ func TestRandomQuery_EdgeCases(t *testing.T) {
 
 	t.Run("total greater than limit", func(t *testing.T) {
 		db := setupDB(t)
-		defer db.Close()
+		defer closeGormDB(db)
 		seedItems(t, db, 10)
 
 		var out []Item
@@ -108,7 +113,7 @@ func TestRandomQuery_EdgeCases(t *testing.T) {
 
 	t.Run("limit zero", func(t *testing.T) {
 		db := setupDB(t)
-		defer db.Close()
+		defer closeGormDB(db)
 		seedItems(t, db, 5)
 
 		var out []Item

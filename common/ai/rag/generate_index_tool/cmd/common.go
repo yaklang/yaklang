@@ -3,22 +3,32 @@ package main
 import (
 	"fmt"
 
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/urfavecli"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
+
+func closeGormDB(db *gorm.DB) error {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.Close()
+}
 
 // getDatabase 获取数据库连接的辅助函数
 func getDatabase(c *cli.Context) (*gorm.DB, error) {
 	dbPath := c.String("db")
-	db, err := gorm.Open("sqlite3", dbPath)
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("连接数据库失败: %v", err)
 	}
 
 	// 自动迁移
-	db.AutoMigrate(&schema.VectorStoreDocument{}, &schema.VectorStoreCollection{}, &schema.YakScript{})
+	if err := db.AutoMigrate(&schema.VectorStoreDocument{}, &schema.VectorStoreCollection{}, &schema.YakScript{}); err != nil {
+		return nil, err
+	}
 	return db, nil
 }
 

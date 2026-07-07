@@ -18,7 +18,7 @@ func TestYieldAIEvent(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
 
-	err = db.AutoMigrate(&schema.AiOutputEvent{}).Error
+	err = db.AutoMigrate(&schema.AiOutputEvent{})
 	require.NoError(t, err)
 
 	// Prepare data
@@ -334,7 +334,7 @@ func TestAiOutputEvent_NormalizeRecoveryBlock(t *testing.T) {
 func TestYieldAIEventRecoveryHistory(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AiOutputEvent{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AiOutputEvent{}))
 
 	create := func(event *schema.AiOutputEvent) uint {
 		t.Helper()

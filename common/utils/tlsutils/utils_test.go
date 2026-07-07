@@ -1,9 +1,10 @@
 package tlsutils
 
 import (
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestSplitBlock(t *testing.T) {

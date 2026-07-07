@@ -4,9 +4,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 type Payload struct {
@@ -30,7 +30,7 @@ type Payload struct {
 	IsFile *bool `json:"is_file" gorm:"column:is_file;default:false"` // default false
 
 	// Hash string
-	Hash string `json:"hash" gorm:"unique_index"`
+	Hash string `json:"hash" gorm:"uniqueIndex"`
 }
 
 func (p *Payload) CalcHash() string {

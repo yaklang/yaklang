@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"gorm.io/gorm"
 
 	_ "github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
 	_ "github.com/yaklang/yaklang/common/aiforge"
@@ -23,7 +23,7 @@ func TestIntegrationWithRealEmbedding(t *testing.T) {
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String()+".db")
 	db, err := vectorstore.NewVectorStoreDatabase(path)
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 知识库名称
 	kbName := "integration-test-kb"

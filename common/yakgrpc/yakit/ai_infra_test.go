@@ -13,7 +13,7 @@ import (
 func TestDeleteAgentRuntime_FilterBySessionID(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AIAgentRuntime{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AIAgentRuntime{}))
 
 	sessionA := "sess-" + uuid.NewString()
 	sessionB := "sess-" + uuid.NewString()

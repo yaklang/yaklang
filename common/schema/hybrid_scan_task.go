@@ -1,11 +1,11 @@
 package schema
 
-import "github.com/jinzhu/gorm"
+import "gorm.io/gorm"
 
 type HybridScanTask struct {
 	gorm.Model
 
-	TaskId string `gorm:"unique_index"`
+	TaskId string `gorm:"uniqueIndex"`
 	// executing
 	// paused
 	// done

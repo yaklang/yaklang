@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/bcicen/jstream"
-	"github.com/jinzhu/gorm/dialects/postgres"
 	"github.com/pkg/errors"
 	"github.com/vjeantet/grok"
 	"github.com/yaklang/yaklang/common/log"
@@ -286,7 +285,7 @@ func JsonRawByteToMap(jbyte json.RawMessage) (map[string]interface{}, error) {
 	err := json.Unmarshal(jbyte, &res)
 	return res, err
 }
-func JsonbToMap(jb postgres.Jsonb) (map[string]interface{}, error) {
+func JsonbToMap(jb utils.JSONB) (map[string]interface{}, error) {
 	if jb.RawMessage == nil {
 		return nil, errors.Errorf("content is nil")
 	}
@@ -294,7 +293,7 @@ func JsonbToMap(jb postgres.Jsonb) (map[string]interface{}, error) {
 	err := json.Unmarshal(jb.RawMessage, &res)
 	return res, err
 }
-func JsonbToString(jb postgres.Jsonb) (string, error) {
+func JsonbToString(jb utils.JSONB) (string, error) {
 	if jb.RawMessage == nil {
 		return "", errors.Errorf("content is nil")
 	}
@@ -308,7 +307,7 @@ func JsonStrToVarList(jstr string) ([]interface{}, error) {
 	err := json.Unmarshal([]byte(jstr), &res)
 	return res, err
 }
-func JsonbToVarList(jb postgres.Jsonb) ([]interface{}, error) {
+func JsonbToVarList(jb utils.JSONB) ([]interface{}, error) {
 	var res []interface{}
 	err := json.Unmarshal(jb.RawMessage, &res)
 	return res, err

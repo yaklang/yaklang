@@ -1,10 +1,10 @@
 package yakit
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"gorm.io/gorm"
 )
 
 // CreateGeneralRuleGroup create general rule group , omit rules and id
@@ -87,7 +87,7 @@ func FirstOrCreateGeneralRuleGroup(db *gorm.DB, group *schema.GeneralRuleGroup) 
 // CreateGeneralRuleAndGroupAssociations create general rule and group associations, require rule and group are in database
 func CreateGeneralRuleAndGroupAssociations(db *gorm.DB, rule []*schema.GeneralRule, group []*schema.GeneralRuleGroup) error {
 	for _, r := range rule {
-		if err := db.Model(r).Association("Groups").Append(group).Error; err != nil {
+		if err := db.Model(r).Association("Groups").Append(group); err != nil {
 			return err
 		}
 	}
@@ -98,7 +98,7 @@ func CreateGeneralRuleAndGroupAssociations(db *gorm.DB, rule []*schema.GeneralRu
 // UpdateGeneralRuleAndGroupAssociations create general rule and group associations, require rule and group are in database
 func UpdateGeneralRuleAndGroupAssociations(db *gorm.DB, rule []*schema.GeneralRule, group []*schema.GeneralRuleGroup) error {
 	for _, r := range rule {
-		if err := db.Model(r).Association("Groups").Replace(group).Error; err != nil {
+		if err := db.Model(r).Association("Groups").Replace(group); err != nil {
 			return err
 		}
 	}
@@ -107,7 +107,7 @@ func UpdateGeneralRuleAndGroupAssociations(db *gorm.DB, rule []*schema.GeneralRu
 
 func AppendGeneralRuleGroupAssociations(db *gorm.DB, rule []*schema.GeneralRule, group []*schema.GeneralRuleGroup) error {
 	for _, r := range rule {
-		if err := db.Model(r).Association("Groups").Replace(append(r.Groups, group...)).Error; err != nil {
+		if err := db.Model(r).Association("Groups").Replace(append(r.Groups, group...)); err != nil {
 			return err
 		}
 	}
@@ -116,7 +116,7 @@ func AppendGeneralRuleGroupAssociations(db *gorm.DB, rule []*schema.GeneralRule,
 
 func DeleteGeneralRuleGroupAssociations(db *gorm.DB, rule []*schema.GeneralRule, group []*schema.GeneralRuleGroup) error {
 	for _, r := range rule {
-		if err := db.Model(r).Association("Groups").Delete(group).Error; err != nil {
+		if err := db.Model(r).Association("Groups").Delete(group); err != nil {
 			return err
 		}
 	}

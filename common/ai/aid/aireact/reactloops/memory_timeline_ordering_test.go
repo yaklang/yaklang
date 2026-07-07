@@ -18,8 +18,8 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 // createTestAIMemory 创建用于测试的AIMemory实例
@@ -28,15 +28,16 @@ func createTestAIMemory(t *testing.T, sessionID string) *aimem.AIMemoryTriage {
 	tmpDir := consts.GetDefaultYakitBaseTempDir()
 	dbFile := filepath.Join(tmpDir, uuid.NewString()+".db")
 
-	db, err := gorm.Open("sqlite3", dbFile)
+	db, err := gorm.Open(sqlite.Open(dbFile), &gorm.Config{})
 	require.NoError(t, err, "创建测试数据库失败")
 
 	// 自动迁移表结构
 	schema.AutoMigrate(db, schema.KEY_SCHEMA_YAKIT_DATABASE)
 
 	// 设置数据库连接池
-	db.DB().SetMaxOpenConns(1)
-	db.DB().SetMaxIdleConns(1)
+	sqlDB, _ := db.DB()
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
 
 	// 创建 mock embedding 客户端
 	mockEmbedder := vectorstore.NewMockEmbedder(func(text string) ([]float32, error) {

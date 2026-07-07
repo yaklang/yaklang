@@ -3,15 +3,17 @@ package aiskillloader
 import (
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func newSearchTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("failed to create in-memory DB: %v", err)
 	}
@@ -70,7 +72,7 @@ func TestManager_SearchKeywordBM25_InMemory(t *testing.T) {
 
 func TestManager_SearchKeywordBM25_WithDB(t *testing.T) {
 	db := newSearchTestDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 	sourceLoader, err := NewAutoSkillLoader(WithAutoLoad_FileSystem(buildNestedTestVFS()))
 	if err != nil {
 		t.Fatalf("failed to create autoloader: %v", err)
@@ -137,7 +139,7 @@ func TestManager_GetCurrentSelectedSkills(t *testing.T) {
 
 func TestManager_DoesNotPersistSkillsOnInit(t *testing.T) {
 	db := newSearchTestDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 	loader, err := NewAutoSkillLoader(WithAutoLoad_FileSystem(buildNestedTestVFS()))
 	if err != nil {
 		t.Fatalf("failed to create autoloader: %v", err)
@@ -151,7 +153,7 @@ func TestManager_DoesNotPersistSkillsOnInit(t *testing.T) {
 
 func TestManager_DBLoaderIsLazy(t *testing.T) {
 	db := newSearchTestDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	sourceLoader, err := NewAutoSkillLoader(WithAutoLoad_FileSystem(buildNestedTestVFS()))
 	if err != nil {

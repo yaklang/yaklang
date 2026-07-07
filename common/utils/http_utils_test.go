@@ -4,16 +4,17 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	pp "github.com/davecgh/go-spew/spew"
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
+	pp "github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func TestMarshalHTTPRequest(t *testing.T) {

@@ -634,9 +634,9 @@ func TestReAct_ToolUse_WithNoToolsCache(t *testing.T) {
 			rsp := i.NewAIResponse()
 			// Return satisfied only if tool execution succeeded
 			if toolExecutionSucceeded.IsSet() {
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "tool executed successfully"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "tool executed successfully"}`))
 			} else {
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "tool execution failed, need to retry"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "tool execution failed, need to retry"}`))
 			}
 			rsp.Close()
 			return rsp, nil

@@ -1,9 +1,9 @@
 package schema
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"gorm.io/gorm"
 )
 
 type MenuItem struct {
@@ -12,7 +12,7 @@ type MenuItem struct {
 	Group         string `json:"group" `
 	Verbose       string `json:"verbose"`
 	YakScriptName string `json:"yak_script_name"`
-	Hash          string `json:"-" gorm:"unique_index"`
+	Hash          string `json:"-" gorm:"uniqueIndex"`
 
 	// quoted json
 	BatchPluginFilterJson string `json:"batch_plugin_filter_json"`

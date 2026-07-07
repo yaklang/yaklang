@@ -2,8 +2,9 @@ package promptui
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/aireactdeps/promptui/screenbuf"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/aireactdeps/promptui/screenbuf"
 )
 
 func TestSelectTemplateRender(t *testing.T) {

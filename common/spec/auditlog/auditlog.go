@@ -1,7 +1,7 @@
 package auditlog
 
 import (
-	"github.com/jinzhu/gorm/dialects/postgres"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type Level string
@@ -82,22 +82,22 @@ type AuditLog struct {
 	SrcPort int    `json:"src_port"`
 
 	// http
-	HttpMethod          string         `json:"http_method"`
-	HttpResponseCode    int            `json:"http_response_code"`
-	HttpContentType     string         `json:"http_content_type"`
-	HttpContentLength   int            `json:"http_content_length"`
-	HttpClientUserAgent string         `json:"http_client_user_agent"`
-	HttpHost            string         `json:"http_host"`
-	HttpRequestBody     postgres.Jsonb `json:"http_request_body" `
+	HttpMethod          string      `json:"http_method"`
+	HttpResponseCode    int         `json:"http_response_code"`
+	HttpContentType     string      `json:"http_content_type"`
+	HttpContentLength   int         `json:"http_content_length"`
+	HttpClientUserAgent string      `json:"http_client_user_agent"`
+	HttpHost            string      `json:"http_host"`
+	HttpRequestBody     utils.JSONB `json:"http_request_body" `
 
 	// 日志的内容
 	//Content map[string]interface{} `json:"content" gorm:"type: jsonb"`
-	Content postgres.Jsonb `json:"content"  `
+	Content utils.JSONB `json:"content"  `
 
 	// 这个 ExtraData 代表的是从日志内容中取出的日志内容
 	// 假如 content 包含着身份证、手机号等信息，被正则捕获或者分析，提取的数据会结构化后放入 ExtraData 中
 	// 或者 JSON 如果被提取出来，也会被提取，放入 extra data 中
-	ExtraData postgres.Jsonb `json:"extra" `
+	ExtraData utils.JSONB `json:"extra" `
 	//sso登陆返回的token
 	BetaUserToken string `json:"beta_user_token" `
 	DeptPath      string `json:"dept_path"` //部门路径

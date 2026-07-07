@@ -60,10 +60,10 @@ func TestBuildOptionsFromConfig_EnableThinkingOptOverridesEnableThinking(t *test
 	config := &ypb.AIModelConfig{
 		ModelName: "doubao-pro",
 		Provider: &ypb.ThirdPartyApplicationConfig{
-			Type:               "openai",
-			APIKey:             "test-key",
-			EnableThinking:     true,
-			EnableThinkingOpt:  &disabled,
+			Type:              "openai",
+			APIKey:            "test-key",
+			EnableThinking:    true,
+			EnableThinkingOpt: &disabled,
 		},
 	}
 	resolved := &AIConfig{}
@@ -102,14 +102,14 @@ func TestBuildOptionsFromConfig_AppliesModelSamplingParams(t *testing.T) {
 	config := &ypb.AIModelConfig{
 		ModelName: "gpt-4o",
 		Provider: &ypb.ThirdPartyApplicationConfig{
-			Type:               "openai",
-			APIKey:             "test-key",
-			MaxTokens:          &maxT,
-			Temperature:        &temp,
-			TopP:               &topP,
-			TopK:               &topK,
-			FrequencyPenalty:   &freq,
-			ReasoningEffort:    &reason,
+			Type:             "openai",
+			APIKey:           "test-key",
+			MaxTokens:        &maxT,
+			Temperature:      &temp,
+			TopP:             &topP,
+			TopK:             &topK,
+			FrequencyPenalty: &freq,
+			ReasoningEffort:  &reason,
 		},
 	}
 

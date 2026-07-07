@@ -99,12 +99,12 @@ func (m *yakRunnerModifyMock) callback(t *testing.T, i aicommon.AICallerConfigIf
 }
 
 type yakRunnerScenarioResult struct {
-	timeline         string
-	taskFailed       bool
-	taskCompleted    bool
-	codeChangeEvents []*ypb.AIOutputEvent
+	timeline          string
+	taskFailed        bool
+	taskCompleted     bool
+	codeChangeEvents  []*ypb.AIOutputEvent
 	pinFilenameEvents []*ypb.AIOutputEvent
-	modifyAttempts   int
+	modifyAttempts    int
 }
 
 type yakRunnerAICallback func(t *testing.T, i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error)

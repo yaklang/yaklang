@@ -3,16 +3,16 @@ package schema
 import (
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 type AIForge struct {
 	gorm.Model
 
 	ForgeVerboseName   string
-	ForgeName          string `gorm:"unique_index"`
+	ForgeName          string `gorm:"uniqueIndex"`
 	ForgeContent       string
 	ForgeType          string // "yak" or "json"
 	ParamsUIConfig     string

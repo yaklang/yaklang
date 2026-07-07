@@ -18,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -701,7 +702,7 @@ func TestFocusMode_SemanticSearchYaklangSamples_BasicSearch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temporary RAG DB: %v", err)
 	}
-	defer tempDb.Close()
+	defer consts.CloseGormDB(tempDb)
 	ragSystem, err := rag.Get("yaklang_aikb", rag.WithDB(tempDb), rag.WithImportFile(tempFile.Name()), rag.WithEmbeddingClient(vectorstore.NewDefaultMockEmbedding()))
 	if err != nil {
 		t.Fatalf("Failed to get RAG system: %v", err)

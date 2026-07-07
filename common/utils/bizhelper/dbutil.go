@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 var (
@@ -22,7 +22,7 @@ var (
 )
 
 func createTempTestDatabase() (*gorm.DB, error) {
-	db, err := gorm.Open("sqlite3", "file::memory:?cache=shared")
+	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
@@ -989,14 +989,14 @@ func FuzzQueryPostgresStringArray(
 		return db
 	}
 
-	subQuery := db.Table(tableName).Select(
-		fmt.Sprintf("unnest(%v) as fuzzquery", subQueryField),
-	).QueryExpr()
+	subQuery := db.ToSQL(func(tx *gorm.DB) *gorm.DB {
+		return tx.Table(tableName).Select(fmt.Sprintf("unnest(%v) as fuzzquery", subQueryField))
+	})
 
-	items = append([]interface{}{subQuery}, items...)
 	db = db.Joins(
 		fmt.Sprintf(
-			"JOIN (?) as t on ((%v) and (%v.%v && ARRAY[fuzzquery]::%v))",
+			"JOIN (%s) as t on ((%v) and (%v.%v && ARRAY[fuzzquery]::%v))",
+			subQuery,
 			strings.Join(conds, " OR "),
 			tableName, subQueryField, subQueryFieldArrayType,
 		), items...,
@@ -1051,7 +1051,7 @@ func MergeOrGormWhereBlocks(blocks []*GormWhereBlock) *GormWhereBlock {
 }
 
 func QueryCount(db *gorm.DB, m interface{}, items *GormWhereBlock) int {
-	var count int
+	var count int64
 	if m != nil {
 		db = db.Model(m)
 	}
@@ -1063,7 +1063,7 @@ func QueryCount(db *gorm.DB, m interface{}, items *GormWhereBlock) int {
 		log.Errorf("query count failed: %s", db.Error)
 		return 0
 	}
-	return count
+	return int(count)
 }
 
 func QueryByJsonKey(db *gorm.DB, field string, filter map[string]interface{}) *gorm.DB {
@@ -1309,7 +1309,7 @@ func YakitPagingQuery(db *gorm.DB, p *ypb.Paging, data any) (*Paginator, *gorm.D
 		}, data)
 	}
 
-	var count int
+	var count int64
 	if db.Model(data).Count(&count); db.Error != nil { // get total count
 		log.Errorf("query count failed: %s", db.Error)
 	}
@@ -1320,11 +1320,11 @@ func YakitPagingQuery(db *gorm.DB, p *ypb.Paging, data any) (*Paginator, *gorm.D
 	var paginator = &Paginator{}
 	if p.Limit == -1 {
 		db.Find(data)
-		paginator.Limit = count
+		paginator.Limit = int(count)
 	} else {
-		db.Limit(p.Limit).Find(data)
+		db.Limit(int(p.Limit)).Find(data)
 	}
-	paginator.TotalRecord = count
+	paginator.TotalRecord = int(count)
 	paginator.Records = data
 	return paginator, db
 }

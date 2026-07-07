@@ -14,7 +14,7 @@ import (
 func TestDeleteAISession_DeletesRuntimeAndEvents(t *testing.T) {
 	projectDB, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, projectDB.AutoMigrate(&schema.AISession{}, &schema.AIAgentRuntime{}, &schema.AiCheckpoint{}, &schema.AiOutputEvent{}, &schema.AiProcessAndAiEvent{}).Error)
+	require.NoError(t, projectDB.AutoMigrate(&schema.AISession{}, &schema.AIAgentRuntime{}, &schema.AiCheckpoint{}, &schema.AiOutputEvent{}, &schema.AiProcessAndAiEvent{}))
 
 	sessionA := "sess-" + uuid.NewString()
 	sessionB := "sess-" + uuid.NewString()
@@ -95,7 +95,7 @@ func TestDeleteAllAISessionData(t *testing.T) {
 		&schema.AiOutputEvent{},
 		&schema.AiProcessAndAiEvent{},
 		&schema.AISessionPlanAndExec{},
-	).Error)
+	))
 
 	sessionA := "sess-" + uuid.NewString()
 	sessionB := "sess-" + uuid.NewString()
@@ -176,7 +176,7 @@ func TestDeleteAllAISessionData(t *testing.T) {
 func TestQueryAISessionIDsForDelete_ByAfterTimestamp(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	sessionOld := "sess-old-" + uuid.NewString()
 	sessionNew := "sess-new-" + uuid.NewString()
@@ -201,7 +201,7 @@ func TestQueryAISessionIDsForDelete_ByAfterTimestamp(t *testing.T) {
 func TestQueryAISessionIDsForDelete_ByBeforeTimestamp(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	sessionOld := "sess-before-old-" + uuid.NewString()
 	sessionNew := "sess-before-new-" + uuid.NewString()
@@ -226,7 +226,7 @@ func TestQueryAISessionIDsForDelete_ByBeforeTimestamp(t *testing.T) {
 func TestQueryAISessionIDsForDelete_ByTimestampRange(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	sessionOld := "sess-range-old-" + uuid.NewString()
 	sessionMid := "sess-range-mid-" + uuid.NewString()
@@ -254,7 +254,7 @@ func TestQueryAISessionIDsForDelete_ByTimestampRange(t *testing.T) {
 func TestQueryAISessionIDsForDelete_DeleteAll(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	sessionA := "sess-a-" + uuid.NewString()
 	sessionB := "sess-b-" + uuid.NewString()
@@ -273,7 +273,7 @@ func TestQueryAISessionIDsForDelete_DeleteAll(t *testing.T) {
 func TestQueryAISessionIDsForDelete_BySource(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	sIde := "sess-ide-" + uuid.NewString()
 	sCli := "sess-cli-" + uuid.NewString()
@@ -309,7 +309,7 @@ func TestQueryAISessionIDsForDelete_BySource(t *testing.T) {
 func TestQueryAISessionMetaPaging_ByEmptySource(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	sEmpty := "sess-empty-" + uuid.NewString()
 	sAi := "sess-ai-" + uuid.NewString()
@@ -351,7 +351,7 @@ func TestQueryAISessionMetaPaging_ByEmptySource(t *testing.T) {
 func TestQueryAISessionMetaPaging_ByNullSource(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	sNull := "sess-null-" + uuid.NewString()
 	sAi := "sess-ai-" + uuid.NewString()
@@ -390,7 +390,7 @@ func TestQueryAISessionMetaPaging_ByNullSource(t *testing.T) {
 func TestQueryAllAISessionMetaOrderByUpdated(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	sessionOld := "sess-order-old-" + uuid.NewString()
 	sessionNew := "sess-order-new-" + uuid.NewString()

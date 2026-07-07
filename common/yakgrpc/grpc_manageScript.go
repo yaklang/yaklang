@@ -18,7 +18,6 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/copier"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata/genmetadata"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
@@ -32,6 +31,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 var nucleiLoaderCD = utils.NewCoolDown(10 * time.Second)
@@ -1158,7 +1158,7 @@ func (s *Server) ExportLocalYakScriptStream(req *ypb.ExportLocalYakScriptRequest
 	var (
 		progress                 float64
 		count                    int
-		total                    int
+		total                    int64
 		message                  string
 		errorCount, successCount int
 	)
@@ -1235,7 +1235,7 @@ func (s *Server) SetYakScriptSkipUpdate(ctx context.Context, req *ypb.SetYakScri
 
 func (s *Server) QueryYakScriptSkipUpdate(ctx context.Context, req *ypb.QueryYakScriptRequest) (*ypb.QueryYakScriptSkipUpdateResponse, error) {
 	var (
-		total      int
+		total      int64
 		skipUpdate = true
 	)
 	db := s.GetProfileDatabase().Model(&schema.YakScript{})

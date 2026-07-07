@@ -9,10 +9,10 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
 	"github.com/kataras/pio"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 type Risk struct {

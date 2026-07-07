@@ -10,19 +10,21 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/embed/testdata"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func newTestForgeDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
 	schema.AutoMigrate(db, schema.KEY_SCHEMA_PROFILE_DATABASE)
 	return db
@@ -61,7 +63,7 @@ func assertToolFields(t *testing.T, expected *schema.AIYakTool, actual *schema.A
 
 func TestExportImportYakForge_AllFieldsAndProgress(t *testing.T) {
 	db := newTestForgeDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	forge := &schema.AIForge{
 		ForgeName:          "yak-" + t.Name(),
@@ -116,7 +118,7 @@ func TestExportImportYakForge_AllFieldsAndProgress(t *testing.T) {
 
 func TestExportImportConfigForge_WithRenameAndOverwrite(t *testing.T) {
 	db := newTestForgeDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	forge := &schema.AIForge{
 		ForgeName:          "config-" + t.Name(),
@@ -168,7 +170,7 @@ func TestExportImportConfigForge_WithRenameAndOverwrite(t *testing.T) {
 
 func TestExportImportMultipleForges_WithDBValidation(t *testing.T) {
 	db := newTestForgeDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	yakForge := &schema.AIForge{
 		ForgeName:        "yak-" + t.Name(),
@@ -211,7 +213,7 @@ func TestExportImportMultipleForges_WithDBValidation(t *testing.T) {
 
 func TestExportImportForgeWithTools(t *testing.T) {
 	db := newTestForgeDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	forge := &schema.AIForge{
 		ForgeName:    "forge-with-tool-" + t.Name(),
@@ -287,7 +289,7 @@ func TestLoadSkillForgeFromEmbeddedZip(t *testing.T) {
 	require.Equal(t, "renamed-skill", renamed.AIForges[0].ForgeName)
 
 	db := newTestForgeDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	imported, err := ImportAIForgesFromZip(db, zipPath, WithImportOverwrite(true))
 	require.NoError(t, err)
@@ -354,7 +356,7 @@ Skill body from directory.
 	require.Equal(t, "print('dir')\n", string(helper))
 
 	db := newTestForgeDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	imported, err := ImportAIForgesFromZip(db, root, WithImportOverwrite(true))
 	require.NoError(t, err)
@@ -428,7 +430,7 @@ Skill body from tar archive.
 			require.Equal(t, "Skill body from tar archive.", loadedSkill.InitPrompt)
 
 			db := newTestForgeDB(t)
-			defer db.Close()
+			defer consts.CloseGormDB(db)
 
 			imported, err := ImportAIForgesFromZip(db, archivePath, WithImportOverwrite(true))
 			require.NoError(t, err)

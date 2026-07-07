@@ -1,10 +1,11 @@
 package excelparser
 
 import (
-	"github.com/xuri/excelize/v2"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/xuri/excelize/v2"
 )
 
 func TestExcelWriter(t *testing.T) {

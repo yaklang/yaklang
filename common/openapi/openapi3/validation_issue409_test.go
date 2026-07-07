@@ -1,8 +1,9 @@
 package openapi3_test
 
 import (
-	"github.com/yaklang/yaklang/common/openapi/openapi3"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/openapi/openapi3"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

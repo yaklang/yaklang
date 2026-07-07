@@ -1,8 +1,8 @@
 package schema
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 	"regexp"
 	"sort"
 	"strings"
@@ -13,7 +13,7 @@ type RssFeed struct {
 	gorm.Model
 
 	SourceXmlUrl    string
-	Hash            string     `gorm:"columns:hash;unique_index"`
+	Hash            string     `gorm:"column:hash;uniqueIndex"`
 	Title           string     `json:"title,omitempty"`
 	Description     string     `json:"description,omitempty"`
 	Link            string     `json:"link,omitempty"`

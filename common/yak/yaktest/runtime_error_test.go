@@ -1,10 +1,11 @@
 package yaktest
 
 import (
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
 	"os"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )

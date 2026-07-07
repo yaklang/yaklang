@@ -14,12 +14,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/utils"
+	_ "gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 type HTTPFlow struct {
@@ -27,7 +28,7 @@ type HTTPFlow struct {
 
 	HiddenIndex        string `gorm:"index" json:"hidden_index,omitempty"`
 	NoFixContentLength bool   `json:"no_fix_content_length" json:"no_fix_content_length,omitempty"`
-	Hash               string `gorm:"unique_index" json:"unique_index,omitempty"`
+	Hash               string `gorm:"uniqueIndex" json:"uniqueIndex,omitempty"`
 	IsHTTPS            bool   `json:"is_https,omitempty"`
 	Url                string `gorm:"index" json:"url,omitempty"`
 	Path               string `json:"path,omitempty"`
@@ -82,7 +83,7 @@ func TestExportAndImport(t *testing.T) {
 	// db := consts.GetGormProjectDatabase().Model(&HTTPFlow{})
 	db, err := createTempTestDatabase()
 	require.NoError(t, err)
-	db = db.AutoMigrate(&HTTPFlow{})
+	require.NoError(t, db.AutoMigrate(&HTTPFlow{}))
 	times := 5
 	flows := make([]*HTTPFlow, 0, times)
 	for i := 0; i < times; i++ {
@@ -313,7 +314,7 @@ type TestData struct {
 func TestZipIsValid(t *testing.T) {
 	db, err := createTempTestDatabase()
 	require.NoError(t, err)
-	db = db.AutoMigrate(&TestData{})
+	require.NoError(t, db.AutoMigrate(&TestData{}))
 	times := 5
 	for i := 0; i < times; i++ {
 		flow := &TestData{
@@ -343,10 +344,10 @@ func TestExportTableZipWithMarshalFunc(t *testing.T) {
 	// 创建临时数据库
 	db, err := createTempTestDatabase()
 	require.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 创建表
-	err = db.AutoMigrate(&TestModel{}).Error
+	err = db.AutoMigrate(&TestModel{})
 	require.NoError(t, err)
 
 	// 插入测试数据
@@ -432,10 +433,10 @@ func TestExportTableZipWithMarshalFuncEncrypted(t *testing.T) {
 	// 创建临时数据库
 	db, err := createTempTestDatabase()
 	require.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 创建表
-	err = db.AutoMigrate(&TestModel{}).Error
+	err = db.AutoMigrate(&TestModel{})
 	require.NoError(t, err)
 
 	// 插入测试数据

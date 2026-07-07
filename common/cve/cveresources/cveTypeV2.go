@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
+	"gorm.io/gorm"
 )
 
 // CVE 2.0 格式的根结构

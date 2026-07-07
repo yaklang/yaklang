@@ -2,10 +2,10 @@ package yakit
 
 import (
 	"context"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"gorm.io/gorm"
 	"strings"
 )
 
@@ -38,7 +38,7 @@ var defaultVectorStoreDocumentFTS5 = &bizhelper.SQLiteFTS5Config{
 //			return
 //		}
 //		baseTable := (&schema.VectorStoreDocument{}).TableName()
-//		if !db.HasTable(baseTable) {
+//		if !db.Migrator().HasTable(baseTable) {
 //			// Base table is gone, but the FTS virtual table may remain; clean it up.
 //			if err := bizhelper.SQLiteFTS5Drop(db, defaultVectorStoreDocumentFTS5); err != nil {
 //				log.Warnf("failed to drop orphan %s fts5 index: %v", baseTable, err)
@@ -88,7 +88,7 @@ func SearchVectorStoreDocumentBM25(db *gorm.DB, filter *VectorDocumentFilter, li
 			maxLen = len(m)
 		}
 	}
-	if maxLen < 3 || !schema.IsSQLite(db) || !db.HasTable(defaultVectorStoreDocumentFTS5.FTSTable) {
+	if maxLen < 3 || !schema.IsSQLite(db) || !db.Migrator().HasTable(defaultVectorStoreDocumentFTS5.FTSTable) {
 		if err := FilterVectorDocuments(db, filter).Limit(limit).Offset(offset).Find(&res).Error; err != nil {
 			return nil, err
 		}
@@ -118,7 +118,7 @@ func SearchVectorStoreDocumentBM25Yield(ctx context.Context, db *gorm.DB, filter
 			maxLen = len(m)
 		}
 	}
-	if maxLen < 3 || !schema.IsSQLite(db) || !db.HasTable(defaultVectorStoreDocumentFTS5.FTSTable) {
+	if maxLen < 3 || !schema.IsSQLite(db) || !db.Migrator().HasTable(defaultVectorStoreDocumentFTS5.FTSTable) {
 		return YieldVectorDocument(ctx, db, filter, options...)
 	}
 	filter.Keywords = nil // if use FTS5, clear keywords in filter to avoid double filtering

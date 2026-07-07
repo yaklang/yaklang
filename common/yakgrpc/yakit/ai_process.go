@@ -1,8 +1,8 @@
 package yakit
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
+	"gorm.io/gorm"
 )
 
 func CreateAIProcess(db *gorm.DB, process *schema.AiProcess) error {

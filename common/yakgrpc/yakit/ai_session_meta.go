@@ -2,10 +2,10 @@ package yakit
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+	"gorm.io/gorm"
 )
 
 const aiSessionMetaMigrationKey = "yakit.ai_session_meta.migrated.v1"
@@ -605,7 +606,7 @@ func AppendAISessionMetaRelatedRuntimeID(db *gorm.DB, sessionID, runtimeID strin
 
 	var meta schema.AISession
 	if err := db.Model(&schema.AISession{}).Where("session_id = ?", sessionID).First(&meta).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil
 		}
 		return err

@@ -3,10 +3,11 @@ package openapi2_test
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/openapi/openapi2"
-	"github.com/yaklang/yaklang/common/openapi/openapiyaml"
 	"os"
 	"reflect"
+
+	"github.com/yaklang/yaklang/common/openapi/openapi2"
+	"github.com/yaklang/yaklang/common/openapi/openapiyaml"
 )
 
 func Example() {

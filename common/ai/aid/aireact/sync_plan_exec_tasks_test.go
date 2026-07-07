@@ -25,7 +25,7 @@ func TestReAct_SyncPlanExecTasks(t *testing.T) {
 
 	sessionID := uuid.NewString()
 	db := consts.GetGormProjectDatabase()
-	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}))
 	t.Cleanup(func() {
 		_ = yakit.DeleteAISessionPlanAndExecBySessionID(db, sessionID)
 	})

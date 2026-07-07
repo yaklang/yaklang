@@ -2,9 +2,10 @@ package xml2
 
 import (
 	"encoding/xml"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
-	"testing"
 )
 
 const code = `<?xml version="1.0" encoding="UTF-8" ?>

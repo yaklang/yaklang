@@ -3,7 +3,7 @@ package yakit
 import (
 	"strings"
 
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 )
 
 func isMissingTableErr(err error) bool {

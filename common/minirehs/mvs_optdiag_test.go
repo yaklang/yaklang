@@ -353,9 +353,9 @@ func TestMVSANDGatePotential(t *testing.T) {
 		curScanBytes, andScanBytes, 100*float64(curScanBytes-andScanBytes)/float64(curScanBytes))
 
 	type pr struct {
-		idx        int
-		cur, and   int64
-		nfactors   int
+		idx      int
+		cur, and int64
+		nfactors int
 	}
 	var prs []pr
 	for i := 0; i < d.n; i++ {
@@ -481,9 +481,9 @@ func TestMVSAnchoredPotential(t *testing.T) {
 		winHi := make(map[int]int)
 		// 锚定单趟: 每个 idx 维护一个注入位 bool[]、minInject/maxInject、scanEnd(=union hi).
 		type ainfo struct {
-			inject             []bool
+			inject              []bool
 			minInj, maxInj, end int
-			has                bool
+			has                 bool
 		}
 		anc := map[int]*ainfo{}
 		for _, h := range hits {

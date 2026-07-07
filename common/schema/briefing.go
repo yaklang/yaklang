@@ -1,7 +1,7 @@
 package schema
 
 import (
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 	"time"
 )
 
@@ -10,7 +10,7 @@ type Briefing struct {
 
 	SourceXmlUrl    string
 	RssFeedHash     string
-	Hash            string     `gorm:"columns:hash;unique_index"`
+	Hash            string     `gorm:"column:hash;uniqueIndex"`
 	Title           string     `json:"title,omitempty"`
 	Description     string     `json:"description,omitempty"`
 	Content         string     `json:"content,omitempty"`

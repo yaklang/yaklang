@@ -4,18 +4,20 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func TestSearchAIYakToolBM25_SQLiteFTS5(t *testing.T) {
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
+	t.Cleanup(func() { _ = consts.CloseGormDB(db) })
 
-	require.NoError(t, db.AutoMigrate(&schema.AIYakTool{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AIYakTool{}))
 
 	if err := EnsureAIYakToolFTS5(db); err != nil {
 		if strings.Contains(err.Error(), "no such module: fts5") {
@@ -48,11 +50,11 @@ func TestSearchAIYakToolBM25_SQLiteFTS5(t *testing.T) {
 }
 
 func TestSearchAIYakToolBM25_ChineseScenarioQuery(t *testing.T) {
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
+	t.Cleanup(func() { _ = consts.CloseGormDB(db) })
 
-	require.NoError(t, db.AutoMigrate(&schema.AIYakTool{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AIYakTool{}))
 
 	if err := EnsureAIYakToolFTS5(db); err != nil {
 		if strings.Contains(err.Error(), "no such module: fts5") {

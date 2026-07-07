@@ -1,9 +1,10 @@
 package yakgrpc
 
 import (
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
 )
 
 func TestExecExtractData(t *testing.T) {

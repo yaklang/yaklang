@@ -21,10 +21,10 @@ type timelineCapturingInvoker struct {
 	mu      sync.Mutex
 	entries []timelineEntry
 
-	verifyEntry  chan struct{}
+	verifyEntry   chan struct{}
 	verifyRelease chan struct{}
-	verifyCalls  atomic.Int64
-	customResult *aicommon.VerifySatisfactionResult
+	verifyCalls   atomic.Int64
+	customResult  *aicommon.VerifySatisfactionResult
 }
 
 type timelineEntry struct {

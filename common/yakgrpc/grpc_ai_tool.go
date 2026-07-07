@@ -147,7 +147,7 @@ func (s *Server) SaveAIToolV2(ctx context.Context, req *ypb.SaveAIToolRequest) (
 		if isAIToolNameUniqueConflict(err) {
 			var existing schema.AIYakTool
 			if err := db.Unscoped().Where("name = ?", tool.Name).First(&existing).Error; err == nil {
-				if existing.DeletedAt != nil && !existing.DeletedAt.IsZero() {
+				if existing.DeletedAt.Valid {
 					if _, delErr := yakit.DeleteAIYakTools(db, tool.Name); delErr != nil {
 						return nil, utils.Errorf("failed to delete soft-deleted AI tool: %s", delErr)
 					}

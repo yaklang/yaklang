@@ -3,15 +3,16 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"gorm.io/gorm"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/utils/chanx"
@@ -173,7 +174,7 @@ func resolveAISessionStartParams(db *gorm.DB, sessionID string, request *ypb.AIS
 	}
 
 	if _, err := yakit.GetAISessionMetaBySessionID(db, sessionID); err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return request, nil
 		}
 		return nil, err

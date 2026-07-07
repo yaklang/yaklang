@@ -2,9 +2,9 @@ package schema
 
 import (
 	"encoding/json"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 	"strconv"
 	"sync"
 )
@@ -16,7 +16,7 @@ var (
 type NaslScript struct {
 	gorm.Model
 	OriginFileName  string `json:"origin_file_name"`
-	Hash            string `json:"hash" gorm:"unique_index"`
+	Hash            string `json:"hash" gorm:"uniqueIndex"`
 	OID             string `json:"oid"`
 	CVE             string `json:"cve"`
 	ScriptName      string `json:"script_name"`

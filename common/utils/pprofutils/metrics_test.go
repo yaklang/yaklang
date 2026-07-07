@@ -2,13 +2,14 @@ package pprofutils
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"math"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 func TestBasicMetrics(t *testing.T) {

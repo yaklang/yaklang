@@ -1,9 +1,10 @@
 package yaktest
 
 import (
+	"testing"
+
 	"github.com/yaklang/yaklang/common/yak"
 	_ "github.com/yaklang/yaklang/common/yakgrpc"
-	"testing"
 )
 
 func TestSpaceEngine(t *testing.T) {

@@ -3,9 +3,10 @@ package vpnbrute
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/vpnbrute/ppp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"testing"
 )
 
 func TestPPTPAuth(t *testing.T) {

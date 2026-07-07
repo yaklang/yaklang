@@ -1,8 +1,9 @@
 package ssa_test
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestCallPhiReplace(t *testing.T) {

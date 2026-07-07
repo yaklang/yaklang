@@ -4,22 +4,24 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 // newMCPSyncTestDB opens an in-memory SQLite database and migrates the
 // MCPServerToolConfig table. Each test gets its own isolated DB instance.
 func newMCPSyncTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
-	require.NoError(t, db.AutoMigrate(&schema.MCPServerToolConfig{}).Error)
+	t.Cleanup(func() { _ = consts.CloseGormDB(db) })
+	require.NoError(t, db.AutoMigrate(&schema.MCPServerToolConfig{}))
 	return db
 }
 
@@ -108,7 +110,7 @@ func TestMUSTPASS_SyncAndCache_RemovedToolIsHardDeleted(t *testing.T) {
 	assert.Equal(t, "keep", rows[0].ToolName)
 
 	// Confirm the row is also absent from an Unscoped query (no soft-delete remnant).
-	var count int
+	var count int64
 	require.NoError(t, db.Unscoped().Model(&schema.MCPServerToolConfig{}).
 		Where("server_name = ? AND tool_name = ?", srv, "gone").
 		Count(&count).Error)
@@ -182,7 +184,7 @@ func TestMUSTPASS_SyncAndCache_ToolRename(t *testing.T) {
 	assert.Equal(t, "find_file", rows[0].ToolName)
 
 	// Old row must be fully gone.
-	var count int
+	var count int64
 	require.NoError(t, db.Unscoped().Model(&schema.MCPServerToolConfig{}).
 		Where("server_name = ? AND tool_name = ?", srv, "search_file").
 		Count(&count).Error)

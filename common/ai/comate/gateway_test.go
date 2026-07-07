@@ -1,10 +1,11 @@
 package comate
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"os"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestComateDemo(t *testing.T) {

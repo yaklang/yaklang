@@ -1,10 +1,11 @@
 package dnslogbrokers
 
 import (
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
-	"testing"
 )
 
 func TestDIGPM1(t *testing.T) {

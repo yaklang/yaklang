@@ -1,11 +1,12 @@
 package yakit
 
 import (
+	"errors"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 func CreateOrUpdateAISessionPlanAndExec(db *gorm.DB, record *schema.AISessionPlanAndExec) error {
@@ -24,7 +25,7 @@ func CreateOrUpdateAISessionPlanAndExec(db *gorm.DB, record *schema.AISessionPla
 
 	var existing schema.AISessionPlanAndExec
 	if err := db.Where("coordinator_id = ?", record.CoordinatorID).First(&existing).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return db.Create(record).Error
 		}
 		return err
@@ -75,7 +76,7 @@ func GetAISessionPlanAndExecByCoordinatorID(db *gorm.DB, coordinatorID string) (
 	}
 	var record schema.AISessionPlanAndExec
 	if err := db.Where("coordinator_id = ?", coordinatorID).First(&record).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) || strings.Contains(err.Error(), "no such table") || strings.Contains(err.Error(), "doesn't exist") {
+		if errors.Is(err, gorm.ErrRecordNotFound) || strings.Contains(err.Error(), "no such table") || strings.Contains(err.Error(), "doesn't exist") {
 			return nil, nil
 		}
 		return nil, err

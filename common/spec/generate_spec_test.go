@@ -1,8 +1,9 @@
 package spec
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGeneratePalmRpcByYaml(t *testing.T) {

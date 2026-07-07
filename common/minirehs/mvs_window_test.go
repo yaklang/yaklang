@@ -18,17 +18,17 @@ import (
 // 锚点 (^/$)、有界重复、alternation。
 var adversarialWindowCases = []string{
 	`eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9._-]{10,}`, // JWT: 字面量 eyJ 后有必需 "." -> tail 必须无界
-	`token=\w+`,             // 尾随无界 -> tail 无界, head 有界
-	`foo\w+bar`,             // 两字面量间无界 -> 触发 foo 后 tail 无界
-	`\.oss\.aliyuncs\.com`,  // 纯字面量尾, 前导无界靠 prefilter
+	`token=\w+`,                   // 尾随无界 -> tail 无界, head 有界
+	`foo\w+bar`,                   // 两字面量间无界 -> 触发 foo 后 tail 无界
+	`\.oss\.aliyuncs\.com`,        // 纯字面量尾, 前导无界靠 prefilter
 	`[\w-.]+\.oss\.aliyuncs\.com`, // 前导无界 + 字面量
 	`jdbc:[a-z:]+://[a-z0-9\.\-_:;=/@?,&]+`,
 	`(jsonp_[a-z0-9]+)|((_?callback|_cb)=)`,
-	`abc[0-9]{2,4}xyz`,      // 有界重复, 两端字面量
+	`abc[0-9]{2,4}xyz`, // 有界重复, 两端字面量
 	`(?i)password['"]?\s*[:=]`,
-	`prefix.*suffix`,        // 中缀 .* -> 两字面量都必需, 触发任一都需整段
+	`prefix.*suffix`, // 中缀 .* -> 两字面量都必需, 触发任一都需整段
 	`GET\s+\S+\.action`,
-	`a{3,}b`,                // 无界下界重复 + 必需 b -> 触发 a-literal? (无 a 字面量, b 才是)
+	`a{3,}b`, // 无界下界重复 + 必需 b -> 触发 a-literal? (无 a 字面量, b 才是)
 }
 
 func TestMVSWindowSoundnessAdversarial(t *testing.T) {
@@ -135,4 +135,3 @@ func randAlnum(rng *rand.Rand, n int) string {
 	}
 	return string(b)
 }
-

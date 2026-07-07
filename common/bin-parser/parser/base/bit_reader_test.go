@@ -2,9 +2,10 @@ package base
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBitReader(t *testing.T) {

@@ -6,13 +6,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/localmodel"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 // ChunkText 将长文本分割成多个小块，以便于处理和嵌入
@@ -216,7 +217,7 @@ func CheckConfigEmbeddingAvailable(opts ...RAGSystemConfigOption) bool {
 // db = rag.NewRagDatabase("/tmp/my-rag.db")~
 // ```
 func NewVectorStoreDatabase(path string) (*gorm.DB, error) {
-	db, err := gorm.Open("sqlite3", path)
+	db, err := gorm.Open(sqlite.Open(path), &gorm.Config{})
 	if err != nil {
 		return db, err
 	}
@@ -253,7 +254,7 @@ func autoMigrateRAGSystem(db *gorm.DB) error {
 
 		&schema.VectorStoreDocument{},
 		&schema.VectorStoreCollection{},
-	).Error
+	)
 }
 
 // MockAIService 创建一个 Mock AI 响应 目前仅供项目内部测试脚本使用。
@@ -266,9 +267,11 @@ func autoMigrateRAGSystem(db *gorm.DB) error {
 //
 // Example:
 // ```
-// cb = ai.MockAIService(func(msg) {
-//     return "mocked response for: " + msg
-// })
+//
+//	cb = ai.MockAIService(func(msg) {
+//	    return "mocked response for: " + msg
+//	})
+//
 // assert cb != nil, "MockAIService should return a non-nil callback"
 // println("ai.MockAIService created callback successfully")
 // ```

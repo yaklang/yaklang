@@ -2,9 +2,10 @@ package webextractor
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
-	"testing"
 )
 
 func TestRodExtractor_ExtractFromURL(t *testing.T) {

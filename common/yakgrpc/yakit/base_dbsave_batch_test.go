@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func TestDrainDBSaveBatchCoalescesWhenIdle(t *testing.T) {

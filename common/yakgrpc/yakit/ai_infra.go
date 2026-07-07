@@ -2,12 +2,13 @@ package yakit
 
 import (
 	"context"
-	"github.com/jinzhu/gorm"
+	"errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 	"time"
 )
 
@@ -18,7 +19,7 @@ func CreateOrUpdateCheckpoint(db *gorm.DB, checkpoint *schema.AiCheckpoint) erro
 
 	var existingCheckpoint schema.AiCheckpoint
 	if err := db.Where("hash = ?", checkpoint.Hash).First(&existingCheckpoint).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return db.Create(checkpoint).Error
 		}
 		return err
@@ -79,7 +80,7 @@ func CreateOrUpdateAIAgentRuntime(db *gorm.DB, runtime *schema.AIAgentRuntime) (
 
 	var existingRuntime schema.AIAgentRuntime
 	if err := db.Where("uuid = ?", runtime.Uuid).First(&existingRuntime).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			err = db.Create(runtime).Error
 			return runtime.ID, err
 		}

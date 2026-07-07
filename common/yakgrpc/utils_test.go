@@ -2,10 +2,11 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type MITMTestConfig struct {

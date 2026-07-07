@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -12,9 +13,9 @@ import (
 func TestSearchVectorStoreDocumentBM25_SQLiteFTS5(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
+	t.Cleanup(func() { _ = consts.CloseGormDB(db) })
 
-	require.NoError(t, db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{}))
 
 	if err := EnsureVectorStoreDocumentFTS5(db); err != nil {
 		if strings.Contains(err.Error(), "no such module: fts5") {
@@ -22,7 +23,7 @@ func TestSearchVectorStoreDocumentBM25_SQLiteFTS5(t *testing.T) {
 		}
 		require.NoError(t, err)
 	}
-	if !db.HasTable(VectorDocumentVTableName()) {
+	if !db.Migrator().HasTable(VectorDocumentVTableName()) {
 		t.Skip("fts5 table not available")
 	}
 

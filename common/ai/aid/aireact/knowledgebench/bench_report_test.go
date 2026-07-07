@@ -315,7 +315,6 @@ func runWithLLMRerank(
 	return metrics
 }
 
-
 // --- Phase 5: Full Matrix Report ---
 
 // TestPhase5_GenerateFullReport reads all saved metrics and generates the combined report.

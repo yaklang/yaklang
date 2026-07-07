@@ -1,11 +1,12 @@
 package openapigen
 
 import (
+	"strings"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/openapi/openapi3"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"strings"
-	"testing"
 )
 
 func packetToPathItem(packet []byte, pathItems *omap.OrderedMap[string, *openapi3.PathItem]) *omap.OrderedMap[string, *openapi3.PathItem] {

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
+	"gorm.io/gorm"
 )
 
 // irIndexInsertColumns are the IrIndex application columns written by the

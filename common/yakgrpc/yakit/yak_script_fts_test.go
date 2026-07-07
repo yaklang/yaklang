@@ -5,18 +5,20 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func setupYakScriptFTSTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
-	require.NoError(t, db.AutoMigrate(&schema.YakScript{}).Error)
+	t.Cleanup(func() { _ = consts.CloseGormDB(db) })
+	require.NoError(t, db.AutoMigrate(&schema.YakScript{}))
 	return db
 }
 

@@ -5,6 +5,13 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
@@ -12,12 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
-	"os"
-	"path/filepath"
-	"sync"
-	"testing"
-	"time"
 )
 
 func TestDashscope_Search(t *testing.T) {

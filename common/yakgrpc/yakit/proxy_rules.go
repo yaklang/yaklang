@@ -1,16 +1,17 @@
 package yakit
 
 import (
+	"errors"
 	"net/url"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 func ensureProxyID(id string) string {
@@ -69,7 +70,7 @@ func GetGlobalProxyRulesConfig() (*ypb.GlobalProxyRulesConfig, error) {
 	cfg := &ypb.GlobalProxyRulesConfig{}
 
 	var endpoints []schema.ProxyEndpoint
-	if err := db.Find(&endpoints).Error; err != nil && !gorm.IsRecordNotFoundError(err) {
+	if err := db.Find(&endpoints).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
 	for _, endpoint := range endpoints {
@@ -77,7 +78,7 @@ func GetGlobalProxyRulesConfig() (*ypb.GlobalProxyRulesConfig, error) {
 	}
 
 	var routes []schema.ProxyRoute
-	if err := db.Find(&routes).Error; err != nil && !gorm.IsRecordNotFoundError(err) {
+	if err := db.Find(&routes).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
 	for _, route := range routes {

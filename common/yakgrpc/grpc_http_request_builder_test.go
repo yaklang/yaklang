@@ -3,11 +3,12 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"

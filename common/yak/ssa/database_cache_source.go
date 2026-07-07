@@ -5,10 +5,10 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"gorm.io/gorm"
 )
 
 func (p *Program) CreateEditor(raw []byte, filepath string, save ...bool) *memedit.MemEditor {

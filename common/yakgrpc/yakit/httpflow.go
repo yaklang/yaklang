@@ -11,7 +11,6 @@ import (
 	"time"
 
 	uuid "github.com/google/uuid"
-	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -23,6 +22,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 func init() {
@@ -1119,7 +1119,7 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 			subQuery.
 				Table("analyzed_http_flows").
 				Where("id IN (?)", params.GetAnalyzedIds()).
-				Select("http_flow_id").QueryExpr(),
+				Select("http_flow_id"),
 		)
 	}
 	if params.AfterBodyLength > 0 {
@@ -1140,32 +1140,32 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 
 func QuickSearchHTTPFlowCount(token string) int {
 	db := consts.GetGormProjectDatabase()
-	var count int
+	var count int64
 	db.Model(&schema.HTTPFlow{}).Where(
 		"(request like ?) OR (response like ?) OR (url like ?)",
 		"%"+token+"%",
 		"%"+token+"%",
 		"%"+token+"%",
 	).Count(&count)
-	return count
+	return int(count)
 }
 
 func QuickSearchMITMHTTPFlowCount(token string) int {
 	db := consts.GetGormProjectDatabase()
-	var count int
+	var count int64
 	db.Model(&schema.HTTPFlow{}).Where(
 		"(request like ?) OR (response like ?) OR (url like ?)",
 		"%"+token+"%",
 		"%"+token+"%",
 		"%"+token+"%",
 	).Where("source_type = ?", "mitm").Count(&count)
-	return count
+	return int(count)
 }
 
 func CountHTTPFlowByRuntimeID(db *gorm.DB, runtimeId string) int {
-	var count int
+	var count int64
 	db.Model(&schema.HTTPFlow{}).Where("runtime_id = ?", runtimeId).Count(&count)
-	return count
+	return int(count)
 }
 
 // BuildHTTPFlowQuery 构建带有过滤条件的查询
@@ -1464,7 +1464,7 @@ func ExportHTTPFlow(db *gorm.DB, params *ypb.ExportHTTPFlowsRequest) (paging *bi
 func HTTPFlowToOnline(db *gorm.DB, hash []string) error {
 	db = db.Model(&schema.HTTPFlow{})
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "hash", hash)
-	db = db.Update(map[string]interface{}{"upload_online": true})
+	db = db.Updates(map[string]interface{}{"upload_online": true})
 	if db.Error != nil {
 		return utils.Errorf("HTTPFlowToOnline failed %s", db.Error)
 	}

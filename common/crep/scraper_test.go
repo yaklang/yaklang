@@ -1,10 +1,11 @@
 package crep
 
 import (
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/log"
 	"testing"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func TestSnapshot(t *testing.T) {

@@ -2,8 +2,9 @@ package php
 
 import (
 	_ "embed"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 //go:embed phpcode/webshell/ants.php

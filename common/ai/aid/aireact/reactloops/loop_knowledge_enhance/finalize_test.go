@@ -20,11 +20,11 @@ import (
 
 type finalizeTestInvoker struct {
 	*mock.MockInvoker
-	artifactDir    string
-	directAnswers  []directlyAnswerCall
-	resultPayloads []string
+	artifactDir     string
+	directAnswers   []directlyAnswerCall
+	resultPayloads  []string
 	timelineEntries []timelineEntry
-	events         []*schema.AiOutputEvent
+	events          []*schema.AiOutputEvent
 
 	// 可配置 DirectlyAnswer 行为：err 非 nil 触发失败回退；returnText 控制成功返回值
 	directAnswerErr        error

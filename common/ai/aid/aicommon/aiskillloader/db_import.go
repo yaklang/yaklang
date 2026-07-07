@@ -2,13 +2,14 @@ package aiskillloader
 
 import (
 	"bytes"
+	"errors"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"gorm.io/gorm"
 )
 
 // ImportAISkillsToDB imports all skills from a loader into the ai_forges table
@@ -42,7 +43,7 @@ func ImportAISkillsToDB(db *gorm.DB, loader SkillLoader) (int, error) {
 		if err == nil && sameSkillMDForge(existing, forge) {
 			continue
 		}
-		if err != nil && !gorm.IsRecordNotFoundError(err) {
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Warnf("failed to query existing skillmd forge %q: %v", meta.Name, err)
 			continue
 		}

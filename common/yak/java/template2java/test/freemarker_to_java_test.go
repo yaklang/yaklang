@@ -2,12 +2,13 @@ package test
 
 import (
 	"embed"
-	"github.com/stretchr/testify/require"
-	tj "github.com/yaklang/yaklang/common/yak/java/template2java"
 	"io/fs"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	tj "github.com/yaklang/yaklang/common/yak/java/template2java"
 )
 
 //go:embed all:testdata

@@ -89,4 +89,3 @@ func TestGetHTTPFlowDomainsByDomainSuffix_NotAffectedByRecentTrafficOrder(t *tes
 	require.Contains(t, domains, hostA)
 	require.Contains(t, domains, hostB)
 }
-

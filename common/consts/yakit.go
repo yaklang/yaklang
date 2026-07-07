@@ -8,9 +8,8 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 
-	"github.com/jinzhu/gorm"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/yaklang/yaklang/common/log"
+	"gorm.io/gorm"
 )
 
 var (
@@ -237,7 +236,7 @@ func init() {
 
 func doHTTPFlowPatch(db *gorm.DB) {
 	var err error
-	if !db.HasTable("http_flows") {
+	if !db.Migrator().HasTable("http_flows") {
 		return
 	}
 	err = db.Exec(`CREATE INDEX IF NOT EXISTS "main"."idx_http_flows_source"
@@ -258,7 +257,7 @@ ON "http_flows" (
 }
 
 func doDBRiskPatch(db *gorm.DB) {
-	if !db.HasTable("risks") {
+	if !db.Migrator().HasTable("risks") {
 		return
 	}
 	err := db.Exec(`CREATE INDEX IF NOT EXISTS main.idx_risks_id ON risks(id);`).Error
@@ -283,7 +282,7 @@ func doDBRiskPatch(db *gorm.DB) {
 
 func doAIEventPatch(db *gorm.DB) {
 	// add indexes for ai_output_events table to improve save/query performance
-	if db.HasTable("ai_output_events") {
+	if db.Migrator().HasTable("ai_output_events") {
 		indexQueries := []struct {
 			name  string
 			query string
@@ -302,7 +301,7 @@ func doAIEventPatch(db *gorm.DB) {
 	}
 
 	// add indexes for ai_processes table
-	if db.HasTable("ai_processes") {
+	if db.Migrator().HasTable("ai_processes") {
 		indexQueries := []struct {
 			name  string
 			query string

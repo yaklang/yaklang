@@ -12,12 +12,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw/hnswspec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 // ChunkText 将长文本分割成多个小块，以便于处理和嵌入
@@ -547,11 +548,13 @@ func MigrateHNSWGraph(db *gorm.DB, collection *schema.VectorStoreCollection) err
 }
 
 func NewVectorStoreDatabase(path string) (*gorm.DB, error) {
-	db, err := gorm.Open("sqlite3", path)
+	db, err := gorm.Open(sqlite.Open(path), &gorm.Config{})
 	if err != nil {
 		return db, err
 	}
-	db = db.AutoMigrate(&schema.KnowledgeBaseEntry{}, &schema.KnowledgeBaseInfo{}, &schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
+	if err := db.AutoMigrate(&schema.KnowledgeBaseEntry{}, &schema.KnowledgeBaseInfo{}, &schema.VectorStoreCollection{}, &schema.VectorStoreDocument{}); err != nil {
+		return nil, err
+	}
 
 	return db, nil
 }

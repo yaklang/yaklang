@@ -10,7 +10,6 @@ package fmtsort_test
 import (
 	"cmp"
 	"fmt"
-	"github.com/gohugoio/hugo/tpl/internal/go_templates/fmtsort"
 	"math"
 	"reflect"
 	"runtime"
@@ -18,6 +17,8 @@ import (
 	"strings"
 	"testing"
 	"unsafe"
+
+	"github.com/gohugoio/hugo/tpl/internal/go_templates/fmtsort"
 )
 
 var compareTests = [][]reflect.Value{

@@ -7,17 +7,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"gorm.io/gorm"
 )
 
 type CVEDescription struct {
-	CVE                string `json:"cve" gorm:"unique_index"`
+	CVE                string `json:"cve" gorm:"uniqueIndex"`
 	Title              string
 	ChineseTitle       string
 	Description        string
@@ -81,7 +81,7 @@ func _migrateTable() error {
 		return utils.Error("no cve db")
 	}
 
-	if !srcDB.HasTable(&CVEDescription{}) {
+	if !srcDB.Migrator().HasTable(&CVEDescription{}) {
 		return utils.Error("no legacy cve desc")
 	}
 

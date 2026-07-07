@@ -17,7 +17,6 @@ import (
 	"sync"
 
 	"github.com/antchfx/xmlquery"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
@@ -26,6 +25,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/utils/ziputil"
+	"gorm.io/gorm"
 
 	// import aiforge to register liteforge callback
 	_ "github.com/yaklang/yaklang/common/aiforge"
@@ -312,7 +312,7 @@ func AICompleteFields(opts ...any) error {
 	}
 
 	// Count total CWEs to process
-	var totalCount int
+	var totalCount int64
 	if err := db.Model(&cveresources.CWE{}).Count(&totalCount).Error; err != nil {
 		return utils.Errorf("count CWE entries failed: %v", err)
 	}

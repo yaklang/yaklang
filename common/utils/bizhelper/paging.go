@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 type Param struct {
@@ -58,12 +58,12 @@ func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 	}
 
 	var paginator Paginator
-	var count int
+	var count int64
 	var offset int
 	shouldQueryCount := true
 
 	if p.QueryCountOnce && p.totalRecord != nil {
-		count = *p.totalRecord
+		count = int64(*p.totalRecord)
 		shouldQueryCount = false
 	}
 
@@ -83,7 +83,7 @@ func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 				return
 			}
 			if p.QueryCountOnce {
-				countVal := count
+				countVal := int(count)
 				p.totalRecord = &countVal
 			}
 		}
@@ -113,17 +113,17 @@ func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 	}
 
 	if p.Limit == -1 {
-		paginator.TotalRecord = count
+		paginator.TotalRecord = int(count)
 		paginator.Records = result
 		paginator.Page = 1
 		paginator.NextPage = 1
 		paginator.Offset = 0
-		paginator.Limit = count
+		paginator.Limit = int(count)
 		paginator.TotalPage = int(math.Ceil(float64(count) / float64(p.Limit)))
 		return &paginator, db
 	}
 
-	paginator.TotalRecord = count
+	paginator.TotalRecord = int(count)
 	paginator.Records = result
 	paginator.Page = p.Page
 
@@ -162,7 +162,7 @@ func (p *Paginator) Next(result interface{}) (error, bool) {
 	return nil, true
 }
 
-func countRecords(db *gorm.DB, anyType interface{}, done chan bool, count *int) {
+func countRecords(db *gorm.DB, anyType interface{}, done chan bool, count *int64) {
 	db.Model(anyType).Count(count)
 	done <- true
 }

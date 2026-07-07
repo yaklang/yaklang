@@ -19,7 +19,7 @@ func TestCleanupSessionData(t *testing.T) {
 	require.NoError(t, db.AutoMigrate(
 		&schema.AISession{}, &schema.AIAgentRuntime{}, &schema.AiCheckpoint{},
 		&schema.AiOutputEvent{}, &schema.AiProcessAndAiEvent{},
-	).Error)
+	))
 
 	sessionID := "airaghttp-" + uuid.NewString()
 	runtimeID := uuid.NewString()

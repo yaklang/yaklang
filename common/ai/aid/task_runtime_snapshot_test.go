@@ -10,12 +10,12 @@ import (
 )
 
 type mockReactRuntimeSource struct {
-	reactID            string
-	runtimeTasks       []aicommon.AIStatefulTask
-	currentTask        aicommon.AIStatefulTask
-	planExecutionTask  aicommon.AIStatefulTask
-	queueingTasks      []aicommon.AIStatefulTask
-	sessionTimeline    *aicommon.Timeline
+	reactID           string
+	runtimeTasks      []aicommon.AIStatefulTask
+	currentTask       aicommon.AIStatefulTask
+	planExecutionTask aicommon.AIStatefulTask
+	queueingTasks     []aicommon.AIStatefulTask
+	sessionTimeline   *aicommon.Timeline
 }
 
 func (m *mockReactRuntimeSource) GetReActID() string { return m.reactID }

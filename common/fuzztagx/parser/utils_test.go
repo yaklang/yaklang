@@ -3,9 +3,10 @@ package parser
 import (
 	"errors"
 	"fmt"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils"
-	"testing"
 )
 
 func TestIndexString(t *testing.T) {

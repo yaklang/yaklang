@@ -3,9 +3,9 @@ package ssadb
 import (
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"gorm.io/gorm"
 )
 
 // TestLegacyDataFormatCompatibility ensures that MarshalFile produces FolderPath compatible with legacy data

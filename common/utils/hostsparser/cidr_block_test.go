@@ -2,9 +2,10 @@ package hostsparser
 
 import (
 	"context"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestNewCIDRBlock(t *testing.T) {

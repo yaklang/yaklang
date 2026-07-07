@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
+	"gorm.io/gorm"
 )
 
 type FastPaginator struct {

@@ -2,6 +2,7 @@ package ssaapi_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"path/filepath"
@@ -11,8 +12,8 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -43,7 +44,7 @@ func Test_CompileError(t *testing.T) {
 		irProg, err := ssadb.GetProgram(progName, ssa.Application)
 		require.Nil(t, irProg)
 		require.Error(t, err)
-		require.True(t, gorm.IsRecordNotFoundError(err))
+		require.True(t, errors.Is(err, gorm.ErrRecordNotFound))
 
 	}
 

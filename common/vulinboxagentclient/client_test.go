@@ -2,6 +2,10 @@ package vulinboxagentclient
 
 import (
 	"context"
+	"math/rand"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/chaosmaker"
 	rule2 "github.com/yaklang/yaklang/common/chaosmaker/rule"
@@ -11,9 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/vulinbox"
 	proto "github.com/yaklang/yaklang/common/vulinboxagentproto"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"math/rand"
-	"testing"
-	"time"
 )
 
 func TestMUSTPASS_Ping(t *testing.T) {

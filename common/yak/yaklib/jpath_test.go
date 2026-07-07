@@ -2,11 +2,12 @@ package yaklib
 
 import (
 	"bytes"
+	"reflect"
+	"testing"
+
 	"github.com/bcicen/jstream"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/jsonpath"
-	"reflect"
-	"testing"
 )
 
 const data = `{

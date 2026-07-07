@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	"github.com/yaklang/yaklang/common/consts"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 // 测试用的表结构
@@ -15,7 +16,7 @@ type TestRecord struct {
 }
 
 func setupTestDB() (*gorm.DB, error) {
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +31,7 @@ func TestSavepointTransaction_BasicUsage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("设置测试数据库失败: %v", err)
 	}
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	st := NewSavepointTransaction(db)
 
@@ -63,7 +64,7 @@ func TestSavepointTransaction_BasicUsage(t *testing.T) {
 	}
 
 	// 验证数据已提交
-	var count int
+	var count int64
 	db.Model(&TestRecord{}).Count(&count)
 	if count != 1 {
 		t.Errorf("期望记录数为1，实际为%d", count)
@@ -75,7 +76,7 @@ func TestSavepointTransaction_NestedCommit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("设置测试数据库失败: %v", err)
 	}
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	err = SavepointTransactionWithCallback(db, func(st *SavepointTransaction) error {
 		// 第一层
@@ -98,7 +99,7 @@ func TestSavepointTransaction_NestedCommit(t *testing.T) {
 	}
 
 	// 验证两条记录都已提交
-	var count int
+	var count int64
 	db.Model(&TestRecord{}).Count(&count)
 	if count != 2 {
 		t.Errorf("期望记录数为2，实际为%d", count)
@@ -110,7 +111,7 @@ func TestSavepointTransaction_NestedRollback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("设置测试数据库失败: %v", err)
 	}
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	err = SavepointTransactionWithCallback(db, func(st *SavepointTransaction) error {
 		// 第一层
@@ -140,7 +141,7 @@ func TestSavepointTransaction_NestedRollback(t *testing.T) {
 	}
 
 	// 验证只有主事务的数据被提交
-	var count int
+	var count int64
 	db.Model(&TestRecord{}).Count(&count)
 	if count != 2 {
 		t.Errorf("期望记录数为2（level1和level1_after_nested_fail），实际为%d", count)
@@ -165,7 +166,7 @@ func TestSavepointTransaction_MainTransactionRollback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("设置测试数据库失败: %v", err)
 	}
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	err = SavepointTransactionWithCallback(db, func(st *SavepointTransaction) error {
 		// 第一层
@@ -191,7 +192,7 @@ func TestSavepointTransaction_MainTransactionRollback(t *testing.T) {
 	}
 
 	// 验证所有数据都被回滚
-	var count int
+	var count int64
 	db.Model(&TestRecord{}).Count(&count)
 	if count != 0 {
 		t.Errorf("期望记录数为0（全部回滚），实际为%d", count)
@@ -203,7 +204,7 @@ func TestSavepointTransaction_MultipleNestingLevels(t *testing.T) {
 	if err != nil {
 		t.Fatalf("设置测试数据库失败: %v", err)
 	}
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	err = SavepointTransactionWithCallback(db, func(st *SavepointTransaction) error {
 		// Level 1
@@ -250,7 +251,7 @@ func TestSavepointTransaction_MultipleNestingLevels(t *testing.T) {
 	}
 
 	// 验证除了level4以外的数据都提交了
-	var count int
+	var count int64
 	db.Model(&TestRecord{}).Count(&count)
 	if count != 4 {
 		t.Errorf("期望记录数为4，实际为%d", count)

@@ -1,8 +1,8 @@
 package schema
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 type WebFuzzerLabel struct {
@@ -11,7 +11,7 @@ type WebFuzzerLabel struct {
 	// 模版数据唯一标识，用来兼容做对比
 	DefaultDescription string `json:"default_description"`
 	Description        string `json:"description"`
-	Hash               string `gorm:"unique_index"`
+	Hash               string `gorm:"uniqueIndex"`
 }
 
 func (w *WebFuzzerLabel) CalcHash() string {

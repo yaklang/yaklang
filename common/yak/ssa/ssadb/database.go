@@ -1,11 +1,11 @@
 package ssadb
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/reportstore"
+	"gorm.io/gorm"
 )
 
 var SSAProjectTables = []any{
@@ -52,11 +52,11 @@ func init() {
 // PostgreSQL: use TEXT (unlimited length)
 // SQLite: use TEXT (supports up to 2GB, no modification needed)
 func patchIrSourceQuotedCode(db *gorm.DB) {
-	if !db.HasTable(TableIrSources) {
+	if !db.Migrator().HasTable(TableIrSources) {
 		return
 	}
 
-	dialect := db.Dialect().GetName()
+	dialect := db.Dialector.Name()
 	switch dialect {
 	case "mysql":
 		// For MySQL, change TEXT to LONGTEXT to support larger source files
@@ -81,7 +81,7 @@ func patchIrSourceQuotedCode(db *gorm.DB) {
 
 // doSSAPatch 添加数据库索引以优化查询性能
 func patchIrCodeIndex(db *gorm.DB) {
-	if !db.HasTable(TableIrCodes) {
+	if !db.Migrator().HasTable(TableIrCodes) {
 		return
 	}
 

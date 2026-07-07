@@ -2,9 +2,10 @@ package lowhttp
 
 import (
 	"bytes"
-	"github.com/davecgh/go-spew/spew"
 	"strings"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 func TestFixHTTPResponse2(t *testing.T) {

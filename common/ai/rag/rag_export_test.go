@@ -6,13 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"gorm.io/gorm"
 )
 
 // createTempTestDatabase 创建临时测试数据库
@@ -682,12 +682,12 @@ func TestMUSTPASS_ImportRAG_OneKnowledgeMultipleVectors(t *testing.T) {
 	}
 
 	// 验证源数据库状态
-	var sourceVectorCount int
+	var sourceVectorCount int64
 	sourceDB.Model(&schema.VectorStoreDocument{}).Count(&sourceVectorCount)
 	t.Logf("源数据库向量文档数量: %d", sourceVectorCount)
 	assert.Equal(t, 10, sourceVectorCount, "应该有10个向量文档")
 
-	var sourceKnowledgeCount int
+	var sourceKnowledgeCount int64
 	sourceDB.Model(&schema.KnowledgeBaseEntry{}).Count(&sourceKnowledgeCount)
 	t.Logf("源数据库知识条目数量: %d", sourceKnowledgeCount)
 	assert.Equal(t, 1, sourceKnowledgeCount, "应该有1个知识条目")
@@ -713,12 +713,12 @@ func TestMUSTPASS_ImportRAG_OneKnowledgeMultipleVectors(t *testing.T) {
 	t.Log("导入完成")
 
 	// 验证目标数据库状态
-	var targetVectorCount int
+	var targetVectorCount int64
 	targetDB.Model(&schema.VectorStoreDocument{}).Count(&targetVectorCount)
 	t.Logf("目标数据库向量文档数量: %d", targetVectorCount)
 	assert.Equal(t, 10, targetVectorCount, "导入后应该有10个向量文档")
 
-	var targetKnowledgeCount int
+	var targetKnowledgeCount int64
 	targetDB.Model(&schema.KnowledgeBaseEntry{}).Count(&targetKnowledgeCount)
 	t.Logf("目标数据库知识条目数量: %d", targetKnowledgeCount)
 	assert.Equal(t, 1, targetKnowledgeCount, "导入后应该只有1个知识条目（去重后）")

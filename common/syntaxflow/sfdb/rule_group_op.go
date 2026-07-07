@@ -3,12 +3,12 @@ package sfdb
 import (
 	"errors"
 
-	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"gorm.io/gorm"
 )
 
 var buildInGroupsMap map[string]struct{}
@@ -50,7 +50,7 @@ func GetOrCreateGroups(db *gorm.DB, groupNames []string) []*schema.SyntaxFlowGro
 	updateBuildInGroup := func(group *schema.SyntaxFlowGroup, isBuildIn bool) (*schema.SyntaxFlowGroup, error) {
 		if group.IsBuildIn != isBuildIn {
 			group.IsBuildIn = isBuildIn
-			err := db.Update(group).Error
+			err := db.Updates(group).Error
 			return group, err
 		}
 		return group, nil
@@ -88,7 +88,7 @@ func isBuildInGroup(groupName string) bool {
 	if ok {
 		return true
 	}
-	
+
 	// 使用 YAML 配置中定义的标准组名
 	return ssaconfig.IsStandardGroupName(groupName)
 }
@@ -199,7 +199,7 @@ func BatchAddGroupsForRules(db *gorm.DB, ruleNames, groupNames []string) (int64,
 			return utils.Errorf("batch add groups for rules failed: groups or rules is empty")
 		}
 		for _, rule := range rules {
-			if err = tx.Model(rule).Association("Groups").Append(groups).Error; err != nil {
+			if err = tx.Model(rule).Association("Groups").Append(groups); err != nil {
 				return err
 			} else {
 				count += int64(len(groups))
@@ -232,7 +232,7 @@ func BatchAddGroupsForRulesByRuleId(db *gorm.DB, ruleIds, groupNames []string) (
 			return utils.Errorf("batch add groups for rules failed: groups or rules is empty")
 		}
 		for _, rule := range rules {
-			if err = tx.Model(rule).Association("Groups").Append(groups).Error; err != nil {
+			if err = tx.Model(rule).Association("Groups").Append(groups); err != nil {
 				return err
 			} else {
 				count += int64(len(groups))
@@ -269,7 +269,7 @@ func BatchRemoveGroupsForRules(db *gorm.DB, ruleNames, groupNames []string) (int
 			return utils.Errorf("batch remove groups for rules failed: groups not found")
 		}
 		for _, rule := range rules {
-			if err = tx.Model(rule).Association("Groups").Delete(groups).Error; err != nil {
+			if err = tx.Model(rule).Association("Groups").Delete(groups); err != nil {
 				return err
 			} else {
 				count += int64(len(groups))
@@ -306,7 +306,7 @@ func BatchRemoveGroupsForRulesById(db *gorm.DB, ruleIds, groupNames []string) (i
 			return utils.Errorf("batch remove groups for rules failed: groups not found")
 		}
 		for _, rule := range rules {
-			if err = tx.Model(rule).Association("Groups").Delete(groups).Error; err != nil {
+			if err = tx.Model(rule).Association("Groups").Delete(groups); err != nil {
 				return err
 			} else {
 				count += int64(len(groups))
@@ -372,7 +372,7 @@ func BatchAddOrUpdateGroupsForRules(db *gorm.DB, ruleNames, groupNames []string)
 			return utils.Errorf("batch add groups for rules failed: groups or rules is empty")
 		}
 		for _, rule := range rules {
-			if err = tx.Model(rule).Association("Groups").Append(groups).Error; err != nil {
+			if err = tx.Model(rule).Association("Groups").Append(groups); err != nil {
 				return err
 			} else {
 				count += int64(len(groups))

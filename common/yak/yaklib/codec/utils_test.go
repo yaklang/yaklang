@@ -1,9 +1,10 @@
 package codec
 
 import (
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestAesEncrypt(t *testing.T) {

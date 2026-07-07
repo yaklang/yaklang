@@ -22,8 +22,9 @@ import (
 	"time"
 
 	"github.com/gobwas/glob"
-	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
@@ -562,7 +563,7 @@ func IndexAllSubstrings(s string, patterns ...string) (result [][2]int) {
 
 func CreateTempTestDatabaseInMemory() (*gorm.DB, error) {
 	uuid := uuid.New().String()
-	db, err := gorm.Open("sqlite3", "file::memory-"+uuid+"?mode=memory&cache=shared")
+	db, err := gorm.Open(sqlite.Open("file::memory-"+uuid+"?mode=memory&cache=shared"), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}

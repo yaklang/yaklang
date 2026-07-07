@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/utils"
+
 	// 触发 yaklang.Import 把 str / log / sprintf 等内置库注册到全局 yaklangLibs，
 	// 否则 yak focus mode 脚本里的 str.HasPrefix / sprint 会因函数缺失 panic。
 	_ "github.com/yaklang/yaklang/common/yak"

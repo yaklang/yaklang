@@ -3,9 +3,10 @@ package vectorstore
 import (
 	"bytes"
 	"context"
-	"github.com/stretchr/testify/require"
 	"io"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"

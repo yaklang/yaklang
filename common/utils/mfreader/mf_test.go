@@ -2,13 +2,14 @@ package mfreader
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/mutate"
 	"io/ioutil"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mutate"
 )
 
 func TestMultiFileLineReader_GetPercent(t *testing.T) {

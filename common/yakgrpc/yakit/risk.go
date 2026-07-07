@@ -4,13 +4,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 func CreateOrUpdateRisk(db *gorm.DB, hash string, i interface{}) error {
@@ -44,7 +44,7 @@ func CreateOrUpdateRisk(db *gorm.DB, hash string, i interface{}) error {
 	if token != "" {
 		if db := db.Where(
 			"reverse_token LIKE ?", "%"+token+"%",
-		).Update(map[string]interface{}{
+		).Updates(map[string]interface{}{
 			"waiting_verified": false,
 		}); db.Error != nil {
 			log.Errorf("reverse_token[%v] found cannot trigger unfinished risk.", token)
@@ -75,11 +75,11 @@ func GetRisksByRuntimeId(db *gorm.DB, runtimeId string) ([]*schema.Risk, error) 
 }
 
 func CountRiskByRuntimeId(db *gorm.DB, runtimeId string) (int, error) {
-	var count int
+	var count int64
 	if db := db.Model(&schema.Risk{}).Where("runtime_id = ?", runtimeId).Count(&count); db.Error != nil {
 		return 0, utils.Errorf("get Risks count failed: %s", db.Error)
 	}
-	return count, nil
+	return int(count), nil
 }
 
 func GetRiskByHash(db *gorm.DB, hash string) (*schema.Risk, error) {
@@ -305,7 +305,7 @@ func NewRiskReadRequest(db *gorm.DB, filter *ypb.QueryRisksRequest) error {
 	} else {
 		db = db.Where("created_at <= ?", time.Unix(time.Now().Unix(), 0))
 	}
-	db = db.Update(map[string]interface{}{"is_read": true})
+	db = db.Updates(map[string]interface{}{"is_read": true})
 	if db.Error != nil {
 		return utils.Errorf("NewRiskReadRequest failed %s", db.Error)
 	}
@@ -319,7 +319,7 @@ func YieldRisks(db *gorm.DB, ctx context.Context) chan *schema.Risk {
 func UploadRiskToOnline(db *gorm.DB, hash []string) error {
 	db = db.Model(&schema.Risk{})
 	db = db.Where("hash in (?)", hash)
-	db = db.Update(map[string]interface{}{"upload_online": true})
+	db = db.Updates(map[string]interface{}{"upload_online": true})
 	if db.Error != nil {
 		return utils.Errorf("UploadRiskToOnline failed %s", db.Error)
 	}

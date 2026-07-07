@@ -3,11 +3,11 @@ package aiskillloader
 import (
 	"strings"
 
-	"github.com/jinzhu/gorm"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 // SearchSkillMetasByStructure performs the original loader-side structural search
@@ -78,13 +78,17 @@ func SearchSkillMetasBM25(query string, metas []*SkillMeta, limit int) ([]*Skill
 		limit = 10
 	}
 
-	memDB, err := gorm.Open("sqlite3", ":memory:")
+	memDB, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
 		return nil, utils.Wrap(err, "failed to create in-memory SQLite for skill BM25 search")
 	}
-	defer memDB.Close()
+	defer func() {
+		if sqlDB, err := memDB.DB(); err == nil {
+			_ = sqlDB.Close()
+		}
+	}()
 
-	if err := memDB.AutoMigrate(&schema.AIForge{}).Error; err != nil {
+	if err := memDB.AutoMigrate(&schema.AIForge{}); err != nil {
 		return nil, utils.Wrap(err, "auto-migrate temporary ai_forges failed")
 	}
 	if err := yakit.EnsureAIForgeFTS5(memDB); err != nil {

@@ -137,12 +137,12 @@ func TestSSAAutoDetective(t *testing.T) {
 
 	t.Run("weighted detect go over docs js", func(t *testing.T) {
 		tempDir, cleanup := setupTempDirWithFiles(t, map[string]string{
-			"src/main.go":  "package main\nfunc main() {}\n",
-			"docs/a.js":    "console.log(1)\n",
-			"docs/b.js":    "console.log(2)\n",
-			"docs/c.js":    "console.log(3)\n",
-			"docs/d.js":    "console.log(4)\n",
-			"docs/e.js":    "console.log(5)\n",
+			"src/main.go": "package main\nfunc main() {}\n",
+			"docs/a.js":   "console.log(1)\n",
+			"docs/b.js":   "console.log(2)\n",
+			"docs/c.js":   "console.log(3)\n",
+			"docs/d.js":   "console.log(4)\n",
+			"docs/e.js":   "console.log(5)\n",
 		})
 		defer cleanup()
 

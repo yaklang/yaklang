@@ -3,14 +3,15 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strings"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/http"
-	"strings"
-	"testing"
 )
 
 func TestGRPCMUSTPASS_MITM_InvalidUTF8RequestDetail(t *testing.T) {

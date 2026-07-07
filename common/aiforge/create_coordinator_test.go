@@ -2,11 +2,12 @@ package aiforge
 
 import (
 	"context"
+	"testing"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"testing"
 )
 
 func TestPlanMocker(t *testing.T) {

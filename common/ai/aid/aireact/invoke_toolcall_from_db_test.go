@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
@@ -22,6 +21,7 @@ import (
 	_ "github.com/yaklang/yaklang/common/yak" // import for init() to register YakScriptAiToolsCovertHandle
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 // setupMockToolInDB creates a mock tool and saves it to the database

@@ -12,7 +12,7 @@ import (
 func TestUsefulRuntimeId(t *testing.T) {
 	db := consts.GetGormProjectDatabase()
 	require.NotNil(t, db)
-	require.NoError(t, db.AutoMigrate(&schema.Risk{}, &schema.HTTPFlow{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.Risk{}, &schema.HTTPFlow{}))
 
 	riskRuntimeID := "useful-risk-" + uuid.NewString()
 	httpFlowRuntimeID := "useful-httpflow-" + uuid.NewString()

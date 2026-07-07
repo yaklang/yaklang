@@ -1,9 +1,9 @@
 package yakit
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 // DeleteAISession deletes all persistent-session scoped data from projectDB:

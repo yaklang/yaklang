@@ -3,9 +3,10 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"

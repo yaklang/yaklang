@@ -2,17 +2,18 @@ package mustpass
 
 import (
 	"fmt"
+	"net"
+	"net/http"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/facades"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
-	"net"
-	"net/http"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestBASIC_SPECIFIC_DNS_2(t *testing.T) {

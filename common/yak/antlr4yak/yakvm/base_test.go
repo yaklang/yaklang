@@ -2,9 +2,10 @@ package yakvm
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/go-funk"
 	"sort"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/go-funk"
 )
 
 func TestOpcodeToName(t *testing.T) {

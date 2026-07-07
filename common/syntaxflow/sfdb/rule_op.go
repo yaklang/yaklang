@@ -17,13 +17,13 @@ import (
 
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"gorm.io/gorm"
 )
 
 func ExportDatabase() io.ReadCloser {
@@ -92,7 +92,7 @@ func MigrateSyntaxFlowWithDB(db *gorm.DB, hash string, i *schema.SyntaxFlowRule)
 
 	var rules []schema.SyntaxFlowRule
 	if err := db.Where("rule_name = ?", i.RuleName).Find(&rules).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return db.Create(i).Error
 		}
 		return err
@@ -137,7 +137,7 @@ func DeleteBuildInRule() error {
 
 		// 2. 清除规则与分组的关联
 		for _, r := range rules {
-			if err := tx.Model(r).Association("Groups").Clear().Error; err != nil {
+			if err := tx.Model(r).Association("Groups").Clear(); err != nil {
 				return err
 			}
 		}
@@ -465,7 +465,7 @@ func UpdateRule(db *gorm.DB, rule *schema.SyntaxFlowRule) error {
 		return utils.Errorf("update syntaxFlow rule failed: rule name is empty")
 	}
 	db = db.Model(&schema.SyntaxFlowRule{})
-	if err := db.Where("rule_name = ?", rule.RuleName).Update(rule).Error; err != nil {
+	if err := db.Where("rule_name = ?", rule.RuleName).Updates(rule).Error; err != nil {
 		return utils.Errorf("update syntaxFlow rule failed: %s", err)
 	}
 	return nil

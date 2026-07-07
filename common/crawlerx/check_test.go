@@ -4,12 +4,13 @@ package crawlerx
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"net/url"
 	"reflect"
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestUrlRepeatCheckGenerator(t *testing.T) {

@@ -700,7 +700,7 @@ func TestGRPCMUSTPASS_SSAProjectMigrateReusesExistingProjectByURL(t *testing.T) 
 	defer func() {
 		_, _ = client.DeleteSSAProject(ctx, &ypb.DeleteSSAProjectRequest{
 			DeleteMode: string(yakit.SSAProjectDeleteAll),
-			Filter: &ypb.SSAProjectFilter{IDs: []int64{existingProjectID}},
+			Filter:     &ypb.SSAProjectFilter{IDs: []int64{existingProjectID}},
 		})
 	}()
 
@@ -798,7 +798,7 @@ func TestGRPCMUSTPASS_SSAProjectMigrateUsesBaseProjectName(t *testing.T) {
 	defer func() {
 		_, _ = client.DeleteSSAProject(ctx, &ypb.DeleteSSAProjectRequest{
 			DeleteMode: string(yakit.SSAProjectDeleteAll),
-			Filter: &ypb.SSAProjectFilter{IDs: []int64{int64(irProg.ProjectID)}},
+			Filter:     &ypb.SSAProjectFilter{IDs: []int64{int64(irProg.ProjectID)}},
 		})
 	}()
 

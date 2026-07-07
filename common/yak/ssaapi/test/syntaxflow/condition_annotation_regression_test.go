@@ -34,4 +34,3 @@ $anno.__ref__.*ab as $method
 		"method": {"Function-HomeDaoClassABC.aaab"},
 	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
-

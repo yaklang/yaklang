@@ -2,14 +2,15 @@ package pcaputil
 
 import (
 	"fmt"
+	"net"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gopacket/gopacket"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/utils"
-	"net"
-	"testing"
-	"time"
 )
 
 func TestStart(t *testing.T) {

@@ -3,15 +3,16 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"testing"
+	"time"
+
 	"github.com/bytedance/mockey"
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"testing"
-	"time"
+	"gorm.io/gorm"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"

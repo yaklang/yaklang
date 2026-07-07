@@ -1,9 +1,10 @@
 package tlsutils
 
 import (
-	"github.com/davecgh/go-spew/spew"
 	"testing"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 func TestGenerateGMSelfSignedCertKey(t *testing.T) {

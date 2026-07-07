@@ -9,7 +9,7 @@ import (
 
 func TestFunctionParamBindingPatternCompile(t *testing.T) {
 	cases := map[string]string{
-		"array destructuring": `var f = ([a, b]) => a + b`,
+		"array destructuring":  `var f = ([a, b]) => a + b`,
 		"object destructuring": `var g = ({x, y}) => x + y`,
 		"rest identifier":      `var h = (...args) => args`,
 		"rest array binding":   `var i = (...[a, b]) => a + b`,

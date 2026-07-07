@@ -2,8 +2,8 @@ package vectorstore
 
 import (
 	"context"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
+	"gorm.io/gorm"
 )
 
 func (s *SQLiteVectorStoreHNSW) startDbActionQueue(ctx context.Context) {

@@ -2,8 +2,9 @@ package utils
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 var (

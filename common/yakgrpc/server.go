@@ -11,7 +11,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/schema"
 
-	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/facades"
@@ -20,6 +19,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools/dicts"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 type Server struct {

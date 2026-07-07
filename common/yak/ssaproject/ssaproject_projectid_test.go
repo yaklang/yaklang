@@ -4,19 +4,21 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func TestSSAProject_SaveToDB_PersistProjectIDInConfig(t *testing.T) {
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
-	require.NoError(t, db.AutoMigrate(&schema.SSAProject{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.SSAProject{}))
 
 	project, err := NewSSAProject(
 		ssaconfig.WithProjectName("projectid-test"),

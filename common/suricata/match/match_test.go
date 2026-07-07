@@ -2,6 +2,8 @@ package match
 
 import (
 	"encoding/hex"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
@@ -11,7 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/suricata/pcre"
 	"github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"testing"
 )
 
 type Test struct {

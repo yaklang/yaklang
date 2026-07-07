@@ -665,12 +665,12 @@ func writeVerifyFrequencyExperimentReport(results []verifySimResult, baseSnapsho
 
 	buf.WriteString("## 16.4 redhaze fixture 关键结果\n\n")
 	redhazeKey := []simVerifyParams{
-		{baseSnapshotAge, basePromptDelta, baseIterInterval, 0, 0, 6},     // baseline (无 cooldown)
-		{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 5000, 3},  // 新版默认
-		{baseSnapshotAge, basePromptDelta, baseIterInterval, 2, 5000, 3},  // cooldown=2 对比
-		{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 8000, 3},  // 硬门更高
-		{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 3000, 3},  // 硬门更低
-		{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 5000, 5},  // firstFire 推后
+		{baseSnapshotAge, basePromptDelta, baseIterInterval, 0, 0, 6},    // baseline (无 cooldown)
+		{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 5000, 3}, // 新版默认
+		{baseSnapshotAge, basePromptDelta, baseIterInterval, 2, 5000, 3}, // cooldown=2 对比
+		{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 8000, 3}, // 硬门更高
+		{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 3000, 3}, // 硬门更低
+		{baseSnapshotAge, basePromptDelta, baseIterInterval, 3, 5000, 5}, // firstFire 推后
 	}
 	writeFixtureSection(&buf, results, "redhaze", redhazeKey)
 

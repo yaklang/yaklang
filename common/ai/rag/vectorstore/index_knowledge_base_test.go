@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -28,7 +29,7 @@ func TestMUSTPASS_BuildVectorIndexForKnowledgeBase(t *testing.T) {
 	// 1. 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 2. 自动迁移数据库表结构
 	db.AutoMigrate(
@@ -181,7 +182,7 @@ func TestMUSTPASS_BuildVectorIndexEmptyKnowledgeBase(t *testing.T) {
 	// 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 自动迁移数据库表结构
 	db.AutoMigrate(
@@ -233,7 +234,7 @@ func TestMUSTPASS_BuildVectorIndexNonExistentKnowledgeBase(t *testing.T) {
 	// 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 自动迁移数据库表结构
 	db.AutoMigrate(
@@ -255,7 +256,7 @@ func TestMUSTPASS_BuildVectorIndexForKnowledgeBaseEntry(t *testing.T) {
 	// 1. 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 2. 自动迁移数据库表结构
 	db.AutoMigrate(
@@ -385,7 +386,7 @@ func TestMUSTPASS_BuildVectorIndexForNonExistentEntry(t *testing.T) {
 	// 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 自动迁移数据库表结构
 	db.AutoMigrate(
@@ -417,7 +418,7 @@ func TestMUSTPASS_DeleteEmbeddingData(t *testing.T) {
 	// 1. 创建临时测试数据库
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	// 2. 自动迁移数据库表结构
 	db.AutoMigrate(

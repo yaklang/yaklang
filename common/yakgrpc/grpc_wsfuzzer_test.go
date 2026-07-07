@@ -3,12 +3,13 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"io"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/proto"

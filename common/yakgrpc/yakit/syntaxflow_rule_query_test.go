@@ -4,23 +4,25 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func newSyntaxFlowRuleTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
+	t.Cleanup(func() { _ = consts.CloseGormDB(db) })
 
-	require.NoError(t, db.AutoMigrate(&schema.SyntaxFlowRule{}, &schema.SyntaxFlowGroup{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.SyntaxFlowRule{}, &schema.SyntaxFlowGroup{}))
 	return db
 }
 
@@ -173,7 +175,7 @@ func TestQuerySyntaxFlowRule_WithGroupAndRuleNames(t *testing.T) {
 		Content:  "println as $output",
 	}
 	require.NoError(t, db.Create(rule).Error)
-	require.NoError(t, db.Model(rule).Association("Groups").Append(group).Error)
+	require.NoError(t, db.Model(rule).Association("Groups").Append(group))
 
 	requireSingleRuleNamed(t, querySyntaxFlowRules(t, db, &ypb.SyntaxFlowRuleFilter{
 		GroupNames: []string{groupName},

@@ -1,8 +1,9 @@
 package iiop
 
 import (
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func TestParseIiop(t *testing.T) {

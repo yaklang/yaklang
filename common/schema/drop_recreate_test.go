@@ -3,18 +3,18 @@ package schema
 import (
 	"testing"
 
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/stretchr/testify/require"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func TestDropRecreateTable_MemoryDB(t *testing.T) {
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	defer db.Close()
+	defer closeGormDB(db)
 
 	// 先建表并插入两条，ID 应为 1、2
-	require.NoError(t, db.AutoMigrate(&GeneralStorage{}).Error)
+	require.NoError(t, db.AutoMigrate(&GeneralStorage{}))
 	require.NoError(t, db.Create(&GeneralStorage{Key: "k1", Value: "v1"}).Error)
 	require.NoError(t, db.Create(&GeneralStorage{Key: "k2", Value: "v2"}).Error)
 
@@ -38,16 +38,16 @@ func TestDropRecreateTable_MemoryDB(t *testing.T) {
 }
 
 func TestResetSQLiteSequence_MemoryDB(t *testing.T) {
-	db, err := gorm.Open("sqlite3", ":memory:")
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	defer db.Close()
+	defer closeGormDB(db)
 
 	// 无表时调用不报错（sqlite_sequence 可能不存在）
 	require.NoError(t, ResetSQLiteSequence(db, "general_storages"))
 	// 无表时 DropRecreateTable 也不报错（Drop 空表 + AutoMigrate 建表）
 	require.NoError(t, DropRecreateTable(db, &GeneralStorage{}))
 
-	require.NoError(t, db.AutoMigrate(&GeneralStorage{}).Error)
+	require.NoError(t, db.AutoMigrate(&GeneralStorage{}))
 	require.NoError(t, db.Create(&GeneralStorage{Key: "a", Value: "b"}).Error)
 	var row GeneralStorage
 	require.NoError(t, db.First(&row).Error)
@@ -69,4 +69,15 @@ func TestDropRecreateTable_NilDB(t *testing.T) {
 func TestResetSQLiteSequence_NilOrEmpty(t *testing.T) {
 	require.NoError(t, ResetSQLiteSequence(nil, "any_table"))
 	require.NoError(t, ResetSQLiteSequence(nil, ""))
+}
+
+func closeGormDB(db *gorm.DB) error {
+	if db == nil {
+		return nil
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.Close()
 }

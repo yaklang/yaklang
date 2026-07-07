@@ -1,12 +1,13 @@
 package httptpl
 
 import (
+	"strings"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"strings"
-	"testing"
 )
 
 func TestCreateYakTemplateFromNucleiTemplateRaw_Network_Smoking(t *testing.T) {

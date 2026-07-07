@@ -1,13 +1,14 @@
 package yakgrpc
 
 import (
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
-	"time"
 )
 
 func TestGRPC_PluginEnv(t *testing.T) {

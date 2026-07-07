@@ -4,13 +4,15 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"path/filepath"
 	"testing"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
+
 	"github.com/stretchr/testify/require"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -609,15 +611,16 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	tmpDir := consts.GetDefaultYakitBaseTempDir()
 	dbFile := filepath.Join(tmpDir, uuid.NewString()+".db")
 
-	db, err := gorm.Open("sqlite3", dbFile)
+	db, err := gorm.Open(sqlite.Open(dbFile), &gorm.Config{})
 	require.NoError(t, err)
 
 	// 自动迁移表结构
 	schema.AutoMigrate(db, schema.KEY_SCHEMA_PROFILE_DATABASE)
 
 	// 设置数据库连接池和超时
-	db.DB().SetMaxOpenConns(1)
-	db.DB().SetMaxIdleConns(1)
+	sqlDB, _ := db.DB()
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
 
 	return db
 }
@@ -628,7 +631,7 @@ func getTestDatabase() (*gorm.DB, error) {
 	tmpDir := consts.GetDefaultYakitBaseTempDir()
 	dbFile := filepath.Join(tmpDir, uuid.NewString()+".db")
 
-	db, err := gorm.Open("sqlite3", dbFile)
+	db, err := gorm.Open(sqlite.Open(dbFile), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
@@ -637,8 +640,9 @@ func getTestDatabase() (*gorm.DB, error) {
 	schema.AutoMigrate(db, schema.KEY_SCHEMA_YAKIT_DATABASE)
 
 	// 设置数据库连接池和超时
-	db.DB().SetMaxOpenConns(1)
-	db.DB().SetMaxIdleConns(1)
+	sqlDB, _ := db.DB()
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
 
 	return db, nil
 }

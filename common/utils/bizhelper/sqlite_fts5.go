@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/schema"
+	"gorm.io/gorm"
 )
 
 func sqliteFTS5BuildMatchQuery(matches []string) string {
@@ -147,7 +148,7 @@ func (c *SQLiteFTS5Config) normalize(db *gorm.DB) error {
 	}
 
 	if c.BaseTable == "" && c.BaseModel != nil {
-		c.BaseTable = db.NewScope(c.BaseModel).TableName()
+		c.BaseTable = schema.GormTableName(db, c.BaseModel)
 	}
 
 	if c.RowIDColumn == "" {
@@ -645,7 +646,7 @@ func SQLiteFTS5BM25MatchYield[T any](ctx context.Context, db *gorm.DB, baseCfg *
 
 		if cfg.CountCallback != nil {
 			if resolved, err := sqliteFTS5ResolveConfig(db, baseCfg); err == nil {
-				var count int
+				var count int64
 				base := resolved.BaseTable
 				fts := resolved.FTSTable
 				pk := resolved.RowIDColumn
@@ -654,7 +655,7 @@ func SQLiteFTS5BM25MatchYield[T any](ctx context.Context, db *gorm.DB, baseCfg *
 					Joins("JOIN "+fts+" ON "+fts+".rowid = "+base+"."+pk).
 					Where(fts+" MATCH ?", matchQuery).
 					Count(&count).Error
-				cfg.CountCallback(count)
+				cfg.CountCallback(int(count))
 			}
 		}
 

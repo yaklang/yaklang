@@ -2,6 +2,8 @@ package yakgrpc
 
 import (
 	"context"
+	"testing"
+
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
@@ -10,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
 )
 
 func TestQueryYakScriptGroup(t *testing.T) {

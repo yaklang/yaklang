@@ -2,8 +2,8 @@ package cvemodels
 
 import (
 	"encoding/json"
-	"github.com/jinzhu/gorm/dialects/postgres"
 	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"time"
 )
@@ -41,40 +41,40 @@ func (c *CVERecord) CWE() string {
 	return strings.Join(cwe, " | ")
 }
 
-func (c *CVERecord) ProblemTypeToJSONB() (postgres.Jsonb, error) {
+func (c *CVERecord) ProblemTypeToJSONB() (utils.JSONB, error) {
 	data, err := json.Marshal(c.Cve.Problemtype)
 	if err != nil {
-		return postgres.Jsonb{}, errors.Errorf("marshal failed: %s", err)
+		return utils.JSONB{}, errors.Errorf("marshal failed: %s", err)
 	}
 
-	return postgres.Jsonb{data}, nil
+	return utils.JSONB{RawMessage: data}, nil
 }
 
-func (c *CVERecord) ReferencesToJSONB() (postgres.Jsonb, error) {
+func (c *CVERecord) ReferencesToJSONB() (utils.JSONB, error) {
 	data, err := json.Marshal(c.Cve.References)
 	if err != nil {
-		return postgres.Jsonb{}, errors.Errorf("marshal failed: %s", err)
+		return utils.JSONB{}, errors.Errorf("marshal failed: %s", err)
 	}
 
-	return postgres.Jsonb{data}, nil
+	return utils.JSONB{RawMessage: data}, nil
 }
 
-func (c *CVERecord) DescriptionsToJSONB() (postgres.Jsonb, error) {
+func (c *CVERecord) DescriptionsToJSONB() (utils.JSONB, error) {
 	data, err := json.Marshal(c.Cve.DescriptionInfo)
 	if err != nil {
-		return postgres.Jsonb{}, errors.Errorf("marshal failed: %s", err)
+		return utils.JSONB{}, errors.Errorf("marshal failed: %s", err)
 	}
 
-	return postgres.Jsonb{data}, nil
+	return utils.JSONB{RawMessage: data}, nil
 }
 
-func (c *CVERecord) CPEConfigurationsToJSONB() (postgres.Jsonb, error) {
+func (c *CVERecord) CPEConfigurationsToJSONB() (utils.JSONB, error) {
 	data, err := json.Marshal(c.Configurations)
 	if err != nil {
-		return postgres.Jsonb{}, errors.Errorf("marshal failed: %s", err)
+		return utils.JSONB{}, errors.Errorf("marshal failed: %s", err)
 	}
 
-	return postgres.Jsonb{data}, nil
+	return utils.JSONB{RawMessage: data}, nil
 }
 
 func (c *CVERecord) DescriptionMain() string {

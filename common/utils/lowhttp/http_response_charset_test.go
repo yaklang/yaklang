@@ -2,10 +2,11 @@ package lowhttp
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/mimetype"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/mimetype"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/stretchr/testify/assert"
 )

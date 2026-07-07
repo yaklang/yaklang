@@ -281,10 +281,10 @@ func TestChatGLMSearch_CustomParams(t *testing.T) {
 	})
 
 	resp, err := client.SearchWithCustomParams("Yaklang", &ChatGLMSearchRequest{
-		Count:              20,
-		SearchEngine:       "search_pro",
+		Count:               20,
+		SearchEngine:        "search_pro",
 		SearchRecencyFilter: "oneWeek",
-		ContentSize:        "high",
+		ContentSize:         "high",
 	})
 	if err != nil {
 		t.Fatalf("search failed: %v", err)
@@ -487,8 +487,8 @@ func TestOmniChatGLMSearch_WithSearchEngineExtra(t *testing.T) {
 		PageSize: 3,
 		Page:     1,
 		Extra: map[string]interface{}{
-			"search_engine":        "search_pro",
-			"content_size":         "high",
+			"search_engine":         "search_pro",
+			"content_size":          "high",
 			"search_recency_filter": "oneWeek",
 		},
 	}

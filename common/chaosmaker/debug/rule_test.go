@@ -2,16 +2,6 @@ package debug
 
 import (
 	"fmt"
-	"github.com/gopacket/gopacket"
-	"github.com/gopacket/gopacket/layers"
-	"github.com/gopacket/gopacket/pcapgo"
-	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/chaosmaker"
-	"github.com/yaklang/yaklang/common/chaosmaker/rule"
-	"github.com/yaklang/yaklang/common/log"
-	surirule "github.com/yaklang/yaklang/common/suricata/rule"
-	"github.com/yaklang/yaklang/common/utils"
-	"golang.org/x/exp/maps"
 	"io"
 	"os"
 	"os/exec"
@@ -22,6 +12,17 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
+	"github.com/gopacket/gopacket/pcapgo"
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/chaosmaker"
+	"github.com/yaklang/yaklang/common/chaosmaker/rule"
+	"github.com/yaklang/yaklang/common/log"
+	surirule "github.com/yaklang/yaklang/common/suricata/rule"
+	"github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/exp/maps"
 )
 
 var workDir = "/Users/z3/Downloads/suricata-test-logs"

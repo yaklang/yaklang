@@ -1,11 +1,12 @@
 package netstackvm
 
 import (
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
-	"testing"
-	"time"
 )
 
 func TestNetstackMonitor(t *testing.T) {

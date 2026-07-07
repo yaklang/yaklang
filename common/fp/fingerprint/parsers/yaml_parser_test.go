@@ -1,11 +1,12 @@
 package parsers
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/embed"
-	"testing"
 )
 
 func TestMatcher(t *testing.T) {

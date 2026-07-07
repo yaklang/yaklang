@@ -1,8 +1,8 @@
 package schema
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 	"io/ioutil"
 )
 
@@ -15,7 +15,7 @@ type Domain struct {
 
 	HTTPTitle string
 
-	Hash string `json:"hash" gorm:"unique_index"`
+	Hash string `json:"hash" gorm:"uniqueIndex"`
 
 	Tags string `json:"tags"`
 }

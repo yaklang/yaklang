@@ -76,7 +76,7 @@ func TestReAct_RecoveryPlanAndExec_SkipCompletedTasks(t *testing.T) {
 	todoIndex := todoTask.Index
 
 	db := consts.GetGormProjectDatabase()
-	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}))
 	t.Cleanup(func() {
 		_ = db.Unscoped().
 			Where("coordinator_id = ?", coordinatorID).
@@ -265,7 +265,7 @@ func TestReAct_RecoveryPlanAndExec_StartFromSpecifiedTask(t *testing.T) {
 	root.GenerateIndex()
 
 	db := consts.GetGormProjectDatabase()
-	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}))
 	t.Cleanup(func() {
 		_ = db.Unscoped().
 			Where("coordinator_id = ?", coordinatorID).

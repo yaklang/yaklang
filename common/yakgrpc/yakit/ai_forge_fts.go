@@ -3,10 +3,10 @@ package yakit
 import (
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"gorm.io/gorm"
 )
 
 // AIForgeVTableName returns the FTS5 virtual table name for AIForge.
@@ -122,7 +122,7 @@ func SearchAIForgeBM25(db *gorm.DB, filter *AIForgeSearchFilter, limit, offset i
 		}
 	}
 	// Short keywords or non-SQLite or no FTS table: fall back to LIKE search
-	if maxLen < 3 || !schema.IsSQLite(db) || !db.HasTable(defaultAIForgeFTS5.FTSTable) {
+	if maxLen < 3 || !schema.IsSQLite(db) || !db.Migrator().HasTable(defaultAIForgeFTS5.FTSTable) {
 		if err := FilterAIForgeForSearch(db, filter).Limit(limit).Offset(offset).Find(&res).Error; err != nil {
 			return nil, err
 		}

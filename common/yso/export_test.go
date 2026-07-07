@@ -1,9 +1,10 @@
 package yso
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestExportFunc(t *testing.T) {

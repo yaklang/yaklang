@@ -2,10 +2,11 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestGRPCMUSTPASS_CSV_Exporter(t *testing.T) {

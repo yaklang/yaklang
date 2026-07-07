@@ -1,11 +1,47 @@
 package utils
 
 import (
+	"database/sql/driver"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 )
+
+// JSONB 兼容 GORM V1 postgres.Jsonb 的 JSONB 字段类型，可通用于 PostgreSQL 与 SQLite。
+type JSONB struct {
+	RawMessage json.RawMessage
+}
+
+// Scan 实现 sql.Scanner
+func (j *JSONB) Scan(value interface{}) error {
+	switch v := value.(type) {
+	case string:
+		j.RawMessage = json.RawMessage(v)
+	case []byte:
+		j.RawMessage = json.RawMessage(v)
+	case nil:
+		j.RawMessage = nil
+	default:
+		return errors.New(fmt.Sprintf("cannot scan %T into JSONB", v))
+	}
+	return nil
+}
+
+// Value 实现 driver.Valuer
+func (j JSONB) Value() (driver.Value, error) {
+	if j.RawMessage == nil {
+		return nil, nil
+	}
+	return string(j.RawMessage), nil
+}
+
+// GormDataType 声明 GORM 字段类型为 jsonb
+func (JSONB) GormDataType() string {
+	return "jsonb"
+}
 
 func GormTransaction(db *gorm.DB, callback func(tx *gorm.DB) error) (err error) {
 	tx := db.Begin()

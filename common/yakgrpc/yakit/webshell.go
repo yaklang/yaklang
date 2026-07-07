@@ -2,11 +2,11 @@ package yakit
 
 import (
 	"errors"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 type shellOptions struct {
@@ -59,7 +59,7 @@ func UpdateWebShellById(db *gorm.DB, id int64, i interface{}) (*schema.WebShell,
 		}
 	}
 	// If the record is found, update it
-	if err := db.Model(shell).Update(i).Error; err != nil {
+	if err := db.Model(shell).Updates(i).Error; err != nil {
 		return nil, utils.Errorf("update WebShell failed: %s", err)
 	}
 

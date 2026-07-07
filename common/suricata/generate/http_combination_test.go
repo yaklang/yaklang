@@ -1,9 +1,10 @@
 package generate
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
-	"testing"
 )
 
 func TestDefaultOrRandom(t *testing.T) {

@@ -6,8 +6,9 @@ package openapi3_test
 import (
 	"embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/openapi/openapi3"
 	"net/url"
+
+	"github.com/yaklang/yaklang/common/openapi/openapi3"
 )
 
 //go:embed testdata/recursiveRef/*

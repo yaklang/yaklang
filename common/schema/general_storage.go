@@ -1,10 +1,10 @@
 package schema
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 	"os"
 	"strconv"
 	"time"
@@ -13,7 +13,7 @@ import (
 type GeneralStorage struct {
 	gorm.Model
 
-	Key string `json:"key" gorm:"unique_index"`
+	Key string `json:"key" gorm:"uniqueIndex"`
 
 	// 经过 JSON + Strconv
 	Value string `json:"value"`

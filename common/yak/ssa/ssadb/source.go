@@ -4,10 +4,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"gorm.io/gorm"
 )
 
 var irSourceCache = utils.NewTTLCache[*memedit.MemEditor]()
@@ -119,11 +119,11 @@ func GetEditorByHash(hash string) (*memedit.MemEditor, error) {
 
 func GetEditorCountByProgramName(programName string) (int, error) {
 	db := GetDB()
-	var count int
+	var count int64
 	if err := db.Model(&IrSource{}).Where("program_name = ?", programName).Count(&count).Error; err != nil {
 		return 0, utils.Wrapf(err, "query source via program name: %v failed", programName)
 	}
-	return count, nil
+	return int(count), nil
 }
 
 func GetEditorByProgramName(programName string) ([]*memedit.MemEditor, error) {

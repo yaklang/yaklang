@@ -2,6 +2,11 @@ package yakgrpc
 
 import (
 	"context"
+	"net/http"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
@@ -10,10 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/http"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestGRPCMUSTPASS_MITM_RemoteAddr(t *testing.T) {

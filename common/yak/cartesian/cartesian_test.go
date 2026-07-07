@@ -2,10 +2,11 @@ package cartesian
 
 import (
 	"context"
-	"github.com/davecgh/go-spew/spew"
 	"math"
 	"reflect"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 func TestProductString(t *testing.T) {

@@ -3,6 +3,10 @@ package chaosmaker
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
@@ -15,9 +19,6 @@ import (
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"os"
-	"strings"
-	"testing"
 )
 
 var rules = []string{

@@ -2,10 +2,11 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestServer_GenerateReverseShellCommand(t *testing.T) {

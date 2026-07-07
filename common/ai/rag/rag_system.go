@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/rag/enhancesearch"
 	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
@@ -21,6 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"gorm.io/gorm"
 )
 
 //go:embed prompt/gen_questions.txt
@@ -660,7 +660,7 @@ func (r *RAGSystem) GenerateQuestionIndex(options ...RAGSystemConfigOption) erro
 	limit := 50
 	db := config.db
 
-	var totalEntries int
+	var totalEntries int64
 	db.Model(&schema.KnowledgeBaseEntry{}).Where("knowledge_base_id = ?", r.GetKnowledgeBaseID()).Count(&totalEntries)
 	config.progressHandler(0, fmt.Sprintf("start to generate question index for %d entries", totalEntries), "info")
 	processedCount := 0

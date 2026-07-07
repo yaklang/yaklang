@@ -3,17 +3,17 @@ package yakit
 import (
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
+	"gorm.io/gorm"
 )
 
 func newMCPUpdateTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db := newMCPSyncTestDB(t)
-	require.NoError(t, db.AutoMigrate(&schema.MCPServer{}).Error)
-	require.NoError(t, db.AutoMigrate(&schema.MCPClientToolConfig{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.MCPServer{}))
+	require.NoError(t, db.AutoMigrate(&schema.MCPClientToolConfig{}))
 	return db
 }
 

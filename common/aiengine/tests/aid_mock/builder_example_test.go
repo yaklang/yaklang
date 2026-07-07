@@ -50,10 +50,10 @@ func ExampleBuildSleepToolParams() {
 // ExampleBuildRiskToolParams 演示如何构建风险创建参数
 func ExampleBuildRiskToolParams() {
 	response := aidmock.BuildRiskToolParams(
-		"http://example.com",  // target
-		"SQL注入漏洞",          // title
-		"high",                 // severity
-		"sqli",                 // risk type
+		"http://example.com", // target
+		"SQL注入漏洞",            // title
+		"high",               // severity
+		"sqli",               // risk type
 	)
 
 	err := aidmock.ValidateResponse(response)
@@ -240,7 +240,7 @@ func ExamplePrettyPrintResponse() {
 
 	// 格式化打印（实际会包含缩进和换行）
 	pretty := aidmock.PrettyPrintResponse(response)
-	
+
 	// 验证格式化后仍是有效JSON
 	err := aidmock.ValidateResponse(pretty)
 	fmt.Printf("Pretty printed response valid: %v\n", err == nil)
@@ -304,4 +304,3 @@ func ExampleBuildRequireTool_comparison() {
 	// Raw JSON valid: true
 	// Builder is recommended for type safety and maintainability
 }
-

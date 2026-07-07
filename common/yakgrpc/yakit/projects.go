@@ -11,12 +11,12 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 const (
@@ -32,7 +32,7 @@ const (
 
 func InitializingProjectDatabase() error {
 	profileDB := consts.GetGormProfileDatabase()
-	profileDB.Model(&schema.Project{}).RemoveIndex("uix_projects_project_name")
+	_ = profileDB.Migrator().DropIndex(&schema.Project{}, "uix_projects_project_name")
 
 	defaultYakitPath := consts.GetDefaultYakitBaseDir()
 	log.Debugf("Yakit base directory: %s", defaultYakitPath)
@@ -146,7 +146,7 @@ func CreateProjectFile(name, Type string) (string, error) {
 		if err != nil {
 			return "", utils.Errorf("create project database failed: %s", err)
 		}
-		defer projectDatabase.Close()
+		defer consts.CloseGormDB(projectDatabase)
 
 		return pathName, nil
 	case TypeSSAProject:
@@ -156,7 +156,7 @@ func CreateProjectFile(name, Type string) (string, error) {
 		if err != nil {
 			return "", utils.Errorf("create ssa project database failed: %s", err)
 		}
-		defer ssaProjectDatabase.Close()
+		defer consts.CloseGormDB(ssaProjectDatabase)
 		return pathName, nil
 	case TypeFile:
 		return "", nil
@@ -272,8 +272,8 @@ func GetCurrentProject(db *gorm.DB, Type string) (*schema.Project, error) {
 			return nil, utils.Errorf("cannot found current project or default database: %s", db2.Error)
 		}
 
-		db.Where("true").Update(map[string]interface{}{"is_current_project": false})
-		db.Where("project_name = ?", INIT_DATABASE_RECORD_NAME).Update(map[string]interface{}{
+		db.Where("true").Updates(map[string]interface{}{"is_current_project": false})
+		db.Where("project_name = ?", INIT_DATABASE_RECORD_NAME).Updates(map[string]interface{}{
 			"is_current_project": true,
 		})
 
@@ -283,16 +283,16 @@ func GetCurrentProject(db *gorm.DB, Type string) (*schema.Project, error) {
 }
 
 func SetCurrentProject(db *gorm.DB, name string) error {
-	if db1 := db.Model(&schema.Project{}).Where("true").Update(map[string]interface{}{
+	if db1 := db.Model(&schema.Project{}).Where("true").Updates(map[string]interface{}{
 		"is_current_project": false,
 	}); db1.Error != nil {
 		log.Errorf("unset all projects current status: %s", db1.Error)
 	}
 
-	if db := db.Model(&schema.Project{}).Where("project_name = ?", name).Update(map[string]interface{}{
+	if db := db.Model(&schema.Project{}).Where("project_name = ?", name).Updates(map[string]interface{}{
 		"is_current_project": true,
 	}); db.Error != nil {
-		db.Model(&schema.Project{}).Where("project_name = ?", name).Update(map[string]interface{}{
+		db.Model(&schema.Project{}).Where("project_name = ?", name).Updates(map[string]interface{}{
 			"is_current_project": false,
 		})
 		return utils.Errorf("cannot set current project: %s", db.Error)
@@ -348,16 +348,16 @@ func YieldProject(db *gorm.DB, ctx context.Context) chan *schema.Project {
 }
 
 func SetCurrentProjectById(db *gorm.DB, id int64) error {
-	if db1 := db.Model(&schema.Project{}).Where("is_current_project = true").Update(map[string]interface{}{
+	if db1 := db.Model(&schema.Project{}).Where("is_current_project = true").Updates(map[string]interface{}{
 		"is_current_project": false,
 	}); db1.Error != nil {
 		log.Errorf("unset all projects current status: %s", db1.Error)
 	}
 
-	if db := db.Model(&schema.Project{}).Where("id = ?", id).Update(map[string]interface{}{
+	if db := db.Model(&schema.Project{}).Where("id = ?", id).Updates(map[string]interface{}{
 		"is_current_project": true,
 	}); db.Error != nil {
-		db.Model(&schema.Project{}).Where("id = ?", id).Update(map[string]interface{}{
+		db.Model(&schema.Project{}).Where("id = ?", id).Updates(map[string]interface{}{
 			"is_current_project": false,
 		})
 		return utils.Errorf("cannot set current project: %s", db.Error)
@@ -420,7 +420,7 @@ func GetProjectByWhere(db *gorm.DB, name string, folderID, childFolderID int64, 
 }
 
 func UpdateProject(db *gorm.DB, id int64, i schema.Project) error {
-	db = db.Model(&schema.Project{}).Where("id = ?", id).Update(map[string]interface{}{
+	db = db.Model(&schema.Project{}).Where("id = ?", id).Updates(map[string]interface{}{
 		"ProjectName":         i.ProjectName,
 		"Description":         i.Description,
 		"DatabasePath":        i.DatabasePath,

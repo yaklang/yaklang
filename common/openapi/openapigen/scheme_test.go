@@ -2,10 +2,11 @@ package openapigen
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/openapi/openapiyaml"
 	"github.com/yaklang/yaklang/common/utils"
-	"testing"
 )
 
 func TestJSONToScheme_INT(t *testing.T) {

@@ -1,9 +1,10 @@
 package openapi3
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/stretchr/testify/require"
 )

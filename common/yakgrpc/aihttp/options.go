@@ -1,6 +1,6 @@
 package aihttp
 
-import "github.com/jinzhu/gorm"
+import "gorm.io/gorm"
 
 type GatewayOption func(*AIAgentHTTPGateway)
 

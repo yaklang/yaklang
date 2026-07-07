@@ -10,11 +10,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
+	"gorm.io/gorm"
 )
 
 // 导出的公共函数

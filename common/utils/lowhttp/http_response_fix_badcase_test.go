@@ -3,15 +3,16 @@ package lowhttp
 import (
 	"bytes"
 	_ "embed"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/h2non/filetype"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net"
 	"strings"
 	"testing"
 	"time"
 	"unicode"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/h2non/filetype"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func _mockHTTP(rsp []byte) (string, int) {

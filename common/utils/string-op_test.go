@@ -2,9 +2,10 @@ package utils
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
-	"testing"
 )
 
 func TestLastLine(t *testing.T) {

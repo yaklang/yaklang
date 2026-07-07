@@ -2,9 +2,10 @@ package asynchelper
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 func TestLogModesWithMock(t *testing.T) {

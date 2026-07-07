@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 )
 
 func TestCommandTomFileTest(t *testing.T) {

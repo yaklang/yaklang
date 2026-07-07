@@ -2,10 +2,11 @@ package aicommon
 
 import (
 	"encoding/json"
+	"testing"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
-	"testing"
 )
 
 func TestAIStatefulTaskBase_TaskBaseOptions(t *testing.T) {

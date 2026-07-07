@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"io"
 	"net/http"
 	"strconv"
@@ -12,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yak/httptpl"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"

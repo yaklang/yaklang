@@ -8,7 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 )
 
 type IrCode struct {

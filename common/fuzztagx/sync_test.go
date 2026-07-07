@@ -2,10 +2,11 @@ package fuzztagx
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 )
 
 // TestSyncRootTag test generator global sync config

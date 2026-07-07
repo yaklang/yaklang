@@ -3,9 +3,9 @@ package schema
 import (
 	"encoding/json"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 type CodecFlow struct {

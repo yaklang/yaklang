@@ -1,9 +1,9 @@
 package schema
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 // Project 描述一个 Yakit 项目
@@ -21,7 +21,7 @@ type Project struct {
 	FolderID         int64
 	ChildFolderID    int64
 	Type             string
-	// Hash string `gorm:"unique_index"`
+	// Hash string `gorm:"uniqueIndex"`
 	// 企业版 项目模块及项目编号
 	ExternalModule      string
 	ExternalProjectCode string

@@ -3,14 +3,14 @@ package schema
 import (
 	"time"
 
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 )
 
 // AISession stores basic metadata for an AI chat session.
 type AISession struct {
 	gorm.Model
 
-	SessionID        string    `json:"session_id" gorm:"unique_index;not null"`
+	SessionID        string    `json:"session_id" gorm:"uniqueIndex;not null"`
 	Title            string    `json:"title" gorm:"type:text"`
 	TitleInitialized bool      `json:"title_initialized" gorm:"index;default:false"`
 	StartParams      string    `json:"start_params" gorm:"column:start_params;type:text"`
@@ -38,7 +38,7 @@ type AISessionPlanAndExec struct {
 	gorm.Model
 
 	SessionID     string `json:"session_id" gorm:"index;not null"`
-	CoordinatorID string `json:"coordinator_id" gorm:"unique_index;not null"`
+	CoordinatorID string `json:"coordinator_id" gorm:"uniqueIndex;not null"`
 
 	// TaskTree stores the serialized plan/execution tree (typically JSON).
 	TaskTree string `json:"task_tree" gorm:"type:text"`

@@ -1,10 +1,11 @@
 package hnsw
 
 import (
-	"github.com/stretchr/testify/require"
 	"math/rand"
 	"slices"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 type Int int

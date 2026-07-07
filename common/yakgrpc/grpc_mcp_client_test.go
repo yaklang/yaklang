@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
@@ -22,6 +21,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 func migrateMCPServerRelatedTables(db *gorm.DB) error {
@@ -29,7 +29,7 @@ func migrateMCPServerRelatedTables(db *gorm.DB) error {
 		&schema.MCPServer{},
 		&schema.MCPServerToolConfig{},
 		&schema.MCPClientToolConfig{},
-	).Error
+	)
 }
 
 func init() {

@@ -1,9 +1,10 @@
 package spel
 
 import (
+	"testing"
+
 	"github.com/yaklang/yaklang/common/utils"
 	spelparser "github.com/yaklang/yaklang/common/yak/java/spel/parser"
-	"testing"
 )
 
 const EXAMPLE = `

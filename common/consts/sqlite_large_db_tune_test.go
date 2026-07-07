@@ -17,7 +17,7 @@ func TestTuneSQLiteByDatabaseFileSize(t *testing.T) {
 
 	db, err := createAndConfigDatabase(dbPath)
 	require.NoError(t, err)
-	require.NoError(t, db.DB().Close())
+	require.NoError(t, CloseGormDB(db))
 
 	wal, err := os.OpenFile(dbPath+"-wal", os.O_CREATE|os.O_WRONLY, 0o666)
 	require.NoError(t, err)
@@ -26,7 +26,7 @@ func TestTuneSQLiteByDatabaseFileSize(t *testing.T) {
 
 	db, err = createAndConfigDatabase(dbPath)
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.DB().Close() })
+	t.Cleanup(func() { _ = CloseGormDB(db) })
 
 	require.True(t, TuneSQLiteByDatabaseFileSize(db, dbPath))
 	require.False(t, TuneSQLiteByDatabaseFileSize(db, dbPath))

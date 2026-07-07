@@ -3,10 +3,11 @@ package aitool
 import (
 	"encoding/json"
 	"fmt"
-	"golang.org/x/net/context"
 	"io"
 	"strings"
 	"testing"
+
+	"golang.org/x/net/context"
 )
 
 // TestToolExecutionResult 测试工具执行结果

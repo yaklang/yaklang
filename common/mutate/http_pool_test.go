@@ -2,14 +2,15 @@ package mutate
 
 import (
 	"fmt"
-	"github.com/samber/lo"
-	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	url2 "net/url"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 func TestFuzzNucleiVar(t *testing.T) {

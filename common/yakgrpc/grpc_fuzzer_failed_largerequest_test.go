@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net"
-	"testing"
 )
 
 func TestGRPCMUSTPASS_HTTPFUZZER_LargeRequest_Failed(t *testing.T) {

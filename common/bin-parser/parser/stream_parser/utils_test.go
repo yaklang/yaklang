@@ -1,9 +1,10 @@
 package stream_parser
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"testing"
 )
 
 func TestAnyToBytes(t *testing.T) {

@@ -3,11 +3,12 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"strings"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"testing"
 )
 
 func TestGRPCMUSTPASS_HTTPFuzzer_RandomChunked(t *testing.T) {

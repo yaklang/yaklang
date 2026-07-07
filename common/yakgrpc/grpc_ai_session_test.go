@@ -17,7 +17,7 @@ import (
 func TestServer_QueryAISession_Pagination(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	srv := &Server{projectDatabase: db}
 
@@ -101,7 +101,7 @@ func TestServer_QueryAISession_Pagination(t *testing.T) {
 func TestServer_QueryAISession_DefaultPagination(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	srv := &Server{projectDatabase: db}
 
@@ -130,7 +130,7 @@ func TestServer_QueryAISession_DefaultPagination(t *testing.T) {
 func TestServer_QueryAISession_FilterBySource(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	srv := &Server{projectDatabase: db}
 

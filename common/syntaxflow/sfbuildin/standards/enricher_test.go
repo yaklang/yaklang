@@ -80,7 +80,7 @@ func TestEnrichGroupNames(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			groups := enricher.EnrichGroupNames(tt.ruleName, tt.filePath, tt.cwes)
-			
+
 			// 检查预期的分组是否都存在
 			for _, expected := range tt.expectGroups {
 				assert.Contains(t, groups, expected, "Expected group %s not found", expected)

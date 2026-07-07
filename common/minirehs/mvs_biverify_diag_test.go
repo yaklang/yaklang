@@ -26,6 +26,7 @@ func BenchmarkMVSBiAnchorAB(b *testing.B) {
 // TestMVSBiAnchorDispatchDiag 确认双向锚定是否在真实 MITM 三大热点生效, 并量化:
 //   - 各 batch-full lean pattern 现归属 (biAnchor / batch / anchor / window)
 //   - 仍走 C 内核 batch 的 nfaExists 扫描字节 (cgoNfaExistsBytes), 对照旧整段 winBytes
+//
 // 仅诊断. 运行: go test -run TestMVSBiAnchorDispatchDiag -v
 func TestMVSBiAnchorDispatchDiag(t *testing.T) {
 	requireDiag(t)

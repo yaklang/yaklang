@@ -71,9 +71,9 @@ func renderDynamicPlanFixture(t *testing.T, task *AiTask, userInput string, froz
 	schema := task.ContextProvider.Schema()
 	materials := &aicommon.PromptMaterials{
 		TaskInstruction: strings.TrimSpace(__prompt_dynamicPlanInstruction),
-		Schema:            schema["RePlanJsonSchema"],
-		TimelineFrozen:    frozen,
-		TimelineOpen:      open,
+		Schema:          schema["RePlanJsonSchema"],
+		TimelineFrozen:  frozen,
+		TimelineOpen:    open,
 	}
 	prompt, err := aicommon.NewDefaultPromptPrefixBuilder().AssemblePromptWithDynamicSection(
 		materials,

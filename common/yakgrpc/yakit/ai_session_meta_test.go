@@ -1,21 +1,22 @@
 package yakit
 
 import (
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 func TestAISessionMetaCRUD(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	created, err := CreateOrUpdateAISessionMeta(db, "sess-1", "first title")
 	require.NoError(t, err)
@@ -52,7 +53,7 @@ func TestAISessionMetaCRUD(t *testing.T) {
 func TestEnsureAISessionMetaDefaultTitle(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	created, err := EnsureAISessionMeta(db, "sess-default-title")
 	require.NoError(t, err)
@@ -68,7 +69,7 @@ func TestEnsureAISessionMetaDefaultTitle(t *testing.T) {
 func TestEnsureAISessionMetaNotOverrideExistingTitle(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	_, err = CreateOrUpdateAISessionMeta(db, "sess-keep-title", "自定义标题")
 	require.NoError(t, err)
@@ -86,7 +87,7 @@ func TestEnsureAISessionMetaNotOverrideExistingTitle(t *testing.T) {
 func TestAppendAISessionMetaRelatedRuntimeID(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	sessionID := "sess-runtime-ids"
 	runtimeID1 := "runtime-a"
@@ -109,7 +110,7 @@ func TestAppendAISessionMetaRelatedRuntimeID(t *testing.T) {
 func TestAppendAISessionMetaRelatedRuntimeID_NotFoundIgnored(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	err = AppendAISessionMetaRelatedRuntimeID(db, "missing-session", uuid.NewString())
 	require.NoError(t, err)
@@ -118,7 +119,7 @@ func TestAppendAISessionMetaRelatedRuntimeID_NotFoundIgnored(t *testing.T) {
 func TestAppendAISessionMetaRelatedRuntimeID_InvalidStoredJSON(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	sessionID := "sess-invalid-runtime-json"
 	_, err = CreateOrUpdateAISessionMeta(db, sessionID, "title")
@@ -134,7 +135,7 @@ func TestAppendAISessionMetaRelatedRuntimeID_InvalidStoredJSON(t *testing.T) {
 func TestAppendAISessionMetaRelatedRuntimeID_PlainString(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	sessionID := "sess-plain-runtime-id"
 	_, err = CreateOrUpdateAISessionMeta(db, sessionID, "title")
@@ -151,7 +152,7 @@ func TestAppendAISessionMetaRelatedRuntimeID_PlainString(t *testing.T) {
 func TestEnsureAISessionMetaSetsSource(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	meta, err := EnsureAISessionMeta(db, "sess-src-new", "ide")
 	require.NoError(t, err)
@@ -172,7 +173,7 @@ func TestEnsureAISessionMetaSetsSource(t *testing.T) {
 func TestEnsureAISessionMetaBackfillSource(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	_, err = CreateOrUpdateAISessionMeta(db, "sess-backfill", "t")
 	require.NoError(t, err)
@@ -190,7 +191,7 @@ func TestEnsureAISessionMetaBackfillSource(t *testing.T) {
 func TestAISessionMetaStartParamsCRUD(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	params := &ypb.AIStartParams{
 		ReviewPolicy:              "ai",
@@ -217,7 +218,7 @@ func TestAISessionMetaStartParamsCRUD(t *testing.T) {
 func TestGetAISessionMetaStartParams_DiscardUnknownFields(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	sessionID := "sess-unknown-start-field"
 	_, err = CreateOrUpdateAISessionMeta(db, sessionID, "test")
@@ -239,7 +240,7 @@ func TestGetAISessionMetaStartParams_DiscardUnknownFields(t *testing.T) {
 func TestTouchAISessionMetaLastUsedAt(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	lastUsedAt := time.Unix(1716200000, 0)
 	got, err := TouchAISessionMetaLastUsedAt(db, "sess-last-used", lastUsedAt)
@@ -286,7 +287,7 @@ func TestUpdateAISessionIMMetaTouchesLastUsedAt(t *testing.T) {
 func TestCreateOrUpdateAISessionMetaOnStart(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}))
 
 	lastUsedAt := time.Unix(1716201234, 0)
 	params := &ypb.AIStartParams{
@@ -352,8 +353,8 @@ func TestMigrateAISessionMetaFromEvents(t *testing.T) {
 	projectDB, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
 
-	require.NoError(t, profileDB.AutoMigrate(&schema.GeneralStorage{}).Error)
-	require.NoError(t, projectDB.AutoMigrate(&schema.AISession{}, &schema.AiOutputEvent{}).Error)
+	require.NoError(t, profileDB.AutoMigrate(&schema.GeneralStorage{}))
+	require.NoError(t, projectDB.AutoMigrate(&schema.AISession{}, &schema.AiOutputEvent{}))
 
 	// sess-1: should prefer first input event title over other event content.
 	require.NoError(t, projectDB.Create(&schema.AiOutputEvent{
@@ -398,7 +399,7 @@ func TestMigrateAISessionMetaFromEvents(t *testing.T) {
 
 	var s3 schema.AISession
 	err = projectDB.Where("session_id = ?", "sess-3").First(&s3).Error
-	require.True(t, gorm.IsRecordNotFoundError(err))
+	require.True(t, errors.Is(err, gorm.ErrRecordNotFound))
 }
 
 func TestExtractTitleFromEventContent_PrefersQuestionField(t *testing.T) {

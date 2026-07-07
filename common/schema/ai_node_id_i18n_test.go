@@ -9,9 +9,9 @@ import (
 
 func TestNodeIdI18n_RequiredNodeIds(t *testing.T) {
 	requiredNodeIds := []struct {
-		nodeId     string
-		expectZh   string
-		expectEn   string
+		nodeId   string
+		expectZh string
+		expectEn string
 	}{
 		{"ai-error", "AI 调用错误", "AI Invocation Error"},
 		{"rate-limit", "请求限频", "Rate Limited"},

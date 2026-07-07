@@ -3,8 +3,9 @@
 package tools
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestTree(t *testing.T) {

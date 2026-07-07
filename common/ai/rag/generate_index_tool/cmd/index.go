@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/ai/rag/generate_index_tool"
+	"github.com/yaklang/yaklang/common/urfavecli"
 
 	_ "github.com/yaklang/yaklang/common/ai/aid"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact"
@@ -16,7 +16,7 @@ func indexCommand(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer closeGormDB(db)
 
 	collectionName := c.String("collection")
 	cacheDir := c.String("cache")

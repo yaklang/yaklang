@@ -3,24 +3,25 @@ package yakit
 import (
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 func setupAIProviderTestDB(t *testing.T) *gorm.DB {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.GeneralStorage{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.GeneralStorage{}))
 	return db
 }
 
 func TestListAIProviders_FromGlobalConfig(t *testing.T) {
 	db := setupAIProviderTestDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	cfg := &ypb.AIGlobalConfig{
 		IntelligentModels: []*ypb.AIModelConfig{
@@ -54,7 +55,7 @@ func TestListAIProviders_FromGlobalConfig(t *testing.T) {
 
 func TestQueryAIProviders_Filter(t *testing.T) {
 	db := setupAIProviderTestDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	cfg := &ypb.AIGlobalConfig{
 		IntelligentModels: []*ypb.AIModelConfig{
@@ -100,7 +101,7 @@ func TestQueryAIProviders_Filter(t *testing.T) {
 
 func TestUpsertAndDeleteAIProvider_Deprecated(t *testing.T) {
 	db := setupAIProviderTestDB(t)
-	defer db.Close()
+	defer consts.CloseGormDB(db)
 
 	_, err := UpsertAIProvider(db, &ypb.AIProvider{
 		Config: &ypb.ThirdPartyApplicationConfig{

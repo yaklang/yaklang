@@ -12,7 +12,7 @@ import (
 func TestSaveStreamAIEvent_CoalesceAndFlush(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AiOutputEvent{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AiOutputEvent{}))
 
 	eventID := uuid.NewString()
 	t.Cleanup(func() { FinishStreamAIEvent(db, eventID) })
@@ -45,7 +45,7 @@ func TestSaveStreamAIEvent_CoalesceAndFlush(t *testing.T) {
 func TestStreamFinished_ClosesStreamBuffer(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AiOutputEvent{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.AiOutputEvent{}))
 
 	eventID := uuid.NewString()
 	t.Cleanup(func() { FinishStreamAIEvent(db, eventID) })

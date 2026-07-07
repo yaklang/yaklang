@@ -3,6 +3,10 @@ package wsm
 import (
 	"encoding/base64"
 	"fmt"
+	"regexp"
+	"strings"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
@@ -10,9 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/wsm/payloads"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"regexp"
-	"strings"
-	"testing"
 )
 
 func TestNewWebJSPShell(t *testing.T) {

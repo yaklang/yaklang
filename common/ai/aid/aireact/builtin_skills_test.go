@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"gorm.io/gorm"
 )
 
 // allBuiltinSkills lists every built-in skill that ships with the binary.
@@ -50,7 +50,7 @@ func useTempBuiltinSkillReleaseDB(t *testing.T) {
 
 	t.Cleanup(func() {
 		builtinSkillReleaseDB = originalResolver
-		_ = db.Close()
+		_ = consts.CloseGormDB(db)
 	})
 }
 

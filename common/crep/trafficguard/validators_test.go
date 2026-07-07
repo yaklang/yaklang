@@ -126,7 +126,7 @@ func TestSecretFieldTightening(t *testing.T) {
 	// 真实凭证型(包括 JS 硬编码): 应保留。
 	truePositives := []string{
 		`{"password":"S3cr3tP@ssw0rd2024"}`,
-		`apiKey: "Ak9Lm2Xz7Qw8Rt5Yu3Vb1Nc"`,         // JS 硬编码长随机串
+		`apiKey: "Ak9Lm2Xz7Qw8Rt5Yu3Vb1Nc"`,           // JS 硬编码长随机串
 		`client_secret=GOCSPX-1a2B3c4D5e6F7g8H9iJ0kL`, // 含大小写+数字+前缀
 	}
 	for _, tp := range truePositives {
@@ -210,8 +210,8 @@ func TestRealSecretInLoginPageStillReported(t *testing.T) {
 	}
 	positives := []string{
 		`{"code":0,"data":{"username":"alice","password":"S3cr3tP@ssw0rd2024"}}`, // 接口返回明文真口令
-		`{"password":"Xk9Lm2Zq7Rw8Tt5Yu3Vb"}`,                                     // 大小写+数字随机串
-		`config: {"db_password":"Pg#2024Prod!"}`,                                  // 含特殊字符
+		`{"password":"Xk9Lm2Zq7Rw8Tt5Yu3Vb"}`,                                    // 大小写+数字随机串
+		`config: {"db_password":"Pg#2024Prod!"}`,                                 // 含特殊字符
 	}
 	for _, p := range positives {
 		if fs := s.ScanResponse([]byte(p)); !ruleHit(fs, 23) {

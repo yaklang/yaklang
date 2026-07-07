@@ -43,4 +43,3 @@ func ExampleSingleFileModificationSuiteFactory_reportGenerating() {
 	// Output:
 	// write_section false
 }
-

@@ -7,18 +7,19 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"reflect"
 	"unicode"
 
-	"github.com/jinzhu/gorm"
 	"github.com/segmentio/ksuid"
 	"github.com/xdg-go/pbkdf2"
 	"github.com/yaklang/yaklang/common/gmsm/sm4"
 	"github.com/yaklang/yaklang/common/gmsm/sm4/padding"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 // ImportConfig 定义了导入配置参数
@@ -292,7 +293,7 @@ func (t *tableImportTool[T]) createOrUpdateByUniqueIndex(d *T) error {
 				}
 			}
 		}
-	} else if gorm.IsRecordNotFoundError(err) {
+	} else if errors.Is(err, gorm.ErrRecordNotFound) {
 		// 记录不存在，创建新记录
 		if err = t.db.Create(d).Error; err != nil {
 			if err = t.config.CallErrorHandler(err); err != nil {

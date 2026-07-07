@@ -1,7 +1,7 @@
 package vulinbox
 
 import (
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 	"math/rand"
 )
 

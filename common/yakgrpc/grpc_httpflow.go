@@ -26,7 +26,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -35,6 +34,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 func (s *Server) DeleteHTTPFlows(ctx context.Context, r *ypb.DeleteHTTPFlowRequest) (*ypb.Empty, error) {
@@ -260,8 +260,7 @@ func (s *Server) QueryHTTPFlows(ctx context.Context, req *ypb.QueryHTTPFlowReque
 	tracer := &yakit.SQLTraceLogger{}
 	db := s.GetProjectDatabase()
 	if db != nil {
-		db.SetLogger(tracer)
-		db = db.LogMode(true)
+		db = db.Session(&gorm.Session{Logger: tracer})
 	}
 
 	paging, data, err := yakit.QueryHTTPFlow(db, req)
@@ -566,9 +565,9 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 				IsReadTooSlowResponse:      data.IsReadTooSlowResponse,
 				TooLargeResponseHeaderFile: data.TooLargeResponseHeaderFile,
 				TooLargeResponseBodyFile:   data.TooLargeResponseBodyFile,
-				IsTooLargeRequest:         data.IsTooLargeRequest,
-				TooLargeRequestHeaderFile: data.TooLargeRequestHeaderFile,
-				TooLargeRequestBodyFile:   data.TooLargeRequestBodyFile,
+				IsTooLargeRequest:          data.IsTooLargeRequest,
+				TooLargeRequestHeaderFile:  data.TooLargeRequestHeaderFile,
+				TooLargeRequestBodyFile:    data.TooLargeRequestBodyFile,
 				Host:                       data.Host,
 			}
 			yakit.SyncLargeHTTPFlowFlagsFromStoredPacket(shareHttpFlow, shareHttpFlow.RequestLength, shareHttpFlow.BodyLength)
@@ -771,9 +770,9 @@ func (s *Server) HTTPFlowsData(ctx context.Context, httpFlow *schema.HTTPFlow) (
 		IsReadTooSlowResponse:      httpFlow.IsReadTooSlowResponse,
 		TooLargeResponseHeaderFile: httpFlow.TooLargeResponseHeaderFile,
 		TooLargeResponseBodyFile:   httpFlow.TooLargeResponseBodyFile,
-		IsTooLargeRequest:         httpFlow.IsTooLargeRequest,
-		TooLargeRequestHeaderFile: httpFlow.TooLargeRequestHeaderFile,
-		TooLargeRequestBodyFile:   httpFlow.TooLargeRequestBodyFile,
+		IsTooLargeRequest:          httpFlow.IsTooLargeRequest,
+		TooLargeRequestHeaderFile:  httpFlow.TooLargeRequestHeaderFile,
+		TooLargeRequestBodyFile:    httpFlow.TooLargeRequestBodyFile,
 		Host:                       httpFlow.Host,
 	}
 	projectStoragesWhere := []string{strconv.Quote(strconv.FormatInt(int64(httpFlow.ID), 10) + "_response"), strconv.Quote(strconv.FormatInt(int64(httpFlow.ID), 10) + "_request")}

@@ -7,11 +7,11 @@ import (
 	"io"
 
 	"github.com/go-viper/mapstructure/v2"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 var NewLocalClient func(locals ...bool) (YakClientInterface, error)

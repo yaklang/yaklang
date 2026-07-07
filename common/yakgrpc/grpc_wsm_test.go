@@ -14,7 +14,7 @@ import (
 
 type stubWebShellManager struct{}
 
-func (s *stubWebShellManager) ClientRequestEncode(raw []byte) ([]byte, error) { return raw, nil }
+func (s *stubWebShellManager) ClientRequestEncode(raw []byte) ([]byte, error)  { return raw, nil }
 func (s *stubWebShellManager) ServerResponseDecode(raw []byte) ([]byte, error) { return raw, nil }
 func (s *stubWebShellManager) SetPacketScriptContent(string)                   {}
 func (s *stubWebShellManager) EchoResultEncodeFormYak(raw []byte) ([]byte, error) {
@@ -45,8 +45,8 @@ func (s *stubWebShellManager) SetCustomEncFunc(func(data, key []byte) ([]byte, e
 func TestCreateWebShellInvalidatesManagerCache(t *testing.T) {
 	server, err := newLiteYakServerForHotPatchTests(t)
 	require.NoError(t, err)
-	require.NoError(t, server.GetProjectDatabase().AutoMigrate(&schema.WebShell{}).Error)
-	require.NoError(t, server.GetProfileDatabase().AutoMigrate(&schema.YakScript{}).Error)
+	require.NoError(t, server.GetProjectDatabase().AutoMigrate(&schema.WebShell{}))
+	require.NoError(t, server.GetProfileDatabase().AutoMigrate(&schema.YakScript{}))
 
 	originCache := webShellManagerCache
 	webShellManagerCache = make(map[int64]wsm.BaseShellManager)
@@ -82,8 +82,8 @@ func TestCreateWebShellInvalidatesManagerCache(t *testing.T) {
 func TestPingReturnsManagerLoadError(t *testing.T) {
 	server, err := newLiteYakServerForHotPatchTests(t)
 	require.NoError(t, err)
-	require.NoError(t, server.GetProjectDatabase().AutoMigrate(&schema.WebShell{}).Error)
-	require.NoError(t, server.GetProfileDatabase().AutoMigrate(&schema.YakScript{}).Error)
+	require.NoError(t, server.GetProjectDatabase().AutoMigrate(&schema.WebShell{}))
+	require.NoError(t, server.GetProfileDatabase().AutoMigrate(&schema.YakScript{}))
 
 	originCache := webShellManagerCache
 	webShellManagerCache = make(map[int64]wsm.BaseShellManager)

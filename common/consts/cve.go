@@ -8,9 +8,9 @@ import (
 
 	"github.com/yaklang/yaklang/common/schema"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 var (
@@ -39,7 +39,7 @@ func SetGormCVEDatabase(db *gorm.DB) {
 		gormCVEDatabase = db
 		return
 	}
-	gormCVEDatabase.Close()
+	_ = CloseGormDB(gormCVEDatabase)
 	gormCVEDatabase = db
 	return
 }
@@ -166,8 +166,8 @@ func InitializeCVEDatabase() (*gorm.DB, error) {
 	}
 	// issue #725 这一步要在添加索引之前，否则会从添加索引的 return 语句中返回
 	// 如果没有表就删除 open 产生的文件
-	if !gormCVEDatabase.HasTable("cves") {
-		gormCVEDatabase.Close()
+	if !gormCVEDatabase.Migrator().HasTable("cves") {
+		_ = CloseGormDB(gormCVEDatabase)
 		gormCVEDatabase = nil
 		err := DeleteDatabaseFile(cveDatabase)
 		if err != nil {

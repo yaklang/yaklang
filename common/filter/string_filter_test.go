@@ -1,9 +1,10 @@
 package filter
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestRemoveDuplicatePorts(t *testing.T) {

@@ -2,17 +2,18 @@ package yakit
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 func CreateEntityBaseInfo(db *gorm.DB, entityBase *schema.EntityRepository) error {
@@ -96,7 +97,7 @@ func GetEntityRepositoryByRAGID(db *gorm.DB, ragID string) (*schema.EntityReposi
 	var entityRepository schema.EntityRepository
 	db = db.Model(&schema.EntityRepository{})
 	if err := db.Where("rag_id = ?", ragID).First(&entityRepository).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, utils.Wrap(err, "entity repository not found")
 		}
 		return nil, err
@@ -108,7 +109,7 @@ func GetEntityRepositoryByName(db *gorm.DB, name string) (*schema.EntityReposito
 	var entityRepository schema.EntityRepository
 	db = db.Model(&schema.EntityRepository{})
 	if err := db.Where("entity_base_name = ?", name).First(&entityRepository).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, utils.Errorf("entity repository not found")
 		}
 		return nil, err
@@ -120,7 +121,7 @@ func GetEntityByID(db *gorm.DB, id uint) (*schema.ERModelEntity, error) {
 	var entity schema.ERModelEntity
 	db = db.Model(&schema.ERModelEntity{})
 	if err := db.Where("id = ?", id).First(&entity).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, utils.Errorf("entity not found")
 		}
 		return nil, err
@@ -132,7 +133,7 @@ func GetEntityByIndex(db *gorm.DB, index string) (*schema.ERModelEntity, error) 
 	var entity schema.ERModelEntity
 	db = db.Model(&schema.ERModelEntity{})
 	if err := db.Where("uuid = ?", index).First(&entity).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, utils.Errorf("entity not found")
 		}
 		return nil, err
@@ -210,7 +211,7 @@ func CreateOrUpdateRelationship(db *gorm.DB, relationship *schema.ERModelRelatio
 
 	var existingRelationship schema.ERModelRelationship
 	if err := db.Where("uuid = ?", relationship.Uuid).First(&existingRelationship).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return db.Create(relationship).Error
 		}
 		return err
@@ -234,7 +235,7 @@ func CreateRelationship(db *gorm.DB, relationship *schema.ERModelRelationship) e
 		if findErr == nil {
 			return nil // 事务成功结束
 		}
-		if gorm.IsRecordNotFoundError(findErr) {
+		if errors.Is(findErr, gorm.ErrRecordNotFound) {
 			return tx.Create(&relationship).Error
 		}
 		return findErr
@@ -258,7 +259,7 @@ func AddRelationship(db *gorm.DB, sourceIndex, targetIndex, baseIndex, Relations
 		if findErr == nil {
 			return nil // 事务成功结束
 		}
-		if gorm.IsRecordNotFoundError(findErr) {
+		if errors.Is(findErr, gorm.ErrRecordNotFound) {
 			return tx.Create(&Relationship).Error
 		}
 		return findErr

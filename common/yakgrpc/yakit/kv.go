@@ -15,12 +15,12 @@ import (
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 
 	"github.com/jinzhu/copier"
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gorm.io/gorm"
 )
 
 func MigrateLegacyDatabase() error {
@@ -29,7 +29,7 @@ func MigrateLegacyDatabase() error {
 	profileDB := consts.GetGormProfileDatabase()
 
 	log.Info("Start migrate general storage")
-	if projectDB.HasTable(&schema.GeneralStorage{}) {
+	if projectDB.Migrator().HasTable(&schema.GeneralStorage{}) {
 		var count int64
 		projectDB.Model(&schema.GeneralStorage{}).Count(&count)
 		if count > 0 {
@@ -50,7 +50,7 @@ func MigrateLegacyDatabase() error {
 	}
 
 	log.Info("start to migrate yakscript")
-	if projectDB.HasTable(&schema.YakScript{}) {
+	if projectDB.Migrator().HasTable(&schema.YakScript{}) {
 		var count int64
 		projectDB.Model(&schema.YakScript{}).Count(&count)
 		if count > 0 {
@@ -76,7 +76,7 @@ func MigrateLegacyDatabase() error {
 	}
 
 	log.Info("start to migrate payload")
-	if projectDB.HasTable(`payloads`) {
+	if projectDB.Migrator().HasTable(`payloads`) {
 		for _, group := range PayloadGroups(projectDB) {
 			switch group {
 			case "user_top10", "pass_top25":
@@ -124,7 +124,6 @@ func init() {
 	// 注意：aibalance 配置的初始化已移至 grpc_config_global_network.go 的 sync-global-config-from-db 中
 	// 确保在 ConfigureNetWork 之后执行，避免配置被覆盖
 }
-
 
 // RefreshProcessEnv 在数据库初始化的时候执行这个，可以快速更新本进程的环境变量
 func RefreshProcessEnv(db *gorm.DB) {
@@ -349,7 +348,6 @@ func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 			defaultConfig.AiApiPriority = append(defaultConfig.AiApiPriority, gw)
 		}
 	}
-
 
 	// ==================== Tiered AI Model Configuration ====================
 	// Enable tiered AI model configuration by default

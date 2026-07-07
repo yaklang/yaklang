@@ -2,9 +2,10 @@ package hostsparser
 
 import (
 	"context"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
-	"testing"
 )
 
 func TestHostsParser(t *testing.T) {

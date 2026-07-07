@@ -9,7 +9,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -319,7 +318,7 @@ use log=info for [ssa.compile.summary] and log=debug for per-phase timings (ssa.
 			if databaseFileRaw == "" {
 				return utils.Errorf("database path is required when using database dialect")
 			}
-			db, err := gorm.Open(databaseDialect, databaseFileRaw)
+			db, err := consts.OpenDatabaseByDriver(databaseDialect, databaseFileRaw)
 			if err != nil {
 				return utils.Errorf("open database failed: %v", err)
 			}
@@ -1965,7 +1964,7 @@ Unlike code-scan, this command runs query-style output rather than batch report 
 			if databaseFileRaw == "" {
 				return utils.Errorf("database path is required when using database dialect")
 			}
-			db, err := gorm.Open(databaseDialect, databaseFileRaw)
+			db, err := consts.OpenDatabaseByDriver(databaseDialect, databaseFileRaw)
 			if err != nil {
 				return utils.Errorf("open database failed: %v", err)
 			}
