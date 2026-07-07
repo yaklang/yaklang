@@ -116,7 +116,7 @@ func ApplyVerificationNextMovementsAndEmit(
 	// 1. apply: 把 delta 写入共享 store, 后续任何 prompt 渲染都能看到.
 	//    无论 emitter 是否存在, store 都必须更新 — 这是契约的关键, 让
 	//    "apply 必有效果"的语义不依赖前端事件通道的可用性.
-	applyErrors := cfg.ApplyVerificationTodoOps(scope, satisfied, movements)
+	applyResults := cfg.ApplyVerificationTodoOps(scope, satisfied, movements)
 
 	// 2. emit 结构化 todo_list_update + current_task_todo_list_update.
 	//    emitter 为 nil 时跳过 (例如部分单元测试).
@@ -131,6 +131,14 @@ func ApplyVerificationNextMovementsAndEmit(
 			TaskIndex:      scope.TaskIndex,
 		}
 		emitter.EmitTodoListUpdates(cfg, task, payload)
+		// split-stream 只统计 apply 成功的 op: 失败的 op (跨作用域 / 缺 id /
+		// 冗余更新等) 没有真正改变 store, 不应该作为 "新增 / 完成" 计数展示给前端,
+		// 否则会出现"流里显示完成 N 条, 但 TODO 列表没变"的口径不一致.
+		emitter.EmitNextMovementsSplitStreams(
+			"todo_added", "todo_completed",
+			SuccessfulVerifyNextMovements(applyResults),
+			scope.TaskIndex,
+		)
 	}
 
 	// 3. timeline breadcrumb: delta-only 一行一个 op, 与 verification 路径
@@ -140,17 +148,40 @@ func ApplyVerificationNextMovementsAndEmit(
 		if line := FormatNextMovementsBreadcrumb(movements); line != "" {
 			timelineHook("NEXT_MOVEMENTS", line)
 		}
-		emitVerificationTodoApplyErrors(timelineHook, applyErrors)
+		emitVerificationTodoApplyErrors(timelineHook, applyResults)
 	}
+}
+
+// SuccessfulVerifyNextMovements collects the movements from a slice of
+// VerificationTodoApplyResult whose Success is true — i.e. the ops that
+// actually mutated the TODO store. It is used by the split-stream emit path so
+// failed ops (cross-scope mutation, missing id, redundant update, etc.) are not
+// counted as "added / completed" in the streamed cards, keeping the stream
+// display consistent with the post-apply TODO snapshot.
+func SuccessfulVerifyNextMovements(results []VerificationTodoApplyResult) []VerifyNextMovement {
+	if len(results) == 0 {
+		return nil
+	}
+	movements := make([]VerifyNextMovement, 0, len(results))
+	for _, r := range results {
+		if r.Success {
+			movements = append(movements, r.Movement)
+		}
+	}
+	return movements
 }
 
 const verificationTodoApplyErrorTimelineCategory = "[NEXT_MOVEMENTS_ERROR]"
 
-func emitVerificationTodoApplyErrors(timelineHook func(category, line string), errors []VerificationTodoApplyError) {
-	if timelineHook == nil || len(errors) == 0 {
+// emitVerificationTodoApplyErrors renders only the failed results (Success ==
+// false) into the [NEXT_MOVEMENTS_ERROR] timeline category. Successful results
+// are intentionally dropped here — the timeline breadcrumb is reserved for
+// apply failures that need user/AI attention.
+func emitVerificationTodoApplyErrors(timelineHook func(category, line string), results []VerificationTodoApplyResult) {
+	if timelineHook == nil || len(results) == 0 {
 		return
 	}
-	if line := FormatVerificationTodoApplyErrors(errors); line != "" {
+	if line := FormatVerificationTodoApplyErrors(results); line != "" {
 		timelineHook(verificationTodoApplyErrorTimelineCategory, line)
 	}
 }

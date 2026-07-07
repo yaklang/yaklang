@@ -31,7 +31,7 @@ func (c *maxIterTestConfig) ActiveVerificationTodoItemsByScope(scope aicommon.Ve
 	return append([]aicommon.VerificationTodoItem(nil), c.activeByTask[scope.TaskID]...)
 }
 
-func (c *maxIterTestConfig) ApplyVerificationTodoOps(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) []aicommon.VerificationTodoApplyError {
+func (c *maxIterTestConfig) ApplyVerificationTodoOps(scope aicommon.VerificationTodoScope, satisfied bool, movements []aicommon.VerifyNextMovement) []aicommon.VerificationTodoApplyResult {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.appliedScope = scope

@@ -45,6 +45,42 @@ func NewSessionPromptState() *SessionPromptState {
 	return &SessionPromptState{}
 }
 
+// ForkForSubAgent returns a deep copy of the session prompt state for a
+// forked sub ReAct agent. Every field is copied so the sub agent owns an
+// independent state that cannot race with (or mutate) the parent's, EXCEPT
+// the global verification TODO store (todoJSON): that list is the parent
+// agent's verification bookkeeping and must neither leak into a sub agent's
+// prompt nor be polluted by a sub agent's next_movements. The sub agent
+// therefore starts with an empty TODO list.
+//
+// 关键词: ForkForSubAgent, 子 agent 隔离, 复制非 todo 状态, todoJSON 丢弃
+func (s *SessionPromptState) ForkForSubAgent() *SessionPromptState {
+	if s == nil {
+		return NewSessionPromptState()
+	}
+	s.m.RLock()
+	defer s.m.RUnlock()
+
+	forked := &SessionPromptState{}
+
+	if len(s.UserInputHistory) > 0 {
+		forked.UserInputHistory = make([]schema.AIAgentUserInputRecord, len(s.UserInputHistory))
+		copy(forked.UserInputHistory, s.UserInputHistory)
+	}
+
+	forked.evidenceJSON = s.evidenceJSON
+	// todoJSON intentionally left empty: sub agents do not inherit the
+	// parent's global TODO list.
+
+	if s.sessionArtifactsState != nil {
+		forked.sessionArtifactsState = s.sessionArtifactsState.Fork()
+	}
+	if s.sessionEvidenceState != nil {
+		forked.sessionEvidenceState = s.sessionEvidenceState.Fork()
+	}
+	return forked
+}
+
 func (s *SessionPromptState) GetOrCreateSessionArtifactsRenderState() *SessionArtifactsRenderState {
 	if s == nil {
 		return NewSessionArtifactsRenderState()

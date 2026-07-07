@@ -55,6 +55,32 @@ func NewSessionArtifactsRenderState() *SessionArtifactsRenderState {
 	}
 }
 
+// Fork returns a deep copy of the render state so a forked sub agent can keep
+// an independent artifacts snapshot without contending on the parent's mutex.
+// A nil receiver stays nil.
+func (s *SessionArtifactsRenderState) Fork() *SessionArtifactsRenderState {
+	if s == nil {
+		return nil
+	}
+	s.m.Lock()
+	defer s.m.Unlock()
+	forked := &SessionArtifactsRenderState{
+		WorkDir:            s.WorkDir,
+		LastFrozenTimeUnix: s.LastFrozenTimeUnix,
+		LastFrozenRendered: s.LastFrozenRendered,
+		FrozenGroups:       make(map[string]SessionArtifactTaskGroupSnapshot, len(s.FrozenGroups)),
+	}
+	for k, v := range s.FrozenGroups {
+		snap := v
+		if len(v.Files) > 0 {
+			snap.Files = make([]SessionArtifactEntry, len(v.Files))
+			copy(snap.Files, v.Files)
+		}
+		forked.FrozenGroups[k] = snap
+	}
+	return forked
+}
+
 func CollectSessionArtifactEntries(config AICallerConfigIf) ([]SessionArtifactEntry, string) {
 	if config == nil {
 		return nil, ""
