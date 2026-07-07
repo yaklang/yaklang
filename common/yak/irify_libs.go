@@ -5,6 +5,7 @@ package yak
 import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -13,9 +14,10 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
-// initIrifyLibs 初始化 Irify 相关的库（SSA 和 SyntaxFlow）
-// 仅在非 irify_exclude 模式下调用
+// initIrifyLibs 初始化 irify_exclude 构建下会剥离的库（SSA、SyntaxFlow、NASL）。
 func initIrifyLibs() {
+	yaklang.Import("nasl", antlr4nasl.Exports)
+
 	// ssa
 	ssaExports := []map[string]any{
 		ssaapi.Exports,

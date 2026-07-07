@@ -80,7 +80,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/htmlquery"
 	"github.com/yaklang/yaklang/common/utils/webforest"
 	"github.com/yaklang/yaklang/common/xhtml"
-	"github.com/yaklang/yaklang/common/yak/antlr4nasl"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
@@ -248,7 +247,6 @@ func initYaklangLib() {
 	// nuclei / httptpl helpers
 	yaklang.Import("nuclei", httptpl.Exports)
 	yaklang.Import("httptpl", httptpl.MatchOrExtractExports)
-	yaklang.Import("nasl", antlr4nasl.Exports)
 
 	// jwt
 	yaklang.Import("jwt", authhack.JWTExports)
