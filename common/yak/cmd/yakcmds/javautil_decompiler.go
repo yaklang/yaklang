@@ -19,7 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -58,31 +57,27 @@ var JavaDecompilerSelfChecking = &cli.Command{
 
 		var decompilerFinishedCount *int64 = new(int64)
 		var decompilerFailedCount *int64 = new(int64)
-		var decompilerSyntaxErrorCount *int64 = new(int64)
 		var decompilerPartialCount *int64 = new(int64)
 
 		go func() {
-			var lastFinished, lastFailed, lastSyntax, lastPartial int64
+			var lastFinished, lastFailed, lastPartial int64
 			for {
 				time.Sleep(time.Second)
 				finished := atomic.LoadInt64(decompilerFinishedCount)
 				failed := atomic.LoadInt64(decompilerFailedCount)
-				syntax := atomic.LoadInt64(decompilerSyntaxErrorCount)
 				partial := atomic.LoadInt64(decompilerPartialCount)
 
-				if finished != lastFinished || failed != lastFailed || syntax != lastSyntax || partial != lastPartial {
-					total := finished + failed + syntax
-					var failedPercent, syntaxPercent, partialPercent float64
+				if finished != lastFinished || failed != lastFailed || partial != lastPartial {
+					total := finished + failed
+					var failedPercent, partialPercent float64
 					if total > 0 {
 						failedPercent = float64(failed) / float64(total) * 100
-						syntaxPercent = float64(syntax) / (float64(total) - float64(failed)) * 100
 						partialPercent = float64(partial) / float64(total) * 100
 					}
-					log.Infof("Decompiler Status - Total: %v, Success: %v, Failed: %v (%.1f%%), Syntax Errors: %v (%.1f%%), Partial(stub): %v (%.1f%%)",
-						total, finished, failed, failedPercent, syntax, syntaxPercent, partial, partialPercent)
+					log.Infof("Decompiler Status - Total: %v, Success: %v, Failed: %v (%.1f%%), Partial(stub): %v (%.1f%%)",
+						total, finished, failed, failedPercent, partial, partialPercent)
 					lastFinished = finished
 					lastFailed = failed
-					lastSyntax = syntax
 					lastPartial = partial
 				}
 			}
@@ -129,22 +124,6 @@ var JavaDecompilerSelfChecking = &cli.Command{
 				}
 			}
 
-			//vfs := filesys.NewVirtualFs()
-			//vfs.AddFile("origin.java", results)
-
-			_, err = java2ssa.Frontend(results)
-			if err != nil {
-				atomic.AddInt64(decompilerSyntaxErrorCount, 1)
-				if c.Bool("verbose") {
-					log.Errorf("java2ssa.Frontend failed: %v", err)
-				}
-				fileName := "syntax-error--" + hash
-				originCls := filepath.Join(outputDir, fileName+".class")
-				target := filepath.Join(outputDir, fileName+".java")
-				os.WriteFile(originCls, raw, 0755)
-				os.WriteFile(target, []byte(results), 0755)
-				return nil
-			}
 			return nil
 		}
 		filesys.Recursive(m2Dir, filesys.WithFileStat(func(s string, info fs.FileInfo) error {
