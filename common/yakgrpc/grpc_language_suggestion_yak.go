@@ -693,15 +693,6 @@ func getFuncCompletionBySSAType(funcName string, typ ssa.Type) string {
 	)
 }
 
-func trimSourceCode(sourceCode string) (code string, containPoint bool, pointSuffix bool) {
-	containPoint = strings.Contains(sourceCode, ".")
-	pointSuffix = strings.HasSuffix(sourceCode, ".")
-	if pointSuffix {
-		sourceCode = sourceCode[:len(sourceCode)-1]
-	}
-	return strings.TrimSpace(sourceCode), containPoint, pointSuffix
-}
-
 func OnHover(prog *ssaapi.Program, word string, containPoint bool, rng *memedit.Range, v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
 	ret = append(ret, &ypb.SuggestionDescription{
 		Label: getDescFromSSAValue(word, containPoint, prog, v),
