@@ -199,15 +199,36 @@ func WriteNextMovementsDisplayStream(reader io.Reader, writer io.Writer) error {
 }
 
 // IsNextMovementAddedOp reports whether the supplied op should be routed to the
-// "TODO 增加" channel of the split stream. add (new item) and doing (marking an
-// existing item as in-progress) are both "adding work to the active list" in
-// direction, so they share the added channel. pending is normalised to doing
-// upstream by NormalizeVerifyNextMovements, so it is not matched here.
+// "TODO 新增" channel of the split stream. It matches only add (a brand-new item
+// appended to the list). doing (marking an existing item as in-progress / 开始执行)
+// has its own dedicated channel now — see IsNextMovementDoingOp. pending is
+// normalised to doing upstream by NormalizeVerifyNextMovements, so it is not
+// matched here.
 //
-// 关键词: IsNextMovementAddedOp, op 归类, 增加 通道
+// 关键词: IsNextMovementAddedOp, op 归类, 新增 通道
 func IsNextMovementAddedOp(op string) bool {
 	switch strings.ToLower(strings.TrimSpace(op)) {
-	case "add", "doing":
+	case "add":
+		return true
+	}
+	return false
+}
+
+// IsNextMovementDoingOp reports whether the supplied op should be routed to the
+// "TODO 开始执行" channel of the split stream. It matches doing (marking an
+// existing item as in-progress). pending is normalised to doing upstream by
+// NormalizeVerifyNextMovements, so callers need not match pending themselves.
+//
+// doing is conceptually distinct from add (a new item) and from done/delete/skip
+// (work removed from the active list): it signals that an already-known item has
+// actually started executing, which the frontend renders under its own card. For
+// that reason it gets its own nodeId rather than being folded into the added
+// channel.
+//
+// 关键词: IsNextMovementDoingOp, op 归类, 开始执行 通道
+func IsNextMovementDoingOp(op string) bool {
+	switch strings.ToLower(strings.TrimSpace(op)) {
+	case "doing":
 		return true
 	}
 	return false

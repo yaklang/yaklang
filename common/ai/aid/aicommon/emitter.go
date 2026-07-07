@@ -755,42 +755,56 @@ func (r *Emitter) EmitDefaultStreamEvent(nodeId string, reader io.Reader, taskIn
 }
 
 // EmitNextMovementsSplitSystemStreams splits an already-parsed next_movements
-// slice by op into an "added" channel (add / doing) and a "completed" channel
-// (done / delete / skip), and emits each non-empty channel as a system stream
-// event under nodeIdAdded / nodeIdCompleted.
+// slice by op into three channels and emits each non-empty channel as a system
+// stream event under the matching nodeId:
+//
+//   - "added"    (add)                   -> nodeIdAdded
+//   - "doing"    (doing / 开始执行)      -> nodeIdDoing
+//   - "completed"(done / delete / skip)  -> nodeIdCompleted
 //
 // Each channel emits exactly ONE summary line — a count of that direction's
-// ops this round (e.g. "新增 2 条" / "完成 3 条") — rather than a per-item
-// list. The card title (i18n via the NodeId) already labels the direction, so
-// the content only carries the count.
+// ops this round (e.g. "新增 2 条" / "开始 1 条" / "完成 3 条") — rather than a
+// per-item list. The card title (i18n via the NodeId) already labels the
+// direction, so the content only carries the count.
 //
 // An empty channel (no ops of that direction this round) produces no event —
 // the frontend never sees an empty card. The caller is expected to have parsed
 // the AI output already; this helper does no JSON decoding.
 //
+// doing is kept separate from add so the frontend can render a distinct
+// "开始执行" card: add means a brand-new TODO was appended, doing means an
+// already-known TODO actually started executing. Routing them through the same
+// nodeId would collapse two semantically different signals into one count.
+//
 // Returns the successfully emitted events in emission order so the caller can
 // capture a reference-materials anchor from whichever channel fired first.
 //
-// 关键词: EmitNextMovementsSplitStreams, next_movements 双通道,
+// 关键词: EmitNextMovementsSplitStreams, next_movements 三通道,
 //
-//	added / completed  流, 每类一条计数摘要, 空通道跳过, 解析后 emit
+//	added / doing / completed 流, 每类一条计数摘要, 空通道跳过, 解析后 emit
 func (r *Emitter) EmitNextMovementsSplitStreams(
-	nodeIdAdded, nodeIdCompleted string,
+	nodeIdAdded, nodeIdDoing, nodeIdCompleted string,
 	movements []VerifyNextMovement,
 	taskIndex string,
 ) ([]*schema.AiOutputEvent, error) {
 	if r == nil || len(movements) == 0 {
 		return nil, nil
 	}
-	var addedCount, completedCount int
-	var addedLines, completedLines []string
+	var addedCount, doingCount, completedCount int
+	var addedLines, doingLines, completedLines []string
 	for _, m := range movements {
-		if IsNextMovementAddedOp(m.Op) {
+		switch {
+		case IsNextMovementAddedOp(m.Op):
 			addedCount++
 			if m.Content != "" {
 				addedLines = append(addedLines, m.Content)
 			}
-		} else {
+		case IsNextMovementDoingOp(m.Op):
+			doingCount++
+			if m.Content != "" {
+				doingLines = append(doingLines, m.Content)
+			}
+		default:
 			completedCount++
 			if m.Content != "" {
 				completedLines = append(completedLines, m.Content)
@@ -827,6 +841,7 @@ func (r *Emitter) EmitNextMovementsSplitStreams(
 		}
 	}
 	emitOne(nodeIdAdded, addedCount, addedLines, "新增")
+	emitOne(nodeIdDoing, doingCount, doingLines, "开始")
 	emitOne(nodeIdCompleted, completedCount, completedLines, "完成")
 
 	if firstErr != nil && len(events) == 0 {

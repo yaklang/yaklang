@@ -157,18 +157,9 @@ func runForkedSubReactAgentJob(
 		aicommon.WithStatefulTaskBaseContextAndCancel(jobCtx, jobCancel),
 	)
 
-	elaboratedGoal, resultContract, elabErr := elaborateSubReactAgentGoal(jobCtx, childInvoker, parentLoop, subTaskID, job)
-	if elabErr != nil {
-		log.Warnf("dispatch_sub_react_agents: elaborate goal for %s failed, falling back to brief intent: %v", subTaskID, elabErr)
-		elaboratedGoal = job.Goal
-		resultContract = ""
-	}
-
-	subTask.SetStatus(aicommon.AITaskState_Processing)
-
-	subTask.SetUserInput(buildSubAgentUserInput(elaboratedGoal, resultContract))
 	parentInvoker.AddRuntimeTask(subTask)
 	childInvoker.SetCurrentTask(subTask)
+
 	// Restore sub-agent emit: derive the sub-task emitter from the parent config emitter
 	// (via PushEventProcesser) so sub-agent events reach the frontend, stamped with the
 	// sub-task id as the aggregation marker. This replaces the temporary discard emitter
@@ -177,6 +168,16 @@ func runForkedSubReactAgentJob(
 	subTask.SetEmitter(buildSubReactForwardingEmitter(parentCfg.GetEmitter(), subTaskID))
 	branchMarker := fmt.Sprintf("sub-react-branch-marker-%s", subTaskID)
 	fork.Branch.PushText(parentCfg.AcquireId(), branchMarker)
+	subTask.SetStatus(aicommon.AITaskState_Processing)
+
+	// Elaborate the sub agent's brief intent into a complete, self-contained goal and an optional result contract.
+	elaboratedGoal, resultContract, elabErr := elaborateSubReactAgentGoal(jobCtx, childInvoker, parentLoop, subTaskID, job)
+	if elabErr != nil {
+		log.Warnf("dispatch_sub_react_agents: elaborate goal for %s failed, falling back to brief intent: %v", subTaskID, elabErr)
+		elaboratedGoal = job.Goal
+		resultContract = ""
+	}
+	subTask.SetUserInput(buildSubAgentUserInput(elaboratedGoal, resultContract))
 
 	subLoop, err := reactloops.CreateLoopByName(job.LoopName, childInvoker, buildSubReactLoopOptions()...)
 	if err != nil {
@@ -781,12 +782,15 @@ var loopAction_DispatchSubReactAgents = &reactloops.LoopAction{
 	Description: "Dispatch multiple independent sub ReAct agents in parallel. Each sub agent inherits the current timeline snapshot as context, " +
 		"runs in an isolated timeline fork, and returns one structured result record back to the parent agent. " +
 		"Use this when a task can be split into parallel sub-goals that should not pollute the parent timeline with their full execution traces. " +
-		"Sub agents cannot dispatch more sub agents.",
+		"Sub agents cannot dispatch more sub agents. " +
+		"IMPORTANT: every dispatched sub agent MUST be mutually independent — no sub agent may depend on the input, output, or result of another sub agent in the same dispatch. " +
+		"If two sub agents are dependent, do NOT dispatch them together: dispatch the first batch now, wait for it to complete, then enter the next loop iteration to dispatch the dependent batch once the prior results are available in the timeline.",
 	Options: []aitool.ToolOption{
 		aitool.WithStructArrayParam("dispatches",
 			[]aitool.PropertyOption{
 				aitool.WithParam_Required(true),
-				aitool.WithParam_Description("Sub agent jobs to dispatch in parallel. Each item runs in an isolated timeline fork and returns one structured result back to the parent."),
+				aitool.WithParam_Description("Sub agent jobs to dispatch in parallel. Each item runs in an isolated timeline fork and returns one structured result back to the parent. " +
+					"All jobs in one dispatch MUST be mutually independent — none may depend on another job's input or result. Dependent sub agents must be split across separate loop iterations: dispatch the first batch, wait for completion, then dispatch the dependent batch in the next iteration."),
 			},
 			nil,
 			aitool.WithStringParam("identifier",
@@ -794,7 +798,7 @@ var loopAction_DispatchSubReactAgents = &reactloops.LoopAction{
 			),
 			aitool.WithStringParam("goal",
 				aitool.WithParam_Required(true),
-				aitool.WithParam_Description("Short one-line intent for this sub agent (a noun phrase or single sentence). Keep it brief; a complete, self-contained goal and result contract are elaborated automatically before the sub agent runs — do not write the full goal here."),
+				aitool.WithParam_Description("Short one-line intent for this sub agent — a noun phrase or single sentence, STRICTLY within 15 characters (English) / 15 字以内 (Chinese). Keep it brief; a complete, self-contained goal and result contract are elaborated automatically before the sub agent runs — do not write the full goal here."),
 			),
 			aitool.WithStringParam("task_name",
 				aitool.WithParam_Description("Short, human-readable name for this sub agent's task, shown as the task title in the UI and timeline. Falls back to identifier, then goal when omitted. Prefer a concise noun phrase here rather than reusing the full goal sentence."),
