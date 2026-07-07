@@ -245,3 +245,109 @@ func (r *errAfterReadReader) Read(p []byte) (int, error) {
 }
 
 func (r *errAfterReadReader) Close() error { return nil }
+
+// TestProcessAIResponse_OllamaReasoningField_Stream 验证 Ollama /v1/chat/completions
+// 使用 "reasoning" 字段（而非标准 "reasoning_content"）时，SSE 流式思考内容
+// 能被正确提取到 reasonBuffer。
+func TestProcessAIResponse_OllamaReasoningField_Stream(t *testing.T) {
+	streamData := `data: {"id":"chatcmpl-1","object":"chat.completion.chunk","model":"kimi-k2.7-code","choices":[{"index":0,"delta":{"role":"assistant","content":"","reasoning":"We need"}}]}
+data: {"id":"chatcmpl-1","object":"chat.completion.chunk","model":"kimi-k2.7-code","choices":[{"index":0,"delta":{"content":"","reasoning":" to answer"}}]}
+data: {"id":"chatcmpl-1","object":"chat.completion.chunk","model":"kimi-k2.7-code","choices":[{"index":0,"delta":{"content":"","reasoning":" 1+1."}}]}
+data: {"id":"chatcmpl-1","object":"chat.completion.chunk","model":"kimi-k2.7-code","choices":[{"index":0,"delta":{"content":"2"}}]}
+data: {"id":"chatcmpl-1","object":"chat.completion.chunk","model":"kimi-k2.7-code","choices":[{"index":0,"delta":{"content":""},"finish_reason":"stop"}]}
+data: [DONE]`
+
+	mockResponse := []byte("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\n\r\n")
+	mockCloser := io.NopCloser(strings.NewReader(streamData))
+
+	outBuffer := &bytes.Buffer{}
+	reasonBuffer := &bytes.Buffer{}
+
+	err := processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if reasonBuffer.String() != "We need to answer 1+1." {
+		t.Errorf("reason mismatch, want %q, got %q", "We need to answer 1+1.", reasonBuffer.String())
+	}
+	if outBuffer.String() != "2" {
+		t.Errorf("content mismatch, want %q, got %q", "2", outBuffer.String())
+	}
+}
+
+// TestProcessAIResponse_OllamaReasoningField_NonStream 验证 Ollama /v1/chat/completions
+// 使用 "reasoning" 字段的非流式 JSON 响应能被正确提取。
+func TestProcessAIResponse_OllamaReasoningField_NonStream(t *testing.T) {
+	nonStreamData := `{"id":"chatcmpl-1","object":"chat.completion","model":"kimi-k2.7-code","choices":[{"index":0,"message":{"role":"assistant","content":"1 + 1 = 2","reasoning":"We need answer simple math. 1+1=2."},"finish_reason":"stop"}],"usage":{"prompt_tokens":12,"completion_tokens":25,"total_tokens":37}}`
+
+	mockResponse := []byte("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
+	mockCloser := io.NopCloser(strings.NewReader(nonStreamData))
+
+	outBuffer := &bytes.Buffer{}
+	reasonBuffer := &bytes.Buffer{}
+
+	err := processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if outBuffer.String() != "1 + 1 = 2" {
+		t.Errorf("content mismatch, want %q, got %q", "1 + 1 = 2", outBuffer.String())
+	}
+	if reasonBuffer.String() != "We need answer simple math. 1+1=2." {
+		t.Errorf("reason mismatch, want %q, got %q", "We need answer simple math. 1+1=2.", reasonBuffer.String())
+	}
+}
+
+// TestProcessAIResponse_StandardReasoningContent_StillWorks 确保标准的 reasoning_content
+// 字段（deepseek/kimi API 等）不受 Ollama fallback 影响。
+func TestProcessAIResponse_StandardReasoningContent_StillWorks(t *testing.T) {
+	streamData := `data: {"choices":[{"delta":{"reasoning_content":"standard thinking"}}]}
+data: {"choices":[{"delta":{"content":"answer"}}]}
+data: [DONE]`
+
+	mockResponse := []byte("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\n\r\n")
+	mockCloser := io.NopCloser(strings.NewReader(streamData))
+
+	outBuffer := &bytes.Buffer{}
+	reasonBuffer := &bytes.Buffer{}
+
+	err := processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if reasonBuffer.String() != "standard thinking" {
+		t.Errorf("reason mismatch, want %q, got %q", "standard thinking", reasonBuffer.String())
+	}
+	if outBuffer.String() != "answer" {
+		t.Errorf("content mismatch, want %q, got %q", "answer", outBuffer.String())
+	}
+}
+
+// TestProcessAIResponse_ReasoningContentTakesPrecedence 确保当同一响应同时包含
+// reasoning_content 和 reasoning 时，reasoning_content 优先。
+func TestProcessAIResponse_ReasoningContentTakesPrecedence(t *testing.T) {
+	streamData := `data: {"choices":[{"delta":{"reasoning_content":"from reasoning_content","reasoning":"from reasoning"}}]}
+data: {"choices":[{"delta":{"content":"done"}}]}
+data: [DONE]`
+
+	mockResponse := []byte("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\n\r\n")
+	mockCloser := io.NopCloser(strings.NewReader(streamData))
+
+	outBuffer := &bytes.Buffer{}
+	reasonBuffer := &bytes.Buffer{}
+
+	err := processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if reasonBuffer.String() != "from reasoning_content" {
+		t.Errorf("reason should prefer reasoning_content, got %q", reasonBuffer.String())
+	}
+	if outBuffer.String() != "done" {
+		t.Errorf("content mismatch, got %q", outBuffer.String())
+	}
+}

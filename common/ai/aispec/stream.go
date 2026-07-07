@@ -318,10 +318,13 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 					if key != "message" {
 						return
 					}
-					result := utils.InterfaceToGeneralMap(data)
-					reasonContent := utils.InterfaceToString(utils.MapGetString(result, "reasoning_content"))
-					content := utils.InterfaceToString(utils.MapGetString(result, "content"))
-					reasonWriter.Write([]byte(reasonContent))
+				result := utils.InterfaceToGeneralMap(data)
+				reasonContent := utils.InterfaceToString(utils.MapGetString(result, "reasoning_content"))
+				if reasonContent == "" {
+					reasonContent = utils.InterfaceToString(utils.MapGetString(result, "reasoning"))
+				}
+				content := utils.InterfaceToString(utils.MapGetString(result, "content"))
+				reasonWriter.Write([]byte(reasonContent))
 					outWriter.Write([]byte(content))
 					if toolcallRaw, ok := result["tool_calls"]; ok {
 						toolcallList := utils.InterfaceToSliceInterface(toolcallRaw)
@@ -422,6 +425,17 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 					return fmt.Sprint(reason)
 				})
 				reasonDelta = strings.Join(reasonStrs, "")
+				// Ollama 的 /v1/chat/completions 用 "reasoning" 而非 "reasoning_content"
+				if reasonDelta == "" {
+					reasonContent = jsonpath.Find(j, `$..choices[*].delta.reasoning`)
+					reasonStrs = lo.Map(utils.InterfaceToSliceInterface(reasonContent), func(reason any, idx int) string {
+						if utils.IsNil(reason) {
+							return ""
+						}
+						return fmt.Sprint(reason)
+					})
+					reasonDelta = strings.Join(reasonStrs, "")
+				}
 			}
 
 			handled := false
