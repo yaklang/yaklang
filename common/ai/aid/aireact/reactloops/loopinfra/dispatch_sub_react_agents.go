@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/chanx"
 	"io"
 	"sort"
 	"strings"
@@ -34,6 +33,7 @@ type subReactDispatchJob struct {
 	Order          int    `json:"order"`
 	Identifier     string `json:"identifier"`
 	Goal           string `json:"goal"`
+	TaskName       string `json:"task_name"`
 	LoopName       string `json:"loop_name"`
 	ResultContract string `json:"result_contract"`
 }
@@ -108,7 +108,16 @@ func runForkedSubReactAgentJob(
 	}
 
 	subTaskID := buildSubReactSubTaskID(parentTask, job)
-	subTaskName := job.Goal
+	// The sub agent's task name is the explicit task_name the caller gave (a
+	// short, human-readable label), not the goal. The goal can be a long
+	// sentence and reads poorly as a task name in the UI and timeline.
+	subTaskName := strings.TrimSpace(job.TaskName)
+	if subTaskName == "" {
+		subTaskName = strings.TrimSpace(job.Identifier)
+	}
+	if subTaskName == "" {
+		subTaskName = job.Goal
+	}
 	if subTaskName == "" {
 		subTaskName = subTaskID
 	}
@@ -175,7 +184,6 @@ func buildForkedSubReactInvoker(
 		aicommon.WithAICallbacks(parentCfg.GetRawAICallbacks()),
 		aicommon.WithEnablePlanAndExec(false),
 		aicommon.WithEmitter(buildSubReactForwardingEmitter(parentCfg.GetEmitter(), subTaskId)),
-		aicommon.WithHotPatchOptionChan(chanx.NewUnlimitedChan[aicommon.ConfigOption](jobCtx, 1)),
 		aicommon.WithAgreeAuto(),
 		aicommon.WithSessionPromptState(parentCfg.SessionPromptState.ForkForSubAgent()),
 	)
@@ -410,6 +418,7 @@ func parseSubReactDispatchJobsFromArray(raw []aitool.InvokeParams) ([]subReactDi
 		jobs = append(jobs, subReactDispatchJob{
 			Identifier:     strings.TrimSpace(item.GetString("identifier")),
 			Goal:           strings.TrimSpace(item.GetString("goal")),
+			TaskName:       strings.TrimSpace(item.GetString("task_name")),
 			LoopName:       strings.TrimSpace(item.GetString("loop_name")),
 			ResultContract: strings.TrimSpace(item.GetString("result_contract")),
 		})
@@ -442,6 +451,7 @@ func normalizeSubReactDispatchJobs(jobs []subReactDispatchJob) ([]subReactDispat
 		if jobs[i].Identifier == "" {
 			jobs[i].Identifier = fmt.Sprintf("sub_agent_%d", jobs[i].Order)
 		}
+		jobs[i].TaskName = strings.TrimSpace(jobs[i].TaskName)
 	}
 	return jobs, nil
 }
@@ -711,6 +721,7 @@ func writeDispatchSubReactDispatchesDisplayStream(reader io.Reader, writer io.Wr
 				Order:      order,
 				Identifier: strings.TrimSpace(params.GetString("identifier")),
 				Goal:       goal,
+				TaskName:   strings.TrimSpace(params.GetString("task_name")),
 				LoopName:   strings.TrimSpace(params.GetString("loop_name")),
 			}
 			if e := emitLine(formatDispatchSubReactJobDisplayLine(job)); e != nil {
@@ -743,6 +754,9 @@ var loopAction_DispatchSubReactAgents = &reactloops.LoopAction{
 			aitool.WithStringParam("goal",
 				aitool.WithParam_Required(true),
 				aitool.WithParam_Description("Task goal for the sub ReAct agent."),
+			),
+			aitool.WithStringParam("task_name",
+				aitool.WithParam_Description("Short, human-readable name for this sub agent's task, shown as the task title in the UI and timeline. Falls back to identifier, then goal when omitted. Prefer a concise noun phrase here rather than reusing the full goal sentence."),
 			),
 			aitool.WithStringParam("loop_name",
 				aitool.WithParam_Description(fmt.Sprintf("Target ReAct loop name. Defaults to %q.", schema.AI_REACT_LOOP_NAME_DEFAULT)),
