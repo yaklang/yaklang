@@ -95,6 +95,9 @@ func DirectlyAnswerContinue(loop *ReActLoop, action *aicommon.Action, operator *
 	if !utils.IsNil(invoker) {
 		invoker.AddToTimeline(TimelineEntryAssistantOutputNote,
 			"assistant output delivered; the task is NOT complete yet. "+
+				"The ReAct loop CONTINUES automatically — the user does NOT need to reply '继续'/'continue' for you to proceed. "+
+				"If you already know the next step, EXECUTE it now in the next iteration via require_tool / directly_call_tool / request_plan; "+
+				"do NOT merely announce it and wait for the user's permission. "+
 				"When the entire CURRENT-TASK is complete, use the 'finish' action to terminate the ReAct loop. "+
 				"Do not repeat the same answer; continue with tools, next_movements, or finish.")
 	}
