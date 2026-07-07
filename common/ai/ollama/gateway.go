@@ -74,6 +74,13 @@ func (g *GatewayClient) LoadOption(opt ...aispec.AIConfigOption) {
 		g.config.Model = "qwen"
 	}
 
+	// Ollama 本地默认走 HTTP；仅当用户显式配置了 domain（如 ollama.com）
+	// 且没有手动设置 NoHttps 时，才走 HTTPS（由 GetBaseURLFromConfig 处理）。
+	// 对于纯本地场景（无 domain / 无 baseURL），强制 NoHttps=true 确保用 HTTP。
+	if config.Domain == "" && config.BaseURL == "" {
+		config.NoHttps = true
+	}
+
 	// 默认使用 OpenAI 兼容 API
 	g.useOpenAIFormat = true
 
@@ -110,11 +117,15 @@ func (g *GatewayClient) LoadOption(opt ...aispec.AIConfigOption) {
 }
 
 func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
+	headers := map[string]string{
+		"Content-Type": "application/json; charset=UTF-8",
+		"Accept":       "application/json",
+	}
+	if g.config.APIKey != "" {
+		headers["Authorization"] = "Bearer " + g.config.APIKey
+	}
 	opts := []poc.PocConfigOption{
-		poc.WithReplaceAllHttpPacketHeaders(map[string]string{
-			"Content-Type": "application/json; charset=UTF-8",
-			"Accept":       "application/json",
-		}),
+		poc.WithReplaceAllHttpPacketHeaders(headers),
 	}
 	opts = aispec.AppendCustomHeadersToPocOptions(opts, aispec.ExtraHeadersToMap(g.config.Headers))
 	opts = append(opts, poc.WithTimeout(g.config.Timeout))
@@ -138,7 +149,18 @@ func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 	return opts, nil
 }
 
+func (g *GatewayClient) isCloudTarget() bool {
+	return strings.Contains(g.targetUrl, "ollama.com")
+}
+
 func (g *GatewayClient) CheckValid() error {
+	if g.isCloudTarget() {
+		if g.config.APIKey == "" {
+			return errors.New("ollama cloud requires an API key")
+		}
+		return nil
+	}
+
 	host, port, err := utils.ParseStringToHostPort(g.targetUrl)
 	if err != nil {
 		return err

@@ -2548,6 +2548,145 @@ func TestChatBase_ResponsesAPI_StreamHandlerWaitsForContinueSignal(t *testing.T)
 	}
 }
 
+// ==================== Ollama Reasoning Format Tests ====================
+
+// mockOllamaReasoningStreamRsp 模拟 Ollama /v1/chat/completions 流式响应
+// Ollama 的思考内容使用 "reasoning" 字段而非标准 "reasoning_content"
+const mockOllamaReasoningStreamRsp = `HTTP/1.1 200 OK
+Connection: close
+Content-Type: text/event-stream
+
+data: {"id":"chatcmpl-ollama-1","object":"chat.completion.chunk","created":1753329315,"model":"kimi-k2.7-code","choices":[{"index":0,"delta":{"role":"assistant","content":"","reasoning":"Let me think about this..."},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-ollama-2","object":"chat.completion.chunk","created":1753329316,"model":"kimi-k2.7-code","choices":[{"index":0,"delta":{"content":"","reasoning":" The answer should be 2."},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-ollama-3","object":"chat.completion.chunk","created":1753329317,"model":"kimi-k2.7-code","choices":[{"index":0,"delta":{"content":"1 + 1 = 2"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-ollama-4","object":"chat.completion.chunk","created":1753329318,"model":"kimi-k2.7-code","choices":[{"index":0,"delta":{"content":""},"finish_reason":"stop"}]}
+
+data: [DONE]
+`
+
+// mockOllamaReasoningNonStreamRsp 模拟 Ollama /v1/chat/completions 非流式响应
+const mockOllamaReasoningNonStreamRsp = `HTTP/1.1 200 OK
+Connection: close
+Content-Type: application/json; charset=utf-8
+
+{
+  "id": "chatcmpl-ollama-nonstream",
+  "object": "chat.completion",
+  "created": 1753327376,
+  "model": "kimi-k2.7-code",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "1 + 1 = 2",
+        "reasoning": "The user is asking a simple arithmetic question. 1 + 1 equals 2."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": { "prompt_tokens": 10, "completion_tokens": 25, "total_tokens": 35 }
+}
+`
+
+// TestChatBase_OllamaReasoningStream 测试 Ollama 流式响应中 "reasoning" 字段的处理
+func TestChatBase_OllamaReasoningStream(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte(mockOllamaReasoningStreamRsp))
+
+	var streamContent strings.Builder
+	var reasonContent strings.Builder
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/chat/completions",
+		"kimi-k2.7-code",
+		"1+1=?",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_StreamHandler(func(reader io.Reader) {
+			data, _ := io.ReadAll(reader)
+			streamContent.Write(data)
+		}),
+		aispec.WithChatBase_ReasonStreamHandler(func(reader io.Reader) {
+			data, _ := io.ReadAll(reader)
+			reasonContent.Write(data)
+		}),
+	)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "1 + 1 = 2", res, "content should match")
+	assert.Contains(t, reasonContent.String(), "Let me think about this...", "reasoning should be captured from Ollama 'reasoning' field")
+	assert.Contains(t, reasonContent.String(), "The answer should be 2.", "reasoning continuation should be captured")
+	t.Logf("Ollama reasoning stream: content=%q, reason=%q", res, reasonContent.String())
+}
+
+// TestChatBase_OllamaReasoningNonStream 测试 Ollama 非流式响应中 "reasoning" 字段的处理
+func TestChatBase_OllamaReasoningNonStream(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte(mockOllamaReasoningNonStreamRsp))
+
+	var reasonContent strings.Builder
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/chat/completions",
+		"kimi-k2.7-code",
+		"1+1=?",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_ReasonStreamHandler(func(reader io.Reader) {
+			data, _ := io.ReadAll(reader)
+			reasonContent.Write(data)
+		}),
+	)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "1 + 1 = 2", res)
+	assert.Contains(t, reasonContent.String(), "simple arithmetic", "reasoning should be extracted from Ollama 'reasoning' field")
+	t.Logf("Ollama reasoning non-stream: content=%q, reason=%q", res, reasonContent.String())
+}
+
+// TestChatBase_StandardReasoningContentNotBroken 确保标准 reasoning_content 仍然正常工作
+func TestChatBase_StandardReasoningContentNotBroken(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte(mockAiReasoningRsp))
+
+	var reasonContent strings.Builder
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/chat/completions",
+		"deepseek-r1",
+		"生命的终极答案",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_ReasonStreamHandler(func(reader io.Reader) {
+			data, _ := io.ReadAll(reader)
+			reasonContent.Write(data)
+		}),
+	)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "基于我的分析，答案是42。", res)
+	assert.Contains(t, reasonContent.String(), "银河系漫游指南")
+}
+
 func TestChatBase_InfersResponsesInterfaceFromURL(t *testing.T) {
 	var capturedRequest []byte
 	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
