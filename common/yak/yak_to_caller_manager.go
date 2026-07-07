@@ -312,6 +312,7 @@ type YakToCallerManager struct {
 	dividedContext     bool
 	loadTimeout        time.Duration
 	callTimeout        time.Duration
+	ctx                context.Context
 	runtimeId          string
 	proxy              string
 	vulFilter          filter.Filterable
@@ -349,6 +350,34 @@ func NewYakToCallerManager() *YakToCallerManager {
 		longRunningThreshold: consts.PluginCallDurationThresholdSeconds, // 默认使用全局常量
 	}
 	return caller
+}
+
+func (y *YakToCallerManager) getDefaultContext() context.Context {
+	if y != nil && y.ctx != nil {
+		return y.ctx
+	}
+	return context.Background()
+}
+
+func (y *YakToCallerManager) SetCtx(ctx context.Context) {
+	if y == nil || ctx == nil {
+		return
+	}
+	y.ctx = ctx
+}
+
+func (y *YakToCallerManager) SetRuntimeId(s string) {
+	if y == nil || s == "" {
+		return
+	}
+	y.runtimeId = s
+}
+
+func (y *YakToCallerManager) SetProxy(s ...string) {
+	if y == nil || len(s) == 0 {
+		return
+	}
+	y.proxy = strings.Join(s, ",")
 }
 
 func (y *YakToCallerManager) WithVulFilter(filter filter.Filterable) *YakToCallerManager {
@@ -474,6 +503,9 @@ func (y *YakToCallerManager) getYakitPluginContext(ctx ...context.Context) *Yaki
 	var finalCtx context.Context
 	if len(ctx) > 0 {
 		finalCtx = ctx[0]
+	}
+	if finalCtx == nil {
+		finalCtx = y.getDefaultContext()
 	}
 
 	canFunc, ok := finalCtx.Value("cancel").(context.CancelFunc)
@@ -883,14 +915,17 @@ func (y *YakToCallerManager) CallPluginKeyByNameSyncWithCallback(pluginId string
 }
 
 func (y *YakToCallerManager) SyncCallPluginKeyByNameEx(pluginId string, name string, callback func(), itemsFuncs ...func() interface{}) {
-	y.CallPluginKeyByNameExWithAsync(context.Background(), true, pluginId, name, callback, itemsFuncs...)
+	y.CallPluginKeyByNameExWithAsync(y.getDefaultContext(), true, pluginId, name, callback, itemsFuncs...)
 }
 
 func (y *YakToCallerManager) CallPluginKeyByNameEx(pluginId string, name string, callback func(), itemsFuncs ...func() interface{}) {
-	y.CallPluginKeyByNameExWithAsync(context.Background(), false, pluginId, name, callback, itemsFuncs...)
+	y.CallPluginKeyByNameExWithAsync(y.getDefaultContext(), false, pluginId, name, callback, itemsFuncs...)
 }
 
 func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(runtimeCtx context.Context, forceSync bool, pluginId string, name string, callback func(), itemsFuncs ...func() interface{}) {
+	if runtimeCtx == nil {
+		runtimeCtx = y.getDefaultContext()
+	}
 	y.Call(name,
 		WithCallConfigRuntimeCtx(runtimeCtx),
 		WithCallConfigForceSync(forceSync),
@@ -920,6 +955,9 @@ func (y *YakToCallerManager) Call(name string, opts ...CallOpt) (results []any) 
 				return i
 			}
 		})
+	}
+	if runtimeCtx == nil {
+		runtimeCtx = y.getDefaultContext()
 	}
 
 	if y.table == nil {
@@ -1686,6 +1724,24 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		}
 		return i
 	})
+
+	nIns.GetVM().RegisterMapMemberCallHandler("hook", "NewManager", func(i interface{}) interface{} {
+		origin, ok := i.(func() *YakToCallerManager)
+		if ok {
+			return func() *YakToCallerManager {
+				manager := origin()
+				if manager == nil {
+					return nil
+				}
+				log.Debugf("bind hook.NewManager to runtime: %v", runtimeId)
+				manager.SetRuntimeId(runtimeId)
+				manager.SetProxy(strings.Split(proxy, ",")...)
+				manager.SetCtx(streamContext)
+				return manager
+			}
+		}
+		return i
+	})
 	// context hook
 
 	// new context
@@ -1989,7 +2045,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 // if err != nil { die(err) }
 // ```
 func loadScript(mng *YakToCallerManager, scriptType string, hookNames ...string) error {
-	return loadScriptCtx(mng, context.Background(), scriptType, hookNames...)
+	return loadScriptCtx(mng, mng.getDefaultContext(), scriptType, hookNames...)
 }
 
 // loadScriptByName 按插件名加载 Yakit 插件到回调管理器（导出名为 hook.LoadYakitPluginByName）
@@ -2009,7 +2065,7 @@ func loadScript(mng *YakToCallerManager, scriptType string, hookNames ...string)
 // if err != nil { die(err) }
 // ```
 func loadScriptByName(mng *YakToCallerManager, scriptName string, hookNames ...string) error {
-	return loadScriptByNameCtx(mng, context.Background(), scriptName, hookNames...)
+	return loadScriptByNameCtx(mng, mng.getDefaultContext(), scriptName, hookNames...)
 }
 
 // CallYakitPluginFunc 跨插件调用指定插件中导出的函数（导出名为 hook.CallYakitPluginFunc）
@@ -2153,7 +2209,7 @@ func loadScriptByNameCtx(mng *YakToCallerManager, ctx context.Context, scriptNam
 // if err != nil { die(err) }
 // ```
 func loadScriptByID(mng *YakToCallerManager, id interface{}, hookNames ...string) error {
-	return loadScriptByIDCtx(mng, context.Background(), id, hookNames...)
+	return loadScriptByIDCtx(mng, mng.getDefaultContext(), id, hookNames...)
 }
 
 // loadScriptByIDCtx 按插件 ID/UUID 加载插件（带上下文，导出名为 hook.LoadYakitPluginByIDContext）

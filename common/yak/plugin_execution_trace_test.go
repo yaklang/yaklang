@@ -8,8 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 // TestPluginExecutionTracing 测试插件执行跟踪功能
@@ -101,6 +104,97 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 	}
 
 	t.Logf("测试完成，总跟踪记录数: %d", len(allTraces))
+}
+
+func TestYakToCallerManagerDefaultContextCancelsSyncCall(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	manager := NewYakToCallerManager()
+	manager.SetCtx(ctx)
+	manager.SetCallPluginTimeout(60)
+
+	testScript := &schema.YakScript{
+		ScriptName: "test-cancel-child-plugin",
+		Content: `
+__main__ = func() {
+	for i in 10000000000 {
+		time.sleep(1)
+	}
+}
+`,
+		Type: "yak",
+	}
+
+	err := manager.Add(ctx, testScript, map[string]any{}, testScript.Content, nil, "__main__")
+	if err != nil {
+		t.Fatalf("add plugin failed: %v", err)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		manager.CallByNameSync("__main__")
+	}()
+
+	time.Sleep(200 * time.Millisecond)
+	cancel()
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("sync child plugin call did not stop after parent context cancellation")
+	}
+}
+
+func TestHookNewManagerInheritsPluginContextCancellation(t *testing.T) {
+	consts.GetGormProfileDatabase()
+	childName, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("yak", `
+__main__ = func() {
+	for i in 10000000000 {
+		time.sleep(1)
+	}
+}
+`)
+	if err != nil {
+		t.Fatalf("create child plugin failed: %v", err)
+	}
+	defer clearFunc()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	engine := NewScriptEngine(1)
+	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
+		BindYakitPluginContextToEngine(
+			engine,
+			CreateYakitPluginContext("test-runtime").
+				WithPluginName("parent-plugin").
+				WithContext(ctx).
+				WithContextCancel(cancel),
+		)
+		return nil
+	})
+
+	done := make(chan error, 1)
+	go func() {
+		parentCode := fmt.Sprintf(`
+manager = hook.NewManager()
+manager.SetCallPluginTimeout(60)
+hook.LoadYakitPluginByName(manager, %q, "__main__")~
+manager.CallByNameSync("__main__")
+`, childName)
+		_, err := engine.ExecuteExWithContext(ctx, parentCode, map[string]any{})
+		done <- err
+	}()
+
+	time.Sleep(200 * time.Millisecond)
+	cancel()
+
+	select {
+	case err := <-done:
+		if err != nil && !strings.Contains(err.Error(), "context canceled") {
+			t.Fatalf("unexpected parent execution error: %v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("child plugin loaded through hook.NewManager kept running after parent context cancellation")
+	}
 }
 
 // TestPluginExecutionTracingLifecycle 测试插件调用生命周期跟踪
