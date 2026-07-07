@@ -22,7 +22,7 @@ import (
 )
 
 type Server struct {
-	ypb.YakServer
+	ypb.UnimplementedYakServer
 	homeDir            string
 	cacheDir           string
 	_abandonedDatabase *gorm.DB
