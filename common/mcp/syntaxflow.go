@@ -9,62 +9,96 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+var filterSyntaxFlowRuleToolOptions = []mcp.ToolOption{
+	mcp.WithStringArray("ruleNames", mcp.Description("Exact SyntaxFlow rule names")),
+	mcp.WithStringArray("language", mcp.Description("Target languages: java, php, js, go, ...")),
+	mcp.WithStringArray("groupNames", mcp.Description("Rule groups")),
+	mcp.WithStringArray("severity", mcp.Description("Severity: info, low, middle, high, critical")),
+	mcp.WithStringArray("purpose", mcp.Description("Rule purpose tags")),
+	mcp.WithStringArray("tag", mcp.Description("Rule tags")),
+	mcp.WithString("keyword", mcp.Description("Fuzzy search on rule name/content")),
+	mcp.WithNumber("afterId", mcp.Description("Rules with ID > afterId")),
+	mcp.WithNumber("beforeId", mcp.Description("Rules with ID < beforeId")),
+	mcp.WithString("filterRuleKind", mcp.Description("buildIn | unBuildIn | empty for all")),
+	mcp.WithString("filterLibRuleKind", mcp.Description("lib | noLib | empty for all")),
+	mcp.WithStringArray("ruleIds", mcp.Description("Rule ID strings")),
+	mcp.WithNumberArray("ids", mcp.Description("Rule numeric IDs")),
+}
+
+var syntaxFlowRuleInputToolOptions = []mcp.ToolOption{
+	mcp.WithString("ruleName", mcp.Description("Unique rule name (index, cannot change on update)"), mcp.Required()),
+	mcp.WithString("content", mcp.Description("SyntaxFlow rule source code"), mcp.Required()),
+	mcp.WithString("language", mcp.Description("Target language: java, php, js, go, ..."), mcp.Required()),
+	mcp.WithString("description", mcp.Description("Human-readable rule description")),
+	mcp.WithStringArray("tags", mcp.Description("Rule tags")),
+	mcp.WithStringArray("groupNames", mcp.Description("Groups to assign")),
+}
+
+var filterSyntaxFlowResultToolOptions = []mcp.ToolOption{
+	mcp.WithStringArray("taskIDs", mcp.Description("Scan task IDs")),
+	mcp.WithStringArray("resultIDs", mcp.Description("Result record IDs")),
+	mcp.WithStringArray("ruleNames", mcp.Description("Rule names")),
+	mcp.WithStringArray("programNames", mcp.Description("SSA program names")),
+	mcp.WithString("keyword", mcp.Description("Fuzzy search")),
+	mcp.WithBool("onlyRisk", mcp.Description("Only results with risks")),
+	mcp.WithNumber("afterID", mcp.Description("Results with ID > afterID")),
+	mcp.WithNumber("beforeID", mcp.Description("Results with ID < beforeID")),
+	mcp.WithStringArray("severity", mcp.Description("info, low, middle, high, critical")),
+	mcp.WithStringArray("kind", mcp.Description("query | debug | scan")),
+}
+
+var filterSyntaxFlowScanTaskToolOptions = []mcp.ToolOption{
+	mcp.WithStringArray("programs", mcp.Description("SSA program names")),
+	mcp.WithStringArray("status", mcp.Description("Task status values")),
+	mcp.WithStringArray("taskIds", mcp.Description("Task IDs")),
+	mcp.WithString("keyword", mcp.Description("Fuzzy search on program name")),
+	mcp.WithStringArray("kind", mcp.Description("debug | scan")),
+	mcp.WithNumberArray("projectIds", mcp.Description("SSA project IDs")),
+	mcp.WithBool("haveRisk", mcp.Description("Only tasks with risks")),
+	mcp.WithNumber("fromId", mcp.Description("Tasks with ID >= fromId")),
+	mcp.WithNumber("untilId", mcp.Description("Tasks with ID <= untilId")),
+}
+
 func init() {
 	AddGlobalToolSet("syntaxflow",
 		WithTool(mcp.NewTool("query_syntaxflow_rule",
 			mcp.WithDescription("Query SyntaxFlow rules with filters"),
 			mcp.WithPaging("pagination", []string{"id", "created_at", "updated_at", "rule_name", "language", "purpose"},
-				mcp.Description("Pagination settings")),
-			mcp.WithStruct("filter", []mcp.PropertyOption{mcp.Description("SyntaxFlow rule filter")}),
+				mcp.Description("Pagination settings for the query")),
+			mcp.WithStruct("filter", []mcp.PropertyOption{
+				mcp.Description("SyntaxFlow rule filter"),
+			}, filterSyntaxFlowRuleToolOptions...),
 		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.QuerySyntaxFlowRuleRequest) (any, error) {
 			return s.grpcClient.QuerySyntaxFlowRule(ctx, req)
 		}, "failed to query syntaxflow rule")),
 
 		WithTool(mcp.NewTool("create_syntaxflow_rule",
-			mcp.WithDescription("Create a new SyntaxFlow rule"),
+			mcp.WithDescription("Create a SyntaxFlow rule (ruleName, language, content required)"),
 			mcp.WithStruct("syntaxFlowInput", []mcp.PropertyOption{
-				mcp.Description("SyntaxFlow rule content (ruleName, language, content required)"),
+				mcp.Description("SyntaxFlow rule payload"),
 				mcp.Required(),
-			},
-				mcp.WithString("ruleName", mcp.Description("Rule name"), mcp.Required()),
-				mcp.WithString("language", mcp.Description("Target language"), mcp.Required()),
-				mcp.WithString("content", mcp.Description("SyntaxFlow rule body")),
-				mcp.WithString("description", mcp.Description("Rule description")),
-			),
+			}, syntaxFlowRuleInputToolOptions...),
 		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.CreateSyntaxFlowRuleRequest) (any, error) {
 			return s.grpcClient.CreateSyntaxFlowRuleEx(ctx, req)
 		}, "failed to create syntaxflow rule")),
 
 		WithTool(mcp.NewTool("update_syntaxflow_rule",
-			mcp.WithDescription("Update an existing SyntaxFlow rule"),
+			mcp.WithDescription("Update a SyntaxFlow rule by ruleName"),
 			mcp.WithStruct("syntaxFlowInput", []mcp.PropertyOption{
-				mcp.Description("SyntaxFlow rule update payload"),
+				mcp.Description("Fields to update; ruleName required as identifier"),
 				mcp.Required(),
-			},
-				mcp.WithString("ruleName", mcp.Description("Rule name"), mcp.Required()),
-				mcp.WithString("language", mcp.Description("Target language")),
-				mcp.WithString("content", mcp.Description("SyntaxFlow rule body")),
-				mcp.WithString("description", mcp.Description("Rule description")),
-			),
+			}, syntaxFlowRuleInputToolOptions...),
 		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.UpdateSyntaxFlowRuleRequest) (any, error) {
 			return s.grpcClient.UpdateSyntaxFlowRuleEx(ctx, req)
 		}, "failed to update syntaxflow rule")),
 
-		WithTool(mcp.NewTool("delete_syntaxflow_rule",
-			mcp.WithDescription("Delete SyntaxFlow rules by filter"),
-			mcp.WithStruct("filter", []mcp.PropertyOption{
-				mcp.Description("Filter selecting rules to delete"),
-				mcp.Required(),
-			}),
-		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.DeleteSyntaxFlowRuleRequest) (any, error) {
-			return s.grpcClient.DeleteSyntaxFlowRule(ctx, req)
-		}, "failed to delete syntaxflow rule")),
-
 		WithTool(mcp.NewTool("query_syntaxflow_result",
 			mcp.WithDescription("Query SyntaxFlow scan results"),
 			mcp.WithPaging("pagination", []string{"id", "created_at", "updated_at", "rule_name", "program_name"},
-				mcp.Description("Pagination settings")),
-			mcp.WithStruct("filter", []mcp.PropertyOption{mcp.Description("Result filter")}),
+				mcp.Description("Pagination settings for the query")),
+			mcp.WithStruct("filter", []mcp.PropertyOption{
+				mcp.Description("Result filter"),
+			}, filterSyntaxFlowResultToolOptions...),
 		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.QuerySyntaxFlowResultRequest) (any, error) {
 			return s.grpcClient.QuerySyntaxFlowResult(ctx, req)
 		}, "failed to query syntaxflow result")),
@@ -72,34 +106,28 @@ func init() {
 		WithTool(mcp.NewTool("query_syntaxflow_scan_task",
 			mcp.WithDescription("Query SyntaxFlow scan tasks"),
 			mcp.WithPaging("pagination", []string{"id", "created_at", "updated_at", "task_id", "status"},
-				mcp.Description("Pagination settings")),
-			mcp.WithStruct("filter", []mcp.PropertyOption{mcp.Description("Task filter")}),
-			mcp.WithBool("showDiffRisk", mcp.Description("Include diff risk info")),
+				mcp.Description("Pagination settings for the query")),
+			mcp.WithStruct("filter", []mcp.PropertyOption{
+				mcp.Description("Scan task filter"),
+			}, filterSyntaxFlowScanTaskToolOptions...),
+			mcp.WithBool("showDiffRisk", mcp.Description("Include SSA risk diff info")),
 		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.QuerySyntaxFlowScanTaskRequest) (any, error) {
 			return s.grpcClient.QuerySyntaxFlowScanTask(ctx, req)
 		}, "failed to query syntaxflow scan task")),
 
-		WithTool(mcp.NewTool("delete_syntaxflow_scan_task",
-			mcp.WithDescription("Delete SyntaxFlow scan tasks by filter"),
-			mcp.WithStruct("filter", []mcp.PropertyOption{
-				mcp.Description("Task filter"),
-				mcp.Required(),
-			}),
-		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.DeleteSyntaxFlowScanTaskRequest) (any, error) {
-			return s.grpcClient.DeleteSyntaxFlowScanTask(ctx, req)
-		}, "failed to delete syntaxflow scan task")),
-
 		WithTool(mcp.NewTool("syntaxflow_scan",
-			mcp.WithDescription("Start a SyntaxFlow scan task (runs in background)"),
-			mcp.WithString("controlMode", mcp.Description("Control mode: start, pause, resume, status"), mcp.Default("start")),
+			mcp.WithDescription("Start/pause/resume SyntaxFlow scan (runs in background)"),
+			mcp.WithString("controlMode", mcp.Description("start | pause | resume | status"), mcp.Default("start")),
 			mcp.WithStringArray("programName", mcp.Description("SSA program names to scan")),
 			mcp.WithString("resumeTaskId", mcp.Description("Task ID to resume")),
-			mcp.WithBool("ignoreLanguage", mcp.Description("Ignore language filter on rules")),
-			mcp.WithNumber("concurrency", mcp.Description("Scan concurrency"), mcp.Default(5)),
-			mcp.WithBool("memory", mcp.Description("Compile data only in memory")),
+			mcp.WithBool("ignoreLanguage", mcp.Description("Run rules regardless of program language")),
+			mcp.WithNumber("concurrency", mcp.Description("Scan worker concurrency"), mcp.Default(5)),
+			mcp.WithBool("memory", mcp.Description("Compile SSA data in memory only")),
 			mcp.WithNumber("ssaProjectId", mcp.Description("SSA project ID")),
 			mcp.WithStringArray("projectName", mcp.Description("Project names to scan")),
-			mcp.WithStruct("filter", []mcp.PropertyOption{mcp.Description("SyntaxFlow rule filter")}),
+			mcp.WithStruct("filter", []mcp.PropertyOption{
+				mcp.Description("Rule filter; same fields as query_syntaxflow_rule"),
+			}, filterSyntaxFlowRuleToolOptions...),
 		), handleSyntaxFlowScan),
 	)
 }

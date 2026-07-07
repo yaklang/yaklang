@@ -26,7 +26,6 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/mcp"
 	rawmcp "github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -278,24 +277,6 @@ func ensureLegacyTestRiskID(t *testing.T) int64 {
 	return id
 }
 
-func ensureLegacyTestReportID(t *testing.T) int64 {
-	t.Helper()
-	db := consts.GetGormProjectDatabase()
-	require.NotNil(t, db)
-	rec := &schema.ReportRecord{
-		Title: uniqueName("mcp-report-title"),
-		Hash:  uniqueName("mcp-report-hash"),
-		Owner: "mcp-test",
-		From:  "integration",
-	}
-	require.NoError(t, db.Create(rec).Error)
-	id := int64(rec.ID)
-	t.Cleanup(func() {
-		_ = yakit.DeleteReportRecordByID(db, id)
-	})
-	return id
-}
-
 func legacyGeneratedYSOBytesArgs(t *testing.T, srv *mcp.MCPServer) map[string]any {
 	t.Helper()
 	result, err := invokeLegacyTool(t, srv, "generate_yso_bytes", map[string]any{
@@ -319,8 +300,7 @@ var expectedLegacyToolSetOrder = []string{
 	"codec", "cve", "httpflow", "hybrid_scan", "payload", "port_scan",
 	"yak_document", "yak_script", "reverse_shell", "reverse_platform", "http_fuzzer", "brute",
 	"subdomain", "crawler", "dynamic", "ssa", "syntaxflow", "risk", "yso", "mitm",
-	"fingerprint", "space_engine", "report", "plugin_env", "http_builder", "chaos_maker",
-	"project_database", "global_hotpatch", "system_proxy",
+	"fingerprint", "project_database", "global_hotpatch", "system_proxy",
 }
 
 var (
@@ -384,16 +364,6 @@ func registerAllLegacyToolSetCases() {
 			cases = legacyMITMToolCases()
 		case "fingerprint":
 			cases = legacyFingerprintToolCases()
-		case "space_engine":
-			cases = legacySpaceEngineToolCases()
-		case "report":
-			cases = legacyReportToolCases()
-		case "plugin_env":
-			cases = legacyPluginEnvToolCases()
-		case "http_builder":
-			cases = legacyHTTPBuilderToolCases()
-		case "chaos_maker":
-			cases = legacyChaosMakerToolCases()
 		case "project_database":
 			cases = legacyProjectDatabaseToolCases()
 		case "global_hotpatch":
@@ -1009,42 +979,6 @@ func legacyReversePlatformToolCases() map[string][]legacyToolCase {
 			},
 		},
 	},
-	"available_local_addr": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"get_tunnel_server_external_ip": {{
-		name:    "requires_bridge_without_config",
-		args:    map[string]any{},
-		timeout: 5 * time.Second,
-		allowErrContains: []string{
-			"bridge addr is required", "empty addr", "failed",
-		},
-		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-			require.NotNil(t, result)
-		},
-	}},
-	"verify_tunnel_server_domain": {{
-		name: "verify_with_domain",
-		args: map[string]any{"domain": "dnslog.example.com"},
-		timeout: 10 * time.Second,
-		allowErrContains: []string{
-			"empty addr", "failed", "connect", "timeout", "bridge",
-		},
-		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-			require.NotNil(t, result)
-		},
-	}},
 	"require_dnslog_domain": {{
 		name:    "fallback_remote_bridge",
 		args:    map[string]any{"useLocal": true},
@@ -1117,52 +1051,7 @@ func legacyReversePlatformToolCases() map[string][]legacyToolCase {
 			},
 		},
 	},
-	"register_facades_http": {{
-		name:    "default_http_response",
-		args:    map[string]any{"url": "http://127.0.0.1/mcp-test"},
-		timeout: 5 * time.Second,
-		skipIfErrContains: []string{
-			"empty", "failed", "connect",
-		},
-		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-			require.NotNil(t, result)
-		},
-	}},
-	"apply_class_to_facades": {{
-		name:        "reject_missing_token",
-		args:        map[string]any{},
-		wantErr:     true,
-		errContains: []string{"token", "Server is not exist"},
-	}},
-	"config_global_reverse": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
 	"start_facades": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"start_facades_with_yso": {
 		{
 			name:    "empty_args_should_not_panic",
 			args:    map[string]any{},
@@ -1400,27 +1289,6 @@ func legacySyntaxFlowToolCases() map[string][]legacyToolCase {
 			require.NotNil(t, result)
 		},
 	}},
-	"delete_syntaxflow_rule": {{
-		name: "delete_created_rule",
-		buildArgs: func(t *testing.T, srv *mcp.MCPServer) map[string]any {
-			name := uniqueName("mcp-sf-del")
-			_, err := invokeLegacyTool(t, srv, "create_syntaxflow_rule", map[string]any{
-				"syntaxFlowInput": map[string]any{
-					"ruleName": name,
-					"language": "java",
-					"content":  `println as $output`,
-				},
-			}, 8*time.Second)
-			require.NoError(t, err)
-			return map[string]any{
-				"filter": map[string]any{"ruleNames": []any{name}},
-			}
-		},
-		timeout: 8 * time.Second,
-		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-			require.NotNil(t, result)
-		},
-	}},
 	"query_syntaxflow_result": {
 		{
 			name:    "minimal_pagination_should_not_panic",
@@ -1441,20 +1309,6 @@ func legacySyntaxFlowToolCases() map[string][]legacyToolCase {
 			timeout: 5 * time.Second,
 			skipIfErrContains: []string{
 				"context deadline", "failed", "invalid",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"delete_syntaxflow_scan_task": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
 			},
 			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
 				require.NotNil(t, result)
@@ -1534,20 +1388,6 @@ func legacyRiskToolCases() map[string][]legacyToolCase {
 			},
 		},
 	},
-	"new_risk_read": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
 	"set_tag_for_risk": {{
 		name: "tag_seeded_risk",
 		buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
@@ -1561,62 +1401,6 @@ func legacyRiskToolCases() map[string][]legacyToolCase {
 			require.NotNil(t, result)
 		},
 	}},
-	"query_risk_tags": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"risk_field_group": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"query_available_risk_type": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"query_available_risk_level": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
 	}
 }
 
@@ -1651,20 +1435,6 @@ func legacyYSOToolCases() map[string][]legacyToolCase {
 		name:    "url_dns_gadget",
 		args:    map[string]any{"gadget": "URLDNS"},
 		timeout: 5 * time.Second,
-		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-			require.NotNil(t, result)
-		},
-	}},
-	"generate_yso_code": {{
-		name: "url_dns_class",
-		args: map[string]any{
-			"gadget": "URLDNS",
-			"class":  "URLDNS",
-		},
-		timeout: 10 * time.Second,
-		skipIfErrContains: []string{
-			"not set class", "not support",
-		},
 		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
 			require.NotNil(t, result)
 		},
@@ -1735,66 +1505,10 @@ func legacyMITMToolCases() map[string][]legacyToolCase {
 			},
 		},
 	},
-	"reset_mitm_filter": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"get_mitm_hijack_filter": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"set_mitm_hijack_filter": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"reset_mitm_hijack_filter": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
 	"query_mitm_replacer_rules": {
 		{
-			name:    "minimal_pagination_should_not_panic",
-			args:    pagingArgs(),
+			name:    "empty_args_should_not_panic",
+			args:    map[string]any{},
 			timeout: 5 * time.Second,
 			skipIfErrContains: []string{
 				"context deadline", "failed", "invalid",
@@ -1826,92 +1540,7 @@ func legacyMITMToolCases() map[string][]legacyToolCase {
 			require.NotNil(t, result)
 		},
 	}},
-	"export_mitm_replacer_rules": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"import_mitm_replacer_rules": {{
-		name:        "import_empty_rules_returns_error",
-		args:        map[string]any{"jsonRaw": "W10="},
-		wantErr:     true,
-		errContains: []string{"no new rules", "没有新规则", "解析失败"},
-	}},
 	"download_mitm_cert": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"download_mitm_gm_cert": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"install_mitm_certificate": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"query_mitm_extracted_aggregate": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"query_mitm_rule_extracted_data": {{
-		name: "reject_empty_filter",
-		args: map[string]any{
-			"pagination": map[string]any{"page": 1, "limit": 1},
-			"filter":     map[string]any{},
-		},
-		wantErr:     true,
-		errContains: []string{"need filter"},
-	}},
-	"delete_mitm_rule_extracted_data": {
 		{
 			name:    "empty_args_should_not_panic",
 			args:    map[string]any{},
@@ -2001,357 +1630,6 @@ func legacyFingerprintToolCases() map[string][]legacyToolCase {
 			name:    "empty_filter_should_not_panic",
 			args:    map[string]any{"filter": map[string]any{}},
 			timeout: 3 * time.Second,
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"get_all_fingerprint_group": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"create_fingerprint_group": {{
-		name: "create_unique_group",
-		args: map[string]any{
-			"group": map[string]any{"GroupName": uniqueName("mcp-fp-grp")},
-		},
-		timeout: 5 * time.Second,
-		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-			require.NotNil(t, result)
-		},
-	}},
-	"rename_fingerprint_group": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"delete_fingerprint_group": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"batch_update_fingerprint_to_group": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"recover_builtin_fingerprint": {{
-		name:    "recover_or_error_without_asset",
-		args:    map[string]any{},
-		timeout: 8 * time.Second,
-		allowErrContains: []string{
-			"asset", "EOF", "gzip", "failed",
-		},
-		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-			require.NotNil(t, result)
-		},
-	}},
-	}
-}
-
-
-// --- ToolSet: space_engine ---
-
-func legacySpaceEngineToolCases() map[string][]legacyToolCase {
-	return map[string][]legacyToolCase{
-	"get_space_engine_status": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"get_space_engine_account_status_v2": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"fetch_port_asset_from_space_engine": {{
-		name: "background_with_filter",
-		args: map[string]any{
-			"type":    "fofa",
-			"filter":  "port=80",
-			"maxPage": 1,
-		},
-		timeout: 5 * time.Second,
-		validate: func(t *testing.T, text string, _ *rawmcp.CallToolResult) {
-			assert.Contains(t, text, "started")
-		},
-	}},
-	}
-}
-
-
-// --- ToolSet: report ---
-
-func legacyReportToolCases() map[string][]legacyToolCase {
-	return map[string][]legacyToolCase{
-	"query_reports": {
-		{
-			name:    "minimal_pagination_should_not_panic",
-			args:    pagingArgs(),
-			timeout: 5 * time.Second,
-			skipIfErrContains: []string{
-				"context deadline", "failed", "invalid",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"query_report": {{
-		name: "query_seeded_report",
-		buildArgs: func(t *testing.T, _ *mcp.MCPServer) map[string]any {
-			return map[string]any{"id": ensureLegacyTestReportID(t)}
-		},
-		timeout: 5 * time.Second,
-		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-			require.NotNil(t, result)
-		},
-	}},
-	"delete_report": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"generate_ssa_report": {{
-		name: "missing_task_id_should_error",
-		args: map[string]any{"reportName": "mcp-test"},
-		timeout: 5 * time.Second,
-		wantErr: true,
-		errContains: []string{"taskID", "filter"},
-	}},
-	}
-}
-
-
-// --- ToolSet: plugin_env ---
-
-func legacyPluginEnvToolCases() map[string][]legacyToolCase {
-	return map[string][]legacyToolCase{
-	"get_all_plugin_env": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"query_plugin_env": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"set_plugin_env": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"create_plugin_env": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"delete_plugin_env": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	}
-}
-
-
-// --- ToolSet: http_builder ---
-
-func legacyHTTPBuilderToolCases() map[string][]legacyToolCase {
-	return map[string][]legacyToolCase{
-	"http_request_builder": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"debug_plugin": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	}
-}
-
-
-// --- ToolSet: chaos_maker ---
-
-func legacyChaosMakerToolCases() map[string][]legacyToolCase {
-	return map[string][]legacyToolCase{
-	"query_chaos_maker_rule": {
-		{
-			name:    "minimal_pagination_should_not_panic",
-			args:    pagingArgs(),
-			timeout: 5 * time.Second,
-			skipIfErrContains: []string{
-				"context deadline", "failed", "invalid",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"import_chaos_maker_rules": {{
-		name:    "minimal_yaml",
-		args:    map[string]any{"content": "title: mcp-test\nprotocols: [http]\n"},
-		timeout: 5 * time.Second,
-		skipIfErrContains: []string{
-			"parse", "invalid", "failed",
-		},
-		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-			require.NotNil(t, result)
-		},
-	}},
-	"delete_chaos_maker_rule_by_id": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
-			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
-				require.NotNil(t, result)
-			},
-		},
-	},
-	"execute_chaos_maker_rule": {
-		{
-			name:    "empty_args_should_not_panic",
-			args:    map[string]any{},
-			timeout: 3 * time.Second,
-			skipIfErrContains: []string{
-				"failed", "invalid", "connect", "bridge", "timeout", "context deadline",
-				"dnslog", "reverse", "panic",
-			},
 			validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
 				require.NotNil(t, result)
 			},
@@ -2667,26 +1945,6 @@ func TestLegacyToolSet_Mitm(t *testing.T) {
 
 func TestLegacyToolSet_Fingerprint(t *testing.T) {
 	runLegacyToolSetIntegration(t, "fingerprint")
-}
-
-func TestLegacyToolSet_SpaceEngine(t *testing.T) {
-	runLegacyToolSetIntegration(t, "space_engine")
-}
-
-func TestLegacyToolSet_Report(t *testing.T) {
-	runLegacyToolSetIntegration(t, "report")
-}
-
-func TestLegacyToolSet_PluginEnv(t *testing.T) {
-	runLegacyToolSetIntegration(t, "plugin_env")
-}
-
-func TestLegacyToolSet_HttpBuilder(t *testing.T) {
-	runLegacyToolSetIntegration(t, "http_builder")
-}
-
-func TestLegacyToolSet_ChaosMaker(t *testing.T) {
-	runLegacyToolSetIntegration(t, "chaos_maker")
 }
 
 func TestLegacyToolSet_ProjectDatabase(t *testing.T) {

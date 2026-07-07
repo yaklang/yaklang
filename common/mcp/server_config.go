@@ -369,46 +369,6 @@ func WithDisableFingerprintToolSet() McpServerOption {
 	return WithDisableToolSet("fingerprint")
 }
 
-func WithEnableSpaceEngineToolSet() McpServerOption {
-	return WithEnableToolSet("space_engine")
-}
-
-func WithDisableSpaceEngineToolSet() McpServerOption {
-	return WithDisableToolSet("space_engine")
-}
-
-func WithEnableReportToolSet() McpServerOption {
-	return WithEnableToolSet("report")
-}
-
-func WithDisableReportToolSet() McpServerOption {
-	return WithDisableToolSet("report")
-}
-
-func WithEnablePluginEnvToolSet() McpServerOption {
-	return WithEnableToolSet("plugin_env")
-}
-
-func WithDisablePluginEnvToolSet() McpServerOption {
-	return WithDisableToolSet("plugin_env")
-}
-
-func WithEnableHTTPBuilderToolSet() McpServerOption {
-	return WithEnableToolSet("http_builder")
-}
-
-func WithDisableHTTPBuilderToolSet() McpServerOption {
-	return WithDisableToolSet("http_builder")
-}
-
-func WithEnableChaosMakerToolSet() McpServerOption {
-	return WithEnableToolSet("chaos_maker")
-}
-
-func WithDisableChaosMakerToolSet() McpServerOption {
-	return WithDisableToolSet("chaos_maker")
-}
-
 // WithGRPCClient pins the MCP server to a specific gRPC client (integration tests).
 func WithGRPCClient(client YakClientInterface) McpServerOption {
 	return func(cfg *MCPServerConfig) error {

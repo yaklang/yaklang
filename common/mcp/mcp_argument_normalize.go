@@ -23,6 +23,15 @@ func normalizeMCPArguments(arguments map[string]any) map[string]any {
 		delete(args, "request")
 	}
 
+	if group, ok := args["group"].(map[string]any); ok {
+		for k, v := range group {
+			if _, exists := args[k]; !exists {
+				args[k] = v
+			}
+		}
+		delete(args, "group")
+	}
+
 	if rule, ok := args["rule"]; ok {
 		if _, exists := args["syntaxFlowInput"]; !exists {
 			args["syntaxFlowInput"] = rule
