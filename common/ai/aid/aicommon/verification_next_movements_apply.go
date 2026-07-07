@@ -141,15 +141,15 @@ func ApplyVerificationNextMovementsAndEmit(
 		)
 	}
 
-	// 3. timeline breadcrumb: delta-only 一行一个 op, 与 verification 路径
-	//    共用同一个 NEXT_MOVEMENTS 类别, 消费者无需区分来源即可还原 TODO
-	//    时间线. timelineHook 为 nil 时跳过 (例如脱离 invoker 的纯单元测试).
-	if timelineHook != nil {
-		if line := FormatNextMovementsBreadcrumb(movements); line != "" {
-			timelineHook("NEXT_MOVEMENTS", line)
-		}
-		emitVerificationTodoApplyErrors(timelineHook, applyResults)
-	}
+	//// 3. timeline breadcrumb: delta-only 一行一个 op, 与 verification 路径
+	////    共用同一个 NEXT_MOVEMENTS 类别, 消费者无需区分来源即可还原 TODO
+	////    时间线. timelineHook 为 nil 时跳过 (例如脱离 invoker 的纯单元测试).
+	//if timelineHook != nil {
+	//	if line := FormatNextMovementsBreadcrumb(movements); line != "" {
+	//		timelineHook("NEXT_MOVEMENTS", line)
+	//	}
+	//	emitVerificationTodoApplyErrors(timelineHook, applyResults)
+	//}
 }
 
 // SuccessfulVerifyNextMovements collects the movements from a slice of
