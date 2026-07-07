@@ -13,7 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -30,12 +29,11 @@ const (
 )
 
 type subReactDispatchJob struct {
-	Order          int    `json:"order"`
-	Identifier     string `json:"identifier"`
-	Goal           string `json:"goal"`
-	TaskName       string `json:"task_name"`
-	LoopName       string `json:"loop_name"`
-	ResultContract string `json:"result_contract"`
+	Order      int    `json:"order"`
+	Identifier string `json:"identifier"`
+	Goal       string `json:"goal"`
+	TaskName   string `json:"task_name"`
+	LoopName   string `json:"loop_name"`
 }
 
 type subReactProcessStats struct {
@@ -141,14 +139,34 @@ func runForkedSubReactAgentJob(
 		return nil, err
 	}
 
+	// Elaborate the brief intent (job.Goal) into a complete, self-contained goal
+	// plus a result contract right before the sub agent runs. This moves the
+	// long-form generation out of the (linear) dispatch action call — where the
+	// parent AI used to write every sub agent's full goal+contract up front —
+	// into a per-sub-agent step that runs with the forked timeline context and
+	// overlaps across the concurrently-dispatched sub agents. The elaborated
+	// goal streams to the sub agent's own thread (sub_react_agent_goal node)
+	// via the child invoker's forwarding emitter. On failure we fall back to the
+	// brief intent so a generation hiccup never blocks the dispatch.
 	subTask := aicommon.NewSubTaskBaseWithOptions(
 		parentTask,
 		subTaskID,
-		buildSubAgentUserInput(job),
+		job.Goal,
 		aicommon.WithStatefulTaskBaseName(subTaskName),
 		aicommon.WithStatefulTaskBaseSubAgent(),
 		aicommon.WithStatefulTaskBaseContextAndCancel(jobCtx, jobCancel),
 	)
+
+	elaboratedGoal, resultContract, elabErr := elaborateSubReactAgentGoal(jobCtx, childInvoker, parentLoop, subTaskID, job)
+	if elabErr != nil {
+		log.Warnf("dispatch_sub_react_agents: elaborate goal for %s failed, falling back to brief intent: %v", subTaskID, elabErr)
+		elaboratedGoal = job.Goal
+		resultContract = ""
+	}
+
+	subTask.SetStatus(aicommon.AITaskState_Processing)
+
+	subTask.SetUserInput(buildSubAgentUserInput(elaboratedGoal, resultContract))
 	parentInvoker.AddRuntimeTask(subTask)
 	childInvoker.SetCurrentTask(subTask)
 	// Restore sub-agent emit: derive the sub-task emitter from the parent config emitter
@@ -165,10 +183,102 @@ func runForkedSubReactAgentJob(
 		result, _ := buildSubReactJobResult(job, startedAt, subTask, nil, fork, err)
 		return result, nil
 	}
-	subTask.SetStatus(aicommon.AITaskState_Processing)
+
 	execErr := subLoop.ExecuteWithExistedTask(subTask)
 	result, _ := buildSubReactJobResult(job, startedAt, subTask, subLoop, fork, execErr)
 	return result, nil
+}
+
+// subReactGoalElaborationPrompt is rendered with the parent loop's base frame
+// context (CurrentTime/OSArch/WorkingDir/Timeline) plus the sub agent's name,
+// identifier and brief intent, and asks the model to produce a complete,
+// self-contained task goal and an optional result contract for the sub agent.
+const subReactGoalElaborationPrompt = `You are preparing a task brief for an autonomous sub ReAct agent that will run in an isolated timeline fork, inheriting the parent agent's current context snapshot.
+
+Parent context (the sub agent will see this snapshot):
+- Current time: {{.CurrentTime}}
+- OS/Arch: {{.OSArch}}{{ if .WorkingDir }}
+- Working directory: {{.WorkingDir}}{{end}}
+
+Parent timeline snapshot (the sub agent inherits this as its starting context):
+{{ if .Timeline }}{{.Timeline}}{{else}}<empty>{{end}}
+
+The parent agent has decided to dispatch a sub agent with the following brief intent. Your job is to elaborate that brief intent into a COMPLETE, self-contained task goal the sub agent can execute without re-reading the parent's reasoning, plus a result contract describing the output format / acceptance criteria the sub agent's final answer should satisfy.
+
+Sub agent name: {{ if .SubTaskName }}{{.SubTaskName}}{{else}}<unspecified>{{end}}
+Sub agent identifier: {{ if .SubTaskIdentifier }}{{.SubTaskIdentifier}}{{else}}<unspecified>{{end}}
+Brief intent: {{ if .BriefGoal }}{{.BriefGoal}}{{else}}<unspecified>{{end}}
+
+Write the elaborated goal so it stands alone (the sub agent does not see this prompt). Keep it focused and actionable; do not invent scope beyond the intent. The result contract is optional — omit it if no specific output format is needed.`
+
+// elaborateSubReactAgentGoal expands a sub agent's brief intent into a complete,
+// self-contained goal and an optional result contract via a QualityPriority
+// LiteForge call. The "goal" field is streamed to the sub agent's own thread
+// (sub_react_agent_goal node) through the child invoker's forwarding emitter,
+// which stamps events with the sub-task id so the frontend aggregates them
+// under this sub agent. The returned goal/contract become the sub task's input.
+func elaborateSubReactAgentGoal(
+	ctx context.Context,
+	childInvoker aicommon.AITaskInvokeRuntime,
+	parentLoop *reactloops.ReActLoop,
+	subTaskId string,
+	job subReactDispatchJob,
+) (goal, resultContract string, err error) {
+	if childInvoker == nil {
+		return "", "", utils.Error("child invoker is nil")
+	}
+	templateData := map[string]any{}
+	if parentLoop != nil {
+		for k, v := range parentLoop.GetBaseFrameContext() {
+			templateData[k] = v
+		}
+	}
+	templateData["SubTaskName"] = strings.TrimSpace(job.TaskName)
+	templateData["SubTaskIdentifier"] = strings.TrimSpace(job.Identifier)
+	templateData["BriefGoal"] = strings.TrimSpace(job.Goal)
+
+	prompt, err := utils.RenderTemplate(subReactGoalElaborationPrompt, templateData)
+	if err != nil {
+		return "", "", utils.Wrap(err, "render sub react goal elaboration prompt failed")
+	}
+
+	action, err := childInvoker.InvokeQualityPriorityLiteForge(
+		ctx,
+		"sub_react_agent_goal_elaboration",
+		prompt,
+		[]aitool.ToolOption{
+			aitool.WithStringParam("goal",
+				aitool.WithParam_Required(true),
+				aitool.WithParam_Description("Elaborated, self-contained task goal for the sub agent."),
+			),
+			aitool.WithStringParam("result_contract",
+				aitool.WithParam_Description("Optional acceptance criteria / output format for the sub agent result."),
+			),
+		},
+		aicommon.WithGeneralConfigStreamableFieldEmitterCallback(
+			[]string{"goal"},
+			func(key string, r io.Reader, emitter *aicommon.Emitter) {
+				r = utils.JSONStringReader(r)
+				if emitter == nil {
+					io.Copy(io.Discard, r)
+					return
+				}
+				emitter.EmitTextPlainTextStreamEvent(loopInfraNodeSubReactGoal, r, subTaskId)
+			},
+		),
+	)
+	if err != nil {
+		return "", "", err
+	}
+	if action == nil {
+		return "", "", utils.Error("sub react goal elaboration returned nil action")
+	}
+	goal = strings.TrimSpace(action.GetString("goal"))
+	resultContract = strings.TrimSpace(action.GetString("result_contract"))
+	if goal == "" {
+		return "", "", utils.Error("sub react goal elaboration returned empty goal")
+	}
+	return goal, resultContract, nil
 }
 
 func buildForkedSubReactInvoker(
@@ -377,10 +487,11 @@ func sanitizeSubReactIDSegment(s string) string {
 	return out
 }
 
-func buildSubAgentUserInput(job subReactDispatchJob) string {
+func buildSubAgentUserInput(goal, resultContract string) string {
+	goal = strings.TrimSpace(goal)
 	var sb strings.Builder
-	sb.WriteString(strings.TrimSpace(job.Goal))
-	if contract := strings.TrimSpace(job.ResultContract); contract != "" {
+	sb.WriteString(goal)
+	if contract := strings.TrimSpace(resultContract); contract != "" {
 		sb.WriteString("\n\n## Result Contract\n\n")
 		sb.WriteString(contract)
 	}
@@ -416,11 +527,10 @@ func parseSubReactDispatchJobsFromArray(raw []aitool.InvokeParams) ([]subReactDi
 			continue
 		}
 		jobs = append(jobs, subReactDispatchJob{
-			Identifier:     strings.TrimSpace(item.GetString("identifier")),
-			Goal:           strings.TrimSpace(item.GetString("goal")),
-			TaskName:       strings.TrimSpace(item.GetString("task_name")),
-			LoopName:       strings.TrimSpace(item.GetString("loop_name")),
-			ResultContract: strings.TrimSpace(item.GetString("result_contract")),
+			Identifier: strings.TrimSpace(item.GetString("identifier")),
+			Goal:       strings.TrimSpace(item.GetString("goal")),
+			TaskName:   strings.TrimSpace(item.GetString("task_name")),
+			LoopName:   strings.TrimSpace(item.GetString("loop_name")),
 		})
 	}
 	return normalizeSubReactDispatchJobs(jobs)
@@ -666,75 +776,6 @@ func writeSubReactAgentTimelineRecord(
 	invoker.AddToTimeline(schema.AI_TIMELINE_ITEM_TYPE_SUB_REACT_AGENT_RESULT, string(raw))
 }
 
-func formatDispatchSubReactJobDisplayLine(job subReactDispatchJob) string {
-	identifier := strings.TrimSpace(job.Identifier)
-	goal := strings.TrimSpace(job.Goal)
-	if identifier == "" && goal == "" {
-		return ""
-	}
-	line := fmt.Sprintf("- %s", goal)
-	if loopName := strings.TrimSpace(job.LoopName); loopName != "" && loopName != schema.AI_REACT_LOOP_NAME_DEFAULT {
-		line += fmt.Sprintf(" (loop: %s)", loopName)
-	}
-	return line
-}
-
-func dispatchSubReactDispatchesStreamHandler(fieldReader io.Reader, emitWriter io.Writer) {
-	if err := writeDispatchSubReactDispatchesDisplayStream(fieldReader, emitWriter); err != nil {
-		log.Debugf("dispatch_sub_react_agents: dispatches display stream failed: %v", err)
-		_, _ = io.Copy(io.Discard, fieldReader)
-	}
-}
-
-func writeDispatchSubReactDispatchesDisplayStream(reader io.Reader, writer io.Writer) error {
-	// Stream each dispatch object as soon as it completes in the JSON array,
-	// instead of buffering the whole array via encoding/json. The structured
-	// streaming extractor invokes the object callback inline in parse order, so
-	// goals are emitted one-by-one as they arrive.
-	firstLine := true
-	order := 0
-	emitLine := func(line string) error {
-		if strings.TrimSpace(line) == "" {
-			return nil
-		}
-		if !firstLine {
-			if _, err := writer.Write([]byte("\n")); err != nil {
-				return err
-			}
-		}
-		firstLine = false
-		_, err := io.WriteString(writer, line)
-		return err
-	}
-
-	err := jsonextractor.ExtractStructuredJSONFromStream(reader,
-		jsonextractor.WithObjectCallback(func(data map[string]any) {
-			params := aitool.InvokeParams(data)
-			goal := strings.TrimSpace(params.GetString("goal"))
-			// Skip objects without a goal: they are either incomplete stream
-			// fragments or nested maps that are not dispatch jobs.
-			if goal == "" {
-				return
-			}
-			order++
-			job := subReactDispatchJob{
-				Order:      order,
-				Identifier: strings.TrimSpace(params.GetString("identifier")),
-				Goal:       goal,
-				TaskName:   strings.TrimSpace(params.GetString("task_name")),
-				LoopName:   strings.TrimSpace(params.GetString("loop_name")),
-			}
-			if e := emitLine(formatDispatchSubReactJobDisplayLine(job)); e != nil {
-				log.Debugf("dispatch_sub_react_agents: dispatches display stream write failed: %v", e)
-			}
-		}),
-		jsonextractor.WithStreamErrorCallback(func(err error) {
-			log.Debugf("dispatch_sub_react_agents: dispatches display stream parse error: %v", err)
-		}),
-	)
-	return err
-}
-
 var loopAction_DispatchSubReactAgents = &reactloops.LoopAction{
 	ActionType: schema.AI_REACT_LOOP_ACTION_DISPATCH_SUB_REACT_AGENTS,
 	Description: "Dispatch multiple independent sub ReAct agents in parallel. Each sub agent inherits the current timeline snapshot as context, " +
@@ -753,16 +794,13 @@ var loopAction_DispatchSubReactAgents = &reactloops.LoopAction{
 			),
 			aitool.WithStringParam("goal",
 				aitool.WithParam_Required(true),
-				aitool.WithParam_Description("Task goal for the sub ReAct agent."),
+				aitool.WithParam_Description("Short one-line intent for this sub agent (a noun phrase or single sentence). Keep it brief; a complete, self-contained goal and result contract are elaborated automatically before the sub agent runs — do not write the full goal here."),
 			),
 			aitool.WithStringParam("task_name",
 				aitool.WithParam_Description("Short, human-readable name for this sub agent's task, shown as the task title in the UI and timeline. Falls back to identifier, then goal when omitted. Prefer a concise noun phrase here rather than reusing the full goal sentence."),
 			),
 			aitool.WithStringParam("loop_name",
 				aitool.WithParam_Description(fmt.Sprintf("Target ReAct loop name. Defaults to %q.", schema.AI_REACT_LOOP_NAME_DEFAULT)),
-			),
-			aitool.WithStringParam("result_contract",
-				aitool.WithParam_Description("Optional output format or acceptance criteria for the sub agent result."),
 			),
 		),
 		aitool.WithIntegerParam(
@@ -772,10 +810,8 @@ var loopAction_DispatchSubReactAgents = &reactloops.LoopAction{
 	},
 	StreamFields: []*reactloops.LoopStreamField{
 		{
-			FieldName:     "dispatches",
-			AINodeId:      loopInfraNodeDispatchSubReact,
-			StreamHandler: dispatchSubReactDispatchesStreamHandler,
-			ContentType:   aicommon.TypeTextMarkdown,
+			FieldName: "goal",
+			AINodeId:  loopInfraNodeDispatchSubReact,
 		},
 		{
 			FieldName: "concurrency",

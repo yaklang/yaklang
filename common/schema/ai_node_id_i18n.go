@@ -133,6 +133,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "下发子 Agent",
 		En: "Dispatch Sub Agents",
 	},
+	"sub_react_agent_goal": {
+		Zh: "子 Agent 任务目标",
+		En: "Sub Agent Goal",
+	},
 	"load_tool": {
 		Zh: "加载工具",
 		En: "Loading Tools",
