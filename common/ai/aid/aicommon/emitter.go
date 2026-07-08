@@ -484,12 +484,16 @@ func (r *Emitter) EmitToolCallWatcher(toolCallID string, id string, tool *aitool
 }
 
 func (r *Emitter) EmitToolCallStart(callToolId string, tool *aitool.Tool, startTime ...time.Time) (*schema.AiOutputEvent, error) {
+	toolMap := map[string]any{
+		"name":        tool.Name,
+		"description": tool.Description,
+	}
+	if verboseName := tool.GetVerboseName(); verboseName != "" {
+		toolMap["verbose_name"] = verboseName
+	}
 	data := map[string]any{
 		"call_tool_id": callToolId,
-		"tool": map[string]any{
-			"name":        tool.Name,
-			"description": tool.Description,
-		},
+		"tool":         toolMap,
 	}
 	if len(startTime) > 0 && !startTime[0].IsZero() {
 		data["start_time"] = startTime[0].Unix()
