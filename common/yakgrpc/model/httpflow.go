@@ -40,6 +40,22 @@ func SetHTTPFlowCacheGRPCModel(f *schema.HTTPFlow, full bool, m *ypb.HTTPFlow) {
 	GlobalHTTPFlowCache.Set(f.CalcCacheHash(full), m)
 }
 
+func UpdateHTTPFlowCacheTags(f *schema.HTTPFlow) {
+	if f == nil {
+		return
+	}
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
+	for _, full := range []bool{false, true} {
+		key := f.CalcCacheHash(full)
+		if flow, ok := GlobalHTTPFlowCache.Get(key); ok && flow != nil {
+			next := *flow
+			next.Tags = utf8safe(f.Tags)
+			GlobalHTTPFlowCache.Set(key, &next)
+		}
+	}
+}
+
 func DeleteHTTPFlowCacheGRPCModel(f *schema.HTTPFlow) {
 	cacheMu.Lock()
 	defer cacheMu.Unlock()
@@ -105,10 +121,10 @@ func FromHTTPFlowGRPCModel(f *ypb.HTTPFlow) (*schema.HTTPFlow, error) {
 		IsReadTooSlowResponse:      f.IsReadTooSlowResponse,
 		TooLargeResponseBodyFile:   string(f.TooLargeResponseBodyFile),
 		TooLargeResponseHeaderFile: string(f.TooLargeResponseHeaderFile),
-		IsTooLargeRequest:         f.IsTooLargeRequest,
-		TooLargeRequestBodyFile:   string(f.TooLargeRequestBodyFile),
-		TooLargeRequestHeaderFile: string(f.TooLargeRequestHeaderFile),
-		IsRequestOversize:         f.IsRequestOversize || f.IsTooLargeRequest,
+		IsTooLargeRequest:          f.IsTooLargeRequest,
+		TooLargeRequestBodyFile:    string(f.TooLargeRequestBodyFile),
+		TooLargeRequestHeaderFile:  string(f.TooLargeRequestHeaderFile),
+		IsRequestOversize:          f.IsRequestOversize || f.IsTooLargeRequest,
 	}
 
 	flow.Response = strconv.Quote(string(f.Response))
@@ -156,10 +172,10 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 		IsReadTooSlowResponse:      f.IsReadTooSlowResponse,
 		TooLargeResponseBodyFile:   utf8safe(f.TooLargeResponseBodyFile),
 		TooLargeResponseHeaderFile: utf8safe(f.TooLargeResponseHeaderFile),
-		IsTooLargeRequest:         f.IsTooLargeRequest,
-		TooLargeRequestBodyFile:   utf8safe(f.TooLargeRequestBodyFile),
-		TooLargeRequestHeaderFile: utf8safe(f.TooLargeRequestHeaderFile),
-		IsRequestOversize:         f.IsRequestOversize || f.IsTooLargeRequest,
+		IsTooLargeRequest:          f.IsTooLargeRequest,
+		TooLargeRequestBodyFile:    utf8safe(f.TooLargeRequestBodyFile),
+		TooLargeRequestHeaderFile:  utf8safe(f.TooLargeRequestHeaderFile),
+		IsRequestOversize:          f.IsRequestOversize || f.IsTooLargeRequest,
 		DurationMs:                 f.Duration / int64(time.Millisecond),
 		PathSuffix:                 utf8safe(f.PathSuffix),
 		Payloads: lo.Map(strings.Split(f.Payload, ","), func(i string, _ int) string {
