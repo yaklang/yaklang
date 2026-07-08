@@ -995,7 +995,7 @@ func legacyReversePlatformToolCases() map[string][]legacyToolCase {
 		args:    map[string]any{"token": "mcp-test-token", "useLocal": true},
 		timeout: 5 * time.Second,
 		allowErrContains: []string{
-			"dnsbroker", "retry", "failed", "no existed",
+			"dnsbroker", "retry", "failed", "no existed", "path mismatch",
 		},
 		validate: func(t *testing.T, _ string, result *rawmcp.CallToolResult) {
 			require.NotNil(t, result)

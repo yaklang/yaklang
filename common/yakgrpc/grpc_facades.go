@@ -30,8 +30,9 @@ var (
 	remoteAddrConvertor = utils.NewTTLCache[string](30 * time.Second)
 
 	// 全局反连配置
-	globalReverseServerStarted = utils.NewBool(false)
-	localReverseHost           string
+	globalReverseServerStarted   = utils.NewBool(false)
+	configuredLocalReverseHost   string // UI saved value; may be empty
+	effectiveLocalReverseHost    string // runtime callback IP; defaults to 127.0.0.1 when bridge active
 	remoteReverseIP            string
 	remoteReversePort          int
 	remoteAddr                 string
@@ -39,10 +40,16 @@ var (
 )
 
 func (s *Server) GetGlobalReverseServer(ctx context.Context, req *ypb.Empty) (*ypb.GetGlobalReverseServerResponse, error) {
+	// LocalReverseAddr is the UI-configured value (may be empty). Effective runtime IP is
+	// exposed via YAK_BRIDGE_LOCAL_REVERSE_ADDR / MCP enriched fields.
+	configured := configuredLocalReverseHost
+	if configured == "" {
+		configured = consts.GetConfiguredLocalReverseHost()
+	}
 	return &ypb.GetGlobalReverseServerResponse{
 		PublicReverseIP:   remoteReverseIP,
 		PublicReversePort: int32(remoteReversePort),
-		LocalReverseAddr:  localReverseHost,
+		LocalReverseAddr:  configured,
 		LocalReversePort:  int32(s.reverseServer.Port),
 	}, nil
 }
@@ -90,11 +97,14 @@ func (s *Server) AvailableLocalAddr(ctx context.Context, empty *ypb.Empty) (*ypb
 }
 
 func (s *Server) ConfigGlobalReverse(req *ypb.ConfigGlobalReverseParams, stream ypb.Yak_ConfigGlobalReverseServer) error {
-	localReverseHost = req.GetLocalAddr()
-	if localReverseHost == "" {
-		localReverseHost = "127.0.0.1"
+	configuredLocalReverseHost = req.GetLocalAddr()
+	os.Setenv(consts.YAK_CONFIGURED_LOCAL_REVERSE_HOST, configuredLocalReverseHost)
+
+	effectiveLocalReverseHost = req.GetLocalAddr()
+	if effectiveLocalReverseHost == "" {
+		effectiveLocalReverseHost = "127.0.0.1"
 	}
-	os.Setenv(consts.YAK_BRIDGE_LOCAL_REVERSE_ADDR, utils.HostPort(localReverseHost, s.reverseServer.Port))
+	os.Setenv(consts.YAK_BRIDGE_LOCAL_REVERSE_ADDR, utils.HostPort(effectiveLocalReverseHost, s.reverseServer.Port))
 
 	if globalReverseServerStarted.IsSet() {
 		return nil

@@ -254,20 +254,71 @@ func RequirePortByToken(
 	addr, secret string,
 	ctx context.Context,
 ) (*tpb.RequireRandomPortTriggerResponse, error) {
-	if ctx == nil {
-		ctx = utils.TimeoutContextSeconds(5)
+	if addr == "" {
+		addr = consts.GetDefaultPublicReverseServer()
 	}
 
-	ctx, client, conn, err := GetClient(ctx, addr, secret)
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
+	count := 0
+	var lastErr error
+	for {
+		count++
+		reqCtx := utils.TimeoutContextSeconds(15)
+		if ctx != nil {
+			select {
+			case <-ctx.Done():
+				if lastErr != nil {
+					return nil, wrapRandomPortBridgeError(addr, lastErr)
+				}
+				return nil, wrapRandomPortBridgeError(addr, ctx.Err())
+			default:
+			}
+		}
 
-	return client.RequireRandomPortTrigger(ctx, &tpb.RequireRandomPortTriggerParams{
-		Token:      token,
-		TTLSeconds: 60,
-	})
+		reqCtx, client, conn, err := GetClient(reqCtx, addr, secret)
+		if err != nil {
+			lastErr = err
+			if count > 3 || !isBridgeRetryableError(err) {
+				return nil, wrapRandomPortBridgeError(addr, err)
+			}
+			continue
+		}
+
+		rsp, err := client.RequireRandomPortTrigger(reqCtx, &tpb.RequireRandomPortTriggerParams{
+			Token:      token,
+			TTLSeconds: 60,
+		})
+		conn.Close()
+		if err == nil {
+			return rsp, nil
+		}
+		lastErr = err
+		if count > 3 || !isBridgeRetryableError(err) {
+			return nil, wrapRandomPortBridgeError(addr, err)
+		}
+	}
+}
+
+func isBridgeRetryableError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "context deadline exceeded") ||
+		strings.Contains(msg, "deadlineexceeded") ||
+		strings.Contains(msg, "waiting for new lb policy update")
+}
+
+func wrapRandomPortBridgeError(addr string, err error) error {
+	if err == nil {
+		return nil
+	}
+	if isBridgeRetryableError(err) {
+		return utils.Errorf(
+			"bridge random port allocation timed out or unavailable at %s (DNSLog on the same bridge may still work): %v",
+			addr, err,
+		)
+	}
+	return utils.Errorf("bridge random port allocation failed at %s: %v", addr, err)
 }
 
 func RequireHTTPLogDomainByRemote(addr string, i ...any) (string, string, string, error) {
