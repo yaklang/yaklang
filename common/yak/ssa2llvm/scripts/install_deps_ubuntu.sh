@@ -16,7 +16,9 @@ fi
 
 PACKAGES=(
   llvm-dev
+  llvm-18-dev
   libclang-dev
+  liblld-18-dev
   zlib1g-dev
   libzstd-dev
   libgc-dev
