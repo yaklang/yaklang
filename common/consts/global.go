@@ -15,7 +15,8 @@ import (
 
 var (
 	YAK_BRIDGE_REMOTE_REVERSE_ADDR = "YAK_BRIDGE_REMOTE_REVERSE_ADDR"
-	YAK_BRIDGE_LOCAL_REVERSE_ADDR  = "YAK_BRIDGE_LOCAL_REVERSE_ADDR"
+	YAK_BRIDGE_LOCAL_REVERSE_ADDR      = "YAK_BRIDGE_LOCAL_REVERSE_ADDR"
+	YAK_CONFIGURED_LOCAL_REVERSE_HOST  = "YAK_CONFIGURED_LOCAL_REVERSE_HOST"
 	YAK_BRIDGE_ADDR                = "YAK_BRIDGE_ADDR"
 	YAK_BRIDGE_SECRET              = "YAK_BRIDGE_SECRET"
 	YAK_DNSLOG_BRIDGE_ADDR         = "YAK_DNSLOG_BRIDGE_ADDR"
@@ -247,6 +248,31 @@ func SetDefaultPublicReverseServer(addr string) {
 
 func SetDefaultPublicReverseServerPassword(addr string) {
 	os.Setenv(YAK_DNSLOG_BRIDGE_PASSWORD, addr)
+}
+
+// GetConfiguredLocalReverseHost returns the user-saved local reverse IP from the
+// Yakit "配置全局反连" form. Empty means the user has not configured it (matches UI).
+func GetConfiguredLocalReverseHost() string {
+	return os.Getenv(YAK_CONFIGURED_LOCAL_REVERSE_HOST)
+}
+
+// GetEffectiveLocalReverseHost returns the runtime local reverse IP used for plugin
+// callbacks and tunnel env (defaults to 127.0.0.1 when bridge is active but UI IP is empty).
+func GetEffectiveLocalReverseHost() string {
+	addr := os.Getenv(YAK_BRIDGE_LOCAL_REVERSE_ADDR)
+	if addr == "" {
+		return ""
+	}
+	host, _, err := utils.ParseStringToHostPort(addr)
+	if err != nil {
+		return ""
+	}
+	return host
+}
+
+// GetEffectiveLocalReverseAddr returns host:port for the runtime local reverse listener env.
+func GetEffectiveLocalReverseAddr() string {
+	return os.Getenv(YAK_BRIDGE_LOCAL_REVERSE_ADDR)
 }
 
 func GetDefaultYakitProjectDatabase(base string) string {

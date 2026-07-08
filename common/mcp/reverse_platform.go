@@ -2,8 +2,9 @@ package mcp
 
 import (
 	"context"
-	"strings"
 
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/cybertunnel"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/utils"
@@ -26,10 +27,8 @@ var dnsLogBridgeToolOptions = []mcp.ToolOption{
 func init() {
 	AddGlobalToolSet("reverse_platform",
 		WithTool(mcp.NewTool("get_global_reverse_server",
-			mcp.WithDescription("Get Yak global reverse listener addresses: PublicReverseIP/Port (Bridge) and LocalReverseAddr/Port (local plugin callback)"),
-		), unaryEmptyToolHandler(func(ctx context.Context, s *MCPServer) (any, error) {
-			return s.grpcClient.GetGlobalReverseServer(ctx, &ypb.Empty{})
-		}, "failed to get global reverse server")),
+			mcp.WithDescription("Get Yak global reverse addresses. ConfiguredLocalAddr matches Yakit UI '本地反连 IP' (may be empty). EffectiveLocalReverseAddr/LocalReverseListener are runtime callback addresses (default 127.0.0.1 when bridge active). PublicReverse* is active Yak Bridge tunnel only"),
+		), handleGetGlobalReverseServer),
 
 		WithTool(mcp.NewTool("require_dnslog_domain",
 			append([]mcp.ToolOption{
@@ -45,10 +44,8 @@ func init() {
 		), handleQueryDNSLogByToken),
 
 		WithTool(mcp.NewTool("require_random_port_token",
-			mcp.WithDescription("Request random high-port reverse token via configured Yak Bridge; returns Token, Addr (public host:port), Port"),
-		), unaryEmptyToolHandler(func(ctx context.Context, s *MCPServer) (any, error) {
-			return s.grpcClient.RequireRandomPortToken(ctx, &ypb.Empty{})
-		}, "failed to require random port token")),
+			mcp.WithDescription("Request random high-port reverse token via configured Yak Bridge (get_bridge_log_server DNSLogAddr). Returns Token, Addr, Port. On failure, error indicates bridge port allocation timeout/unavailability (not DNSLog password); DNSLog may still work on the same host"),
+		), handleRequireRandomPortToken),
 
 		WithTool(mcp.NewTool("query_random_port_trigger",
 			mcp.WithDescription("Query TCP reverse hit for a random-port token. Returns error if no connection yet (not an empty list). Auto-calls require_random_port_token when token omitted"),
@@ -84,6 +81,59 @@ func init() {
 			}, bridgeConnectToolOptions...),
 		), handleStartFacades),
 	)
+}
+
+func handleGetGlobalReverseServer(s *MCPServer) server.ToolHandlerFunc {
+	return func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		rsp, err := s.grpcClient.GetGlobalReverseServer(ctx, &ypb.Empty{})
+		if err != nil {
+			return nil, utils.Wrap(err, "failed to get global reverse server")
+		}
+		return NewCommonCallToolResult(globalReverseServerResult(rsp))
+	}
+}
+
+func globalReverseServerResult(rsp *ypb.GetGlobalReverseServerResponse) map[string]any {
+	configured := rsp.GetLocalReverseAddr()
+	effectiveHost := consts.GetEffectiveLocalReverseHost()
+	effectiveAddr := consts.GetEffectiveLocalReverseAddr()
+
+	out := map[string]any{
+		"PublicReverseIP":           rsp.GetPublicReverseIP(),
+		"PublicReversePort":         rsp.GetPublicReversePort(),
+		"ConfiguredLocalAddr":       configured,
+		"EffectiveLocalReverseAddr": effectiveHost,
+		"LocalReversePort":          rsp.GetLocalReversePort(),
+		// Legacy fields: LocalReverseAddr is the UI-configured value (not runtime default).
+		"LocalReverseAddr": rsp.GetLocalReverseAddr(),
+	}
+	if effectiveAddr != "" {
+		out["LocalReverseListener"] = effectiveAddr
+	} else if effectiveHost != "" && rsp.GetLocalReversePort() > 0 {
+		out["LocalReverseListener"] = utils.HostPort(effectiveHost, int(rsp.GetLocalReversePort()))
+	}
+	if configured == "" && effectiveHost != "" {
+		out["note"] = "ConfiguredLocalAddr is empty (matches Yakit UI); EffectiveLocalReverseAddr is the runtime callback IP"
+	}
+	return out
+}
+
+func handleRequireRandomPortToken(s *MCPServer) server.ToolHandlerFunc {
+	return func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		rsp, err := s.grpcClient.RequireRandomPortToken(ctx, &ypb.Empty{})
+		if err != nil {
+			return nil, utils.Wrap(err, "failed to require random port token")
+		}
+		out := map[string]any{
+			"Token": rsp.GetToken(),
+			"Addr":  rsp.GetAddr(),
+			"Port":  rsp.GetPort(),
+		}
+		if cfg, cfgErr := s.grpcClient.GetCurrentYakBridgeLogServer(ctx, &ypb.Empty{}); cfgErr == nil && cfg != nil {
+			out["bridgeDNSLogAddr"] = cfg.GetDNSLogAddr()
+		}
+		return NewCommonCallToolResult(out)
+	}
 }
 
 func handleStartFacades(s *MCPServer) server.ToolHandlerFunc {
@@ -148,20 +198,17 @@ func handleRequireDNSLogDomain(s *MCPServer) server.ToolHandlerFunc {
 				return nil, err
 			}
 		}
-		fallbackToRemote := false
 		rsp, err := s.grpcClient.RequireDNSLogDomain(ctx, &req)
-		if err != nil && req.GetUseLocal() && strings.Contains(strings.ToLower(err.Error()), "dnsbroker") {
-			addr, secret := fillBridgeFromConfig(ctx, s, req.GetDNSLogAddr(), req.GetDNSLogAddrSecret())
-			req.DNSLogAddr, req.DNSLogAddrSecret = addr, secret
-			req.UseLocal, req.UseRemote = false, true
-			rsp, err = s.grpcClient.RequireDNSLogDomain(ctx, &req)
-			fallbackToRemote = err == nil
-		}
 		if err != nil {
 			return nil, utils.Wrap(err, "failed to require dnslog domain")
 		}
-		useLocal := req.GetUseLocal()
-		return NewCommonCallToolResult(dnsLogDomainResult(rsp, useLocal, !useLocal, fallbackToRemote, req.GetDNSMode()))
+		fallbackToRemote := false
+		if req.GetUseLocal() {
+			if issuedLocal, ok := cybertunnel.DNSLogTokenIssuedUseLocal(rsp.GetToken()); ok && !issuedLocal {
+				fallbackToRemote = true
+			}
+		}
+		return NewCommonCallToolResult(dnsLogDomainResult(rsp, req.GetUseLocal(), !req.GetUseLocal(), fallbackToRemote, req.GetDNSMode()))
 	}
 }
 
@@ -175,8 +222,11 @@ func handleQueryDNSLogByToken(s *MCPServer) server.ToolHandlerFunc {
 		if !req.GetUseLocal() {
 			req.DNSLogAddr, _ = fillBridgeFromConfig(ctx, s, req.GetDNSLogAddr(), "")
 		}
+		if err := cybertunnel.ValidateDNSLogQueryPath(req.GetToken(), req.GetUseLocal(), req.GetDNSMode()); err != nil {
+			return nil, utils.Wrap(err, "failed to query dnslog by token")
+		}
 		rsp, err := s.grpcClient.QueryDNSLogByToken(ctx, &req)
-		if err != nil && req.GetUseLocal() && strings.Contains(strings.ToLower(err.Error()), "dnsbroker") {
+		if err != nil && req.GetUseLocal() && cybertunnel.ShouldFallbackFromLocalDNSLogBroker(err) {
 			req.UseLocal, req.UseRemote = false, true
 			req.DNSLogAddr, _ = fillBridgeFromConfig(ctx, s, req.GetDNSLogAddr(), "")
 			rsp, err = s.grpcClient.QueryDNSLogByToken(ctx, &req)
@@ -201,7 +251,7 @@ func handleQueryRandomPortTrigger(s *MCPServer) server.ToolHandlerFunc {
 		if req.GetToken() == "" {
 			tokenRsp, err := s.grpcClient.RequireRandomPortToken(ctx, &ypb.Empty{})
 			if err != nil {
-				return nil, utils.Wrap(err, "failed to require random port token")
+				return nil, utils.Wrap(err, "failed to require random port token for auto-token query")
 			}
 			req.Token = tokenRsp.GetToken()
 		}

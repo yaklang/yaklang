@@ -65,25 +65,18 @@ func (s *Server) VerifyTunnelServerDomain(ctx context.Context, p *ypb.VerifyTunn
 }
 
 func (s *Server) RequireDNSLogDomain(ctx context.Context, params *ypb.YakDNSLogBridgeAddr) (*ypb.DNSLogRootDomain, error) {
-	if params.GetUseLocal() {
-		domain, token, _, err := cybertunnel.RequireDNSLogDomainByLocal(params.GetDNSMode())
-		if err != nil {
-			return nil, err
-		}
-		return &ypb.DNSLogRootDomain{
-			Domain: domain,
-			Token:  token,
-		}, nil
-	} else {
-		domain, token, _, err := cybertunnel.RequireDNSLogDomainByRemote(params.GetDNSLogAddr(), params.GetDNSMode())
-		if err != nil {
-			return nil, err
-		}
-		return &ypb.DNSLogRootDomain{
-			Domain: domain,
-			Token:  token,
-		}, nil
+	addr := params.GetDNSLogAddr()
+	if addr == "" {
+		addr = consts.GetDefaultPublicReverseServer()
 	}
+	domain, token, _, err := cybertunnel.RequireDNSLogDomain(addr, params.GetUseLocal(), params.GetDNSMode())
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.DNSLogRootDomain{
+		Domain: domain,
+		Token:  token,
+	}, nil
 }
 
 func (s *Server) RequireDNSLogDomainByScript(ctx context.Context, req *ypb.RequireDNSLogDomainByScriptRequest) (*ypb.DNSLogRootDomain, error) {
@@ -127,6 +120,10 @@ func (s *Server) QuerySupportedDnsLogPlatforms(ctx context.Context, req *ypb.Emp
 }
 
 func (s *Server) QueryDNSLogByToken(ctx context.Context, req *ypb.QueryDNSLogByTokenRequest) (*ypb.QueryDNSLogByTokenResponse, error) {
+	if err := cybertunnel.ValidateDNSLogQueryPath(req.GetToken(), req.GetUseLocal(), req.GetDNSMode()); err != nil {
+		return nil, err
+	}
+
 	var events []*tpb.DNSLogEvent
 	var err error
 	if req.GetUseLocal() {
@@ -263,11 +260,12 @@ func (s *Server) RequireICMPRandomLength(ctx context.Context, req *ypb.Empty) (*
 
 func (s *Server) RequireRandomPortToken(ctx context.Context, req *ypb.Empty) (*ypb.RandomPortInfo, error) {
 	token := utils.RandStringBytes(8)
+	// Use background ctx so cybertunnel can retry port allocation on bridge timeouts.
 	rsp, err := cybertunnel.RequirePortByToken(
 		token,
 		consts.GetDefaultPublicReverseServer(),
 		consts.GetDefaultPublicReverseServerPassword(),
-		utils.TimeoutContextSeconds(10),
+		context.Background(),
 	)
 	if err != nil {
 		return nil, err
