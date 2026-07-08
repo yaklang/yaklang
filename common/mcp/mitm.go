@@ -32,7 +32,7 @@ var mitmFilterDataToolOptions = []mcp.ToolOption{
 		mitmFilterDataItemToolOptions...),
 	mcp.WithStructArray("excludeMIME", []mcp.PropertyOption{mcp.Description("Content-types to exclude")},
 		mitmFilterDataItemToolOptions...),
-	mcp.WithBool("filterBundledStaticJS", mcp.Description("Filter bundled/minified static JS (default true)")),
+	mcp.WithBool("filterBundledStaticJS", mcp.Description("Exclude bundled/minified .js static assets from interception (default true)")),
 }
 
 var mitmSetFilterToolOptions = []mcp.ToolOption{
@@ -69,34 +69,34 @@ var mitmContentReplacerToolOptions = []mcp.ToolOption{
 func init() {
 	AddGlobalToolSet("mitm",
 		WithTool(mcp.NewTool("get_mitm_filter",
-			mcp.WithDescription("Get MITM traffic filter configuration"),
+			mcp.WithDescription("Read MITM capture filter (include/exclude hostnames, URI, methods, MIME); controls which traffic is shown/processed"),
 		), unaryEmptyToolHandler(func(ctx context.Context, s *MCPServer) (any, error) {
 			return s.grpcClient.GetMITMFilter(ctx, &ypb.Empty{})
 		}, "failed to get mitm filter")),
 
 		WithTool(mcp.NewTool("set_mitm_filter",
 			append([]mcp.ToolOption{
-				mcp.WithDescription("Set MITM traffic filter configuration"),
+				mcp.WithDescription("Update MITM capture filter; prefer filterData struct, legacy flat *Hostname/*Suffix fields still supported"),
 			}, mitmSetFilterToolOptions...)...,
 		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.SetMITMFilterRequest) (any, error) {
 			return s.grpcClient.SetMITMFilter(ctx, req)
 		}, "failed to set mitm filter")),
 
 		WithTool(mcp.NewTool("query_mitm_replacer_rules",
-			mcp.WithDescription("Query MITM content replacer rules"),
-			mcp.WithString("keyword", mcp.Description("Fuzzy search on replacer rules")),
+			mcp.WithDescription("Search saved MITM replacer rule library (not necessarily active); keyword optional"),
+			mcp.WithString("keyword", mcp.Description("Fuzzy match on rule name or pattern")),
 		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.QueryMITMReplacerRulesRequest) (any, error) {
 			return s.grpcClient.QueryMITMReplacerRules(ctx, req)
 		}, "failed to query mitm replacer rules")),
 
 		WithTool(mcp.NewTool("get_current_rules",
-			mcp.WithDescription("Get currently active MITM content replacer rules"),
+			mcp.WithDescription("Get MITM replacer rules currently applied to live interception"),
 		), unaryEmptyToolHandler(func(ctx context.Context, s *MCPServer) (any, error) {
 			return s.grpcClient.GetCurrentRules(ctx, &ypb.Empty{})
 		}, "failed to get current mitm rules")),
 
 		WithTool(mcp.NewTool("set_current_rules",
-			mcp.WithDescription("Set active MITM content replacer rules"),
+			mcp.WithDescription("Replace active MITM replacers immediately on running proxy; use get_current_rules first to preserve existing"),
 			mcp.WithStructArray("rules", []mcp.PropertyOption{
 				mcp.Description("MITM content replacers"),
 			}, mitmContentReplacerToolOptions...),
@@ -109,20 +109,20 @@ func init() {
 		}, "failed to set current mitm rules")),
 
 		WithTool(mcp.NewTool("download_mitm_cert",
-			mcp.WithDescription("Download MITM CA certificate PEM"),
+			mcp.WithDescription("Download MITM root CA PEM; install in client trust store before pointing browser proxy to start_mitm_v2"),
 		), unaryEmptyToolHandler(func(ctx context.Context, s *MCPServer) (any, error) {
 			return s.grpcClient.DownloadMITMCert(ctx, &ypb.Empty{})
 		}, "failed to download mitm cert")),
 
 		WithTool(mcp.NewTool("start_mitm_v2",
-			mcp.WithDescription("Start MITM v2 proxy (runs in background)"),
-			mcp.WithString("host", mcp.Description("Listen host"), mcp.Default("127.0.0.1")),
-			mcp.WithNumber("port", mcp.Description("Listen port"), mcp.Required()),
-			mcp.WithString("downstreamProxy", mcp.Description("Upstream proxy URL, e.g. http://127.0.0.1:7890")),
-			mcp.WithBool("enableHttp2", mcp.Description("Enable HTTP/2")),
-			mcp.WithBool("filterWebsocket", mcp.Description("Filter websocket traffic")),
-			mcp.WithNumber("maxContentLength", mcp.Description("Max captured content length in bytes")),
-			mcp.WithBool("disableSystemProxy", mcp.Description("Ignore system proxy environment variables")),
+			mcp.WithDescription("Start MITM v2 HTTPS proxy in background (status:started). Typical flow: download_mitm_cert → set system/browser proxy to host:port → set_mitm_filter / set_current_rules"),
+			mcp.WithString("host", mcp.Description("Listen address, usually 127.0.0.1")),
+			mcp.WithNumber("port", mcp.Description("Listen port for HTTP/HTTPS proxy"), mcp.Required()),
+			mcp.WithString("downstreamProxy", mcp.Description("Upstream proxy URL chained after MITM, e.g. http://127.0.0.1:7890")),
+			mcp.WithBool("enableHttp2", mcp.Description("Terminate and forward HTTP/2")),
+			mcp.WithBool("filterWebsocket", mcp.Description("Skip websocket upgrade traffic")),
+			mcp.WithNumber("maxContentLength", mcp.Description("Max request/response body bytes to capture")),
+			mcp.WithBool("disableSystemProxy", mcp.Description("Do not read OS HTTP_PROXY/HTTPS_PROXY for upstream")),
 		), handleStartMITMV2),
 	)
 }

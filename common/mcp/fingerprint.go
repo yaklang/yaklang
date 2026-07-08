@@ -32,7 +32,7 @@ var fingerprintRuleToolOptions = []mcp.ToolOption{
 		mcp.Description("Optional extra metadata"),
 	),
 	mcp.WithStringArray("groupName",
-		mcp.Description("Group labels; create groups via create_fingerprint_group"),
+		mcp.Description("Optional group labels for organizing rules in UI"),
 	),
 	mcp.WithStruct("cpe", []mcp.PropertyOption{
 		mcp.Description("CPE product metadata reported when matched"),
@@ -47,7 +47,7 @@ var fingerprintRuleToolOptions = []mcp.ToolOption{
 func init() {
 	AddGlobalToolSet("fingerprint",
 		WithTool(mcp.NewTool("query_fingerprint",
-			mcp.WithDescription("Query service fingerprint rules with filters and pagination"),
+			mcp.WithDescription("Page HTTP service fingerprint rules used by port_scan and crawlers; matchExpression runs on response body/headers/title"),
 			mcp.WithPaging("pagination", []string{"id", "created_at", "updated_at", "name", "type"},
 				mcp.Description("Pagination settings for the query")),
 			mcp.WithStruct("filter", []mcp.PropertyOption{
@@ -58,7 +58,7 @@ func init() {
 		}, "failed to query fingerprint")),
 
 		WithTool(mcp.NewTool("create_fingerprint",
-			mcp.WithDescription("Create a service fingerprint rule (ruleName and matchExpression required in rule)"),
+			mcp.WithDescription("Create custom fingerprint rule; rule.ruleName + rule.matchExpression required"),
 			mcp.WithStruct("rule", []mcp.PropertyOption{
 				mcp.Description("Fingerprint rule data"),
 				mcp.Required(),
@@ -68,7 +68,7 @@ func init() {
 		}, "failed to create fingerprint")),
 
 		WithTool(mcp.NewTool("update_fingerprint",
-			mcp.WithDescription("Update a fingerprint rule by id or ruleName"),
+			mcp.WithDescription("Update fingerprint by id or ruleName; only fields in rule struct are changed"),
 			mcp.WithNumber("id", mcp.Description("Fingerprint rule ID")),
 			mcp.WithString("ruleName", mcp.Description("Fingerprint rule name")),
 			mcp.WithStruct("rule", []mcp.PropertyOption{
@@ -91,7 +91,7 @@ func init() {
 		}, "failed to update fingerprint")),
 
 		WithTool(mcp.NewTool("delete_fingerprint",
-			mcp.WithDescription("Delete fingerprint rules by filter"),
+			mcp.WithDescription("Delete fingerprint rules matching filter (same fields as query_fingerprint)"),
 			mcp.WithStruct("filter", []mcp.PropertyOption{
 				mcp.Description("Fingerprint filter; same fields as query_fingerprint"),
 				mcp.Required(),

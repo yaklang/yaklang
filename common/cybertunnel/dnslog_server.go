@@ -176,7 +176,7 @@ func (D *DNSLogGRPCServer) QueryExistedDNSLog(ctx context.Context, params *tpb.Q
 	}
 
 	if mode != "" {
-		a, _ := dnslogbrokers.Get(params.Mode)
+		a, _ := dnslogbrokers.Get(mode)
 		if a != nil {
 			results, err := a.GetResult(params.GetToken(), 15*time.Second)
 			if err != nil {
