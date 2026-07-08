@@ -2,9 +2,11 @@ package mcp
 
 import (
 	"context"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -14,71 +16,71 @@ var bridgeConnectToolOptions = []mcp.ToolOption{
 }
 
 var dnsLogBridgeToolOptions = []mcp.ToolOption{
-	mcp.WithString("dnsLogAddr", mcp.Description("Remote DNSLog bridge address")),
-	mcp.WithString("dnsLogAddrSecret", mcp.Description("Remote DNSLog bridge secret")),
-	mcp.WithString("dnsMode", mcp.Description("DNSLog mode")),
-	mcp.WithBool("useLocal", mcp.Description("Use local DNSLog server")),
-	mcp.WithBool("useRemote", mcp.Description("Use remote DNSLog via bridge")),
+	mcp.WithString("dnsLogAddr", mcp.Description("Remote Yak Bridge DNSLog address host:port; auto-filled from get_bridge_log_server when omitted on remote path")),
+	mcp.WithString("dnsLogAddrSecret", mcp.Description("Remote Bridge secret for require_dnslog_domain only; auto-filled from get_bridge_log_server when omitted")),
+	mcp.WithString("dnsMode", mcp.Description(`Broker/platform name, e.g. "dnslog.cn", or "*" for random; must match between require and query when useLocal is true`)),
+	mcp.WithBool("useLocal", mcp.Description("Use in-process third-party DNSLog broker (e.g. dnslog.cn), NOT start_facades embedded DNS; auto-fallback to Bridge remote on broker failure")),
+	mcp.WithBool("useRemote", mcp.Description("Hint only: remote Bridge is used when useLocal is false (default); gRPC routes by useLocal")),
 }
 
 func init() {
 	AddGlobalToolSet("reverse_platform",
 		WithTool(mcp.NewTool("get_global_reverse_server",
-			mcp.WithDescription("Get global reverse server addresses (public IP/port and local listener)"),
+			mcp.WithDescription("Get Yak global reverse listener addresses: PublicReverseIP/Port (Bridge) and LocalReverseAddr/Port (local plugin callback)"),
 		), unaryEmptyToolHandler(func(ctx context.Context, s *MCPServer) (any, error) {
 			return s.grpcClient.GetGlobalReverseServer(ctx, &ypb.Empty{})
 		}, "failed to get global reverse server")),
 
 		WithTool(mcp.NewTool("require_dnslog_domain",
 			append([]mcp.ToolOption{
-				mcp.WithDescription("Request a DNSLog subdomain and token for OOB detection"),
+				mcp.WithDescription("Request DNSLog subdomain and token for OOB detection. Default: remote Yak Bridge. Omit useLocal for Bridge. Response includes Domain, Token, useLocal, useRemote, and fallbackToRemote if local broker failed"),
 			}, dnsLogBridgeToolOptions...)...,
 		), handleRequireDNSLogDomain),
 
 		WithTool(mcp.NewTool("query_dnslog_by_token",
 			append([]mcp.ToolOption{
-				mcp.WithDescription("Query DNSLog trigger events by token"),
-				mcp.WithString("token", mcp.Description("DNSLog token from require_dnslog_domain"), mcp.Required()),
+				mcp.WithDescription("Query DNSLog hit events by token from require_dnslog_domain. Use the same path as require (same useLocal/dnsMode). Response: Events[], useLocal, useRemote, fallbackToRemote"),
+				mcp.WithString("token", mcp.Description("Token returned by require_dnslog_domain"), mcp.Required()),
 			}, dnsLogBridgeToolOptions...)...,
 		), handleQueryDNSLogByToken),
 
 		WithTool(mcp.NewTool("require_random_port_token",
-			mcp.WithDescription("Request random-port reverse connection token and listen address"),
+			mcp.WithDescription("Request random high-port reverse token via configured Yak Bridge; returns Token, Addr (public host:port), Port"),
 		), unaryEmptyToolHandler(func(ctx context.Context, s *MCPServer) (any, error) {
 			return s.grpcClient.RequireRandomPortToken(ctx, &ypb.Empty{})
 		}, "failed to require random port token")),
 
 		WithTool(mcp.NewTool("query_random_port_trigger",
-			mcp.WithDescription("Query random-port reverse trigger events; auto-requests token if omitted"),
-			mcp.WithString("token", mcp.Description("Random port token from require_random_port_token")),
+			mcp.WithDescription("Query TCP reverse hit for a random-port token. Returns error if no connection yet (not an empty list). Auto-calls require_random_port_token when token omitted"),
+			mcp.WithString("token", mcp.Description("Token from require_random_port_token")),
 		), handleQueryRandomPortTrigger),
 
 		WithTool(mcp.NewTool("get_bridge_log_server",
-			mcp.WithDescription("Get configured Yak Bridge DNSLog/reverse server address"),
+			mcp.WithDescription("Read persisted Yak Bridge address for DNSLog/random-port reverse (DNSLogAddr, DNSLogAddrSecret)"),
 		), unaryEmptyToolHandler(func(ctx context.Context, s *MCPServer) (any, error) {
 			return s.grpcClient.GetCurrentYakBridgeLogServer(ctx, &ypb.Empty{})
 		}, "failed to get bridge log server")),
 
 		WithTool(mcp.NewTool("set_bridge_log_server",
-			mcp.WithDescription("Configure Yak Bridge DNSLog/reverse server"),
-			mcp.WithString("dnsLogAddr", mcp.Description("Bridge server address host:port")),
-			mcp.WithString("dnsLogAddrSecret", mcp.Description("Bridge server secret")),
+			mcp.WithDescription("Persist Yak Bridge DNSLog/reverse server config used by remote require/query and random-port tools"),
+			mcp.WithString("dnsLogAddr", mcp.Description("Bridge server address host:port, e.g. ns1.example.com:64333")),
+			mcp.WithString("dnsLogAddrSecret", mcp.Description("Bridge authentication secret")),
 		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.YakDNSLogBridgeAddr) (any, error) {
 			return s.grpcClient.SetYakBridgeLogServer(ctx, req)
 		}, "failed to set bridge log server")),
 
 		WithTool(mcp.NewTool("start_facades",
-			mcp.WithDescription("Start facades server with DNSLog/RMI/HTTP (background stream)"),
-			mcp.WithString("localFacadeHost", mcp.Description("Local facades bind host")),
-			mcp.WithNumber("localFacadePort", mcp.Description("Local facades port (RMI/HTTP/HTTPS)")),
-			mcp.WithBool("enableDNSLogServer", mcp.Description("Enable embedded DNSLog server")),
-			mcp.WithNumber("dnsLogLocalPort", mcp.Description("Local DNSLog port")),
-			mcp.WithNumber("dnsLogRemotePort", mcp.Description("Remote DNSLog mirror port on bridge")),
-			mcp.WithNumber("facadeRemotePort", mcp.Description("Remote facades mirror port on bridge")),
-			mcp.WithString("externalDomain", mcp.Description("External DNS domain for DNSLog records")),
-			mcp.WithBool("verify", mcp.Description("Verify tunnel domain before starting")),
+			mcp.WithDescription("Start local Facades (embedded DNSLog + RMI/HTTP/HTTPS) in background; returns status:started immediately. NOT wired to require_dnslog_domain/query_dnslog_by_token unless DNSLogRemotePort mirrors to Bridge. RMI/HTTP hits may create risks; DNS hits are stream-only"),
+			mcp.WithString("localFacadeHost", mcp.Description("Local bind host for RMI/HTTP/HTTPS facades, e.g. 127.0.0.1 or 0.0.0.0")),
+			mcp.WithNumber("localFacadePort", mcp.Description("Local facades listen port for RMI/HTTP/HTTPS; 0 disables")),
+			mcp.WithBool("enableDNSLogServer", mcp.Description("Start embedded local DNS server (separate from dnslog.cn broker path)")),
+			mcp.WithNumber("dnsLogLocalPort", mcp.Description("Local UDP DNS listen port when enableDNSLogServer is true")),
+			mcp.WithNumber("dnsLogRemotePort", mcp.Description("Mirror local DNS UDP to this port on Yak Bridge; required to query DNS hits remotely")),
+			mcp.WithNumber("facadeRemotePort", mcp.Description("Mirror local RMI/HTTP TCP to this port on Yak Bridge")),
+			mcp.WithString("externalDomain", mcp.Description("Root domain for embedded DNSLog A records, must resolve to Bridge external IP when using remote mirror")),
+			mcp.WithBool("verify", mcp.Description("Verify externalDomain resolves to Bridge exit IP before start")),
 			mcp.WithStruct("connectParam", []mcp.PropertyOption{
-				mcp.Description("Bridge connection parameters"),
+				mcp.Description("Yak Bridge connection (addr, secret); required for remote port mirror and DNS external IP lookup"),
 			}, bridgeConnectToolOptions...),
 		), handleStartFacades),
 	)
@@ -99,5 +101,114 @@ func handleStartFacades(s *MCPServer) server.ToolHandlerFunc {
 		return startBackgroundExecStream(s, "start_facades", summary, func(bgCtx context.Context) (execResultReceiver, error) {
 			return s.grpcClient.StartFacades(bgCtx, &req)
 		})
+	}
+}
+
+func fillBridgeFromConfig(ctx context.Context, s *MCPServer, addr, secret string) (string, string) {
+	if addr != "" && secret != "" {
+		return addr, secret
+	}
+	cfg, err := s.grpcClient.GetCurrentYakBridgeLogServer(ctx, &ypb.Empty{})
+	if err != nil || cfg == nil {
+		return addr, secret
+	}
+	if addr == "" {
+		addr = cfg.GetDNSLogAddr()
+	}
+	if secret == "" {
+		secret = cfg.GetDNSLogAddrSecret()
+	}
+	return addr, secret
+}
+
+func dnsLogDomainResult(rsp *ypb.DNSLogRootDomain, useLocal, useRemote, fallbackToRemote bool, dnsMode string) map[string]any {
+	out := map[string]any{"Domain": rsp.GetDomain(), "Token": rsp.GetToken(), "useLocal": useLocal, "useRemote": useRemote}
+	if fallbackToRemote {
+		out["fallbackToRemote"] = true
+	}
+	if dnsMode != "" {
+		out["dnsMode"] = dnsMode
+	}
+	return out
+}
+
+func dnsLogQueryResult(rsp *ypb.QueryDNSLogByTokenResponse, useLocal, useRemote, fallbackToRemote bool) map[string]any {
+	out := map[string]any{"Events": rsp.GetEvents(), "useLocal": useLocal, "useRemote": useRemote}
+	if fallbackToRemote {
+		out["fallbackToRemote"] = true
+	}
+	return out
+}
+
+func handleRequireDNSLogDomain(s *MCPServer) server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		var req ypb.YakDNSLogBridgeAddr
+		if request.Params.Arguments != nil {
+			if err := decodeYakRequest(request.Params.Arguments, &req); err != nil {
+				return nil, err
+			}
+		}
+		fallbackToRemote := false
+		rsp, err := s.grpcClient.RequireDNSLogDomain(ctx, &req)
+		if err != nil && req.GetUseLocal() && strings.Contains(strings.ToLower(err.Error()), "dnsbroker") {
+			addr, secret := fillBridgeFromConfig(ctx, s, req.GetDNSLogAddr(), req.GetDNSLogAddrSecret())
+			req.DNSLogAddr, req.DNSLogAddrSecret = addr, secret
+			req.UseLocal, req.UseRemote = false, true
+			rsp, err = s.grpcClient.RequireDNSLogDomain(ctx, &req)
+			fallbackToRemote = err == nil
+		}
+		if err != nil {
+			return nil, utils.Wrap(err, "failed to require dnslog domain")
+		}
+		useLocal := req.GetUseLocal()
+		return NewCommonCallToolResult(dnsLogDomainResult(rsp, useLocal, !useLocal, fallbackToRemote, req.GetDNSMode()))
+	}
+}
+
+func handleQueryDNSLogByToken(s *MCPServer) server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		var req ypb.QueryDNSLogByTokenRequest
+		if err := decodeYakRequest(request.Params.Arguments, &req); err != nil {
+			return nil, err
+		}
+		fallbackToRemote := false
+		if !req.GetUseLocal() {
+			req.DNSLogAddr, _ = fillBridgeFromConfig(ctx, s, req.GetDNSLogAddr(), "")
+		}
+		rsp, err := s.grpcClient.QueryDNSLogByToken(ctx, &req)
+		if err != nil && req.GetUseLocal() && strings.Contains(strings.ToLower(err.Error()), "dnsbroker") {
+			req.UseLocal, req.UseRemote = false, true
+			req.DNSLogAddr, _ = fillBridgeFromConfig(ctx, s, req.GetDNSLogAddr(), "")
+			rsp, err = s.grpcClient.QueryDNSLogByToken(ctx, &req)
+			fallbackToRemote = err == nil
+		}
+		if err != nil {
+			return nil, utils.Wrap(err, "failed to query dnslog by token")
+		}
+		useLocal := req.GetUseLocal()
+		return NewCommonCallToolResult(dnsLogQueryResult(rsp, useLocal, !useLocal, fallbackToRemote))
+	}
+}
+
+func handleQueryRandomPortTrigger(s *MCPServer) server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		var req ypb.QueryRandomPortTriggerRequest
+		if request.Params.Arguments != nil {
+			if err := decodeYakRequest(request.Params.Arguments, &req); err != nil {
+				return nil, err
+			}
+		}
+		if req.GetToken() == "" {
+			tokenRsp, err := s.grpcClient.RequireRandomPortToken(ctx, &ypb.Empty{})
+			if err != nil {
+				return nil, utils.Wrap(err, "failed to require random port token")
+			}
+			req.Token = tokenRsp.GetToken()
+		}
+		rsp, err := s.grpcClient.QueryRandomPortTrigger(ctx, &req)
+		if err != nil {
+			return nil, utils.Wrap(err, "failed to query random port trigger")
+		}
+		return NewCommonCallToolResult(rsp)
 	}
 }

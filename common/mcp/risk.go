@@ -16,9 +16,9 @@ var filterRisksToolOptions = []mcp.ToolOption{
 	mcp.WithString("network", mcp.Description("Filter by IP/host network")),
 	mcp.WithString("ports", mcp.Description("Filter by ports")),
 	mcp.WithString("riskType", mcp.Description("Filter by risk type")),
-	mcp.WithString("token", mcp.Description("Filter by reverse connection token")),
-	mcp.WithBool("waitingVerified", mcp.Description("Filter by waiting-verified status")),
-	mcp.WithString("severity", mcp.Description("Filter by severity: info, low, middle, high, critical")),
+	mcp.WithString("token", mcp.Description("Reverse/OOB token from require_dnslog_domain or random-port tools; links DNSLog hits to risks")),
+	mcp.WithBool("waitingVerified", mcp.Description("true: only risks pending manual verification")),
+	mcp.WithString("severity", mcp.Description("info | low | middle | high | critical")),
 	mcp.WithString("tags", mcp.Description("Filter by tags")),
 	mcp.WithString("title", mcp.Description("Filter by title")),
 	mcp.WithString("runtimeId", mcp.Description("Filter by single runtime ID")),
@@ -29,21 +29,21 @@ var filterRisksToolOptions = []mcp.ToolOption{
 	mcp.WithNumber("beforeCreatedAt", mcp.Description("Filter risks created before unix timestamp")),
 	mcp.WithNumber("afterCreatedAt", mcp.Description("Filter risks created after unix timestamp")),
 	mcp.WithNumberArray("ids", mcp.Description("Filter by risk IDs")),
-	mcp.WithStringArray("ssaProgramNames", mcp.Description("Filter by SSA program names")),
+	mcp.WithStringArray("ssaProgramNames", mcp.Description("SSA program names from ssa_compile; filter SyntaxFlow/static-analysis risks")),
 }
 
 func init() {
 	AddGlobalToolSet("risk",
 		WithTool(mcp.NewTool("query_risks",
 			append([]mcp.ToolOption{
-				mcp.WithDescription("Query vulnerability/risk records with flexible filters"),
+				mcp.WithDescription("Page vulnerability/risk records from scans, plugins, MITM, or OOB. Returns title, severity, riskType, reverseToken, request/response, programName for SSA findings"),
 			}, filterRisksToolOptions...)...,
 		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.QueryRisksRequest) (any, error) {
 			return s.grpcClient.QueryRisks(ctx, req)
 		}, "failed to query risks")),
 
 		WithTool(mcp.NewTool("query_risk",
-			mcp.WithDescription("Query a single risk record by ID, hash, or filter"),
+			mcp.WithDescription("Get one risk by id/hash or filter; includes full request/response and details unlike list view"),
 			mcp.WithNumber("id", mcp.Description("Risk ID")),
 			mcp.WithString("hash", mcp.Description("Risk hash")),
 			mcp.WithNumberArray("ids", mcp.Description("Risk IDs")),
@@ -55,7 +55,7 @@ func init() {
 		}, "failed to query risk")),
 
 		WithTool(mcp.NewTool("delete_risk",
-			mcp.WithDescription("Delete risk records by ID, hash, or filter"),
+			mcp.WithDescription("Delete risks by id/hash/ids/filter, or deleteAll/deleteRepetition for bulk cleanup"),
 			mcp.WithNumber("id", mcp.Description("Risk ID")),
 			mcp.WithString("hash", mcp.Description("Risk hash")),
 			mcp.WithNumberArray("ids", mcp.Description("Risk IDs")),
@@ -73,14 +73,14 @@ func init() {
 		}, "failed to delete risk")),
 
 		WithTool(mcp.NewTool("query_new_risks",
-			mcp.WithDescription("Query new/unread risk records after a given ID"),
-			mcp.WithNumber("afterId", mcp.Description("Return risks with ID greater than this value")),
+			mcp.WithDescription("Poll incremental risks with id > afterId; use after last seen id in automation loops (pairs with syntaxflow_scan, port_scan, query_dnslog_by_token)"),
+			mcp.WithNumber("afterId", mcp.Description("Return risks with database id strictly greater than this; 0 for all unread/new")),
 		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.QueryNewRiskRequest) (any, error) {
 			return s.grpcClient.QueryNewRisk(ctx, req)
 		}, "failed to query new risks")),
 
 		WithTool(mcp.NewTool("set_tag_for_risk",
-			mcp.WithDescription("Set tags for a risk record"),
+			mcp.WithDescription("Replace tags on a risk (id or hash); tags are comma-joined string in storage"),
 			mcp.WithNumber("id", mcp.Description("Risk ID"), mcp.Required()),
 			mcp.WithString("hash", mcp.Description("Risk hash (alternative to id)")),
 			mcp.WithStringArray("tags", mcp.Description("Tags to set"), mcp.Required()),

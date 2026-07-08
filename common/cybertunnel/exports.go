@@ -95,13 +95,25 @@ func GetSupportDNSLogBroker(mode string) dnslogbrokers.DNSLogBroker {
 	return dnslogbrokers.GetDNSLogBroker(mode)
 }
 
-func RequireDNSLogDomainByLocal(mode string) (string, string, string, error) {
-	if mode == "*" {
+func resolveLocalDNSLogBroker(mode string) (dnslogbrokers.DNSLogBroker, string, error) {
+	if mode == "" || mode == "*" {
 		mode = dnslogbrokers.Random()
 	}
-	broke, err := dnslogbrokers.Get(mode)
+	broker, err := dnslogbrokers.Get(mode)
+	if err != nil || broker == nil {
+		label := mode
+		if label == "" {
+			label = "*"
+		}
+		return nil, label, utils.Errorf("get dnslog broker by local failed: dnsbroker [%s] no existed", label)
+	}
+	return broker, mode, nil
+}
+
+func RequireDNSLogDomainByLocal(mode string) (string, string, string, error) {
+	broke, mode, err := resolveLocalDNSLogBroker(mode)
 	if err != nil {
-		return "", "", "", utils.Errorf("get dnslog broker by local failed: %v", err)
+		return "", "", "", err
 	}
 	count := 0
 	for {
@@ -414,16 +426,9 @@ func QueryExistedDNSLogEventsByLocalEx(token, mode string, timeout ...float64) (
 		f = 5
 	}
 
-	if mode == "*" {
-		mode = dnslogbrokers.Random()
-	}
-
-	broker, _ := dnslogbrokers.Get(mode)
-	if broker == nil {
-		if mode == "" {
-			mode = "*"
-		}
-		return nil, utils.Errorf("get dnslog broker by local failed: dnsbroker [%s] no existed", mode)
+	broker, _, err := resolveLocalDNSLogBroker(mode)
+	if err != nil {
+		return nil, err
 	}
 
 	count := 0
