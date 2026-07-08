@@ -86,3 +86,19 @@ func isVerifySatisfactionPrompt(prompt string) bool {
 	return strings.Contains(prompt, "任务策略师") ||
 		(strings.Contains(prompt, "当前子任务") && strings.Contains(prompt, "completed_task_index"))
 }
+
+// isToolCallReasonLiteForgePrompt 检测 ToolCaller.generateReasonByLiteForge
+// 发出的 LiteForge prompt (forge action 名 "tool-call-reason").
+//
+// 工具调用类测试的 mock AI 回调应当在所有业务分支之前短路这个 prompt, 直接返回一个
+// 合法的 tool-call-reason action, 让 lite forge 一次性解析成功; 否则 prompt 会落进
+// mock 的 error/fallback 分支, LiteForge 触发重试, 而审查路径 (wrong_tool /
+// wrong_params) 里的 reason 生成是同步执行的, 会被重试阻塞到超过测试超时.
+func isToolCallReasonLiteForgePrompt(prompt string) bool {
+	return strings.Contains(prompt, `"tool-call-reason"`) &&
+		strings.Contains(prompt, "describing WHY this tool call is needed")
+}
+
+// mockedToolCallReasonActionJSON 是测试 mock 用来一次性应答 tool-call-reason
+// lite forge 的合法 action, 让 forge 立即结束、不再重试.
+const mockedToolCallReasonActionJSON = `{"@action": "tool-call-reason", "reason": "mocked tool-call reason"}`

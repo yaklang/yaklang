@@ -19,6 +19,13 @@ import (
 
 func mockedToolCallingWrongTool_Abandon(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
+	if isToolCallReasonLiteForgePrompt(prompt) {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(mockedToolCallReasonActionJSON))
+		rsp.Close()
+		return rsp, nil
+	}
+
 	if isPrimaryDecisionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
