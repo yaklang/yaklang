@@ -8,6 +8,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -669,6 +670,7 @@ func TestGRPCMUSTPASS_MITMV2_HotPatch_HijackSaveHTTPFlow(t *testing.T) {
 		t.Fatal(err)
 	}
 	token := utils.RandStringBytes(16)
+	var sendOnce sync.Once
 
 	RunMITMV2TestServerEx(client, ctx, func(stream ypb.Yak_MITMV2Client) {
 		stream.Send(&ypb.MITMV2Request{
@@ -684,37 +686,48 @@ func TestGRPCMUSTPASS_MITMV2_HotPatch_HijackSaveHTTPFlow(t *testing.T) {
 			SetContentReplacers: true,
 			Replacers:           make([]*ypb.MITMContentReplacer, 0),
 		})
-		stream.Send(&ypb.MITMV2Request{
-			GetCurrentHook: true,
-		})
 	}, func(stream ypb.Yak_MITMV2Client, msg *ypb.MITMV2Response) {
 		if msg.GetCurrentHook && len(msg.GetHooks()) > 0 {
-			// send packet
-			_, err := yak.Execute(`
-			for i in 10 {
-				url = f"${target}?token=${token}&randstr=${str.RandStr(10)}"
-				rsp, req, _ = poc.Get(url, poc.proxy(mitmProxy), poc.save(false))
-			}
-			`, map[string]any{
-				"mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort),
-				"target":    `http://` + utils.HostPort(mockHost, mockPort),
-				"token":     token,
+			sendOnce.Do(func() {
+				_, err := yak.Execute(`
+				for i in 10 {
+					url = f"${target}?token=${token}&randstr=${str.RandStr(10)}"
+					rsp, req, _ = poc.Get(url, poc.proxy(mitmProxy), poc.save(false))
+				}
+				`, map[string]any{
+					"mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort),
+					"target":    `http://` + utils.HostPort(mockHost, mockPort),
+					"token":     token,
+				})
+				require.NoError(t, err)
+				time.Sleep(500 * time.Millisecond)
+				cancel()
 			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			cancel()
 		}
 	})
 
-	rsp, err := QueryHTTPFlows(utils.TimeoutContextSeconds(2), client, &ypb.QueryHTTPFlowRequest{
-		Keyword:    token,
-		SourceType: "mitm",
-	}, 10)
+	var rsp *ypb.QueryHTTPFlowResponse
+	err = utils.AttemptWithDelay(20, 300*time.Millisecond, func() error {
+		out, err := client.QueryHTTPFlows(utils.TimeoutContextSeconds(2), &ypb.QueryHTTPFlowRequest{
+			Keyword:    token,
+			SourceType: "mitm",
+		})
+		if err != nil {
+			return err
+		}
+		if len(out.Data) != 10 {
+			return utils.Errorf("expect 10, got %d", len(out.Data))
+		}
+		for _, flow := range out.Data {
+			if !strings.Contains(flow.Tags, "YAKIT_COLOR_BLUE") {
+				return utils.Errorf("flow tags not contains COLOR_BLUE: %s", flow.Tags)
+			}
+		}
+		rsp = out
+		return nil
+	})
 	require.NoError(t, err)
-	for _, flow := range rsp.GetData() {
-		require.Containsf(t, flow.Tags, "YAKIT_COLOR_BLUE", "flow tags not contains COLOR_BLUE")
-	}
+	require.Len(t, rsp.GetData(), 10)
 }
 
 func TestGRPCMUSTPASS_MITMV2_HotPatch_PluginRuntimeID(t *testing.T) {
