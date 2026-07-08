@@ -70,12 +70,7 @@ func TestMarkActiveTodosDoneOnAsyncHandoff_ClosesOnlyCurrentTaskActiveTodos(t *t
 		{Op: "add", ID: "sibling_todo", Content: "兄弟任务待办"},
 	})
 
-	var timelineEntries []string
-	timelineHook := func(category, line string) {
-		timelineEntries = append(timelineEntries, category+": "+line)
-	}
-
-	MarkActiveTodosDoneOnAsyncHandoff(cfg, nil, taskOne, 2, timelineHook)
+	MarkActiveTodosDoneOnAsyncHandoff(cfg, nil, taskOne, 2, nil)
 
 	scopeOne := BuildVerificationTodoScope(taskOne)
 	itemsOne := cfg.SnapshotVerificationTodoItemsByScope(scopeOne)
@@ -88,10 +83,6 @@ func TestMarkActiveTodosDoneOnAsyncHandoff_ClosesOnlyCurrentTaskActiveTodos(t *t
 	require.Len(t, siblingItems, 1)
 	require.Equal(t, VerificationTodoStatusPending, siblingItems[0].Status)
 
-	require.NotEmpty(t, timelineEntries)
-	require.Contains(t, timelineEntries[0], "NEXT_MOVEMENTS:")
-	require.Contains(t, strings.Join(timelineEntries, "\n"), "DONE[main_todo]")
-	require.Contains(t, strings.Join(timelineEntries, "\n"), "DONE[main_doing]")
 }
 
 func TestMarkActiveTodosDoneOnAsyncHandoff_NoOpWhenNoActiveTodos(t *testing.T) {

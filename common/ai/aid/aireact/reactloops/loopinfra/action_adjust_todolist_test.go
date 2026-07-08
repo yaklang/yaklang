@@ -32,6 +32,7 @@ type adjustTodolistTestConfig struct {
 	lastScope       aicommon.VerificationTodoScope
 	lastSatisfied   bool
 	lastMovements   []aicommon.VerifyNextMovement
+	applyResults    []aicommon.VerificationTodoApplyResult
 	snapshotItems   []aicommon.VerificationTodoItem
 	snapshotStats   aicommon.VerificationTodoStats
 	markdownReturn  string
@@ -47,7 +48,9 @@ func (c *adjustTodolistTestConfig) ApplyVerificationTodoOps(scope aicommon.Verif
 	c.lastScope = scope
 	c.lastSatisfied = satisfied
 	c.lastMovements = append([]aicommon.VerifyNextMovement(nil), movements...)
-	return nil
+	// 默认返回 nil (无 apply 结果 → 无错误 → timeline 为空). 测试可在调用前
+	// 注入 c.applyResults 模拟 apply 失败, 验证 [NEXT_MOVEMENTS_ERROR] 落地.
+	return append([]aicommon.VerificationTodoApplyResult(nil), c.applyResults...)
 }
 
 func (c *adjustTodolistTestConfig) SnapshotVerificationTodoItems() []aicommon.VerificationTodoItem {
@@ -204,11 +207,19 @@ func TestAdjustTodolist_Verifier_NormalizesPendingToDoing(t *testing.T) {
 
 // TestAdjustTodolist_Handler_AppliesAddOpAndEmitsTodoListUpdate 验证: handler
 // 把 add op 透传给 ApplyVerificationTodoOps(satisfied=false, ...) 并以
-// EVENT_TYPE_TODO_LIST_UPDATE 形式把 store snapshot 广播出去, 同时把
-// breadcrumb 写进 timeline 的 NEXT_MOVEMENTS 键, 与 verification 路径对齐.
+// EVENT_TYPE_TODO_LIST_UPDATE 形式把 store snapshot 广播出去.
+//
+// timeline 契约: 自 "timeline 仅写 apply 出错部分" 重构后, adjust_todolist 路径
+// 走单源 helper ApplyVerificationNextMovementsAndEmit, 该 helper 只把 apply 失败
+// 的 op 写进 timeline 的 [NEXT_MOVEMENTS_ERROR] 类别; 成功的增量不再产出
+// NEXT_MOVEMENTS breadcrumb (与 verification 路径不同 — verification 仍自带
+// addNextMovementsBreadcrumb). 本用例 add/done 均成功 (mock 返回 nil apply
+// 结果), 故 timeline 必须保持为空. 失败侧由
+// TestAdjustTodolist_Handler_WritesApplyErrorsToTimeline 覆盖.
+//
 // 关键词: adjust_todolist handler add op, EVENT_TYPE_TODO_LIST_UPDATE,
 //
-//	NEXT_MOVEMENTS timeline 对齐
+//	timeline 仅写 apply 错误, 成功增量不写 timeline
 func TestAdjustTodolist_Handler_AppliesAddOpAndEmitsTodoListUpdate(t *testing.T) {
 	ctx := context.Background()
 	captured := make([]*schema.AiOutputEvent, 0, 4)
@@ -275,12 +286,67 @@ func TestAdjustTodolist_Handler_AppliesAddOpAndEmitsTodoListUpdate(t *testing.T)
 	assert.True(t, strings.Contains(feedback, "TODO list adjusted"),
 		"feedback should announce the TODO adjustment, got %q", feedback)
 
-	// timeline breadcrumb should have one entry under NEXT_MOVEMENTS, matching
-	// the verification path's key (so consumers see a unified chronology).
+	// timeline 契约: 单源 helper 只把 apply 失败的 op 写进 timeline
+	// ([NEXT_MOVEMENTS_ERROR]); 成功的增量不再产出 NEXT_MOVEMENTS breadcrumb.
+	// 本用例 add/done 均成功 (mock 返回 nil apply 结果), 故 timeline 必须为空.
 	tlString := invoker.testInvoker.getTimelineString()
-	assert.Contains(t, tlString, "NEXT_MOVEMENTS")
-	assert.Contains(t, tlString, "ADD[create_file]: create A.md")
-	assert.Contains(t, tlString, "DONE[cleanup_temp]")
+	assert.Empty(t, tlString,
+		"adjust_todolist 成功增量不应写 timeline breadcrumb; timeline 现仅承载 apply 失败的 op")
+}
+
+// TestAdjustTodolist_Handler_WritesApplyErrorsToTimeline 验证 "timeline 仅写
+// apply 出错部分" 重构后, adjust_todolist handler 路径的正向覆盖: 当某个 op
+// apply 失败 (例如跨作用域修改) 时, handler 经单源 helper
+// ApplyVerificationNextMovementsAndEmit 把失败 op 写进 timeline 的
+// [NEXT_MOVEMENTS_ERROR] 类别, 让消费者能看到"哪条增量没真正落地". 与
+// TestAdjustTodolist_Handler_AppliesAddOpAndEmitsTodoListUpdate (成功 →
+// timeline 为空) 互补, 共同锁定新契约.
+//
+// 关键词: adjust_todolist handler apply 错误, [NEXT_MOVEMENTS_ERROR] timeline
+//
+//	单源 helper 失败侧覆盖
+func TestAdjustTodolist_Handler_WritesApplyErrorsToTimeline(t *testing.T) {
+	ctx := context.Background()
+	captured := make([]*schema.AiOutputEvent, 0, 4)
+	mu := new(sync.Mutex)
+	captureFn := func(e *schema.AiOutputEvent) {
+		mu.Lock()
+		captured = append(captured, e)
+		mu.Unlock()
+	}
+	invoker, cfg := newAdjustTodolistInvoker(t, ctx, captureFn)
+
+	// 模拟 apply 失败: done 一个跨作用域的 todo, helper 会把它作为 Success=false
+	// 结果透出, 写进 [NEXT_MOVEMENTS_ERROR] timeline.
+	cfg.applyResults = []aicommon.VerificationTodoApplyResult{
+		{Movement: aicommon.VerifyNextMovement{Op: "done", ID: "other_scope_todo"}, Success: false, Reason: "another task scope"},
+	}
+
+	task := newTestTask(ctx)
+	invoker.testInvoker.currentTask = task
+	loop := reactloops.NewMinimalReActLoop(invoker.GetConfig(), invoker)
+	loop.SetCurrentTask(task)
+
+	action := buildAdjustTodolistAction(t, `{
+		"@action": "adjust_todolist",
+		"next_movements": [
+			{"op": "done", "id": "other_scope_todo"}
+		]
+	}`)
+	require.NoError(t, loopAction_AdjustTodolist.ActionVerifier(loop, action))
+	loopAction_AdjustTodolist.ActionHandler(loop, action, reactloops.NewActionHandlerOperator(task))
+	cfg.MockedAIConfig.Emitter.WaitForStream()
+
+	tlString := invoker.testInvoker.getTimelineString()
+	assert.Contains(t, tlString, "[NEXT_MOVEMENTS_ERROR]:",
+		"handler must surface failed apply ops to the [NEXT_MOVEMENTS_ERROR] timeline category")
+	assert.Contains(t, tlString, "FAILED DONE[other_scope_todo]",
+		"timeline must name the failed op")
+	assert.Contains(t, tlString, "another task scope",
+		"timeline must carry the failure reason")
+	// 成功增量不应出现在 timeline (本用例只有一条失败 op, 没有成功 breadcrumb).
+	assert.NotContains(t, tlString, "ADD[",
+		"timeline must not carry a success breadcrumb; only apply errors belong in the timeline now")
 }
 
 // TestAdjustTodolist_Handler_DoesNotEmitNextMovementsSnapshotStream 验证:

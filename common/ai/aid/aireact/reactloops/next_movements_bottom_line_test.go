@@ -241,12 +241,6 @@ func TestApplyNextMovementsBottomLine_FiresForNonAdjustTodolistAction(t *testing
 	assert.Contains(t, string(todoUpdateEvt.Content), "test_employee_idor",
 		"todo_list_update payload should carry the snapshot items containing the new id")
 
-	// 3. NEXT_MOVEMENTS timeline breadcrumb 必须写入, 与 verification 路径
-	//    使用同一个 timeline 类别
-	tl := invoker.timelineString()
-	assert.Contains(t, tl, "NEXT_MOVEMENTS")
-	assert.Contains(t, tl, "ADD[test_employee_idor]: test workspace IDOR")
-	assert.Contains(t, tl, "ADD[sqli_union_extract_data]: extract DB")
 }
 
 // TestApplyNextMovementsBottomLine_SkipsForAdjustTodolistAction 验证: 当
