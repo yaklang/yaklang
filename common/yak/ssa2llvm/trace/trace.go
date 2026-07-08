@@ -58,6 +58,24 @@ func Printf(format string, args ...any) {
 	Log.Infof(format, args...)
 }
 
+// PrintLink prints a synthetic command line for an in-process tool invocation
+// (e.g. the in-process lld link or TargetMachine emit), so -x output clearly
+// shows what ran even though no subprocess was spawned. prog is the tool name
+// (e.g. "ld.lld (in-process)"); args are its arguments, quoted like PrintCmd.
+func PrintLink(prog string, args []string) {
+	prog = strings.TrimSpace(prog)
+	if prog == "" {
+		return
+	}
+	var b strings.Builder
+	b.WriteString(quoteArg(prog))
+	for _, a := range args {
+		b.WriteByte(' ')
+		b.WriteString(quoteArg(a))
+	}
+	Log.Infof("%s", strings.TrimSpace(b.String()))
+}
+
 func quoteArg(s string) string {
 	if s == "" {
 		return `""`

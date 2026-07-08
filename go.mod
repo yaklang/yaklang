@@ -9,6 +9,11 @@ replace github.com/wenlng/go-captcha-assets v1.0.5 => github.com/wenlng/go-captc
 // Use the locally forked go-sqlite3 (FTS5 enabled by default) without rewriting imports.
 replace github.com/mattn/go-sqlite3 => github.com/yaklang/go-sqlite3 v0.0.1
 
+// Use the locally enhanced go-llvm (TargetMachine AOT emit + in-process lld link)
+// during development of the self-contained ssa2llvm build. Remove before publishing
+// a yaklang release that depends on a published go-llvm version.
+replace github.com/yaklang/go-llvm => /home/wlz/Developer/work/go-llvm
+
 require (
 	github.com/BurntSushi/toml v1.3.2
 	github.com/CycloneDX/cyclonedx-go v0.7.2

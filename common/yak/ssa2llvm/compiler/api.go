@@ -11,11 +11,9 @@ import (
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssa2llvm/linkprep"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/profile"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
-	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/embed"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/trace"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -566,14 +564,17 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 	extraLinkArgs := append([]string{}, cfg.ExtraLinkArgs...)
 	cfg.ExtraLinkArgs = extraLinkArgs
 
-	// When stdlib pruning is disabled, use a prebuilt runtime archive from disk.
+	// When stdlib pruning is disabled, use a prebuilt runtime archive from disk
+	// (legacy path; the self-contained build embeds the runtime and resolves to "").
 	if linking && runtimeArchive == "" && !cfg.StdlibCompile {
-		p, err := findRuntimeArchive()
+		p, err := resolveDiskRuntimeArchive(cfg)
 		if err != nil {
 			return CompileResult{}, err
 		}
-		cfg.RuntimeArchive = p
-		runtimeArchive = p
+		if p != "" {
+			cfg.RuntimeArchive = p
+			runtimeArchive = p
+		}
 	}
 
 	_, comp, ir, err := compileInputWithConfig(cfg)
@@ -674,7 +675,7 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 		} else {
 			outputFile = replaceExt(cfg.SourceFile, ".s")
 		}
-		if err := CompileLLVMToAsm(finalLL, outputFile); err != nil {
+		if err := emitAsmModule(comp.Mod, finalLL, outputFile); err != nil {
 			return CompileResult{}, err
 		}
 		log.Infof("Assembly written to: %s", outputFile)
@@ -691,7 +692,7 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 		} else {
 			outputFile = replaceExt(cfg.SourceFile, ".o")
 		}
-		if err := CompileLLVMToObject(finalLL, outputFile); err != nil {
+		if err := emitObjectModule(comp.Mod, finalLL, outputFile); err != nil {
 			return CompileResult{}, err
 		}
 		log.Infof("Object file written to: %s", outputFile)
@@ -703,49 +704,11 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 		return CompileResult{WorkDir: cfg.WorkDir, Artifact: outputFile, CacheHit: false}, nil
 	}
 
-	linkingNative := !cfg.SkipRuntimeLink
-	if linkingNative && strings.TrimSpace(cfg.RuntimeArchive) == "" && cfg.StdlibCompile {
-		deps := runtimeDepsFromCompiler(comp)
-		archivePath, gcLibDir, buildErr := embed.BuildPrunedRuntimeArchiveFromLocalSourceWithDeps(cfg.WorkDir, deps)
-		if buildErr != nil {
-			return CompileResult{}, buildErr
-		}
-		runtimeArchive = archivePath
-		cfg.RuntimeArchive = archivePath
-		if strings.TrimSpace(gcLibDir) != "" {
-			extraLinkArgs = append(extraLinkArgs, "-L"+gcLibDir)
-			cfg.ExtraLinkArgs = extraLinkArgs
-		}
-	}
-	var linkprepCleanup func()
-	if linkingNative && len(cfg.RuntimeSymManifest) > 0 && strings.TrimSpace(cfg.RuntimeArchive) != "" {
-		archives := []string{filepath.Clean(cfg.RuntimeArchive)}
-		for _, o := range cfg.ObfArchives {
-			o = strings.TrimSpace(o)
-			if o != "" {
-				archives = append(archives, filepath.Clean(o))
-			}
-		}
-		out, cleanup, lpErr := linkprep.PrepareForLink(linkprep.PrepareInput{
-			Archives: archives,
-			Manifest: cfg.RuntimeSymManifest,
-			WorkDir:  cfg.WorkDir,
-			Trace:    cfg.Trace,
-		})
-		if lpErr != nil {
-			return CompileResult{}, utils.Errorf("linkprep: %v", lpErr)
-		}
-		linkprepCleanup = cleanup
-		defer linkprepCleanup()
-		cfg.RuntimeArchive = out[0]
-		if len(out) > 1 {
-			cfg.ObfArchives = append([]string{}, out[1:]...)
-		}
-	}
-
-	if err := CompileLLVMToBinary(finalLL, outputFile, !cfg.SkipRuntimeLink, cfg.RuntimeArchive, cfg.ObfArchives, cfg.ExtraLinkArgs...); err != nil {
+	ra, el, err := prepareAndLinkBinary(comp, finalLL, outputFile, cfg)
+	if err != nil {
 		return CompileResult{}, err
 	}
+	runtimeArchive, extraLinkArgs = ra, el
 
 	log.Infof("Executable written to: %s", outputFile)
 	if dst := finalOutputPath(cfg); strings.TrimSpace(dst) != "" {

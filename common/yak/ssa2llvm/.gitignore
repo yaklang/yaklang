@@ -17,5 +17,9 @@ runtime/libyak.h
 runtime/libyak.debug.h
 runtime/runtime_go/libyak.h
 
+# Generated embedded-runtime assets (produced by scripts/build_runtime_embed.sh:
+# the .a/.o are covered by the patterns above; the manifest is generated Go).
+runtime/embed/assets/manifest_generated.go
+
 # Test binaries
 *.test
