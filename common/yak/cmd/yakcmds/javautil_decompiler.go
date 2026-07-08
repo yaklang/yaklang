@@ -1,5 +1,3 @@
-//go:build !irify_exclude
-
 package yakcmds
 
 import (

@@ -1,17 +1,11 @@
 name: Cross-Build-Yak
 
 # 版本命名规则和 Build Tag 说明:
-# 
-# 版本类型              Build Tag              输出文件名前缀          示例
-# ------------------------------------------------------------------------------------------------
-# v1.3.0-yakit-beta     irify_exclude          yaklang_yakit_         yaklang_yakit_linux_amd64
-# v1.3.0-irify-beta     yakit_exclude          yaklang_irify_         yaklang_irify_linux_amd64
-# v1.3.0-beta/alpha     gzip_embed             yak_                   yak_linux_amd64
 #
-# 说明:
-# - yakit 版本: 排除 irify 功能，使用 irify_exclude build tag，文件名前缀为 yaklang_yakit_
-# - irify 版本: 排除 yakit 功能，使用 yakit_exclude build tag，文件名前缀为 yaklang_irify_
-# - 标准版本: 包含所有功能，使用默认 gzip_embed build tag，文件名前缀为 yak_
+# 产物类型              Build Tag              输出文件名前缀          示例
+# ------------------------------------------------------------------------------------------------
+# 标准版本              gzip_embed             yak_                   yak_linux_amd64
+# yak-slim（并行构建）  gzip_embed,irify_exclude  yak-slim_             yak-slim_linux_amd64
 #
 # Linux 兼容性:
 # - 仅在 go build 时用 docker run manylinux2014（glibc 2.17）；其余 CI 步骤在 Ubuntu runner 上执行
@@ -321,29 +315,12 @@ jobs:
           echo "YAK_TAG=$(cat tags.txt)" >> "$GITHUB_ENV"
           echo "YAK_TAG=$(cat tags.txt)" >> "$GITHUB_OUTPUT"
 
-      # 根据版本类型确定 Build Tag 和输出文件名
-      # 版本命名规则:
-      #   - vx.x.x-yakit-*  → irify_exclude + yaklang_yakit_* 文件名
-      #   - vx.x.x-irify-*  → yakit_exclude + yaklang_irify_* 文件名
-      #   - vx.x.x-beta/alpha → gzip_embed + yak_* 文件名（标准版本）
       - name: Determine Build Tags and Output Name
         id: build_tags
         shell: bash
         run: |
-          YAK_TAG=$(cat tags.txt)
-          BUILD_TAGS="gzip_embed"
-          OUTPUT_BINARY="${{ matrix.binary }}"
-          
-          if [[ "$YAK_TAG" == *"-yakit-"* ]]; then
-            BUILD_TAGS="gzip_embed,irify_exclude"
-            OUTPUT_BINARY="${OUTPUT_BINARY/yak_/yaklang_yakit_}"
-          elif [[ "$YAK_TAG" == *"-irify-"* ]]; then
-            BUILD_TAGS="gzip_embed,yakit_exclude"
-            OUTPUT_BINARY="${OUTPUT_BINARY/yak_/yaklang_irify_}"
-          fi
-          
-          echo "BUILD_TAGS=$BUILD_TAGS" >> "$GITHUB_ENV"
-          echo "OUTPUT_BINARY=$OUTPUT_BINARY" >> "$GITHUB_ENV"
+          echo "BUILD_TAGS=gzip_embed" >> "$GITHUB_ENV"
+          echo "OUTPUT_BINARY=${{ matrix.binary }}" >> "$GITHUB_ENV"
 
       - name: Go Patch for Win7
         if: matrix.os == 'windows7'
@@ -570,12 +547,7 @@ jobs:
           go run common/yak/cmd/yak.go repos-tag -o tags.txt
           YAK_TAG=$(cat tags.txt)
           echo "YAK_TAG=$YAK_TAG"
-          if [[ "$YAK_TAG" == *"-yakit-"* ]] || [[ "$YAK_TAG" == *"-irify-"* ]]; then
-            echo "Skip yak-slim build for variant tag: $YAK_TAG"
-            echo "build_slim=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "build_slim=true" >> "$GITHUB_OUTPUT"
-          fi
+          echo "build_slim=true" >> "$GITHUB_OUTPUT"
 
   build_slim_binaries:
     needs: [check_commit_msg, resolve_slim_build]
@@ -645,9 +617,7 @@ jobs:
           echo "$YAK_VERSION" > ../yak-slim-version.txt
           UPLOAD_FILES="${UPLOAD_FILES};../yak-slim-version.txt:/yak/${YAK_TAG}/yak-slim-version.txt"
 
-          if [[ "$YAK_TAG" != *"-yakit-"* ]] && [[ "$YAK_TAG" != *"-irify-"* ]]; then
-            UPLOAD_FILES="${UPLOAD_FILES};../yak-slim-version.txt:/yak/latest/yak-slim-version.txt"
-          fi
+          UPLOAD_FILES="${UPLOAD_FILES};../yak-slim-version.txt:/yak/latest/yak-slim-version.txt"
 
           echo "Uploading: $UPLOAD_FILES"
           ../yak upload-oss --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f "$UPLOAD_FILES"
@@ -676,8 +646,8 @@ jobs:
         shell: bash
         run: |
           pwd && ls -lh
-          # Find the linux_amd64 binary (could be yak_linux_amd64, yaklang_yakit_linux_amd64, or yaklang_irify_linux_amd64)
-          LINUX_BINARY=$(ls | grep -E "(yak|yaklang_(yakit|irify))_linux_amd64$" | head -n 1)
+          # Find the full linux_amd64 binary (exclude yak-slim)
+          LINUX_BINARY=$(ls | grep -E '^yak_linux_amd64$' | head -n 1)
           if [ -z "$LINUX_BINARY" ]; then
             echo "Error: Could not find linux_amd64 binary"
             exit 1
@@ -690,29 +660,11 @@ jobs:
       - name: Checkout Tags Version
         run: echo ${{ env.YAK_TAG }}
 
-      # 根据版本类型生成 GitHub Release 文件列表
-      # 文件列表会根据版本命名规则自动调整文件名前缀:
-      #   - yakit 版本: yaklang_yakit_*
-      #   - irify 版本: yaklang_irify_*
-      #   - 标准版本: yak_*
       - name: Generate Release File List
         id: release_files
         shell: bash
         run: |
-          YAK_TAG="${{ env.YAK_TAG }}"
-          FILE_LIST=""
-          
-          # Determine file prefix based on version type
-          if [[ "$YAK_TAG" == *"-yakit-"* ]]; then
-            PREFIX="yaklang_yakit_"
-            echo "Detected yakit version, using prefix: $PREFIX"
-          elif [[ "$YAK_TAG" == *"-irify-"* ]]; then
-            PREFIX="yaklang_irify_"
-            echo "Detected irify version, using prefix: $PREFIX"
-          else
-            PREFIX="yak_"
-            echo "Standard version, using prefix: $PREFIX"
-          fi
+          PREFIX="yak_"
           
           # Generate file list using heredoc for multiline output
           {
@@ -730,21 +682,18 @@ jobs:
             echo "${PREFIX}darwin_arm64.sha256.txt"
           } > file_list.txt
           
-          # Standard releases also ship yak-slim alongside full binaries
-          if [[ "$PREFIX" == "yak_" ]]; then
-            {
-              echo "yak-slim_windows_amd64.exe"
-              echo "yak-slim_linux_amd64"
-              echo "yak-slim_linux_arm64"
-              echo "yak-slim_darwin_amd64"
-              echo "yak-slim_darwin_arm64"
-              echo "yak-slim_windows_amd64.exe.sha256.txt"
-              echo "yak-slim_linux_amd64.sha256.txt"
-              echo "yak-slim_linux_arm64.sha256.txt"
-              echo "yak-slim_darwin_amd64.sha256.txt"
-              echo "yak-slim_darwin_arm64.sha256.txt"
-            } >> file_list.txt
-          fi
+          {
+            echo "yak-slim_windows_amd64.exe"
+            echo "yak-slim_linux_amd64"
+            echo "yak-slim_linux_arm64"
+            echo "yak-slim_darwin_amd64"
+            echo "yak-slim_darwin_arm64"
+            echo "yak-slim_windows_amd64.exe.sha256.txt"
+            echo "yak-slim_linux_amd64.sha256.txt"
+            echo "yak-slim_linux_arm64.sha256.txt"
+            echo "yak-slim_darwin_amd64.sha256.txt"
+            echo "yak-slim_darwin_arm64.sha256.txt"
+          } >> file_list.txt
           
           echo "Generated file list:"
           cat file_list.txt
@@ -765,7 +714,7 @@ jobs:
           line_count=$(wc -l < "$raw_commit_file")
           
           # Find the linux_amd64 binary
-          LINUX_BINARY=$(ls | grep -E "(yak|yaklang_(yakit|irify))_linux_amd64$" | head -n 1)
+          LINUX_BINARY=$(ls | grep -E '^yak_linux_amd64$' | head -n 1)
           
           # 如果行数超过3行，输出111
           if [ "$line_count" -gt 3 ]; then
@@ -789,7 +738,7 @@ jobs:
           echo "start to handle versions"
           bash ./scripts/prepare-version-info-for-oss.sh "${{ env.YAK_TAG }}"
 
-          LINUX_BINARY=$(ls | grep -E "(yak|yaklang_(yakit|irify))_linux_amd64$" | head -n 1)
+          LINUX_BINARY=$(ls | grep -E '^yak_linux_amd64$' | head -n 1)
           "./$LINUX_BINARY" upload-oss -f 'new_history_versions.txt:/yak/version-info/history_versions.txt' -ak ${{ secrets.OSS_KEY_ID }} -sk ${{ secrets.OSS_KEY_SECRET }} -t 5
           "./$LINUX_BINARY" upload-oss -f 'active_versions.txt:/yak/version-info/active_versions.txt' -ak ${{ secrets.OSS_KEY_ID }} -sk ${{ secrets.OSS_KEY_SECRET }} -t 5
 
@@ -815,9 +764,9 @@ jobs:
           formatted_tag="${FORMATTEDTAG//\//-}"
           
           echo "start to build docker image..."
-          # Find linux binaries (could be yak_*, yaklang_yakit_*, or yaklang_irify_*)
-          LINUX_AMD64=$(ls | grep -E "(yak|yaklang_(yakit|irify))_linux_amd64$" | head -n 1)
-          LINUX_ARM64=$(ls | grep -E "(yak|yaklang_(yakit|irify))_linux_arm64$" | head -n 1)
+          # Find linux binaries (full yak_* only, exclude yak-slim_*)
+          LINUX_AMD64=$(ls | grep -E '^yak_linux_amd64$' | head -n 1)
+          LINUX_ARM64=$(ls | grep -E '^yak_linux_arm64$' | head -n 1)
           
           if [ -z "$LINUX_AMD64" ] || [ -z "$LINUX_ARM64" ]; then
             echo "Error: Could not find linux binaries"
