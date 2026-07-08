@@ -23,13 +23,11 @@ on:
         description: whether to sign windows executable
         default: false
       build_type:
-        description: "Build type: full, yakit, irify, or yakslim (workflow_call also supports this)"
+        description: "Build type: full or yakslim (workflow_call also supports this)"
         required: false
         type: choice
         options:
           - full
-          - yakit
-          - irify
           - yakslim
         default: full
   
@@ -40,7 +38,7 @@ on:
         required: true
         type: string
       build_type:
-        description: "Build type: full, yakit, irify, or yakslim"
+        description: "Build type: full or yakslim"
         required: false
         type: string
         default: full
@@ -98,17 +96,9 @@ jobs:
           OUTPUT_NAME_PREFIX="yak_"
           
           case "$BUILD_TYPE" in
-            yakit)
-              BUILD_TAGS="gzip_embed,irify_exclude"
-              OUTPUT_NAME_PREFIX="yaklang_yakit_"
-              ;;
             yakslim)
               BUILD_TAGS="gzip_embed,irify_exclude"
               OUTPUT_NAME_PREFIX="yak-slim_"
-              ;;
-            irify)
-              BUILD_TAGS="gzip_embed,yakit_exclude"
-              OUTPUT_NAME_PREFIX="yaklang_irify_"
               ;;
           esac
           
