@@ -352,10 +352,10 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 	)
 
 	var (
-		method              string
-		requestUri           string
-		fReq                 *mutate.FuzzHTTPRequest
-		isTooLargeRequest      bool
+		method                string
+		requestUri            string
+		fReq                  *mutate.FuzzHTTPRequest
+		isTooLargeRequest     bool
 		tooLargeReqHeaderFile string
 		tooLargeReqBodyFile   string
 		requestBodyLen        int
@@ -429,9 +429,9 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		Duration:                   duration,
 		TooLargeResponseBodyFile:   tooLargeBodyFile,
 		TooLargeResponseHeaderFile: tooLargeHeaderFile,
-		IsTooLargeRequest:         isTooLargeRequest,
-		TooLargeRequestBodyFile:   tooLargeReqBodyFile,
-		TooLargeRequestHeaderFile: tooLargeReqHeaderFile,
+		IsTooLargeRequest:          isTooLargeRequest,
+		TooLargeRequestBodyFile:    tooLargeReqBodyFile,
+		TooLargeRequestHeaderFile:  tooLargeReqHeaderFile,
 		FromPlugin:                 fromPlugin,
 	}
 	if storeBareWire {
@@ -764,11 +764,6 @@ func GetHTTPFlowByIDOrHash(db *gorm.DB, id int64, hash string) (*schema.HTTPFlow
 }
 
 func SaveSetTagForHTTPFlow(db *gorm.DB, id int64, hash string, tags []string) error {
-	flow, err := GetHTTPFlowByIDOrHash(db, id, hash)
-	if err != nil {
-		return err
-	}
-	// flow.AddTag(tags...)
 	extLen := len(tags)
 	tagsData := make([]string, extLen)
 	if extLen > 0 {
@@ -776,13 +771,36 @@ func SaveSetTagForHTTPFlow(db *gorm.DB, id int64, hash string, tags []string) er
 			tagsData[i] = tags[i]
 		}
 	}
-	flow.Tags = strings.Join(utils.RemoveRepeatStringSlice(tagsData), "|")
-	err = UpdateHTTPFlowTags(db, flow)
-	m, _ := model.ToHTTPFlowGRPCModel(flow, true)
-	model.SetHTTPFlowCacheGRPCModel(flow, false, m)
-	if err != nil {
-		return err
+	tagValue := strings.Join(utils.RemoveRepeatStringSlice(tagsData), "|")
+
+	var flow schema.HTTPFlow
+	query := db.Model(&schema.HTTPFlow{}).Select("id, hash, runtime_id")
+	switch {
+	case id > 0:
+		query = query.Where("id = ?", id)
+	case hash != "":
+		query = query.Where("hash = ?", hash)
+	default:
+		return utils.Errorf("id or hash is required")
 	}
+	if query := query.First(&flow); query.Error != nil {
+		return utils.Errorf("get HTTPFlow failed: %s", query.Error)
+	}
+
+	flow.Tags = tagValue
+	if db := db.Model(&schema.HTTPFlow{}).Where("id = ?", flow.ID).UpdateColumn("tags", tagValue); db.Error != nil {
+		log.Errorf("update tags(by id) failed: %s", db.Error)
+		return db.Error
+	}
+
+	model.UpdateHTTPFlowCacheTags(&flow)
+	schema.GetBroadCast_Data().Call("httpflow", map[string]any{
+		"id":         flow.ID,
+		"tags":       flow.Tags,
+		"action":     "update",
+		"runtime_id": flow.RuntimeId,
+	})
+	schema.PublishRuntimeScopedBroadcast(schema.RuntimeScopedBroadcastTypeHTTPFlow, flow.RuntimeId, "update", flow.ID)
 	return nil
 }
 

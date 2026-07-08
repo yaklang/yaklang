@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,6 +35,39 @@ Content-Length: 2
 	test.NoError(err)
 	test.Equal(0, flow.PostParamsTotal)
 	test.Equal(0, flow.GetParamsTotal)
+}
+
+func TestSaveSetTagForHTTPFlowKeepsHashAndUpdatesCache(t *testing.T) {
+	db := consts.GetGormProjectDatabase()
+	token := uuid.NewString()
+	req := lowhttp.FixHTTPRequest([]byte(fmt.Sprintf("POST /%s HTTP/1.1\r\nHost: example.com\r\nContent-Length: %d\r\n\r\n%s", token, 256*1024, strings.Repeat("A", 256*1024))))
+
+	flow, err := CreateHTTPFlow(
+		CreateHTTPFlowWithURL("http://example.com/"+token),
+		CreateHTTPFlowWithRequestRaw(req),
+		CreateHTTPFlowWithTags("origin"),
+	)
+	require.NoError(t, err)
+	require.NoError(t, InsertHTTPFlow(db, flow))
+	t.Cleanup(func() {
+		DeleteHTTPFlow(db, &ypb.DeleteHTTPFlowRequest{Id: []int64{int64(flow.ID)}})
+	})
+
+	cached, err := model.ToHTTPFlowGRPCModel(flow, false)
+	require.NoError(t, err)
+	model.SetHTTPFlowCacheGRPCModel(flow, false, cached)
+	oldHash := flow.Hash
+	oldCacheKey := flow.CalcCacheHash(false)
+
+	require.NoError(t, SaveSetTagForHTTPFlow(db, int64(flow.ID), "", []string{"YAKIT_COLOR_BLUE", "case"}))
+
+	got, err := GetHTTPFlow(db, int64(flow.ID))
+	require.NoError(t, err)
+	require.Equal(t, oldHash, got.Hash)
+	require.Equal(t, "YAKIT_COLOR_BLUE|case", got.Tags)
+	cached, ok := model.GlobalHTTPFlowCache.Get(oldCacheKey)
+	require.True(t, ok)
+	require.Equal(t, "YAKIT_COLOR_BLUE|case", cached.Tags)
 }
 
 func TestHTTPFlowToGRPCModelBase64(t *testing.T) {
