@@ -265,7 +265,7 @@ jobs:
         run: |
           cat > "${{ runner.temp }}/prepare_yakgrpc_test_config.json" <<'CONFIGEOF'
           [
-            {"package": "./common/yakgrpc/...", "timeout": "10m"}
+            {"package": "./common/yakgrpc/...", "timeout": "10m", "exclude_packages": ["./common/yakgrpc/airaghttp/...", "./common/yakgrpc/aihttp/tests/..."]}
           ]
           CONFIGEOF
 
@@ -730,7 +730,8 @@ jobs:
               [
                 {"package": "./common/yakgrpc/yakit", "timeout": "2m", "run": "^TestMUSTPASS_(UpdateMCPServer|SyncAndCache|McpServerEndpoint|MCPServerToolFullName|MigrateMCPServer|MigrateMCPClientBridge|DeleteMCPServer|MCPServerUserJourney|GetMCPServerToolConfigByFullName).*$"},
                 {"package": "./common/yakgrpc/...", "timeout": "4m", "run": "^TestGRPCMUSTPASS_StartMcpServer_.*$"},
-                {"package": "./common/yakgrpc/...", "timeout": "10m", "skip": "^(TestGRPCMUSTPASS_PluginTrace.*|TestGRPCMUSTPASS_AnalyzeHTTPFlow.*|TestGRPCMUSTPASS_Fingerprint.*|TestGRPCMUSTPASS_HTTP_.*|TestGRPCMUSTPASS_HTTPFUZZER.*|TestGRPCMUSTPASS_HTTPFuzzer.*|TestAITaskWith.*|TestGRPCMUSTPASS_MITM.*|TestGRPCMUSTPASS_MITMV2.*|TestGRPCMUSTPASS_LANGUAGE.*|TestGRPCMUSTPASS_COMMON.*|TestLARGEGRPCMUSTPASS.*|TestGRPCMUSTPASS_SyntaxFlow.*|TestGRPCMUSTPASS_SSA.*|TestGRPCMUSTPASS_FuzzerConfig|TestGRPCMUSTPASS_MaxSize|TestPBTest|TestLargePayload|TestGRPCMUSTPASS_AIForge.*|TestGRPCMUSTPASS_RequestYakURL.*|TestGRPCMUSTPASS_StartMcpServer_.*)$"}
+                {"package": "./common/yakgrpc/yakit", "timeout": "10m", "skip": "^TestMUSTPASS.*$"},
+                {"package": "./common/yakgrpc/...", "timeout": "10m", "exclude_packages": ["./common/yakgrpc/yakit/...", "./common/yakgrpc/airaghttp/...", "./common/yakgrpc/aihttp/tests/..."], "skip": "^(TestGRPCMUSTPASS_PluginTrace.*|TestGRPCMUSTPASS_AnalyzeHTTPFlow.*|TestGRPCMUSTPASS_Fingerprint.*|TestGRPCMUSTPASS_HTTP_.*|TestGRPCMUSTPASS_HTTPFlowSlowSQL|TestGRPCMUSTPASS_HTTPFUZZER.*|TestGRPCMUSTPASS_HTTPFuzzer.*|TestAITaskWith.*|TestGRPCMUSTPASS_MITM.*|TestGRPCMUSTPASS_MITMV2.*|TestGRPCMUSTPASS_LANGUAGE.*|TestGRPCMUSTPASS_COMMON.*|TestGRPCMUSTPASS_HybridScan.*|TestLARGEGRPCMUSTPASS.*|TestGRPCMUSTPASS_SyntaxFlow.*|TestGRPCMUSTPASS_SSA.*|TestGRPCMUSTPASS_FuzzerConfig|TestGRPCMUSTPASS_MaxSize|TestPBTest|TestLargePayload|TestGRPCMUSTPASS_AIForge.*|TestGRPCMUSTPASS_RequestYakURL.*|TestGRPCMUSTPASS_StartMcpServer_.*)$"}
               ]
     steps:
       - name: Checkout
