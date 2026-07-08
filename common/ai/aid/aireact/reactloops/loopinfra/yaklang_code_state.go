@@ -43,6 +43,8 @@ type loopYaklangCodeChange struct {
 	Version       int
 	ResetBaseline bool
 	EmitEvent     bool
+	// DeliveryPatch when set records a fragment delivery for editor_sync (live patch events).
+	DeliveryPatch *YaklangCodeDeliveryPatch
 }
 
 type loopYaklangCodeChangeResult struct {
@@ -255,6 +257,14 @@ func (f *SingleFileModificationSuiteFactory) applyLoopYaklangCodeChange(loop *re
 	loop.Set(loopYaklangCodeSourceActionKey, currentState.SourceAction)
 	loop.Set(loopYaklangCodeChangeReasonKey, currentState.ChangeReason)
 	clearLoopCodeSeededOnly(loop)
+
+	if input.DeliveryPatch != nil {
+		patch := *input.DeliveryPatch
+		patch.SourceAction = currentState.SourceAction
+		patch.ChangeReason = currentState.ChangeReason
+		patch.Version = currentState.Version
+		SetLoopYaklangDeliveryPatch(loop, &patch)
+	}
 
 	if input.EmitEvent {
 		emitLoopYaklangCodeChangeEvent(loop, currentState, eventOp)

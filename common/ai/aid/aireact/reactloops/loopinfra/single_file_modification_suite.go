@@ -285,6 +285,7 @@ func (f *SingleFileModificationSuiteFactory) CommitAfterCodeEdit(
 	op *reactloops.LoopActionHandlerOperator,
 	filename, fullCode, sourceAction, changeReason, editorPartial string,
 	successTimeline, failTimeline, successMsg string,
+	deliveryPatch *YaklangCodeDeliveryPatch,
 ) error {
 	runtime := f.GetRuntime()
 	writeErr := f.replaceLoopFileContent(runtime, filename, fullCode, successTimeline, failTimeline, successMsg)
@@ -299,12 +300,13 @@ func (f *SingleFileModificationSuiteFactory) CommitAfterCodeEdit(
 
 	loop.GetEmitter().EmitPinFilename(filename)
 	_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
-		Content:      fullCode,
-		Path:         filename,
-		SourceAction: sourceAction,
-		ChangeReason: changeReason,
-		EventOp:      loopYaklangCodeEventOpReplace,
-		EmitEvent:    true,
+		Content:       fullCode,
+		Path:          filename,
+		SourceAction:  sourceAction,
+		ChangeReason:  changeReason,
+		EventOp:       loopYaklangCodeEventOpReplace,
+		EmitEvent:     true,
+		DeliveryPatch: deliveryPatch,
 	})
 	if editorPartial != "" {
 		loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, sourceAction, editorPartial)
@@ -435,6 +437,7 @@ old_snippet 预览：
 	if err := f.CommitAfterCodeEdit(
 		loop, op, filename, fullCode, actionName, reason, newCode,
 		"modify_success", "modify_write_failed", successMsg,
+		BuildYaklangPatchSnippet(newCode, oldSnippet, loop.GetInt(LoopVarCodeLineBase)),
 	); err != nil {
 		op.Fail(fmt.Sprintf("failed to write modified content: %v", err))
 		return

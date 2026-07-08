@@ -16,6 +16,12 @@ import (
 //   - Type=file, Key=file_path, Value=open file absolute path
 //   - Type=selected, Key=content, Value=AttachedCodeSelection JSON (path/content/line numbers)
 //
+// yaklang_code_change delivery (backend → frontend):
+//   - op=patch: code.content is the changed fragment; code.patch describes how to apply it
+//     (kind: line_range | snippet | insert | delete | full; optional old_snippet; 1-based file lines).
+//   - op=create|replace: code.content is the full script (create for new files; replace on loop flush).
+//   - code.version / code.change_id: monotonic dedup for multi-round edits.
+//
 // Other loops use domain-specific keys (e.g. code_security_audit uses code_audit_target_path).
 // Frontend strings must match CONTEXT_PROVIDER_* and AttachedResource* constants.
 

@@ -17,6 +17,8 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
+type editorSyncYaklangCodeChangeEvent = loopinfra.YaklangCodeChangeEvent
+
 type editorSyncCapturedEvents struct {
 	mu     sync.Mutex
 	events []*schema.AiOutputEvent
@@ -92,12 +94,18 @@ func TestYaklangEditorSync_LiveEmitsForEditDuringLoop(t *testing.T) {
 	require.Len(t, events, 1)
 	assert.Empty(t, capture.byType(schema.EVENT_TYPE_FILESYSTEM_PIN_FILENAME))
 
-	var payload yaklangCodeChangeEvent
+	var payload editorSyncYaklangCodeChangeEvent
 	require.NoError(t, json.Unmarshal(events[0].Content, &payload))
-	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpReplace, payload.Op)
-	assert.Equal(t, "a\nnew\nc", payload.Code.Content)
+	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpPatch, payload.Op)
+	assert.Equal(t, "new", payload.Code.Content)
 	assert.Equal(t, filename, payload.Code.Path)
 	assert.Equal(t, "modify_code", payload.SourceAction)
+	require.NotNil(t, payload.Code.Patch)
+	assert.Equal(t, loopinfra.YaklangPatchKindLineRange, payload.Code.Patch.Kind)
+	assert.Equal(t, 2, payload.Code.Patch.StartLine)
+	assert.Equal(t, 2, payload.Code.Patch.EndLine)
+	assert.Equal(t, "old", payload.Code.Patch.OldSnippet)
+	assert.NotEmpty(t, payload.Code.ChangeID)
 
 	// Disk is overwritten live as well.
 	disk, readErr := os.ReadFile(filename)
@@ -138,7 +146,7 @@ func TestYaklangDeferredEditorSync_CreateModePersistsToCodeDir(t *testing.T) {
 	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
 	require.Len(t, events, 1)
 
-	var payload yaklangCodeChangeEvent
+	var payload editorSyncYaklangCodeChangeEvent
 	require.NoError(t, json.Unmarshal(events[0].Content, &payload))
 	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpCreate, payload.Op)
 	assert.Equal(t, "println(\"create\")", payload.Code.Content)
@@ -181,7 +189,7 @@ func TestYaklangDeferredEditorSync_EditorFileWinsOverGenCodePath(t *testing.T) {
 	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
 	require.Len(t, events, 1)
 
-	var payload yaklangCodeChangeEvent
+	var payload editorSyncYaklangCodeChangeEvent
 	require.NoError(t, json.Unmarshal(events[0].Content, &payload))
 	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpReplace, payload.Op)
 	assert.Equal(t, filepath.Clean(editorFile), filepath.Clean(payload.Code.Path))
@@ -270,10 +278,12 @@ func TestYaklangDeferredEditorSync_FlushesAfterWriteCodeOnSeed(t *testing.T) {
 	events := capture.byType(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE)
 	require.Len(t, events, 1)
 
-	var payload yaklangCodeChangeEvent
+	var payload editorSyncYaklangCodeChangeEvent
 	require.NoError(t, json.Unmarshal(events[0].Content, &payload))
+	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpPatch, payload.Op)
 	assert.Equal(t, "println(\"new task code\")", payload.Code.Content)
-	assert.Equal(t, loopinfra.LoopYaklangCodeEventOpReplace, payload.Op)
+	require.NotNil(t, payload.Code.Patch)
+	assert.Equal(t, loopinfra.YaklangPatchKindFull, payload.Code.Patch.Kind)
 
 	data, readErr := os.ReadFile(editorFile)
 	require.NoError(t, readErr)
