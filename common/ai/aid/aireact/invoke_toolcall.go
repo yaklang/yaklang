@@ -141,6 +141,10 @@ func (r *ReAct) newToolCallerForCall(ctx context.Context, currentTask aicommon.A
 		aicommon.WithToolCaller_AICaller(r.config),
 		aicommon.WithToolCaller_RuntimeId(r.config.Id),
 		aicommon.WithToolCaller_Emitter(currentTask.GetEmitter()),
+		// r implements AIInvokeRuntime; enables lightweight (re)generation of the
+		// tool-call reason: fallback when no reason was preset, and after a review
+		// override (wrong_tool/wrong_params). No-op when nil.
+		aicommon.WithToolCaller_InvokeRuntime(r),
 	)
 
 	// Add task context

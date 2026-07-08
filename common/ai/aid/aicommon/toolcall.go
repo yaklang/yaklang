@@ -233,6 +233,12 @@ type ToolCaller struct {
 	startTime  time.Time // Track tool call start time
 	reason     string    // human-readable reason for this tool call, emitted with the start card
 
+	// invokeRuntime is an optional AIInvokeRuntime used to (re)generate a
+	// human-readable reason via a lightweight (speed-priority) lite forge when
+	// no reason was preset (emitStart) or when review changed the tool/params.
+	// nil in paths without a runtime (e.g. AiTask.callTool) → graceful no-op.
+	invokeRuntime AIInvokeRuntime
+
 	ctx    context.Context
 	cancel context.CancelFunc
 
@@ -274,6 +280,77 @@ func WithToolCaller_Reason(reason string) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.reason = reason
 	}
+}
+
+// WithToolCaller_InvokeRuntime sets an optional AIInvokeRuntime on the ToolCaller.
+// When present, a speed-priority lite forge is used to (re)generate a
+// human-readable reason: as a fallback in emitStart when no reason was preset,
+// and after a review override (wrong_tool/wrong_params) so the card's reason
+// matches the finally-executed tool/params. When absent, both paths no-op and
+// behavior is unchanged.
+func WithToolCaller_InvokeRuntime(rt AIInvokeRuntime) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.invokeRuntime = rt
+	}
+}
+
+// generateReasonByLiteForge uses the speed-priority lite forge to generate one
+// concise sentence describing WHY the given tool call is needed. It returns an
+// empty string (no-op) when no invokeRuntime is configured or generation fails,
+// so callers without a runtime keep their original behavior.
+func (t *ToolCaller) generateReasonByLiteForge(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams) string {
+	if t.invokeRuntime == nil || utils.IsNil(t.invokeRuntime) || tool == nil {
+		return ""
+	}
+	if utils.IsNil(ctx) {
+		ctx = t.ctx
+	}
+	prompt := buildToolCallReasonPrompt(tool, params, t.task)
+	action, err := t.invokeRuntime.InvokeSpeedPriorityLiteForge(
+		ctx, "tool-call-reason", prompt,
+		[]aitool.ToolOption{
+			aitool.WithStringParam("reason",
+				aitool.WithParam_Description("One concise sentence (<=120 chars) describing WHY this tool call is needed: the intent/goal, not the params."),
+				aitool.WithParam_MaxLength(120),
+				aitool.WithParam_Required(true)),
+		},
+	)
+	if err != nil || utils.IsNil(action) {
+		log.Debugf("generate tool-call reason via liteforge failed: %v", err)
+		return ""
+	}
+	return strings.TrimSpace(action.GetString("reason"))
+}
+
+// buildToolCallReasonPrompt builds the lite-forge prompt asking for a one-line
+// reason for a tool call, given the tool, its (possibly empty) params, and the
+// owning task's user input / name for intent context.
+func buildToolCallReasonPrompt(tool *aitool.Tool, params aitool.InvokeParams, task AITask) string {
+	var sb strings.Builder
+	sb.WriteString("Generate one concise sentence (<=120 chars) describing WHY this tool call is needed (the intent/goal, not the parameters).\n\n")
+	sb.WriteString(fmt.Sprintf("Tool: %s\n", tool.Name))
+	if desc := strings.TrimSpace(tool.Description); desc != "" {
+		sb.WriteString(fmt.Sprintf("Tool description: %s\n", desc))
+	}
+	if task != nil {
+		if name := strings.TrimSpace(task.GetName()); name != "" {
+			sb.WriteString(fmt.Sprintf("Task: %s\n", name))
+		}
+		// GetUserInput lives on AIStatefulTask (the concrete task type used by the
+		// ReAct runtime path); AITask itself does not expose it. Type-assert so the
+		// intent context is included when available, and silently skip otherwise.
+		if stateful, ok := task.(AIStatefulTask); ok {
+			if userInput := strings.TrimSpace(stateful.GetUserInput()); userInput != "" {
+				sb.WriteString(fmt.Sprintf("User input: %s\n", userInput))
+			}
+		}
+	}
+	if len(params) > 0 {
+		sb.WriteString("Params:\n")
+		sb.WriteString(renderParamsAsYAML(params))
+	}
+	sb.WriteString("\nOutput only the reason sentence in the `reason` field.")
+	return sb.String()
 }
 
 func WithToolCaller_ReviewWrongTool(
@@ -468,6 +545,18 @@ func (t *ToolCaller) emitStart(tool *aitool.Tool) {
 	t.emitter.EmitToolCallStart(t.callToolId, tool, t.startTime)
 	if t.reason != "" {
 		t.emitter.EmitToolCallReason(t.callToolId, t.reason)
+	} else if t.invokeRuntime != nil && !utils.IsNil(t.invokeRuntime) {
+		// No preset reason: ask the lightweight model for a one-line reason so
+		// the card isn't blank. Run async so emitStart (and the require path's
+		// param generation right after) isn't blocked on the model call. The
+		// goroutine does not take t.m, so the lock held here is safe.
+		toolRef := tool
+		go func() {
+			defer func() { _ = recover() }()
+			if reason := t.generateReasonByLiteForge(t.ctx, toolRef, nil); reason != "" {
+				t.emitter.EmitToolCallReason(t.callToolId, reason)
+			}
+		}()
 	}
 }
 
