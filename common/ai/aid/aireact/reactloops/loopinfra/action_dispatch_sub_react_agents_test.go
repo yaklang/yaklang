@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -764,4 +765,132 @@ func TestRunForkedSubReactAgentJob_SubTaskEmitterForwardsAndStampsTaskId(t *test
 	for _, e := range events {
 		assert.Equal(t, subTaskId, e.TaskId, "sub-task events must be tagged with the sub-task id aggregation marker")
 	}
+}
+
+// newSubReactAICallbackProbe returns a distinct AI callback closure that increments its own
+// hit counter each time it is invoked. Using closures (rather than comparing function pointers,
+// which Go forbids for non-nil funcs) lets the test verify behaviorally that a given child slot
+// actually runs the callback the parent put there — invoke the slot and check which probe fired.
+func newSubReactAICallbackProbe() (aicommon.AICallbackType, *int64) {
+	var hits int64
+	cb := func(_ aicommon.AICallerConfigIf, _ *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		atomic.AddInt64(&hits, 1)
+		return &aicommon.AIResponse{}, nil
+	}
+	return cb, &hits
+}
+
+func assertProbeHits(t *testing.T, label string, cb aicommon.AICallbackType, hits *int64) {
+	t.Helper()
+	require.NotNil(t, cb, "%s callback must be present on the child invoker", label)
+	before := atomic.LoadInt64(hits)
+	_, err := cb(nil, nil)
+	require.NoError(t, err, "%s callback must run without error", label)
+	assert.Equal(t, before+1, atomic.LoadInt64(hits), "%s callback must be the one wired into the child slot", label)
+}
+
+// TestBuildForkedSubReactInvoker_PassesAICallbacksToChild verifies the core dispatch wiring at
+// buildForkedSubReactInvoker: the child invoker inherits the parent's AI callbacks
+// (Original / QualityPriorityRaw / SpeedPriorityRaw) via WithAICallbacks(parentCfg.GetRawAICallbacks()),
+// so every forked sub agent actually calls the same AI the parent is configured with. Each probe
+// lands in its own slot — this catches both "callbacks lost entirely" and "callbacks shuffled
+// into the wrong tier" regressions. AIRuntimeInvokerGetter is swapped so we can build a real
+// child config from the options without a live AI runtime.
+func TestBuildForkedSubReactInvoker_PassesAICallbacksToChild(t *testing.T) {
+	origCb, origHits := newSubReactAICallbackProbe()
+	qualityCb, qualityHits := newSubReactAICallbackProbe()
+	speedCb, speedHits := newSubReactAICallbackProbe()
+
+	parentCfg := aicommon.NewConfig(
+		context.Background(),
+		aicommon.WithAICallbacks(&aicommon.AICallbacks{
+			Original:           origCb,
+			QualityPriorityRaw: qualityCb,
+			SpeedPriorityRaw:   speedCb,
+		}),
+		aicommon.WithDisableAutoSkills(true),
+	)
+
+	parentTimeline := aicommon.NewTimeline(nil, nil)
+	parentTimeline.PushText(1, "parent-seed")
+	fork, err := parentTimeline.ForkForTask("sub", "sub", parentCfg, parentCfg)
+	require.NoError(t, err)
+	require.NotNil(t, fork)
+
+	origGetter := aicommon.AIRuntimeInvokerGetter
+	defer func() { aicommon.AIRuntimeInvokerGetter = origGetter }()
+	aicommon.AIRuntimeInvokerGetter = func(ctx context.Context, opts ...aicommon.ConfigOption) (aicommon.AITaskInvokeRuntime, error) {
+		cfg := aicommon.NewConfig(ctx, opts...)
+		return &configBackedDispatchInvoker{
+			dispatchSubReactTestInvoker: newDispatchSubReactTestInvoker(ctx),
+			cfg:                         cfg,
+		}, nil
+	}
+
+	const subTaskId = "sub-agent-cb"
+	childInvoker, err := buildForkedSubReactInvoker(parentCfg, fork, context.Background(), subTaskId)
+	require.NoError(t, err)
+	require.NotNil(t, childInvoker)
+
+	childCfg, ok := childInvoker.GetConfig().(*aicommon.Config)
+	require.True(t, ok, "child invoker config must be *aicommon.Config to expose AI callbacks")
+	require.NotNil(t, childCfg)
+
+	childRaw := childCfg.GetRawAICallbacks()
+	require.NotNil(t, childRaw)
+
+	// No probe should have fired yet — the callbacks are only wired, not invoked, during build.
+	assert.Equal(t, int64(0), atomic.LoadInt64(origHits), "test setup: Original probe must start cold")
+	assert.Equal(t, int64(0), atomic.LoadInt64(qualityHits), "test setup: QualityPriorityRaw probe must start cold")
+	assert.Equal(t, int64(0), atomic.LoadInt64(speedHits), "test setup: SpeedPriorityRaw probe must start cold")
+
+	// Invoking each child slot must fire exactly its own probe — proving the parent's callback
+	// for that tier is the one wired into the child, not a fabricated default or a shuffled slot.
+	assertProbeHits(t, "Original", childRaw.Original, origHits)
+	assertProbeHits(t, "QualityPriorityRaw", childRaw.QualityPriorityRaw, qualityHits)
+	assertProbeHits(t, "SpeedPriorityRaw", childRaw.SpeedPriorityRaw, speedHits)
+
+	assert.Equal(t, int64(1), atomic.LoadInt64(origHits), "only the Original slot may have fired the Original probe")
+	assert.Equal(t, int64(1), atomic.LoadInt64(qualityHits), "only the QualityPriorityRaw slot may have fired the QualityPriorityRaw probe")
+	assert.Equal(t, int64(1), atomic.LoadInt64(speedHits), "only the SpeedPriorityRaw slot may have fired the SpeedPriorityRaw probe")
+}
+
+// TestBuildForkedSubReactInvoker_ChildHasNoAICallbacksWhenParentHasNone is the negative control:
+// a parent with no AI callbacks set must produce a child that also has no AI callbacks, rather
+// than silently fabricating or inheriting unrelated defaults through the dispatch wiring.
+func TestBuildForkedSubReactInvoker_ChildHasNoAICallbacksWhenParentHasNone(t *testing.T) {
+	parentCfg := aicommon.NewConfig(
+		context.Background(),
+		aicommon.WithDisableAutoSkills(true),
+	)
+	require.Nil(t, parentCfg.GetRawAICallbacks().Original)
+	require.Nil(t, parentCfg.GetRawAICallbacks().QualityPriorityRaw)
+	require.Nil(t, parentCfg.GetRawAICallbacks().SpeedPriorityRaw)
+
+	parentTimeline := aicommon.NewTimeline(nil, nil)
+	parentTimeline.PushText(1, "parent-seed")
+	fork, err := parentTimeline.ForkForTask("sub", "sub", parentCfg, parentCfg)
+	require.NoError(t, err)
+	require.NotNil(t, fork)
+
+	origGetter := aicommon.AIRuntimeInvokerGetter
+	defer func() { aicommon.AIRuntimeInvokerGetter = origGetter }()
+	aicommon.AIRuntimeInvokerGetter = func(ctx context.Context, opts ...aicommon.ConfigOption) (aicommon.AITaskInvokeRuntime, error) {
+		cfg := aicommon.NewConfig(ctx, opts...)
+		return &configBackedDispatchInvoker{
+			dispatchSubReactTestInvoker: newDispatchSubReactTestInvoker(ctx),
+			cfg:                         cfg,
+		}, nil
+	}
+
+	childInvoker, err := buildForkedSubReactInvoker(parentCfg, fork, context.Background(), "sub-agent-noop")
+	require.NoError(t, err)
+	require.NotNil(t, childInvoker)
+
+	childCfg, ok := childInvoker.GetConfig().(*aicommon.Config)
+	require.True(t, ok)
+	childRaw := childCfg.GetRawAICallbacks()
+	assert.Nil(t, childRaw.Original, "child must not fabricate an Original callback when the parent has none")
+	assert.Nil(t, childRaw.QualityPriorityRaw, "child must not fabricate a QualityPriorityRaw callback when the parent has none")
+	assert.Nil(t, childRaw.SpeedPriorityRaw, "child must not fabricate a SpeedPriorityRaw callback when the parent has none")
 }
