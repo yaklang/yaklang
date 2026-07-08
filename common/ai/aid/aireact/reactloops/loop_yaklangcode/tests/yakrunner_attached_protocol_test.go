@@ -2,6 +2,10 @@ package yaklangcodetests
 
 // YakRunner protocol E2E tests (FreeInput + FocusModeLoop + AttachedResourceInfo + yaklang_code_change).
 //
+// Wire protocol (backend):
+//   - op=patch: code.content is a fragment; code.patch carries line_range/snippet/insert/delete/full metadata.
+//   - op=create|replace: code.content is the full file (create on new files, replace on loop-end flush for review).
+//
 // Run:
 //   go test -v -run TestYakRunnerProtocol_ ./common/ai/aid/aireact/reactloops/loop_yaklangcode/tests/...
 
@@ -36,10 +40,17 @@ type yaklangCodeChangeResponse struct {
 	SourceAction string `json:"source_action"`
 	Reason       string `json:"reason,omitempty"`
 	Code         struct {
-		Content string `json:"content"`
-		Path    string `json:"path,omitempty"`
-		Summary string `json:"summary,omitempty"`
-		Version int    `json:"version"`
+		Content  string `json:"content"`
+		Path     string `json:"path,omitempty"`
+		Summary  string `json:"summary,omitempty"`
+		Version  int    `json:"version"`
+		ChangeID string `json:"change_id,omitempty"`
+		Patch    *struct {
+			Kind       string `json:"kind"`
+			StartLine  int    `json:"start_line,omitempty"`
+			EndLine    int    `json:"end_line,omitempty"`
+			OldSnippet string `json:"old_snippet,omitempty"`
+		} `json:"patch,omitempty"`
 	} `json:"code"`
 }
 
@@ -304,13 +315,16 @@ func TestYakRunnerProtocol_4_YaklangCodeChangeResponseShape(t *testing.T) {
 	last := result.codeChangeEvents[len(result.codeChangeEvents)-1]
 	payload := parseYaklangCodeChangeResponse(t, last)
 
-	assert.Equal(t, "replace", payload.Op)
+	assert.Equal(t, "patch", payload.Op)
 	assert.Equal(t, "modify_code", payload.SourceAction)
 	assert.Equal(t, "修正 synscan 超时参数", payload.Reason)
 	assert.Equal(t, filepath.Clean(yakPath), filepath.Clean(payload.Code.Path))
-	assert.Contains(t, payload.Code.Content, `// timeout was 60`)
+	assert.Equal(t, `// timeout was 60`, payload.Code.Content)
 	assert.NotEmpty(t, payload.Code.Summary)
 	assert.Greater(t, payload.Code.Version, 0)
+	require.NotNil(t, payload.Code.Patch)
+	assert.Equal(t, "line_range", payload.Code.Patch.Kind)
+	assert.NotEmpty(t, payload.Code.ChangeID)
 
 	// Deferred editor sync: only one final yaklang_code_change after the loop completes.
 	assert.Len(t, result.codeChangeEvents, 1)
@@ -373,9 +387,11 @@ func TestYakRunnerProtocol_7_DirectoryAndNamedFileInQuery(t *testing.T) {
 	require.Len(t, result.codeChangeEvents, 1, "exactly one yaklang_code_change per conversation")
 
 	payload := parseYaklangCodeChangeResponse(t, result.codeChangeEvents[0])
-	assert.Equal(t, "replace", payload.Op)
+	assert.Equal(t, "patch", payload.Op)
 	assert.Equal(t, filepath.Clean(yakPath), filepath.Clean(payload.Code.Path))
 	assert.Contains(t, payload.Code.Content, "hello")
+	require.NotNil(t, payload.Code.Patch)
+	assert.Equal(t, "full", payload.Code.Patch.Kind)
 
 	disk, readErr := os.ReadFile(yakPath)
 	require.NoError(t, readErr)

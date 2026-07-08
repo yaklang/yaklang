@@ -13,56 +13,41 @@ import (
 )
 
 const (
-	yaklangEditorSyncPendingLoopKey    = "yaklang_editor_sync_pending"
-	yaklangEditorSyncFlushingLoopKey   = "yaklang_editor_sync_flushing"
-	yaklangEditorLastEmittedContentKey = "yaklang_editor_last_emitted_content"
-	yaklangEditorDeliveryPathLoopKey   = "yaklang_editor_delivery_path"
-	yaklangEditorDeliveryOpLoopKey     = "yaklang_editor_delivery_op"
-	yaklangCodeVersionLoopKey          = "yaklang_code_change_version"
-	yaklangCodeSourceActionLoopKey     = "current_yaklang_code_source_action"
-	yaklangCodeChangeReasonLoopKey     = "current_yaklang_code_change_reason"
-	yaklangCodeChangeEventNode         = "yaklang_code_change"
+	yaklangEditorSyncPendingLoopKey     = "yaklang_editor_sync_pending"
+	yaklangEditorSyncFlushingLoopKey    = "yaklang_editor_sync_flushing"
+	yaklangEditorLastEmittedContentKey  = "yaklang_editor_last_emitted_content"
+	yaklangEditorLastEmittedVersionKey  = "yaklang_editor_last_emitted_version"
+	yaklangEditorDeliveryPathLoopKey    = "yaklang_editor_delivery_path"
+	yaklangEditorDeliveryOpLoopKey      = "yaklang_editor_delivery_op"
+	yaklangCodeVersionLoopKey           = "yaklang_code_change_version"
+	yaklangCodeSourceActionLoopKey      = "current_yaklang_code_source_action"
+	yaklangCodeChangeReasonLoopKey      = "current_yaklang_code_change_reason"
+	yaklangCodeChangeEventNode          = "yaklang_code_change"
 )
-
-type yaklangCodeChangeEvent struct {
-	Op           string                     `json:"op"`
-	Code         yaklangCodeChangeEventCode `json:"code"`
-	Reason       string                     `json:"reason,omitempty"`
-	SourceAction string                     `json:"source_action,omitempty"`
-}
-
-type yaklangCodeChangeEventCode struct {
-	Content string `json:"content"`
-	Path    string `json:"path,omitempty"`
-	Summary string `json:"summary,omitempty"`
-	Version int    `json:"version"`
-}
 
 // withYaklangDeferredEditorSync installs the editor-sync event processor for the yaklang code loop.
 //
-// Delivery policy (关键: 第一次输出代码就覆盖编辑器文件):
-//   - Replace targets (an open editor file or a concrete file path): every code change is delivered
-//     to the frontend LIVE, i.e. the very first write_code/modify_code immediately overwrites the
-//     editor file, and later edits keep it in sync. This is what "直接开始输出第一次代码就覆盖文件" needs.
-//   - Create targets (a brand-new gen_code_*.yak, no open editor file): the new-file path is allocated
-//     once by the frontend, so intermediate events are suppressed and exactly one create event is
-//     delivered when the loop finishes.
+// Delivery policy:
+//   - Replace targets (open editor file): each committed edit emits op=patch with a code fragment in
+//     code.content plus code.patch metadata (line_range / snippet / insert / delete / full).
+//     The delivery file on disk is still updated with the loop's full_code after each edit.
+//   - Create targets (gen_code_*.yak): intermediate patch events are suppressed; exactly one
+//     op=create with full code.content is delivered when the loop finishes.
+//   - Loop flush for replace targets emits op=replace with full code.content so the frontend can
+//     run a final review diff against the task-start baseline.
 //
-// The internal yaklang_code_editor / filesystem_pin_filename events always carry aispace staging
-// paths and are suppressed; only the resolved yaklang_code_change reaches the frontend.
+// Internal yaklang_code_editor / filesystem_pin_filename events are suppressed.
 func withYaklangDeferredEditorSync() reactloops.ReActLoopOption {
 	return func(loop *reactloops.ReActLoop) {
 		reactloops.WithLoopEmitterProcesser(func(e *schema.AiOutputEvent) *schema.AiOutputEvent {
 			if e == nil {
 				return nil
 			}
-			// Our own resolved yaklang_code_change is re-emitted with this flag set; let it pass.
 			if isYaklangEditorSyncFlushing(loop) {
 				return e
 			}
 			switch e.Type {
 			case schema.EVENT_TYPE_YAKLANG_CODE_CHANGE:
-				// Suppress the internal event (staging path) and deliver a resolved one instead.
 				liveSyncYaklangEditorOnChange(loop)
 				return nil
 			case schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, schema.EVENT_TYPE_FILESYSTEM_PIN_FILENAME:
@@ -78,22 +63,18 @@ func withYaklangDeferredEditorSync() reactloops.ReActLoopOption {
 			flushYaklangDeferredEditorSync(l)
 		})(loop)
 
-		// Safety net: some terminal paths break out of the iteration loop without isDone post hooks.
 		reactloops.WithOnLoopRelease(func() {
 			flushYaklangDeferredEditorSync(loop)
 		})(loop)
 	}
 }
 
-// liveSyncYaklangEditorOnChange runs inside the emitter processor on every internal
-// yaklang_code_change. Replace targets are delivered immediately (first code output overwrites the
-// editor file); create targets are deferred until the loop finishes.
 func liveSyncYaklangEditorOnChange(loop *reactloops.ReActLoop) {
 	if loop == nil || loop.GetEmitter() == nil {
 		return
 	}
-	content := strings.TrimSpace(loop.Get("full_code"))
-	if content == "" {
+	fullCode := strings.TrimSpace(loop.Get("full_code"))
+	if fullCode == "" {
 		return
 	}
 
@@ -106,19 +87,25 @@ func liveSyncYaklangEditorOnChange(loop *reactloops.ReActLoop) {
 		return
 	}
 
-	// New-file delivery is finalized once when the loop ends; the frontend allocates the
-	// destination path a single time, so emitting multiple create events would fork files.
 	if eventOp == loopinfra.LoopYaklangCodeEventOpCreate {
 		loop.Set(yaklangEditorSyncPendingLoopKey, true)
 		return
 	}
 
-	emitYaklangEditorDelivery(loop, path, eventOp, content)
+	if writeErr := writeYaklangDeliveryFile(path, fullCode); writeErr != nil {
+		log.Warnf("yaklang_code_change: write delivery file failed: %v", writeErr)
+		return
+	}
+
+	deliveryPatch := loopinfra.GetLoopYaklangDeliveryPatch(loop)
+	if deliveryPatch != nil {
+		emitYaklangEditorPatchDelivery(loop, path, fullCode, deliveryPatch)
+		return
+	}
+
+	emitYaklangEditorFullDelivery(loop, path, loopinfra.LoopYaklangCodeEventOpReplace, fullCode)
 }
 
-// flushYaklangDeferredEditorSync delivers the final yaklang_code_change when the loop finishes.
-// For replace targets this is usually a no-op (already delivered live, deduplicated by content);
-// for create targets this emits the single new-file event.
 func flushYaklangDeferredEditorSync(loop *reactloops.ReActLoop) {
 	if loop == nil || loop.GetEmitter() == nil {
 		return
@@ -128,7 +115,6 @@ func flushYaklangDeferredEditorSync(loop *reactloops.ReActLoop) {
 		log.Infof("skip yaklang_code_change flush: full_code is empty")
 		return
 	}
-	// Already delivered this exact content (e.g. live edit sync); nothing to do.
 	if content == loop.Get(yaklangEditorLastEmittedContentKey) {
 		loop.Set(yaklangEditorSyncPendingLoopKey, false)
 		return
@@ -155,11 +141,9 @@ func flushYaklangDeferredEditorSync(loop *reactloops.ReActLoop) {
 		return
 	}
 
-	emitYaklangEditorDelivery(loop, path, eventOp, content)
+	emitYaklangEditorFullDelivery(loop, path, eventOp, content)
 }
 
-// resolveCachedYaklangDeliveryTarget resolves the frontend delivery path + op once and caches it,
-// so live edits and the final flush all target a single stable file.
 func resolveCachedYaklangDeliveryTarget(loop *reactloops.ReActLoop) (string, string, error) {
 	if cachedPath := strings.TrimSpace(loop.Get(yaklangEditorDeliveryPathLoopKey)); cachedPath != "" {
 		cachedOp := strings.TrimSpace(loop.Get(yaklangEditorDeliveryOpLoopKey))
@@ -181,9 +165,34 @@ func resolveCachedYaklangDeliveryTarget(loop *reactloops.ReActLoop) (string, str
 	return path, eventOp, nil
 }
 
-// emitYaklangEditorDelivery writes the delivery file and emits one resolved yaklang_code_change.
-// It deduplicates by last-emitted content so repeated flushes / identical edits stay quiet.
-func emitYaklangEditorDelivery(loop *reactloops.ReActLoop, path, eventOp, content string) {
+func emitYaklangEditorPatchDelivery(loop *reactloops.ReActLoop, path, fullCode string, patch *loopinfra.YaklangCodeDeliveryPatch) {
+	if loop == nil || patch == nil {
+		return
+	}
+	version := loopinfra.ResolvedYaklangCodeChangeVersion(loop, "full_code")
+	if version <= 0 {
+		version = 1
+	}
+	if version <= loop.GetInt(yaklangEditorLastEmittedVersionKey) {
+		return
+	}
+
+	sourceAction := strings.TrimSpace(loop.Get(yaklangCodeSourceActionLoopKey))
+	reason := strings.TrimSpace(loop.Get(yaklangCodeChangeReasonLoopKey))
+	payload := loopinfra.BuildYaklangPatchChangeEvent(path, patch, version, sourceAction, reason)
+
+	emitYaklangCodeChangeEvent(loop, payload)
+	log.Infof(
+		"yaklang_code_change patch delivered: path=%s kind=%s version=%d bytes=%d",
+		path, patch.Meta.Kind, version, len(payload.Code.Content),
+	)
+	loop.Set(yaklangEditorLastEmittedVersionKey, version)
+	loop.Set(yaklangEditorLastEmittedContentKey, strings.TrimSpace(fullCode))
+	loop.Set(yaklangEditorSyncPendingLoopKey, false)
+	loopinfra.ClearLoopYaklangDeliveryPatch(loop)
+}
+
+func emitYaklangEditorFullDelivery(loop *reactloops.ReActLoop, path, eventOp, content string) {
 	if loop == nil || loop.GetEmitter() == nil {
 		return
 	}
@@ -209,20 +218,16 @@ func emitYaklangEditorDelivery(loop *reactloops.ReActLoop, path, eventOp, conten
 		eventOp = loopinfra.LoopYaklangCodeEventOpReplace
 	}
 
-	emitYaklangCodeChangeEvent(loop, yaklangCodeChangeEvent{
-		Op: eventOp,
-		Code: yaklangCodeChangeEventCode{
-			Content: content,
-			Path:    path,
-			Summary: buildYaklangCodeSummary(content),
-			Version: version,
-		},
-		Reason:       strings.TrimSpace(loop.Get(yaklangCodeChangeReasonLoopKey)),
-		SourceAction: strings.TrimSpace(loop.Get(yaklangCodeSourceActionLoopKey)),
-	})
+	sourceAction := strings.TrimSpace(loop.Get(yaklangCodeSourceActionLoopKey))
+	reason := strings.TrimSpace(loop.Get(yaklangCodeChangeReasonLoopKey))
+	payload := loopinfra.BuildYaklangFullChangeEvent(eventOp, path, content, version, sourceAction, reason)
+
+	emitYaklangCodeChangeEvent(loop, payload)
 	log.Infof("yaklang_code_change delivered: path=%s op=%s version=%d bytes=%d", path, eventOp, version, len(content))
 	loop.Set(yaklangEditorLastEmittedContentKey, content)
+	loop.Set(yaklangEditorLastEmittedVersionKey, version)
 	loop.Set(yaklangEditorSyncPendingLoopKey, false)
+	loopinfra.ClearLoopYaklangDeliveryPatch(loop)
 }
 
 func writeYaklangDeliveryFile(finalPath, content string) error {
@@ -240,9 +245,7 @@ func writeYaklangDeliveryFile(finalPath, content string) error {
 	return os.WriteFile(finalPath, []byte(content), 0o644)
 }
 
-// emitYaklangCodeChangeEvent re-emits a resolved yaklang_code_change. The flushing flag makes the
-// loop emitter processor pass this event straight through instead of re-intercepting it.
-func emitYaklangCodeChangeEvent(loop *reactloops.ReActLoop, payload yaklangCodeChangeEvent) {
+func emitYaklangCodeChangeEvent(loop *reactloops.ReActLoop, payload loopinfra.YaklangCodeChangeEvent) {
 	loop.Set(yaklangEditorSyncFlushingLoopKey, true)
 	defer loop.Set(yaklangEditorSyncFlushingLoopKey, false)
 	_, _ = loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE, yaklangCodeChangeEventNode, payload)
@@ -277,15 +280,4 @@ func yaklangDeferredFlushWouldRepeatSeed(loop *reactloops.ReActLoop, content str
 		return false
 	}
 	return strings.TrimSpace(content) == seed
-}
-
-func buildYaklangCodeSummary(content string) string {
-	content = strings.TrimSpace(content)
-	if content == "" {
-		return ""
-	}
-	if len(content) > 200 {
-		return content[:200] + "..."
-	}
-	return content
 }

@@ -126,11 +126,12 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 			}
 			loop.GetEmitter().EmitPinFilename(filename)
 			_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
-				Content:      code,
-				Path:         filename,
-				SourceAction: actionName,
-				EventOp:      loopYaklangCodeEventOpCreate,
-				EmitEvent:    true,
+				Content:       code,
+				Path:          filename,
+				SourceAction:  actionName,
+				EventOp:       loopYaklangCodeEventOpCreate,
+				EmitEvent:     true,
+				DeliveryPatch: BuildYaklangPatchFull(code),
 			})
 			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "write_code", code)
 		},
@@ -312,12 +313,13 @@ GEN_CODE 解析行号：[%d-%d]
 			}
 			loop.GetEmitter().EmitPinFilename(filename)
 			_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
-				Content:      fullCode,
-				Path:         filename,
-				SourceAction: actionName,
-				ChangeReason: reason,
-				EventOp:      loopYaklangCodeEventOpReplace,
-				EmitEvent:    true,
+				Content:       fullCode,
+				Path:          filename,
+				SourceAction:  actionName,
+				ChangeReason:  reason,
+				EventOp:       loopYaklangCodeEventOpReplace,
+				EmitEvent:     true,
+				DeliveryPatch: BuildYaklangPatchLineRange(partialCode, modifyStartLine, modifyEndLine, oldSegment, loop.GetInt(LoopVarCodeLineBase)),
 			})
 			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "modify_code", partialCode)
 
@@ -427,11 +429,12 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 			}
 			loop.GetEmitter().EmitPinFilename(filename)
 			_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
-				Content:      fullCode,
-				Path:         filename,
-				SourceAction: actionName,
-				EventOp:      loopYaklangCodeEventOpReplace,
-				EmitEvent:    true,
+				Content:       fullCode,
+				Path:          filename,
+				SourceAction:  actionName,
+				EventOp:       loopYaklangCodeEventOpReplace,
+				EmitEvent:     true,
+				DeliveryPatch: BuildYaklangPatchInsert(partialCode, insertLine, loop.GetInt(LoopVarCodeLineBase)),
 			})
 			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "insert_lines", partialCode)
 
@@ -571,11 +574,12 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 			}
 			loop.GetEmitter().EmitPinFilename(filename)
 			_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
-				Content:      fullCode,
-				Path:         filename,
-				SourceAction: actionName,
-				EventOp:      loopYaklangCodeEventOpReplace,
-				EmitEvent:    true,
+				Content:       fullCode,
+				Path:          filename,
+				SourceAction:  actionName,
+				EventOp:       loopYaklangCodeEventOpReplace,
+				EmitEvent:     true,
+				DeliveryPatch: BuildYaklangPatchDelete(deletedStart, deletedEnd, oldSegment, loop.GetInt(LoopVarCodeLineBase)),
 			})
 
 			// Emit event with deletion info
