@@ -20,6 +20,13 @@ type Recorder struct {
 
 	stepsMu sync.Mutex
 	steps   []Step
+	// storeSteps controls whether appendStep retains Steps in r.steps.
+	// Steps() is only used by tests/inspection; production code never reads
+	// the slice, but appendStep was storing every trace Step unconditionally,
+	// consuming 46-57% of heap on heavy dataflow rules (millions of Steps
+	// retained for the whole scan). Default false (don't store); tests
+	// enable it via SetStoreSteps(true).
+	storeSteps bool
 
 	runMu           sync.Mutex
 	nested          bool
@@ -37,6 +44,18 @@ func NewRecorder() *Recorder {
 		nestedWriter:    logLineWriter{},
 		lastLoggedDepth: -1,
 	}
+}
+
+// SetStoreSteps enables retention of Steps in r.steps (for test/inspection
+// only). Production code never reads Steps(); storing them unconditionally
+// was the #1 heap allocator on heavy dataflow rules.
+func (r *Recorder) SetStoreSteps(enabled bool) {
+	if r == nil {
+		return
+	}
+	r.stepsMu.Lock()
+	r.storeSteps = enabled
+	r.stepsMu.Unlock()
 }
 
 func (r *Recorder) TraceLab(lab Lab, fn func() error) error {

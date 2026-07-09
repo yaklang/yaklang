@@ -114,6 +114,7 @@ func TestRecorderConcurrentTrackCount(t *testing.T) {
 func TestRecorderConcurrentStepExpansion(t *testing.T) {
 	withDiagnosticsLevel(t, LevelNormal)
 	rec := NewRecorder()
+	rec.SetStoreSteps(true)
 	const workers = 120
 
 	var wg sync.WaitGroup
