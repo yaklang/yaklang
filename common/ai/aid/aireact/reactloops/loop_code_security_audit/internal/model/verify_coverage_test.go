@@ -2,10 +2,30 @@ package model
 
 import (
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestAddFinding_AllocatesMonotonicIDs(t *testing.T) {
+	state := NewAuditState()
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			state.AddFinding(&Finding{Title: "x", File: "f", Line: 1, Severity: "LOW", Category: "sql_injection"})
+		}()
+	}
+	wg.Wait()
+	ids := make(map[string]struct{})
+	for _, f := range state.GetFindings() {
+		require.NotEmpty(t, f.ID)
+		ids[f.ID] = struct{}{}
+	}
+	require.Len(t, ids, 20)
+}
 
 func sampleFindings() []*Finding {
 	return []*Finding{

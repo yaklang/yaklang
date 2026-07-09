@@ -105,7 +105,7 @@ type AuditState struct {
 	WorkDir string `json:"work_dir,omitempty"`
 
 	// 前端附件聚焦（directory_path / file_path / selected）
-	FocusFilePath string                            `json:"focus_file_path,omitempty"`
+	FocusFilePath string                          `json:"focus_file_path,omitempty"`
 	Selection     *aicommon.AttachedCodeSelection `json:"-"`
 
 	// Phase 1 产出：简要摘要（常驻内存，注入每轮 reactive data）
@@ -126,12 +126,12 @@ type AuditState struct {
 
 	// Phase 2 产出：原始 findings 列表
 	Findings []*Finding `json:"findings,omitempty"`
+	// findingSeq allocates stable VULN-xxx IDs under concurrent sub-agent writes.
+	findingSeq int `json:"-"`
 	// Phase 2 产出：各类别扫描观察记录（包含 uncertain 线索、覆盖总结）
 	ScanObservations []*ScanObservation `json:"scan_observations,omitempty"`
 	// Phase 2 产出：findings 持久化文件路径（.audit/scan_findings.json）
 	FindingsFilePath string `json:"findings_file_path,omitempty"`
-	// Phase 2 产出：扫描观察记录持久化文件路径（.audit/scan_observations.md）
-	ScanObservationsFilePath string `json:"scan_observations_file_path,omitempty"`
 
 	// Phase 3 产出：验证后的漏洞列表
 	VerifiedVulns []*VerifiedFinding `json:"verified_vulns,omitempty"`
@@ -269,10 +269,18 @@ func (s *AuditState) GetReconFileContent() (string, error) {
 
 // --------- Phase 2 helpers ---------
 
-// AddScanObservation 追加一条类别扫描观察记录
+// AddScanObservation 追加一条类别扫描观察记录（同 category_id 仅保留首条，避免并发子 Agent 重复写入）。
 func (s *AuditState) AddScanObservation(obs *ScanObservation) {
+	if obs == nil {
+		return
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	for _, existing := range s.ScanObservations {
+		if existing != nil && existing.CategoryID == obs.CategoryID {
+			return
+		}
+	}
 	s.ScanObservations = append(s.ScanObservations, obs)
 }
 
@@ -285,19 +293,13 @@ func (s *AuditState) GetScanObservations() []*ScanObservation {
 	return result
 }
 
-// GetScanObservationsFilePath 返回扫描观察持久化文件路径
-func (s *AuditState) GetScanObservationsFilePath() string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.ScanObservationsFilePath
-}
-
 // AddFinding 添加一个扫描发现，自动生成 ID
 func (s *AuditState) AddFinding(f *Finding) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if f.ID == "" {
-		f.ID = fmt.Sprintf("VULN-%03d", len(s.Findings)+1)
+		s.findingSeq++
+		f.ID = fmt.Sprintf("VULN-%03d", s.findingSeq)
 	}
 	s.Findings = append(s.Findings, f)
 }
@@ -407,66 +409,6 @@ func (s *AuditState) GetStats() AuditStats {
 }
 
 // --------- 持久化 helpers ---------
-
-// PersistScanObservations 将扫描观察记录序列化为 Markdown 写入 filePath，并记录路径。
-// 由 orchestrator 在 Phase2 结束后调用。
-func (s *AuditState) PersistScanObservations(filePath string) error {
-	s.mu.RLock()
-	obs := make([]*ScanObservation, len(s.ScanObservations))
-	copy(obs, s.ScanObservations)
-	s.mu.RUnlock()
-
-	if len(obs) == 0 {
-		return nil
-	}
-
-	var sb strings.Builder
-	sb.WriteString("# Phase 2 扫描观察记录\n\n")
-	sb.WriteString("> 本文件记录各漏洞类别扫描的完整观察，包括 uncertain 线索（值得人工跟进）、覆盖总结和已排除的假设。\n\n")
-
-	for _, o := range obs {
-		sb.WriteString(fmt.Sprintf("---\n\n## 类别：%s（%s）\n\n", o.CategoryName, o.CategoryID))
-		sb.WriteString(fmt.Sprintf("- **停止原因**: %s\n", o.StopReason))
-		sb.WriteString(fmt.Sprintf("- **假设统计**: confirmed=%d uncertain=%d safe=%d\n", o.ConfirmedCount, o.UncertainCount, o.SafeCount))
-		sb.WriteString(fmt.Sprintf("- **覆盖总结**: %s\n", o.CoverageSummary))
-		if o.FindingsSummary != "" {
-			sb.WriteString(fmt.Sprintf("- **发现总结**: %s\n", o.FindingsSummary))
-		}
-		sb.WriteString("\n")
-
-		if len(o.UncertainLeads) > 0 {
-			sb.WriteString("### Uncertain 线索（证据不足，值得人工跟进）\n\n")
-			for _, lead := range o.UncertainLeads {
-				sb.WriteString(fmt.Sprintf("#### [%s] %s\n\n", lead.HypothesisID, lead.Title))
-				sb.WriteString(fmt.Sprintf("- **Sink**: `%s`\n", lead.SinkHint))
-				if lead.SourceHint != "" {
-					sb.WriteString(fmt.Sprintf("- **Source**: `%s`\n", lead.SourceHint))
-				}
-				sb.WriteString(fmt.Sprintf("- **Uncertain 原因**: %s\n", lead.Reason))
-				if lead.EvidenceLog != "" {
-					sb.WriteString(fmt.Sprintf("- **已收集证据**: %s\n", lead.EvidenceLog))
-				}
-				sb.WriteString("\n")
-			}
-		}
-
-		if len(o.SafeHypotheses) > 0 {
-			sb.WriteString("### 已排除假设\n\n")
-			for _, s := range o.SafeHypotheses {
-				sb.WriteString(fmt.Sprintf("- %s\n", s))
-			}
-			sb.WriteString("\n")
-		}
-	}
-
-	if err := os.WriteFile(filePath, []byte(sb.String()), 0o644); err != nil {
-		return fmt.Errorf("write scan_observations file: %w", err)
-	}
-	s.mu.Lock()
-	s.ScanObservationsFilePath = filePath
-	s.mu.Unlock()
-	return nil
-}
 
 // PersistFindings 将当前 findings 序列化为 JSON 写入 filePath，并记录路径。
 // 由 orchestrator 在 Phase2 结束后调用。

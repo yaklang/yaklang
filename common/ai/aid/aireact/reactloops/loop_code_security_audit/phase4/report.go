@@ -63,9 +63,6 @@ func BuildReportLoop(r aicommon.AIInvokeRuntime, state *model.AuditState, opts .
 			if p := state.GetReconFilePath(); p != "" {
 				referenceFiles = append(referenceFiles, p)
 			}
-			if p := state.GetScanObservationsFilePath(); p != "" {
-				referenceFiles = append(referenceFiles, p)
-			}
 			if p := state.GetFindingsFilePath(); p != "" {
 				referenceFiles = append(referenceFiles, p)
 			}
@@ -181,8 +178,7 @@ func buildAuditReportWritePrompt(state *model.AuditState, referenceFiles []strin
 %s
 - verified_vulns.json：包含每个漏洞的详细验证结果（reason / exploit / fix / data_flow）
 - recon_notes.md：项目背景信息（技术栈、路由、认证机制）
-- scan_observations.md：各类别扫描覆盖总结
-- scan_findings.json：Phase2 原始发现
+- scan_findings.json：Phase2 原始发现（已合并，无需再读 scan_obs_{category}.json）
 
 ## 必须写入报告的 Finding 清单（Go 层校验，遗漏会被系统自动补录）
 

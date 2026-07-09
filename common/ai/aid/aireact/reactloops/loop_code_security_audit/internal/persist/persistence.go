@@ -13,24 +13,23 @@ import (
 const AuditStateFileName = "audit_state.json"
 
 type auditStateSnapshot struct {
-	Phase                    model.AuditPhase         `json:"phase"`
-	ProjectPath              string                   `json:"project_path,omitempty"`
-	ProjectName              string                   `json:"project_name,omitempty"`
-	WorkDir                  string                   `json:"work_dir,omitempty"`
-	TechStack                string                   `json:"tech_stack,omitempty"`
-	EntryPoints              string                   `json:"entry_points,omitempty"`
-	AuthMechanism            string                   `json:"auth_mechanism,omitempty"`
-	ReconOutline             string                   `json:"recon_outline,omitempty"`
-	ReconFilePath            string                   `json:"recon_file_path,omitempty"`
-	ReconNoteFiles           []string                 `json:"recon_note_files,omitempty"`
-	Findings                 []*model.Finding         `json:"findings,omitempty"`
-	ScanObservations         []*model.ScanObservation `json:"scan_observations,omitempty"`
-	FindingsFilePath         string                   `json:"findings_file_path,omitempty"`
-	ScanObservationsFilePath string                   `json:"scan_observations_file_path,omitempty"`
-	VerifiedVulns            []*model.VerifiedFinding `json:"verified_vulns,omitempty"`
-	VerifiedVulnsFilePath    string                   `json:"verified_vulns_file_path,omitempty"`
-	FinalReport              string                   `json:"final_report,omitempty"`
-	FinalReportPath          string                   `json:"final_report_path,omitempty"`
+	Phase                 model.AuditPhase         `json:"phase"`
+	ProjectPath           string                   `json:"project_path,omitempty"`
+	ProjectName           string                   `json:"project_name,omitempty"`
+	WorkDir               string                   `json:"work_dir,omitempty"`
+	TechStack             string                   `json:"tech_stack,omitempty"`
+	EntryPoints           string                   `json:"entry_points,omitempty"`
+	AuthMechanism         string                   `json:"auth_mechanism,omitempty"`
+	ReconOutline          string                   `json:"recon_outline,omitempty"`
+	ReconFilePath         string                   `json:"recon_file_path,omitempty"`
+	ReconNoteFiles        []string                 `json:"recon_note_files,omitempty"`
+	Findings              []*model.Finding         `json:"findings,omitempty"`
+	ScanObservations      []*model.ScanObservation `json:"scan_observations,omitempty"`
+	FindingsFilePath      string                   `json:"findings_file_path,omitempty"`
+	VerifiedVulns         []*model.VerifiedFinding `json:"verified_vulns,omitempty"`
+	VerifiedVulnsFilePath string                   `json:"verified_vulns_file_path,omitempty"`
+	FinalReport           string                   `json:"final_report,omitempty"`
+	FinalReportPath       string                   `json:"final_report_path,omitempty"`
 }
 
 func toSnapshot(s *model.AuditState) *auditStateSnapshot {
@@ -38,20 +37,19 @@ func toSnapshot(s *model.AuditState) *auditStateSnapshot {
 		return nil
 	}
 	snap := &auditStateSnapshot{
-		Phase:                    s.GetPhase(),
-		ProjectPath:              s.ProjectPath,
-		ProjectName:              s.ProjectName,
-		WorkDir:                  s.WorkDir,
-		TechStack:                s.TechStack,
-		EntryPoints:              s.EntryPoints,
-		AuthMechanism:            s.AuthMechanism,
-		ReconOutline:             s.GetReconOutline(),
-		ReconFilePath:            s.GetReconFilePath(),
-		FindingsFilePath:         s.GetFindingsFilePath(),
-		ScanObservationsFilePath: s.GetScanObservationsFilePath(),
-		VerifiedVulnsFilePath:    s.GetVerifiedVulnsFilePath(),
-		FinalReport:              s.GetFinalReport(),
-		FinalReportPath:          s.GetFinalReportPath(),
+		Phase:                 s.GetPhase(),
+		ProjectPath:           s.ProjectPath,
+		ProjectName:           s.ProjectName,
+		WorkDir:               s.WorkDir,
+		TechStack:             s.TechStack,
+		EntryPoints:           s.EntryPoints,
+		AuthMechanism:         s.AuthMechanism,
+		ReconOutline:          s.GetReconOutline(),
+		ReconFilePath:         s.GetReconFilePath(),
+		FindingsFilePath:      s.GetFindingsFilePath(),
+		VerifiedVulnsFilePath: s.GetVerifiedVulnsFilePath(),
+		FinalReport:           s.GetFinalReport(),
+		FinalReportPath:       s.GetFinalReportPath(),
 	}
 	for _, f := range s.GetReconNoteFiles() {
 		snap.ReconNoteFiles = append(snap.ReconNoteFiles, f)
@@ -80,7 +78,6 @@ func fromSnapshot(snap *auditStateSnapshot) *model.AuditState {
 	state.SetReconOutline(snap.ReconOutline)
 	state.SetReconFilePath(snap.ReconFilePath)
 	state.FindingsFilePath = snap.FindingsFilePath
-	state.ScanObservationsFilePath = snap.ScanObservationsFilePath
 	state.VerifiedVulnsFilePath = snap.VerifiedVulnsFilePath
 	state.SetFinalReportPath(snap.FinalReportPath)
 	if snap.FinalReport != "" {

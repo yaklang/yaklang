@@ -3,8 +3,9 @@ package aireact
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"time"
+
+	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -14,6 +15,31 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+func (r *ReAct) withTaskEmitterScope(fn func(currentTask aicommon.AIStatefulTask) (*aitool.ToolResult, bool, error)) (*aitool.ToolResult, bool, error) {
+	var taskIndex string
+	currentTask := r.GetCurrentTask()
+	if !utils.IsNil(currentTask) {
+		taskIndex = currentTask.GetIndex()
+	}
+	if currentTask == nil {
+		currentTask = r.config.DefaultTask
+	}
+	processor := func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
+		if event != nil && event.TaskIndex == "" {
+			event.TaskIndex = taskIndex
+		}
+		return event
+	}
+	var result *aitool.ToolResult
+	var directly bool
+	var err error
+	run := func() {
+		result, directly, err = fn(currentTask)
+	}
+	aicommon.WithEmitterProcessorOnTask(currentTask, processor, run)
+	return result, directly, err
+}
 
 // executeToolCallInternal is the internal implementation that handles both regular and preset-parameter tool calls.
 // If params is nil, it will use AI to generate parameters (require phase).
@@ -36,65 +62,46 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 		defer r.config.RunVerificationWatchdogToolBlockingEnd()
 	}
 
-	// Setup task-aware event emitter
-	var taskIndex string
-	currentTask := r.GetCurrentTask()
-	if !utils.IsNil(r.GetCurrentTask()) {
-		taskIndex = r.GetCurrentTask().GetIndex()
-	}
-	if currentTask == nil {
-		currentTask = r.config.DefaultTask
-	}
-	currentTask.SetEmitter(
-		currentTask.GetEmitter().PushEventProcesser(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
-			if event != nil && event.TaskIndex == "" {
-				event.TaskIndex = taskIndex
-			}
-			return event
-		}),
-	)
-	defer func() {
-		currentTask.SetEmitter(currentTask.GetEmitter().PopEventProcesser())
-	}()
-
-	tool, err := r.resolveToolForCall(ctx, toolName)
-	if err != nil {
-		return nil, false, err
-	}
-
-	if skipRequire {
-		log.Infof("preparing tool with preset params: %s - %s", tool.Name, tool.Description)
-	} else {
-		log.Infof("preparing tool: %s - %s", tool.Name, tool.Description)
-	}
-
-	// Only the require path needs AI to generate params; the preset path skips it.
-	toolCaller, err := r.newToolCallerForCall(ctx, currentTask, toolName, !skipRequire, opt...)
-	if err != nil {
-		return nil, false, err
-	}
-
-	// Call the tool with appropriate method
-	var result *aitool.ToolResult
-	var directlyAnswer bool
-	if skipRequire {
-		if currentLoop := r.GetCurrentLoop(); currentLoop != nil {
-			if allow, guardMsg := reactloops.CheckToolInvokeGuard(currentLoop, toolName, params); !allow {
-				return nil, false, utils.Error(guardMsg)
-			}
-			params = reactloops.ApplyToolInvokeParamsMutators(currentLoop, toolName, params)
+	return r.withTaskEmitterScope(func(currentTask aicommon.AIStatefulTask) (*aitool.ToolResult, bool, error) {
+		tool, err := r.resolveToolForCall(ctx, toolName)
+		if err != nil {
+			return nil, false, err
 		}
-		// Call with preset parameters, skipping the require phase
-		result, directlyAnswer, err = toolCaller.CallToolWithExistedParams(tool, true, params)
-	} else {
-		// Call with AI parameter generation (require phase included)
-		result, directlyAnswer, err = toolCaller.CallTool(tool)
-	}
 
-	if err != nil {
-		return nil, false, utils.Errorf("tool call failed: %v", err)
-	}
-	return r.finalizeToolCallResult(currentTask, result, directlyAnswer)
+		if skipRequire {
+			log.Infof("preparing tool with preset params: %s - %s", tool.Name, tool.Description)
+		} else {
+			log.Infof("preparing tool: %s - %s", tool.Name, tool.Description)
+		}
+
+		// Only the require path needs AI to generate params; the preset path skips it.
+		toolCaller, err := r.newToolCallerForCall(ctx, currentTask, toolName, !skipRequire, opt...)
+		if err != nil {
+			return nil, false, err
+		}
+
+		// Call the tool with appropriate method
+		var result *aitool.ToolResult
+		var directlyAnswer bool
+		if skipRequire {
+			if currentLoop := r.GetCurrentLoop(); currentLoop != nil {
+				if allow, guardMsg := reactloops.CheckToolInvokeGuard(currentLoop, toolName, params); !allow {
+					return nil, false, utils.Error(guardMsg)
+				}
+				params = reactloops.ApplyToolInvokeParamsMutators(currentLoop, toolName, params)
+			}
+			// Call with preset parameters, skipping the require phase
+			result, directlyAnswer, err = toolCaller.CallToolWithExistedParams(tool, true, params)
+		} else {
+			// Call with AI parameter generation (require phase included)
+			result, directlyAnswer, err = toolCaller.CallTool(tool)
+		}
+
+		if err != nil {
+			return nil, false, utils.Errorf("tool call failed: %v", err)
+		}
+		return r.finalizeToolCallResult(currentTask, result, directlyAnswer)
+	})
 }
 
 // resolveToolForCall looks up a tool by name and, for MCP tools, waits for the

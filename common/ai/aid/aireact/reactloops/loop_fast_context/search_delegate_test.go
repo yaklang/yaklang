@@ -6,21 +6,63 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/subagent"
+	"github.com/yaklang/yaklang/common/schema"
 )
 
-func TestFastContextIsolatedSubTaskDoesNotCancelParent(t *testing.T) {
-	parent := aicommon.NewStatefulTaskBase("parent-scan-sql", "audit", context.Background(), nil)
-	sub := newFastContextIsolatedSubTask(parent)
-	require.NotNil(t, sub)
-	require.NotEqual(t, parent.GetId(), sub.GetId())
+func TestSwapInvokerEmitterForNestedScope(t *testing.T) {
+	cfg := aicommon.NewConfig(context.Background())
+	parentEmitter := aicommon.NewEmitter("parent", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		return e, nil
+	})
+	cfg.Emitter = parentEmitter
+	invoker := mock.NewMockInvoker(context.Background())
+	invoker.SetConfig(cfg)
 
-	sub.SetStatus(aicommon.AITaskState_Completed)
+	const categorySubID = "parent-cat-sub-sql_injection-abcd"
+	categoryEmitter := subagent.BuildForwardingEmitter(parentEmitter, categorySubID)
+	parent := aicommon.NewSubTaskBaseWithOptions(
+		aicommon.NewStatefulTaskBase("orchestrator", "audit", context.Background(), parentEmitter, true),
+		categorySubID,
+		"scan",
+		aicommon.WithStatefulTaskBaseSubAgent(),
+		aicommon.WithStatefulTaskBaseSkipTaskStatusChangeEmit(),
+	)
+	parent.SetEmitter(categoryEmitter)
 
-	select {
-	case <-parent.GetContext().Done():
-		t.Fatal("parent task context must stay alive when isolated fast_context sub-task completes")
-	default:
-	}
+	restore := cfg.SwapEmitter(parent.GetEmitter())
+	require.Same(t, categoryEmitter, cfg.GetEmitter())
+	restore()
+	require.Same(t, parentEmitter, cfg.GetEmitter())
+}
+
+func TestNestedScopeEmitter_UsesCategorySubAgentTaskId(t *testing.T) {
+	var captured []*schema.AiOutputEvent
+	rootEmitter := aicommon.NewEmitter("root", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		captured = append(captured, e)
+		return e, nil
+	})
+	rootCfg := aicommon.NewConfig(context.Background(), aicommon.WithEmitter(rootEmitter))
+
+	const categorySubID = "parent-phase2-sub-sql_injection-abcd"
+	categoryEmitter := subagent.BuildForwardingEmitter(rootCfg.GetEmitter(), categorySubID)
+
+	categoryTask := aicommon.NewSubTaskBaseWithOptions(
+		aicommon.NewStatefulTaskBase("orchestrator", "audit", context.Background(), rootCfg.GetEmitter(), true),
+		categorySubID,
+		"scan sql injection",
+		aicommon.WithStatefulTaskBaseSubAgent(),
+		aicommon.WithStatefulTaskBaseSkipTaskStatusChangeEmit(),
+	)
+	categoryTask.SetEmitter(categoryEmitter)
+
+	_, err := categoryTask.GetEmitter().EmitStatus("grep", "running")
+	require.NoError(t, err)
+
+	require.Len(t, captured, 1)
+	require.Equal(t, categorySubID, captured[0].TaskId,
+		"fast_context grep/thought events must use the category sub-agent TaskId so the UI nests them inside the sub-agent card")
 }
 
 func TestParseGrepFilesWithMatchesOutput(t *testing.T) {

@@ -12,6 +12,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/subagent"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -95,46 +96,13 @@ func runForkedSubReactAgentJob(
 	job subReactDispatchJob,
 ) (*subReactAgentJobResult, error) {
 	startedAt := time.Now()
+	loopName := job.LoopName
+	forkJob := forkJobFromDispatch(job)
 
-	parentCfg, ok := parentInvoker.GetConfig().(*aicommon.Config)
-	if !ok || parentCfg == nil {
-		return nil, utils.Error("dispatch_sub_react_agents requires parent config to be *aicommon.Config")
+	childInvoker, subTask, fork, jobCancel, err := subagent.PrepareForkedSubAgent(parentInvoker, parentTask, forkJob)
+	if jobCancel != nil {
+		defer jobCancel()
 	}
-	parentTimeline := parentCfg.GetTimeline()
-	if parentTimeline == nil {
-		return nil, utils.Error("parent timeline is nil")
-	}
-
-	subTaskID := buildSubReactSubTaskID(parentTask, job)
-	// The sub agent's task name is the explicit task_name the caller gave (a
-	// short, human-readable label), not the goal. The goal can be a long
-	// sentence and reads poorly as a task name in the UI and timeline.
-	subTaskName := strings.TrimSpace(job.TaskName)
-	if subTaskName == "" {
-		subTaskName = strings.TrimSpace(job.Identifier)
-	}
-	if subTaskName == "" {
-		subTaskName = job.Goal
-	}
-	if subTaskName == "" {
-		subTaskName = subTaskID
-	}
-
-	fork, err := parentTimeline.ForkForTask(subTaskID, subTaskName, parentCfg, parentCfg)
-	if err != nil {
-		return nil, err
-	}
-	if fork == nil || fork.Branch == nil {
-		return nil, utils.Error("failed to create timeline fork for sub react agent")
-	}
-
-	// No per-job timeout: sub agents inherit the parent task context and run
-	// until they finish naturally. Previously each job could carry a
-	// timeout_seconds that the AI often underestimated, cutting sub agents off
-	// mid-task; that param is gone, so there is nothing to clamp here.
-	jobCtx, jobCancel := context.WithCancel(parentTask.GetContext())
-
-	childInvoker, err := buildForkedSubReactInvoker(parentCfg, fork, jobCtx, subTaskID)
 	if err != nil {
 		return nil, err
 	}
@@ -144,42 +112,19 @@ func runForkedSubReactAgentJob(
 	// long-form generation out of the (linear) dispatch action call — where the
 	// parent AI used to write every sub agent's full goal+contract up front —
 	// into a per-sub-agent step that runs with the forked timeline context and
-	// overlaps across the concurrently-dispatched sub agents. The elaborated
-	// goal streams to the sub agent's own thread (sub_react_agent_goal node)
-	// via the child invoker's forwarding emitter. On failure we fall back to the
-	// brief intent so a generation hiccup never blocks the dispatch.
-	subTask := aicommon.NewSubTaskBaseWithOptions(
-		parentTask,
-		subTaskID,
-		job.Goal,
-		aicommon.WithStatefulTaskBaseName(subTaskName),
-		aicommon.WithStatefulTaskBaseSubAgent(),
-		aicommon.WithStatefulTaskBaseContextAndCancel(jobCtx, jobCancel),
+	// overlaps across the concurrently-dispatched sub agents.
+	elaboratedGoal, resultContract, elabErr := elaborateSubReactAgentGoal(
+		subTask.GetContext(), childInvoker, parentLoop, subTask.GetId(), job,
 	)
-
-	parentInvoker.AddRuntimeTask(subTask)
-	childInvoker.SetCurrentTask(subTask)
-
-	// Restore sub-agent emit: derive the sub-task emitter from the parent config emitter
-	// (via PushEventProcesser) so sub-agent events reach the frontend, stamped with the
-	// sub-task id as the aggregation marker. This replaces the temporary discard emitter
-	// that suppressed sub-agent output while waiting for the frontend to support
-	// aggregating sub-agent messages.
-	subTask.SetEmitter(buildSubReactForwardingEmitter(parentCfg.GetEmitter(), subTaskID))
-	branchMarker := fmt.Sprintf("sub-react-branch-marker-%s", subTaskID)
-	fork.Branch.PushText(parentCfg.AcquireId(), branchMarker)
-	subTask.SetStatus(aicommon.AITaskState_Processing)
-
-	// Elaborate the sub agent's brief intent into a complete, self-contained goal and an optional result contract.
-	elaboratedGoal, resultContract, elabErr := elaborateSubReactAgentGoal(jobCtx, childInvoker, parentLoop, subTaskID, job)
 	if elabErr != nil {
-		log.Warnf("dispatch_sub_react_agents: elaborate goal for %s failed, falling back to brief intent: %v", subTaskID, elabErr)
+		log.Warnf("dispatch_sub_react_agents: elaborate goal for %s failed, falling back to brief intent: %v", subTask.GetId(), elabErr)
 		elaboratedGoal = job.Goal
 		resultContract = ""
 	}
 	subTask.SetUserInput(buildSubAgentUserInput(elaboratedGoal, resultContract))
+	subTask.SetStatus(aicommon.AITaskState_Processing)
 
-	subLoop, err := reactloops.CreateLoopByName(job.LoopName, childInvoker, buildSubReactLoopOptions()...)
+	subLoop, err := reactloops.CreateLoopByName(loopName, childInvoker, buildSubReactLoopOptions()...)
 	if err != nil {
 		result, _ := buildSubReactJobResult(job, startedAt, subTask, nil, fork, err)
 		return result, nil
@@ -215,9 +160,7 @@ Write the elaborated goal so it stands alone (the sub agent does not see this pr
 // elaborateSubReactAgentGoal expands a sub agent's brief intent into a complete,
 // self-contained goal and an optional result contract via a QualityPriority
 // LiteForge call. The "goal" field is streamed to the sub agent's own thread
-// (sub_react_agent_goal node) through the child invoker's forwarding emitter,
-// which stamps events with the sub-task id so the frontend aggregates them
-// under this sub agent. The returned goal/contract become the sub task's input.
+// (sub_react_agent_goal node) through the child invoker's forwarding emitter.
 func elaborateSubReactAgentGoal(
 	ctx context.Context,
 	childInvoker aicommon.AITaskInvokeRuntime,
@@ -282,94 +225,14 @@ func elaborateSubReactAgentGoal(
 	return goal, resultContract, nil
 }
 
-func buildForkedSubReactInvoker(
-	parentCfg *aicommon.Config,
-	fork *aicommon.TimelineFork,
-	jobCtx context.Context,
-	subTaskId string,
-) (aicommon.AITaskInvokeRuntime, error) {
-	baseOpts := aicommon.ConvertConfigToOptions(parentCfg)
-	baseOpts = append(baseOpts,
-		aicommon.WithTimeline(fork.Branch),
-		aicommon.WithContext(jobCtx),
-		aicommon.WithAICallbacks(parentCfg.GetRawAICallbacks()),
-		aicommon.WithEmitter(buildSubReactForwardingEmitter(parentCfg.GetEmitter(), subTaskId)),
-		aicommon.WithAgreeAuto(),
-		aicommon.WithSessionPromptState(parentCfg.SessionPromptState.ForkForSubAgent()),
-	)
-	// Sub agents must not inherit any top-level execution strategy. Even though
-	// ConvertConfigToOptions already omits EnableDispatchSubReactAgents /
-	// PreferDispatchSubReactAgents / EnableGoalMode, we disable plan and goal
-	// mode explicitly here so the sub-agent contract is self-documenting and does
-	// not silently regress if ConvertConfigToOptions propagation changes.
-	baseOpts = append(baseOpts, buildSubAgentStrategyOptions()...)
-
-	childInvoker, err := aicommon.AIRuntimeInvokerGetter(jobCtx, baseOpts...)
-	if err != nil {
-		return nil, utils.Wrap(err, "create forked sub react invoker failed")
-	}
-	return childInvoker, nil
+// BuildSubReactForwardingEmitter derives a sub-agent emitter from the parent config
+// emitter (not the parent task emitter) via PushEventProcesser.
+func BuildSubReactForwardingEmitter(parentEmitter *aicommon.Emitter, subTaskId string) *aicommon.Emitter {
+	return subagent.BuildForwardingEmitter(parentEmitter, subTaskId)
 }
 
-// buildSubReactForwardingEmitter derives a sub-agent emitter from the parent emitter
-// via PushEventProcesser (same pattern used by coordinator_invoker.go and taskif.go for
-// stamping task identity onto events). The derived emitter shares the parent's frontend
-// sink (its baseEmitter), so sub-agent status/action-log/answer events reach the frontend,
-// while a processor stamps every event's TaskId with the sub-task id — the marker the
-// frontend uses to aggregate sub-agent messages.
-//
-// It derives from the parent *config* emitter (empty processor stack) rather than the
-// parent *task* emitter on purpose: ForeachStack runs top-to-bottom, so deriving from the
-// task emitter would let the parent task's own TaskId stamp (pushed earlier, lower in the
-// stack) overwrite this sub-task stamp. Deriving from the config emitter leaves only this
-// stamp in the stack, so the sub-task id wins.
-//
-// A nil parentEmitter (e.g. some test configs) degrades to a no-op dummy emitter so
-// callers never panic.
-func buildSubReactForwardingEmitter(parentEmitter *aicommon.Emitter, subTaskId string) *aicommon.Emitter {
-	if parentEmitter == nil {
-		return aicommon.NewDummyEmitter()
-	}
-	return parentEmitter.PushEventProcesser(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
-		if event != nil && subTaskId != "" {
-			event.TaskId = subTaskId
-		}
-		return event
-	})
-}
-
-// buildSubAgentStrategyOptions returns the config options that strip every
-// top-level execution strategy from a forked sub agent. A sub agent must not:
-//   - open a plan (plan is a top-level orchestration concern),
-//   - be subject to the goal-mode minimum-iteration finish gate (it must be
-//     free to finish as soon as its single goal is done),
-//   - inherit the multi-agent dispatch preference (only the top-level loop
-//     dispatches; sub agents are blocked from dispatching anyway via the action
-//     filter + verifier depth check, but clearing the preference keeps the
-//     prompt honest).
-func buildSubAgentStrategyOptions() []aicommon.ConfigOption {
-	return []aicommon.ConfigOption{
-		aicommon.WithEnablePlanAndExec(false),
-		aicommon.WithEnableGoalMode(false),
-		aicommon.WithPreferDispatchSubReactAgents(false),
-	}
-}
-
-// buildSubReactLoopOptions returns the loop options applied to every forked
-// sub-react agent. Notably it no longer sets WithMaxIterations: sub agents
-// inherit the ReActLoop's own default iteration ceiling (soft-interrupt,
-// not a hard close) instead of a per-job cap the parent AI could
-// misestimate. There is also no per-job timeout — see runForkedSubReactAgentJob.
 func buildSubReactLoopOptions() []reactloops.ReActLoopOption {
-	return []reactloops.ReActLoopOption{
-		reactloops.WithVar(subAgentDepthLoopVar, 1),
-		reactloops.WithNoEndLoadingStatus(true),
-		reactloops.WithAllowPlanAndExec(false),
-		reactloops.WithAllowAIForge(false),
-		reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
-			return action.ActionType != schema.AI_REACT_LOOP_ACTION_DISPATCH_SUB_REACT_AGENTS
-		}),
-	}
+	return subagent.DefaultForkOptions()
 }
 
 func buildSubReactJobResult(
@@ -482,32 +345,20 @@ func summarizeForkDiff(fork *aicommon.TimelineFork) (preview string, bytes int) 
 }
 
 func buildSubReactSubTaskID(parentTask aicommon.AIStatefulTask, job subReactDispatchJob) string {
-	parentID := "sub-react"
-	if parentTask != nil && parentTask.GetId() != "" {
-		parentID = parentTask.GetId()
+	return subagent.BuildForkTaskID(parentTask, forkJobFromDispatch(job))
+}
+
+func forkJobFromDispatch(job subReactDispatchJob) subagent.ForkJob {
+	return subagent.ForkJob{
+		Order:      job.Order,
+		Identifier: job.Identifier,
+		Goal:       job.Goal,
+		TaskName:   job.TaskName,
 	}
-	segment := sanitizeSubReactIDSegment(job.Identifier)
-	if segment == "" {
-		segment = fmt.Sprintf("job-%d", job.Order)
-	}
-	return fmt.Sprintf("%s-sub-%s-%s", parentID, segment, utils.RandStringBytes(4))
 }
 
 func sanitizeSubReactIDSegment(s string) string {
-	s = strings.ToLower(strings.TrimSpace(s))
-	var b strings.Builder
-	for _, r := range s {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
-			b.WriteRune(r)
-		} else if r == ' ' || r == '/' {
-			b.WriteRune('-')
-		}
-	}
-	out := strings.Trim(b.String(), "-")
-	if len(out) > 24 {
-		out = out[:24]
-	}
-	return out
+	return subagent.SanitizeIDSegment(s)
 }
 
 func buildSubAgentUserInput(goal, resultContract string) string {
@@ -610,7 +461,7 @@ func getSubAgentDepth(loop *reactloops.ReActLoop) int {
 	if loop == nil {
 		return 0
 	}
-	return loop.GetInt(subAgentDepthLoopVar)
+	return loop.GetInt(subagent.DepthLoopVar)
 }
 
 func verifyDispatchSubReactAgents(loop *reactloops.ReActLoop, action *aicommon.Action) error {

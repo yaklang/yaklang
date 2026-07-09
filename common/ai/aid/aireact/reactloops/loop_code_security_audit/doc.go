@@ -4,7 +4,7 @@
 // Subpackages:
 //   - orchestrator: pipeline wiring across phases
 //   - phase2: category scan loops and guards
-//   - phase3: sequential finding verification
+//   - phase3: parallel per-finding verification via forked sub-agents
 //   - phase4: report generation
 //   - followup: post-audit Q&A mode
 //   - internal/model: shared state and domain types

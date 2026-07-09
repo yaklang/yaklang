@@ -113,6 +113,30 @@ func fileHasCategoryFinding(state *model.AuditState, scan *ScanState, categoryID
 	return hasFindingForAbsPath(state, categoryID, absPath, projectRoot)
 }
 
+func hasFindingForAbsPath(state *model.AuditState, categoryID, absPath, projectRoot string) bool {
+	if state == nil || absPath == "" {
+		return false
+	}
+	rel := absPath
+	if projectRoot != "" {
+		if r, err := filepath.Rel(projectRoot, absPath); err == nil && r != "" && !strings.HasPrefix(r, "..") {
+			rel = filepath.ToSlash(r)
+		}
+	}
+	rel = strings.TrimPrefix(rel, "./")
+	absNorm := filepath.ToSlash(absPath)
+	for _, f := range state.GetFindings() {
+		if f == nil || f.Category != categoryID {
+			continue
+		}
+		fFile := filepath.ToSlash(strings.TrimPrefix(f.File, "./"))
+		if fFile == rel || strings.HasSuffix(absNorm, "/"+fFile) || fFile == absNorm {
+			return true
+		}
+	}
+	return false
+}
+
 func validateMarkFileDoneDisposition(
 	scan *ScanState,
 	state *model.AuditState,

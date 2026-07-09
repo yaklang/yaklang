@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/util"
+	"sort"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -137,6 +138,34 @@ func Phase2ScanPlan(loop *reactloops.ReActLoop, categories []model.VulnCategory)
 	})
 }
 
+// Phase2AuditVulnerabilityTypes emits the finalized vulnerability types for the frontend sub-agent card.
+func Phase2AuditVulnerabilityTypes(loop *reactloops.ReActLoop, categories []model.VulnCategory) {
+	if loop == nil || len(categories) == 0 {
+		return
+	}
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("审计漏洞类型：%d 类 / Audit vulnerability types: %d\n", len(categories), len(categories)))
+	ids := make([]string, 0, len(categories))
+	names := make([]string, 0, len(categories))
+	for i, c := range categories {
+		if i < 12 {
+			b.WriteString(fmt.Sprintf("  %d. %s (%s)\n", i+1, c.Name, c.ID))
+		}
+		ids = append(ids, c.ID)
+		names = append(names, c.Name)
+	}
+	if len(categories) > 12 {
+		b.WriteString(fmt.Sprintf("  ... 另有 %d 类\n", len(categories)-12))
+	}
+	reactloops.EmitActionLog(loop, util.ScanNodeID, b.String())
+	reactloops.EmitStatus(loop, fmt.Sprintf("已确定 %d 类审计漏洞类型 / %d vulnerability types confirmed", len(categories), len(categories)))
+	Structured(loop, "code_audit_vulnerability_types", map[string]any{
+		"type_count": len(categories),
+		"type_ids":   ids,
+		"type_names": names,
+	})
+}
+
 func Phase2AllCategoriesDone(loop *reactloops.ReActLoop, categoryCount, findingCount int) {
 	if loop == nil {
 		return
@@ -250,6 +279,36 @@ func Phase3VerifyStart(loop *reactloops.ReActLoop, total int) {
 	reactloops.EmitActionLog(loop, util.VerifyNodeID,
 		fmt.Sprintf("开始验证 %d 个 findings / Verifying %d findings", total, total))
 	reactloops.EmitStatus(loop, fmt.Sprintf("漏洞验证中 (%d) / Verifying findings (%d)", total, total))
+}
+
+// Phase3VerifyScope emits the verification scope grouped by vulnerability type for the frontend.
+func Phase3VerifyScope(loop *reactloops.ReActLoop, findings []*model.Finding, byCategory map[string][]string) {
+	if loop == nil || len(findings) == 0 {
+		return
+	}
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("验证范围：%d 个 finding，%d 类漏洞 / Verify scope: %d findings, %d types\n",
+		len(findings), len(byCategory), len(findings), len(byCategory)))
+	categoryIDs := make([]string, 0, len(byCategory))
+	for cat := range byCategory {
+		categoryIDs = append(categoryIDs, cat)
+	}
+	sort.Strings(categoryIDs)
+	for i, cat := range categoryIDs {
+		if i >= 12 {
+			b.WriteString(fmt.Sprintf("  ... 另有 %d 类\n", len(categoryIDs)-12))
+			break
+		}
+		b.WriteString(fmt.Sprintf("  • %s: %s\n", cat, strings.Join(byCategory[cat], ", ")))
+	}
+	reactloops.EmitActionLog(loop, util.VerifyNodeID, b.String())
+	reactloops.EmitStatus(loop, fmt.Sprintf("已确定验证范围 (%d findings) / Verification scope confirmed", len(findings)))
+	Structured(loop, "code_audit_verify_scope", map[string]any{
+		"finding_count": len(findings),
+		"type_count":    len(byCategory),
+		"category_ids":  categoryIDs,
+		"by_category":   byCategory,
+	})
 }
 
 func Phase3ConcludeFinding(

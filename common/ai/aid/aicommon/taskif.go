@@ -511,6 +511,63 @@ func (s *AIStatefulTaskBase) GetEmitter() *Emitter {
 func (s *AIStatefulTaskBase) SetEmitter(emitter *Emitter) {
 	s.Emitter = emitter
 }
+
+// WithEmitterProcessor temporarily pushes processor onto this task's emitter under taskMutex.
+// Used so concurrent tool calls do not corrupt a shared emitter chain via push/pop races.
+func (s *AIStatefulTaskBase) WithEmitterProcessor(processor EventProcesser, fn func()) {
+	if s == nil {
+		if fn != nil {
+			fn()
+		}
+		return
+	}
+	if fn == nil {
+		return
+	}
+	s.taskMutex.Lock()
+	defer s.taskMutex.Unlock()
+	prev := s.Emitter
+	if processor != nil && prev != nil {
+		s.Emitter = prev.PushEventProcesser(processor)
+	}
+	defer func() {
+		s.Emitter = prev
+	}()
+	fn()
+}
+
+// EmitterTaskBase returns the concrete task base used for emitter push/pop scopes.
+func (s *AIStatefulTaskBase) EmitterTaskBase() *AIStatefulTaskBase {
+	return s
+}
+
+// WithEmitterProcessorOnTask runs fn with a temporary processor on the task emitter.
+// Uses mutex serialization on AIStatefulTaskBase (including thin wrappers that expose EmitterTaskBase).
+func WithEmitterProcessorOnTask(task AIStatefulTask, processor EventProcesser, fn func()) {
+	if fn == nil {
+		return
+	}
+	if task == nil {
+		fn()
+		return
+	}
+	type emitterTaskBase interface {
+		EmitterTaskBase() *AIStatefulTaskBase
+	}
+	if holder, ok := task.(emitterTaskBase); ok {
+		if base := holder.EmitterTaskBase(); base != nil {
+			base.WithEmitterProcessor(processor, fn)
+			return
+		}
+	}
+	emitter := task.GetEmitter()
+	if processor != nil && emitter != nil {
+		task.SetEmitter(emitter.PushEventProcesser(processor))
+		defer task.SetEmitter(emitter.PopEventProcesser())
+	}
+	fn()
+}
+
 func (s *AIStatefulTaskBase) GetReActLoop() ReActLoopIF {
 	return s.reActLoop
 }
