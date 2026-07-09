@@ -92,6 +92,8 @@ type AIStatefulTask interface {
 	SetDB(db *gorm.DB)
 	GetRisks() []*schema.Risk
 	GetUUID() string
+	GetUserInputUUID() string
+	SetUserInputUUID(uuid string)
 
 	GetFocusMode() string
 	SetFocusMode(mode string)
@@ -123,6 +125,7 @@ type AIStatefulTaskBase struct {
 	db                *gorm.DB
 
 	uuid          string
+	userInputUUID string
 	attachedDatas []*AttachedResource
 
 	focusMode         string
@@ -209,6 +212,20 @@ func (s *AIStatefulTaskBase) SetSubAgent(isSubAgent bool) {
 
 func (s *AIStatefulTaskBase) GetUUID() string {
 	return s.uuid
+}
+
+func (s *AIStatefulTaskBase) GetUserInputUUID() string {
+	if s == nil {
+		return ""
+	}
+	return s.userInputUUID
+}
+
+func (s *AIStatefulTaskBase) SetUserInputUUID(uuid string) {
+	if s == nil {
+		return
+	}
+	s.userInputUUID = uuid
 }
 
 func (s *AIStatefulTaskBase) GetDB() *gorm.DB {
