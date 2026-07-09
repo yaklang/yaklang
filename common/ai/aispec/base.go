@@ -936,74 +936,140 @@ func chatBaseResponses(url string, model string, msg string, ctx *ChatBaseContex
 //
 // 字符串 content 渲染成 [{type:"input_text", text:...}]；[]*ChatContent
 // 类型按各自 type 字段分别映射为 input_text / input_image / input_video。
+// assistant.tool_calls → function_call；tool 角色 → function_call_output。
 //
 // 关键词: convertChatDetailsToResponsesInput, ChatDetail 转 responses input
 func convertChatDetailsToResponsesInput(msgs []ChatDetail) []map[string]any {
 	out := make([]map[string]any, 0, len(msgs))
 	for _, m := range msgs {
-		role := m.Role
+		role := strings.ToLower(strings.TrimSpace(m.Role))
 		if role == "" {
 			role = "user"
 		}
-		var content []map[string]any
-		switch v := m.Content.(type) {
-		case string:
-			content = append(content, map[string]any{
-				"type": "input_text",
-				"text": v,
+
+		// tool 结果 → Responses function_call_output
+		if role == "tool" || m.ToolCallID != "" {
+			var output string
+			switch v := m.Content.(type) {
+			case string:
+				output = v
+			case nil:
+				output = ""
+			default:
+				b, _ := json.Marshal(v)
+				output = string(b)
+			}
+			out = append(out, map[string]any{
+				"type":    "function_call_output",
+				"call_id": m.ToolCallID,
+				"output":  output,
 			})
-		case []*ChatContent:
-			for _, c := range v {
-				if c == nil {
+			continue
+		}
+
+		// assistant tool_calls → Responses function_call（可附带文本 message）
+		if len(m.ToolCalls) > 0 {
+			if hasNonEmptyChatContent(m.Content) {
+				out = append(out, buildResponsesMessageItem(role, m))
+			}
+			for _, tc := range m.ToolCalls {
+				if tc == nil {
 					continue
 				}
-				switch c.Type {
-				case "text":
+				out = append(out, map[string]any{
+					"type":      "function_call",
+					"call_id":   tc.ID,
+					"name":      tc.Function.Name,
+					"arguments": tc.Function.Arguments,
+				})
+			}
+			continue
+		}
+
+		out = append(out, buildResponsesMessageItem(role, m))
+	}
+	return out
+}
+
+func hasNonEmptyChatContent(content any) bool {
+	switch v := content.(type) {
+	case nil:
+		return false
+	case string:
+		return strings.TrimSpace(v) != ""
+	case []*ChatContent:
+		for _, c := range v {
+			if c == nil {
+				continue
+			}
+			if strings.TrimSpace(c.Text) != "" || c.ImageUrl != nil || c.VideoUrl != nil {
+				return true
+			}
+		}
+		return false
+	default:
+		return strings.TrimSpace(utils.InterfaceToString(v)) != ""
+	}
+}
+
+func buildResponsesMessageItem(role string, m ChatDetail) map[string]any {
+	var content []map[string]any
+	switch v := m.Content.(type) {
+	case string:
+		content = append(content, map[string]any{
+			"type": "input_text",
+			"text": v,
+		})
+	case []*ChatContent:
+		for _, c := range v {
+			if c == nil {
+				continue
+			}
+			switch c.Type {
+			case "text":
+				content = append(content, map[string]any{
+					"type": "input_text",
+					"text": c.Text,
+				})
+			case "image_url":
+				content = append(content, map[string]any{
+					"type":      "input_image",
+					"image_url": c.ImageUrl,
+				})
+			case "video_url":
+				content = append(content, map[string]any{
+					"type":      "input_video",
+					"video_url": c.VideoUrl,
+				})
+			default:
+				if c.Text != "" {
 					content = append(content, map[string]any{
 						"type": "input_text",
 						"text": c.Text,
 					})
-				case "image_url":
-					content = append(content, map[string]any{
-						"type":      "input_image",
-						"image_url": c.ImageUrl,
-					})
-				case "video_url":
-					content = append(content, map[string]any{
-						"type":      "input_video",
-						"video_url": c.VideoUrl,
-					})
-				default:
-					if c.Text != "" {
-						content = append(content, map[string]any{
-							"type": "input_text",
-							"text": c.Text,
-						})
-					}
 				}
 			}
-		default:
-			content = append(content, map[string]any{
-				"type": "input_text",
-				"text": utils.InterfaceToString(m.Content),
-			})
 		}
-		if len(content) == 0 {
-			content = append(content, map[string]any{
-				"type": "input_text",
-				"text": "",
-			})
-		}
-		item := map[string]any{
-			"role":    role,
-			"content": content,
-		}
-		if rc := strings.TrimSpace(m.ReasoningContent); rc != "" {
-			item["reasoning_content"] = rc
-		}
-		out = append(out, item)
+	default:
+		content = append(content, map[string]any{
+			"type": "input_text",
+			"text": utils.InterfaceToString(m.Content),
+		})
 	}
-	return out
+	if len(content) == 0 {
+		content = append(content, map[string]any{
+			"type": "input_text",
+			"text": "",
+		})
+	}
+	item := map[string]any{
+		"role":    role,
+		"content": content,
+	}
+	if rc := strings.TrimSpace(m.ReasoningContent); rc != "" {
+		item["reasoning_content"] = rc
+	}
+	return item
 }
 
 func buildResponsesInput(msg string, images []*ImageDescription) []map[string]any {
