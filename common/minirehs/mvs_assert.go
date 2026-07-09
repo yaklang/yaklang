@@ -549,8 +549,13 @@ func buildCondBits(ps []posGuard, npos, nword int) (uncond []uint64, cond []guar
 
 // computeBoundaries 预计算 data 每个字节边界位置的零宽条件集 (与具体 pattern 无关, 仅取决于输入):
 // bound[j] = 第 j 字节处 (前一 rune 结尾 / 后一 rune 开头之间) 的边界条件. 仅在 rune 起始偏移与
-// 末尾 n 处写入 (existsInAssertShared 只读这些位置). 复用入参 buf 底层数组。
+// computeBoundaries 预算每个 rune 起始处的边界条件集 (bound[i]) 与文本末尾 (bound[n]),
+// 供多条断言 NFA 共享 (existsInAssertShared 只读这些位置). 复用入参 buf 底层数组。
 // 多条断言 NFA 共享同一份 bound, 省去 boundaryConds / isWordRune 的逐 pattern 重复计算。
+//
+// ASCII 快路径: 真实流量绝大多数为 ASCII, 对 c<0x80 的字节 rune==rune(c)、size==1 (与
+// utf8.DecodeRune 逐位一致), 直接用字节判定 isWordRune/\n, 跳过 DecodeRune 的分支与 rune 宽化开销。
+// 遇到非 ASCII 字节才回退到逐 rune 解码路径。
 func computeBoundaries(data []byte, buf []uint8) []uint8 {
 	n := len(data)
 	if cap(buf) < n+1 {
@@ -558,16 +563,82 @@ func computeBoundaries(data []byte, buf []uint8) []uint8 {
 	} else {
 		buf = buf[:n+1]
 	}
-	prev := rune(-1)
+	// wordPrev/prevIsNewline 追踪"前一 rune 是否单词字符 / 是否 \n", prevIsTextStart 追踪是否文本始.
+	// 用字节级状态避免 rune 比较 (ASCII 快路径内零 rune 操作).
+	prevWord := false       // isWordRune(prev); prev==-1 时 isWordRune(-1)=false
+	prevIsNewline := false  // prev == '\n'
+	prevIsStart := true     // prev < 0 (文本始)
 	i := 0
 	for i < n {
+		c := data[i]
+		var b uint8
+		// before 侧边界.
+		if prevIsStart {
+			b |= condBeginText | condBeginLine
+		} else if prevIsNewline {
+			b |= condBeginLine
+		}
+		if c < utf8.RuneSelf {
+			// ASCII 快路径: rune == rune(c), size == 1.
+			curWord := isWordByte(c)
+			curIsNewline := c == '\n'
+			// after 侧边界 (after = rune(c), 非 -1).
+			if curIsNewline {
+				b |= condEndLine
+			}
+			if prevWord != curWord {
+				b |= condWordBoundary
+			} else {
+				b |= condNoWordBoundary
+			}
+			buf[i] = b
+			prevWord = curWord
+			prevIsNewline = curIsNewline
+			prevIsStart = false
+			i++
+			continue
+		}
+		// 非 ASCII: 回退逐 rune 解码.
 		r, size := utf8.DecodeRune(data[i:])
-		buf[i] = boundaryConds(prev, r)
-		prev = r
+		curWord := isWordRune(r)
+		curIsNewline := r == '\n'
+		if curIsNewline {
+			b |= condEndLine
+		}
+		if prevWord != curWord {
+			b |= condWordBoundary
+		} else {
+			b |= condNoWordBoundary
+		}
+		buf[i] = b
+		prevWord = curWord
+		prevIsNewline = curIsNewline
+		prevIsStart = false
 		i += size
 	}
-	buf[n] = boundaryConds(prev, -1)
+	// 末尾: after = -1 (文本末).
+	var b uint8
+	if prevIsStart {
+		b |= condBeginText | condBeginLine
+	} else if prevIsNewline {
+		b |= condBeginLine
+	}
+	b |= condEndText | condEndLine
+	if prevWord { // isWordRune(prev) != isWordRune(-1)=false
+		b |= condWordBoundary
+	} else {
+		b |= condNoWordBoundary
+	}
+	buf[n] = b
 	return buf
+}
+
+// isWordByte 是 isWordRune 的 ASCII 字节版 (c < 0x80 时与 isWordRune(rune(c)) 同真伪).
+func isWordByte(c byte) bool {
+	return c == '_' ||
+		'0' <= c && c <= '9' ||
+		'a' <= c && c <= 'z' ||
+		'A' <= c && c <= 'Z'
 }
 
 // existsInAssert 是带边界条件门控的位并行存在性判定 (与 existsIn 同语义, 额外处理零宽断言).
