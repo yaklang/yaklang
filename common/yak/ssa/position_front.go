@@ -94,7 +94,12 @@ func (b *FunctionBuilder) GetCurrentRange(fallback CanStartStopToken) *memedit.R
 		return b.CurrentRange
 	}
 	if fallback != nil {
-		log.Warn("use fallback for GetCurrentRange, unhealthy operation")
+		// CurrentRange is nil (e.g. during Go import/init handling before the
+		// function builder sets it), but the fallback token provides a valid
+		// range via the editor. This is correct — demoted from Warn to Debug
+		// to avoid thousands of warnings on Go projects (hugo 5818, fastschema
+		// 2289, etc.) that obscure real issues.
+		log.Debug("use fallback for GetCurrentRange, unhealthy operation")
 		return GetRange(b.GetEditor(), fallback)
 	}
 	log.Error("fallback for GetCurrentRange is nil..., use (1:1, 1000,1) fallback, bad operation")
