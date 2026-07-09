@@ -34,12 +34,6 @@ func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 			}
 		}
 	}
-	// 现已经被 knowledge enhance loop 替代
-	// for _, resource := range event.AttachedResourceInfo {
-	// 	registrationKey := resource.GetType() + "_" + resource.GetKey() + resource.GetValue()
-	// 	hashKey := codec.Md5(registrationKey)
-	// 	r.config.ContextProviderManager.RegisterTracedContent(hashKey, aicommon.NewContextProvider(resource.GetType(), resource.GetKey(), resource.GetValue(), userInput))
-	// }
 
 	if r.config.DebugEvent {
 		log.Infof("Using free input: %s", userInput)
@@ -214,6 +208,10 @@ func (r *ReAct) buildReTaskFromEvent(event *ypb.AIInputEvent) aicommon.AIStatefu
 	var attachedDatas []*aicommon.AttachedResource
 	if len(event.AttachedResourceInfo) > 0 {
 		for _, resource := range event.AttachedResourceInfo {
+			if resource.GetType() == aicommon.USER_FREE_INPUT_UUID {
+				task.SetUserInputUUID(resource.GetValue())
+				continue
+			}
 			attachedDatas = append(attachedDatas, aicommon.NewAttachedResource(resource.GetType(), resource.GetKey(), resource.GetValue()))
 		}
 	}
