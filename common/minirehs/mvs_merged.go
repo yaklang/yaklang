@@ -44,6 +44,14 @@ type mvsMergedNFA struct {
 	reach    [][]uint64
 
 	hasAnchored bool
+
+	// R1-Anchor: span-injected merged NFA 字段. 当 isAnchoredMerge=true 时, firstUnanchored
+	// 为零 (不每步注入), 改由 scanExistAnchored 按 per-member span 注入 firstPerMember[mi].
+	isAnchoredMerge bool       // 是否为 R1 锚定式合并 (span-gated first 注入)
+	nmem            int        // 成员数 (R1)
+	offsets         []int      // [nmem] 各成员的全局位置偏移 (R1, 诊断用)
+	firstPerMember  [][]uint64 // [nmem][nword] 各成员的 first (已按 offset 平移) (R1)
+	memIdx          []int      // [nmem] -> compiledPattern idx (R1, == mergeMember.idx)
 }
 
 // posRanges 从已压缩的字母表 (cuts/reach) 反推位置 p 接受的 rune 区间集合, 供合并重建全局字母表.
@@ -117,6 +125,77 @@ func buildMergedNFA(members []mergeMember) *mvsMergedNFA {
 			m.hasAnchored = true
 		}
 		forEachSetBit(nf.first, func(q int) { bsSet(dst, off+q) })
+		// accept 平移 + 位置->成员映射.
+		forEachSetBit(nf.lastAny, func(q int) {
+			bsSet(m.lastAny, off+q)
+			m.posPat[off+q] = int32(mem.idx)
+		})
+		forEachSetBit(nf.lastEnd, func(q int) {
+			bsSet(m.lastEnd, off+q)
+			m.posPat[off+q] = int32(mem.idx)
+		})
+	}
+
+	m.buildAlphabet(posClass)
+	return m
+}
+
+// buildMergedAnchoredNFA 构造 R1-Anchor 锚定式合并自动机: 与 buildMergedNFA 同构, 但
+// unanchored 成员的 first 不 OR 进 firstUnanchored (保持零), 而是存入 firstPerMember[mi]
+// (已按 offset 平移). scanExistAnchored 在扫描时按 per-member span 注入对应 first.
+// anchoredStart 成员不应进入 R1 合并 (调用方须排除). 成员数为 0 返回 nil.
+func buildMergedAnchoredNFA(members []mergeMember) *mvsMergedNFA {
+	if len(members) == 0 {
+		return nil
+	}
+	offsets := make([]int, len(members))
+	total := 0
+	for mi, mem := range members {
+		offsets[mi] = total
+		total += mem.nfa.npos
+	}
+	npos := total
+	nword := (npos + 63) / 64
+
+	m := &mvsMergedNFA{
+		npos:            npos,
+		nword:           nword,
+		firstUnanchored: bsNew(nword), // R1: 保持零 (不每步注入)
+		firstAnchored:   bsNew(nword), // R1: 不应有 anchored 成员, 保持零
+		follow:          make([][]uint64, npos),
+		lastAny:         bsNew(nword),
+		lastEnd:         bsNew(nword),
+		posPat:          make([]int32, npos),
+		isAnchoredMerge: true,
+		nmem:            len(members),
+		offsets:         offsets,
+		firstPerMember:  make([][]uint64, len(members)),
+		memIdx:          make([]int, len(members)),
+	}
+	for p := range m.posPat {
+		m.posPat[p] = -1
+	}
+	for p := range m.follow {
+		m.follow[p] = bsNew(nword)
+	}
+
+	posClass := make([][]runeRange, npos)
+
+	for mi, mem := range members {
+		off := offsets[mi]
+		nf := mem.nfa
+		m.memIdx[mi] = mem.idx
+		// R1: per-member first (平移), 不进 firstUnanchored.
+		fm := bsNew(nword)
+		forEachSetBit(nf.first, func(q int) { bsSet(fm, off+q) })
+		m.firstPerMember[mi] = fm
+		// follow 平移.
+		for p := 0; p < nf.npos; p++ {
+			posClass[off+p] = nf.posRanges(p)
+			forEachSetBit(nf.follow[p], func(q int) {
+				bsSet(m.follow[off+p], off+q)
+			})
+		}
 		// accept 平移 + 位置->成员映射.
 		forEachSetBit(nf.lastAny, func(q int) {
 			bsSet(m.lastAny, off+q)
@@ -238,7 +317,153 @@ func (m *mvsMergedNFA) scanExist(data []byte, seen []bool, out []int) []int {
 	return out
 }
 
-// forEachSetBit 对 bitset 中每个置位下标调用 fn.
+// scanExistAnchored 是 R1-Anchor 的 span-injected 单趟扫描: 每个 rune 处, 仅注入
+// 当前 runeStart 落入其 span 的成员的 firstPerMember[mi], 其余成员不注入 (提前消亡).
+// spansPerMember[mi] 是成员 mi 的已排序合并注入区间 (可为空 = 本报文无字面量命中, 不注入).
+// 命中成员 idx (去重, 用 seen) 追加到 out. 与各成员单独 existsInAnchored 命中集合等价 (差分护栏).
+//
+// 正确性: 任一匹配 M 必含某必需字面量 (命中于 h.end), M.start >= h.end - head_L 落入该成员
+// 的某 span => merged scan 必能从该起点注入并经 follow 传播到 accept => 无假阴. span 外不注入
+// => 只会找到真实起点的匹配 => 无假阳. 不同成员 follow 无跨边, 彼此独立.
+func (m *mvsMergedNFA) scanExistAnchored(data []byte, spansPerMember [][]anchorSpan, seen []bool, out []int) []int {
+	nword := m.nword
+	nmem := m.nmem
+	prev := make([]uint64, nword)
+	cand := make([]uint64, nword)
+	n := len(data)
+
+	// per-member span 游标: si[mi] 单调推进, curLo/curHi 缓存当前 span (避免每 rune 数组索引).
+	si := make([]int, nmem)
+	curLo := make([]int, nmem)
+	curHi := make([]int, nmem)
+	hasSpan := make([]bool, nmem)
+	for mi := 0; mi < nmem; mi++ {
+		spans := spansPerMember[mi]
+		if len(spans) > 0 {
+			hasSpan[mi] = true
+			curLo[mi] = int(spans[0].lo)
+			curHi[mi] = int(spans[0].hi)
+		}
+	}
+	// lastHi[mi] = 最后一个 span 的 hi, 用于提前消亡判定.
+	lastHi := make([]int, nmem)
+	for mi := 0; mi < nmem; mi++ {
+		spans := spansPerMember[mi]
+		if len(spans) > 0 {
+			lastHi[mi] = int(spans[len(spans)-1].hi)
+		}
+	}
+
+	// 起始位置: 各成员 span 的最小 lo, rune 对齐.
+	minLo := n
+	for mi := 0; mi < nmem; mi++ {
+		if hasSpan[mi] && curLo[mi] < minLo {
+			minLo = curLo[mi]
+		}
+	}
+	if minLo < 0 {
+		minLo = 0
+	}
+
+	i := alignRuneStart(data, minLo)
+	if i > n {
+		i = n
+	}
+	for i < n {
+		runeStart := i
+		c := data[i]
+		var sym, ni int
+		if c < utf8.RuneSelf {
+			sym = int(m.asciiSym[c])
+			ni = i + 1
+		} else {
+			r, size := utf8.DecodeRune(data[i:])
+			sym = m.symbolOf(r)
+			ni = i + size
+		}
+
+		// cand 清零 + per-member span-gated first 注入.
+		for w := 0; w < nword; w++ {
+			cand[w] = 0
+		}
+		for mi := 0; mi < nmem; mi++ {
+			if !hasSpan[mi] {
+				continue
+			}
+			// 推进游标: 跳过已过去的 span.
+			for runeStart >= curHi[mi] {
+				si[mi]++
+				if si[mi] >= len(spansPerMember[mi]) {
+					hasSpan[mi] = false // 该成员 span 耗尽
+					break
+				}
+				spans := spansPerMember[mi]
+				curLo[mi] = int(spans[si[mi]].lo)
+				curHi[mi] = int(spans[si[mi]].hi)
+			}
+			if hasSpan[mi] && runeStart >= curLo[mi] {
+				fm := m.firstPerMember[mi]
+				for w := 0; w < nword; w++ {
+					cand[w] |= fm[w]
+				}
+			}
+		}
+
+		// follow 展开 (与 scanExist 同).
+		for w := 0; w < nword; w++ {
+			pw := prev[w]
+			for pw != 0 {
+				p := w*64 + bits.TrailingZeros64(pw)
+				pw &= pw - 1
+				fp := m.follow[p]
+				for k := 0; k < nword; k++ {
+					cand[k] |= fp[k]
+				}
+			}
+		}
+
+		rc := m.reach[sym]
+		atEnd := ni == n
+		anyActive := false
+		for w := 0; w < nword; w++ {
+			v := cand[w] & rc[w]
+			prev[w] = v
+			if v == 0 {
+				continue
+			}
+			anyActive = true
+			acc := v & m.lastAny[w]
+			if atEnd {
+				acc |= v & m.lastEnd[w]
+			}
+			for acc != 0 {
+				p := w*64 + bits.TrailingZeros64(acc)
+				acc &= acc - 1
+				idx := int(m.posPat[p])
+				if idx >= 0 && !seen[idx] {
+					seen[idx] = true
+					out = append(out, idx)
+				}
+			}
+		}
+
+		// 提前消亡: 活跃集空且所有成员 span 耗尽 => 不可能再命中.
+		if !anyActive {
+			allDone := true
+			for mi := 0; mi < nmem; mi++ {
+				if hasSpan[mi] && lastHi[mi] > runeStart {
+					allDone = false
+					break
+				}
+			}
+			if allDone {
+				break
+			}
+		}
+		i = ni
+	}
+	return out
+}
 func forEachSetBit(bs []uint64, fn func(i int)) {
 	for w := 0; w < len(bs); w++ {
 		x := bs[w]

@@ -2,6 +2,7 @@ package minirehs
 
 import (
 	"regexp/syntax"
+	"sort"
 	"strings"
 )
 
@@ -218,6 +219,47 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 	}
 	db.merged = buildMergedNFA(mergeMembers)
 	db.mergedCount = len(mergeMembers)
+
+	// R1-Anchor: 收集 anchorable lean NFA (非断言、非 ^锚定、anchorable[idx]), 按 npos 升序取子集
+	// 使合并 npos <= 1024 (nword <= 16), 排除 npos 过大的成员. 见先导诊断 (TestDiagAnchorableMergeNpos).
+	{
+		var anchorCands []mergeMember
+		for _, cp := range patterns {
+			nfa := db.nfas[cp.idx]
+			if nfa == nil || nfa.hasAssert || nfa.anchoredStart {
+				continue
+			}
+			if !db.anchorable[cp.idx] {
+				continue
+			}
+			anchorCands = append(anchorCands, mergeMember{idx: cp.idx, nfa: nfa})
+		}
+		// 按 npos 升序排序, 取总 npos <= 1024 的子集 (贪心: 小的优先, 最大化成员数).
+		sort.Slice(anchorCands, func(i, j int) bool {
+			return anchorCands[i].nfa.npos < anchorCands[j].nfa.npos
+		})
+		var anchorMembers []mergeMember
+		cumNpos := 0
+		for _, m := range anchorCands {
+			if cumNpos+m.nfa.npos > 1024 {
+				break
+			}
+			cumNpos += m.nfa.npos
+			anchorMembers = append(anchorMembers, m)
+		}
+		if len(anchorMembers) >= 2 { // 至少 2 条才值得合并
+			db.mergedAnchored = buildMergedAnchoredNFA(anchorMembers)
+			db.anchorMemIdx = make([]int, db.n)
+			for i := range db.anchorMemIdx {
+				db.anchorMemIdx[i] = -1
+			}
+			for mi, m := range anchorMembers {
+				db.anchorMemIdx[m.idx] = mi
+				db.anchorMembers = append(db.anchorMembers, m.idx)
+			}
+		}
+	}
+
 	db.nfaCount = nfaCount
 
 	// P4 (M2): minirehs_mvs 构建下, 把 per-pattern NFA + 合并 always-on 序列化为平台无关
@@ -364,6 +406,13 @@ type mvsDB struct {
 	mergedCount    int           // 合并成员数
 	assertAlwaysOn []int         // 无字面量的断言 NFA (hasAssert): existsInAssert 门控 + verifier 定位
 	otherAlwaysOn  []int         // 无字面量且不可编入 NFA (regexp2/RE2 兜底): 逐条验证
+
+	// R1-Anchor: anchorable literal-gated lean NFA 合并为 span-injected 单趟自动机.
+	// mergedAnchored 为该合并自动机 (nil=无 R1 合并). anchorMemIdx[patIdx]=成员下标 (-1=非 R1 成员).
+	// anchorMembers 是参与 R1 的 pattern idx 列表 (供 scan 构建 per-member CSR spans).
+	mergedAnchored *mvsMergedNFA
+	anchorMemIdx   []int // [n] pattern idx -> R1 成员下标, -1 表示非成员
+	anchorMembers  []int // R1 成员的 pattern idx 列表
 
 	reportLoc bool // 命中是否上报精确偏移与内容 (见 WithReportLocation)
 
@@ -535,26 +584,55 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 		}
 		// 锚定式批处理: 对本报文每条触发的锚定式 pattern, 合并其注入区间后做一次锚定式单趟存在性.
 		sc.anchorBatch = anchorBatch
-		for _, idx32 := range anchorBatch {
-			idx := int(idx32)
-			sc.fullDone[idx] = true
-			spans := mergeAnchorSpans(sc.anchorRanges[idx])
-			nfa := d.nfas[idx]
-			var hit bool
-			// nword==1 (绝大多数真实 pattern) 走标量零分配快路径, 否则走多字通用版.
-			switch {
-			case nfa.hasAssert && nfa.single:
-				hit = nfa.existsInAssertAnchored1(data, d.sharedBound(data, sc), spans)
-			case nfa.hasAssert:
-				hit = nfa.existsInAssertAnchored(data, d.sharedBound(data, sc), spans, sc.anchorPrev, sc.anchorCand)
-			case nfa.single:
-				hit = nfa.existsInAnchored1(data, spans)
-			default:
-				hit = nfa.existsInAnchored(data, spans, sc.anchorPrev, sc.anchorCand, sc.anchorActive)
+		// R1-Anchor: 有 C 内核 + mergedAnchored 时, 把 R1 成员一次 span-injected merged scan;
+		// 否则 (无 C 内核 / 无 mergedAnchored) 逐条走 Go existsInAnchored*. Go 路径的 merged scan
+		// 每报文 O(n×nmem) + 多次 make, 比逐条 O(Σ window) 慢, 故仅 C 内核档启用 (SIMD 一次 nword 字).
+		if d.mergedAnchored != nil && d.kernel != nil && d.kernel.db != nil {
+			// TODO Step 4: C 内核 mergedScanAnchored 接入后替换下方 Go 占位.
+			// 当前 C 入口未实现, 退回逐条 Go (与回退等价, 保证正确性).
+			for _, idx32 := range anchorBatch {
+				idx := int(idx32)
+				sc.fullDone[idx] = true
+				spans := mergeAnchorSpans(sc.anchorRanges[idx])
+				nfa := d.nfas[idx]
+				var hit bool
+				switch {
+				case nfa.hasAssert && nfa.single:
+					hit = nfa.existsInAssertAnchored1(data, d.sharedBound(data, sc), spans)
+				case nfa.hasAssert:
+					hit = nfa.existsInAssertAnchored(data, d.sharedBound(data, sc), spans, sc.anchorPrev, sc.anchorCand)
+				case nfa.single:
+					hit = nfa.existsInAnchored1(data, spans)
+				default:
+					hit = nfa.existsInAnchored(data, spans, sc.anchorPrev, sc.anchorCand, sc.anchorActive)
+				}
+				if hit {
+					if stop := d.finalizeHit(idx, data, sc, handler); stop {
+						return true, nil
+					}
+				}
 			}
-			if hit {
-				if stop := d.finalizeHit(idx, data, sc, handler); stop {
-					return true, nil
+		} else {
+			for _, idx32 := range anchorBatch {
+				idx := int(idx32)
+				sc.fullDone[idx] = true
+				spans := mergeAnchorSpans(sc.anchorRanges[idx])
+				nfa := d.nfas[idx]
+				var hit bool
+				switch {
+				case nfa.hasAssert && nfa.single:
+					hit = nfa.existsInAssertAnchored1(data, d.sharedBound(data, sc), spans)
+				case nfa.hasAssert:
+					hit = nfa.existsInAssertAnchored(data, d.sharedBound(data, sc), spans, sc.anchorPrev, sc.anchorCand)
+				case nfa.single:
+					hit = nfa.existsInAnchored1(data, spans)
+				default:
+					hit = nfa.existsInAnchored(data, spans, sc.anchorPrev, sc.anchorCand, sc.anchorActive)
+				}
+				if hit {
+					if stop := d.finalizeHit(idx, data, sc, handler); stop {
+						return true, nil
+					}
 				}
 			}
 		}
