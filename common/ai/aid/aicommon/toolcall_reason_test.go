@@ -25,7 +25,9 @@ func TestBuildToolCallReasonPrompt_ContainsContext(t *testing.T) {
 	require.Contains(t, prompt, "User input: scan 10.0.0.1 for open ports")
 	require.Contains(t, prompt, "Params:")
 	require.Contains(t, prompt, "target")
-	require.Contains(t, prompt, "Output only the reason sentence in the `reason` field.")
+	require.Contains(t, prompt, "Output only the reason in the `reason` field.")
+	require.Contains(t, prompt, "Match the language of the user input")
+	require.Contains(t, prompt, "~20 chars/words")
 }
 
 func TestBuildToolCallReasonPrompt_NilTaskAndEmptyParams(t *testing.T) {
