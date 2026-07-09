@@ -142,10 +142,18 @@ func (r *Recorder) trace(lab Lab, fn func() error, nestDepth bool) (err error) {
 	}
 
 	start := time.Now()
-	gid := currentGoroutineID()
+	// currentGoroutineID() calls runtime.Stack() which is extremely expensive
+	// (captures the full goroutine stack trace). It is ONLY consumed by
+	// pushTraceSpan, which short-circuits unless nested trace logging is
+	// enabled. Computing it unconditionally on every trace() call made heavy
+	// dataflow rules spend 82-88% of CPU in runtime.Stack on large projects
+	// with diagnostics enabled. Gate it behind the live-nesting check.
+	var gid int64
 	var depth int
 	var asyncWorker bool
-	if r.traceLiveEnabled() {
+	live := r.traceLiveEnabled()
+	if live {
+		gid = currentGoroutineID()
 		depth, asyncWorker = r.traceLogDepthInfo()
 		if nestDepth {
 			r.pushRunDepth()
@@ -243,6 +251,13 @@ func (r *Recorder) pushTraceSpan(depth int, lab Lab, gid int64, asyncWorker bool
 
 func (r *Recorder) popTraceSpan() (traceSpanFrame, bool) {
 	if r == nil {
+		return traceSpanFrame{}, false
+	}
+	// Short-circuit when nested logging is disabled: pushTraceSpan also
+	// short-circuits, so nothing was pushed and there is nothing to pop.
+	// This avoids the expensive currentGoroutineID() / runtime.Stack() call
+	// on every trace() completion when nesting is off.
+	if !r.traceLiveEnabled() {
 		return traceSpanFrame{}, false
 	}
 	r.runMu.Lock()
@@ -362,9 +377,14 @@ func (r *Recorder) popRunDepth() {
 
 func (r *Recorder) appendStep(lab Lab, start, end time.Time, err error) Step {
 	step := stepFromLab(lab, start, end, err)
-	r.stepsMu.Lock()
-	r.steps = append(r.steps, step)
-	r.stepsMu.Unlock()
+	// Only retain Steps in r.steps when explicitly enabled (tests/inspection).
+	// Production code never reads Steps(); the unconditional append was the
+	// #1 heap allocator on heavy dataflow rules (46-57% of in-use heap).
+	if r.storeSteps {
+		r.stepsMu.Lock()
+		r.steps = append(r.steps, step)
+		r.stepsMu.Unlock()
+	}
 	return step
 }
 
@@ -391,6 +411,12 @@ func (r *Recorder) finishTrace(lab Lab, start time.Time, depth int, err error) {
 
 func (r *Recorder) emitTraceBegin(depth int, lab Lab) {
 	if r == nil {
+		return
+	}
+	// Short-circuit when nested logging is disabled: no trace output is
+	// produced, and this avoids currentSpanLineMeta -> currentGoroutineID
+	// -> runtime.Stack() on every trace() entry.
+	if !r.traceLiveEnabled() {
 		return
 	}
 	if r.traceBeginDeferred(depth, lab) {
