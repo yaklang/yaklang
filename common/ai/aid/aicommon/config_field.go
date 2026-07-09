@@ -173,9 +173,10 @@ func (c *Config) GetExecutionPolicy() string {
 	lines := make([]string, 0, 4)
 	if c.GetPreferDispatchSubReactAgents() {
 		lines = append(lines,
-			"- Multi-agent mode is ENABLED (preference, not hard-enforced): for any task with 2+ mostly-independent workstreams, your DEFAULT first move is dispatch_sub_react_agents, not serial tool calls. Only fall back to serial execution when the task is genuinely sequential or a single sub-goal.",
-			"- Dispatch is for parallelizing independent workstreams, NOT for offloading one sequential task or dumping every subtask at once. Only batch subtasks you have confirmed are mutually independent; if B depends on A's result, do A first and dispatch B in a later iteration once A's result is in the timeline.",
-			"- When dispatching, write a crisp goal for each sub agent and use result_contract to define the expected output shape whenever possible.",
+			"- 【MUST】Multi-agent mode is ENABLED. For ANY task containing 2+ mostly-independent workstreams, you MUST make dispatch_sub_react_agents your FIRST move — do not start with serial tool calls. This is a mandatory strategy, not a suggestion; only fall back to serial execution when you can justify that the task is genuinely sequential or a single sub-goal.",
+			"- 【MUST】Dispatch is strictly for parallelizing INDEPENDENT workstreams. You MUST NOT use it to offload a single sequential task you should do yourself, and you MUST NOT dump every imaginable subtask into one call to avoid thinking. Before batching, you MUST verify each subtask is mutually independent.",
+			"- 【MUST】If subtask B depends on subtask A's result, you MUST NOT batch them together. Do A first (dispatch it or do it yourself), wait for its result to land in the timeline, then dispatch B in a LATER iteration. Only zero-dependency subtasks may share one dispatch.",
+			"- When dispatching, write a crisp, self-contained goal for each sub agent and use result_contract to define the expected output shape whenever possible.",
 		)
 	}
 	if c.GetEnableGoalMode() {

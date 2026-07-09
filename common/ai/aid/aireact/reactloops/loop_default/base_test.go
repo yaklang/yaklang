@@ -33,16 +33,17 @@ func TestConfigExecutionPolicy(t *testing.T) {
 	require.False(t, strings.Contains(text, "Current iteration"))
 }
 
-// TestConfigExecutionPolicy_MultiAgentSoftPreference asserts the multi-agent
-// line is marked as a non-enforced preference so callers don't assume the
-// framework forces dispatch.
-func TestConfigExecutionPolicy_MultiAgentSoftPreference(t *testing.T) {
+// TestConfigExecutionPolicy_MultiAgentDirective asserts the multi-agent
+// ExecutionPolicy line is written as a mandatory directive (MUST / 【强制】)
+// so the model treats dispatch as a required first move, not a weak hint.
+func TestConfigExecutionPolicy_MultiAgentDirective(t *testing.T) {
 	cfg := aicommon.NewConfig(
 		context.Background(),
 		aicommon.WithEnableMultiAgentMode(true),
 	)
 	text := cfg.GetExecutionPolicy()
-	require.Contains(t, text, "preference, not hard-enforced")
+	require.Contains(t, text, "MUST make dispatch_sub_react_agents your FIRST move")
+	require.Contains(t, text, "MUST NOT use it to offload")
 	require.NotContains(t, text, "Goal mode")
 }
 
