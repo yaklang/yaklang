@@ -310,8 +310,8 @@ func (t *ToolCaller) generateReasonByLiteForge(ctx context.Context, tool *aitool
 		ctx, "tool-call-reason", prompt,
 		[]aitool.ToolOption{
 			aitool.WithStringParam("reason",
-				aitool.WithParam_Description("One concise sentence (<=120 chars) describing WHY this tool call is needed: the intent/goal, not the params."),
-				aitool.WithParam_MaxLength(120),
+				aitool.WithParam_Description("A short phrase (~15 chars/words) describing WHY this tool call is needed: the intent/goal, not the params. Match the language of the user input."),
+				aitool.WithParam_MaxLength(15),
 				aitool.WithParam_Required(true)),
 		},
 	)
@@ -327,7 +327,7 @@ func (t *ToolCaller) generateReasonByLiteForge(ctx context.Context, tool *aitool
 // owning task's user input / name for intent context.
 func buildToolCallReasonPrompt(tool *aitool.Tool, params aitool.InvokeParams, task AITask) string {
 	var sb strings.Builder
-	sb.WriteString("Generate one concise sentence (<=120 chars) describing WHY this tool call is needed (the intent/goal, not the parameters).\n\n")
+	sb.WriteString("Generate a short reason (~20 chars/words) describing WHY this tool call is needed (the intent/goal, not the parameters). Keep it concise.\n")
 	sb.WriteString(fmt.Sprintf("Tool: %s\n", tool.Name))
 	if desc := strings.TrimSpace(tool.Description); desc != "" {
 		sb.WriteString(fmt.Sprintf("Tool description: %s\n", desc))
@@ -349,7 +349,7 @@ func buildToolCallReasonPrompt(tool *aitool.Tool, params aitool.InvokeParams, ta
 		sb.WriteString("Params:\n")
 		sb.WriteString(renderParamsAsYAML(params))
 	}
-	sb.WriteString("\nOutput only the reason sentence in the `reason` field.")
+	sb.WriteString("\nMatch the language of the user input (Chinese if the user writes in Chinese, English otherwise).\nOutput only the reason in the `reason` field.")
 	return sb.String()
 }
 
