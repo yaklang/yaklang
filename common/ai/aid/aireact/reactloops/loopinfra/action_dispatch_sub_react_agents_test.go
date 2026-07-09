@@ -894,3 +894,51 @@ func TestBuildForkedSubReactInvoker_ChildHasNoAICallbacksWhenParentHasNone(t *te
 	assert.Nil(t, childRaw.QualityPriorityRaw, "child must not fabricate a QualityPriorityRaw callback when the parent has none")
 	assert.Nil(t, childRaw.SpeedPriorityRaw, "child must not fabricate a SpeedPriorityRaw callback when the parent has none")
 }
+
+// TestBuildForkedSubReactInvoker_StripsTopLevelStrategies verifies that a
+// forked sub agent never inherits top-level execution strategies: plan,
+// goal mode and the multi-agent dispatch preference must all be disabled on
+// the child config, even when the parent has them enabled.
+func TestBuildForkedSubReactInvoker_StripsTopLevelStrategies(t *testing.T) {
+	parentCfg := aicommon.NewConfig(
+		context.Background(),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithEnableMultiAgentMode(true),
+		aicommon.WithEnableGoalMode(true),
+		aicommon.WithGoalMinIterations(6),
+		aicommon.WithEnablePlanAndExec(true),
+	)
+	require.True(t, parentCfg.GetEnableGoalMode())
+	require.True(t, parentCfg.GetPreferDispatchSubReactAgents())
+	require.True(t, parentCfg.GetEnablePlanAndExec())
+
+	parentTimeline := aicommon.NewTimeline(nil, nil)
+	parentTimeline.PushText(1, "parent-seed")
+	fork, err := parentTimeline.ForkForTask("sub-strategy", "sub", parentCfg, parentCfg)
+	require.NoError(t, err)
+
+	var capturedCfg *aicommon.Config
+	origGetter := aicommon.AIRuntimeInvokerGetter
+	defer func() { aicommon.AIRuntimeInvokerGetter = origGetter }()
+	aicommon.AIRuntimeInvokerGetter = func(ctx context.Context, opts ...aicommon.ConfigOption) (aicommon.AITaskInvokeRuntime, error) {
+		cfg := aicommon.NewConfig(ctx, opts...)
+		capturedCfg = cfg
+		return &configBackedDispatchInvoker{
+			dispatchSubReactTestInvoker: newDispatchSubReactTestInvoker(ctx),
+			cfg:                         cfg,
+		}, nil
+	}
+
+	_, err = buildForkedSubReactInvoker(parentCfg, fork, context.Background(), "sub-strategy-1")
+	require.NoError(t, err)
+	require.NotNil(t, capturedCfg)
+
+	assert.False(t, capturedCfg.GetEnableGoalMode(),
+		"sub agent must not inherit goal mode (no minimum-iteration finish gate)")
+	assert.False(t, capturedCfg.GetPreferDispatchSubReactAgents(),
+		"sub agent must not inherit the multi-agent dispatch preference")
+	assert.False(t, capturedCfg.GetEnablePlanAndExec(),
+		"sub agent must not open plans")
+	assert.False(t, capturedCfg.EnableDispatchSubReactAgents,
+		"sub agent must not be able to dispatch further sub agents")
+}

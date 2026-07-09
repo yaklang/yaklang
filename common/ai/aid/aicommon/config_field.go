@@ -173,7 +173,8 @@ func (c *Config) GetExecutionPolicy() string {
 	lines := make([]string, 0, 4)
 	if c.GetPreferDispatchSubReactAgents() {
 		lines = append(lines,
-			"- Multi-agent mode is enabled: if the task can be decomposed into 2+ mostly independent workstreams, prefer dispatch_sub_react_agents instead of doing everything serially yourself.",
+			"- Multi-agent mode is ENABLED (preference, not hard-enforced): for any task with 2+ mostly-independent workstreams, your DEFAULT first move is dispatch_sub_react_agents, not serial tool calls. Only fall back to serial execution when the task is genuinely sequential or a single sub-goal.",
+			"- Dispatch is for parallelizing independent workstreams, NOT for offloading one sequential task or dumping every subtask at once. Only batch subtasks you have confirmed are mutually independent; if B depends on A's result, do A first and dispatch B in a later iteration once A's result is in the timeline.",
 			"- When dispatching, write a crisp goal for each sub agent and use result_contract to define the expected output shape whenever possible.",
 		)
 	}
@@ -181,6 +182,11 @@ func (c *Config) GetExecutionPolicy() string {
 		lines = append(lines,
 			fmt.Sprintf("- Goal mode is enabled: do not use finish before iteration %d.", c.GetGoalMinIterations()),
 			"- Before the finish gate opens, only emit progress updates via directly_answer when necessary; keep pushing execution forward instead of wrapping up early.",
+		)
+	}
+	if c.GetPreferDispatchSubReactAgents() && c.GetEnableGoalMode() {
+		lines = append(lines,
+			fmt.Sprintf("- Both modes are active: dispatch sub-agents for parallelizable work, but the top-level loop must still reach iteration %d before finishing; do not idle after dispatch — keep verifying sub-agent results or synthesize outputs until the gate opens.", c.GetGoalMinIterations()),
 		)
 	}
 	return strings.TrimSpace(strings.Join(lines, "\n"))
