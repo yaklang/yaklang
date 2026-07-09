@@ -1,9 +1,7 @@
 package yakit
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
 	"hash/fnv"
 	"math"
 	"sort"
@@ -28,6 +26,21 @@ func DefaultAIBalanceProviderConfig() *ypb.ThirdPartyApplicationConfig {
 		APIKey: aiProviderDefaultAPIKey,
 		Domain: aiProviderDefaultDomain,
 	}
+}
+
+// builtinAIProviderTypes 记录所有内置 AI 服务类型，新增内置服务时只需在此追加。
+var builtinAIProviderTypes = map[string]struct{}{
+	aiProviderTypeAIBalance: {},
+}
+
+// IsBuiltinAIProvider 判断该模型配置是否指向内置 AI 服务（目前仅 aibalance）。
+// 新增内置服务时往 builtinAIProviderTypes 增加对应类型即可，无需改动调用方。
+func IsBuiltinAIProvider(model *ypb.AIModelConfig) bool {
+	if model == nil || model.Provider == nil {
+		return false
+	}
+	_, ok := builtinAIProviderTypes[strings.ToLower(strings.TrimSpace(model.Provider.Type))]
+	return ok
 }
 
 func ListAIProviders(db *gorm.DB) ([]*ypb.AIProvider, error) {
@@ -401,32 +414,4 @@ func providerIDFromHash(hash string) int64 {
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(hash))
 	return int64(h.Sum64() & math.MaxInt64)
-}
-
-func ReplaceAPIKeys(db *gorm.DB, oldKey, newKey string) error {
-	cfg, err := GetAIGlobalConfig(db)
-	if err != nil {
-		return err
-	}
-	if cfg == nil {
-		return nil
-	}
-
-	for _, models := range [][]*ypb.AIModelConfig{
-		cfg.IntelligentModels,
-		cfg.LightweightModels,
-		cfg.VisionModels,
-	} {
-		for _, model := range models {
-			if model != nil && model.Provider != nil && model.Provider.APIKey == oldKey {
-				model.Provider.APIKey = newKey
-			}
-		}
-	}
-
-	data, err := json.Marshal(cfg)
-	if err != nil {
-		return err
-	}
-	return SetKey(db, consts.AI_GLOBAL_CONFIG_KEY, string(data))
 }

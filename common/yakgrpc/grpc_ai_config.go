@@ -3,7 +3,6 @@ package yakgrpc
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -124,23 +123,26 @@ func (s *Server) GetApiKeyByOnline(ctx context.Context, req *ypb.GetApiKeyByOnli
 		return nil, err
 	}
 
-	var (
-		aiThirdPartyConfig schema.AIThirdPartyConfig
-		oldKey             string
-	)
-	err = consts.GetGormProfileDatabase().First(&aiThirdPartyConfig).Error
+	cfg, err := s.GetAIGlobalConfig(ctx, &ypb.Empty{})
 	if err != nil {
-		oldKey = "free-user"
-	} else {
-		oldKey = aiThirdPartyConfig.APIKey
-		aiThirdPartyConfig.APIKey = apiKey
-		if err := consts.GetGormProfileDatabase().Save(&aiThirdPartyConfig).Error; err != nil {
-			return nil, utils.Errorf("update apiKey failed: %v", err)
-		}
+		return nil, err
 	}
-
-	if err := yakit.ReplaceAPIKeys(s.GetProfileDatabase(), oldKey, apiKey); err != nil {
-		return nil, utils.Errorf("ReplaceAPIKeys failed: %v", err)
+	if cfg != nil {
+		for _, models := range [][]*ypb.AIModelConfig{
+			cfg.IntelligentModels,
+			cfg.LightweightModels,
+			cfg.VisionModels,
+		} {
+			for _, model := range models {
+				if yakit.IsBuiltinAIProvider(model) {
+					model.Provider.APIKey = apiKey
+				}
+			}
+		}
+		// SetAIGlobalConfig 会写入并手动 Apply 到运行时缓存
+		if _, err := s.SetAIGlobalConfig(ctx, cfg); err != nil {
+			return nil, utils.Errorf("update AIGlobalConfig failed: %v", err)
+		}
 	}
 
 	return &ypb.GetApiKeyByOnlineResponse{ApiKey: apiKey}, nil
