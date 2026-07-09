@@ -7,6 +7,18 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
 )
 
+func TestHasFindingForAbsPath(t *testing.T) {
+	state := &model.AuditState{ProjectPath: "/proj"}
+	state.AddFinding(&model.Finding{
+		Category: "cmd_injection",
+		File:     "vulnerabilities/exec/source/medium.php",
+	})
+
+	abs := "/proj/vulnerabilities/exec/source/medium.php"
+	require.True(t, hasFindingForAbsPath(state, "cmd_injection", abs, "/proj"))
+	require.False(t, hasFindingForAbsPath(state, "cmd_injection", "/proj/vulnerabilities/exec/source/high.php", "/proj"))
+}
+
 func TestValidateMarkFileDoneDisposition_FindingRequiresAddFinding(t *testing.T) {
 	scan := newScanState()
 	scan.AddTargetFiles([]string{"/proj/vuln/low.php"})

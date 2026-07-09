@@ -2,11 +2,11 @@ package loop_fast_context
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/subagent"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -28,7 +28,7 @@ type SearchResult struct {
 	Error     error
 }
 
-// RunFastContextSearch runs fast_context with timeline isolation.
+// RunFastContextSearch runs fast_context as a nested sub-loop under the parent TaskId.
 func RunFastContextSearch(
 	invoker aicommon.AIInvokeRuntime,
 	parentTask aicommon.AIStatefulTask,
@@ -42,35 +42,27 @@ func RunFastContextSearch(
 		return SearchResult{Error: utils.Error("query is required")}
 	}
 
-	applyToolComposeConcurrency(invoker)
-
 	if parentTask == nil {
 		return SearchResult{Error: utils.Error("parent task is nil")}
 	}
-	// Must not run the sub-loop on parentTask: sub-loop Exit() marks its task Completed
-	// and cancels context, which would kill the caller loop (e.g. Phase2 category scan)
-	// right after fast_context returns.
-	isolatedTask := newFastContextIsolatedSubTask(parentTask)
 
-	subLoop, err := reactloops.RunSubLoopIsolated(invoker, isolatedTask, schema.AI_REACT_LOOP_NAME_FAST_CONTEXT, func(loop *reactloops.ReActLoop) {
-		ConfigureSubLoop(loop, input)
-	}, withFastContextToolPool(invoker))
+	subLoop, err := subagent.RunNestedLoop(
+		invoker,
+		parentTask,
+		"fast-context",
+		schema.AI_REACT_LOOP_NAME_FAST_CONTEXT,
+		func(loop *reactloops.ReActLoop) {
+			ConfigureSubLoop(loop, input)
+		},
+		withFastContextToolPool(invoker),
+	)
 	if err != nil {
-		return SearchResult{Error: utils.Wrap(err, "fast_context isolated run")}
+		return SearchResult{Error: utils.Wrap(err, "fast_context nested run")}
 	}
 
 	result := ExtractSearchResult(subLoop)
-	log.Infof("[FastContext] isolated search done paths=%d err=%v", len(result.FilePaths), result.Error)
+	log.Infof("[FastContext] nested search done paths=%d err=%v", len(result.FilePaths), result.Error)
 	return result
-}
-
-func newFastContextIsolatedSubTask(parentTask aicommon.AIStatefulTask) aicommon.AIStatefulTask {
-	return aicommon.NewSubTaskBase(
-		parentTask,
-		fmt.Sprintf("%s-fast-context", parentTask.GetId()),
-		parentTask.GetUserInput(),
-		true,
-	)
 }
 
 // ConfigureSubLoop sets loop variables before execution.
@@ -109,19 +101,6 @@ func withFastContextToolPool(invoker aicommon.AIInvokeRuntime) reactloops.ReActL
 		}
 		return out
 	})
-}
-
-func applyToolComposeConcurrency(invoker aicommon.AIInvokeRuntime) {
-	if invoker == nil {
-		return
-	}
-	cfg := invoker.GetConfig()
-	if cfg == nil {
-		return
-	}
-	if c, ok := cfg.(*aicommon.Config); ok {
-		_ = aicommon.WithToolComposeConcurrency(grepBatchConcurrency)(c)
-	}
 }
 
 // ExtractSearchResult reads deliverable fields from a finished sub-loop.

@@ -1,6 +1,9 @@
 package model
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // SinkHint 描述一类 Sink 的语义特征和跨语言示例。
 // 不硬编码具体的 grep 关键词——AI 在阶段A看到技术栈后自行决定搜什么。
@@ -41,13 +44,11 @@ func (c *VulnCategory) RenderSinkHints() string {
 	if len(c.SinkHints) == 0 {
 		return ""
 	}
-	var sb fmt.Stringer
-	_ = sb
-	result := ""
+	var result strings.Builder
 	for _, h := range c.SinkHints {
-		result += fmt.Sprintf("- **%s**：%s\n  典型示例（参考，非固定关键词）：%v\n", h.Name, h.Description, h.Examples)
+		result.WriteString(fmt.Sprintf("- **%s**：%s\n  典型示例（参考，非固定关键词）：%v\n", h.Name, h.Description, h.Examples))
 	}
-	return result
+	return result.String()
 }
 
 // DefaultVulnCategories 默认的 8 个 OWASP 漏洞扫描类别。

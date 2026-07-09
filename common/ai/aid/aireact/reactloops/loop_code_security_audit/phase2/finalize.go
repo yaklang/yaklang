@@ -1,19 +1,17 @@
 package phase2
 
 import (
-	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/emit"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/util"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 // finalizeCategoryScanOnLoopEnd runs when a category loop ends without complete_scan.
@@ -25,6 +23,7 @@ func finalizeCategoryScanOnLoopEnd(
 	scan *ScanState,
 	category model.VulnCategory,
 	reason any,
+	artifacts *categoryArtifactStore,
 ) {
 	if scan == nil || state == nil {
 		return
@@ -32,9 +31,9 @@ func finalizeCategoryScanOnLoopEnd(
 
 	phase := scan.CurrentPhase()
 	if phase == ScanPhaseSearch {
-		if scan.TargetFileCount() > 0 {
-			msg := fmt.Sprintf("[Phase2/%s] 类别循环结束前仍处于阶段A，但已纳入 %d 个目标；编排器将尝试恢复阶段B。",
-				category.ID, scan.TargetFileCount())
+		if scan.TargetFileCount() > 0 || scan.DiscoveryCandidateCount() > 0 {
+			msg := fmt.Sprintf("[Phase2/%s] 类别循环结束前仍处于阶段A（目标 %d，fast_context 候选 %d）；编排器将尝试恢复阶段B。",
+				category.ID, scan.TargetFileCount(), scan.DiscoveryCandidateCount())
 			log.Warnf("[CodeAudit/Phase2] %s", msg)
 			r.AddToTimeline("[SCAN_INCOMPLETE]", msg)
 			emit.Phase2ScanWarning(loop, category, "stuck_phase_a_resumable", msg)
@@ -49,11 +48,11 @@ func finalizeCategoryScanOnLoopEnd(
 
 	remaining := scan.RemainingFiles()
 	done, total := scan.Progress()
-	reasonText := formatLoopEndReason(reason)
+	reasonText := util.FormatLoopEndReason(reason)
 
 	if len(remaining) == 0 && done == total && total > 0 {
 		log.Infof("[CodeAudit/Phase2] Category '%s' loop ended with all files marked but no complete_scan; auto-finalizing.", category.ID)
-		recordAutoFinalizedScanObservation(r, state, scan, category, reasonText, "all_marked_no_complete_scan")
+		recordAutoFinalizedScanObservation(r, state, scan, category, reasonText, "all_marked_no_complete_scan", artifacts)
 		return
 	}
 
@@ -81,27 +80,7 @@ func finalizeCategoryScanOnLoopEnd(
 	r.AddToTimeline("[SCAN_AUTO_FINALIZE]", fmt.Sprintf("[Phase2/%s] %s", category.ID, summary))
 	emit.Phase2ScanWarning(loop, category, "auto_finalize", summary)
 
-	recordAutoFinalizedScanObservation(r, state, scan, category, summary, "auto_finalized_on_loop_end")
-}
-
-func formatLoopEndReason(reason any) string {
-	if reason == nil {
-		return "loop 正常/异常结束但未调用 complete_scan"
-	}
-	switch v := reason.(type) {
-	case error:
-		if v != nil {
-			return v.Error()
-		}
-	case fmt.Stringer:
-		return v.String()
-	default:
-		text := strings.TrimSpace(utils.InterfaceToString(v))
-		if text != "" {
-			return text
-		}
-	}
-	return "loop 结束但未调用 complete_scan"
+	recordAutoFinalizedScanObservation(r, state, scan, category, summary, "auto_finalized_on_loop_end", artifacts)
 }
 
 func recordAutoFinalizedScanObservation(
@@ -111,6 +90,7 @@ func recordAutoFinalizedScanObservation(
 	category model.VulnCategory,
 	coverageSummary string,
 	stopReason string,
+	artifacts *categoryArtifactStore,
 ) {
 	done, total := scan.Progress()
 	obs := &model.ScanObservation{
@@ -129,24 +109,5 @@ func recordAutoFinalizedScanObservation(
 		log.Warnf("[CodeAudit/Phase2] Failed to create audit dir for auto-finalize: %v", mkErr)
 		return
 	}
-	obsFile := filepath.Join(auditDirPath, "scan_observations.md")
-	if err := state.PersistScanObservations(obsFile); err != nil {
-		log.Warnf("[CodeAudit/Phase2] Persist scan_observations failed: %v", err)
-	}
-	persistCategoryFindings(state, category.ID, auditDirPath)
-}
-
-func persistCategoryFindings(state *model.AuditState, categoryID, auditDirPath string) {
-	var catFindings []*model.Finding
-	for _, f := range state.GetFindings() {
-		if f.Category == categoryID {
-			catFindings = append(catFindings, f)
-		}
-	}
-	catFile := filepath.Join(auditDirPath, fmt.Sprintf("findings_%s.json", categoryID))
-	if data, err := json.MarshalIndent(catFindings, "", "  "); err == nil {
-		if err := os.WriteFile(catFile, data, 0o644); err != nil {
-			log.Warnf("[CodeAudit/Phase2] Write category findings file failed: %v", err)
-		}
-	}
+	persistCategoryObservation(artifacts, auditDirPath, category.ID, obs)
 }

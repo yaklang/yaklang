@@ -14,7 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func buildFastContextIsolatedAction(
+func buildFastContextAction(
 	r aicommon.AIInvokeRuntime,
 	state *model.AuditState,
 	category model.VulnCategory,
@@ -24,7 +24,7 @@ func buildFastContextIsolatedAction(
 	// phase-B trace uses single grep in content mode (phase2_grep_guard.go).
 	return reactloops.WithOverrideLoopAction(&reactloops.LoopAction{
 		ActionType: schema.AI_REACT_LOOP_NAME_FAST_CONTEXT,
-		Description: "Run isolated FastContext sub-loop: parallel files_with_matches / find_file search for this vulnerability category. " +
+		Description: "Run nested FastContext sub-loop: parallel files_with_matches / find_file search for this vulnerability category. " +
 			"Returns a candidate file index (not auto-locked). In phase A: read_file spot-check candidates, then lock_target_files; repeat or enter phase B.",
 		Options: []aitool.ToolOption{
 			aitool.WithStringParam("query",
@@ -61,7 +61,7 @@ func buildFastContextIsolatedAction(
 
 			log.Infof("[CodeAudit/Phase2/%s] fast_context start query_len=%d", category.ID, len(query))
 			r.AddToTimeline("[FAST_CONTEXT_START]",
-				fmt.Sprintf("[Phase2/%s] 启动 FastContext 并行搜索（子 loop timeline 隔离）", category.ID))
+				fmt.Sprintf("[Phase2/%s] 启动 FastContext 嵌套搜索（共用 category SubAgent TaskId）", category.ID))
 
 			result := loop_fast_context.RunFastContextSearch(r, loop.GetCurrentTask(), loop_fast_context.SearchInput{
 				Query:             query,

@@ -10,12 +10,12 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/util"
 	"math"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/subagent"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -408,7 +408,7 @@ const phase2ReactiveDataTpl = `## 当前扫描任务
 //   - discovery guard: block find_file/tree in phase B
 //   - trace grep guard: scoped content grep in phase B
 //   - spot-read / read-spin guards: phase2_guards.go
-func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditState, category model.VulnCategory, categoryIndex, categoryTotal int, initialScan *ScanState) (*reactloops.ReActLoop, *ScanState, error) {
+func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditState, category model.VulnCategory, categoryIndex, categoryTotal int, initialScan *ScanState, artifacts *categoryArtifactStore) (*reactloops.ReActLoop, *ScanState, error) {
 	scan := initialScan
 	if scan == nil {
 		scan = newScanState()
@@ -581,11 +581,11 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 			if !isDone || scanCompleted {
 				return
 			}
-			finalizeCategoryScanOnLoopEnd(loop, r, state, scan, category, reason)
+			finalizeCategoryScanOnLoopEnd(loop, r, state, scan, category, reason, artifacts)
 		}),
 
 		reactloops.WithActionFactoryFromLoop(schema.AI_REACT_LOOP_NAME_FAST_CONTEXT),
-		buildFastContextIsolatedAction(r, state, category, scan),
+		buildFastContextAction(r, state, category, scan),
 
 		// ─── lock_target_files：每次 grep 后调用追加文件，done=true 时切换阶段B ───
 		reactloops.WithRegisterLoopAction(
@@ -830,27 +830,6 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 
 				log.Infof("[CodeAudit/Phase2] Finding added: %s - %s (%s:%d)", f.ID, f.Category, f.File, f.Line)
 
-				// 实时落盘：全量 + 当前类别独立文件
-				auditDirPath := util.AuditDir(state)
-				if mkErr := os.MkdirAll(auditDirPath, 0o755); mkErr == nil {
-					allFindingsFile := filepath.Join(auditDirPath, "scan_findings.json")
-					if err := state.PersistFindings(allFindingsFile); err != nil {
-						log.Warnf("[CodeAudit/Phase2] Persist findings failed: %v", err)
-					}
-					var catFindings []*model.Finding
-					for _, finding := range state.GetFindings() {
-						if finding.Category == category.ID {
-							catFindings = append(catFindings, finding)
-						}
-					}
-					catFile := filepath.Join(auditDirPath, fmt.Sprintf("findings_%s.json", category.ID))
-					if data, err := json.MarshalIndent(catFindings, "", "  "); err == nil {
-						if err := os.WriteFile(catFile, data, 0o644); err != nil {
-							log.Warnf("[CodeAudit/Phase2] Persist category findings failed: %v", err)
-						}
-					}
-				}
-
 				op.Feedback(fmt.Sprintf("Finding %s 已记录（%s, %s:%d, %s）。继续审计当前文件，完成后调用 mark_file_done。",
 					f.ID, f.Category, f.File, f.Line, f.Title))
 			},
@@ -927,28 +906,9 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 				r.AddToTimeline("[SCAN_COMPLETE]", fmt.Sprintf("[Phase2/%s] 扫描完成\n%s", category.ID, coverageSummary))
 				log.Infof("[CodeAudit/Phase2] Category '%s' complete", category.ID)
 
-				// 落盘
 				auditDirPath := util.AuditDir(state)
 				if mkErr := os.MkdirAll(auditDirPath, 0o755); mkErr == nil {
-					obsFile := filepath.Join(auditDirPath, "scan_observations.md")
-					if err := state.PersistScanObservations(obsFile); err != nil {
-						log.Warnf("[CodeAudit/Phase2] Persist scan_observations failed: %v", err)
-					}
-					var catFindings []*model.Finding
-					for _, f := range state.GetFindings() {
-						if f.Category == category.ID {
-							catFindings = append(catFindings, f)
-						}
-					}
-					catFile := filepath.Join(auditDirPath, fmt.Sprintf("findings_%s.json", category.ID))
-					if data, err := json.MarshalIndent(catFindings, "", "  "); err == nil {
-						if err := os.WriteFile(catFile, data, 0o644); err != nil {
-							log.Warnf("[CodeAudit/Phase2] Write category findings file failed: %v", err)
-						} else {
-							log.Infof("[CodeAudit/Phase2] Category '%s' findings (%d) persisted: %s",
-								category.ID, len(catFindings), catFile)
-						}
-					}
+					persistCategoryObservation(artifacts, auditDirPath, category.ID, obs)
 				}
 
 				op.Feedback(fmt.Sprintf("类别 [%s] 扫描完成。\n%s", category.Name, coverageSpill))
@@ -958,6 +918,7 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 	}
 
 	preset = append(preset, buildPhase2WhitelistFSToolOptions(r)...)
+	preset = append(preset, subagent.DefaultForkOptions()...)
 
 	loopName := fmt.Sprintf("code_audit_scan_%s", category.ID)
 	loop, err := reactloops.NewReActLoop(loopName, r, preset...)
@@ -968,8 +929,7 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 // Phase 2 编排层
 //
 // BuildAllCategoriesLoop is a non-interactive orchestrator: it plans categories,
-// runs buildSingleCategoryScanLoop serially, truncates timeline between categories,
-// then hands off to Phase 3 (verify). It does not register tool guards itself.
+// runs buildSingleCategoryScanLoop via forked sub-agents, then hands off to Phase 3.
 // ─────────────────────────────────────────────────────────────────────
 
 const planPromptTemplate = `你是代码安全审计专家。现在需要确定本次审计的漏洞扫描计划。
@@ -1012,88 +972,10 @@ func BuildAllCategoriesLoop(r aicommon.AIInvokeRuntime, state *model.AuditState,
 			if len(finalCategories) == 0 {
 				finalCategories = planScanCategories(r, task, state)
 			}
+			presentAuditVulnerabilityTypes(r, loop, task, finalCategories)
 			emit.Phase2ScanPlan(loop, finalCategories)
 
-			log.Infof("[CodeAudit/Phase2] Starting serial scan of %d categories", len(finalCategories))
-			r.AddToTimeline("[PHASE2_START]",
-				fmt.Sprintf("Phase 2 开始：将串行扫描 %d 个漏洞类别，各类别 agent 间 timeline 隔离。", len(finalCategories)))
-
-			timeline := getTimeline(r)
-
-			for i, category := range finalCategories {
-				log.Infof("[CodeAudit/Phase2] [%d/%d] Starting category: %s (%s)",
-					i+1, len(finalCategories), category.Name, category.ID)
-
-				var checkpoint int64
-				if timeline != nil {
-					checkpoint = timeline.GetMaxID()
-				}
-
-				catLoop, scanState, err := buildSingleCategoryScanLoop(r, state, category, i+1, len(finalCategories), nil)
-				if err != nil {
-					log.Errorf("[CodeAudit/Phase2] Failed to build loop for category '%s': %v", category.ID, err)
-					continue
-				}
-
-				obsCountBefore := len(state.GetScanObservations())
-				catSubTask := aicommon.NewSubTaskBase(task, fmt.Sprintf("%s-scan-%s", task.GetId(), category.ID), task.GetUserInput(), true)
-				if err := catLoop.ExecuteWithExistedTask(catSubTask); err != nil {
-					log.Warnf("[CodeAudit/Phase2] Category '%s' loop error: %v", category.ID, err)
-				}
-
-				catIncomplete := len(state.GetScanObservations()) == obsCountBefore
-
-				// Resume phase B when phase A ended early but targets were already locked.
-				if catIncomplete && scanState != nil &&
-					scanState.CurrentPhase() == ScanPhaseSearch && scanState.TargetFileCount() > 0 {
-					autoLocked, skipped := scanState.PrepareDiscoveryGateForPhaseB()
-					locked := scanState.CommitToAudit()
-					log.Warnf("[CodeAudit/Phase2] Category '%s' stuck in phase A with %d targets; resuming phase B (auto_locked=%d skipped=%d)",
-						category.ID, len(locked), autoLocked, skipped)
-					r.AddToTimeline("[PHASE2_RESUME]",
-						fmt.Sprintf("[Phase2/%s] 阶段A 提前结束，已自动纳入全部剩余候选（%d 个目标）并恢复阶段B",
-							category.ID, len(locked)))
-					emit.Phase2ScanWarning(loop, category, "resume_phase_b",
-						fmt.Sprintf("阶段A 未完成，已从 %d 个已纳入目标恢复阶段B", len(locked)))
-
-					resumeLoop, _, err := buildSingleCategoryScanLoop(r, state, category, i+1, len(finalCategories), scanState)
-					if err != nil {
-						log.Errorf("[CodeAudit/Phase2] Failed to build resume loop for '%s': %v", category.ID, err)
-					} else {
-						resumeTask := aicommon.NewSubTaskBase(task, fmt.Sprintf("%s-scan-%s-resume", task.GetId(), category.ID), task.GetUserInput(), true)
-						if err := resumeLoop.ExecuteWithExistedTask(resumeTask); err != nil {
-							log.Warnf("[CodeAudit/Phase2] Category '%s' resume loop error: %v", category.ID, err)
-						}
-						catIncomplete = len(state.GetScanObservations()) == obsCountBefore
-					}
-				}
-
-				if catIncomplete {
-					log.Warnf("[CodeAudit/Phase2] Category '%s' ended without calling complete_scan. "+
-						"AI may have exited the loop prematurely.", category.ID)
-					msg := fmt.Sprintf("类别 '%s' 扫描未调用 complete_scan 就结束了，可能未完整审计。", category.ID)
-					r.AddToTimeline("[PHASE2_CAT_INCOMPLETE]", "警告："+msg)
-					emit.Phase2ScanWarning(loop, category, "incomplete", msg)
-				}
-
-				if timeline != nil {
-					truncated := countIDsAfter(timeline, checkpoint)
-					timeline.TruncateAfter(checkpoint)
-					log.Infof("[CodeAudit/Phase2] Category '%s' done. Timeline rolled back: removed %d entries",
-						category.ID, truncated)
-				}
-
-				catFindingCount := 0
-				for _, f := range state.GetFindings() {
-					if f.Category == category.ID {
-						catFindingCount++
-					}
-				}
-				emit.Phase2CategoryOutcome(loop, i+1, len(finalCategories), category, catFindingCount, catIncomplete)
-
-				log.Infof("[CodeAudit/Phase2] [%d/%d] Category '%s' complete. Total findings so far: %d",
-					i+1, len(finalCategories), category.ID, len(state.GetFindings()))
-			}
+			runAllCategoryScans(r, loop, task, state, finalCategories)
 
 			allFindings := state.GetFindings()
 			state.SetPhase(model.AuditPhaseVerify)
@@ -1111,19 +993,8 @@ func BuildAllCategoriesLoop(r aicommon.AIInvokeRuntime, state *model.AuditState,
 	return reactloops.NewReActLoop("code_audit_phase2_orchestrator", r, preset...)
 }
 
-// planScanCategories 调用 AI 生成本次审计的扫描类别列表
+// planScanCategories 调用 AI 生成本次审计的扫描类别列表（LiteForge 在 fork 子 timeline 上运行，避免污染父 timeline）。
 func planScanCategories(r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask, state *model.AuditState) []model.VulnCategory {
-	timeline := getTimeline(r)
-	var planCheckpoint int64
-	if timeline != nil {
-		planCheckpoint = timeline.GetMaxID()
-	}
-	defer func() {
-		if timeline != nil {
-			timeline.TruncateAfter(planCheckpoint)
-		}
-	}()
-
 	var defaultDesc strings.Builder
 	for _, c := range model.DefaultVulnCategories {
 		defaultDesc.WriteString(fmt.Sprintf("- %s（id: %s）\n", c.Name, c.ID))
@@ -1136,27 +1007,38 @@ func planScanCategories(r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask
 
 	prompt := fmt.Sprintf(planPromptTemplate, defaultDesc.String(), userInput)
 
-	ctx := task.GetContext()
-	action, err := r.InvokeSpeedPriorityLiteForge(
-		ctx,
-		"scan_plan",
-		prompt,
-		[]aitool.ToolOption{
-			aitool.WithStringArrayParam("selected_category_ids",
-				aitool.WithParam_Required(true),
-				aitool.WithParam_Description("从默认 8 个类别中选择的 ID 列表，通常全选"),
-			),
-			aitool.WithStringParam("extra_categories_json",
-				aitool.WithParam_Required(false),
-				aitool.WithParam_Description(`用户额外要求的漏洞类别，JSON 数组字符串：
+	var action *aicommon.Action
+	planErr := subagent.RunForkInvokerCallback(r, task, subagent.ForkJob{
+		Identifier: "scan-plan",
+		Goal:       "Determine code audit vulnerability scan categories",
+	}, func(childInvoker aicommon.AIInvokeRuntime, childTask aicommon.AIStatefulTask) error {
+		var err error
+		action, err = childInvoker.InvokeSpeedPriorityLiteForge(
+			childTask.GetContext(),
+			"scan_plan",
+			prompt,
+			[]aitool.ToolOption{
+				aitool.WithStringArrayParam("selected_category_ids",
+					aitool.WithParam_Required(true),
+					aitool.WithParam_Description("从默认 8 个类别中选择的 ID 列表，通常全选"),
+				),
+				aitool.WithStringParam("extra_categories_json",
+					aitool.WithParam_Required(false),
+					aitool.WithParam_Description(`用户额外要求的漏洞类别，JSON 数组字符串：
 [{"id":"custom_category","name":"类别名称","sink_patterns":"keyword1,keyword2","instruction":"扫描指南"}]
 如果没有额外要求，传入空字符串 ""`),
-			),
-		},
-	)
+				),
+			},
+		)
+		return err
+	})
+	if planErr != nil {
+		log.Warnf("[CodeAudit/Phase2] Plan AI call failed: %v, falling back to default categories", planErr)
+		return model.DefaultVulnCategories
+	}
 
-	if err != nil {
-		log.Warnf("[CodeAudit/Phase2] Plan AI call failed: %v, falling back to default categories", err)
+	if action == nil {
+		log.Warnf("[CodeAudit/Phase2] Plan returned nil action, using all defaults")
 		return model.DefaultVulnCategories
 	}
 
@@ -1222,30 +1104,6 @@ func planScanCategories(r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask
 	r.AddToTimeline("[SCAN_PLAN]", planSummary.String())
 	log.Infof("[CodeAudit/Phase2] Scan plan: %s", planSummary.String())
 	return result
-}
-
-// getTimeline 从 AIInvokeRuntime 中提取 *aicommon.Timeline
-func getTimeline(r aicommon.AIInvokeRuntime) *aicommon.Timeline {
-	cfg := r.GetConfig()
-	if cfg == nil {
-		return nil
-	}
-	c, ok := cfg.(*aicommon.Config)
-	if !ok {
-		return nil
-	}
-	return c.Timeline
-}
-
-// countIDsAfter 返回 timeline 中 ID > checkpoint 的条目数量
-func countIDsAfter(timeline *aicommon.Timeline, checkpoint int64) int {
-	count := 0
-	for _, id := range timeline.GetTimelineItemIDs() {
-		if id > checkpoint {
-			count++
-		}
-	}
-	return count
 }
 
 // buildPrevFindingsSummary 返回当前 category 之前已发现的 findings 摘要

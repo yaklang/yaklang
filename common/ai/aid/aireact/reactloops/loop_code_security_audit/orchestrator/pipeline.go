@@ -185,17 +185,9 @@ func runPhase2(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, task aico
 		log.Warnf("[CodeAudit] Phase 2 returned error: %v (continuing)", err)
 	}
 
-	if len(state.GetFindings()) > 0 {
-		findingsFile := filepath.Join(auditDirPath, "scan_findings.json")
-		if err := state.PersistFindings(findingsFile); err != nil {
-			log.Warnf("[CodeAudit] Failed to persist findings: %v", err)
-		} else {
-			r.AddToTimeline("[PHASE2_PERSISTED]", fmt.Sprintf("Phase 2 扫描完成，共 %d 个 finding 已写入: %s", len(state.GetFindings()), findingsFile))
-		}
-	}
-	obsFile := filepath.Join(auditDirPath, "scan_observations.md")
-	if err := state.PersistScanObservations(obsFile); err != nil {
-		log.Warnf("[CodeAudit] Failed to persist scan_observations: %v", err)
+	findingsFile := state.GetFindingsFilePath()
+	if findingsFile != "" {
+		r.AddToTimeline("[PHASE2_PERSISTED]", fmt.Sprintf("Phase 2 扫描完成，共 %d 个 finding 已写入: %s", len(state.GetFindings()), findingsFile))
 	}
 	reactloops.EmitStatus(loop, "Phase 2 完成 / Phase 2 complete")
 }
@@ -209,7 +201,7 @@ func runPhase3(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, task aico
 	}
 	log.Infof("[CodeAudit] Starting Phase 3 (Verify), %d findings", len(findings))
 	reactloops.EmitActionLog(loop, util.VerifyNodeID, "Phase 3：漏洞验证 / Phase 3: Vulnerability verification")
-	r.AddToTimeline("[PHASE3_START]", "开始 Phase 3：逐 Finding 验证")
+	r.AddToTimeline("[PHASE3_START]", fmt.Sprintf("开始 Phase 3：fork 子 Agent 并行验证 %d 个 finding（并发 %d）", len(findings), phase3.DefaultFindingVerifyConcurrency))
 	verifyLoop, err := phase3.BuildVerifyLoop(r, state)
 	if err != nil {
 		log.Errorf("[CodeAudit] Failed to build Phase 3 loop: %v", err)

@@ -44,8 +44,8 @@ grep(pattern="exec(", path="/abs/project/src/")
 ## 核心原则
 
 - **假定安全**：除非能证明完整攻击路径（Source 可控 + 数据流无断层 + 无有效过滤），否则判定 `safe`
-- **顺序验证**：按 Finding ID 顺序（VULN-001, VULN-002...）逐个验证，不能跳过
-- **每个必须有结论**：每个 Finding 必须有且只有一次 `conclude_finding` 调用
+- **专注本任务 Finding**：每个子 Agent 只验证分配给自己的一个 Finding，完成后调用 `conclude_finding` 结束
+- **每个必须有结论**：本 Finding 必须有且只有一次 `conclude_finding` 调用
 
 ## 验证流程（对每个 Finding 严格执行）
 
@@ -58,8 +58,7 @@ grep(pattern="exec(", path="/abs/project/src/")
 ④ trace_data_flow(step=2, ...)   // 记录上游节点
 ⑤ ... 重复 ③④ 直到找到 Source（HTTP入口）或确认 Source 不可控
 ⑥ note_filter(...)               // 如果数据流中有过滤函数，记录有效性
-⑦ conclude_finding(finding_id, status, ...)  // 输出最终结论
-⑧ 继续下一个 Finding
+⑦ conclude_finding(finding_id, status, ...)  // 输出最终结论，子 Agent 任务结束
 ```
 
 **当行号不准确时**：使用 `grep` 搜索 Sink 函数名（如 `"call_user_func"`, `"mysql_query"`, `"exec("` 等）。
