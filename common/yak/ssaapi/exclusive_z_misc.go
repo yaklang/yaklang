@@ -80,7 +80,7 @@ func (i *Value) AppendDependOn(v *Value) (ret *Value) {
 	if v == nil {
 		return
 	}
-	if i.GetUUID() == v.GetUUID() {
+	if i.GetUID() == v.GetUID() {
 		return
 	}
 	if i.hasDependOn(v) {
@@ -107,7 +107,7 @@ func (i *Value) AppendEffectOn(v *Value) (ret *Value) {
 	if v == nil {
 		return
 	}
-	if i.GetUUID() == v.GetUUID() {
+	if i.GetUID() == v.GetUID() {
 		return
 	}
 	if i.hasEffectOn(v) {
@@ -131,7 +131,7 @@ func (i *Value) RemoveDependOn(vs ...*Value) {
 		if v == nil {
 			continue
 		}
-		if i.GetUUID() == v.GetUUID() {
+		if i.GetUID() == v.GetUID() {
 			continue
 		}
 		if i.hasDependOn(v) {
@@ -151,7 +151,7 @@ func (i *Value) RemoveEffectOn(vs ...*Value) {
 		if v == nil {
 			continue
 		}
-		if i.GetUUID() == v.GetUUID() {
+		if i.GetUID() == v.GetUID() {
 			continue
 		}
 		if i.hasEffectOn(v) {
@@ -180,7 +180,7 @@ func MergeValues(allVs ...Values) Values {
 
 			// merge v to exist value
 			if v.EffectOn != nil {
-				v.EffectOn.ForEach(func(key string, effect *Value) bool {
+				v.EffectOn.ForEach(func(key int64, effect *Value) bool {
 					effect.RemoveDependOn(v)
 					existValue.AppendEffectOn(effect)
 					return true
@@ -188,7 +188,7 @@ func MergeValues(allVs ...Values) Values {
 			}
 
 			if v.DependOn != nil {
-				v.DependOn.ForEach(func(key string, depend *Value) bool {
+				v.DependOn.ForEach(func(key int64, depend *Value) bool {
 					depend.RemoveEffectOn(v)
 					existValue.AppendDependOn(depend)
 					return true

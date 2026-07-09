@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -15,11 +16,11 @@ import (
 type Value struct {
 	runtimeCtx    *omap.OrderedMap[ContextID, *Value]
 	ParentProgram *Program
-	EffectOn      *utils.SafeMapWithKey[string, *Value]
-	DependOn      *utils.SafeMapWithKey[string, *Value]
+	EffectOn      *utils.SafeMapWithKey[int64, *Value]
+	DependOn      *utils.SafeMapWithKey[int64, *Value]
 
-	// 唯一标识符
-	uuid string
+	// 唯一标识符 (int64, avoids per-NewValue string allocation)
+	uid int64
 
 	// inner data for ssa
 	innerValue ssa.Value
@@ -105,7 +106,7 @@ func (v *Value) hasDependOn(target *Value) bool {
 	if v.DependOn == nil {
 		return false
 	}
-	_, b := v.DependOn.Get(target.GetUUID())
+	_, b := v.DependOn.Get(target.GetUID())
 	return b
 }
 
@@ -114,16 +115,16 @@ func (v *Value) setDependOn(target *Value) {
 		return
 	}
 	if v.DependOn == nil {
-		v.DependOn = utils.NewSafeMapWithKey[string, *Value]()
+		v.DependOn = utils.NewSafeMapWithKey[int64, *Value]()
 	}
-	v.DependOn.Set(target.GetUUID(), target)
+	v.DependOn.Set(target.GetUID(), target)
 }
 
 func (v *Value) deleteDependOn(target *Value) {
 	if v == nil || v.DependOn == nil {
 		return
 	}
-	v.DependOn.Delete(target.GetUUID())
+	v.DependOn.Delete(target.GetUID())
 }
 
 func (v *Value) hasEffectOn(target *Value) bool {
@@ -133,7 +134,7 @@ func (v *Value) hasEffectOn(target *Value) bool {
 	if v.EffectOn == nil {
 		return false
 	}
-	_, b := v.EffectOn.Get(target.GetUUID())
+	_, b := v.EffectOn.Get(target.GetUID())
 	return b
 }
 
@@ -142,16 +143,16 @@ func (v *Value) setEffectOn(target *Value) {
 		return
 	}
 	if v.EffectOn == nil {
-		v.EffectOn = utils.NewSafeMapWithKey[string, *Value]()
+		v.EffectOn = utils.NewSafeMapWithKey[int64, *Value]()
 	}
-	v.EffectOn.Set(target.GetUUID(), target)
+	v.EffectOn.Set(target.GetUID(), target)
 }
 
 func (v *Value) deleteEffectOn(target *Value) {
 	if v == nil || v.EffectOn == nil {
 		return
 	}
-	v.EffectOn.Delete(target.GetUUID())
+	v.EffectOn.Delete(target.GetUID())
 }
 
 func (v *Value) GetDependOnCount() int {
@@ -267,12 +268,20 @@ func (v *Value) GetId() int64 {
 	return v.getInstruction().GetId()
 }
 
-// GetUUID 返回Value的唯一标识符
+// GetUID returns the unique int64 identifier of the Value.
+func (v *Value) GetUID() int64 {
+	if v.IsNil() {
+		return 0
+	}
+	return v.uid
+}
+
+// GetUUID returns the unique identifier as a string (backward compat).
 func (v *Value) GetUUID() string {
 	if v.IsNil() {
 		return ""
 	}
-	return v.uuid
+	return strconv.FormatInt(v.uid, 10)
 }
 
 func (v *Value) GetSSAInst() ssa.Instruction {
@@ -1122,7 +1131,7 @@ func (v *Value) GetDependOn() Values {
 		if auditNode := v.auditNode; auditNode != nil {
 			nodeIds := ssadb.GetDependEdgeOnByFromNodeId(ssadb.GetDB(), auditNode.NodeID)
 			if v.DependOn == nil {
-				v.DependOn = utils.NewSafeMapWithKey[string, *Value]()
+				v.DependOn = utils.NewSafeMapWithKey[int64, *Value]()
 			}
 			for _, id := range nodeIds {
 				d := v.NewValueFromAuditNode(id)
@@ -1140,12 +1149,12 @@ func (v *Value) GetEffectOn() Values {
 		if auditNode := v.auditNode; auditNode != nil {
 			nodeIds := ssadb.GetEffectOnEdgeByFromNodeId(ssadb.GetDB(), auditNode.NodeID)
 			if v.EffectOn == nil {
-				v.EffectOn = utils.NewSafeMapWithKey[string, *Value]()
+				v.EffectOn = utils.NewSafeMapWithKey[int64, *Value]()
 			}
 			for _, id := range nodeIds {
 				e := v.NewValueFromAuditNode(id)
 				if e != nil {
-					v.EffectOn.Set(e.GetUUID(), e)
+					v.EffectOn.Set(e.GetUID(), e)
 				}
 			}
 		}
@@ -1153,13 +1162,13 @@ func (v *Value) GetEffectOn() Values {
 	return v.safeMapToValues(v.EffectOn)
 }
 
-func (v *Value) safeMapToValues(safeMap *utils.SafeMapWithKey[string, *Value]) Values {
+func (v *Value) safeMapToValues(safeMap *utils.SafeMapWithKey[int64, *Value]) Values {
 	if safeMap == nil {
 		return Values{}
 	}
 
 	var result Values
-	safeMap.ForEach(func(key string, value *Value) bool {
+	safeMap.ForEach(func(key int64, value *Value) bool {
 		result = append(result, value)
 		return true
 	})
@@ -1170,7 +1179,7 @@ func (v *Value) ForEachDependOn(f func(value *Value)) {
 	if v == nil || v.DependOn == nil {
 		return
 	}
-	v.DependOn.ForEach(func(key string, value *Value) bool {
+	v.DependOn.ForEach(func(key int64, value *Value) bool {
 		f(value)
 		return true
 	})
@@ -1180,7 +1189,7 @@ func (v *Value) ForEachEffectOn(f func(value *Value)) {
 	if v == nil || v.EffectOn == nil {
 		return
 	}
-	v.EffectOn.ForEach(func(key string, value *Value) bool {
+	v.EffectOn.ForEach(func(key int64, value *Value) bool {
 		f(value)
 		return true
 	})

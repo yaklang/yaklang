@@ -163,7 +163,7 @@ func (v *Value) Backtrack() *omap.OrderedMap[string, *Value] {
 		deps := current.DependOn
 		var p *Value
 		if deps != nil && deps.Count() > 0 {
-			deps.ForEach(func(key string, result *Value) bool {
+			deps.ForEach(func(key int64, result *Value) bool {
 				if _, ok := visited[result.GetId()]; !ok {
 					visited[result.GetId()] = true
 					p = result

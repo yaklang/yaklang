@@ -46,14 +46,14 @@ func (v *Value) MergeProvenanceFrom(source sfvm.ValueOperator) {
 		v.Predecessors = utils.AppendSliceItemWhenNotExists(v.Predecessors, pred)
 	}
 	if other.EffectOn != nil {
-		other.EffectOn.ForEach(func(_ string, effect *Value) bool {
+		other.EffectOn.ForEach(func(_ int64, effect *Value) bool {
 			effect.RemoveDependOn(other)
 			v.AppendEffectOn(effect)
 			return true
 		})
 	}
 	if other.DependOn != nil {
-		other.DependOn.ForEach(func(_ string, depend *Value) bool {
+		other.DependOn.ForEach(func(_ int64, depend *Value) bool {
 			depend.RemoveEffectOn(other)
 			v.AppendDependOn(depend)
 			return true

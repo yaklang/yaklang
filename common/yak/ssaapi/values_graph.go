@@ -140,7 +140,7 @@ const MAXLevel = 1000
 
 func valueDFS(node *Value, handler func(*Value) (Values, error), ctx context.Context) error {
 	// Perform DFS traversal
-	stack := omap.NewEmptyOrderedMap[string, *Value]()
+	stack := omap.NewEmptyOrderedMap[int64, *Value]()
 	level := 0
 	var dfs func(v *Value) error
 	dfs = func(v *Value) error {
@@ -153,10 +153,10 @@ func valueDFS(node *Value, handler func(*Value) (Values, error), ctx context.Con
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if stack.Have(v.GetUUID()) {
+		if stack.Have(v.GetUID()) {
 			return nil
 		}
-		stack.PushKey(v.GetUUID(), v)
+		stack.PushKey(v.GetUID(), v)
 		defer stack.Pop()
 
 		vs, err := handler(v)
