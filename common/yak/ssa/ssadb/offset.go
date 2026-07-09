@@ -80,11 +80,17 @@ func SaveIrOffsetBatch(db *gorm.DB, items []*IrOffset) error {
 	return nil
 }
 
+// bulkInsertIrOffset issues a single multi-row INSERT for one chunk.
+//
+// TODO(gorm-v2): once the gorm v1->v2 migration (commit 178272476, not yet on
+// this branch) lands, replace this hand-built multi-row INSERT with
+// db.CreateInBatches(items, irOffsetBatchChunk). gorm v1 (v1.9.2) panics on
+// Create(slice), so raw Exec is the only way to batch INSERT here.
 func bulkInsertIrOffset(db *gorm.DB, items []*IrOffset) error {
 	if len(items) == 0 {
 		return nil
 	}
-	const cols = 6
+	cols := len(irOffsetInsertColumns)
 	placeholder := "(" + strings.Repeat("?,", cols-1) + "?)"
 	values := make([]string, 0, len(items))
 	args := make([]interface{}, 0, len(items)*cols)

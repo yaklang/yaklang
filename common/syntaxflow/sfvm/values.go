@@ -14,6 +14,14 @@ import (
 
 type Values []ValueOperator
 
+// inlinePipelineThreshold is the max element count for which RunValueOperatorPipeline
+// processes inline (single loop, no pipeline/cancelCtx/goroutine allocation). Above this
+// the concurrency benefit outweighs the channel/cancelCtx overhead. 256 was measured as
+// the sweet spot: per-opcode pipe creation was the #2 allocator (~18% / ~1GB of
+// cancelCtx+Done channels) and a major GC driver on large projects; for small sets the
+// concurrency is worthless and the overhead dominates.
+const inlinePipelineThreshold = 256
+
 type ValuePipelineOptions struct {
 	Frame            *SFFrame
 	PredecessorLabel string
@@ -155,13 +163,7 @@ func RunValueOperatorPipeline(values Values, opts ValuePipelineOptions, f func(V
 		_, _, propagateAnchors = opts.Frame.ActiveAnchorScope()
 	}
 
-	// Inline fast path for small value sets. The pipe path creates an UnlimitedChan
-	// per call, which does context.WithCancel + spawns goroutines (see chanx), so
-	// per-opcode pipe creation was the #2 allocator (~18% / ~1GB of cancelCtx+Done
-	// channels) and a major GC driver on large projects. For small sets the
-	// concurrency is worthless and the channel/cancelCtx/goroutine overhead
-	// dominates, so process inline (single loop, no allocation).
-	const inlinePipelineThreshold = 256
+	// Inline fast path for small value sets (see inlinePipelineThreshold).
 	size := len(values)
 	if size <= inlinePipelineThreshold {
 		out := make([]ValueOperator, 0, size)

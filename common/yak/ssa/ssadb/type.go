@@ -111,6 +111,12 @@ func SaveIrTypeBatch(db *gorm.DB, items []*IrType) error {
 // at 999 to respect SQLite's host-parameter limit) then issues a single
 // multi-row INSERT. Must run inside the caller's transaction so the delete +
 // insert are atomic.
+//
+// TODO(gorm-v2): once the gorm v1->v2 migration (commit 178272476, not yet on
+// this branch) lands, the multi-row INSERT here can be replaced with
+// db.CreateInBatches(items, irTypeBatchChunk); the DELETE chunking would still
+// be manual until gorm v2 upsert support is available. gorm v1 (v1.9.2) panics
+// on Create(slice), so raw Exec is the only way to batch INSERT here.
 func bulkUpsertIrType(db *gorm.DB, items []*IrType) error {
 	if len(items) == 0 {
 		return nil
@@ -135,7 +141,7 @@ func bulkUpsertIrType(db *gorm.DB, items []*IrType) error {
 		}
 	}
 
-	const cols = 5
+	cols := len(irTypeInsertColumns)
 	placeholder := "(" + strings.Repeat("?,", cols-1) + "?)"
 	values := make([]string, 0, len(items))
 	args := make([]interface{}, 0, len(items)*cols)
