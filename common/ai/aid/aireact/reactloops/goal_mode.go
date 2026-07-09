@@ -22,6 +22,9 @@ func (r *ReActLoop) GetGoalMinIterations() int {
 	return int(aicommon.DefaultGoalMinIterations)
 }
 
+// ShouldBlockFinishAtIteration reports whether the finish action should be
+// blocked at the given iteration. finish is allowed for iteration >=
+// GoalMinIterations; every earlier iteration is blocked.
 func (r *ReActLoop) ShouldBlockFinishAtIteration(iteration int) bool {
 	if !r.IsGoalModeEnabled() {
 		return false
@@ -32,11 +35,19 @@ func (r *ReActLoop) ShouldBlockFinishAtIteration(iteration int) bool {
 	return iteration < r.GetGoalMinIterations()
 }
 
-func (r *ReActLoop) ApplyGoalModeNextIterationGate(operator *LoopActionHandlerOperator, nextIteration int) {
+// ApplyGoalModeGate enforces the goal-mode finish gate for the given iteration
+// on the operator that will be used to build this iteration's prompt. When the
+// gate blocks finish, the operator's disallowLoopExit flag is set so that
+// generateSchemaString removes the finish action from the schema.
+//
+// This is the single application point for the schema-level gate; it is called
+// once per iteration right before prompt generation. DisallowNextLoopExit uses
+// a Once, so repeated calls are idempotent.
+func (r *ReActLoop) ApplyGoalModeGate(operator *LoopActionHandlerOperator, iteration int) {
 	if r == nil || operator == nil {
 		return
 	}
-	if r.ShouldBlockFinishAtIteration(nextIteration) {
+	if r.ShouldBlockFinishAtIteration(iteration) {
 		operator.DisallowNextLoopExit()
 	}
 }
