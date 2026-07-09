@@ -37,7 +37,9 @@
 > 差分 + 两档短回归全绿。两项增量合计 `MVS_Exist` 5.79→**6.16~6.23 MB/s(+7%)**、allocs 16.3K→**8.9K(-45%)**。
 > **本会话收尾复测(2026-06-23, C 内核, FULL_CORPUS, 8x)**:`MVS_Exist` **6.16 MB/s / 8915 allocs**、
 > `MVS_Located` 3.04 MB/s、`MVS_Exist_RE2only` 8.12 MB/s(无 gate, 健全性);**完整非 short 套件全绿(40s)**。
-> **当前性能(实测,vs Go RE2 逐条 0.18 MB/s 基线)**:存在性 **~34x**(全规则)/**45x**(纯 RE2 子集)、定位 **17x**;
+> **2026-07-09 增量复测(FULL_CORPUS, 5x×2)**:`MVS_Exist` **6.44-6.48 MB/s / 8939 allocs**、
+> `MVS_Located` **3.30-3.32 MB/s**、`MVS_Exist_RE2only` **8.46-8.47 MB/s**(本轮 4 增量累计: 见下)。
+> **当前性能(实测,vs Go RE2 逐条 0.18 MB/s 基线)**:存在性 **~36x**(全规则)/**~47x**(纯 RE2 子集)、定位 **~18x**;
 > dlopen 真 hyperscan 历史天花板 87x,故现实目标 = 存在性冲 80x(再 ~2x)。详见第 4' 节倍数评估与路线。
 > **剩余瓶颈(本会话剖析, 干净小改已出尽)**:① `runtime.cgocall` 28%(合并 always-on 整段扫 5.25MB + 不可
 > 局部化 lean 的 nfaExists 3.93MB);② 门控 lean anchored 系 ~32%(`existsInAnchored` 16% + `…1` 7% +
@@ -80,6 +82,21 @@
 > (字面量 `://` 命中后 PCRE2 复核全不命中), 局部化只省 22%; Get注入点实为 widened=false(re2Loc 非 gate),
 > 诊断里的 "gate-recheck" 是分类把 fallback 也算入。**结论: 干净纯 Go 小改已出尽, 剩余瓶颈
 > (cgocall 30% 合并扫描 / 锚定 20% 纯 Go 位递归 / PCRE2 13% gate 复核) 均结构性, 需 R1/R2/R5 级改动。**
+> **已落地(2026-07-09 第三轮, 4 增量, PR #4728)**:
+> ① `findLocFrom1` 单字定位快路径(`mvs_exec.go`): 77% 真实 NFA 是 nword==1, `findLocFrom`(leftmost-longest
+> 定位)原走通用多字版, 每步 for-w 循环开销。新增 `findLocFrom1`: 活跃集/候选集是单个 uint64(寄存器),
+> 起点追踪用 npos<=64 紧凑 int 数组, 全程无 for-w 循环; `findLocFrom` 在 `nfa.single` 时分发。A/B:
+> `MVS_Located` 3.08→**3.28 MB/s(+6.5%)**(Exist 档持平, 不走定位)。差分: `TestMVSFindLoc*`(direct + random
+> 9180 + real-traffic 77×1332 + toggle)全绿, 与 `regexp.Longest().FindAllIndex` 逐字节一致。
+> ② `existsInAnchored1` span 缓存(`mvs_anchored.go`): span 推进是 `existsInAnchored1` 最大热点(profile ~24%
+> flat), 每 rune 重索引 `spans[si].hi/lo` + int32→int 转换。缓存 `curLo/curHi` 到局部变量, 推进时更新(si
+> 单调递增), 省每 rune 数组索引 + 转换。A/B: `MVS_Exist` 6.31→**6.44(+2.1%)**。
+> ③ `existsInAssertAnchored1` span 缓存(同上): 断言锚定 nword==1 路径同样的 span 推进优化。A/B: `MVS_Exist`
+> 6.40→**6.44-6.48(+0.6-1.2%)**。
+> **累计收益(4 增量, vs 本轮起点基线)**: `MVS_Exist` 6.32→**6.44-6.48(+1.9-2.5%)**、
+> `MVS_Located` 3.08→**3.30-3.32(+7.1-7.8%)**、`MVS_Exist_RE2only` 8.23→**8.46-8.47(+2.8-2.9%)**、
+> allocs 不变。**A/B 回退(第三轮)**: `existsInAnchored` 多字版 + `existsInReverseAnchored1` span 缓存——
+> 噪声波动无净收益(多字版 nword>=2 循环开销大稀释 span 缓存; 反向版触发 pattern 少), 已回退。
 
 ---
 
