@@ -2,13 +2,16 @@
 set -euo pipefail
 
 # Populate runtime/embed/assets/ with the self-contained runtime artifacts:
-#   - libyak.a              (Go c-archive runtime, built by build_runtime_go.sh)
+#   - libyak.a              (Go c-archive runtime, built registering a configured
+#                            set of yaklib modules so their exports resolve)
 #   - libgc.a               (Boehm GC)
-#   - crt1.o crti.o crtn.o  (glibc crt objects)
-#   - crtbegin.o crtend.o   (gcc EH-frame crt objects)
+#   - crt1.o crti.o crtn.o crtbegin.o crtend.o  (crt objects)
 #   - libc.a libgcc.a libgcc_eh.a  (static glibc + gcc runtime)
 # and generate manifest_generated.go with their SHA256 (used as a cache key).
 #
+# Which yaklib modules the embedded libyak.a registers is controlled by
+# SSA2LLVM_EMBED_MODULES (comma-separated module names; "all" = every registered
+# module — large, ~270M libyak.a). Default is a curated common-stdlib subset.
 # Run this before `go build -tags=selfcontained ./common/yak/ssa2llvm/cmd`.
 # Building ssa2llvm itself may use any environment; these artifacts are embedded
 # so the resulting ssa2llvm binary needs none of them at runtime.
@@ -17,15 +20,39 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SSA2LLVM_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 RUNTIME_DIR="${SSA2LLVM_DIR}/runtime"
 ASSETS_DIR="${SSA2LLVM_DIR}/runtime/embed/assets"
+REPO_ROOT="$(cd "${SSA2LLVM_DIR}/../../.." && pwd)"
+RUNTIME_GO_DIR="${RUNTIME_DIR}/runtime_go"
+IMPORTS_FILE="${RUNTIME_GO_DIR}/runtime_imports_generated.go"
+
+# Default curated common-stdlib module set (covers typical scripting + the
+# os/poc/http workflow). Override with SSA2LLVM_EMBED_MODULES="m1,m2,..." or
+# SSA2LLVM_EMBED_MODULES="all" for the full set (large).
+DEFAULT_MODULES="os,poc,http,httpool,httptpl,codec,str,json,re,re2,time,math,io,sync,cli,file,filesys,env,log,gzip,zip,context,bufio,container,dictutil,judge,x,xhtml,xml,xpath,yaml,exec,dns,fuzz"
+MODULES="${SSA2LLVM_EMBED_MODULES:-${DEFAULT_MODULES}}"
 
 mkdir -p "${ASSETS_DIR}"
 
-# 1. Build libyak.a (Go c-archive runtime).
-echo "[ssa2llvm] building libyak.a (Go runtime)..."
+# 1. Build libyak.a with the configured yaklib modules registered.
+#    genfull generates runtime_imports_generated.go for the module set; overlay
+#    it onto the checked-in stub, build the c-archive, then restore the stub so
+#    the source tree stays clean.
+echo "[ssa2llvm] generating runtime imports for modules: ${MODULES}"
+GENFULL_OUT="$(mktemp -t ssa2llvm-imports-XXXXXX.go)"
+trap 'rm -f "${GENFULL_OUT}"; [ -n "${STUB_BACKUP:-}" ] && cp "${STUB_BACKUP}" "${IMPORTS_FILE}" 2>/dev/null || true; rm -f "${STUB_BACKUP:-/dev/null}" 2>/dev/null || true' EXIT
+STUB_BACKUP="$(mktemp -t ssa2llvm-stub-XXXXXX.go)"
+cp "${IMPORTS_FILE}" "${STUB_BACKUP}"
+
+# shellcheck disable=SC2086
+( cd "${REPO_ROOT}" && go run ./common/yak/ssa2llvm/runtime/embed/genfull "${GENFULL_OUT}" ${MODULES//,/ } )
+cp "${GENFULL_OUT}" "${IMPORTS_FILE}"
+
+echo "[ssa2llvm] building libyak.a (Go runtime, modules: ${MODULES})..."
 "${SSA2LLVM_DIR}/scripts/build_runtime_go.sh"
+# Restore the stub so the source tree is clean (libyak.a already built from the overlay).
+cp "${STUB_BACKUP}" "${IMPORTS_FILE}"
 
 # 2. Locate libgc.a — prefer runtime/runtime_go/libs/libgc.a, else via cc/gcc/clang.
-LIBGC_SRC="${RUNTIME_DIR}/runtime_go/libs/libgc.a"
+LIBGC_SRC="${RUNTIME_GO_DIR}/libs/libgc.a"
 if [[ ! -s "${LIBGC_SRC}" ]]; then
   LIBGC_SRC=""
   for tool in cc gcc clang; do
@@ -47,26 +74,18 @@ need_file() {
   [[ -s "${p}" ]] || { echo "missing system file: ${name} (gcc -print-file-name returned '${p}')" >&2; exit 1; }
   printf '%s' "${p}"
 }
-CRT1="$(need_file crt1.o)"
-CRTI="$(need_file crti.o)"
-CRTN="$(need_file crtn.o)"
-CRTBEGIN="$(need_file crtbegin.o)"
-CRTEND="$(need_file crtend.o)"
-LIBC_A="$(need_file libc.a)"
-LIBGCC_A="$(need_file libgcc.a)"
-LIBGCC_EH_A="$(need_file libgcc_eh.a)"
+CRT1="$(need_file crt1.o)"; CRTI="$(need_file crti.o)"; CRTN="$(need_file crtn.o)"
+CRTBEGIN="$(need_file crtbegin.o)"; CRTEND="$(need_file crtend.o)"
+LIBC_A="$(need_file libc.a)"; LIBGCC_A="$(need_file libgcc.a)"; LIBGCC_EH_A="$(need_file libgcc_eh.a)"
 
 # 4. Copy assets into the embed dir.
 cp "${RUNTIME_DIR}/libyak.a" "${ASSETS_DIR}/libyak.a"
 cp "${LIBGC_SRC}"            "${ASSETS_DIR}/libgc.a"
-cp "${CRT1}"                 "${ASSETS_DIR}/crt1.o"
-cp "${CRTI}"                 "${ASSETS_DIR}/crti.o"
-cp "${CRTN}"                 "${ASSETS_DIR}/crtn.o"
-cp "${CRTBEGIN}"             "${ASSETS_DIR}/crtbegin.o"
-cp "${CRTEND}"               "${ASSETS_DIR}/crtend.o"
-cp "${LIBC_A}"               "${ASSETS_DIR}/libc.a"
-cp "${LIBGCC_A}"             "${ASSETS_DIR}/libgcc.a"
-cp "${LIBGCC_EH_A}"          "${ASSETS_DIR}/libgcc_eh.a"
+cp "${CRT1}"  "${ASSETS_DIR}/crt1.o";  cp "${CRTI}"  "${ASSETS_DIR}/crti.o";  cp "${CRTN}"  "${ASSETS_DIR}/crtn.o"
+cp "${CRTBEGIN}" "${ASSETS_DIR}/crtbegin.o"; cp "${CRTEND}" "${ASSETS_DIR}/crtend.o"
+cp "${LIBC_A}"     "${ASSETS_DIR}/libc.a"
+cp "${LIBGCC_A}"   "${ASSETS_DIR}/libgcc.a"
+cp "${LIBGCC_EH_A}" "${ASSETS_DIR}/libgcc_eh.a"
 
 # 5. Generate manifest_generated.go with SHA256 of each asset.
 sha_of() { sha256sum "$1" | awk '{print $1}'; }
@@ -95,6 +114,6 @@ gen_field() { printf '\t%-10s "%s",\n' "$1:" "$(sha_of "$2")"; }
 } > "${ASSETS_DIR}/manifest_generated.go"
 
 echo "[ssa2llvm] embedded runtime assets prepared in ${ASSETS_DIR}"
-echo "[ssa2llvm]   libyak.a $(du -h "${ASSETS_DIR}/libyak.a" | cut -f1), libgc.a $(du -h "${ASSETS_DIR}/libgc.a" | cut -f1)"
+echo "[ssa2llvm]   libyak.a $(du -h "${ASSETS_DIR}/libyak.a" | cut -f1) (modules: ${MODULES}), libgc.a $(du -h "${ASSETS_DIR}/libgc.a" | cut -f1)"
 echo "[ssa2llvm]   crt1/crti/crtn + crtbegin/crtend"
 echo "[ssa2llvm]   libc.a $(du -h "${ASSETS_DIR}/libc.a" | cut -f1), libgcc.a $(du -h "${ASSETS_DIR}/libgcc.a" | cut -f1), libgcc_eh.a $(du -h "${ASSETS_DIR}/libgcc_eh.a" | cut -f1)"
