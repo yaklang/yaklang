@@ -46,6 +46,40 @@
 > 下一步(按收益, **均为大型结构性改动, 净收益不确定, 需决策**):**R1 字面量门控合并单趟**(吃掉②, 现最大 Go 头)
 > → R1' 把门控 lean anchored 扫描下沉 C 内核走 SIMD(吃掉②, 但需 C 内核加锚定注入入口 + amalgamation + 跨平台)
 > → R2 断言 NFA 合并 → R3 AVX2 → R5 定位 C 内核。详见 IMPL 第 0'.4 / 0'.5 节 + 本文件第 4' 节。
+>
+> **已落地(2026-07-09):R1' C 内核锚定注入入口(基建完成, backend 批量接线回退)** —— 给 C 内核加了锚定式
+> 位并行递推入口 `mvscan_db_nfa_exists_anchored`(+ `_scalar` 孪生 + `_many` 批量), 对应 Go
+> `existsInAnchored`: 仅在 spans 注入区间内注入 NFA 起点 first, 区间外不注入 + 提前消亡, 标量孪生 +
+> SIMD 档(nword>=2 走 SSE2/NEON)。新增 `mvscan_run_anchored.inc` 递推体模板(被 `mvscan.c` 以两套
+> ROW_* 宏 include 两次);`mvs_rune_start` 复刻 Go `alignRuneStart`(rune 起始对齐)。Go 侧
+> `mvs_cgo.go` 暴露 `nfaExistsAnchored`/`Scalar`/`Many`,`mvs_stub.go` 退化空实现。**差分护栏全绿**:
+> `TestMVSKernelAnchoredDirect`(13 定向, C==Go==scalar-twin)、`...Random`(4500, 含多字 + 非法 UTF-8)、
+> `...RealTraffic`(30 anchorable × 80 记录 = 2400)、`...EndToEndOracle`(1332 全量 == stdlib)。
+> **A/B 决策(backend 批量接线回退)**: 试把锚定批处理下沉 C 一次 cgo(`nfaExistsAnchoredMany`), 实测
+> `MVS_Exist` 5.97 MB/s / **16751 allocs**(vs 逐条 Go 6.00 / 8981)—— **净回归**(吞吐持平、allocs +86%、
+> cgocall 仍 40%): 锚定 pattern 每报文触发数少, 批量化摊薄不了 cgo, 反引入 `make(map)`/slice 开销。
+> 故 `mvs_backend.go` scan 锚定/bi 段回退原逐条 Go 路径, 恢复 6.32 MB/s / 8980 allocs 基线; **C 内核
+> anchored 入口作为合格基建保留**, 供 R1'(门控 lean anchored 下沉 SIMD, 需先解决触发密度)与 R5(定位
+> C 内核)后续接线。`amalgamate` 工具泛化为处理任意 `mvscan_run*.inc`(原仅认 `mvscan_run.inc`),
+> amalgamation 已重生, 漂移护栏通过。
+> **已落地(2026-07-09 增量):`computeBoundaries` ASCII 快路径** —— 断言系热路径
+> (`computeBoundaries` 惰性每报文一次, profile 占 ~3.8% flat / 含 `boundaryConds`+`isWordRune`+
+> `utf8.DecodeRune` 累计更高) 的新版对 `c<0x80` 字节走字节级快路径(rune==rune(c)、size==1 与
+> `utf8.DecodeRune` 逐位一致), 用 `isWordByte`/字节 `\n` 判定直接产出 bound, 跳过 `DecodeRune` 的
+> 分支与 rune 宽化; 非 ASCII 回退原逐 rune 解码。**A/B(实测, FULL_CORPUS, 5x×2)**:`MVS_Exist`
+> 6.32→**6.46 MB/s(+2.3%)**、`MVS_Located` 3.00→**3.13(+4.3%)**、`MVS_Exist_RE2only` 8.23→**8.48(+3.0%)**、
+> allocs 不变(零分配)。差分护栏新增 `TestComputeBoundariesASCIIFastPath`(214 例含纯 ASCII/混合/非法
+> UTF-8, 与 rune 级参考实现逐字节一致)+ 既有断言随机差分(26680)/标量等价(53706)/真实恢复(7×80)全绿。
+> **A/B(锚定单条 C 下沉, 已回退)**: 试把锚定段 lean NFA 有 C 内核时走 `nfaExistsAnchored`(单条 SIMD),
+> 实测 5.98 MB/s / 9026 allocs(vs 逐条 Go 6.32 / 8980)——净回归: cgo 跨界开销抵消 SIMD 收益(锚定 pattern
+> 每报文触发数少、扫描窗口小)。已回退, 印证 R1' 需先解决触发密度。
+> **A/B(2026-07-09 第二轮, 均已回退)**: ① `existsInAnchored1` 单 span 特化(省每 rune span 推进循环):
+> 实测 6.38-6.42 vs 6.46-6.47——噪声范围内略降, 单 span 省的循环开销被代码膨胀(分支预测失败)抵消。
+> ② `gateSupersetPrecheck=true`(gate 复核前超集 NFA 预检滤假阳): 5.93-6.35 不稳定——超集对 gate 几乎不过滤
+> 反成净开销(印证 2026-06-23 结论)。③ 诊断 gate 局部化: 参数-URL设计已局部化(maxHead=83)但假阳 1015/1015
+> (字面量 `://` 命中后 PCRE2 复核全不命中), 局部化只省 22%; Get注入点实为 widened=false(re2Loc 非 gate),
+> 诊断里的 "gate-recheck" 是分类把 fallback 也算入。**结论: 干净纯 Go 小改已出尽, 剩余瓶颈
+> (cgocall 30% 合并扫描 / 锚定 20% 纯 Go 位递归 / PCRE2 13% gate 复核) 均结构性, 需 R1/R2/R5 级改动。**
 
 ---
 
@@ -349,8 +383,9 @@ docker run --rm --platform linux/amd64 -v $PWD:/amalg:ro -v /tmp/mvs_fixture:/fi
    **可空根(能匹配空串)与空 first → 兜底**。触及 `mvs_assert.go`/守卫求值者必须重跑
    `mvs_assert_test.go`(随机断言差分 + 真实恢复规则)。
 6. **SIMD 必须配标量孪生且逐位一致**:任何 SIMD 档(Teddy `native/teddy.c`、bit-NFA 多字
-   `nfa_run_simd`)都有等价标量孪生(`*_scalar` / `teddy_scan_scalar`),改动后必跑孪生逐位差分
-   (`mvs_cgo_test.go` SIMD twin、`teddy_cgo_test.go`)。SIMD 只能加速、不得改变命中。
+   `nfa_run_simd`、**锚定式 `nfa_run_anchored_simd`**)都有等价标量孪生(`*_scalar` /
+   `teddy_scan_scalar`),改动后必跑孪生逐位差分(`mvs_cgo_test.go` SIMD twin、`teddy_cgo_test.go`、
+   `TestMVSKernelAnchored*`)。SIMD 只能加速、不得改变命中。
 7. **单文件 amalgamation 不得手改、不得漂移**:`native/mvscan/amalgamation/{mvscan.c,mvscan.h}` 是
    `tools/amalgamate` 从 `native/mvscan` 源生成的产物。改源后必重生(`go run
    ./common/minirehs/tools/amalgamate/cmd/amalgamate`),否则 `TestMVSAmalgamationFresh` 失败。
@@ -404,6 +439,13 @@ docker run --rm --platform linux/amd64 -v $PWD:/amalg:ro -v /tmp/mvs_fixture:/fi
 - **P4-M3 SIMD bit-NFA**:`native/mvscan/mvscan_run.inc`(递推体模板,`ROW_*`/`NFA_RUN_NAME` 宏)、
   `mvscan.c` 的 `row_*_{s,v}`/`nfa_run_{scalar,simd}`/`nfa_run_dispatch`、`mvscan.h` +
   `mvs_cgo.go` 的 `*_scalar`/`mvscan_simd_enabled` 孪生入口。
+- **R1' C 内核锚定入口(2026-07-09)**:`native/mvscan/mvscan_run_anchored.inc`(锚定式递推体模板,
+  `ROW_ZERO` 新增、`NFA_RUN_ANCHORED_NAME` 宏,被 `mvscan.c` include 两次生成 `nfa_run_anchored_{scalar,simd}`)、
+  `mvscan.c` 的 `mvs_rune_start`(复刻 Go `alignRuneStart`)/`nfa_run_anchored_dispatch`/
+  `mvscan_db_nfa_exists_anchored`(+`_scalar`/`_many`)、`mvscan.h` 的 `mvs_span`/API 声明、
+  `mvs_cgo.go` 的 `nfaExistsAnchored`/`Scalar`/`Many` + `anchSpanPool`(lo/hi 切片复用)、
+  `mvs_stub.go` 退化空实现。差分:`mvs_cgo_test.go` `TestMVSKernelAnchored{Direct,Random,RealTraffic,EndToEndOracle}`。
+  **backend 未接线(经 A/B 回退)**,C 入口留作 R1'/R5 后续用。
 - **P4-M4 amalgamation**:`tools/amalgamate/{amalgamate.go,cmd/amalgamate/main.go}`(生成器)、
   `native/mvscan/amalgamation/{mvscan.c,mvscan.h,example_smoke.c,fixture_check.c}`(发行单文件 +
   独立校验器)、`mvs_amalgamation_test.go`(漂移护栏,纯 Go)、`mvs_fixture_emit_test.go`
@@ -582,12 +624,17 @@ CGO_ENABLED=1 MINIREHS_FULL_CORPUS=1 go test -tags minirehs_mvs ./common/minireh
 - **遗留**:`dlclark/regexp2` 仅作 `dop251/goja`(JS 引擎)传递依赖残留 go.mod `// indirect`,与 yaklang 正则路径无关。
 
 ### Phase 7 — 冲击 80x(存在性)路线 — 待落地(按收益/确定性排序,详见第 4' 节)
+- **R1' C 内核锚定注入入口 ✅ 基建完成(2026-07-09)**:`mvscan_db_nfa_exists_anchored`(+`_scalar`/`_many`)、
+  `mvscan_run_anchored.inc`、`mvs_rune_start`、Go `nfaExistsAnchored`/`Scalar`/`Many` + 差分护栏全绿
+  (direct/random/real-traffic/end-to-end oracle)。**backend 批量接线经 A/B 验证为净回归已回退**,
+  C 入口保留供后续 R1'(解决触发密度后再下沉)与 R5 接线。`amalgamate` 泛化处理 `mvscan_run*.inc`。
 - **R1 字面量门控 pattern 合并单趟**(现最大头,结构性,预期最高收益):扩 `mvs_merged.go` 覆盖门控 lean NFA,
   Teddy 命中位置驱动单趟位递推,消除 N 条门控 = N 次 cgo + N 趟扫。护栏:合并命中集 == 各成员 existsIn。
 - **R2 断言 NFA 合并单趟**(中等,确定性):guard 断言 NFA 仿合并法收一趟,削 ~13% 断言路径 CPU。
 - **R3 AVX2 档**(纯吞吐):一次 32 字节,需 AVX2 标量孪生差分 + 运行期探测。
 - **R4 Rose 子串图多跳链**(>2 字面量,工程量大):中间子串级编排压低误触发率。
-- **R5 定位档 C 内核**(独立,把 `MVS_Located` 16x→~30x):仅替换场景受益,需与 Go oracle 逐字节差分。
+- **R5 定位档 C 内核**(独立,把 `MVS_Located` 16x→~30x):仅替换场景受益,需与 Go oracle 逐字节差分;
+  可复用 R1' 的 C 锚定注入入口(已就位)。
 
 ---
 

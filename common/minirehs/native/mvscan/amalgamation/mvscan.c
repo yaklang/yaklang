@@ -3,7 +3,8 @@
  *
  * 本文件由 common/minirehs/tools/amalgamate 从下列源拼接而成 (source of truth):
  *   native/mvscan/mvscan.c   (内核主体)
- *   native/mvscan/mvscan_run.inc  (位并行递推体, 原以两套 ROW_* 宏 #include 两次)
+ *   native/mvscan/mvscan_run.inc            (位并行递推体, 以两套 ROW_* 宏 #include 两次)
+ *   native/mvscan/mvscan_run_anchored.inc   (锚定式递推体, 以两套 ROW_* 宏 #include 两次)
  * 公共 API 头随附 mvscan.h (与 native/mvscan/mvscan.h 逐字一致).
  *
  * 用法: 宿主工程仅需此 mvscan.c + mvscan.h 两个文件, 任意 C99 编译器一条命令即可编译,
@@ -226,6 +227,9 @@ static inline void row_or_s(uint64_t *d, const uint64_t *s, int n) {
 static inline void row_and_s(uint64_t *d, const uint64_t *x, const uint64_t *y, int n) {
     for (int w = 0; w < n; w++) d[w] = x[w] & y[w];
 }
+static inline void row_zero_s(uint64_t *d, int n) {
+    for (int w = 0; w < n; w++) d[w] = 0;
+}
 
 /* SIMD 字向量原语 (一次处理 2 个 uint64 = 128 位, 尾字标量). */
 #if defined(MVS_SSE2)
@@ -253,6 +257,12 @@ static inline void row_and_v(uint64_t *d, const uint64_t *x, const uint64_t *y, 
     }
     for (; w < n; w++) d[w] = x[w] & y[w];
 }
+static inline void row_zero_v(uint64_t *d, int n) {
+    int w = 0;
+    for (; w + 2 <= n; w += 2)
+        _mm_storeu_si128((__m128i *)(d + w), _mm_setzero_si128());
+    for (; w < n; w++) d[w] = 0;
+}
 #elif defined(MVS_NEON)
 static inline void row_copy_v(uint64_t *d, const uint64_t *s, int n) {
     int w = 0;
@@ -269,7 +279,25 @@ static inline void row_and_v(uint64_t *d, const uint64_t *x, const uint64_t *y, 
     for (; w + 2 <= n; w += 2) vst1q_u64(d + w, vandq_u64(vld1q_u64(x + w), vld1q_u64(y + w)));
     for (; w < n; w++) d[w] = x[w] & y[w];
 }
+static inline void row_zero_v(uint64_t *d, int n) {
+    int w = 0;
+    for (; w + 2 <= n; w += 2) vst1q_u64(d + w, vdupq_n_u64(0));
+    for (; w < n; w++) d[w] = 0;
+}
 #endif
+
+/* mvs_rune_start: 复刻 Go alignRuneStart — 把字节偏移 off 向左吸附到最近的 rune 起始.
+ * 共享 bound 仅在 rune 起始与末尾处写入真实值, 故注入区间端点须 rune 对齐. */
+static inline size_t mvs_rune_start(const uint8_t *data, size_t len, size_t off) {
+    if (off <= 0) return 0;
+    if (off >= len) return len;
+    while (off > 0) {
+        /* UTF-8 continuation bytes have (b & 0xC0) == 0x80; rune start otherwise. */
+        if ((data[off] & 0xC0) != 0x80) break;
+        off--;
+    }
+    return off;
+}
 
 /* 标量孪生: nfa_run_scalar. */
 #define NFA_RUN_NAME nfa_run_scalar
@@ -482,6 +510,247 @@ done:
 #undef ROW_OR
 #undef ROW_AND
 #endif
+
+/* ====================================================================
+ * 锚定式位并行递推 (对应 Go mvs_anchored.go existsInAnchored).
+ * 仅在 spans 注入区间内注入 first, 其余位置不注入, 支持提前消亡.
+ * 标量孪生 + SIMD 档 (nword>=2 走 SIMD), 与 Go 逐位一致 (差分护栏).
+ * ==================================================================== */
+
+/* 标量孪生: nfa_run_anchored_scalar. */
+#define NFA_RUN_ANCHORED_NAME nfa_run_anchored_scalar
+#define ROW_COPY row_copy_s
+#define ROW_OR row_or_s
+#define ROW_AND row_and_s
+#define ROW_ZERO row_zero_s
+/* >>> begin inlined mvscan_run_anchored.inc (copy 1) >>> */
+/*
+ * mvscan_run_anchored.inc - 锚定式位并行 Glushkov 递推体 (被 mvscan.c 以不同 ROW_* 宏
+ * #include 两次, 生成标量孪生 nfa_run_anchored_scalar 与 SIMD 档 nfa_run_anchored_simd).
+ *
+ * 与 mvscan_run.inc 的区别 (对应 Go mvs_anchored.go existsInAnchored / existsInAnchored1):
+ *   - 不再每步注入 firstUnanchored, 而是仅在 runeStart 落入某 span [lo,hi) 时注入 first.
+ *   - firstAnchored 不使用 (锚定式 pattern 均为 !anchoredStart, 故 firstAnchored 为零).
+ *   - 提前消亡: 活跃集空且已越过所有注入区间 (runeStart >= lastHi) => 不可能再命中, 立即返回.
+ *
+ * 正确性与 Go existsInAnchored 同源: 任一匹配 M 必含某必需字面量, 其命中结束于 h.end, 则
+ * M.start >= h.end - head_L => M.start 落入某注入区间 [h.end-head_L, h.end] => 锚定式必能
+ * 从该起点找到 M (无假阴). 区间外不注入 => 只会找到真实起点的匹配 (无假阳).
+ *
+ * 不要单独编译本文件; 它依赖包含处的 mvs_nfa / mvs_decode_rune / symbol_of / mvs_ctz64
+ * / mvs_rune_start / ROW_COPY / ROW_OR / ROW_AND / NFA_RUN_ANCHORED_NAME 宏.
+ */
+static int NFA_RUN_ANCHORED_NAME(const mvs_nfa *a, const uint8_t *data, size_t len,
+                                 const int32_t *loArr, const int32_t *hiArr, int32_t nspan) {
+    if (nspan <= 0) return 0;
+    int nword = a->nword;
+    uint64_t stackPrev[8], stackCand[8];
+    uint64_t *prev, *cand;
+    if (nword <= 8) {
+        prev = stackPrev; cand = stackCand;
+        memset(prev, 0, (size_t)nword * sizeof(uint64_t));
+    } else {
+        prev = (uint64_t *)calloc((size_t)nword, sizeof(uint64_t));
+        cand = (uint64_t *)malloc((size_t)nword * sizeof(uint64_t));
+        if (!prev || !cand) { free(prev); free(cand); return 0; }
+    }
+
+    int found = 0;
+    int32_t lastHi = hiArr[nspan - 1];
+    int32_t si = 0;
+    /* 起始位置: 对齐到 rune 起始 (与 Go alignRuneStart 一致). */
+    size_t i = (size_t)mvs_rune_start(data, len, (size_t)loArr[0]);
+    int hasActive = 0;
+
+    while (i < len) {
+        size_t runeStart = i;
+        int sym;
+        uint8_t c0 = data[i];
+        if (c0 < 0x80) {
+            sym = (int)a->asciiSym[c0];
+            i += 1;
+        } else {
+            int32_t r;
+            int size = mvs_decode_rune(data + i, len - i, &r);
+            i += (size_t)size;
+            sym = symbol_of(a, r);
+        }
+        int atEnd = (i == len);
+
+        /* 推进 si 到第一个 hi > runeStart 的 span (跳过已过去的区间). */
+        while (si < nspan && (size_t)hiArr[si] <= runeStart) si++;
+        int inject = (si < nspan && (size_t)loArr[si] <= runeStart);
+
+        if (inject) {
+            ROW_COPY(cand, a->firstUnanchored, nword);
+        } else {
+            ROW_ZERO(cand, nword);
+        }
+        if (hasActive) {
+            for (int w = 0; w < nword; w++) {
+                uint64_t pw = prev[w];
+                while (pw) {
+                    int p = (w << 6) + mvs_ctz64(pw);
+                    pw &= pw - 1;
+                    ROW_OR(cand, a->follow + (size_t)p * nword, nword);
+                }
+            }
+        }
+
+        const uint64_t *rc = a->reach + (size_t)sym * nword;
+        ROW_AND(prev, cand, rc, nword);
+
+        uint64_t anyActive = 0;
+        for (int w = 0; w < nword; w++) {
+            uint64_t v = prev[w];
+            anyActive |= v;
+            uint64_t acc = v & a->lastAny[w];
+            if (atEnd) acc |= v & a->lastEnd[w];
+            if (acc) { found = 1; goto done; }
+        }
+
+        hasActive = (anyActive != 0);
+        if (!hasActive && (si >= nspan || (size_t)lastHi <= runeStart)) {
+            /* 提前消亡: 活跃集空且已越过所有注入区间 => 不可能再命中. */
+            goto done;
+        }
+    }
+
+done:
+    if (nword > 8) { free(prev); free(cand); }
+    return found;
+}
+/* <<< end inlined mvscan_run_anchored.inc (copy 1) <<< */
+#undef NFA_RUN_ANCHORED_NAME
+#undef ROW_COPY
+#undef ROW_OR
+#undef ROW_AND
+#undef ROW_ZERO
+
+/* SIMD 档: nfa_run_anchored_simd. */
+#if defined(MVS_SSE2) || defined(MVS_NEON)
+#define NFA_RUN_ANCHORED_NAME nfa_run_anchored_simd
+#define ROW_COPY row_copy_v
+#define ROW_OR row_or_v
+#define ROW_AND row_and_v
+#define ROW_ZERO row_zero_v
+/* >>> begin inlined mvscan_run_anchored.inc (copy 2) >>> */
+/*
+ * mvscan_run_anchored.inc - 锚定式位并行 Glushkov 递推体 (被 mvscan.c 以不同 ROW_* 宏
+ * #include 两次, 生成标量孪生 nfa_run_anchored_scalar 与 SIMD 档 nfa_run_anchored_simd).
+ *
+ * 与 mvscan_run.inc 的区别 (对应 Go mvs_anchored.go existsInAnchored / existsInAnchored1):
+ *   - 不再每步注入 firstUnanchored, 而是仅在 runeStart 落入某 span [lo,hi) 时注入 first.
+ *   - firstAnchored 不使用 (锚定式 pattern 均为 !anchoredStart, 故 firstAnchored 为零).
+ *   - 提前消亡: 活跃集空且已越过所有注入区间 (runeStart >= lastHi) => 不可能再命中, 立即返回.
+ *
+ * 正确性与 Go existsInAnchored 同源: 任一匹配 M 必含某必需字面量, 其命中结束于 h.end, 则
+ * M.start >= h.end - head_L => M.start 落入某注入区间 [h.end-head_L, h.end] => 锚定式必能
+ * 从该起点找到 M (无假阴). 区间外不注入 => 只会找到真实起点的匹配 (无假阳).
+ *
+ * 不要单独编译本文件; 它依赖包含处的 mvs_nfa / mvs_decode_rune / symbol_of / mvs_ctz64
+ * / mvs_rune_start / ROW_COPY / ROW_OR / ROW_AND / NFA_RUN_ANCHORED_NAME 宏.
+ */
+static int NFA_RUN_ANCHORED_NAME(const mvs_nfa *a, const uint8_t *data, size_t len,
+                                 const int32_t *loArr, const int32_t *hiArr, int32_t nspan) {
+    if (nspan <= 0) return 0;
+    int nword = a->nword;
+    uint64_t stackPrev[8], stackCand[8];
+    uint64_t *prev, *cand;
+    if (nword <= 8) {
+        prev = stackPrev; cand = stackCand;
+        memset(prev, 0, (size_t)nword * sizeof(uint64_t));
+    } else {
+        prev = (uint64_t *)calloc((size_t)nword, sizeof(uint64_t));
+        cand = (uint64_t *)malloc((size_t)nword * sizeof(uint64_t));
+        if (!prev || !cand) { free(prev); free(cand); return 0; }
+    }
+
+    int found = 0;
+    int32_t lastHi = hiArr[nspan - 1];
+    int32_t si = 0;
+    /* 起始位置: 对齐到 rune 起始 (与 Go alignRuneStart 一致). */
+    size_t i = (size_t)mvs_rune_start(data, len, (size_t)loArr[0]);
+    int hasActive = 0;
+
+    while (i < len) {
+        size_t runeStart = i;
+        int sym;
+        uint8_t c0 = data[i];
+        if (c0 < 0x80) {
+            sym = (int)a->asciiSym[c0];
+            i += 1;
+        } else {
+            int32_t r;
+            int size = mvs_decode_rune(data + i, len - i, &r);
+            i += (size_t)size;
+            sym = symbol_of(a, r);
+        }
+        int atEnd = (i == len);
+
+        /* 推进 si 到第一个 hi > runeStart 的 span (跳过已过去的区间). */
+        while (si < nspan && (size_t)hiArr[si] <= runeStart) si++;
+        int inject = (si < nspan && (size_t)loArr[si] <= runeStart);
+
+        if (inject) {
+            ROW_COPY(cand, a->firstUnanchored, nword);
+        } else {
+            ROW_ZERO(cand, nword);
+        }
+        if (hasActive) {
+            for (int w = 0; w < nword; w++) {
+                uint64_t pw = prev[w];
+                while (pw) {
+                    int p = (w << 6) + mvs_ctz64(pw);
+                    pw &= pw - 1;
+                    ROW_OR(cand, a->follow + (size_t)p * nword, nword);
+                }
+            }
+        }
+
+        const uint64_t *rc = a->reach + (size_t)sym * nword;
+        ROW_AND(prev, cand, rc, nword);
+
+        uint64_t anyActive = 0;
+        for (int w = 0; w < nword; w++) {
+            uint64_t v = prev[w];
+            anyActive |= v;
+            uint64_t acc = v & a->lastAny[w];
+            if (atEnd) acc |= v & a->lastEnd[w];
+            if (acc) { found = 1; goto done; }
+        }
+
+        hasActive = (anyActive != 0);
+        if (!hasActive && (si >= nspan || (size_t)lastHi <= runeStart)) {
+            /* 提前消亡: 活跃集空且已越过所有注入区间 => 不可能再命中. */
+            goto done;
+        }
+    }
+
+done:
+    if (nword > 8) { free(prev); free(cand); }
+    return found;
+}
+/* <<< end inlined mvscan_run_anchored.inc (copy 2) <<< */
+#undef NFA_RUN_ANCHORED_NAME
+#undef ROW_COPY
+#undef ROW_OR
+#undef ROW_AND
+#undef ROW_ZERO
+#endif
+
+/* nfa_run_anchored 分发: nword>=2 且有 SIMD 档时走 SIMD, 否则标量孪生. */
+static int nfa_run_anchored_dispatch(const mvs_nfa *a, const uint8_t *data, size_t len,
+                                     const int32_t *lo, const int32_t *hi, int32_t nspan,
+                                     int forceScalar) {
+#if defined(MVS_SSE2) || defined(MVS_NEON)
+    if (!forceScalar && a->nword >= 2)
+        return nfa_run_anchored_simd(a, data, len, lo, hi, nspan);
+#else
+    (void)forceScalar;
+#endif
+    return nfa_run_anchored_scalar(a, data, len, lo, hi, nspan);
+}
 
 /* nfa_run 分发: nword>=2 且有 SIMD 档时走 SIMD (一次 2 字), 否则走标量孪生.
  * forceScalar!=0 强制标量 (供差分测试对照 SIMD 与标量逐位一致). */
@@ -697,6 +966,63 @@ int mvscan_db_nfa_exists_scalar(const mvscan_db *db, int32_t idx,
     int32_t u = db->slotUnit[idx];
     if (u < 0 || u >= db->nUnits) return -1;
     return nfa_run_dispatch(&db->units[u], data, len, 0, NULL, 0, NULL, 0, NULL, 1);
+}
+
+/* 锚定式存在性: 仅在 spans 注入区间内注入 first (对应 Go existsInAnchored).
+ * spans 以平行数组 lo[0..nspan) / hi[0..nspan) 传入, 避免 Go 侧 C 结构体分配. */
+int mvscan_db_nfa_exists_anchored(const mvscan_db *db, int32_t idx,
+                                   const uint8_t *data, size_t len,
+                                   const int32_t *lo, const int32_t *hi, int32_t nspan) {
+    if (!db || idx < 0 || idx >= db->npat) return -1;
+    int32_t u = db->slotUnit[idx];
+    if (u < 0 || u >= db->nUnits) return -1;
+    if (!lo || !hi || nspan <= 0) return 0;
+    return nfa_run_anchored_dispatch(&db->units[u], data, len, lo, hi, nspan, 0);
+}
+
+/* 锚定式存在性 (强制标量孪生, 供差分测试). */
+int mvscan_db_nfa_exists_anchored_scalar(const mvscan_db *db, int32_t idx,
+                                          const uint8_t *data, size_t len,
+                                          const int32_t *lo, const int32_t *hi, int32_t nspan) {
+    if (!db || idx < 0 || idx >= db->npat) return -1;
+    int32_t u = db->slotUnit[idx];
+    if (u < 0 || u >= db->nUnits) return -1;
+    if (!lo || !hi || nspan <= 0) return 0;
+    return nfa_run_anchored_dispatch(&db->units[u], data, len, lo, hi, nspan, 1);
+}
+
+/* 批量锚定式存在性: 一次 cgo 对多条 pattern 各自做锚定式扫描, 摊薄跨界开销. */
+void mvscan_db_nfa_exists_anchored_many(const mvscan_db *db,
+                                         const uint8_t *data, size_t len,
+                                         const int32_t *idxs, int32_t npat,
+                                         const int32_t *patSpanOff,
+                                         const int32_t *spansLo, const int32_t *spansHi,
+                                         int32_t totalSpans,
+                                         uint8_t *out) {
+    if (!out) return;
+    if (!db || !idxs || !patSpanOff || !spansLo || !spansHi) {
+        for (int32_t i = 0; i < npat; i++) out[i] = 0;
+        return;
+    }
+    (void)totalSpans;
+    for (int32_t i = 0; i < npat; i++) {
+        int32_t idx = idxs[i];
+        uint8_t r = 0;
+        if (idx >= 0 && idx < db->npat) {
+            int32_t u = db->slotUnit[idx];
+            if (u >= 0 && u < db->nUnits) {
+                int32_t off0 = patSpanOff[i];
+                int32_t off1 = patSpanOff[i + 1];
+                int32_t nspan = off1 - off0;
+                if (nspan > 0) {
+                    const int32_t *lo = spansLo + off0;
+                    const int32_t *hi = spansHi + off0;
+                    r = (uint8_t)(nfa_run_anchored_dispatch(&db->units[u], data, len, lo, hi, nspan, 0) == 1);
+                }
+            }
+        }
+        out[i] = r;
+    }
 }
 
 int32_t mvscan_db_merged_scan_scalar(const mvscan_db *db,

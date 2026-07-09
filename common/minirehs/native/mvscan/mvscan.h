@@ -82,6 +82,47 @@ int32_t mvscan_db_merged_scan_scalar(const mvscan_db *db,
                                      uint8_t *seen, int32_t seenLen,
                                      int32_t *out, int32_t cap);
 
+/*
+ * mvs_span 是锚定式扫描的注入区间 [lo, hi) (字节偏移). 仅当 rune 起始落入某 span 时
+ * 才注入 NFA 起点 first, 其余位置不注入, 实现提前消亡 (对应 Go existsInAnchored).
+ * spans 须已按 lo 升序排序并合并重叠/相邻区间.
+ */
+typedef struct {
+    int32_t lo;
+    int32_t hi;
+} mvs_span;
+
+/*
+ * mvscan_db_nfa_exists_anchored 判定 pattern idx 的 NFA 是否在 data 中存在命中,
+ * 但仅在 spans 描述的注入区间内注入起点 (锚定式语义). 语义与 Go existsInAnchored 逐位一致:
+ * 任一匹配必起于某注入区间, 区间外不注入 => 无假阳; 匹配起点必落某区间 => 无假阴.
+ * spans 以两个平行数组 lo[0..nspan) 和 hi[0..nspan) 传入 (已排序合并), 避免 Go 侧 C 结构体分配.
+ * 返回 1 命中 / 0 不命中 / -1 表示该 idx 无 NFA.
+ */
+int mvscan_db_nfa_exists_anchored(const mvscan_db *db, int32_t idx,
+                                   const uint8_t *data, size_t len,
+                                   const int32_t *lo, const int32_t *hi, int32_t nspan);
+
+/* 强制标量孪生入口 (语义同上, 绕过 SIMD 分发恒走标量). 供差分测试. */
+int mvscan_db_nfa_exists_anchored_scalar(const mvscan_db *db, int32_t idx,
+                                          const uint8_t *data, size_t len,
+                                          const int32_t *lo, const int32_t *hi, int32_t nspan);
+
+/*
+ * mvscan_db_nfa_exists_anchored_many 一次 cgo 调用对多条 anchorable pattern 各自做
+ * 锚定式存在性, 摊薄 "每 pattern 一次 cgo" 的跨界开销 (锚定批处理的 cgo 调用数从
+ * O(触发数) 降到 O(1)). 各 pattern 的 spans 平铺在 spansLo[]/spansHi[] 中, 用
+ * patSpanOff[i+1]-patSpanOff[i] 取第 i 条 pattern 的 span 数; idxs[i] 为其 pattern 下标.
+ * out[i] 写入命中结果 (1 命中 / 0 不命中或无 NFA). data 在调用期间须存活.
+ */
+void mvscan_db_nfa_exists_anchored_many(const mvscan_db *db,
+                                         const uint8_t *data, size_t len,
+                                         const int32_t *idxs, int32_t npat,
+                                         const int32_t *patSpanOff,
+                                         const int32_t *spansLo, const int32_t *spansHi,
+                                         int32_t totalSpans,
+                                         uint8_t *out);
+
 /* mvscan_simd_enabled 报告本次构建是否编入 SIMD 加速档 (1) 还是纯标量 (0). */
 int mvscan_simd_enabled(void);
 

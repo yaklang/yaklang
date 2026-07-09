@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"regexp/syntax"
 	"testing"
+	"unicode/utf8"
 )
 
 // buildAssertNFA 编译 expr 为断言扩展 NFA; ok=false 表示该 expr 不在断言核处理范围 (交兜底).
@@ -228,4 +229,90 @@ func TestMVSAssertScalarEquivalence(t *testing.T) {
 	if singleN < 50 {
 		t.Fatalf("too few single (nword==1) assert NFAs (%d); coverage/generator problem", singleN)
 	}
+}
+
+// computeBoundariesRef 是 computeBoundaries 的独立 rune 级参考实现 (即原 boundaryConds 逐 rune 版),
+// 供 TestComputeBoundariesASCIIFastPath 对照新版 ASCII 快路径逐字节一致.
+func computeBoundariesRef(data []byte, buf []uint8) []uint8 {
+	n := len(data)
+	if cap(buf) < n+1 {
+		buf = make([]uint8, n+1)
+	} else {
+		buf = buf[:n+1]
+	}
+	prev := rune(-1)
+	i := 0
+	for i < n {
+		r, size := utf8.DecodeRune(data[i:])
+		buf[i] = boundaryConds(prev, r)
+		prev = r
+		i += size
+	}
+	buf[n] = boundaryConds(prev, -1)
+	return buf
+}
+
+// TestComputeBoundariesASCIIFastPath 对照新版 computeBoundaries (含 ASCII 快路径) 与独立 rune 级
+// 参考实现逐字节一致, 覆盖纯 ASCII / 混合多字节 / 非法 UTF-8 / 空输入 / 单字节各类边界条件.
+func TestComputeBoundariesASCIIFastPath(t *testing.T) {
+	r := rand.New(rand.NewSource(0xB01D))
+	cases := [][]byte{
+		nil,
+		{},
+		{'a'},
+		{'_'},
+		{'\n'},
+		{0x80},        // 非法 UTF-8 首字节
+		{0xC0, 0xAF},  // 非法 overlong
+		[]byte("hello world\nfoo bar"),
+		[]byte("  \t\n\n  "),
+		[]byte("café résumé 日本語"),
+		[]byte("abc\x80def\xC0\xAFghi"), // 非法 UTF-8 夹杂
+		[]byte("_word_boundary_"),
+		[]byte("line1\nline2\nline3\n"),
+		[]byte("Ünïcödé"),
+	}
+	// 随机长输入: 纯 ASCII / 混合 / 含非法字节.
+	for k := 0; k < 200; k++ {
+		n := r.Intn(512)
+		data := make([]byte, n)
+		kind := r.Intn(3)
+		for i := range data {
+			switch kind {
+			case 0: // 纯 ASCII (含控制/字母/数字/符号)
+				data[i] = byte(r.Intn(128))
+			case 1: // 混合: 多为 ASCII, 偶尔多字节首字节
+				if r.Intn(8) == 0 {
+					data[i] = byte(0xC0 + r.Intn(0x30)) // 可能非法续
+				} else {
+					data[i] = byte(r.Intn(128))
+				}
+			default: // 任意字节 (含非法 UTF-8)
+				data[i] = byte(r.Intn(256))
+			}
+		}
+		cases = append(cases, data)
+	}
+	var ref, got []byte
+	mism := 0
+	for i, data := range cases {
+		ref = computeBoundariesRef(data, ref)
+		got = computeBoundaries(data, got)
+		if len(ref) != len(got) {
+			t.Errorf("case %d len mismatch: ref=%d got=%d data=%q", i, len(ref), len(got), data)
+			continue
+		}
+		for j := range ref {
+			if ref[j] != got[j] {
+				if mism < 16 {
+					t.Errorf("case %d pos %d: ref=%08b got=%08b data=%q", i, j, ref[j], got[j], data)
+				}
+				mism++
+			}
+		}
+	}
+	if mism > 0 {
+		t.Fatalf("computeBoundaries ASCII fast path: %d byte mismatches vs rune-level reference", mism)
+	}
+	t.Logf("computeBoundaries ASCII fast path: %d cases all byte-identical to rune-level reference", len(cases))
 }

@@ -19,9 +19,39 @@ import "C"
 
 import (
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"unsafe"
 )
+
+// anchSpanPool 复用锚定式 spans 的 lo/hi []int32 切片, 避免 cgo 热路径每次分配.
+// 锚定批处理每报文每 pattern 调用 nfaExistsAnchored, 若每次 make 会成为分配大头.
+var anchSpanPool = sync.Pool{
+	New: func() interface{} {
+		return &anchSpanBufs{lo: make([]int32, 0, 16), hi: make([]int32, 0, 16)}
+	},
+}
+
+type anchSpanBufs struct {
+	lo, hi []int32
+}
+
+// anchSpanBuf 取一对容量 >= n 的 lo/hi 切片 (复用池). 调用方在 cgo 调用后须调 anchSpanPut 归还.
+func anchSpanBuf(n int) *anchSpanBufs {
+	b := anchSpanPool.Get().(*anchSpanBufs)
+	if cap(b.lo) < n {
+		b.lo = make([]int32, n)
+		b.hi = make([]int32, n)
+	} else {
+		b.lo = b.lo[:n]
+		b.hi = b.hi[:n]
+	}
+	return b
+}
+
+func anchSpanPut(b *anchSpanBufs) {
+	anchSpanPool.Put(b)
+}
 
 // 本文件是纯 C99 运行期内核 (native/mvscan) 的 cgo 薄封装 (范式同 prefilter_cgo.go):
 // Go 把编译产物序列化为平台无关 blob 传入 C, C 出力做位并行存在性扫描. 只要启用 CGO
@@ -86,6 +116,90 @@ func (k *mvsKernel) nfaExists(idx int, data []byte) bool {
 // nfaExistsScalar 强制走 C 标量孪生 (绕过 SIMD 分发), 仅供差分测试.
 func (k *mvsKernel) nfaExistsScalar(idx int, data []byte) bool {
 	return k.nfaExistsImpl(idx, data, true)
+}
+
+// nfaExistsAnchored 判定 pattern idx 的 NFA 是否在 data 中存在命中, 但仅在 spans
+// 注入区间内注入起点 (锚定式语义, 对应 Go existsInAnchored). spans 须已排序合并.
+// 与 Go existsInAnchored 逐位一致 (差分护栏). 返回 true 命中.
+func (k *mvsKernel) nfaExistsAnchored(idx int, data []byte, spans []anchorSpan) bool {
+	return k.nfaExistsAnchoredImpl(idx, data, spans, false)
+}
+
+// nfaExistsAnchoredScalar 强制走 C 标量孪生, 仅供差分测试.
+func (k *mvsKernel) nfaExistsAnchoredScalar(idx int, data []byte, spans []anchorSpan) bool {
+	return k.nfaExistsAnchoredImpl(idx, data, spans, true)
+}
+
+func (k *mvsKernel) nfaExistsAnchoredImpl(idx int, data []byte, spans []anchorSpan, scalar bool) bool {
+	if k == nil || k.db == nil || len(spans) == 0 {
+		return false
+	}
+	// 把 Go anchorSpan (lo,hi int32) 拆为两个 []int32 传 C, 避免 C.mvs_span 的 Go 分配.
+	// 用 sync.Pool 复用 lo/hi 切片, 消除热路径 make 开销 (cgo 调用后归还).
+	n := len(spans)
+	buf := anchSpanBuf(n)
+	lo, hi := buf.lo, buf.hi
+	for i, s := range spans {
+		lo[i] = int32(s.lo)
+		hi[i] = int32(s.hi)
+	}
+	var dptr *C.uint8_t
+	if len(data) > 0 {
+		dptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	}
+	var r C.int
+	if scalar {
+		r = C.mvscan_db_nfa_exists_anchored_scalar(k.db, C.int32_t(idx), dptr, C.size_t(len(data)),
+			(*C.int32_t)(unsafe.Pointer(&lo[0])), (*C.int32_t)(unsafe.Pointer(&hi[0])), C.int32_t(n))
+	} else {
+		r = C.mvscan_db_nfa_exists_anchored(k.db, C.int32_t(idx), dptr, C.size_t(len(data)),
+			(*C.int32_t)(unsafe.Pointer(&lo[0])), (*C.int32_t)(unsafe.Pointer(&hi[0])), C.int32_t(n))
+	}
+	keepAlive(data)
+	runtime.KeepAlive(lo)
+	runtime.KeepAlive(hi)
+	anchSpanPut(buf)
+	return r == 1
+}
+
+// nfaExistsAnchoredMany 一次 cgo 调用对多条 anchorable pattern 各自做锚定式存在性,
+// 摊薄 "每 pattern 一次 cgo" 的跨界开销 (锚定批处理 cgo 次数从 O(触发数) 降到 O(1)).
+// idxs[i] 为 pattern 下标, patSpanOff[i+1]-patSpanOff[i] 为其 spans 数, spansLo/Hi 平铺.
+// 结果写入返回切片 (len==len(idxs), 1 命中/0 不命中). 当前 backend 仍走逐条 Go 路径,
+// 本入口作为 C 内核 API 保留供差分测试及后续 R1' 批量接线使用.
+func (k *mvsKernel) nfaExistsAnchoredMany(idxs []int32, data []byte,
+	patSpanOff []int32, spansLo, spansHi []int32) []byte {
+	if k == nil || k.db == nil || len(idxs) == 0 {
+		return nil
+	}
+	out := make([]byte, len(idxs))
+	var dptr *C.uint8_t
+	if len(data) > 0 {
+		dptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	}
+	var idxPtr *C.int32_t
+	if len(idxs) > 0 {
+		idxPtr = (*C.int32_t)(unsafe.Pointer(&idxs[0]))
+	}
+	var offPtr *C.int32_t
+	if len(patSpanOff) > 0 {
+		offPtr = (*C.int32_t)(unsafe.Pointer(&patSpanOff[0]))
+	}
+	var loPtr, hiPtr *C.int32_t
+	if len(spansLo) > 0 {
+		loPtr = (*C.int32_t)(unsafe.Pointer(&spansLo[0]))
+		hiPtr = (*C.int32_t)(unsafe.Pointer(&spansHi[0]))
+	}
+	C.mvscan_db_nfa_exists_anchored_many(k.db, dptr, C.size_t(len(data)),
+		idxPtr, C.int32_t(len(idxs)),
+		offPtr, loPtr, hiPtr, C.int32_t(len(spansLo)),
+		(*C.uint8_t)(unsafe.Pointer(&out[0])))
+	keepAlive(data)
+	runtime.KeepAlive(idxs)
+	runtime.KeepAlive(patSpanOff)
+	runtime.KeepAlive(spansLo)
+	runtime.KeepAlive(spansHi)
+	return out
 }
 
 // simdEnabled 报告 C 内核是否编入 SIMD 加速档.

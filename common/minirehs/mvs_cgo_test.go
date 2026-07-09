@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"regexp"
 	"regexp/syntax"
+	"strings"
 	"testing"
 )
 
@@ -489,4 +490,208 @@ func toIntSet(in []int) map[int]struct{} {
 		s[v] = struct{}{}
 	}
 	return s
+}
+
+// TestMVSKernelAnchoredDirect 用固定 pattern + 定向输入 + 手工 spans, 比对 C nfaExistsAnchored
+// 与 Go existsInAnchored / existsInAnchored1 及 SIMD/标量孪生四方一致. 覆盖 nword==1 与 nword>=2.
+func TestMVSKernelAnchoredDirect(t *testing.T) {
+	cases := []struct {
+		expr   string
+		input  string
+		spans  []anchorSpan
+	}{
+		{`token=\w+`, "xx token=abc123 yy", []anchorSpan{{4, 10}}},
+		{`token=\w+`, "token=abc zz token=def", []anchorSpan{{0, 6}, {14, 20}}},
+		{`token=\w+`, "no match here", []anchorSpan{{0, 4}}},
+		{`pass[word]?\s*[:=]`, "x password: y", []anchorSpan{{2, 8}}},
+		{`AKIA[0-9A-Z]{16}`, "xxAKIAABCDEFGHIJKLMNOPyy", []anchorSpan{{2, 7}}},
+		{`a[bc]+d`, "xabcbcdy abcd", []anchorSpan{{1, 2}, {9, 10}}},
+		{`https?://[a-z]+`, "visit http://abc or https://xyz", []anchorSpan{{6, 11}, {20, 26}}},
+		{`[0-9]{4,6}`, "code 12345 ok 99", []anchorSpan{{5, 10}}},
+		{`colou?r`, "color colour", []anchorSpan{{0, 6}, {6, 12}}},
+		{`café`, "xcaféy", []anchorSpan{{2, 6}}},
+		{`[\x{4e00}-\x{9fff}]+`, "x 中文 y", []anchorSpan{{2, 5}}},
+		// nword>=2 (位置数>64) 走 SIMD 档
+		{`[a-z]{70}`, strings.Repeat("x", 50) + strings.Repeat("a", 70) + strings.Repeat("y", 30), []anchorSpan{{50, 51}}},
+		{`[0-9a-f]{80}`, strings.Repeat("z", 40) + strings.Repeat("0123456789abcdef", 8) + strings.Repeat("z", 40), []anchorSpan{{40, 41}}},
+	}
+	checks := 0
+	for _, c := range cases {
+		nfa := buildNFAFor(t, c.expr)
+		if nfa == nil {
+			t.Logf("expr=%q fallback (skip)", c.expr)
+			continue
+		}
+		data := []byte(c.input)
+		k := openSingleNFAKernel(t, nfa)
+		var goHit bool
+		if nfa.single {
+			goHit = nfa.existsInAnchored1(data, c.spans)
+		} else {
+			prev := make([]uint64, nfa.nword)
+			cand := make([]uint64, nfa.nword)
+			active := make([]uint64, nfa.nword)
+			goHit = nfa.existsInAnchored(data, c.spans, prev, cand, active)
+		}
+		cHit := k.nfaExistsAnchored(0, data, c.spans)
+		cScalarHit := k.nfaExistsAnchoredScalar(0, data, c.spans)
+		checks++
+		if cHit != goHit {
+			t.Errorf("C!=Go expr=%q input=%q spans=%v C=%v go=%v", c.expr, c.input, c.spans, cHit, goHit)
+		}
+		if cHit != cScalarHit {
+			t.Errorf("SIMD!=scalar expr=%q input=%q spans=%v simd=%v scalar=%v", c.expr, c.input, c.spans, cHit, cScalarHit)
+		}
+		k.close()
+	}
+	t.Logf("anchored direct: checks=%d (all C==Go==scalar-twin)", checks)
+}
+
+// TestMVSKernelAnchoredRandom 随机 pattern + 随机输入 + 随机 spans, 比对 C nfaExistsAnchored
+// 与 Go existsInAnchored 逐位一致 (含 SIMD/标量孪生). 覆盖 nword==1 与 nword>=2, 含非法 UTF-8.
+func TestMVSKernelAnchoredRandom(t *testing.T) {
+	exprs := []string{
+		`ab+c`, `[0-9]{3,}`, `https?://`, `colou?r`, `a[bc]*d`, `Druid`,
+		`AKIA[0-9A-Z]{16}`, `\d{1,3}\.\d{1,3}`, `(GET|POST|PUT)`, `<[^>]+>`,
+		`café`, `[\x{4e00}-\x{9fff}]+`,
+		`[a-z]{70}`, `[0-9a-f]{80}`, `(abc|def|ghi){25}`,
+	}
+	r := rand.New(rand.NewSource(0xA7 + 0xC))
+	checks, multiWord := 0, 0
+	for _, expr := range exprs {
+		nfa := buildNFAFor(t, expr)
+		if nfa == nil {
+			t.Logf("expr=%q fallback (skip)", expr)
+			continue
+		}
+		if nfa.nword >= 2 {
+			multiWord++
+		}
+		k := openSingleNFAKernel(t, nfa)
+		for s := 0; s < 300; s++ {
+			n := r.Intn(200)
+			data := make([]byte, n)
+			for i := range data {
+				switch r.Intn(3) {
+				case 0:
+					data[i] = byte("abcdef0123.GETPOST _"[r.Intn(20)])
+				case 1:
+					data[i] = byte(r.Intn(128))
+				default:
+					data[i] = byte(r.Intn(256))
+				}
+			}
+			nspan := 1 + r.Intn(3)
+			spans := make([]anchorSpan, nspan)
+			for i := range spans {
+				lo := r.Intn(n + 1)
+				hi := lo + r.Intn(n-lo+1)
+				spans[i] = anchorSpan{int32(lo), int32(hi)}
+			}
+			spans = mergeAnchorSpans(spans)
+			var goHit bool
+			if nfa.single {
+				goHit = nfa.existsInAnchored1(data, spans)
+			} else {
+				prev := make([]uint64, nfa.nword)
+				cand := make([]uint64, nfa.nword)
+				active := make([]uint64, nfa.nword)
+				goHit = nfa.existsInAnchored(data, spans, prev, cand, active)
+			}
+			cHit := k.nfaExistsAnchored(0, data, spans)
+			cScalar := k.nfaExistsAnchoredScalar(0, data, spans)
+			checks++
+			if cHit != cScalar {
+				t.Fatalf("SIMD!=scalar expr=%q nword=%d data=%q spans=%v simd=%v scalar=%v", expr, nfa.nword, data, spans, cHit, cScalar)
+			}
+			if cHit != goHit {
+				t.Fatalf("C!=Go expr=%q nword=%d data=%q spans=%v C=%v go=%v", expr, nfa.nword, data, spans, cHit, goHit)
+			}
+		}
+		k.close()
+	}
+	t.Logf("anchored random diff: exprs=%d (multiWord=%d) checks=%d (all C==Go==scalar)", len(exprs), multiWord, checks)
+	if multiWord < 2 {
+		t.Fatalf("too few multi-word (nword>=2) NFAs exercised: %d", multiWord)
+	}
+}
+
+// TestMVSKernelAnchoredRealTraffic 在真实 MITM 规则集 + 真实流量上, 对每条 anchorable lean pattern
+// 比对 C nfaExistsAnchored 与 Go existsInAnchored 逐条一致. 用全报文宽 [0,n] 作保守 spans.
+func TestMVSKernelAnchoredRealTraffic(t *testing.T) {
+	patterns, _ := compilableMITMPatterns(t)
+	db, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false))
+	if err != nil {
+		t.Fatalf("compile: %v", err)
+	}
+	defer db.Close()
+	mdb := getMVSDB(t, db)
+	if mdb.kernel == nil {
+		t.Fatal("expected C kernel active")
+	}
+	records, _ := loadCorpus(t)
+	if testing.Short() && len(records) > 200 {
+		records = records[:200]
+	}
+	anchorCount, checks := 0, 0
+	for idx := 0; idx < mdb.n; idx++ {
+		if !mdb.anchorable[idx] {
+			continue
+		}
+		nfa := mdb.nfas[idx]
+		if nfa == nil || nfa.hasAssert {
+			continue
+		}
+		anchorCount++
+		for ri, rec := range records {
+			n := len(rec)
+			spans := []anchorSpan{{0, int32(n)}}
+			var goHit bool
+			if nfa.single {
+				goHit = nfa.existsInAnchored1(rec, spans)
+			} else {
+				prev := make([]uint64, nfa.nword)
+				cand := make([]uint64, nfa.nword)
+				active := make([]uint64, nfa.nword)
+				goHit = nfa.existsInAnchored(rec, spans, prev, cand, active)
+			}
+			cHit := mdb.kernel.nfaExistsAnchored(idx, rec, spans)
+			checks++
+			if cHit != goHit {
+				t.Fatalf("C!=Go anchored idx=%d record#%d len=%d C=%v go=%v", idx, ri, n, cHit, goHit)
+			}
+		}
+	}
+	t.Logf("anchored real traffic: anchorable=%d records=%d checks=%d (all C==Go)", anchorCount, len(records), checks)
+}
+
+// TestMVSKernelAnchoredEndToEndOracle 端到端: C 内核 anchored 路径激活后, 整体命中集合与
+// stdlib oracle 一致 (含 anchorable + biAnchorable 前向走 C 的路径).
+func TestMVSKernelAnchoredEndToEndOracle(t *testing.T) {
+	patterns, _ := compilableMITMPatterns(t)
+	mvs, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false))
+	if err != nil {
+		t.Fatalf("compile mvs: %v", err)
+	}
+	defer mvs.Close()
+	if getMVSDB(t, mvs).kernel == nil {
+		t.Fatal("expected C kernel active")
+	}
+	oracle, err := Compile(patterns, WithBackend(BackendStdlib))
+	if err != nil {
+		t.Fatalf("compile oracle: %v", err)
+	}
+	defer oracle.Close()
+	records, _ := loadCorpus(t)
+	if testing.Short() && len(records) > 200 {
+		records = records[:200]
+	}
+	for i, rec := range records {
+		got := mvsExistIDs(t, mvs, rec)
+		ora := mvsExistIDs(t, oracle, rec)
+		mvsAssertSameIDSet(t, got, ora, fmt.Sprintf("anchored-e2e-record#%d(len=%d)", i, len(rec)))
+		if t.Failed() {
+			t.FailNow()
+		}
+	}
 }
