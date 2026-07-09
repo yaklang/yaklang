@@ -522,9 +522,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			var actualParam ssa.Value
 			if inst.IsFreeValue {
 				// free value
-				if tmp := inst.GetDefault(); tmp != nil && !isInner {
-					actualParam = tmp
-				} else if binding, ok := calledInstance.Binding[inst.GetName()]; ok && isInner {
+				if binding, ok := calledInstance.Binding[inst.GetName()]; ok && isInner {
 					// Prefer call-site scope (same as formal parameters): binding id refers to
 					// the actual SSA value at the call, which may not resolve on inst alone.
 					// TODO(scan-log): binding id may not reload after split-compile flush (GetValueById miss).
@@ -535,9 +533,22 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 							actualParam = nil
 						}
 					}
-				} else {
-					// TODO(scan-log): PHP free value / closure binding missing at compile or scan time.
-					log.Errorf("free value: %v is not found in binding", inst.GetName())
+				}
+				// Fallback to GetDefault when the binding is missing or the
+				// binding id didn't resolve. This was previously an Errorf +
+				// early return that silently dropped taint paths through
+				// captured variables (e.g. "template" in tutor, "q" in sonic,
+				// "a"/"rd" in GoBlog — thousands of occurrences across projects).
+				// GetDefault is the compile-time captured value; using it
+				// preserves the dataflow path even when the call-site binding
+				// was not populated (known gap in HandleFreeValue / split-compile).
+				if utils.IsNil(actualParam) {
+					if tmp := inst.GetDefault(); tmp != nil {
+						actualParam = tmp
+					}
+				}
+				if utils.IsNil(actualParam) {
+					log.Debugf("free value: %v is not found in binding and has no default", inst.GetName())
 					return getMemberCall(i, i.getValue(), actx)
 				}
 			} else {

@@ -208,7 +208,7 @@ func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
 	// 1w recursive call check
 	// if !utils.InGithubActions() {
 	if a.IsRecursiveLimit() {
-		log.Warnf("recursive call is over 10000, stop it")
+		log.Warnf("recursive visit limit reached (%d), stop descent", recursiveStackLimit)
 		a.reachedDepthLimited = true
 		return
 	}
