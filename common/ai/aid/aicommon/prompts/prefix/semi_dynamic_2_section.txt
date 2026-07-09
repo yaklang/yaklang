@@ -1,12 +1,14 @@
-{{ if .TaskInstruction }}<|PERSISTENT|>
-{{ .TaskInstruction }}
-<|PERSISTENT_END|>{{ end }}
-{{ if .ExecutionPolicy }}
+{{ if .ExecutionPolicy }}<|EXECUTION_POLICY|>
+## 执行策略
 
-<|EXECUTION_POLICY|>
+以下是当前会话的顶层运行策略，决定你如何选择动作、是否拆分并行子 Agent、以及何时收尾。这些约束优先级高于你的默认习惯，必须严格遵守；仅在策略未覆盖时才回退到常规判断。
+
 {{ .ExecutionPolicy }}
-<|EXECUTION_POLICY_END|>{{ end }}
-{{ if .Schema }}
+<|EXECUTION_POLICY_END|>{{ end }}{{ if .TaskInstruction }}
+
+<|PERSISTENT|>
+{{ .TaskInstruction }}
+<|PERSISTENT_END|>{{ end }}{{ if .Schema }}
 
 响应格式输出JSON和<|TAG...|>，请遵守如下Schema ：
 
@@ -14,8 +16,7 @@
 ```jsonschema
 {{ .Schema }}
 ```
-<|SCHEMA|>{{ end }}
-{{ if .OutputExample }}
+<|SCHEMA|>{{ end }}{{ if .OutputExample }}
 
 <|OUTPUT_EXAMPLE|>
 {{ .OutputExample }}
