@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -90,15 +91,15 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 	keyText := key.String()
 	if constInst, ok := ToConstInst(key); ok {
 		if constInst.IsNumber() {
-			ret.name = fmt.Sprintf("#%d[%d]", value.GetId(), constInst.Number())
+			ret.name = "#" + strconv.FormatInt(value.GetId(), 10) + "[" + strconv.FormatInt(constInst.Number(), 10) + "]"
 		}
 		if constInst.IsString() {
-			ret.name = fmt.Sprintf("#%d.%s", value.GetId(), keyText)
+			ret.name = "#" + strconv.FormatInt(value.GetId(), 10) + "." + keyText
 		}
 	} else {
 		// key is not const value
 		// can't get member value
-		ret.name = fmt.Sprintf("#%d.#%d", value.GetId(), key.GetId())
+		ret.name = "#" + strconv.FormatInt(value.GetId(), 10) + ".#" + strconv.FormatInt(key.GetId(), 10) + ""
 		switch valueType.GetTypeKind() {
 		case SliceTypeKind, MapTypeKind:
 			objTyp, _ := ToObjectType(valueType)
