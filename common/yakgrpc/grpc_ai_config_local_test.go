@@ -205,7 +205,7 @@ func TestGetApiKey_ReplaceAPIKeys(t *testing.T) {
 				ModelName: "model-vision",
 				Provider: &ypb.ThirdPartyApplicationConfig{
 					Type:    "aibalance",
-					APIKey:  "not-free-user", // 不会替换
+					APIKey:  "not-free-user", // 同为 aibalance，会被替换为新 onlinekey
 					BaseURL: "https://aibalance.yaklang.com/v1",
 				},
 			},
@@ -247,7 +247,7 @@ func TestGetApiKey_ReplaceAPIKeys(t *testing.T) {
 			assert.Equal(t, newAPIKey, m.Provider.APIKey)
 		}
 		for _, m := range updatedCfg.VisionModels {
-			assert.Equal(t, "not-free-user", m.Provider.APIKey) // 未被替换
+			assert.Equal(t, newAPIKey, m.Provider.APIKey) // aibalance 类型一并被替换为 onlinekey
 		}
 
 	})
