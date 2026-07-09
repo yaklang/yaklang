@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -41,6 +42,13 @@ type sfCheck struct {
 type checkItem struct {
 	*sf.RecursiveConfigItem
 	frame *sf.SFFrame
+	// matchCache memoizes per-node until/hook match results (keyed by SSA
+	// node ID) so the same node is not re-queried via a full SF sub-query
+	// when it appears in multiple descent paths. CheckUntil is the hot
+	// path: 156 sources each with deep descents call CheckUntil per node,
+	// and the same node recurs across sources. Without this cache every
+	// node visit ran a full QuerySyntaxflow, consuming 24.79% of CPU.
+	matchCache sync.Map
 }
 
 // appendSubRuleFromNativeParam adds one include/exclude/hook/until sub-rule from a native-call param if non-empty.
@@ -237,7 +245,16 @@ func (r *sfCheck) check(
 	// output. No per-path re-snapshot — re-snapshotting per path is what made
 	// Opt A over-skip (a key merged by an earlier path looked "inherited" to a
 	// later path, so the later path's re-bind of it was skipped).
+	nodeId := extractCheckNodeId(path)
 	for _, it := range items {
+		if nodeId > 0 {
+			if cached, ok := it.matchCache.Load(nodeId); ok {
+				if !fn(it.Key, cached.(bool)) {
+					return
+				}
+				continue
+			}
+		}
 		res, err := it.check(path, opt...)
 		if err != nil {
 			log.Errorf("check path value %v fail: %v", path.String(), err)
@@ -246,10 +263,30 @@ func (r *sfCheck) check(
 
 		match := isMatch(res)
 		r.clearup(res.GetSFResult())
+		if nodeId > 0 {
+			it.matchCache.Store(nodeId, match)
+		}
 		if !fn(it.Key, match) {
 			return
 		}
 	}
+}
+
+// extractCheckNodeId gets a stable SSA node ID from the path values for
+// cache keying. Uses the first value's GetId() which is the SSA instruction
+// ID -- stable across different descent paths within the same program.
+func extractCheckNodeId(path sf.Values) int64 {
+	var id int64
+	path.Recursive(func(op sf.ValueOperator) error {
+		if v, ok := op.(interface{ GetId() int64 }); ok {
+			if i := v.GetId(); i > 0 {
+				id = i
+				return utils.Error("done")
+			}
+		}
+		return nil
+	})
+	return id
 }
 
 func (item *checkItem) check(value sf.Values, opt ...QueryOption) (*SyntaxFlowResult, error) {
