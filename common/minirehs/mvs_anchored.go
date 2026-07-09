@@ -168,12 +168,17 @@ func (nfa *mvsNFA) existsInAnchored1(data []byte, spans []anchorSpan) bool {
 	reach := nfa.reach1
 	requireEnd := nfa.requireEnd
 	n := len(data)
-	lastHi := int(spans[len(spans)-1].hi)
+	nspan := len(spans)
+	lastHi := int(spans[nspan-1].hi)
 	si := 0
+	// 缓存当前 span 的 lo/hi 到局部变量, 推进时更新, 避免每 rune 的 spans[si].hi/lo 数组索引
+	// + int32->int 转换开销 (span 推进是 existsInAnchored1 的最大热点, profile ~24% flat).
+	curLo := int(spans[0].lo)
+	curHi := int(spans[0].hi)
 	var prev uint64
 	hasActive := false
 
-	i := alignRuneStart(data, int(spans[0].lo))
+	i := alignRuneStart(data, curLo)
 	for i < n {
 		runeStart := i
 		c := data[i]
@@ -187,11 +192,17 @@ func (nfa *mvsNFA) existsInAnchored1(data []byte, spans []anchorSpan) bool {
 			ni = i + size
 		}
 
-		for si < len(spans) && runeStart >= int(spans[si].hi) {
+		// span 推进: si 单调递增, 推进时更新缓存的 curLo/curHi.
+		for runeStart >= curHi {
 			si++
+			if si >= nspan {
+				break
+			}
+			curLo = int(spans[si].lo)
+			curHi = int(spans[si].hi)
 		}
 		var cand uint64
-		if si < len(spans) && runeStart >= int(spans[si].lo) {
+		if si < nspan && runeStart >= curLo {
 			cand = first
 		}
 		if hasActive {
@@ -207,7 +218,7 @@ func (nfa *mvsNFA) existsInAnchored1(data []byte, spans []anchorSpan) bool {
 			return true
 		}
 		hasActive = active != 0
-		if !hasActive && (si >= len(spans) || runeStart >= lastHi) {
+		if !hasActive && (si >= nspan || runeStart >= lastHi) {
 			return false
 		}
 		prev = active
