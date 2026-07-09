@@ -3,7 +3,6 @@ package ssaapi
 import (
 	"context"
 	"sort"
-	"strconv"
 	goatomic "sync/atomic"
 	"time"
 
@@ -379,11 +378,10 @@ func (p *Program) NewValue(inst ssa.Instruction) (*Value, error) {
 	// format-string parse + reflect boxing. NewValue is called per instruction in
 	// hot dataflow paths (alloc_objects showed fmt.Sprintf ~22% of all allocs /
 	// ~480M calls on large projects), so this is a high-frequency allocator.
-	uuidStr := "uuid-" + strconv.FormatInt(p.id.Inc(), 10)
 	v = &Value{
 		runtimeCtx:    nil,
 		ParentProgram: p,
-		uuid:          uuidStr,
+		uid:           p.id.Inc(),
 		EffectOn:      nil,
 		DependOn:      nil,
 	}
