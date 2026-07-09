@@ -205,11 +205,18 @@ func (s *SarifContext) CreateCodeFlowsFromPredecessor(v *ssaapi.Value) {
 }
 
 func (s *SarifContext) CreateLocation(artifactId int, rg *memedit.Range) *sarif.Location {
+	al := sarif.NewArtifactLocation().WithIndex(artifactId)
+	// Include the URI directly in the result location so SARIF viewers
+	// (VS Code, GitHub, etc.) can resolve the file without looking up the
+	// run.artifacts array by index. Many viewers do not resolve index refs.
+	if editor := rg.GetEditor(); editor != nil {
+		if uri := editor.GetFilename(); uri != "" {
+			al = al.WithUri(uri)
+		}
+	}
 	return sarif.NewLocation().
 		WithPhysicalLocation(
-			sarif.NewPhysicalLocation().WithArtifactLocation(
-				sarif.NewArtifactLocation().WithIndex(artifactId),
-			).WithRegion(
+			sarif.NewPhysicalLocation().WithArtifactLocation(al).WithRegion(
 				sarif.NewRegion().
 					WithStartLine(rg.GetStart().GetLine()).
 					WithStartColumn(rg.GetStart().GetColumn()).
