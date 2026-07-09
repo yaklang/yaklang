@@ -345,12 +345,16 @@ func (nfa *mvsNFA) existsInAssertAnchored1(data []byte, bound []uint8, spans []a
 	follow := nfa.follow1
 	reach := nfa.reach1
 	n := len(data)
-	lastHi := int(spans[len(spans)-1].hi)
+	nspan := len(spans)
+	lastHi := int(spans[nspan-1].hi)
 	si := 0
+	// 缓存当前 span lo/hi (同 existsInAnchored1, 省每 rune 数组索引 + int32 转换).
+	curLo := int(spans[0].lo)
+	curHi := int(spans[0].hi)
 	var prev uint64
 	hasActive := false
 
-	i := alignRuneStart(data, int(spans[0].lo))
+	i := alignRuneStart(data, curLo)
 	for i < n {
 		runeStart := i
 		c := data[i]
@@ -365,11 +369,16 @@ func (nfa *mvsNFA) existsInAssertAnchored1(data []byte, bound []uint8, spans []a
 		}
 		bpre := bound[runeStart]
 
-		for si < len(spans) && runeStart >= int(spans[si].hi) {
+		for runeStart >= curHi {
 			si++
+			if si >= nspan {
+				break
+			}
+			curLo = int(spans[si].lo)
+			curHi = int(spans[si].hi)
 		}
 		var cand uint64
-		if si < len(spans) && runeStart >= int(spans[si].lo) {
+		if si < nspan && runeStart >= curLo {
 			cand = first
 			for _, gb := range nfa.condFirst {
 				if guardHolds(gb.g, bpre) {
@@ -401,7 +410,7 @@ func (nfa *mvsNFA) existsInAssertAnchored1(data []byte, bound []uint8, spans []a
 			}
 		}
 		hasActive = active != 0
-		if !hasActive && (si >= len(spans) || runeStart >= lastHi) {
+		if !hasActive && (si >= nspan || runeStart >= lastHi) {
 			return false
 		}
 		prev = active
