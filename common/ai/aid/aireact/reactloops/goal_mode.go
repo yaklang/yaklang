@@ -6,6 +6,13 @@ func (r *ReActLoop) IsGoalModeEnabled() bool {
 	if r == nil || r.config == nil {
 		return false
 	}
+	// Goal mode is a top-level-only strategy: it forces a minimum-iteration
+	// finish gate, which must never apply to a forked sub agent (a sub agent
+	// should be free to finish as soon as its single goal is done). Even if a
+	// sub-agent config somehow had EnableGoalMode set, this guard forces it off.
+	if r.IsSubAgent() {
+		return false
+	}
 	if cfg, ok := r.config.(interface{ GetEnableGoalMode() bool }); ok {
 		return cfg.GetEnableGoalMode()
 	}

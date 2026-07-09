@@ -40,7 +40,15 @@ const reActPostSummary = `
 
 `
 
-func defaultLoopMaxIterations(cfg aicommon.AICallerConfigIf) int {
+// resolveMaxIterations computes the iteration ceiling for a loop from the
+// caller config. When goal mode is enabled it raises a too-small ceiling to
+// GoalMinIterations + buffer via EnsureGoalModeMaxIterations, so the finish
+// gate can actually open before the loop exhausts its iterations. This is the
+// single loop-level resolution point; the gRPC entry point
+// (ConvertYPBAIStartParamsToReActConfig) performs the same bump on the config
+// field as an idempotent safety net, so both programmatic and gRPC entry paths
+// are covered regardless of which one runs first.
+func resolveMaxIterations(cfg aicommon.AICallerConfigIf) int {
 	if cfg == nil {
 		return 100
 	}
@@ -77,7 +85,7 @@ func init() {
 				reactloops.WithPlanExecActionType(schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION),
 				reactloops.WithInitTask(buildInitTask(r)),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
-				reactloops.WithMaxIterations(defaultLoopMaxIterations(r.GetConfig())),
+				reactloops.WithMaxIterations(resolveMaxIterations(r.GetConfig())),
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
 				buildDefaultReactiveDataBuilder(),
@@ -136,7 +144,7 @@ func init() {
 				reactloops.WithAllowToolCall(true),
 				reactloops.WithInitTask(buildPETaskInitTask(r)),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
-				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
+				reactloops.WithMaxIterations(resolveMaxIterations(r.GetConfig())),
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
 				buildDefaultReactiveDataBuilder(),

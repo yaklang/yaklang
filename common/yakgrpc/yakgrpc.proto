@@ -2071,6 +2071,8 @@ message AIStartParams {
 message AIExecutionStrategy {
   // 为 true 时启用多 Agent 模式：顶层 ReAct 暴露并偏好 dispatch_sub_react_agents，
   // 倾向于把复杂任务拆成多个并行子 Agent 执行后再汇总。
+  // 注意：这是 prompt 层的软偏好（soft preference），不通过 schema/verifier 强制；
+  // 若 LLM 未选择 dispatch，框架不会阻拦。Goal 模式则有硬性运行时拦截。
   bool EnableMultiAgent = 1;
 
   // 为 true 时启用 Goal 模式：在达到 GoalMinIterations 之前禁止 finish 提前退出，

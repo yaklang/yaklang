@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	subAgentDepthLoopVar               = "sub_agent_depth"
+	subAgentDepthLoopVar               = reactloops.SubAgentDepthLoopVar
 	dispatchSubReactJobsLoopKey        = "dispatch_sub_react_jobs"
 	dispatchSubReactConcurrencyLoopKey = "dispatch_sub_react_concurrency"
 
@@ -293,11 +293,16 @@ func buildForkedSubReactInvoker(
 		aicommon.WithTimeline(fork.Branch),
 		aicommon.WithContext(jobCtx),
 		aicommon.WithAICallbacks(parentCfg.GetRawAICallbacks()),
-		aicommon.WithEnablePlanAndExec(false),
 		aicommon.WithEmitter(buildSubReactForwardingEmitter(parentCfg.GetEmitter(), subTaskId)),
 		aicommon.WithAgreeAuto(),
 		aicommon.WithSessionPromptState(parentCfg.SessionPromptState.ForkForSubAgent()),
 	)
+	// Sub agents must not inherit any top-level execution strategy. Even though
+	// ConvertConfigToOptions already omits EnableDispatchSubReactAgents /
+	// PreferDispatchSubReactAgents / EnableGoalMode, we disable plan and goal
+	// mode explicitly here so the sub-agent contract is self-documenting and does
+	// not silently regress if ConvertConfigToOptions propagation changes.
+	baseOpts = append(baseOpts, buildSubAgentStrategyOptions()...)
 
 	childInvoker, err := aicommon.AIRuntimeInvokerGetter(jobCtx, baseOpts...)
 	if err != nil {
@@ -331,6 +336,23 @@ func buildSubReactForwardingEmitter(parentEmitter *aicommon.Emitter, subTaskId s
 		}
 		return event
 	})
+}
+
+// buildSubAgentStrategyOptions returns the config options that strip every
+// top-level execution strategy from a forked sub agent. A sub agent must not:
+//   - open a plan (plan is a top-level orchestration concern),
+//   - be subject to the goal-mode minimum-iteration finish gate (it must be
+//     free to finish as soon as its single goal is done),
+//   - inherit the multi-agent dispatch preference (only the top-level loop
+//     dispatches; sub agents are blocked from dispatching anyway via the action
+//     filter + verifier depth check, but clearing the preference keeps the
+//     prompt honest).
+func buildSubAgentStrategyOptions() []aicommon.ConfigOption {
+	return []aicommon.ConfigOption{
+		aicommon.WithEnablePlanAndExec(false),
+		aicommon.WithEnableGoalMode(false),
+		aicommon.WithPreferDispatchSubReactAgents(false),
+	}
 }
 
 // buildSubReactLoopOptions returns the loop options applied to every forked
@@ -779,12 +801,13 @@ func writeSubReactAgentTimelineRecord(
 
 var loopAction_DispatchSubReactAgents = &reactloops.LoopAction{
 	ActionType: schema.AI_REACT_LOOP_ACTION_DISPATCH_SUB_REACT_AGENTS,
-	Description: "Dispatch multiple independent sub ReAct agents in parallel. Each sub agent inherits the current timeline snapshot as context, " +
+	Description: "Dispatch multiple INDEPENDENT sub ReAct agents in parallel. Each sub agent inherits the current timeline snapshot as context, " +
 		"runs in an isolated timeline fork, and returns one structured result record back to the parent agent. " +
-		"Use this when a task can be split into parallel sub-goals that should not pollute the parent timeline with their full execution traces. " +
-		"Sub agents cannot dispatch more sub agents. " +
-		"IMPORTANT: every dispatched sub agent MUST be mutually independent — no sub agent may depend on the input, output, or result of another sub agent in the same dispatch. " +
-		"If two sub agents are dependent, do NOT dispatch them together: dispatch the first batch now, wait for it to complete, then enter the next loop iteration to dispatch the dependent batch once the prior results are available in the timeline.",
+		"Sub agents cannot dispatch more sub agents, open plans, or be subject to goal-mode limits.\n" +
+		"WHAT THIS IS FOR: parallelizing genuinely independent workstreams that can run at the same time without talking to each other (e.g. scan host A and scan host B).\n" +
+		"WHAT THIS IS NOT FOR: (1) offloading a single sequential task you should do yourself — if the whole task is one chain of steps, do NOT dispatch it; (2) dumping every imaginable subtask into one call to avoid thinking. Only dispatch subtasks you have actually confirmed are independent.\n" +
+		"DEPENDENCY RULE: every sub agent in ONE dispatch MUST be mutually independent — none may depend on another's input or result. If B depends on A's result, do NOT batch them: dispatch A (or do A yourself) now, wait for its result to land in the timeline, then in a LATER loop iteration dispatch B once the prior result is available. Group only no-dependency subtasks into the same dispatch.\n" +
+		"GOAL QUALITY: give each sub agent a crisp, self-contained goal and a result_contract whenever possible, so it can finish and return a structured result without re-reading your reasoning.",
 	Options: []aitool.ToolOption{
 		aitool.WithStructArrayParam("dispatches",
 			[]aitool.PropertyOption{

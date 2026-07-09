@@ -60,6 +60,10 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 
 	if i.ReActMaxIteration > 0 {
 		maxIterations := i.GetReActMaxIteration()
+		// Goal-mode entry-point normalization: raise a too-small ceiling so the
+		// finish gate (GoalMinIterations) can open before iterations run out.
+		// loop_default.resolveMaxIterations applies the same bump idempotently
+		// as a safety net for programmatic (non-gRPC) entry paths.
 		if goalModeEnabled {
 			maxIterations = aicommon.EnsureGoalModeMaxIterations(maxIterations, goalMinIterations)
 		}

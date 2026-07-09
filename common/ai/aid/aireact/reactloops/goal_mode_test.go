@@ -94,3 +94,28 @@ func TestApplyGoalModeGate_NilSafe(t *testing.T) {
 	registerFinishAndAnswer(loop)
 	loop.ApplyGoalModeGate(nil, 1) // nil operator must not panic
 }
+
+// TestIsGoalModeEnabled_SubAgentForcedFalse verifies the defense-in-depth guard:
+// even if a sub-agent config somehow had EnableGoalMode set, the loop-level
+// IsSubAgent check forces goal mode off so the finish gate never applies to a
+// forked sub agent.
+func TestIsGoalModeEnabled_SubAgentForcedFalse(t *testing.T) {
+	loop, _, cfg, _ := newTodoGateTestLoop(t, nil)
+	registerFinishAndAnswer(loop)
+	cfg.enableGoalMode = true
+	cfg.goalMinIterations = 6
+
+	// Top-level: goal mode is active and blocks finish early.
+	require.True(t, loop.IsGoalModeEnabled())
+	require.True(t, loop.ShouldBlockFinishAtIteration(3))
+
+	// Mark the loop as a forked sub agent (depth 1, as buildSubReactLoopOptions
+	// does via WithVar(SubAgentDepthLoopVar, 1)).
+	loop.Set(SubAgentDepthLoopVar, 1)
+	require.True(t, loop.IsSubAgent())
+	require.False(t, loop.IsGoalModeEnabled(),
+		"sub agent must not be subject to goal mode even when config has it enabled")
+	require.False(t, loop.ShouldBlockFinishAtIteration(3))
+	require.False(t, loop.ShouldBlockFinishAtIteration(1),
+		"sub agent must be free to finish as soon as its goal is done")
+}
