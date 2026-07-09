@@ -1051,13 +1051,8 @@ func init() {
 				// Re-check the per-rule ctx + total-work budget here so the
 				// --rule-timeout / --rule-work-limit budgets bail this loop instead
 				// of the rule running for hours inside one opcode.
-				select {
-				case <-frame.GetContext().Done():
-					return utils.Errorf("context done")
-				default:
-				}
-				if frame.GetConfig().EnterWork() {
-					return utils.Errorf("work budget exceeded")
+				if err := frame.GetConfig().BailCheck(); err != nil {
+					return err
 				}
 				switch val := operator.(type) {
 				case *Value:

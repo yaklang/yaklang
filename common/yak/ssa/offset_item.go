@@ -14,12 +14,11 @@ type OffsetItem struct {
 	rangeLength int
 }
 
-// OffsetLock/OffsetUnlock/OffsetRLock/OffsetRUnlock expose the offset-map guard
-// so cross-package readers (e.g. ssaapi) can hold it while inspecting
-// OffsetMap/OffsetSortedSlice, which are otherwise unsafe under concurrent
-// scan-time lazy reloads.
-func (prog *Program) OffsetLock()    { prog.offsetMu.Lock() }
-func (prog *Program) OffsetUnlock()  { prog.offsetMu.Unlock() }
+// OffsetRLock/OffsetRUnlock expose the offset-map read lock so cross-package
+// readers (e.g. ssaapi) can hold it while inspecting OffsetMap/
+// OffsetSortedSlice, which are otherwise unsafe under concurrent scan-time lazy
+// reloads. Write-path mutations stay in-package (SetOffsetValue etc.) so no
+// public write-lock wrapper is needed.
 func (prog *Program) OffsetRLock()   { prog.offsetMu.RLock() }
 func (prog *Program) OffsetRUnlock() { prog.offsetMu.RUnlock() }
 

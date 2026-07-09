@@ -95,11 +95,16 @@ func SaveIrIndexBatch(db *gorm.DB, items []*IrIndex) {
 // UNIQUE constraint on ir_indices_v1 (only a non-unique index), and recompile
 // deletes the program's rows first (ssadb.DeleteProgramIrCode), so this is a
 // pure INSERT — never an upsert — matching the prior per-row db.Create path.
+//
+// TODO(gorm-v2): once the gorm v1->v2 migration (commit 178272476, not yet on
+// this branch) lands, replace this hand-built multi-row INSERT with
+// db.CreateInBatches(items, irIndexBatchChunk). gorm v1 (v1.9.2) panics on
+// Create(slice), so raw Exec is the only way to batch INSERT here.
 func bulkInsertIrIndex(db *gorm.DB, items []*IrIndex) error {
 	if len(items) == 0 {
 		return nil
 	}
-	const cols = 8
+	cols := len(irIndexInsertColumns)
 	placeholder := "(" + strings.Repeat("?,", cols-1) + "?)"
 	values := make([]string, 0, len(items))
 	args := make([]interface{}, 0, len(items)*cols)

@@ -5,6 +5,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
@@ -114,6 +115,26 @@ func (c *Config) GetWorkBudget() *RuleWorkBudget {
 		return nil
 	}
 	return c.workBudget
+}
+
+// BailCheck combines the per-rule context-cancellation check and the per-rule
+// work-budget check into a single call. Returns a non-nil error when the rule
+// context is done (deadline/budget cancel) or EnterWork reports the work budget
+// exceeded, so hot per-element loops (e.g. <typeName> in sf_native_call.go) can
+// bail with one call instead of repeating the select+EnterWork boilerplate.
+func (c *Config) BailCheck() error {
+	if c == nil {
+		return nil
+	}
+	select {
+	case <-c.GetContext().Done():
+		return utils.Errorf("context done")
+	default:
+	}
+	if c.EnterWork() {
+		return utils.Errorf("work budget exceeded")
+	}
+	return nil
 }
 
 func (c *Config) GetContext() context.Context {

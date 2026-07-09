@@ -36,25 +36,16 @@ func recursiveDeepChain(frame *SFFrame, element Values, handle func(operator Val
 		visited = make(map[int64]struct{})
 	}
 
-	// Honor the rule ctx so the per-rule wall-clock budget
-	// (syntaxflow_scan/runtime.go Query -> QueryWithContext -> sfvm.Config.ctx)
-	// can bail a pathological filter-chain DFS on large projects. Without this
-	// check the chain recurses unbounded and a heavy rule never returns even after
-	// its deadline fires (execRule's per-opcode ctx check never re-runs because the
-	// work is all inside this single opcode).
-	select {
-	case <-frame.GetContext().Done():
-		return utils.Errorf("context done")
-	default:
-	}
-
 	var next []ValueOperator
 
-	// nodeCtxCheck aborts the inner per-node iteration when the rule ctx is
-	// cancelled, so a pathological recursiveDeepChain on a large project bails
-	// at the per-rule budget instead of walking every node in one level. The
-	// entry-level ctx check above only re-runs on recursion; a single wide level
-	// (e.g. all calls/fields of a method) can itself enumerate millions of nodes.
+	// nodeCtxCheck aborts the per-node iteration (and the entry-level check)
+	// when the rule ctx is cancelled, so a pathological recursiveDeepChain on a
+	// large project bails at the per-rule budget instead of walking every node.
+	// Without this check the chain recurses unbounded and a heavy rule never
+	// returns even after its deadline fires (execRule's per-opcode ctx check
+	// never re-runs because the work is all inside this single opcode). A single
+	// wide level (e.g. all calls/fields of a method) can itself enumerate
+	// millions of nodes, so we check on every node, not just on recursion.
 	nodeCtxCheck := func() error {
 		select {
 		case <-frame.GetContext().Done():
@@ -62,6 +53,10 @@ func recursiveDeepChain(frame *SFFrame, element Values, handle func(operator Val
 		default:
 			return nil
 		}
+	}
+
+	if err := nodeCtxCheck(); err != nil {
+		return err
 	}
 
 	val, err := RunValueOperatorPipeline(element, ValuePipelineOptions{Frame: frame}, func(operator ValueOperator) (Values, error) {
