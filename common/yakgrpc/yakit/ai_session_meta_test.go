@@ -254,6 +254,35 @@ func TestTouchAISessionMetaLastUsedAt(t *testing.T) {
 	require.Equal(t, lastUsedAt.Unix(), got.UpdatedAt.Unix())
 }
 
+func TestUpdateAISessionIMMetaTouchesLastUsedAt(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+
+	sessionID := "sess-im-touch"
+	_, err = CreateOrUpdateAISessionMeta(db, sessionID, "old")
+	require.NoError(t, err)
+
+	oldTime := time.Unix(1716200000, 0)
+	require.NoError(t, db.Model(&schema.AISession{}).
+		Where("session_id = ?", sessionID).
+		UpdateColumns(map[string]any{
+			"last_used_at": oldTime,
+			"updated_at":   oldTime,
+		}).Error)
+
+	_, err = UpdateAISessionIMMeta(db, sessionID, &ypb.IMSourceMeta{
+		Platform: "feishu",
+		ChatType: "private",
+	})
+	require.NoError(t, err)
+
+	got, err := GetAISessionMetaBySessionID(db, sessionID)
+	require.NoError(t, err)
+	require.Greater(t, got.LastUsedAt.Unix(), oldTime.Unix())
+	require.Greater(t, got.UpdatedAt.Unix(), oldTime.Unix())
+}
+
 func TestCreateOrUpdateAISessionMetaOnStart(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
@@ -370,4 +399,14 @@ func TestMigrateAISessionMetaFromEvents(t *testing.T) {
 	var s3 schema.AISession
 	err = projectDB.Where("session_id = ?", "sess-3").First(&s3).Error
 	require.True(t, gorm.IsRecordNotFoundError(err))
+}
+
+func TestExtractTitleFromEventContent_PrefersQuestionField(t *testing.T) {
+	title := extractTitleFromEventContent([]byte(`{"focus_mode":"","question":"  你好，你是什么模型  "}`))
+	require.Equal(t, "你好，你是什么模型", title)
+}
+
+func TestExtractTitleFromEventContent_DoesNotUseRawStructuredJSON(t *testing.T) {
+	title := extractTitleFromEventContent([]byte(`{"focus_mode":"","unknown":"not a display title"}`))
+	require.Empty(t, title)
 }

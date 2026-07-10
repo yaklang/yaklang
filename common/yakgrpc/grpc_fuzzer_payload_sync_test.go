@@ -45,7 +45,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SyncPayloadGroup_UnequalLength(t *testing.T) {
 	})
 
 	stream, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
-		Request: fmt.Sprintf("POST / HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\n\r\n{{payload::1(%s)}}---{{payload::1(%s)}}", utils.HostPort(host, port), groupShort, groupLong),
+		Request:          fmt.Sprintf("POST / HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\n\r\n{{payload::1(%s)}}---{{payload::1(%s)}}", utils.HostPort(host, port), groupShort, groupLong),
 		ForceFuzz:        true,
 		FuzzTagSyncIndex: true,
 		Concurrent:       1,
@@ -86,7 +86,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SyncPayloadGroup_PreserveAtSign(t *testing.T) {
 	})
 
 	stream, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
-		Request: fmt.Sprintf("POST / HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\n\r\n{{payload::1(%s)}}---{{payload::1(%s)}}", utils.HostPort(host, port), groupLeft, groupRight),
+		Request:          fmt.Sprintf("POST / HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\n\r\n{{payload::1(%s)}}---{{payload::1(%s)}}", utils.HostPort(host, port), groupLeft, groupRight),
 		ForceFuzz:        true,
 		FuzzTagSyncIndex: true,
 		Concurrent:       1,
@@ -121,7 +121,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SyncPayloadGroup_RepLabel(t *testing.T) {
 	})
 
 	stream, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
-		Request: fmt.Sprintf("POST / HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\n\r\n{{payload::1::rep(%s)}}---{{payload::1(%s)}}", utils.HostPort(host, port), groupShort, groupLong),
+		Request:          fmt.Sprintf("POST / HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\n\r\n{{payload::1::rep(%s)}}---{{payload::1(%s)}}", utils.HostPort(host, port), groupShort, groupLong),
 		ForceFuzz:        true,
 		FuzzTagSyncIndex: true,
 		Concurrent:       1,

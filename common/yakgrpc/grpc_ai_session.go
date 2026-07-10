@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/aisessioncleanup"
@@ -48,6 +49,10 @@ func (s *Server) QueryAISession(ctx context.Context, req *ypb.QueryAISessionRequ
 		if err != nil {
 			return nil, err
 		}
+		imMeta, err := yakit.UnmarshalAISessionIMSource(item.IMSource)
+		if err != nil {
+			log.Warnf("unmarshal im source meta for session %s failed: %v", item.SessionID, err)
+		}
 		if !item.LastUsedAt.IsZero() {
 			lastUsedAt = item.LastUsedAt.Unix()
 		}
@@ -65,6 +70,7 @@ func (s *Server) QueryAISession(ctx context.Context, req *ypb.QueryAISessionRequ
 			RelatedRuntimeIDs: runtimeIDs,
 			StartParams:       startParams,
 			Source:            item.Source,
+			IMSourceMeta:      imMeta,
 		})
 	}
 
@@ -99,6 +105,32 @@ func (s *Server) UpdateAISessionTitle(ctx context.Context, req *ypb.UpdateAISess
 			return nil, err
 		}
 		affected = 1
+	}
+
+	return &ypb.DbOperateMessage{
+		TableName:    (&schema.AISession{}).TableName(),
+		Operation:    "update",
+		EffectRows:   affected,
+		ExtraMessage: "session_id=" + sessionID,
+	}, nil
+}
+
+// UpdateAISessionIMMeta 由 IM 引擎在建立 agent 会话成功后调用，回写结构化 IM 元数据
+// （平台 / 会话类型 / 可读标题 / 发送者 / 话题），用于 Yakit 历史列表展示与按平台筛选。
+// best-effort：写失败只返回错误，不影响 agent 主流程。
+func (s *Server) UpdateAISessionIMMeta(ctx context.Context, req *ypb.UpdateAISessionIMMetaRequest) (*ypb.DbOperateMessage, error) {
+	if req == nil {
+		return nil, utils.Errorf("request is nil")
+	}
+	sessionID := strings.TrimSpace(req.GetSessionID())
+	if sessionID == "" {
+		return nil, utils.Errorf("session_id is required")
+	}
+
+	db := s.GetProjectDatabase()
+	affected, err := yakit.UpdateAISessionIMMeta(db, sessionID, req.GetMeta())
+	if err != nil {
+		return nil, err
 	}
 
 	return &ypb.DbOperateMessage{

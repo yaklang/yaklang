@@ -26,8 +26,8 @@ func (s *Server) SaveFuzzerConfig(ctx context.Context, req *ypb.SaveFuzzerConfig
 			Type:   v.Type,
 			Config: v.Config,
 		}
-		count,err := yakit.CreateOrUpdateWebFuzzerConfig(s.GetProjectDatabase(), item)
-		msg.EffectRows +=count
+		count, err := yakit.CreateOrUpdateWebFuzzerConfig(s.GetProjectDatabase(), item)
+		msg.EffectRows += count
 		errs = utils.JoinErrors(errs, err)
 	}
 	return msg, errs
@@ -36,7 +36,7 @@ func (s *Server) SaveFuzzerConfig(ctx context.Context, req *ypb.SaveFuzzerConfig
 func (s *Server) QueryFuzzerConfig(ctx context.Context, params *ypb.QueryFuzzerConfigRequest) (*ypb.QueryFuzzerConfigResponse, error) {
 	var res []*ypb.FuzzerConfig
 	fuzzerConfig, err := yakit.QueryWebFuzzerConfig(s.GetProjectDatabase(), params)
- 	if err != nil {
+	if err != nil {
 		return nil, err
 	}
 	for _, v := range fuzzerConfig {

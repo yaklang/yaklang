@@ -543,6 +543,7 @@ const (
 	Yak_DeleteAIEvent_FullMethodName                              = "/ypb.Yak/DeleteAIEvent"
 	Yak_QueryAISession_FullMethodName                             = "/ypb.Yak/QueryAISession"
 	Yak_UpdateAISessionTitle_FullMethodName                       = "/ypb.Yak/UpdateAISessionTitle"
+	Yak_UpdateAISessionIMMeta_FullMethodName                      = "/ypb.Yak/UpdateAISessionIMMeta"
 	Yak_DeleteAISession_FullMethodName                            = "/ypb.Yak/DeleteAISession"
 	Yak_GetRandomAIMaterials_FullMethodName                       = "/ypb.Yak/GetRandomAIMaterials"
 	Yak_ExportAILogs_FullMethodName                               = "/ypb.Yak/ExportAILogs"
@@ -637,6 +638,15 @@ const (
 	Yak_SetMCPToolEnabled_FullMethodName                          = "/ypb.Yak/SetMCPToolEnabled"
 	Yak_RAGCollectionSearch_FullMethodName                        = "/ypb.Yak/RAGCollectionSearch"
 	Yak_DownloadRAGs_FullMethodName                               = "/ypb.Yak/DownloadRAGs"
+	Yak_SaveIMBot_FullMethodName                                  = "/ypb.Yak/SaveIMBot"
+	Yak_ListIMBots_FullMethodName                                 = "/ypb.Yak/ListIMBots"
+	Yak_DeleteIMBot_FullMethodName                                = "/ypb.Yak/DeleteIMBot"
+	Yak_TestIMBot_FullMethodName                                  = "/ypb.Yak/TestIMBot"
+	Yak_StartIMOnboarding_FullMethodName                          = "/ypb.Yak/StartIMOnboarding"
+	Yak_StartIMControl_FullMethodName                             = "/ypb.Yak/StartIMControl"
+	Yak_StopIMControl_FullMethodName                              = "/ypb.Yak/StopIMControl"
+	Yak_SubscribeIMControlState_FullMethodName                    = "/ypb.Yak/SubscribeIMControlState"
+	Yak_UpdateIMControlConfig_FullMethodName                      = "/ypb.Yak/UpdateIMControlConfig"
 )
 
 // YakClient is the client API for Yak service.
@@ -1312,6 +1322,7 @@ type YakClient interface {
 	DeleteAIEvent(ctx context.Context, in *AIEventDeleteRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	QueryAISession(ctx context.Context, in *QueryAISessionRequest, opts ...grpc.CallOption) (*QueryAISessionResponse, error)
 	UpdateAISessionTitle(ctx context.Context, in *UpdateAISessionTitleRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	UpdateAISessionIMMeta(ctx context.Context, in *UpdateAISessionIMMetaRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	DeleteAISession(ctx context.Context, in *DeleteAISessionRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	GetRandomAIMaterials(ctx context.Context, in *GetRandomAIMaterialsRequest, opts ...grpc.CallOption) (*GetRandomAIMaterialsResponse, error)
 	ExportAILogs(ctx context.Context, in *ExportAILogsRequest, opts ...grpc.CallOption) (*ExportAILogsResponse, error)
@@ -1421,6 +1432,23 @@ type YakClient interface {
 	RAGCollectionSearch(ctx context.Context, in *RAGCollectionSearchRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RAGCollectionSearchResponse], error)
 	// Download rags
 	DownloadRAGs(ctx context.Context, in *DownloadRAGsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
+	// IM Bot 远程通知：保存 / 列出 / 删除 / 测试连接（飞书、钉钉等 IM 平台 bot 凭证）
+	SaveIMBot(ctx context.Context, in *SaveIMBotRequest, opts ...grpc.CallOption) (*SaveIMBotResponse, error)
+	ListIMBots(ctx context.Context, in *ListIMBotRequest, opts ...grpc.CallOption) (*ListIMBotResponse, error)
+	DeleteIMBot(ctx context.Context, in *DeleteIMBotRequest, opts ...grpc.CallOption) (*DeleteIMBotResponse, error)
+	TestIMBot(ctx context.Context, in *TestIMBotRequest, opts ...grpc.CallOption) (*TestIMBotResponse, error)
+	// IM 扫码注册（device-code onboarding）：平台无关的单入口。
+	// 按 Request.Platform 路由到对应平台的 onboarding 流程（飞书/钉钉/未来的 wecom 等），
+	// 流式推送「二维码/等待/成功/失败」状态。新增平台只需注册 notify driver descriptor，proto 永不动。
+	StartIMOnboarding(ctx context.Context, in *StartIMOnboardingRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[IMOnboardingEvent], error)
+	// IM 远程控制：启动/停止/订阅 IM Engine 状态。
+	// 启动后，已配置且启用的 IM bot（飞书/钉钉）开始监听入站消息，
+	// 用户在 IM 端通过斜杠命令控制会话，或发送普通消息交给 AI agent 执行。
+	StartIMControl(ctx context.Context, in *StartIMControlRequest, opts ...grpc.CallOption) (*StartIMControlResponse, error)
+	StopIMControl(ctx context.Context, in *StopIMControlRequest, opts ...grpc.CallOption) (*StopIMControlResponse, error)
+	SubscribeIMControlState(ctx context.Context, in *SubscribeIMControlStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[IMControlStateEvent], error)
+	// 热更新 IM 回复配置（转发回复开关 / 回复颗粒度），无需重启 IM Engine。
+	UpdateIMControlConfig(ctx context.Context, in *UpdateIMControlConfigRequest, opts ...grpc.CallOption) (*UpdateIMControlConfigResponse, error)
 }
 
 type yakClient struct {
@@ -7436,6 +7464,16 @@ func (c *yakClient) UpdateAISessionTitle(ctx context.Context, in *UpdateAISessio
 	return out, nil
 }
 
+func (c *yakClient) UpdateAISessionIMMeta(ctx context.Context, in *UpdateAISessionIMMetaRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_UpdateAISessionIMMeta_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) DeleteAISession(ctx context.Context, in *DeleteAISessionRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DbOperateMessage)
@@ -8535,6 +8573,114 @@ func (c *yakClient) DownloadRAGs(ctx context.Context, in *DownloadRAGsRequest, o
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_DownloadRAGsClient = grpc.ServerStreamingClient[ExecResult]
 
+func (c *yakClient) SaveIMBot(ctx context.Context, in *SaveIMBotRequest, opts ...grpc.CallOption) (*SaveIMBotResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SaveIMBotResponse)
+	err := c.cc.Invoke(ctx, Yak_SaveIMBot_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) ListIMBots(ctx context.Context, in *ListIMBotRequest, opts ...grpc.CallOption) (*ListIMBotResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListIMBotResponse)
+	err := c.cc.Invoke(ctx, Yak_ListIMBots_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteIMBot(ctx context.Context, in *DeleteIMBotRequest, opts ...grpc.CallOption) (*DeleteIMBotResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteIMBotResponse)
+	err := c.cc.Invoke(ctx, Yak_DeleteIMBot_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) TestIMBot(ctx context.Context, in *TestIMBotRequest, opts ...grpc.CallOption) (*TestIMBotResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TestIMBotResponse)
+	err := c.cc.Invoke(ctx, Yak_TestIMBot_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) StartIMOnboarding(ctx context.Context, in *StartIMOnboardingRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[IMOnboardingEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[114], Yak_StartIMOnboarding_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[StartIMOnboardingRequest, IMOnboardingEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_StartIMOnboardingClient = grpc.ServerStreamingClient[IMOnboardingEvent]
+
+func (c *yakClient) StartIMControl(ctx context.Context, in *StartIMControlRequest, opts ...grpc.CallOption) (*StartIMControlResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StartIMControlResponse)
+	err := c.cc.Invoke(ctx, Yak_StartIMControl_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) StopIMControl(ctx context.Context, in *StopIMControlRequest, opts ...grpc.CallOption) (*StopIMControlResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StopIMControlResponse)
+	err := c.cc.Invoke(ctx, Yak_StopIMControl_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) SubscribeIMControlState(ctx context.Context, in *SubscribeIMControlStateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[IMControlStateEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[115], Yak_SubscribeIMControlState_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[SubscribeIMControlStateRequest, IMControlStateEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_SubscribeIMControlStateClient = grpc.ServerStreamingClient[IMControlStateEvent]
+
+func (c *yakClient) UpdateIMControlConfig(ctx context.Context, in *UpdateIMControlConfigRequest, opts ...grpc.CallOption) (*UpdateIMControlConfigResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateIMControlConfigResponse)
+	err := c.cc.Invoke(ctx, Yak_UpdateIMControlConfig_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility.
@@ -9208,6 +9354,7 @@ type YakServer interface {
 	DeleteAIEvent(context.Context, *AIEventDeleteRequest) (*DbOperateMessage, error)
 	QueryAISession(context.Context, *QueryAISessionRequest) (*QueryAISessionResponse, error)
 	UpdateAISessionTitle(context.Context, *UpdateAISessionTitleRequest) (*DbOperateMessage, error)
+	UpdateAISessionIMMeta(context.Context, *UpdateAISessionIMMetaRequest) (*DbOperateMessage, error)
 	DeleteAISession(context.Context, *DeleteAISessionRequest) (*DbOperateMessage, error)
 	GetRandomAIMaterials(context.Context, *GetRandomAIMaterialsRequest) (*GetRandomAIMaterialsResponse, error)
 	ExportAILogs(context.Context, *ExportAILogsRequest) (*ExportAILogsResponse, error)
@@ -9317,6 +9464,23 @@ type YakServer interface {
 	RAGCollectionSearch(*RAGCollectionSearchRequest, grpc.ServerStreamingServer[RAGCollectionSearchResponse]) error
 	// Download rags
 	DownloadRAGs(*DownloadRAGsRequest, grpc.ServerStreamingServer[ExecResult]) error
+	// IM Bot 远程通知：保存 / 列出 / 删除 / 测试连接（飞书、钉钉等 IM 平台 bot 凭证）
+	SaveIMBot(context.Context, *SaveIMBotRequest) (*SaveIMBotResponse, error)
+	ListIMBots(context.Context, *ListIMBotRequest) (*ListIMBotResponse, error)
+	DeleteIMBot(context.Context, *DeleteIMBotRequest) (*DeleteIMBotResponse, error)
+	TestIMBot(context.Context, *TestIMBotRequest) (*TestIMBotResponse, error)
+	// IM 扫码注册（device-code onboarding）：平台无关的单入口。
+	// 按 Request.Platform 路由到对应平台的 onboarding 流程（飞书/钉钉/未来的 wecom 等），
+	// 流式推送「二维码/等待/成功/失败」状态。新增平台只需注册 notify driver descriptor，proto 永不动。
+	StartIMOnboarding(*StartIMOnboardingRequest, grpc.ServerStreamingServer[IMOnboardingEvent]) error
+	// IM 远程控制：启动/停止/订阅 IM Engine 状态。
+	// 启动后，已配置且启用的 IM bot（飞书/钉钉）开始监听入站消息，
+	// 用户在 IM 端通过斜杠命令控制会话，或发送普通消息交给 AI agent 执行。
+	StartIMControl(context.Context, *StartIMControlRequest) (*StartIMControlResponse, error)
+	StopIMControl(context.Context, *StopIMControlRequest) (*StopIMControlResponse, error)
+	SubscribeIMControlState(*SubscribeIMControlStateRequest, grpc.ServerStreamingServer[IMControlStateEvent]) error
+	// 热更新 IM 回复配置（转发回复开关 / 回复颗粒度），无需重启 IM Engine。
+	UpdateIMControlConfig(context.Context, *UpdateIMControlConfigRequest) (*UpdateIMControlConfigResponse, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -10899,6 +11063,9 @@ func (UnimplementedYakServer) QueryAISession(context.Context, *QueryAISessionReq
 func (UnimplementedYakServer) UpdateAISessionTitle(context.Context, *UpdateAISessionTitleRequest) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateAISessionTitle not implemented")
 }
+func (UnimplementedYakServer) UpdateAISessionIMMeta(context.Context, *UpdateAISessionIMMetaRequest) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateAISessionIMMeta not implemented")
+}
 func (UnimplementedYakServer) DeleteAISession(context.Context, *DeleteAISessionRequest) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteAISession not implemented")
 }
@@ -11180,6 +11347,33 @@ func (UnimplementedYakServer) RAGCollectionSearch(*RAGCollectionSearchRequest, g
 }
 func (UnimplementedYakServer) DownloadRAGs(*DownloadRAGsRequest, grpc.ServerStreamingServer[ExecResult]) error {
 	return status.Errorf(codes.Unimplemented, "method DownloadRAGs not implemented")
+}
+func (UnimplementedYakServer) SaveIMBot(context.Context, *SaveIMBotRequest) (*SaveIMBotResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SaveIMBot not implemented")
+}
+func (UnimplementedYakServer) ListIMBots(context.Context, *ListIMBotRequest) (*ListIMBotResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListIMBots not implemented")
+}
+func (UnimplementedYakServer) DeleteIMBot(context.Context, *DeleteIMBotRequest) (*DeleteIMBotResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteIMBot not implemented")
+}
+func (UnimplementedYakServer) TestIMBot(context.Context, *TestIMBotRequest) (*TestIMBotResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method TestIMBot not implemented")
+}
+func (UnimplementedYakServer) StartIMOnboarding(*StartIMOnboardingRequest, grpc.ServerStreamingServer[IMOnboardingEvent]) error {
+	return status.Errorf(codes.Unimplemented, "method StartIMOnboarding not implemented")
+}
+func (UnimplementedYakServer) StartIMControl(context.Context, *StartIMControlRequest) (*StartIMControlResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StartIMControl not implemented")
+}
+func (UnimplementedYakServer) StopIMControl(context.Context, *StopIMControlRequest) (*StopIMControlResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StopIMControl not implemented")
+}
+func (UnimplementedYakServer) SubscribeIMControlState(*SubscribeIMControlStateRequest, grpc.ServerStreamingServer[IMControlStateEvent]) error {
+	return status.Errorf(codes.Unimplemented, "method SubscribeIMControlState not implemented")
+}
+func (UnimplementedYakServer) UpdateIMControlConfig(context.Context, *UpdateIMControlConfigRequest) (*UpdateIMControlConfigResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateIMControlConfig not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 func (UnimplementedYakServer) testEmbeddedByValue()             {}
@@ -19909,6 +20103,24 @@ func _Yak_UpdateAISessionTitle_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_UpdateAISessionIMMeta_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateAISessionIMMetaRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateAISessionIMMeta(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateAISessionIMMeta_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateAISessionIMMeta(ctx, req.(*UpdateAISessionIMMetaRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_DeleteAISession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteAISessionRequest)
 	if err := dec(in); err != nil {
@@ -21459,6 +21671,154 @@ func _Yak_DownloadRAGs_Handler(srv interface{}, stream grpc.ServerStream) error 
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_DownloadRAGsServer = grpc.ServerStreamingServer[ExecResult]
+
+func _Yak_SaveIMBot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SaveIMBotRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).SaveIMBot(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_SaveIMBot_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).SaveIMBot(ctx, req.(*SaveIMBotRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_ListIMBots_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListIMBotRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ListIMBots(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_ListIMBots_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ListIMBots(ctx, req.(*ListIMBotRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteIMBot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteIMBotRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteIMBot(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteIMBot_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteIMBot(ctx, req.(*DeleteIMBotRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_TestIMBot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TestIMBotRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).TestIMBot(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_TestIMBot_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).TestIMBot(ctx, req.(*TestIMBotRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_StartIMOnboarding_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StartIMOnboardingRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).StartIMOnboarding(m, &grpc.GenericServerStream[StartIMOnboardingRequest, IMOnboardingEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_StartIMOnboardingServer = grpc.ServerStreamingServer[IMOnboardingEvent]
+
+func _Yak_StartIMControl_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartIMControlRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).StartIMControl(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_StartIMControl_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).StartIMControl(ctx, req.(*StartIMControlRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_StopIMControl_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StopIMControlRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).StopIMControl(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_StopIMControl_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).StopIMControl(ctx, req.(*StopIMControlRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_SubscribeIMControlState_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(SubscribeIMControlStateRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).SubscribeIMControlState(m, &grpc.GenericServerStream[SubscribeIMControlStateRequest, IMControlStateEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_SubscribeIMControlStateServer = grpc.ServerStreamingServer[IMControlStateEvent]
+
+func _Yak_UpdateIMControlConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateIMControlConfigRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateIMControlConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateIMControlConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateIMControlConfig(ctx, req.(*UpdateIMControlConfigRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
 
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
@@ -23184,6 +23544,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_UpdateAISessionTitle_Handler,
 		},
 		{
+			MethodName: "UpdateAISessionIMMeta",
+			Handler:    _Yak_UpdateAISessionIMMeta_Handler,
+		},
+		{
 			MethodName: "DeleteAISession",
 			Handler:    _Yak_DeleteAISession_Handler,
 		},
@@ -23482,6 +23846,34 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetMCPToolEnabled",
 			Handler:    _Yak_SetMCPToolEnabled_Handler,
+		},
+		{
+			MethodName: "SaveIMBot",
+			Handler:    _Yak_SaveIMBot_Handler,
+		},
+		{
+			MethodName: "ListIMBots",
+			Handler:    _Yak_ListIMBots_Handler,
+		},
+		{
+			MethodName: "DeleteIMBot",
+			Handler:    _Yak_DeleteIMBot_Handler,
+		},
+		{
+			MethodName: "TestIMBot",
+			Handler:    _Yak_TestIMBot_Handler,
+		},
+		{
+			MethodName: "StartIMControl",
+			Handler:    _Yak_StartIMControl_Handler,
+		},
+		{
+			MethodName: "StopIMControl",
+			Handler:    _Yak_StopIMControl_Handler,
+		},
+		{
+			MethodName: "UpdateIMControlConfig",
+			Handler:    _Yak_UpdateIMControlConfig_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
@@ -24070,6 +24462,16 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "DownloadRAGs",
 			Handler:       _Yak_DownloadRAGs_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "StartIMOnboarding",
+			Handler:       _Yak_StartIMOnboarding_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "SubscribeIMControlState",
+			Handler:       _Yak_SubscribeIMControlState_Handler,
 			ServerStreams: true,
 		},
 	},

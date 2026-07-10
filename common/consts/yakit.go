@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	initYakitDatabaseRetError   error
-	initYakitDatabaseOnce       = new(sync.Once)
+	initYakitDatabaseRetError  error
+	initYakitDatabaseOnce      = new(sync.Once)
 	projectDataBase            *gorm.DB
 	profileDatabase            *gorm.DB
 	debugProjectDatabase       = false
@@ -76,9 +76,16 @@ func BindProjectDatabase(db *gorm.DB, path string) {
 func BindProfileDatabase(db *gorm.DB, path string) {
 	profileDatabase = db
 	currentProfileDatabasePath = path
+	schema.SetGormProfileDatabase(db)
 }
 
 func GetGormProfileDatabase() *gorm.DB {
+	if profileDatabase != nil {
+		if debugProfileDatabase {
+			return profileDatabase.Debug()
+		}
+		return profileDatabase
+	}
 	initYakitDatabase()
 	if debugProfileDatabase {
 		return profileDatabase.Debug()
@@ -87,6 +94,12 @@ func GetGormProfileDatabase() *gorm.DB {
 }
 
 func GetGormProjectDatabase() *gorm.DB {
+	if projectDataBase != nil {
+		if debugProjectDatabase {
+			return projectDataBase.Debug()
+		}
+		return projectDataBase
+	}
 	initYakitDatabase()
 	if debugProjectDatabase {
 		return projectDataBase.Debug()
@@ -96,6 +109,9 @@ func GetGormProjectDatabase() *gorm.DB {
 
 // GetCurrentProjectDatabasePath 返回当前项目 SQLite 数据库文件路径；仅在慢 SQL 等使用 project DB 的创建处调用
 func GetCurrentProjectDatabasePath() string {
+	if currentProjectDatabasePath != "" {
+		return currentProjectDatabasePath
+	}
 	initYakitDatabase()
 	if currentProjectDatabasePath != "" {
 		return currentProjectDatabasePath
@@ -105,6 +121,9 @@ func GetCurrentProjectDatabasePath() string {
 
 // GetCurrentProfileDatabasePath 返回当前 profile SQLite 数据库文件路径；仅在慢 SQL 等使用 profile DB 的创建处调用
 func GetCurrentProfileDatabasePath() string {
+	if currentProfileDatabasePath != "" {
+		return currentProfileDatabasePath
+	}
 	initYakitDatabase()
 	if currentProfileDatabasePath != "" {
 		return currentProfileDatabasePath
@@ -173,23 +192,27 @@ func initYakitDatabase() error {
 		)
 
 		/* 先创建插件数据库 */
-		profileDatabase, err = CreateProfileDatabase(profileDatabaseName)
-		if err != nil {
-			err = utils.Errorf("init plugin-db[%v] failed: %s", profileDatabaseName, err)
-			log.Errorf("%s", err)
-			initYakitDatabaseRetError = utils.JoinErrors(initYakitDatabaseRetError, err)
+		if profileDatabase == nil {
+			profileDatabase, err = CreateProfileDatabase(profileDatabaseName)
+			if err != nil {
+				err = utils.Errorf("init plugin-db[%v] failed: %s", profileDatabaseName, err)
+				log.Errorf("%s", err)
+				initYakitDatabaseRetError = utils.JoinErrors(initYakitDatabaseRetError, err)
+			}
+			currentProfileDatabasePath = profileDatabaseName
 		}
-		currentProfileDatabasePath = profileDatabaseName
 		schema.SetGormProfileDatabase(profileDatabase)
 
 		/* 再创建项目数据库 */
-		projectDataBase, err = CreateProjectDatabase(projectDatabaseName)
-		if err != nil {
-			err = utils.Errorf("init project-db[%v] failed: %s", projectDatabaseName, err)
-			log.Errorf("%s", err)
-			initYakitDatabaseRetError = utils.JoinErrors(initYakitDatabaseRetError, err)
+		if projectDataBase == nil {
+			projectDataBase, err = CreateProjectDatabase(projectDatabaseName)
+			if err != nil {
+				err = utils.Errorf("init project-db[%v] failed: %s", projectDatabaseName, err)
+				log.Errorf("%s", err)
+				initYakitDatabaseRetError = utils.JoinErrors(initYakitDatabaseRetError, err)
+			}
+			currentProjectDatabasePath = projectDatabaseName
 		}
-		currentProjectDatabasePath = projectDatabaseName
 		schema.SetGormProjectDatabase(projectDataBase)
 
 		/* 创建SSA数据库 */

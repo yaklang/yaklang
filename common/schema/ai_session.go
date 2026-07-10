@@ -19,6 +19,12 @@ type AISession struct {
 	// Source identifies who started the session (e.g. ide, cli); indexed for filtering.
 	Source string `json:"source" gorm:"index;type:varchar(128)"`
 
+	// IMSource stores structured IM metadata JSON when Source == "im"
+	// (platform / chatType / chatTitle / senderName / threadID), empty otherwise.
+	// Populated best-effort by the IM engine via UpdateAISessionIMMeta; AutoMigrate
+	// adds the column automatically. Not indexed (filtering stays on Source).
+	IMSource string `json:"im_source" gorm:"column:im_source;type:text"`
+
 	// RelatedRuntimeIDS stores a JSON-encoded string array of related runtime UUIDs.
 	RelatedRuntimeIDS string `json:"related_runtime_ids" gorm:"column:related_runtime_ids;type:text"`
 }

@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"sync"
 	"time"
@@ -372,7 +373,10 @@ func (s *Server) attachToRunningAIReActSession(
 	debugStreamPrinter := aicommon.GetDefaultDebugStreamPrinter()
 	aicommon.EnsureLogFlushWrapperInstalled()
 
-	feedback := func(e *schema.AiOutputEvent) {
+	sendEvent := func(e *schema.AiOutputEvent) error {
+		if e == nil {
+			return nil
+		}
 		if e.Timestamp <= 0 {
 			e.Timestamp = time.Now().Unix()
 		}
@@ -386,11 +390,15 @@ func (s *Server) attachToRunningAIReActSession(
 		})
 
 		if stream.Context().Err() != nil {
-			return
+			return nil
 		}
 		sendMu.Lock()
 		defer sendMu.Unlock()
-		if err := stream.Send(e.ToGRPC()); err != nil {
+		return stream.Send(e.ToGRPC())
+	}
+
+	feedback := func(e *schema.AiOutputEvent) {
+		if err := sendEvent(e); err != nil {
 			log.Errorf("send re-act event to attached stream failed: %v", err)
 		}
 	}
@@ -423,10 +431,100 @@ func (s *Server) attachToRunningAIReActSession(
 		if event.GetIsStart() {
 			continue
 		}
+		if event.GetIsSyncMessage() && event.GetSyncType() == aicommon.SYNC_TYPE_RECOVERY_HISTORY {
+			if err := s.sendAttachedRecoveryHistory(stream.Context(), sendEvent, persistentSession, event); err != nil {
+				log.Warnf("send attached recovery history failed: %v", err)
+			}
+			continue
+		}
 		if err := runningReAct.SendInputEvent(event); err != nil {
 			log.Warnf("forward input to running session failed: %v", err)
 		}
 	}
+}
+
+const attachedRecoveryHistoryBlockLimit = 20
+
+func (s *Server) sendAttachedRecoveryHistory(
+	ctx context.Context,
+	send func(*schema.AiOutputEvent) error,
+	persistentSession string,
+	event *ypb.AIInputEvent,
+) error {
+	db := s.GetProjectDatabase()
+	if db == nil {
+		return sendAttachedSyncError(send, "recovery_history", utils.Errorf("db is nil"), event.GetSyncID())
+	}
+
+	sessionID := persistentSession
+	startID := int64(0)
+	limit := attachedRecoveryHistoryBlockLimit
+
+	if raw := event.GetSyncJsonInput(); raw != "" {
+		var params map[string]interface{}
+		if err := json.Unmarshal([]byte(raw), &params); err != nil {
+			return sendAttachedSyncError(send, "recovery_history", utils.Errorf("failed to parse recovery history params: %v", err), event.GetSyncID())
+		}
+		if sid := utils.InterfaceToString(params["session_id"]); sid != "" {
+			sessionID = sid
+		}
+		if rawStartID, ok := params["start_id"]; ok {
+			startID = int64(utils.InterfaceToInt(rawStartID))
+		}
+		if rawLimit, ok := params["limit"]; ok {
+			if parsedLimit := utils.InterfaceToInt(rawLimit); parsedLimit > 0 {
+				limit = parsedLimit
+			}
+		}
+	}
+
+	if sessionID == "" {
+		return sendAttachedSyncError(send, "recovery_history", utils.Errorf("session_id is empty"), event.GetSyncID())
+	}
+
+	eventCh, result, err := yakit.YieldAIEventRecoveryHistory(ctx, db, sessionID, startID, limit)
+	if err != nil {
+		return sendAttachedSyncError(send, "recovery_history", err, event.GetSyncID())
+	}
+	for recoveredEvent := range eventCh {
+		if recoveredEvent == nil {
+			continue
+		}
+		recoveredEvent.IsSync = true
+		if err := send(recoveredEvent); err != nil {
+			return err
+		}
+	}
+
+	return sendAttachedSyncJSON(send, schema.EVENT_TYPE_STRUCTURED, "recovery_history", map[string]interface{}{
+		"session_id":         sessionID,
+		"requested_start_id": startID,
+		"block_count":        result.BlockCount,
+		"event_count":        result.EventCount,
+		"next_start_id":      result.NextStartID,
+		"has_more":           result.HasMore,
+	}, event.GetSyncID())
+}
+
+func sendAttachedSyncError(send func(*schema.AiOutputEvent) error, nodeID string, err error, syncID string) error {
+	if err == nil {
+		return nil
+	}
+	return sendAttachedSyncJSON(send, schema.EVENT_TYPE_STRUCTURED, nodeID, map[string]any{
+		"error": err.Error(),
+	}, syncID)
+}
+
+func sendAttachedSyncJSON(send func(*schema.AiOutputEvent) error, eventType schema.EventType, nodeID string, payload any, syncID string) error {
+	return send(&schema.AiOutputEvent{
+		Type:      eventType,
+		NodeId:    nodeID,
+		IsJson:    true,
+		IsSync:    true,
+		Content:   utils.Jsonify(payload),
+		Timestamp: time.Now().Unix(),
+		SyncID:    syncID,
+	})
 }
 
 func (s *Server) GetRandomAIMaterials(ctx context.Context, req *ypb.GetRandomAIMaterialsRequest) (*ypb.GetRandomAIMaterialsResponse, error) {

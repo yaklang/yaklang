@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/yaklang/yaklang/common/imcontrol"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -29,6 +30,8 @@ type Server struct {
 	reverseServer      *facades.FacadeServer
 	profileDatabase    *gorm.DB
 	projectDatabase    *gorm.DB
+	// imEngine 是 IM 远程控制引擎（可选，StartIMControl 启动后非 nil）。
+	imEngine *imcontrol.Engine
 }
 
 type ServerOpts func(config *ServerConfig)
