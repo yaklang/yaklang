@@ -933,7 +933,8 @@ func TestBuildForkedSubReactInvoker_StripsTopLevelStrategies(t *testing.T) {
 		}, nil
 	}
 
-	_, err = buildForkedSubReactInvoker(parentCfg, fork, context.Background(), "sub-strategy-1")
+	taskEmitter := subagent.BuildForwardingEmitter(parentCfg.GetEmitter(), "sub-strategy-1")
+	_, err = subagent.BuildForkReactInvoker(parentCfg, fork, context.Background(), taskEmitter)
 	require.NoError(t, err)
 	require.NotNil(t, capturedCfg)
 
@@ -945,4 +946,201 @@ func TestBuildForkedSubReactInvoker_StripsTopLevelStrategies(t *testing.T) {
 		"sub agent must not open plans")
 	assert.False(t, capturedCfg.EnableDispatchSubReactAgents,
 		"sub agent must not be able to dispatch further sub agents")
+}
+
+// ---------------------------------------------------------------------------
+// Tests for rebase fix changes: early SetStatus(Processing), HotPatchOptionChan
+// removal, and buildSubAgentStrategyOptions.
+// ---------------------------------------------------------------------------
+
+// elaborationObservingInvoker wraps the dispatch test invoker to observe the
+// sub-task status at the moment InvokeQualityPriorityLiteForge is called (i.e.
+// during goal elaboration) and returns a valid elaborated goal action.
+type elaborationObservingInvoker struct {
+	*dispatchSubReactTestInvoker
+	cfg           *aicommon.Config
+	observeStatus func(aicommon.AITaskState)
+}
+
+func (e *elaborationObservingInvoker) GetConfig() aicommon.AICallerConfigIf {
+	return e.cfg
+}
+
+func (e *elaborationObservingInvoker) InvokeQualityPriorityLiteForge(
+	ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption,
+) (*aicommon.Action, error) {
+	if e.observeStatus != nil {
+		task := e.GetCurrentTask()
+		if task != nil {
+			e.observeStatus(task.GetStatus())
+		}
+	}
+	// Return a valid elaborated goal action so elaborateSubReactAgentGoal succeeds.
+	return aicommon.NewSimpleAction("sub_react_agent_goal_elaboration", aitool.InvokeParams{
+		"goal":            "Elaborated self-contained goal for sub agent",
+		"result_contract": "Return a summary of findings",
+	}), nil
+}
+
+// TestRunForkedSubReactAgentJob_SetsProcessingBeforeElaboration verifies the
+// rebase fix that moves subTask.SetStatus(Processing) to BEFORE the
+// elaborateSubReactAgentGoal call. This ensures the sub-agent task card shows
+// "processing" in the UI while the goal-elaboration AI call is in flight,
+// rather than only flipping to processing after elaboration completes.
+//
+// We intercept the child invoker's InvokeQualityPriorityLiteForge (called during
+// goal elaboration) and check that the sub-task is already in the Processing
+// state at that point — not still in Created.
+func TestRunForkedSubReactAgentJob_SetsProcessingBeforeElaboration(t *testing.T) {
+	parentTimeline := aicommon.NewTimeline(nil, nil)
+	parentTimeline.PushText(1, "parent-seed")
+	parentCfg := aicommon.NewConfig(
+		context.Background(),
+		aicommon.WithTimeline(parentTimeline),
+		aicommon.WithDisableAutoSkills(true),
+		// Provide a dummy AI callback so the sub-loop does not panic when the
+		// mock invoker cannot reach a real AI backend.
+		aicommon.WithAICallbacks(&aicommon.AICallbacks{
+			Original: func(_ aicommon.AICallerConfigIf, _ *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+				return &aicommon.AIResponse{}, nil
+			},
+		}),
+	)
+
+	parentInvoker := &configBackedDispatchInvoker{
+		dispatchSubReactTestInvoker: newDispatchSubReactTestInvoker(context.Background()),
+		cfg:                         parentCfg,
+	}
+
+	elaborationStatusCh := make(chan aicommon.AITaskState, 1)
+	origGetter := aicommon.AIRuntimeInvokerGetter
+	defer func() { aicommon.AIRuntimeInvokerGetter = origGetter }()
+	aicommon.AIRuntimeInvokerGetter = func(ctx context.Context, opts ...aicommon.ConfigOption) (aicommon.AITaskInvokeRuntime, error) {
+		cfg := aicommon.NewConfig(ctx, opts...)
+		return &elaborationObservingInvoker{
+			dispatchSubReactTestInvoker: newDispatchSubReactTestInvoker(ctx),
+			cfg:                         cfg,
+			observeStatus: func(s aicommon.AITaskState) {
+				select {
+				case elaborationStatusCh <- s:
+				default:
+				}
+			},
+		}, nil
+	}
+
+	parentTask := aicommon.NewStatefulTaskBase(
+		"parent-task", "parent input", context.Background(), parentCfg.GetEmitter(), true,
+	)
+
+	job := subReactDispatchJob{
+		Order:      1,
+		Identifier: "agent_a",
+		Goal:       "task A",
+		LoopName:   schema.AI_REACT_LOOP_NAME_DEFAULT,
+	}
+
+	result, err := runForkedSubReactAgentJob(parentInvoker, nil, parentTask, job)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	select {
+	case s := <-elaborationStatusCh:
+		assert.Equal(t, aicommon.AITaskState_Processing, s,
+			"sub-task must be in Processing state when goal elaboration runs, not Created")
+	default:
+		t.Fatal("goal elaboration was not invoked, so status-at-elaboration could not be observed")
+	}
+}
+
+// TestBuildForkReactInvoker_ChildHasFreshHotPatchOptionChan verifies the rebase
+// fix that removes the per-job WithHotPatchOptionChan from
+// BuildForkReactInvoker. The child invoker must NOT share the parent's
+// HotPatchOptionChan — it should get its own fresh channel created by
+// NewConfig. Sharing the parent's channel would cause sub-agent hot-patch
+// events to interleave with the parent's config mutations.
+func TestBuildForkReactInvoker_ChildHasFreshHotPatchOptionChan(t *testing.T) {
+	parentCfg := aicommon.NewConfig(
+		context.Background(),
+		aicommon.WithDisableAutoSkills(true),
+	)
+	require.NotNil(t, parentCfg.HotPatchOptionChan, "parent must have a HotPatchOptionChan")
+
+	parentTimeline := aicommon.NewTimeline(nil, nil)
+	parentTimeline.PushText(1, "parent-seed")
+	fork, err := parentTimeline.ForkForTask("sub-hotpatch", "sub", parentCfg, parentCfg)
+	require.NoError(t, err)
+
+	var capturedCfg *aicommon.Config
+	origGetter := aicommon.AIRuntimeInvokerGetter
+	defer func() { aicommon.AIRuntimeInvokerGetter = origGetter }()
+	aicommon.AIRuntimeInvokerGetter = func(ctx context.Context, opts ...aicommon.ConfigOption) (aicommon.AITaskInvokeRuntime, error) {
+		cfg := aicommon.NewConfig(ctx, opts...)
+		capturedCfg = cfg
+		return &configBackedDispatchInvoker{
+			dispatchSubReactTestInvoker: newDispatchSubReactTestInvoker(ctx),
+			cfg:                         cfg,
+		}, nil
+	}
+
+	taskEmitter := subagent.BuildForwardingEmitter(parentCfg.GetEmitter(), "sub-hotpatch")
+	_, err = subagent.BuildForkReactInvoker(parentCfg, fork, context.Background(), taskEmitter)
+	require.NoError(t, err)
+	require.NotNil(t, capturedCfg)
+
+	require.NotNil(t, capturedCfg.HotPatchOptionChan,
+		"child must have its own (fresh) HotPatchOptionChan, not nil")
+	assert.NotSame(t, parentCfg.HotPatchOptionChan, capturedCfg.HotPatchOptionChan,
+		"child must not share the parent's HotPatchOptionChan — each invoker needs an isolated hot-patch channel")
+}
+
+// TestBuildForkReactInvoker_StrategyOptionsDisableAllTopLevelStrategies
+// verifies that buildSubAgentStrategyOptions (applied inside
+// BuildForkReactInvoker) explicitly disables plan-and-exec, goal mode, and the
+// multi-agent dispatch preference on the child config, even when the parent
+// has them all enabled. This is a defensive belt-and-suspenders alongside
+// ConvertConfigToOptions which already omits these fields.
+func TestBuildForkReactInvoker_StrategyOptionsDisableAllTopLevelStrategies(t *testing.T) {
+	parentCfg := aicommon.NewConfig(
+		context.Background(),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithEnableMultiAgentMode(true),
+		aicommon.WithEnableGoalMode(true),
+		aicommon.WithGoalMinIterations(6),
+		aicommon.WithEnablePlanAndExec(true),
+	)
+	require.True(t, parentCfg.GetEnableGoalMode())
+	require.True(t, parentCfg.GetPreferDispatchSubReactAgents())
+	require.True(t, parentCfg.GetEnablePlanAndExec())
+
+	parentTimeline := aicommon.NewTimeline(nil, nil)
+	parentTimeline.PushText(1, "parent-seed")
+	fork, err := parentTimeline.ForkForTask("sub-strat-opts", "sub", parentCfg, parentCfg)
+	require.NoError(t, err)
+
+	var capturedCfg *aicommon.Config
+	origGetter := aicommon.AIRuntimeInvokerGetter
+	defer func() { aicommon.AIRuntimeInvokerGetter = origGetter }()
+	aicommon.AIRuntimeInvokerGetter = func(ctx context.Context, opts ...aicommon.ConfigOption) (aicommon.AITaskInvokeRuntime, error) {
+		cfg := aicommon.NewConfig(ctx, opts...)
+		capturedCfg = cfg
+		return &configBackedDispatchInvoker{
+			dispatchSubReactTestInvoker: newDispatchSubReactTestInvoker(ctx),
+			cfg:                         cfg,
+		}, nil
+	}
+
+	taskEmitter := subagent.BuildForwardingEmitter(parentCfg.GetEmitter(), "sub-strat-opts")
+	_, err = subagent.BuildForkReactInvoker(parentCfg, fork, context.Background(), taskEmitter)
+	require.NoError(t, err)
+	require.NotNil(t, capturedCfg)
+
+	assert.False(t, capturedCfg.GetEnablePlanAndExec(),
+		"buildSubAgentStrategyOptions must force-disable plan-and-exec on child")
+	assert.False(t, capturedCfg.GetEnableGoalMode(),
+		"buildSubAgentStrategyOptions must force-disable goal mode on child")
+	assert.False(t, capturedCfg.GetPreferDispatchSubReactAgents(),
+		"buildSubAgentStrategyOptions must force-disable multi-agent dispatch preference on child")
+	assert.False(t, capturedCfg.EnableDispatchSubReactAgents,
+		"child must not be able to dispatch further sub agents")
 }
