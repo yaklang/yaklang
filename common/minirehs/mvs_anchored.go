@@ -26,6 +26,10 @@ import (
 //
 // 关键词: anchored verification, Rose-lite, single-pass, literal anchoring, early death, 锚定式单趟
 
+// gapJumpMin 是大空洞跳跃的最小间隔字节: 活跃集空且距下一个 span > gapJumpMin 字节时,
+// 直接跳到下一个 span 的 rune 对齐位置, 省去逐 rune 走过大空洞. 太小则跳跃开销 > 逐 rune 走过.
+const gapJumpMin = 32
+
 // anchorSpan 是一个注入区间 [lo,hi): 锚定式扫描只在落入这些区间的 rune 起始处注入 NFA 起点 first.
 type anchorSpan struct {
 	lo, hi int32
@@ -148,6 +152,14 @@ func (nfa *mvsNFA) existsInAnchored(data []byte, spans []anchorSpan, prev, cand,
 		if !hasActive && (si >= len(spans) || runeStart >= lastHi) {
 			return false
 		}
+		// 大空洞跳跃 (同 existsInAnchored1): 活跃集空且距下一个 span > gapJumpMin 字节时跳过.
+		if !hasActive && si < len(spans) && int(spans[si].lo) > runeStart+gapJumpMin {
+			jump := alignRuneStart(data, int(spans[si].lo))
+			if jump > i {
+				i = jump
+				continue
+			}
+		}
 		copy(prev, active)
 		i = ni
 	}
@@ -220,6 +232,17 @@ func (nfa *mvsNFA) existsInAnchored1(data []byte, spans []anchorSpan) bool {
 		hasActive = active != 0
 		if !hasActive && (si >= nspan || runeStart >= lastHi) {
 			return false
+		}
+		// 大空洞跳跃: 活跃集空且距下一个 span 间隔 > gapJumpMin 字节时, 直接跳到下一个 span
+		// 的 rune 对齐位置, 省去逐 rune 走过大空洞. 安全性: curLo 是 span lo (字面量命中点算出),
+		// 是合法偏移; alignRuneStart 向左吸附 rune start 不会回退到 i 之前 (curLo > runeStart);
+		// 活跃集已空, 跳过空洞不影响 follow 传播. 小间隔不跳 (跳跃开销 > 逐 rune 走过).
+		if !hasActive && si < nspan && curLo > runeStart+gapJumpMin {
+			jump := alignRuneStart(data, curLo)
+			if jump > i {
+				i = jump
+				continue
+			}
 		}
 		prev = active
 		i = ni
