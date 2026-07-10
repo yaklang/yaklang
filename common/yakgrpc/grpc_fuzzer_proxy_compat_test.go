@@ -27,4 +27,3 @@ func TestBuildFuzzerProxyList_CompatEndpointIDInProxyField(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, proxies, "http://127.0.0.1:18080")
 }
-

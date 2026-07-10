@@ -47,10 +47,10 @@ func TestGRPCMUSTPASS_EncodeHTTPPacketContent_HTTPFlowId(t *testing.T) {
 	require.NoError(t, err)
 
 	flow := &schema.HTTPFlow{
-		Request:  strconvQuote(`GET / HTTP/1.1\r\nHost: example.com\r\n\r\nworld`),
-		IsHTTPS:  false,
-		Url:      "http://example.com/",
-		Method:   "GET",
+		Request: strconvQuote(`GET / HTTP/1.1\r\nHost: example.com\r\n\r\nworld`),
+		IsHTTPS: false,
+		Url:     "http://example.com/",
+		Method:  "GET",
 	}
 	err = yakit.InsertHTTPFlow(consts.GetGormProjectDatabase(), flow)
 	require.NoError(t, err)

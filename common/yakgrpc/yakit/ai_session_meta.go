@@ -156,13 +156,26 @@ func CreateOrUpdateAISessionMetaOnStart(db *gorm.DB, sessionID string, params *y
 	if _, err := EnsureAISessionMeta(db, sessionID); err != nil {
 		return nil, err
 	}
+	updates := map[string]any{
+		"start_params": raw,
+		"last_used_at": lastUsedAt,
+		"updated_at":   lastUsedAt,
+	}
+	// 回填 source 列：OnStart 路径不再依赖 re-act.go 的 EnsureAISessionMeta 独立回填。
+	// params.Source 非空且当前行 source 为空时才写入，避免覆盖已有 source。
+	if src := strings.TrimSpace(params.GetSource()); src != "" {
+		// 只在 source 列为空时回填（不覆盖已有值，如已被 NewReAct 回填的 im）
+		var existing schema.AISession
+		if err := db.Model(&schema.AISession{}).Where("session_id = ?", sessionID).
+			Select("source").First(&existing).Error; err == nil {
+			if strings.TrimSpace(existing.Source) == "" {
+				updates["source"] = src
+			}
+		}
+	}
 	if err := db.Model(&schema.AISession{}).
 		Where("session_id = ?", sessionID).
-		UpdateColumns(map[string]any{
-			"start_params": raw,
-			"last_used_at": lastUsedAt,
-			"updated_at":   lastUsedAt,
-		}).Error; err != nil {
+		UpdateColumns(updates).Error; err != nil {
 		return nil, err
 	}
 	return GetAISessionMetaBySessionID(db, sessionID)
@@ -489,6 +502,94 @@ func UpdateAISessionMetaTitle(db *gorm.DB, sessionID, title string) (int64, erro
 	return result.RowsAffected, result.Error
 }
 
+// imSourceMetaJSON 序列化 IMSourceMeta 为 ai_sessions_v1.im_source 列存储的 JSON。
+func imSourceMetaJSON(meta *ypb.IMSourceMeta) (string, error) {
+	if meta == nil {
+		return "", nil
+	}
+	raw, err := protojson.Marshal(meta)
+	if err != nil {
+		return "", utils.Errorf("marshal im source meta: %w", err)
+	}
+	return string(raw), nil
+}
+
+// UnmarshalAISessionIMSource 把 ai_sessions_v1.im_source 列的 JSON 反序列化为 IMSourceMeta。
+// 空字符串返回 nil。
+func UnmarshalAISessionIMSource(raw string) (*ypb.IMSourceMeta, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+	meta := &ypb.IMSourceMeta{}
+	if err := protojson.Unmarshal([]byte(raw), meta); err != nil {
+		return nil, utils.Errorf("unmarshal im source meta: %w", err)
+	}
+	return meta, nil
+}
+
+func shouldInitializeTitleFromIMMeta(meta *ypb.IMSourceMeta) bool {
+	if meta == nil {
+		return false
+	}
+	title := strings.TrimSpace(meta.GetChatTitle())
+	if title == "" {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(meta.GetChatType())) {
+	case "private":
+		return false
+	}
+	switch title {
+	case "私聊会话", "群聊会话", "话题会话", "IM 会话":
+		return false
+	default:
+		return true
+	}
+}
+
+// UpdateAISessionIMMeta 写入/更新 source=im 会话的结构化 IM 元数据（platform/chatType/
+// chatTitle/senderName/threadID），存进 ai_sessions_v1.im_source 列。
+// meta==nil 时清空列。会话行不存在时先建空行（保证后续 agent 启动能挂上）。
+func UpdateAISessionIMMeta(db *gorm.DB, sessionID string, meta *ypb.IMSourceMeta) (int64, error) {
+	if db == nil {
+		return 0, utils.Errorf("database is nil")
+	}
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return 0, utils.Errorf("session_id is empty")
+	}
+
+	raw, err := imSourceMetaJSON(meta)
+	if err != nil {
+		return 0, err
+	}
+
+	// 确保行存在（agent 启动尚未写入时，IM 引擎回写可能先到）。
+	// 带 source="im" 回填：若 OnStart/re-act.go 路径尚未跑，行存在但 source 为空，
+	// 这里一并补上，保证前端按 source=im 筛选能命中。
+	record, err := EnsureAISessionMeta(db, sessionID, "im")
+	if err != nil {
+		return 0, err
+	}
+
+	updates := map[string]any{"im_source": raw}
+	if shouldInitializeTitleFromIMMeta(meta) {
+		if title := strings.TrimSpace(meta.GetChatTitle()); title != "" && !record.TitleInitialized {
+			updates["title"] = title
+			updates["title_initialized"] = true
+		}
+	}
+	now := time.Now()
+	updates["last_used_at"] = now
+	updates["updated_at"] = now
+
+	result := db.Model(&schema.AISession{}).
+		Where("session_id = ?", sessionID).
+		UpdateColumns(updates)
+	return result.RowsAffected, result.Error
+}
+
 func AppendAISessionMetaRelatedRuntimeID(db *gorm.DB, sessionID, runtimeID string) error {
 	if db == nil {
 		return utils.Errorf("database is nil")
@@ -706,6 +807,10 @@ func extractTitleFromEventContent(raw []byte) string {
 	if err := json.Unmarshal(raw, &obj); err != nil {
 		return plain
 	}
+	return extractTitleFromJSONObject(obj)
+}
+
+func extractTitleFromJSONObject(obj map[string]any) string {
 	for _, key := range []string{
 		"free_input",
 		"prompt",
@@ -713,6 +818,7 @@ func extractTitleFromEventContent(raw []byte) string {
 		"message",
 		"input",
 		"query",
+		"question",
 		"react_user_input",
 	} {
 		if v, ok := obj[key]; ok {
@@ -721,7 +827,7 @@ func extractTitleFromEventContent(raw []byte) string {
 			}
 		}
 	}
-	return plain
+	return ""
 }
 
 func normalizeTitle(s string) string {
