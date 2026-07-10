@@ -726,12 +726,15 @@ func (nfa *mvsNFA) existsInAssertShared(data []byte, bound []uint8) bool {
 // existsInAssertShared1 是 existsInAssertShared 的 nword==1 标量快路径: 活跃集为单个 uint64,
 // 全程寄存器位运算且零分配 (多字版每调用 make 两个 []uint64; 本版用本地标量, 显著省分配 + 位运算).
 // 语义与 existsInAssertShared 完全一致, 仅用于 nfa.single 的断言 NFA. guard 位集取 gb.bits[0].
-// 含 ASCII 快路径 (省 utf8.DecodeRune + symbolOf 调用). bound 为整段共享边界 (computeBoundaries).
+// 含 ASCII 快路径 (省 utf8.DecodeRune + symbolOf 调用) + LimEx 链/异常拆分 (链边左移批量推进).
+// bound 为整段共享边界 (computeBoundaries).
 func (nfa *mvsNFA) existsInAssertShared1(data []byte, bound []uint8) bool {
 	first := nfa.first1
 	lastAny := nfa.lastAny1
-	follow := nfa.follow1
 	reach := nfa.reach1
+	chainTarget := nfa.chainTarget1
+	excMask := nfa.excMask1
+	excFollow := nfa.excFollow1
 	n := len(data)
 
 	var prev uint64
@@ -749,18 +752,32 @@ func (nfa *mvsNFA) existsInAssertShared1(data []byte, bound []uint8) bool {
 		}
 		bpre := bound[i]
 
-		cand := first
+		// LimEx: 链边用左移批量推进; 异常边逐个 OR (含 condFollow guard 门控).
+		shifted := (prev << 1) & chainTarget
+		cand := first | shifted
 		for _, gb := range nfa.condFirst {
 			if guardHolds(gb.g, bpre) {
 				cand |= gb.bits[0]
 			}
 		}
-		for pw := prev; pw != 0; pw &= pw - 1 {
-			p := bits.TrailingZeros64(pw)
-			cand |= follow[p]
-			for _, gb := range nfa.condFollow[p] {
-				if guardHolds(gb.g, bpre) {
-					cand |= gb.bits[0]
+		// 异常边: 仅对活跃的异常位置展开无条件异常后继.
+		if exc := prev & excMask; exc != 0 {
+			for exc != 0 {
+				p := bits.TrailingZeros64(exc)
+				exc &= exc - 1
+				cand |= excFollow[p]
+			}
+		}
+		// condFollow: 条件后继对所有"有 condFollow 条目的活跃位置"展开 (不仅限于异常位置).
+		// condFollowMask1 标记哪些位置有 condFollow 条目; 逐个检查活跃的 condFollow 位置.
+		if cfm := prev & nfa.condFollowMask1; cfm != 0 {
+			for cfm != 0 {
+				p := bits.TrailingZeros64(cfm)
+				cfm &= cfm - 1
+				for _, gb := range nfa.condFollow[p] {
+					if guardHolds(gb.g, bpre) {
+						cand |= gb.bits[0]
+					}
 				}
 			}
 		}

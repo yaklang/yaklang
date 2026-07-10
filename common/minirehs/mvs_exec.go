@@ -432,23 +432,30 @@ func (nfa *mvsNFA) findLocFrom1(data []byte, searchFrom int, sc *scratch) (int, 
 	}
 	return bestStart, bestEnd, true
 }
-// 绝大多数真实 pattern 走此路径.
+// existsIn1 是 nword==1 标量快路径 (绝大多数真实 pattern 走此路径).
+// 使用 LimEx 链/异常拆分 (源自 Hyperscan NSDI'19): 链边 p->p+1 用一次左移批量推进,
+// 异常边仅对活跃异常位置逐个 OR. 对 Glushkov 连接产生的边恰是 p->p+1, 大量 follow 落入
+// 链边、异常稀疏, 故每字节趋近 O(1) 位运算 (与活跃位置数无关).
+//
+// 另含两个快路径: ① ASCII 快路径 (省 utf8.DecodeRune + symbolOf); ② prev==0 时跳过异常循环
+// (NFA 休眠: 只需注入 first, 无活跃后继需展开). 对稀疏命中的真实流量 (大多字节不激活 NFA),
+// ② 是显著收益.
 func (nfa *mvsNFA) existsIn1(data []byte) bool {
 	first := nfa.first1
 	lastAny := nfa.lastAny1
 	lastEnd := nfa.lastEnd1
-	follow := nfa.follow1
 	reach := nfa.reach1
 	anchored := nfa.anchoredStart
 	requireEnd := nfa.requireEnd
+	chainTarget := nfa.chainTarget1
+	excMask := nfa.excMask1
+	excFollow := nfa.excFollow1
 	n := len(data)
 
 	var prev uint64
 	i := 0
 	for i < n {
 		atStart := i == 0
-		// ASCII 快路径: 单字节 rune 直接查 asciiSym, 省去 utf8.DecodeRune + symbolOf 调用开销
-		// (语料绝大多数字节为 ASCII; 非 ASCII 才回退完整解码 + 切点二分).
 		c := data[i]
 		var sym int
 		if c < utf8.RuneSelf {
@@ -460,12 +467,21 @@ func (nfa *mvsNFA) existsIn1(data []byte) bool {
 			i += size
 		}
 
+		// LimEx 递推: 链边用左移批量推进; 异常边逐个 OR.
+		shifted := (prev << 1) & chainTarget
 		var cand uint64
 		if !anchored || atStart {
-			cand = first
+			cand = first | shifted
+		} else {
+			cand = shifted
 		}
-		for pw := prev; pw != 0; pw &= pw - 1 {
-			cand |= follow[bits.TrailingZeros64(pw)]
+		// 异常边: 仅对活跃的异常位置展开 (excCount 越少越快).
+		if exc := prev & excMask; exc != 0 {
+			for exc != 0 {
+				p := bits.TrailingZeros64(exc)
+				exc &= exc - 1
+				cand |= excFollow[p]
+			}
 		}
 		active := cand & reach[sym]
 		if active&lastAny != 0 {
