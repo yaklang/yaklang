@@ -1,17 +1,117 @@
 yakit.AutoInitYakit()
 
+// 支持的语言注册表（单一数据源）：新增语言只需在 langOrder 增加一项，并补全
+// langLabel / langExts / langMarkers / langManifests 即可，CLI 选项、扩展名映射、
+// 标记/清单计分都会自动跟进，无需再分散修改多处。
+langOrder = ["java", "php", "go", "python", "js", "ts", "yak", "c"]
+
+langLabel = {
+    "java":   "Java",
+    "php":    "PHP",
+    "go":     "Golang",
+    "python": "Python",
+    "js":     "JavaScript",
+    "ts":     "TypeScript",
+    "yak":    "Yaklang",
+    "c":      "C",
+}
+
+// 源码扩展名 -> 语言（一个语言可对应多个扩展名）
+langExts = {
+    "java":   ["java"],
+    "php":    ["php"],
+    "go":     ["go"],
+    "python": ["py", "pyi", "pyw"],
+    "js":     ["js", "mjs", "cjs"],
+    "ts":     ["ts", "tsx"],
+    "yak":    ["yak"],
+    "c":      ["c", "h"],
+}
+
+// 通用标记文件（小写文件名）-> 语言；命中累计 markerWeight（弱信号）
+langMarkers = {
+    "java":   ["web.xml", "pom.xml", "application.properties", "struts.xml", "application.yml", "log4j2.xml", "log4j.properties", "shiro.ini"],
+    "php":    ["index.php", "composer.json", "composer.lock", "wp-config.php", "config.php"],
+    "go":     [],
+    "python": ["requirements.txt", "setup.py", "pyproject.toml", "pipfile", "manage.py", "setup.cfg"],
+    "js":     ["package-lock.json", "package.json", "yarn.lock", "tsconfig.json"],
+    "ts":     [],
+    "yak":    [],
+    "c":      ["makefile", "makefile.am", "makefile.in", "configure.ac", "configure.in", "configure"],
+}
+
+// 高权重构建/依赖清单（小写文件名）-> 语言；命中累计 manifestWeight（强信号）
+langManifests = {
+    "java":   ["pom.xml", "build.gradle", "build.gradle.kts"],
+    "php":    ["composer.json"],
+    "go":     ["go.mod"],
+    "python": ["requirements.txt", "pyproject.toml"],
+    "js":     ["package.json"],
+    "ts":     [],
+    "yak":    [],
+    "c":      ["cmakelists.txt"],
+}
+
+// 扩展名 -> 语言，由 langExts 反向构建
+extToLanguage = {}
+for _, lang := range langOrder {
+    for _, ext := range langExts[lang] {
+        extToLanguage[ext] = lang
+    }
+}
+
+// 各语言得分表（文件计数 / 标记命中 / 清单命中），全部由 langOrder 初始化
+var scoreMap = map[string]int{}
+var markerMap = map[string]int{}
+var manifestMap = map[string]int{}
+for _, lang := range langOrder {
+    scoreMap[lang] = 0
+    markerMap[lang] = 0
+    manifestMap[lang] = 0
+}
+
+// markerWeight 弱信号（单个特征文件）；manifestWeight 强信号（构建/依赖清单）。
+// 强信号足以钉住纯配置项目，但不足以压过数千文件的源码多数。
+markerWeight = 200
+manifestWeight = 1500
+
+func addMarker(language) {
+    if language == "" {
+        return
+    }
+    markerMap[language] = markerMap[language] + 1
+}
+func addManifest(language) {
+    if language == "" {
+        return
+    }
+    manifestMap[language] = manifestMap[language] + 1
+}
+// 根据文件名（小写）为命中的语言累计 marker / manifest。一个文件可能同时是某语言
+// 的 marker 与 manifest（如 requirements.txt 之于 python），此时两者都计分，保留
+// 原有双重计分语义。
+func addFileMarkers(name) {
+    for _, lang := range langOrder {
+        if name in langManifests[lang] {
+            addManifest(lang)
+        }
+        if name in langMarkers[lang] {
+            addMarker(lang)
+        }
+    }
+}
+
 target = cli.String("target", cli.setRequired(true))
+
+// 语言 CLI 选项由注册表生成，新增语言无需手改 CLI
+langSelectOpts = []
+for _, lang := range langOrder {
+    langSelectOpts = append(langSelectOpts, cli.setSelectOption(langLabel[lang], lang))
+}
 languages = cli.StringSlice(
-    "language", 
-    cli.setMultipleSelect(false), 
-    cli.setSelectOption("Java", "java"), 
-    cli.setSelectOption("PHP", "php"), 
-    cli.setSelectOption("Yaklang", "yak"), 
-    cli.setSelectOption("JavaScript", "js"), 
-    cli.setSelectOption("TypeScript", "ts"), 
-    cli.setSelectOption("Golang", "go"), 
-    cli.setSelectOption("C", "c"), 
-    cli.setSelectOption("Python", "python"), 
+    "language",
+    cli.setMultipleSelect(false),
+    langSelectOpts...,
 )
 
 compile_immediately := cli.Bool(
@@ -185,49 +285,6 @@ cli.check()
 target = target.Trim(" ", "\n", "\t")
 origin = target
 proxy = str.TrimSpace(proxy.Lower())
-javaDir = []
-// jsDir = ["node_modules"]
-jsFiles = ["package-lock.json", "package.json", "yarn.lock", "tsconfig.json"]
-phpFiles = ["index.php", "composer.json", "composer.lock", "wp-config.php", "config.php"]
-javaFiles = ["web.xml", "pom.xml", "application.properties", "struts.xml", "application.yml", "log4j2.xml", "log4j.properties", "shiro.ini"]
-pythonFiles = ["requirements.txt", "setup.py", "pyproject.toml", "pipfile", "manage.py", "setup.cfg"]
-// 后缀名 -> 语言，用于统一从文件扩展名推断语言
-extToLanguage = {"js": "js", "mjs": "js", "cjs": "js", "ts": "ts", "tsx": "ts", "php": "php", "java": "java", "go": "go", "yak": "yak", "py": "python", "pyi": "python", "pyw": "python"}
-var scoreMap = map[string]int{"php": 0, "go": 0, "java": 0, "yak": 0, "js": 0, "ts": 0, "python": 0, "c": 0}
-// markerMap / manifestMap: language detection now SCORES markers (pom.xml,
-// composer.json, go.mod, ...) instead of letting the first marker hit
-// short-circuit setLanguage. A single stray marker (e.g. a requirements.txt in
-// a tooling dir of a 7k-file Java project) used to lock the wrong language
-// because it was seen first in the unsorted walk; scoring lets the clear
-// extension majority win.
-var markerMap = map[string]int{"php": 0, "go": 0, "java": 0, "yak": 0, "js": 0, "ts": 0, "python": 0, "c": 0}
-var manifestMap = map[string]int{"php": 0, "go": 0, "java": 0, "yak": 0, "js": 0, "ts": 0, "python": 0, "c": 0}
-func addMarker(language) {
-    language = sprint(language)
-    if language == "" {
-        return
-    }
-    markerMap[language] = markerMap[language] + 1
-}
-func addManifest(language) {
-    language = sprint(language)
-    if language == "" {
-        return
-    }
-    manifestMap[language] = manifestMap[language] + 1
-}
-// High-signal build/dep manifests (lowercased name -> language key). Strong but
-// not strong enough to override a multi-thousand-file source majority.
-manifestFiles = {"pom.xml": "java", "build.gradle": "java", "build.gradle.kts": "java", "go.mod": "go", "composer.json": "php", "package.json": "js", "requirements.txt": "python", "pyproject.toml": "python", "cmakelists.txt": "c"}
-func manifestLang(name) {
-    if name in manifestFiles {
-        return manifestFiles[name]
-    }
-    return ""
-}
-markerWeight = 200
-manifestWeight = 1500
-langOrder = ["java", "php", "go", "python", "js", "ts", "yak", "c"]
 
 // 语言探测：跳过目录（不参与计分）
 // NOTE: do NOT include generic words like "target"/"build"/"out"/"dist" here —
@@ -434,35 +491,9 @@ func getZipinfo(basePath) {
         (dir, path, info) => {
             if !info.IsDir() {
                 params.file_count++
-            }
-
-            if !info.IsDir() {
                 addLanguageScore(path)
-            }
-
-            if params.language == "" && !shouldSkipPath(path) {
-                name = info.Name().Lower()
-                if info.IsDir() {
-                    if name in javaDir {
-                        addMarker(ssa.Java)
-                    }
-                } else {
-                    mlang = manifestLang(name)
-                    if mlang != "" {
-                        addManifest(mlang)
-                    }
-                    if name in javaFiles {
-                        addMarker(ssa.Java)
-                    }
-                    if name in phpFiles {
-                        addMarker(ssa.PHP)
-                    }
-                    if name in jsFiles {
-                        addMarker(ssa.Javascript)
-                    }
-                    if name in pythonFiles {
-                        addMarker(ssa.Python)
-                    }
+                if params.language == "" && !shouldSkipPath(path) {
+                    addFileMarkers(info.Name().Lower())
                 }
             }
         },
@@ -505,34 +536,11 @@ func getLocalInfo(localFile) {
         params.info.local_file = localFile
         filesys.Recursive(
             localFile,
-            filesys.onDirStat(func(path, info) {
-                if params.language == "" && !shouldSkipPath(path) {
-                    switch  {
-                    case info.Name().Lower() in javaDir:
-                        addMarker(ssa.Java)
-                    }
-                }
-            }),
             filesys.onFileStat(func(path, info) {
                 params.file_count++
                 addLanguageScore(path)
-
                 if params.language == "" && !shouldSkipPath(path) {
-                    name = info.Name().Lower()
-                    mlang = manifestLang(name)
-                    if mlang != "" {
-                        addManifest(mlang)
-                    }
-                    switch  {
-                    case name in javaFiles:
-                        addMarker(ssa.Java)
-                    case name in phpFiles:
-                        addMarker(ssa.PHP)
-                    case name in jsFiles:
-                        addMarker(ssa.Javascript)
-                    case name in pythonFiles:
-                        addMarker(ssa.Python)
-                    }
+                    addFileMarkers(info.Name().Lower())
                 }
             }),
         )

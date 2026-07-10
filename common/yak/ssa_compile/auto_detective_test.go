@@ -194,6 +194,7 @@ func TestSSAAutoDetective(t *testing.T) {
 			{"composer + 1 php", "php", map[string]string{"composer.json": "{}\n", "index.php": "<?php\n"}},
 			{"go.mod + 1 go", "golang", map[string]string{"go.mod": "module x\ngo 1.20\n", "main.go": "package main\nfunc main(){}\n"}},
 			{"requirements + 1 py", "python", map[string]string{"requirements.txt": "requests\n", "app.py": "print(1)\n"}},
+			{"cmake + 1 c", "c", map[string]string{"CMakeLists.txt": "cmake_minimum_required(VERSION 3.0)\nproject(x)\n", "main.c": "int main(){return 0;}\n"}},
 		}
 		for _, c := range cases {
 			t.Run(c.name, func(t *testing.T) {
@@ -242,6 +243,21 @@ func TestSSAAutoDetective(t *testing.T) {
 		config, err := check(t, tempDir)
 		require.NoError(t, err)
 		require.Equal(t, "java", string(config.GetLanguage()), "4 src/*.java + pom.xml must beat requirements.txt + 2 *.py")
+	})
+	// C detection regression: previously C had no extension mapping and no
+	// markers, so a pure-C project without CMakeLists.txt was never detected and
+	// fell through to "language need select". Now .c/.h score, so a clear source
+	// majority detects C with no manifest present.
+	t.Run("scoring c detected by source files without manifest", func(t *testing.T) {
+		tempDir, cleanup := setupTempDirWithFiles(t, map[string]string{
+			"src/a.c": "int main(){return 0;}\n",
+			"src/b.c": "int b;\n",
+			"src/f.h": "void f();\n",
+		})
+		defer cleanup()
+		config, err := check(t, tempDir)
+		require.NoError(t, err)
+		require.Equal(t, "c", string(config.GetLanguage()), "src/*.c + *.h should auto-detect as C without any manifest")
 	})
 }
 
