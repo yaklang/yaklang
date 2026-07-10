@@ -42,6 +42,36 @@ func TestMVSKernelAvailable(t *testing.T) {
 	}
 }
 
+// TestMVSKernelAnchoredBatchBackendOracle 接通 C anchored-many 的端到端 A/B 路径。
+// 默认生产开关保持关闭，直到 C 侧能把 literal trigger 与局部 verifier 融为一趟；此测试
+// 保证未来重新评估时，该批处理路径仍和 stdlib oracle 完全一致。
+func TestMVSKernelAnchoredBatchBackendOracle(t *testing.T) {
+	old := anchorCBatchEnabled
+	anchorCBatchEnabled = true
+	defer func() { anchorCBatchEnabled = old }()
+
+	patterns, _ := compilableMITMPatterns(t)
+	db, err := Compile(patterns, WithBackend(BackendMVS))
+	if err != nil {
+		t.Fatalf("compile mvs: %v", err)
+	}
+	defer db.Close()
+	oracle, err := Compile(patterns, WithBackend(BackendStdlib))
+	if err != nil {
+		t.Fatalf("compile oracle: %v", err)
+	}
+	defer oracle.Close()
+	records, _ := loadCorpus(t)
+	if testing.Short() && len(records) > 200 {
+		records = records[:200]
+	}
+	for i, rec := range records {
+		got := mvsExistIDs(t, db, rec)
+		want := mvsExistIDs(t, oracle, rec)
+		mvsAssertSameIDSet(t, got, want, fmt.Sprintf("anchored-c-batch-record#%d", i))
+	}
+}
+
 // openSingleNFAKernel 把一条 NFA 序列化为 blob 并打开 C 内核 (pattern 槽位仅 idx 0).
 func openSingleNFAKernel(t *testing.T, nfa *mvsNFA) *mvsKernel {
 	t.Helper()
@@ -496,9 +526,9 @@ func toIntSet(in []int) map[int]struct{} {
 // 与 Go existsInAnchored / existsInAnchored1 及 SIMD/标量孪生四方一致. 覆盖 nword==1 与 nword>=2.
 func TestMVSKernelAnchoredDirect(t *testing.T) {
 	cases := []struct {
-		expr   string
-		input  string
-		spans  []anchorSpan
+		expr  string
+		input string
+		spans []anchorSpan
 	}{
 		{`token=\w+`, "xx token=abc123 yy", []anchorSpan{{4, 10}}},
 		{`token=\w+`, "token=abc zz token=def", []anchorSpan{{0, 6}, {14, 20}}},
