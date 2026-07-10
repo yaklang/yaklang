@@ -45,10 +45,12 @@ func runAllCategoryScans(
 	jobs := make([]subagent.ForkJob, 0, len(categories))
 	catalog := make(map[string]categoryScanJob, len(categories))
 	for i, category := range categories {
+		goal := fmt.Sprintf("Phase 2 category scan: %s (%s)", category.Name, category.ID)
 		jobs = append(jobs, subagent.ForkJob{
 			Order:      i + 1,
 			Identifier: category.ID,
-			Goal:       fmt.Sprintf("Phase 2 category scan: %s (%s)", category.Name, category.ID),
+			TaskName:   goal,
+			Goal:       goal,
 		})
 		catalog[category.ID] = categoryScanJob{
 			category: category,
@@ -204,10 +206,12 @@ func tryResumeCategoryScanPhaseB(
 	emit.Phase2ScanWarning(loop, category, "resume_phase_b",
 		fmt.Sprintf("阶段A 未完成，已从 %d 个目标恢复阶段B", len(locked)))
 
+	resumeGoal := fmt.Sprintf("Phase 2 category scan resume: %s", category.Name)
 	resumeJob := subagent.ForkJob{
 		Order:      catJob.index,
 		Identifier: category.ID + "-resume",
-		Goal:       fmt.Sprintf("Phase 2 category scan resume: %s", category.Name),
+		TaskName:   resumeGoal,
+		Goal:       resumeGoal,
 	}
 	resumeResult, resumeErr := subagent.RunForkJob(r, task, resumeJob, func(childInvoker aicommon.AIInvokeRuntime, _ subagent.ForkJob) (*reactloops.ReActLoop, error) {
 		catLoop, scan, err := buildSingleCategoryScanLoop(childInvoker, state, category, catJob.index, catJob.total, scanState, artifacts)

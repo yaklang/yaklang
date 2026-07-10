@@ -27,6 +27,7 @@ func presentAuditVulnerabilityTypes(
 	summary := formatAuditVulnerabilityTypesSummary(categories)
 	err := subagent.RunForkInvokerCallback(r, task, subagent.ForkJob{
 		Identifier: "audit-vuln-types",
+		TaskName:   forkGoalDetermineAuditVulnerabilityTypes,
 		Goal:       forkGoalDetermineAuditVulnerabilityTypes,
 	}, func(childInvoker aicommon.AIInvokeRuntime, _ aicommon.AIStatefulTask) error {
 		childInvoker.AddToTimeline("[AUDIT_VULN_TYPES]", summary)

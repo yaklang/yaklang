@@ -1010,6 +1010,7 @@ func planScanCategories(r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask
 	var action *aicommon.Action
 	planErr := subagent.RunForkInvokerCallback(r, task, subagent.ForkJob{
 		Identifier: "scan-plan",
+		TaskName:   "Determine code audit vulnerability scan categories",
 		Goal:       "Determine code audit vulnerability scan categories",
 	}, func(childInvoker aicommon.AIInvokeRuntime, childTask aicommon.AIStatefulTask) error {
 		var err error
