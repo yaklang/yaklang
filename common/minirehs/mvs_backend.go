@@ -653,6 +653,8 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 				hit = nfa.existsInAssertAnchored(data, d.sharedBound(data, sc), spans, sc.anchorPrev, sc.anchorCand)
 			case nfa.single:
 				hit = nfa.existsInAnchored1(data, spans)
+			case nfa.nword == 2:
+				hit = nfa.existsInAnchored2(data, spans)
 			default:
 				hit = nfa.existsInAnchored(data, spans, sc.anchorPrev, sc.anchorCand, sc.anchorActive)
 			}
@@ -673,6 +675,8 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 				fwd := d.nfas[idx]
 				if fwd.single {
 					hit = fwd.existsInAnchored1(data, fwdSpans)
+				} else if fwd.nword == 2 {
+					hit = fwd.existsInAnchored2(data, fwdSpans)
 				} else {
 					hit = fwd.existsInAnchored(data, fwdSpans, sc.anchorPrev, sc.anchorCand, sc.anchorActive)
 				}
