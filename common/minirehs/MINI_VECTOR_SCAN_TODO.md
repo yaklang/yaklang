@@ -39,8 +39,8 @@
 > `MVS_Located` 3.04 MB/s、`MVS_Exist_RE2only` 8.12 MB/s(无 gate, 健全性);**完整非 short 套件全绿(40s)**。
 > **2026-07-10 gap jump 复测(FULL_CORPUS, 5x×2)**:`MVS_Exist` **9.89-9.93 MB/s / 8939 allocs**、
 > `MVS_Located` **4.05-4.10 MB/s**、`MVS_Exist_RE2only` **15.16-15.31 MB/s**(gap jump 系列累计: 见下)。
-> **当前性能(实测,vs Go RE2 逐条 0.18 MB/s 基线)**:存在性 **~55x**(全规则)/**~85x**(纯 RE2 子集)、定位 **~23x**;
-> **纯 RE2 子集 ~85x 已逼近 dlopen 真 hyperscan 历史天花板 87x!** 详见第 4' 节倍数评估与路线。
+> **当前性能(实测,vs Go RE2 逐条 0.18 MB/s 基线)**:存在性 **~57x**(全规则)/**~89x**(纯 RE2 子集)、定位 **~23x**;
+> **纯 RE2 子集 ~89x 已超越 dlopen 真 hyperscan 历史天花板 87x!** 详见第 4' 节倍数评估与路线。
 > **剩余瓶颈(本会话剖析, 干净小改已出尽)**:① `runtime.cgocall` 28%(合并 always-on 整段扫 5.25MB + 不可
 > 局部化 lean 的 nfaExists 3.93MB);② 门控 lean anchored 系 ~32%(`existsInAnchored` 16% + `…1` 7% +
 > `existsInReverseAnchored` 9%, 纯 Go 位递归无 SIMD);③ 断言系 ~18%;④ PCRE2 gate 对**非法 UTF-8(二进制流量)**
@@ -127,6 +127,48 @@
 > `anchorMergedEnabled` 后，默认不构建、不占生产数据库内存。另：CNF 必需 literal 因子诊断显示
 > 22 条 lean-gated pattern 理论可减 **13.6%** NFA 触发记录 / **7.8%** 验证字节；直接在 Go 层
 > 扩 literal + 二次 hit 扫描实测回归，需与 C trigger/event runtime 融合后再接线。
+> **已落地(2026-07-11):LimEx 链/异常拆分移植到单字标量快路径 (源自 Hyperscan NSDI'19 论文研究)** ——
+> 把 Glushkov follow 边拆成链边 (p→p+1, 用一次 `(prev << 1) & chainTarget` 批量推进) 和异常边
+> (其余, 仅对活跃异常位置逐个 OR)。此前每字节 follow 循环是 O(popcount(active)) 逐活跃位迭代;
+> LimEx 后趋近 O(excCount) 位运算 (excCount 典型 0-2, MAC NFA 0/35, lean NFA 0/npos)。
+> 论文研究: Hyperscan NSDI'19 §4.2 (LimEx NFA)、Brno 论文 "Finding Weaknesses of Hyperscan"
+> (LimEx chain/exception 详细描述)、Navarro & Raffinot bit-parallel Glushkov (Algorithmica 2005)。
+> 覆盖 4 个热路径: `existsIn1`、`existsInAssertShared1`、`existsInAnchored1`、`existsInReverseAnchored1`。
+> 新增字段: `chainTarget1`/`excMask1`/`excFollow1`/`excCount` (在 `initScalar` 构建) +
+> `condFollowMask1` (断言 NFA 专用, 标记有 condFollow 条目的位置)。
+> **A/B 回退(多字 LimEx)**: 试把 LimEx 扩到多字断言/锚定路径 (existsInAssertShared/existsInAnchored
+> nword>1), 实测净回归: 多字 NFA 休眠时 prev 有多个零字, shiftLeft1 + chainTarget AND 比"逐字看到
+> 零即跳过"的原循环更慢; prevAny 零检查本身也加 nword OR/字节。仅 3/87 pattern (nword>1 断言 NFA)
+> 会受益, 不值得惩罚常见情况。已回退, 多字路径保留原逐位循环。
+> **A/B 回退(prev==0 快路径)**: 试在 existsIn1/existsInAssertShared1 加 prev==0 分支跳过 shift+exc,
+> 实测净回归: 额外分支检查 (assert NFA prev 频繁非零) 的预测失败开销 > 省的 shift+exc。excMask
+> 检查已自然过滤到仅有异常的位置, 故无需额外 prev==0 门控。已回退。
+> **A/B 回退(R2 断言 NFA 合并单趟)**: 试把 2 条 assert-always-on NFA (身份证 npos=45 + MAC npos=35)
+> 合并为单趟 scanExistAssert (共享 bound), 实测净回归: 合并后 nword 1→2 (两成员拼接 80 positions),
+> 多字循环开销 > 省的趟数 (与 lean 合并结论一致)。已回退, 基建保留在 `assertMergedEnabled` 开关后。
+> **性能(实测, FULL_CORPUS, 5x×2, vs 第四轮 gap-jump 基线)**:
+> `MVS_Exist` 9.89→**10.20-10.36(+3.1-4.7%)**、`MVS_Located` 4.05→**4.21-4.24(+3.7-4.4%)**、
+> `MVS_Exist_RE2only` 15.16→**15.95-16.09(+5.2-6.1%, ~89x)**、allocs 不变.
+> **累计 vs 原始基线(本 PR 起点)**: `MVS_Exist` 6.32→**10.30(+62.9%)**、
+> `MVS_Located` 3.08→**4.22(+37.0%)**、`MVS_Exist_RE2only` 8.23→**15.98(+94.2%)**.
+> **纯 RE2 子集 ~89x! 超越了 dlopen 真 hyperscan 历史天花板 87x!**
+> **Hyperscan 论文研究关键发现 (指导后续优化方向)**:
+> ① **Rose 引擎 (literal-anchored graph verification)**: Hyperscan 的核心架构 — 每条 regex
+>    分解为 literal 节点 + FA 组件的图, literal 命中才触发 FA。minirehs 的 Rose-lite (双向锚定 +
+>    窗口化) 已部分实现此理念。
+> ② **LimEx NFA (bit-parallel + chain/exception split)**: 已移植到单字路径 (本轮)。后续可做
+>    **位置重排** (position reordering) 让更多 follow 边成为 p→p+1 链边, 进一步降低 excCount。
+> ③ **加速状态 (accelerated states)**: Hyperscan 的 Vermicelli/Shufty/Truffle — 当 NFA 活跃集
+>    坍缩到单状态 + 自环时, 用 SIMD memchr 跳过不感兴趣的字符序列。**尚未实现, 是下一个大杠杆**
+>    (对 `.*`/`[^x]*` 类 pattern 的长字符序列可省大量逐 rune 扫描)。
+> ④ **partial determinization (boundary states)**: 把 NFA 的前缀/后缀转成小 DFA, 中间难区域
+>    留 LimEx。直接控制状态宽度。**结构性改动, 未实现**。
+> ⑤ **bounded-repeat counters (Castle)**: `{m,n}` 不展开为 m-n 个位置, 而用计数器保持 O(1) 位。
+>    **minirehs 当前用 {m,n} 展开, 可优化为计数器**。
+> **剩余瓶颈(2026-07-11 复剖析, MVS_Exist)**: ① `runtime.cgocall` 43% (merged_scan + nfaExists,
+>    always-on 整段 C 扫的结构性开销); ② 断言 always-on `existsInAssertShared1` + `existsInAssertShared`
+>    ~20% (2 条无字面量断言 NFA 整段 Go 扫); ③ `sort.Search`/`symIndex` ~7% (符号二分查找);
+>    ④ `stringtoslicerune`/`encoderune` ~5% (PCRE2 gate rune 正规化, 依赖库内)。
 
 ---
 
