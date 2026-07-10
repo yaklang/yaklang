@@ -37,10 +37,10 @@
 > 差分 + 两档短回归全绿。两项增量合计 `MVS_Exist` 5.79→**6.16~6.23 MB/s(+7%)**、allocs 16.3K→**8.9K(-45%)**。
 > **本会话收尾复测(2026-06-23, C 内核, FULL_CORPUS, 8x)**:`MVS_Exist` **6.16 MB/s / 8915 allocs**、
 > `MVS_Located` 3.04 MB/s、`MVS_Exist_RE2only` 8.12 MB/s(无 gate, 健全性);**完整非 short 套件全绿(40s)**。
-> **2026-07-09 增量复测(FULL_CORPUS, 5x×2)**:`MVS_Exist` **6.44-6.48 MB/s / 8939 allocs**、
-> `MVS_Located` **3.30-3.32 MB/s**、`MVS_Exist_RE2only` **8.46-8.47 MB/s**(本轮 4 增量累计: 见下)。
-> **当前性能(实测,vs Go RE2 逐条 0.18 MB/s 基线)**:存在性 **~36x**(全规则)/**~47x**(纯 RE2 子集)、定位 **~18x**;
-> dlopen 真 hyperscan 历史天花板 87x,故现实目标 = 存在性冲 80x(再 ~2x)。详见第 4' 节倍数评估与路线。
+> **2026-07-10 gap jump 复测(FULL_CORPUS, 5x×2)**:`MVS_Exist` **9.89-9.93 MB/s / 8939 allocs**、
+> `MVS_Located` **4.05-4.10 MB/s**、`MVS_Exist_RE2only` **15.16-15.31 MB/s**(gap jump 系列累计: 见下)。
+> **当前性能(实测,vs Go RE2 逐条 0.18 MB/s 基线)**:存在性 **~55x**(全规则)/**~85x**(纯 RE2 子集)、定位 **~23x**;
+> **纯 RE2 子集 ~85x 已逼近 dlopen 真 hyperscan 历史天花板 87x!** 详见第 4' 节倍数评估与路线。
 > **剩余瓶颈(本会话剖析, 干净小改已出尽)**:① `runtime.cgocall` 28%(合并 always-on 整段扫 5.25MB + 不可
 > 局部化 lean 的 nfaExists 3.93MB);② 门控 lean anchored 系 ~32%(`existsInAnchored` 16% + `…1` 7% +
 > `existsInReverseAnchored` 9%, 纯 Go 位递归无 SIMD);③ 断言系 ~18%;④ PCRE2 gate 对**非法 UTF-8(二进制流量)**
@@ -97,6 +97,23 @@
 > `MVS_Located` 3.08→**3.30-3.32(+7.1-7.8%)**、`MVS_Exist_RE2only` 8.23→**8.46-8.47(+2.8-2.9%)**、
 > allocs 不变。**A/B 回退(第三轮)**: `existsInAnchored` 多字版 + `existsInReverseAnchored1` span 缓存——
 > 噪声波动无净收益(多字版 nword>=2 循环开销大稀释 span 缓存; 反向版触发 pattern 少), 已回退。
+> **已落地(2026-07-10 第四轮, gap jump 系列, 最大收益)**: 锚定式扫描的**大空洞跳跃** ——
+> `existsInAnchored1`/`existsInAnchored`/`existsInAssertAnchored`/`existsInAssertAnchored1`/
+> `existsInReverseAnchored`/`existsInReverseAnchored1` 全部加 gap jump: 活跃集空且距下一个注入 span
+> > `gapJumpMin`(32) 字节时, 直接 `alignRuneStart` 跳到下一个 span 的 lo/hi, 省去逐 rune 走过大空洞.
+> 诊断显示 avgSpanBytes=8 (注入窗口极小), 但 span 之间可能有数千字节空洞; gap jump 把锚定系 CPU
+> 从 34.5% 砍到 <10%. **A/B(实测, FULL_CORPUS, 5x×2, vs 第三轮基线)**:
+> `MVS_Exist` 6.48→**9.89-9.93(+53-54%)**、`MVS_Located` 3.32→**4.05-4.10(+22-24%)**、
+> `MVS_Exist_RE2only` 8.47→**15.16-15.31(+79-80%)**、allocs 不变.
+> **累计 vs 原始基线(本 PR 起点)**: `MVS_Exist` 6.32→**9.89-9.93(+56-57%)**、
+> `MVS_Located` 3.08→**4.05-4.10(+31-33%)**、`MVS_Exist_RE2only` 8.23→**15.16-15.31(+84-86%)**.
+> **纯 RE2 子集 ~85x 逼近 dlopen 真 hyperscan 87x 天花板!**
+> **A/B 回退(第四轮)**: ① 锚定单条 C 下沉 `nfaExistsAnchoredMany` 批量——净回归(cgo 开销 > SIMD,
+> nword==1 无 SIMD 优势). ② Go merged scan 替代 C——净回归(C 快 +7%). ③ gap jump 的 ASCII 检查版
+> (逐字节检查空洞全 ASCII 才跳)——灾难性回归(检查开销 > 跳跃收益), 改为无条件跳 + alignRuneStart.
+> **剩余瓶颈(RE2only 档)**: ① `runtime.cgocall` 37.6%(merged_scan 32% = 5 条 always-on 整段 C 扫,
+> 结构性: always-on 无字面量不可门控); ② 断言 always-on `existsInAssertShared1` 11.3%(2 条无字面量
+> 断言 NFA 整段 Go 扫, 结构性); ③ `ahoCorasick.scan` 4.1%(预过滤, Teddy 未激活退化 Go AC).
 
 ---
 
