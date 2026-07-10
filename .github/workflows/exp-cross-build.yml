@@ -7,7 +7,8 @@ name: Cross-Build-Yak
 # 标准版本              gzip_embed             yak_                   yak_linux_amd64 / yak_windows_arm64.exe
 # yak-slim（并行构建）  gzip_embed,irify_exclude  yak-slim_             yak-slim_linux_amd64
 #
-# Windows ARM64: 使用 windows-11-arm 原生 runner 编译（与 linux-arm64 同理，不做 x64 交叉编译）
+# Windows ARM64: windows-11-arm 原生 runner + llvm-mingw (CC=aarch64-w64-mingw32-clang)
+# 标准 MinGW 无法处理 runtime/cgo 的 ARM64 汇编；参考 agentsview/nginx-ui/llvm-mingw
 # Linux 兼容性:
 # - 仅在 go build 时用 docker run manylinux2014（glibc 2.17）；其余 CI 步骤在 Ubuntu runner 上执行
 #   （不能把 job 放进 manylinux 容器：Actions 的 Node 20 需要 GLIBC_2.27+，会在 checkout 阶段失败）
@@ -124,6 +125,12 @@ jobs:
           go-version-file: "./go.mod"
           cache: false
         id: go
+
+      - name: Setup llvm-mingw (Windows ARM64)
+        if: matrix.os == 'windows-arm64'
+        shell: pwsh
+        run: |
+          & "${{ github.workspace }}/.github/scripts/setup-llvm-mingw-windows-arm64.ps1"
 
       # - name: Cache Go modules
       #   uses: actions/cache@v3
