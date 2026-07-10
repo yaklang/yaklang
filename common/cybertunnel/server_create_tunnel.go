@@ -31,6 +31,51 @@ type connectionDesc struct {
 	Reader     chan *tpb.TunnelInput
 }
 
+func dispatchTunnelInputToTCPConnection(ctx context.Context, desc *tunnelDesc, rsp *tpb.TunnelInput) (handled bool) {
+	if desc == nil || desc.Connections == nil || rsp == nil {
+		return false
+	}
+
+	remoteAddr := rsp.GetToRemoteAddr()
+	connRaw, ok := desc.Connections.Load(remoteAddr)
+	if !ok {
+		return false
+	}
+
+	conn, ok := connRaw.(*connectionDesc)
+	if !ok || conn == nil {
+		desc.Connections.Delete(remoteAddr)
+		return false
+	}
+
+	defer func() {
+		if err := recover(); err != nil {
+			log.Warnf("drop tunnel input for closed tcp conn %s: %v", remoteAddr, err)
+			if conn.Connection != nil {
+				_ = conn.Connection.Close()
+			}
+			desc.Connections.Delete(remoteAddr)
+			handled = false
+		}
+	}()
+
+	if rsp.GetClose() {
+		close(conn.Reader)
+		if conn.Connection != nil {
+			_ = conn.Connection.Close()
+		}
+		desc.Connections.Delete(remoteAddr)
+		return true
+	}
+
+	select {
+	case conn.Reader <- rsp:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
 func (t *tunnelDesc) Close() {
 	if t.Listener != nil {
 		t.Listener.Close()
@@ -168,22 +213,7 @@ func (s *TunnelServer) CreateTunnel(server tpb.Tunnel_CreateTunnelServer) error 
 
 			switch desc.Network {
 			case "tcp":
-				connRaw, ok := desc.Connections.Load(rsp.GetToRemoteAddr())
-				if !ok {
-					continue
-				}
-				conn := connRaw.(*connectionDesc)
-
-				if rsp.GetClose() {
-					close(conn.Reader)
-					conn.Connection.Close()
-					desc.Connections.Delete(rsp.GetToRemoteAddr())
-					continue
-				}
-
-				select {
-				case conn.Reader <- rsp:
-				case <-server.Context().Done():
+				if !dispatchTunnelInputToTCPConnection(server.Context(), desc, rsp) && server.Context().Err() != nil {
 					return
 				}
 			case "udp":
