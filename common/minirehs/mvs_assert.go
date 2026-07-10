@@ -752,7 +752,7 @@ func (nfa *mvsNFA) existsInAssertShared1(data []byte, bound []uint8) bool {
 		}
 		bpre := bound[i]
 
-		// LimEx: 链边用左移批量推进; 异常边逐个 OR (含 condFollow guard 门控).
+		// LimEx: 链边用左移批量推进; 异常边逐个 OR.
 		shifted := (prev << 1) & chainTarget
 		cand := first | shifted
 		for _, gb := range nfa.condFirst {
@@ -768,8 +768,7 @@ func (nfa *mvsNFA) existsInAssertShared1(data []byte, bound []uint8) bool {
 				cand |= excFollow[p]
 			}
 		}
-		// condFollow: 条件后继对所有"有 condFollow 条目的活跃位置"展开 (不仅限于异常位置).
-		// condFollowMask1 标记哪些位置有 condFollow 条目; 逐个检查活跃的 condFollow 位置.
+		// condFollow: 条件后继对所有"有 condFollow 条目的活跃位置"展开.
 		if cfm := prev & nfa.condFollowMask1; cfm != 0 {
 			for cfm != 0 {
 				p := bits.TrailingZeros64(cfm)
