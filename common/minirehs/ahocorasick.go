@@ -135,3 +135,21 @@ func (ac *ahoCorasick) scan(data []byte, onHit func(litID int32, end int)) {
 		}
 	}
 }
+
+// scanFoldASCII 是 scan 的大小写无关版本。它在状态转移前就地折叠 ASCII 大写字母，
+// 避免 prefilter 为整段报文另建 lower 副本；非 ASCII 字节保持原样，因此与
+// asciiLowerInto + scan 的匹配集合及偏移完全一致。
+func (ac *ahoCorasick) scanFoldASCII(data []byte, onHit func(litID int32, end int)) {
+	state := int32(0)
+	for i, c := range data {
+		if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		state = ac.next[state<<8|int32(c)]
+		off := ac.outOff[state]
+		end := ac.outOff[state+1]
+		for ; off < end; off++ {
+			onHit(ac.outFlat[off], i+1)
+		}
+	}
+}

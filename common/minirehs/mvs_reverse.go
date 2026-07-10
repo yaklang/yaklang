@@ -113,10 +113,19 @@ func (nfa *mvsNFA) existsInReverseAnchored(data []byte, spans []anchorSpan, prev
 
 	i := alignRuneStart(data, maxHi) // 自最高匹配终点候选 (rune 边界) 起, 向头扫.
 	for i > 0 {
-		r, size := utf8.DecodeLastRune(data[:i])
 		runeEnd := i
-		j := i - size
-		sym := nfa.symbolOf(r)
+		// 与正向锚定一致的 ASCII 快路径：绝大多数报文是 ASCII，直接从
+		// data[i-1] 取得完整 rune 与压缩符号，省去 DecodeLastRune 的尾部
+		// 回溯和 symbolOf 的切点二分。非 ASCII / 非法 UTF-8 保持标准库语义。
+		var j, sym int
+		if c := data[i-1]; c < utf8.RuneSelf {
+			j = i - 1
+			sym = int(nfa.asciiSym[c])
+		} else {
+			r, size := utf8.DecodeLastRune(data[:i])
+			j = i - size
+			sym = nfa.symbolOf(r)
+		}
 
 		// 定位包含 runeEnd 的 span (descending): 跳过 lo 高于 runeEnd 的 span.
 		for si >= 0 && runeEnd < int(spans[si].lo) {
@@ -205,10 +214,16 @@ func (nfa *mvsNFA) existsInReverseAnchored1(data []byte, spans []anchorSpan) boo
 
 	i := alignRuneStart(data, maxHi)
 	for i > 0 {
-		r, size := utf8.DecodeLastRune(data[:i])
 		runeEnd := i
-		j := i - size
-		sym := nfa.symbolOf(r)
+		var j, sym int
+		if c := data[i-1]; c < utf8.RuneSelf {
+			j = i - 1
+			sym = int(nfa.asciiSym[c])
+		} else {
+			r, size := utf8.DecodeLastRune(data[:i])
+			j = i - size
+			sym = nfa.symbolOf(r)
+		}
 
 		for si >= 0 && runeEnd < int(spans[si].lo) {
 			si--

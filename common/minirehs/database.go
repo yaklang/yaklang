@@ -63,6 +63,10 @@ type scratch struct {
 	anchorCand   []uint64
 	anchorActive []uint64
 
+	// R1 anchored merged scan 的每报文成员 span 视图。元素只借用 anchorRanges 中
+	// 已合并的切片，不复制 span；扫描结束后下次 reset 时覆盖。
+	anchorMergedSpans [][]anchorSpan
+
 	// 双向锚定 (Rose-lite 完全体) 每报文缓冲: biSeen 标记某 idx 是否已入双向锚定批; biFwdRanges[idx]
 	// 累积前向注入区间 [h.end-headF, h.end] (头有界字面量), biRevRanges[idx] 累积反向注入区间
 	// [h.end, h.end+tailR] (尾有界字面量); biBatch 收集本报文触发的双向锚定 pattern idx. 位并行状态

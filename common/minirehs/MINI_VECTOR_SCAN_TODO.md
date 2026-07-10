@@ -120,6 +120,13 @@
 > URL 20%/JSON 0%/AWS 0%/Windows 0.15%, 但 first-set 字节太常见无法有效预筛. **结论: RE2only ~85x
 > 已逼近 87x 天花板, 剩余 cgocall 37.6% 是 always-on 整段扫描的结构性开销, 突破需规则层面提取更精确
 > 必需条件 (如 `^{.*}$` 的 `data[0]=='{'` 位置预检) 而非引擎层面的 first-set 预筛.**
+> **2026-07-10 后续 A/B(未默认启用)**:把既有 `buildMergedAnchoredNFA` 接入真实 backend，并补齐 merged
+> gap jump、真实 120 条 oracle 与独立 benchmark。正确性全绿，但 RE2-only `IndividualGapJump`
+> **13.3–14.0 MB/s** vs `MergedGapJump` **10.3–10.4 MB/s**，且 allocs **363→923/op**；全局
+> `nword`/alphabet 扩大压过了跨 pattern 合并省下的空洞扫描。实现保留在 A/B 开关
+> `anchorMergedEnabled` 后，默认不构建、不占生产数据库内存。另：CNF 必需 literal 因子诊断显示
+> 22 条 lean-gated pattern 理论可减 **13.6%** NFA 触发记录 / **7.8%** 验证字节；直接在 Go 层
+> 扩 literal + 二次 hit 扫描实测回归，需与 C trigger/event runtime 融合后再接线。
 
 ---
 

@@ -1,6 +1,7 @@
 package minirehs
 
 import (
+	"fmt"
 	"math/rand"
 	"sort"
 	"testing"
@@ -122,6 +123,61 @@ func TestMVSAnchoredMergedEquivalence(t *testing.T) {
 		t.Fatalf("anchored merged equivalence: %d mismatches in %d checks", mismatches, checks)
 	}
 	t.Logf("anchored merged equivalence: checks=%d all consistent", checks)
+}
+
+// TestMVSAnchoredMergedBackendOracle 把 R1 merged 调度真正接入 backend，在真实规则与
+// 真实流量上对照 stdlib。它覆盖 production scan 中 span 收集、成员槽映射、merged hit
+// 回报以及未合并的断言成员回退路径；默认开关仍关闭，防止未做性能验收前改变生产选择。
+func TestMVSAnchoredMergedBackendOracle(t *testing.T) {
+	old := anchorMergedEnabled
+	anchorMergedEnabled = true
+	defer func() { anchorMergedEnabled = old }()
+
+	patterns, _ := compilableMITMPatterns(t)
+	mvs, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false))
+	if err != nil {
+		t.Fatalf("compile mvs: %v", err)
+	}
+	defer mvs.Close()
+	oracle, err := Compile(patterns, WithBackend(BackendStdlib))
+	if err != nil {
+		t.Fatalf("compile oracle: %v", err)
+	}
+	defer oracle.Close()
+
+	records, _ := loadCorpus(t)
+	if len(records) > 120 {
+		records = records[:120]
+	}
+	for i, rec := range records {
+		got := mvsExistIDs(t, mvs, rec)
+		want := mvsExistIDs(t, oracle, rec)
+		mvsAssertSameIDSet(t, got, want, fmt.Sprintf("anchored-merged-record#%d", i))
+		if t.Failed() {
+			t.FailNow()
+		}
+	}
+}
+
+// BenchmarkMVSAnchoredMergedAB 在同一规则集/语料下比较逐条 gap-jump 与 R1 merged
+// 调度。单独保留，避免把尚未证明的实现混入主性能数字。
+func BenchmarkMVSAnchoredMergedAB(b *testing.B) {
+	patterns := re2OnlyMITMPatterns(b)
+	records, _ := loadCorpusB(b)
+	old := anchorMergedEnabled
+	defer func() { anchorMergedEnabled = old }()
+	for _, tc := range []struct {
+		name    string
+		enabled bool
+	}{
+		{"IndividualGapJump", false},
+		{"MergedGapJump", true},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			anchorMergedEnabled = tc.enabled
+			benchScanRecordsOpts(b, patterns, records, WithBackend(BackendMVS), WithReportLocation(false))
+		})
+	}
 }
 
 func sameIntSetMap(a, b map[int]bool) bool {

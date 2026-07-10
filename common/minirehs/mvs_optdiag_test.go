@@ -13,90 +13,6 @@ import (
 // nowNanos 返回当前单调纳秒 (诊断计时用).
 func nowNanos() int64 { return time.Now().UnixNano() }
 
-// requiredLiteralFactors 返回 pattern 的"必需字面量因子"合取范式: [][]string, 每个内层 []string
-// 是一个 OR 集 (任一命中满足该因子), 多个因子之间是 AND (全部因子都需满足才可能命中).
-// 与 extractRequiredLiterals (只取单个最长 OR 集) 不同, 它把 concat 各部分的必需字面量都作为
-// 独立必要条件. 任一命中 => 所有因子都出现 (concat 语义), 故"任一因子缺失则跳过"绝不漏报.
-func requiredLiteralFactors(re *syntax.Regexp, minLen int) [][]string {
-	raw := factorsOf(re)
-	var out [][]string
-	seenFactor := make(map[string]struct{})
-	for _, f := range raw {
-		if len(f) == 0 {
-			continue
-		}
-		norm := make([]string, 0, len(f))
-		seen := make(map[string]struct{}, len(f))
-		ok := true
-		for _, l := range f {
-			if len([]byte(l)) < minLen {
-				ok = false
-				break
-			}
-			low := strings.ToLower(l)
-			if _, d := seen[low]; d {
-				continue
-			}
-			seen[low] = struct{}{}
-			norm = append(norm, low)
-		}
-		if !ok || len(norm) == 0 {
-			continue
-		}
-		sort.Strings(norm)
-		key := strings.Join(norm, "\x00")
-		if _, d := seenFactor[key]; d {
-			continue
-		}
-		seenFactor[key] = struct{}{}
-		out = append(out, norm)
-	}
-	return out
-}
-
-// factorsOf 递归求合取因子 (未做 minLen/小写规整, 由 requiredLiteralFactors 后处理).
-func factorsOf(re *syntax.Regexp) [][]string {
-	switch re.Op {
-	case syntax.OpLiteral:
-		if len(re.Rune) == 0 {
-			return nil
-		}
-		if re.Flags&syntax.FoldCase != 0 {
-			for _, r := range re.Rune {
-				if r > 127 {
-					return nil
-				}
-			}
-		}
-		return [][]string{{string(re.Rune)}}
-	case syntax.OpConcat:
-		var all [][]string
-		for _, sub := range re.Sub {
-			all = append(all, factorsOf(sub)...)
-		}
-		return all
-	case syntax.OpAlternate:
-		// 跨分支只能保证"并集 OR 因子"为必要 (单一因子); 各分支必须都提供非空必需集.
-		lits := requiredLiterals(re)
-		if len(lits) == 0 {
-			return nil
-		}
-		return [][]string{lits}
-	case syntax.OpCapture, syntax.OpPlus:
-		if len(re.Sub) == 1 {
-			return factorsOf(re.Sub[0])
-		}
-		return nil
-	case syntax.OpRepeat:
-		if re.Min >= 1 && len(re.Sub) == 1 {
-			return factorsOf(re.Sub[0])
-		}
-		return nil
-	default:
-		return nil
-	}
-}
-
 // TestMVSOptDiag 数据驱动诊断: 在真实 MITM 规则 + 真实流量上, 统计每条 pattern 的工作量分布
 // (字面量触发记录数 / 窗口扫描字节总量 / 窗口是否尾部无界 / always-on 全段扫描成本), 把
 // profile 的 "C内核NFA / regexp2 / assert" 三块成本精确归因到具体 pattern, 指导优化方向.
@@ -280,7 +196,7 @@ func TestMVSANDGatePotential(t *testing.T) {
 		if err != nil {
 			continue
 		}
-		f := requiredLiteralFactors(parsed.Simplify(), 2)
+		f := extractRequiredLiteralFactors(parsed.Simplify(), 2)
 		factors[i] = f
 		if len(f) >= 2 {
 			multiFactor++
@@ -353,9 +269,9 @@ func TestMVSANDGatePotential(t *testing.T) {
 		curScanBytes, andScanBytes, 100*float64(curScanBytes-andScanBytes)/float64(curScanBytes))
 
 	type pr struct {
-		idx        int
-		cur, and   int64
-		nfactors   int
+		idx      int
+		cur, and int64
+		nfactors int
 	}
 	var prs []pr
 	for i := 0; i < d.n; i++ {
@@ -481,9 +397,9 @@ func TestMVSAnchoredPotential(t *testing.T) {
 		winHi := make(map[int]int)
 		// 锚定单趟: 每个 idx 维护一个注入位 bool[]、minInject/maxInject、scanEnd(=union hi).
 		type ainfo struct {
-			inject             []bool
+			inject              []bool
 			minInj, maxInj, end int
-			has                bool
+			has                 bool
 		}
 		anc := map[int]*ainfo{}
 		for _, h := range hits {
