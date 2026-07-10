@@ -161,6 +161,23 @@ func (nfa *mvsNFA) existsInReverseAnchored(data []byte, spans []anchorSpan, prev
 		if !hasActive && (si < 0 || j < firstLo) {
 			return false
 		}
+		// 大空洞跳跃 (反向): 活跃集空且当前 runeEnd 在 span 之上 (runeEnd > spans[si].hi), 且距下一个
+		// span (si-1) 的 hi > gapJumpMin 字节时, 跳到下一个 span 的 hi 的 rune 边界. 反向扫描中 si 递减,
+		// "下一个 span" 是 spans[si-1]. 向头跳 = 减小 i 到 spans[si-1].hi (rune 对齐: 用 i 之前的位置).
+		if !hasActive && si >= 0 && runeEnd > int(spans[si].hi)+gapJumpMin {
+			if si > 0 {
+				targetHi := int(spans[si-1].hi)
+				if targetHi < j && targetHi > 0 {
+					jump := targetHi
+					// 向左吸附到 rune 起始 (反向扫需对齐: jump 处是某 rune 的结尾, alignRuneStart 吸附到其起始).
+					jump = alignRuneStart(data, jump)
+					if jump > 0 && jump < i {
+						i = jump
+						continue
+					}
+				}
+			}
+		}
 		copy(prev, active)
 		i = j
 	}
@@ -212,6 +229,19 @@ func (nfa *mvsNFA) existsInReverseAnchored1(data []byte, spans []anchorSpan) boo
 		hasActive = active != 0
 		if !hasActive && (si < 0 || j < firstLo) {
 			return false
+		}
+		// 大空洞跳跃 (反向单字版, 同多字版逻辑).
+		if !hasActive && si >= 0 && runeEnd > int(spans[si].hi)+gapJumpMin {
+			if si > 0 {
+				targetHi := int(spans[si-1].hi)
+				if targetHi < j && targetHi > 0 {
+					jump := alignRuneStart(data, targetHi)
+					if jump > 0 && jump < i {
+						i = jump
+						continue
+					}
+				}
+			}
 		}
 		prev = active
 		i = j
