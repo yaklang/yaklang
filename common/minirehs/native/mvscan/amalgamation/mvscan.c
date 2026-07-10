@@ -763,10 +763,70 @@ done:
 #undef ROW_ZERO
 #endif
 
+/* nword==1 是真实规则集锚定 verifier 的主路径。通用运行器为任意字宽保留了
+ * 栈数组、ROW_* 调用和按 word 的循环；这里将状态留在寄存器中，逐位 OR follow
+ * 仍与通用递推完全同构。它只用于 !anchoredStart 的 span 注入语义。 */
+static int nfa_run_anchored_1(const mvs_nfa *a, const uint8_t *data, size_t len,
+                              const int32_t *loArr, const int32_t *hiArr, int32_t nspan) {
+    if (nspan <= 0) return 0;
+    uint64_t prev = 0;
+    int hasActive = 0;
+    int32_t si = 0;
+    int32_t lastHi = hiArr[nspan - 1];
+    int32_t curLo = loArr[0], curHi = hiArr[0];
+    size_t i = mvs_rune_start(data, len, (size_t)curLo);
+
+    while (i < len) {
+        size_t runeStart = i;
+        int sym;
+        uint8_t c0 = data[i];
+        if (c0 < 0x80) {
+            sym = (int)a->asciiSym[c0];
+            i++;
+        } else {
+            int32_t r;
+            int size = mvs_decode_rune(data + i, len - i, &r);
+            i += (size_t)size;
+            sym = symbol_of(a, r);
+        }
+        int atEnd = (i == len);
+
+        while (si < nspan && runeStart >= (size_t)curHi) {
+            si++;
+            if (si < nspan) {
+                curLo = loArr[si];
+                curHi = hiArr[si];
+            }
+        }
+        uint64_t cand = (si < nspan && runeStart >= (size_t)curLo) ? a->firstUnanchored[0] : 0;
+        for (uint64_t pw = prev; pw; pw &= pw - 1) {
+            int p = mvs_ctz64(pw);
+            cand |= a->follow[p];
+        }
+        uint64_t active = cand & a->reach[sym];
+        if (active & a->lastAny[0]) return 1;
+        if (atEnd && (active & a->lastEnd[0])) return 1;
+
+        hasActive = (active != 0);
+        if (!hasActive && (si >= nspan || (size_t)lastHi <= runeStart)) return 0;
+        if (!hasActive && si < nspan && (size_t)curLo > runeStart + 32) {
+            size_t jump = mvs_rune_start(data, len, (size_t)curLo);
+            if (jump > i) {
+                i = jump;
+                continue;
+            }
+        }
+        prev = active;
+    }
+    return 0;
+}
+
 /* nfa_run_anchored 分发: nword>=2 且有 SIMD 档时走 SIMD, 否则标量孪生. */
 static int nfa_run_anchored_dispatch(const mvs_nfa *a, const uint8_t *data, size_t len,
                                      const int32_t *lo, const int32_t *hi, int32_t nspan,
                                      int forceScalar) {
+	if (a->nword == 1)
+		return nfa_run_anchored_1(a, data, len, lo, hi, nspan);
 #if defined(MVS_SSE2) || defined(MVS_NEON)
     if (!forceScalar && a->nword >= 2)
         return nfa_run_anchored_simd(a, data, len, lo, hi, nspan);
