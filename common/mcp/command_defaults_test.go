@@ -31,46 +31,51 @@ func listRegisteredToolNames(t *testing.T, opts ...McpServerOption) map[string]s
 	return names
 }
 
-func TestLegacyMCPToolSetOptions_DefaultEnableAll(t *testing.T) {
-	opts, err := legacyMCPToolSetOptions(nil, nil)
+func TestLegacyMCPToolSetOptions_DefaultEnablesCoreSets(t *testing.T) {
+	opts, err := legacyMCPToolSetOptions(nil, nil, false)
 	require.NoError(t, err)
 	require.NotEmpty(t, opts)
 
 	names := listRegisteredToolNames(t, opts...)
-	require.NotEmpty(t, names)
 	require.Contains(t, names, "exec_codec")
-	require.Contains(t, names, "query_cve")
-}
-
-func TestLegacyMCPToolSetOptions_DisableSubtractsFromDefaultAll(t *testing.T) {
-	disabled := []string{
-		"cve", "hybrid_scan", "payload", "port_scan", "yak_document", "yak_script",
-		"reverse_shell", "brute", "subdomain", "crawler", "dynamic", "ssa", "system_proxy",
-	}
-	opts, err := legacyMCPToolSetOptions(nil, disabled)
-	require.NoError(t, err)
-
-	names := listRegisteredToolNames(t, opts...)
-	require.NotEmpty(t, names, "CLI with only --disable-tool must still expose remaining legacy tools")
-
-	require.Contains(t, names, "exec_codec")
-	require.NotContains(t, names, "query_cve")
-	require.NotContains(t, names, "start_port_scan")
+	require.Contains(t, names, "require_dnslog_domain")
+	require.NotContains(t, names, "start_hybrid_scan")
 	require.NotContains(t, names, "exec_yak_script")
 }
 
+func TestLegacyMCPToolSetOptions_EnableAllExposesEverything(t *testing.T) {
+	opts, err := legacyMCPToolSetOptions(nil, nil, true)
+	require.NoError(t, err)
+
+	names := listRegisteredToolNames(t, opts...)
+	require.Contains(t, names, "exec_codec")
+	require.Contains(t, names, "hybrid_scan")
+	require.Contains(t, names, "exec_yak_script")
+}
+
+func TestLegacyMCPToolSetOptions_DisableSubtractsFromDefaultCore(t *testing.T) {
+	opts, err := legacyMCPToolSetOptions(nil, []string{"cve", "port_scan"}, false)
+	require.NoError(t, err)
+
+	names := listRegisteredToolNames(t, opts...)
+	require.Contains(t, names, "exec_codec")
+	require.Contains(t, names, "require_dnslog_domain")
+	require.NotContains(t, names, "query_cve")
+	require.NotContains(t, names, "port_scan")
+}
+
 func TestLegacyMCPToolSetOptions_ExplicitToolNarrowsSet(t *testing.T) {
-	opts, err := legacyMCPToolSetOptions([]string{"codec"}, nil)
+	opts, err := legacyMCPToolSetOptions([]string{"codec"}, nil, false)
 	require.NoError(t, err)
 
 	names := listRegisteredToolNames(t, opts...)
 	require.Contains(t, names, "exec_codec")
 	require.NotContains(t, names, "query_cve")
-	require.NotContains(t, names, "start_port_scan")
+	require.NotContains(t, names, "port_scan")
 }
 
 func TestLegacyMCPToolSetOptions_ExplicitToolWithDisable(t *testing.T) {
-	opts, err := legacyMCPToolSetOptions([]string{"codec", "cve"}, []string{"cve"})
+	opts, err := legacyMCPToolSetOptions([]string{"codec", "cve"}, []string{"cve"}, false)
 	require.NoError(t, err)
 
 	names := listRegisteredToolNames(t, opts...)
@@ -79,7 +84,7 @@ func TestLegacyMCPToolSetOptions_ExplicitToolWithDisable(t *testing.T) {
 }
 
 func TestLegacyMCPToolSetOptions_InvalidDisableSetFailsAtNewServer(t *testing.T) {
-	opts, err := legacyMCPToolSetOptions(nil, []string{"not_a_real_tool_set"})
+	opts, err := legacyMCPToolSetOptions(nil, []string{"not_a_real_tool_set"}, false)
 	require.NoError(t, err)
 	_, err = NewMCPServer(opts...)
 	require.Error(t, err)
@@ -99,8 +104,8 @@ func TestMCPServerOptInWithoutEnableAllExposesNoLegacyTools(t *testing.T) {
 	require.Contains(t, errResp.Error.Message, "Tools not supported")
 }
 
-func TestMCPServerCLIStyleDefaultEnableAllWithDisable_JSONRoundTrip(t *testing.T) {
-	opts, err := legacyMCPToolSetOptions(nil, []string{"cve", "port_scan"})
+func TestMCPServerCLIStyleDefaultCoreWithDisable_JSONRoundTrip(t *testing.T) {
+	opts, err := legacyMCPToolSetOptions(nil, []string{"cve", "port_scan"}, false)
 	require.NoError(t, err)
 
 	srv, err := NewMCPServer(opts...)

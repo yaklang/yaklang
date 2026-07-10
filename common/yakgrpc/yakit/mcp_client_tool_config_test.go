@@ -15,7 +15,7 @@ func newToolConfigDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.MCPClientToolConfig{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.MCPClientToolConfig{}, &schema.GeneralStorage{}).Error)
 	return db
 }
 
@@ -29,6 +29,12 @@ func TestGetOrCreateMCPClientToolConfig(t *testing.T) {
 		assert.Equal(t, schema.MCPClientToolSourceBuiltin, cfg.Source)
 		assert.Equal(t, "desc_a", cfg.Description)
 		assert.True(t, cfg.Enable)
+	})
+
+	t.Run("creates disabled row when defaultEnable is false", func(t *testing.T) {
+		cfg, err := GetOrCreateMCPClientToolConfigWithDefaultEnable(db, "optional_tool_xyz", schema.MCPClientToolSourceBuiltin, "", "desc", false)
+		require.NoError(t, err)
+		assert.False(t, cfg.Enable)
 	})
 
 	t.Run("returns existing row without modifying it", func(t *testing.T) {
@@ -236,6 +242,35 @@ func TestDeleteMCPClientToolConfigsByServerAndNames(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "v2", cfg.Description)
 	})
+}
+
+func TestReconcileMCPBuiltinToolTierDefaults(t *testing.T) {
+	db := newToolConfigDB(t)
+
+	_, err := GetOrCreateMCPClientToolConfig(db, "require_dnslog_domain", schema.MCPClientToolSourceBuiltin, "", "")
+	require.NoError(t, err)
+	_, err = GetOrCreateMCPClientToolConfig(db, "save_payload", schema.MCPClientToolSourceBuiltin, "", "")
+	require.NoError(t, err)
+
+	isDefault := func(name string) bool {
+		return name == "require_dnslog_domain"
+	}
+
+	require.NoError(t, ReconcileMCPBuiltinToolTierDefaults(db, isDefault))
+
+	defaultTool, err := GetMCPClientToolConfigByName(db, "require_dnslog_domain")
+	require.NoError(t, err)
+	assert.True(t, defaultTool.Enable)
+
+	optionalTool, err := GetMCPClientToolConfigByName(db, "save_payload")
+	require.NoError(t, err)
+	assert.False(t, optionalTool.Enable)
+
+	// second run is idempotent
+	require.NoError(t, ReconcileMCPBuiltinToolTierDefaults(db, isDefault))
+	optionalTool, err = GetMCPClientToolConfigByName(db, "save_payload")
+	require.NoError(t, err)
+	assert.False(t, optionalTool.Enable)
 }
 
 func TestQueryMCPClientToolConfigs(t *testing.T) {

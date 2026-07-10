@@ -16,11 +16,15 @@ import (
 )
 
 // legacyMCPToolSetOptions builds enable/disable options for legacy MCP tool sets.
-// When toolSets is empty, all registered tool sets are enabled (historical CLI default).
-func legacyMCPToolSetOptions(toolSets, disableToolSets []string) ([]McpServerOption, error) {
+// When toolSets is empty, DefaultMCPToolSets are enabled unless enableAll is true.
+func legacyMCPToolSetOptions(toolSets, disableToolSets []string, enableAll bool) ([]McpServerOption, error) {
 	opts := make([]McpServerOption, 0, len(toolSets)+len(disableToolSets)+1)
 	if len(toolSets) == 0 {
-		opts = append(opts, WithEnableAllToolSets())
+		if enableAll {
+			opts = append(opts, WithEnableAllToolSets())
+		} else {
+			opts = append(opts, WithEnableDefaultToolSets())
+		}
 	} else {
 		for _, toolSet := range toolSets {
 			opts = append(opts, WithEnableToolSet(toolSet))
@@ -34,7 +38,13 @@ func legacyMCPToolSetOptions(toolSets, disableToolSets []string) ([]McpServerOpt
 
 var MCPCommandUsage = `Start a mcp server for providing mcp service.
 
-Available ToolSets: codec, cve, httpflow, hybrid_scan, payload, port_scan, yak_document, yak_script, reverse_shell, reverse_platform, http_fuzzer, brute, subdomain, crawler, dynamic, ssa, syntaxflow, risk, yso, mitm, fingerprint, project_database, global_hotpatch, system_proxy
+By default only commonly used ToolSets are enabled (` + fmt.Sprintf("%d tools across %d sets", DefaultMCPToolCount(), len(DefaultMCPToolSets)) + `). Use --enable-all to expose every registered set.
+
+Default ToolSets: ` + strings.Join(DefaultMCPToolSets, ", ") + `
+
+Optional ToolSets (enable with -t): ` + strings.Join(OptionalMCPToolSets, ", ") + `
+
+All ToolSets: ` + strings.Join(AllMCPToolSetNames(), ", ") + `
 
 Available ResourceSets: codec`
 
@@ -45,8 +55,9 @@ var MCPCommand = &cli.Command{
 		cli.StringFlag{Name: "transport", Usage: "transport protocol, e.g. sse/stdio/streamable_http", Value: "stdio"},
 		cli.StringFlag{Name: "host", Usage: "if transport is http-based, listen host", Value: "localhost"},
 		cli.IntFlag{Name: "port", Usage: "if transport is http-based, listen port", Value: 11432},
-		cli.StringFlag{Name: "t,tool", Usage: "enable tool sets, split by ','"},
+		cli.StringFlag{Name: "t,tool", Usage: "enable tool sets, split by ',' (overrides default core sets unless empty with --enable-all)"},
 		cli.StringFlag{Name: "dt,disable-tool", Usage: "disable tool sets, split by ','"},
+		cli.BoolFlag{Name: "enable-all", Usage: "enable every registered tool set instead of the default core sets"},
 		cli.StringFlag{Name: "r,resource", Usage: "enable resource sets, split by ','"},
 		cli.StringFlag{Name: "dr,disable-resource", Usage: "disable resource sets, split by ','"},
 		cli.StringSliceFlag{Name: "script", Usage: "add the dynamic Yak script as a tool to the MCP server"},
@@ -66,6 +77,7 @@ var MCPCommand = &cli.Command{
 		baseURL := c.String("base-url")
 		enableAIToolFramework := c.Bool("enable-aitool-framework")
 		enableBridgeExternalMCP := c.Bool("enable-bridge-external-mcp")
+		enableAllToolSets := c.Bool("enable-all")
 		toolSets := lo.FilterMap(strings.Split(tool, ","), func(item string, _ int) (string, bool) {
 			item = strings.TrimSpace(item)
 			return item, item != ""
@@ -75,6 +87,9 @@ var MCPCommand = &cli.Command{
 			return item, item != ""
 		})
 		resource, disableResource := c.String("resource"), c.String("disable-resource")
+		if resource == "" && !enableAllToolSets && len(toolSets) == 0 {
+			resource = strings.Join(DefaultMCPResourceSets, ",")
+		}
 		resourceSets := lo.FilterMap(strings.Split(resource, ","), func(item string, _ int) (string, bool) {
 			item = strings.TrimSpace(item)
 			return item, item != ""
@@ -85,7 +100,7 @@ var MCPCommand = &cli.Command{
 		})
 
 		opts := make([]McpServerOption, 0, len(toolSets)+len(disableToolSets)+len(resourceSets)+len(disableResourceSets)+1)
-		legacyOpts, legacyErr := legacyMCPToolSetOptions(toolSets, disableToolSets)
+		legacyOpts, legacyErr := legacyMCPToolSetOptions(toolSets, disableToolSets, enableAllToolSets)
 		if legacyErr != nil {
 			return legacyErr
 		}

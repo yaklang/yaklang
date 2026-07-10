@@ -48,6 +48,12 @@ func MCPBridgeToolOriginalName(canonicalName, serverName string) string {
 // description is stored on creation; existing rows are NOT updated here —
 // use UpsertMCPClientToolConfigDescription to refresh the description on an existing row.
 func GetOrCreateMCPClientToolConfig(db *gorm.DB, toolName, source, serverName, description string) (*schema.MCPClientToolConfig, error) {
+	return GetOrCreateMCPClientToolConfigWithDefaultEnable(db, toolName, source, serverName, description, true)
+}
+
+// GetOrCreateMCPClientToolConfigWithDefaultEnable is like GetOrCreateMCPClientToolConfig but
+// sets the initial enable flag on first insert only.
+func GetOrCreateMCPClientToolConfigWithDefaultEnable(db *gorm.DB, toolName, source, serverName, description string, defaultEnable bool) (*schema.MCPClientToolConfig, error) {
 	cfg := &schema.MCPClientToolConfig{}
 	err := db.Where("tool_name = ?", toolName).First(cfg).Error
 	if err == nil {
@@ -66,7 +72,43 @@ func GetOrCreateMCPClientToolConfig(db *gorm.DB, toolName, source, serverName, d
 	if err := db.Create(cfg).Error; err != nil {
 		return nil, utils.Errorf("create mcp_client_tool_config failed: %s", err)
 	}
+	if !defaultEnable {
+		if err := SetMCPClientToolEnabled(db, toolName, false); err != nil {
+			return nil, err
+		}
+		cfg.Enable = false
+	}
 	return cfg, nil
+}
+
+const mcpBuiltinTierDefaultsMigrationKey = "yak_mcp_builtin_tier_defaults_v1"
+
+// ReconcileMCPBuiltinToolTierDefaults disables optional/internal legacy builtin tools once
+// after upgrading to catalog-based default startup. User toggles after migration are preserved.
+func ReconcileMCPBuiltinToolTierDefaults(db *gorm.DB, isDefaultBuiltin func(string) bool) error {
+	if db == nil {
+		return nil
+	}
+	if GetKey(db, mcpBuiltinTierDefaultsMigrationKey) == "true" {
+		return nil
+	}
+
+	var cfgs []*schema.MCPClientToolConfig
+	if err := db.Where("source = ?", schema.MCPClientToolSourceBuiltin).Find(&cfgs).Error; err != nil {
+		return utils.Errorf("fetch builtin mcp client tool configs: %s", err)
+	}
+	for _, cfg := range cfgs {
+		if isDefaultBuiltin(cfg.ToolName) {
+			continue
+		}
+		if !cfg.Enable {
+			continue
+		}
+		if err := SetMCPClientToolEnabled(db, cfg.ToolName, false); err != nil {
+			return err
+		}
+	}
+	return SetKey(db, mcpBuiltinTierDefaultsMigrationKey, "true")
 }
 
 // UpsertMCPClientToolConfigDescription updates the cached description for an existing

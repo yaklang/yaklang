@@ -26,24 +26,32 @@ func (s *Server) StartMcpServer(req *ypb.StartMcpServerRequest, stream ypb.Yak_S
 		for _, resourceSet := range toolSetList.ResourceSetList {
 			req.Resource = append(req.Resource, resourceSet.Name)
 		}
+		log.Infof("StartMcpServer: EnableAll=true, exposing %d tool sets", len(req.GetTool()))
+	} else if len(req.GetTool()) == 0 {
+		req.Tool = append(req.Tool, mcp.DefaultMCPToolSets...)
+		if len(req.GetResource()) == 0 {
+			req.Resource = append(req.Resource, mcp.DefaultMCPResourceSets...)
+		}
+		log.Infof("StartMcpServer: using default tool sets (%d sets, ~%d tools)", len(req.GetTool()), mcp.DefaultMCPToolCount())
+	} else {
+		log.Infof("StartMcpServer: explicit tool sets: %v", req.GetTool())
 	}
 	return launchMcpServer(stream.Context(), req, stream.Send)
 }
 
 func (s *Server) GetToolSetList(ctx context.Context, req *ypb.Empty) (*ypb.GetToolSetListResponse, error) {
-	toolSetList := mcp.GlobalToolSetList()
-	resourceSetList := mcp.GlobalResourceSetList()
 	response := &ypb.GetToolSetListResponse{
-		ToolSetList:     make([]*ypb.ToolSetInfo, 0, len(toolSetList)),
-		ResourceSetList: make([]*ypb.ResourceSetInfo, 0, len(resourceSetList)),
+		ToolSetList:     make([]*ypb.ToolSetInfo, 0, len(mcp.AllMCPToolSetNames())),
+		ResourceSetList: make([]*ypb.ResourceSetInfo, 0, len(mcp.GlobalResourceSetList())),
 	}
 
-	for _, toolSet := range toolSetList {
+	for _, toolSet := range mcp.AllMCPToolSetNames() {
 		response.ToolSetList = append(response.ToolSetList, &ypb.ToolSetInfo{
 			Name: toolSet,
 		})
 	}
 
+	resourceSetList := mcp.GlobalResourceSetList()
 	for _, resourceSet := range resourceSetList {
 		response.ResourceSetList = append(response.ResourceSetList, &ypb.ResourceSetInfo{
 			Name: resourceSet,
