@@ -614,6 +614,18 @@ static int NFA_RUN_ANCHORED_NAME(const mvs_nfa *a, const uint8_t *data, size_t l
             /* 提前消亡: 活跃集空且已越过所有注入区间 => 不可能再命中. */
             goto done;
         }
+        /* 大空洞跳跃与 Go existsInAnchored 保持同一策略：活跃集已经消亡时，
+         * 下一个 literal 注入区间之前的 rune 不可能影响任何状态。直接跳到该
+         * span 的 rune 起点，避免 C 批处理在稀疏触发的长报文上无意义地扫完整个洞。
+         * 32 与 Go gapJumpMin 一致；mvs_rune_start 向左对齐且只在 jump>i 时采用，
+         * 因而不会破坏前向单调性。 */
+        if (!hasActive && si < nspan && (size_t)loArr[si] > runeStart + 32) {
+            size_t jump = mvs_rune_start(data, len, (size_t)loArr[si]);
+            if (jump > i) {
+                i = jump;
+                continue;
+            }
+        }
     }
 
 done:
@@ -724,6 +736,18 @@ static int NFA_RUN_ANCHORED_NAME(const mvs_nfa *a, const uint8_t *data, size_t l
         if (!hasActive && (si >= nspan || (size_t)lastHi <= runeStart)) {
             /* 提前消亡: 活跃集空且已越过所有注入区间 => 不可能再命中. */
             goto done;
+        }
+        /* 大空洞跳跃与 Go existsInAnchored 保持同一策略：活跃集已经消亡时，
+         * 下一个 literal 注入区间之前的 rune 不可能影响任何状态。直接跳到该
+         * span 的 rune 起点，避免 C 批处理在稀疏触发的长报文上无意义地扫完整个洞。
+         * 32 与 Go gapJumpMin 一致；mvs_rune_start 向左对齐且只在 jump>i 时采用，
+         * 因而不会破坏前向单调性。 */
+        if (!hasActive && si < nspan && (size_t)loArr[si] > runeStart + 32) {
+            size_t jump = mvs_rune_start(data, len, (size_t)loArr[si]);
+            if (jump > i) {
+                i = jump;
+                continue;
+            }
         }
     }
 
