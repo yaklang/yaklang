@@ -682,6 +682,8 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 					rev := d.revNFAs[idx]
 					if rev.single {
 						hit = rev.existsInReverseAnchored1(data, revSpans)
+					} else if rev.nword == 2 {
+						hit = rev.existsInReverseAnchored2(data, revSpans)
 					} else {
 						hit = rev.existsInReverseAnchored(data, revSpans, sc.anchorPrev, sc.anchorCand, sc.anchorActive)
 					}

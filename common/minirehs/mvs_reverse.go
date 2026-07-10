@@ -194,6 +194,84 @@ func (nfa *mvsNFA) existsInReverseAnchored(data []byte, spans []anchorSpan, prev
 	return false
 }
 
+// existsInReverseAnchored2 是 nword==2 的寄存器快路径。双向锚定的真实热点中，反向 NFA
+// 很多仅刚好跨过 64 个位置；通用版为它们仍承担三层 word 循环和 []uint64 写回。把两个字
+// 拆开后，follow 的二维行访问与通用版完全同构，语义保持一致。
+func (nfa *mvsNFA) existsInReverseAnchored2(data []byte, spans []anchorSpan) bool {
+	if len(spans) == 0 {
+		return false
+	}
+	first := nfa.first
+	lastAny := nfa.lastAny
+	follow := nfa.follow
+	reach := nfa.reach
+	n := len(data)
+	firstLo := int(spans[0].lo)
+	maxHi := int(spans[len(spans)-1].hi)
+	if maxHi > n {
+		maxHi = n
+	}
+	si := len(spans) - 1
+	var prev0, prev1 uint64
+	hasActive := false
+
+	i := alignRuneStart(data, maxHi)
+	for i > 0 {
+		runeEnd := i
+		var j, sym int
+		if c := data[i-1]; c < utf8.RuneSelf {
+			j = i - 1
+			sym = int(nfa.asciiSym[c])
+		} else {
+			r, size := utf8.DecodeLastRune(data[:i])
+			j = i - size
+			sym = nfa.symbolOf(r)
+		}
+
+		for si >= 0 && runeEnd < int(spans[si].lo) {
+			si--
+		}
+		var cand0, cand1 uint64
+		if si >= 0 && runeEnd >= int(spans[si].lo) && runeEnd <= int(spans[si].hi) {
+			cand0, cand1 = first[0], first[1]
+		}
+		if hasActive {
+			for pw := prev0; pw != 0; pw &= pw - 1 {
+				fp := follow[bits.TrailingZeros64(pw)]
+				cand0 |= fp[0]
+				cand1 |= fp[1]
+			}
+			for pw := prev1; pw != 0; pw &= pw - 1 {
+				fp := follow[64+bits.TrailingZeros64(pw)]
+				cand0 |= fp[0]
+				cand1 |= fp[1]
+			}
+		}
+		rc := reach[sym]
+		active0, active1 := cand0&rc[0], cand1&rc[1]
+		if active0&lastAny[0] != 0 || active1&lastAny[1] != 0 {
+			return true
+		}
+		hasActive = active0|active1 != 0
+		if !hasActive && (si < 0 || j < firstLo) {
+			return false
+		}
+		if !hasActive && si >= 0 && runeEnd > int(spans[si].hi)+gapJumpMin && si > 0 {
+			targetHi := int(spans[si-1].hi)
+			if targetHi < j && targetHi > 0 {
+				jump := alignRuneStart(data, targetHi)
+				if jump > 0 && jump < i {
+					i = jump
+					continue
+				}
+			}
+		}
+		prev0, prev1 = active0, active1
+		i = j
+	}
+	return false
+}
+
 // existsInReverseAnchored1 是 existsInReverseAnchored 的 nword==1 标量零分配快路径. 语义完全一致.
 func (nfa *mvsNFA) existsInReverseAnchored1(data []byte, spans []anchorSpan) bool {
 	if len(spans) == 0 {
