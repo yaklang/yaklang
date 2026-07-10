@@ -209,6 +209,33 @@ func TestGRPC_StartMcpServer_TierDefaultCoreOnly(t *testing.T) {
 	assert.False(t, containsTool(names, "hybrid_scan"), "non-default sets should stay hidden")
 }
 
+func TestGRPC_StartMcpServer_ExplicitOptionalToolSetOverridesTierDisable(t *testing.T) {
+	grpcSrv, err := NewServer()
+	require.NoError(t, err)
+	ctx := context.Background()
+
+	_, err = grpcSrv.GetMCPToolList(ctx, &ypb.GetMCPToolListRequest{
+		Source:     schema.MCPClientToolSourceBuiltin,
+		Pagination: &ypb.Paging{Page: 1, Limit: 200},
+	})
+	require.NoError(t, err)
+
+	cfg, err := yakit.GetMCPClientToolConfigByName(consts.GetGormProfileDatabase(), "create_project_database")
+	require.NoError(t, err)
+	require.False(t, cfg.Enable, "optional project_database tools should be tier-disabled in DB")
+
+	names := startMCPListToolNames(t, &ypb.StartMcpServerRequest{
+		Host:                  "127.0.0.1",
+		Port:                  0,
+		Tool:                  []string{"project_database"},
+		EnableAll:             false,
+		EnableAIToolFramework: false,
+	})
+
+	assert.True(t, containsTool(names, "create_project_database"), "explicit optional set should expose tier-disabled tools")
+	assert.True(t, containsTool(names, "list_project_databases"))
+}
+
 func TestGRPC_StartMcpServer_TierLegacyOnly(t *testing.T) {
 	names := startMCPListToolNames(t, &ypb.StartMcpServerRequest{
 		Host:                  "127.0.0.1",

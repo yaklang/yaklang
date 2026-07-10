@@ -15,6 +15,7 @@ import (
 )
 
 func (s *Server) StartMcpServer(req *ypb.StartMcpServerRequest, stream ypb.Yak_StartMcpServerServer) error {
+	explicitToolSets := false
 	if req.GetEnableAll() {
 		toolSetList, err := s.GetToolSetList(stream.Context(), &ypb.Empty{})
 		if err != nil {
@@ -34,9 +35,10 @@ func (s *Server) StartMcpServer(req *ypb.StartMcpServerRequest, stream ypb.Yak_S
 		}
 		log.Infof("StartMcpServer: using default tool sets (%d sets, ~%d tools)", len(req.GetTool()), mcp.DefaultMCPToolCount())
 	} else {
+		explicitToolSets = true
 		log.Infof("StartMcpServer: explicit tool sets: %v", req.GetTool())
 	}
-	return launchMcpServer(stream.Context(), req, stream.Send)
+	return launchMcpServer(stream.Context(), req, stream.Send, explicitToolSets)
 }
 
 func (s *Server) GetToolSetList(ctx context.Context, req *ypb.Empty) (*ypb.GetToolSetListResponse, error) {
@@ -62,7 +64,7 @@ func (s *Server) GetToolSetList(ctx context.Context, req *ypb.Empty) (*ypb.GetTo
 }
 
 // launchMcpServer 启动 MCP 服务器的具体实现
-func launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send func(*ypb.StartMcpServerResponse) error) (err error) {
+func launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send func(*ypb.StartMcpServerResponse) error, explicitToolSets bool) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Errorf("panic in launchMcpServer: %v", r)
@@ -148,6 +150,15 @@ func launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send f
 	disabledTools, dbErr := GetDisabledMCPToolNamesFromDB()
 	if dbErr != nil {
 		log.Warnf("launchMcpServer: failed to load disabled tool list: %v", dbErr)
+	}
+	// Explicit -t/Tool requests intentionally enable optional sets; do not apply
+	// tier-default disable flags for tools in those sets.
+	if explicitToolSets {
+		for _, setName := range req.GetTool() {
+			for _, toolName := range mcp.ToolNamesInSet(setName) {
+				delete(disabledTools, toolName)
+			}
+		}
 	}
 	if len(disabledTools) > 0 {
 		opts = append(opts, mcp.WithDisabledToolNames(disabledTools))
