@@ -578,6 +578,8 @@ func TestMVSKernelAnchoredDirect(t *testing.T) {
 		var goHit bool
 		if nfa.single {
 			goHit = nfa.existsInAnchored1(data, c.spans)
+		} else if nfa.nword == 2 {
+			goHit = nfa.existsInAnchored2(data, c.spans)
 		} else {
 			prev := make([]uint64, nfa.nword)
 			cand := make([]uint64, nfa.nword)
@@ -643,6 +645,8 @@ func TestMVSKernelAnchoredRandom(t *testing.T) {
 			var goHit bool
 			if nfa.single {
 				goHit = nfa.existsInAnchored1(data, spans)
+			} else if nfa.nword == 2 {
+				goHit = nfa.existsInAnchored2(data, spans)
 			} else {
 				prev := make([]uint64, nfa.nword)
 				cand := make([]uint64, nfa.nword)

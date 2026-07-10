@@ -169,6 +169,79 @@ func (nfa *mvsNFA) existsInAnchored(data []byte, spans []anchorSpan, prev, cand,
 // existsInAnchored1 是 existsInAnchored 的 nword==1 (位置数<=64) 标量快路径: 活跃集为单个 uint64,
 // 全程寄存器位运算, 零分配 (无需调用方 prev/cand/active 缓冲). 语义与 existsInAnchored 完全一致,
 // 仅用于 nfa.single 的 lean NFA. 含 ASCII 快路径 (省去 utf8.DecodeRune + symbolOf 调用开销).
+// existsInAnchored2 keeps the two-word anchored state in registers. It is the
+// common just-over-64-position case in the real rule set.
+func (nfa *mvsNFA) existsInAnchored2(data []byte, spans []anchorSpan) bool {
+	if len(spans) == 0 {
+		return false
+	}
+	first, lastAny, lastEnd := nfa.first, nfa.lastAny, nfa.lastEnd
+	follow, reach := nfa.follow, nfa.reach
+	n := len(data)
+	lastHi := int(spans[len(spans)-1].hi)
+	si := 0
+	curLo, curHi := int(spans[0].lo), int(spans[0].hi)
+	var prev0, prev1 uint64
+	hasActive := false
+	i := alignRuneStart(data, curLo)
+	for i < n {
+		runeStart := i
+		c := data[i]
+		var sym, ni int
+		if c < utf8.RuneSelf {
+			sym, ni = int(nfa.asciiSym[c]), i+1
+		} else {
+			r, size := utf8.DecodeRune(data[i:])
+			sym, ni = nfa.symbolOf(r), i+size
+		}
+		for runeStart >= curHi {
+			si++
+			if si >= len(spans) {
+				break
+			}
+			curLo, curHi = int(spans[si].lo), int(spans[si].hi)
+		}
+		var cand0, cand1 uint64
+		if si < len(spans) && runeStart >= curLo {
+			cand0, cand1 = first[0], first[1]
+		}
+		if hasActive {
+			for pw := prev0; pw != 0; pw &= pw - 1 {
+				fp := follow[bits.TrailingZeros64(pw)]
+				cand0 |= fp[0]
+				cand1 |= fp[1]
+			}
+			for pw := prev1; pw != 0; pw &= pw - 1 {
+				fp := follow[64+bits.TrailingZeros64(pw)]
+				cand0 |= fp[0]
+				cand1 |= fp[1]
+			}
+		}
+		rc := reach[sym]
+		active0, active1 := cand0&rc[0], cand1&rc[1]
+		if active0&lastAny[0] != 0 || active1&lastAny[1] != 0 {
+			return true
+		}
+		if nfa.requireEnd && ni == n && (active0&lastEnd[0] != 0 || active1&lastEnd[1] != 0) {
+			return true
+		}
+		hasActive = active0|active1 != 0
+		if !hasActive && (si >= len(spans) || runeStart >= lastHi) {
+			return false
+		}
+		if !hasActive && si < len(spans) && curLo > runeStart+gapJumpMin {
+			jump := alignRuneStart(data, curLo)
+			if jump > i {
+				i = jump
+				continue
+			}
+		}
+		prev0, prev1 = active0, active1
+		i = ni
+	}
+	return false
+}
+
 func (nfa *mvsNFA) existsInAnchored1(data []byte, spans []anchorSpan) bool {
 	if len(spans) == 0 {
 		return false
