@@ -114,6 +114,12 @@
 > **剩余瓶颈(RE2only 档)**: ① `runtime.cgocall` 37.6%(merged_scan 32% = 5 条 always-on 整段 C 扫,
 > 结构性: always-on 无字面量不可门控); ② 断言 always-on `existsInAssertShared1` 11.3%(2 条无字面量
 > 断言 NFA 整段 Go 扫, 结构性); ③ `ahoCorasick.scan` 4.1%(预过滤, Teddy 未激活退化 Go AC).
+> **A/B 回退(第五轮, 算法层面)**: merged always-on first-set 字节预筛 (`firstBytes[128]` 位图, 报文不含
+> 任何 firstBytes 字节则跳过整段 merged_scan)——0% skip rate (first 字节 `"'/+018` 等在 HTTP 流量里
+> 几乎必然出现), Go 预检 O(n) 开销 > 省下的 cgo, 净回归 -3%. 诊断: 5 条 always-on 命中率 手机号 37%/
+> URL 20%/JSON 0%/AWS 0%/Windows 0.15%, 但 first-set 字节太常见无法有效预筛. **结论: RE2only ~85x
+> 已逼近 87x 天花板, 剩余 cgocall 37.6% 是 always-on 整段扫描的结构性开销, 突破需规则层面提取更精确
+> 必需条件 (如 `^{.*}$` 的 `data[0]=='{'` 位置预检) 而非引擎层面的 first-set 预筛.**
 
 ---
 
