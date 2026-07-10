@@ -72,6 +72,27 @@ func TestMVSKernelAnchoredBatchBackendOracle(t *testing.T) {
 	}
 }
 
+// BenchmarkMVSCAnchoredBatchAB 衡量 C anchored-many 与默认 Go 单字 gap-jump 的净差异。
+// 该 A/B 只在 cgo+mvs 构建中存在，避免将尚未验收的 C 调度混入主基准。
+func BenchmarkMVSCAnchoredBatchAB(b *testing.B) {
+	patterns := re2OnlyMITMPatterns(b)
+	records, _ := loadCorpusB(b)
+	old := anchorCBatchEnabled
+	defer func() { anchorCBatchEnabled = old }()
+	for _, tc := range []struct {
+		name    string
+		enabled bool
+	}{
+		{"GoGapJump", false},
+		{"CBatchGapJump", true},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			anchorCBatchEnabled = tc.enabled
+			benchScanRecordsOpts(b, patterns, records, WithBackend(BackendMVS), WithReportLocation(false))
+		})
+	}
+}
+
 // openSingleNFAKernel 把一条 NFA 序列化为 blob 并打开 C 内核 (pattern 槽位仅 idx 0).
 func openSingleNFAKernel(t *testing.T, nfa *mvsNFA) *mvsKernel {
 	t.Helper()
