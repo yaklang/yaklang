@@ -91,9 +91,18 @@ jobs:
           cd ${{ github.workspace }}
 
       - name: Get Repo tags
+        shell: bash
         run: |
-          go run common/yak/cmd/yak.go repos-tag -o tags.txt
-          echo "YAK_TAG=$(cat tags.txt)" >> ${{ contains(inputs.os, 'windows') && '$env:GITHUB_ENV' || '$GITHUB_ENV' }}
+          export PATH="$HOME/.local/bin:$PATH"
+          if command -v yak >/dev/null 2>&1; then
+            YAK=yak
+          else
+            CGO_ENABLED="${CGO_ENABLED:-1}" go build -o ./yak_cli -v common/yak/cmd/yak.go
+            YAK=./yak_cli
+            [ -f ./yak_cli.exe ] && YAK=./yak_cli.exe
+          fi
+          "$YAK" repos-tag -o tags.txt
+          echo "YAK_TAG=$(cat tags.txt)" >> "$GITHUB_ENV"
 
       - name: Determine Build Tags and Output Name
         id: build_info
@@ -130,7 +139,17 @@ jobs:
         run: go run -gcflags=all="-N -l" common/yak/yaklib/codec/codegrpc/doc/codec_doc.go common/yak/yaklib/codec/codegrpc/codec.gob.zst
 
       - name: Sync Embed FS Hash to Code
-        run: go run common/yak/cmd/yak.go embed-fs-hash --override --all
+        shell: bash
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          if command -v yak >/dev/null 2>&1; then
+            YAK=yak
+          else
+            CGO_ENABLED="${CGO_ENABLED:-1}" go build -o ./yak_cli -v common/yak/cmd/yak.go
+            YAK=./yak_cli
+            [ -f ./yak_cli.exe ] && YAK=./yak_cli.exe
+          fi
+          "$YAK" embed-fs-hash --override --all
 
       - name: Install gzip-embed tool
         run: go install ./common/utils/gzip_embed/gzip-embed
