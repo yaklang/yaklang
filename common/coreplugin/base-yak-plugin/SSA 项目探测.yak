@@ -1,20 +1,9 @@
 yakit.AutoInitYakit()
 
 // 支持的语言注册表（单一数据源）：新增语言只需在 langOrder 增加一项，并补全
-// langLabel / langExts / langMarkers / langManifests 即可，CLI 选项、扩展名映射、
-// 标记/清单计分都会自动跟进，无需再分散修改多处。
+// langExts / langMarkers / langManifests 即可，扩展名映射、标记/清单计分都会自动
+// 跟进，无需再分散修改多处。CLI 的语言选项仍保持手写，与注册表独立。
 langOrder = ["java", "php", "go", "python", "js", "ts", "yak", "c"]
-
-langLabel = {
-    "java":   "Java",
-    "php":    "PHP",
-    "go":     "Golang",
-    "python": "Python",
-    "js":     "JavaScript",
-    "ts":     "TypeScript",
-    "yak":    "Yaklang",
-    "c":      "C",
-}
 
 // 源码扩展名 -> 语言（一个语言可对应多个扩展名）
 langExts = {
@@ -102,16 +91,17 @@ func addFileMarkers(name) {
 }
 
 target = cli.String("target", cli.setRequired(true))
-
-// 语言 CLI 选项由注册表生成，新增语言无需手改 CLI
-langSelectOpts = []
-for _, lang := range langOrder {
-    langSelectOpts = append(langSelectOpts, cli.setSelectOption(langLabel[lang], lang))
-}
 languages = cli.StringSlice(
-    "language",
-    cli.setMultipleSelect(false),
-    langSelectOpts...,
+    "language", 
+    cli.setMultipleSelect(false), 
+    cli.setSelectOption("Java", "java"), 
+    cli.setSelectOption("PHP", "php"), 
+    cli.setSelectOption("Yaklang", "yak"), 
+    cli.setSelectOption("JavaScript", "js"), 
+    cli.setSelectOption("TypeScript", "ts"), 
+    cli.setSelectOption("Golang", "go"), 
+    cli.setSelectOption("C", "c"), 
+    cli.setSelectOption("Python", "python"), 
 )
 
 compile_immediately := cli.Bool(
