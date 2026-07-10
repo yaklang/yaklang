@@ -63,6 +63,15 @@ type scratch struct {
 	anchorCand   []uint64
 	anchorActive []uint64
 
+	// C 锚定批处理的平铺视图。每条 lean pattern 的已合并 spans 连续写入
+	// anchorSpansLo/Hi，anchorSpanOff 划分各 pattern 的子区间；避免在热路径为
+	// []anchorSpan -> C 平行数组做逐条分配/跨界。
+	anchorCIdx     []int32
+	anchorSpanOff  []int32
+	anchorSpansLo  []int32
+	anchorSpansHi  []int32
+	anchorBatchOut []byte
+
 	// R1 anchored merged scan 的每报文成员 span 视图。元素只借用 anchorRanges 中
 	// 已合并的切片，不复制 span；扫描结束后下次 reset 时覆盖。
 	anchorMergedSpans [][]anchorSpan

@@ -165,14 +165,19 @@ func (k *mvsKernel) nfaExistsAnchoredImpl(idx int, data []byte, spans []anchorSp
 // nfaExistsAnchoredMany 一次 cgo 调用对多条 anchorable pattern 各自做锚定式存在性,
 // 摊薄 "每 pattern 一次 cgo" 的跨界开销 (锚定批处理 cgo 次数从 O(触发数) 降到 O(1)).
 // idxs[i] 为 pattern 下标, patSpanOff[i+1]-patSpanOff[i] 为其 spans 数, spansLo/Hi 平铺.
-// 结果写入返回切片 (len==len(idxs), 1 命中/0 不命中). 当前 backend 仍走逐条 Go 路径,
-// 本入口作为 C 内核 API 保留供差分测试及后续 R1' 批量接线使用.
+// 结果复用 scratch 返回 (len==len(idxs), 1 命中/0 不命中). 由 A/B 门控的 backend
+// 把同一报文所有 lean anchored verifier 合并为一次跨界；默认路径仍可保守回退 Go gap-jump。
 func (k *mvsKernel) nfaExistsAnchoredMany(idxs []int32, data []byte,
-	patSpanOff []int32, spansLo, spansHi []int32) []byte {
+	patSpanOff []int32, spansLo, spansHi []int32, sc *scratch) []byte {
 	if k == nil || k.db == nil || len(idxs) == 0 {
 		return nil
 	}
-	out := make([]byte, len(idxs))
+	if cap(sc.anchorBatchOut) < len(idxs) {
+		sc.anchorBatchOut = make([]byte, len(idxs))
+	} else {
+		sc.anchorBatchOut = sc.anchorBatchOut[:len(idxs)]
+	}
+	out := sc.anchorBatchOut
 	var dptr *C.uint8_t
 	if len(data) > 0 {
 		dptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))

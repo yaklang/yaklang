@@ -404,6 +404,11 @@ var gateSupersetPrecheck = false
 // 关闭，直到真实语料的 oracle 与基准都证明其全局位集成本低于逐条 gap-jump 路径。
 var anchorMergedEnabled = false
 
+// anchorCBatchEnabled 控制 C anchored-many 接线。它与 Go gap-jump 路径语义等价，
+// 但真实规则集上 C 对大量单字 NFA 的逐条重扫目前慢于 Go 标量快路径；默认关闭，保留作
+// C 侧 trigger/event 融合完成前的差分护栏和 A/B 基线。
+var anchorCBatchEnabled = false
+
 // cgo 调用诊断计数器 (仅 cgoDiagEnabled=true 时累加, 默认关闭, 近零开销). 用于量化
 // "cgo 跨界次数 vs 实际扫描字节" 以判定瓶颈是跨界开销还是扫描工作量 (见 TestMVSCgoCallDiag).
 // 声明置于无构建标签文件, 使 cgo / 非 cgo 构建与测试均可引用 (增量仅在 mvs_cgo.go 的真实调用处).
@@ -559,6 +564,44 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 		}
 		// 锚定式批处理: 对本报文每条触发的锚定式 pattern, 合并其注入区间后做一次锚定式单趟存在性.
 		sc.anchorBatch = anchorBatch
+		// lean anchored NFA 已在 C blob 中。把本报文所有 pattern 的 spans 平铺后一次跨界；
+		// C 内仍按 pattern 独立执行相同的提前消亡递推，但避免 Go 热循环和 O(pattern) cgo。
+		// 含零宽断言的 NFA 不入 blob，必须留在下方 Go 路径以复用真实边界 guard。
+		if anchorCBatchEnabled && d.kernel != nil && !anchorMergedEnabled && len(anchorBatch) > 0 {
+			sc.anchorCIdx = sc.anchorCIdx[:0]
+			sc.anchorSpanOff = sc.anchorSpanOff[:0]
+			sc.anchorSpansLo = sc.anchorSpansLo[:0]
+			sc.anchorSpansHi = sc.anchorSpansHi[:0]
+			for _, idx32 := range anchorBatch {
+				idx := int(idx32)
+				nfa := d.nfas[idx]
+				if nfa == nil || nfa.hasAssert {
+					continue
+				}
+				spans := mergeAnchorSpans(sc.anchorRanges[idx])
+				if len(spans) == 0 {
+					continue
+				}
+				sc.anchorCIdx = append(sc.anchorCIdx, idx32)
+				sc.anchorSpanOff = append(sc.anchorSpanOff, int32(len(sc.anchorSpansLo)))
+				for _, span := range spans {
+					sc.anchorSpansLo = append(sc.anchorSpansLo, span.lo)
+					sc.anchorSpansHi = append(sc.anchorSpansHi, span.hi)
+				}
+			}
+			if len(sc.anchorCIdx) > 0 {
+				sc.anchorSpanOff = append(sc.anchorSpanOff, int32(len(sc.anchorSpansLo)))
+				out := d.kernel.nfaExistsAnchoredMany(sc.anchorCIdx, data, sc.anchorSpanOff,
+					sc.anchorSpansLo, sc.anchorSpansHi, sc)
+				for i, hit := range out {
+					idx := int(sc.anchorCIdx[i])
+					sc.fullDone[idx] = true
+					if hit != 0 && d.finalizeHit(idx, data, sc, handler) {
+						return true, nil
+					}
+				}
+			}
+		}
 		if anchorMergedEnabled && d.anchoredMerged != nil {
 			if cap(sc.anchorMergedSpans) < d.anchoredMerged.nmem {
 				sc.anchorMergedSpans = make([][]anchorSpan, d.anchoredMerged.nmem)
@@ -592,6 +635,9 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 		}
 		for _, idx32 := range anchorBatch {
 			idx := int(idx32)
+			if anchorCBatchEnabled && d.kernel != nil && !anchorMergedEnabled && d.nfas[idx] != nil && !d.nfas[idx].hasAssert {
+				continue // 已由上方 C anchored-many 精确判定
+			}
 			if anchorMergedEnabled && d.anchoredMerged != nil && d.anchorMergedSlot[idx] >= 0 {
 				continue // 已由上方 merged verifier 精确判定
 			}
