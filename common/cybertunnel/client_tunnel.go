@@ -198,6 +198,7 @@ func HoldingCreateTunnelClient(
 
 	go func() {
 		defer func() {
+			cancel()
 			if err := recover(); err != nil {
 				log.Errorf(
 					"panic from main loop mirror tunnel: %s => %v, reason: %s",
@@ -210,7 +211,12 @@ func HoldingCreateTunnelClient(
 		for {
 			output, err := client.Recv()
 			if err != nil {
-				panic(err)
+				log.Errorf(
+					"recv from mirror tunnel failed: %s => %v, reason: %s",
+					fmt.Sprintf("%v - %v", id, utils.HostPort(localhost, localport)),
+					remoteport, err,
+				)
+				return
 			}
 			dispatchOutput(
 				ctx, output, idToLocalHost[output.GetFromId()], idToLocalPort[output.GetFromId()],
