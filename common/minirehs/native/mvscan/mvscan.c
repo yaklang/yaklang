@@ -309,6 +309,38 @@ static inline size_t mvs_rune_start(const uint8_t *data, size_t len, size_t off)
 #undef ROW_AND
 #endif
 
+/* 单条存在性验证绝大多数是一个 64-bit 状态字。通用 nfa_run 为 merged/multiword
+ * 保留了栈数组和 ROW_* 抽象；此处把同一 Glushkov 递推留在寄存器中。merged 的 mode=1
+ * 仍走通用实现，因为它需要逐接受位置发射成员。 */
+static int nfa_run_1_exists(const mvs_nfa *a, const uint8_t *data, size_t len) {
+    uint64_t prev = 0;
+    size_t i = 0;
+    while (i < len) {
+        int atStart = (i == 0);
+        int sym;
+        uint8_t c0 = data[i];
+        if (c0 < 0x80) {
+            sym = (int)a->asciiSym[c0];
+            i++;
+        } else {
+            int32_t r;
+            int size = mvs_decode_rune(data + i, len - i, &r);
+            i += (size_t)size;
+            sym = symbol_of(a, r);
+        }
+        uint64_t cand = a->firstUnanchored[0];
+        if (atStart && a->hasAnchored) cand |= a->firstAnchored[0];
+        for (uint64_t pw = prev; pw; pw &= pw - 1) {
+            cand |= a->follow[mvs_ctz64(pw)];
+        }
+        prev = cand & a->reach[sym];
+        if (prev & a->lastAny[0]) return 1;
+        if (i == len && (prev & a->lastEnd[0])) return 1;
+        if (prev == 0 && a->unanchoredEmpty) break;
+    }
+    return 0;
+}
+
 /* ====================================================================
  * 锚定式位并行递推 (对应 Go mvs_anchored.go existsInAnchored).
  * 仅在 spans 注入区间内注入 first, 其余位置不注入, 支持提前消亡.
@@ -421,6 +453,8 @@ static int nfa_run_anchored_dispatch(const mvs_nfa *a, const uint8_t *data, size
 static int nfa_run_dispatch(const mvs_nfa *a, const uint8_t *data, size_t len, int mode,
                             uint8_t *seen, int32_t seenLen, int32_t *out, int32_t cap,
                             int32_t *outTotal, int forceScalar) {
+	if (mode == 0 && a->nword == 1)
+		return nfa_run_1_exists(a, data, len);
 #if defined(MVS_SSE2) || defined(MVS_NEON)
     if (!forceScalar && a->nword >= 2)
         return nfa_run_simd(a, data, len, mode, seen, seenLen, out, cap, outTotal);
