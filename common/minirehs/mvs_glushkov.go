@@ -454,41 +454,40 @@ func glushkovNFA(root *bnode, anchoredStart, requireEnd bool) (*mvsNFA, bool) {
 // 建好 reach 之后调用)。lean 与断言 NFA 共用: 断言额外的 condFirst/condFollow/condAccept 在标量执行器里
 // 直接取 gb.bits[0] (nword==1 时其长度即 1), 无需此处单独镜像。nword>1 时不置 single, 走多字通用路径。
 func (nfa *mvsNFA) initScalar() {
-	if nfa.nword != 1 {
-		return
-	}
-	nfa.single = true
-	nfa.first1 = nfa.first[0]
-	nfa.lastAny1 = nfa.lastAny[0]
-	nfa.lastEnd1 = nfa.lastEnd[0]
-	nfa.follow1 = make([]uint64, nfa.npos)
-	for p := 0; p < nfa.npos; p++ {
-		nfa.follow1[p] = nfa.follow[p][0]
-	}
-	nfa.reach1 = make([]uint64, nfa.nsym)
-	for s := 0; s < nfa.nsym; s++ {
-		nfa.reach1[s] = nfa.reach[s][0]
-	}
-	// LimEx 链/异常拆分: 链边 p->p+1 用左移批量推进; 异常边逐个 OR.
-	nfa.excFollow1 = make([]uint64, nfa.npos)
-	for p := 0; p < nfa.npos; p++ {
-		f := nfa.follow1[p]
-		hasChain := p+1 < nfa.npos && (f&(1<<uint(p+1))) != 0
-		if hasChain {
-			nfa.chainTarget1 |= 1 << uint(p+1)
+	if nfa.nword == 1 {
+		nfa.single = true
+		nfa.first1 = nfa.first[0]
+		nfa.lastAny1 = nfa.lastAny[0]
+		nfa.lastEnd1 = nfa.lastEnd[0]
+		nfa.follow1 = make([]uint64, nfa.npos)
+		for p := 0; p < nfa.npos; p++ {
+			nfa.follow1[p] = nfa.follow[p][0]
 		}
-		exc := f
-		if hasChain {
-			exc &^= 1 << uint(p+1)
+		nfa.reach1 = make([]uint64, nfa.nsym)
+		for s := 0; s < nfa.nsym; s++ {
+			nfa.reach1[s] = nfa.reach[s][0]
 		}
-		if exc != 0 {
-			nfa.excFollow1[p] = exc
-			nfa.excMask1 |= 1 << uint(p)
-			nfa.excCount++
-		}
-		// condFollowMask1: 标记有 condFollow 条目的位置 (断言 NFA 专用).
-		if nfa.condFollow != nil && len(nfa.condFollow[p]) > 0 {
-			nfa.condFollowMask1 |= 1 << uint(p)
+		// LimEx 链/异常拆分: 链边 p->p+1 用左移批量推进; 异常边逐个 OR.
+		nfa.excFollow1 = make([]uint64, nfa.npos)
+		for p := 0; p < nfa.npos; p++ {
+			f := nfa.follow1[p]
+			hasChain := p+1 < nfa.npos && (f&(1<<uint(p+1))) != 0
+			if hasChain {
+				nfa.chainTarget1 |= 1 << uint(p+1)
+			}
+			exc := f
+			if hasChain {
+				exc &^= 1 << uint(p+1)
+			}
+			if exc != 0 {
+				nfa.excFollow1[p] = exc
+				nfa.excMask1 |= 1 << uint(p)
+				nfa.excCount++
+			}
+			// condFollowMask1: 标记有 condFollow 条目的位置 (断言 NFA 专用).
+			if nfa.condFollow != nil && len(nfa.condFollow[p]) > 0 {
+				nfa.condFollowMask1 |= 1 << uint(p)
+			}
 		}
 	}
 }
