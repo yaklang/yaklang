@@ -127,7 +127,7 @@ require (
 	github.com/yaklang/fastgocaptcha v1.0.4
 	github.com/yaklang/go-llvm v0.0.0-20260325033841-7304627dfe8f
 	github.com/yaklang/javajive v0.1.2
-	github.com/yaklang/pcap v1.0.5
+	github.com/yaklang/pcap v1.0.6-0.20260710032136-5f3df87eea80
 	github.com/ysmood/gson v0.7.3
 	github.com/ysmood/leakless v0.9.0
 	go.mongodb.org/mongo-driver v1.12.1
@@ -148,7 +148,6 @@ require (
 	gopkg.in/fatih/set.v0 v0.2.1
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
-	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/v3 v3.5.0

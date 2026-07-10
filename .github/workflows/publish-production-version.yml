@@ -42,8 +42,10 @@ jobs:
             ["linux_amd64"]="yak_linux_amd64"
             ["linux_arm64"]="yak_linux_arm64"
             ["windows_amd64"]="yak_windows_amd64.exe"
+            ["windows_arm64"]="yak_windows_arm64.exe"
             ["windows_legacy_amd64"]="yak_windows_legacy_amd64.exe"
             ["slim_windows_amd64"]="yak-slim_windows_amd64.exe"
+            ["slim_windows_arm64"]="yak-slim_windows_arm64.exe"
             ["slim_darwin_amd64"]="yak-slim_darwin_amd64"
             ["slim_darwin_arm64"]="yak-slim_darwin_arm64"
             ["slim_linux_amd64"]="yak-slim_linux_amd64"
@@ -90,7 +92,7 @@ jobs:
       - name: Upload Yak Binary Version
         run: |
           bucket="yaklang"
-          for arch in darwin_amd64 darwin_arm64 linux_amd64 linux_arm64 windows_amd64.exe windows_legacy_amd64.exe; do
+          for arch in darwin_amd64 darwin_arm64 linux_amd64 linux_arm64 windows_amd64.exe windows_arm64.exe windows_legacy_amd64.exe; do
             file_path="yak_${arch}:/yak/latest/yak_${arch}"
             file_hash_path="yak_${arch}.sha256.txt:/yak/latest/yak_${arch}.sha256.txt"
             
@@ -113,7 +115,7 @@ jobs:
       - name: Upload Yak-Slim Binary Version
         run: |
           bucket="yaklang"
-          for arch in windows_amd64.exe darwin_amd64 darwin_arm64 linux_amd64 linux_arm64; do
+          for arch in windows_amd64.exe windows_arm64.exe darwin_amd64 darwin_arm64 linux_amd64 linux_arm64; do
             file_path="yak-slim_${arch}:/yak/latest/yak-slim_${arch}"
             file_hash_path="yak-slim_${arch}.sha256.txt:/yak/latest/yak-slim_${arch}.sha256.txt"
 
