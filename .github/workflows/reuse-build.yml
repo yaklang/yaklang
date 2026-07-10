@@ -65,6 +65,13 @@ jobs:
           cache: false
         id: go
 
+      # WoA CGO needs llvm-mingw; stock MinGW/gcc cannot assemble runtime/cgo ARM64 asm.
+      - name: Setup llvm-mingw (Windows ARM64)
+        if: inputs.os == 'windows-arm64'
+        shell: pwsh
+        run: |
+          & "${{ github.workspace }}/.github/scripts/setup-llvm-mingw-windows-arm64.ps1"
+
       # - name: Cache Go modules
       #   uses: actions/cache@v3
       #   id: cache-go-modules
