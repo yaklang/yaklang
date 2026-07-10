@@ -53,8 +53,7 @@ func (cfg *MCPServerConfig) trackBridgeClientCloser(c io.Closer) {
 
 func (cfg *MCPServerConfig) ApplyConfig(s *MCPServer) {
 	// Legacy MCP tools are only exposed when at least one tool set was enabled
-	// via WithEnableToolSet / WithEnableAllToolSets (CLI defaults to all enabled;
-	// Yakit uses StartMcpServerRequest.EnableAll).
+	// via WithEnableToolSet / WithEnableDefaultToolSets / WithEnableAllToolSets.
 	tools := make(map[string]*ToolWithHandler)
 	if len(cfg.enableTools) > 0 {
 		for name, tool := range cfg.enableTools {
@@ -148,6 +147,18 @@ func WithEnableToolSet(name string) McpServerOption {
 			return utils.Errorf("undefined tool set: %s", name)
 		}
 		maps.Copy(cfg.enableTools, toolSet.Tools)
+		return nil
+	}
+}
+
+// WithEnableDefaultToolSets registers catalog default-tier legacy MCP tool sets.
+func WithEnableDefaultToolSets() McpServerOption {
+	return func(cfg *MCPServerConfig) error {
+		for _, name := range DefaultMCPToolSets {
+			if err := WithEnableToolSet(name)(cfg); err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 }

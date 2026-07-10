@@ -189,10 +189,24 @@ func TestGRPC_StartMcpServer_TierRawOnly_NoTools(t *testing.T) {
 		Host:                    "127.0.0.1",
 		Port:                    0,
 		EnableAll:               false,
+		DisableTool:             append([]string{}, mcp.DefaultMCPToolSets...),
 		EnableAIToolFramework:   false,
 		EnableBridgeExternalMCP: false,
 	})
 	assert.Empty(t, names, "raw MCP server should not expose tools when all tiers are disabled")
+}
+
+func TestGRPC_StartMcpServer_TierDefaultCoreOnly(t *testing.T) {
+	names := startMCPListToolNames(t, &ypb.StartMcpServerRequest{
+		Host:                  "127.0.0.1",
+		Port:                  0,
+		EnableAll:             false,
+		EnableAIToolFramework: false,
+	})
+
+	assert.True(t, containsTool(names, "port_scan"), "default core sets should expose port_scan")
+	assert.True(t, containsTool(names, "require_dnslog_domain"), "default core sets should expose reverse_platform")
+	assert.False(t, containsTool(names, "hybrid_scan"), "non-default sets should stay hidden")
 }
 
 func TestGRPC_StartMcpServer_TierLegacyOnly(t *testing.T) {
@@ -212,11 +226,12 @@ func TestGRPC_StartMcpServer_TierAIToolFrameworkOnly(t *testing.T) {
 		Host:                  "127.0.0.1",
 		Port:                  0,
 		EnableAll:             false,
+		DisableTool:           append([]string{}, mcp.DefaultMCPToolSets...),
 		EnableAIToolFramework: true,
 	})
 
 	assert.True(t, containsTool(names, "now"), "aitool-framework tier should expose now")
-	assert.False(t, containsTool(names, "port_scan"), "legacy tool should not appear when EnableAll is false")
+	assert.False(t, containsTool(names, "port_scan"), "legacy tool should not appear when default sets are disabled")
 }
 
 func TestGRPC_StartMcpServer_TierBothEnabled(t *testing.T) {
@@ -348,12 +363,13 @@ func TestGRPCMUSTPASS_StartMcpServer_TierBridgeOnly(t *testing.T) {
 			Host:                    "127.0.0.1",
 			Port:                    0,
 			EnableAll:               false,
+			DisableTool:             append([]string{}, mcp.DefaultMCPToolSets...),
 			EnableAIToolFramework:   false,
 			EnableBridgeExternalMCP: true,
 		})
 
 		assert.True(t, containsTool(names, bridgeCanonical), "bridge tier should expose synced bridge tool")
-		assert.False(t, containsTool(names, "port_scan"), "legacy tool must stay hidden when EnableAll=false")
+		assert.False(t, containsTool(names, "port_scan"), "legacy tool must stay hidden when default sets are disabled")
 		assert.False(t, containsTool(names, "now"), "aitool builtin must stay hidden when EnableAIToolFramework=false")
 	})
 }
@@ -392,6 +408,7 @@ func TestGRPCMUSTPASS_StartMcpServer_AIToolWithoutBridge(t *testing.T) {
 			Host:                    "127.0.0.1",
 			Port:                    0,
 			EnableAll:               false,
+			DisableTool:             append([]string{}, mcp.DefaultMCPToolSets...),
 			EnableAIToolFramework:   true,
 			EnableBridgeExternalMCP: false,
 		})
@@ -446,6 +463,7 @@ func TestGRPCMUSTPASS_StartMcpServer_DisabledAIToolNotExposed(t *testing.T) {
 		Host:                    "127.0.0.1",
 		Port:                    0,
 		EnableAll:               false,
+		DisableTool:             append([]string{}, mcp.DefaultMCPToolSets...),
 		EnableAIToolFramework:   true,
 		EnableBridgeExternalMCP: false,
 	})
