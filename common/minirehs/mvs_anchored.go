@@ -249,7 +249,6 @@ func (nfa *mvsNFA) existsInAnchored1(data []byte, spans []anchorSpan) bool {
 	first := nfa.first1
 	lastAny := nfa.lastAny1
 	lastEnd := nfa.lastEnd1
-	follow := nfa.follow1
 	reach := nfa.reach1
 	requireEnd := nfa.requireEnd
 	n := len(data)
@@ -291,8 +290,14 @@ func (nfa *mvsNFA) existsInAnchored1(data []byte, spans []anchorSpan) bool {
 			cand = first
 		}
 		if hasActive {
-			for pw := prev; pw != 0; pw &= pw - 1 {
-				cand |= follow[bits.TrailingZeros64(pw)]
+			// LimEx: 链边用左移批量推进; 异常边逐个 OR.
+			cand |= (prev << 1) & nfa.chainTarget1
+			if exc := prev & nfa.excMask1; exc != 0 {
+				for exc != 0 {
+					p := bits.TrailingZeros64(exc)
+					exc &= exc - 1
+					cand |= nfa.excFollow1[p]
+				}
 			}
 		}
 		active := cand & reach[sym]
