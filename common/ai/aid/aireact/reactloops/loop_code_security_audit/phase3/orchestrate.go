@@ -52,10 +52,12 @@ func runAllFindingVerifications(
 			log.Infof("[CodeAudit/Phase3] Skipping already verified finding %s", finding.ID)
 			continue
 		}
+		goal := fmt.Sprintf("Phase 3 verify: %s — %s", finding.ID, finding.Title)
 		jobs = append(jobs, subagent.ForkJob{
 			Order:      i + 1,
 			Identifier: finding.ID,
-			Goal:       fmt.Sprintf("Phase 3 verify: %s — %s", finding.ID, finding.Title),
+			TaskName:   goal,
+			Goal:       goal,
 		})
 		catalog[finding.ID] = findingVerifyJob{
 			finding: finding,

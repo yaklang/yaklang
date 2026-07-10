@@ -30,6 +30,7 @@ func presentVerifyScope(
 	byCategory := findingsByCategoryMap(findings)
 	err := subagent.RunForkInvokerCallback(r, task, subagent.ForkJob{
 		Identifier: "verify-scope",
+		TaskName:   forkGoalDetermineVerifyScope,
 		Goal:       forkGoalDetermineVerifyScope,
 	}, func(childInvoker aicommon.AIInvokeRuntime, _ aicommon.AIStatefulTask) error {
 		childInvoker.AddToTimeline("[VERIFY_SCOPE]", summary)
