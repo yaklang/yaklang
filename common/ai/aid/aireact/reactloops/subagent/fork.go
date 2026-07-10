@@ -9,7 +9,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/chanx"
 )
 
 // RunForkInvokerCallback executes fn on a timeline-forked child invoker.
@@ -246,14 +245,28 @@ func BuildForkReactInvoker(
 		aicommon.WithAICallbacks(parentCfg.GetRawAICallbacks()),
 		aicommon.WithEnablePlanAndExec(false),
 		aicommon.WithEmitter(taskEmitter),
-		aicommon.WithHotPatchOptionChan(chanx.NewUnlimitedChan[aicommon.ConfigOption](jobCtx, 1)),
 		aicommon.WithAgreeAuto(),
 		aicommon.WithSessionPromptState(parentCfg.SessionPromptState.ForkForSubAgent()),
 	)
+
+	// Sub agents must not inherit any top-level execution strategy. Even though
+	// ConvertConfigToOptions already omits EnableDispatchSubReactAgents /
+	// PreferDispatchSubReactAgents / EnableGoalMode, we disable plan and goal
+	// mode explicitly here so the sub-agent contract is self-documenting and does
+	// not silently regress if ConvertConfigToOptions propagation changes.
+	baseOpts = append(baseOpts, buildSubAgentStrategyOptions()...)
 
 	childInvoker, err := aicommon.AIRuntimeInvokerGetter(jobCtx, baseOpts...)
 	if err != nil {
 		return nil, utils.Wrap(err, "create forked sub react invoker failed")
 	}
 	return childInvoker, nil
+}
+
+func buildSubAgentStrategyOptions() []aicommon.ConfigOption {
+	return []aicommon.ConfigOption{
+		aicommon.WithEnablePlanAndExec(false),
+		aicommon.WithEnableGoalMode(false),
+		aicommon.WithPreferDispatchSubReactAgents(false),
+	}
 }

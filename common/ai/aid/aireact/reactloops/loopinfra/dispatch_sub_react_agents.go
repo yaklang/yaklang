@@ -113,6 +113,7 @@ func runForkedSubReactAgentJob(
 	// parent AI used to write every sub agent's full goal+contract up front —
 	// into a per-sub-agent step that runs with the forked timeline context and
 	// overlaps across the concurrently-dispatched sub agents.
+	subTask.SetStatus(aicommon.AITaskState_Processing)
 	elaboratedGoal, resultContract, elabErr := elaborateSubReactAgentGoal(
 		subTask.GetContext(), childInvoker, parentLoop, subTask.GetId(), job,
 	)
@@ -122,7 +123,7 @@ func runForkedSubReactAgentJob(
 		resultContract = ""
 	}
 	subTask.SetUserInput(buildSubAgentUserInput(elaboratedGoal, resultContract))
-	subTask.SetStatus(aicommon.AITaskState_Processing)
+
 
 	subLoop, err := reactloops.CreateLoopByName(loopName, childInvoker, buildSubReactLoopOptions()...)
 	if err != nil {
