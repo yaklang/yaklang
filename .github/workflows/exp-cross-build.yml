@@ -312,19 +312,15 @@ jobs:
         id: get_tag
         shell: bash
         run: |
-          # 统一使用 repos-tag 命令生成版本号，确保版本号格式一致（8位 hash）
-          # 优先使用下载的 yak（已在 PATH 中），否则 fallback 到编译
-          if [ "${{ steps.download_yak.outputs.yak_downloaded }}" = "true" ]; then
-            echo "Using downloaded yak binary for repos-tag"
-            # 确保 yak 在 PATH 中
-            if ! command -v yak >/dev/null 2>&1; then
-              export PATH="$HOME/.local/bin:$PATH"
-            fi
-            yak repos-tag -o tags.txt
+          export PATH="$HOME/.local/bin:$PATH"
+          if command -v yak >/dev/null 2>&1; then
+            YAK=yak
           else
-            echo "Building yak for repos-tag command"
-            go run common/yak/cmd/yak.go repos-tag -o tags.txt
+            CGO_ENABLED="${CGO_ENABLED:-1}" go build -o ./yak_cli -v common/yak/cmd/yak.go
+            YAK=./yak_cli
+            [ -f ./yak_cli.exe ] && YAK=./yak_cli.exe
           fi
+          "$YAK" repos-tag -o tags.txt
           
           echo "$(cat tags.txt)"
           echo "YAK_TAG=$(cat tags.txt)" >> "$GITHUB_ENV"
@@ -359,11 +355,15 @@ jobs:
       - name: Sync Embed FS Hash to Code
         shell: bash
         run: |
-          # 使用下载的 yak（已在 PATH 中）
-          if ! command -v yak >/dev/null 2>&1; then
-            export PATH="$HOME/.local/bin:$PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+          if command -v yak >/dev/null 2>&1; then
+            YAK=yak
+          else
+            CGO_ENABLED="${CGO_ENABLED:-1}" go build -o ./yak_cli -v common/yak/cmd/yak.go
+            YAK=./yak_cli
+            [ -f ./yak_cli.exe ] && YAK=./yak_cli.exe
           fi
-          yak embed-fs-hash --override --all
+          "$YAK" embed-fs-hash --override --all
 
       - name: Install gzip-embed tool
         run: go install ./common/utils/gzip_embed/gzip-embed
@@ -510,11 +510,15 @@ jobs:
       - name: Generate Checksums
         shell: bash
         run: |
-          # 使用下载的 yak（已在 PATH 中）
-          if ! command -v yak >/dev/null 2>&1; then
-            export PATH="$HOME/.local/bin:$PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+          if command -v yak >/dev/null 2>&1; then
+            YAK=yak
+          else
+            CGO_ENABLED="${CGO_ENABLED:-1}" go build -o ./yak_cli -v common/yak/cmd/yak.go
+            YAK=./yak_cli
+            [ -f ./yak_cli.exe ] && YAK=./yak_cli.exe
           fi
-          yak sha256 -f ${{ env.OUTPUT_BINARY }}
+          "$YAK" sha256 -f ${{ env.OUTPUT_BINARY }}
           echo "SHA256=${{ env.OUTPUT_BINARY }}.sha256.txt" >> $GITHUB_ENV
 
       - name: debug info
@@ -546,11 +550,15 @@ jobs:
           fi
           
           echo "Uploading files: ${UPLOAD_FILES}"
-          # 使用下载的 yak（已在 PATH 中）
-          if ! command -v yak >/dev/null 2>&1; then
-            export PATH="$HOME/.local/bin:$PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+          if command -v yak >/dev/null 2>&1; then
+            YAK=yak
+          else
+            CGO_ENABLED="${CGO_ENABLED:-1}" go build -o ./yak_cli -v common/yak/cmd/yak.go
+            YAK=./yak_cli
+            [ -f ./yak_cli.exe ] && YAK=./yak_cli.exe
           fi
-          yak upload-oss --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f "${UPLOAD_FILES}"
+          "$YAK" upload-oss --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f "${UPLOAD_FILES}"
 
       # upload assets
       - name: Upload binary artifacts
