@@ -27,11 +27,11 @@ func NewLab(opts ...LabOption) Lab {
 	return l
 }
 
-func LabName(name string) LabOption     { return func(l *Lab) { l.Name = strings.TrimSpace(name) } }
-func LabKind(kind string) LabOption     { return func(l *Lab) { l.Kind = strings.TrimSpace(kind) } }
-func LabText(text string) LabOption     { return func(l *Lab) { l.Text = strings.TrimSpace(text) } }
-func LabDesc(desc string) LabOption     { return func(l *Lab) { l.Desc = strings.TrimSpace(desc) } }
-func LabStepIndex(i int) LabOption      { return func(l *Lab) { l.StepIndex = i } }
+func LabName(name string) LabOption { return func(l *Lab) { l.Name = strings.TrimSpace(name) } }
+func LabKind(kind string) LabOption { return func(l *Lab) { l.Kind = strings.TrimSpace(kind) } }
+func LabText(text string) LabOption { return func(l *Lab) { l.Text = strings.TrimSpace(text) } }
+func LabDesc(desc string) LabOption { return func(l *Lab) { l.Desc = strings.TrimSpace(desc) } }
+func LabStepIndex(i int) LabOption  { return func(l *Lab) { l.StepIndex = i } }
 
 func (l Lab) Key() string {
 	if k := strings.TrimSpace(l.Name); k != "" {
@@ -53,4 +53,11 @@ func TrackStepLab(name string, stepIndex, stepCount int) Lab {
 		opts = append(opts, LabStepIndex(stepIndex))
 	}
 	return NewLab(opts...)
+}
+
+// TrackStepLabKey returns the measurement key for a track step without
+// allocating a Lab struct. Used by the track() fast path when nested
+// logging is disabled (avoids Lab + LabOption closure allocations).
+func TrackStepLabKey(name string, stepIndex, stepCount int) string {
+	return strings.TrimSpace(name)
 }

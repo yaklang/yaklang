@@ -141,6 +141,36 @@ func (r *Recorder) track(enabled bool, name string, steps ...func() error) error
 	if !enabled || r == nil {
 		return runStepsWithoutRecording(steps)
 	}
+	// Fast path: when nested trace logging is disabled AND step storage
+	// is not requested, skip Lab creation (TrackStepLab allocates a Lab
+	// struct + LabOption closures per step). TrackStepLab/NewLab/LabName/
+	// LabText accounted for ~2.3% of alloc objects on heavy dataflow rules
+	// with YAK_DIAGNOSTICS_LOG_LEVEL=trace. The measurement (name +
+	// duration + count + error) is recorded directly without allocating
+	// a Lab. When storeSteps is true (tests), fall through to trace() so
+	// steps are appended to r.steps.
+	if !r.traceLiveEnabled() && !r.storeSteps {
+		for i, step := range steps {
+			if step == nil {
+				continue
+			}
+			key := TrackStepLabKey(name, i, len(steps))
+			start := time.Now()
+			err := step()
+			dur := time.Since(start)
+			if m, mErr := r.ensureMeasurement(key); mErr == nil && m != nil {
+				if err != nil {
+					m.markError()
+				} else {
+					m.absorb(dur, -1)
+				}
+			}
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 	n := len(steps)
 	for i, step := range steps {
 		if step == nil {
