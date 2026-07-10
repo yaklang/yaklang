@@ -98,7 +98,9 @@ func (nfa *mvsNFA) existsInReverseAnchored(data []byte, spans []anchorSpan, prev
 	nword := nfa.nword
 	prev = prev[:nword]
 	cand = cand[:nword]
-	active = active[:nword]
+	// active 保留在签名中以复用调用方 scratch 的 API；反向执行器直接覆写 prev，
+	// 无需每 rune 先写 active 再 copy 到 prev。
+	_ = active
 	for w := 0; w < nword; w++ {
 		prev[w] = 0
 	}
@@ -158,7 +160,7 @@ func (nfa *mvsNFA) existsInReverseAnchored(data []byte, spans []anchorSpan, prev
 		var anyActive uint64
 		for w := 0; w < nword; w++ {
 			v := cand[w] & rc[w]
-			active[w] = v
+			prev[w] = v
 			anyActive |= v
 			if v&nfa.lastAny[w] != 0 {
 				return true
@@ -187,7 +189,6 @@ func (nfa *mvsNFA) existsInReverseAnchored(data []byte, spans []anchorSpan, prev
 				}
 			}
 		}
-		copy(prev, active)
 		i = j
 	}
 	return false
