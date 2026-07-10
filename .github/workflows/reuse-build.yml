@@ -10,6 +10,7 @@ on:
         options:
           - windows
           - windows7
+          - windows-arm64
           - darwin-amd64 
           - darwin-arm64
           - linux-amd64
@@ -53,7 +54,7 @@ on:
 
 jobs:
   build_and_upload_asset:
-    runs-on: ${{ contains(inputs.os, 'windows') && 'windows-latest' || (inputs.os == 'linux-amd64' && 'ubuntu-22.04' || (inputs.os == 'linux-arm64' && 'ubuntu-24.04-arm' || 'macos-14')) }}
+    runs-on: ${{ inputs.os == 'windows-arm64' && 'windows-11-arm' || ((inputs.os == 'windows' || inputs.os == 'windows7') && 'windows-latest') || (inputs.os == 'linux-amd64' && 'ubuntu-22.04') || (inputs.os == 'linux-arm64' && 'ubuntu-24.04-arm') || 'macos-14' }}
     steps:
       - uses: actions/checkout@v2
       
@@ -147,11 +148,23 @@ jobs:
           OUTPUT_NAME_PREFIX: ${{ env.OUTPUT_NAME_PREFIX }}
         run: |
           $env:GOOS = "windows"
-          $env:GOARCH = "amd64"
-          $baseName = if ("${{ inputs.os }}" -eq "windows7") { "windows_legacy_amd64.exe" } else { "windows_amd64.exe" }
+          $env:CGO_ENABLED = "1"
+          if ("${{ inputs.os }}" -eq "windows7") {
+            $env:GOARCH = "amd64"
+            $baseName = "windows_legacy_amd64.exe"
+          } elseif ("${{ inputs.os }}" -eq "windows-arm64") {
+            if ($env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
+              throw "windows-arm64 must build on native ARM64 runner (windows-11-arm), got PROCESSOR_ARCHITECTURE=$($env:PROCESSOR_ARCHITECTURE)"
+            }
+            $env:GOARCH = "arm64"
+            $baseName = "windows_arm64.exe"
+          } else {
+            $env:GOARCH = "amd64"
+            $baseName = "windows_amd64.exe"
+          }
           $outputName = "${{ env.OUTPUT_NAME_PREFIX }}" + $baseName
           
-          Write-Host "Building with tags: ${{ env.BUILD_TAGS }}"
+          Write-Host "Runner: $env:PROCESSOR_ARCHITECTURE GOOS=$env:GOOS GOARCH=$env:GOARCH CGO_ENABLED=$env:CGO_ENABLED"
           Write-Host "Output file: $outputName"
           
           go build -tags "${{ env.BUILD_TAGS }}" -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o $outputName -v common/yak/cmd/yak.go

@@ -4,9 +4,10 @@ name: Cross-Build-Yak
 #
 # 产物类型              Build Tag              输出文件名前缀          示例
 # ------------------------------------------------------------------------------------------------
-# 标准版本              gzip_embed             yak_                   yak_linux_amd64
+# 标准版本              gzip_embed             yak_                   yak_linux_amd64 / yak_windows_arm64.exe
 # yak-slim（并行构建）  gzip_embed,irify_exclude  yak-slim_             yak-slim_linux_amd64
 #
+# Windows ARM64: 使用 windows-11-arm 原生 runner 编译（与 linux-arm64 同理，不做 x64 交叉编译）
 # Linux 兼容性:
 # - 仅在 go build 时用 docker run manylinux2014（glibc 2.17）；其余 CI 步骤在 Ubuntu runner 上执行
 #   （不能把 job 放进 manylinux 容器：Actions 的 Node 20 需要 GLIBC_2.27+，会在 checkout 阶段失败）
@@ -64,6 +65,7 @@ jobs:
         os:
           - windows
           - windows7
+          - windows-arm64
           # macos amd64
           - macos-15-intel
           # macos arm64
@@ -77,6 +79,12 @@ jobs:
           - os: windows7
             binary: yak_windows_legacy_amd64.exe
             env: $env:GITHUB_ENV
+          - os: windows-arm64
+            binary: yak_windows_arm64.exe
+            env: $env:GITHUB_ENV
+            GOOS: windows
+            GOARCH: arm64
+            runs-on: windows-11-arm
           - os: macos-15-intel
             binary: yak_darwin_amd64
             env: $GITHUB_ENV
@@ -105,7 +113,7 @@ jobs:
             GOARCH: arm64
             runs-on: ubuntu-24.04-arm
             manylinux_image: quay.io/pypa/manylinux2014_aarch64
-    runs-on: ${{ matrix.runs-on || (contains(matrix.os, 'windows') && 'windows-latest' || 'macos-14') }}
+    runs-on: ${{ matrix.runs-on || ((matrix.os == 'windows' || matrix.os == 'windows7') && 'windows-latest' || 'macos-14') }}
     steps:
       # build
       - uses: actions/checkout@v2
@@ -365,7 +373,31 @@ jobs:
       - name: Initialize License Machine
         run: go run common/xlic/cmd/initializer.go --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }}
 
+      - name: Build for Windows
+        if: contains(matrix.os, 'windows')
+        shell: pwsh
+        env:
+          BUILD_TAGS: ${{ env.BUILD_TAGS }}
+          OUTPUT_BINARY: ${{ env.OUTPUT_BINARY }}
+          YAK_TAG: ${{ env.YAK_TAG }}
+        run: |
+          $env:GOOS = "windows"
+          $env:CGO_ENABLED = "1"
+          if ("${{ matrix.os }}" -eq "windows-arm64") {
+            if ($env:PROCESSOR_ARCHITECTURE -ne "ARM64") {
+              throw "windows-arm64 must build on native ARM64 runner (windows-11-arm), got PROCESSOR_ARCHITECTURE=$($env:PROCESSOR_ARCHITECTURE)"
+            }
+            $env:GOARCH = "arm64"
+          } else {
+            $env:GOARCH = "amd64"
+          }
+          Write-Host "Runner: $env:PROCESSOR_ARCHITECTURE GOOS=$env:GOOS GOARCH=$env:GOARCH CGO_ENABLED=$env:CGO_ENABLED"
+          Write-Host "Building ${{ env.OUTPUT_BINARY }} with tags: $env:BUILD_TAGS"
+          go build -tags "$env:BUILD_TAGS" -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=$env:YAK_TAG'" -o "./$env:OUTPUT_BINARY" -v common/yak/cmd/yak.go
+          Get-ChildItem "./$env:OUTPUT_BINARY"
+
       - name: Build
+        if: ${{ !contains(matrix.os, 'windows') }}
         shell: bash
         env:
           BUILD_TAGS: ${{ env.BUILD_TAGS }}
@@ -402,7 +434,7 @@ jobs:
             exit 0
           fi
 
-          # Build with proper tag handling (Windows / macOS matrix on native runners)
+          # macOS matrix on native runners
           BUILD_CMD="go build"
           if [ -n "${BUILD_TAGS}" ]; then
             BUILD_CMD="${BUILD_CMD} -tags ${BUILD_TAGS}"
@@ -557,6 +589,7 @@ jobs:
       matrix:
         os:
           - windows
+          - windows-arm64
           - darwin-amd64
           - darwin-arm64
           - linux-amd64
@@ -566,7 +599,7 @@ jobs:
       os: ${{ matrix.os }}
       build_type: yakslim
       ee: false
-      sign: ${{ matrix.os == 'windows' }}
+      sign: ${{ matrix.os == 'windows' || matrix.os == 'windows-arm64' }}
     secrets: inherit
 
   upload_slim_binaries_to_oss:
@@ -607,9 +640,9 @@ jobs:
             ../yak sha256 -f "$bin"
             sha_file="${bin}.sha256.txt"
             if [[ -z "$UPLOAD_FILES" ]]; then
-              UPLOAD_FILES="${bin}:/yak/${YAK_TAG}/${bin};${sha_file}:/yak/${YAK_TAG}/${sha_file}"
+              UPLOAD_FILES="${bin}:/yak/${YAK_TAG}/${bin};${sha_file}:/yak/${YAK_TAG}/${sha_file};${bin}:/yak/latest/${bin};${sha_file}:/yak/latest/${sha_file}"
             else
-              UPLOAD_FILES="${UPLOAD_FILES};${bin}:/yak/${YAK_TAG}/${bin};${sha_file}:/yak/${YAK_TAG}/${sha_file}"
+              UPLOAD_FILES="${UPLOAD_FILES};${bin}:/yak/${YAK_TAG}/${bin};${sha_file}:/yak/${YAK_TAG}/${sha_file};${bin}:/yak/latest/${bin};${sha_file}:/yak/latest/${sha_file}"
             fi
           done
 
@@ -669,12 +702,14 @@ jobs:
           # Generate file list using heredoc for multiline output
           {
             echo "${PREFIX}windows_amd64.exe"
+            echo "${PREFIX}windows_arm64.exe"
             echo "${PREFIX}windows_legacy_amd64.exe"
             echo "${PREFIX}linux_amd64"
             echo "${PREFIX}linux_arm64"
             echo "${PREFIX}darwin_amd64"
             echo "${PREFIX}darwin_arm64"
             echo "${PREFIX}windows_amd64.exe.sha256.txt"
+            echo "${PREFIX}windows_arm64.exe.sha256.txt"
             echo "${PREFIX}windows_legacy_amd64.exe.sha256.txt"
             echo "${PREFIX}linux_amd64.sha256.txt"
             echo "${PREFIX}linux_arm64.sha256.txt"
@@ -684,11 +719,13 @@ jobs:
           
           {
             echo "yak-slim_windows_amd64.exe"
+            echo "yak-slim_windows_arm64.exe"
             echo "yak-slim_linux_amd64"
             echo "yak-slim_linux_arm64"
             echo "yak-slim_darwin_amd64"
             echo "yak-slim_darwin_arm64"
             echo "yak-slim_windows_amd64.exe.sha256.txt"
+            echo "yak-slim_windows_arm64.exe.sha256.txt"
             echo "yak-slim_linux_amd64.sha256.txt"
             echo "yak-slim_linux_arm64.sha256.txt"
             echo "yak-slim_darwin_amd64.sha256.txt"
