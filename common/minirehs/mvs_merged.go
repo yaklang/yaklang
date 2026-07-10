@@ -450,14 +450,42 @@ func (m *mvsMergedNFA) scanExistAnchored(data []byte, spansPerMember [][]anchorS
 		// 提前消亡: 活跃集空且所有成员 span 耗尽 => 不可能再命中.
 		if !anyActive {
 			allDone := true
+			nextLo := n
 			for mi := 0; mi < nmem; mi++ {
-				if hasSpan[mi] && lastHi[mi] > runeStart {
+				if !hasSpan[mi] {
+					continue
+				}
+				if lastHi[mi] > runeStart {
 					allDone = false
-					break
+				}
+				// 推导下一次可能注入的位置，但不修改 cursor（下一轮仍由原有
+				// 推进逻辑统一处理）。若 ni 仍落在当前 span 内，不能跳过。
+				s := si[mi]
+				spans := spansPerMember[mi]
+				for s < len(spans) && int(spans[s].hi) <= ni {
+					s++
+				}
+				if s < len(spans) {
+					if int(spans[s].lo) < ni {
+						nextLo = ni // 当前/下一 rune 仍可注入，禁止 jump
+						break
+					}
+					if lo := int(spans[s].lo); lo < nextLo {
+						nextLo = lo
+					}
 				}
 			}
 			if allDone {
 				break
+			}
+			// 与单条 anchored verifier 同一原则：活跃集已空时，跨度之间没有
+			// 状态依赖；直接跳到所有成员下一次注入的最早位置，避免扫描空洞。
+			if nextLo > ni+gapJumpMin {
+				jump := alignRuneStart(data, nextLo)
+				if jump > i {
+					i = jump
+					continue
+				}
 			}
 		}
 		i = ni

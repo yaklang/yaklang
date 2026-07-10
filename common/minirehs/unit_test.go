@@ -1,6 +1,7 @@
 package minirehs
 
 import (
+	"reflect"
 	"regexp"
 	"regexp/syntax"
 	"strings"
@@ -385,6 +386,25 @@ func TestScalarPrefilterScanHits(t *testing.T) {
 	// abc(end5), xyz(end10), ABC->abc(end15): 大小写无关, 共 3 次命中.
 	if len(hits) != 3 {
 		t.Fatalf("scalar scanHits expected 3 hits, got %d: %v", len(hits), hits)
+	}
+}
+
+func TestACScanFoldASCIIEquivalence(t *testing.T) {
+	li := buildLiteralIndex([]*compiledPattern{
+		{id: 1, idx: 0, literals: []string{"authorization"}},
+		{id: 2, idx: 1, literals: []string{"cookie"}},
+	})
+	p := newScalarPrefilter(li)
+	data := []byte("AUTHORIZATION: x\\r\\nCoOkIe: y\\xff")
+	var want, got []litHit
+	p.ac.scan(asciiLowerInto(data, new([]byte)), func(id int32, end int) {
+		want = append(want, litHit{litID: id, end: int32(end)})
+	})
+	p.ac.scanFoldASCII(data, func(id int32, end int) {
+		got = append(got, litHit{litID: id, end: int32(end)})
+	})
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("folded scan mismatch: got=%v want=%v", got, want)
 	}
 }
 

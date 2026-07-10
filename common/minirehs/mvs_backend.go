@@ -21,21 +21,21 @@ func (b *mvsBackend) simd() bool        { return false }
 
 func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiledDB, error) {
 	db := &mvsDB{
-		all:       patterns,
-		n:         len(patterns),
-		nfas:       make([]*mvsNFA, len(patterns)),
-		gate:       make([]bool, len(patterns)),
-		re2Loc:     make([]bool, len(patterns)),
-		windowable: make([]bool, len(patterns)),
-		batchable:  make([]bool, len(patterns)),
-		anchorable: make([]bool, len(patterns)),
-		win:        make([]litWindow, len(patterns)),
-		gateHead:   make([]int32, len(patterns)),
+		all:          patterns,
+		n:            len(patterns),
+		nfas:         make([]*mvsNFA, len(patterns)),
+		gate:         make([]bool, len(patterns)),
+		re2Loc:       make([]bool, len(patterns)),
+		windowable:   make([]bool, len(patterns)),
+		batchable:    make([]bool, len(patterns)),
+		anchorable:   make([]bool, len(patterns)),
+		win:          make([]litWindow, len(patterns)),
+		gateHead:     make([]int32, len(patterns)),
 		biAnchorable: make([]bool, len(patterns)),
 		revNFAs:      make([]*mvsNFA, len(patterns)),
-		reportLoc:  cfg.reportLocation,
+		reportLoc:    cfg.reportLocation,
 	}
-	perPatHeads := make(map[int]map[string]int32, len(patterns))         // 锚定式 pattern 的 per-literal head
+	perPatHeads := make(map[int]map[string]int32, len(patterns))        // 锚定式 pattern 的 per-literal head
 	perPatBiCover := make(map[int]map[string]litBiCover, len(patterns)) // 双向锚定 pattern 的 per-literal headF/tailR
 	for i := range db.win {
 		db.win[i] = litWindow{head: -1, tail: -1} // 默认不收窄 (整段)
@@ -218,6 +218,24 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 	}
 	db.merged = buildMergedNFA(mergeMembers)
 	db.mergedCount = len(mergeMembers)
+	// R1：把可 forward-anchor 的 lean NFA 编成一个 span-injected 不相交并集。
+	// 只在 A/B 开关开启时构建，避免尚未验收的全局位集给默认数据库增加内存与编译成本。
+	var anchorMembers []mergeMember
+	for idx, nfa := range db.nfas {
+		if nfa != nil && db.anchorable[idx] && !nfa.hasAssert {
+			anchorMembers = append(anchorMembers, mergeMember{idx: idx, nfa: nfa})
+		}
+	}
+	if anchorMergedEnabled && len(anchorMembers) >= 2 {
+		db.anchoredMerged = buildMergedAnchoredNFA(anchorMembers)
+		db.anchorMergedSlot = make([]int, db.n)
+		for i := range db.anchorMergedSlot {
+			db.anchorMergedSlot[i] = -1
+		}
+		for mi, idx := range db.anchoredMerged.memIdx {
+			db.anchorMergedSlot[idx] = mi
+		}
+	}
 	db.nfaCount = nfaCount
 
 	// P4 (M2): minirehs_mvs 构建下, 把 per-pattern NFA + 合并 always-on 序列化为平台无关
@@ -322,12 +340,12 @@ func compileExprToNFA(expr string) *mvsNFA {
 type mvsDB struct {
 	all        []*compiledPattern // 按 idx 索引
 	n          int
-	nfas       []*mvsNFA // 按 idx; nil 表示该 pattern 走 verifier 兜底
-	gate       []bool    // 按 idx; true=该 NFA 为严格超集门, 命中须 regexp2 复核滤假阳
-	re2Loc     []bool    // 按 idx; true=精确定位交 regexp2 (regexp2-origin, 保 PCRE span 语义)
-	windowable []bool    // 按 idx; true=可在字面量命中点邻域窗口内做存在性验证 (有界宽 lean NFA)
-	batchable  []bool    // 按 idx; true=非断言且有 NFA (在 C blob 中), 可走 nfaExistsMany 批处理
-	anchorable []bool    // 按 idx; true=可走锚定式单趟存在性 (有界头/无界尾, 命中字面量后只在邻域注入起点)
+	nfas       []*mvsNFA   // 按 idx; nil 表示该 pattern 走 verifier 兜底
+	gate       []bool      // 按 idx; true=该 NFA 为严格超集门, 命中须 regexp2 复核滤假阳
+	re2Loc     []bool      // 按 idx; true=精确定位交 regexp2 (regexp2-origin, 保 PCRE span 语义)
+	windowable []bool      // 按 idx; true=可在字面量命中点邻域窗口内做存在性验证 (有界宽 lean NFA)
+	batchable  []bool      // 按 idx; true=非断言且有 NFA (在 C blob 中), 可走 nfaExistsMany 批处理
+	anchorable []bool      // 按 idx; true=可走锚定式单趟存在性 (有界头/无界尾, 命中字面量后只在邻域注入起点)
 	win        []litWindow // 按 idx; 命中字面量结尾两侧上下文界 (head/tail; -1=该侧无界不收窄)
 	nfaCount   int
 
@@ -360,10 +378,12 @@ type mvsDB struct {
 	pf       prefilter // 可能为 nil (无任何字面量 pattern)
 	litToPat [][]int32 // litID -> pattern idx
 
-	merged         *mvsMergedNFA // 无字面量且可编入 lean NFA 的 always-on 合并为单趟自动机
-	mergedCount    int           // 合并成员数
-	assertAlwaysOn []int         // 无字面量的断言 NFA (hasAssert): existsInAssert 门控 + verifier 定位
-	otherAlwaysOn  []int         // 无字面量且不可编入 NFA (regexp2/RE2 兜底): 逐条验证
+	merged           *mvsMergedNFA // 无字面量且可编入 lean NFA 的 always-on 合并为单趟自动机
+	mergedCount      int           // 合并成员数
+	anchoredMerged   *mvsMergedNFA // R1 span-injected lean anchored 合并自动机（A/B 开关控制使用）
+	anchorMergedSlot []int         // pattern idx -> anchoredMerged 成员槽位；-1 表示非成员
+	assertAlwaysOn   []int         // 无字面量的断言 NFA (hasAssert): existsInAssert 门控 + verifier 定位
+	otherAlwaysOn    []int         // 无字面量且不可编入 NFA (regexp2/RE2 兜底): 逐条验证
 
 	reportLoc bool // 命中是否上报精确偏移与内容 (见 WithReportLocation)
 
@@ -379,6 +399,10 @@ func (d *mvsDB) numAlwaysOn() int {
 // gateSupersetPrecheck 控制可局部化超集门复核前是否先跑超集 NFA 存在性预检 (见 verifyGateLocalized).
 // PCRE2 (go-pcre2-lite) 线性复核后该预检对 gate 几乎不过滤、反成净开销, 故默认关闭; 仅 A/B 基准临时开。
 var gateSupersetPrecheck = false
+
+// anchorMergedEnabled 控制 R1 span-injected merged verifier 的运行期接线。保守起见默认
+// 关闭，直到真实语料的 oracle 与基准都证明其全局位集成本低于逐条 gap-jump 路径。
+var anchorMergedEnabled = false
 
 // cgo 调用诊断计数器 (仅 cgoDiagEnabled=true 时累加, 默认关闭, 近零开销). 用于量化
 // "cgo 跨界次数 vs 实际扫描字节" 以判定瓶颈是跨界开销还是扫描工作量 (见 TestMVSCgoCallDiag).
@@ -535,8 +559,42 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 		}
 		// 锚定式批处理: 对本报文每条触发的锚定式 pattern, 合并其注入区间后做一次锚定式单趟存在性.
 		sc.anchorBatch = anchorBatch
+		if anchorMergedEnabled && d.anchoredMerged != nil {
+			if cap(sc.anchorMergedSpans) < d.anchoredMerged.nmem {
+				sc.anchorMergedSpans = make([][]anchorSpan, d.anchoredMerged.nmem)
+			} else {
+				sc.anchorMergedSpans = sc.anchorMergedSpans[:d.anchoredMerged.nmem]
+				for i := range sc.anchorMergedSpans {
+					sc.anchorMergedSpans[i] = nil
+				}
+			}
+			mergedAny := false
+			for _, idx32 := range anchorBatch {
+				idx := int(idx32)
+				mi := d.anchorMergedSlot[idx]
+				if mi < 0 {
+					continue // 断言 NFA 仍由下方单条 guarded verifier 执行
+				}
+				spans := mergeAnchorSpans(sc.anchorRanges[idx])
+				sc.anchorMergedSpans[mi] = spans
+				sc.fullDone[idx] = true
+				mergedAny = true
+			}
+			if mergedAny {
+				sc.mergedSeen = resetBoolBuf(sc.mergedSeen, d.n)
+				sc.mergedHits = d.anchoredMerged.scanExistAnchored(data, sc.anchorMergedSpans, sc.mergedSeen, sc.mergedHits[:0])
+				for _, idx := range sc.mergedHits {
+					if stop := d.finalizeHit(idx, data, sc, handler); stop {
+						return true, nil
+					}
+				}
+			}
+		}
 		for _, idx32 := range anchorBatch {
 			idx := int(idx32)
+			if anchorMergedEnabled && d.anchoredMerged != nil && d.anchorMergedSlot[idx] >= 0 {
+				continue // 已由上方 merged verifier 精确判定
+			}
 			sc.fullDone[idx] = true
 			spans := mergeAnchorSpans(sc.anchorRanges[idx])
 			nfa := d.nfas[idx]
@@ -729,6 +787,7 @@ func (d *mvsDB) verifyOne(idx int, data []byte, sc *scratch, handler MatchHandle
 // 故 data[winLo:] 上的判定与整段一致:
 //   - 无假阴: regexp2 真匹配整体落在 [winLo, n) 内 (其字面量结尾 >= firstHitEnd > winLo+head);
 //   - 无假阳: 子切片首位 (winLo) 起不了匹配 (前方 head 距内无该门字面量), 内部命中左上下文真实。
+//
 // gate 的 verifier 命中报 -1/-1, 偏移无需换算; 与整段 reportViaVerifier 同上报。
 func (d *mvsDB) verifyGateLocalized(idx int, data []byte, winLo int, sc *scratch, handler MatchHandler) bool {
 	sub := data
