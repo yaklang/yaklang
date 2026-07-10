@@ -218,6 +218,20 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 	}
 	db.merged = buildMergedNFA(mergeMembers)
 	db.mergedCount = len(mergeMembers)
+	// R2: 把无字面量的断言 always-on NFA 合并为单趟扫描 (共享边界条件),
+	// 替代逐条 existsInAssertShared 整段扫 (省 K-1 趟全量扫描 + K-1 次 make).
+	// 注: 实测合并后 nword 1→2 净回归 (见 assertMergedEnabled), 仅在 A/B 开关开启时构建.
+	if assertMergedEnabled && len(db.assertAlwaysOn) >= 2 {
+		var assertMembers []mergeMember
+		for _, idx := range db.assertAlwaysOn {
+			if nfa := db.nfas[idx]; nfa != nil && nfa.hasAssert {
+				assertMembers = append(assertMembers, mergeMember{idx: idx, nfa: nfa})
+			}
+		}
+		if len(assertMembers) >= 2 {
+			db.assertMerged = buildAssertMergedNFA(assertMembers)
+		}
+	}
 	// R1：把可 forward-anchor 的 lean NFA 编成一个 span-injected 不相交并集。
 	// 只在 A/B 开关开启时构建，避免尚未验收的全局位集给默认数据库增加内存与编译成本。
 	var anchorMembers []mergeMember
@@ -380,6 +394,11 @@ type mvsDB struct {
 
 	merged           *mvsMergedNFA // 无字面量且可编入 lean NFA 的 always-on 合并为单趟自动机
 	mergedCount      int           // 合并成员数
+
+	// assertMerged 是无字面量的断言 NFA always-on (hasAssert) 的单趟合并自动机 (R2),
+	// 共享 computeBoundaries 预算的边界条件, 替代逐条 existsInAssertShared 整段扫.
+	// 仅在有 >=2 条断言 always-on 时构建 (单条直接走 verifyOne 逐条). 不影响命中语义.
+	assertMerged *mvsAssertMergedNFA
 	anchoredMerged   *mvsMergedNFA // R1 span-injected lean anchored 合并自动机（A/B 开关控制使用）
 	anchorMergedSlot []int         // pattern idx -> anchoredMerged 成员槽位；-1 表示非成员
 	assertAlwaysOn   []int         // 无字面量的断言 NFA (hasAssert): existsInAssert 门控 + verifier 定位
@@ -403,6 +422,10 @@ var gateSupersetPrecheck = false
 // anchorMergedEnabled 控制 R1 span-injected merged verifier 的运行期接线。保守起见默认
 // 关闭，直到真实语料的 oracle 与基准都证明其全局位集成本低于逐条 gap-jump 路径。
 var anchorMergedEnabled = false
+
+// assertMergedEnabled 控制 R2 断言 NFA 合并单趟的运行期接线。实测合并后 nword 1→2,
+// 多字循环开销 > 省的趟数 (与 lean 合并的 A/B 结论一致), 默认关闭保留作差分护栏.
+var assertMergedEnabled = false
 
 // anchorCBatchEnabled 控制 C anchored-many 接线。它与 Go gap-jump 路径语义等价，
 // 但真实规则集上 C 对大量单字 NFA 的逐条重扫目前慢于 Go 标量快路径；默认关闭，保留作
@@ -723,14 +746,32 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 		}
 	}
 
-	// 3) 无字面量的断言 NFA always-on: existsInAssertShared 位并行门控 (共享边界), 命中后交 verifier 定位.
-	for _, idx := range d.assertAlwaysOn {
-		if sc.fullDone[idx] {
-			continue
+	// 3) 无字面量的断言 NFA always-on: 有合并自动机时走单趟 scanExistAssert (共享边界条件),
+	//    命中后交 verifier 定位; 否则逐条 existsInAssertShared (共享边界) 门控.
+	// 注: 合并经 A/B 实测为净回归 (nword 1→2, 多字循环开销 > 省的趟数), 默认不启用 (见 assertMergedEnabled).
+	if assertMergedEnabled && d.assertMerged != nil {
+		bound := d.sharedBound(data, sc)
+		sc.mergedSeen = resetBoolBuf(sc.mergedSeen, d.n)
+		hits := d.assertMerged.scanExistAssert(data, bound, sc.mergedSeen, sc.mergedHits[:0])
+		sc.mergedHits = hits
+		for _, idx := range hits {
+			if sc.fullDone[idx] {
+				continue
+			}
+			sc.fullDone[idx] = true
+			if stop := d.finalizeHit(idx, data, sc, handler); stop {
+				return true, nil
+			}
 		}
-		sc.fullDone[idx] = true
-		if stop := d.verifyOne(idx, data, sc, handler); stop {
-			return true, nil
+	} else {
+		for _, idx := range d.assertAlwaysOn {
+			if sc.fullDone[idx] {
+				continue
+			}
+			sc.fullDone[idx] = true
+			if stop := d.verifyOne(idx, data, sc, handler); stop {
+				return true, nil
+			}
 		}
 	}
 

@@ -270,6 +270,19 @@ type mvsNFA struct {
 	follow1  []uint64 // follow1[p] = follow[p][0]
 	reach1   []uint64 // reach1[符号] = reach[符号][0]
 
+	// LimEx 链/异常拆分 (单字标量快路径): 把 follow 边拆成链边 (p->p+1, 用一次左移批量推进)
+	// 和异常边 (其余, 仅对活跃异常位置逐个 OR). 对连接产生的 Glushkov 边恰是 p->p+1,
+	// 故大量 follow 落入链边、异常稀疏, 每字节趋近 O(1) 位运算 (与活跃数无关).
+	// 源自 Hyperscan LimEx (NSDI'19). 无位置重排时仅捕获恰好 p->p+1 的边, 仍 100% 正确.
+	chainTarget1 uint64   // 位 q 置位 <=> 存在链边 (q-1)->q
+	excMask1     uint64   // 位 p 置位 <=> excFollow1[p] != 0 (有异常边)
+	excFollow1   []uint64 // 异常后继 (= follow[p] 去掉 p+1); 仅 excMask1[p] 为真时有效
+	excCount     int      // 异常位置总数 (诊断: 越少越接近 O(1)/字节)
+	// condFollowMask1 标记哪些位置有 condFollow 条目 (断言 NFA 专用); 位 p 置位 <=> len(condFollow[p])>0.
+	// 存在是因为: LimEx 把无条件 follow 拆成链/异常, 但 condFollow 是独立于无条件 follow 的条件边,
+	// 链边位置也可能有 condFollow 条目, 故需单独掩码标记.
+	condFollowMask1 uint64
+
 	// ---- 零宽断言扩展 (见 mvs_assert.go) ----
 	// hasAssert 为真表示本 NFA 含零宽断言 (\b \B / 行锚 (?m)^$ / 中缀 ^$\A\z), 走 existsInAssert
 	// 执行器 (带边界条件门控的位并行递推), 不走 lean existsIn; 且不进 C 内核 (Go 侧执行).
@@ -455,6 +468,28 @@ func (nfa *mvsNFA) initScalar() {
 	nfa.reach1 = make([]uint64, nfa.nsym)
 	for s := 0; s < nfa.nsym; s++ {
 		nfa.reach1[s] = nfa.reach[s][0]
+	}
+	// LimEx 链/异常拆分: 链边 p->p+1 用左移批量推进; 异常边逐个 OR.
+	nfa.excFollow1 = make([]uint64, nfa.npos)
+	for p := 0; p < nfa.npos; p++ {
+		f := nfa.follow1[p]
+		hasChain := p+1 < nfa.npos && (f&(1<<uint(p+1))) != 0
+		if hasChain {
+			nfa.chainTarget1 |= 1 << uint(p+1)
+		}
+		exc := f
+		if hasChain {
+			exc &^= 1 << uint(p+1)
+		}
+		if exc != 0 {
+			nfa.excFollow1[p] = exc
+			nfa.excMask1 |= 1 << uint(p)
+			nfa.excCount++
+		}
+		// condFollowMask1: 标记有 condFollow 条目的位置 (断言 NFA 专用).
+		if nfa.condFollow != nil && len(nfa.condFollow[p]) > 0 {
+			nfa.condFollowMask1 |= 1 << uint(p)
+		}
 	}
 }
 
