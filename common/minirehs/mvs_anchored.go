@@ -351,6 +351,14 @@ func (nfa *mvsNFA) existsInAssertAnchored(data []byte, bound []uint8, spans []an
 		if !hasActive && (si >= len(spans) || runeStart >= lastHi) {
 			return false
 		}
+		// 大空洞跳跃 (同 existsInAnchored): 断言 NFA 锚定式同样受益.
+		if !hasActive && si < len(spans) && int(spans[si].lo) > runeStart+gapJumpMin {
+			jump := alignRuneStart(data, int(spans[si].lo))
+			if jump > i {
+				i = jump
+				continue
+			}
+		}
 		i = ni
 	}
 	return false
@@ -435,6 +443,14 @@ func (nfa *mvsNFA) existsInAssertAnchored1(data []byte, bound []uint8, spans []a
 		hasActive = active != 0
 		if !hasActive && (si >= nspan || runeStart >= lastHi) {
 			return false
+		}
+		// 大空洞跳跃 (同 existsInAnchored1): 断言 NFA 单字版同样受益.
+		if !hasActive && si < nspan && curLo > runeStart+gapJumpMin {
+			jump := alignRuneStart(data, curLo)
+			if jump > i {
+				i = jump
+				continue
+			}
 		}
 		prev = active
 		i = ni
