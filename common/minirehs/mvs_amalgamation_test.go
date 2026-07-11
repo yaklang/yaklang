@@ -3,6 +3,7 @@ package minirehs
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/minirehs/tools/amalgamate"
@@ -46,4 +47,28 @@ func TestMVSAmalgamationFresh(t *testing.T) {
 	}
 	t.Logf("amalgamation fresh: mvscan.c=%d bytes, mvscan.h=%d bytes (byte-identical to source regen)",
 		len(gotC), len(gotH))
+}
+
+// TestMVSSIMDDispatchPortabilityGuard 固化 SIMD 的兼容性契约：高于平台 ABI
+// 基线的指令集不能靠翻译单元级编译宏直接替换通用路径；未知架构必须拥有标量别名。
+// 这项静态护栏可在任意 GOARCH 上执行，避免某次优化只在开发机架构上能编译。
+func TestMVSSIMDDispatchPortabilityGuard(t *testing.T) {
+	src, err := os.ReadFile(filepath.Join("native", "mvscan", "mvscan.c"))
+	if err != nil {
+		t.Fatalf("read mvscan.c: %v", err)
+	}
+	s := string(src)
+	if strings.Contains(s, "#if defined(__AVX2__)") || strings.Contains(s, "#ifdef __AVX2__") {
+		t.Fatal("AVX2 must use a function-level target and runtime CPU dispatch, not translation-unit compile-time selection")
+	}
+	for _, fallback := range []string{
+		"#define row_copy_v row_copy_s",
+		"#define row_or_v row_or_s",
+		"#define row_and_v row_and_s",
+		"#define row_zero_v row_zero_s",
+	} {
+		if !strings.Contains(s, fallback) {
+			t.Fatalf("missing unknown-architecture scalar fallback %q", fallback)
+		}
+	}
 }
