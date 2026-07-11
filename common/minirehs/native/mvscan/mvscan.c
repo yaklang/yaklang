@@ -188,9 +188,12 @@ typedef struct {
     /* ---- 必要条件预过滤 (v2 blob). 在 NFA 扫描前做快速字节检查. ---- */
     int32_t  necMinRunLen;     /* 0=无约束; >0 表示需要 >= necMinRunLen 个连续 necRunClass 字节 */
     int32_t  necRunClass;      /* 1=digit, 2=hex. 见 mvs_byte_in_class. */
-    /* necRequiredByte: 某字节必须至少出现 necRequiredCount 次. necRequiredByte<0=无约束. */
     int32_t  necRequiredByte;  /* 0-255, -1=无 */
     int32_t  necRequiredCount; /* 最少出现次数 */
+    /* Vermicelli 加速: startByteMask[b]=1 表示字节 b 可以开始匹配 (firstUnanchored & reach[asciiSym[b]] != 0).
+     * NFA 休眠时 (anyActive==0) 跳到下一个 startByteMask 字节. hasStartByteMask=0 表示未构建. */
+    int      hasStartByteMask;
+    uint8_t  startByteMask[256];
 } mvs_nfa;
 
 struct mvscan_db {
@@ -995,6 +998,21 @@ static int parse_unit(const uint8_t *blob, size_t blobLen, size_t off, mvs_nfa *
     uint64_t fu = 0;
     for (int w = 0; w < nword; w++) fu |= out->firstUnanchored[w];
     out->unanchoredEmpty = (fu == 0) ? 1 : 0;
+
+    /* Vermicelli: 构建 startByteMask — 哪些字节可以开始匹配. */
+    out->hasStartByteMask = 0;
+    if (!out->unanchoredEmpty) {
+        memset(out->startByteMask, 0, 256);
+        int anyStart = 0;
+        for (int b = 0; b < 128; b++) {
+            int sym = (int)out->asciiSym[b];
+            const uint64_t *rc = out->reach + (size_t)sym * nword;
+            uint64_t overlap = 0;
+            for (int w = 0; w < nword; w++) overlap |= (rc[w] & out->firstUnanchored[w]);
+            if (overlap) { out->startByteMask[b] = 1; anyStart = 1; }
+        }
+        out->hasStartByteMask = anyStart ? 1 : 0;
+    }
     return 0;
 }
 
