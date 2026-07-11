@@ -2,7 +2,6 @@ package mcp
 
 import (
 	"context"
-	"maps"
 	"strconv"
 	"strings"
 	"time"
@@ -264,33 +263,7 @@ func ypbHTTPFlowToFriendlyHTTPFlow(f *ypb.HTTPFlow) *schema.HTTPFlow {
 	return flow
 }
 
-func normalizeHTTPFlowToolArguments(arguments map[string]any) map[string]any {
-	if arguments == nil {
-		return nil
-	}
-	args := maps.Clone(arguments)
-	pagination, ok := args["pagination"].(map[string]any)
-	if !ok {
-		return args
-	}
-	p := maps.Clone(pagination)
-	if _, ok := p["OrderBy"]; !ok {
-		if v, ok := p["orderBy"]; ok {
-			p["OrderBy"] = v
-		} else if v, ok := p["orderby"]; ok {
-			p["OrderBy"] = v
-		}
-	}
-	if _, ok := p["Order"]; !ok {
-		if v, ok := p["order"]; ok {
-			p["Order"] = v
-		}
-	}
-	args["pagination"] = p
-	return args
-}
-
-func normalizeHTTPFlowQueryRequest(req *ypb.QueryHTTPFlowRequest) {
+func applyHTTPFlowQueryDefaults(req *ypb.QueryHTTPFlowRequest) {
 	if req == nil {
 		return
 	}
@@ -410,11 +383,11 @@ func handleQueryHTTPFlows(s *MCPServer) server.ToolHandlerFunc {
 		request mcp.CallToolRequest,
 	) (*mcp.CallToolResult, error) {
 		var req ypb.QueryHTTPFlowRequest
-		err := mapstructure.Decode(normalizeHTTPFlowToolArguments(request.Params.Arguments), &req)
+		err := mapstructure.Decode(request.Params.Arguments, &req)
 		if err != nil {
 			return nil, utils.Wrap(err, "invalid argument")
 		}
-		normalizeHTTPFlowQueryRequest(&req)
+		applyHTTPFlowQueryDefaults(&req)
 		rsp, err := queryHTTPFlows(ctx, s, &req)
 		if err != nil {
 			return nil, utils.Wrap(err, "failed to query HTTPFlows")
