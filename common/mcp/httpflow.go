@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"maps"
 	"strconv"
 	"strings"
 	"time"
@@ -12,6 +13,8 @@ import (
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	grpcmodel "github.com/yaklang/yaklang/common/yakgrpc/model"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -250,9 +253,9 @@ func ypbHTTPFlowToFriendlyHTTPFlow(f *ypb.HTTPFlow) *schema.HTTPFlow {
 		IsTooLargeResponse:         f.IsTooLargeResponse,
 		TooLargeResponseBodyFile:   string(f.TooLargeResponseBodyFile),
 		TooLargeResponseHeaderFile: string(f.TooLargeResponseHeaderFile),
-		IsTooLargeRequest:         f.IsTooLargeRequest,
-		TooLargeRequestBodyFile:   string(f.TooLargeRequestBodyFile),
-		TooLargeRequestHeaderFile: string(f.TooLargeRequestHeaderFile),
+		IsTooLargeRequest:          f.IsTooLargeRequest,
+		TooLargeRequestBodyFile:    string(f.TooLargeRequestBodyFile),
+		TooLargeRequestHeaderFile:  string(f.TooLargeRequestHeaderFile),
 	}
 
 	flow.Response = strconv.Quote(string(f.Response))
@@ -261,17 +264,158 @@ func ypbHTTPFlowToFriendlyHTTPFlow(f *ypb.HTTPFlow) *schema.HTTPFlow {
 	return flow
 }
 
+func normalizeHTTPFlowToolArguments(arguments map[string]any) map[string]any {
+	if arguments == nil {
+		return nil
+	}
+	args := maps.Clone(arguments)
+	pagination, ok := args["pagination"].(map[string]any)
+	if !ok {
+		return args
+	}
+	p := maps.Clone(pagination)
+	if _, ok := p["OrderBy"]; !ok {
+		if v, ok := p["orderBy"]; ok {
+			p["OrderBy"] = v
+		} else if v, ok := p["orderby"]; ok {
+			p["OrderBy"] = v
+		}
+	}
+	if _, ok := p["Order"]; !ok {
+		if v, ok := p["order"]; ok {
+			p["Order"] = v
+		}
+	}
+	args["pagination"] = p
+	return args
+}
+
+func normalizeHTTPFlowQueryRequest(req *ypb.QueryHTTPFlowRequest) {
+	if req == nil {
+		return
+	}
+	if req.Pagination == nil {
+		req.Pagination = &ypb.Paging{}
+	}
+	if req.Pagination.Page <= 0 {
+		req.Pagination.Page = 1
+	}
+	if req.Pagination.Limit <= 0 {
+		req.Pagination.Limit = 30
+	}
+	if strings.TrimSpace(req.Pagination.OrderBy) == "" {
+		req.Pagination.OrderBy = "updated_at"
+	}
+	if strings.TrimSpace(req.Pagination.Order) == "" {
+		req.Pagination.Order = "desc"
+	}
+}
+
+func queryHTTPFlows(ctx context.Context, s *MCPServer, req *ypb.QueryHTTPFlowRequest) (*ypb.QueryHTTPFlowResponse, error) {
+	if s.projectDB == nil {
+		return s.grpcClient.QueryHTTPFlows(ctx, req)
+	}
+	paging, data, err := yakit.QueryHTTPFlow(s.projectDB, req)
+	if err != nil {
+		return nil, err
+	}
+	rsp := &ypb.QueryHTTPFlowResponse{}
+	if paging != nil {
+		rsp.Total = int64(paging.TotalRecord)
+		rsp.Pagination = &ypb.Paging{
+			Page:    int64(paging.Page),
+			Limit:   int64(paging.Limit),
+			OrderBy: req.GetPagination().GetOrderBy(),
+			Order:   req.GetPagination().GetOrder(),
+		}
+	}
+	for _, flow := range data {
+		if flow == nil {
+			continue
+		}
+		item, err := grpcmodel.ToHTTPFlowGRPCModel(flow, req.GetFull())
+		if err != nil {
+			return nil, utils.Errorf("cannot convert httpflow failed: %s", err)
+		}
+		rsp.Data = append(rsp.Data, item)
+	}
+	return rsp, nil
+}
+
+func setTagForHTTPFlow(ctx context.Context, s *MCPServer, req *ypb.SetTagForHTTPFlowRequest) error {
+	if s.projectDB == nil {
+		_, err := s.grpcClient.SetTagForHTTPFlow(ctx, req)
+		return err
+	}
+	if len(req.GetCheckTags()) > 0 {
+		return utils.GormTransaction(s.projectDB, func(tx *gorm.DB) error {
+			for _, tag := range req.GetCheckTags() {
+				if err := yakit.SaveSetTagForHTTPFlow(tx, tag.GetId(), tag.GetHash(), tag.GetTags()); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+	}
+	return yakit.SaveSetTagForHTTPFlow(s.projectDB, req.GetId(), req.GetHash(), req.GetTags())
+}
+
+func deleteHTTPFlows(ctx context.Context, s *MCPServer, req *ypb.DeleteHTTPFlowRequest) error {
+	if s.projectDB == nil {
+		_, err := s.grpcClient.DeleteHTTPFlows(ctx, req)
+		return err
+	}
+	db := s.projectDB
+	if req.GetDeleteAll() {
+		yakit.DropWebsocketFlowTable(db)
+		yakit.DropExtractedDataTable(db)
+		grpcmodel.DropHTTPFlowCacheGRPCModelByFlow()
+		return yakit.DeleteHTTPFlow(db, req)
+	}
+
+	queryDB := yakit.QueryWebsocketFlowsByHTTPFlowHash(db, req).Select([]string{"id", "websocket_hash", "hash"})
+	var httpFlowHashes []string
+	for flow := range yakit.YieldHTTPFlows(queryDB, ctx) {
+		httpFlowHashes = append(httpFlowHashes, flow.Hash)
+		grpcmodel.DeleteHTTPFlowCacheGRPCModel(flow)
+	}
+	if len(httpFlowHashes) > 0 {
+		if err := utils.GormTransaction(db, func(tx *gorm.DB) error {
+			for _, hash := range httpFlowHashes {
+				if err := yakit.DeleteWebsocketFlowsByHTTPFlowHash(tx, hash); err != nil {
+					return err
+				}
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+		if err := utils.GormTransaction(db, func(tx *gorm.DB) error {
+			for _, hash := range httpFlowHashes {
+				if err := yakit.DeleteExtractedDataByTraceId(tx, hash); err != nil {
+					return err
+				}
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+	}
+	return yakit.DeleteHTTPFlow(db, req)
+}
+
 func handleQueryHTTPFlows(s *MCPServer) server.ToolHandlerFunc {
 	return func(
 		ctx context.Context,
 		request mcp.CallToolRequest,
 	) (*mcp.CallToolResult, error) {
 		var req ypb.QueryHTTPFlowRequest
-		err := mapstructure.Decode(request.Params.Arguments, &req)
+		err := mapstructure.Decode(normalizeHTTPFlowToolArguments(request.Params.Arguments), &req)
 		if err != nil {
 			return nil, utils.Wrap(err, "invalid argument")
 		}
-		rsp, err := s.grpcClient.QueryHTTPFlows(ctx, &req)
+		normalizeHTTPFlowQueryRequest(&req)
+		rsp, err := queryHTTPFlows(ctx, s, &req)
 		if err != nil {
 			return nil, utils.Wrap(err, "failed to query HTTPFlows")
 		}
@@ -311,8 +455,7 @@ func handleSetTagForHTTPFlow(s *MCPServer) server.ToolHandlerFunc {
 		if err != nil {
 			return nil, utils.Wrap(err, "invalid argument")
 		}
-		_, err = s.grpcClient.SetTagForHTTPFlow(ctx, &req)
-		if err != nil {
+		if err := setTagForHTTPFlow(ctx, s, &req); err != nil {
 			return nil, utils.Wrap(err, "failed to set tag for httpflow(s)")
 		}
 		return NewCommonCallToolResult("set tag for httpflow(s) success")
@@ -329,8 +472,7 @@ func handleDeleteHTTPFlows(s *MCPServer) server.ToolHandlerFunc {
 		if err != nil {
 			return nil, utils.Wrap(err, "invalid argument")
 		}
-		_, err = s.grpcClient.DeleteHTTPFlows(ctx, &req)
-		if err != nil {
+		if err := deleteHTTPFlows(ctx, s, &req); err != nil {
 			return nil, utils.Wrap(err, "failed to delete httpflow(s)")
 		}
 		return NewCommonCallToolResult("delete httpflow(s) success")

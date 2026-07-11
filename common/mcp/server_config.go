@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp/yakcliconvert"
 	"github.com/yaklang/yaklang/common/utils"
@@ -21,6 +22,8 @@ type MCPServerConfig struct {
 	dynamicScript    []string
 	// grpcClient, when set, is used instead of NewLocalClient() (integration tests).
 	grpcClient YakClientInterface
+	profileDB  *gorm.DB
+	projectDB  *gorm.DB
 	// extraAITools holds aitool.Tool instances registered via WithAITools.
 	// They are merged last and override globalTools entries with the same name.
 	extraAITools map[string]*ToolWithHandler
@@ -384,6 +387,14 @@ func WithDisableFingerprintToolSet() McpServerOption {
 func WithGRPCClient(client YakClientInterface) McpServerOption {
 	return func(cfg *MCPServerConfig) error {
 		cfg.grpcClient = client
+		return nil
+	}
+}
+
+func WithDatabases(profileDB, projectDB *gorm.DB) McpServerOption {
+	return func(cfg *MCPServerConfig) error {
+		cfg.profileDB = profileDB
+		cfg.projectDB = projectDB
 		return nil
 	}
 }
