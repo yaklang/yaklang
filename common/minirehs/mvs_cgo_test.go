@@ -9,6 +9,7 @@ import (
 	"regexp/syntax"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 // 本文件是纯 C99 运行期内核 (native/mvscan) 的差分护栏, 仅在 `cgo && minirehs_mvs` 构建运行.
@@ -39,6 +40,54 @@ func getMVSDB(t *testing.T, db Database) *mvsDB {
 func TestMVSKernelAvailable(t *testing.T) {
 	if !mvsKernelAvailable() {
 		t.Fatal("expected C kernel available under cgo && minirehs_mvs build")
+	}
+}
+
+// TestMVSKernelCombinedBoundaryFusion 验证 combined scanner 在线生成的断言边界与
+// Go 参考实现逐字节一致，覆盖 ASCII、任意字节和非法 UTF-8。边界融合让 combined
+// 从“预算边界 + NFA”两趟数据变为一趟，因此必须独立守住零宽断言语义。
+func TestMVSKernelCombinedBoundaryFusion(t *testing.T) {
+	patterns := []Pattern{
+		{ID: 1, Expr: `[a-z]{2,4}`},
+		{ID: 2, Expr: `\b[0-9]{2,5}\b`},
+		{ID: 3, Expr: `(?m)^[A-Z][0-9]+$`},
+	}
+	db, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false))
+	if err != nil {
+		t.Fatalf("compile: %v", err)
+	}
+	defer db.Close()
+	mdb := getMVSDB(t, db)
+	if mdb.kernel == nil || mdb.merged == nil || len(mdb.assertAlwaysOnCIdxs) == 0 {
+		t.Fatalf("combined prerequisites missing: kernel=%v merged=%v assert=%d",
+			mdb.kernel != nil, mdb.merged != nil, len(mdb.assertAlwaysOnCIdxs))
+	}
+
+	rng := rand.New(rand.NewSource(0x5eed))
+	sc := &scratch{}
+	for caseNo := 0; caseNo < 800; caseNo++ {
+		data := make([]byte, 1+rng.Intn(256))
+		for i := range data {
+			switch rng.Intn(3) {
+			case 0:
+				data[i] = "abcXYZ019_ \n"[rng.Intn(len("abcXYZ019_ \n"))]
+			default:
+				data[i] = byte(rng.Intn(256))
+			}
+		}
+		mdb.kernel.combinedScan(data, mdb.assertAlwaysOnCIdxs, sc)
+		want := computeBoundaries(data, nil)
+		for i := 0; ; {
+			if sc.assertBound[i] != want[i] {
+				t.Fatalf("case=%d offset=%d data=%q combined=%#x want=%#x",
+					caseNo, i, data, sc.assertBound[i], want[i])
+			}
+			if i == len(data) {
+				break
+			}
+			_, size := utf8.DecodeRune(data[i:])
+			i += size
+		}
 	}
 }
 

@@ -466,6 +466,25 @@ static inline int mvs_is_word_byte(uint8_t c) {
            c == '_';
 }
 
+static inline int mvs_is_word_rune(int32_t r) {
+    return (r >= '0' && r <= '9') ||
+           (r >= 'a' && r <= 'z') ||
+           (r >= 'A' && r <= 'Z') ||
+           r == '_';
+}
+
+/* before/after 为 -1 表示文本端点；与 Go boundaryConds 完全同构。 */
+static inline uint8_t mvs_boundary_conds(int32_t before, int32_t after) {
+    uint8_t b = 0;
+    if (before < 0) b |= MVS_COND_BEGIN_TEXT | MVS_COND_BEGIN_LINE;
+    else if (before == '\n') b |= MVS_COND_BEGIN_LINE;
+    if (after < 0) b |= MVS_COND_END_TEXT | MVS_COND_END_LINE;
+    else if (after == '\n') b |= MVS_COND_END_LINE;
+    if (mvs_is_word_rune(before) != mvs_is_word_rune(after)) b |= MVS_COND_WORD_BOUNDARY;
+    else b |= MVS_COND_NO_WORD_BOUND;
+    return b;
+}
+
 /* mvscan_compute_boundaries: 复刻 Go computeBoundaries. 产出 bound[0..len] (len+1 字节).
  * buf 由调用方提供 (容量 >= len+1). ASCII 快路径 (c<0x80 直接字节判定, 省 DecodeRune). */
 void mvscan_compute_boundaries(const uint8_t *data, size_t len, uint8_t *buf) {
@@ -495,10 +514,7 @@ void mvscan_compute_boundaries(const uint8_t *data, size_t len, uint8_t *buf) {
         } else {
             int32_t r;
             int size = mvs_decode_rune(data + i, len - i, &r);
-            int curWord = mvs_is_word_byte((uint8_t)(r & 0xFF)) ? 0 : 0; /* placeholder */
-            /* 非 ASCII: isWordRune 用 rune 值判定 */
-            curWord = ((r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') ||
-                       (r >= 'A' && r <= 'Z') || r == '_') ? 1 : 0;
+            int curWord = mvs_is_word_rune(r);
             int curIsNewline = (r == '\n');
             if (curIsNewline) b |= MVS_COND_END_LINE;
             if (prevWord != curWord) b |= MVS_COND_WORD_BOUNDARY;
@@ -1361,7 +1377,7 @@ int mvscan_simd_enabled(void) {
 /* mvscan_db_combined_scan: 单次数据遍历同时跑 merged NFA + 多个 assert NFA.
  * 消除第二次数据遍历 (merged + assert 各扫一遍 -> 合并为一次).
  * 对每个字节: 先推进 merged NFA 状态, 再推进每个 assert NFA 状态.
- * assert NFA 的边界条件在遍历前预算一次. */
+ * assert NFA 的边界条件与 rune 解码融合在线产出，避免预算边界 + NFA 的双趟扫描. */
 int32_t mvscan_db_combined_scan(const mvscan_db *db,
                                 const uint8_t *data, size_t len,
                                 uint8_t *mergedSeen, int32_t mergedSeenLen,
@@ -1372,16 +1388,18 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
                                 int32_t *assertOut, int32_t assertCap) {
     if (!db || !data || len == 0) return 0;
 
-    /* 预算边界 (供 assert NFA) */
-    if (boundBuf) {
-        mvscan_compute_boundaries(data, len, boundBuf);
-    }
-
     /* 获取 assert NFA 单元 */
+    mvs_nfa *stackAssertNFAs[16];
     mvs_nfa **assertNFAs = NULL;
+    int assertNFAsHeap = 0;
     int32_t nAssertReal = 0;
     if (nAssert > 0 && assertIdxs) {
-        assertNFAs = (mvs_nfa **)malloc((size_t)nAssert * sizeof(mvs_nfa *));
+        if (nAssert <= 16) {
+            assertNFAs = stackAssertNFAs;
+        } else {
+            assertNFAs = (mvs_nfa **)malloc((size_t)nAssert * sizeof(mvs_nfa *));
+            assertNFAsHeap = 1;
+        }
         if (!assertNFAs) return 0;
         for (int32_t i = 0; i < nAssert; i++) {
             int32_t idx = assertIdxs[i];
@@ -1416,7 +1434,7 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
 
     /* 如果没有 merged 也没有 assert, 直接返回 */
     if (!mu && nAssertReal == 0) {
-        if (assertNFAs) free(assertNFAs);
+        if (assertNFAsHeap) free(assertNFAs);
         if (mergedTotalOut) *mergedTotalOut = 0;
         return 0;
     }
@@ -1444,19 +1462,23 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
     int32_t assertTotal = 0;
 
     size_t i = 0;
+    int32_t curRune;
+    int curSize = mvs_decode_rune(data, len, &curRune);
+    uint8_t bpre = mvs_boundary_conds(-1, curRune);
     while (i < len) {
-        /* 解码 rune */
-        int sym;
-        size_t ni;
-        uint8_t c0 = data[i];
-        if (c0 < 0x80) {
-            sym = mu ? (int)mu->asciiSym[c0] : 0;
-            ni = i + 1;
-        } else {
-            int32_t r;
-            int size = mvs_decode_rune(data + i, len - i, &r);
-            ni = i + (size_t)size;
-            sym = mu ? symbol_of(mu, r) : 0;
+        /* 当前 rune 已由上一轮 lookahead 解码；同时窥视下一 rune，在线生成两侧边界。 */
+        size_t ni = i + (size_t)curSize;
+        int32_t nextRune = -1;
+        int nextSize = 0;
+        if (ni < len) nextSize = mvs_decode_rune(data + ni, len - ni, &nextRune);
+        uint8_t bpost = mvs_boundary_conds(curRune, nextRune);
+        if (boundBuf) {
+            boundBuf[i] = bpre;
+            boundBuf[ni] = bpost;
+        }
+        int sym = 0;
+        if (mu) {
+            sym = curRune >= 0 && curRune < 0x80 ? (int)mu->asciiSym[curRune] : symbol_of(mu, curRune);
         }
         int atStart = (i == 0);
         int atEnd = (ni == len);
@@ -1504,8 +1526,6 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
 
         /* ---- assert NFA 递推 (每个单字 NFA) ---- */
         if (nAssertReal > 0 && boundBuf) {
-            uint8_t bpre = boundBuf[i];
-            uint8_t bpost = boundBuf[ni];
             for (int32_t k = 0; k < nAssert; k++) {
                 if (!assertNFAs[k] || aDone[k]) continue;
                 mvs_nfa *a = assertNFAs[k];
@@ -1561,12 +1581,15 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
         }
 
         i = ni;
+        curRune = nextRune;
+        curSize = nextSize;
+        bpre = bpost;
     }
 
     /* 清理 (仅 free 非栈缓冲) */
     if (mu && mw > 8) { free(mPrev); free(mCand); }
     if (nAssertReal > 0 && nAssert > 16) { free(aPrev); free(aDone); }
-    if (assertNFAs) free(assertNFAs);
+    if (assertNFAsHeap) free(assertNFAs);
     if (mergedTotalOut) *mergedTotalOut = mergedTotal;
     return assertTotal;
 }
