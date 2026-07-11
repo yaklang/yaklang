@@ -2049,6 +2049,9 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
                 if (!assertNFAs[k] || aDone[k]) continue;
                 mvs_nfa *a = assertNFAs[k];
                 if (a->nword != 1) continue; /* 仅单字 assert */
+				/* 每条 NFA 的压缩字母表独立，不能复用 merged unit 的 sym。 */
+				int asym = curRune >= 0 && curRune < 0x80 ?
+					(int)a->asciiSym[curRune] : symbol_of(a, curRune);
 
                 uint64_t prev = aPrev[k];
                 /* LimEx: 链边 + 异常 */
@@ -2078,7 +2081,7 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
                     }
                 }
                 /* active + accept */
-                uint64_t active = cand & a->reach[(size_t)sym * a->nword];
+                uint64_t active = cand & a->reach[(size_t)asym * a->nword];
                 if (active & a->lastAny[0]) {
                     aDone[k] = 1;
                     if (assertTotal < assertCap) assertOut[assertTotal] = assertIdxs[k];

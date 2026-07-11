@@ -91,6 +91,42 @@ func TestMVSKernelCombinedBoundaryFusion(t *testing.T) {
 	}
 }
 
+func TestMVSKernelCombinedAlwaysOnAssertOracle(t *testing.T) {
+	patterns := []Pattern{
+		{ID: 1, Expr: `[a-z]{2,4}`}, // 确保 combined 含 merged unit
+		{ID: 2, Expr: `[^0-9]((\d{8}(0\d|10|11|12)([0-2]\d|30|31)\d{3}$)|(\d{6}(18|19|20)\d{2}(0[1-9]|10|11|12)([0-2]\d|30|31)\d{3}(\d|X|x)))[^0-9]`},
+		{ID: 3, Expr: `(^([a-fA-F0-9]{2}(:[a-fA-F0-9]{2}){5})|[^a-zA-Z0-9]([a-fA-F0-9]{2}(:[a-fA-F0-9]{2}){5}))`},
+	}
+	mvs, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false))
+	if err != nil {
+		t.Fatalf("compile mvs: %v", err)
+	}
+	defer mvs.Close()
+	oracle, err := Compile(patterns, WithBackend(BackendStdlib), WithReportLocation(false))
+	if err != nil {
+		t.Fatalf("compile oracle: %v", err)
+	}
+	defer oracle.Close()
+	mdb := getMVSDB(t, mvs)
+	for _, data := range [][]byte{
+		[]byte(` 11:22:33:44:55:66 `),
+		[]byte(`x 11010519491231002X y`),
+		[]byte(`ordinary payload without either form`),
+	} {
+		bound := computeBoundaries(data, nil)
+		for _, idx := range mdb.assertAlwaysOn {
+			goHit := mdb.nfas[idx].existsInAssertShared1(data, bound)
+			cHit := mdb.kernel.nfaExistsAssertSelf(idx, data, nil)
+			if cHit != goHit {
+				t.Fatalf("assert self mismatch data=%q idx=%d C=%v Go=%v", data, idx, cHit, goHit)
+			}
+		}
+		got := mvsExistIDs(t, mvs, data)
+		want := mvsExistIDs(t, oracle, data)
+		mvsAssertSameIDSet(t, got, want, fmt.Sprintf("combined-assert %q", data))
+	}
+}
+
 // TestMVSKernelAnchoredBatchBackendOracle 接通 C anchored-many 的端到端 A/B 路径。
 // 默认生产开关保持关闭，直到 C 侧能把 literal trigger 与局部 verifier 融为一趟；此测试
 // 保证未来重新评估时，该批处理路径仍和 stdlib oracle 完全一致。

@@ -245,62 +245,11 @@ func extractRunFromTree(re *syntax.Regexp) mandatoryRun {
 		return mandatoryRun{} // . 接受所有, 无强制
 
 	case syntax.OpConcat:
-		// 对 concat 的各子: 合并相邻同类 run (如 \d\d\d → {3, digit}), 取最终最长段.
-		// 先提取各子的 run, 再做"同类连续累加, 异类取最大"的合并.
-		if len(re.Sub) == 0 {
-			return mandatoryRun{}
+		runs := make([]mandatoryRun, 0, len(re.Sub))
+		for _, s := range re.Sub {
+			runs = append(runs, extractRunFromTree(s))
 		}
-		// 提取每个子的"首字符类"和"run" (用于跨子合并)
-		type subRun struct {
-			firstCls byteClass // 子的首字符类 (用于判断相邻子是否同类可合并)
-			lastCls  byteClass // 子的末字符类
-			run      mandatoryRun
-		}
-		subs := make([]subRun, len(re.Sub))
-		for i, s := range re.Sub {
-			r := extractRunFromTree(s)
-			subs[i] = subRun{
-				firstCls: treeFirstByteClass(s),
-				lastCls:  treeLastByteClass(s),
-				run:      r,
-			}
-		}
-		// 合并: 遍历 subs, 维护"当前连续同类段长度". 跨子合并: 如果前子 lastCls == 后子 firstCls,
-		// 且两者都是同一类, 则连续段长度累加.
-		best := mandatoryRun{}
-		curLen := 0
-		curCls := byteClassNone
-		for i, sr := range subs {
-			if sr.run.Class != byteClassNone && sr.run.Len > 0 {
-				// 子内部已有同类段
-				if sr.run.Class == curCls {
-					// 与前子同类: 累加 (前子末尾 + 本子整个 run)
-					curLen += sr.run.Len
-				} else {
-					curCls = sr.run.Class
-					curLen = sr.run.Len
-				}
-				if curLen > best.Len {
-					best = mandatoryRun{curLen, curCls}
-				}
-			} else if sr.firstCls != byteClassNone {
-				// 子无 run 但有首字符类 (如单个 \d): 可能与前子连续
-				if sr.firstCls == curCls {
-					curLen++
-				} else {
-					curCls = sr.firstCls
-					curLen = 1
-				}
-				if curLen > best.Len {
-					best = mandatoryRun{curLen, curCls}
-				}
-			} else {
-				curCls = byteClassNone
-				curLen = 0
-			}
-			_ = i
-		}
-		return best
+		return mergeRunConcat(runs)
 
 	case syntax.OpAlternate:
 		runs := make([]mandatoryRun, 0, len(re.Sub))
@@ -327,9 +276,10 @@ func extractRunFromTree(re *syntax.Regexp) mandatoryRun {
 	case syntax.OpRepeat:
 		if len(re.Sub) == 1 {
 			child := extractRunFromTree(re.Sub[0])
-			if child.Len > 0 && re.Min > 0 {
-				return mandatoryRun{child.Len * re.Min, child.Class}
+			if unit, ok := uniformRun(re.Sub[0]); ok && re.Min > 0 {
+				return mandatoryRun{unit.Len * re.Min, unit.Class}
 			}
+			return child
 		}
 		return mandatoryRun{}
 
@@ -337,6 +287,47 @@ func extractRunFromTree(re *syntax.Regexp) mandatoryRun {
 		return mandatoryRun{}
 	}
 	return mandatoryRun{}
+}
+
+// uniformRun 只在子树每次匹配都完全由同一 byteClass 的字符组成时返回长度下界。
+// 这使 Repeat 的乘法仅用于 \d{N} / [0-9A-F]{N} 等真正连续的重复；包含 ':'、分支
+// 或可空部分的复合组绝不能把内部最长 run 跨迭代相加。
+func uniformRun(re *syntax.Regexp) (mandatoryRun, bool) {
+	switch re.Op {
+	case syntax.OpLiteral:
+		if len(re.Rune) == 0 {
+			return mandatoryRun{}, false
+		}
+		cls := runeToByteClass(re.Rune[0])
+		if cls == byteClassNone {
+			return mandatoryRun{}, false
+		}
+		for _, r := range re.Rune[1:] {
+			if runeToByteClass(r) != cls {
+				return mandatoryRun{}, false
+			}
+		}
+		return mandatoryRun{Len: len(re.Rune), Class: cls}, true
+	case syntax.OpCharClass:
+		cls := charRangesToByteClass(re.Rune)
+		return mandatoryRun{Len: 1, Class: cls}, cls != byteClassNone
+	case syntax.OpCapture:
+		if len(re.Sub) == 1 {
+			return uniformRun(re.Sub[0])
+		}
+	case syntax.OpConcat:
+		var out mandatoryRun
+		for _, sub := range re.Sub {
+			r, ok := uniformRun(sub)
+			if !ok || (out.Class != byteClassNone && r.Class != out.Class) {
+				return mandatoryRun{}, false
+			}
+			out.Class = r.Class
+			out.Len += r.Len
+		}
+		return out, out.Len > 0
+	}
+	return mandatoryRun{}, false
 }
 
 // longestRunInRunes 找 rune 序列中最长的"同 byteClass 连续段".
