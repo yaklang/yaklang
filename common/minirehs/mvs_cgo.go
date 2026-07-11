@@ -80,7 +80,7 @@ func newMVSKernel(d *mvsDB) *mvsKernel {
 	if d == nil {
 		return nil
 	}
-	blob := buildMVSBlob(d.nfas, d.merged)
+	blob := buildMVSBlob(d.nfas, d.merged, d.assertNecFactor)
 	return openMVSKernel(blob, d.n)
 }
 

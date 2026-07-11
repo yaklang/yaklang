@@ -96,7 +96,7 @@ func BenchmarkMVSCAnchoredBatchAB(b *testing.B) {
 // openSingleNFAKernel 把一条 NFA 序列化为 blob 并打开 C 内核 (pattern 槽位仅 idx 0).
 func openSingleNFAKernel(t *testing.T, nfa *mvsNFA) *mvsKernel {
 	t.Helper()
-	blob := buildMVSBlob([]*mvsNFA{nfa}, nil)
+	blob := buildMVSBlob([]*mvsNFA{nfa}, nil, nil)
 	k := openMVSKernel(blob, 1)
 	if k == nil {
 		t.Fatal("openMVSKernel returned nil for valid single-NFA blob")
@@ -375,7 +375,7 @@ func TestMVSKernelMergedRandom(t *testing.T) {
 	for _, m := range members {
 		nfas[m.idx] = m.nfa
 	}
-	blob := buildMVSBlob(nfas, merged)
+	blob := buildMVSBlob(nfas, merged, nil)
 	k := openMVSKernel(blob, npat)
 	if k == nil {
 		t.Fatal("openMVSKernel nil")
