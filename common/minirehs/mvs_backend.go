@@ -281,6 +281,11 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 		}
 	}
 	db.nfaCount = nfaCount
+	// 构建 hasLiterals (用于 DFA: 有字面量的 pattern 不构建 DFA).
+	db.hasLiterals = make([]bool, db.n)
+	for _, cp := range patterns {
+		db.hasLiterals[cp.idx] = len(cp.literals) > 0
+	}
 	// 预计算 assert always-on 中 single (nword==1) 的 C 批量扫描 idx 数组.
 	for _, idx := range db.assertAlwaysOn {
 		if nfa := db.nfas[idx]; nfa != nil && nfa.hasAssert && nfa.single {
@@ -442,6 +447,8 @@ type mvsDB struct {
 	// assertNecFactor 按 idx: 断言 always-on NFA 的 per-pattern 必要条件预过滤.
 	// scan() 中, 对每条 assert always-on 先 check; check==false 则跳过 existsInAssertShared.
 	assertNecFactor []necFactor
+	// hasLiterals 按 idx: true=该 pattern 有必需字面量 (不构建 DFA).
+	hasLiterals []bool
 	// assertAlwaysOnCIdxs 是 assertAlwaysOn 中 single (nword==1) 断言 NFA 的 idx 数组 (C 内核批量用).
 	// 预计算一次, scan 中复用 (零分配).
 	assertAlwaysOnCIdxs []int32
