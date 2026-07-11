@@ -38,7 +38,7 @@ func (s *Server) StartMcpServer(req *ypb.StartMcpServerRequest, stream ypb.Yak_S
 		explicitToolSets = true
 		log.Infof("StartMcpServer: explicit tool sets: %v", req.GetTool())
 	}
-	return launchMcpServer(stream.Context(), req, stream.Send, explicitToolSets, mcp.WithDatabases(s.GetProfileDatabase(), s.GetProjectDatabase()))
+	return launchMcpServer(stream.Context(), req, stream.Send, explicitToolSets, mcp.WithDatabaseProvider(s.GetProfileDatabase, s.GetProjectDatabase))
 }
 
 func (s *Server) GetToolSetList(ctx context.Context, req *ypb.Empty) (*ypb.GetToolSetListResponse, error) {
