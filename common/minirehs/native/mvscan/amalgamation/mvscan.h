@@ -142,6 +142,11 @@ int mvscan_db_nfa_exists_assert(const mvscan_db *db, int32_t idx,
                                 const uint8_t *data, size_t len,
                                 const uint8_t *bound);
 
+/* mvscan_db_nfa_exists_assert_self: 自包含断言扫描 — 内部预算边界, 省去 Go 侧一次 cgo. */
+int mvscan_db_nfa_exists_assert_self(const mvscan_db *db, int32_t idx,
+                                     const uint8_t *data, size_t len,
+                                     uint8_t *boundBuf);
+
 /*
  * mvscan_db_nfa_exists_assert_many 一次 cgo 对多条断言 always-on NFA 各自做断言存在性,
  * 内部预算边界 (每报文一次, 跨多条 NFA 共享), 摊薄跨界开销.
