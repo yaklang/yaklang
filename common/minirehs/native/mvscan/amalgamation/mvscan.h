@@ -73,6 +73,18 @@ int32_t mvscan_db_merged_scan(const mvscan_db *db,
                               uint8_t *seen, int32_t seenLen,
                               int32_t *out, int32_t cap);
 
+/*
+ * mvscan_db_merged_scan_batch: 批量扫描多条记录 (拼接为一个 buffer), 每条记录独立扫描.
+ * recOff 长度 nrec+1: 第 i 条记录 = data[recOff[i]..recOff[i+1]).
+ * 对每条记录跑 merged NFA, 把 (recIdx, memberIdx) 对写入 out (容量 capPairs).
+ * 返回命中总对数 (可能 > capPairs, 表示截断).
+ * 省去每记录一次 cgo 调用 (N 次 cgo -> 1 次 cgo).
+ */
+int32_t mvscan_db_merged_scan_batch(const mvscan_db *db,
+                                    const uint8_t *data, size_t totalLen,
+                                    const int32_t *recOff, int32_t nrec,
+                                    int32_t *out, int32_t capPairs);
+
 /* 强制标量孪生入口 (语义同上, 但绕过 SIMD 分发恒走标量). 供差分测试对照默认 (SIMD) 分发,
  * 二者命中结果必逐位一致; 生产路径用非 _scalar 版本. */
 int mvscan_db_nfa_exists_scalar(const mvscan_db *db, int32_t idx,
