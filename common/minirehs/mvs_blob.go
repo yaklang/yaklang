@@ -54,6 +54,11 @@ type mvsUnit struct {
 	necRunClass      int32 // 1=digit, 2=hex
 	necRequiredByte  int32 // -1=无, 0-255
 	necRequiredCount int32
+	// DFA 转换 (小规模 NFA 确定性化)
+	hasDFA     bool
+	dfaNstates int32
+	dfaNext    []int32 // [nstates*256]
+	dfaAccept  []byte  // [nstates]
 }
 
 // unitFromNFA 把一条 per-pattern NFA 转为 unit. reportedIdx 填入命中位置的 posPat
@@ -87,6 +92,9 @@ func unitFromNFA(nfa *mvsNFA, reportedIdx int) mvsUnit {
 	}
 	setAcceptPos(u.posPat, nfa.lastAny, int32(reportedIdx))
 	setAcceptPos(u.posPat, nfa.lastEnd, int32(reportedIdx))
+	// DFA 转换: 暂不启用 (dfa_run 有正确性问题: 非 ASCII 处理 + 死状态重置).
+	// 基建已就位 (buildDFAFromNFA + blob 序列化 + parse_unit + dfa_run C 函数).
+	// 待修复 dfa_run 后接线.
 	return u
 }
 
@@ -265,6 +273,9 @@ func encodeUnit(u mvsUnit) []byte {
 	if u.hasAssert {
 		flags |= 2 // bit1 = hasAssert
 	}
+	if u.hasDFA {
+		flags |= 4 // bit2 = hasDFA
+	}
 	b := make([]byte, 0, 16+(len(u.follow)+len(u.reach)+u.nword*4)*8+(len(u.cuts)+128+u.npos)*4)
 	b = putU32(b, uint32(u.npos))
 	b = putU32(b, uint32(u.nword))
@@ -309,6 +320,14 @@ func encodeUnit(u mvsUnit) []byte {
 		b = putI32(b, u.necRunClass)
 		b = putI32(b, u.necRequiredByte)
 		b = putI32(b, u.necRequiredCount)
+	}
+	// DFA 扩展 (bit2 = hasDFA, 在所有字段最后)
+	if u.hasDFA {
+		b = putI32(b, u.dfaNstates)
+		b = putI32s(b, u.dfaNext)
+		for _, a := range u.dfaAccept {
+			b = append(b, a)
+		}
 	}
 	return b
 }
