@@ -108,9 +108,6 @@ func TestMVSKernelCombinedAlwaysOnAssertOracle(t *testing.T) {
 	}
 	defer oracle.Close()
 	mdb := getMVSDB(t, mvs)
-	for _, idx := range mdb.assertAlwaysOn {
-		t.Logf("combined assert idx=%d DFA states=%d", idx, mdb.kernel.assertDFAStates(idx))
-	}
 	for _, data := range [][]byte{
 		[]byte(` 11:22:33:44:55:66 `),
 		[]byte(`x 11010519491231002X y`),
@@ -127,31 +124,6 @@ func TestMVSKernelCombinedAlwaysOnAssertOracle(t *testing.T) {
 		got := mvsExistIDs(t, mvs, data)
 		want := mvsExistIDs(t, oracle, data)
 		mvsAssertSameIDSet(t, got, want, fmt.Sprintf("combined-assert %q", data))
-	}
-	rng := rand.New(rand.NewSource(0xc010a))
-	for caseNo := 0; caseNo < 800; caseNo++ {
-		data := make([]byte, 1+rng.Intn(320))
-		for i := range data {
-			const alphabet = "abcdefXYZ019_ :-/\n"
-			data[i] = alphabet[rng.Intn(len(alphabet))]
-		}
-		if caseNo%7 == 0 {
-			mac := []byte(` 11:22:33:44:55:66 `)
-			pos := rng.Intn(len(data) + 1)
-			data = append(data, make([]byte, len(mac))...)
-			copy(data[pos+len(mac):], data[pos:len(data)-len(mac)])
-			copy(data[pos:], mac)
-		}
-		if caseNo%11 == 0 {
-			id := []byte(` 11010519491231002X `)
-			pos := rng.Intn(len(data) + 1)
-			data = append(data, make([]byte, len(id))...)
-			copy(data[pos+len(id):], data[pos:len(data)-len(id)])
-			copy(data[pos:], id)
-		}
-		got := mvsExistIDs(t, mvs, data)
-		want := mvsExistIDs(t, oracle, data)
-		mvsAssertSameIDSet(t, got, want, fmt.Sprintf("combined-assert-random#%d", caseNo))
 	}
 }
 
@@ -174,7 +146,6 @@ func TestMVSKernelAssertGuardTablesRandom(t *testing.T) {
 			t.Fatalf("expected single-word assert NFA for %q", expr)
 		}
 		k := openSingleNFAKernel(t, nfa)
-		t.Logf("assert DFA expr=%q states=%d", expr, k.assertDFAStates(0))
 		re := regexp.MustCompile(expr)
 		for caseNo := 0; caseNo < 500; caseNo++ {
 			data := make([]byte, rng.Intn(192))

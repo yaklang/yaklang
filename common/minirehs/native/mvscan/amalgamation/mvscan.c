@@ -209,15 +209,6 @@ typedef struct {
     uint64_t *condFirstEval;   /* [64] */
     uint64_t *condFollowEval;  /* [64*npos], B-major */
     uint64_t *condAcceptEval;  /* [64] */
-    /* single-word assert 的受限确定化；超过状态上限时保持关闭并回退 LimEx。 */
-    int       hasAssertDFA;
-    int32_t   assertDFAStates;
-    int32_t   assertDFAGuardClasses;
-    uint8_t   assertDFAGuardClass[64];
-    uint16_t *assertDFANext;       /* [states*nsym*guardClasses] */
-    uint64_t *assertDFAAcceptMask; /* [states], bit B 表示该 bpost 接受 */
-    int       assertRareDefer;
-    int32_t   assertRareMaxSpan;
 
     /* ---- 必要条件预过滤 (v2 blob). 在 NFA 扫描前做快速字节检查. ---- */
     int32_t  necMinRunLen;     /* 0=无约束; >0 表示需要 >= necMinRunLen 个连续 necRunClass 字节 */
@@ -234,100 +225,6 @@ typedef struct {
     int32_t *dfaNext;    /* [nstates*256] 转移表: next[state*256 + byte] (-1=死) */
     uint8_t *dfaAccept;  /* [nstates] 接受状态标记 */
 } mvs_nfa;
-
-#define MVS_ASSERT_DFA_MAX_STATES 512
-
-static int build_assert_dfa(mvs_nfa *a) {
-    if (!a || !a->hasAssert || a->nword != 1 || a->nsym <= 0 ||
-        !a->condFirstEval || !a->condFollowEval || !a->condAcceptEval) return 0;
-
-    /* 将 64 个边界掩码按实际 guard 求值结果合并为等价类。 */
-    int nclass = 0;
-    uint8_t reps[64];
-    for (int B = 0; B < 64; B++) {
-        int found = -1;
-        for (int c = 0; c < nclass; c++) {
-            int R = reps[c];
-            if (a->condFirstEval[B] == a->condFirstEval[R] &&
-                memcmp(a->condFollowEval + (size_t)B * a->npos,
-                       a->condFollowEval + (size_t)R * a->npos,
-                       (size_t)a->npos * sizeof(uint64_t)) == 0 &&
-                ((B & 0x01u) != 0) == ((R & 0x01u) != 0)) {
-                found = c;
-                break;
-            }
-        }
-        if (found < 0) { found = nclass; reps[nclass++] = (uint8_t)B; }
-        a->assertDFAGuardClass[B] = (uint8_t)found;
-    }
-
-    size_t stride = (size_t)a->nsym * nclass;
-    if (stride == 0 || stride > SIZE_MAX / MVS_ASSERT_DFA_MAX_STATES / sizeof(uint16_t)) return 0;
-    uint16_t *next = (uint16_t *)malloc((size_t)MVS_ASSERT_DFA_MAX_STATES * stride * sizeof(uint16_t));
-    uint64_t *states = (uint64_t *)malloc((size_t)MVS_ASSERT_DFA_MAX_STATES * sizeof(uint64_t));
-    uint64_t *accept = (uint64_t *)malloc((size_t)MVS_ASSERT_DFA_MAX_STATES * sizeof(uint64_t));
-    if (!next || !states || !accept) { free(next); free(states); free(accept); return 0; }
-
-    int nstate = 1;
-    states[0] = 0;
-    for (int sid = 0; sid < nstate; sid++) {
-        uint64_t active = states[sid];
-        uint64_t am = 0;
-        for (int B = 0; B < 64; B++) {
-            if ((active & a->lastAny[0]) ||
-                ((B & 0x02u) && (active & a->lastEnd[0])) ||
-                (active & a->condAcceptEval[B])) {
-                am |= UINT64_C(1) << B;
-            }
-        }
-        accept[sid] = am;
-
-        for (int sym = 0; sym < a->nsym; sym++) {
-            uint64_t rc = a->reach[(size_t)sym];
-            for (int gc = 0; gc < nclass; gc++) {
-                int B = reps[gc];
-                uint64_t cand = a->firstUnanchored[0] |
-                                ((active << 1) & a->chainTarget1) |
-                                a->condFirstEval[B];
-                if (B & 0x01u) cand |= a->firstAnchored[0];
-                uint64_t ex = active & a->excMask1;
-                while (ex) {
-                    int p = mvs_ctz64(ex);
-                    ex &= ex - 1;
-                    cand |= a->excFollow1Flat[p];
-                }
-                uint64_t cfm = active & a->condFollowMask1;
-                while (cfm) {
-                    int p = mvs_ctz64(cfm);
-                    cfm &= cfm - 1;
-                    cand |= a->condFollowEval[(size_t)B * a->npos + p];
-                }
-                uint64_t target = cand & rc;
-                int tid = -1;
-                for (int j = 0; j < nstate; j++) {
-                    if (states[j] == target) { tid = j; break; }
-                }
-                if (tid < 0) {
-                    if (nstate >= MVS_ASSERT_DFA_MAX_STATES) {
-                        free(next); free(states); free(accept);
-                        return 0;
-                    }
-                    tid = nstate;
-                    states[nstate++] = target;
-                }
-                next[(size_t)sid * stride + (size_t)sym * nclass + gc] = (uint16_t)tid;
-            }
-        }
-    }
-
-    a->hasAssertDFA = 1;
-    a->assertDFAStates = nstate;
-    a->assertDFAGuardClasses = nclass;
-    a->assertDFANext = next;
-    a->assertDFAAcceptMask = accept;
-    free(states);
-    return 1;
-}
 
 struct mvscan_db {
     int32_t  npat;
@@ -985,29 +882,6 @@ static int nfa_run_assert_1(const mvs_nfa *a, const uint8_t *data, size_t len,
                             const uint8_t *bound) {
     /* 必要条件预过滤: C 内核同侧检查, 不满足则直接返回 0 (省去整段位递推). */
     if (!mvs_nec_check(a, data, len)) return 0;
-    if (a->hasAssertDFA) {
-        uint16_t state = 0;
-        size_t di = 0;
-        int gcN = a->assertDFAGuardClasses;
-        size_t stride = (size_t)a->nsym * gcN;
-        while (di < len) {
-            int sym;
-            size_t ni;
-            uint8_t c0 = data[di];
-            if (c0 < 0x80) { sym = (int)a->asciiSym[c0]; ni = di + 1; }
-            else {
-                int32_t r;
-                int size = mvs_decode_rune(data + di, len - di, &r);
-                ni = di + (size_t)size;
-                sym = symbol_of(a, r);
-            }
-            int gc = a->assertDFAGuardClass[bound[di] & 63u];
-            state = a->assertDFANext[(size_t)state * stride + (size_t)sym * gcN + gc];
-            if (a->assertDFAAcceptMask[state] & (UINT64_C(1) << (bound[ni] & 63u))) return 1;
-            di = ni;
-        }
-        return 0;
-    }
     uint64_t prev = 0;
     size_t i = 0;
     while (i < len) {
@@ -1687,25 +1561,6 @@ static int parse_unit(const uint8_t *blob, size_t blobLen, size_t off, size_t un
                         out->condAcceptEval[B] |= out->condAcceptBits[k];
                 }
             }
-            (void)build_assert_dfa(out);
-            if (!out->hasAssertDFA && out->necRequiredByte >= 0 &&
-                out->necRequiredCount >= 2 && out->necRequiredCount <= 16) {
-                int acyclic = 1;
-                for (int p = 0; p < npos && acyclic; p++) {
-                    for (int w = 0; w < nword && acyclic; w++) {
-                        uint64_t edge = out->follow[(size_t)p * nword + w];
-                        while (edge) {
-                            int q = (w << 6) + mvs_ctz64(edge);
-                            edge &= edge - 1;
-                            if (q <= p) { acyclic = 0; break; }
-                        }
-                    }
-                }
-                if (acyclic && npos <= INT32_MAX / 4) {
-                    out->assertRareDefer = 1;
-                    out->assertRareMaxSpan = npos * 4;
-                }
-            }
         }
     }
 
@@ -1778,8 +1633,6 @@ static void free_unit(mvs_nfa *u) {
     free(u->condFirstEval);
     free(u->condFollowEval);
     free(u->condAcceptEval);
-    free(u->assertDFANext);
-    free(u->assertDFAAcceptMask);
     free(u->dfaNext);
     free(u->dfaAccept);
     memset(u, 0, sizeof(*u));
@@ -2034,14 +1887,6 @@ int mvscan_simd_enabled(void) {
 #endif
 }
 
-int32_t mvscan_db_assert_dfa_states(const mvscan_db *db, int32_t idx) {
-    if (!db || idx < 0 || idx >= db->npat) return 0;
-    int32_t u = db->slotUnit[idx];
-    if (u < 0 || u >= db->nUnits) return 0;
-    const mvs_nfa *a = &db->units[u];
-    return a->hasAssertDFA ? a->assertDFAStates : 0;
-}
-
 /* mvscan_db_combined_scan: 单次数据遍历同时跑 merged NFA + 多个 assert NFA.
  * 消除第二次数据遍历 (merged + assert 各扫一遍 -> 合并为一次).
  * 对每个字节: 先推进 merged NFA 状态, 再推进每个 assert NFA 状态.
@@ -2118,14 +1963,11 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
 
     /* 分配 assert NFA 工作缓冲 (用栈缓冲) */
     uint64_t stackAPrev[16];
-    uint16_t stackADFAState[16];
-    int32_t stackRarePos[16][16];
-    uint8_t stackRareCount[16], stackRarePossible[16];
     uint8_t stackADone[16];
     uint64_t *aPrev = NULL;
     uint8_t *aDone = NULL;
     if (nAssertReal > 0) {
-        if (nAssert <= 16) { aPrev = stackAPrev; aDone = stackADone; memset(aPrev, 0, (size_t)nAssert * 8); memset(stackADFAState, 0, (size_t)nAssert * sizeof(uint16_t)); memset(stackRareCount, 0, (size_t)nAssert); memset(stackRarePossible, 0, (size_t)nAssert); memset(aDone, 0, (size_t)nAssert); }
+        if (nAssert <= 16) { aPrev = stackAPrev; aDone = stackADone; memset(aPrev, 0, (size_t)nAssert * 8); memset(aDone, 0, (size_t)nAssert); }
         else { aPrev = (uint64_t *)calloc((size_t)nAssert, sizeof(uint64_t)); aDone = (uint8_t *)calloc((size_t)nAssert, 1); }
     }
 
@@ -2220,40 +2062,9 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
                 if (!assertNFAs[k] || aDone[k]) continue;
                 mvs_nfa *a = assertNFAs[k];
                 if (a->nword != 1) continue; /* 仅单字 assert */
-				if (a->assertRareDefer && nAssert <= 16) {
-					if (curRune >= 0 && curRune < 256 &&
-						(uint8_t)curRune == (uint8_t)a->necRequiredByte) {
-						int need = a->necRequiredCount;
-						int count = stackRareCount[k];
-						if (count < need) {
-							stackRarePos[k][count++] = (int32_t)i;
-							stackRareCount[k] = (uint8_t)count;
-						} else {
-							for (int r = 1; r < need; r++) stackRarePos[k][r-1] = stackRarePos[k][r];
-							stackRarePos[k][need-1] = (int32_t)i;
-						}
-						if (count >= need && (int32_t)i - stackRarePos[k][0] <= a->assertRareMaxSpan)
-							stackRarePossible[k] = 1;
-					}
-					continue;
-				}
 				/* 每条 NFA 的压缩字母表独立，不能复用 merged unit 的 sym。 */
 				int asym = curRune >= 0 && curRune < 0x80 ?
 					(int)a->asciiSym[curRune] : symbol_of(a, curRune);
-				if (a->hasAssertDFA && nAssert <= 16) {
-					int gcN = a->assertDFAGuardClasses;
-					size_t stride = (size_t)a->nsym * gcN;
-					int gc = a->assertDFAGuardClass[bpre & 63u];
-					uint16_t state = a->assertDFANext[(size_t)stackADFAState[k] * stride +
-						(size_t)asym * gcN + gc];
-					stackADFAState[k] = state;
-					if (a->assertDFAAcceptMask[state] & (UINT64_C(1) << (bpost & 63u))) {
-						aDone[k] = 1;
-						if (assertTotal < assertCap) assertOut[assertTotal] = assertIdxs[k];
-						assertTotal++;
-					}
-					continue;
-				}
 
                 uint64_t prev = aPrev[k];
                 /* LimEx: 链边 + 异常 */
@@ -2294,18 +2105,6 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
         curRune = nextRune;
         curSize = nextSize;
         bpre = bpost;
-    }
-
-    if (nAssert <= 16 && boundBuf) {
-        for (int32_t k = 0; k < nAssert; k++) {
-            mvs_nfa *a = assertNFAs ? assertNFAs[k] : NULL;
-            if (!a || !a->assertRareDefer || aDone[k] || !stackRarePossible[k]) continue;
-            if (nfa_run_assert_1(a, data, len, boundBuf)) {
-                aDone[k] = 1;
-                if (assertTotal < assertCap) assertOut[assertTotal] = assertIdxs[k];
-                assertTotal++;
-            }
-        }
     }
 
     /* 清理 (仅 free 非栈缓冲) */
