@@ -118,23 +118,42 @@ func unitFromAssertNFA(nfa *mvsNFA, reportedIdx int, nec necFactor) mvsUnit {
 	u.excFollow1Flat = make([]uint64, nfa.npos)
 	copy(u.excFollow1Flat, nfa.excFollow1)
 	u.condFollowMask1 = nfa.condFollowMask1
-	// condFirst
+	nw := uint64(nfa.nword)
+	// condFirst: 每个 guard 条目的 bits 为 nword 个 uint64 (单字时 nword=1, 向后兼容).
 	for _, gb := range nfa.condFirst {
 		u.condFirstGuard = append(u.condFirstGuard, uint8(gb.g))
-		u.condFirstBits = append(u.condFirstBits, gb.bits[0])
+		for w := 0; w < int(nw); w++ {
+			if w < len(gb.bits) {
+				u.condFirstBits = append(u.condFirstBits, gb.bits[w])
+			} else {
+				u.condFirstBits = append(u.condFirstBits, 0)
+			}
+		}
 	}
-	// condFollow (扁平三元组)
+	// condFollow (扁平三元组, 每个 bits 为 nword 个 uint64)
 	for p := 0; p < nfa.npos; p++ {
 		for _, gb := range nfa.condFollow[p] {
 			u.condFollowPos = append(u.condFollowPos, int32(p))
 			u.condFollowGuard = append(u.condFollowGuard, uint8(gb.g))
-			u.condFollowBits = append(u.condFollowBits, gb.bits[0])
+			for w := 0; w < int(nw); w++ {
+				if w < len(gb.bits) {
+					u.condFollowBits = append(u.condFollowBits, gb.bits[w])
+				} else {
+					u.condFollowBits = append(u.condFollowBits, 0)
+				}
+			}
 		}
 	}
 	// condAccept
 	for _, gb := range nfa.condAccept {
 		u.condAcceptGuard = append(u.condAcceptGuard, uint8(gb.g))
-		u.condAcceptBits = append(u.condAcceptBits, gb.bits[0])
+		for w := 0; w < int(nw); w++ {
+			if w < len(gb.bits) {
+				u.condAcceptBits = append(u.condAcceptBits, gb.bits[w])
+			} else {
+				u.condAcceptBits = append(u.condAcceptBits, 0)
+			}
+		}
 	}
 	// 必要条件预过滤 (从 necFactor 提取, C 内核同侧检查)
 	if nec.hasFactor && nec.minRunLen > 0 {
@@ -181,14 +200,9 @@ func buildMVSBlob(nfas []*mvsNFA, merged *mvsMergedNFA, assertNecFactors []necFa
 			continue
 		}
 		if nfas[idx].hasAssert {
-			// 断言 NFA: 仅 nword==1 (single) 且 excFollow1 已初始化的才序列化进 C
-			if nfas[idx].single {
-				slotUnit[idx] = int32(len(units))
-				units = append(units, unitFromAssertNFA(nfas[idx], idx, getNecFactor(assertNecFactors, idx)))
-				continue
-			}
-			// 多字断言 NFA 仍走 Go (C 暂不支持)
-			slotUnit[idx] = -1
+			// 断言 NFA: 序列化进 C (单字走 nfa_run_assert_1, 多字走 nfa_run_assert_mw)
+			slotUnit[idx] = int32(len(units))
+			units = append(units, unitFromAssertNFA(nfas[idx], idx, getNecFactor(assertNecFactors, idx)))
 			continue
 		}
 		slotUnit[idx] = int32(len(units))
