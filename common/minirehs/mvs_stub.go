@@ -20,6 +20,8 @@ func newMVSKernel(d *mvsDB) *mvsKernel { return nil }
 
 func (k *mvsKernel) close() {}
 
+func (k *mvsKernel) assertDFAStates(idx int) int { return 0 }
+
 func (k *mvsKernel) nfaExists(idx int, data []byte) bool { return false }
 
 func (k *mvsKernel) nfaExistsAnchored(idx int, data []byte, spans []anchorSpan) bool { return false }
