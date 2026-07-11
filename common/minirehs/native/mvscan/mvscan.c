@@ -540,6 +540,90 @@ static int nfa_find_loc_1(const mvs_nfa *a, const uint8_t *data, size_t len,
     return 1;
 }
 
+/* nfa_find_loc_mw 是多字版本的 leftmost-longest 定位器。工作区由调用方在一次
+ * find-all 调用中分配并跨非重叠匹配复用，避免 Go 定位器逐 pattern 反复扫整段。 */
+static int nfa_find_loc_mw(const mvs_nfa *a, const uint8_t *data, size_t len,
+                           size_t searchFrom, uint64_t *prev, uint64_t *cand,
+                           int32_t *candStart, int32_t *prevStart,
+                           int32_t *fromOut, int32_t *toOut) {
+    if (searchFrom > len || (a->hasAnchored && searchFrom > 0)) return 0;
+    int nw = a->nword;
+    memset(prev, 0, (size_t)nw * sizeof(uint64_t));
+    int hasPrev = 0;
+    int32_t bestStart = -1, bestEnd = -1;
+    size_t i = searchFrom;
+    while (i < len) {
+        size_t runeStart = i;
+        int sym;
+        uint8_t c0 = data[i];
+        if (c0 < 0x80) { sym = (int)a->asciiSym[c0]; i++; }
+        else { int32_t r; int size = mvs_decode_rune(data + i, len - i, &r); i += (size_t)size; sym = symbol_of(a, r); }
+        memset(cand, 0, (size_t)nw * sizeof(uint64_t));
+        if (hasPrev) {
+            for (int w = 0; w < nw; w++) {
+                for (uint64_t pw = prev[w]; pw; pw &= pw - 1) {
+                    int p = (w << 6) + mvs_ctz64(pw);
+                    int32_t start = prevStart[p];
+                    const uint64_t *fp = a->follow + (size_t)p * nw;
+                    for (int fw = 0; fw < nw; fw++) {
+                        for (uint64_t fb = fp[fw]; fb; fb &= fb - 1) {
+                            int q = (fw << 6) + mvs_ctz64(fb);
+                            uint64_t bit = UINT64_C(1) << (q & 63);
+                            if (!(cand[fw] & bit) || start < candStart[q]) {
+                                cand[fw] |= bit;
+                                candStart[q] = start;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        for (int w = 0; w < nw; w++) {
+            uint64_t first = a->firstUnanchored[w];
+            if (runeStart == 0 && a->hasAnchored) first |= a->firstAnchored[w];
+            for (uint64_t fb = first; fb; fb &= fb - 1) {
+                int q = (w << 6) + mvs_ctz64(fb);
+                uint64_t bit = UINT64_C(1) << (q & 63);
+                if (!(cand[w] & bit) || (int32_t)runeStart < candStart[q]) {
+                    cand[w] |= bit;
+                    candStart[q] = (int32_t)runeStart;
+                }
+            }
+        }
+        const uint64_t *rc = a->reach + (size_t)sym * nw;
+        int anyActive = 0;
+        int32_t minActiveStart = INT32_MAX, minAcceptStart = INT32_MAX;
+        for (int w = 0; w < nw; w++) {
+            uint64_t active = cand[w] & rc[w];
+            prev[w] = active;
+            uint64_t accept = active & a->lastAny[w];
+            if (i == len) accept |= active & a->lastEnd[w];
+            for (uint64_t bits = active; bits; bits &= bits - 1) {
+                int q = (w << 6) + mvs_ctz64(bits);
+                int32_t start = candStart[q];
+                prevStart[q] = start;
+                if (start < minActiveStart) minActiveStart = start;
+                anyActive = 1;
+            }
+            for (uint64_t bits = accept; bits; bits &= bits - 1) {
+                int q = (w << 6) + mvs_ctz64(bits);
+                if (candStart[q] < minAcceptStart) minAcceptStart = candStart[q];
+            }
+        }
+        hasPrev = anyActive;
+        if (minAcceptStart != INT32_MAX &&
+            (bestEnd < 0 || minAcceptStart < bestStart ||
+             (minAcceptStart == bestStart && (int32_t)i > bestEnd))) {
+            bestStart = minAcceptStart; bestEnd = (int32_t)i;
+        }
+        if (!anyActive) { if (a->hasAnchored || bestEnd >= 0) break; }
+        else if (bestEnd >= 0 && minActiveStart > bestStart) break;
+    }
+    if (bestEnd < 0) return 0;
+    *fromOut = bestStart; *toOut = bestEnd;
+    return 1;
+}
+
 /* ====================================================================
  * 断言 NFA: 零宽断言 guard 门控的位并行递推 (对应 Go mvs_assert.go).
  *
@@ -1342,6 +1426,38 @@ int32_t mvscan_db_nfa_find_all_1(const mvscan_db *db, int32_t idx,
         if (to > (int32_t)pos) pos = (size_t)to;
         else pos++;
     }
+    return total;
+}
+
+int32_t mvscan_db_nfa_find_all(const mvscan_db *db, int32_t idx,
+                                const uint8_t *data, size_t len,
+                                int32_t *out, int32_t capPairs) {
+    if (!db || !data || idx < 0 || idx >= db->npat || capPairs < 0) return -1;
+    int32_t u = db->slotUnit[idx];
+    if (u < 0 || u >= db->nUnits) return -1;
+    const mvs_nfa *a = &db->units[u];
+    if (a->hasAssert) return -1;
+    if (a->nword == 1) return mvscan_db_nfa_find_all_1(db, idx, data, len, out, capPairs);
+
+    uint64_t *prev = (uint64_t *)malloc((size_t)a->nword * sizeof(uint64_t));
+    uint64_t *cand = (uint64_t *)malloc((size_t)a->nword * sizeof(uint64_t));
+    int32_t *candStart = (int32_t *)malloc((size_t)a->npos * sizeof(int32_t));
+    int32_t *prevStart = (int32_t *)malloc((size_t)a->npos * sizeof(int32_t));
+    if (!prev || !cand || !candStart || !prevStart) {
+        free(prev); free(cand); free(candStart); free(prevStart);
+        return -1;
+    }
+    int32_t total = 0;
+    size_t pos = 0;
+    while (pos <= len) {
+        int32_t from, to;
+        if (!nfa_find_loc_mw(a, data, len, pos, prev, cand, candStart, prevStart, &from, &to)) break;
+        if (total < capPairs && out) { out[(size_t)total * 2] = from; out[(size_t)total * 2 + 1] = to; }
+        total++;
+        if (to > (int32_t)pos) pos = (size_t)to;
+        else pos++;
+    }
+    free(prev); free(cand); free(candStart); free(prevStart);
     return total;
 }
 

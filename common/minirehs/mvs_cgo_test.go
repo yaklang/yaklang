@@ -299,17 +299,18 @@ func TestMVSKernelFindAllLoc1Direct(t *testing.T) {
 		{`^GET`, []string{"GET /x", "GET GET", "xGET"}},
 		{`END$`, []string{"the END", "ENDx", "END"}},
 		{`[A-Z]+`, []string{"xABCy DEF G", "äÖX"}},
+		{`(?:ab){40}`, []string{"xxababababababababababababababababababababababababababababababababababababababababababababyy", "abababab"}},
 	}
 	for _, tc := range cases {
 		nfa := buildNFAFor(t, tc.expr)
-		if nfa == nil || !nfa.single || nfa.hasAssert {
-			t.Fatalf("expected single lean NFA for %q", tc.expr)
+		if nfa == nil || nfa.hasAssert {
+			t.Fatalf("expected lean NFA for %q", tc.expr)
 		}
 		k := openSingleNFAKernel(t, nfa)
 		for _, input := range tc.inputs {
 			data := []byte(input)
 			want := nfaFindAll(nfa, data)
-			gotFlat, ok := k.findAllLoc1(0, data, &scratch{})
+			gotFlat, ok := k.findAllLoc(0, data, &scratch{})
 			if !ok {
 				t.Fatalf("C locator rejected supported expr=%q input=%q", tc.expr, input)
 			}

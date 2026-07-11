@@ -991,8 +991,8 @@ func (d *mvsDB) finalizeHit(idx int, data []byte, sc *scratch, handler MatchHand
 	// 单字 lean NFA 是真实规则集的主力。已由 C 存在性门确认命中时，直接在 C 侧枚举
 	// leftmost-longest spans，避免 Go 再完整扫描一遍；C 内核不适用或异常空结果时回退
 	// 已验证的 Go 定位器，绝不因优化漏报。
-	if d.kernel != nil && nfa.single {
-		if locs, ok := d.kernel.findAllLoc1(idx, data, sc); ok && len(locs) > 0 {
+	if d.kernel != nil {
+		if locs, ok := d.kernel.findAllLoc(idx, data, sc); ok && len(locs) > 0 {
 			for i := 0; i < len(locs); i += 2 {
 				if !handler(Match{ID: cp.id, From: int(locs[i]), To: int(locs[i+1])}) {
 					return true
@@ -1039,8 +1039,8 @@ func (d *mvsDB) finalizeHitWindow(idx int, data []byte, lo, hi int, sc *scratch,
 		}
 		return false
 	}
-	if d.kernel != nil && nfa.single {
-		if locs, ok := d.kernel.findAllLoc1(idx, sub, sc); ok && len(locs) > 0 {
+	if d.kernel != nil {
+		if locs, ok := d.kernel.findAllLoc(idx, sub, sc); ok && len(locs) > 0 {
 			for i := 0; i < len(locs); i += 2 {
 				if !handler(Match{ID: cp.id, From: lo + int(locs[i]), To: lo + int(locs[i+1])}) {
 					return true
