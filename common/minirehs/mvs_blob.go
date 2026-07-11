@@ -13,7 +13,7 @@ package minirehs
 // mvsBlobMagic / mvsBlobVersion 是 blob 头, C 侧校验. 契约一旦冻结不得随意改 (改则升 version).
 var mvsBlobMagic = [4]byte{'M', 'V', 'S', '1'}
 
-const mvsBlobVersion uint32 = 2
+const mvsBlobVersion uint32 = 3
 
 // mvsUnit 是 per-pattern NFA 与合并 NFA 的统一可序列化视图.
 type mvsUnit struct {
@@ -31,6 +31,12 @@ type mvsUnit struct {
 	cuts            []int32  // [nsym+1] 升序切点
 	asciiSym        []int32  // [128]
 	posPat          []int32  // [npos] 命中位置->成员 idx (-1 表示非命中位置)
+
+	// LimEx 多字扩展 (v3 blob, merged NFA): 链边由整个位集左移推进，只保留异常边行。
+	hasLimEx    bool
+	chainTarget []uint64 // [nword]
+	excMask     []uint64 // [nword]
+	excFollow   []uint64 // [npos*nword]
 
 	// 断言扩展 (v2 blob, 仅 hasAssert NFA). 对应 C mvs_nfa assert 字段.
 	hasAssert bool
@@ -108,6 +114,7 @@ func unitFromNFA(nfa *mvsNFA, reportedIdx int, hasLiterals bool) mvsUnit {
 
 // unitFromMerged 把合并 always-on NFA 转为 unit.
 func unitFromMerged(m *mvsMergedNFA) mvsUnit {
+	le := buildLimEx(m)
 	return mvsUnit{
 		npos:            m.npos,
 		nword:           m.nword,
@@ -122,6 +129,10 @@ func unitFromMerged(m *mvsMergedNFA) mvsUnit {
 		cuts:            runesToI32(m.cuts),
 		asciiSym:        m.asciiSym[:],
 		posPat:          cloneI32(m.posPat),
+		hasLimEx:        true,
+		chainTarget:     cloneU64(le.chainTarget),
+		excMask:         cloneU64(le.excMask),
+		excFollow:       flattenRows(le.excFollow, m.npos, m.nword),
 	}
 }
 
@@ -285,6 +296,9 @@ func encodeUnit(u mvsUnit) []byte {
 	if u.hasDFA {
 		flags |= 4 // bit2 = hasDFA
 	}
+	if u.hasLimEx {
+		flags |= 8 // bit3 = hasLimEx (v3)
+	}
 	b := make([]byte, 0, 16+(len(u.follow)+len(u.reach)+u.nword*4)*8+(len(u.cuts)+128+u.npos)*4)
 	b = putU32(b, uint32(u.npos))
 	b = putU32(b, uint32(u.nword))
@@ -299,6 +313,12 @@ func encodeUnit(u mvsUnit) []byte {
 	b = putI32s(b, u.cuts)
 	b = putI32s(b, u.asciiSym)
 	b = putI32s(b, u.posPat)
+	// LimEx 多字扩展 (v3, flags bit3).
+	if u.hasLimEx {
+		b = putU64s(b, u.chainTarget)
+		b = putU64s(b, u.excMask)
+		b = putU64s(b, u.excFollow)
+	}
 	// 断言扩展 (v2, 仅 hasAssert):
 	if u.hasAssert {
 		b = putU64(b, u.chainTarget1)
