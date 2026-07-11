@@ -159,16 +159,76 @@ func TestBuildOnboardingWelcomeCard(t *testing.T) {
 		"回复：标准 · 审批：人工",
 		"群聊默认允许成员使用",
 		"直接发送消息即可开始",
-		`"action":"session_info"`,
-		`"action":"config"`,
-		`"action":"review"`,
-		`"action":"status"`,
-		`"token"`,
 	} {
 		if !strings.Contains(raw, want) {
 			t.Fatalf("welcome card missing %q: %s", want, raw)
 		}
 	}
+	if strings.Contains(raw, `"token"`) || strings.Contains(raw, `"behaviors"`) {
+		t.Fatalf("direct welcome card should not include callback buttons: %s", raw)
+	}
+}
+
+func TestBuildOnboardingWelcomeCardForMessageSignsRealChat(t *testing.T) {
+	auth := NewCallbackAuth([]byte("test-secret-key-32-bytes-long!!!"))
+	e := New(Config{ReplyQuote: true})
+	e.callbackAuth = auth
+	card := e.BuildOnboardingWelcomeCardForMessage(notify.PlatformFeishu, "ou_owner", &notify.InboundMessage{
+		Platform: notify.PlatformFeishu,
+		ChatID:   "oc_real_chat",
+		SenderID: "ou_owner",
+		ChatType: "private",
+	})
+	if card == nil {
+		t.Fatal("card is nil")
+	}
+	value := onboardingWelcomeButtonValue(t, card, 0)
+	if value["action"] != string(ActionSessionInfo) {
+		t.Fatalf("button action = %v, want %s", value["action"], ActionSessionInfo)
+	}
+	token, _ := value["token"].(string)
+	if token == "" {
+		t.Fatal("button token is empty")
+	}
+	result := auth.Verify(token, CallbackVerifyExpected{
+		ChatID: "oc_real_chat",
+		Action: string(ActionSessionInfo),
+	})
+	if !result.OK {
+		t.Fatalf("verify with real chat failed: %s", result.Reason)
+	}
+	mismatch := auth.Verify(token, CallbackVerifyExpected{
+		ChatID: "ou_owner",
+		Action: string(ActionSessionInfo),
+	})
+	if mismatch.OK || mismatch.Reason != "context-mismatch" {
+		t.Fatalf("verify with owner id = ok:%v reason:%s, want context-mismatch", mismatch.OK, mismatch.Reason)
+	}
+}
+
+func onboardingWelcomeButtonValue(t *testing.T, card *notify.Card, index int) map[string]any {
+	t.Helper()
+	if len(card.Elements) < 4 {
+		t.Fatalf("welcome card elements = %d, want action row", len(card.Elements))
+	}
+	row := card.Elements[3]
+	columns, ok := row["columns"].([]map[string]any)
+	if !ok || len(columns) <= index {
+		t.Fatalf("welcome card columns = %#v", row["columns"])
+	}
+	elements, ok := columns[index]["elements"].([]map[string]any)
+	if !ok || len(elements) == 0 {
+		t.Fatalf("welcome card column elements = %#v", columns[index]["elements"])
+	}
+	behaviors, ok := elements[0]["behaviors"].([]map[string]any)
+	if !ok || len(behaviors) == 0 {
+		t.Fatalf("welcome card button behaviors = %#v", elements[0]["behaviors"])
+	}
+	value, ok := behaviors[0]["value"].(map[string]any)
+	if !ok {
+		t.Fatalf("welcome card button value = %#v", behaviors[0]["value"])
+	}
+	return value
 }
 
 func TestBuildStatusCard_StructuredElements(t *testing.T) {

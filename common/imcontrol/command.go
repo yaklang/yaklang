@@ -814,10 +814,10 @@ func (e *Engine) queryRecentAISessions(limit int) (*ypb.QueryAISessionResponse, 
 	if e.queryAISessionFunc != nil {
 		return e.queryAISessionFunc(ctx, req)
 	}
-	if e.grpcClient == nil {
-		return nil, fmt.Errorf("未连接 yaklang 引擎，无法加载 Yakit 历史")
+	if e.sessionStore == nil {
+		return nil, fmt.Errorf("AI Session 存储未配置，无法加载 Yakit 历史")
 	}
-	return e.grpcClient.QueryAISession(ctx, req)
+	return e.sessionStore.QueryAISession(ctx, req)
 }
 
 func aiSessionHistoryItemFromPB(session *ypb.AISession, currentSessionID string) imSessionHistoryItem {

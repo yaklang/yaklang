@@ -114,12 +114,13 @@ func (a *CallbackAuth) Sign(input CallbackSignInput) string {
 		base64.RawURLEncoding.EncodeToString(sig))
 }
 
-// oneShotActions 是必须一次性消费 nonce 的动作集合（停止运行等）。
+// oneShotActions 是必须一次性消费 nonce 的动作集合（停止运行、审批确认等）。
 // 这些动作的按钮随运行卡片发出，token 含 run_id，语义上只应被点一次。
 // 其它动作（new/resume/update_reply_mode 等配置/导航类）允许复用：
 // 它们的按钮在最终卡片上是静态的，用户可能多次点击。
 var oneShotActions = map[string]bool{
-	"stop": true,
+	"stop":            true,
+	"review_decision": true,
 }
 
 // Verify 验签一个回调 token。expected 为当前请求环境的上下文。
