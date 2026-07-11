@@ -159,6 +159,13 @@ int mvscan_db_nfa_exists_assert_self(const mvscan_db *db, int32_t idx,
                                      const uint8_t *data, size_t len,
                                      uint8_t *boundBuf);
 
+/* mvscan_db_dfa_scan_batch: 在单次调用中对多个 DFA 模式扫描同一段 data.
+ * 对每个 idx 逐个跑 dfa_run, 把命中的 idx 写入 out. 返回命中数. */
+int32_t mvscan_db_dfa_scan_batch(const mvscan_db *db,
+                                 const uint8_t *data, size_t len,
+                                 const int32_t *idxs, int32_t nidx,
+                                 int32_t *out, int32_t cap);
+
 /*
  * mvscan_db_nfa_exists_assert_many 一次 cgo 对多条断言 always-on NFA 各自做断言存在性,
  * 内部预算边界 (每报文一次, 跨多条 NFA 共享), 摊薄跨界开销.

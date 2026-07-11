@@ -177,8 +177,8 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 		case nfa != nil && nfa.hasAssert:
 			db.assertAlwaysOn = append(db.assertAlwaysOn, cp.idx)
 		case nfa != nil:
-			// 注: DFA 拆分经 A/B 测试为净回归 (-3.6%): DFA 虽快 (293 MB/s), 但每记录多扫 2 次
-			// (AWS+Windows 各一次) 抵消了 nword 3→2 的收益. 基建保留供未来批量 DFA scan 使用.
+			// DFA 拆分经 A/B 测试为净回归: 即使 batch (1 次 cgo), 2 次数据遍历 (DFA + merged)
+			// 仍比 1 次 merged NFA 遍历慢 (cache miss on second pass). 基建保留.
 			mergeMembers = append(mergeMembers, mergeMember{idx: cp.idx, nfa: nfa})
 		default:
 			db.otherAlwaysOn = append(db.otherAlwaysOn, cp.idx)
@@ -840,18 +840,20 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 		}
 	}
 
-	// 2b) DFA always-on: 从 merged NFA 拆出的 DFA 模式, 通过 nfaExists (DFA 路径) 单独扫.
-	// DFA 单模式 293 MB/s (vs merged 60 MB/s), 拆分后省去 DFA 模式在 merged 中的位置 (降低 nword).
+	// 2b) DFA always-on: 从 merged NFA 拆出的 DFA 模式, 一次 cgo 调用批量扫描所有 DFA.
+	// DFA 单模式 293 MB/s, batch 在一次 cgo 内逐个查表, 省去每模式一次 cgo 调用.
 	if len(d.dfaAlwaysOnIdxs) > 0 && d.kernel != nil {
-		for _, idx := range d.dfaAlwaysOnIdxs {
-			if sc.fullDone[int(idx)] {
-				continue
-			}
+		dfaHits := d.kernel.dfaScanBatch(d.dfaAlwaysOnIdxs, data, sc)
+		for _, idx := range dfaHits {
 			sc.fullDone[int(idx)] = true
-			if d.kernel.nfaExists(int(idx), data) {
-				if stop := d.finalizeHit(int(idx), data, sc, handler); stop {
-					return true, nil
-				}
+		}
+		// 未命中的 DFA 模式也标记 fullDone (已由 DFA 批量判定)
+		for _, idx := range d.dfaAlwaysOnIdxs {
+			sc.fullDone[int(idx)] = true
+		}
+		for _, idx := range dfaHits {
+			if stop := d.finalizeHit(int(idx), data, sc, handler); stop {
+				return true, nil
 			}
 		}
 	}

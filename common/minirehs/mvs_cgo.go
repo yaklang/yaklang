@@ -207,6 +207,36 @@ func (k *mvsKernel) nfaExistsAssertSelf(idx int, data []byte, boundBuf []byte) b
 // 内部在 C 预算边界 (每报文一次, 跨多条 NFA 共享). 省去每条 NFA 一次 cgo.
 // idxs 为断言 always-on pattern 下标. boundBuf 容量须 >= len(data)+1.
 // 结果复用 sc.assertBatchOut (len==len(idxs), 1 命中/0 不命中).
+// dfaScanBatch 在单次 cgo 调用中对多个 DFA 模式扫描同一段 data.
+// 返回命中的 pattern idx 列表.
+func (k *mvsKernel) dfaScanBatch(idxs []int32, data []byte, sc *scratch) []int32 {
+	if k == nil || k.db == nil || len(idxs) == 0 || len(data) == 0 {
+		return nil
+	}
+	capOut := len(idxs)
+	if cap(sc.cmerged) < capOut {
+		sc.cmerged = make([]int32, capOut)
+	} else {
+		sc.cmerged = sc.cmerged[:capOut]
+	}
+	var dptr *C.uint8_t
+	dptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	var iptr *C.int32_t
+	if len(idxs) > 0 {
+		iptr = (*C.int32_t)(unsafe.Pointer(&idxs[0]))
+	}
+	var optr *C.int32_t
+	if len(sc.cmerged) > 0 {
+		optr = (*C.int32_t)(unsafe.Pointer(&sc.cmerged[0]))
+	}
+	got := int32(C.mvscan_db_dfa_scan_batch(k.db, dptr, C.size_t(len(data)),
+		iptr, C.int(len(idxs)), optr, C.int(capOut)))
+	keepAlive(data)
+	runtime.KeepAlive(idxs)
+	runtime.KeepAlive(sc.cmerged)
+	return sc.cmerged[:got]
+}
+
 func (k *mvsKernel) nfaExistsAssertMany(idxs []int32, data []byte, sc *scratch) []byte {
 	if k == nil || k.db == nil || len(idxs) == 0 {
 		return nil
