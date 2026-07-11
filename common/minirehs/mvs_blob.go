@@ -13,7 +13,7 @@ package minirehs
 // mvsBlobMagic / mvsBlobVersion 是 blob 头, C 侧校验. 契约一旦冻结不得随意改 (改则升 version).
 var mvsBlobMagic = [4]byte{'M', 'V', 'S', '1'}
 
-const mvsBlobVersion uint32 = 1
+const mvsBlobVersion uint32 = 2
 
 // mvsUnit 是 per-pattern NFA 与合并 NFA 的统一可序列化视图.
 type mvsUnit struct {
@@ -31,6 +31,24 @@ type mvsUnit struct {
 	cuts            []int32  // [nsym+1] 升序切点
 	asciiSym        []int32  // [128]
 	posPat          []int32  // [npos] 命中位置->成员 idx (-1 表示非命中位置)
+
+	// 断言扩展 (v2 blob, 仅 hasAssert NFA). 对应 C mvs_nfa assert 字段.
+	hasAssert bool
+	// LimEx 单字字段
+	chainTarget1    uint64
+	excMask1        uint64
+	excFollow1Flat  []uint64 // [npos]
+	condFollowMask1 uint64
+	// condFirst (条件起点注入)
+	condFirstGuard []uint8
+	condFirstBits  []uint64
+	// condFollow (条件后继, 扁平三元组)
+	condFollowPos   []int32
+	condFollowGuard []uint8
+	condFollowBits  []uint64
+	// condAccept (条件接受)
+	condAcceptGuard []uint8
+	condAcceptBits  []uint64
 }
 
 // unitFromNFA 把一条 per-pattern NFA 转为 unit. reportedIdx 填入命中位置的 posPat
@@ -86,15 +104,56 @@ func unitFromMerged(m *mvsMergedNFA) mvsUnit {
 	}
 }
 
+// unitFromAssertNFA 把断言 NFA (hasAssert, nword==1) 转为 unit, 含 LimEx + guard 字段.
+func unitFromAssertNFA(nfa *mvsNFA, reportedIdx int) mvsUnit {
+	u := unitFromNFA(nfa, reportedIdx)
+	u.hasAssert = true
+	u.chainTarget1 = nfa.chainTarget1
+	u.excMask1 = nfa.excMask1
+	u.excFollow1Flat = make([]uint64, nfa.npos)
+	copy(u.excFollow1Flat, nfa.excFollow1)
+	u.condFollowMask1 = nfa.condFollowMask1
+	// condFirst
+	for _, gb := range nfa.condFirst {
+		u.condFirstGuard = append(u.condFirstGuard, uint8(gb.g))
+		u.condFirstBits = append(u.condFirstBits, gb.bits[0])
+	}
+	// condFollow (扁平三元组)
+	for p := 0; p < nfa.npos; p++ {
+		for _, gb := range nfa.condFollow[p] {
+			u.condFollowPos = append(u.condFollowPos, int32(p))
+			u.condFollowGuard = append(u.condFollowGuard, uint8(gb.g))
+			u.condFollowBits = append(u.condFollowBits, gb.bits[0])
+		}
+	}
+	// condAccept
+	for _, gb := range nfa.condAccept {
+		u.condAcceptGuard = append(u.condAcceptGuard, uint8(gb.g))
+		u.condAcceptBits = append(u.condAcceptBits, gb.bits[0])
+	}
+	return u
+}
+
 // buildMVSBlob 把整个 db 的 per-pattern NFA (按 idx) + 合并 NFA 序列化为单段 blob.
-// nfas[idx]==nil (走 verifier 兜底) 或 hasAssert (带零宽断言 guard, C 内核不表达, 由 Go
-// existsInAssert 执行) 的, slotUnit 记 -1, C 侧无对应 unit.
+// v2: 断言 NFA (hasAssert) 也序列化进 blob (C 内核 nfa_run_assert_1 执行).
+// nfas[idx]==nil (走 verifier 兜底) 的 slotUnit 记 -1.
 func buildMVSBlob(nfas []*mvsNFA, merged *mvsMergedNFA) []byte {
 	npat := len(nfas)
 	slotUnit := make([]int32, npat)
 	var units []mvsUnit
 	for idx := 0; idx < npat; idx++ {
-		if nfas[idx] == nil || nfas[idx].hasAssert {
+		if nfas[idx] == nil {
+			slotUnit[idx] = -1
+			continue
+		}
+		if nfas[idx].hasAssert {
+			// 断言 NFA: 仅 nword==1 (single) 且 excFollow1 已初始化的才序列化进 C
+			if nfas[idx].single {
+				slotUnit[idx] = int32(len(units))
+				units = append(units, unitFromAssertNFA(nfas[idx], idx))
+				continue
+			}
+			// 多字断言 NFA 仍走 Go (C 暂不支持)
 			slotUnit[idx] = -1
 			continue
 		}
@@ -155,6 +214,9 @@ func encodeUnit(u mvsUnit) []byte {
 	if u.hasAnchored {
 		flags |= 1
 	}
+	if u.hasAssert {
+		flags |= 2 // bit1 = hasAssert
+	}
 	b := make([]byte, 0, 16+(len(u.follow)+len(u.reach)+u.nword*4)*8+(len(u.cuts)+128+u.npos)*4)
 	b = putU32(b, uint32(u.npos))
 	b = putU32(b, uint32(u.nword))
@@ -169,6 +231,32 @@ func encodeUnit(u mvsUnit) []byte {
 	b = putI32s(b, u.cuts)
 	b = putI32s(b, u.asciiSym)
 	b = putI32s(b, u.posPat)
+	// 断言扩展 (v2, 仅 hasAssert):
+	if u.hasAssert {
+		b = putU64(b, u.chainTarget1)
+		b = putU64(b, u.excMask1)
+		b = putU64s(b, u.excFollow1Flat)
+		b = putU64(b, u.condFollowMask1)
+		// condFirst
+		b = putI32(b, int32(len(u.condFirstGuard)))
+		for _, g := range u.condFirstGuard {
+			b = append(b, g)
+		}
+		b = putU64s(b, u.condFirstBits)
+		// condFollow
+		b = putI32(b, int32(len(u.condFollowPos)))
+		b = putI32s(b, u.condFollowPos)
+		for _, g := range u.condFollowGuard {
+			b = append(b, g)
+		}
+		b = putU64s(b, u.condFollowBits)
+		// condAccept
+		b = putI32(b, int32(len(u.condAcceptGuard)))
+		for _, g := range u.condAcceptGuard {
+			b = append(b, g)
+		}
+		b = putU64s(b, u.condAcceptBits)
+	}
 	return b
 }
 

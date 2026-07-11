@@ -163,6 +163,27 @@ typedef struct {
     int32_t *cuts;             /* [nsym+1] */
     int32_t *asciiSym;         /* [128] */
     int32_t *posPat;           /* [npos] */
+
+    /* ---- 断言扩展 (hasAssert, v2 blob). 对应 Go condFirst/condFollow/condAccept. ---- */
+    int      hasAssert;        /* flags bit1: 是否含零宽断言 guard */
+    /* LimEx 链/异常拆分 (单字 nword==1 快路径, 对应 Go chainTarget1/excMask1/excFollow1). */
+    uint64_t chainTarget1;     /* 位 q 置位 <=> 链边 (q-1)->q */
+    uint64_t excMask1;         /* 位 p 置位 <=> excFollow1Flat 中有异常后继 */
+    uint64_t *excFollow1Flat;  /* [npos] 每位置的异常后继 (单 uint64) */
+    uint64_t condFollowMask1;  /* 位 p 置位 <=> 有 condFollow 条目 */
+    /* condFirst: 条件起点注入. nCondFirst 条, 每条 = (u8 guard, u64 bits). */
+    int32_t  nCondFirst;
+    uint8_t *condFirstGuard;   /* [nCondFirst] */
+    uint64_t *condFirstBits;   /* [nCondFirst] */
+    /* condFollow: 条件后继 (per-position, jagged). 扁平化为 (pos, guard, bits) 三元组. */
+    int32_t  nCondFollow;
+    int32_t *condFollowPos;    /* [nCondFollow] */
+    uint8_t *condFollowGuard;  /* [nCondFollow] */
+    uint64_t *condFollowBits;  /* [nCondFollow] */
+    /* condAccept: 条件接受. nCondAccept 条, 每条 = (u8 guard, u64 bits). */
+    int32_t  nCondAccept;
+    uint8_t *condAcceptGuard;  /* [nCondAccept] */
+    uint64_t *condAcceptBits;  /* [nCondAccept] */
 } mvs_nfa;
 
 struct mvscan_db {
@@ -337,6 +358,162 @@ static int nfa_run_1_exists(const mvs_nfa *a, const uint8_t *data, size_t len) {
         if (prev & a->lastAny[0]) return 1;
         if (i == len && (prev & a->lastEnd[0])) return 1;
         if (prev == 0 && a->unanchoredEmpty) break;
+    }
+    return 0;
+}
+
+/* ====================================================================
+ * 断言 NFA: 零宽断言 guard 门控的位并行递推 (对应 Go mvs_assert.go).
+ *
+ * compute_boundaries: 复刻 Go computeBoundaries. 逐 rune 走 data, 在每个 rune 起始
+ * 与末尾处写入边界条件集 bound[i] (uint8, 6 位: BeginText/EndText/BeginLine/EndLine/
+ * WordBoundary/NoWordBoundary). bound 长度 = len+1.
+ *
+ * nfa_run_assert_1: 断言 NFA 的单字 (nword==1) 存在性扫描, 含 LimEx 链/异常拆分 +
+ * condFirst/condFollow/condAccept guard 门控. 与 Go existsInAssertShared1 逐位一致.
+ * ==================================================================== */
+
+/* 边界条件位 (与 Go condBeginText 等完全一致). */
+#define MVS_COND_BEGIN_TEXT      0x01u
+#define MVS_COND_END_TEXT        0x02u
+#define MVS_COND_BEGIN_LINE      0x04u
+#define MVS_COND_END_LINE        0x08u
+#define MVS_COND_WORD_BOUNDARY   0x10u
+#define MVS_COND_NO_WORD_BOUND   0x20u
+
+/* mvs_is_word_byte: 复刻 Go isWordByte (ASCII [0-9A-Za-z_]). */
+static inline int mvs_is_word_byte(uint8_t c) {
+    return (c >= '0' && c <= '9') ||
+           (c >= 'a' && c <= 'z') ||
+           (c >= 'A' && c <= 'Z') ||
+           c == '_';
+}
+
+/* mvscan_compute_boundaries: 复刻 Go computeBoundaries. 产出 bound[0..len] (len+1 字节).
+ * buf 由调用方提供 (容量 >= len+1). ASCII 快路径 (c<0x80 直接字节判定, 省 DecodeRune). */
+void mvscan_compute_boundaries(const uint8_t *data, size_t len, uint8_t *buf) {
+    int prevWord = 0;       /* isWordRune(prev); prev==-1 => false */
+    int prevIsNewline = 0;  /* prev == '\n' */
+    int prevIsStart = 1;    /* prev < 0 (文本始) */
+    size_t i = 0;
+    while (i < len) {
+        uint8_t c = data[i];
+        uint8_t b = 0;
+        if (prevIsStart) {
+            b |= MVS_COND_BEGIN_TEXT | MVS_COND_BEGIN_LINE;
+        } else if (prevIsNewline) {
+            b |= MVS_COND_BEGIN_LINE;
+        }
+        if (c < 0x80) {
+            int curWord = mvs_is_word_byte(c);
+            int curIsNewline = (c == '\n');
+            if (curIsNewline) b |= MVS_COND_END_LINE;
+            if (prevWord != curWord) b |= MVS_COND_WORD_BOUNDARY;
+            else b |= MVS_COND_NO_WORD_BOUND;
+            buf[i] = b;
+            prevWord = curWord;
+            prevIsNewline = curIsNewline;
+            prevIsStart = 0;
+            i++;
+        } else {
+            int32_t r;
+            int size = mvs_decode_rune(data + i, len - i, &r);
+            int curWord = mvs_is_word_byte((uint8_t)(r & 0xFF)) ? 0 : 0; /* placeholder */
+            /* 非 ASCII: isWordRune 用 rune 值判定 */
+            curWord = ((r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') ||
+                       (r >= 'A' && r <= 'Z') || r == '_') ? 1 : 0;
+            int curIsNewline = (r == '\n');
+            if (curIsNewline) b |= MVS_COND_END_LINE;
+            if (prevWord != curWord) b |= MVS_COND_WORD_BOUNDARY;
+            else b |= MVS_COND_NO_WORD_BOUND;
+            buf[i] = b;
+            prevWord = curWord;
+            prevIsNewline = curIsNewline;
+            prevIsStart = 0;
+            i += (size_t)size;
+        }
+    }
+    /* 末尾: after = -1 (文本末). */
+    uint8_t b = 0;
+    if (prevIsStart) {
+        b |= MVS_COND_BEGIN_TEXT | MVS_COND_BEGIN_LINE;
+    } else if (prevIsNewline) {
+        b |= MVS_COND_BEGIN_LINE;
+    }
+    b |= MVS_COND_END_TEXT | MVS_COND_END_LINE;
+    if (prevWord) b |= MVS_COND_WORD_BOUNDARY;
+    else b |= MVS_COND_NO_WORD_BOUND;
+    buf[len] = b;
+}
+
+/* nfa_run_assert_1: 断言 NFA 单字 (nword==1) 存在性扫描.
+ * 与 Go existsInAssertShared1 逐位一致: LimEx 链/异常 + condFirst/condFollow/condAccept guard.
+ * bound 由调用方预算 (mvscan_compute_boundaries). */
+static int nfa_run_assert_1(const mvs_nfa *a, const uint8_t *data, size_t len,
+                            const uint8_t *bound) {
+    uint64_t prev = 0;
+    size_t i = 0;
+    while (i < len) {
+        int sym;
+        size_t ni;
+        uint8_t c0 = data[i];
+        if (c0 < 0x80) {
+            sym = (int)a->asciiSym[c0];
+            ni = i + 1;
+        } else {
+            int32_t r;
+            int size = mvs_decode_rune(data + i, len - i, &r);
+            ni = i + (size_t)size;
+            sym = symbol_of(a, r);
+        }
+        uint8_t bpre = bound[i];
+        uint8_t bpost = bound[ni];
+
+        /* LimEx: 链边左移批量推进; 异常边逐个 OR. */
+        uint64_t shifted = (prev << 1) & a->chainTarget1;
+        uint64_t cand = a->firstUnanchored[0] | shifted;
+
+        /* condFirst: 按 bpre 门控的条件起点注入. */
+        for (int k = 0; k < a->nCondFirst; k++) {
+            if ((a->condFirstGuard[k] & bpre) == a->condFirstGuard[k]) {
+                cand |= a->condFirstBits[k];
+            }
+        }
+
+        /* 异常边: 仅对活跃的异常位置展开. */
+        uint64_t exc = prev & a->excMask1;
+        while (exc) {
+            int p = mvs_ctz64(exc);
+            exc &= exc - 1;
+            cand |= a->excFollow1Flat[p];
+        }
+
+        /* condFollow: 对有 condFollow 条目的活跃位置展开. */
+        uint64_t cfm = prev & a->condFollowMask1;
+        while (cfm) {
+            int p = mvs_ctz64(cfm);
+            cfm &= cfm - 1;
+            /* 线性搜索 condFollow 中 pos==p 的条目 (npos 通常 < 64, 条目数少). */
+            for (int k = 0; k < a->nCondFollow; k++) {
+                if (a->condFollowPos[k] == p) {
+                    if ((a->condFollowGuard[k] & bpre) == a->condFollowGuard[k]) {
+                        cand |= a->condFollowBits[k];
+                    }
+                }
+            }
+        }
+
+        uint64_t active = cand & a->reach[sym];
+        if (active & a->lastAny[0]) return 1;
+        if (a->nCondAccept > 0) {
+            for (int k = 0; k < a->nCondAccept; k++) {
+                if ((a->condAcceptGuard[k] & bpost) == a->condAcceptGuard[k]) {
+                    if (active & a->condAcceptBits[k]) return 1;
+                }
+            }
+        }
+        prev = active;
+        i = ni;
     }
     return 0;
 }
@@ -541,6 +718,76 @@ static int parse_unit(const uint8_t *blob, size_t blobLen, size_t off, mvs_nfa *
 #undef MVS_RD_U64
 #undef MVS_RD_I32
 
+    /* 断言扩展 (v2 blob, flags bit1 = hasAssert): 在 posPat 之后追加 assert 字段.
+     * 布局: u64 chainTarget1, u64 excMask1, u64[npos] excFollow1Flat, u64 condFollowMask1,
+     *   i32 nCondFirst, {u8[nCondFirst] guard, u64[nCondFirst] bits},
+     *   i32 nCondFollow, {i32[nCondFollow] pos, u8[nCondFollow] guard, u64[nCondFollow] bits},
+     *   i32 nCondAccept, {u8[nCondAccept] guard, u64[nCondAccept] bits}.
+     * 仅 nword==1 的断言 NFA 才有序列化 (Go 侧保证). */
+    out->hasAssert = (flags & 0x2u) ? 1 : 0;
+    if (out->hasAssert) {
+        /* 计算剩余所需字节数. */
+        size_t assertU64 = 3 + (size_t)npos; /* chainTarget1, excMask1, condFollowMask1 + excFollow1Flat[npos] */
+        /* 先读固定头部 (chainTarget1, excMask1, excFollow1Flat, condFollowMask1) */
+        if (cur + assertU64 * 8 > blobLen) return -1;
+        out->chainTarget1 = le_u64(blob + cur); cur += 8;
+        out->excMask1 = le_u64(blob + cur); cur += 8;
+        out->excFollow1Flat = (uint64_t *)malloc((size_t)npos * 8);
+        if (!out->excFollow1Flat) return -1;
+        for (int _i = 0; _i < npos; _i++) { out->excFollow1Flat[_i] = le_u64(blob + cur); cur += 8; }
+        out->condFollowMask1 = le_u64(blob + cur); cur += 8;
+
+        /* condFirst */
+        if (cur + 4 > blobLen) return -1;
+        out->nCondFirst = (int32_t)le_i32(blob + cur); cur += 4;
+        if (out->nCondFirst > 0) {
+            if (cur + (size_t)out->nCondFirst * 9 > blobLen) return -1;
+            out->condFirstGuard = (uint8_t *)malloc((size_t)out->nCondFirst);
+            out->condFirstBits = (uint64_t *)malloc((size_t)out->nCondFirst * 8);
+            if (!out->condFirstGuard || !out->condFirstBits) return -1;
+            for (int _i = 0; _i < out->nCondFirst; _i++) { out->condFirstGuard[_i] = blob[cur + _i]; }
+            cur += (size_t)out->nCondFirst;
+            for (int _i = 0; _i < out->nCondFirst; _i++) { out->condFirstBits[_i] = le_u64(blob + cur + (size_t)_i * 8); }
+            cur += (size_t)out->nCondFirst * 8;
+        }
+
+        /* condFollow (扁平三元组: pos, guard, bits) */
+        if (cur + 4 > blobLen) return -1;
+        out->nCondFollow = (int32_t)le_i32(blob + cur); cur += 4;
+        if (out->nCondFollow > 0) {
+            size_t posBytes = (size_t)out->nCondFollow * 4;
+            size_t guardBytes = (size_t)out->nCondFollow;
+            size_t bitsBytes = (size_t)out->nCondFollow * 8;
+            if (cur + posBytes + guardBytes + bitsBytes > blobLen) return -1;
+            out->condFollowPos = (int32_t *)malloc(posBytes);
+            out->condFollowGuard = (uint8_t *)malloc(guardBytes);
+            out->condFollowBits = (uint64_t *)malloc(bitsBytes);
+            if (!out->condFollowPos || !out->condFollowGuard || !out->condFollowBits) return -1;
+            for (int _i = 0; _i < out->nCondFollow; _i++) { out->condFollowPos[_i] = le_i32(blob + cur + (size_t)_i * 4); }
+            cur += posBytes;
+            for (int _i = 0; _i < out->nCondFollow; _i++) { out->condFollowGuard[_i] = blob[cur + _i]; }
+            cur += guardBytes;
+            for (int _i = 0; _i < out->nCondFollow; _i++) { out->condFollowBits[_i] = le_u64(blob + cur + (size_t)_i * 8); }
+            cur += bitsBytes;
+        }
+
+        /* condAccept */
+        if (cur + 4 > blobLen) return -1;
+        out->nCondAccept = (int32_t)le_i32(blob + cur); cur += 4;
+        if (out->nCondAccept > 0) {
+            size_t guardBytes = (size_t)out->nCondAccept;
+            size_t bitsBytes = (size_t)out->nCondAccept * 8;
+            if (cur + guardBytes + bitsBytes > blobLen) return -1;
+            out->condAcceptGuard = (uint8_t *)malloc(guardBytes);
+            out->condAcceptBits = (uint64_t *)malloc(bitsBytes);
+            if (!out->condAcceptGuard || !out->condAcceptBits) return -1;
+            for (int _i = 0; _i < out->nCondAccept; _i++) { out->condAcceptGuard[_i] = blob[cur + _i]; }
+            cur += guardBytes;
+            for (int _i = 0; _i < out->nCondAccept; _i++) { out->condAcceptBits[_i] = le_u64(blob + cur + (size_t)_i * 8); }
+            cur += bitsBytes;
+        }
+    }
+
     uint64_t fu = 0;
     for (int w = 0; w < nword; w++) fu |= out->firstUnanchored[w];
     out->unanchoredEmpty = (fu == 0) ? 1 : 0;
@@ -557,6 +804,15 @@ static void free_unit(mvs_nfa *u) {
     free(u->cuts);
     free(u->asciiSym);
     free(u->posPat);
+    /* 断言扩展字段. */
+    free(u->excFollow1Flat);
+    free(u->condFirstGuard);
+    free(u->condFirstBits);
+    free(u->condFollowPos);
+    free(u->condFollowGuard);
+    free(u->condFollowBits);
+    free(u->condAcceptGuard);
+    free(u->condAcceptBits);
     memset(u, 0, sizeof(*u));
 }
 
@@ -566,7 +822,7 @@ mvscan_db *mvscan_db_open(const uint8_t *blob, size_t len) {
     if (!blob || len < 20) return NULL;
     if (blob[0] != 'M' || blob[1] != 'V' || blob[2] != 'S' || blob[3] != '1') return NULL;
     uint32_t version = le_u32(blob + 4);
-    if (version != 1) return NULL;
+    if (version != 2) return NULL;
     int32_t npat = (int32_t)le_u32(blob + 8);
     int32_t mergedUnit = (int32_t)le_u32(blob + 12);
     int32_t nUnits = (int32_t)le_u32(blob + 16);
@@ -741,3 +997,27 @@ int mvscan_simd_enabled(void) {
     return 0;
 #endif
 }
+
+/* ====================================================================
+ * 断言 NFA 公共 API (v2 blob 扩展).
+ * ==================================================================== */
+
+/* mvscan_compute_boundaries: 公共入口, 复刻 Go computeBoundaries. */
+void mvscan_compute_boundaries_pub(const uint8_t *data, size_t len, uint8_t *buf) {
+    mvscan_compute_boundaries(data, len, buf);
+}
+
+/* mvscan_db_nfa_exists_assert: 断言 NFA 单字存在性扫描 (含 guard 门控).
+ * bound 由调用方预算 (mvscan_compute_boundaries_pub). 仅用于 hasAssert 且 nword==1 的 NFA.
+ * 返回 1 命中 / 0 不命中 / -1 无 NFA 或非断言 NFA. */
+int mvscan_db_nfa_exists_assert(const mvscan_db *db, int32_t idx,
+                                const uint8_t *data, size_t len,
+                                const uint8_t *bound) {
+    if (!db || idx < 0 || idx >= db->npat) return -1;
+    int32_t u = db->slotUnit[idx];
+    if (u < 0 || u >= db->nUnits) return -1;
+    mvs_nfa *a = &db->units[u];
+    if (!a->hasAssert || a->nword != 1) return -1;
+    return nfa_run_assert_1(a, data, len, bound);
+}
+
