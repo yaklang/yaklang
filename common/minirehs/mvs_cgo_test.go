@@ -127,6 +127,50 @@ func TestMVSKernelCombinedAlwaysOnAssertOracle(t *testing.T) {
 	}
 }
 
+func TestMVSKernelAssertGuardTablesRandom(t *testing.T) {
+	exprs := []string{
+		`\b[a-z]{2,8}\b`,
+		`\B_[A-Z0-9]{1,5}\B`,
+		`(?m)^[A-Z][a-z0-9_]{0,12}$`,
+		`(?:^|[^0-9])[0-9]{3,7}(?:$|[^0-9])`,
+		`\A(?:GET|POST)[ \t]+[^\n]{1,20}\z`,
+	}
+	rng := rand.New(rand.NewSource(0x6a17d))
+	for _, expr := range exprs {
+		parsed, err := syntax.Parse(expr, syntax.Perl)
+		if err != nil {
+			t.Fatalf("parse %q: %v", expr, err)
+		}
+		nfa, ok := compileMVSNFAAssert(parsed.Simplify())
+		if !ok || nfa == nil || !nfa.hasAssert || !nfa.single {
+			t.Fatalf("expected single-word assert NFA for %q", expr)
+		}
+		k := openSingleNFAKernel(t, nfa)
+		re := regexp.MustCompile(expr)
+		for caseNo := 0; caseNo < 500; caseNo++ {
+			data := make([]byte, rng.Intn(192))
+			for i := range data {
+				switch rng.Intn(4) {
+				case 0, 1:
+					const alphabet = "abcXYZ019_ \t\n-:"
+					data[i] = alphabet[rng.Intn(len(alphabet))]
+				default:
+					data[i] = byte(rng.Intn(256))
+				}
+			}
+			bound := computeBoundaries(data, nil)
+			goHit := nfa.existsInAssertShared1(data, bound)
+			cHit := k.nfaExistsAssertSelf(0, data, nil)
+			want := re.Match(data)
+			if cHit != goHit || goHit != want {
+				t.Fatalf("expr=%q case=%d data=%q C=%v Go=%v oracle=%v",
+					expr, caseNo, data, cHit, goHit, want)
+			}
+		}
+		k.close()
+	}
+}
+
 // TestMVSKernelAnchoredBatchBackendOracle 接通 C anchored-many 的端到端 A/B 路径。
 // 默认生产开关保持关闭，直到 C 侧能把 literal trigger 与局部 verifier 融为一趟；此测试
 // 保证未来重新评估时，该批处理路径仍和 stdlib oracle 完全一致。
