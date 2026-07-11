@@ -464,8 +464,10 @@ var anchorMergedEnabled = false
 // 多字循环开销 > 省的趟数 (与 lean 合并的 A/B 结论一致), 默认关闭保留作差分护栏.
 var assertMergedEnabled = false
 
-// necPrefilterEnabled 控制必要条件字节预过滤的运行期接线。A/B 实测 Go 预检 O(n) 不比
-// Go NFA (LimEx shift+AND) 快, 净回归 (-9%). 基建保留供后续 C 内核 SIMD 预检接线.
+// necPrefilterEnabled 控制必要条件字节预过滤的运行期接线. A/B 实测: micro-benchmark 下
+// 预检 ~267 MB/s vs NFA ~149 MB/s, 但端到端基准仍净回归 (-2~3%): LimEx NFA (excCount=0)
+// 每字节仅 shift+AND (3 操作), 与 digit-run 检查 (4 操作/字节) 相当; 高 skip rate 省下的
+// NFA 扫描抵不过每记录额外的预检扫描 + 分支开销. 需 C 内核 SIMD 预检才净赚. 默认关闭.
 var necPrefilterEnabled = false
 
 // anchorCBatchEnabled 控制 C anchored-many 接线。它与 Go gap-jump 路径语义等价，

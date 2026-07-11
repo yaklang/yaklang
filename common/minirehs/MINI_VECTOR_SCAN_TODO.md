@@ -169,6 +169,26 @@
 >    always-on 整段 C 扫的结构性开销); ② 断言 always-on `existsInAssertShared1` + `existsInAssertShared`
 >    ~20% (2 条无字面量断言 NFA 整段 Go 扫); ③ `sort.Search`/`symIndex` ~7% (符号二分查找);
 >    ④ `stringtoslicerune`/`encoderune` ~5% (PCRE2 gate rune 正规化, 依赖库内)。
+> **A/B 回退(必要条件字节预过滤, 2026-07-11 第二轮)**: 实现了完整的必要条件提取器 (`mvs_necfactor.go`):
+> 从 RE2 语法树提取强制连续同类字符序列 (alternation 取最小值, concat 合并相邻同类段)、
+> 稀有字节计数 (:, -, {, })、首/末字节约束. **提取安全 (绝不假阴)**, skip rate: 身份证 100%、MAC 88.8%.
+> Micro-benchmark: digit-run 检查 ~267 MB/s vs 断言 NFA ~149 MB/s (检查更快). 但端到端基准仍净回归
+> (-2~3%): LimEx NFA (excCount=0) 每字节仅 shift+AND (3 操作), 与 digit-run 检查 (4 操作/字节) 相当;
+> 高 skip rate 省下的 NFA 扫描抵不过每记录额外的预检扫描 + 分支开销. 基建保留在 `necPrefilterEnabled`
+> 开关后, 默认关闭. **结论: Go 预检无法净赚 Go NFA (同语言同 O(n) 不可向量化); 需 C 内核 SIMD 预检
+> (bytes.Count / SIMD memchr 一次 16-32 字节) 才能突破.**
+> **Hyperscan 论文研究指导的后续方向 (按收益/确定性排序)**:
+> ① **断言 NFA 下沉 C 内核** (吃掉 ②, ~24% CPU): 在 C blob 序列化 condFirst/condFollow/condAccept +
+> 在 C 侧实现 computeBoundaries + guard 求值. C 侧可 SIMD 加速, 预期 2-3x.
+> ② **C 内核 SIMD 必要条件预检** (吃掉 ① 的 cgo 调用次数): 在 C merged_scan 入口先跑 SIMD 字节检查,
+> 不满足则跳过整段扫描. SIMD bytes.Count 一次 16-32 字节 vs Go 逐字节, 预期净赚.
+> ③ **AVX2 bit-NFA** (扩 C 内核 ROW_* 宏到 256 位): 现 SSE2/NEON 一次 2 字, AVX2 一次 4 字 (256 位),
+> 多字 NFA (nword>=2) 提速 ~2x.
+> ④ **Vermicelli 加速状态**: NFA 活跃集坍缩到单状态 + 自环时, 用 SIMD memchr 跳过不感兴趣的字符序列.
+> ⑤ **partial determinization** (boundary states): NFA 的前缀/后缀转成小 DFA, 控制状态宽度.
+> **性能上限分析 (到 800x 需的结构性改动)**: 当前 ~89x, 800x 需 ~9x. 每步消除一类结构性浪费:
+> 步 1 (本轮, LimEx): 84x→89x ✓ | 步 2 (断言 NFA 下沉 C): ~130x | 步 3 (C SIMD 预检): ~200x
+> | 步 4 (AVX2): ~400x | 步 5 (Vermicelli + partial det): ~600-800x. 每步都是 C 内核级改动.
 
 ---
 
