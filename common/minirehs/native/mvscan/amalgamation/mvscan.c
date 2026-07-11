@@ -208,10 +208,15 @@ typedef struct {
     int32_t  necRunClass;      /* 1=digit, 2=hex. 见 mvs_byte_in_class. */
     int32_t  necRequiredByte;  /* 0-255, -1=无 */
     int32_t  necRequiredCount; /* 最少出现次数 */
-    /* Vermicelli 加速: startByteMask[b]=1 表示字节 b 可以开始匹配 (firstUnanchored & reach[asciiSym[b]] != 0).
-     * NFA 休眠时 (anyActive==0) 跳到下一个 startByteMask 字节. hasStartByteMask=0 表示未构建. */
+    /* Vermicelli 加速 */
     int      hasStartByteMask;
     uint8_t  startByteMask[256];
+
+    /* ---- DFA 转换 (小规模 NFA 的确定性化). 当 hasDFA=1 时用 dfa_run 替代 nfa_run. ---- */
+    int      hasDFA;
+    int32_t  dfaNstates;
+    int32_t *dfaNext;    /* [nstates*256] 转移表: next[state*256 + byte] (-1=死) */
+    uint8_t *dfaAccept;  /* [nstates] 接受状态标记 */
 } mvs_nfa;
 
 struct mvscan_db {
@@ -783,6 +788,28 @@ void mvscan_compute_boundaries(const uint8_t *data, size_t len, uint8_t *buf) {
     buf[len] = b;
 }
 
+/* dfa_run: DFA 存在性扫描 — 每字节一次查表 (O(1)), 比 NFA 位递推快 O(npos) 倍.
+ * 对小规模 NFA (JSON npos=3, Windows npos=8, AWS npos=42) 构建的 DFA.
+ * 返回 1 命中 / 0 不命中. */
+static int dfa_run(const mvs_nfa *a, const uint8_t *data, size_t len) {
+    int32_t state = 0; /* 初始状态 */
+    const int32_t *next = a->dfaNext;
+    const uint8_t *accept = a->dfaAccept;
+    for (size_t i = 0; i < len; i++) {
+        state = next[state * 256 + data[i]];
+        if (state < 0) {
+            /* 死状态: 重置到初始 (无锚 NFA 可从任意位置重新开始) */
+            state = 0;
+            /* 但需检查当前字节能否从初始开始 */
+            state = next[0 * 256 + data[i]];
+            if (state < 0) state = 0;
+            continue;
+        }
+        if (accept[state]) return 1;
+    }
+    return 0;
+}
+
 /* mvs_byte_in_class: 复刻 Go byteInClass (仅 C 内核用). */
 static inline int mvs_byte_in_class_c(uint8_t c, int32_t cls) {
     switch (cls) {
@@ -1320,6 +1347,8 @@ static int nfa_run_anchored_dispatch(const mvs_nfa *a, const uint8_t *data, size
 static int nfa_run_dispatch(const mvs_nfa *a, const uint8_t *data, size_t len, int mode,
                             uint8_t *seen, int32_t seenLen, int32_t *out, int32_t cap,
                             int32_t *outTotal, int forceScalar) {
+	/* DFA 快路径暂时禁用: dfa_run 的死状态重置 + 非 ASCII 处理有正确性问题.
+	 * DFA 基建已就位 (buildDFAFromNFA + blob 序列化 + parse_unit), 待修复 dfa_run. */
 	if (mode == 0 && a->nword == 1)
 		return nfa_run_1_exists(a, data, len);
 #if defined(MVS_SSE2) || defined(MVS_NEON)
@@ -1505,6 +1534,29 @@ static int parse_unit(const uint8_t *blob, size_t blobLen, size_t off, mvs_nfa *
         }
         out->hasStartByteMask = anyStart ? 1 : 0;
     }
+
+    /* DFA 转换 (可选, flags bit2 = hasDFA). 在所有其他字段之后.
+     * 布局: i32 dfaNstates, {i32[nstates*256] next, u8[nstates] accept}. */
+    out->hasDFA = (flags & 0x4u) ? 1 : 0;
+    if (out->hasDFA) {
+        if (cur + 4 > blobLen) return -1;
+        out->dfaNstates = (int32_t)le_i32(blob + cur); cur += 4;
+        if (out->dfaNstates <= 0 || out->dfaNstates > 512) return -1;
+        size_t nextBytes = (size_t)out->dfaNstates * 256 * 4;
+        size_t acceptBytes = (size_t)out->dfaNstates;
+        if (cur + nextBytes + acceptBytes > blobLen) return -1;
+        out->dfaNext = (int32_t *)malloc(nextBytes);
+        out->dfaAccept = (uint8_t *)malloc(acceptBytes);
+        if (!out->dfaNext || !out->dfaAccept) return -1;
+        for (int _i = 0; _i < out->dfaNstates * 256; _i++) {
+            out->dfaNext[_i] = (int32_t)le_i32(blob + cur + (size_t)_i * 4);
+        }
+        cur += nextBytes;
+        for (int _i = 0; _i < out->dfaNstates; _i++) {
+            out->dfaAccept[_i] = blob[cur + _i];
+        }
+        cur += acceptBytes;
+    }
     return 0;
 }
 
@@ -1527,6 +1579,8 @@ static void free_unit(mvs_nfa *u) {
     free(u->condFollowBits);
     free(u->condAcceptGuard);
     free(u->condAcceptBits);
+    free(u->dfaNext);
+    free(u->dfaAccept);
     memset(u, 0, sizeof(*u));
 }
 
