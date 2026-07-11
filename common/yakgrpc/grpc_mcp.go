@@ -38,7 +38,7 @@ func (s *Server) StartMcpServer(req *ypb.StartMcpServerRequest, stream ypb.Yak_S
 		explicitToolSets = true
 		log.Infof("StartMcpServer: explicit tool sets: %v", req.GetTool())
 	}
-	return launchMcpServer(stream.Context(), req, stream.Send, explicitToolSets)
+	return launchMcpServer(stream.Context(), req, stream.Send, explicitToolSets, mcp.WithDatabases(s.GetProfileDatabase(), s.GetProjectDatabase()))
 }
 
 func (s *Server) GetToolSetList(ctx context.Context, req *ypb.Empty) (*ypb.GetToolSetListResponse, error) {
@@ -64,7 +64,7 @@ func (s *Server) GetToolSetList(ctx context.Context, req *ypb.Empty) (*ypb.GetTo
 }
 
 // launchMcpServer 启动 MCP 服务器的具体实现
-func launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send func(*ypb.StartMcpServerResponse) error, explicitToolSets bool) (err error) {
+func launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send func(*ypb.StartMcpServerResponse) error, explicitToolSets bool, baseOpts ...mcp.McpServerOption) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Errorf("panic in launchMcpServer: %v", r)
@@ -82,7 +82,7 @@ func launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send f
 	}
 
 	// 构建 MCP 服务器选项
-	var opts []mcp.McpServerOption
+	opts := append([]mcp.McpServerOption{}, baseOpts...)
 
 	// 处理工具集配置
 	if len(req.GetTool()) > 0 {

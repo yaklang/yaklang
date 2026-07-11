@@ -44,6 +44,8 @@ func NewMCPServer(opts ...McpServerOption) (*MCPServer, error) {
 		}
 	}
 	s.bridgeClientClosers = cfg.bridgeClientClosers
+	s.profileDB = cfg.profileDB
+	s.projectDB = cfg.projectDB
 	cfg.ApplyConfig(s)
 	if cfg.grpcClient != nil {
 		s.grpcClient = cfg.grpcClient
