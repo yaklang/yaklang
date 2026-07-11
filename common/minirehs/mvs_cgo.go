@@ -313,12 +313,17 @@ func (k *mvsKernel) combinedScan(data []byte, assertIdxs []int32, sc *scratch) (
 	} else {
 		sc.assertBound = sc.assertBound[:n+1]
 	}
-	// assertOut
+	// assertOut (复用 scratch 缓冲)
 	assertCap := len(assertIdxs)
 	if assertCap < 1 {
 		assertCap = 1
 	}
-	assertOutBuf := make([]int32, assertCap)
+	if cap(sc.assertBatchOutIdx) < assertCap {
+		sc.assertBatchOutIdx = make([]int32, assertCap)
+	} else {
+		sc.assertBatchOutIdx = sc.assertBatchOutIdx[:assertCap]
+	}
+	assertOutBuf := sc.assertBatchOutIdx
 
 	// assertIdxs C pointer
 	var assertPtr *C.int32_t
