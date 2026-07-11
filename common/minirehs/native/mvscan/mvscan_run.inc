@@ -45,17 +45,35 @@ static int NFA_RUN_NAME(const mvs_nfa *a, const uint8_t *data, size_t len, int m
         }
         int atEnd = (i == len);
 
-        /* cand = firstUnanchored (每步注入) | firstAnchored (仅起点). */
-        ROW_COPY(cand, a->firstUnanchored, nword);
-        if (atStart && a->hasAnchored) ROW_OR(cand, a->firstAnchored, nword);
-
-        /* 后继并集: OR follow[p] for p in prev (读完旧 prev 后才覆写). */
-        for (int w = 0; w < nword; w++) {
-            uint64_t pw = prev[w];
-            while (pw) {
-                int p = (w << 6) + mvs_ctz64(pw);
-                pw &= pw - 1;
-                ROW_OR(cand, a->follow + (size_t)p * nword, nword);
+        if (a->hasLimEx) {
+            /* LimEx: 所有 p->p+1 链边由一次跨字左移推进；仅枚举稀疏异常源。 */
+            uint64_t carry = 0;
+            for (int w = 0; w < nword; w++) {
+                uint64_t v = prev[w];
+                uint64_t shifted = (v << 1) | carry;
+                carry = v >> 63;
+                cand[w] = a->firstUnanchored[w] | (shifted & a->chainTarget[w]);
+            }
+            if (atStart && a->hasAnchored) ROW_OR(cand, a->firstAnchored, nword);
+            for (int w = 0; w < nword; w++) {
+                uint64_t ex = prev[w] & a->excMask[w];
+                while (ex) {
+                    int p = (w << 6) + mvs_ctz64(ex);
+                    ex &= ex - 1;
+                    ROW_OR(cand, a->excFollow + (size_t)p * nword, nword);
+                }
+            }
+        } else {
+            /* 通用 Glushkov 后继并集。 */
+            ROW_COPY(cand, a->firstUnanchored, nword);
+            if (atStart && a->hasAnchored) ROW_OR(cand, a->firstAnchored, nword);
+            for (int w = 0; w < nword; w++) {
+                uint64_t pw = prev[w];
+                while (pw) {
+                    int p = (w << 6) + mvs_ctz64(pw);
+                    pw &= pw - 1;
+                    ROW_OR(cand, a->follow + (size_t)p * nword, nword);
+                }
             }
         }
 

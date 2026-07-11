@@ -165,6 +165,12 @@ typedef struct {
     int32_t *asciiSym;         /* [128] */
     int32_t *posPat;           /* [npos] */
 
+    /* ---- LimEx 多字扩展 (v3 blob, merged NFA). ---- */
+    int       hasLimEx;
+    uint64_t *chainTarget;     /* [nword], 链边目标位 */
+    uint64_t *excMask;         /* [nword], 含异常后继的源位置 */
+    uint64_t *excFollow;       /* [npos*nword], 已移除 p->p+1 链边 */
+
     /* ---- 断言扩展 (hasAssert, v2 blob). 对应 Go condFirst/condFollow/condAccept. ---- */
     int      hasAssert;        /* flags bit1: 是否含零宽断言 guard */
     /* LimEx 链/异常拆分 (单字 nword==1 快路径, 对应 Go chainTarget1/excMask1/excFollow1). */
@@ -914,7 +920,7 @@ static inline int nfa_run(const mvs_nfa *a, const uint8_t *data, size_t len, int
  *   u64[npos*nword] follow; u64[nsym*nword] reach;
  *   i32[nsym+1] cuts; i32[128] asciiSym; i32[npos] posPat.
  * ==================================================================== */
-static int parse_unit(const uint8_t *blob, size_t blobLen, size_t off, mvs_nfa *out) {
+static int parse_unit(const uint8_t *blob, size_t blobLen, size_t off, size_t unitLen, mvs_nfa *out) {
     memset(out, 0, sizeof(*out));
     if (off + 16 > blobLen) return -1;
     const uint8_t *p = blob + off;
@@ -977,6 +983,21 @@ static int parse_unit(const uint8_t *blob, size_t blobLen, size_t off, mvs_nfa *
 
 #undef MVS_RD_U64
 #undef MVS_RD_I32
+
+    /* LimEx 多字扩展 (v3, flags bit3): chainTarget[nword], excMask[nword],
+     * excFollow[npos*nword]. 仅 merged unit 写入。 */
+    out->hasLimEx = (flags & 0x8u) ? 1 : 0;
+    if (out->hasLimEx) {
+        size_t limexU64 = (size_t)nword * 2 + (size_t)npos * nword;
+        if (cur + limexU64 * 8 > off + unitLen || cur + limexU64 * 8 > blobLen) return -1;
+        out->chainTarget = (uint64_t *)malloc((size_t)nword * 8);
+        out->excMask = (uint64_t *)malloc((size_t)nword * 8);
+        out->excFollow = (uint64_t *)malloc((size_t)npos * nword * 8);
+        if (!out->chainTarget || !out->excMask || !out->excFollow) return -1;
+        for (int w = 0; w < nword; w++) { out->chainTarget[w] = le_u64(blob + cur); cur += 8; }
+        for (int w = 0; w < nword; w++) { out->excMask[w] = le_u64(blob + cur); cur += 8; }
+        for (size_t j = 0; j < (size_t)npos * nword; j++) { out->excFollow[j] = le_u64(blob + cur); cur += 8; }
+    }
 
     /* 断言扩展 (v2 blob, flags bit1 = hasAssert): 在 posPat 之后追加 assert 字段.
      * 布局: u64 chainTarget1, u64 excMask1, u64[npos] excFollow1Flat, u64 condFollowMask1,
@@ -1111,6 +1132,9 @@ static void free_unit(mvs_nfa *u) {
     free(u->cuts);
     free(u->asciiSym);
     free(u->posPat);
+    free(u->chainTarget);
+    free(u->excMask);
+    free(u->excFollow);
     /* 断言扩展字段. */
     free(u->excFollow1Flat);
     free(u->condFirstGuard);
@@ -1131,7 +1155,7 @@ mvscan_db *mvscan_db_open(const uint8_t *blob, size_t len) {
     if (!blob || len < 20) return NULL;
     if (blob[0] != 'M' || blob[1] != 'V' || blob[2] != 'S' || blob[3] != '1') return NULL;
     uint32_t version = le_u32(blob + 4);
-    if (version != 2) return NULL;
+    if (version != 3) return NULL;
     int32_t npat = (int32_t)le_u32(blob + 8);
     int32_t mergedUnit = (int32_t)le_u32(blob + 12);
     int32_t nUnits = (int32_t)le_u32(blob + 16);
@@ -1156,11 +1180,11 @@ mvscan_db *mvscan_db_open(const uint8_t *blob, size_t len) {
     for (int i = 0; i < npat; i++) { db->slotUnit[i] = le_i32(blob + cur); cur += 4; }
     const uint8_t *offTab = blob + cur; cur += offBytes;
     const uint8_t *lenTab = blob + cur; cur += lenBytes;
-    (void)lenTab;
-
     for (int i = 0; i < nUnits; i++) {
         uint32_t uoff = le_u32(offTab + (size_t)i * 4);
-        if (parse_unit(blob, len, uoff, &db->units[i]) != 0) {
+        uint32_t ulen = le_u32(lenTab + (size_t)i * 4);
+        if ((size_t)uoff + (size_t)ulen > len ||
+            parse_unit(blob, len, uoff, ulen, &db->units[i]) != 0) {
             mvscan_db_close(db);
             return NULL;
         }
@@ -1485,14 +1509,33 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
 
         /* ---- merged NFA 递推 ---- */
         if (mu) {
-            row_copy_v(mCand, mu->firstUnanchored, mw);
-            if (atStart && mu->hasAnchored) row_or_v(mCand, mu->firstAnchored, mw);
-            for (int w = 0; w < mw; w++) {
-                uint64_t pw = mPrev[w];
-                while (pw) {
-                    int p = (w << 6) + mvs_ctz64(pw);
-                    pw &= pw - 1;
-                    row_or_v(mCand, mu->follow + (size_t)p * mw, mw);
+            if (mu->hasLimEx) {
+                uint64_t carry = 0;
+                for (int w = 0; w < mw; w++) {
+                    uint64_t v = mPrev[w];
+                    uint64_t shifted = (v << 1) | carry;
+                    carry = v >> 63;
+                    mCand[w] = mu->firstUnanchored[w] | (shifted & mu->chainTarget[w]);
+                }
+                if (atStart && mu->hasAnchored) row_or_v(mCand, mu->firstAnchored, mw);
+                for (int w = 0; w < mw; w++) {
+                    uint64_t ex = mPrev[w] & mu->excMask[w];
+                    while (ex) {
+                        int p = (w << 6) + mvs_ctz64(ex);
+                        ex &= ex - 1;
+                        row_or_v(mCand, mu->excFollow + (size_t)p * mw, mw);
+                    }
+                }
+            } else {
+                row_copy_v(mCand, mu->firstUnanchored, mw);
+                if (atStart && mu->hasAnchored) row_or_v(mCand, mu->firstAnchored, mw);
+                for (int w = 0; w < mw; w++) {
+                    uint64_t pw = mPrev[w];
+                    while (pw) {
+                        int p = (w << 6) + mvs_ctz64(pw);
+                        pw &= pw - 1;
+                        row_or_v(mCand, mu->follow + (size_t)p * mw, mw);
+                    }
                 }
             }
             const uint64_t *rc = mu->reach + (size_t)sym * mw;
