@@ -29,6 +29,7 @@ type scratch struct {
 	mergedSeen []bool  // 纯 Go scanExist 的成员去重位图 (长度 npat)
 	cseen      []byte  // C 合并 scan 的去重位图 (uint8, 长度 npat)
 	cmerged    []int32 // C 返回命中成员 idx 的 int32 缓冲
+	cLocs      []int32 // C 单字 NFA 定位返回的平铺 (from,to) 对，按报文复用
 
 	// mvs 存在性快路径"按报文批处理 cgo"缓冲 (Phase 2): batchIdx 收集本报文触发的、可走 C 内核
 	// per-pattern 存在性的 pattern idx (去重), 一次 cgo 调用 nfaExistsMany 后, batchOut[i] 回写

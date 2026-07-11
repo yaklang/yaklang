@@ -283,6 +283,48 @@ func TestMVSKernelExistsDirect(t *testing.T) {
 	}
 }
 
+// TestMVSKernelFindAllLoc1Direct 验证 C 单字定位器与 Go leftmost-longest 定位器逐 span
+// 一致。它覆盖重叠、量词、锚定、大小写折叠、UTF-8 与多次非重叠匹配，防止存在性内核
+// 的定位优化改变既有 Match.From/To 语义。
+func TestMVSKernelFindAllLoc1Direct(t *testing.T) {
+	cases := []struct {
+		expr   string
+		inputs []string
+	}{
+		{`Druid`, []string{"DruidDruid", "xDruidyDruidz", "none", "Druid Druid Druid Druid Druid Druid Druid Druid Druid Druid Druid Druid Druid Druid Druid Druid Druid"}},
+		{`[0-9]{3,}`, []string{"ab123cd456", "99999 12 777", "no digits"}},
+		{`ab+c`, []string{"abc abbbbc ac", "xabbcy abc"}},
+		{`a[bc]*d`, []string{"ad abcbcd abbccd", "aXd"}},
+		{`(?i)druid`, []string{"DRUID DrUiD druid", "none"}},
+		{`^GET`, []string{"GET /x", "GET GET", "xGET"}},
+		{`END$`, []string{"the END", "ENDx", "END"}},
+		{`[A-Z]+`, []string{"xABCy DEF G", "äÖX"}},
+	}
+	for _, tc := range cases {
+		nfa := buildNFAFor(t, tc.expr)
+		if nfa == nil || !nfa.single || nfa.hasAssert {
+			t.Fatalf("expected single lean NFA for %q", tc.expr)
+		}
+		k := openSingleNFAKernel(t, nfa)
+		for _, input := range tc.inputs {
+			data := []byte(input)
+			want := nfaFindAll(nfa, data)
+			gotFlat, ok := k.findAllLoc1(0, data, &scratch{})
+			if !ok {
+				t.Fatalf("C locator rejected supported expr=%q input=%q", tc.expr, input)
+			}
+			got := make([][2]int, 0, len(gotFlat)/2)
+			for i := 0; i < len(gotFlat); i += 2 {
+				got = append(got, [2]int{int(gotFlat[i]), int(gotFlat[i+1])})
+			}
+			if !sameSpans(got, want) {
+				t.Fatalf("expr=%q input=%q C=%v Go=%v", tc.expr, input, got, want)
+			}
+		}
+		k.close()
+	}
+}
+
 // TestMVSKernelRandomDifferential 随机生成大量 RE2, 在随机字节 (含非法 UTF-8) 上比对
 // C nfaExists == Go existsIn == stdlib oracle. 这是 C utf8 解码 / 字母表 / 位并行递推的主护栏.
 func TestMVSKernelRandomDifferential(t *testing.T) {

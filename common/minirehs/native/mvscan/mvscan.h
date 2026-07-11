@@ -95,6 +95,18 @@ int32_t mvscan_db_merged_scan_scalar(const mvscan_db *db,
                                      int32_t *out, int32_t cap);
 
 /*
+ * mvscan_db_nfa_find_all_1 为单字、无零宽断言的 NFA 枚举全部 leftmost-longest、
+ * 非重叠匹配区间。out 为平铺的 (from,to) 对；返回总对数，可能大于 capPairs
+ * 表示输出被截断。返回 -1 表示 idx 不适用（调用方必须回退其通用定位器）。
+ *
+ * 这是存在性 C 内核的定位孪生：避免「C 判命中后 Go 再完整扫描一次」；复杂多字
+ * 与断言 NFA 仍由 Go 的已验证定位器处理。
+ */
+int32_t mvscan_db_nfa_find_all_1(const mvscan_db *db, int32_t idx,
+                                  const uint8_t *data, size_t len,
+                                  int32_t *out, int32_t capPairs);
+
+/*
  * mvs_span 是锚定式扫描的注入区间 [lo, hi) (字节偏移). 仅当 rune 起始落入某 span 时
  * 才注入 NFA 起点 first, 其余位置不注入, 实现提前消亡 (对应 Go existsInAnchored).
  * spans 须已按 lo 升序排序并合并重叠/相邻区间.
