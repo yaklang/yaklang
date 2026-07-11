@@ -1464,20 +1464,24 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
         return 0;
     }
 
-    /* 分配 merged NFA 工作缓冲 */
+    /* 分配 merged NFA 工作缓冲 (用栈缓冲避免 malloc) */
     int mw = mu ? mu->nword : 0;
+    uint64_t stackMPrev[8], stackMCand[8];
     uint64_t *mPrev = NULL, *mCand = NULL;
     if (mu) {
-        mPrev = (uint64_t *)calloc((size_t)mw, sizeof(uint64_t));
-        mCand = (uint64_t *)malloc((size_t)mw * sizeof(uint64_t));
+        if (mw <= 8) { mPrev = stackMPrev; mCand = stackMCand; memset(mPrev, 0, (size_t)mw * 8); }
+        else { mPrev = (uint64_t *)calloc((size_t)mw, sizeof(uint64_t)); mCand = (uint64_t *)malloc((size_t)mw * sizeof(uint64_t)); }
     }
 
-    /* 分配 assert NFA 工作缓冲 (单字) */
+    /* 分配 assert NFA 工作缓冲 (用栈缓冲) */
+    uint64_t stackAPrev[16];
+    uint8_t stackADone[16];
     uint64_t *aPrev = NULL;
+    uint8_t *aDone = NULL;
     if (nAssertReal > 0) {
-        aPrev = (uint64_t *)calloc((size_t)nAssert, sizeof(uint64_t));
+        if (nAssert <= 16) { aPrev = stackAPrev; aDone = stackADone; memset(aPrev, 0, (size_t)nAssert * 8); memset(aDone, 0, (size_t)nAssert); }
+        else { aPrev = (uint64_t *)calloc((size_t)nAssert, sizeof(uint64_t)); aDone = (uint8_t *)calloc((size_t)nAssert, 1); }
     }
-    uint8_t *aDone = (uint8_t *)calloc((size_t)nAssert, 1); /* 标记已命中 */
 
     int32_t mergedTotal = 0;
     int32_t assertTotal = 0;
@@ -1602,11 +1606,9 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
         i = ni;
     }
 
-    /* 清理 */
-    if (mPrev) free(mPrev);
-    if (mCand) free(mCand);
-    if (aPrev) free(aPrev);
-    if (aDone) free(aDone);
+    /* 清理 (仅 free 非栈缓冲) */
+    if (mu && mw > 8) { free(mPrev); free(mCand); }
+    if (nAssertReal > 0 && nAssert > 16) { free(aPrev); free(aDone); }
     if (assertNFAs) free(assertNFAs);
     if (mergedTotalOut) *mergedTotalOut = mergedTotal;
     return assertTotal;
