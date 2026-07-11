@@ -816,14 +816,6 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 				continue
 			}
 			sc.fullDone[idx] = true
-			// 必要条件预过滤: check==false 时跳过该 pattern 的断言 NFA 扫描 (绝不假阴).
-			// A/B 实测: Go 预检 O(n) 不比 Go NFA (LimEx shift+AND) 快, 净回归. 仅在 necPrefilterEnabled 时启用.
-			if necPrefilterEnabled && idx < len(d.assertNecFactor) {
-				nf := &d.assertNecFactor[idx]
-				if nf.hasFactor && !nf.check(data) {
-					continue
-				}
-			}
 			if stop := d.verifyOne(idx, data, sc, handler); stop {
 				return true, nil
 			}

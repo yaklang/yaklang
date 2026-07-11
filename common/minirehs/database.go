@@ -72,6 +72,9 @@ type scratch struct {
 	anchorSpansHi  []int32
 	anchorBatchOut []byte
 
+	// 断言 always-on C 批量扫描的输出缓冲 (nfaExistsAssertMany).
+	assertBatchOut []byte
+
 	// R1 anchored merged scan 的每报文成员 span 视图。元素只借用 anchorRanges 中
 	// 已合并的切片，不复制 span；扫描结束后下次 reset 时覆盖。
 	anchorMergedSpans [][]anchorSpan

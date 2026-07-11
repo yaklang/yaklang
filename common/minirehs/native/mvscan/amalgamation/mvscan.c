@@ -1441,3 +1441,37 @@ int mvscan_db_nfa_exists_assert(const mvscan_db *db, int32_t idx,
     return nfa_run_assert_1(a, data, len, bound);
 }
 
+/* mvscan_db_nfa_exists_assert_many: 一次 cgo 对多条断言 always-on NFA 各自做断言存在性,
+ * 内部预算边界 (每报文一次), 摊薄 "每 pattern 一次 cgo" 的跨界开销.
+ * boundBuf 由调用方提供 (容量 >= len+1). 仅用于 hasAssert 且 nword==1 的 NFA. */
+void mvscan_db_nfa_exists_assert_many(const mvscan_db *db,
+                                      const uint8_t *data, size_t len,
+                                      const int32_t *idxs, int32_t nidx,
+                                      uint8_t *boundBuf,
+                                      uint8_t *out) {
+    if (!out) return;
+    if (nidx <= 0) return;
+    /* 预算边界一次 (跨多条断言 NFA 共享). */
+    if (data && len > 0 && boundBuf) {
+        mvscan_compute_boundaries(data, len, boundBuf);
+    } else if (boundBuf && len == 0) {
+        boundBuf[0] = MVS_COND_BEGIN_TEXT | MVS_COND_END_TEXT | MVS_COND_BEGIN_LINE | MVS_COND_END_LINE | MVS_COND_NO_WORD_BOUND;
+    }
+    for (int32_t i = 0; i < nidx; i++) {
+        uint8_t r = 0;
+        if (db && idxs && boundBuf) {
+            int32_t idx = idxs[i];
+            if (idx >= 0 && idx < db->npat) {
+                int32_t u = db->slotUnit[idx];
+                if (u >= 0 && u < db->nUnits) {
+                    mvs_nfa *a = &db->units[u];
+                    if (a->hasAssert && a->nword == 1) {
+                        r = (uint8_t)(nfa_run_assert_1(a, data, len, boundBuf) == 1);
+                    }
+                }
+            }
+        }
+        out[i] = r;
+    }
+}
+
