@@ -722,12 +722,25 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 			spans := mergeAnchorSpans(sc.anchorRanges[idx])
 			nfa := d.nfas[idx]
 			var hit bool
-			// nword==1 (绝大多数真实 pattern) 走标量零分配快路径, 否则走多字通用版.
 			switch {
 			case nfa.hasAssert && nfa.single:
 				hit = nfa.existsInAssertAnchored1(data, d.sharedBound(data, sc), spans)
 			case nfa.hasAssert:
 				hit = nfa.existsInAssertAnchored(data, d.sharedBound(data, sc), spans, sc.anchorPrev, sc.anchorCand)
+			case d.kernel != nil:
+				// C 内核作快速预筛: C 说"否"直接跳过 (省去 Go 位递推); C 说"是"用 Go 复核
+				// (C anchored 多 span 有已知假阳, 须 Go 确认).
+				if !d.kernel.nfaExistsAnchored(idx, data, spans) {
+					hit = false
+					break
+				}
+				if nfa.single {
+					hit = nfa.existsInAnchored1(data, spans)
+				} else if nfa.nword == 2 {
+					hit = nfa.existsInAnchored2(data, spans)
+				} else {
+					hit = nfa.existsInAnchored(data, spans, sc.anchorPrev, sc.anchorCand, sc.anchorActive)
+				}
 			case nfa.single:
 				hit = nfa.existsInAnchored1(data, spans)
 			case nfa.nword == 2:
@@ -750,7 +763,18 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 			var hit bool
 			if fwdSpans := mergeAnchorSpans(sc.biFwdRanges[idx]); len(fwdSpans) > 0 {
 				fwd := d.nfas[idx]
-				if fwd.single {
+				if d.kernel != nil && !d.kernel.nfaExistsAnchored(idx, data, fwdSpans) {
+					// C 快速预筛说"否": 前向不命中, 尝试反向
+				} else if d.kernel != nil {
+					// C 说"是": 用 Go 复核
+					if fwd.single {
+						hit = fwd.existsInAnchored1(data, fwdSpans)
+					} else if fwd.nword == 2 {
+						hit = fwd.existsInAnchored2(data, fwdSpans)
+					} else {
+						hit = fwd.existsInAnchored(data, fwdSpans, sc.anchorPrev, sc.anchorCand, sc.anchorActive)
+					}
+				} else if fwd.single {
 					hit = fwd.existsInAnchored1(data, fwdSpans)
 				} else if fwd.nword == 2 {
 					hit = fwd.existsInAnchored2(data, fwdSpans)
