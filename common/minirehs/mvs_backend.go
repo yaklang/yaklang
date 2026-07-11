@@ -177,6 +177,8 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 		case nfa != nil && nfa.hasAssert:
 			db.assertAlwaysOn = append(db.assertAlwaysOn, cp.idx)
 		case nfa != nil:
+			// 注: DFA 拆分经 A/B 测试为净回归 (-3.6%): DFA 虽快 (293 MB/s), 但每记录多扫 2 次
+			// (AWS+Windows 各一次) 抵消了 nword 3→2 的收益. 基建保留供未来批量 DFA scan 使用.
 			mergeMembers = append(mergeMembers, mergeMember{idx: cp.idx, nfa: nfa})
 		default:
 			db.otherAlwaysOn = append(db.otherAlwaysOn, cp.idx)
@@ -449,6 +451,9 @@ type mvsDB struct {
 	assertNecFactor []necFactor
 	// hasLiterals 按 idx: true=该 pattern 有必需字面量 (不构建 DFA).
 	hasLiterals []bool
+	// dfaAlwaysOnIdxs: 从 merged NFA 中拆出的 DFA always-on pattern idx 列表.
+	// 这些 pattern 通过 nfaExists (DFA 路径, 293 MB/s) 单独扫描, 不参与 merged scan.
+	dfaAlwaysOnIdxs []int32
 	// assertAlwaysOnCIdxs 是 assertAlwaysOn 中 single (nword==1) 断言 NFA 的 idx 数组 (C 内核批量用).
 	// 预计算一次, scan 中复用 (零分配).
 	assertAlwaysOnCIdxs []int32
@@ -831,6 +836,22 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 			sc.fullDone[idx] = true
 			if stop := d.reportLocated(idx, data, sc, handler); stop {
 				return true, nil
+			}
+		}
+	}
+
+	// 2b) DFA always-on: 从 merged NFA 拆出的 DFA 模式, 通过 nfaExists (DFA 路径) 单独扫.
+	// DFA 单模式 293 MB/s (vs merged 60 MB/s), 拆分后省去 DFA 模式在 merged 中的位置 (降低 nword).
+	if len(d.dfaAlwaysOnIdxs) > 0 && d.kernel != nil {
+		for _, idx := range d.dfaAlwaysOnIdxs {
+			if sc.fullDone[int(idx)] {
+				continue
+			}
+			sc.fullDone[int(idx)] = true
+			if d.kernel.nfaExists(int(idx), data) {
+				if stop := d.finalizeHit(int(idx), data, sc, handler); stop {
+					return true, nil
+				}
 			}
 		}
 	}
