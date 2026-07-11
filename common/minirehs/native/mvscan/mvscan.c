@@ -184,6 +184,13 @@ typedef struct {
     int32_t  nCondAccept;
     uint8_t *condAcceptGuard;  /* [nCondAccept] */
     uint64_t *condAcceptBits;  /* [nCondAccept] */
+
+    /* ---- 必要条件预过滤 (v2 blob). 在 NFA 扫描前做快速字节检查. ---- */
+    int32_t  necMinRunLen;     /* 0=无约束; >0 表示需要 >= necMinRunLen 个连续 necRunClass 字节 */
+    int32_t  necRunClass;      /* 1=digit, 2=hex. 见 mvs_byte_in_class. */
+    /* necRequiredByte: 某字节必须至少出现 necRequiredCount 次. necRequiredByte<0=无约束. */
+    int32_t  necRequiredByte;  /* 0-255, -1=无 */
+    int32_t  necRequiredCount; /* 最少出现次数 */
 } mvs_nfa;
 
 struct mvscan_db {
@@ -446,11 +453,55 @@ void mvscan_compute_boundaries(const uint8_t *data, size_t len, uint8_t *buf) {
     buf[len] = b;
 }
 
+/* mvs_byte_in_class: 复刻 Go byteInClass (仅 C 内核用). */
+static inline int mvs_byte_in_class_c(uint8_t c, int32_t cls) {
+    switch (cls) {
+    case 1: return c >= '0' && c <= '9';            /* digit */
+    case 2: return (c >= '0' && c <= '9') ||        /* hex */
+                 (c >= 'a' && c <= 'f') ||
+                 (c >= 'A' && c <= 'F');
+    }
+    return 0;
+}
+
+/* mvs_nec_check: 必要条件预过滤. 返回 0 = 绝不可能命中, 可跳过 NFA 扫描.
+ * 在 C 内核中执行, 与 NFA 同侧, 无跨界开销. 对不匹配记录省去整段 NFA 位递推. */
+static inline int mvs_nec_check(const mvs_nfa *a, const uint8_t *data, size_t len) {
+    /* 连续序列约束 */
+    if (a->necMinRunLen > 0) {
+        int maxRun = 0, curRun = 0;
+        for (size_t i = 0; i < len; i++) {
+            if (mvs_byte_in_class_c(data[i], a->necRunClass)) {
+                curRun++;
+                if (curRun > maxRun) maxRun = curRun;
+            } else {
+                curRun = 0;
+            }
+        }
+        if (maxRun < a->necMinRunLen) return 0;
+    }
+    /* 稀有字节计数约束 */
+    if (a->necRequiredByte >= 0 && a->necRequiredCount > 0) {
+        int cnt = 0;
+        uint8_t target = (uint8_t)a->necRequiredByte;
+        for (size_t i = 0; i < len; i++) {
+            if (data[i] == target) {
+                cnt++;
+                if (cnt >= a->necRequiredCount) break;
+            }
+        }
+        if (cnt < a->necRequiredCount) return 0;
+    }
+    return 1; /* 可能命中, 需跑 NFA */
+}
+
 /* nfa_run_assert_1: 断言 NFA 单字 (nword==1) 存在性扫描.
  * 与 Go existsInAssertShared1 逐位一致: LimEx 链/异常 + condFirst/condFollow/condAccept guard.
- * bound 由调用方预算 (mvscan_compute_boundaries). */
+ * bound 由调用方预算 (mvscan_compute_boundaries). 含必要条件预过滤 (C 内核同侧, 零跨界开销). */
 static int nfa_run_assert_1(const mvs_nfa *a, const uint8_t *data, size_t len,
                             const uint8_t *bound) {
+    /* 必要条件预过滤: C 内核同侧检查, 不满足则直接返回 0 (省去整段位递推). */
+    if (!mvs_nec_check(a, data, len)) return 0;
     uint64_t prev = 0;
     size_t i = 0;
     while (i < len) {
@@ -786,6 +837,13 @@ static int parse_unit(const uint8_t *blob, size_t blobLen, size_t off, mvs_nfa *
             for (int _i = 0; _i < out->nCondAccept; _i++) { out->condAcceptBits[_i] = le_u64(blob + cur + (size_t)_i * 8); }
             cur += bitsBytes;
         }
+
+        /* 必要条件预过滤字段 (4 个 i32: necMinRunLen, necRunClass, necRequiredByte, necRequiredCount). */
+        if (cur + 16 > blobLen) return -1;
+        out->necMinRunLen = (int32_t)le_i32(blob + cur); cur += 4;
+        out->necRunClass = (int32_t)le_i32(blob + cur); cur += 4;
+        out->necRequiredByte = (int32_t)le_i32(blob + cur); cur += 4;
+        out->necRequiredCount = (int32_t)le_i32(blob + cur); cur += 4;
     }
 
     uint64_t fu = 0;

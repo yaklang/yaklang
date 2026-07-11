@@ -49,6 +49,11 @@ type mvsUnit struct {
 	// condAccept (条件接受)
 	condAcceptGuard []uint8
 	condAcceptBits  []uint64
+	// 必要条件预过滤 (C 内核同侧检查, 零跨界开销)
+	necMinRunLen     int32
+	necRunClass      int32 // 1=digit, 2=hex
+	necRequiredByte  int32 // -1=无, 0-255
+	necRequiredCount int32
 }
 
 // unitFromNFA 把一条 per-pattern NFA 转为 unit. reportedIdx 填入命中位置的 posPat
@@ -104,8 +109,8 @@ func unitFromMerged(m *mvsMergedNFA) mvsUnit {
 	}
 }
 
-// unitFromAssertNFA 把断言 NFA (hasAssert, nword==1) 转为 unit, 含 LimEx + guard 字段.
-func unitFromAssertNFA(nfa *mvsNFA, reportedIdx int) mvsUnit {
+// unitFromAssertNFA 把断言 NFA (hasAssert, nword==1) 转为 unit, 含 LimEx + guard + 必要条件字段.
+func unitFromAssertNFA(nfa *mvsNFA, reportedIdx int, nec necFactor) mvsUnit {
 	u := unitFromNFA(nfa, reportedIdx)
 	u.hasAssert = true
 	u.chainTarget1 = nfa.chainTarget1
@@ -131,13 +136,42 @@ func unitFromAssertNFA(nfa *mvsNFA, reportedIdx int) mvsUnit {
 		u.condAcceptGuard = append(u.condAcceptGuard, uint8(gb.g))
 		u.condAcceptBits = append(u.condAcceptBits, gb.bits[0])
 	}
+	// 必要条件预过滤 (从 necFactor 提取, C 内核同侧检查)
+	if nec.hasFactor && nec.minRunLen > 0 {
+		u.necMinRunLen = int32(nec.minRunLen)
+		switch nec.runClass {
+		case byteClassDigit:
+			u.necRunClass = 1
+		case byteClassHex:
+			u.necRunClass = 2
+		default:
+			u.necMinRunLen = 0
+		}
+	}
+	u.necRequiredByte = -1
+	for b, req := range nec.requiredBytes {
+		if req > 0 {
+			u.necRequiredByte = int32(b)
+			u.necRequiredCount = int32(req)
+			break
+		}
+	}
 	return u
+}
+
+// getNecFactor 安全获取 assertNecFactors[idx] (可能为 nil 或越界).
+func getNecFactor(factors []necFactor, idx int) necFactor {
+	if factors != nil && idx < len(factors) {
+		return factors[idx]
+	}
+	return necFactor{}
 }
 
 // buildMVSBlob 把整个 db 的 per-pattern NFA (按 idx) + 合并 NFA 序列化为单段 blob.
 // v2: 断言 NFA (hasAssert) 也序列化进 blob (C 内核 nfa_run_assert_1 执行).
 // nfas[idx]==nil (走 verifier 兜底) 的 slotUnit 记 -1.
-func buildMVSBlob(nfas []*mvsNFA, merged *mvsMergedNFA) []byte {
+// assertNecFactors 提供 per-idx 必要条件 (可为 nil).
+func buildMVSBlob(nfas []*mvsNFA, merged *mvsMergedNFA, assertNecFactors []necFactor) []byte {
 	npat := len(nfas)
 	slotUnit := make([]int32, npat)
 	var units []mvsUnit
@@ -150,7 +184,7 @@ func buildMVSBlob(nfas []*mvsNFA, merged *mvsMergedNFA) []byte {
 			// 断言 NFA: 仅 nword==1 (single) 且 excFollow1 已初始化的才序列化进 C
 			if nfas[idx].single {
 				slotUnit[idx] = int32(len(units))
-				units = append(units, unitFromAssertNFA(nfas[idx], idx))
+				units = append(units, unitFromAssertNFA(nfas[idx], idx, getNecFactor(assertNecFactors, idx)))
 				continue
 			}
 			// 多字断言 NFA 仍走 Go (C 暂不支持)
@@ -256,6 +290,11 @@ func encodeUnit(u mvsUnit) []byte {
 			b = append(b, g)
 		}
 		b = putU64s(b, u.condAcceptBits)
+		// 必要条件预过滤 (4 个 i32)
+		b = putI32(b, u.necMinRunLen)
+		b = putI32(b, u.necRunClass)
+		b = putI32(b, u.necRequiredByte)
+		b = putI32(b, u.necRequiredCount)
 	}
 	return b
 }
