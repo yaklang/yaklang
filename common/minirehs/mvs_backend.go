@@ -910,6 +910,12 @@ func (d *mvsDB) verifyOne(idx int, data []byte, sc *scratch, handler MatchHandle
 			// 与 Go existsInAssertShared1 逐位一致 (差分护栏).
 			bound := d.sharedBound(data, sc)
 			hit = d.kernel.nfaExistsAssert(idx, data, bound)
+		case nfa.hasAssert && nfa.single && d.kernel != nil:
+			// 断言 NFA 单字: 有 C 内核时走 C nfa_run_assert_1 (C 侧 computeBoundaries + guard 门控).
+			hit = d.kernel.nfaExistsAssert(idx, data, d.sharedBound(data, sc))
+		case nfa.hasAssert && d.kernel != nil:
+			// 断言 NFA 多字: 有 C 内核时走 C nfa_run_assert_mw.
+			hit = d.kernel.nfaExistsAssert(idx, data, d.sharedBound(data, sc))
 		case nfa.hasAssert && nfa.single:
 			hit = nfa.existsInAssertShared1(data, d.sharedBound(data, sc))
 		case nfa.hasAssert:
