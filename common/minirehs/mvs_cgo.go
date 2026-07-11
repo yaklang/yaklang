@@ -162,6 +162,58 @@ func (k *mvsKernel) nfaExistsAnchoredImpl(idx int, data []byte, spans []anchorSp
 	return r == 1
 }
 
+// nfaExistsAssert 判定断言 NFA (hasAssert, nword==1) 在 data 中是否存在命中 (C 实现).
+// bound 为预算的共享边界数组 (computeBoundariesC). 与 Go existsInAssertShared1 逐位一致.
+// 返回 true 命中 / false 不命中或无 C 断言 NFA.
+func (k *mvsKernel) nfaExistsAssert(idx int, data []byte, bound []byte) bool {
+	if k == nil || k.db == nil || len(data) == 0 || len(bound) < len(data)+1 {
+		return false
+	}
+	var dptr *C.uint8_t
+	if len(data) > 0 {
+		dptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	}
+	var bptr *C.uint8_t
+	if len(bound) > 0 {
+		bptr = (*C.uint8_t)(unsafe.Pointer(&bound[0]))
+	}
+	r := C.mvscan_db_nfa_exists_assert(k.db, C.int32_t(idx), dptr, C.size_t(len(data)), bptr)
+	keepAlive(data)
+	runtime.KeepAlive(bound)
+	return r == 1
+}
+
+// computeBoundariesC 在 C 侧计算边界条件数组 (复刻 Go computeBoundaries).
+// buf 容量须 >= len(data)+1. 返回 buf[:len(data)+1].
+func (k *mvsKernel) computeBoundariesC(data []byte, buf []byte) []byte {
+	if len(data) == 0 {
+		if cap(buf) >= 1 {
+			buf = buf[:1]
+		} else {
+			buf = make([]byte, 1)
+		}
+	} else {
+		if cap(buf) < len(data)+1 {
+			buf = make([]byte, len(data)+1)
+		} else {
+			buf = buf[:len(data)+1]
+		}
+	}
+	if len(data) == 0 {
+		// 空输入: 文本始=文本末
+		buf[0] = 0x01 | 0x02 | 0x04 | 0x08 | 0x20 // BeginText|EndText|BeginLine|EndLine|NoWordBoundary
+		return buf
+	}
+	var dptr *C.uint8_t
+	dptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	var bptr *C.uint8_t
+	bptr = (*C.uint8_t)(unsafe.Pointer(&buf[0]))
+	C.mvscan_compute_boundaries_pub(dptr, C.size_t(len(data)), bptr)
+	keepAlive(data)
+	runtime.KeepAlive(buf)
+	return buf
+}
+
 // nfaExistsAnchoredMany 一次 cgo 调用对多条 anchorable pattern 各自做锚定式存在性,
 // 摊薄 "每 pattern 一次 cgo" 的跨界开销 (锚定批处理 cgo 次数从 O(触发数) 降到 O(1)).
 // idxs[i] 为 pattern 下标, patSpanOff[i+1]-patSpanOff[i] 为其 spans 数, spansLo/Hi 平铺.

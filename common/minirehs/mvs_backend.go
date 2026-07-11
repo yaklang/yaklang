@@ -911,6 +911,11 @@ func (d *mvsDB) verifyOne(idx int, data []byte, sc *scratch, handler MatchHandle
 		// 后者复核已收窄到 data[winLo:] 廉价, 故移除预检为净赚)。真正的杠杆是把该 gate 也局部化 (gateHead>=0)。
 		var hit bool
 		switch {
+		case nfa.hasAssert && nfa.single && d.kernel != nil:
+			// 断言 NFA 单字: 有 C 内核时走 C nfa_run_assert_1 (C 侧 computeBoundaries + guard 门控).
+			// 与 Go existsInAssertShared1 逐位一致 (差分护栏).
+			bound := d.sharedBound(data, sc)
+			hit = d.kernel.nfaExistsAssert(idx, data, bound)
 		case nfa.hasAssert && nfa.single:
 			hit = nfa.existsInAssertShared1(data, d.sharedBound(data, sc))
 		case nfa.hasAssert:

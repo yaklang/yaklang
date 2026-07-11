@@ -126,6 +126,22 @@ void mvscan_db_nfa_exists_anchored_many(const mvscan_db *db,
 /* mvscan_simd_enabled 报告本次构建是否编入 SIMD 加速档 (1) 还是纯标量 (0). */
 int mvscan_simd_enabled(void);
 
+/*
+ * mvscan_compute_boundaries_pub 预计算 data 的零宽断言边界条件集 (复刻 Go computeBoundaries).
+ * 产出 bound[0..len] (len+1 字节), 供 mvscan_db_nfa_exists_assert 使用.
+ * buf 容量须 >= len+1. 多条断言 NFA 可共享同一份 bound (每报文一次).
+ */
+void mvscan_compute_boundaries_pub(const uint8_t *data, size_t len, uint8_t *buf);
+
+/*
+ * mvscan_db_nfa_exists_assert 判定断言 NFA (hasAssert, nword==1) 在 data 中是否存在命中.
+ * bound 为 mvscan_compute_boundaries_pub 产出的共享边界数组 (len+1 字节).
+ * 返回 1 命中 / 0 不命中 / -1 无 NFA 或非断言 NFA (应由 Go 侧兜底).
+ */
+int mvscan_db_nfa_exists_assert(const mvscan_db *db, int32_t idx,
+                                const uint8_t *data, size_t len,
+                                const uint8_t *bound);
+
 #ifdef __cplusplus
 }
 #endif
