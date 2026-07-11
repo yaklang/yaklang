@@ -218,6 +218,36 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 	}
 	db.merged = buildMergedNFA(mergeMembers)
 	db.mergedCount = len(mergeMembers)
+	// 必要条件预过滤: 对 always-on NFA (merged + assert) 从 RE2 表达式提取必要条件,
+	// 运行期先做廉价字节检查, 不满足则跳过整段 NFA 扫描 (绝不假阴).
+	if len(mergeMembers) > 0 {
+		factors := make([]necFactor, len(mergeMembers))
+		for mi, mem := range mergeMembers {
+			cp := patterns[mem.idx]
+			anchoredStart := false
+			requireEnd := false
+			if nfa := db.nfas[mem.idx]; nfa != nil {
+				anchoredStart = nfa.anchoredStart
+				requireEnd = nfa.requireEnd
+			}
+			factors[mi] = extractNecFactor(analysisExprFor(cp), anchoredStart, requireEnd)
+		}
+		db.mergedNecFactor = mergeNecFactorsDisj(factors)
+	}
+	if len(db.assertAlwaysOn) > 0 {
+		db.assertNecFactor = make([]necFactor, db.n)
+		for _, idx := range db.assertAlwaysOn {
+			cp := patterns[idx]
+			nfa := db.nfas[idx]
+			anchoredStart := false
+			requireEnd := false
+			if nfa != nil {
+				anchoredStart = nfa.anchoredStart
+				requireEnd = nfa.requireEnd
+			}
+			db.assertNecFactor[idx] = extractNecFactor(analysisExprFor(cp), anchoredStart, requireEnd)
+		}
+	}
 	// R2: 把无字面量的断言 always-on NFA 合并为单趟扫描 (共享边界条件),
 	// 替代逐条 existsInAssertShared 整段扫 (省 K-1 趟全量扫描 + K-1 次 make).
 	// 注: 实测合并后 nword 1→2 净回归 (见 assertMergedEnabled), 仅在 A/B 开关开启时构建.
@@ -399,6 +429,13 @@ type mvsDB struct {
 	// 共享 computeBoundaries 预算的边界条件, 替代逐条 existsInAssertShared 整段扫.
 	// 仅在有 >=2 条断言 always-on 时构建 (单条直接走 verifyOne 逐条). 不影响命中语义.
 	assertMerged *mvsAssertMergedNFA
+
+	// mergedNecFactor 是合并 always-on NFA 的必要条件预过滤 (所有成员必要条件的"最宽松交集").
+	// scan() 中, merged_scan 前先 check; check==false 则跳过 cgo 调用 (绝不假阴).
+	mergedNecFactor necFactor
+	// assertNecFactor 按 idx: 断言 always-on NFA 的 per-pattern 必要条件预过滤.
+	// scan() 中, 对每条 assert always-on 先 check; check==false 则跳过 existsInAssertShared.
+	assertNecFactor []necFactor
 	anchoredMerged   *mvsMergedNFA // R1 span-injected lean anchored 合并自动机（A/B 开关控制使用）
 	anchorMergedSlot []int         // pattern idx -> anchoredMerged 成员槽位；-1 表示非成员
 	assertAlwaysOn   []int         // 无字面量的断言 NFA (hasAssert): existsInAssert 门控 + verifier 定位
@@ -426,6 +463,10 @@ var anchorMergedEnabled = false
 // assertMergedEnabled 控制 R2 断言 NFA 合并单趟的运行期接线。实测合并后 nword 1→2,
 // 多字循环开销 > 省的趟数 (与 lean 合并的 A/B 结论一致), 默认关闭保留作差分护栏.
 var assertMergedEnabled = false
+
+// necPrefilterEnabled 控制必要条件字节预过滤的运行期接线。A/B 实测 Go 预检 O(n) 不比
+// Go NFA (LimEx shift+AND) 快, 净回归 (-9%). 基建保留供后续 C 内核 SIMD 预检接线.
+var necPrefilterEnabled = false
 
 // anchorCBatchEnabled 控制 C anchored-many 接线。它与 Go gap-jump 路径语义等价，
 // 但真实规则集上 C 对大量单字 NFA 的逐条重扫目前慢于 Go 标量快路径；默认关闭，保留作
@@ -726,14 +767,18 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 
 	// 2) 无字面量且可编入 NFA 的 always-on: 合并自动机单趟扫描得命中集合, 命中后逐个定位上报.
 	//    有 C 内核时单趟扫描走 C (返回去重后的成员 idx, 再用 fullDone 跨步去重); 否则走纯 Go.
+	//    注: 必要条件预过滤仅在纯 Go 路径 (无 C 内核) 时启用 —— C 内核 merged_scan 已是 SIMD 加速,
+	//    Go 字节预检 O(n) 不比 C 快, 反成净开销. 纯 Go 路径则 NFA 也是 Go, 预检能省整段位递推.
 	if d.merged != nil {
 		var hits []int
 		if d.kernel != nil {
 			hits = d.kernel.mergedScan(data, sc)
 		} else {
-			sc.mergedSeen = resetBoolBuf(sc.mergedSeen, d.n)
-			sc.mergedHits = d.merged.scanExist(data, sc.mergedSeen, sc.mergedHits[:0])
-			hits = sc.mergedHits
+			if !d.mergedNecFactor.hasFactor || d.mergedNecFactor.check(data) {
+				sc.mergedSeen = resetBoolBuf(sc.mergedSeen, d.n)
+				sc.mergedHits = d.merged.scanExist(data, sc.mergedSeen, sc.mergedHits[:0])
+				hits = sc.mergedHits
+			}
 		}
 		for _, idx := range hits {
 			if sc.fullDone[idx] {
@@ -769,6 +814,14 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 				continue
 			}
 			sc.fullDone[idx] = true
+			// 必要条件预过滤: check==false 时跳过该 pattern 的断言 NFA 扫描 (绝不假阴).
+			// A/B 实测: Go 预检 O(n) 不比 Go NFA (LimEx shift+AND) 快, 净回归. 仅在 necPrefilterEnabled 时启用.
+			if necPrefilterEnabled && idx < len(d.assertNecFactor) {
+				nf := &d.assertNecFactor[idx]
+				if nf.hasFactor && !nf.check(data) {
+					continue
+				}
+			}
 			if stop := d.verifyOne(idx, data, sc, handler); stop {
 				return true, nil
 			}
