@@ -22,15 +22,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* M3: SIMD 加速档. x86_64 用 SSE2 (基线必有) + AVX2 (可选, 256-bit), arm64 用 NEON.
- * AVX2 一次处理 4 个 uint64 = 256 位 (一条 __m256i 指令), 比 SSE2 两条 __m128i 快. */
+/* M3: SIMD 加速档. x86_64 用 SSE2 (ABI 基线必有), arm64 用 NEON.
+ * 更高指令集必须放在独立的 target 函数里并经运行期 CPU 探测后调用；不能根据
+ * __AVX2__ 替换本翻译单元的基线路径，否则用 -mavx2 构建的产物会在旧 CPU 上 SIGILL. */
 #if defined(__x86_64__) || defined(_M_X64)
 #include <emmintrin.h>
 #define MVS_SSE2 1
-#if defined(__AVX2__)
-#include <immintrin.h>
-#define MVS_AVX2 1
-#endif
 #elif defined(__aarch64__) || defined(_M_ARM64)
 #include <arm_neon.h>
 #define MVS_NEON 1
@@ -257,8 +254,8 @@ static inline void row_zero_s(uint64_t *d, int n) {
     for (int w = 0; w < n; w++) d[w] = 0;
 }
 
-/* SIMD 字向量原语. SSE2 (128-bit) / AVX2 (256-bit) / NEON (128-bit) 三选一. */
-#if (defined(MVS_SSE2) && !defined(MVS_AVX2))
+/* SIMD 字向量原语. SSE2 (128-bit) / NEON (128-bit) 二选一. */
+#if defined(MVS_SSE2)
 static inline void row_copy_v(uint64_t *d, const uint64_t *s, int n) {
     int w = 0;
     for (; w + 4 <= n; w += 4) {
@@ -315,53 +312,6 @@ static inline void row_zero_v(uint64_t *d, int n) {
     for (; w < n; w++) d[w] = 0;
 }
 
-/* AVX2: 一次 __m256i 处理 4 个 uint64 = 256 位 (一条指令, 覆盖 SSE2). */
-#elif defined(MVS_AVX2)
-static inline void row_copy_v(uint64_t *d, const uint64_t *s, int n) {
-    int w = 0;
-    for (; w + 4 <= n; w += 4)
-        _mm256_storeu_si256((__m256i *)(d + w), _mm256_loadu_si256((const __m256i *)(s + w)));
-    for (; w + 2 <= n; w += 2)
-        _mm_storeu_si128((__m128i *)(d + w), _mm_loadu_si128((const __m128i *)(s + w)));
-    for (; w < n; w++) d[w] = s[w];
-}
-static inline void row_or_v(uint64_t *d, const uint64_t *s, int n) {
-    int w = 0;
-    for (; w + 4 <= n; w += 4) {
-        __m256i a = _mm256_loadu_si256((const __m256i *)(d + w));
-        __m256i b = _mm256_loadu_si256((const __m256i *)(s + w));
-        _mm256_storeu_si256((__m256i *)(d + w), _mm256_or_si256(a, b));
-    }
-    for (; w + 2 <= n; w += 2) {
-        __m128i a = _mm_loadu_si128((const __m128i *)(d + w));
-        __m128i b = _mm_loadu_si128((const __m128i *)(s + w));
-        _mm_storeu_si128((__m128i *)(d + w), _mm_or_si128(a, b));
-    }
-    for (; w < n; w++) d[w] |= s[w];
-}
-static inline void row_and_v(uint64_t *d, const uint64_t *x, const uint64_t *y, int n) {
-    int w = 0;
-    for (; w + 4 <= n; w += 4) {
-        __m256i a = _mm256_loadu_si256((const __m256i *)(x + w));
-        __m256i b = _mm256_loadu_si256((const __m256i *)(y + w));
-        _mm256_storeu_si256((__m256i *)(d + w), _mm256_and_si256(a, b));
-    }
-    for (; w + 2 <= n; w += 2) {
-        __m128i a = _mm_loadu_si128((const __m128i *)(x + w));
-        __m128i b = _mm_loadu_si128((const __m128i *)(y + w));
-        _mm_storeu_si128((__m128i *)(d + w), _mm_and_si128(a, b));
-    }
-    for (; w < n; w++) d[w] = x[w] & y[w];
-}
-static inline void row_zero_v(uint64_t *d, int n) {
-    int w = 0;
-    __m256i z256 = _mm256_setzero_si256();
-    for (; w + 4 <= n; w += 4) _mm256_storeu_si256((__m256i *)(d + w), z256);
-    __m128i z128 = _mm_setzero_si128();
-    for (; w + 2 <= n; w += 2) _mm_storeu_si128((__m128i *)(d + w), z128);
-    for (; w < n; w++) d[w] = 0;
-}
-
 #elif defined(MVS_NEON)
 /* arm64 NEON: 一次处理 4 个 uint64 = 256 位 (两条 vld1q/vst1q 指令, 双发射). */
 static inline void row_copy_v(uint64_t *d, const uint64_t *s, int n) {
@@ -411,6 +361,13 @@ static inline void row_zero_v(uint64_t *d, int n) {
     for (; w + 2 <= n; w += 2) vst1q_u64(d + w, z);
     for (; w < n; w++) d[w] = 0;
 }
+#else
+/* 未知架构的 combined scanner 也会引用 ROW_V 名称；让它们显式落到标量孪生，
+ * 保证非 x86_64 / 非 arm64 构建既能编译，也不会尝试执行任何 SIMD 指令。 */
+#define row_copy_v row_copy_s
+#define row_or_v row_or_s
+#define row_and_v row_and_s
+#define row_zero_v row_zero_s
 #endif
 
 /* mvs_rune_start: 复刻 Go alignRuneStart — 把字节偏移 off 向左吸附到最近的 rune 起始.
@@ -1722,4 +1679,3 @@ void mvscan_db_nfa_exists_assert_many(const mvscan_db *db,
         out[i] = r;
     }
 }
-
