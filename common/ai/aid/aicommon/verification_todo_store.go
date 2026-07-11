@@ -349,7 +349,11 @@ func (s *VerificationTodoStore) applyStatusMutation(
 	}
 	item.Status = target
 	item.UpdatedAt = roundIndex
-	return todoApplySuccess(movement)
+	resultMovement := movement
+	if resultMovement.Content == "" {
+		resultMovement.Content = item.Content
+	}
+	return todoApplySuccess(resultMovement)
 }
 
 func (i *VerificationTodoItem) scope() VerificationTodoScope {

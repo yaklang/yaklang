@@ -74,15 +74,15 @@ var nodeIdMapper = map[string]*I18n{
 		En: "TODO List",
 	},
 	"todo_added": {
-		Zh: "TODO 增加",
+		Zh: "待办任务",
 		En: "TODO Added",
 	},
 	"todo_doing": {
-		Zh: "TODO 开始",
+		Zh: "待办进行中",
 		En: "TODO In Progress",
 	},
 	"todo_completed": {
-		Zh: "TODO 完成",
+		Zh: "待办完成",
 		En: "TODO Completed",
 	},
 	"task-dependency": {

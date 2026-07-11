@@ -754,34 +754,23 @@ func (r *Emitter) EmitDefaultStreamEvent(nodeId string, reader io.Reader, taskIn
 	})
 }
 
-// EmitNextMovementsSplitSystemStreams splits an already-parsed next_movements
-// slice by op into three channels and emits each non-empty channel as a system
-// stream event under the matching nodeId:
+// EmitNextMovementsSplitStreams splits an already-parsed next_movements slice
+// by op and emits each individual movement as its own stream event under the
+// matching nodeId:
 //
 //   - "added"    (add)                   -> nodeIdAdded
 //   - "doing"    (doing / 开始执行)      -> nodeIdDoing
 //   - "completed"(done / delete / skip)  -> nodeIdCompleted
 //
-// Each channel emits exactly ONE summary line — a count of that direction's
-// ops this round (e.g. "新增 2 条" / "开始 1 条" / "完成 3 条") — rather than a
-// per-item list. The card title (i18n via the NodeId) already labels the
-// direction, so the content only carries the count.
+// Each movement emits one event whose text is the TODO item's content only
+// (no label, no ID). The nodeId already carries the semantic label (i18n),
+// and the content is resolved by applyStatusMutation backfilling from the
+// store when the original movement didn't carry it. Movements with empty
+// content after resolution are silently skipped.
 //
-// An empty channel (no ops of that direction this round) produces no event —
-// the frontend never sees an empty card. The caller is expected to have parsed
-// the AI output already; this helper does no JSON decoding.
+// 关键词: EmitNextMovementsSplitStreams, next_movements 逐条 emit,
 //
-// doing is kept separate from add so the frontend can render a distinct
-// "开始执行" card: add means a brand-new TODO was appended, doing means an
-// already-known TODO actually started executing. Routing them through the same
-// nodeId would collapse two semantically different signals into one count.
-//
-// Returns the successfully emitted events in emission order so the caller can
-// capture a reference-materials anchor from whichever channel fired first.
-//
-// 关键词: EmitNextMovementsSplitStreams, next_movements 三通道,
-//
-//	added / doing / completed 流, 每类一条计数摘要, 空通道跳过, 解析后 emit
+//	added / doing / completed 流, 每条直接展示 content, 无参考资料
 func (r *Emitter) EmitNextMovementsSplitStreams(
 	nodeIdAdded, nodeIdDoing, nodeIdCompleted string,
 	movements []VerifyNextMovement,
@@ -790,39 +779,19 @@ func (r *Emitter) EmitNextMovementsSplitStreams(
 	if r == nil || len(movements) == 0 {
 		return nil, nil
 	}
-	var addedCount, doingCount, completedCount int
-	var addedLines, doingLines, completedLines []string
-	for _, m := range movements {
-		switch {
-		case IsNextMovementAddedOp(m.Op):
-			addedCount++
-			if m.Content != "" {
-				addedLines = append(addedLines, m.Content)
-			}
-		case IsNextMovementDoingOp(m.Op):
-			doingCount++
-			if m.Content != "" {
-				doingLines = append(doingLines, m.Content)
-			}
-		default:
-			completedCount++
-			if m.Content != "" {
-				completedLines = append(completedLines, m.Content)
-			}
-		}
-	}
 
 	var (
 		events   []*schema.AiOutputEvent
 		firstErr error
 	)
-	emitOne := func(nodeId string, count int, lines []string, label string) {
-		if count <= 0 {
+	emitItem := func(nodeId string, m VerifyNextMovement) {
+		text := strings.TrimSpace(m.Content)
+		if text == "" {
 			return
 		}
 		event, err := r.EmitDefaultStreamEvent(
 			nodeId,
-			strings.NewReader(fmt.Sprintf("%s 待办 %d 条", label, count)),
+			strings.NewReader(text),
 			taskIndex,
 			func() {},
 		)
@@ -836,13 +805,17 @@ func (r *Emitter) EmitNextMovementsSplitStreams(
 		if event != nil {
 			events = append(events, event)
 		}
-		if len(lines) > 0 && event != nil {
-			r.EmitTextReferenceMaterial(event.GetStreamEventWriterId(), strings.Join(lines, "\n"))
+	}
+	for _, m := range movements {
+		switch {
+		case IsNextMovementAddedOp(m.Op):
+			emitItem(nodeIdAdded, m)
+		case IsNextMovementDoingOp(m.Op):
+			emitItem(nodeIdDoing, m)
+		default:
+			emitItem(nodeIdCompleted, m)
 		}
 	}
-	emitOne(nodeIdAdded, addedCount, addedLines, "新增")
-	emitOne(nodeIdDoing, doingCount, doingLines, "开始")
-	emitOne(nodeIdCompleted, completedCount, completedLines, "完成")
 
 	if firstErr != nil && len(events) == 0 {
 		return nil, firstErr

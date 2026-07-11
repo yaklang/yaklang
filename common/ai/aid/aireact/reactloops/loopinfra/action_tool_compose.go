@@ -177,16 +177,16 @@ Example - Sequential file operations(With AI-Tag tags):
 			return
 		}
 
-		if mermaidCode, _ := dag.GenerateMermaidFlowChartWithStyles(); mermaidCode != "" {
-			markdownCompose, markdownComposeWriter := utils.NewPipe()
-			emitter := loop.GetEmitter()
-			emitter.EmitStreamEventWithContentType("tool_compose_progress", markdownCompose, loop.GetCurrentTask().GetId(), "text/markdown")
-			markdownComposeWriter.WriteString("## Tool Compose DAG\n")
-			markdownComposeWriter.WriteString("```mermaid\n")
-			markdownComposeWriter.WriteString(mermaidCode)
-			markdownComposeWriter.WriteString("```\n")
-			markdownComposeWriter.Close()
-		}
+		// if mermaidCode, _ := dag.GenerateMermaidFlowChartWithStyles(); mermaidCode != "" {
+		// 	markdownCompose, markdownComposeWriter := utils.NewPipe()
+		// 	emitter := loop.GetEmitter()
+		// 	emitter.EmitStreamEventWithContentType("tool_compose_progress", markdownCompose, loop.GetCurrentTask().GetId(), "text/markdown")
+		// 	markdownComposeWriter.WriteString("## Tool Compose DAG\n")
+		// 	markdownComposeWriter.WriteString("```mermaid\n")
+		// 	markdownComposeWriter.WriteString(mermaidCode)
+		// 	markdownComposeWriter.WriteString("```\n")
+		// 	markdownComposeWriter.Close()
+		// }
 
 		// Log the DAG structure
 		log.Infof("Tool compose DAG built successfully with %d nodes", len(dag.GetAllNodes()))
