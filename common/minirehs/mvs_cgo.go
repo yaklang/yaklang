@@ -118,10 +118,10 @@ func (k *mvsKernel) nfaExistsScalar(idx int, data []byte) bool {
 	return k.nfaExistsImpl(idx, data, true)
 }
 
-// findAllLoc1 在 C 内核中枚举单字 lean NFA 的 leftmost-longest 非重叠定位。
+// findAllLoc 在 C 内核中枚举 lean NFA 的 leftmost-longest 非重叠定位。
 // C 先前只做存在性判定，命中后 Go 会再次整段扫描以取 span；此入口把两段扫描收敛为
 // 一次 C 定位。返回 false 表示该 NFA 不适用，调用方必须安全回退 Go 定位器。
-func (k *mvsKernel) findAllLoc1(idx int, data []byte, sc *scratch) ([]int32, bool) {
+func (k *mvsKernel) findAllLoc(idx int, data []byte, sc *scratch) ([]int32, bool) {
 	if k == nil || k.db == nil || len(data) == 0 || sc == nil {
 		return nil, false
 	}
@@ -133,7 +133,7 @@ func (k *mvsKernel) findAllLoc1(idx int, data []byte, sc *scratch) ([]int32, boo
 	}
 	for {
 		capPairs := len(sc.cLocs) / 2
-		got := int32(C.mvscan_db_nfa_find_all_1(k.db, C.int32_t(idx),
+		got := int32(C.mvscan_db_nfa_find_all(k.db, C.int32_t(idx),
 			(*C.uint8_t)(unsafe.Pointer(&data[0])), C.size_t(len(data)),
 			(*C.int32_t)(unsafe.Pointer(&sc.cLocs[0])), C.int32_t(capPairs)))
 		keepAlive(data)

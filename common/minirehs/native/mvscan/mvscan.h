@@ -106,6 +106,11 @@ int32_t mvscan_db_nfa_find_all_1(const mvscan_db *db, int32_t idx,
                                   const uint8_t *data, size_t len,
                                   int32_t *out, int32_t capPairs);
 
+/* 通用多字版本；语义同 _1，覆盖所有无断言 lean NFA。 */
+int32_t mvscan_db_nfa_find_all(const mvscan_db *db, int32_t idx,
+                                const uint8_t *data, size_t len,
+                                int32_t *out, int32_t capPairs);
+
 /*
  * mvs_span 是锚定式扫描的注入区间 [lo, hi) (字节偏移). 仅当 rune 起始落入某 span 时
  * 才注入 NFA 起点 first, 其余位置不注入, 实现提前消亡 (对应 Go existsInAnchored).
