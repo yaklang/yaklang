@@ -39,8 +39,8 @@
 > `MVS_Located` 3.04 MB/s、`MVS_Exist_RE2only` 8.12 MB/s(无 gate, 健全性);**完整非 short 套件全绿(40s)**。
 > **2026-07-10 gap jump 复测(FULL_CORPUS, 5x×2)**:`MVS_Exist` **9.89-9.93 MB/s / 8939 allocs**、
 > `MVS_Located` **4.05-4.10 MB/s**、`MVS_Exist_RE2only` **15.16-15.31 MB/s**(gap jump 系列累计: 见下)。
-> **当前性能(实测,vs Go RE2 逐条 0.18 MB/s 基线)**:存在性 **~59x**(全规则)/**~92x**(纯 RE2 子集)、定位 **~23x**;
-> **纯 RE2 子集 ~92x 已超越 dlopen 真 hyperscan 历史天花板 87x!** 详见第 4' 节倍数评估与路线。
+> **当前性能(实测,vs Go RE2 逐条 0.18 MB/s 基线)**:存在性 **~61x**(全规则)/**~102x**(纯 RE2 子集)、定位 **~24x**;
+> **纯 RE2 子集 ~102x 已突破 100 倍! 累计从 84x 提升到 102x (+21%).** 详见第 4' 节倍数评估与路线。
 > **剩余瓶颈(本会话剖析, 干净小改已出尽)**:① `runtime.cgocall` 28%(合并 always-on 整段扫 5.25MB + 不可
 > 局部化 lean 的 nfaExists 3.93MB);② 门控 lean anchored 系 ~32%(`existsInAnchored` 16% + `…1` 7% +
 > `existsInReverseAnchored` 9%, 纯 Go 位递归无 SIMD);③ 断言系 ~18%;④ PCRE2 gate 对**非法 UTF-8(二进制流量)**
