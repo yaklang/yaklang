@@ -21,9 +21,11 @@ type MCPServerConfig struct {
 	disableResources map[string]*ResourceWithHandler
 	dynamicScript    []string
 	// grpcClient, when set, is used instead of NewLocalClient() (integration tests).
-	grpcClient YakClientInterface
-	profileDB  *gorm.DB
-	projectDB  *gorm.DB
+	grpcClient        YakClientInterface
+	profileDB         *gorm.DB
+	projectDB         *gorm.DB
+	profileDBProvider func() *gorm.DB
+	projectDBProvider func() *gorm.DB
 	// extraAITools holds aitool.Tool instances registered via WithAITools.
 	// They are merged last and override globalTools entries with the same name.
 	extraAITools map[string]*ToolWithHandler
@@ -395,6 +397,14 @@ func WithDatabases(profileDB, projectDB *gorm.DB) McpServerOption {
 	return func(cfg *MCPServerConfig) error {
 		cfg.profileDB = profileDB
 		cfg.projectDB = projectDB
+		return nil
+	}
+}
+
+func WithDatabaseProvider(profileDBProvider, projectDBProvider func() *gorm.DB) McpServerOption {
+	return func(cfg *MCPServerConfig) error {
+		cfg.profileDBProvider = profileDBProvider
+		cfg.projectDBProvider = projectDBProvider
 		return nil
 	}
 }

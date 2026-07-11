@@ -67,6 +67,9 @@ var MCPCommand = &cli.Command{
 	},
 	Action: func(c *cli.Context) error {
 		yakit.CallPostInitDatabase()
+		if err := syncCommandLineMCPProjectDatabase(); err != nil {
+			return err
+		}
 
 		var err error
 		transport := c.String("transport")
@@ -186,4 +189,17 @@ var MCPCommand = &cli.Command{
 
 		return nil
 	},
+}
+
+func syncCommandLineMCPProjectDatabase() error {
+	project, err := yakit.GetCurrentProject(consts.GetGormProfileDatabase(), yakit.TypeProject)
+	if err != nil {
+		return utils.Wrap(err, "sync command-line MCP current project")
+	}
+	databasePath := strings.TrimSpace(project.DatabasePath)
+	if databasePath == "" {
+		return utils.Error("sync command-line MCP current project: database path is empty")
+	}
+	consts.SetDefaultYakitProjectDatabaseName(databasePath)
+	return consts.SetGormProjectDatabase(databasePath)
 }

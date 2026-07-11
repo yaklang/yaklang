@@ -160,18 +160,13 @@ var filterHTTPFlowToolOptions = []mcp.ToolOption{
 }
 
 // httpFlowDatabaseHint is appended to every HTTP-flow tool description so that
-// AI clients understand that results come from the *current* project database.
-// If no data is found, the agent should verify and potentially switch the active
-// project before retrying.
+// AI clients keep HTTP traffic analysis scoped to the current project database.
 const httpFlowDatabaseHint = `
 <IMPORTANT>
-HTTP flow records are stored in the CURRENT project database.
-If the query returns no results or unexpected results, the active project database may not be the one the user intended.
-Recommended recovery steps:
-  1. Call get_current_database_context to inspect the active project database.
-  2. Call list_project_databases to enumerate all available projects.
-  3. Present the project list to the user and ask which project to switch to. DO NOT switch automatically.
-  4. Only call switch_current_project_database after the user explicitly confirms their choice.
+HTTP flow records are read from the current Yakit project database. By default, query_http_flow returns only current MITM/capture traffic (sourceType=mitm) and only the newest page ordered by updated_at desc. Pass sourceType="all" only when the user explicitly asks for all HTTP flow sources.
+Use returned_count as the number of flow records included in this tool response. Use total_matched_count as the total number of records matching the effective filter in the current project database. Do not call a paged response "read N records" by using the pagination limit or total_matched_count.
+Do not iterate pages, query unrelated tables, or call risk/port/MITM-rule tools as substitutes for HTTP traffic unless the user explicitly asks for those data types.
+If no HTTP flows are returned, report the current_project/current_database from the tool result and ask the user to confirm that Yakit is using the intended project and that capture/MITM traffic has been written to it.
 </IMPORTANT>`
 
 func init() {
@@ -282,13 +277,30 @@ func applyHTTPFlowQueryDefaults(req *ypb.QueryHTTPFlowRequest) {
 	if strings.TrimSpace(req.Pagination.Order) == "" {
 		req.Pagination.Order = "desc"
 	}
+	sourceType := strings.TrimSpace(req.SourceType)
+	if sourceType == "" {
+		req.SourceType = schema.HTTPFlow_SourceType_MITM
+	} else if strings.EqualFold(sourceType, "all") {
+		req.SourceType = ""
+	}
+}
+
+func currentHTTPFlowProjectDB(s *MCPServer) *gorm.DB {
+	if s == nil {
+		return nil
+	}
+	if s.projectDBProvider != nil {
+		return s.projectDBProvider()
+	}
+	return s.projectDB
 }
 
 func queryHTTPFlows(ctx context.Context, s *MCPServer, req *ypb.QueryHTTPFlowRequest) (*ypb.QueryHTTPFlowResponse, error) {
-	if s.projectDB == nil {
+	db := currentHTTPFlowProjectDB(s)
+	if db == nil {
 		return s.grpcClient.QueryHTTPFlows(ctx, req)
 	}
-	paging, data, err := yakit.QueryHTTPFlow(s.projectDB, req)
+	paging, data, err := yakit.QueryHTTPFlow(db, req)
 	if err != nil {
 		return nil, err
 	}
@@ -316,12 +328,13 @@ func queryHTTPFlows(ctx context.Context, s *MCPServer, req *ypb.QueryHTTPFlowReq
 }
 
 func setTagForHTTPFlow(ctx context.Context, s *MCPServer, req *ypb.SetTagForHTTPFlowRequest) error {
-	if s.projectDB == nil {
+	db := currentHTTPFlowProjectDB(s)
+	if db == nil {
 		_, err := s.grpcClient.SetTagForHTTPFlow(ctx, req)
 		return err
 	}
 	if len(req.GetCheckTags()) > 0 {
-		return utils.GormTransaction(s.projectDB, func(tx *gorm.DB) error {
+		return utils.GormTransaction(db, func(tx *gorm.DB) error {
 			for _, tag := range req.GetCheckTags() {
 				if err := yakit.SaveSetTagForHTTPFlow(tx, tag.GetId(), tag.GetHash(), tag.GetTags()); err != nil {
 					return err
@@ -330,15 +343,15 @@ func setTagForHTTPFlow(ctx context.Context, s *MCPServer, req *ypb.SetTagForHTTP
 			return nil
 		})
 	}
-	return yakit.SaveSetTagForHTTPFlow(s.projectDB, req.GetId(), req.GetHash(), req.GetTags())
+	return yakit.SaveSetTagForHTTPFlow(db, req.GetId(), req.GetHash(), req.GetTags())
 }
 
 func deleteHTTPFlows(ctx context.Context, s *MCPServer, req *ypb.DeleteHTTPFlowRequest) error {
-	if s.projectDB == nil {
+	db := currentHTTPFlowProjectDB(s)
+	if db == nil {
 		_, err := s.grpcClient.DeleteHTTPFlows(ctx, req)
 		return err
 	}
-	db := s.projectDB
 	if req.GetDeleteAll() {
 		yakit.DropWebsocketFlowTable(db)
 		yakit.DropExtractedDataTable(db)
@@ -405,14 +418,29 @@ func handleQueryHTTPFlows(s *MCPServer) server.ToolHandlerFunc {
 		if dbCtx.CurrentProject != nil && dbCtx.CurrentProject.GetProjectName() != "" {
 			projectName = dbCtx.CurrentProject.GetProjectName()
 		}
+		sourceType := req.GetSourceType()
+		if sourceType == "" {
+			sourceType = "all"
+		}
+		pagination := req.GetPagination()
 		ret := map[string]any{
-			"current_project":  projectName,
-			"current_database": dbCtx.CurrentProjectDBPath,
-			"flows":            results,
-			"total":            rsp.GetTotal(),
+			"current_project":     projectName,
+			"current_database":    dbCtx.CurrentProjectDBPath,
+			"query_scope":         "current_project_http_flows",
+			"flows":               results,
+			"returned_count":      len(results),
+			"total_matched_count": rsp.GetTotal(),
+			"count_note":          "returned_count is the number of records in this response page; total_matched_count is the total number of records matching the effective_filter in the current project database.",
+			"effective_filter": map[string]any{
+				"source_type": sourceType,
+				"page":        pagination.GetPage(),
+				"limit":       pagination.GetLimit(),
+				"order_by":    pagination.GetOrderBy(),
+				"order":       pagination.GetOrder(),
+			},
 		}
 		if len(results) == 0 {
-			ret["hint"] = "No HTTP flows found. The data may reside in a different project database. Call list_project_databases to get all available projects, present the list to the user, and ask them to confirm which project to switch to. Only call switch_current_project_database after the user explicitly confirms their choice."
+			ret["hint"] = "No HTTP flows found in the current project database. Report current_project/current_database to the user and ask them to confirm that Yakit is using the intended project and that capture/MITM traffic has been written to it. Do not inspect risks, ports, or MITM rules as substitutes unless the user asks for those data types."
 		}
 		return NewCommonCallToolResult(ret)
 	}

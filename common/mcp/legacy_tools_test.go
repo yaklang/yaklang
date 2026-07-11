@@ -565,8 +565,11 @@ func legacyHTTPFlowToolCases() map[string][]legacyToolCase {
 				var result map[string]any
 				decodeToolResultJSON(t, text, &result)
 				assert.Contains(t, result, "flows")
-				assert.Contains(t, result, "total")
+				assert.Contains(t, result, "returned_count")
+				assert.Contains(t, result, "total_matched_count")
+				assert.NotContains(t, result, "total")
 				assert.Contains(t, result, "current_database")
+				assert.Contains(t, result, "effective_filter")
 			},
 		},
 		{
@@ -1958,4 +1961,3 @@ func TestLegacyToolSet_GlobalHotpatch(t *testing.T) {
 func TestLegacyToolSet_SystemProxy(t *testing.T) {
 	runLegacyToolSetIntegration(t, "system_proxy")
 }
-

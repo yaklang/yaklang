@@ -20,6 +20,8 @@ type MCPServer struct {
 	grpcClient           YakClientInterface
 	profileDB            *gorm.DB
 	projectDB            *gorm.DB
+	profileDBProvider    func() *gorm.DB
+	projectDBProvider    func() *gorm.DB
 
 	sseMu sync.Mutex
 
@@ -46,6 +48,8 @@ func NewMCPServer(opts ...McpServerOption) (*MCPServer, error) {
 	s.bridgeClientClosers = cfg.bridgeClientClosers
 	s.profileDB = cfg.profileDB
 	s.projectDB = cfg.projectDB
+	s.profileDBProvider = cfg.profileDBProvider
+	s.projectDBProvider = cfg.projectDBProvider
 	cfg.ApplyConfig(s)
 	if cfg.grpcClient != nil {
 		s.grpcClient = cfg.grpcClient
