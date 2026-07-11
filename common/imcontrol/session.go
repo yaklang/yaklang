@@ -15,7 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/notify"
 	"github.com/yaklang/yaklang/common/notify/credential"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"google.golang.org/grpc"
 )
 
 // imSession 是一个 IM 会话的运行时状态，按 (platform + chatID + senderID) 隔离。
@@ -29,8 +28,8 @@ type imSession struct {
 	// 首次为 sessionKey；/new 后追加时间戳生成新 ID。
 	persistentSessionId string
 
-	// stream 是活跃的 StartAIReAct gRPC 双向流；nil 表示尚未建立或已关闭。
-	stream ypb.Yak_StartAIReActClient
+	// stream 是活跃的 StartAIReAct 双向流；nil 表示尚未建立或已关闭。
+	stream AIReActStream
 	// streamCancel 关闭当前 gRPC 流的 context（不影响 Engine 整体 ctx）。
 	streamCancel context.CancelFunc
 	// streamMu 保护 stream 的建立/关闭/发送。
@@ -83,23 +82,23 @@ type imSession struct {
 	pendingInteractiveAt      time.Time
 }
 
-// isAnswerStream 判断一个流事件的 NodeId 是否代表「给用户的最终回复」。
-// 只有这些 NodeId 的流式内容才应该回发给 IM 用户，其余（intent_summary /
-// next_movements / dispatches / plan / directly-answer 等）都是中间过程，必须过滤。
+// isUserVisibleStream 判断一个流事件的 NodeId 是否应该直接展示给 IM 用户。
+// 最终回复和 AI 调用错误都必须展示；其余 intent_summary / next_movements /
+// dispatches / plan / directly-answer 等中间过程必须过滤。
 // 注意：directly-answer NodeId 含 <|FINAL_ANSWER|> 内部标记，不是纯用户回复。
-func isAnswerStream(nodeID string) bool {
+func isUserVisibleStream(nodeID string) bool {
 	switch nodeID {
-	case "re-act-loop-answer-payload":
+	case "re-act-loop-answer-payload", "ai-error":
 		return true
 	}
 	return false
 }
 
 // shouldShowStream 根据 replyGranularity 颗粒度决定哪些流 NodeId 应展示给用户。
-//   - standard/summary：只展示最终回复（answer-payload / directly-answer）
+//   - standard/summary：只展示最终回复和 AI 错误（answer-payload / ai-error）
 //   - detailed：额外展示思考过程（thought）和工具调用摘要（tool-call-summary）
 func (e *Engine) shouldShowStream(platform, nodeID string) bool {
-	if isAnswerStream(nodeID) {
+	if isUserVisibleStream(nodeID) {
 		return true
 	}
 	if e.replyGranularityForPlatform(platform) == "detailed" {
@@ -296,16 +295,7 @@ func (s *imSession) clearPendingInteraction() {
 	s.pendingInteractiveAt = time.Time{}
 }
 
-// dialEngine 连接 yaklang 引擎 gRPC，返回客户端和关闭函数。
-func dialEngine(addr string) (ypb.YakClient, func() error, error) {
-	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(10*time.Second))
-	if err != nil {
-		return nil, nil, fmt.Errorf("dial %s: %w", addr, err)
-	}
-	return ypb.NewYakClient(conn), conn.Close, nil
-}
-
-// dispatchToAgent 把普通文本消息喂给 aid AI agent（通过 StartAIReAct gRPC 流）。
+// dispatchToAgent 把普通文本消息喂给 aid AI agent（通过 StartAIReAct 双向流）。
 // agent 的输出事件会被异步读取并回发到 IM。
 func (e *Engine) dispatchToAgent(msg *notify.InboundMessage, content string) {
 	sessionKey := imSessionKey(msg)
@@ -451,7 +441,11 @@ func (e *Engine) startAgentStream(sess *imSession) error {
 	defer sess.streamMu.Unlock()
 
 	ctx, cancel := context.WithCancel(e.ctx)
-	stream, err := e.grpcClient.StartAIReAct(ctx)
+	if e.streamFactory == nil {
+		cancel()
+		return fmt.Errorf("ai agent stream factory is not configured")
+	}
+	stream, err := e.streamFactory.StartAIReAct(ctx)
 	if err != nil {
 		cancel()
 		return fmt.Errorf("open StartAIReAct stream: %w", err)
@@ -507,15 +501,15 @@ func (e *Engine) buildStartParams(sess *imSession) *ypb.AIStartParams {
 	}
 }
 
-// writeSessionIMMeta 把当前会话的结构化 IM 元数据通过 gRPC 回写到项目库。
+// writeSessionIMMeta 把当前会话的结构化 IM 元数据写入项目库。
 // 在 startAgentStream 成功后异步调用。
 func (e *Engine) writeSessionIMMeta(sess *imSession) {
-	if e.grpcClient == nil || sess == nil || sess.persistentSessionId == "" {
+	if e.sessionStore == nil || sess == nil || sess.persistentSessionId == "" {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	_, err := e.grpcClient.UpdateAISessionIMMeta(ctx, &ypb.UpdateAISessionIMMetaRequest{
+	_, err := e.sessionStore.UpdateAISessionIMMeta(ctx, &ypb.UpdateAISessionIMMetaRequest{
 		SessionID: sess.persistentSessionId,
 		Meta: &ypb.IMSourceMeta{
 			Platform:   sess.platform,
@@ -662,7 +656,7 @@ type streamSegment struct {
 //
 // 关键：每个 event_writer_id 段在 stream-finished 时独立发一条消息，与前端"每个 writer_id
 // 一个 AI 响应节点"完全一致。agent 跑几轮就发几条，忠实呈现，不做跨段去重。
-func (e *Engine) readAgentOutput(sess *imSession, stream ypb.Yak_StartAIReActClient) {
+func (e *Engine) readAgentOutput(sess *imSession, stream AIReActStream) {
 	// 取当前 turn 的 presenter + run context（dispatchToAgent 在发输入前已设置）。
 	getPresenterCtx := func() (RunPresenter, *RunContext) {
 		sess.presenterMu.RLock()

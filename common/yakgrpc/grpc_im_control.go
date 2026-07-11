@@ -43,7 +43,6 @@ func (s *Server) StartIMControl(ctx context.Context, req *ypb.StartIMControlRequ
 	}
 
 	cfg := imcontrol.Config{
-		EngineAddr:                req.GetEngineAddr(),
 		Platforms:                 req.GetPlatforms(),
 		SessionIdleTimeoutSeconds: int(req.GetSessionIdleTimeoutSeconds()),
 		ReplyQuote:                req.GetReplyQuote(),       // 默认 false；grpc 层在 proto 默认值下取 false
@@ -53,6 +52,7 @@ func (s *Server) StartIMControl(ctx context.Context, req *ypb.StartIMControlRequ
 		PlatformConfigs:           buildIMRuntimePlatformConfigs(req.GetPlatformConfigs()),
 	}
 	engine := imcontrol.New(cfg)
+	engine.SetAIBackend(&imAIReActBackend{server: s}, s)
 	if err := engine.Start(); err != nil {
 		log.Errorf("start im engine failed: %v", err)
 		signalIMEngineLifecycleLocked()

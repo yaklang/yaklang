@@ -49,25 +49,27 @@ func TestCallbackAuth_Expired(t *testing.T) {
 }
 
 func TestCallbackAuth_NonceReplay(t *testing.T) {
-	a := NewCallbackAuth([]byte("test-secret-key-32-bytes-long!!!"))
-	token := a.Sign(CallbackSignInput{
-		RunID: "r1", ChatID: "oc1", Action: "stop",
-	})
-	expected := CallbackVerifyExpected{
-		RunID: "r1", ChatID: "oc1", Action: "stop",
-	}
-	// 第一次验签通过
-	r1 := a.Verify(token, expected)
-	if !r1.OK {
-		t.Fatalf("first verify failed: %s", r1.Reason)
-	}
-	// 同 token 二次验签 → nonce 重放（stop 是 one-shot）
-	r2 := a.Verify(token, expected)
-	if r2.OK {
-		t.Error("replay should fail for one-shot action stop")
-	}
-	if r2.Reason != "nonce-replay" {
-		t.Errorf("reason = %q, want nonce-replay", r2.Reason)
+	for _, action := range []string{"stop", "review_decision"} {
+		t.Run(action, func(t *testing.T) {
+			a := NewCallbackAuth([]byte("test-secret-key-32-bytes-long!!!"))
+			token := a.Sign(CallbackSignInput{
+				RunID: "r1", ChatID: "oc1", Action: action,
+			})
+			expected := CallbackVerifyExpected{
+				RunID: "r1", ChatID: "oc1", Action: action,
+			}
+			r1 := a.Verify(token, expected)
+			if !r1.OK {
+				t.Fatalf("first verify failed: %s", r1.Reason)
+			}
+			r2 := a.Verify(token, expected)
+			if r2.OK {
+				t.Fatalf("replay should fail for one-shot action %s", action)
+			}
+			if r2.Reason != "nonce-replay" {
+				t.Fatalf("reason = %q, want nonce-replay", r2.Reason)
+			}
+		})
 	}
 }
 

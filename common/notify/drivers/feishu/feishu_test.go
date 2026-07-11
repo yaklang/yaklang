@@ -559,6 +559,12 @@ func TestBuildFeishuOnboardingQRURL_AddsCardActionCallback(t *testing.T) {
 	if len(items) != 1 || items[0] != "card.action.trigger" {
 		t.Fatalf("callbacks.items = %#v, want card.action.trigger", items)
 	}
+	events, _ := addons["events"].(map[string]any)
+	eventItems, _ := events["items"].(map[string]any)
+	tenantEvents, _ := eventItems["tenant"].([]any)
+	if len(tenantEvents) != 1 || tenantEvents[0] != "im.message.receive_v1" {
+		t.Fatalf("events.items.tenant = %#v, want im.message.receive_v1", tenantEvents)
+	}
 }
 
 func TestDispatchEventMixedContentObject(t *testing.T) {

@@ -3,7 +3,7 @@
 // 它把已配置的 IM bot（飞书/钉钉，凭证来自 credential.BotConfig 扫码/手动落库）
 // 接收到的入站消息，路由到两类处理：
 //   - 斜杠命令（/help /new /stop /model /scan …）：在本地直接处理，控制会话/模型/执行。
-//   - 普通文本：通过 gRPC 双向流 StartAIReAct 喂给 aid AI agent 执行，结果回发到 IM。
+//   - 普通文本：通过内部 AIReAct 双向流喂给 aid AI agent 执行，结果回发到 IM。
 //
 // 设计参考 cc-connect 的 Platform/Engine/Command 分层，但在 yaklang 内实现，
 // agent 一端对接已有的 StartAIReAct gRPC 流（而非 Claude Code CLI）。
@@ -25,13 +25,11 @@ import (
 
 // Engine 是 IM 远程控制的核心，常驻后台。
 type Engine struct {
-	// engineAddr 是 yaklang 引擎 gRPC 地址，IM Engine 作为客户端连接它来调 StartAIReAct。
-	engineAddr string
-	// grpcClient 连接本机引擎，用于创建 StartAIReAct 双向流。
-	grpcClient ypb.YakClient
-	// grpcClose 关闭底层连接。
-	grpcClose func() error
-	// queryAISessionFunc 允许测试注入 AI Session 查询；为空时使用 grpcClient.QueryAISession。
+	// streamFactory 创建 AIReAct 双向流。
+	streamFactory AIReActStreamFactory
+	// sessionStore 查询和写入 AI Session 元数据。
+	sessionStore AISessionStore
+	// queryAISessionFunc 允许测试注入 AI Session 查询；为空时使用 sessionStore.QueryAISession。
 	queryAISessionFunc func(context.Context, *ypb.QueryAISessionRequest) (*ypb.QueryAISessionResponse, error)
 
 	mu        sync.Mutex
@@ -93,7 +91,6 @@ type platformState struct {
 
 // Config 是构造 Engine 的参数。
 type Config struct {
-	EngineAddr                   string   // yaklang 引擎 gRPC 地址（留空用默认 127.0.0.1:8087）
 	Platforms                    []string // 只监听这些平台；空 = 所有已配置且 Enabled 的 bot
 	SessionIdleTimeoutSeconds    int      // 会话空闲超时秒数（默认 1800）
 	ReplyQuote                   bool     // bot 回复时是否引用用户消息（默认 true）
@@ -115,9 +112,6 @@ type RuntimePlatformConfig struct {
 	DisallowRequireForUserPrompt bool
 }
 
-// DefaultEngineAddr 默认 yaklang 引擎地址。
-const DefaultEngineAddr = "127.0.0.1:8087"
-
 const (
 	inboundDedupeTTL            = 10 * time.Minute
 	inboundPersistentDedupeTTL  = 24 * time.Hour
@@ -128,10 +122,6 @@ const (
 
 // New 构造一个未启动的 IM Engine。需要后续调 Start 才会开始监听。
 func New(cfg Config) *Engine {
-	addr := cfg.EngineAddr
-	if addr == "" {
-		addr = DefaultEngineAddr
-	}
 	idle := time.Duration(cfg.SessionIdleTimeoutSeconds) * time.Second
 	if cfg.SessionIdleTimeoutSeconds <= 0 {
 		idle = 30 * time.Minute
@@ -147,7 +137,6 @@ func New(cfg Config) *Engine {
 	reviewPolicy := normalizeReviewPolicy(cfg.ReviewPolicy)
 	riskScore := normalizeAIReviewRiskControlScore(cfg.AIReviewRiskControlScore)
 	return &Engine{
-		engineAddr:                   addr,
 		sessions:                     map[string]*imSession{},
 		platforms:                    map[string]*platformState{},
 		stateWatchers:                map[int]chan *ypb.IMControlStateEvent{},
@@ -228,14 +217,13 @@ func normalizePlatformConfigKey(platform string) string {
 	return strings.ToLower(strings.TrimSpace(platform))
 }
 
-// SetGRPCClient 注入一个已建好的 gRPC 客户端（用于 in-process 复用或测试 mock）。
-// 若不调用，Start() 会自动按 engineAddr 建立连接。
-func (e *Engine) SetGRPCClient(client ypb.YakClient, closeFn func() error) {
-	e.grpcClient = client
-	e.grpcClose = closeFn
+// SetAIBackend 注入 AI Agent 流工厂和 AI Session 存储入口。
+func (e *Engine) SetAIBackend(factory AIReActStreamFactory, store AISessionStore) {
+	e.streamFactory = factory
+	e.sessionStore = store
 }
 
-// Start 启动 IM Engine：连接引擎 + 对每个已配置 bot 启动 Receive 循环。
+// Start 启动 IM Engine：校验 AI 后端 + 对每个已配置 bot 启动 Receive 循环。
 // 返回启动结果消息。
 func (e *Engine) Start() error {
 	e.mu.Lock()
@@ -252,14 +240,12 @@ func (e *Engine) Start() error {
 		e.callbackAuth = NewCallbackAuth(nil) // nil 时内部派生默认密钥
 	}
 
-	// 1) 建立 gRPC 客户端（若未注入）
-	if e.grpcClient == nil {
-		client, closeFn, err := dialEngine(e.engineAddr)
-		if err != nil {
-			return fmt.Errorf("dial engine %s: %w", e.engineAddr, err)
+	// 1) 校验 AI 后端。
+	if e.streamFactory == nil {
+		if e.cancel != nil {
+			e.cancel()
 		}
-		e.grpcClient = client
-		e.grpcClose = closeFn
+		return fmt.Errorf("ai agent stream factory is not configured")
 	}
 
 	// 2) 加载已配置的 bot 凭证
@@ -908,10 +894,6 @@ func (e *Engine) Stop() {
 
 	if ctxCancel != nil {
 		ctxCancel()
-	}
-	if e.grpcClose != nil {
-		_ = e.grpcClose()
-		e.grpcClose = nil
 	}
 	log.Info("im engine stopped")
 }

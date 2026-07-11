@@ -143,8 +143,8 @@ func RunOnboarding(timeoutSeconds int, opts map[string]string, handler notify.On
 	}
 
 	// 推送二维码给前端（URL + 渲染好的 PNG，前端零依赖直接 <img> 展示）。
-	// 卡片按钮回调需要额外申请 card.action.trigger；否则用户点击按钮只有 loading，
-	// 后端不会收到任何 card action 事件。
+	// IM 消息事件和卡片按钮回调都需要在扫码注册时申请；否则新建应用可能
+	// 只能展示卡片，不能在客户端输入消息或把按钮点击推给后端。
 	qrURL, err := buildFeishuOnboardingQRURL(beginRes.VerificationURIComplete, opts)
 	if err != nil {
 		return handler(&notify.OnboardingStep{State: "error", Message: fmt.Sprintf("build qr url failed: %v", err)})
@@ -248,6 +248,11 @@ func buildFeishuOnboardingQRURL(rawURL string, opts map[string]string) (string, 
 
 func encodeFeishuOnboardingAddons() (string, error) {
 	payload := map[string]any{
+		"events": map[string]any{
+			"items": map[string]any{
+				"tenant": []string{"im.message.receive_v1"},
+			},
+		},
 		"callbacks": map[string]any{
 			"items": []string{"card.action.trigger"},
 		},
