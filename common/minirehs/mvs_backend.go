@@ -1055,7 +1055,12 @@ func ensureInt32(buf []int32, n int) []int32 {
 // 仅在首条断言 NFA 需要门控时触发; 无断言命中的报文完全不计算 (零开销).
 func (d *mvsDB) sharedBound(data []byte, sc *scratch) []uint8 {
 	if !sc.assertBoundReady {
-		sc.assertBound = computeBoundaries(data, sc.assertBound)
+		// 有 C 内核时用 C 侧 computeBoundaries (省 Go 逐字节循环), 否则纯 Go.
+		if d.kernel != nil {
+			sc.assertBound = d.kernel.computeBoundariesC(data, sc.assertBound)
+		} else {
+			sc.assertBound = computeBoundaries(data, sc.assertBound)
+		}
 		sc.assertBoundReady = true
 	}
 	return sc.assertBound
