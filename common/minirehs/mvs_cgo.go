@@ -455,13 +455,6 @@ func (k *mvsKernel) nfaExistsAnchoredMany(idxs []int32, data []byte,
 // simdEnabled 报告 C 内核是否编入 SIMD 加速档.
 func (k *mvsKernel) simdEnabled() bool { return C.mvscan_simd_enabled() != 0 }
 
-func (k *mvsKernel) assertDFAStates(idx int) int {
-	if k == nil || k.db == nil {
-		return 0
-	}
-	return int(C.mvscan_db_assert_dfa_states(k.db, C.int32_t(idx)))
-}
-
 func (k *mvsKernel) nfaExistsImpl(idx int, data []byte, scalar bool) bool {
 	if k == nil || k.db == nil {
 		return false

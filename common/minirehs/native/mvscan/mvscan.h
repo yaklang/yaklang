@@ -137,7 +137,6 @@ void mvscan_db_nfa_exists_anchored_many(const mvscan_db *db,
 
 /* mvscan_simd_enabled 报告本次构建是否编入 SIMD 加速档 (1) 还是纯标量 (0). */
 int mvscan_simd_enabled(void);
-int32_t mvscan_db_assert_dfa_states(const mvscan_db *db, int32_t idx);
 
 /*
  * mvscan_compute_boundaries_pub 预计算 data 的零宽断言边界条件集 (复刻 Go computeBoundaries).
