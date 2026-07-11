@@ -814,11 +814,81 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 		}
 	}
 
-	// 2) 无字面量且可编入 NFA 的 always-on: 合并自动机单趟扫描得命中集合, 命中后逐个定位上报.
-	//    有 C 内核时单趟扫描走 C (返回去重后的成员 idx, 再用 fullDone 跨步去重); 否则走纯 Go.
-	//    注: 必要条件预过滤仅在纯 Go 路径 (无 C 内核) 时启用 —— C 内核 merged_scan 已是 SIMD 加速,
-	//    Go 字节预检 O(n) 不比 C 快, 反成净开销. 纯 Go 路径则 NFA 也是 Go, 预检能省整段位递推.
-	if d.merged != nil {
+	// 2+3) 合并扫描 + 断言扫描合并为单次 C 数据遍历 (消除第二次 traversal).
+	// 有 C 内核且 merged != nil 时走 combinedScan (merged + single-word assert 在一次遍历内).
+	// 多字 assert NFA 回退逐条 verifyOne (需要共享边界, 不适合 combined).
+	if d.kernel != nil && d.merged != nil && len(d.assertAlwaysOn) > 0 {
+		// 收集 single-word assert always-on idxs
+		var assertCIdxs []int32
+		var assertGoIdxs []int
+		for _, idx := range d.assertAlwaysOn {
+			nfa := d.nfas[idx]
+			if nfa != nil && nfa.hasAssert && nfa.single {
+				assertCIdxs = append(assertCIdxs, int32(idx))
+			} else {
+				assertGoIdxs = append(assertGoIdxs, idx)
+			}
+		}
+		if len(assertCIdxs) > 0 {
+			mHits, aHits := d.kernel.combinedScan(data, assertCIdxs, sc)
+			sc.assertBoundReady = true // combinedScan 内部预算了边界
+			// 处理 merged 命中
+			for _, idx := range mHits {
+				if sc.fullDone[idx] {
+					continue
+				}
+				sc.fullDone[idx] = true
+				if stop := d.reportLocated(idx, data, sc, handler); stop {
+					return true, nil
+				}
+			}
+			// 处理 assert 命中
+			for _, idx := range aHits {
+				sc.fullDone[idx] = true
+				if stop := d.finalizeHit(idx, data, sc, handler); stop {
+					return true, nil
+				}
+			}
+			// 标记未命中的 assert (已由 combinedScan 判定)
+			for _, idx := range assertCIdxs {
+				sc.fullDone[int(idx)] = true
+			}
+			// Go 逐条处理多字 assert
+			for _, idx := range assertGoIdxs {
+				if sc.fullDone[idx] {
+					continue
+				}
+				sc.fullDone[idx] = true
+				if stop := d.verifyOne(idx, data, sc, handler); stop {
+					return true, nil
+				}
+			}
+		} else {
+			// 无 single-word assert, 走原路径
+			if d.merged != nil {
+				hits := d.kernel.mergedScan(data, sc)
+				for _, idx := range hits {
+					if sc.fullDone[idx] {
+						continue
+					}
+					sc.fullDone[idx] = true
+					if stop := d.reportLocated(idx, data, sc, handler); stop {
+						return true, nil
+					}
+				}
+			}
+			for _, idx := range d.assertAlwaysOn {
+				if sc.fullDone[idx] {
+					continue
+				}
+				sc.fullDone[idx] = true
+				if stop := d.verifyOne(idx, data, sc, handler); stop {
+					return true, nil
+				}
+			}
+		}
+	} else if d.merged != nil {
+		// 无 assert always-on 或无 C 内核: 原路径
 		var hits []int
 		if d.kernel != nil {
 			hits = d.kernel.mergedScan(data, sc)
@@ -838,44 +908,18 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 				return true, nil
 			}
 		}
-	}
-
-	// 2b) DFA always-on: 从 merged NFA 拆出的 DFA 模式, 一次 cgo 调用批量扫描所有 DFA.
-	// DFA 单模式 293 MB/s, batch 在一次 cgo 内逐个查表, 省去每模式一次 cgo 调用.
-	if len(d.dfaAlwaysOnIdxs) > 0 && d.kernel != nil {
-		dfaHits := d.kernel.dfaScanBatch(d.dfaAlwaysOnIdxs, data, sc)
-		for _, idx := range dfaHits {
-			sc.fullDone[int(idx)] = true
-		}
-		// 未命中的 DFA 模式也标记 fullDone (已由 DFA 批量判定)
-		for _, idx := range d.dfaAlwaysOnIdxs {
-			sc.fullDone[int(idx)] = true
-		}
-		for _, idx := range dfaHits {
-			if stop := d.finalizeHit(int(idx), data, sc, handler); stop {
-				return true, nil
-			}
-		}
-	}
-
-	// 3) 无字面量的断言 NFA always-on: 有合并自动机时走单趟 scanExistAssert (共享边界条件),
-	//    命中后交 verifier 定位; 否则逐条 existsInAssertShared (共享边界) 门控.
-	// 注: 合并经 A/B 实测为净回归 (nword 1→2, 多字循环开销 > 省的趟数), 默认不启用 (见 assertMergedEnabled).
-	if assertMergedEnabled && d.assertMerged != nil {
-		bound := d.sharedBound(data, sc)
-		sc.mergedSeen = resetBoolBuf(sc.mergedSeen, d.n)
-		hits := d.assertMerged.scanExistAssert(data, bound, sc.mergedSeen, sc.mergedHits[:0])
-		sc.mergedHits = hits
-		for _, idx := range hits {
+		// 3) assert always-on
+		for _, idx := range d.assertAlwaysOn {
 			if sc.fullDone[idx] {
 				continue
 			}
 			sc.fullDone[idx] = true
-			if stop := d.finalizeHit(idx, data, sc, handler); stop {
+			if stop := d.verifyOne(idx, data, sc, handler); stop {
 				return true, nil
 			}
 		}
 	} else {
+		// 无 merged: 仅 assert always-on
 		for _, idx := range d.assertAlwaysOn {
 			if sc.fullDone[idx] {
 				continue

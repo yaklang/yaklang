@@ -285,6 +285,90 @@ func (k *mvsKernel) nfaExistsAssertMany(idxs []int32, data []byte, sc *scratch) 
 	runtime.KeepAlive(out)
 	return out
 }
+
+// combinedScan: 单次数据遍历同时跑 merged NFA + assert NFA.
+// 返回 (mergedHits, assertHits).
+func (k *mvsKernel) combinedScan(data []byte, assertIdxs []int32, sc *scratch) (mergedHits []int, assertHits []int) {
+	if k == nil || k.db == nil || len(data) == 0 {
+		return nil, nil
+	}
+	n := len(data)
+	// mergedSeen
+	if cap(sc.cseen) < k.npat {
+		sc.cseen = make([]byte, k.npat)
+	} else {
+		sc.cseen = sc.cseen[:k.npat]
+		for i := range sc.cseen {
+			sc.cseen[i] = 0
+		}
+	}
+	// mergedOut
+	mergedCap := k.npat
+	if cap(sc.cmerged) < mergedCap {
+		sc.cmerged = make([]int32, mergedCap)
+	}
+	// boundBuf
+	if cap(sc.assertBound) < n+1 {
+		sc.assertBound = make([]byte, n+1)
+	} else {
+		sc.assertBound = sc.assertBound[:n+1]
+	}
+	// assertOut
+	assertCap := len(assertIdxs)
+	if assertCap < 1 {
+		assertCap = 1
+	}
+	assertOutBuf := make([]int32, assertCap)
+
+	// assertIdxs C pointer
+	var assertPtr *C.int32_t
+	if len(assertIdxs) > 0 {
+		assertPtr = (*C.int32_t)(unsafe.Pointer(&assertIdxs[0]))
+	}
+
+	var mergedTotal int32
+	var dptr *C.uint8_t
+	dptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	var mergedSeenPtr *C.uint8_t
+	if len(sc.cseen) > 0 {
+		mergedSeenPtr = (*C.uint8_t)(unsafe.Pointer(&sc.cseen[0]))
+	}
+	var mergedOutPtr *C.int32_t
+	if len(sc.cmerged) > 0 {
+		mergedOutPtr = (*C.int32_t)(unsafe.Pointer(&sc.cmerged[0]))
+	}
+	var boundPtr *C.uint8_t
+	if len(sc.assertBound) > 0 {
+		boundPtr = (*C.uint8_t)(unsafe.Pointer(&sc.assertBound[0]))
+	}
+	var assertOutPtr *C.int32_t
+	if len(assertOutBuf) > 0 {
+		assertOutPtr = (*C.int32_t)(unsafe.Pointer(&assertOutBuf[0]))
+	}
+
+	assertTotal := int32(C.mvscan_db_combined_scan(k.db, dptr, C.size_t(len(data)),
+		mergedSeenPtr, C.int32_t(k.npat),
+		mergedOutPtr, C.int32_t(mergedCap),
+		(*C.int32_t)(unsafe.Pointer(&mergedTotal)),
+		assertPtr, C.int32_t(len(assertIdxs)),
+		boundPtr,
+		assertOutPtr, C.int32_t(assertCap)))
+
+	keepAlive(data)
+	runtime.KeepAlive(sc.cseen)
+	runtime.KeepAlive(sc.cmerged)
+	runtime.KeepAlive(sc.assertBound)
+	runtime.KeepAlive(assertIdxs)
+	runtime.KeepAlive(assertOutBuf)
+
+	for i := int32(0); i < mergedTotal && i < int32(mergedCap); i++ {
+		mergedHits = append(mergedHits, int(sc.cmerged[i]))
+	}
+	for i := int32(0); i < assertTotal && i < int32(assertCap); i++ {
+		assertHits = append(assertHits, int(assertOutBuf[i]))
+	}
+	return mergedHits, assertHits
+}
 // buf 容量须 >= len(data)+1. 返回 buf[:len(data)+1].
 func (k *mvsKernel) computeBoundariesC(data []byte, buf []byte) []byte {
 	if len(data) == 0 {

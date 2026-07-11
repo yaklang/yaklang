@@ -167,6 +167,23 @@ int32_t mvscan_db_dfa_scan_batch(const mvscan_db *db,
                                  int32_t *out, int32_t cap);
 
 /*
+ * mvscan_db_combined_scan: 单次数据遍历同时跑 merged NFA + assert NFA.
+ * mergedOut: 合并 NFA 命中的成员 idx (去重 via seen).
+ * assertIdxs: 断言 NFA 的 pattern idx 列表.
+ * assertOut: 断言命中的 pattern idx.
+ * boundBuf: 边界缓冲 (len+1 字节), 内部预算.
+ * 返回 assertOut 中的命中数; mergedOut 通过 mergedSeen/mergedTotal 写入.
+ */
+int32_t mvscan_db_combined_scan(const mvscan_db *db,
+                                const uint8_t *data, size_t len,
+                                uint8_t *mergedSeen, int32_t mergedSeenLen,
+                                int32_t *mergedOut, int32_t mergedCap,
+                                int32_t *mergedTotalOut,
+                                const int32_t *assertIdxs, int32_t nAssert,
+                                uint8_t *boundBuf,
+                                int32_t *assertOut, int32_t assertCap);
+
+/*
  * mvscan_db_nfa_exists_assert_many 一次 cgo 对多条断言 always-on NFA 各自做断言存在性,
  * 内部预算边界 (每报文一次, 跨多条 NFA 共享), 摊薄跨界开销.
  * boundBuf 容量须 >= len+1. out[i] 写入命中结果 (1 命中 / 0 不命中或无 C 断言 NFA).
