@@ -143,14 +143,19 @@ func (nfa *mvsNFA) existsInReverseAnchored(data []byte, spans []anchorSpan, prev
 			}
 		}
 		if hasActive {
+			carry := uint64(0)
 			for w := 0; w < nword; w++ {
-				pw := prev[w]
-				for pw != 0 {
-					p := w*64 + bits.TrailingZeros64(pw)
-					pw &= pw - 1
-					fp := nfa.follow[p]
+				v := prev[w]
+				shifted := (v << 1) | carry
+				carry = v >> 63
+				cand[w] |= shifted & nfa.chainTarget[w]
+			}
+			for w := 0; w < nword; w++ {
+				for ex := prev[w] & nfa.excMask[w]; ex != 0; ex &= ex - 1 {
+					p := w*64 + bits.TrailingZeros64(ex)
+					ef := nfa.excFollow[p]
 					for k := 0; k < nword; k++ {
-						cand[k] |= fp[k]
+						cand[k] |= ef[k]
 					}
 				}
 			}
@@ -203,7 +208,6 @@ func (nfa *mvsNFA) existsInReverseAnchored2(data []byte, spans []anchorSpan) boo
 	}
 	first := nfa.first
 	lastAny := nfa.lastAny
-	follow := nfa.follow
 	reach := nfa.reach
 	n := len(data)
 	firstLo := int(spans[0].lo)
@@ -236,15 +240,17 @@ func (nfa *mvsNFA) existsInReverseAnchored2(data []byte, spans []anchorSpan) boo
 			cand0, cand1 = first[0], first[1]
 		}
 		if hasActive {
-			for pw := prev0; pw != 0; pw &= pw - 1 {
-				fp := follow[bits.TrailingZeros64(pw)]
-				cand0 |= fp[0]
-				cand1 |= fp[1]
+			cand0 |= (prev0 << 1) & nfa.chainTarget[0]
+			cand1 |= ((prev1 << 1) | (prev0 >> 63)) & nfa.chainTarget[1]
+			for ex := prev0 & nfa.excMask[0]; ex != 0; ex &= ex - 1 {
+				ef := nfa.excFollow[bits.TrailingZeros64(ex)]
+				cand0 |= ef[0]
+				cand1 |= ef[1]
 			}
-			for pw := prev1; pw != 0; pw &= pw - 1 {
-				fp := follow[64+bits.TrailingZeros64(pw)]
-				cand0 |= fp[0]
-				cand1 |= fp[1]
+			for ex := prev1 & nfa.excMask[1]; ex != 0; ex &= ex - 1 {
+				ef := nfa.excFollow[64+bits.TrailingZeros64(ex)]
+				cand0 |= ef[0]
+				cand1 |= ef[1]
 			}
 		}
 		rc := reach[sym]
