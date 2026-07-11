@@ -191,6 +191,10 @@ typedef struct {
     int32_t  nCondAccept;
     uint8_t *condAcceptGuard;  /* [nCondAccept] */
     uint64_t *condAcceptBits;  /* [nCondAccept] */
+    /* guard 求值确定化表 (仅 nword==1): B=0..63 直接映射位集，消除热循环条件扫描。 */
+    uint64_t *condFirstEval;   /* [64] */
+    uint64_t *condFollowEval;  /* [64*npos], B-major */
+    uint64_t *condAcceptEval;  /* [64] */
 
     /* ---- 必要条件预过滤 (v2 blob). 在 NFA 扫描前做快速字节检查. ---- */
     int32_t  necMinRunLen;     /* 0=无约束; >0 表示需要 >= necMinRunLen 个连续 necRunClass 字节 */
@@ -642,12 +646,7 @@ static int nfa_run_assert_1(const mvs_nfa *a, const uint8_t *data, size_t len,
         uint64_t shifted = (prev << 1) & a->chainTarget1;
         uint64_t cand = a->firstUnanchored[0] | shifted;
 
-        /* condFirst: 按 bpre 门控的条件起点注入. */
-        for (int k = 0; k < a->nCondFirst; k++) {
-            if ((a->condFirstGuard[k] & bpre) == a->condFirstGuard[k]) {
-                cand |= a->condFirstBits[k];
-            }
-        }
+        cand |= a->condFirstEval[bpre & 63u];
 
         /* 异常边: 仅对活跃的异常位置展开. */
         uint64_t exc = prev & a->excMask1;
@@ -662,25 +661,12 @@ static int nfa_run_assert_1(const mvs_nfa *a, const uint8_t *data, size_t len,
         while (cfm) {
             int p = mvs_ctz64(cfm);
             cfm &= cfm - 1;
-            /* 线性搜索 condFollow 中 pos==p 的条目 (npos 通常 < 64, 条目数少). */
-            for (int k = 0; k < a->nCondFollow; k++) {
-                if (a->condFollowPos[k] == p) {
-                    if ((a->condFollowGuard[k] & bpre) == a->condFollowGuard[k]) {
-                        cand |= a->condFollowBits[k];
-                    }
-                }
-            }
+            cand |= a->condFollowEval[(size_t)(bpre & 63u) * a->npos + p];
         }
 
         uint64_t active = cand & a->reach[sym];
         if (active & a->lastAny[0]) return 1;
-        if (a->nCondAccept > 0) {
-            for (int k = 0; k < a->nCondAccept; k++) {
-                if ((a->condAcceptGuard[k] & bpost) == a->condAcceptGuard[k]) {
-                    if (active & a->condAcceptBits[k]) return 1;
-                }
-            }
-        }
+        if (active & a->condAcceptEval[bpost & 63u]) return 1;
         prev = active;
         i = ni;
     }
@@ -1076,6 +1062,30 @@ static int parse_unit(const uint8_t *blob, size_t blobLen, size_t off, size_t un
         out->necRunClass = (int32_t)le_i32(blob + cur); cur += 4;
         out->necRequiredByte = (int32_t)le_i32(blob + cur); cur += 4;
         out->necRequiredCount = (int32_t)le_i32(blob + cur); cur += 4;
+
+        if (nword == 1) {
+            out->condFirstEval = (uint64_t *)calloc(64, sizeof(uint64_t));
+            out->condFollowEval = (uint64_t *)calloc((size_t)64 * npos, sizeof(uint64_t));
+            out->condAcceptEval = (uint64_t *)calloc(64, sizeof(uint64_t));
+            if (!out->condFirstEval || !out->condFollowEval || !out->condAcceptEval) return -1;
+            for (int B = 0; B < 64; B++) {
+                for (int k = 0; k < out->nCondFirst; k++) {
+                    if ((out->condFirstGuard[k] & B) == out->condFirstGuard[k])
+                        out->condFirstEval[B] |= out->condFirstBits[k];
+                }
+                for (int k = 0; k < out->nCondFollow; k++) {
+                    if ((out->condFollowGuard[k] & B) == out->condFollowGuard[k]) {
+                        int32_t p = out->condFollowPos[k];
+                        if (p >= 0 && p < npos)
+                            out->condFollowEval[(size_t)B * npos + p] |= out->condFollowBits[k];
+                    }
+                }
+                for (int k = 0; k < out->nCondAccept; k++) {
+                    if ((out->condAcceptGuard[k] & B) == out->condAcceptGuard[k])
+                        out->condAcceptEval[B] |= out->condAcceptBits[k];
+                }
+            }
+        }
     }
 
     uint64_t fu = 0;
@@ -1144,6 +1154,9 @@ static void free_unit(mvs_nfa *u) {
     free(u->condFollowBits);
     free(u->condAcceptGuard);
     free(u->condAcceptBits);
+    free(u->condFirstEval);
+    free(u->condFollowEval);
+    free(u->condAcceptEval);
     free(u->dfaNext);
     free(u->dfaAccept);
     memset(u, 0, sizeof(*u));
@@ -1581,11 +1594,7 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
                 /* LimEx: 链边 + 异常 */
                 uint64_t shifted = (prev << 1) & a->chainTarget1;
                 uint64_t cand = a->firstUnanchored[0] | shifted;
-                /* condFirst */
-                for (int cf = 0; cf < a->nCondFirst; cf++) {
-                    if ((a->condFirstGuard[cf] & bpre) == a->condFirstGuard[cf])
-                        cand |= a->condFirstBits[cf];
-                }
+                cand |= a->condFirstEval[bpre & 63u];
                 /* exc */
                 uint64_t exc = prev & a->excMask1;
                 while (exc) {
@@ -1598,11 +1607,7 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
                 while (cfm) {
                     int p = mvs_ctz64(cfm);
                     cfm &= cfm - 1;
-                    for (int cfi = 0; cfi < a->nCondFollow; cfi++) {
-                        if (a->condFollowPos[cfi] == p &&
-                            (a->condFollowGuard[cfi] & bpre) == a->condFollowGuard[cfi])
-                            cand |= a->condFollowBits[cfi];
-                    }
+                    cand |= a->condFollowEval[(size_t)(bpre & 63u) * a->npos + p];
                 }
                 /* active + accept */
                 uint64_t active = cand & a->reach[(size_t)asym * a->nword];
@@ -1611,16 +1616,10 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
                     if (assertTotal < assertCap) assertOut[assertTotal] = assertIdxs[k];
                     assertTotal++;
                 }
-                if (!aDone[k] && a->nCondAccept > 0) {
-                    for (int ca = 0; ca < a->nCondAccept; ca++) {
-                        if ((a->condAcceptGuard[ca] & bpost) == a->condAcceptGuard[ca] &&
-                            (active & a->condAcceptBits[ca])) {
-                            aDone[k] = 1;
-                            if (assertTotal < assertCap) assertOut[assertTotal] = assertIdxs[k];
-                            assertTotal++;
-                            break;
-                        }
-                    }
+                if (!aDone[k] && (active & a->condAcceptEval[bpost & 63u])) {
+                    aDone[k] = 1;
+                    if (assertTotal < assertCap) assertOut[assertTotal] = assertIdxs[k];
+                    assertTotal++;
                 }
                 aPrev[k] = active;
             }
