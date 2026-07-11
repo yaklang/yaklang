@@ -1130,8 +1130,19 @@ int32_t mvscan_db_merged_scan(const mvscan_db *db,
                               uint8_t *seen, int32_t seenLen,
                               int32_t *out, int32_t cap) {
     if (!db || db->mergedUnit < 0 || db->mergedUnit >= db->nUnits) return 0;
+    /* Rose-lite 必要条件预检: 数据不含任何能开始匹配的字节 => 跳过整段扫描.
+     * startByteMask 预计算: firstUnanchored & reach[asciiSym[b]] != 0 的字节集.
+     * 对 HTTP 流量, 很多记录不含能开始匹配的字节 (如纯二进制响应体). */
+    mvs_nfa *mu = &db->units[db->mergedUnit];
+    if (mu->hasStartByteMask) {
+        int anyStart = 0;
+        for (size_t i = 0; i < len; i++) {
+            if (mu->startByteMask[data[i]]) { anyStart = 1; break; }
+        }
+        if (!anyStart) return 0; /* 无字节能开始匹配: 跳过整段扫描 */
+    }
     int32_t total = 0;
-    nfa_run(&db->units[db->mergedUnit], data, len, 1, seen, seenLen, out, cap, &total);
+    nfa_run(mu, data, len, 1, seen, seenLen, out, cap, &total);
     return total;
 }
 
