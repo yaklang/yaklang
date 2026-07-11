@@ -1401,6 +1401,35 @@ int mvscan_simd_enabled(void) {
 #endif
 }
 
+/* mvscan_db_dfa_scan_batch: 在单次调用中对多个 DFA 模式扫描同一段 data.
+ * 对每个 idx 逐个跑 dfa_run, 把命中的 idx 写入 out. 返回命中数.
+ * 非 ASCII 输入时 DFA 回退 NFA (逐个 idx). 一次 cgo 调用完成所有 DFA 模式. */
+int32_t mvscan_db_dfa_scan_batch(const mvscan_db *db,
+                                 const uint8_t *data, size_t len,
+                                 const int32_t *idxs, int32_t nidx,
+                                 int32_t *out, int32_t cap) {
+    if (!db || !data || !idxs || nidx <= 0) return 0;
+    int32_t total = 0;
+    for (int32_t i = 0; i < nidx; i++) {
+        int32_t idx = idxs[i];
+        if (idx < 0 || idx >= db->npat) continue;
+        int32_t u = db->slotUnit[idx];
+        if (u < 0 || u >= db->nUnits) continue;
+        mvs_nfa *a = &db->units[u];
+        if (!a->hasDFA) continue;
+        int r = dfa_run(a, data, len);
+        if (r < 0) {
+            /* 非 ASCII 回退 NFA */
+            r = nfa_run_dispatch(a, data, len, 0, NULL, 0, NULL, 0, NULL, 0);
+        }
+        if (r == 1) {
+            if (total < cap) out[total] = idx;
+            total++;
+        }
+    }
+    return total;
+}
+
 /* mvscan_db_nfa_exists_assert_self: 自包含断言扫描 — 内部预算边界, 不需外部 bound 参数.
  * 省去 Go 侧 sharedBound 一次 cgo 调用 (每报文省 1 次跨界). */
 int mvscan_db_nfa_exists_assert_self(const mvscan_db *db, int32_t idx,
