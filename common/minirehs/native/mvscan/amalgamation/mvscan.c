@@ -1841,6 +1841,217 @@ int mvscan_simd_enabled(void) {
 #endif
 }
 
+/* mvscan_db_combined_scan: 单次数据遍历同时跑 merged NFA + 多个 assert NFA.
+ * 消除第二次数据遍历 (merged + assert 各扫一遍 -> 合并为一次).
+ * 对每个字节: 先推进 merged NFA 状态, 再推进每个 assert NFA 状态.
+ * assert NFA 的边界条件在遍历前预算一次. */
+int32_t mvscan_db_combined_scan(const mvscan_db *db,
+                                const uint8_t *data, size_t len,
+                                uint8_t *mergedSeen, int32_t mergedSeenLen,
+                                int32_t *mergedOut, int32_t mergedCap,
+                                int32_t *mergedTotalOut,
+                                const int32_t *assertIdxs, int32_t nAssert,
+                                uint8_t *boundBuf,
+                                int32_t *assertOut, int32_t assertCap) {
+    if (!db || !data || len == 0) return 0;
+
+    /* 预算边界 (供 assert NFA) */
+    if (boundBuf) {
+        mvscan_compute_boundaries(data, len, boundBuf);
+    }
+
+    /* 获取 assert NFA 单元 */
+    mvs_nfa **assertNFAs = NULL;
+    int32_t nAssertReal = 0;
+    if (nAssert > 0 && assertIdxs) {
+        assertNFAs = (mvs_nfa **)malloc((size_t)nAssert * sizeof(mvs_nfa *));
+        if (!assertNFAs) return 0;
+        for (int32_t i = 0; i < nAssert; i++) {
+            int32_t idx = assertIdxs[i];
+            if (idx < 0 || idx >= db->npat) { assertNFAs[i] = NULL; continue; }
+            int32_t u = db->slotUnit[idx];
+            if (u < 0 || u >= db->nUnits) { assertNFAs[i] = NULL; continue; }
+            mvs_nfa *a = &db->units[u];
+            if (!a->hasAssert) { assertNFAs[i] = NULL; continue; }
+            assertNFAs[i] = a;
+            nAssertReal++;
+        }
+    }
+
+    /* 获取 merged NFA */
+    mvs_nfa *mu = NULL;
+    if (db->mergedUnit >= 0 && db->mergedUnit < db->nUnits) {
+        mu = &db->units[db->mergedUnit];
+        /* Rose-lite skip */
+        if (mu->hasStartByteMask) {
+            int anyStart = 0, hasNonASCII = 0;
+            for (size_t i = 0; i < len; i++) {
+                uint8_t b = data[i];
+                if (b < 0x80) { if (mu->startByteMask[b]) { anyStart = 1; break; } }
+                else { hasNonASCII = 1; break; }
+            }
+            if (!anyStart && !hasNonASCII) {
+                /* merged 不会命中, 只跑 assert */
+                mu = NULL;
+            }
+        }
+    }
+
+    /* 如果没有 merged 也没有 assert, 直接返回 */
+    if (!mu && nAssertReal == 0) {
+        if (assertNFAs) free(assertNFAs);
+        if (mergedTotalOut) *mergedTotalOut = 0;
+        return 0;
+    }
+
+    /* 分配 merged NFA 工作缓冲 */
+    int mw = mu ? mu->nword : 0;
+    uint64_t *mPrev = NULL, *mCand = NULL;
+    if (mu) {
+        mPrev = (uint64_t *)calloc((size_t)mw, sizeof(uint64_t));
+        mCand = (uint64_t *)malloc((size_t)mw * sizeof(uint64_t));
+    }
+
+    /* 分配 assert NFA 工作缓冲 (单字) */
+    uint64_t *aPrev = NULL;
+    if (nAssertReal > 0) {
+        aPrev = (uint64_t *)calloc((size_t)nAssert, sizeof(uint64_t));
+    }
+    uint8_t *aDone = (uint8_t *)calloc((size_t)nAssert, 1); /* 标记已命中 */
+
+    int32_t mergedTotal = 0;
+    int32_t assertTotal = 0;
+
+    size_t i = 0;
+    while (i < len) {
+        /* 解码 rune */
+        int sym;
+        size_t ni;
+        uint8_t c0 = data[i];
+        if (c0 < 0x80) {
+            sym = mu ? (int)mu->asciiSym[c0] : 0;
+            ni = i + 1;
+        } else {
+            int32_t r;
+            int size = mvs_decode_rune(data + i, len - i, &r);
+            ni = i + (size_t)size;
+            sym = mu ? symbol_of(mu, r) : 0;
+        }
+        int atStart = (i == 0);
+        int atEnd = (ni == len);
+
+        /* ---- merged NFA 递推 ---- */
+        if (mu) {
+            row_copy_v(mCand, mu->firstUnanchored, mw);
+            if (atStart && mu->hasAnchored) row_or_v(mCand, mu->firstAnchored, mw);
+            for (int w = 0; w < mw; w++) {
+                uint64_t pw = mPrev[w];
+                while (pw) {
+                    int p = (w << 6) + mvs_ctz64(pw);
+                    pw &= pw - 1;
+                    row_or_v(mCand, mu->follow + (size_t)p * mw, mw);
+                }
+            }
+            const uint64_t *rc = mu->reach + (size_t)sym * mw;
+            uint64_t anyActive = 0;
+            for (int w = 0; w < mw; w++) {
+                mPrev[w] = mCand[w] & rc[w];
+                anyActive |= mPrev[w];
+                uint64_t acc = mPrev[w] & mu->lastAny[w];
+                if (atEnd) acc |= mPrev[w] & mu->lastEnd[w];
+                while (acc) {
+                    int p = (w << 6) + mvs_ctz64(acc);
+                    acc &= acc - 1;
+                    int32_t id = mu->posPat[p];
+                    if (id >= 0 && id < mergedSeenLen && !mergedSeen[id]) {
+                        mergedSeen[id] = 1;
+                        if (mergedTotal < mergedCap) mergedOut[mergedTotal] = id;
+                        mergedTotal++;
+                    }
+                }
+            }
+            /* Vermicelli skip for merged */
+            if (anyActive == 0 && mu->hasStartByteMask) {
+                size_t j = i + 1;
+                while (j < len && data[j] < 0x80 && !mu->startByteMask[data[j]]) j++;
+                if (j > ni) {
+                    /* 跳过 — 但仍需推进 assert NFA */
+                    /* 简化: 不跳, 逐字节走 (assert NFA 需要每字节) */
+                }
+            }
+        }
+
+        /* ---- assert NFA 递推 (每个单字 NFA) ---- */
+        if (nAssertReal > 0 && boundBuf) {
+            uint8_t bpre = boundBuf[i];
+            uint8_t bpost = boundBuf[ni];
+            for (int32_t k = 0; k < nAssert; k++) {
+                if (!assertNFAs[k] || aDone[k]) continue;
+                mvs_nfa *a = assertNFAs[k];
+                if (a->nword != 1) continue; /* 仅单字 assert */
+
+                uint64_t prev = aPrev[k];
+                /* LimEx: 链边 + 异常 */
+                uint64_t shifted = (prev << 1) & a->chainTarget1;
+                uint64_t cand = a->firstUnanchored[0] | shifted;
+                /* condFirst */
+                for (int cf = 0; cf < a->nCondFirst; cf++) {
+                    if ((a->condFirstGuard[cf] & bpre) == a->condFirstGuard[cf])
+                        cand |= a->condFirstBits[cf];
+                }
+                /* exc */
+                uint64_t exc = prev & a->excMask1;
+                while (exc) {
+                    int p = mvs_ctz64(exc);
+                    exc &= exc - 1;
+                    cand |= a->excFollow1Flat[p];
+                }
+                /* condFollow */
+                uint64_t cfm = prev & a->condFollowMask1;
+                while (cfm) {
+                    int p = mvs_ctz64(cfm);
+                    cfm &= cfm - 1;
+                    for (int cfi = 0; cfi < a->nCondFollow; cfi++) {
+                        if (a->condFollowPos[cfi] == p &&
+                            (a->condFollowGuard[cfi] & bpre) == a->condFollowGuard[cfi])
+                            cand |= a->condFollowBits[cfi];
+                    }
+                }
+                /* active + accept */
+                uint64_t active = cand & a->reach[(size_t)sym * a->nword];
+                if (active & a->lastAny[0]) {
+                    aDone[k] = 1;
+                    if (assertTotal < assertCap) assertOut[assertTotal] = assertIdxs[k];
+                    assertTotal++;
+                }
+                if (!aDone[k] && a->nCondAccept > 0) {
+                    for (int ca = 0; ca < a->nCondAccept; ca++) {
+                        if ((a->condAcceptGuard[ca] & bpost) == a->condAcceptGuard[ca] &&
+                            (active & a->condAcceptBits[ca])) {
+                            aDone[k] = 1;
+                            if (assertTotal < assertCap) assertOut[assertTotal] = assertIdxs[k];
+                            assertTotal++;
+                            break;
+                        }
+                    }
+                }
+                aPrev[k] = active;
+            }
+        }
+
+        i = ni;
+    }
+
+    /* 清理 */
+    if (mPrev) free(mPrev);
+    if (mCand) free(mCand);
+    if (aPrev) free(aPrev);
+    if (aDone) free(aDone);
+    if (assertNFAs) free(assertNFAs);
+    if (mergedTotalOut) *mergedTotalOut = mergedTotal;
+    return assertTotal;
+}
+
 /* mvscan_db_dfa_scan_batch: 在单次调用中对多个 DFA 模式扫描同一段 data.
  * 对每个 idx 逐个跑 dfa_run, 把命中的 idx 写入 out. 返回命中数.
  * 非 ASCII 输入时 DFA 回退 NFA (逐个 idx). 一次 cgo 调用完成所有 DFA 模式. */
