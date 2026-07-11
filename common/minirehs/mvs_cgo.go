@@ -288,9 +288,11 @@ func (k *mvsKernel) nfaExistsAssertMany(idxs []int32, data []byte, sc *scratch) 
 
 // combinedScan: 单次数据遍历同时跑 merged NFA + assert NFA.
 // 返回 (mergedHits, assertHits).
-func (k *mvsKernel) combinedScan(data []byte, assertIdxs []int32, sc *scratch) (mergedHits []int, assertHits []int) {
+func (k *mvsKernel) combinedScan(data []byte, assertIdxs []int32, sc *scratch) ([]int, []int) {
+	sc.mergedHits = sc.mergedHits[:0]
+	sc.assertHits = sc.assertHits[:0]
 	if k == nil || k.db == nil || len(data) == 0 {
-		return nil, nil
+		return sc.mergedHits, sc.assertHits
 	}
 	n := len(data)
 	// mergedSeen
@@ -367,13 +369,14 @@ func (k *mvsKernel) combinedScan(data []byte, assertIdxs []int32, sc *scratch) (
 	runtime.KeepAlive(assertOutBuf)
 
 	for i := int32(0); i < mergedTotal && i < int32(mergedCap); i++ {
-		mergedHits = append(mergedHits, int(sc.cmerged[i]))
+		sc.mergedHits = append(sc.mergedHits, int(sc.cmerged[i]))
 	}
 	for i := int32(0); i < assertTotal && i < int32(assertCap); i++ {
-		assertHits = append(assertHits, int(assertOutBuf[i]))
+		sc.assertHits = append(sc.assertHits, int(assertOutBuf[i]))
 	}
-	return mergedHits, assertHits
+	return sc.mergedHits, sc.assertHits
 }
+
 // buf 容量须 >= len(data)+1. 返回 buf[:len(data)+1].
 func (k *mvsKernel) computeBoundariesC(data []byte, buf []byte) []byte {
 	if len(data) == 0 {

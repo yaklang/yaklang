@@ -22,6 +22,7 @@ type scratch struct {
 	dedup      map[matchKey]struct{} // 邻域窗口验证的去重集合 (跨多次命中)
 	fullDone   []bool                // 非窗口候选 pattern 是否已做过整段验证 (按 idx)
 	mergedHits []int                 // mvs 合并 always-on 自动机单趟命中的成员 idx 缓冲 (复用)
+	assertHits []int                 // combined scanner 的断言命中成员 idx 缓冲 (复用)
 
 	// mvs 合并 always-on 单趟扫描的"成员级去重"缓冲 (按成员 idx 去重, 不触碰 fullDone;
 	// 跨步去重由调用方用 fullDone 完成). mergedSeen 供纯 Go 路径, cseen/cmerged 供 C 内核路径.
@@ -73,7 +74,7 @@ type scratch struct {
 	anchorBatchOut []byte
 
 	// 断言 always-on C 批量扫描的输出缓冲 (nfaExistsAssertMany).
-	assertBatchOut []byte
+	assertBatchOut    []byte
 	assertBatchOutIdx []int32 // combinedScan 的 assert 命中 idx 输出缓冲
 
 	// R1 anchored merged scan 的每报文成员 span 视图。元素只借用 anchorRanges 中
