@@ -249,12 +249,24 @@ static inline void row_zero_s(uint64_t *d, int n) {
 #if defined(MVS_SSE2)
 static inline void row_copy_v(uint64_t *d, const uint64_t *s, int n) {
     int w = 0;
+    for (; w + 4 <= n; w += 4) {
+        _mm_storeu_si128((__m128i *)(d + w), _mm_loadu_si128((const __m128i *)(s + w)));
+        _mm_storeu_si128((__m128i *)(d + w + 2), _mm_loadu_si128((const __m128i *)(s + w + 2)));
+    }
     for (; w + 2 <= n; w += 2)
         _mm_storeu_si128((__m128i *)(d + w), _mm_loadu_si128((const __m128i *)(s + w)));
     for (; w < n; w++) d[w] = s[w];
 }
 static inline void row_or_v(uint64_t *d, const uint64_t *s, int n) {
     int w = 0;
+    for (; w + 4 <= n; w += 4) {
+        __m128i a0 = _mm_loadu_si128((const __m128i *)(d + w));
+        __m128i b0 = _mm_loadu_si128((const __m128i *)(s + w));
+        _mm_storeu_si128((__m128i *)(d + w), _mm_or_si128(a0, b0));
+        __m128i a1 = _mm_loadu_si128((const __m128i *)(d + w + 2));
+        __m128i b1 = _mm_loadu_si128((const __m128i *)(s + w + 2));
+        _mm_storeu_si128((__m128i *)(d + w + 2), _mm_or_si128(a1, b1));
+    }
     for (; w + 2 <= n; w += 2) {
         __m128i a = _mm_loadu_si128((const __m128i *)(d + w));
         __m128i b = _mm_loadu_si128((const __m128i *)(s + w));
@@ -264,6 +276,14 @@ static inline void row_or_v(uint64_t *d, const uint64_t *s, int n) {
 }
 static inline void row_and_v(uint64_t *d, const uint64_t *x, const uint64_t *y, int n) {
     int w = 0;
+    for (; w + 4 <= n; w += 4) {
+        __m128i a0 = _mm_loadu_si128((const __m128i *)(x + w));
+        __m128i b0 = _mm_loadu_si128((const __m128i *)(y + w));
+        _mm_storeu_si128((__m128i *)(d + w), _mm_and_si128(a0, b0));
+        __m128i a1 = _mm_loadu_si128((const __m128i *)(x + w + 2));
+        __m128i b1 = _mm_loadu_si128((const __m128i *)(y + w + 2));
+        _mm_storeu_si128((__m128i *)(d + w + 2), _mm_and_si128(a1, b1));
+    }
     for (; w + 2 <= n; w += 2) {
         __m128i a = _mm_loadu_si128((const __m128i *)(x + w));
         __m128i b = _mm_loadu_si128((const __m128i *)(y + w));
@@ -273,29 +293,62 @@ static inline void row_and_v(uint64_t *d, const uint64_t *x, const uint64_t *y, 
 }
 static inline void row_zero_v(uint64_t *d, int n) {
     int w = 0;
+    __m128i z = _mm_setzero_si128();
+    for (; w + 4 <= n; w += 4) {
+        _mm_storeu_si128((__m128i *)(d + w), z);
+        _mm_storeu_si128((__m128i *)(d + w + 2), z);
+    }
     for (; w + 2 <= n; w += 2)
-        _mm_storeu_si128((__m128i *)(d + w), _mm_setzero_si128());
+        _mm_storeu_si128((__m128i *)(d + w), z);
     for (; w < n; w++) d[w] = 0;
 }
 #elif defined(MVS_NEON)
+/* arm64 NEON: 一次处理 4 个 uint64 = 256 位 (两条 vld1q/vst1q 指令, 双发射). */
 static inline void row_copy_v(uint64_t *d, const uint64_t *s, int n) {
     int w = 0;
+    for (; w + 4 <= n; w += 4) {
+        uint64x2_t a = vld1q_u64(s + w);
+        uint64x2_t b = vld1q_u64(s + w + 2);
+        vst1q_u64(d + w, a);
+        vst1q_u64(d + w + 2, b);
+    }
     for (; w + 2 <= n; w += 2) vst1q_u64(d + w, vld1q_u64(s + w));
     for (; w < n; w++) d[w] = s[w];
 }
 static inline void row_or_v(uint64_t *d, const uint64_t *s, int n) {
     int w = 0;
+    for (; w + 4 <= n; w += 4) {
+        uint64x2_t a0 = vld1q_u64(d + w);
+        uint64x2_t b0 = vld1q_u64(s + w);
+        uint64x2_t a1 = vld1q_u64(d + w + 2);
+        uint64x2_t b1 = vld1q_u64(s + w + 2);
+        vst1q_u64(d + w, vorrq_u64(a0, b0));
+        vst1q_u64(d + w + 2, vorrq_u64(a1, b1));
+    }
     for (; w + 2 <= n; w += 2) vst1q_u64(d + w, vorrq_u64(vld1q_u64(d + w), vld1q_u64(s + w)));
     for (; w < n; w++) d[w] |= s[w];
 }
 static inline void row_and_v(uint64_t *d, const uint64_t *x, const uint64_t *y, int n) {
     int w = 0;
+    for (; w + 4 <= n; w += 4) {
+        uint64x2_t a0 = vld1q_u64(x + w);
+        uint64x2_t b0 = vld1q_u64(y + w);
+        uint64x2_t a1 = vld1q_u64(x + w + 2);
+        uint64x2_t b1 = vld1q_u64(y + w + 2);
+        vst1q_u64(d + w, vandq_u64(a0, b0));
+        vst1q_u64(d + w + 2, vandq_u64(a1, b1));
+    }
     for (; w + 2 <= n; w += 2) vst1q_u64(d + w, vandq_u64(vld1q_u64(x + w), vld1q_u64(y + w)));
     for (; w < n; w++) d[w] = x[w] & y[w];
 }
 static inline void row_zero_v(uint64_t *d, int n) {
     int w = 0;
-    for (; w + 2 <= n; w += 2) vst1q_u64(d + w, vdupq_n_u64(0));
+    uint64x2_t z = vdupq_n_u64(0);
+    for (; w + 4 <= n; w += 4) {
+        vst1q_u64(d + w, z);
+        vst1q_u64(d + w + 2, z);
+    }
+    for (; w + 2 <= n; w += 2) vst1q_u64(d + w, z);
     for (; w < n; w++) d[w] = 0;
 }
 #endif
