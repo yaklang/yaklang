@@ -142,6 +142,17 @@ int mvscan_db_nfa_exists_assert(const mvscan_db *db, int32_t idx,
                                 const uint8_t *data, size_t len,
                                 const uint8_t *bound);
 
+/*
+ * mvscan_db_nfa_exists_assert_many 一次 cgo 对多条断言 always-on NFA 各自做断言存在性,
+ * 内部预算边界 (每报文一次, 跨多条 NFA 共享), 摊薄跨界开销.
+ * boundBuf 容量须 >= len+1. out[i] 写入命中结果 (1 命中 / 0 不命中或无 C 断言 NFA).
+ */
+void mvscan_db_nfa_exists_assert_many(const mvscan_db *db,
+                                      const uint8_t *data, size_t len,
+                                      const int32_t *idxs, int32_t nidx,
+                                      uint8_t *boundBuf,
+                                      uint8_t *out);
+
 #ifdef __cplusplus
 }
 #endif
