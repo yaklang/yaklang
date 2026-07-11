@@ -185,7 +185,8 @@ func (nfa *mvsNFA) findLocFrom(data []byte, searchFrom int, sc *scratch) (int, i
 			cand[w] = 0
 		}
 
-		// 后继并集: 继承前驱起点, 汇聚取最小.
+		// LimEx 后继并集: p->p+1 链边直接推进，只有异常边展开位集；
+		// 起点传播仍按目标位置取最小，故 leftmost-longest 语义不变。
 		if hasPrev {
 			for w := 0; w < nword; w++ {
 				pw := prevActive[w]
@@ -193,7 +194,18 @@ func (nfa *mvsNFA) findLocFrom(data []byte, searchFrom int, sc *scratch) (int, i
 					p := w*64 + bits.TrailingZeros64(pw)
 					pw &= pw - 1
 					sp := prevStart[p]
-					fp := nfa.follow[p]
+					if q := p + 1; q < npos && bsTest(nfa.chainTarget, q) {
+						qw := q >> 6
+						bit := uint64(1) << uint(q&63)
+						if cand[qw]&bit == 0 || sp < candStart[q] {
+							cand[qw] |= bit
+							candStart[q] = sp
+						}
+					}
+					fp := nfa.excFollow[p]
+					if fp == nil {
+						continue
+					}
 					for fw := 0; fw < nword; fw++ {
 						fb := fp[fw]
 						for fb != 0 {
@@ -304,7 +316,8 @@ func (nfa *mvsNFA) findLocFrom1(data []byte, searchFrom int, sc *scratch) (int, 
 	first := nfa.first1
 	lastAny := nfa.lastAny1
 	lastEnd := nfa.lastEnd1
-	follow := nfa.follow1
+	chainTarget := nfa.chainTarget1
+	excFollow := nfa.excFollow1
 	reach := nfa.reach1
 	anchored := nfa.anchoredStart
 	requireEnd := nfa.requireEnd
@@ -339,13 +352,20 @@ func (nfa *mvsNFA) findLocFrom1(data []byte, searchFrom int, sc *scratch) (int, 
 		}
 
 		var cand uint64
-		// 后继并集: 继承前驱起点, 汇聚取最小.
+		// LimEx 后继并集: 链边直接推进，只有异常边逐目标传播起点。
 		if hasPrev {
 			for pw := prevActive; pw != 0; {
 				p := bits.TrailingZeros64(pw)
 				pw &= pw - 1
 				sp := prevStart[p]
-				fp := follow[p]
+				if q := p + 1; q < npos && chainTarget&(uint64(1)<<uint(q)) != 0 {
+					bit := uint64(1) << uint(q)
+					if cand&bit == 0 || sp < candStart[q] {
+						cand |= bit
+						candStart[q] = sp
+					}
+				}
+				fp := excFollow[p]
 				for fb := fp; fb != 0; {
 					q := bits.TrailingZeros64(fb)
 					fb &= fb - 1
@@ -432,6 +452,7 @@ func (nfa *mvsNFA) findLocFrom1(data []byte, searchFrom int, sc *scratch) (int, 
 	}
 	return bestStart, bestEnd, true
 }
+
 // existsIn1 是 nword==1 标量快路径 (绝大多数真实 pattern 走此路径).
 // 使用 LimEx 链/异常拆分 (源自 Hyperscan NSDI'19): 链边 p->p+1 用一次左移批量推进,
 // 异常边仅对活跃异常位置逐个 OR. 对 Glushkov 连接产生的边恰是 p->p+1, 大量 follow 落入

@@ -435,8 +435,8 @@ type mvsDB struct {
 	pf       prefilter // 可能为 nil (无任何字面量 pattern)
 	litToPat [][]int32 // litID -> pattern idx
 
-	merged           *mvsMergedNFA // 无字面量且可编入 lean NFA 的 always-on 合并为单趟自动机
-	mergedCount      int           // 合并成员数
+	merged      *mvsMergedNFA // 无字面量且可编入 lean NFA 的 always-on 合并为单趟自动机
+	mergedCount int           // 合并成员数
 
 	// assertMerged 是无字面量的断言 NFA always-on (hasAssert) 的单趟合并自动机 (R2),
 	// 共享 computeBoundaries 预算的边界条件, 替代逐条 existsInAssertShared 整段扫.
@@ -457,10 +457,10 @@ type mvsDB struct {
 	// assertAlwaysOnCIdxs 是 assertAlwaysOn 中 single (nword==1) 断言 NFA 的 idx 数组 (C 内核批量用).
 	// 预计算一次, scan 中复用 (零分配).
 	assertAlwaysOnCIdxs []int32
-	anchoredMerged   *mvsMergedNFA // R1 span-injected lean anchored 合并自动机（A/B 开关控制使用）
-	anchorMergedSlot []int         // pattern idx -> anchoredMerged 成员槽位；-1 表示非成员
-	assertAlwaysOn   []int         // 无字面量的断言 NFA (hasAssert): existsInAssert 门控 + verifier 定位
-	otherAlwaysOn    []int         // 无字面量且不可编入 NFA (regexp2/RE2 兜底): 逐条验证
+	anchoredMerged      *mvsMergedNFA // R1 span-injected lean anchored 合并自动机（A/B 开关控制使用）
+	anchorMergedSlot    []int         // pattern idx -> anchoredMerged 成员槽位；-1 表示非成员
+	assertAlwaysOn      []int         // 无字面量的断言 NFA (hasAssert): existsInAssert 门控 + verifier 定位
+	otherAlwaysOn       []int         // 无字面量且不可编入 NFA (regexp2/RE2 兜底): 逐条验证
 
 	reportLoc bool // 命中是否上报精确偏移与内容 (见 WithReportLocation)
 
@@ -646,7 +646,9 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 			sc.fullDone[idx] = true
 			lo, hi := int(sc.winLo[idx]), int(sc.winHi[idx])
 			if d.kernel.nfaExists(idx, data[lo:hi]) {
-				if stop := d.finalizeHit(idx, data, sc, handler); stop {
+				// litSpan 的 union 已覆盖任一包含本 pattern 必需字面量的完整匹配；
+				// 因此定位无需退回整段 data 重扫。对需 verifier 的规则由 helper 安全回退。
+				if stop := d.finalizeHitWindow(idx, data, lo, hi, sc, handler); stop {
 					return true, nil
 				}
 			}
@@ -986,9 +988,70 @@ func (d *mvsDB) finalizeHit(idx int, data []byte, sc *scratch, handler MatchHand
 		// regexp2-origin (语言等价) 或断言 NFA: 精确定位交 verifier.
 		return d.reportViaVerifier(cp, data, handler)
 	}
+	// 单字 lean NFA 是真实规则集的主力。已由 C 存在性门确认命中时，直接在 C 侧枚举
+	// leftmost-longest spans，避免 Go 再完整扫描一遍；C 内核不适用或异常空结果时回退
+	// 已验证的 Go 定位器，绝不因优化漏报。
+	if d.kernel != nil && nfa.single {
+		if locs, ok := d.kernel.findAllLoc1(idx, data, sc); ok && len(locs) > 0 {
+			for i := 0; i < len(locs); i += 2 {
+				if !handler(Match{ID: cp.id, From: int(locs[i]), To: int(locs[i+1])}) {
+					return true
+				}
+			}
+			return false
+		}
+	}
 	stopped := false
 	nfa.findAllLoc(data, sc, func(from, to int) bool {
 		if !handler(Match{ID: cp.id, From: from, To: to}) {
+			stopped = true
+			return false
+		}
+		return true
+	})
+	return stopped
+}
+
+// finalizeHitWindow 是已被字面量窗口验证命中的定位出口。对 exact lean NFA，窗口 union
+// 覆盖本报文所有可能匹配，故在 data[lo:hi] 内枚举并将偏移平移回原文即可；这消除过去
+// “局部 existsIn 后又整段 findAllLoc” 的重复扫描。gate、re2Loc、断言仍保留原出口，
+// 因为其定位语义依赖 verifier 或边界 guard，不能假设普通子串等价。
+func (d *mvsDB) finalizeHitWindow(idx int, data []byte, lo, hi int, sc *scratch, handler MatchHandler) bool {
+	if lo < 0 || hi > len(data) || lo >= hi {
+		return d.finalizeHit(idx, data, sc, handler)
+	}
+	cp := d.all[idx]
+	nfa := d.nfas[idx]
+	if d.gate[idx] || nfa == nil || nfa.hasAssert {
+		return d.finalizeHit(idx, data, sc, handler)
+	}
+	if !d.reportLoc {
+		return !handler(Match{ID: cp.id, From: -1, To: -1})
+	}
+	sub := data[lo:hi]
+	// re2Loc 的语言与 NFA 相等，但为保持原 regexp2 的 leftmost 语义仍必须交 verifier。
+	// litSpan 已完整覆盖每个匹配，故 verifier 同样可在子串运行；将相对偏移平移回原文。
+	if d.re2Loc[idx] {
+		for _, loc := range cp.v.findAll(sub) {
+			if !handler(Match{ID: cp.id, From: lo + loc[0], To: lo + loc[1]}) {
+				return true
+			}
+		}
+		return false
+	}
+	if d.kernel != nil && nfa.single {
+		if locs, ok := d.kernel.findAllLoc1(idx, sub, sc); ok && len(locs) > 0 {
+			for i := 0; i < len(locs); i += 2 {
+				if !handler(Match{ID: cp.id, From: lo + int(locs[i]), To: lo + int(locs[i+1])}) {
+					return true
+				}
+			}
+			return false
+		}
+	}
+	stopped := false
+	nfa.findAllLoc(sub, sc, func(from, to int) bool {
+		if !handler(Match{ID: cp.id, From: lo + from, To: lo + to}) {
 			stopped = true
 			return false
 		}

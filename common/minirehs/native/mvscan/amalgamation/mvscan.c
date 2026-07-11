@@ -707,6 +707,97 @@ static int nfa_run_1_exists(const mvs_nfa *a, const uint8_t *data, size_t len) {
     return 0;
 }
 
+/* nfa_find_loc_1 是 nword==1 lean NFA 的单个 leftmost-longest 定位器。
+ * 和 Go findLocFrom1 同构：每个活跃位置携带最小起点；接受时取最小起点，
+ * 同起点延长到最长终点；当更早起点的活跃线程全部消亡即提前停止。 */
+static int nfa_find_loc_1(const mvs_nfa *a, const uint8_t *data, size_t len,
+                          size_t searchFrom, int32_t *fromOut, int32_t *toOut) {
+    if (searchFrom > len || (a->hasAnchored && searchFrom > 0)) return 0;
+
+    int32_t candStart[64];
+    int32_t prevStart[64];
+    uint64_t prev = 0;
+    int hasPrev = 0;
+    int32_t bestStart = -1, bestEnd = -1;
+    size_t i = searchFrom;
+
+    while (i < len) {
+        size_t runeStart = i;
+        int sym;
+        uint8_t c0 = data[i];
+        if (c0 < 0x80) {
+            sym = (int)a->asciiSym[c0];
+            i++;
+        } else {
+            int32_t r;
+            int size = mvs_decode_rune(data + i, len - i, &r);
+            i += (size_t)size;
+            sym = symbol_of(a, r);
+        }
+
+        uint64_t cand = 0;
+        if (hasPrev) {
+            for (uint64_t pw = prev; pw; pw &= pw - 1) {
+                int p = mvs_ctz64(pw);
+                int32_t start = prevStart[p];
+                for (uint64_t fb = a->follow[p]; fb; fb &= fb - 1) {
+                    int q = mvs_ctz64(fb);
+                    uint64_t bit = UINT64_C(1) << q;
+                    if (!(cand & bit) || start < candStart[q]) {
+                        cand |= bit;
+                        candStart[q] = start;
+                    }
+                }
+            }
+        }
+        uint64_t first = a->firstUnanchored[0];
+        if (runeStart == 0 && a->hasAnchored) first |= a->firstAnchored[0];
+        for (uint64_t fb = first; fb; fb &= fb - 1) {
+            int q = mvs_ctz64(fb);
+            uint64_t bit = UINT64_C(1) << q;
+            if (!(cand & bit) || (int32_t)runeStart < candStart[q]) {
+                cand |= bit;
+                candStart[q] = (int32_t)runeStart;
+            }
+        }
+
+        uint64_t active = cand & a->reach[sym];
+        int32_t minActiveStart = INT32_MAX;
+        int32_t minAcceptStart = INT32_MAX;
+        uint64_t accept = active & a->lastAny[0];
+        if (i == len) accept |= active & a->lastEnd[0];
+        for (uint64_t bits = active; bits; bits &= bits - 1) {
+            int q = mvs_ctz64(bits);
+            int32_t start = candStart[q];
+            prevStart[q] = start;
+            if (start < minActiveStart) minActiveStart = start;
+        }
+        for (uint64_t bits = accept; bits; bits &= bits - 1) {
+            int q = mvs_ctz64(bits);
+            if (candStart[q] < minAcceptStart) minAcceptStart = candStart[q];
+        }
+        prev = active;
+        hasPrev = active != 0;
+
+        if (minAcceptStart != INT32_MAX) {
+            if (bestEnd < 0 || minAcceptStart < bestStart ||
+                (minAcceptStart == bestStart && (int32_t)i > bestEnd)) {
+                bestStart = minAcceptStart;
+                bestEnd = (int32_t)i;
+            }
+        }
+        if (!hasPrev) {
+            if (a->hasAnchored || bestEnd >= 0) break;
+            continue;
+        }
+        if (bestEnd >= 0 && minActiveStart > bestStart) break;
+    }
+    if (bestEnd < 0) return 0;
+    *fromOut = bestStart;
+    *toOut = bestEnd;
+    return 1;
+}
+
 /* ====================================================================
  * 断言 NFA: 零宽断言 guard 门控的位并行递推 (对应 Go mvs_assert.go).
  *
@@ -1703,6 +1794,31 @@ int mvscan_db_nfa_exists(const mvscan_db *db, int32_t idx,
     int32_t u = db->slotUnit[idx];
     if (u < 0 || u >= db->nUnits) return -1;
     return nfa_run(&db->units[u], data, len, 0, NULL, 0, NULL, 0, NULL);
+}
+
+int32_t mvscan_db_nfa_find_all_1(const mvscan_db *db, int32_t idx,
+                                  const uint8_t *data, size_t len,
+                                  int32_t *out, int32_t capPairs) {
+    if (!db || !data || idx < 0 || idx >= db->npat || capPairs < 0) return -1;
+    int32_t u = db->slotUnit[idx];
+    if (u < 0 || u >= db->nUnits) return -1;
+    const mvs_nfa *a = &db->units[u];
+    if (a->nword != 1 || a->hasAssert) return -1;
+
+    int32_t total = 0;
+    size_t pos = 0;
+    while (pos <= len) {
+        int32_t from, to;
+        if (!nfa_find_loc_1(a, data, len, pos, &from, &to)) break;
+        if (total < capPairs && out) {
+            out[(size_t)total * 2] = from;
+            out[(size_t)total * 2 + 1] = to;
+        }
+        total++;
+        if (to > (int32_t)pos) pos = (size_t)to;
+        else pos++;
+    }
+    return total;
 }
 
 void mvscan_db_nfa_exists_many(const mvscan_db *db,
