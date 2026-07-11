@@ -281,6 +281,12 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 		}
 	}
 	db.nfaCount = nfaCount
+	// 预计算 assert always-on 中 single (nword==1) 的 C 批量扫描 idx 数组.
+	for _, idx := range db.assertAlwaysOn {
+		if nfa := db.nfas[idx]; nfa != nil && nfa.hasAssert && nfa.single {
+			db.assertAlwaysOnCIdxs = append(db.assertAlwaysOnCIdxs, int32(idx))
+		}
+	}
 
 	// P4 (M2): minirehs_mvs 构建下, 把 per-pattern NFA + 合并 always-on 序列化为平台无关
 	// blob, 交纯 C99 运行期内核执行存在性扫描 (与纯 Go 参考执行器逐位一致). 非该构建返回 nil,
@@ -436,6 +442,9 @@ type mvsDB struct {
 	// assertNecFactor 按 idx: 断言 always-on NFA 的 per-pattern 必要条件预过滤.
 	// scan() 中, 对每条 assert always-on 先 check; check==false 则跳过 existsInAssertShared.
 	assertNecFactor []necFactor
+	// assertAlwaysOnCIdxs 是 assertAlwaysOn 中 single (nword==1) 断言 NFA 的 idx 数组 (C 内核批量用).
+	// 预计算一次, scan 中复用 (零分配).
+	assertAlwaysOnCIdxs []int32
 	anchoredMerged   *mvsMergedNFA // R1 span-injected lean anchored 合并自动机（A/B 开关控制使用）
 	anchorMergedSlot []int         // pattern idx -> anchoredMerged 成员槽位；-1 表示非成员
 	assertAlwaysOn   []int         // 无字面量的断言 NFA (hasAssert): existsInAssert 门控 + verifier 定位
