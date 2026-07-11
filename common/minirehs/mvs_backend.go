@@ -453,8 +453,10 @@ func (d *mvsDB) numAlwaysOn() int {
 }
 
 // gateSupersetPrecheck 控制可局部化超集门复核前是否先跑超集 NFA 存在性预检 (见 verifyGateLocalized).
-// PCRE2 (go-pcre2-lite) 线性复核后该预检对 gate 几乎不过滤、反成净开销, 故默认关闭; 仅 A/B 基准临时开。
-var gateSupersetPrecheck = false
+// 有 C 内核时重新启用: C nfaExists (一次 SIMD 位递推) 比 PCRE2 复核 (整段正则匹配) 廉价得多,
+// 且 gate 的超集 NFA 对 "字面量在但无完整结构" 的报文有显著过滤力 (Get注入点 1015/1015 FP 全部滤除).
+// 无 C 内核时仍关闭 (Go NFA 预检不比 PCRE2 快).
+var gateSupersetPrecheck = true
 
 // anchorMergedEnabled 控制 R1 span-injected merged verifier 的运行期接线。保守起见默认
 // 关闭，直到真实语料的 oracle 与基准都证明其全局位集成本低于逐条 gap-jump 路径。
