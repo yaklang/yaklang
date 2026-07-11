@@ -1658,6 +1658,27 @@ int mvscan_simd_enabled(void) {
 #endif
 }
 
+/* mvscan_db_nfa_exists_assert_self: 自包含断言扫描 — 内部预算边界, 不需外部 bound 参数.
+ * 省去 Go 侧 sharedBound 一次 cgo 调用 (每报文省 1 次跨界). */
+int mvscan_db_nfa_exists_assert_self(const mvscan_db *db, int32_t idx,
+                                     const uint8_t *data, size_t len,
+                                     uint8_t *boundBuf) {
+    if (!db || idx < 0 || idx >= db->npat) return -1;
+    int32_t u = db->slotUnit[idx];
+    if (u < 0 || u >= db->nUnits) return -1;
+    mvs_nfa *a = &db->units[u];
+    if (!a->hasAssert) return -1;
+    /* 内部预算边界 */
+    if (data && len > 0 && boundBuf) {
+        mvscan_compute_boundaries(data, len, boundBuf);
+    } else if (boundBuf && len == 0) {
+        boundBuf[0] = MVS_COND_BEGIN_TEXT | MVS_COND_END_TEXT | MVS_COND_BEGIN_LINE | MVS_COND_END_LINE | MVS_COND_NO_WORD_BOUND;
+    }
+    if (a->nword == 1)
+        return nfa_run_assert_1(a, data, len, boundBuf);
+    return nfa_run_assert_mw(a, data, len, boundBuf);
+}
+
 /* ====================================================================
  * 断言 NFA 公共 API (v2 blob 扩展).
  * ==================================================================== */

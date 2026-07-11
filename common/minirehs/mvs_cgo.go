@@ -162,7 +162,7 @@ func (k *mvsKernel) nfaExistsAnchoredImpl(idx int, data []byte, spans []anchorSp
 	return r == 1
 }
 
-// nfaExistsAssert 判定断言 NFA (hasAssert, nword==1) 在 data 中是否存在命中 (C 实现).
+// nfaExistsAssert 判定断言 NFA (hasAssert) 在 data 中是否存在命中 (C 实现).
 // bound 为预算的共享边界数组 (computeBoundariesC). 与 Go existsInAssertShared1 逐位一致.
 // 返回 true 命中 / false 不命中或无 C 断言 NFA.
 func (k *mvsKernel) nfaExistsAssert(idx int, data []byte, bound []byte) bool {
@@ -180,6 +180,26 @@ func (k *mvsKernel) nfaExistsAssert(idx int, data []byte, bound []byte) bool {
 	r := C.mvscan_db_nfa_exists_assert(k.db, C.int32_t(idx), dptr, C.size_t(len(data)), bptr)
 	keepAlive(data)
 	runtime.KeepAlive(bound)
+	return r == 1
+}
+
+// nfaExistsAssertSelf 自包含断言扫描 — C 内部预算边界, 省去 Go 侧 sharedBound 一次 cgo.
+func (k *mvsKernel) nfaExistsAssertSelf(idx int, data []byte, boundBuf []byte) bool {
+	if k == nil || k.db == nil || len(data) == 0 {
+		return false
+	}
+	if cap(boundBuf) < len(data)+1 {
+		boundBuf = make([]byte, len(data)+1)
+	} else {
+		boundBuf = boundBuf[:len(data)+1]
+	}
+	var dptr *C.uint8_t
+	dptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	var bptr *C.uint8_t
+	bptr = (*C.uint8_t)(unsafe.Pointer(&boundBuf[0]))
+	r := C.mvscan_db_nfa_exists_assert_self(k.db, C.int32_t(idx), dptr, C.size_t(len(data)), bptr)
+	keepAlive(data)
+	runtime.KeepAlive(boundBuf)
 	return r == 1
 }
 
