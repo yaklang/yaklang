@@ -385,6 +385,47 @@ func (k *mvsKernel) mergedScan(data []byte, sc *scratch) []int {
 	return k.mergedScanImpl(data, sc, false)
 }
 
+// mergedScanBatch 批量扫描多条记录 (拼接为一个 buffer), 一次 cgo 调用.
+// recOff 长度 nrec+1: 第 i 条 = data[recOff[i]..recOff[i+1]).
+// 返回 (recIdx, memberIdx) 对列表.
+func (k *mvsKernel) mergedScanBatch(data []byte, recOff []int32, sc *scratch) [][2]int32 {
+	if k == nil || k.db == nil || C.mvscan_db_has_merged(k.db) == 0 || len(recOff) <= 1 {
+		return nil
+	}
+	nrec := int32(len(recOff) - 1)
+	capPairs := nrec * 8
+	if capPairs < 64 {
+		capPairs = 64
+	}
+	if cap(sc.cpairs) < int(capPairs)*2 {
+		sc.cpairs = make([]int32, capPairs*2)
+	} else {
+		sc.cpairs = sc.cpairs[:capPairs*2]
+	}
+	var dptr *C.uint8_t
+	if len(data) > 0 {
+		dptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	}
+	var optr *C.int32_t
+	var recOffPtr *C.int32_t
+	if len(recOff) > 0 {
+		recOffPtr = (*C.int32_t)(unsafe.Pointer(&recOff[0]))
+	}
+	if len(sc.cpairs) > 0 {
+		optr = (*C.int32_t)(unsafe.Pointer(&sc.cpairs[0]))
+	}
+	got := int32(C.mvscan_db_merged_scan_batch(k.db, dptr, C.size_t(len(data)),
+		recOffPtr, C.int(nrec), optr, C.int(capPairs)))
+	keepAlive(data)
+	runtime.KeepAlive(recOff)
+	runtime.KeepAlive(sc.cpairs)
+	out := make([][2]int32, 0, got)
+	for i := int32(0); i < got; i++ {
+		out = append(out, [2]int32{sc.cpairs[i*2], sc.cpairs[i*2+1]})
+	}
+	return out
+}
+
 // mergedScanScalar 强制走 C 标量孪生, 仅供差分测试.
 func (k *mvsKernel) mergedScanScalar(data []byte, sc *scratch) []int {
 	return k.mergedScanImpl(data, sc, true)

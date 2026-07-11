@@ -1182,19 +1182,75 @@ int32_t mvscan_db_merged_scan(const mvscan_db *db,
                               uint8_t *seen, int32_t seenLen,
                               int32_t *out, int32_t cap) {
     if (!db || db->mergedUnit < 0 || db->mergedUnit >= db->nUnits) return 0;
-    /* Rose-lite 必要条件预检: 数据不含任何能开始匹配的字节 => 跳过整段扫描.
-     * startByteMask 预计算: firstUnanchored & reach[asciiSym[b]] != 0 的字节集.
-     * 对 HTTP 流量, 很多记录不含能开始匹配的字节 (如纯二进制响应体). */
+    /* Rose-lite 必要条件预检: 数据不含任何能开始匹配的字节 => 跳过整段扫描. */
     mvs_nfa *mu = &db->units[db->mergedUnit];
     if (mu->hasStartByteMask) {
         int anyStart = 0;
+        int hasNonASCII = 0;
         for (size_t i = 0; i < len; i++) {
-            if (mu->startByteMask[data[i]]) { anyStart = 1; break; }
+            uint8_t b = data[i];
+            if (b < 0x80) {
+                if (mu->startByteMask[b]) { anyStart = 1; break; }
+            } else {
+                hasNonASCII = 1; break; /* 非 ASCII: 无法用 startByteMask 判定, 不跳过 */
+            }
         }
-        if (!anyStart) return 0; /* 无字节能开始匹配: 跳过整段扫描 */
+        if (!anyStart && !hasNonASCII) return 0;
     }
     int32_t total = 0;
     nfa_run(mu, data, len, 1, seen, seenLen, out, cap, &total);
+    return total;
+}
+
+/* mvscan_db_merged_scan_batch: 批量扫描多条记录, 每条记录独立.
+ * 对每条记录跑 merged NFA (重置 prev=0), 把 (recIdx, memberIdx) 写入 out. */
+int32_t mvscan_db_merged_scan_batch(const mvscan_db *db,
+                                    const uint8_t *data, size_t totalLen,
+                                    const int32_t *recOff, int32_t nrec,
+                                    int32_t *out, int32_t capPairs) {
+    if (!db || db->mergedUnit < 0 || db->mergedUnit >= db->nUnits) return 0;
+    if (!data || !recOff || nrec <= 0 || !out) return 0;
+    mvs_nfa *mu = &db->units[db->mergedUnit];
+    int32_t total = 0;
+    /* seen 缓冲: 每条记录重置 (per-record dedup). 用栈缓冲 (npat 通常 < 1024). */
+    uint8_t stackSeen[1024];
+    uint8_t *seen = (db->npat <= 1024) ? stackSeen : (uint8_t *)malloc((size_t)db->npat);
+    if (!seen) return 0;
+    int32_t stackOut[256]; /* 每条记录的临时输出 (通常命中数 < 5) */
+    for (int32_t r = 0; r < nrec; r++) {
+        size_t off0 = (size_t)recOff[r];
+        size_t off1 = (size_t)recOff[r + 1];
+        if (off0 >= totalLen || off1 > totalLen || off1 <= off0) continue;
+        size_t rlen = off1 - off0;
+        const uint8_t *rdata = data + off0;
+        /* Rose-lite skip */
+        if (mu->hasStartByteMask) {
+            int anyStart = 0;
+            int hasNonASCII = 0;
+            for (size_t i = 0; i < rlen; i++) {
+                uint8_t b = rdata[i];
+                if (b < 0x80) {
+                    if (mu->startByteMask[b]) { anyStart = 1; break; }
+                } else {
+                    hasNonASCII = 1; break;
+                }
+            }
+            if (!anyStart && !hasNonASCII) continue;
+        }
+        /* 重置 seen */
+        memset(seen, 0, (size_t)db->npat);
+        int32_t recTotal = 0;
+        nfa_run(mu, rdata, rlen, 1, seen, db->npat, stackOut, 256, &recTotal);
+        /* 输出 (recIdx, memberIdx) 对 */
+        for (int32_t k = 0; k < recTotal && k < 256; k++) {
+            if (total < capPairs) {
+                out[total * 2] = r;           /* recIdx */
+                out[total * 2 + 1] = stackOut[k]; /* memberIdx */
+            }
+            total++;
+        }
+    }
+    if (seen != stackSeen) free(seen);
     return total;
 }
 

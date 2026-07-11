@@ -88,9 +88,10 @@ static int NFA_RUN_NAME(const mvs_nfa *a, const uint8_t *data, size_t len, int m
          * NFA 完全休眠, 跳到下一个能开始匹配的字节 (startByteMask[b] != 0).
          * 省去逐字节走过多数不激活 NFA 的 HTTP 文本. */
         if (anyActive == 0 && a->hasStartByteMask) {
-            /* 从当前 i 向前找第一个 startByteMask[data[j]] != 0 的 j. */
+            /* 从当前 i 向前找第一个 startByteMask[data[j]] != 0 的 j.
+             * 非 ASCII 字节 (>=0x80) 不跳过 (startByteMask 仅覆盖 ASCII). */
             size_t j = i;
-            while (j < len && !a->startByteMask[data[j]]) j++;
+            while (j < len && data[j] < 0x80 && !a->startByteMask[data[j]]) j++;
             if (j > i) i = j;
         }
     }
