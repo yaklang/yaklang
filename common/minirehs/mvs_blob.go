@@ -63,7 +63,7 @@ type mvsUnit struct {
 
 // unitFromNFA 把一条 per-pattern NFA 转为 unit. reportedIdx 填入命中位置的 posPat
 // (存在性执行不使用 posPat, 仅为统一结构/可观测).
-func unitFromNFA(nfa *mvsNFA, reportedIdx int) mvsUnit {
+func unitFromNFA(nfa *mvsNFA, reportedIdx int, hasLiterals bool) mvsUnit {
 	zero := make([]uint64, nfa.nword)
 	u := mvsUnit{
 		npos:        nfa.npos,
@@ -92,9 +92,17 @@ func unitFromNFA(nfa *mvsNFA, reportedIdx int) mvsUnit {
 	}
 	setAcceptPos(u.posPat, nfa.lastAny, int32(reportedIdx))
 	setAcceptPos(u.posPat, nfa.lastEnd, int32(reportedIdx))
-	// DFA 转换: 暂不启用 (dfa_run 有正确性问题: 非 ASCII 处理 + 死状态重置).
-	// 基建已就位 (buildDFAFromNFA + blob 序列化 + parse_unit + dfa_run C 函数).
-	// 待修复 dfa_run 后接线.
+	// DFA 转换: 仅对无字面量、无锚点、无断言的 always-on lean NFA 构建.
+	// anchoredStart/requireEnd NFA 的 DFA 死状态重置不正确 (锚点语义).
+	if !hasLiterals && !nfa.hasAssert && !nfa.anchoredStart && !nfa.requireEnd &&
+		nfa.npos <= DFA_MAX_NPOS && nfa.npos >= 2 {
+		if dfa := buildDFAFromNFA(nfa); dfa != nil {
+			u.hasDFA = true
+			u.dfaNstates = int32(dfa.nstates)
+			u.dfaNext = dfa.next
+			u.dfaAccept = dfa.accept
+		}
+	}
 	return u
 }
 
@@ -119,7 +127,7 @@ func unitFromMerged(m *mvsMergedNFA) mvsUnit {
 
 // unitFromAssertNFA 把断言 NFA (hasAssert, nword==1) 转为 unit, 含 LimEx + guard + 必要条件字段.
 func unitFromAssertNFA(nfa *mvsNFA, reportedIdx int, nec necFactor) mvsUnit {
-	u := unitFromNFA(nfa, reportedIdx)
+	u := unitFromNFA(nfa, reportedIdx, true) // assert NFA: 不构建 DFA
 	u.hasAssert = true
 	u.chainTarget1 = nfa.chainTarget1
 	u.excMask1 = nfa.excMask1
@@ -195,10 +203,8 @@ func getNecFactor(factors []necFactor, idx int) necFactor {
 }
 
 // buildMVSBlob 把整个 db 的 per-pattern NFA (按 idx) + 合并 NFA 序列化为单段 blob.
-// v2: 断言 NFA (hasAssert) 也序列化进 blob (C 内核 nfa_run_assert_1 执行).
-// nfas[idx]==nil (走 verifier 兜底) 的 slotUnit 记 -1.
-// assertNecFactors 提供 per-idx 必要条件 (可为 nil).
-func buildMVSBlob(nfas []*mvsNFA, merged *mvsMergedNFA, assertNecFactors []necFactor) []byte {
+// hasLiterals[idx] 标记该 idx 是否有必需字面量 (有字面量的 pattern 不构建 DFA).
+func buildMVSBlob(nfas []*mvsNFA, merged *mvsMergedNFA, assertNecFactors []necFactor, hasLiterals []bool) []byte {
 	npat := len(nfas)
 	slotUnit := make([]int32, npat)
 	var units []mvsUnit
@@ -208,13 +214,16 @@ func buildMVSBlob(nfas []*mvsNFA, merged *mvsMergedNFA, assertNecFactors []necFa
 			continue
 		}
 		if nfas[idx].hasAssert {
-			// 断言 NFA: 序列化进 C (单字走 nfa_run_assert_1, 多字走 nfa_run_assert_mw)
 			slotUnit[idx] = int32(len(units))
 			units = append(units, unitFromAssertNFA(nfas[idx], idx, getNecFactor(assertNecFactors, idx)))
 			continue
 		}
+		hl := true // 默认有字面量 (保守: 不构建 DFA)
+		if hasLiterals != nil && idx < len(hasLiterals) {
+			hl = hasLiterals[idx]
+		}
 		slotUnit[idx] = int32(len(units))
-		units = append(units, unitFromNFA(nfas[idx], idx))
+		units = append(units, unitFromNFA(nfas[idx], idx, hl))
 	}
 	mergedUnit := int32(-1)
 	if merged != nil {

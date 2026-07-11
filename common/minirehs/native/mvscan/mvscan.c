@@ -567,23 +567,27 @@ void mvscan_compute_boundaries(const uint8_t *data, size_t len, uint8_t *buf) {
 }
 
 /* dfa_run: DFA 存在性扫描 — 每字节一次查表 (O(1)), 比 NFA 位递推快 O(npos) 倍.
- * 对小规模 NFA (JSON npos=3, Windows npos=8, AWS npos=42) 构建的 DFA.
- * 返回 1 命中 / 0 不命中. */
+ * 仅处理纯 ASCII 输入 (byte < 128); 非 ASCII 字节回退到 NFA.
+ * 返回 1 命中 / 0 不命中 / -1 需回退 NFA (非 ASCII 数据). */
 static int dfa_run(const mvs_nfa *a, const uint8_t *data, size_t len) {
-    int32_t state = 0; /* 初始状态 */
     const int32_t *next = a->dfaNext;
-    const uint8_t *accept = a->dfaAccept;
+    const uint8_t *acc = a->dfaAccept;
+    /* 快速检查: 是否纯 ASCII? 若有非 ASCII 字节, 回退 NFA. */
     for (size_t i = 0; i < len; i++) {
-        state = next[state * 256 + data[i]];
+        if (data[i] >= 0x80) return -1; /* 非 ASCII: 回退 NFA */
+    }
+    /* 纯 ASCII: DFA 快速扫描 (每字节一次查表). */
+    int32_t state = 0;
+    for (size_t i = 0; i < len; i++) {
+        uint8_t b = data[i];
+        state = next[state * 256 + b];
         if (state < 0) {
-            /* 死状态: 重置到初始 (无锚 NFA 可从任意位置重新开始) */
-            state = 0;
-            /* 但需检查当前字节能否从初始开始 */
-            state = next[0 * 256 + data[i]];
+            /* 死状态: 从初始重新开始 (无锚 NFA 每步注入 first).
+             * DFA 状态 0 已含 first 注入, 故直接用 next[0*256+b]. */
+            state = next[0 * 256 + b];
             if (state < 0) state = 0;
-            continue;
         }
-        if (accept[state]) return 1;
+        if (acc[state]) return 1;
     }
     return 0;
 }
@@ -907,8 +911,12 @@ static int nfa_run_anchored_dispatch(const mvs_nfa *a, const uint8_t *data, size
 static int nfa_run_dispatch(const mvs_nfa *a, const uint8_t *data, size_t len, int mode,
                             uint8_t *seen, int32_t seenLen, int32_t *out, int32_t cap,
                             int32_t *outTotal, int forceScalar) {
-	/* DFA 快路径暂时禁用: dfa_run 的死状态重置 + 非 ASCII 处理有正确性问题.
-	 * DFA 基建已就位 (buildDFAFromNFA + blob 序列化 + parse_unit), 待修复 dfa_run. */
+	/* DFA 快路径: 存在性模式时优先用 DFA. 非 ASCII 输入回退 NFA. */
+	if (mode == 0 && a->hasDFA) {
+		int r = dfa_run(a, data, len);
+		if (r >= 0) return r; /* DFA 结果确定 (0 或 1) */
+		/* r == -1: 非 ASCII 输入, 回退 NFA */
+	}
 	if (mode == 0 && a->nword == 1)
 		return nfa_run_1_exists(a, data, len);
 #if defined(MVS_SSE2) || defined(MVS_NEON)
