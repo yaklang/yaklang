@@ -278,6 +278,10 @@ type mvsNFA struct {
 	excMask1     uint64   // 位 p 置位 <=> excFollow1[p] != 0 (有异常边)
 	excFollow1   []uint64 // 异常后继 (= follow[p] 去掉 p+1); 仅 excMask1[p] 为真时有效
 	excCount     int      // 异常位置总数 (诊断: 越少越接近 O(1)/字节)
+	// 多字 LimEx 视图，供 reverse anchored 等 nword>1 热路径使用。
+	chainTarget []uint64
+	excMask     []uint64
+	excFollow   [][]uint64
 	// condFollowMask1 标记哪些位置有 condFollow 条目 (断言 NFA 专用); 位 p 置位 <=> len(condFollow[p])>0.
 	// 存在是因为: LimEx 把无条件 follow 拆成链/异常, 但 condFollow 是独立于无条件 follow 的条件边,
 	// 链边位置也可能有 condFollow 条目, 故需单独掩码标记.
@@ -454,6 +458,22 @@ func glushkovNFA(root *bnode, anchoredStart, requireEnd bool) (*mvsNFA, bool) {
 // 建好 reach 之后调用)。lean 与断言 NFA 共用: 断言额外的 condFirst/condFollow/condAccept 在标量执行器里
 // 直接取 gb.bits[0] (nword==1 时其长度即 1), 无需此处单独镜像。nword>1 时不置 single, 走多字通用路径。
 func (nfa *mvsNFA) initScalar() {
+	// 所有宽度都预拆一次 LimEx；编译期换取扫描期从“全部活跃位置”降为“位移 + 异常位置”。
+	nfa.chainTarget = bsNew(nfa.nword)
+	nfa.excMask = bsNew(nfa.nword)
+	nfa.excFollow = make([][]uint64, nfa.npos)
+	for p := 0; p < nfa.npos; p++ {
+		exc := cloneU64(nfa.follow[p])
+		if p+1 < nfa.npos && bsTest(exc, p+1) {
+			bsSet(nfa.chainTarget, p+1)
+			bsClear(exc, p+1)
+		}
+		if !bsIsZero(exc) {
+			nfa.excFollow[p] = exc
+			bsSet(nfa.excMask, p)
+			nfa.excCount++
+		}
+	}
 	if nfa.nword == 1 {
 		nfa.single = true
 		nfa.first1 = nfa.first[0]
@@ -468,21 +488,12 @@ func (nfa *mvsNFA) initScalar() {
 			nfa.reach1[s] = nfa.reach[s][0]
 		}
 		// LimEx 链/异常拆分: 链边 p->p+1 用左移批量推进; 异常边逐个 OR.
+		nfa.chainTarget1 = nfa.chainTarget[0]
+		nfa.excMask1 = nfa.excMask[0]
 		nfa.excFollow1 = make([]uint64, nfa.npos)
 		for p := 0; p < nfa.npos; p++ {
-			f := nfa.follow1[p]
-			hasChain := p+1 < nfa.npos && (f&(1<<uint(p+1))) != 0
-			if hasChain {
-				nfa.chainTarget1 |= 1 << uint(p+1)
-			}
-			exc := f
-			if hasChain {
-				exc &^= 1 << uint(p+1)
-			}
-			if exc != 0 {
-				nfa.excFollow1[p] = exc
-				nfa.excMask1 |= 1 << uint(p)
-				nfa.excCount++
+			if nfa.excFollow[p] != nil {
+				nfa.excFollow1[p] = nfa.excFollow[p][0]
 			}
 			// condFollowMask1: 标记有 condFollow 条目的位置 (断言 NFA 专用).
 			if nfa.condFollow != nil && len(nfa.condFollow[p]) > 0 {
