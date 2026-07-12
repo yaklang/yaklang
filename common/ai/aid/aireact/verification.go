@@ -123,11 +123,6 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				}
 			}
 
-			taskID := ""
-			if r.GetCurrentTask() != nil {
-				taskID = r.GetCurrentTask().GetId()
-			}
-
 			action, err := aicommon.ExtractValidActionFromStream(
 				ctx,
 				stream, "verify-satisfaction",
@@ -201,7 +196,6 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			result.CompletedTaskIndex = action.GetString("completed_task_index")
 			result.Evidence = strings.TrimSpace(action.GetString("evidence"))
 			result.EvidenceOps = normalizeEvidenceOperations(action)
-			result.OutputFiles = action.GetStringSlice("output_files")
 
 			if len(result.EvidenceOps) > 0 {
 				var opSummary []string
@@ -232,28 +226,6 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			// 时序敏感.
 			result.NextMovements = nextMovements
 			r.addNextMovementsBreadcrumb(result)
-
-			deliveryFilesMarkdown := r.RenderVerificationOutputFilesMarkdown(result.OutputFiles)
-			if strings.TrimSpace(deliveryFilesMarkdown) != "" {
-				var out bytes.Buffer
-				var outputReader = io.TeeReader(strings.NewReader(deliveryFilesMarkdown), &out)
-				var event *schema.AiOutputEvent
-				event, err = boundEmitter.EmitDefaultStreamEvent(
-					"delivery_files_snapshot",
-					outputReader,
-					taskID,
-					func() {
-						if out.Len() > 0 {
-							r.AddToTimeline("delivery_files", out.String())
-						}
-					},
-				)
-				if err != nil {
-					return utils.Errorf("failed to emit delivery files markdown stream event: %v", err)
-				}
-				captureReferenceAnchor(event)
-				r.EmitFileArtifactWithExt("delivery_files", ".md", deliveryFilesMarkdown)
-			}
 
 			emitVerificationReferenceMaterials(boundEmitter, rawResponse.String())
 			return nil

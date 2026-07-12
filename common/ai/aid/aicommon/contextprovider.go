@@ -32,14 +32,14 @@ const (
 	CONTEXT_PROVIDER_KEY_FILE_PATH      = "file_path"
 	CONTEXT_PROVIDER_KEY_FILE_CONTENT   = "file_content"
 	CONTEXT_PROVIDER_KEY_DIRECTORY_PATH = "directory_path"
-	CONTEXT_PROVIDER_KEY_NAME         = "name"
+	CONTEXT_PROVIDER_KEY_NAME           = "name"
 
 	CONTEXT_PROVIDER_KEY_SYSTEM_FLAG = "system_flag"
 
 	CONTEXT_PROVIDER_VALUE_ALL_KNOWLEDGE_BASE         = "all_knowledge_base"
 	CONTEXT_PROVIDER_VALUE_AUTO_SELECT_KNOWLEDGE_BASE = "auto_select_knowledge_base"
 
-	USER_FREE_INPUT_UUID  = "user_free_input_uuid"
+	USER_FREE_INPUT_UUID = "user_free_input_uuid"
 )
 
 type ContextProviderEntry struct {
@@ -251,13 +251,13 @@ func FileContextProvider(filePath string, userPrompt ...string) ContextProvider 
 // RegisterTracedContent, which flooded the dynamic segment with stale file
 // contents.
 //
-// Delivery files are now recorded as a single Open Timeline entry by
-// pushDeliveryFileToTimeline (see common/ai/aid/aireact/reactloops/
-// verification_gate.go). The timeline entry contains only path / size /
-// mime / mtime; the file body is never re-injected into the prompt and can
-// be re-read on demand via existing file-read or view-window actions.
+// Delivery files are now surfaced only as truncation markers inside
+// ToolResult.OutputFiles (populated by the tool execution layer in
+// aitool/tool_invoke.go). The marker contains the file path and size;
+// the file body is never re-injected into the prompt and can be re-read
+// on demand via existing file-read or view-window actions.
 //
-// 关键词: OutputFileContextProvider 已废弃, 交付文件 timeline 化,
+// 关键词: OutputFileContextProvider 已废弃, 交付文件截断标记化,
 //
 //	Pure Dynamic 反污染, AutoContext 反污染
 func KnowledgeBaseContextProvider(knowledgeBaseName string, userPrompt ...string) ContextProvider {

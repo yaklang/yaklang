@@ -13,8 +13,9 @@ import (
 func TestToolExecutionResult(t *testing.T) {
 	// 创建工具执行结果
 	execResult := &ToolExecutionResult{
-		Stdout: "标准输出内容",
-		Stderr: "标准错误输出内容",
+		Stdout:         "标准输出内容",
+		Stderr:         "标准错误输出内容",
+		CombinedOutput: "标准输出内容标准错误输出内容",
 		Result: map[string]interface{}{
 			"key": "value",
 		},
@@ -39,6 +40,10 @@ func TestToolExecutionResult(t *testing.T) {
 
 	if stderr, ok := jsonData["stderr"].(string); !ok || stderr != "标准错误输出内容" {
 		t.Errorf("stderr = %v, want %v", jsonData["stderr"], "标准错误输出内容")
+	}
+
+	if combined, ok := jsonData["combined_output"].(string); !ok || combined != "标准输出内容标准错误输出内容" {
+		t.Errorf("combined_output = %v, want %v", jsonData["combined_output"], "标准输出内容标准错误输出内容")
 	}
 
 	if result, ok := jsonData["result"].(map[string]interface{}); !ok || result["key"] != "value" {
@@ -117,8 +122,8 @@ func TestExecuteToolWithCapture(t *testing.T) {
 		t.Errorf("执行工具失败: %v", err)
 	}
 
-	if !strings.Contains(result1.Stdout, "命令: test") || !strings.Contains(result1.Stdout, "执行成功") {
-		t.Errorf("标准输出内容不正确: %s", result1.Stdout)
+	if !strings.Contains(result1.CombinedOutput, "命令: test") || !strings.Contains(result1.CombinedOutput, "执行成功") {
+		t.Errorf("合并输出内容不正确: %s", result1.CombinedOutput)
 	}
 
 	if result1.Stderr != "" {
@@ -136,12 +141,12 @@ func TestExecuteToolWithCapture(t *testing.T) {
 		t.Errorf("执行工具失败: %v", err)
 	}
 
-	if !strings.Contains(result2.Stdout, "命令: test-warning") {
-		t.Errorf("标准输出内容不正确: %s", result2.Stdout)
+	if !strings.Contains(result2.CombinedOutput, "命令: test-warning") {
+		t.Errorf("合并输出中应包含 stdout 内容: %s", result2.CombinedOutput)
 	}
 
-	if !strings.Contains(result2.Stderr, "警告") {
-		t.Errorf("标准错误内容不正确: %s", result2.Stderr)
+	if !strings.Contains(result2.CombinedOutput, "警告") {
+		t.Errorf("合并输出中应包含 stderr 内容: %s", result2.CombinedOutput)
 	}
 
 	// 验证结果包含预期数据
@@ -205,9 +210,9 @@ func TestToolResultIntegration(t *testing.T) {
 		return
 	}
 
-	// 验证 stdout 被捕获
-	if !strings.Contains(execResult.Stdout, "处理参数") {
-		t.Errorf("stdout 内容不正确: %s", execResult.Stdout)
+	// 验证合并输出被捕获
+	if !strings.Contains(execResult.CombinedOutput, "处理参数") {
+		t.Errorf("combined output 内容不正确: %s", execResult.CombinedOutput)
 	}
 
 	// 验证结果数据

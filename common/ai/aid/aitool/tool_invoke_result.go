@@ -100,14 +100,13 @@ func (t *ToolResult) String() string {
 		// 处理工具执行结果
 		switch ret := t.Data.(type) {
 		case *ToolExecutionResult:
-			// 处理标准输出
-			if ret.Stdout != "" {
-				buf.WriteString(fmt.Sprintf("stdout: \n%v\n", string(ret.Stdout)))
+			// 优先使用 CombinedOutput；兼容旧消费者回退到 stdout/stderr
+			combined := ret.CombinedOutput
+			if combined == "" {
+				combined = ret.Stdout + ret.Stderr
 			}
-
-			// 处理标准错误
-			if ret.Stderr != "" {
-				buf.WriteString(fmt.Sprintf("stderr: \n%v\n", string(ret.Stderr)))
+			if combined != "" {
+				buf.WriteString(fmt.Sprintf("output: \n%v\n", combined))
 			}
 
 			// 处理结果
@@ -117,7 +116,7 @@ func (t *ToolResult) String() string {
 			}
 
 			// 如果没有任何输出，显示提示信息
-			if ret.Stdout == "" && ret.Stderr == "" && result == "" {
+			if combined == "" && result == "" {
 				buf.WriteString("no output\n")
 			}
 		default:

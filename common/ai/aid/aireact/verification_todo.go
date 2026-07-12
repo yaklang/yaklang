@@ -1,10 +1,6 @@
 package aireact
 
 import (
-	"fmt"
-	"path/filepath"
-	"strings"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
 
@@ -88,13 +84,6 @@ func (r *ReAct) RenderVerificationTodoMarkdownSnapshot(current *aicommon.VerifyS
 	return r.config.GetVerificationTodoMarkdownDelta(aicommon.BuildVerificationTodoScope(r.GetCurrentTask()), current.Satisfied, current.NextMovements)
 }
 
-func (r *ReAct) RenderVerificationOutputFilesMarkdown(outputFiles []string) string {
-	if r == nil {
-		return ""
-	}
-	return renderVerificationOutputFilesMarkdown(outputFiles)
-}
-
 // renderVerificationTodoSnapshot is kept as a package-local shim so existing
 // aireact tests (verification_todo_test.go) can keep operating on a
 // VerifySatisfactionResult history slice. It rebuilds a fresh
@@ -154,58 +143,4 @@ func formatVerificationTodoMarkdownLine(item aicommon.VerificationTodoItem, mark
 
 func sanitizeVerificationTodoMarkdownContent(content string) string {
 	return aicommon.SanitizeVerificationTodoMarkdownContent(content)
-}
-
-// renderVerificationOutputFilesMarkdown renders the per-task delivery file
-// listing emitted at verification time. The logic is intentionally local to
-// aireact because it has no equivalent in the SessionPromptState store yet.
-func renderVerificationOutputFilesMarkdown(outputFiles []string) string {
-	normalized := normalizeVerificationOutputFiles(outputFiles)
-	if len(normalized) == 0 {
-		return ""
-	}
-
-	lines := make([]string, 0, len(normalized)+3)
-	for _, filePath := range normalized {
-		lines = append(lines, fmt.Sprintf("- %s", filePath))
-	}
-	return strings.Join(lines, "\n")
-}
-
-func normalizeVerificationOutputFiles(outputFiles []string) []string {
-	if len(outputFiles) == 0 {
-		return nil
-	}
-
-	result := make([]string, 0, len(outputFiles))
-	seen := make(map[string]struct{}, len(outputFiles))
-	for _, filePath := range outputFiles {
-		normalizedPath := sanitizeVerificationOutputFilePath(filePath)
-		if normalizedPath == "" {
-			continue
-		}
-		if _, exists := seen[normalizedPath]; exists {
-			continue
-		}
-		seen[normalizedPath] = struct{}{}
-		result = append(result, normalizedPath)
-	}
-	return result
-}
-
-func sanitizeVerificationOutputFilePath(filePath string) string {
-	cleaned := strings.TrimSpace(filePath)
-	if cleaned == "" {
-		return ""
-	}
-	cleaned = strings.NewReplacer("\r", "", "\n", "", "\t", " ").Replace(cleaned)
-	cleaned = strings.TrimSpace(cleaned)
-	if cleaned == "" {
-		return ""
-	}
-	base := filepath.Base(cleaned)
-	if strings.HasPrefix(base, "ai_bash_script_") && strings.HasSuffix(base, ".sh") {
-		return ""
-	}
-	return cleaned
 }

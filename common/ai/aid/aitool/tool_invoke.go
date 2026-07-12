@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -212,25 +213,30 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 		}, err
 	}
 
-	handleLargeContent(&execResult.Stdout, "stdout", func(s string) {
-		log.Infof("large stdout content saved to file: %v", s)
-	})
-	handleLargeContent(&execResult.Stderr, "stderr", func(filename string) {
-		log.Infof("large stderr content saved to file: %s", filename)
-	})
+	var spilledFiles []*OutputFileInfo
+	combinedFile := handleLargeContent(&execResult.CombinedOutput, "output")
+	if combinedFile != "" {
+		log.Infof("large combined output saved to file: %v", combinedFile)
+		spilledFiles = append(spilledFiles, newSpillFileInfo(combinedFile))
+		// 同步截断 stdout/stderr 以保持一致性（兼容旧消费者）
+		execResult.Stdout = execResult.CombinedOutput
+		execResult.Stderr = ""
+	}
 
-	// 阈值设置为50KB，与handleLargeContent保持一致
 	if jsonResultRaw := utils.Jsonify(execResult.Result); len(jsonResultRaw) > 50*1024 {
 		originJsonResult := string(jsonResultRaw)
-		jsonResult := utils.ShrinkString(originJsonResult, 8000)
-		filename := handleLargeContentToFile(originJsonResult, "json")
-		execResult.Result = fmt.Sprintf("%s (total: %v, saved in file[%v]) see file use some other filesystem tool",
-			jsonResult, len(originJsonResult), filename)
-		log.Infof("large json result content saved to file: %s", filename)
+		jsonFile := handleLargeContentToFile(originJsonResult, "json")
+		execResult.Result = buildSpillMarker(jsonFile, len(originJsonResult), originJsonResult, 8000)
+		log.Infof("large json result content saved to file: %s", jsonFile)
+		spilledFiles = append(spilledFiles, newSpillFileInfo(jsonFile))
 	}
 
 	if cb := cfg.resCallback; cb != nil {
-		return cb(execResult)
+		result, cbErr := cb(execResult)
+		if result != nil && len(spilledFiles) > 0 && len(result.OutputFiles) == 0 {
+			result.OutputFiles = spilledFiles
+		}
+		return result, cbErr
 	}
 
 	return &ToolResult{
@@ -239,6 +245,7 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 		Param:       params,
 		Success:     true,
 		Data:        execResult,
+		OutputFiles: spilledFiles,
 	}, nil
 }
 
@@ -277,31 +284,47 @@ func (t *Tool) InvokeWithOrderedParams(params *omap.OrderedMap[string, any], opt
 	return t.InvokeWithParams(paramMap, opts...)
 }
 
-// handleLargeContent 处理大文本内容，将其截断并保存到临时文件
-// content: 要处理的内容指针
-// contentType: 内容类型(stdout/stderr/json)
-// logCallback: 可选的日志回调函数
-// Note: 阈值设置为50KB，避免AI工具调用时因内容被截断而反复重试
-func handleLargeContent(content *string, contentType string, logCallback func(string)) {
+// handleLargeContent 处理大文本内容，将其截断并保存到临时文件。
+// 超过 50KB 的内容会被保存到临时文件，原始内容被替换为 ShrinkTextBlock 风格的
+// 截断标记（保留开头 + 中间省略 + 结尾 + 文件路径）。返回保存的文件路径；
+// 内容未超阈值时返回空字符串。
+func handleLargeContent(content *string, contentType string) string {
 	if len(*content) <= 50*1024 {
-		return
+		return ""
 	}
 
 	origContent := *content
-	newData := utils.ShrinkString(origContent, 4096)
 	filename := handleLargeContentToFile(origContent, contentType)
+	*content = buildSpillMarker(filename, len(origContent), origContent, 4096)
+	return filename
+}
 
-	newData += fmt.Sprintf(
-		"\n___________\n"+
-			" (total: %v, saved in file[%v]) see file use some other filesystem tool\n"+
-			"___________",
-		utils.ByteSize(uint64(len(origContent))),
-		filename)
-	*content = newData
-
-	if logCallback != nil {
-		logCallback(filename)
+// buildSpillMarker 生成截断标记文本：保留开头 previewBytes/2 字节和结尾 previewBytes/2
+// 字节，中间插入省略信息和文件路径。
+func buildSpillMarker(filename string, totalSize int, content string, previewBytes int) string {
+	if previewBytes < 100 {
+		previewBytes = 100
 	}
+	half := previewBytes / 2
+	runes := []rune(content)
+	if len(runes) <= previewBytes {
+		return content
+	}
+	head := string(runes[:half])
+	tail := string(runes[len(runes)-half:])
+	return fmt.Sprintf(
+		"%s\n\n... (truncated, %d bytes total, saved to: %s) ...\n\n%s",
+		head, totalSize, filename, tail,
+	)
+}
+
+// newSpillFileInfo 从文件路径构建 OutputFileInfo（不读取正文内容）。
+func newSpillFileInfo(path string) *OutputFileInfo {
+	info := &OutputFileInfo{Path: path}
+	if fi, err := os.Stat(path); err == nil {
+		info.Size = fi.Size()
+	}
+	return info
 }
 
 // handleLargeContentToFile 将大文本内容保存到临时文件并返回文件名

@@ -1370,35 +1370,24 @@ func (t *ToolCaller) saveToolCallFiles(
 		md.WriteString("(empty)\n\n")
 	}
 
-	// --- STDOUT ---
-	md.WriteString("## STDOUT\n\n")
+	// --- COMBINED OUTPUT ---
+	md.WriteString("## OUTPUT\n\n")
 	stdoutContent := stdoutBuffer.Bytes()
 	frameworkMsgPrefix := fmt.Sprintf("invoking tool[%s] ...\n", tool.Name)
 	if bytes.HasPrefix(stdoutContent, []byte(frameworkMsgPrefix)) {
 		stdoutContent = stdoutContent[len(frameworkMsgPrefix):]
 	}
-	if len(stdoutContent) > 0 {
+	stderrContent := stderrBuffer.Bytes()
+	combinedContent := append(stdoutContent, stderrContent...)
+	if len(combinedContent) > 0 {
 		md.WriteString(markdownCodeFence + "\n")
-		md.Write(stdoutContent)
-		if !bytes.HasSuffix(stdoutContent, []byte("\n")) {
+		md.Write(combinedContent)
+		if !bytes.HasSuffix(combinedContent, []byte("\n")) {
 			md.WriteString("\n")
 		}
 		md.WriteString(markdownCodeFence + "\n\n")
 	} else {
 		md.WriteString("(empty)\n\n")
-	}
-
-	// --- STDERR ---
-	md.WriteString("## STDERR\n\n")
-	if stderrBuffer.Len() > 0 {
-		md.WriteString(markdownCodeFence + "\n")
-		md.Write(stderrBuffer.Bytes())
-		if !bytes.HasSuffix(stderrBuffer.Bytes(), []byte("\n")) {
-			md.WriteString("\n")
-		}
-		md.WriteString(markdownCodeFence + "\n")
-	} else {
-		md.WriteString("(empty)\n")
 	}
 
 	// Write the single markdown file
@@ -1435,8 +1424,8 @@ func extractResultHumanReadable(toolResult *aitool.ToolResult, emitter *Emitter)
 		toolExecutionResult, ok := toolResult.Data.(*aitool.ToolExecutionResult)
 		if ok && toolExecutionResult.Result != nil {
 			resultStr := utils.InterfaceToString(toolExecutionResult.Result)
-			// Check if result contains a file path (from handleLargeContent)
-			filePathRegex := regexp.MustCompile(`saved in file\[([^\]]+)\]`)
+			// Check if result contains a file path (from handleLargeContent / buildSpillMarker)
+			filePathRegex := regexp.MustCompile(`saved to: ([^\s\n]+)`)
 			matches := filePathRegex.FindStringSubmatch(resultStr)
 			if len(matches) > 1 {
 				filePath := matches[1]

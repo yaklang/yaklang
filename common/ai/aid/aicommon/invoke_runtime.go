@@ -29,7 +29,6 @@ type VerifySatisfactionResult struct {
 	NextMovements      []VerifyNextMovement `json:"next_movements"`       // AI's next action plan for in-progress status tracking
 	Evidence           string               `json:"evidence"`             // Legacy: markdown evidence string
 	EvidenceOps        []EvidenceOperation  `json:"evidence_ops"`         // Structured evidence incremental operations
-	OutputFiles        []string             `json:"output_files"`         // File paths created/modified by tool execution, extracted by verify AI
 }
 
 // NewVerifySatisfactionResult creates a new VerifySatisfactionResult
