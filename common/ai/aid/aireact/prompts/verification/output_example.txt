@@ -130,12 +130,12 @@
 
 **任务完成时（必须设置 completed_task_index）：**
 ```json
-{"@action": "verify-satisfaction", "user_satisfied": true, "completed_task_index": "任务索引", "reasoning": "简明扼要分析", "next_movements": [], "evidence": [], "output_files": ["/abs/path/to/result.md"]}
+{"@action": "verify-satisfaction", "user_satisfied": true, "completed_task_index": "任务索引", "reasoning": "简明扼要分析", "next_movements": [], "evidence": []}
 ```
 
 **任务未完成时（completed_task_index 为空）：**
 ```json
-{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "简明扼要分析", "next_movements": [{"op": "add", "id": "next_step_id", "content": "下一步计划"}], "evidence": [{"op": "add", "id": "health_403", "content": "主体: 接口 GET /health\n动作: 发送未带认证头的健康检查请求\n观测: 响应状态码为 403，响应头包含 x-auth-required: true\n控制含义: 应切换为携带认证头的请求，不再沿无认证分支重复测试"}], "output_files": []}
+{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "简明扼要分析", "next_movements": [{"op": "add", "id": "next_step_id", "content": "下一步计划"}], "evidence": [{"op": "add", "id": "health_403", "content": "主体: 接口 GET /health\n动作: 发送未带认证头的健康检查请求\n观测: 响应状态码为 403，响应头包含 x-auth-required: true\n控制含义: 应切换为携带认证头的请求，不再沿无认证分支重复测试"}]}
 ```
 
 **标记已有 TODO 正在推进时：**

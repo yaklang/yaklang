@@ -527,10 +527,11 @@ func TestHandleLargeContent(t *testing.T) {
 		originalContent := smallContent
 
 		// 调用处理函数
-		handleLargeContent(&smallContent, "test", nil)
+		file := handleLargeContent(&smallContent, "test")
 
 		// 验证内容没有被修改
 		require.Equal(t, originalContent, smallContent, "小于50KB的内容不应被修改")
+		require.Empty(t, file, "小内容不应产生截断文件")
 	})
 
 	t.Run("处理大文本内容", func(t *testing.T) {
@@ -539,29 +540,23 @@ func TestHandleLargeContent(t *testing.T) {
 		originalContent := largeContent
 
 		// 调用处理函数
-		handleLargeContent(&largeContent, "test", nil)
+		savedFile := handleLargeContent(&largeContent, "test")
 
 		// 验证内容已被截断
 		require.NotEqual(t, originalContent, largeContent, "大于50KB的内容应被修改")
-		require.Contains(t, largeContent, "saved in file", "应包含文件保存信息")
+		require.Contains(t, largeContent, "saved to:", "应包含文件保存信息")
 		require.True(t, len(largeContent) < len(originalContent), "内容应被截断")
+		require.NotEmpty(t, savedFile, "应返回截断文件路径")
 	})
 
-	t.Run("测试回调函数", func(t *testing.T) {
+	t.Run("测试返回文件路径", func(t *testing.T) {
 		// 创建一个大于50KB的文本
 		largeContent := strings.Repeat("c", 1024*60) // 60KB
 
-		// 回调函数验证
-		callbackCalled := false
-		var savedFilename string
+		// 调用处理函数并获取返回的文件路径
+		savedFilename := handleLargeContent(&largeContent, "test")
 
-		handleLargeContent(&largeContent, "test", func(filename string) {
-			callbackCalled = true
-			savedFilename = filename
-		})
-
-		// 验证回调被调用
-		require.True(t, callbackCalled, "回调函数应被调用")
+		// 验证文件名不为空
 		require.NotEmpty(t, savedFilename, "文件名不应为空")
 	})
 
@@ -618,18 +613,21 @@ func TestInvokeWithParamsLargeContent(t *testing.T) {
 	execResult, ok := result.Data.(*ToolExecutionResult)
 	require.True(t, ok, "结果类型错误，期望 *ToolExecutionResult")
 
-	// 验证标准输出被截断和保存
-	require.Less(t, len(execResult.Stdout), 12*1024, "标准输出应被截断")
-	require.Contains(t, execResult.Stdout, "saved in file", "标准输出应包含文件保存信息")
+	// 验证合并输出被截断和保存
+	require.Less(t, len(execResult.CombinedOutput), 20*1024, "合并输出应被截断")
+	require.Contains(t, execResult.CombinedOutput, "saved to:", "合并输出应包含文件保存信息")
+	require.Empty(t, execResult.Stderr, "截断后 stderr 应被清空")
 
-	// 验证标准错误被截断和保存
-	require.Less(t, len(execResult.Stderr), 11*1024, "标准错误应被截断")
-	require.Contains(t, execResult.Stderr, "saved in file", "标准错误应包含文件保存信息")
+	// 验证 ToolResult.OutputFiles 包含截断保存的文件路径
+	require.NotEmpty(t, result.OutputFiles, "OutputFiles 应包含截断保存的文件路径")
+	for _, f := range result.OutputFiles {
+		require.NotEmpty(t, f.Path, "截断文件路径不应为空")
+	}
 
 	// 验证JSON结果处理
 	resultStr, ok := execResult.Result.(string)
 	require.True(t, ok, "JSON结果类型错误，应为字符串")
-	require.Contains(t, resultStr, "saved in file", "JSON结果应包含文件保存信息")
+	require.Contains(t, resultStr, "saved to:", "JSON结果应包含文件保存信息")
 }
 
 func TestApplyDefault_NestedArrayWithNilPropertyTypesDoesNotPanic(t *testing.T) {

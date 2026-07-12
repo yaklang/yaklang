@@ -294,7 +294,6 @@ Example - Sequential file operations(With AI-Tag tags):
 				verifyResult.CompletedTaskIndex,
 				verifyResult.NextMovements,
 				verifyResult.Evidence,
-				verifyResult.OutputFiles,
 				verifyResult.EvidenceOps,
 			)
 			if len(verifyResult.EvidenceOps) > 0 {

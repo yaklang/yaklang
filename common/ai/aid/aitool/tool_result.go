@@ -10,9 +10,12 @@ import (
 
 // ToolExecutionResult 表示工具执行的完整结果
 type ToolExecutionResult struct {
-	Stdout string      `json:"stdout"`
-	Stderr string      `json:"stderr,omitempty"`
-	Result interface{} `json:"result,omitempty"`
+	Stdout string `json:"stdout"`
+	Stderr string `json:"stderr,omitempty"`
+	// CombinedOutput 是 stdout + stderr 的合并输出，按时间顺序交错。
+	// 截断保存时只针对 CombinedOutput 做一次，不再分别处理 stdout/stderr。
+	CombinedOutput string      `json:"combined_output"`
+	Result         interface{} `json:"result,omitempty"`
 }
 
 // ToJSON 将执行结果转换为JSON字符串
@@ -39,11 +42,15 @@ func (r *ToolExecutionResult) GetJSONSchema() map[string]interface{} {
 				"type":        "string",
 				"description": "标准错误输出内容",
 			},
+			"combined_output": map[string]interface{}{
+				"type":        "string",
+				"description": "stdout + stderr 合并输出",
+			},
 			"result": map[string]interface{}{
 				"description": "工具执行的结果",
 			},
 		},
-		"required": []string{"stdout", "stderr", "result"},
+		"required": []string{"stdout", "stderr", "combined_output", "result"},
 	}
 
 	return schema
@@ -89,18 +96,20 @@ func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any
 	select {
 	case <-ctx.Done():
 		execResult = &ToolExecutionResult{
-			Stdout: stdoutBuf.String(),
-			Stderr: stderrBuf.String(),
-			Result: res,
+			Stdout:         stdoutBuf.String(),
+			Stderr:         stderrBuf.String(),
+			CombinedOutput: stdoutBuf.String() + stderrBuf.String(),
+			Result:         res,
 		}
 		if cancelCallback != nil {
 			execResult, err = cancelCallback(execResult, err)
 		}
 	case <-finsh:
 		execResult = &ToolExecutionResult{
-			Stdout: stdoutBuf.String(),
-			Stderr: stderrBuf.String(),
-			Result: res,
+			Stdout:         stdoutBuf.String(),
+			Stderr:         stderrBuf.String(),
+			CombinedOutput: stdoutBuf.String() + stderrBuf.String(),
+			Result:         res,
 		}
 	}
 	return execResult, err
@@ -117,7 +126,7 @@ func ValidateResult(resultJSON string) (bool, []string) {
 	errors := []string{}
 
 	// 验证必要字段
-	requiredFields := []string{"stdout", "stderr", "result"}
+	requiredFields := []string{"stdout", "stderr", "combined_output", "result"}
 	for _, field := range requiredFields {
 		if _, exists := result[field]; !exists {
 			errors = append(errors, fmt.Sprintf("缺少必要字段: %s", field))

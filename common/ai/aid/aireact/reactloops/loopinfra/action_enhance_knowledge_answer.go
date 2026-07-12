@@ -124,7 +124,7 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 			op.Fail(utils.Wrap(err, "knowledge_enhance action enhanced knowledge answer"))
 			return
 		}
-		loop.PushSatisfactionRecordWithCompletedTaskIndex(verifyResult.Satisfied, verifyResult.Reasoning, verifyResult.CompletedTaskIndex, verifyResult.NextMovements, verifyResult.Evidence, verifyResult.OutputFiles, verifyResult.EvidenceOps)
+		loop.PushSatisfactionRecordWithCompletedTaskIndex(verifyResult.Satisfied, verifyResult.Reasoning, verifyResult.CompletedTaskIndex, verifyResult.NextMovements, verifyResult.Evidence, verifyResult.EvidenceOps)
 		if len(verifyResult.EvidenceOps) > 0 {
 			loop.GetConfig().ApplySessionEvidenceOps(verifyResult.EvidenceOps)
 		}
@@ -151,4 +151,3 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 		op.Continue()
 	},
 }
-

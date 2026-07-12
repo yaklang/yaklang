@@ -37,7 +37,6 @@ type SatisfactionRecord struct {
 	NextMovements      []aicommon.VerifyNextMovement `json:"next_movements"`       // AI 下一步行动计划，用于任务执行中状态追踪
 	Evidence           string                        `json:"evidence"`             // 运行期新增的证据 Markdown (legacy)
 	EvidenceOps        []aicommon.EvidenceOperation  `json:"evidence_ops"`         // 结构化证据增量操作
-	OutputFiles        []string                      `json:"output_files"`         // 本轮验证识别出的交付文件
 }
 
 // ActionRecord 记录每次迭代执行的 Action 信息
@@ -343,14 +342,13 @@ func (r *ReActLoop) PushSatisfactionRecord(satisfactory bool, reason string) {
 }
 
 // PushSatisfactionRecordWithCompletedTaskIndex 推送满意度记录，并同时记录已完成的任务索引和下一步行动计划
-func (r *ReActLoop) PushSatisfactionRecordWithCompletedTaskIndex(satisfactory bool, reason string, completedTaskIndex string, nextMovements []aicommon.VerifyNextMovement, evidence string, outputFiles []string, evidenceOps ...[]aicommon.EvidenceOperation) {
+func (r *ReActLoop) PushSatisfactionRecordWithCompletedTaskIndex(satisfactory bool, reason string, completedTaskIndex string, nextMovements []aicommon.VerifyNextMovement, evidence string, evidenceOps ...[]aicommon.EvidenceOperation) {
 	record := &SatisfactionRecord{
 		Satisfactory:       satisfactory,
 		Reason:             reason,
 		CompletedTaskIndex: completedTaskIndex,
 		NextMovements:      nextMovements,
 		Evidence:           evidence,
-		OutputFiles:        append([]string(nil), outputFiles...),
 	}
 	if len(evidenceOps) > 0 {
 		record.EvidenceOps = evidenceOps[0]

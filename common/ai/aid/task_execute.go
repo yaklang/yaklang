@@ -77,16 +77,14 @@ func (t *AiTask) execute() error {
 			// This provides an additional mechanism to end tasks beyond just isDone
 			lastRecord := loop.GetLastSatisfactionRecordFull()
 			var summary, completedTaskIndex, nextMovements string
-			var outputFiles []string
 			if lastRecord != nil {
 				summary = lastRecord.Reason
 				completedTaskIndex = lastRecord.CompletedTaskIndex
 				nextMovements = aicommon.FormatVerifyNextMovementsSummary(lastRecord.NextMovements)
-				outputFiles = append(outputFiles, lastRecord.OutputFiles...)
 
 				var allOps []aicommon.EvidenceOperation
 				allOps = append(allOps, lastRecord.EvidenceOps...)
-				allOps = append(allOps, buildVerificationCarryoverEvidenceOps(t, summary, outputFiles)...)
+				allOps = append(allOps, buildVerificationCarryoverEvidenceOps(t, summary)...)
 				if len(allOps) > 0 {
 					// EVIDENCE 单写到 SessionPromptState (SESSION_EVIDENCE 段)。
 					// 历史曾把 EVIDENCE 块嵌入 root user input, 但这会让 PlanContext

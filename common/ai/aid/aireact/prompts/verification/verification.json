@@ -83,13 +83,6 @@
                     "content": { "type": "string", "description": "当 op=add 或 update 时必填。写清楚主体、动作、观测、控制含义。" }
                 }
             }
-        },
-        "output_files": {
-            "description": "**工具执行过程中创建或修改的文件路径列表。从工具的 stdout/stderr 和执行上下文中提取所有涉及的文件绝对路径。例如：write_file 创建的文件路径、bash 中 cat > /tmp/script.py 写入的文件路径、modify_file 修改的文件路径。只包含实际存在于磁盘上的文件，不包含临时脚本文件（如 ai_bash_script_*.sh）。如果工具没有创建或修改任何文件，输出空数组 `[]`。这些路径会在 verify 结果中以“交付文件”区块显式展示给用户、写入 artifact 清单，并像 EVIDENCE 一样进入共享执行上下文，因此必须准确反映真正交付的文件。**",
-            "type": "array",
-            "items": {
-                "type": "string"
-            }
         }
     },
     "additionalProperties": false

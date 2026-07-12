@@ -3,7 +3,6 @@ package aid
 import (
 	"fmt"
 	"io"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -247,8 +246,8 @@ func appendTaskPlanEvidence(task *AiTask, incoming string) (string, bool) {
 	return merged, true
 }
 
-func buildTaskPlanVerificationCarryoverMarkdown(task *AiTask, reasoning string, outputFiles []string) string {
-	sections := make([]string, 0, 3)
+func buildTaskPlanVerificationCarryoverMarkdown(task *AiTask, reasoning string) string {
+	sections := make([]string, 0, 2)
 	taskLabel := formatTaskPlanEvidenceLabel(task)
 	reasoning = strings.TrimSpace(reasoning)
 
@@ -256,16 +255,6 @@ func buildTaskPlanVerificationCarryoverMarkdown(task *AiTask, reasoning string, 
 		parts := []string{fmt.Sprintf("## %s 核实结果", taskLabel)}
 		parts = append(parts, "### 判定", reasoning)
 		sections = append(sections, strings.TrimSpace(strings.Join(parts, "\n\n")))
-	}
-
-	normalizedFiles := normalizeTaskPlanOutputFiles(outputFiles)
-	if len(normalizedFiles) > 0 {
-		lines := make([]string, 0, len(normalizedFiles)+1)
-		lines = append(lines, fmt.Sprintf("## %s 交付文件", taskLabel))
-		for _, filePath := range normalizedFiles {
-			lines = append(lines, "- "+filePath)
-		}
-		sections = append(sections, strings.TrimSpace(strings.Join(lines, "\n")))
 	}
 
 	return strings.TrimSpace(strings.Join(sections, "\n\n"))
@@ -297,44 +286,7 @@ func formatTaskPlanEvidenceLabel(task *AiTask) string {
 	return fmt.Sprintf("子任务 %s %s", index, name)
 }
 
-func normalizeTaskPlanOutputFiles(outputFiles []string) []string {
-	if len(outputFiles) == 0 {
-		return nil
-	}
-	result := make([]string, 0, len(outputFiles))
-	seen := make(map[string]struct{}, len(outputFiles))
-	for _, filePath := range outputFiles {
-		normalizedPath := sanitizeTaskPlanOutputFilePath(filePath)
-		if normalizedPath == "" {
-			continue
-		}
-		if _, exists := seen[normalizedPath]; exists {
-			continue
-		}
-		seen[normalizedPath] = struct{}{}
-		result = append(result, normalizedPath)
-	}
-	return result
-}
-
-func sanitizeTaskPlanOutputFilePath(filePath string) string {
-	cleaned := strings.TrimSpace(filePath)
-	if cleaned == "" {
-		return ""
-	}
-	cleaned = strings.NewReplacer("\r", "", "\n", "", "\t", " ").Replace(cleaned)
-	cleaned = strings.TrimSpace(cleaned)
-	if cleaned == "" {
-		return ""
-	}
-	base := filepath.Base(cleaned)
-	if strings.HasPrefix(base, "ai_bash_script_") && strings.HasSuffix(base, ".sh") {
-		return ""
-	}
-	return cleaned
-}
-
-func buildVerificationCarryoverEvidenceOps(task *AiTask, reasoning string, outputFiles []string) []aicommon.EvidenceOperation {
+func buildVerificationCarryoverEvidenceOps(task *AiTask, reasoning string) []aicommon.EvidenceOperation {
 	var ops []aicommon.EvidenceOperation
 	taskLabel := formatTaskPlanEvidenceLabel(task)
 
@@ -344,16 +296,6 @@ func buildVerificationCarryoverEvidenceOps(task *AiTask, reasoning string, outpu
 			Op:      "add",
 			ID:      fmt.Sprintf("verify-%s", task.GetIndex()),
 			Content: fmt.Sprintf("[%s] 核实: %s", taskLabel, reasoning),
-		})
-	}
-
-	normalizedFiles := normalizeTaskPlanOutputFiles(outputFiles)
-	if len(normalizedFiles) > 0 {
-		fileList := strings.Join(normalizedFiles, ", ")
-		ops = append(ops, aicommon.EvidenceOperation{
-			Op:      "add",
-			ID:      fmt.Sprintf("files-%s", task.GetIndex()),
-			Content: fmt.Sprintf("[%s] 交付文件: %s", taskLabel, fileList),
 		})
 	}
 	return ops
