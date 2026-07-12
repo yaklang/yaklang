@@ -2,6 +2,7 @@ package minirehs
 
 import (
 	"regexp/syntax"
+	"runtime"
 	"strings"
 )
 
@@ -292,6 +293,8 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 	for _, idx := range db.assertAlwaysOn {
 		if nfa := db.nfas[idx]; nfa != nil && nfa.hasAssert && nfa.single {
 			db.assertAlwaysOnCIdxs = append(db.assertAlwaysOnCIdxs, int32(idx))
+		} else {
+			db.assertAlwaysOnGoIdxs = append(db.assertAlwaysOnGoIdxs, idx)
 		}
 	}
 
@@ -456,11 +459,12 @@ type mvsDB struct {
 	dfaAlwaysOnIdxs []int32
 	// assertAlwaysOnCIdxs 是 assertAlwaysOn 中 single (nword==1) 断言 NFA 的 idx 数组 (C 内核批量用).
 	// 预计算一次, scan 中复用 (零分配).
-	assertAlwaysOnCIdxs []int32
-	anchoredMerged      *mvsMergedNFA // R1 span-injected lean anchored 合并自动机（A/B 开关控制使用）
-	anchorMergedSlot    []int         // pattern idx -> anchoredMerged 成员槽位；-1 表示非成员
-	assertAlwaysOn      []int         // 无字面量的断言 NFA (hasAssert): existsInAssert 门控 + verifier 定位
-	otherAlwaysOn       []int         // 无字面量且不可编入 NFA (regexp2/RE2 兜底): 逐条验证
+	assertAlwaysOnCIdxs  []int32
+	assertAlwaysOnGoIdxs []int
+	anchoredMerged       *mvsMergedNFA // R1 span-injected lean anchored 合并自动机（A/B 开关控制使用）
+	anchorMergedSlot     []int         // pattern idx -> anchoredMerged 成员槽位；-1 表示非成员
+	assertAlwaysOn       []int         // 无字面量的断言 NFA (hasAssert): existsInAssert 门控 + verifier 定位
+	otherAlwaysOn        []int         // 无字面量且不可编入 NFA (regexp2/RE2 兜底): 逐条验证
 
 	reportLoc bool // 命中是否上报精确偏移与内容 (见 WithReportLocation)
 
@@ -522,6 +526,27 @@ func (d *mvsDB) close() error {
 
 func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, error) {
 	d.resetScratch(sc)
+	asyncAlways := false
+	asyncConsumed := false
+	if runtime.GOMAXPROCS(0) > 1 && len(data) >= 512 && d.kernel != nil && d.merged != nil &&
+		len(d.assertAlwaysOnCIdxs) > 0 && len(d.assertAlwaysOnGoIdxs) == 0 {
+		if sc.alwaysScratch == nil {
+			sc.alwaysScratch = &scratch{}
+			sc.alwaysRes = make(chan alwaysResult, 1)
+		}
+		go func() {
+			merged, asserts := d.kernel.combinedScan(data, d.assertAlwaysOnCIdxs, false, sc.alwaysScratch)
+			sc.alwaysRes <- alwaysResult{merged: merged, assert: asserts}
+		}()
+		asyncAlways = true
+		defer func() {
+			// handler 可能在候选阶段要求提前停止；仍须收走本报文结果，保证
+			// 短生命周期 worker 在本次 Scan 返回前完成。
+			if !asyncConsumed {
+				<-sc.alwaysRes
+			}
+		}()
+	}
 
 	// 1) 字面量预过滤: 命中某 pattern 的必需字面量, 才对其做一次存在性验证.
 	//    存在性快门档 (!reportLoc) 下, 有界宽 lean NFA 走"邻域窗口"验证: 任一匹配必含必需字面量,
@@ -820,20 +845,20 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 	// 有 C 内核且 merged != nil 时走 combinedScan (merged + single-word assert 在一次遍历内).
 	// 多字 assert NFA 回退逐条 verifyOne (需要共享边界, 不适合 combined).
 	if d.kernel != nil && d.merged != nil && len(d.assertAlwaysOn) > 0 {
-		// 收集 single-word assert always-on idxs
-		var assertCIdxs []int32
-		var assertGoIdxs []int
-		for _, idx := range d.assertAlwaysOn {
-			nfa := d.nfas[idx]
-			if nfa != nil && nfa.hasAssert && nfa.single {
-				assertCIdxs = append(assertCIdxs, int32(idx))
-			} else {
-				assertGoIdxs = append(assertGoIdxs, idx)
-			}
-		}
+		// 两组下标在编译期预计算，避免每条报文重复分类和分配切片。
+		assertCIdxs := d.assertAlwaysOnCIdxs
+		assertGoIdxs := d.assertAlwaysOnGoIdxs
 		if len(assertCIdxs) > 0 {
-			mHits, aHits := d.kernel.combinedScan(data, assertCIdxs, sc)
-			sc.assertBoundReady = true // combinedScan 内部预算了边界
+			keepBound := len(assertGoIdxs) > 0
+			var mHits, aHits []int
+			if asyncAlways {
+				res := <-sc.alwaysRes
+				asyncConsumed = true
+				mHits, aHits = res.merged, res.assert
+			} else {
+				mHits, aHits = d.kernel.combinedScan(data, assertCIdxs, keepBound, sc)
+			}
+			sc.assertBoundReady = keepBound
 			// 处理 merged 命中
 			for _, idx := range mHits {
 				if sc.fullDone[idx] {

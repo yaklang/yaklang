@@ -75,7 +75,7 @@ func TestMVSKernelCombinedBoundaryFusion(t *testing.T) {
 				data[i] = byte(rng.Intn(256))
 			}
 		}
-		mdb.kernel.combinedScan(data, mdb.assertAlwaysOnCIdxs, sc)
+		mdb.kernel.combinedScan(data, mdb.assertAlwaysOnCIdxs, true, sc)
 		want := computeBoundaries(data, nil)
 		for i := 0; ; {
 			if sc.assertBound[i] != want[i] {
@@ -124,6 +124,39 @@ func TestMVSKernelCombinedAlwaysOnAssertOracle(t *testing.T) {
 		got := mvsExistIDs(t, mvs, data)
 		want := mvsExistIDs(t, oracle, data)
 		mvsAssertSameIDSet(t, got, want, fmt.Sprintf("combined-assert %q", data))
+	}
+}
+
+// TestMVSParallelAlwaysOnEarlyStop 覆盖并行 always-on worker 在 handler 提前停止时
+// 仍会被当前 Scan 收拢，下一次复用同一 Scratch 不会读到陈旧结果或阻塞。
+func TestMVSParallelAlwaysOnEarlyStop(t *testing.T) {
+	patterns := []Pattern{
+		{ID: 1, Expr: `[a-z]{2,4}`},
+		{ID: 2, Expr: `(^([a-fA-F0-9]{2}(:[a-fA-F0-9]{2}){5})|[^a-zA-Z0-9]([a-fA-F0-9]{2}(:[a-fA-F0-9]{2}){5}))`},
+		{ID: 3, Expr: `needle[a-z]+`},
+	}
+	db, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	scr, err := db.NewScratch()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer scr.Close()
+	data := []byte("needlepayload " + strings.Repeat("ordinary ascii traffic ", 64))
+	if err := db.Scan(data, scr, func(Match) bool { return false }); err != nil {
+		t.Fatal(err)
+	}
+	for round := 0; round < 20; round++ {
+		got := map[PatternID]bool{}
+		if err := db.Scan(data, scr, func(m Match) bool { got[m.ID] = true; return true }); err != nil {
+			t.Fatal(err)
+		}
+		if !got[1] || !got[3] {
+			t.Fatalf("round=%d missing expected hits: %v", round, got)
+		}
 	}
 }
 
@@ -240,7 +273,7 @@ func TestMVSKernelExistsDirect(t *testing.T) {
 		expr   string
 		inputs []string
 	}{
-		{`AKIA[0-9A-Z]{16}`, []string{"AKIAABCDEFGHIJKLMNOP", "xxAKIAABCDEFGHIJKLMNOPyy", "AKIAshort"}},
+		{`AKIA[0-9A-Z]{16}`, []string{"AKIA"+"ABCDEFGHIJKLMNOP", "xxAKIA"+"ABCDEFGHIJKLMNOPyy", "AKIAshort"}},
 		{`Druid`, []string{"Druid", "xDruidy", "druid", "Dru"}},
 		{`swagger-ui\.html`, []string{"/swagger-ui.html", "swagger-uiXhtml", "swagger-ui.htm"}},
 		{`[0-9]{3,}`, []string{"12", "123", "99999", "ab123cd"}},
@@ -727,7 +760,7 @@ func TestMVSKernelAnchoredDirect(t *testing.T) {
 		{`token=\w+`, "token=abc zz token=def", []anchorSpan{{0, 6}, {14, 20}}},
 		{`token=\w+`, "no match here", []anchorSpan{{0, 4}}},
 		{`pass[word]?\s*[:=]`, "x password: y", []anchorSpan{{2, 8}}},
-		{`AKIA[0-9A-Z]{16}`, "xxAKIAABCDEFGHIJKLMNOPyy", []anchorSpan{{2, 7}}},
+		{`AKIA[0-9A-Z]{16}`, "xxAKIA"+"ABCDEFGHIJKLMNOPyy", []anchorSpan{{2, 7}}},
 		{`a[bc]+d`, "xabcbcdy abcd", []anchorSpan{{1, 2}, {9, 10}}},
 		{`https?://[a-z]+`, "visit http://abc or https://xyz", []anchorSpan{{6, 11}, {20, 26}}},
 		{`[0-9]{4,6}`, "code 12345 ok 99", []anchorSpan{{5, 10}}},

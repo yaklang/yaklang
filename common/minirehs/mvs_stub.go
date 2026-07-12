@@ -31,3 +31,7 @@ func (k *mvsKernel) nfaExistsAnchoredMany(idxs []int32, data []byte, patSpanOff 
 func (k *mvsKernel) nfaExistsMany(idxs []int32, data []byte, sc *scratch) []byte { return nil }
 
 func (k *mvsKernel) mergedScan(data []byte, sc *scratch) []int { return sc.mergedHits[:0] }
+
+func (k *mvsKernel) combinedScan(data []byte, assertIdxs []int32, keepBound bool, sc *scratch) ([]int, []int) {
+	return sc.mergedHits[:0], sc.assertHits[:0]
+}

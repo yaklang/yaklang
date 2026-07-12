@@ -39,6 +39,12 @@
 > `MVS_Located` 3.04 MB/s、`MVS_Exist_RE2only` 8.12 MB/s(无 gate, 健全性);**完整非 short 套件全绿(40s)**。
 > **2026-07-10 gap jump 复测(FULL_CORPUS, 5x×2)**:`MVS_Exist` **9.89-9.93 MB/s / 8939 allocs**、
 > `MVS_Located` **4.05-4.10 MB/s**、`MVS_Exist_RE2only` **15.16-15.31 MB/s**(gap jump 系列累计: 见下)。
+> **2026-07-12 多核流水并行(FULL_CORPUS, 8x×5)**:`MVS_Exist_RE2only` 从本分支串行基线
+> **21.54-21.64 MB/s** 推进到 **32.64-32.85 MB/s(+51-52%)**。`mvsDB.scan` 在记录 >=512B、
+> `GOMAXPROCS>1` 且 combined 形态可用时，让只读的 C always-on combined 与 Go 字面量/锚定候选验证
+> 并行；每次 Scan 使用该 Scratch 独占的 worker scratch，短生命周期 goroutine 在返回前必收拢，handler
+> 仍只在调用线程按原阶段顺序执行。单核自动回落原串行路径。定向 race、handler 提前停止后 Scratch
+> 连续复用、默认/`minirehs_mvs`/amalgamation short、完整非 short 与 1332 真实流量 oracle 均通过。
 > **当前性能(实测,vs Go RE2 逐条 0.18 MB/s 基线)**:存在性 **~63x**(全规则)/**~107x**(纯 RE2 子集)、定位 **~25x**;
 > **纯 RE2 子集 ~107x! 累计从 84x 提升到 107x (+27%).** 详见第 4' 节倍数评估与路线。
 > **剩余瓶颈(本会话剖析, 干净小改已出尽)**:① `runtime.cgocall` 28%(合并 always-on 整段扫 5.25MB + 不可
