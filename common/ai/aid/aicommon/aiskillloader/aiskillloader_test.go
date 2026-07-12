@@ -222,7 +222,7 @@ func TestSkillsContextManager_SearchSkills(t *testing.T) {
 	}
 }
 
-func TestSkillsContextManager_RenderStable_SortsAvailableSkills(t *testing.T) {
+func TestSkillsContextManager_RenderStable_CatalogHiddenByDefault(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, err := NewFSSkillLoader(vfs)
 	if err != nil {
@@ -232,20 +232,46 @@ func TestSkillsContextManager_RenderStable_SortsAvailableSkills(t *testing.T) {
 	mgr := NewSkillsContextManager(loader)
 	rendered := mgr.RenderStable()
 
-	codeReviewIdx := strings.Index(rendered, "  - code-review:")
-	deployAppIdx := strings.Index(rendered, "  - deploy-app:")
-	if codeReviewIdx == -1 || deployAppIdx == -1 {
-		t.Fatalf("stable render should list both available skills. Got:\n%s", rendered)
+	// 改造后: 默认隐藏 SKILL 目录, 零加载 + 目录不可见 → 整段不渲染.
+	if rendered != "" {
+		t.Fatalf("default render with no loaded skills and hidden catalog should be empty. Got:\n%s", rendered)
 	}
-	if codeReviewIdx > deployAppIdx {
-		t.Fatalf("available skills should be rendered in stable alphabetical order. Got:\n%s", rendered)
+	if mgr.IsCatalogVisible() {
+		t.Fatalf("catalog should be hidden by default")
 	}
 }
 
-// TestSkillsContextManager_RenderStable_DualSectionStructure 验证 RenderStable
-// 输出始终为"Currently Loaded / Available Skills"双段结构, 即使零加载时也保留双段头。
-// 这是 Prompt 按稳定性分层路径下进入 AI_CACHE_FROZEN 块的字节稳定前置。
-// 关键词: SkillsContext renderWithTag, dual-section, 字节稳定
+// TestSkillsContextManager_RenderStable_CatalogVisibleWhenSet 验证意图识别写入
+// 目录后, catalog 段按 name 排序出现, 且截断到 MaxCatalogSkills.
+func TestSkillsContextManager_RenderStable_CatalogVisibleWhenSet(t *testing.T) {
+	vfs := buildTestVFS()
+	loader, err := NewFSSkillLoader(vfs)
+	if err != nil {
+		t.Fatalf("NewFSSkillLoader failed: %v", err)
+	}
+
+	mgr := NewSkillsContextManager(loader)
+	metas := loader.AllSkillMetas()
+	mgr.SetCatalogSkills(metas)
+	mgr.SetCatalogVisible(true)
+
+	rendered := mgr.RenderStable()
+	codeReviewIdx := strings.Index(rendered, "  - code-review:")
+	deployAppIdx := strings.Index(rendered, "  - deploy-app:")
+	if codeReviewIdx == -1 || deployAppIdx == -1 {
+		t.Fatalf("visible catalog should list both skills. Got:\n%s", rendered)
+	}
+	if codeReviewIdx > deployAppIdx {
+		t.Fatalf("catalog skills should be rendered in alphabetical order. Got:\n%s", rendered)
+	}
+	if !strings.Contains(rendered, "Relevant Skills") {
+		t.Fatalf("catalog section should use Relevant Skills header. Got:\n%s", rendered)
+	}
+}
+
+// TestSkillsContextManager_RenderStable_DualSectionStructure 验证当有 catalog 或
+// 加载时 RenderStable 输出 "Currently Loaded" + "Relevant Skills" 双段结构.
+// 改造后: 零加载 + 目录隐藏 → 整段为空 (节约 token); 有 catalog 时才出现双段.
 func TestSkillsContextManager_RenderStable_DualSectionStructure(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, err := NewFSSkillLoader(vfs)
@@ -254,23 +280,23 @@ func TestSkillsContextManager_RenderStable_DualSectionStructure(t *testing.T) {
 	}
 
 	mgr := NewSkillsContextManager(loader)
+	mgr.SetCatalogSkills(loader.AllSkillMetas())
 
-	zeroLoadedRendered := mgr.RenderStable()
-	if !strings.Contains(zeroLoadedRendered, "== Currently Loaded Skills ==") {
-		t.Fatalf("zero-loaded render should contain 'Currently Loaded Skills' header. Got:\n%s", zeroLoadedRendered)
+	rendered := mgr.RenderStable()
+	if !strings.Contains(rendered, "== Currently Loaded Skills ==") {
+		t.Fatalf("render should contain 'Currently Loaded Skills' header. Got:\n%s", rendered)
 	}
-	if !strings.Contains(zeroLoadedRendered, "(none)") {
-		t.Fatalf("zero-loaded render should contain '(none)' under Currently Loaded. Got:\n%s", zeroLoadedRendered)
+	if !strings.Contains(rendered, "(none)") {
+		t.Fatalf("render should contain '(none)' under Currently Loaded. Got:\n%s", rendered)
 	}
-	if !strings.Contains(zeroLoadedRendered, "== Available Skills (use loading_skills action to load) ==") {
-		t.Fatalf("zero-loaded render should contain 'Available Skills' header. Got:\n%s", zeroLoadedRendered)
+	if !strings.Contains(rendered, "Relevant Skills") {
+		t.Fatalf("render should contain 'Relevant Skills' catalog header when visible. Got:\n%s", rendered)
 	}
 }
 
 // TestSkillsContextManager_RenderStable_AvailableSectionByteStable 验证 0->1
-// 加载技能时, "Available Skills"下半段保持字节稳定, 仅"Currently Loaded"上半段
-// 发生变化。这是前缀缓存命中率提升的关键: 零加载与有加载共享同一段 registry 字节。
-// 关键词: SkillsContext, 字节稳定, registry listing 不变
+// 加载技能时, catalog 下半段保持字节稳定 (意图识别写入的目录不变 → 输出不变).
+// 关键词: SkillsContext, 字节稳定, catalog 不变
 func TestSkillsContextManager_RenderStable_AvailableSectionByteStable(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, err := NewFSSkillLoader(vfs)
@@ -279,6 +305,7 @@ func TestSkillsContextManager_RenderStable_AvailableSectionByteStable(t *testing
 	}
 
 	mgr := NewSkillsContextManager(loader)
+	mgr.SetCatalogSkills(loader.AllSkillMetas())
 	zeroLoaded := mgr.RenderStable()
 
 	if err := mgr.LoadSkill("deploy-app"); err != nil {
@@ -286,21 +313,20 @@ func TestSkillsContextManager_RenderStable_AvailableSectionByteStable(t *testing
 	}
 	withLoaded := mgr.RenderStable()
 
-	availableHeader := "== Available Skills (use loading_skills action to load) =="
-	zeroAvailableIdx := strings.Index(zeroLoaded, availableHeader)
-	withLoadedAvailableIdx := strings.Index(withLoaded, availableHeader)
-	if zeroAvailableIdx == -1 || withLoadedAvailableIdx == -1 {
-		t.Fatalf("both renders should contain Available Skills header. zero=%q with=%q",
-			zeroLoaded, withLoaded)
+	catalogHeader := "== Relevant Skills"
+	zeroCatalogIdx := strings.Index(zeroLoaded, catalogHeader)
+	withLoadedCatalogIdx := strings.Index(withLoaded, catalogHeader)
+	if zeroCatalogIdx == -1 || withLoadedCatalogIdx == -1 {
+		t.Fatalf("both renders should contain catalog header. zero=%q with=%q", zeroLoaded, withLoaded)
 	}
 
 	endTag := "<|SKILLS_CONTEXT_END_skills_context|>"
-	zeroAvailableSection := zeroLoaded[zeroAvailableIdx : strings.Index(zeroLoaded, endTag)]
-	withLoadedAvailableSection := withLoaded[withLoadedAvailableIdx : strings.Index(withLoaded, endTag)]
+	zeroCatalogSection := zeroLoaded[zeroCatalogIdx:strings.Index(zeroLoaded, endTag)]
+	withLoadedCatalogSection := withLoaded[withLoadedCatalogIdx:strings.Index(withLoaded, endTag)]
 
-	if zeroAvailableSection != withLoadedAvailableSection {
-		t.Fatalf("Available Skills section must be byte-stable across 0->1 load.\nzero:\n%s\nwith:\n%s",
-			zeroAvailableSection, withLoadedAvailableSection)
+	if zeroCatalogSection != withLoadedCatalogSection {
+		t.Fatalf("catalog section must be byte-stable across 0->1 load.\nzero:\n%s\nwith:\n%s",
+			zeroCatalogSection, withLoadedCatalogSection)
 	}
 }
 
@@ -670,13 +696,20 @@ func TestSkillsContextManager_LoadAndRender(t *testing.T) {
 		t.Fatal("manager should report skills available")
 	}
 
-	// Render before loading any skill - should show available skills hint
+	// Render before loading any skill - catalog hidden by default → empty (save tokens).
 	rendered := mgr.Render("test_nonce")
+	if rendered != "" {
+		t.Fatalf("default render with hidden catalog should be empty. Got:\n%s", rendered)
+	}
+
+	// Explicitly surface the catalog (simulating intent recognition).
+	mgr.SetCatalogSkills(loader.AllSkillMetas())
+	rendered = mgr.Render("test_nonce")
 	if !strings.Contains(rendered, "SKILLS_CONTEXT_test_nonce") {
-		t.Fatal("render should contain SKILLS_CONTEXT tags")
+		t.Fatal("render should contain SKILLS_CONTEXT tags when catalog visible")
 	}
 	if !strings.Contains(rendered, "deploy-app") {
-		t.Fatal("render should list available skills")
+		t.Fatal("render should list catalog skills when visible")
 	}
 
 	// Load a skill

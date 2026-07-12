@@ -18,7 +18,7 @@ const (
 	SessionSnapshotSectionCapabilities        = "capabilities"
 	SessionSnapshotSectionBackgroundProcesses = "background_processes"
 
-	SessionSnapshotProcessTypeBrowser = "browser"
+	SessionSnapshotProcessTypeBrowser   = "browser"
 	SessionSnapshotProcessStatusRunning = "running"
 )
 
@@ -27,11 +27,11 @@ type sessionSnapshotEmitHandler func()
 // SessionSnapshot is the unified real-time sidebar payload for frontend consumption.
 // TaskId / TaskIndex are carried on the outer AIOutputEvent envelope, not duplicated here.
 type SessionSnapshot struct {
-	Revision            int64                             `json:"revision"`
-	UpdatedAt           int64                             `json:"updated_at"`
-	Execution           *SessionSnapshotExecution         `json:"execution"`
-	Perception          *SessionSnapshotPerception        `json:"perception"`
-	Capabilities        []CapabilityInventoryItem         `json:"capabilities"`
+	Revision            int64                              `json:"revision"`
+	UpdatedAt           int64                              `json:"updated_at"`
+	Execution           *SessionSnapshotExecution          `json:"execution"`
+	Perception          *SessionSnapshotPerception         `json:"perception"`
+	Capabilities        []CapabilityInventoryItem          `json:"capabilities"`
 	BackgroundProcesses []SessionSnapshotBackgroundProcess `json:"background_processes"`
 }
 
@@ -60,33 +60,33 @@ type SessionSnapshotExecution struct {
 }
 
 type SessionSnapshotPerception struct {
-	Summary      string  `json:"summary"`
+	Summary      string   `json:"summary"`
 	Topics       []string `json:"topics"`
 	Keywords     []string `json:"keywords"`
-	Confidence   float64 `json:"confidence"`
-	Changed      bool    `json:"changed"`
-	Epoch        int     `json:"epoch"`
-	LastTrigger  string  `json:"last_trigger"`
-	IntentShift  string  `json:"intent_shift"`
-	LastUpdateAt int64   `json:"last_update_at"`
+	Confidence   float64  `json:"confidence"`
+	Changed      bool     `json:"changed"`
+	Epoch        int      `json:"epoch"`
+	LastTrigger  string   `json:"last_trigger"`
+	IntentShift  string   `json:"intent_shift"`
+	LastUpdateAt int64    `json:"last_update_at"`
 
 	CapabilityMatches *SessionSnapshotPerceptionCapabilityMatches `json:"capability_matches"`
 	Knowledge         *SessionSnapshotPerceptionKnowledge         `json:"knowledge"`
 }
 
 type SessionSnapshotPerceptionCapabilityMatches struct {
-	Query                    string   `json:"query"`
-	MatchedToolNames         []string `json:"matched_tool_names"`
-	MatchedForgeNames        []string `json:"matched_forge_names"`
-	MatchedSkillNames        []string `json:"matched_skill_names"`
-	MatchedFocusModeNames    []string `json:"matched_focus_mode_names"`
-	RecommendedCapabilities  []string `json:"recommended_capabilities"`
+	Query                   string   `json:"query"`
+	MatchedToolNames        []string `json:"matched_tool_names"`
+	MatchedForgeNames       []string `json:"matched_forge_names"`
+	MatchedSkillNames       []string `json:"matched_skill_names"`
+	MatchedFocusModeNames   []string `json:"matched_focus_mode_names"`
+	RecommendedCapabilities []string `json:"recommended_capabilities"`
 }
 
 type SessionSnapshotPerceptionKnowledge struct {
-	Query           string   `json:"query"`
-	KnowledgeBases  []string `json:"knowledge_bases"`
-	Content         string   `json:"content"`
+	Query          string   `json:"query"`
+	KnowledgeBases []string `json:"knowledge_bases"`
+	Content        string   `json:"content"`
 }
 
 type sessionSnapshotPerceptionExtras struct {
@@ -111,14 +111,14 @@ func isSessionSnapshotExecutionTerminal(status string) bool {
 }
 
 type sessionSnapshotState struct {
-	mu                       sync.Mutex
-	revision                 int64
-	perceptionExtras         sessionSnapshotPerceptionExtras
-	backgroundProcesses      map[string]SessionSnapshotBackgroundProcess
-	execution                sessionExecutionTracker
-	emitHandler              sessionSnapshotEmitHandler
-	debounceTimer            *time.Timer
-	legacySeparateEvents     bool
+	mu                   sync.Mutex
+	revision             int64
+	perceptionExtras     sessionSnapshotPerceptionExtras
+	backgroundProcesses  map[string]SessionSnapshotBackgroundProcess
+	execution            sessionExecutionTracker
+	emitHandler          sessionSnapshotEmitHandler
+	debounceTimer        *time.Timer
+	legacySeparateEvents bool
 }
 
 func (c *Config) ensureSessionSnapshotState() *sessionSnapshotState {
@@ -626,6 +626,11 @@ func NotifySessionSnapshotToolCall(cfg AICallerConfigIf, result *aitool.ToolResu
 	if c := ConfigFromAICaller(cfg); c != nil {
 		c.RecordSessionSnapshotToolCall(result)
 		c.NotifySessionSnapshotEmit()
+		// 命中统计: 任意一次工具调用 (成功/失败, 直接/申请) 都计一次 tool 命中.
+		// 这是「重要反馈点」, 供意图层与工具 inventory 做命中数排序.
+		if result != nil && result.Name != "" {
+			SubmitToolHit(c, result.Name, StatsSourceToolDirect)
+		}
 	}
 }
 

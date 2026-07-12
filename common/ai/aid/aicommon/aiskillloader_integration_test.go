@@ -51,16 +51,22 @@ func TestSkillsContextManager_Integration_FullLifecycle(t *testing.T) {
 		t.Fatal("no truncated views before loading any skill")
 	}
 
-	// Step 2: render without loading -> should list available skills
+	// Step 2: render without loading -> catalog hidden by default → empty (save tokens).
 	rendered := mgr.Render("lifecycle_nonce")
+	if rendered != "" {
+		t.Fatalf("default render with hidden catalog should be empty. Got:\n%s", rendered)
+	}
+	// Surface catalog (simulating intent recognition).
+	mgr.SetCatalogSkills(loader.AllSkillMetas())
+	rendered = mgr.Render("lifecycle_nonce")
 	if !strings.Contains(rendered, "<|SKILLS_CONTEXT_lifecycle_nonce|>") {
-		t.Fatal("render should have context start tag")
+		t.Fatal("render should have context start tag when catalog visible")
 	}
 	if !strings.Contains(rendered, "<|SKILLS_CONTEXT_END_lifecycle_nonce|>") {
-		t.Fatal("render should have context end tag")
+		t.Fatal("render should have context end tag when catalog visible")
 	}
 	if !strings.Contains(rendered, "deploy-app") || !strings.Contains(rendered, "code-review") {
-		t.Fatal("render should list all available skills before loading")
+		t.Fatal("render should list catalog skills when visible")
 	}
 
 	// Step 3: load a skill

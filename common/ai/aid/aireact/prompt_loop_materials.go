@@ -245,6 +245,10 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 		//        缓存边界外
 		materials.FrozenUserContext = input.FrozenUserContext
 		materials.FrozenPartitions = append(materials.FrozenPartitions, input.FrozenPartitions...)
+		// SKILL 三态透传: forced (frozen_block 顶部) / auto (semi_dynamic_2 尾部).
+		// SkillsContext (含 catalog) 已透传, 这里补 forced / auto.
+		materials.ForcedSkills = input.ForcedSkills
+		materials.AutoLoadedSkills = input.AutoLoadedSkills
 	}
 	if base != nil {
 		// UserHistory 来自 LoopPromptBaseMaterials (config.FormatUserInputHistoryAITag)
@@ -459,6 +463,13 @@ func (pm *PromptManager) buildFrozenBlockObservation(
 	// 关键词: section.frozen_block 子节点 Name 去前缀, UI 信息密度
 	children := []*reactloops.PromptSectionObservation{
 		reactloops.NewPromptSectionObservation(
+			"section.frozen_block.user_forced_skill",
+			"User Forced Skills",
+			reactloops.PromptSectionRoleFrozenBlock,
+			true,
+			renderUserForcedSkillBlock(materials),
+		),
+		reactloops.NewPromptSectionObservation(
 			"section.frozen_block.tool_inventory",
 			"Tool Inventory",
 			reactloops.PromptSectionRoleFrozenBlock,
@@ -659,6 +670,16 @@ func (pm *PromptManager) buildSemiDynamic2Observation(
 			reactloops.PromptSectionRoleSemiDynamic2,
 			true,
 			renderStaticTaggedBlock("OUTPUT_EXAMPLE", materials.OutputExample),
+		),
+		// section.semi_dynamic_2.auto_loaded_skills: AI 意图驱动加载的 SKILL 段 (尾部).
+		// 物理位置在 OutputExample 之后, 保 TaskInstr/Schema/Example 前缀字节稳定 →
+		// AI_CACHE_SEMI2 前缀缓存命中, 仅尾部变化.
+		reactloops.NewPromptSectionObservation(
+			"section.semi_dynamic_2.auto_loaded_skills",
+			"Auto-loaded Skills",
+			reactloops.PromptSectionRoleSemiDynamic2,
+			true,
+			renderAutoLoadedSkillsBlock(materials),
 		),
 	}
 	section.Children = filterIncludedPromptSections(children)
@@ -1072,6 +1093,22 @@ func renderTimelineFrozenBlock(materials *reactloops.PromptPrefixMaterials) stri
 		return ""
 	}
 	return "# Timeline Memory (Frozen Prefix)\n" + materials.TimelineFrozen
+}
+
+// renderUserForcedSkillBlock 渲染用户强制加载 SKILL 段 (frozen_block 顶部, 满内容).
+func renderUserForcedSkillBlock(materials *reactloops.PromptPrefixMaterials) string {
+	if materials == nil {
+		return ""
+	}
+	return strings.TrimSpace(materials.ForcedSkills)
+}
+
+// renderAutoLoadedSkillsBlock 渲染 AI 意图驱动加载 SKILL 段 (semi_dynamic_2 尾部).
+func renderAutoLoadedSkillsBlock(materials *reactloops.PromptPrefixMaterials) string {
+	if materials == nil {
+		return ""
+	}
+	return strings.TrimSpace(materials.AutoLoadedSkills)
 }
 
 // renderTimelineOpenBlock 渲染 timeline 开放尾段 (最末 interval + midterm prefix)。

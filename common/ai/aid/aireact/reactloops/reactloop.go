@@ -652,9 +652,11 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 					}
 				}
 
-				// Load user-specified skills from EnabledCapabilities (AIStartParams)
+				// Load user-specified skills from EnabledCapabilities (AIStartParams).
+				// 这些是用户主动指定的, 作为「用户强制加载」走 frozen_block 顶部 (满内容, 最高优先级),
+				// 与 persistent session 恢复 (走 SKILLS_CONTEXT) 区分开.
 				if names := realConfig.GetEnabledSkillNames(); len(names) > 0 {
-					loadConfiguredSkills(mgr, names, "enabled capabilities")
+					loadConfiguredForcedSkills(mgr, names, "enabled capabilities")
 				}
 			}
 		}
@@ -1048,6 +1050,37 @@ func loadConfiguredSkills(mgr *aiskillloader.SkillsContextManager, names []strin
 	}
 	if len(failed) > 0 {
 		log.Warnf("failed to load %d skills from %s: %v", len(failed), source, failed)
+	}
+}
+
+// loadConfiguredForcedSkills 把用户 EnabledCapabilities 来源的 skill 作为「用户强制加载」
+// 走 LoadForcedSkill (满内容 → frozen_block 顶部, 最高优先级). 这与 persistent session
+// 恢复 (走 LoadSkill → SKILLS_CONTEXT) 区分开, 是「用户主动指定」语义.
+//
+// 关键词: loadConfiguredForcedSkills, EnabledCapabilities → forced, frozen_block
+func loadConfiguredForcedSkills(mgr *aiskillloader.SkillsContextManager, names []string, source string) {
+	if mgr == nil || len(names) == 0 {
+		return
+	}
+	var loaded, already, failed []string
+	for _, name := range names {
+		added, err := mgr.LoadForcedSkill(name)
+		if err != nil {
+			failed = append(failed, name)
+			log.Warnf("failed to force-load skill %q from %s: %v", name, source, err)
+			continue
+		}
+		if !added {
+			already = append(already, name)
+			continue
+		}
+		loaded = append(loaded, name)
+	}
+	if len(loaded) > 0 {
+		log.Infof("force-loaded %d skills from %s: %v", len(loaded), source, loaded)
+	}
+	if len(failed) > 0 {
+		log.Warnf("failed to force-load %d skills from %s: %v", len(failed), source, failed)
 	}
 }
 

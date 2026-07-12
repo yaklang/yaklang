@@ -10,6 +10,15 @@ import (
 // AvailableSkillsRegistryHeader is the registry listing header in SKILLS_CONTEXT.
 const AvailableSkillsRegistryHeader = "== Available Skills (use loading_skills action to load) ==\n"
 
+// MaxCatalogSkills 是意图识别写入「最相关 SKILL 目录」(SKILLS_CONTEXT 下半段) 的最大条目数.
+// 目录默认隐藏, 仅当意图识别命中后由 SetCatalogVisible(true) 开启, 取最相关 top-N.
+// 关键词: MaxCatalogSkills, 意图识别目录 top-N, 默认隐藏 SKILL 目录
+const MaxCatalogSkills = 10
+
+// CatalogHeader 是意图识别驱动的「最相关 SKILL 目录」段头.
+// 与 AvailableSkillsRegistryHeader 区分开: 这是意图命中后的精简目录, 不是全量列表.
+const CatalogHeader = "== Relevant Skills (intent-matched, top %d) ==\n"
+
 // AvailableSkillsOverflowHint formats the tail line when registry listing hits the token budget.
 func AvailableSkillsOverflowHint(omitted int) string {
 	return fmt.Sprintf("  ... and %d more skills. Use search_capabilities to find specific skills.\n", omitted)

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -465,6 +466,12 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 					"cache_hit_token":         cacheHitTokens,
 					"token_source":            usageMetrics.TokenSource,
 					"caller_label":            callerLabel,
+				})
+				// 命中统计: 记录一次 AI (模型) 调用及其 token 用量 (每日汇总).
+				SubmitAICall(c, model, &aispec.ChatUsage{
+					PromptTokens:     int(inputTokens),
+					CompletionTokens: int(outputTokens),
+					TotalTokens:      int(totalTokens),
 				})
 				if outputBytes == 0 {
 					rawDump := origRsp.GetRawHTTPResponseDump()

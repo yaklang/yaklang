@@ -195,6 +195,7 @@ func PopulateExtraCapabilitiesFromDeepIntent(r aicommon.AIInvokeRuntime, loop *R
 		if provider, ok := cfg.(skillLoaderProvider); ok {
 			skillLoader := provider.GetSkillLoader()
 			if skillLoader != nil && skillLoader.HasSkills() {
+				var matchedMetas []*aiskillloader.SkillMeta
 				for _, name := range skillNames {
 					meta, err := aiskillloader.LookupSkillMeta(skillLoader, name)
 					if err != nil || meta == nil {
@@ -205,7 +206,10 @@ func PopulateExtraCapabilitiesFromDeepIntent(r aicommon.AIInvokeRuntime, loop *R
 						Name:        meta.Name,
 						Description: meta.Description,
 					})
+					matchedMetas = append(matchedMetas, meta)
 				}
+				// 把意图命中的 skill 写入「最相关目录」(默认隐藏, 意图命中后开启).
+				ApplyMatchedSkillsToCatalog(loop, cfg, matchedMetas)
 			}
 		}
 	}
