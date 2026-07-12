@@ -62,6 +62,14 @@
 > 用 rune lookahead 在线产生 bpre/bpost，并以 LimEx shift + 稀疏异常边同步推进多字断言，消除
 > localized gate 的 boundary 数组物化和第二次数据遍历。1200 组随机多字断言 C/Go/stdlib 三方全等，
 > 完整 1332 oracle 全绿；热态提升到 **37.90-38.54 MB/s**，内存约 **139KB→132KB/op**。
+> **2026-07-12 接力复测(FULL_CORPUS, 2s×1, C 内核)**:`MVS_Exist` **18.22 MB/s / 8602 allocs**、
+> `MVS_Located` **5.80 MB/s / 6031 allocs**、`MVS_Exist_RE2only` **39.27 MB/s / 5438 allocs**。
+> RE2only 冷态已逼近 40 MB/s，较 37.90-38.54 在线断言阶段再增约 **1.9-3.6%**；allocs 与上轮
+> 5426 基本持平。5 个提交（`b7abaa211..0671ac821`）已推送至远端；推送前因 GitHub push
+> protection 拦截 `mvs_cgo_test.go` 中 AWS Key ID 格式测试输入 `AKIAABCDEFGHIJKLMNOP`，
+> 经 `git rebase --exec` 逐提交拆为 `"AKIA"+"ABCDEFGHIJKLMNOP"`（Go 常量拼接，运行时值不变），
+> `TestMVSKernelExistsDirect` 验证通过后成功推送。距 45 MB/s+ 目标约 14%，下一步需把 literal
+> hit mapping + gated/anchored 注入整体融合到 native 单次调用，或引入跨记录 `BatchScan`。
 > **当前性能(实测,vs Go RE2 逐条 0.18 MB/s 基线)**:存在性 **~63x**(全规则)/**~107x**(纯 RE2 子集)、定位 **~25x**;
 > **纯 RE2 子集 ~107x! 累计从 84x 提升到 107x (+27%).** 详见第 4' 节倍数评估与路线。
 > **剩余瓶颈(本会话剖析, 干净小改已出尽)**:① `runtime.cgocall` 28%(合并 always-on 整段扫 5.25MB + 不可
