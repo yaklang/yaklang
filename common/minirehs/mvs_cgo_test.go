@@ -127,8 +127,8 @@ func TestMVSKernelCombinedAlwaysOnAssertOracle(t *testing.T) {
 	}
 }
 
-// TestMVSParallelAlwaysOnEarlyStop 覆盖并行 always-on worker 在 handler 提前停止时
-// 仍会被当前 Scan 收拢，下一次复用同一 Scratch 不会读到陈旧结果或阻塞。
+// TestMVSParallelAlwaysOnEarlyStop 覆盖并行 always-on merged/assert 两个 worker 在
+// handler 提前停止时仍会被当前 Scan 收拢，下一次复用同一 Scratch 不会读到陈旧结果或阻塞。
 func TestMVSParallelAlwaysOnEarlyStop(t *testing.T) {
 	patterns := []Pattern{
 		{ID: 1, Expr: `[a-z]{2,4}`},

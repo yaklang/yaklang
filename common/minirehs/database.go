@@ -106,15 +106,12 @@ type scratch struct {
 	statFullScan     int64 // 非窗口 exact (有字面量) 命中字面量后触发的整段验证次数
 	statAlwaysScan   int64 // 无字面量 exact + regexp2-only 的逐条整段扫描次数
 
-	// always-on combined 与字面量候选验证可并行执行。内部 scratch 与结果通道
-	// 每个 Scratch 独占；每次扫描的短生命周期 goroutine 会在返回前完成，不会泄漏。
-	alwaysScratch *scratch
-	alwaysRes     chan alwaysResult
-}
-
-type alwaysResult struct {
-	merged []int
-	assert []int
+	// always-on merged、always-on assert 与字面量候选验证可并行执行。两个内部
+	// scratch 与结果通道均由每个 Scratch 独占；短生命周期 worker 返回前必收拢。
+	alwaysMergedScratch *scratch
+	alwaysAssertScratch *scratch
+	alwaysMergedRes     chan []int
+	alwaysAssertRes     chan []byte
 }
 
 func (s *scratch) Close() error { return nil }
