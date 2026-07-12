@@ -252,10 +252,10 @@ func FileContextProvider(filePath string, userPrompt ...string) ContextProvider 
 // contents.
 //
 // Delivery files are now surfaced only as truncation markers inside
-// ToolResult.OutputFiles (populated by the tool execution layer in
-// aitool/tool_invoke.go). The marker contains the file path and size;
-// the file body is never re-injected into the prompt and can be re-read
-// on demand via existing file-read or view-window actions.
+// the combined output saved to the tool call report file. The marker
+// contains the file path; the file body is never re-injected into the
+// prompt and can be re-read on demand via existing file-read or
+// view-window actions.
 //
 // 关键词: OutputFileContextProvider 已废弃, 交付文件截断标记化,
 //

@@ -6,7 +6,27 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"sync"
 )
+
+// combinedBuffer is a thread-safe buffer that captures stdout and stderr
+// writes in real-time order, preserving the actual interleaving of output.
+type combinedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (c *combinedBuffer) Write(p []byte) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.buf.Write(p)
+}
+
+func (c *combinedBuffer) String() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.buf.String()
+}
 
 // ToolExecutionResult 表示工具执行的完整结果
 type ToolExecutionResult struct {
@@ -71,18 +91,23 @@ func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any
 	stdout, stderr := config.GetStdout(), config.GetStderr()
 	cancelCallback := config.GetCancelCallback()
 
+	// combinedBuf captures stdout and stderr writes in real-time order,
+	// preserving the actual interleaving of output rather than concatenating
+	// stdout+stderr after the fact.
+	combinedBuf := &combinedBuffer{}
+
 	// 创建stdout和stderr的缓冲区
 	stdoutBuf := new(bytes.Buffer)
 	stderrBuf := new(bytes.Buffer)
 	if stdout != nil {
-		stdout = io.MultiWriter(stdout, stdoutBuf)
+		stdout = io.MultiWriter(stdout, stdoutBuf, combinedBuf)
 	} else {
-		stdout = stdoutBuf
+		stdout = io.MultiWriter(stdoutBuf, combinedBuf)
 	}
 	if stderr != nil {
-		stderr = io.MultiWriter(stderr, stderrBuf)
+		stderr = io.MultiWriter(stderr, stderrBuf, combinedBuf)
 	} else {
-		stderr = stderrBuf
+		stderr = io.MultiWriter(stderrBuf, combinedBuf)
 	}
 	var res any
 	var err error
@@ -98,7 +123,7 @@ func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any
 		execResult = &ToolExecutionResult{
 			Stdout:         stdoutBuf.String(),
 			Stderr:         stderrBuf.String(),
-			CombinedOutput: stdoutBuf.String() + stderrBuf.String(),
+			CombinedOutput: combinedBuf.String(),
 			Result:         res,
 		}
 		if cancelCallback != nil {
@@ -108,7 +133,7 @@ func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any
 		execResult = &ToolExecutionResult{
 			Stdout:         stdoutBuf.String(),
 			Stderr:         stderrBuf.String(),
-			CombinedOutput: stdoutBuf.String() + stderrBuf.String(),
+			CombinedOutput: combinedBuf.String(),
 			Result:         res,
 		}
 	}
