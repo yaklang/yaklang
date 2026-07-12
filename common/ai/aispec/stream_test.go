@@ -351,3 +351,158 @@ data: [DONE]`
 		t.Errorf("content mismatch, got %q", outBuffer.String())
 	}
 }
+
+// TestHandleResponsesSSEEvent_CompletedFallback 验证当上游不发 output_text.delta、
+// 只在 response.completed 里给 output_text 时（packyapi codex 风格），
+// handleResponsesSSEEvent 仍能通过 completed 事件补吐文本。
+// 关键词: response.completed 补吐, packyapi codex 风格, 流式内容不丢
+func TestHandleResponsesSSEEvent_CompletedFallback(t *testing.T) {
+	outBuf := &bytes.Buffer{}
+	reasonBuf := &bytes.Buffer{}
+	state := newResponsesToolCallState()
+
+	handleResponsesSSEEvent(map[string]any{
+		"type": "response.output_item.added",
+		"item": map[string]any{"type": "message", "id": "msg_1", "role": "assistant",
+			"content": []any{map[string]any{"type": "output_text", "text": ""}}},
+		"output_index": 0,
+	}, outBuf, reasonBuf, nil, state)
+
+	handleResponsesSSEEvent(map[string]any{
+		"type": "response.output_item.done",
+		"item": map[string]any{"type": "message", "id": "msg_1", "role": "assistant",
+			"content": []any{map[string]any{"type": "output_text", "text": ""}}},
+		"output_index": 0,
+	}, outBuf, reasonBuf, nil, state)
+
+	if outBuf.Len() != 0 {
+		t.Fatalf("expected empty output before completed, got %q", outBuf.String())
+	}
+
+	handleResponsesSSEEvent(map[string]any{
+		"type": "response.completed",
+		"response": map[string]any{
+			"output_text": "PONG",
+			"output": []any{map[string]any{
+				"type": "message", "role": "assistant",
+				"content": []any{map[string]any{"type": "output_text", "text": "PONG"}},
+			}},
+		},
+	}, outBuf, reasonBuf, nil, state)
+
+	if outBuf.String() != "PONG" {
+		t.Errorf("expected output %q from completed fallback, got %q", "PONG", outBuf.String())
+	}
+}
+
+// TestHandleResponsesSSEEvent_DeltaSuppressCompleted 验证已有 delta 事件后
+// completed 不会重复吐出内容（防重复逻辑不回退）。
+// 关键词: response.completed 防重复, anyTextStreamed
+func TestHandleResponsesSSEEvent_DeltaSuppressCompleted(t *testing.T) {
+	outBuf := &bytes.Buffer{}
+	reasonBuf := &bytes.Buffer{}
+	state := newResponsesToolCallState()
+
+	handleResponsesSSEEvent(map[string]any{
+		"type":         "response.output_text.delta",
+		"delta":        "Hello",
+		"output_index": 0,
+		"item_id":      "msg_1",
+	}, outBuf, reasonBuf, nil, state)
+
+	handleResponsesSSEEvent(map[string]any{
+		"type": "response.completed",
+		"response": map[string]any{
+			"output_text": "Hello",
+			"output": []any{map[string]any{
+				"type": "message", "role": "assistant",
+				"content": []any{map[string]any{"type": "output_text", "text": "Hello"}},
+			}},
+		},
+	}, outBuf, reasonBuf, nil, state)
+
+	if outBuf.String() != "Hello" {
+		t.Errorf("expected exactly one %q, got %q", "Hello", outBuf.String())
+	}
+}
+
+// TestHandleResponsesSSEEvent_OutputTextDone 验证 response.output_text.done 事件
+// 在没有 delta 的情况下能补吐文本。
+// 关键词: response.output_text.done, 流式补吐
+func TestHandleResponsesSSEEvent_OutputTextDone(t *testing.T) {
+	outBuf := &bytes.Buffer{}
+	reasonBuf := &bytes.Buffer{}
+	state := newResponsesToolCallState()
+
+	handleResponsesSSEEvent(map[string]any{
+		"type": "response.output_text.done",
+		"text": "done-text",
+	}, outBuf, reasonBuf, nil, state)
+
+	if outBuf.String() != "done-text" {
+		t.Errorf("expected %q, got %q", "done-text", outBuf.String())
+	}
+	if !state.anyTextStreamed {
+		t.Error("anyTextStreamed should be true after output_text.done")
+	}
+}
+
+// TestHandleResponsesSSEEvent_ReasoningTextDone 验证 response.reasoning_text.done
+// 在没有 reasoning delta 的情况下能补吐推理文本。
+// 关键词: response.reasoning_text.done, 推理补吐
+func TestHandleResponsesSSEEvent_ReasoningTextDone(t *testing.T) {
+	outBuf := &bytes.Buffer{}
+	reasonBuf := &bytes.Buffer{}
+	state := newResponsesToolCallState()
+
+	handleResponsesSSEEvent(map[string]any{
+		"type": "response.reasoning_text.done",
+		"text": "reason-done",
+	}, outBuf, reasonBuf, nil, state)
+
+	if reasonBuf.String() != "reason-done" {
+		t.Errorf("expected %q, got %q", "reason-done", reasonBuf.String())
+	}
+	if !state.anyReasonStreamed {
+		t.Error("anyReasonStreamed should be true after reasoning_text.done")
+	}
+}
+
+// TestHandleResponsesSSEEvent_CompletedWithToolCalls 验证 completed 事件含
+// function_call output 时 tool_call 不丢。
+// 关键词: response.completed tool_calls, function_call 不丢
+func TestHandleResponsesSSEEvent_CompletedWithToolCalls(t *testing.T) {
+	outBuf := &bytes.Buffer{}
+	reasonBuf := &bytes.Buffer{}
+	state := newResponsesToolCallState()
+	var receivedCalls []*ToolCall
+	tcCallback := func(calls []*ToolCall) {
+		receivedCalls = append(receivedCalls, calls...)
+	}
+
+	handleResponsesSSEEvent(map[string]any{
+		"type": "response.completed",
+		"response": map[string]any{
+			"output_text": "",
+			"output": []any{
+				map[string]any{
+					"type":      "function_call",
+					"id":        "fc_1",
+					"call_id":   "call_abc",
+					"name":      "get_weather",
+					"arguments": `{"city":"Tokyo"}`,
+				},
+			},
+		},
+	}, outBuf, reasonBuf, tcCallback, state)
+
+	if len(receivedCalls) == 0 {
+		t.Fatal("expected tool call from completed event, got none")
+	}
+	if receivedCalls[0].Function.Name != "get_weather" {
+		t.Errorf("expected tool name %q, got %q", "get_weather", receivedCalls[0].Function.Name)
+	}
+	if receivedCalls[0].Function.Arguments != `{"city":"Tokyo"}` {
+		t.Errorf("expected arguments %q, got %q", `{"city":"Tokyo"}`, receivedCalls[0].Function.Arguments)
+	}
+}
