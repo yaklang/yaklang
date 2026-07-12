@@ -344,7 +344,22 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 
 		mgr := loop.GetConfig().GetAiToolManager()
 		if mgr == nil || !mgr.IsRecentlyUsedTool(toolName) {
-			return utils.Errorf("tool '%s' is not in the recently-used cache; use require_tool instead", toolName)
+			// 工具不在 recently-used cache 中时只记录警告，不报错触发重试。
+			// 后续 ActionHandler 会通过 GetToolByName 自行决定：工具存在则继续
+			// 直接调用，工具不存在则走已有的 fallback 到 require_tool 路径。
+			// 关键词: directly_call_tool, cache miss, 不触发重试, handler 自处理
+			emit := loop.GetEmitter()
+			if emit != nil {
+				emit.EmitWarning("tool '%s' is not in the recently-used cache; handler will resolve it", toolName)
+			}
+			loop.GetInvoker().AddToTimeline(
+				"directly_call_cache_miss",
+				fmt.Sprintf(
+					"[DIRECT_CALL_CACHE_MISS] directly_call_tool selected '%s' but it is not in the recently-used cache. "+
+						"Letting handler resolve (call if tool exists, otherwise fall back to require_tool).",
+					toolName,
+				),
+			)
 		}
 		reactloops.MaybeWarnBashBeforeEdit(loop, toolName)
 

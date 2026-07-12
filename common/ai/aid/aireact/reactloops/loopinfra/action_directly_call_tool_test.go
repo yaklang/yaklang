@@ -292,3 +292,45 @@ func TestDirectlyCallTool_Handler_RequiredParamMismatchAddsLatestFewShot(t *test
 	assert.NotContains(t, timeline, `"next_action"`)
 	assert.Contains(t, op.GetFeedback().String(), "automatically switching to @action=require_tool")
 }
+
+func TestDirectlyCallTool_Verifier_PassesThroughWhenNotCached(t *testing.T) {
+	ctx := context.Background()
+	testTool := mustNewTool(
+		"scan_port",
+		aitool.WithNumberParam("port"),
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			return "ok", nil
+		}),
+	)
+	// 工具启用但不在 recently-used cache 中，模拟 LLM 误用 directly_call_tool
+	cfg := &aicommon.Config{AiToolManager: newToolManagerWithTool(testTool)}
+	require.False(t, cfg.GetAiToolManager().IsRecentlyUsedTool("scan_port"), "scan_port should not be in cache at start")
+
+	invoker := &directlyCallTestInvoker{testInvoker: newTestInvoker(ctx)}
+	invoker.tool = testTool
+	invoker.toolCallResult = &aitool.ToolResult{Success: true, Data: "ok"}
+	invoker.verifySatisfactionResult = aicommon.NewVerifySatisfactionResult(true, "done", "")
+
+	task := newTestTask(ctx)
+	invoker.currentTask = task
+
+	loop := reactloops.NewMinimalReActLoop(cfg, invoker)
+	loop.SetCurrentTask(task)
+
+	action := buildDirectlyCallAction(`{
+		"@action": "directly_call_tool",
+		"directly_call_tool_name": "scan_port",
+		"directly_call_tool_params": {"port": 443}
+	}`)
+
+	// Verifier 不应返回错误，不触发 transaction 重试
+	require.NoError(t, loopAction_directlyCallTool.ActionVerifier(loop, action))
+
+	// 验证 directly_call_tool_name 仍然被设置（handler 正常处理）
+	assert.Equal(t, "scan_port", loop.Get("directly_call_tool_name"))
+
+	// 验证 timeline 记录了 cache miss 信息
+	timeline := invoker.getTimelineString()
+	assert.Contains(t, timeline, "DIRECT_CALL_CACHE_MISS")
+	assert.Contains(t, timeline, "scan_port")
+}
