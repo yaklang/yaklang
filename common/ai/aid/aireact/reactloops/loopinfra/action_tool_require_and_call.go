@@ -20,7 +20,7 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 		),
 		aitool.WithStringParam(
 			"tool_call_reason",
-			aitool.WithParam_Description(`Optional. A short, human-readable sentence describing WHY this tool call is needed (the intent/goal, not the params). Omit only when human_readable_thought already states the reason. Shown to the user on the tool-call card.`),
+			aitool.WithParam_Description(`Optional. A human-readable sentence describing WHY this specific tool call is needed AT THIS POINT in the task. Reference the specific finding, prior tool result, or task step that motivates this call — e.g. 'login endpoint returned sess_ent cookie, replaying with SQLi payload in username'. Avoid generic descriptions like 'test the target' or 'scan for vulnerabilities'. Omit only when human_readable_thought already states the reason. Shown to the user on the tool-call card.`),
 		),
 	},
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {

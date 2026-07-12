@@ -223,16 +223,17 @@ func recoverSingleMismatchedAITagParam(invokeParams aitool.InvokeParams, rawAIRe
 }
 
 type ToolCaller struct {
-	runtimeId  string
-	task       AITask
-	config     AICallerConfigIf
-	emitter    *Emitter // specific, backup for config.GetEmitter()
-	ai         AICaller
-	start      *sync.Once
-	done       *sync.Once
-	callToolId string
-	startTime  time.Time // Track tool call start time
-	reason     string    // human-readable reason for this tool call, emitted with the start card
+	runtimeId       string
+	task            AITask
+	config          AICallerConfigIf
+	emitter         *Emitter // specific, backup for config.GetEmitter()
+	ai              AICaller
+	start           *sync.Once
+	done            *sync.Once
+	callToolId      string
+	startTime       time.Time // Track tool call start time
+	reason          string    // human-readable reason for this tool call, emitted with the start card
+	reasonFinalized bool      // when true, the thinking stream should not overwrite the reason
 
 	// invokeRuntime is an optional AIInvokeRuntime used to (re)generate a
 	// human-readable reason via a lightweight (speed-priority) lite forge when
@@ -280,6 +281,9 @@ func WithToolCaller_CallExpectations(expectations string) ToolCallerOption {
 func WithToolCaller_Reason(reason string) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.reason = reason
+		if strings.TrimSpace(reason) != "" {
+			tc.reasonFinalized = true
+		}
 	}
 }
 
@@ -311,8 +315,8 @@ func (t *ToolCaller) generateReasonByLiteForge(ctx context.Context, tool *aitool
 		ctx, "tool-call-reason", prompt,
 		[]aitool.ToolOption{
 			aitool.WithStringParam("reason",
-				aitool.WithParam_Description("A short phrase (~10 chars/words, <15) describing WHY this tool call is needed: the intent/goal, not the params. Match the language of the user input."),
-				aitool.WithParam_MaxLength(15),
+				aitool.WithParam_Description("A concise sentence (15-40 words, <50) describing WHY this specific tool call is needed at this point, referencing prior findings or task progress. Match the language of the user input."),
+				aitool.WithParam_MaxLength(80),
 				aitool.WithParam_Required(true)),
 		},
 	)
@@ -323,12 +327,17 @@ func (t *ToolCaller) generateReasonByLiteForge(ctx context.Context, tool *aitool
 	return strings.TrimSpace(action.GetString("reason"))
 }
 
-// buildToolCallReasonPrompt builds the lite-forge prompt asking for a one-line
+// buildToolCallReasonPrompt builds the lite-forge prompt asking for a concise
 // reason for a tool call, given the tool, its (possibly empty) params, and the
-// owning task's user input / name for intent context.
+// owning task's user input / name for intent context. It also includes a brief
+// summary of recent tool-call results so the generated reason can reference the
+// specific progress that motivates this call.
 func buildToolCallReasonPrompt(tool *aitool.Tool, params aitool.InvokeParams, task AITask) string {
 	var sb strings.Builder
-	sb.WriteString("Generate a short reason (~10 chars/words, keep it under 15) describing WHY this tool call is needed (the intent/goal, not the parameters). Keep it concise.\n")
+	sb.WriteString("Generate a concise reason (15-40 words, keep it under 50) describing WHY this specific tool call is needed AT THIS POINT in the task. " +
+		"Reference the specific finding, prior result, or task step that motivates this call. " +
+		"Avoid generic descriptions like 'test the target' or 'scan for vulnerabilities'; " +
+		"prefer specifics like 'login page returned 200 with session cookie, testing SQLi on username param'.\n")
 	sb.WriteString(fmt.Sprintf("Tool: %s\n", tool.Name))
 	if desc := strings.TrimSpace(tool.Description); desc != "" {
 		sb.WriteString(fmt.Sprintf("Tool description: %s\n", desc))
@@ -345,12 +354,53 @@ func buildToolCallReasonPrompt(tool *aitool.Tool, params aitool.InvokeParams, ta
 				sb.WriteString(fmt.Sprintf("User input: %s\n", userInput))
 			}
 		}
+
+		if recentSteps := buildRecentToolCallSummary(task, 5); recentSteps != "" {
+			sb.WriteString("Recent steps (use these to contextualize your reason):\n")
+			sb.WriteString(recentSteps)
+		}
 	}
 	if len(params) > 0 {
 		sb.WriteString("Params:\n")
 		sb.WriteString(renderParamsAsYAML(params))
 	}
 	sb.WriteString("\nMatch the language of the user input (Chinese if the user writes in Chinese, English otherwise).\nOutput only the reason in the `reason` field.")
+	return sb.String()
+}
+
+// buildRecentToolCallSummary returns a short markdown summary of the most
+// recent N tool-call results from the task, oldest first. Each entry is a
+// one-line bullet: "- tool_name: success/failed (brief error if any)".
+// Returns "" when no prior results exist.
+func buildRecentToolCallSummary(task AITask, maxItems int) string {
+	if task == nil {
+		return ""
+	}
+	results := task.GetAllToolCallResults()
+	if len(results) == 0 {
+		return ""
+	}
+
+	start := 0
+	if len(results) > maxItems {
+		start = len(results) - maxItems
+	}
+	var sb strings.Builder
+	for _, r := range results[start:] {
+		status := "success"
+		extra := ""
+		if !r.Success {
+			status = "failed"
+			if r.Error != "" {
+				errMsg := r.Error
+				if len(errMsg) > 80 {
+					errMsg = errMsg[:80] + "..."
+				}
+				extra = fmt.Sprintf(" (%s)", errMsg)
+			}
+		}
+		sb.WriteString(fmt.Sprintf("- %s: %s%s\n", r.Name, status, extra))
+	}
 	return sb.String()
 }
 
@@ -556,6 +606,7 @@ func (t *ToolCaller) emitStart(tool *aitool.Tool) {
 			defer func() { _ = recover() }()
 			if reason := t.generateReasonByLiteForge(t.ctx, toolRef, nil); reason != "" {
 				t.emitter.EmitToolCallReason(t.callToolId, reason)
+				t.reasonFinalized = true
 			}
 		}()
 	}
@@ -600,6 +651,7 @@ func (t *ToolCaller) DirectlyCallTool(nominalTool *aitool.Tool, action *Action, 
 		}
 		if strings.TrimSpace(reason) != "" {
 			t.emitter.EmitToolCallReason(t.callToolId, reason)
+			t.reasonFinalized = true
 		}
 	}
 
@@ -700,10 +752,11 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 	}, func(rsp *AIResponse) error {
 		boundEmitter := rsp.BindEmitter(emitter)
 		// Stream the model's thinking as the tool-call reason (updating the card)
-		// during param generation. EmitToolCallReason may be called many times;
-		// the frontend updates the reason shown on the card.
+		// during param generation — but only when no specific reason has already
+		// been finalized (via preset, LiteForge, or directly_call_reason). This
+		// prevents raw thinking fragments from overwriting a contextualized reason.
 		rsp.SetOnReasonChunk(func(b []byte) {
-			if len(b) == 0 {
+			if len(b) == 0 || t.reasonFinalized {
 				return
 			}
 			boundEmitter.EmitToolCallReason(t.callToolId, string(b))
