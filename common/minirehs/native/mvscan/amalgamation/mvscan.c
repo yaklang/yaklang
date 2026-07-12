@@ -1498,6 +1498,7 @@ static int nfa_run_anchored_1(const mvs_nfa *a, const uint8_t *data, size_t len,
         if (!hasActive && si < nspan && (size_t)curLo > runeStart + 32) {
             size_t jump = mvs_rune_start(data, len, (size_t)curLo);
             if (jump > i) {
+                prev = 0;
                 i = jump;
                 continue;
             }

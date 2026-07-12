@@ -127,8 +127,8 @@ func TestMVSKernelCombinedAlwaysOnAssertOracle(t *testing.T) {
 	}
 }
 
-// TestMVSParallelAlwaysOnEarlyStop 覆盖并行 always-on merged/assert 两个 worker 在
-// handler 提前停止时仍会被当前 Scan 收拢，下一次复用同一 Scratch 不会读到陈旧结果或阻塞。
+// TestMVSParallelAlwaysOnEarlyStop 覆盖 Scratch 常驻 worker team 在 handler 提前停止时
+// 仍会收拢本次任务，下一次复用及 Close 不会读到陈旧结果、阻塞或泄漏活跃任务。
 func TestMVSParallelAlwaysOnEarlyStop(t *testing.T) {
 	patterns := []Pattern{
 		{ID: 1, Expr: `[a-z]{2,4}`},
@@ -877,7 +877,8 @@ func TestMVSKernelAnchoredRandom(t *testing.T) {
 }
 
 // TestMVSKernelAnchoredRealTraffic 在真实 MITM 规则集 + 真实流量上, 对每条 anchorable lean pattern
-// 比对 C nfaExistsAnchored 与 Go existsInAnchored 逐条一致. 用全报文宽 [0,n] 作保守 spans.
+// 比对 C nfaExistsAnchored 与生产 Go 快路径逐条一致。spans 直接由真实字面量命中按生产公式构造，
+// 覆盖全报文宽测试无法触发的稀疏 span/gap-jump 边界。
 func TestMVSKernelAnchoredRealTraffic(t *testing.T) {
 	patterns, _ := compilableMITMPatterns(t)
 	db, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false))
@@ -893,23 +894,55 @@ func TestMVSKernelAnchoredRealTraffic(t *testing.T) {
 	if testing.Short() && len(records) > 200 {
 		records = records[:200]
 	}
+	scr, err := db.NewScratch()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sc := scr.(*scratch)
+	spansByIdx := make([][]anchorSpan, mdb.n)
 	anchorCount, checks := 0, 0
 	for idx := 0; idx < mdb.n; idx++ {
-		if !mdb.anchorable[idx] {
-			continue
+		if mdb.anchorable[idx] && mdb.nfas[idx] != nil && !mdb.nfas[idx].hasAssert {
+			anchorCount++
 		}
-		nfa := mdb.nfas[idx]
-		if nfa == nil || nfa.hasAssert {
-			continue
+	}
+	for ri, rec := range records {
+		for idx := range spansByIdx {
+			spansByIdx[idx] = spansByIdx[idx][:0]
 		}
-		anchorCount++
-		for ri, rec := range records {
-			n := len(rec)
-			spans := []anchorSpan{{0, int32(n)}}
+		for _, h := range mdb.pf.scanHits(rec, sc) {
+			if int(h.litID) >= len(mdb.litToPat) {
+				continue
+			}
+			for k, idx32 := range mdb.litToPat[h.litID] {
+				idx := int(idx32)
+				if !mdb.anchorable[idx] || mdb.nfas[idx] == nil || mdb.nfas[idx].hasAssert {
+					continue
+				}
+				head := mdb.litHead[h.litID][k]
+				lo := 0
+				if head >= 0 {
+					lo = int(h.end) - int(head)
+					if lo < 0 {
+						lo = 0
+					}
+				}
+				spansByIdx[idx] = append(spansByIdx[idx], anchorSpan{int32(lo), h.end})
+			}
+		}
+		for idx, rawSpans := range spansByIdx {
+			if len(rawSpans) == 0 {
+				continue
+			}
+			nfa := mdb.nfas[idx]
+			spans := mergeAnchorSpans(rawSpans)
 			var goHit bool
-			if nfa.single {
+			switch {
+			case nfa.single:
 				goHit = nfa.existsInAnchored1(rec, spans)
-			} else {
+			case nfa.nword == 2:
+				goHit = nfa.existsInAnchored2(rec, spans)
+			default:
 				prev := make([]uint64, nfa.nword)
 				cand := make([]uint64, nfa.nword)
 				active := make([]uint64, nfa.nword)
@@ -918,7 +951,9 @@ func TestMVSKernelAnchoredRealTraffic(t *testing.T) {
 			cHit := mdb.kernel.nfaExistsAnchored(idx, rec, spans)
 			checks++
 			if cHit != goHit {
-				t.Fatalf("C!=Go anchored idx=%d record#%d len=%d C=%v go=%v", idx, ri, n, cHit, goHit)
+				cScalar := mdb.kernel.nfaExistsAnchoredScalar(idx, rec, spans)
+				t.Fatalf("C!=Go anchored idx=%d rule=%d record#%d len=%d nword=%d spans=%v C=%v scalar=%v go=%v",
+					idx, mdb.all[idx].id, ri, len(rec), nfa.nword, spans, cHit, cScalar, goHit)
 			}
 		}
 	}

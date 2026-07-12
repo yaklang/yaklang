@@ -267,6 +267,7 @@ func (nfa *mvsNFA) existsInReverseAnchored2(data []byte, spans []anchorSpan) boo
 			if targetHi < j && targetHi > 0 {
 				jump := alignRuneStart(data, targetHi)
 				if jump > 0 && jump < i {
+					prev0, prev1 = 0, 0
 					i = jump
 					continue
 				}
@@ -342,6 +343,7 @@ func (nfa *mvsNFA) existsInReverseAnchored1(data []byte, spans []anchorSpan) boo
 				if targetHi < j && targetHi > 0 {
 					jump := alignRuneStart(data, targetHi)
 					if jump > 0 && jump < i {
+						prev = 0
 						i = jump
 						continue
 					}

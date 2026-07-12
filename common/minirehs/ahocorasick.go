@@ -153,3 +153,19 @@ func (ac *ahoCorasick) scanFoldASCII(data []byte, onHit func(litID int32, end in
 		}
 	}
 }
+
+// scanHitsFoldASCII 是预过滤热路径的无回调版本，直接把命中写入调用方复用切片。
+func (ac *ahoCorasick) scanHitsFoldASCII(data []byte, out []litHit) []litHit {
+	state := int32(0)
+	next, outOff, outFlat := ac.next, ac.outOff, ac.outFlat
+	for i, c := range data {
+		if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		state = next[state<<8|int32(c)]
+		for off, end := outOff[state], outOff[state+1]; off < end; off++ {
+			out = append(out, litHit{litID: outFlat[off], end: int32(i + 1)})
+		}
+	}
+	return out
+}
