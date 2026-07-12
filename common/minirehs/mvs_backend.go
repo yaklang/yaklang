@@ -530,20 +530,25 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 	asyncConsumed := false
 	if runtime.GOMAXPROCS(0) > 1 && len(data) >= 512 && d.kernel != nil && d.merged != nil &&
 		len(d.assertAlwaysOnCIdxs) > 0 && len(d.assertAlwaysOnGoIdxs) == 0 {
-		if sc.alwaysScratch == nil {
-			sc.alwaysScratch = &scratch{}
-			sc.alwaysRes = make(chan alwaysResult, 1)
+		if sc.alwaysMergedScratch == nil {
+			sc.alwaysMergedScratch = &scratch{}
+			sc.alwaysAssertScratch = &scratch{}
+			sc.alwaysMergedRes = make(chan []int, 1)
+			sc.alwaysAssertRes = make(chan []byte, 1)
 		}
 		go func() {
-			merged, asserts := d.kernel.combinedScan(data, d.assertAlwaysOnCIdxs, false, sc.alwaysScratch)
-			sc.alwaysRes <- alwaysResult{merged: merged, assert: asserts}
+			sc.alwaysMergedRes <- d.kernel.mergedScan(data, sc.alwaysMergedScratch)
+		}()
+		go func() {
+			sc.alwaysAssertRes <- d.kernel.nfaExistsAssertMany(d.assertAlwaysOnCIdxs, data, sc.alwaysAssertScratch)
 		}()
 		asyncAlways = true
 		defer func() {
 			// handler 可能在候选阶段要求提前停止；仍须收走本报文结果，保证
-			// 短生命周期 worker 在本次 Scan 返回前完成。
+			// 两个短生命周期 worker 在本次 Scan 返回前完成。
 			if !asyncConsumed {
-				<-sc.alwaysRes
+				<-sc.alwaysMergedRes
+				<-sc.alwaysAssertRes
 			}
 		}()
 	}
@@ -852,9 +857,16 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 			keepBound := len(assertGoIdxs) > 0
 			var mHits, aHits []int
 			if asyncAlways {
-				res := <-sc.alwaysRes
+				mHits = <-sc.alwaysMergedRes
+				assertBits := <-sc.alwaysAssertRes
 				asyncConsumed = true
-				mHits, aHits = res.merged, res.assert
+				sc.assertHits = sc.assertHits[:0]
+				for i, hit := range assertBits {
+					if hit != 0 {
+						sc.assertHits = append(sc.assertHits, int(assertCIdxs[i]))
+					}
+				}
+				aHits = sc.assertHits
 			} else {
 				mHits, aHits = d.kernel.combinedScan(data, assertCIdxs, keepBound, sc)
 			}

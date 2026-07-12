@@ -45,6 +45,10 @@
 > 并行；每次 Scan 使用该 Scratch 独占的 worker scratch，短生命周期 goroutine 在返回前必收拢，handler
 > 仍只在调用线程按原阶段顺序执行。单核自动回落原串行路径。定向 race、handler 提前停止后 Scratch
 > 连续复用、默认/`minirehs_mvs`/amalgamation short、完整非 short 与 1332 真实流量 oracle 均通过。
+> **2026-07-12 三路流水跟进(FULL_CORPUS, 20x×5)**:always-on merged 与 2 条 always-on assert
+> 从融合 worker 拆为两个独立 C worker，与 Go 字面量/锚定候选形成三路并行。吞吐进一步到
+> **33.50-33.80 MB/s**，较 32.45-32.60 MB/s 长跑对照再增 **2.8-4.2%**；单核仍自动使用
+> 已验证的融合串行路径。
 > **当前性能(实测,vs Go RE2 逐条 0.18 MB/s 基线)**:存在性 **~63x**(全规则)/**~107x**(纯 RE2 子集)、定位 **~25x**;
 > **纯 RE2 子集 ~107x! 累计从 84x 提升到 107x (+27%).** 详见第 4' 节倍数评估与路线。
 > **剩余瓶颈(本会话剖析, 干净小改已出尽)**:① `runtime.cgocall` 28%(合并 always-on 整段扫 5.25MB + 不可
