@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -1148,9 +1149,14 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	stdoutBuffer := &toolOutputBuffer{}
 	stderrBuffer := &toolOutputBuffer{}
 
-	// Use MultiWriter to write to both the pipe (for streaming) and the buffer (for file saving)
-	stdoutMultiWriter := io.MultiWriter(stdoutWriter, stdoutBuffer)
-	stderrMultiWriter := io.MultiWriter(stderrWriter, stderrBuffer)
+	// combinedOutputBuffer captures stdout and stderr writes in real-time order,
+	// preserving the actual interleaving of output rather than concatenating
+	// stdout+stderr after the fact.
+	combinedOutputBuffer := &toolOutputBuffer{}
+
+	// Use MultiWriter to write to both the pipe (for streaming) and the buffers (for file saving)
+	stdoutMultiWriter := io.MultiWriter(stdoutWriter, stdoutBuffer, combinedOutputBuffer)
+	stderrMultiWriter := io.MultiWriter(stderrWriter, stderrBuffer, combinedOutputBuffer)
 
 	waitToolStdFlush := t.emitter.EmitToolCallStd(tool.Name, stdoutReader, stderrReader, t.task.GetIndex())
 
@@ -1226,8 +1232,8 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	// we emit the tool result event, preserving correct event ordering.
 	waitToolStdFlush()
 
-	// Save tool call report markdown (params, stdout, stderr, result merged into one file)
-	t.saveToolCallFiles(tool, callToolId, destinationIdentifier, invokeParams, stdoutBuffer, stderrBuffer, toolResult, paramGenDuration, rawAIParamResponse)
+	// Save tool call report markdown (params, combined output, result merged into one file)
+	t.saveToolCallFiles(tool, callToolId, destinationIdentifier, invokeParams, combinedOutputBuffer, toolResult, paramGenDuration, rawAIParamResponse)
 
 	t.emitter.EmitInfo("start to generate and feedback tool[%v] result in task: %#v", tool.Name, t.task.GetName())
 	if toolResult.Data != nil {
@@ -1251,8 +1257,7 @@ func (t *ToolCaller) saveToolCallFiles(
 	callToolId string,
 	destinationIdentifier string,
 	params aitool.InvokeParams,
-	stdoutBuffer *toolOutputBuffer,
-	stderrBuffer *toolOutputBuffer,
+	combinedOutputBuffer *toolOutputBuffer,
 	toolResult *aitool.ToolResult,
 	paramGenDuration time.Duration,
 	rawAIParamResponse string,
@@ -1372,17 +1377,21 @@ func (t *ToolCaller) saveToolCallFiles(
 
 	// --- COMBINED OUTPUT ---
 	md.WriteString("## OUTPUT\n\n")
-	stdoutContent := stdoutBuffer.Bytes()
+	combinedContent := combinedOutputBuffer.Bytes()
 	frameworkMsgPrefix := fmt.Sprintf("invoking tool[%s] ...\n", tool.Name)
-	if bytes.HasPrefix(stdoutContent, []byte(frameworkMsgPrefix)) {
-		stdoutContent = stdoutContent[len(frameworkMsgPrefix):]
+	if bytes.HasPrefix(combinedContent, []byte(frameworkMsgPrefix)) {
+		combinedContent = combinedContent[len(frameworkMsgPrefix):]
 	}
-	stderrContent := stderrBuffer.Bytes()
-	combinedContent := append(stdoutContent, stderrContent...)
 	if len(combinedContent) > 0 {
+		// Shrink combined output if larger than 50KB, keeping 30KB total
+		// with head, tail, and a truncation notice pointing to the report file.
+		combinedStr := string(combinedContent)
+		if len(combinedStr) > 50*1024 {
+			combinedStr = shrinkCombinedOutput(combinedStr, 30*1024, toolCallFilePath)
+		}
 		md.WriteString(markdownCodeFence + "\n")
-		md.Write(combinedContent)
-		if !bytes.HasSuffix(combinedContent, []byte("\n")) {
+		md.WriteString(combinedStr)
+		if !strings.HasSuffix(combinedStr, "\n") {
 			md.WriteString("\n")
 		}
 		md.WriteString(markdownCodeFence + "\n\n")
@@ -1397,6 +1406,54 @@ func (t *ToolCaller) saveToolCallFiles(
 		t.emitter.EmitPinFilename(toolCallFilePath)
 		log.Infof("saved tool call report to file: %s", toolCallFilePath)
 	}
+}
+
+// shrinkCombinedOutput truncates combined output to approximately targetSize bytes,
+// keeping the head and tail portions and replacing the middle with a truncation
+// notice. The notice tells the user which portion was chunked and that the full
+// content can be found in the report file.
+//
+// targetSize is interpreted as a byte budget; the actual output may be slightly
+// larger due to rune-boundary alignment and the truncation notice.
+func shrinkCombinedOutput(content string, targetSize int, reportFilePath string) string {
+	if len(content) <= targetSize {
+		return content
+	}
+
+	runes := []rune(content)
+	// Reserve space for the truncation notice (~200 bytes)
+	noticeBudget := 200
+	contentBudget := targetSize - noticeBudget
+	if contentBudget < 200 {
+		contentBudget = 200
+	}
+
+	// Walk from the head accumulating runes until we reach ~half the content budget.
+	halfBudget := contentBudget / 2
+	headEnd := 0
+	headBytes := 0
+	for headEnd < len(runes) && headBytes+utf8.RuneLen(runes[headEnd]) <= halfBudget {
+		headBytes += utf8.RuneLen(runes[headEnd])
+		headEnd++
+	}
+
+	// Walk backwards from the tail accumulating runes until we reach ~half the content budget.
+	tailStart := len(runes)
+	tailBytes := 0
+	for tailStart > headEnd && tailBytes+utf8.RuneLen(runes[tailStart-1]) <= halfBudget {
+		tailBytes += utf8.RuneLen(runes[tailStart-1])
+		tailStart--
+	}
+
+	head := string(runes[:headEnd])
+	tail := string(runes[tailStart:])
+	chunkedBytes := len(content) - headBytes - tailBytes
+
+	notice := fmt.Sprintf(
+		"\n\n... (truncated: %d bytes in the middle were chunked, full output saved to: %s) ...\n\n",
+		chunkedBytes, reportFilePath,
+	)
+	return head + notice + tail
 }
 
 // renderParamsAsYAML renders InvokeParams as YAML for human-readable output.

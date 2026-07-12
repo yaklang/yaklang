@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -213,29 +213,8 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 		}, err
 	}
 
-	var spilledFiles []*OutputFileInfo
-	combinedFile := handleLargeContent(&execResult.CombinedOutput, "output")
-	if combinedFile != "" {
-		log.Infof("large combined output saved to file: %v", combinedFile)
-		spilledFiles = append(spilledFiles, newSpillFileInfo(combinedFile))
-		// 同步截断 stdout/stderr 以保持一致性（兼容旧消费者）
-		execResult.Stdout = execResult.CombinedOutput
-		execResult.Stderr = ""
-	}
-
-	if jsonResultRaw := utils.Jsonify(execResult.Result); len(jsonResultRaw) > 50*1024 {
-		originJsonResult := string(jsonResultRaw)
-		jsonFile := handleLargeContentToFile(originJsonResult, "json")
-		execResult.Result = buildSpillMarker(jsonFile, len(originJsonResult), originJsonResult, 8000)
-		log.Infof("large json result content saved to file: %s", jsonFile)
-		spilledFiles = append(spilledFiles, newSpillFileInfo(jsonFile))
-	}
-
 	if cb := cfg.resCallback; cb != nil {
 		result, cbErr := cb(execResult)
-		if result != nil && len(spilledFiles) > 0 && len(result.OutputFiles) == 0 {
-			result.OutputFiles = spilledFiles
-		}
 		return result, cbErr
 	}
 
@@ -245,7 +224,6 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 		Param:       params,
 		Success:     true,
 		Data:        execResult,
-		OutputFiles: spilledFiles,
 	}, nil
 }
 
@@ -295,36 +273,46 @@ func handleLargeContent(content *string, contentType string) string {
 
 	origContent := *content
 	filename := handleLargeContentToFile(origContent, contentType)
-	*content = buildSpillMarker(filename, len(origContent), origContent, 4096)
+	*content = buildSpillMarker(filename, len(origContent), origContent, 30*1024)
 	return filename
 }
 
 // buildSpillMarker 生成截断标记文本：保留开头 previewBytes/2 字节和结尾 previewBytes/2
-// 字节，中间插入省略信息和文件路径。
+// 字节，中间插入省略信息和文件路径。总大小约为 previewBytes。
+//
+// previewBytes 是字节预算；切割时按 rune 边界对齐，保证不会截断 UTF-8 字符。
 func buildSpillMarker(filename string, totalSize int, content string, previewBytes int) string {
 	if previewBytes < 100 {
 		previewBytes = 100
 	}
-	half := previewBytes / 2
-	runes := []rune(content)
-	if len(runes) <= previewBytes {
+	if len(content) <= previewBytes {
 		return content
 	}
-	head := string(runes[:half])
-	tail := string(runes[len(runes)-half:])
+	runes := []rune(content)
+	half := previewBytes / 2
+
+	// 从头部累加 rune 直到达到 half 字节
+	headEnd := 0
+	headBytes := 0
+	for headEnd < len(runes) && headBytes+utf8.RuneLen(runes[headEnd]) <= half {
+		headBytes += utf8.RuneLen(runes[headEnd])
+		headEnd++
+	}
+
+	// 从尾部累加 rune 直到达到 half 字节
+	tailStart := len(runes)
+	tailBytes := 0
+	for tailStart > headEnd && tailBytes+utf8.RuneLen(runes[tailStart-1]) <= half {
+		tailBytes += utf8.RuneLen(runes[tailStart-1])
+		tailStart--
+	}
+
+	head := string(runes[:headEnd])
+	tail := string(runes[tailStart:])
 	return fmt.Sprintf(
 		"%s\n\n... (truncated, %d bytes total, saved to: %s) ...\n\n%s",
 		head, totalSize, filename, tail,
 	)
-}
-
-// newSpillFileInfo 从文件路径构建 OutputFileInfo（不读取正文内容）。
-func newSpillFileInfo(path string) *OutputFileInfo {
-	info := &OutputFileInfo{Path: path}
-	if fi, err := os.Stat(path); err == nil {
-		info.Size = fi.Size()
-	}
-	return info
 }
 
 // handleLargeContentToFile 将大文本内容保存到临时文件并返回文件名

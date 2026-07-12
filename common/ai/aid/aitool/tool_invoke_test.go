@@ -547,6 +547,9 @@ func TestHandleLargeContent(t *testing.T) {
 		require.Contains(t, largeContent, "saved to:", "应包含文件保存信息")
 		require.True(t, len(largeContent) < len(originalContent), "内容应被截断")
 		require.NotEmpty(t, savedFile, "应返回截断文件路径")
+		// 截断后保留约 30KB (15KB head + 15KB tail + notice)
+		require.Less(t, len(largeContent), 35*1024, "截断后内容应约为30KB")
+		require.Greater(t, len(largeContent), 20*1024, "截断后内容应保留足够头部和尾部")
 	})
 
 	t.Run("测试返回文件路径", func(t *testing.T) {
@@ -613,21 +616,14 @@ func TestInvokeWithParamsLargeContent(t *testing.T) {
 	execResult, ok := result.Data.(*ToolExecutionResult)
 	require.True(t, ok, "结果类型错误，期望 *ToolExecutionResult")
 
-	// 验证合并输出被截断和保存
-	require.Less(t, len(execResult.CombinedOutput), 20*1024, "合并输出应被截断")
-	require.Contains(t, execResult.CombinedOutput, "saved to:", "合并输出应包含文件保存信息")
-	require.Empty(t, execResult.Stderr, "截断后 stderr 应被清空")
+	// CombinedOutput 应该包含完整的 stdout 和 stderr 内容
+	// (InvokeWithParams 不再做截断，截断在 saveToolCallFiles 层完成)
+	require.Contains(t, execResult.CombinedOutput, strings.Repeat("A", 100), "合并输出应包含 stdout 内容")
+	require.Contains(t, execResult.CombinedOutput, strings.Repeat("B", 100), "合并输出应包含 stderr 内容")
 
-	// 验证 ToolResult.OutputFiles 包含截断保存的文件路径
-	require.NotEmpty(t, result.OutputFiles, "OutputFiles 应包含截断保存的文件路径")
-	for _, f := range result.OutputFiles {
-		require.NotEmpty(t, f.Path, "截断文件路径不应为空")
-	}
-
-	// 验证JSON结果处理
-	resultStr, ok := execResult.Result.(string)
-	require.True(t, ok, "JSON结果类型错误，应为字符串")
-	require.Contains(t, resultStr, "saved to:", "JSON结果应包含文件保存信息")
+	// stdout 和 stderr 仍然分别保留
+	require.Contains(t, execResult.Stdout, strings.Repeat("A", 100), "stdout 应包含 stdout 内容")
+	require.Contains(t, execResult.Stderr, strings.Repeat("B", 100), "stderr 应包含 stderr 内容")
 }
 
 func TestApplyDefault_NestedArrayWithNilPropertyTypesDoesNotPanic(t *testing.T) {

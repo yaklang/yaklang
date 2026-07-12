@@ -29,8 +29,6 @@ type ToolResult struct {
 	ShrinkResult string `json:"shrink_result,omitempty"`
 
 	CallExpectations string `json:"call_expectations,omitempty"`
-
-	OutputFiles []*OutputFileInfo `json:"output_files,omitempty"`
 }
 
 func (t *ToolResult) DumpTimelineItem(buf io.Writer) {
@@ -154,13 +152,6 @@ func (t *ToolResult) String() string {
 	// 处理错误信息
 	if t.Error != "" {
 		buf.WriteString(fmt.Sprintf("err: %s\n", t.Error))
-	}
-
-	if len(t.OutputFiles) > 0 {
-		buf.WriteString("output_files:\n")
-		for _, f := range t.OutputFiles {
-			buf.WriteString(fmt.Sprintf("  - %s (%d bytes)\n", f.Path, f.Size))
-		}
 	}
 
 	return buf.String()
