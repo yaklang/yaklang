@@ -485,8 +485,10 @@ description: Tax excel analysis skill
 	if strings.Contains(prompt, skillCommandMarker) {
 		t.Fatalf("unloaded skill body should not appear in tool params prompt. Got:\n%s", prompt)
 	}
-	if !strings.Contains(prompt, "tax-excel") {
-		t.Fatalf("available skill registry should still be visible. Got:\n%s", prompt)
+	// 改造后: SKILL 目录默认隐藏 (节约 token), 未加载 skill 既不应出现 body 也不应出现在目录里.
+	// 目录仅由意图识别 (SetCatalogSkills + SetCatalogVisible) 主动 surface.
+	if strings.Contains(prompt, "tax-excel") {
+		t.Fatalf("unloaded skill should not appear in tool params prompt when catalog is hidden by default. Got:\n%s", prompt)
 	}
 }
 
