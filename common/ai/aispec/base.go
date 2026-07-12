@@ -330,6 +330,9 @@ func WithChatBase_AISamplingFromConfig(cfg *AIConfig) ChatBaseOption {
 		if s := strings.TrimSpace(cfg.ReasoningEffort); s != "" {
 			c.ReasoningEffort = s
 		}
+		if cfg.DisableStream {
+			c.DisableStream = true
+		}
 	}
 }
 

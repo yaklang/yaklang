@@ -53,7 +53,12 @@ type AIConfig struct {
 	Type                    string `json:"Type"`
 	PreferredTier           consts.ModelTier
 	DisableProviderFallback bool
-	Context                 context.Context
+	// DisableStream forces the upstream request to use non-streaming mode
+	// even if the caller originally requested streaming. The response
+	// callbacks (StreamHandler etc.) still fire with the full payload,
+	// allowing the caller to re-chunk it to the downstream client.
+	DisableStream bool
+	Context       context.Context
 
 	FunctionCallRetryTimes int
 
@@ -884,6 +889,12 @@ func WithProxy(p string) AIConfigOption {
 func WithAPIType(apiType string) AIConfigOption {
 	return func(c *AIConfig) {
 		c.APIType = strings.TrimSpace(apiType)
+	}
+}
+
+func WithDisableStream(b bool) AIConfigOption {
+	return func(c *AIConfig) {
+		c.DisableStream = b
 	}
 }
 

@@ -721,6 +721,8 @@ func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.
 type responsesToolCallState struct {
 	byItemID          map[string]*ToolCall
 	streamedMessageID map[string]struct{}
+	anyTextStreamed    bool
+	anyReasonStreamed  bool
 }
 
 func newResponsesToolCallState() *responsesToolCallState {
@@ -841,13 +843,31 @@ func handleResponsesSSEEvent(event map[string]any, outWriter io.Writer, reasonWr
 		itemID := utils.MapGetString(event, "item_id")
 		delta := utils.MapGetString(event, "delta")
 		if delta != "" {
+			toolState.anyTextStreamed = true
 			toolState.markMessageStreamed(itemID, outputIndex)
 			outWriter.Write([]byte(delta))
+		}
+	case "response.output_text.done":
+		if !toolState.anyTextStreamed {
+			text := utils.MapGetString(event, "text")
+			if text != "" {
+				toolState.anyTextStreamed = true
+				outWriter.Write([]byte(text))
+			}
 		}
 	case "response.reasoning_text.delta", "response.reasoning_summary_text.delta":
 		delta := utils.MapGetString(event, "delta")
 		if delta != "" {
+			toolState.anyReasonStreamed = true
 			reasonWriter.Write([]byte(delta))
+		}
+	case "response.reasoning_text.done", "response.reasoning_summary_text.done":
+		if !toolState.anyReasonStreamed {
+			text := utils.MapGetString(event, "text")
+			if text != "" {
+				toolState.anyReasonStreamed = true
+				reasonWriter.Write([]byte(text))
+			}
 		}
 	case "response.function_call_arguments.delta":
 		outputIndex := utils.InterfaceToInt(event["output_index"])
@@ -879,7 +899,12 @@ func handleResponsesSSEEvent(event map[string]any, outWriter io.Writer, reasonWr
 		outputIndex := utils.InterfaceToInt(event["output_index"])
 		handleResponsesOutputItem(item, outputIndex, eventType, outWriter, reasonWriter, toolCallCallback, toolState)
 	case "response.completed":
-		// Ignore completed event in streaming mode to avoid duplicate output/tool-calls.
+		if !toolState.anyTextStreamed {
+			resp := utils.MapGetMapRaw(event, "response")
+			if len(resp) > 0 {
+				extractResponsesOutputFromObject(resp, outWriter, reasonWriter, toolCallCallback)
+			}
+		}
 	default:
 		if strings.Contains(eventType, "reasoning") {
 			delta := utils.MapGetString(event, "delta")
