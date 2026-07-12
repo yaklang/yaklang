@@ -94,9 +94,11 @@ func isVerifySatisfactionPrompt(prompt string) bool {
 // 合法的 tool-call-reason action, 让 lite forge 一次性解析成功; 否则 prompt 会落进
 // mock 的 error/fallback 分支, LiteForge 触发重试, 而审查路径 (wrong_tool /
 // wrong_params) 里的 reason 生成是同步执行的, 会被重试阻塞到超过测试超时.
+//
+// 只用稳定的 forge-action 名 "tool-call-reason" 做匹配, 不依赖 reason 描述的具体
+// 措辞 (描述会随提示词迭代而变, 匹配措辞会让 mock 在文案改动后误判为 unknown prompt).
 func isToolCallReasonLiteForgePrompt(prompt string) bool {
-	return strings.Contains(prompt, `"tool-call-reason"`) &&
-		strings.Contains(prompt, "describing WHY this tool call is needed")
+	return strings.Contains(prompt, `"tool-call-reason"`)
 }
 
 // mockedToolCallReasonActionJSON 是测试 mock 用来一次性应答 tool-call-reason
