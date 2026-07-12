@@ -1244,11 +1244,8 @@ func (d *mvsDB) verifyOne(idx int, data []byte, sc *scratch, handler MatchHandle
 			// 断言 NFA 单字: C 内核扫描 (共享边界, 每报文一次).
 			hit = d.kernel.nfaExistsAssert(idx, data, d.sharedBound(data, sc))
 		case nfa.hasAssert && d.kernel != nil:
-			// 断言 NFA 多字: C 内核扫描.
-			hit = d.kernel.nfaExistsAssert(idx, data, d.sharedBound(data, sc))
-		case nfa.hasAssert && d.kernel != nil:
-			// 断言 NFA 多字: 有 C 内核时走 C nfa_run_assert_mw.
-			hit = d.kernel.nfaExistsAssert(idx, data, d.sharedBound(data, sc))
+			// 多字断言在线生成边界并递推，避免 bound 物化后二次遍历。
+			hit = d.kernel.nfaExistsAssertOnline(idx, data)
 		case nfa.hasAssert && nfa.single:
 			hit = nfa.existsInAssertShared1(data, d.sharedBound(data, sc))
 		case nfa.hasAssert:
@@ -1343,6 +1340,8 @@ func (d *mvsDB) existsNoReport(idx int, data []byte, winLo int, sc *scratch) boo
 			nfa := d.nfas[idx]
 			var hit bool
 			switch {
+			case nfa.hasAssert && !nfa.single && d.kernel != nil:
+				hit = d.kernel.nfaExistsAssertOnline(idx, sub)
 			case nfa.hasAssert && nfa.single:
 				sc.gateBound = computeBoundaries(sub, sc.gateBound)
 				hit = nfa.existsInAssertShared1(sub, sc.gateBound)
@@ -1367,6 +1366,8 @@ func (d *mvsDB) existsNoReport(idx int, data []byte, winLo int, sc *scratch) boo
 	}
 	var hit bool
 	switch {
+	case nfa.hasAssert && !nfa.single && d.kernel != nil:
+		hit = d.kernel.nfaExistsAssertOnline(idx, data)
 	case nfa.hasAssert && d.kernel != nil:
 		hit = d.kernel.nfaExistsAssert(idx, data, d.sharedBound(data, sc))
 	case nfa.hasAssert && nfa.single:
@@ -1407,6 +1408,8 @@ func (d *mvsDB) verifyGateLocalized(idx int, data []byte, winLo int, sc *scratch
 		nfa := d.nfas[idx]
 		var hit bool
 		switch {
+		case nfa.hasAssert && !nfa.single && d.kernel != nil:
+			hit = d.kernel.nfaExistsAssertOnline(idx, sub)
 		case nfa.hasAssert && nfa.single:
 			sc.gateBound = computeBoundaries(sub, sc.gateBound)
 			hit = nfa.existsInAssertShared1(sub, sc.gateBound)

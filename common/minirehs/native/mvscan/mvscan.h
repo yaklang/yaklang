@@ -176,6 +176,10 @@ int mvscan_db_nfa_exists_assert_self(const mvscan_db *db, int32_t idx,
                                      const uint8_t *data, size_t len,
                                      uint8_t *boundBuf);
 
+/* 多字断言在线边界单趟扫描；仅 hasAssert && nword>1，其他形态返回 -1。 */
+int mvscan_db_nfa_exists_assert_online(const mvscan_db *db, int32_t idx,
+                                       const uint8_t *data, size_t len);
+
 /* mvscan_db_dfa_scan_batch: 在单次调用中对多个 DFA 模式扫描同一段 data.
  * 对每个 idx 逐个跑 dfa_run, 把命中的 idx 写入 out. 返回命中数. */
 int32_t mvscan_db_dfa_scan_batch(const mvscan_db *db,

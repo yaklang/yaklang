@@ -939,6 +939,92 @@ static int nfa_run_assert_mw(const mvs_nfa *a, const uint8_t *data, size_t len,
     return 0;
 }
 
+/* 多字断言在线边界执行器：lookahead 解码同时生成 bpre/bpost，避免先物化 len+1
+ * boundary 数组再二次遍历。LimEx 链边批量推进，仅展开稀疏异常边。 */
+static int nfa_run_assert_mw_online(const mvs_nfa *a, const uint8_t *data, size_t len) {
+    if (!data || len == 0 || a->nword <= 1) return 0;
+    int nword = a->nword;
+    uint64_t stackPrev[8], stackCand[8];
+    uint64_t *prev, *cand;
+    if (nword <= 8) {
+        prev = stackPrev; cand = stackCand;
+        memset(prev, 0, (size_t)nword * sizeof(uint64_t));
+    } else {
+        prev = (uint64_t *)calloc((size_t)nword, sizeof(uint64_t));
+        cand = (uint64_t *)malloc((size_t)nword * sizeof(uint64_t));
+        if (!prev || !cand) { free(prev); free(cand); return 0; }
+    }
+    size_t i = 0;
+    int32_t curRune;
+    int curSize = mvs_decode_rune(data, len, &curRune);
+    uint8_t bpre = mvs_boundary_conds(-1, curRune);
+    while (i < len) {
+        size_t ni = i + (size_t)curSize;
+        int32_t nextRune = -1;
+        int nextSize = 0;
+        if (ni < len) nextSize = mvs_decode_rune(data + ni, len - ni, &nextRune);
+        uint8_t bpost = mvs_boundary_conds(curRune, nextRune);
+        int sym = curRune >= 0 && curRune < 0x80 ? (int)a->asciiSym[curRune] : symbol_of(a, curRune);
+
+        if (a->hasLimEx) {
+            uint64_t carry = 0;
+            for (int w = 0; w < nword; w++) {
+                uint64_t v = prev[w];
+                uint64_t shifted = (v << 1) | carry;
+                carry = v >> 63;
+                cand[w] = a->firstUnanchored[w] | (shifted & a->chainTarget[w]);
+            }
+            for (int w = 0; w < nword; w++) {
+                uint64_t ex = prev[w] & a->excMask[w];
+                while (ex) {
+                    int p = (w << 6) + mvs_ctz64(ex);
+                    ex &= ex - 1;
+                    row_or_v(cand, a->excFollow + (size_t)p * nword, nword);
+                }
+            }
+        } else {
+            row_copy_v(cand, a->firstUnanchored, nword);
+            for (int w = 0; w < nword; w++) {
+                uint64_t pw = prev[w];
+                while (pw) {
+                    int p = (w << 6) + mvs_ctz64(pw);
+                    pw &= pw - 1;
+                    row_or_v(cand, a->follow + (size_t)p * nword, nword);
+                }
+            }
+        }
+        for (int k = 0; k < a->nCondFirst; k++) {
+            if ((a->condFirstGuard[k] & bpre) == a->condFirstGuard[k])
+                for (int w = 0; w < nword; w++) cand[w] |= a->condFirstBits[k * nword + w];
+        }
+        for (int k = 0; k < a->nCondFollow; k++) {
+            int p = a->condFollowPos[k], pw = p >> 6;
+            if (pw < nword && (prev[pw] & (1ULL << (p & 63))) &&
+                (a->condFollowGuard[k] & bpre) == a->condFollowGuard[k]) {
+                for (int w = 0; w < nword; w++) cand[w] |= a->condFollowBits[(size_t)k * nword + w];
+            }
+        }
+        const uint64_t *rc = a->reach + (size_t)sym * nword;
+        for (int w = 0; w < nword; w++) {
+            prev[w] = cand[w] & rc[w];
+            if (prev[w] & a->lastAny[w]) { if (nword > 8) { free(prev); free(cand); } return 1; }
+        }
+        for (int k = 0; k < a->nCondAccept; k++) {
+            if ((a->condAcceptGuard[k] & bpost) == a->condAcceptGuard[k]) {
+                for (int w = 0; w < nword; w++) {
+                    if (prev[w] & a->condAcceptBits[(size_t)k * nword + w]) {
+                        if (nword > 8) { free(prev); free(cand); }
+                        return 1;
+                    }
+                }
+            }
+        }
+        i = ni; curRune = nextRune; curSize = nextSize; bpre = bpost;
+    }
+    if (nword > 8) { free(prev); free(cand); }
+    return 0;
+}
+
 /* ====================================================================
  * 锚定式位并行递推 (对应 Go mvs_anchored.go existsInAnchored).
  * 仅在 spans 注入区间内注入 first, 其余位置不注入, 支持提前消亡.
@@ -1920,6 +2006,16 @@ int mvscan_db_nfa_exists_assert_self(const mvscan_db *db, int32_t idx,
     if (a->nword == 1)
         return nfa_run_assert_1(a, data, len, boundBuf);
     return nfa_run_assert_mw(a, data, len, boundBuf);
+}
+
+int mvscan_db_nfa_exists_assert_online(const mvscan_db *db, int32_t idx,
+                                       const uint8_t *data, size_t len) {
+    if (!db || idx < 0 || idx >= db->npat || !data || len == 0) return -1;
+    int32_t u = db->slotUnit[idx];
+    if (u < 0 || u >= db->nUnits) return -1;
+    mvs_nfa *a = &db->units[u];
+    if (!a->hasAssert || a->nword <= 1) return -1;
+    return nfa_run_assert_mw_online(a, data, len);
 }
 
 /* ====================================================================
