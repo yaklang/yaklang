@@ -245,9 +245,8 @@ func (k *mvsKernel) nfaExistsAssertOnline(idx int, data []byte) bool {
 	return r == 1
 }
 
-// nfaExistsAssertMany 一次 cgo 对多条断言 always-on NFA 做断言存在性扫描,
-// 内部在 C 预算边界 (每报文一次, 跨多条 NFA 共享). 省去每条 NFA 一次 cgo.
-// idxs 为断言 always-on pattern 下标. boundBuf 容量须 >= len(data)+1.
+// nfaExistsAssertMany 一次 cgo、一次数据遍历推进多条断言 always-on NFA.
+// rune 解码与零宽断言边界在线共享，省去边界物化和逐 NFA 重复扫描.
 // 结果复用 sc.assertBatchOut (len==len(idxs), 1 命中/0 不命中).
 // dfaScanBatch 在单次 cgo 调用中对多个 DFA 模式扫描同一段 data.
 // 返回命中的 pattern idx 列表.
@@ -283,13 +282,6 @@ func (k *mvsKernel) nfaExistsAssertMany(idxs []int32, data []byte, sc *scratch) 
 	if k == nil || k.db == nil || len(idxs) == 0 {
 		return nil
 	}
-	n := len(data)
-	// 确保 boundBuf 容量 >= n+1
-	if cap(sc.assertBound) < n+1 {
-		sc.assertBound = make([]byte, n+1)
-	} else {
-		sc.assertBound = sc.assertBound[:n+1]
-	}
 	if cap(sc.assertBatchOut) < len(idxs) {
 		sc.assertBatchOut = make([]byte, len(idxs))
 	} else {
@@ -300,30 +292,18 @@ func (k *mvsKernel) nfaExistsAssertMany(idxs []int32, data []byte, sc *scratch) 
 	if len(data) > 0 {
 		dptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
 	}
-	var bptr *C.uint8_t
-	if len(sc.assertBound) > 0 {
-		bptr = (*C.uint8_t)(unsafe.Pointer(&sc.assertBound[0]))
-	}
-	// 构建 C int32 数组传 idxs (复用 scratch 缓冲, 避免热路径分配)
-	if cap(sc.anchorCIdx) < len(idxs) {
-		sc.anchorCIdx = make([]int32, len(idxs))
-	} else {
-		sc.anchorCIdx = sc.anchorCIdx[:len(idxs)]
-	}
-	copy(sc.anchorCIdx, idxs)
 	var iptr *C.int32_t
-	if len(sc.anchorCIdx) > 0 {
-		iptr = (*C.int32_t)(unsafe.Pointer(&sc.anchorCIdx[0]))
+	if len(idxs) > 0 {
+		iptr = (*C.int32_t)(unsafe.Pointer(&idxs[0]))
 	}
 	var optr *C.uint8_t
 	if len(out) > 0 {
 		optr = (*C.uint8_t)(unsafe.Pointer(&out[0]))
 	}
-	C.mvscan_db_nfa_exists_assert_many(k.db, dptr, C.size_t(len(data)),
-		iptr, C.int32_t(len(idxs)), bptr, optr)
+	C.mvscan_db_nfa_exists_assert_online_many(k.db, dptr, C.size_t(len(data)),
+		iptr, C.int32_t(len(idxs)), optr)
 	keepAlive(data)
-	runtime.KeepAlive(sc.assertBound)
-	runtime.KeepAlive(sc.anchorCIdx)
+	runtime.KeepAlive(idxs)
 	runtime.KeepAlive(out)
 	return out
 }

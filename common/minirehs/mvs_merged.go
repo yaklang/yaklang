@@ -98,6 +98,9 @@ func buildMergedNFA(members []mergeMember) *mvsMergedNFA {
 		lastAny:         bsNew(nword),
 		lastEnd:         bsNew(nword),
 		posPat:          make([]int32, npos),
+		nmem:            len(members),
+		offsets:         offsets,
+		memIdx:          make([]int, len(members)),
 	}
 	for p := range m.posPat {
 		m.posPat[p] = -1
@@ -111,6 +114,7 @@ func buildMergedNFA(members []mergeMember) *mvsMergedNFA {
 	for mi, mem := range members {
 		off := offsets[mi]
 		nf := mem.nfa
+		m.memIdx[mi] = mem.idx
 		for p := 0; p < nf.npos; p++ {
 			posClass[off+p] = nf.posRanges(p)
 			// follow 平移.

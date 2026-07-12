@@ -127,6 +127,46 @@ func TestMVSKernelCombinedAlwaysOnAssertOracle(t *testing.T) {
 	}
 }
 
+// TestMVSKernelAssertOnlineManyRandom 验证 always-on assert 的单趟融合扫描与
+// 单条 C 执行器逐位一致，覆盖 ASCII、Unicode 与非法 UTF-8 输入。
+func TestMVSKernelAssertOnlineManyRandom(t *testing.T) {
+	patterns := []Pattern{
+		{ID: 1, Expr: `\b[0-9]{2,5}\b`},
+		{ID: 2, Expr: `(?m)^[A-Z][0-9]+$`},
+		{ID: 3, Expr: `(^([a-fA-F0-9]{2}(:[a-fA-F0-9]{2}){5})|[^a-zA-Z0-9]([a-fA-F0-9]{2}(:[a-fA-F0-9]{2}){5}))`},
+	}
+	db, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false))
+	if err != nil {
+		t.Fatalf("compile: %v", err)
+	}
+	defer db.Close()
+	mdb := getMVSDB(t, db)
+	if len(mdb.assertAlwaysOnCIdxs) < 2 {
+		t.Fatalf("need multiple C assert units, got %d", len(mdb.assertAlwaysOnCIdxs))
+	}
+
+	rng := rand.New(rand.NewSource(0xa55e47))
+	sc := &scratch{}
+	for caseNo := 0; caseNo < 1200; caseNo++ {
+		data := make([]byte, 1+rng.Intn(384))
+		for i := range data {
+			if rng.Intn(3) == 0 {
+				data[i] = "abcXYZ019_: \n"[rng.Intn(len("abcXYZ019_: \n"))]
+			} else {
+				data[i] = byte(rng.Intn(256))
+			}
+		}
+		got := mdb.kernel.nfaExistsAssertMany(mdb.assertAlwaysOnCIdxs, data, sc)
+		for i, idx := range mdb.assertAlwaysOnCIdxs {
+			want := mdb.kernel.nfaExistsAssertSelf(int(idx), data, nil)
+			if (got[i] != 0) != want {
+				t.Fatalf("case=%d idx=%d data=%q fused=%v single=%v",
+					caseNo, idx, data, got[i] != 0, want)
+			}
+		}
+	}
+}
+
 // TestMVSParallelAlwaysOnEarlyStop 覆盖 Scratch 常驻 worker team 在 handler 提前停止时
 // 仍会收拢本次任务，下一次复用及 Close 不会读到陈旧结果、阻塞或泄漏活跃任务。
 func TestMVSParallelAlwaysOnEarlyStop(t *testing.T) {
@@ -746,6 +786,39 @@ func TestMVSKernelMergedSIMDScalarTwin(t *testing.T) {
 		}
 	}
 	t.Logf("merged SIMD/scalar twin: %d inputs bit-identical", len(inputs))
+}
+
+func TestMVSKernelMergedMembersRealTraffic(t *testing.T) {
+	patterns, _ := compilableMITMPatterns(t)
+	db, err := Compile(patterns, WithBackend(BackendMVS), WithReportLocation(false))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	mdb := getMVSDB(t, db)
+	if mdb.kernel == nil || mdb.merged == nil || len(mdb.merged.memIdx) == 0 {
+		t.Fatal("expected merged C kernel members")
+	}
+	for _, idx := range mdb.merged.memIdx {
+		t.Logf("merged member idx=%d rule=%d npos=%d nword=%d", idx, mdb.all[idx].id, mdb.nfas[idx].npos, mdb.nfas[idx].nword)
+	}
+	records, _ := loadCorpus(t)
+	if testing.Short() && len(records) > 200 {
+		records = records[:200]
+	}
+	mergedSc := &scratch{}
+	for ri, rec := range records {
+		merged := toIntSet(mdb.kernel.mergedScan(rec, mergedSc))
+		individual := map[int]struct{}{}
+		for _, idx := range mdb.merged.memIdx {
+			if mdb.kernel.nfaExists(idx, rec) {
+				individual[idx] = struct{}{}
+			}
+		}
+		if !sameIntSet(individual, merged) {
+			t.Fatalf("record#%d merged=%v individual=%v members=%v", ri, merged, individual, mdb.merged.memIdx)
+		}
+	}
 }
 
 // TestMVSKernelEndToEndOracle 端到端: minirehs_mvs 构建 (C 内核驱动存在性) 与 stdlib oracle
