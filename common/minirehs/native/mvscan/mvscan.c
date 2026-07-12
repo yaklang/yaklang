@@ -1813,7 +1813,7 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
         }
 
         /* ---- assert NFA 递推 (每个单字 NFA) ---- */
-        if (nAssertReal > 0 && boundBuf) {
+        if (nAssertReal > 0) {
             for (int32_t k = 0; k < nAssert; k++) {
                 if (!assertNFAs[k] || aDone[k]) continue;
                 mvs_nfa *a = assertNFAs[k];

@@ -26,10 +26,11 @@ type scratch struct {
 
 	// mvs 合并 always-on 单趟扫描的"成员级去重"缓冲 (按成员 idx 去重, 不触碰 fullDone;
 	// 跨步去重由调用方用 fullDone 完成). mergedSeen 供纯 Go 路径, cseen/cmerged 供 C 内核路径.
-	mergedSeen []bool  // 纯 Go scanExist 的成员去重位图 (长度 npat)
-	cseen      []byte  // C 合并 scan 的去重位图 (uint8, 长度 npat)
-	cmerged    []int32 // C 返回命中成员 idx 的 int32 缓冲
-	cLocs      []int32 // C 单字 NFA 定位返回的平铺 (from,to) 对，按报文复用
+	mergedSeen   []bool  // 纯 Go scanExist 的成员去重位图 (长度 npat)
+	cseen        []byte  // C 合并 scan 的去重位图 (uint8, 长度 npat)
+	cmerged      []int32 // C 返回命中成员 idx 的 int32 缓冲
+	cmergedTotal int32   // combinedScan C 输出计数，置于 scratch 避免每次取局部地址逃逸
+	cLocs        []int32 // C 单字 NFA 定位返回的平铺 (from,to) 对，按报文复用
 
 	// mvs 存在性快路径"按报文批处理 cgo"缓冲 (Phase 2): batchIdx 收集本报文触发的、可走 C 内核
 	// per-pattern 存在性的 pattern idx (去重), 一次 cgo 调用 nfaExistsMany 后, batchOut[i] 回写
@@ -104,6 +105,16 @@ type scratch struct {
 	statWindowVerify int64 // 邻域窗口验证次数
 	statFullScan     int64 // 非窗口 exact (有字面量) 命中字面量后触发的整段验证次数
 	statAlwaysScan   int64 // 无字面量 exact + regexp2-only 的逐条整段扫描次数
+
+	// always-on combined 与字面量候选验证可并行执行。内部 scratch 与结果通道
+	// 每个 Scratch 独占；每次扫描的短生命周期 goroutine 会在返回前完成，不会泄漏。
+	alwaysScratch *scratch
+	alwaysRes     chan alwaysResult
+}
+
+type alwaysResult struct {
+	merged []int
+	assert []int
 }
 
 func (s *scratch) Close() error { return nil }

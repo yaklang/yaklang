@@ -319,7 +319,7 @@ func (k *mvsKernel) nfaExistsAssertMany(idxs []int32, data []byte, sc *scratch) 
 
 // combinedScan: 单次数据遍历同时跑 merged NFA + assert NFA.
 // 返回 (mergedHits, assertHits).
-func (k *mvsKernel) combinedScan(data []byte, assertIdxs []int32, sc *scratch) ([]int, []int) {
+func (k *mvsKernel) combinedScan(data []byte, assertIdxs []int32, keepBound bool, sc *scratch) ([]int, []int) {
 	sc.mergedHits = sc.mergedHits[:0]
 	sc.assertHits = sc.assertHits[:0]
 	if k == nil || k.db == nil || len(data) == 0 {
@@ -340,11 +340,14 @@ func (k *mvsKernel) combinedScan(data []byte, assertIdxs []int32, sc *scratch) (
 	if cap(sc.cmerged) < mergedCap {
 		sc.cmerged = make([]int32, mergedCap)
 	}
-	// boundBuf
-	if cap(sc.assertBound) < n+1 {
-		sc.assertBound = make([]byte, n+1)
-	} else {
-		sc.assertBound = sc.assertBound[:n+1]
+	// 只有后续 Go 多字断言仍会消费边界数组时才物化；C 内的 single-word
+	// assert 直接使用在线生成的 bpre/bpost，无需每字节写回内存。
+	if keepBound {
+		if cap(sc.assertBound) < n+1 {
+			sc.assertBound = make([]byte, n+1)
+		} else {
+			sc.assertBound = sc.assertBound[:n+1]
+		}
 	}
 	// assertOut (复用 scratch 缓冲)
 	assertCap := len(assertIdxs)
@@ -364,7 +367,7 @@ func (k *mvsKernel) combinedScan(data []byte, assertIdxs []int32, sc *scratch) (
 		assertPtr = (*C.int32_t)(unsafe.Pointer(&assertIdxs[0]))
 	}
 
-	var mergedTotal int32
+	sc.cmergedTotal = 0
 	var dptr *C.uint8_t
 	dptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
 	var mergedSeenPtr *C.uint8_t
@@ -376,7 +379,7 @@ func (k *mvsKernel) combinedScan(data []byte, assertIdxs []int32, sc *scratch) (
 		mergedOutPtr = (*C.int32_t)(unsafe.Pointer(&sc.cmerged[0]))
 	}
 	var boundPtr *C.uint8_t
-	if len(sc.assertBound) > 0 {
+	if keepBound && len(sc.assertBound) > 0 {
 		boundPtr = (*C.uint8_t)(unsafe.Pointer(&sc.assertBound[0]))
 	}
 	var assertOutPtr *C.int32_t
@@ -387,7 +390,7 @@ func (k *mvsKernel) combinedScan(data []byte, assertIdxs []int32, sc *scratch) (
 	assertTotal := int32(C.mvscan_db_combined_scan(k.db, dptr, C.size_t(len(data)),
 		mergedSeenPtr, C.int32_t(k.npat),
 		mergedOutPtr, C.int32_t(mergedCap),
-		(*C.int32_t)(unsafe.Pointer(&mergedTotal)),
+		(*C.int32_t)(unsafe.Pointer(&sc.cmergedTotal)),
 		assertPtr, C.int32_t(len(assertIdxs)),
 		boundPtr,
 		assertOutPtr, C.int32_t(assertCap)))
@@ -399,7 +402,7 @@ func (k *mvsKernel) combinedScan(data []byte, assertIdxs []int32, sc *scratch) (
 	runtime.KeepAlive(assertIdxs)
 	runtime.KeepAlive(assertOutBuf)
 
-	for i := int32(0); i < mergedTotal && i < int32(mergedCap); i++ {
+	for i := int32(0); i < sc.cmergedTotal && i < int32(mergedCap); i++ {
 		sc.mergedHits = append(sc.mergedHits, int(sc.cmerged[i]))
 	}
 	for i := int32(0); i < assertTotal && i < int32(assertCap); i++ {
