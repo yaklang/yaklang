@@ -409,3 +409,52 @@ func TestConvertChatDetailsToResponsesInput(t *testing.T) {
 	assert.Equal(t, "input_text", c2[0]["type"])
 	assert.Equal(t, "12345", c2[0]["text"])
 }
+
+// TestNormalizeResponsesInput 确保 normalizeResponsesInput 把字符串/nil/数组
+// 全部规范化成 []map[string]any 格式，防止上游 response-only 网关（如 packyapi）
+// 拒绝字符串 input 报 "Input must be a list"。
+// 关键词: normalizeResponsesInput, input 字符串兜底, packyapi
+func TestNormalizeResponsesInput(t *testing.T) {
+	t.Run("string input wrapped into array", func(t *testing.T) {
+		result := normalizeResponsesInput("hello world")
+		arr, ok := result.([]map[string]any)
+		require.True(t, ok, "string input must be normalized to []map[string]any")
+		require.Len(t, arr, 1)
+		assert.Equal(t, "user", arr[0]["role"])
+		content := arr[0]["content"].([]map[string]any)
+		require.Len(t, content, 1)
+		assert.Equal(t, "input_text", content[0]["type"])
+		assert.Equal(t, "hello world", content[0]["text"])
+	})
+
+	t.Run("nil input produces default array", func(t *testing.T) {
+		result := normalizeResponsesInput(nil)
+		arr, ok := result.([]map[string]any)
+		require.True(t, ok, "nil input must be normalized to []map[string]any")
+		require.Len(t, arr, 1)
+	})
+
+	t.Run("existing []map[string]any passthrough", func(t *testing.T) {
+		original := []map[string]any{
+			{"role": "user", "content": []map[string]any{{"type": "input_text", "text": "hi"}}},
+		}
+		result := normalizeResponsesInput(original)
+		assert.Equal(t, original, result, "[]map[string]any should pass through unchanged")
+	})
+
+	t.Run("existing []any passthrough", func(t *testing.T) {
+		original := []any{
+			map[string]any{"role": "user", "content": "text"},
+		}
+		result := normalizeResponsesInput(original)
+		assert.Equal(t, original, result, "[]any should pass through unchanged")
+	})
+
+	t.Run("empty string produces default array", func(t *testing.T) {
+		result := normalizeResponsesInput("")
+		arr, ok := result.([]map[string]any)
+		require.True(t, ok)
+		require.Len(t, arr, 1)
+		assert.Equal(t, "user", arr[0]["role"])
+	})
+}

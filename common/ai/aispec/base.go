@@ -885,6 +885,12 @@ func chatBaseResponses(url string, model string, msg string, ctx *ChatBaseContex
 	} else {
 		input = buildResponsesInput(msg, ctx.ImageUrls)
 	}
+	// 防御性规范化：部分 response-only 上游（如 packyapi）严格要求 input 为
+	// JSON 数组，拒绝字符串简写。当 input 因 ExtraBody 覆盖、调用链透传等
+	// 边缘路径落入字符串时，这里兜底包装成标准的 [{role,content}] 数组，
+	// 避免 "Input must be a list" 报错。
+	// 关键词: normalizeResponsesInput, input 必须为数组, packyapi 兼容
+	input = normalizeResponsesInput(input)
 	req := map[string]any{
 		"model":  model,
 		"input":  input,
@@ -1102,6 +1108,28 @@ func buildResponsesInput(msg string, images []*ImageDescription) []map[string]an
 			"role":    "user",
 			"content": content,
 		},
+	}
+}
+
+// normalizeResponsesInput 确保 input 始终为 JSON 数组格式。
+// OpenAI Responses API 同时接受字符串和数组，但部分上游网关（如 packyapi）
+// 严格要求 input 为数组，否则返回 "Input must be a list"。
+// 当 input 已经是切片类型时直接返回；当 input 为字符串时包装成
+// [{role:"user", content:[{type:"input_text", text:...}]}] 标准格式。
+// 关键词: normalizeResponsesInput, input 字符串转数组, packyapi 兼容
+func normalizeResponsesInput(input any) any {
+	if input == nil {
+		return buildResponsesInput("", nil)
+	}
+	switch v := input.(type) {
+	case []map[string]any:
+		return v
+	case []any:
+		return v
+	case string:
+		return buildResponsesInput(v, nil)
+	default:
+		return input
 	}
 }
 
