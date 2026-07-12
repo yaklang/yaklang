@@ -22,6 +22,8 @@ func (k *mvsKernel) close() {}
 
 func (k *mvsKernel) nfaExists(idx int, data []byte) bool { return false }
 
+func (k *mvsKernel) nfaExistsAssertOnline(idx int, data []byte) bool { return false }
+
 func (k *mvsKernel) nfaExistsAnchored(idx int, data []byte, spans []anchorSpan) bool { return false }
 
 func (k *mvsKernel) nfaExistsAnchoredMany(idxs []int32, data []byte, patSpanOff []int32, spansLo, spansHi []int32, sc *scratch) []byte {

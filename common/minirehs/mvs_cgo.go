@@ -234,6 +234,17 @@ func (k *mvsKernel) nfaExistsAssertSelf(idx int, data []byte, boundBuf []byte) b
 	return r == 1
 }
 
+// nfaExistsAssertOnline 把多字断言的边界生成与 NFA 递推融合为单次 C 遍历。
+func (k *mvsKernel) nfaExistsAssertOnline(idx int, data []byte) bool {
+	if k == nil || k.db == nil || len(data) == 0 {
+		return false
+	}
+	dptr := (*C.uint8_t)(unsafe.Pointer(&data[0]))
+	r := C.mvscan_db_nfa_exists_assert_online(k.db, C.int32_t(idx), dptr, C.size_t(len(data)))
+	keepAlive(data)
+	return r == 1
+}
+
 // nfaExistsAssertMany 一次 cgo 对多条断言 always-on NFA 做断言存在性扫描,
 // 内部在 C 预算边界 (每报文一次, 跨多条 NFA 共享). 省去每条 NFA 一次 cgo.
 // idxs 为断言 always-on pattern 下标. boundBuf 容量须 >= len(data)+1.

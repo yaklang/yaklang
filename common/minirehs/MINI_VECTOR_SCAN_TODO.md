@@ -58,6 +58,10 @@
 > 33.50-33.80 再增 **5.7-12.9%**，
 > allocs 约 **7700→5426/op(-29.5%)**。50 MB/s 尚未达到；继续提升需把 literal hit mapping +
 > gated/anchored 注入整体融合到 native 单次调用，或引入跨记录 `BatchScan`，局部调度优化已实测出尽。
+> **2026-07-12 在线多字断言阶段(FULL_CORPUS, 20x×5)**:新增 C `nfa_run_assert_mw_online`，
+> 用 rune lookahead 在线产生 bpre/bpost，并以 LimEx shift + 稀疏异常边同步推进多字断言，消除
+> localized gate 的 boundary 数组物化和第二次数据遍历。1200 组随机多字断言 C/Go/stdlib 三方全等，
+> 完整 1332 oracle 全绿；热态提升到 **37.90-38.54 MB/s**，内存约 **139KB→132KB/op**。
 > **当前性能(实测,vs Go RE2 逐条 0.18 MB/s 基线)**:存在性 **~63x**(全规则)/**~107x**(纯 RE2 子集)、定位 **~25x**;
 > **纯 RE2 子集 ~107x! 累计从 84x 提升到 107x (+27%).** 详见第 4' 节倍数评估与路线。
 > **剩余瓶颈(本会话剖析, 干净小改已出尽)**:① `runtime.cgocall` 28%(合并 always-on 整段扫 5.25MB + 不可
