@@ -530,10 +530,13 @@ func TestReActLoop_SkillsContext_VisibleInAllSubsequentCallbacks(t *testing.T) {
 				return makeLoadSkillResponse(i, "recon")
 			}
 
-			// After skill is loaded, every main prompt must contain SKILLS_CONTEXT
+			// After skill is loaded, every main prompt must contain the skill section.
+			// 改造后: AI 自主加载走 LoadAutoSkill, 渲染进 AUTO_LOADED_SKILLS 段
+			// (而非 SKILLS_CONTEXT). 用 tag-agnostic 判断: 只要含 skill 段标签
+			// (SKILLS_CONTEXT 或 AUTO_LOADED_SKILLS) 即视为可见.
 			if skillLoaded {
 				postLoadPrompts = append(postLoadPrompts, prompt)
-				if strings.Contains(prompt, "SKILLS_CONTEXT") {
+				if strings.Contains(prompt, "SKILLS_CONTEXT") || strings.Contains(prompt, "AUTO_LOADED_SKILLS") {
 					mainCallsWithSkillsContext++
 				}
 				if strings.Contains(prompt, "=== Skill: recon ===") {
@@ -565,9 +568,9 @@ func TestReActLoop_SkillsContext_VisibleInAllSubsequentCallbacks(t *testing.T) {
 		t.Fatal("expected at least 1 main prompt after skill loading, got 0")
 	}
 
-	// ALL post-load main prompts must contain SKILLS_CONTEXT
+	// ALL post-load main prompts must contain the skill section (SKILLS_CONTEXT or AUTO_LOADED_SKILLS)
 	if mainCallsWithSkillsContext != len(postLoadPrompts) {
-		t.Errorf("SKILLS_CONTEXT should appear in ALL %d post-load main prompts, but only appeared in %d",
+		t.Errorf("skill section (SKILLS_CONTEXT/AUTO_LOADED_SKILLS) should appear in ALL %d post-load main prompts, but only appeared in %d",
 			len(postLoadPrompts), mainCallsWithSkillsContext)
 	}
 
@@ -577,7 +580,7 @@ func TestReActLoop_SkillsContext_VisibleInAllSubsequentCallbacks(t *testing.T) {
 			len(postLoadPrompts), mainCallsWithSkillHeader)
 	}
 
-	t.Logf("Visibility test passed: %d total main calls, %d post-load prompts, all contain SKILLS_CONTEXT",
+	t.Logf("Visibility test passed: %d total main calls, %d post-load prompts, all contain skill section",
 		totalMainCalls, len(postLoadPrompts))
 }
 
