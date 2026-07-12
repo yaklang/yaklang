@@ -193,17 +193,19 @@ LOOP:
 	require.Contains(t, contentStr, "## Basic Info")
 	require.Contains(t, contentStr, "## Parameters")
 	require.Contains(t, contentStr, "## Execution Result")
-	require.Contains(t, contentStr, "## STDOUT")
-	require.Contains(t, contentStr, "## STDERR")
+	// STDOUT/STDERR 已合并为单个 OUTPUT 段
+	require.Contains(t, contentStr, "## OUTPUT")
+	require.NotContains(t, contentStr, "## STDOUT")
+	require.NotContains(t, contentStr, "## STDERR")
 
 	// 验证参数内容 (YAML 格式)
 	require.Contains(t, contentStr, "message")
 	require.Contains(t, contentStr, "output_lines")
 
-	// 验证 stdout 内容
+	// 验证 stdout 内容(已合入 OUTPUT)
 	require.Contains(t, contentStr, "stdout line")
 
-	// 验证 stderr 内容
+	// 验证 stderr 内容(已合入 OUTPUT)
 	require.Contains(t, contentStr, "stderr")
 
 	// 验证 result 内容
@@ -540,10 +542,11 @@ LOOP:
 	require.NoError(t, err)
 	contentStr := string(reportContent)
 
-	// 验证 STDOUT 和 STDERR 部分标记为 (empty)
-	// 在 markdown 中，空的 stdout/stderr 显示为 "(empty)"
-	require.Contains(t, contentStr, "## STDOUT")
-	require.Contains(t, contentStr, "## STDERR")
+	// 验证合并后的 OUTPUT 部分标记为 (empty)
+	// STDOUT/STDERR 已合并为单个 OUTPUT 段，空输出显示为 "(empty)"
+	require.Contains(t, contentStr, "## OUTPUT")
+	require.NotContains(t, contentStr, "## STDOUT")
+	require.NotContains(t, contentStr, "## STDERR")
 
 	// 验证仍然包含参数和结果
 	require.Contains(t, contentStr, "## Parameters")

@@ -1424,8 +1424,10 @@ func extractResultHumanReadable(toolResult *aitool.ToolResult, emitter *Emitter)
 		toolExecutionResult, ok := toolResult.Data.(*aitool.ToolExecutionResult)
 		if ok && toolExecutionResult.Result != nil {
 			resultStr := utils.InterfaceToString(toolExecutionResult.Result)
-			// Check if result contains a file path (from handleLargeContent / buildSpillMarker)
-			filePathRegex := regexp.MustCompile(`saved to: ([^\s\n]+)`)
+			// Check if result contains a file path (from handleLargeContent / buildSpillMarker).
+			// buildSpillMarker 格式为 "... saved to: <path>) ..."; 路径后紧跟 ")",
+			// 因此字符类必须排除 ")" 以免把括号捕获进路径导致 ReadFile 失败.
+			filePathRegex := regexp.MustCompile(`saved to: ([^()\s\n]+)`)
 			matches := filePathRegex.FindStringSubmatch(resultStr)
 			if len(matches) > 1 {
 				filePath := matches[1]
