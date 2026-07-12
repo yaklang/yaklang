@@ -330,7 +330,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 		),
 		aitool.WithStringParam(
 			"directly_call_reason",
-			aitool.WithParam_Description(`Optional. A human-readable sentence describing WHY this specific tool call is needed AT THIS POINT in the task. Reference the specific finding, prior tool result, or task step that motivates this call — e.g. 'vendor/login returned 302 with session token, now testing id param for IDOR'. Avoid generic descriptions like 'send HTTP request' or 'execute test'. Omit only when human_readable_thought already states the reason. Shown to the user on the tool-call card.`),
+			aitool.WithParam_Description(`Optional. A terse phrase (under 15 words) stating WHAT this tool call does — e.g. 'test id param for IDOR on /api/user' or '用union注入探测字段数'. No prior-step summaries or transitions. Omit only when human_readable_thought already states the reason. Shown to the user on the tool-call card.`),
 		),
 	},
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {

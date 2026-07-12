@@ -315,8 +315,8 @@ func (t *ToolCaller) generateReasonByLiteForge(ctx context.Context, tool *aitool
 		ctx, "tool-call-reason", prompt,
 		[]aitool.ToolOption{
 			aitool.WithStringParam("reason",
-				aitool.WithParam_Description("A concise sentence (15-40 words, <50) describing WHY this specific tool call is needed at this point, referencing prior findings or task progress. Match the language of the user input."),
-				aitool.WithParam_MaxLength(80),
+				aitool.WithParam_Description("A terse phrase (under 15 words) stating WHAT this tool call does right now. No transitions or prior-step summaries. Match the language of the user input."),
+				aitool.WithParam_MaxLength(30),
 				aitool.WithParam_Required(true)),
 		},
 	)
@@ -334,10 +334,10 @@ func (t *ToolCaller) generateReasonByLiteForge(ctx context.Context, tool *aitool
 // specific progress that motivates this call.
 func buildToolCallReasonPrompt(tool *aitool.Tool, params aitool.InvokeParams, task AITask) string {
 	var sb strings.Builder
-	sb.WriteString("Generate a concise reason (15-40 words, keep it under 50) describing WHY this specific tool call is needed AT THIS POINT in the task. " +
-		"Reference the specific finding, prior result, or task step that motivates this call. " +
-		"Avoid generic descriptions like 'test the target' or 'scan for vulnerabilities'; " +
-		"prefer specifics like 'login page returned 200 with session cookie, testing SQLi on username param'.\n")
+	sb.WriteString("Generate a terse reason (under 15 words) stating WHAT this tool call does right now. " +
+		"Focus on the concrete current action, not on prior steps or transitions. " +
+		"Bad: '端口扫描完成，接下来需要执行简单爬虫收集页面' / 'previous scan found open ports, now crawling'. " +
+		"Good: '爬取目标站点页面与API端点' / 'crawl site pages and API endpoints'.\n")
 	sb.WriteString(fmt.Sprintf("Tool: %s\n", tool.Name))
 	if desc := strings.TrimSpace(tool.Description); desc != "" {
 		sb.WriteString(fmt.Sprintf("Tool description: %s\n", desc))
