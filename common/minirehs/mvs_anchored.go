@@ -156,6 +156,9 @@ func (nfa *mvsNFA) existsInAnchored(data []byte, spans []anchorSpan, prev, cand,
 		if !hasActive && si < len(spans) && int(spans[si].lo) > runeStart+gapJumpMin {
 			jump := alignRuneStart(data, int(spans[si].lo))
 			if jump > i {
+				for w := 0; w < nword; w++ {
+					prev[w] = 0
+				}
 				i = jump
 				continue
 			}
@@ -232,6 +235,7 @@ func (nfa *mvsNFA) existsInAnchored2(data []byte, spans []anchorSpan) bool {
 		if !hasActive && si < len(spans) && curLo > runeStart+gapJumpMin {
 			jump := alignRuneStart(data, curLo)
 			if jump > i {
+				prev0, prev1 = 0, 0
 				i = jump
 				continue
 			}
@@ -318,6 +322,7 @@ func (nfa *mvsNFA) existsInAnchored1(data []byte, spans []anchorSpan) bool {
 		if !hasActive && si < nspan && curLo > runeStart+gapJumpMin {
 			jump := alignRuneStart(data, curLo)
 			if jump > i {
+				prev = 0
 				i = jump
 				continue
 			}
@@ -526,6 +531,7 @@ func (nfa *mvsNFA) existsInAssertAnchored1(data []byte, bound []uint8, spans []a
 		if !hasActive && si < nspan && curLo > runeStart+gapJumpMin {
 			jump := alignRuneStart(data, curLo)
 			if jump > i {
+				prev = 0
 				i = jump
 				continue
 			}

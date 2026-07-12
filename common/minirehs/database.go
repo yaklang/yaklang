@@ -3,6 +3,7 @@ package minirehs
 import (
 	"regexp"
 	"regexp/syntax"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/utils"
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
@@ -112,9 +113,84 @@ type scratch struct {
 	alwaysAssertScratch *scratch
 	alwaysMergedRes     chan []int
 	alwaysAssertRes     chan []byte
+
+	// RE2-only 存在性模式下，把字面量命中循环中的 gated/assert 立即验证移出调用线程，
+	// 与窗口及 anchored 阶段重叠；worker 使用独占 Scratch，handler 仍只在调用线程执行。
+	gateTasks        []gateTask
+	gateAsyncScratch *scratch
+	gateAsyncOut     []byte
+	gateAsyncRes     chan []byte
+
+	anchoredAsyncScratch *scratch
+	anchoredAnchorOut    []byte
+	anchoredBiOut        []byte
+	anchoredAsyncRes     chan anchoredResult
+
+	workerOnce      sync.Once
+	workerCloseOnce sync.Once
+	workerWG        sync.WaitGroup
+	mergedTasks     chan alwaysMergedTask
+	assertTasks     chan alwaysAssertTask
+	gatedTasks      chan gatedWorkerTask
+	anchoredTasks   chan anchoredWorkerTask
 }
 
-func (s *scratch) Close() error { return nil }
+type gateTask struct {
+	idx   int32
+	winLo int32 // >=0: verifyGateLocalized；-1: verifyOne 等价存在性判定
+}
+
+type anchoredResult struct {
+	anchor []byte
+	bi     []byte
+}
+
+type alwaysMergedTask struct {
+	kernel  *mvsKernel
+	data    []byte
+	scratch *scratch
+	result  chan<- []int
+}
+
+type alwaysAssertTask struct {
+	kernel  *mvsKernel
+	data    []byte
+	idxs    []int32
+	scratch *scratch
+	result  chan<- []byte
+}
+
+type gatedWorkerTask struct {
+	db      *mvsDB
+	data    []byte
+	tasks   []gateTask
+	scratch *scratch
+	out     []byte
+	result  chan<- []byte
+}
+
+type anchoredWorkerTask struct {
+	db                   *mvsDB
+	data                 []byte
+	anchorBatch, biBatch []int32
+	owner, scratch       *scratch
+	anchorOut, biOut     []byte
+	result               chan<- anchoredResult
+}
+
+func (s *scratch) Close() error {
+	s.workerCloseOnce.Do(func() {
+		if s.mergedTasks == nil {
+			return
+		}
+		close(s.mergedTasks)
+		close(s.assertTasks)
+		close(s.gatedTasks)
+		close(s.anchoredTasks)
+		s.workerWG.Wait()
+	})
+	return nil
+}
 
 // Database 是编译产物, 不可变、并发安全 (只读), 可被多 goroutine 共享.
 type Database interface {

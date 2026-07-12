@@ -49,6 +49,15 @@
 > 从融合 worker 拆为两个独立 C worker，与 Go 字面量/锚定候选形成三路并行。吞吐进一步到
 > **33.50-33.80 MB/s**，较 32.45-32.60 MB/s 长跑对照再增 **2.8-4.2%**；单核仍自动使用
 > 已验证的融合串行路径。
+> **2026-07-12 常驻流水重构(FULL_CORPUS, 20x×5)**:修复 forward/reverse gap-jump 跨稀疏 span
+> 时未清空 `prev` 的陈旧状态假阳（真实规则 64 / record#395 复现），真实字面量 spans 的 C/Go
+> **11931 组差分全等**；C anchored 修复后直接作为权威结果，移除重复 Go 复核。存在性路径把
+> always merged/assert、gated/assert、forward+reverse anchored 固定到每 Scratch 的 4 槽常驻 worker team，
+> `Scratch.Close` 负责收拢，handler 仍仅在调用线程执行；AC 预过滤改为无回调直写命中缓冲。
+> `MVS_Exist_RE2only` 热态长跑 **35.73-37.84 MB/s**（冷态最佳组 38.68-38.84），较
+> 33.50-33.80 再增 **5.7-12.9%**，
+> allocs 约 **7700→5426/op(-29.5%)**。50 MB/s 尚未达到；继续提升需把 literal hit mapping +
+> gated/anchored 注入整体融合到 native 单次调用，或引入跨记录 `BatchScan`，局部调度优化已实测出尽。
 > **当前性能(实测,vs Go RE2 逐条 0.18 MB/s 基线)**:存在性 **~63x**(全规则)/**~107x**(纯 RE2 子集)、定位 **~25x**;
 > **纯 RE2 子集 ~107x! 累计从 84x 提升到 107x (+27%).** 详见第 4' 节倍数评估与路线。
 > **剩余瓶颈(本会话剖析, 干净小改已出尽)**:① `runtime.cgocall` 28%(合并 always-on 整段扫 5.25MB + 不可
