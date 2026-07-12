@@ -205,6 +205,15 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
                                 int32_t *assertOut, int32_t assertCap);
 
 /*
+ * mvscan_db_nfa_exists_assert_online_many 单趟在线计算 rune 边界并并行推进
+ * 多条单字 LimEx 断言 NFA. out[i] 写入对应 idxs[i] 的存在性结果.
+ */
+void mvscan_db_nfa_exists_assert_online_many(const mvscan_db *db,
+                                             const uint8_t *data, size_t len,
+                                             const int32_t *idxs, int32_t nidx,
+                                             uint8_t *out);
+
+/*
  * mvscan_db_nfa_exists_assert_many 一次 cgo 对多条断言 always-on NFA 各自做断言存在性,
  * 内部预算边界 (每报文一次, 跨多条 NFA 共享), 摊薄跨界开销.
  * boundBuf 容量须 >= len+1. out[i] 写入命中结果 (1 命中 / 0 不命中或无 C 断言 NFA).

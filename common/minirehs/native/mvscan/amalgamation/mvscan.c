@@ -2434,6 +2434,123 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
     return assertTotal;
 }
 
+/* 单趟推进多条 always-on assert NFA. 常见的单字 LimEx 单元共享 rune 解码与
+ * 边界计算；其余形态走单条正确性回退，不让快路径收窄公共 API 语义. */
+void mvscan_db_nfa_exists_assert_online_many(const mvscan_db *db,
+                                             const uint8_t *data, size_t len,
+                                             const int32_t *idxs, int32_t nidx,
+                                             uint8_t *out) {
+    if (!out || nidx <= 0) return;
+    memset(out, 0, (size_t)nidx);
+    if (!db || !data || len == 0 || !idxs) return;
+
+    mvs_nfa *stackNFAs[16];
+    uint64_t stackPrev[16];
+    mvs_nfa **nfas = stackNFAs;
+    uint64_t *prev = stackPrev;
+    if (nidx > 16) {
+        nfas = (mvs_nfa **)malloc((size_t)nidx * sizeof(*nfas));
+        prev = (uint64_t *)malloc((size_t)nidx * sizeof(*prev));
+        if (!nfas || !prev) {
+            free(nfas);
+            free(prev);
+            return;
+        }
+    }
+    memset(nfas, 0, (size_t)nidx * sizeof(*nfas));
+    memset(prev, 0, (size_t)nidx * sizeof(*prev));
+
+    int32_t activeCount = 0;
+    int needBoundFallback = 0;
+    for (int32_t k = 0; k < nidx; k++) {
+        int32_t idx = idxs[k];
+        if (idx < 0 || idx >= db->npat) continue;
+        int32_t u = db->slotUnit[idx];
+        if (u < 0 || u >= db->nUnits) continue;
+        mvs_nfa *a = &db->units[u];
+        if (!a->hasAssert) continue;
+        if (a->nword == 1 && a->hasLimEx) {
+            nfas[k] = a;
+            activeCount++;
+        } else if (a->nword > 1) {
+            out[k] = (uint8_t)(nfa_run_assert_mw_online(a, data, len) == 1);
+        } else {
+            needBoundFallback = 1;
+        }
+    }
+
+    if (needBoundFallback) {
+        uint8_t *bound = (uint8_t *)malloc(len + 1);
+        if (bound) {
+            mvscan_compute_boundaries(data, len, bound);
+            for (int32_t k = 0; k < nidx; k++) {
+                int32_t idx = idxs[k];
+                if (idx < 0 || idx >= db->npat) continue;
+                int32_t u = db->slotUnit[idx];
+                if (u < 0 || u >= db->nUnits) continue;
+                mvs_nfa *a = &db->units[u];
+                if (a->hasAssert && a->nword == 1 && !a->hasLimEx)
+                    out[k] = (uint8_t)(nfa_run_assert_1(a, data, len, bound) == 1);
+            }
+            free(bound);
+        }
+    }
+
+    if (activeCount > 0) {
+        size_t i = 0;
+        int32_t curRune;
+        int curSize = mvs_decode_rune(data, len, &curRune);
+        uint8_t bpre = mvs_boundary_conds(-1, curRune);
+        while (i < len && activeCount > 0) {
+            size_t ni = i + (size_t)curSize;
+            int32_t nextRune = -1;
+            int nextSize = 0;
+            if (ni < len) nextSize = mvs_decode_rune(data + ni, len - ni, &nextRune);
+            uint8_t bpost = mvs_boundary_conds(curRune, nextRune);
+
+            for (int32_t k = 0; k < nidx; k++) {
+                mvs_nfa *a = nfas[k];
+                if (!a) continue;
+                int sym = curRune >= 0 && curRune < 0x80 ?
+                    (int)a->asciiSym[curRune] : symbol_of(a, curRune);
+                uint64_t old = prev[k];
+                uint64_t cand = a->firstUnanchored[0] |
+                    ((old << 1) & a->chainTarget1) |
+                    a->condFirstEval[bpre & 63u];
+                uint64_t exc = old & a->excMask1;
+                while (exc) {
+                    int p = mvs_ctz64(exc);
+                    exc &= exc - 1;
+                    cand |= a->excFollow1Flat[p];
+                }
+                uint64_t cfm = old & a->condFollowMask1;
+                while (cfm) {
+                    int p = mvs_ctz64(cfm);
+                    cfm &= cfm - 1;
+                    cand |= a->condFollowEval[(size_t)(bpre & 63u) * a->npos + p];
+                }
+                uint64_t now = cand & a->reach[(size_t)sym];
+                if ((now & a->lastAny[0]) || (now & a->condAcceptEval[bpost & 63u])) {
+                    out[k] = 1;
+                    nfas[k] = NULL;
+                    activeCount--;
+                } else {
+                    prev[k] = now;
+                }
+            }
+            i = ni;
+            curRune = nextRune;
+            curSize = nextSize;
+            bpre = bpost;
+        }
+    }
+
+    if (nidx > 16) {
+        free(nfas);
+        free(prev);
+    }
+}
+
 /* mvscan_db_dfa_scan_batch: 在单次调用中对多个 DFA 模式扫描同一段 data.
  * 对每个 idx 逐个跑 dfa_run, 把命中的 idx 写入 out. 返回命中数.
  * 非 ASCII 输入时 DFA 回退 NFA (逐个 idx). 一次 cgo 调用完成所有 DFA 模式. */
