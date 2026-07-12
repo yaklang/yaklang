@@ -68,13 +68,14 @@ func TestAutoSkillLoader_Integration_WithContextManager(t *testing.T) {
 		t.Fatal("manager should detect skills from AutoSkillLoader")
 	}
 
-	// Render available skills list
+	// Render catalog (default hidden; surface it like intent recognition does).
+	mgr.SetCatalogSkills(loader.AllSkillMetas())
 	rendered := mgr.Render("autoload_nonce")
 	if !strings.Contains(rendered, "deploy-app") {
-		t.Fatal("render should list deploy-app")
+		t.Fatal("render should list deploy-app in catalog")
 	}
 	if !strings.Contains(rendered, "vuln-scan") {
-		t.Fatal("render should list vuln-scan")
+		t.Fatal("render should list vuln-scan in catalog")
 	}
 
 	// Load a skill
@@ -188,8 +189,23 @@ func TestAutoSkillLoader_Integration_DBAndContextManager(t *testing.T) {
 	if !mgr.HasRegisteredSkills() {
 		t.Fatal("manager should have skills")
 	}
-	if rendered := mgr.Render("db_lazy_nonce"); !strings.Contains(rendered, "database-backed skills") {
-		t.Fatalf("expected render to expose database-backed skill stats, got: %s", rendered)
+	// 改造后: 目录默认隐藏, 数据库来源 skill 是 lazy 的 (不在 AllSkillMetas).
+	// 数据库 skill 通过搜索 (BM25) 访问, 验证可检索即可.
+	results, err := mgr.SearchKeywordBM25("deploy", 5)
+	if err != nil {
+		t.Fatalf("SearchKeywordBM25 failed: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("expected to find deploy-app via BM25 search on database-backed skills")
+	}
+	found := false
+	for _, m := range results {
+		if m != nil && m.Name == "deploy-app" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("BM25 search should find deploy-app, got: %v", results)
 	}
 
 	_ = mgr.LoadSkill("deploy-app")

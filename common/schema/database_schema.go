@@ -71,6 +71,11 @@ var ProfileTables = []interface{}{
 	&AIYakTool{},
 	&AISkill{}, // AI Skills for aiskillloader BM25 search
 
+	// UserAIStats: per-entity 命中计数 + per-user/day 汇总, 用户级反馈统计.
+	// 关键词: UserAIStats, ProfileTables 注册, 命中反馈
+	&AIStatsEntityHit{},
+	&AIUserDailyStats{},
+
 	&Snippets{}, // Snippets
 	// SSA Projects Config Info
 	&SSAProject{},

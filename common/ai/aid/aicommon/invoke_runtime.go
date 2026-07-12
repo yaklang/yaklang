@@ -245,6 +245,22 @@ type LoopPromptAssemblyInput struct {
 	// FrozenPartitions 是业务侧提供的通用 frozen-block 分区。共享模板只识别
 	// FrozenBlockPartition，不直接依赖 planAndExec / FACTS / DOCUMENT 等业务类型。
 	FrozenPartitions []FrozenBlockPartition
+
+	// ForcedSkills 是「用户强制加载」SKILL 的满内容渲染 (含 USER_FORCED_SKILL 边界).
+	// 物理位置: frozen_block 顶部 (比 SKILLS_CONTEXT 目录层级还高), 最高优先级.
+	// 用户主动加载是偶发行为, 加载后整段字节稳定, 利于 frozen_block 缓存; 热加载时
+	// 接受重缓存. 空字符串时 frozen_block 顶部子块自动跳过.
+	//
+	// 关键词: ForcedSkills, 用户强制加载, frozen_block 顶部, 最高优先级
+	ForcedSkills string
+
+	// AutoLoadedSkills 是「AI 意图驱动加载」SKILL 的渲染 (含 AUTO_LOADED_SKILLS 边界).
+	// 物理位置: semi_dynamic_2 尾部 (TaskInstruction/Schema/OutputExample 之后).
+	// 关键缓存点: semi2 前缀字节不变 → AI_CACHE_SEMI2 前缀缓存命中, 仅尾部变化.
+	// 空字符串时 semi_dynamic_2 尾部子块自动跳过.
+	//
+	// 关键词: AutoLoadedSkills, AI 意图驱动, semi_dynamic_2 尾部, LRU 折叠
+	AutoLoadedSkills string
 }
 
 type LoopPromptAssemblyResult struct {

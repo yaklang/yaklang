@@ -224,10 +224,16 @@ func (r *ReActLoop) generateLoopPrompt(
 		}
 	}
 
-	// Render skills context if the manager is available
+	// Render skills context if the manager is available.
+	// 三态分离: SkillsContext (SemiDynamic 1, 含 catalog) + ForcedSkills (frozen_block
+	// 顶部) + AutoLoadedSkills (SemiDynamic 2 尾部).
 	var skillsContext string
+	var forcedSkillsBlock string
+	var autoSkillsBlock string
 	if r.skillsContextManager != nil {
 		skillsContext = r.skillsContextManager.RenderStable()
+		forcedSkillsBlock = r.skillsContextManager.RenderForcedSkills()
+		autoSkillsBlock = r.skillsContextManager.RenderAutoLoadedSkills()
 	}
 
 	// Render extra capabilities discovered via intent recognition
@@ -295,6 +301,8 @@ func (r *ReActLoop) generateLoopPrompt(
 		OutputExample:     outputExample,
 		Schema:            schema,
 		SkillsContext:     skillsContext,
+		ForcedSkills:      forcedSkillsBlock,
+		AutoLoadedSkills:  autoSkillsBlock,
 		ExtraCapabilities: extraCapabilities,
 		TodoSnapshot:      todoSnapshot,
 		ReactiveData:      reactiveData,

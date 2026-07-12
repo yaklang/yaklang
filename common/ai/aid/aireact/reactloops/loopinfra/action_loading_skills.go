@@ -127,13 +127,16 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 		}
 
 		// Check if the skill is already loaded and unfolded — no need to load again.
+		// 改造后: AI 自主加载走 LoadAutoSkill (进 SemiDynamic 2), 这里查 auto-loaded 状态.
+		// forced skill 也算「已加载且满可见」(IsAutoSkillLoadedAndUnfolded 内部含 forced 检查),
+		// 直接短路, 避免重复加载.
 		// Do NOT return error — set a flag for ActionHandler to silently skip.
-		if mgr.IsSkillLoadedAndUnfolded(skillName) {
+		if mgr.IsAutoSkillLoadedAndUnfolded(skillName) {
 			viewSummary := mgr.GetSkillViewSummary(skillName)
 			alreadyLoadedMsg := fmt.Sprintf(
 				"IMPORTANT: Skill '%s' is ALREADY loaded and visible in your context. "+
 					"Do NOT load it again. The skill content is already displayed in the "+
-					"SKILLS_CONTEXT section of your prompt (look for '<|SKILLS_CONTEXT_' tags). "+
+					"SKILLS_CONTEXT / AUTO_LOADED_SKILLS / USER_FORCED_SKILL section of your prompt. "+
 					"Read the View Window content that is already available to you. %s",
 				skillName, viewSummary,
 			)
@@ -163,15 +166,30 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 			loop.Set("_batch_skill_names", "")
 
 			names := strings.Split(batchNames, ",")
-			results := mgr.LoadSkills(names)
-
 			var loaded, skipped, failed []string
-			for name, err := range results {
+			// 批量自动加载 (AI 意图驱动 → SemiDynamic 2). 已 forced/auto 的会短路.
+			results := make(map[string]error, len(names))
+			loadedSet := make(map[string]bool, len(names))
+			var loadedCfg *aicommon.Config
+			if cfg, ok := invoker.GetConfig().(*aicommon.Config); ok {
+				loadedCfg = cfg
+			}
+			for _, raw := range names {
+				name := strings.TrimSpace(raw)
+				if name == "" {
+					continue
+				}
+				added, err := mgr.LoadAutoSkill(name)
+				results[name] = err
 				if err != nil {
 					failed = append(failed, fmt.Sprintf("%s(%v)", name, err))
 					log.Warnf("batch load skill %q failed: %v", name, err)
-				} else {
-					loaded = append(loaded, name)
+					continue
+				}
+				loaded = append(loaded, name)
+				loadedSet[name] = true
+				if added && loadedCfg != nil {
+					aicommon.SubmitSkillHit(loadedCfg, name, aicommon.StatsSourceSkillAILoad)
 				}
 			}
 
@@ -180,10 +198,8 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 				if name == "" {
 					continue
 				}
-				if mgr.IsSkillLoadedAndUnfolded(name) {
-					if _, inResults := results[name]; !inResults {
-						skipped = append(skipped, name)
-					}
+				if !loadedSet[name] && mgr.IsAutoSkillLoadedAndUnfolded(name) {
+					skipped = append(skipped, name)
 				}
 			}
 
@@ -259,8 +275,9 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 			return
 		}
 
-		// Attempt to load the skill
-		err := mgr.LoadSkill(skillName)
+		// Attempt to load the skill as auto-loaded (AI 意图驱动 → SemiDynamic 2 尾部).
+		// 若该 skill 已是 forced, LoadAutoSkill 会短路返回 (added=false), 不重复加载.
+		added, err := mgr.LoadAutoSkill(skillName)
 		if err != nil {
 			log.Warnf("failed to load skill %q: %v", skillName, err)
 
@@ -379,7 +396,17 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 			return
 		}
 
-		// Load succeeded
+		// Load succeeded (or short-circuited because already forced/auto-loaded).
+		if !added {
+			// 幂等: 该 skill 已是 forced 或已 auto-loaded, 不重复计数 / 不重复 emit.
+			viewSummary := mgr.GetSkillViewSummary(skillName)
+			invoker.AddToTimeline("skill_already_loaded",
+				fmt.Sprintf("Skill '%s' already present (forced or auto-loaded). %s", skillName, viewSummary))
+			op.Feedback(fmt.Sprintf("Skill '%s' was already loaded; no duplicate load performed.", skillName))
+			op.Continue()
+			return
+		}
+
 		viewSummary := mgr.GetSkillViewSummary(skillName)
 
 		contextSizeAfter := 0
@@ -410,7 +437,7 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 
 		contextExpansionKB := float64(skillMDSize) / 1024
 		timelineMsg := fmt.Sprintf(
-			"Successfully loaded skill '%s' into context. "+
+			"Successfully loaded skill '%s' into context (auto-loaded into SemiDynamic 2). "+
 				"SKILL.md: %.1fKB, %d files in skill directory. %s "+
 				"Context expanded by ~%.1fKB. "+
 				"Use load_skill_resources to load additional files (e.g. @%s/filename.md). "+
@@ -419,8 +446,12 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 			contextExpansionKB, skillName,
 		)
 		invoker.AddToTimeline("skill_loaded", timelineMsg)
+		// 命中反馈: AI 自主加载是反馈点.
+		if cfg, ok := invoker.GetConfig().(*aicommon.Config); ok {
+			aicommon.SubmitSkillHit(cfg, skillName, aicommon.StatsSourceSkillAILoad)
+		}
 
-		log.Infof("skill %q loaded into context successfully (SKILL.md: %.1fKB, %d files)", skillName, contextExpansionKB, fileCount)
+		log.Infof("skill %q auto-loaded into context successfully (SKILL.md: %.1fKB, %d files)", skillName, contextExpansionKB, fileCount)
 		_ = contextSizeAfter
 
 		persistLoadedSkillNames(loop, invoker)

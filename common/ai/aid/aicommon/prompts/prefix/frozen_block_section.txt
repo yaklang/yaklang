@@ -1,4 +1,6 @@
-{{ if .ToolInventory }}# Tool Inventory
+{{ if .ForcedSkills }}{{ .ForcedSkills }}
+
+{{ end }}{{ if .ToolInventory }}# Tool Inventory
 You have access to {{ .ToolsCount }} built-in tools. Below are {{ .TopToolsCount }} prioritized entries selected within a token budget:
 
 ## Call Mode (single tool vs tool_compose)

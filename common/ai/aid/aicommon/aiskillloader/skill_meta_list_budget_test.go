@@ -44,8 +44,10 @@ func TestSelectSkillMetasForPromptRegistry_MatchesAppendAvailableSkillsSection(t
 		t.Fatalf("expected full registry list, got listed=%d omitted=%d", len(listed), omitted)
 	}
 
+	// 改造后: 目录默认隐藏, 需 SetCatalogSkills 才在 RenderStable 出现.
+	mgr.SetCatalogSkills(loader.AllSkillMetas())
 	rendered := mgr.RenderStable()
 	if !strings.Contains(rendered, "  - code-review:") || !strings.Contains(rendered, "  - deploy-app:") {
-		t.Fatalf("rendered prompt should list both skills: %s", rendered)
+		t.Fatalf("rendered prompt should list both skills in catalog: %s", rendered)
 	}
 }

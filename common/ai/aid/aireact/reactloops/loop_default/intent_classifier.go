@@ -635,6 +635,8 @@ func populateExtraCapabilitiesFromFastMatch(r aicommon.AIInvokeRuntime, loop *re
 				Description: skill.Description,
 			})
 		}
+		// 意图命中 → 写入「最相关 SKILL 目录」(默认隐藏, 命中后开启), 按命中数排序 top-N.
+		reactloops.ApplyMatchedSkillsToCatalog(loop, r.GetConfig(), result.MatchedSkills)
 	}
 
 	// Add matched forges

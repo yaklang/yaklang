@@ -31,6 +31,13 @@ type PromptMaterials struct {
 	OriginalUserInput string
 	StableInstruction string
 
+	// ForcedSkills 是「用户强制加载」SKILL 满内容, 进 frozen_block 顶部 (最高优先级).
+	// 空时 frozen_block 顶部子块不渲染.
+	ForcedSkills string
+	// AutoLoadedSkills 是「AI 意图驱动加载」SKILL, 进 semi_dynamic_2 尾部.
+	// 空时 semi_dynamic_2 尾部子块不渲染.
+	AutoLoadedSkills string
+
 	ToolInventory bool
 	ToolsCount    int
 	TopToolsCount int
@@ -100,25 +107,27 @@ func (m *PromptMaterials) SemiDynamic1Data() map[string]any {
 }
 
 // SemiDynamic2Data 供 TaskInstruction -> ExecutionPolicy -> Schema ->
-// OutputExample 半动态段消费。
+// OutputExample 半动态段消费, 尾部追加 AutoLoadedSkills (AI 意图驱动加载 SKILL).
 func (m *PromptMaterials) SemiDynamic2Data() map[string]any {
 	if m == nil {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"TaskInstruction": m.TaskInstruction,
-		"ExecutionPolicy": m.ExecutionPolicy,
-		"Schema":          m.Schema,
-		"OutputExample":   m.OutputExample,
+		"TaskInstruction":  m.TaskInstruction,
+		"ExecutionPolicy":  m.ExecutionPolicy,
+		"Schema":           m.Schema,
+		"OutputExample":    m.OutputExample,
+		"AutoLoadedSkills": m.AutoLoadedSkills,
 	}
 }
 
-// FrozenBlockData 供 frozen-block 模板消费。
+// FrozenBlockData 供 frozen-block 模板消费, 顶部前置 ForcedSkills (用户强制加载 SKILL 满内容).
 func (m *PromptMaterials) FrozenBlockData() map[string]any {
 	if m == nil {
 		return map[string]any{}
 	}
 	return map[string]any{
+		"ForcedSkills":           m.ForcedSkills,
 		"ToolInventory":          m.ToolInventory,
 		"ToolsCount":             m.ToolsCount,
 		"TopToolsCount":          m.TopToolsCount,

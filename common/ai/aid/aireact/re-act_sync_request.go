@@ -45,6 +45,8 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 		return r.HandleSyncTypeSessionSnapshotEvent(event)
 	case aicommon.SYNC_TYPE_CLOSE_BROWSER:
 		return r.HandleSyncTypeCloseBrowserEvent(event)
+	case aicommon.SYNC_TYPE_LOAD_SKILL:
+		return r.HandleSyncTypeLoadSkillEvent(event)
 	default:
 		return fmt.Errorf("unsupported sync type: %s", event.SyncType)
 	}
@@ -64,6 +66,7 @@ func (r *ReAct) RegisterReActSyncEvent() {
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_PERCEPTION, r.HandleSyncTypePerceptionEvent)
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_SESSION_SNAPSHOT, r.HandleSyncTypeSessionSnapshotEvent)
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_CLOSE_BROWSER, r.HandleSyncTypeCloseBrowserEvent)
+	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_LOAD_SKILL, r.HandleSyncTypeLoadSkillEvent)
 }
 
 func (r *ReAct) UnRegisterReActSyncEvent() {
@@ -80,6 +83,7 @@ func (r *ReAct) UnRegisterReActSyncEvent() {
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_PERCEPTION)
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_SESSION_SNAPSHOT)
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_CLOSE_BROWSER)
+	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_LOAD_SKILL)
 }
 
 func (r *ReAct) HandleSyncTypeQueueInfoEvent(event *ypb.AIInputEvent) error {
