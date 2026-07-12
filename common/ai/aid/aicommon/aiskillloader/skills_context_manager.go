@@ -295,13 +295,27 @@ func (m *SkillsContextManager) SearchByAI(userNeed string) ([]*SkillMeta, error)
 	return SearchByAI(metas, userNeed, m.searchAICallback)
 }
 
-// GetCurrentSelectedSkills returns currently loaded (selected) skills.
+// GetCurrentSelectedSkills returns currently loaded/selected skills across all
+// three containers (loadedSkills = persistent-restore + forced 副本, autoLoadedSkills
+// = AI 意图驱动). Forced skills also live in loadedSkills, so no separate iteration
+// needed for them.
 func (m *SkillsContextManager) GetCurrentSelectedSkills() []*SkillMeta {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	selected := make([]*SkillMeta, 0, m.loadedSkills.Len())
+	selected := make([]*SkillMeta, 0, m.loadedSkills.Len()+m.autoLoadedSkills.Len())
+	seen := make(map[string]bool, m.loadedSkills.Len()+m.autoLoadedSkills.Len())
 	m.loadedSkills.ForEach(func(name string, state *skillContextState) bool {
-		selected = append(selected, state.Skill.Meta)
+		if state != nil && state.Skill != nil && state.Skill.Meta != nil && !seen[name] {
+			seen[name] = true
+			selected = append(selected, state.Skill.Meta)
+		}
+		return true
+	})
+	m.autoLoadedSkills.ForEach(func(name string, state *skillContextState) bool {
+		if state != nil && state.Skill != nil && state.Skill.Meta != nil && !seen[name] {
+			seen[name] = true
+			selected = append(selected, state.Skill.Meta)
+		}
 		return true
 	})
 	return selected
@@ -596,12 +610,22 @@ func (m *SkillsContextManager) ChangeViewOffset(skillName, filePath string, offs
 	return nil
 }
 
-// IsSkillLoaded returns true if the given skill is currently loaded (either folded or unfolded).
+// IsSkillLoaded returns true if the given skill is currently loaded in ANY container
+// (loadedSkills = persistent-restore + forced 副本, autoLoadedSkills = AI 意图驱动,
+// or forcedSkills). This is the unified "is this skill present in the manager" check.
 func (m *SkillsContextManager) IsSkillLoaded(skillName string) bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	_, ok := m.loadedSkills.Get(skillName)
-	return ok
+	if _, ok := m.loadedSkills.Get(skillName); ok {
+		return true
+	}
+	if _, ok := m.autoLoadedSkills.Get(skillName); ok {
+		return true
+	}
+	if m.forcedSkills != nil && m.forcedSkills.Has(skillName) {
+		return true
+	}
+	return false
 }
 
 // IsSkillLoadedAndUnfolded returns true if the skill is loaded and currently unfolded (fully visible).
