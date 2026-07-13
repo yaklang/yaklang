@@ -768,7 +768,17 @@ func (m *SkillsContextManager) renderWithTag(tag string) string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	hasLoaded := m.loadedSkills.Len() > 0
+	// forced skill 的满内容已通过 RenderForcedSkills 进 frozen_block 顶部,
+	// 此处需排除 forced 副本, 避免同一份内容在 SKILLS_CONTEXT 中重复渲染.
+	visibleLoaded := make([]namedSkillState, 0, m.loadedSkills.Len())
+	for _, item := range m.sortedLoadedSkillStates() {
+		if m.forcedSkills != nil && m.forcedSkills.Has(item.name) {
+			continue
+		}
+		visibleLoaded = append(visibleLoaded, item)
+	}
+
+	hasLoaded := len(visibleLoaded) > 0
 	hasForced := m.forcedSkills != nil && !m.forcedSkills.IsEmpty()
 	showCatalog := m.catalogVisible && len(m.catalogSkills) > 0
 
@@ -782,7 +792,7 @@ func (m *SkillsContextManager) renderWithTag(tag string) string {
 
 	buf.WriteString("== Currently Loaded Skills ==\n")
 	if hasLoaded {
-		for _, item := range m.sortedLoadedSkillStates() {
+		for _, item := range visibleLoaded {
 			state := item.state
 			if state.IsFolded {
 				buf.WriteString(m.renderFolded(state))
