@@ -664,9 +664,9 @@ func (c *Coordinator) HandleSkipSubtaskInPlan(event *ypb.AIInputEvent) error {
 	// 取消任务并设置为 Skipped 状态（区别于 Aborted，Skipped 专门表示用户主动跳过）
 	task.SetStatus(aicommon.AITaskState_Skipped)
 	if userReason != "" {
-		task.Cancel("user skipped subtask: " + userReason)
+		task.Cancel("user skipped subtask: " + userReason + "; do NOT re-dispatch or retry this cancelled sub agent")
 	} else {
-		task.Cancel("user skipped subtask")
+		task.Cancel("user skipped subtask; do NOT re-dispatch or retry this cancelled sub agent")
 	}
 
 	// 构建 timeline 消息
