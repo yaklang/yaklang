@@ -284,8 +284,28 @@ jobs:
         if: startsWith(inputs.os, 'linux')
         run: bash .github/scripts/verify-glibc-baseline.sh "./${{ env.OUTPUT_NAME }}"
 
+      - name: Generate Checksums
+        shell: bash
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          if command -v yak >/dev/null 2>&1; then
+            YAK=yak
+          else
+            CGO_ENABLED="${CGO_ENABLED:-1}" go build -o ./yak_cli -v common/yak/cmd/yak.go
+            YAK=./yak_cli
+            [ -f ./yak_cli.exe ] && YAK=./yak_cli.exe
+          fi
+          "$YAK" sha256 -f ${{ env.OUTPUT_NAME }}
+          echo "SHA256=${{ env.OUTPUT_NAME }}.sha256.txt" >> "$GITHUB_ENV"
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.OUTPUT_NAME }}
           path: ./${{ env.OUTPUT_NAME }}
+
+      - name: Upload sha256 checksums artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.SHA256 }}
+          path: ./${{ env.SHA256 }}
