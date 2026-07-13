@@ -219,11 +219,21 @@ func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiled
 		// 无 NFA (regexp2/RE2 兜底) 逐条验证.
 		switch {
 		case nfa != nil && nfa.hasAssert:
-			db.assertAlwaysOn = append(db.assertAlwaysOn, cp.idx)
+			if kind := mvsSpecializedExpr(cp.expr); kind != mvsSpecializedNone {
+				db.specializedAlwaysOn = append(db.specializedAlwaysOn, mvsSpecializedAlwaysOn{idx: cp.idx, kind: kind})
+				db.specializedMask |= uint64(1) << kind
+			} else {
+				db.assertAlwaysOn = append(db.assertAlwaysOn, cp.idx)
+			}
 		case nfa != nil:
-			// DFA 拆分经 A/B 测试为净回归: 即使 batch (1 次 cgo), 2 次数据遍历 (DFA + merged)
-			// 仍比 1 次 merged NFA 遍历慢 (cache miss on second pass). 基建保留.
-			mergeMembers = append(mergeMembers, mergeMember{idx: cp.idx, nfa: nfa})
+			if kind := mvsSpecializedExpr(cp.expr); kind != mvsSpecializedNone {
+				db.specializedAlwaysOn = append(db.specializedAlwaysOn, mvsSpecializedAlwaysOn{idx: cp.idx, kind: kind})
+				db.specializedMask |= uint64(1) << kind
+			} else {
+				// DFA 拆分经 A/B 测试为净回归: 即使 batch (1 次 cgo), 2 次数据遍历 (DFA + merged)
+				// 仍比 1 次 merged NFA 遍历慢 (cache miss on second pass). 基建保留.
+				mergeMembers = append(mergeMembers, mergeMember{idx: cp.idx, nfa: nfa})
+			}
 		default:
 			db.otherAlwaysOn = append(db.otherAlwaysOn, cp.idx)
 		}
@@ -504,6 +514,8 @@ type mvsDB struct {
 	// 预计算一次, scan 中复用 (零分配).
 	assertAlwaysOnCIdxs  []int32
 	assertAlwaysOnGoIdxs []int
+	specializedAlwaysOn  []mvsSpecializedAlwaysOn // rigid exact structures with allocation-free existence scans
+	specializedMask      uint64
 	anchoredMerged       *mvsMergedNFA // R1 span-injected lean anchored 合并自动机（A/B 开关控制使用）
 	anchorMergedSlot     []int         // pattern idx -> anchoredMerged 成员槽位；-1 表示非成员
 	assertAlwaysOn       []int         // 无字面量的断言 NFA (hasAssert): existsInAssert 门控 + verifier 定位
@@ -517,14 +529,13 @@ type mvsDB struct {
 }
 
 func (d *mvsDB) numAlwaysOn() int {
-	return d.mergedCount + len(d.assertAlwaysOn) + len(d.otherAlwaysOn)
+	return d.mergedCount + len(d.assertAlwaysOn) + len(d.specializedAlwaysOn) + len(d.otherAlwaysOn)
 }
 
 // gateSupersetPrecheck 控制可局部化超集门复核前是否先跑超集 NFA 存在性预检 (见 verifyGateLocalized).
-// 有 C 内核时重新启用: C nfaExists (一次 SIMD 位递推) 比 PCRE2 复核 (整段正则匹配) 廉价得多,
-// 且 gate 的超集 NFA 对 "字面量在但无完整结构" 的报文有显著过滤力 (Get注入点 1015/1015 FP 全部滤除).
-// 无 C 内核时仍关闭 (Go NFA 预检不比 PCRE2 快).
-var gateSupersetPrecheck = true
+// 真实全语料 A/B 显示，门已被字面量局部化后，额外的超集 NFA 预检会重复扫描同一窗口，
+// 其过滤收益不足以覆盖扫描成本；默认关闭，直接进入权威 verifier。保留开关供规则集变化后复测。
+var gateSupersetPrecheck = false
 
 // anchorMergedEnabled 控制 R1 span-injected merged verifier 的运行期接线。保守起见默认
 // 关闭，直到真实语料的 oracle 与基准都证明其全局位集成本低于逐条 gap-jump 路径。
@@ -1095,6 +1106,23 @@ func (d *mvsDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, erro
 			if stop := d.verifyOne(idx, data, sc, handler); stop {
 				return true, nil
 			}
+		}
+	}
+
+	// Rigid always-on assertions that were recognized at compile time. A
+	// positive existence result still uses finalizeHit, preserving located-mode
+	// verifier semantics.
+	var specializedFound uint64
+	if d.specializedMask != 0 {
+		specializedFound = mvsSpecializedMask(data, d.specializedMask)
+	}
+	for _, fast := range d.specializedAlwaysOn {
+		if sc.fullDone[fast.idx] {
+			continue
+		}
+		sc.fullDone[fast.idx] = true
+		if specializedFound&(uint64(1)<<fast.kind) != 0 && d.finalizeHit(fast.idx, data, sc, handler) {
+			return true, nil
 		}
 	}
 

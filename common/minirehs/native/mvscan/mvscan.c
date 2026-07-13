@@ -1816,6 +1816,7 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
 
     int32_t mergedTotal = 0;
     int32_t assertTotal = 0;
+    int mergedDormant = 1;
 
     size_t i = 0;
     int32_t curRune;
@@ -1832,15 +1833,17 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
             boundBuf[i] = bpre;
             boundBuf[ni] = bpost;
         }
-        int sym = 0;
-        if (mu) {
-            sym = curRune >= 0 && curRune < 0x80 ? (int)mu->asciiSym[curRune] : symbol_of(mu, curRune);
-        }
         int atStart = (i == 0);
         int atEnd = (ni == len);
+        int skipMerged = mu && mergedDormant && !atStart && curRune >= 0 && curRune < 0x80 &&
+                         mu->hasStartByteMask && !mu->startByteMask[curRune];
+        int sym = 0;
+        if (mu && !skipMerged) {
+            sym = curRune >= 0 && curRune < 0x80 ? (int)mu->asciiSym[curRune] : symbol_of(mu, curRune);
+        }
 
         /* ---- merged NFA 递推 ---- */
-        if (mu) {
+        if (mu && !skipMerged) {
             if (mu->hasLimEx) {
                 uint64_t carry = 0;
                 for (int w = 0; w < mw; w++) {
@@ -1888,6 +1891,7 @@ int32_t mvscan_db_combined_scan(const mvscan_db *db,
                     }
                 }
             }
+            mergedDormant = (anyActive == 0);
             /* Vermicelli skip for merged */
             if (anyActive == 0 && mu->hasStartByteMask) {
                 size_t j = i + 1;
