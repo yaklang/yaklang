@@ -21,6 +21,8 @@ type Scratch interface {
 // 的输入顺序串行调用 handler，因此 handler 无需承担并发同步。
 type BatchMatchHandler func(record int, match Match) bool
 
+const maxBatchLanes = 4
+
 type batchMatch struct {
 	record int
 	match  Match
@@ -137,10 +139,10 @@ type scratch struct {
 	anchoredBiOut        []byte
 	anchoredAsyncRes     chan anchoredResult
 
-	// ScanBatch 使用两个独占子 Scratch 并行处理交错记录。结果按 lane 复用，扫描
+	// ScanBatch 使用最多四个独占子 Scratch 并行处理动态记录块。结果按 lane 复用，扫描
 	// 收拢后再按 record 顺序串行重放 handler，避免并发回调改变现有使用习惯。
-	batchLanes   [2]*scratch
-	batchResults [2][]batchMatch
+	batchLanes   [maxBatchLanes]*scratch
+	batchResults [maxBatchLanes][]batchMatch
 
 	workerOnce      sync.Once
 	workerCloseOnce sync.Once
@@ -220,7 +222,7 @@ type Database interface {
 	NewScratch() (Scratch, error)
 	// Scan 对完整 data 做 block 扫描, 每命中一次调用 handler; handler 返回 false 提前终止.
 	Scan(data []byte, s Scratch, handler MatchHandler) error
-	// ScanBatch 以两个独占 lane 并行扫描多条独立记录。handler 按 records 输入顺序
+	// ScanBatch 以 1-4 个独占 lane 并行扫描多条独立记录。handler 按 records 输入顺序
 	// 串行重放；返回 false 停止后续回调，但已经启动的记录扫描会安全收拢。
 	ScanBatch(records [][]byte, s Scratch, handler BatchMatchHandler) error
 	// Info 返回该 db 的元信息.
@@ -420,7 +422,13 @@ func (d *database) ScanBatch(records [][]byte, s Scratch, handler BatchMatchHand
 		return nil
 	}
 
-	for lane := range root.batchLanes {
+	lanes := runtime.GOMAXPROCS(0) / 2
+	if lanes < 1 {
+		lanes = 1
+	} else if lanes > len(root.batchLanes) {
+		lanes = len(root.batchLanes)
+	}
+	for lane := 0; lane < lanes; lane++ {
 		if root.batchLanes[lane] == nil {
 			ns, err := d.NewScratch()
 			if err != nil {
@@ -431,11 +439,11 @@ func (d *database) ScanBatch(records [][]byte, s Scratch, handler BatchMatchHand
 		root.batchResults[lane] = root.batchResults[lane][:0]
 	}
 	var wg sync.WaitGroup
-	var laneErr [2]error
+	var laneErr [maxBatchLanes]error
 	var nextRecord int64
 	const batchChunk = int64(8)
-	wg.Add(2)
-	for lane := 0; lane < 2; lane++ {
+	wg.Add(lanes)
+	for lane := 0; lane < lanes; lane++ {
 		go func(lane int) {
 			defer wg.Done()
 			laneSc := root.batchLanes[lane]
@@ -466,23 +474,31 @@ func (d *database) ScanBatch(records [][]byte, s Scratch, handler BatchMatchHand
 	}
 	wg.Wait()
 
-	left, right := root.batchResults[0], root.batchResults[1]
-	for len(left) > 0 || len(right) > 0 {
-		var next batchMatch
-		if len(right) == 0 || (len(left) > 0 && left[0].record < right[0].record) {
-			next, left = left[0], left[1:]
-		} else {
-			next, right = right[0], right[1:]
+	var resultPos [maxBatchLanes]int
+	for {
+		minLane := -1
+		for lane := 0; lane < lanes; lane++ {
+			if resultPos[lane] >= len(root.batchResults[lane]) {
+				continue
+			}
+			if minLane < 0 ||
+				root.batchResults[lane][resultPos[lane]].record < root.batchResults[minLane][resultPos[minLane]].record {
+				minLane = lane
+			}
 		}
+		if minLane < 0 {
+			break
+		}
+		next := root.batchResults[minLane][resultPos[minLane]]
+		resultPos[minLane]++
 		if !handler(next.record, next.match) {
 			return nil
 		}
 	}
-	if laneErr[0] != nil {
-		return laneErr[0]
-	}
-	if laneErr[1] != nil {
-		return laneErr[1]
+	for lane := 0; lane < lanes; lane++ {
+		if laneErr[lane] != nil {
+			return laneErr[lane]
+		}
 	}
 	return nil
 }

@@ -142,7 +142,7 @@ func BenchmarkMVSExistence(b *testing.B) {
 		re2 := re2OnlyMITMPatterns(b)
 		benchScanRecordsOpts(b, re2, records, WithBackend(BackendMVS), WithReportLocation(false))
 	})
-	b.Run("MVS_Exist_RE2only_Batch2", func(b *testing.B) {
+	b.Run("MVS_Exist_RE2only_BatchAdaptive", func(b *testing.B) {
 		re2 := re2OnlyMITMPatterns(b)
 		benchScanRecordsBatchOpts(b, re2, records, WithBackend(BackendMVS), WithReportLocation(false))
 	})
