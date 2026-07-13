@@ -506,3 +506,113 @@ func TestHandleResponsesSSEEvent_CompletedWithToolCalls(t *testing.T) {
 		t.Errorf("expected arguments %q, got %q", `{"city":"Tokyo"}`, receivedCalls[0].Function.Arguments)
 	}
 }
+
+// TestHandleResponsesSSEEvent_FunctionCallArgumentsDeltaIncremental 验证
+// response.function_call_arguments.delta 喂给 toolCallCallback 的是**增量片段**，
+// 而非累积全量。下游 (aibalance chat-completions writer) 按 OpenAI 增量 tool_calls
+// 语义自行累积；若这里喂累积全量会导致双重累积，客户端拼出残缺 JSON
+// (如 ZCode "Expected ':' after property name at position 4")。
+// 关键词: function_call_arguments.delta 增量, 避免双重累积, toolCallCallback 语义
+func TestHandleResponsesSSEEvent_FunctionCallArgumentsDeltaIncremental(t *testing.T) {
+	outBuf := &bytes.Buffer{}
+	reasonBuf := &bytes.Buffer{}
+	state := newResponsesToolCallState()
+	var receivedCalls []string // collect each delta fragment
+	tcCallback := func(calls []*ToolCall) {
+		for _, c := range calls {
+			receivedCalls = append(receivedCalls, c.Function.Arguments)
+		}
+	}
+
+	// Simulate upstream streaming arguments in fragments:
+	// {"city":"Tokyo"} -> deltas: {"  | city | ":" | Tokyo | "}
+	fragments := []string{`{"`, "city", `":"`, "Tokyo", `"}`}
+	for _, frag := range fragments {
+		handleResponsesSSEEvent(map[string]any{
+			"type":         "response.function_call_arguments.delta",
+			"delta":         frag,
+			"output_index":  0,
+			"item_id":       "fc_1",
+			"call_id":        "call_abc",
+			"name":          "get_weather",
+		}, outBuf, reasonBuf, tcCallback, state)
+	}
+
+	// Each callback invocation must carry ONLY that frame's delta fragment,
+	// not the cumulative arguments. Concatenating them reconstructs the JSON.
+	want := `{"city":"Tokyo"}`
+	got := strings.Join(receivedCalls, "")
+	if got != want {
+		t.Fatalf("incremental deltas should concatenate to %q, got %q (per-frame: %#v)", want, got, receivedCalls)
+	}
+	// And no single frame should equal the cumulative value (that would be
+	// the double-accumulation bug). The last fragment is `"` which is fine,
+	// but the earlier ones must not already contain the prefix.
+	if receivedCalls[1] == `{"city` {
+		// would be the bug: cumulative fed as delta
+		t.Fatalf("frame 2 was cumulative %q, expected incremental %q", receivedCalls[1], "city")
+	}
+}
+
+// TestHandleResponsesSSEEvent_DeltaThenDoneNoDuplicate 验证当 function_call
+// 的 arguments 已通过 delta 增量流式发出后，后续的 response.output_item.done
+// 与 response.completed 不应再通过 toolCallCallback 重发全量 arguments，否则
+// 下游增量累积器 (aibalance) 会再次拼接全量，拼出
+// {"city":"Tokyo"}{"city":"Tokyo"} 这样的残缺 JSON。
+// 关键词: delta 后 done 不重发, completed 不重发, 避免三重累积
+func TestHandleResponsesSSEEvent_DeltaThenDoneNoDuplicate(t *testing.T) {
+	outBuf := &bytes.Buffer{}
+	reasonBuf := &bytes.Buffer{}
+	state := newResponsesToolCallState()
+	var receivedCalls []string
+	tcCallback := func(calls []*ToolCall) {
+		for _, c := range calls {
+			receivedCalls = append(receivedCalls, c.Function.Arguments)
+		}
+	}
+
+	// 1) stream arguments incrementally
+	for _, frag := range []string{`{"`, "city", `":"`, "Tokyo", `"}`} {
+		handleResponsesSSEEvent(map[string]any{
+			"type":         "response.function_call_arguments.delta",
+			"delta":         frag,
+			"output_index":  0,
+			"item_id":       "fc_1",
+			"call_id":        "call_abc",
+			"name":          "get_weather",
+		}, outBuf, reasonBuf, tcCallback, state)
+	}
+	// 2) output_item.done carries the full function_call item
+	handleResponsesSSEEvent(map[string]any{
+		"type":         "response.output_item.done",
+		"output_index": 0,
+		"item": map[string]any{
+			"type":      "function_call",
+			"id":        "fc_1",
+			"call_id":   "call_abc",
+			"name":      "get_weather",
+			"arguments": `{"city":"Tokyo"}`,
+		},
+	}, outBuf, reasonBuf, tcCallback, state)
+	// 3) response.completed with the same function_call in output
+	handleResponsesSSEEvent(map[string]any{
+		"type": "response.completed",
+		"response": map[string]any{
+			"output_text": "",
+			"output": []any{map[string]any{
+				"type":      "function_call",
+				"id":        "fc_1",
+				"call_id":   "call_abc",
+				"name":      "get_weather",
+				"arguments": `{"city":"Tokyo"}`,
+			}},
+		},
+	}, outBuf, reasonBuf, tcCallback, state)
+
+	// Concatenating all received arguments must yield exactly one JSON object,
+	// NOT two or three copies.
+	got := strings.Join(receivedCalls, "")
+	if got != `{"city":"Tokyo"}` {
+		t.Fatalf("expected a single %q, got %q (per-frame: %#v)", `{"city":"Tokyo"}`, got, receivedCalls)
+	}
+}

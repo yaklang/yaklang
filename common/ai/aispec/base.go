@@ -920,22 +920,17 @@ func chatBaseResponses(url string, model string, msg string, ctx *ChatBaseContex
 		req["tool_choice"] = convertToolChoiceToResponses(ctx.ToolChoice)
 	}
 
-	// stream_options.include_usage=true 自动注入：与 chatBaseChatCompletions 保持一致，
-	// 当上层注册了 ctx.UsageCallback 且当前为流式请求时注入，让上游 /responses 端点
-	// 在末帧返回 usage（含 prompt_tokens_details.cached_tokens）。
-	// dashscope OpenAI /responses 兼容端点与 OpenAI 官方均识别该字段，未识别的上游
-	// 会忽略该字段不影响请求。
-	// 关键词: chatBaseResponses include_usage 注入, /responses cached_tokens 一致性
-	if stream && ctx.UsageCallback != nil {
-		streamOpts, _ := req["stream_options"].(map[string]any)
-		if streamOpts == nil {
-			streamOpts = map[string]any{}
-		}
-		if _, ok := streamOpts["include_usage"]; !ok {
-			streamOpts["include_usage"] = true
-		}
-		req["stream_options"] = streamOpts
-	}
+	// 注意: responses 路径不注入 stream_options.include_usage。
+	// stream_options.include_usage 是 chat-completions 协议的字段, 用于让上游在
+	// SSE 末帧返回 usage。而 responses 协议的 usage 本就由 response.completed 事件
+	// 携带 (processAIResponseForResponses 已通过兜底扫描原始 payload 提取 usage 并
+	// 回调 UsageCallback), 不依赖 stream_options。
+	// 更关键的是: 部分 responses 兼容网关 (如 packyapi codex 分组) 会把
+	// stream_options 当成未知参数直接拒绝, 返回 400 "Unknown parameter:
+	// 'stream_options.include_usage'", 导致整条流式请求失败、客户端拿到空输出。
+	// 因此这里移除自动注入。调用方若通过 ExtraBody 显式设置 stream_options, 仍会被保留。
+	// 关键词: chatBaseResponses 不注入 stream_options, packyapi codex 流式 400 修复,
+	//         responses usage 走 completed 兜底
 
 	return executeChatBaseRequest(url, stream, req, ctx, appendResponsesStreamHandlerPoCOptionEx)
 }
@@ -1021,12 +1016,27 @@ func hasNonEmptyChatContent(content any) bool {
 	}
 }
 
+// responsesTextType returns the Responses content-part "type" for a text part
+// based on message role: assistant messages use "output_text" (OpenAI Responses
+// spec), all other roles (user/developer/system) use "input_text".
+// Some responses-only upstreams (e.g. packyapi codex group) reject "input_text"
+// on assistant items with 400 "Invalid value: 'input_text'. Supported values
+// are: 'output_text' and 'refusal'.".
+// 关键词: responsesTextType, output_text input_text role, assistant 消息内容类型
+func responsesTextType(role string) string {
+	if role == "assistant" {
+		return "output_text"
+	}
+	return "input_text"
+}
+
 func buildResponsesMessageItem(role string, m ChatDetail) map[string]any {
+	textType := responsesTextType(role)
 	var content []map[string]any
 	switch v := m.Content.(type) {
 	case string:
 		content = append(content, map[string]any{
-			"type": "input_text",
+			"type": textType,
 			"text": v,
 		})
 	case []*ChatContent:
@@ -1037,7 +1047,7 @@ func buildResponsesMessageItem(role string, m ChatDetail) map[string]any {
 			switch c.Type {
 			case "text":
 				content = append(content, map[string]any{
-					"type": "input_text",
+					"type": textType,
 					"text": c.Text,
 				})
 			case "image_url":
@@ -1053,7 +1063,7 @@ func buildResponsesMessageItem(role string, m ChatDetail) map[string]any {
 			default:
 				if c.Text != "" {
 					content = append(content, map[string]any{
-						"type": "input_text",
+						"type": textType,
 						"text": c.Text,
 					})
 				}
@@ -1061,13 +1071,13 @@ func buildResponsesMessageItem(role string, m ChatDetail) map[string]any {
 		}
 	default:
 		content = append(content, map[string]any{
-			"type": "input_text",
+			"type": textType,
 			"text": utils.InterfaceToString(m.Content),
 		})
 	}
 	if len(content) == 0 {
 		content = append(content, map[string]any{
-			"type": "input_text",
+			"type": textType,
 			"text": "",
 		})
 	}
@@ -1075,9 +1085,13 @@ func buildResponsesMessageItem(role string, m ChatDetail) map[string]any {
 		"role":    role,
 		"content": content,
 	}
-	if rc := strings.TrimSpace(m.ReasoningContent); rc != "" {
-		item["reasoning_content"] = rc
-	}
+	// NOTE: do NOT emit reasoning_content on Responses input items.
+	// The chat-completions "reasoning_content" field is rejected by some
+	// responses-only upstreams (e.g. packyapi codex group) with 400
+	// "Unknown parameter: 'input[N].reasoning_content'". Reasoning context
+	// for the Responses API is carried via the reasoning effort / reasoning
+	// summary mechanism, not the input message items.
+	// 关键词: reasoning_content 不注入 responses input, packyapi unknown_parameter
 	return item
 }
 

@@ -168,22 +168,72 @@ func extractLastChatUsageFromPayload(raw []byte) *ChatUsage {
 		}
 	}
 
-	var usageProbe struct {
-		Usage *ChatUsage `json:"usage"`
-	}
-	if err := json.Unmarshal(raw, &usageProbe); err == nil {
-		recordUsage(usageProbe.Usage)
-	}
-
-	for _, rawJSON := range jsonextractor.ExtractStandardJSON(string(raw)) {
-		usageProbe = struct {
-			Usage *ChatUsage `json:"usage"`
-		}{}
-		if err := json.Unmarshal([]byte(rawJSON), &usageProbe); err == nil {
-			recordUsage(usageProbe.Usage)
+	// parse 提取一段 JSON 片段里的 usage。支持两种位置:
+	//   1. 顶层 usage (chat-completions 风格: {"usage":{"prompt_tokens":...}})
+	//   2. 嵌套在 response.usage (responses 风格: {"response":{"usage":{"input_tokens":...}}})
+	// 并在字段名是 responses 别名 (input_tokens/output_tokens) 时归一化。
+	// 关键词: extractLastChatUsageFromPayload, responses usage 嵌套提取
+	parse := func(b []byte) {
+		var generic map[string]any
+		if err := json.Unmarshal(b, &generic); err != nil {
+			return
+		}
+		// 收集所有候选 usage 块 (顶层 + response.* 链路), 逐个归一化后反序列化。
+		var candidates []map[string]any
+		if u, ok := generic["usage"].(map[string]any); ok {
+			candidates = append(candidates, u)
+		}
+		if resp, ok := generic["response"].(map[string]any); ok {
+			if u, ok := resp["usage"].(map[string]any); ok {
+				candidates = append(candidates, u)
+			}
+		}
+		for _, u := range candidates {
+			normalized := normalizeUsageMap(u)
+			usageBytes, err := json.Marshal(map[string]any{"usage": normalized})
+			if err != nil {
+				continue
+			}
+			var usageProbe struct {
+				Usage *ChatUsage `json:"usage"`
+			}
+			if err := json.Unmarshal(usageBytes, &usageProbe); err == nil {
+				recordUsage(usageProbe.Usage)
+			}
 		}
 	}
+
+	parse(raw)
+	for _, rawJSON := range jsonextractor.ExtractStandardJSON(string(raw)) {
+		parse([]byte(rawJSON))
+	}
 	return lastUsage
+}
+
+// normalizeUsageMap 把 usage map 里 responses 协议的别名
+// (input_tokens / output_tokens / input_tokens_details) 归一化为
+// chat-completions 的字段名 (prompt_tokens / completion_tokens /
+// prompt_tokens_details), 让统一的 ChatUsage 能正确反序列化两种协议的 usage。
+// 仅在 alias 存在而标准字段缺失时补齐, 不覆盖已存在的标准字段。
+// 关键词: normalizeUsageMap, responses usage 别名归一化
+func normalizeUsageMap(usage map[string]any) map[string]any {
+	alias := func(dst, src string) {
+		if _, hasDst := usage[dst]; hasDst {
+			return
+		}
+		if v, hasSrc := usage[src]; hasSrc {
+			usage[dst] = v
+		}
+	}
+	alias("prompt_tokens", "input_tokens")
+	alias("completion_tokens", "output_tokens")
+	// input_tokens_details -> prompt_tokens_details (cached_tokens 子字段同名, 直接搬运)
+	if _, hasDst := usage["prompt_tokens_details"]; !hasDst {
+		if v, hasSrc := usage["input_tokens_details"]; hasSrc {
+			usage["prompt_tokens_details"] = v
+		}
+	}
+	return usage
 }
 
 // processAIResponse 处理流式响应
@@ -723,12 +773,21 @@ type responsesToolCallState struct {
 	streamedMessageID map[string]struct{}
 	anyTextStreamed    bool
 	anyReasonStreamed  bool
+	// streamedArgsIDs records function_call item ids whose arguments were
+	// already delivered incrementally via response.function_call_arguments.delta.
+	// response.output_item.done for such items must NOT re-emit the full
+	// arguments via toolCallCallback, otherwise downstream incremental
+	// accumulators (aibalance chatJSONChunkWriter) append the snapshot again
+	// and corrupt the assembled JSON (e.g. {"city":"Tokyo"}{"city":"Tokyo"}).
+	// 关键词: streamedArgsIDs, output_item.done 不重复发, 增量已发不再发全量
+	streamedArgsIDs map[string]bool
 }
 
 func newResponsesToolCallState() *responsesToolCallState {
 	return &responsesToolCallState{
 		byItemID:          make(map[string]*ToolCall),
 		streamedMessageID: make(map[string]struct{}),
+		streamedArgsIDs:   make(map[string]bool),
 	}
 }
 
@@ -770,7 +829,7 @@ func handleResponsesJSONPayload(body []byte, outWriter io.Writer, reasonWriter i
 	if len(obj) == 0 {
 		return false
 	}
-	extractResponsesOutputFromObject(obj, outWriter, reasonWriter, toolCallCallback)
+	extractResponsesOutputFromObject(obj, outWriter, reasonWriter, toolCallCallback, nil)
 	return true
 }
 
@@ -881,13 +940,31 @@ func handleResponsesSSEEvent(event map[string]any, outWriter io.Writer, reasonWr
 		}
 		delta := utils.MapGetString(event, "delta")
 		if delta != "" {
+			// Internal accumulation is kept for output_item.done / completed
+			// (non-stream) paths that need the full arguments snapshot.
 			tc.Function.Arguments += delta
+			// Record that this item's arguments were streamed incrementally,
+			// so output_item.done does not re-emit the full snapshot via the
+			// callback (would double-accumulate downstream).
+			// 关键词: streamedArgsIDs mark, delta 已发标记
+			toolState.streamedArgsIDs[toolState.buildKey(itemID, outputIndex)] = true
 		}
 		if delta == "" {
 			return
 		}
 		if toolCallCallback != nil {
-			toolCallCallback([]*ToolCall{tc.Clone()})
+			// Feed the INCREMENTAL delta fragment to the callback, NOT the
+			// cumulative arguments. Downstream consumers (e.g. aibalance
+			// chat-completions writer) are built for OpenAI incremental
+			// tool_calls semantics and accumulate arguments themselves; feeding
+			// them the cumulative value caused double-accumulation and
+			// produced malformed JSON on the client (e.g. ZCode "Expected
+			// ':' after property name at position 4"). The clone carries only
+			// id/name + this delta's fragment as Arguments.
+			// 关键词: function_call_arguments.delta 增量语义, 避免双重累积
+			inc := tc.Clone()
+			inc.Function.Arguments = delta
+			toolCallCallback([]*ToolCall{inc})
 		} else {
 			outWriter.Write([]byte(delta))
 		}
@@ -902,7 +979,7 @@ func handleResponsesSSEEvent(event map[string]any, outWriter io.Writer, reasonWr
 		if !toolState.anyTextStreamed {
 			resp := utils.MapGetMapRaw(event, "response")
 			if len(resp) > 0 {
-				extractResponsesOutputFromObject(resp, outWriter, reasonWriter, toolCallCallback)
+				extractResponsesOutputFromObject(resp, outWriter, reasonWriter, toolCallCallback, toolState)
 			}
 		}
 	default:
@@ -941,7 +1018,8 @@ func handleResponsesOutputItem(item map[string]any, outputIndex int, eventType s
 		if tc == nil {
 			return
 		}
-		streamTC := toolState.getOrCreate(utils.MapGetString(item, "id"), tc.Index)
+		itemID := utils.MapGetString(item, "id")
+		streamTC := toolState.getOrCreate(itemID, tc.Index)
 		if streamTC.ID == "" {
 			streamTC.ID = tc.ID
 		}
@@ -957,6 +1035,17 @@ func handleResponsesOutputItem(item map[string]any, outputIndex int, eventType s
 		if eventType != "response.output_item.done" {
 			return
 		}
+		// If this item's arguments were already streamed incrementally via
+		// response.function_call_arguments.delta, do NOT re-emit the full
+		// snapshot via toolCallCallback — downstream incremental accumulators
+		// (aibalance) would append the snapshot again and corrupt the JSON
+		// (e.g. {"city":"Tokyo"}{"city":"Tokyo"}). Only deliver the done event
+		// for items whose arguments were NOT streamed (non-stream / completed-
+		// only upstreams), preserving the legacy completed-event path.
+		// 关键词: output_item.done 跳过已流式, 避免全量重发双重累积
+		if toolState.streamedArgsIDs[toolState.buildKey(itemID, tc.Index)] {
+			return
+		}
 		if toolCallCallback != nil {
 			toolCallCallback([]*ToolCall{streamTC.Clone()})
 		} else {
@@ -965,7 +1054,7 @@ func handleResponsesOutputItem(item map[string]any, outputIndex int, eventType s
 	}
 }
 
-func extractResponsesOutputFromObject(obj map[string]any, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall)) {
+func extractResponsesOutputFromObject(obj map[string]any, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), toolState *responsesToolCallState) {
 	if nested := utils.MapGetMapRaw(obj, "response"); len(nested) > 0 {
 		obj = nested
 	}
@@ -1001,9 +1090,17 @@ func extractResponsesOutputFromObject(obj map[string]any, outWriter io.Writer, r
 			}
 		case "function_call":
 			tc := parseResponsesFunctionCall(item, index)
-			if tc != nil {
-				toolCalls = append(toolCalls, tc)
+			if tc == nil {
+				continue
 			}
+			// Skip items whose arguments were already streamed incrementally
+			// via response.function_call_arguments.delta; re-emitting the full
+			// snapshot here would double-accumulate downstream.
+			// 关键词: completed 跳过已流式 function_call, 避免三重累积
+			if toolState != nil && toolState.streamedArgsIDs[toolState.buildKey(utils.MapGetString(item, "id"), index)] {
+				continue
+			}
+			toolCalls = append(toolCalls, tc)
 		}
 	}
 	if len(toolCalls) > 0 {
