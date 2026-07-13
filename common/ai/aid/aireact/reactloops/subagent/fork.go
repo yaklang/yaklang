@@ -207,7 +207,10 @@ func PrepareForkedSubAgent(
 	taskEmitter := BuildForwardingEmitterForTask(parentCfg.GetEmitter(), subTask)
 	subTask.SetEmitter(taskEmitter)
 
-	childInvoker, err := BuildForkReactInvoker(parentCfg, fork, jobCtx, taskEmitter)
+	// Use subTask.GetContext() (not jobCtx) for the child config so that
+	// subTask.Cancel() directly cancels the child config's context — this
+	// ensures the underlying AI HTTP requests abort immediately on cancel.
+	childInvoker, err := BuildForkReactInvoker(parentCfg, fork, subTask.GetContext(), taskEmitter)
 	if err != nil {
 		jobCancel()
 		return nil, nil, nil, nil, err
