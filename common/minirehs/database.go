@@ -3,7 +3,9 @@ package minirehs
 import (
 	"regexp"
 	"regexp/syntax"
+	"runtime"
 	"sync"
+	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/utils"
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
@@ -13,6 +15,15 @@ import (
 // 每个 goroutine 应独占一份 Scratch (非并发安全).
 type Scratch interface {
 	Close() error
+}
+
+// BatchMatchHandler 接收批扫描中的记录下标及其匹配。ScanBatch 保证按 records
+// 的输入顺序串行调用 handler，因此 handler 无需承担并发同步。
+type BatchMatchHandler func(record int, match Match) bool
+
+type batchMatch struct {
+	record int
+	match  Match
 }
 
 // scratch 是 Scratch 的内部实现, 持有可复用缓冲区.
@@ -126,6 +137,11 @@ type scratch struct {
 	anchoredBiOut        []byte
 	anchoredAsyncRes     chan anchoredResult
 
+	// ScanBatch 使用两个独占子 Scratch 并行处理交错记录。结果按 lane 复用，扫描
+	// 收拢后再按 record 顺序串行重放 handler，避免并发回调改变现有使用习惯。
+	batchLanes   [2]*scratch
+	batchResults [2][]batchMatch
+
 	workerOnce      sync.Once
 	workerCloseOnce sync.Once
 	workerWG        sync.WaitGroup
@@ -180,6 +196,12 @@ type anchoredWorkerTask struct {
 
 func (s *scratch) Close() error {
 	s.workerCloseOnce.Do(func() {
+		for i := range s.batchLanes {
+			if s.batchLanes[i] != nil {
+				_ = s.batchLanes[i].Close()
+				s.batchLanes[i] = nil
+			}
+		}
 		if s.mergedTasks == nil {
 			return
 		}
@@ -198,6 +220,9 @@ type Database interface {
 	NewScratch() (Scratch, error)
 	// Scan 对完整 data 做 block 扫描, 每命中一次调用 handler; handler 返回 false 提前终止.
 	Scan(data []byte, s Scratch, handler MatchHandler) error
+	// ScanBatch 以两个独占 lane 并行扫描多条独立记录。handler 按 records 输入顺序
+	// 串行重放；返回 false 停止后续回调，但已经启动的记录扫描会安全收拢。
+	ScanBatch(records [][]byte, s Scratch, handler BatchMatchHandler) error
 	// Info 返回该 db 的元信息.
 	Info() DatabaseInfo
 	// Close 释放后端持有的本地资源 (纯 Go 后端为 no-op).
@@ -356,6 +381,110 @@ func (d *database) Scan(data []byte, s Scratch, handler MatchHandler) error {
 	}
 	_, err := d.primary.scan(data, sc, handler)
 	return err
+}
+
+func (d *database) ScanBatch(records [][]byte, s Scratch, handler BatchMatchHandler) error {
+	if len(records) == 0 {
+		return nil
+	}
+	root, ok := s.(*scratch)
+	if !ok || root == nil {
+		ns, err := d.NewScratch()
+		if err != nil {
+			return err
+		}
+		root = ns.(*scratch)
+		defer root.Close()
+	}
+	if handler == nil {
+		handler = func(int, Match) bool { return true }
+	}
+	totalBytes := 0
+	for _, rec := range records {
+		totalBytes += len(rec)
+	}
+	if len(records) == 1 || totalBytes < 32*1024 || runtime.GOMAXPROCS(0) < 2 {
+		for i, rec := range records {
+			stop := false
+			err := d.Scan(rec, root, func(m Match) bool {
+				if !handler(i, m) {
+					stop = true
+					return false
+				}
+				return true
+			})
+			if err != nil || stop {
+				return err
+			}
+		}
+		return nil
+	}
+
+	for lane := range root.batchLanes {
+		if root.batchLanes[lane] == nil {
+			ns, err := d.NewScratch()
+			if err != nil {
+				return err
+			}
+			root.batchLanes[lane] = ns.(*scratch)
+		}
+		root.batchResults[lane] = root.batchResults[lane][:0]
+	}
+	var wg sync.WaitGroup
+	var laneErr [2]error
+	var nextRecord int64
+	const batchChunk = int64(8)
+	wg.Add(2)
+	for lane := 0; lane < 2; lane++ {
+		go func(lane int) {
+			defer wg.Done()
+			laneSc := root.batchLanes[lane]
+			out := root.batchResults[lane]
+			for {
+				start := int(atomic.AddInt64(&nextRecord, batchChunk) - batchChunk)
+				if start >= len(records) {
+					break
+				}
+				end := start + int(batchChunk)
+				if end > len(records) {
+					end = len(records)
+				}
+				for i := start; i < end; i++ {
+					err := d.Scan(records[i], laneSc, func(m Match) bool {
+						out = append(out, batchMatch{record: i, match: m})
+						return true
+					})
+					if err != nil {
+						laneErr[lane] = err
+						root.batchResults[lane] = out
+						return
+					}
+				}
+			}
+			root.batchResults[lane] = out
+		}(lane)
+	}
+	wg.Wait()
+
+	left, right := root.batchResults[0], root.batchResults[1]
+	for len(left) > 0 || len(right) > 0 {
+		var next batchMatch
+		if len(right) == 0 || (len(left) > 0 && left[0].record < right[0].record) {
+			next, left = left[0], left[1:]
+		} else {
+			next, right = right[0], right[1:]
+		}
+		if !handler(next.record, next.match) {
+			return nil
+		}
+	}
+	if laneErr[0] != nil {
+		return laneErr[0]
+	}
+	if laneErr[1] != nil {
+		return laneErr[1]
+	}
+	return nil
 }
 
 func (d *database) Info() DatabaseInfo { return d.info }

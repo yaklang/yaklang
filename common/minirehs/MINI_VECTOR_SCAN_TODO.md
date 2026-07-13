@@ -70,6 +70,11 @@
 > 经 `git rebase --exec` 逐提交拆为 `"AKIA"+"ABCDEFGHIJKLMNOP"`（Go 常量拼接，运行时值不变），
 > `TestMVSKernelExistsDirect` 验证通过后成功推送。距 45 MB/s+ 目标约 14%，下一步需把 literal
 > hit mapping + gated/anchored 注入整体融合到 native 单次调用，或引入跨记录 `BatchScan`。
+> **2026-07-13 BatchScan 阶段**：新增正式 `Database.ScanBatch`，以两个独占 Scratch lane 对
+> 独立记录做跨记录并行，并用 8-record 动态块领取消除报文大小/候选复杂度不均造成的尾部空洞；
+> 扫描完成后按输入记录顺序串行重放 handler，调用方无需承担并发回调同步。完整 1332 条真实流量
+> 与逐条 `Scan` 的 2451 个 `(record, Match)` 逐项一致；`MVS_Exist_RE2only_Batch2` 连续 10 次为
+> **61.29-77.49 MB/s**，全部越过 50 MB/s 目标（逐条档同期约 37.4-39.2 MB/s）。
 > **当前性能(实测,vs Go RE2 逐条 0.18 MB/s 基线)**:存在性 **~63x**(全规则)/**~107x**(纯 RE2 子集)、定位 **~25x**;
 > **纯 RE2 子集 ~107x! 累计从 84x 提升到 107x (+27%).** 详见第 4' 节倍数评估与路线。
 > **剩余瓶颈(本会话剖析, 干净小改已出尽)**:① `runtime.cgocall` 28%(合并 always-on 整段扫 5.25MB + 不可
