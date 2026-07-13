@@ -951,6 +951,9 @@ service Yak {
   // mcp server
   rpc StartMcpServer(StartMcpServerRequest) returns(stream StartMcpServerResponse);
   rpc GetToolSetList(Empty) returns(GetToolSetListResponse);
+  rpc GetMCPGlobalConfig(Empty) returns (MCPGlobalConfig);
+  rpc SetMCPGlobalConfig(MCPGlobalConfig) returns (Empty);
+  rpc ResetMCPGlobalConfig(Empty) returns (MCPGlobalConfig);
 
   rpc GetAIToolList(GetAIToolListRequest) returns(GetAIToolListResponse);
   rpc DeleteAITool(DeleteAIToolRequest) returns(DbOperateMessage);
@@ -1939,12 +1942,28 @@ message GetToolSetListResponse {
   repeated ResourceSetInfo ResourceSetList = 2;
 }
 
+// MCPGlobalConfig stores user-customizable MCP startup defaults in profile DB.
+// When DefaultToolSets is empty on disk, GetMCPGlobalConfig returns catalog factory defaults.
+message MCPGlobalConfig {
+  repeated string DefaultToolSets = 1;
+  repeated string DefaultResourceSets = 2;
+  bool EnableAIToolFramework = 3;
+  bool EnableBridgeExternalMCP = 4;
+  // True when no user config is persisted yet (factory catalog defaults are returned).
+  bool UsesCatalogDefaults = 5;
+}
+
 message ToolSetInfo {
   string Name = 1;
+  string Summary = 2;
+  string Tier = 3;
+  int32 ToolCount = 4;
+  bool EnabledByDefault = 5;
 }
 
 message ResourceSetInfo {
   string Name = 1;
+  bool EnabledByDefault = 2;
 }
 
 

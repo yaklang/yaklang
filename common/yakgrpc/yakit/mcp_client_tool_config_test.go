@@ -252,11 +252,7 @@ func TestReconcileMCPBuiltinToolTierDefaults(t *testing.T) {
 	_, err = GetOrCreateMCPClientToolConfig(db, "save_payload", schema.MCPClientToolSourceBuiltin, "", "")
 	require.NoError(t, err)
 
-	isDefault := func(name string) bool {
-		return name == "require_dnslog_domain"
-	}
-
-	require.NoError(t, ReconcileMCPBuiltinToolTierDefaults(db, isDefault))
+	require.NoError(t, ReconcileMCPBuiltinToolTierDefaults(db))
 
 	defaultTool, err := GetMCPClientToolConfigByName(db, "require_dnslog_domain")
 	require.NoError(t, err)
@@ -266,8 +262,7 @@ func TestReconcileMCPBuiltinToolTierDefaults(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, optionalTool.Enable)
 
-	// second run is idempotent
-	require.NoError(t, ReconcileMCPBuiltinToolTierDefaults(db, isDefault))
+	require.NoError(t, ReconcileMCPBuiltinToolTierDefaults(db))
 	optionalTool, err = GetMCPClientToolConfigByName(db, "save_payload")
 	require.NoError(t, err)
 	assert.False(t, optionalTool.Enable)

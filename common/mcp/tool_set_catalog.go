@@ -1,17 +1,19 @@
 package mcp
 
-import "sort"
+import (
+	"fmt"
+	"sort"
+
+	"github.com/yaklang/yaklang/common/mcpcatalog"
+)
 
 // MCPToolSetTier classifies legacy MCP tool sets for default startup selection.
-type MCPToolSetTier int
+type MCPToolSetTier = mcpcatalog.Tier
 
 const (
-	// ToolSetTierDefault — high-frequency pentest / audit workflows; enabled when no -t/--tool is given.
-	ToolSetTierDefault MCPToolSetTier = iota
-	// ToolSetTierOptional — specialized, long-running, or Yakit-UI-centric; enable with -t or --enable-all.
-	ToolSetTierOptional
-	// ToolSetTierInternal — meta/runtime hooks; not recommended for default MCP exposure.
-	ToolSetTierInternal
+	ToolSetTierDefault  = mcpcatalog.TierDefault
+	ToolSetTierOptional = mcpcatalog.TierOptional
+	ToolSetTierInternal = mcpcatalog.TierInternal
 )
 
 // MCPToolSetCatalogEntry documents one registered legacy tool set.
@@ -21,71 +23,32 @@ type MCPToolSetCatalogEntry struct {
 	Summary string
 }
 
-// mcpToolSetCatalog is the authoritative inventory and default-startup classification.
-// Order mirrors legacy registration order in MCPCommandUsage.
-var mcpToolSetCatalog = []MCPToolSetCatalogEntry{
-	// --- default: daily pentest / traffic / vuln workflows ---
-	{Name: "codec", Tier: ToolSetTierDefault, Summary: "Encode/decode and fuzztag rendering; used in almost every payload workflow"},
-	{Name: "cve", Tier: ToolSetTierDefault, Summary: "CVE vulnerability database lookup"},
-	{Name: "httpflow", Tier: ToolSetTierDefault, Summary: "HTTP history query, tagging, and cleanup"},
-	{Name: "port_scan", Tier: ToolSetTierDefault, Summary: "Port scan and port-result management (can be slow; still high-frequency)"},
-	{Name: "reverse_shell", Tier: ToolSetTierDefault, Summary: "Generate reverse-shell commands; pairs with reverse_platform"},
-	{Name: "reverse_platform", Tier: ToolSetTierDefault, Summary: "Global reverse, DNSLog, random port, bridge log — core OOB workflow"},
-	{Name: "http_fuzzer", Tier: ToolSetTierDefault, Summary: "Web fuzzer requests and fuzzer tab creation"},
-	{Name: "risk", Tier: ToolSetTierDefault, Summary: "Vulnerability/risk records from scans, MITM, plugins, and OOB"},
-	{Name: "yso", Tier: ToolSetTierDefault, Summary: "Java deserialization (YSO) gadget/class payload generation"},
-	{Name: "syntaxflow", Tier: ToolSetTierDefault, Summary: "SyntaxFlow rule management and code-audit scans"},
-	{Name: "mitm", Tier: ToolSetTierDefault, Summary: "MITM proxy filters, replacer rules, cert download, start_mitm_v2"},
-	{Name: "fingerprint", Tier: ToolSetTierDefault, Summary: "Service fingerprint query and CRUD"},
-
-	// --- optional: specialized / heavy / UI-oriented ---
-	{Name: "hybrid_scan", Tier: ToolSetTierOptional, Summary: "Combined hybrid scan; long-running, task-oriented"},
-	{Name: "payload", Tier: ToolSetTierOptional, Summary: "Payload dictionary CRUD; Yakit dictionary UI workflow"},
-	{Name: "yak_document", Tier: ToolSetTierOptional, Summary: "Yak API/library documentation lookup for script authors"},
-	{Name: "yak_script", Tier: ToolSetTierOptional, Summary: "Yak script query/group/online sync; exec_yak_script hidden over SSE"},
-	{Name: "brute", Tier: ToolSetTierOptional, Summary: "Credential brute force; scenario-specific"},
-	{Name: "subdomain", Tier: ToolSetTierOptional, Summary: "Subdomain collection; recon-specific"},
-	{Name: "crawler", Tier: ToolSetTierOptional, Summary: "Web crawler; recon-specific"},
-	{Name: "ssa", Tier: ToolSetTierOptional, Summary: "SSA compile/query; overlaps syntaxflow for static analysis"},
-	{Name: "project_database", Tier: ToolSetTierOptional, Summary: "Project database list/switch/create; session setup"},
-	{Name: "global_hotpatch", Tier: ToolSetTierOptional, Summary: "Global MITM hotpatch templates; advanced MITM"},
-	{Name: "system_proxy", Tier: ToolSetTierOptional, Summary: "OS system proxy get/set; edge-case environment setup"},
-
-	// --- internal ---
-	{Name: "dynamic", Tier: ToolSetTierInternal, Summary: "Runtime dynamic tool registration; meta hook"},
+func toMCPToolSetCatalogEntry(entry mcpcatalog.Entry) MCPToolSetCatalogEntry {
+	return MCPToolSetCatalogEntry{
+		Name:    entry.Name,
+		Tier:    entry.Tier,
+		Summary: entry.Summary,
+	}
 }
 
 // MCPToolSetCatalog returns a copy of the tool-set catalog entries.
 func MCPToolSetCatalog() []MCPToolSetCatalogEntry {
-	out := make([]MCPToolSetCatalogEntry, len(mcpToolSetCatalog))
-	copy(out, mcpToolSetCatalog)
+	entries := mcpcatalog.Catalog()
+	out := make([]MCPToolSetCatalogEntry, len(entries))
+	for i, entry := range entries {
+		out[i] = toMCPToolSetCatalogEntry(entry)
+	}
 	return out
 }
 
 // MCPToolSetTierOf returns the catalog tier for a tool set, or false if unknown.
 func MCPToolSetTierOf(name string) (MCPToolSetTier, bool) {
-	for _, entry := range mcpToolSetCatalog {
-		if entry.Name == name {
-			return entry.Tier, true
-		}
-	}
-	return 0, false
+	return mcpcatalog.TierOf(name)
 }
 
 // IsDefaultMCPToolSet reports whether name is enabled on default MCP startup.
 func IsDefaultMCPToolSet(name string) bool {
-	tier, ok := MCPToolSetTierOf(name)
-	return ok && tier == ToolSetTierDefault
-}
-
-func toolSetNamesByTier(tier MCPToolSetTier) []string {
-	names := make([]string, 0)
-	for _, entry := range mcpToolSetCatalog {
-		if entry.Tier == tier {
-			names = append(names, entry.Name)
-		}
-	}
-	return names
+	return mcpcatalog.IsDefaultToolSet(name)
 }
 
 // IsDefaultBuiltinTool reports whether a legacy builtin tool belongs to a default-tier tool set.
@@ -107,20 +70,50 @@ func BuiltinToolSetOf(toolName string) (string, bool) {
 	return "", false
 }
 
-// DefaultMCPToolSets are enabled when no -t/--tool is given (CLI) or StartMcpServer
-// is called without EnableAll and an empty Tool list (gRPC/Yakit).
-// Derived from catalog entries marked ToolSetTierDefault.
-var DefaultMCPToolSets = toolSetNamesByTier(ToolSetTierDefault)
+// CatalogDefaultMCPToolSets are factory defaults from the built-in catalog tier.
+var CatalogDefaultMCPToolSets = mcpcatalog.DefaultToolSetNames()
+
+// DefaultMCPToolSets is an alias of CatalogDefaultMCPToolSets for legacy callers/tests.
+// Runtime startup should use yakit.EffectiveDefaultMCPToolSets(profileDB) when available.
+var DefaultMCPToolSets = CatalogDefaultMCPToolSets
+
+// CatalogDefaultMCPResourceSets are factory default resource sets.
+var CatalogDefaultMCPResourceSets = mcpcatalog.DefaultResourceSetNames()
+
+// DefaultMCPResourceSets is an alias of CatalogDefaultMCPResourceSets.
+var DefaultMCPResourceSets = CatalogDefaultMCPResourceSets
 
 // OptionalMCPToolSets are registered but not enabled by default; use -t or --enable-all.
-var OptionalMCPToolSets = toolSetNamesByTier(ToolSetTierOptional)
+var OptionalMCPToolSets = mcpcatalog.OptionalToolSetNames()
 
 // InternalMCPToolSets are not recommended for routine MCP exposure.
-var InternalMCPToolSets = toolSetNamesByTier(ToolSetTierInternal)
+var InternalMCPToolSets = mcpcatalog.InternalToolSetNames()
 
-// DefaultMCPResourceSets are enabled together with DefaultMCPToolSets.
-var DefaultMCPResourceSets = []string{
-	"codec",
+// TierName returns the wire/string tier label for API responses.
+func TierName(tier MCPToolSetTier) string {
+	return mcpcatalog.TierName(tier)
+}
+
+// CatalogEntryByName returns catalog metadata for a tool set.
+func CatalogEntryByName(name string) (MCPToolSetCatalogEntry, bool) {
+	entry, ok := mcpcatalog.EntryByName(name)
+	if !ok {
+		return MCPToolSetCatalogEntry{}, false
+	}
+	return toMCPToolSetCatalogEntry(entry), true
+}
+
+// ValidateToolSetNames returns an error if any name is unknown.
+func ValidateToolSetNames(names []string) error {
+	for _, name := range names {
+		if name == "" {
+			continue
+		}
+		if _, ok := globalToolSets[name]; !ok {
+			return fmt.Errorf("undefined tool set: %s", name)
+		}
+	}
+	return nil
 }
 
 // ToolNamesInSet returns sorted tool names registered under a tool set.
@@ -137,10 +130,15 @@ func ToolNamesInSet(setName string) []string {
 	return names
 }
 
-// DefaultMCPToolCount returns how many legacy tools default startup exposes.
+// DefaultMCPToolCount returns how many legacy tools catalog factory defaults expose.
 func DefaultMCPToolCount() int {
+	return MCPToolCountForSets(CatalogDefaultMCPToolSets)
+}
+
+// MCPToolCountForSets returns how many legacy tools the given tool sets expose.
+func MCPToolCountForSets(setNames []string) int {
 	n := 0
-	for _, setName := range DefaultMCPToolSets {
+	for _, setName := range setNames {
 		if set, ok := globalToolSets[setName]; ok {
 			n += len(set.Tools)
 		}
@@ -150,9 +148,5 @@ func DefaultMCPToolCount() int {
 
 // AllMCPToolSetNames returns every cataloged tool set name in registration order.
 func AllMCPToolSetNames() []string {
-	names := make([]string, len(mcpToolSetCatalog))
-	for i, entry := range mcpToolSetCatalog {
-		names[i] = entry.Name
-	}
-	return names
+	return mcpcatalog.AllToolSetNames()
 }

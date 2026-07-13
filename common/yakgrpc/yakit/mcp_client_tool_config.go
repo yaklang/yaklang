@@ -83,9 +83,9 @@ func GetOrCreateMCPClientToolConfigWithDefaultEnable(db *gorm.DB, toolName, sour
 
 const mcpBuiltinTierDefaultsMigrationKey = "yak_mcp_builtin_tier_defaults_v1"
 
-// ReconcileMCPBuiltinToolTierDefaults disables optional/internal legacy builtin tools once
-// after upgrading to catalog-based default startup. User toggles after migration are preserved.
-func ReconcileMCPBuiltinToolTierDefaults(db *gorm.DB, isDefaultBuiltin func(string) bool) error {
+// ReconcileMCPBuiltinToolTierDefaults aligns legacy builtin tool enable flags with
+// the effective default tool sets from MCP global config (one-time migration).
+func ReconcileMCPBuiltinToolTierDefaults(db *gorm.DB) error {
 	if db == nil {
 		return nil
 	}
@@ -98,13 +98,14 @@ func ReconcileMCPBuiltinToolTierDefaults(db *gorm.DB, isDefaultBuiltin func(stri
 		return utils.Errorf("fetch builtin mcp client tool configs: %s", err)
 	}
 	for _, cfg := range cfgs {
-		if isDefaultBuiltin(cfg.ToolName) {
+		enabled, err := IsBuiltinToolInEffectiveDefaultSets(db, cfg.ToolName)
+		if err != nil {
+			return err
+		}
+		if enabled == cfg.Enable {
 			continue
 		}
-		if !cfg.Enable {
-			continue
-		}
-		if err := SetMCPClientToolEnabled(db, cfg.ToolName, false); err != nil {
+		if err := SetMCPClientToolEnabled(db, cfg.ToolName, enabled); err != nil {
 			return err
 		}
 	}

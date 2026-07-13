@@ -11,11 +11,19 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) StartMcpServer(req *ypb.StartMcpServerRequest, stream ypb.Yak_StartMcpServerServer) error {
+	db := s.GetProfileDatabase()
+	globalCfg, err := yakit.GetMCPGlobalConfig(db)
+	if err != nil {
+		return err
+	}
+
 	explicitToolSets := false
+	useGlobalStartupDefaults := false
 	if req.GetEnableAll() {
 		toolSetList, err := s.GetToolSetList(stream.Context(), &ypb.Empty{})
 		if err != nil {
@@ -29,34 +37,67 @@ func (s *Server) StartMcpServer(req *ypb.StartMcpServerRequest, stream ypb.Yak_S
 		}
 		log.Infof("StartMcpServer: EnableAll=true, exposing %d tool sets", len(req.GetTool()))
 	} else if len(req.GetTool()) == 0 {
-		req.Tool = append(req.Tool, mcp.DefaultMCPToolSets...)
+		useGlobalStartupDefaults = true
+		req.Tool = append(req.Tool, globalCfg.GetDefaultToolSets()...)
 		if len(req.GetResource()) == 0 {
-			req.Resource = append(req.Resource, mcp.DefaultMCPResourceSets...)
+			req.Resource = append(req.Resource, globalCfg.GetDefaultResourceSets()...)
 		}
-		log.Infof("StartMcpServer: using default tool sets (%d sets, ~%d tools)", len(req.GetTool()), mcp.DefaultMCPToolCount())
+		log.Infof("StartMcpServer: using configured default tool sets (%d sets, ~%d tools)", len(req.GetTool()), mcp.MCPToolCountForSets(req.GetTool()))
 	} else {
 		explicitToolSets = true
 		log.Infof("StartMcpServer: explicit tool sets: %v", req.GetTool())
 	}
+
+	if useGlobalStartupDefaults {
+		if globalCfg.GetEnableAIToolFramework() {
+			req.EnableAIToolFramework = true
+		}
+		if globalCfg.GetEnableBridgeExternalMCP() {
+			req.EnableBridgeExternalMCP = true
+		}
+	}
+
 	return launchMcpServer(stream.Context(), req, stream.Send, explicitToolSets)
 }
 
 func (s *Server) GetToolSetList(ctx context.Context, req *ypb.Empty) (*ypb.GetToolSetListResponse, error) {
+	defaultSets, err := yakit.EffectiveDefaultMCPToolSetMap(s.GetProfileDatabase())
+	if err != nil {
+		return nil, err
+	}
+	defaultResources, err := yakit.EffectiveDefaultMCPResourceSets(s.GetProfileDatabase())
+	if err != nil {
+		return nil, err
+	}
+	defaultResourceSet := make(map[string]struct{}, len(defaultResources))
+	for _, name := range defaultResources {
+		defaultResourceSet[name] = struct{}{}
+	}
+
 	response := &ypb.GetToolSetListResponse{
 		ToolSetList:     make([]*ypb.ToolSetInfo, 0, len(mcp.AllMCPToolSetNames())),
 		ResourceSetList: make([]*ypb.ResourceSetInfo, 0, len(mcp.GlobalResourceSetList())),
 	}
 
 	for _, toolSet := range mcp.AllMCPToolSetNames() {
-		response.ToolSetList = append(response.ToolSetList, &ypb.ToolSetInfo{
-			Name: toolSet,
-		})
+		entry, ok := mcp.CatalogEntryByName(toolSet)
+		info := &ypb.ToolSetInfo{
+			Name:      toolSet,
+			ToolCount: int32(len(mcp.ToolNamesInSet(toolSet))),
+		}
+		if ok {
+			info.Summary = entry.Summary
+			info.Tier = mcp.TierName(entry.Tier)
+		}
+		_, info.EnabledByDefault = defaultSets[toolSet]
+		response.ToolSetList = append(response.ToolSetList, info)
 	}
 
-	resourceSetList := mcp.GlobalResourceSetList()
-	for _, resourceSet := range resourceSetList {
+	for _, resourceSet := range mcp.GlobalResourceSetList() {
+		_, enabled := defaultResourceSet[resourceSet]
 		response.ResourceSetList = append(response.ResourceSetList, &ypb.ResourceSetInfo{
-			Name: resourceSet,
+			Name:              resourceSet,
+			EnabledByDefault: enabled,
 		})
 	}
 

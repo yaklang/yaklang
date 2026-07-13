@@ -188,13 +188,17 @@ func syncMCPToolConfigSources(db *gorm.DB) map[string]*aitool.Tool {
 
 	for name := range mcp.GlobalBuiltinTools() {
 		legacyNames[name] = struct{}{}
-		defaultEnable := mcp.IsDefaultBuiltinTool(name)
+		defaultEnable, err := yakit.IsBuiltinToolInEffectiveDefaultSets(db, name)
+		if err != nil {
+			log.Warnf("GetMCPToolList: resolve default enable for %q: %v", name, err)
+			defaultEnable = mcp.IsDefaultBuiltinTool(name)
+		}
 		if _, err := yakit.GetOrCreateMCPClientToolConfigWithDefaultEnable(db, name, schema.MCPClientToolSourceBuiltin, "", "", defaultEnable); err != nil {
 			log.Warnf("GetMCPToolList: upsert legacy builtin tool config %q: %v", name, err)
 		}
 	}
 
-	if err := yakit.ReconcileMCPBuiltinToolTierDefaults(db, mcp.IsDefaultBuiltinTool); err != nil {
+	if err := yakit.ReconcileMCPBuiltinToolTierDefaults(db); err != nil {
 		log.Warnf("GetMCPToolList: reconcile builtin tier defaults: %v", err)
 	}
 

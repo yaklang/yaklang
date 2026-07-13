@@ -13,7 +13,7 @@ func TestMCPToolSetCatalogMatchesRegistration(t *testing.T) {
 	catalogNames := AllMCPToolSetNames()
 	require.ElementsMatch(t, registered, catalogNames, "catalog must list every registered tool set exactly once")
 
-	for _, entry := range mcpToolSetCatalog {
+	for _, entry := range MCPToolSetCatalog() {
 		require.Contains(t, globalToolSets, entry.Name)
 		require.NotEmpty(t, entry.Summary)
 		require.NotEmpty(t, ToolNamesInSet(entry.Name), "tool set %q must expose tools", entry.Name)

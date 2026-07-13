@@ -23,7 +23,14 @@ func legacyMCPToolSetOptions(toolSets, disableToolSets []string, enableAll bool)
 		if enableAll {
 			opts = append(opts, WithEnableAllToolSets())
 		} else {
-			opts = append(opts, WithEnableDefaultToolSets())
+			profileSets, err := yakit.EffectiveDefaultMCPToolSets(consts.GetGormProfileDatabase())
+			if err != nil || len(profileSets) == 0 {
+				opts = append(opts, WithEnableDefaultToolSets())
+			} else {
+				for _, toolSet := range profileSets {
+					opts = append(opts, WithEnableToolSet(toolSet))
+				}
+			}
 		}
 	} else {
 		for _, toolSet := range toolSets {
@@ -88,7 +95,12 @@ var MCPCommand = &cli.Command{
 		})
 		resource, disableResource := c.String("resource"), c.String("disable-resource")
 		if resource == "" && !enableAllToolSets && len(toolSets) == 0 {
-			resource = strings.Join(DefaultMCPResourceSets, ",")
+			resourceSetsFromProfile, err := yakit.EffectiveDefaultMCPResourceSets(consts.GetGormProfileDatabase())
+			if err != nil || len(resourceSetsFromProfile) == 0 {
+				resource = strings.Join(DefaultMCPResourceSets, ",")
+			} else {
+				resource = strings.Join(resourceSetsFromProfile, ",")
+			}
 		}
 		resourceSets := lo.FilterMap(strings.Split(resource, ","), func(item string, _ int) (string, bool) {
 			item = strings.TrimSpace(item)
