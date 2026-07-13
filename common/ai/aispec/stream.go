@@ -168,22 +168,72 @@ func extractLastChatUsageFromPayload(raw []byte) *ChatUsage {
 		}
 	}
 
-	var usageProbe struct {
-		Usage *ChatUsage `json:"usage"`
-	}
-	if err := json.Unmarshal(raw, &usageProbe); err == nil {
-		recordUsage(usageProbe.Usage)
-	}
-
-	for _, rawJSON := range jsonextractor.ExtractStandardJSON(string(raw)) {
-		usageProbe = struct {
-			Usage *ChatUsage `json:"usage"`
-		}{}
-		if err := json.Unmarshal([]byte(rawJSON), &usageProbe); err == nil {
-			recordUsage(usageProbe.Usage)
+	// parse 提取一段 JSON 片段里的 usage。支持两种位置:
+	//   1. 顶层 usage (chat-completions 风格: {"usage":{"prompt_tokens":...}})
+	//   2. 嵌套在 response.usage (responses 风格: {"response":{"usage":{"input_tokens":...}}})
+	// 并在字段名是 responses 别名 (input_tokens/output_tokens) 时归一化。
+	// 关键词: extractLastChatUsageFromPayload, responses usage 嵌套提取
+	parse := func(b []byte) {
+		var generic map[string]any
+		if err := json.Unmarshal(b, &generic); err != nil {
+			return
+		}
+		// 收集所有候选 usage 块 (顶层 + response.* 链路), 逐个归一化后反序列化。
+		var candidates []map[string]any
+		if u, ok := generic["usage"].(map[string]any); ok {
+			candidates = append(candidates, u)
+		}
+		if resp, ok := generic["response"].(map[string]any); ok {
+			if u, ok := resp["usage"].(map[string]any); ok {
+				candidates = append(candidates, u)
+			}
+		}
+		for _, u := range candidates {
+			normalized := normalizeUsageMap(u)
+			usageBytes, err := json.Marshal(map[string]any{"usage": normalized})
+			if err != nil {
+				continue
+			}
+			var usageProbe struct {
+				Usage *ChatUsage `json:"usage"`
+			}
+			if err := json.Unmarshal(usageBytes, &usageProbe); err == nil {
+				recordUsage(usageProbe.Usage)
+			}
 		}
 	}
+
+	parse(raw)
+	for _, rawJSON := range jsonextractor.ExtractStandardJSON(string(raw)) {
+		parse([]byte(rawJSON))
+	}
 	return lastUsage
+}
+
+// normalizeUsageMap 把 usage map 里 responses 协议的别名
+// (input_tokens / output_tokens / input_tokens_details) 归一化为
+// chat-completions 的字段名 (prompt_tokens / completion_tokens /
+// prompt_tokens_details), 让统一的 ChatUsage 能正确反序列化两种协议的 usage。
+// 仅在 alias 存在而标准字段缺失时补齐, 不覆盖已存在的标准字段。
+// 关键词: normalizeUsageMap, responses usage 别名归一化
+func normalizeUsageMap(usage map[string]any) map[string]any {
+	alias := func(dst, src string) {
+		if _, hasDst := usage[dst]; hasDst {
+			return
+		}
+		if v, hasSrc := usage[src]; hasSrc {
+			usage[dst] = v
+		}
+	}
+	alias("prompt_tokens", "input_tokens")
+	alias("completion_tokens", "output_tokens")
+	// input_tokens_details -> prompt_tokens_details (cached_tokens 子字段同名, 直接搬运)
+	if _, hasDst := usage["prompt_tokens_details"]; !hasDst {
+		if v, hasSrc := usage["input_tokens_details"]; hasSrc {
+			usage["prompt_tokens_details"] = v
+		}
+	}
+	return usage
 }
 
 // processAIResponse 处理流式响应
