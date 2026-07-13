@@ -1016,12 +1016,27 @@ func hasNonEmptyChatContent(content any) bool {
 	}
 }
 
+// responsesTextType returns the Responses content-part "type" for a text part
+// based on message role: assistant messages use "output_text" (OpenAI Responses
+// spec), all other roles (user/developer/system) use "input_text".
+// Some responses-only upstreams (e.g. packyapi codex group) reject "input_text"
+// on assistant items with 400 "Invalid value: 'input_text'. Supported values
+// are: 'output_text' and 'refusal'.".
+// 关键词: responsesTextType, output_text input_text role, assistant 消息内容类型
+func responsesTextType(role string) string {
+	if role == "assistant" {
+		return "output_text"
+	}
+	return "input_text"
+}
+
 func buildResponsesMessageItem(role string, m ChatDetail) map[string]any {
+	textType := responsesTextType(role)
 	var content []map[string]any
 	switch v := m.Content.(type) {
 	case string:
 		content = append(content, map[string]any{
-			"type": "input_text",
+			"type": textType,
 			"text": v,
 		})
 	case []*ChatContent:
@@ -1032,7 +1047,7 @@ func buildResponsesMessageItem(role string, m ChatDetail) map[string]any {
 			switch c.Type {
 			case "text":
 				content = append(content, map[string]any{
-					"type": "input_text",
+					"type": textType,
 					"text": c.Text,
 				})
 			case "image_url":
@@ -1048,7 +1063,7 @@ func buildResponsesMessageItem(role string, m ChatDetail) map[string]any {
 			default:
 				if c.Text != "" {
 					content = append(content, map[string]any{
-						"type": "input_text",
+						"type": textType,
 						"text": c.Text,
 					})
 				}
@@ -1056,13 +1071,13 @@ func buildResponsesMessageItem(role string, m ChatDetail) map[string]any {
 		}
 	default:
 		content = append(content, map[string]any{
-			"type": "input_text",
+			"type": textType,
 			"text": utils.InterfaceToString(m.Content),
 		})
 	}
 	if len(content) == 0 {
 		content = append(content, map[string]any{
-			"type": "input_text",
+			"type": textType,
 			"text": "",
 		})
 	}
@@ -1070,9 +1085,13 @@ func buildResponsesMessageItem(role string, m ChatDetail) map[string]any {
 		"role":    role,
 		"content": content,
 	}
-	if rc := strings.TrimSpace(m.ReasoningContent); rc != "" {
-		item["reasoning_content"] = rc
-	}
+	// NOTE: do NOT emit reasoning_content on Responses input items.
+	// The chat-completions "reasoning_content" field is rejected by some
+	// responses-only upstreams (e.g. packyapi codex group) with 400
+	// "Unknown parameter: 'input[N].reasoning_content'". Reasoning context
+	// for the Responses API is carried via the reasoning effort / reasoning
+	// summary mechanism, not the input message items.
+	// 关键词: reasoning_content 不注入 responses input, packyapi unknown_parameter
 	return item
 }
 

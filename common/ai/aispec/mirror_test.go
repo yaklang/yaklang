@@ -402,12 +402,67 @@ func TestConvertChatDetailsToResponsesInput(t *testing.T) {
 	assert.Equal(t, "input_text", c1[0]["type"])
 	assert.Equal(t, "input_image", c1[1]["type"])
 
-	// 第 3 条：未知类型 → InterfaceToString 兜底
+	// 第 3 条：未知类型 → InterfaceToString 兜底, assistant 角色 → output_text
 	assert.Equal(t, "assistant", out[2]["role"])
 	c2 := out[2]["content"].([]map[string]any)
 	require.Len(t, c2, 1)
-	assert.Equal(t, "input_text", c2[0]["type"])
+	assert.Equal(t, "output_text", c2[0]["type"])
 	assert.Equal(t, "12345", c2[0]["text"])
+}
+
+// TestConvertChatDetailsToResponsesInput_AssistantOutputText 验证 assistant 消息的
+// text content 映射为 "output_text" (OpenAI Responses 规范), 而非 "input_text".
+// 部分 responses-only 上游 (如 packyapi codex 分组) 会拒绝 assistant 上的
+// input_text 并返回 400 "Invalid value: 'input_text'. Supported values are:
+// 'output_text' and 'refusal'.".
+// 关键词: assistant output_text, responses input content type, packyapi codex
+func TestConvertChatDetailsToResponsesInput_AssistantOutputText(t *testing.T) {
+	msgs := []ChatDetail{
+		{Role: "assistant", Content: "hello from assistant"},
+		{Role: "assistant", Content: []*ChatContent{NewUserChatContentText("part text")}},
+		{Role: "user", Content: "hi"},
+		{Role: "system", Content: "sys"},
+		{Role: "developer", Content: "dev"},
+	}
+	out := convertChatDetailsToResponsesInput(msgs)
+	require.Len(t, out, 5)
+
+	// assistant string content → output_text
+	assert.Equal(t, "assistant", out[0]["role"])
+	c0 := out[0]["content"].([]map[string]any)
+	assert.Equal(t, "output_text", c0[0]["type"])
+
+	// assistant []*ChatContent text → output_text
+	assert.Equal(t, "assistant", out[1]["role"])
+	c1 := out[1]["content"].([]map[string]any)
+	assert.Equal(t, "output_text", c1[0]["type"])
+
+	// user / system / developer → input_text (unchanged)
+	assert.Equal(t, "input_text", out[2]["content"].([]map[string]any)[0]["type"])
+	assert.Equal(t, "input_text", out[3]["content"].([]map[string]any)[0]["type"])
+	assert.Equal(t, "input_text", out[4]["content"].([]map[string]any)[0]["type"])
+}
+
+// TestConvertChatDetailsToResponsesInput_NoReasoningContent 验证 Responses input
+// 不注入 reasoning_content 字段。chat-completions 的 reasoning_content 被
+// 部分 responses-only 上游 (如 packyapi codex 分组) 以 400
+// "Unknown parameter: 'input[N].reasoning_content'" 拒绝。
+// 关键词: reasoning_content 不注入 responses input, packyapi unknown_parameter
+func TestConvertChatDetailsToResponsesInput_NoReasoningContent(t *testing.T) {
+	msgs := []ChatDetail{
+		NewAssistantChatDetailWithReasoningContent("visible answer", "secret reasoning"),
+	}
+	out := convertChatDetailsToResponsesInput(msgs)
+	require.Len(t, out, 1)
+
+	// reasoning_content must NOT appear on the responses input item
+	_, hasReasoning := out[0]["reasoning_content"]
+	assert.False(t, hasReasoning, "reasoning_content must not be injected into responses input items")
+
+	// assistant visible content still carried as output_text
+	c := out[0]["content"].([]map[string]any)
+	assert.Equal(t, "output_text", c[0]["type"])
+	assert.Equal(t, "visible answer", c[0]["text"])
 }
 
 // TestNormalizeResponsesInput 确保 normalizeResponsesInput 把字符串/nil/数组
