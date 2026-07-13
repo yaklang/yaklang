@@ -3,6 +3,11 @@ package netstackvm
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/netip"
+	"sync"
+	"time"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
@@ -10,10 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
-	"net"
-	"net/netip"
-	"sync"
-	"time"
 )
 
 type NetStackVirtualMachine struct {

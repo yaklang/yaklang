@@ -1,10 +1,11 @@
 package payloads
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type FileBaseInfo struct {

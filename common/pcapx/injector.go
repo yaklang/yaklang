@@ -2,6 +2,11 @@ package pcapx
 
 import (
 	"fmt"
+	"math/rand"
+	"net"
+	"sync"
+	"time"
+
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/pcap"
@@ -9,10 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"math/rand"
-	"net"
-	"sync"
-	"time"
 )
 
 var (

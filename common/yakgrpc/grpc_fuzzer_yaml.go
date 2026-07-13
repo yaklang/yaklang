@@ -6,12 +6,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/fuzztagx"
-	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/fuzztagx"
+	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 
 	"github.com/samber/lo"
 

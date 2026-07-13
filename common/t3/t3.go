@@ -6,11 +6,12 @@ import (
 	"crypto/md5"
 	"encoding/binary"
 	"fmt"
+	"text/template"
+	"time"
+
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yserx"
-	"text/template"
-	"time"
 )
 
 func aa() ([]byte, []byte) {

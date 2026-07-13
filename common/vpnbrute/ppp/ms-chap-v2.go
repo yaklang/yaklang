@@ -3,10 +3,11 @@ package ppp
 import (
 	"crypto/des"
 	"crypto/sha1"
+	"math/bits"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/crypto/md4"
 	"golang.org/x/text/encoding/unicode"
-	"math/bits"
 )
 
 func ToUTF16(in []byte) ([]byte, error) {

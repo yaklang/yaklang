@@ -3,11 +3,12 @@ package pandocutils
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"os"
-	"os/exec"
 )
 
 func SimpleCovertMarkdownToDocx(ctx context.Context, inputFile string, outputFile string) error {

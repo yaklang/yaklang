@@ -61,7 +61,7 @@ type RuleGroup struct {
 
 // ScanPolicyConfig 扫描策略配置
 type ScanPolicyConfig struct {
-	PolicyType  string            `json:"policy_type"`  // 策略类型: owasp-web, critical-high, fullstack, custom
+	PolicyType  string             `json:"policy_type"`  // 策略类型: owasp-web, critical-high, fullstack, custom
 	CustomRules *CustomRulesConfig `json:"custom_rules"` // 自定义规则组（当 PolicyType 为 custom 时使用）
 }
 
@@ -113,9 +113,9 @@ func GetAllStandardGroupNames() []string {
 	if config == nil {
 		return nil
 	}
-	
+
 	var groupNames []string
-	
+
 	// 从 custom_rule_groups 中提取所有组名
 	if config.CustomRuleGroups.ComplianceRules != nil {
 		for _, category := range config.CustomRuleGroups.ComplianceRules {
@@ -124,7 +124,7 @@ func GetAllStandardGroupNames() []string {
 			}
 		}
 	}
-	
+
 	if config.CustomRuleGroups.TechStackRules != nil {
 		for _, category := range config.CustomRuleGroups.TechStackRules {
 			for _, group := range category.Groups {
@@ -132,7 +132,7 @@ func GetAllStandardGroupNames() []string {
 			}
 		}
 	}
-	
+
 	if config.CustomRuleGroups.SpecialRules != nil {
 		for _, category := range config.CustomRuleGroups.SpecialRules {
 			for _, group := range category.Groups {
@@ -140,7 +140,7 @@ func GetAllStandardGroupNames() []string {
 			}
 		}
 	}
-	
+
 	return groupNames
 }
 

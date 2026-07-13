@@ -3,6 +3,8 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -10,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/wsm"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 )
 
 // TODO 何时清理缓存

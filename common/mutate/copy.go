@@ -2,11 +2,12 @@ package mutate
 
 import (
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
 	"net/textproto"
 	"net/url"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func deepCopyHeader(h http.Header) (http.Header, error) {

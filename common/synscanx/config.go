@@ -2,12 +2,13 @@ package synscanx
 
 import (
 	"context"
+	"net"
+	"time"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
-	"net"
-	"time"
 )
 
 type SynxConfig struct {

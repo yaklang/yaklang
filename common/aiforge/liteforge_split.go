@@ -2,9 +2,10 @@ package aiforge
 
 import (
 	"bytes"
+	"text/template"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
-	"text/template"
 )
 
 var splitPrompt = `# 角色

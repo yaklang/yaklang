@@ -3,14 +3,15 @@ package protocol_impl
 import (
 	"bytes"
 	"errors"
+	"io"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/bin-parser/parser"
 	utils2 "github.com/yaklang/yaklang/common/bin-parser/utils"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"golang.org/x/crypto/md4"
 	"golang.org/x/text/encoding/unicode"
-	"io"
-	"strings"
 )
 
 type AVPAIR struct {

@@ -1,8 +1,9 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
 // use in for/switch

@@ -1,9 +1,10 @@
 package chaosmaker
 
 import (
+	"sync"
+
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
-	"sync"
 )
 
 /*

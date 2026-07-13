@@ -44,31 +44,31 @@ const (
 
 // ChatGLMSearchRequest represents the request body for ChatGLM Web Search API
 type ChatGLMSearchRequest struct {
-	SearchQuery        string `json:"search_query"`                   // Required: search content, max 70 chars
-	SearchEngine       string `json:"search_engine"`                  // Required: search_std, search_pro, search_pro_sogou, search_pro_quark
-	SearchIntent       bool   `json:"search_intent"`                  // Required: whether to perform intent recognition
-	Count              int    `json:"count,omitempty"`                // Optional: 1-50, default 10
-	SearchDomainFilter string `json:"search_domain_filter,omitempty"` // Optional: whitelist domain
+	SearchQuery         string `json:"search_query"`                    // Required: search content, max 70 chars
+	SearchEngine        string `json:"search_engine"`                   // Required: search_std, search_pro, search_pro_sogou, search_pro_quark
+	SearchIntent        bool   `json:"search_intent"`                   // Required: whether to perform intent recognition
+	Count               int    `json:"count,omitempty"`                 // Optional: 1-50, default 10
+	SearchDomainFilter  string `json:"search_domain_filter,omitempty"`  // Optional: whitelist domain
 	SearchRecencyFilter string `json:"search_recency_filter,omitempty"` // Optional: oneDay, oneWeek, oneMonth, oneYear, noLimit
-	ContentSize        string `json:"content_size,omitempty"`         // Optional: medium, high
-	RequestID          string `json:"request_id,omitempty"`           // Optional: unique request ID
-	UserID             string `json:"user_id,omitempty"`              // Optional: end user ID (6-128 chars)
+	ContentSize         string `json:"content_size,omitempty"`          // Optional: medium, high
+	RequestID           string `json:"request_id,omitempty"`            // Optional: unique request ID
+	UserID              string `json:"user_id,omitempty"`               // Optional: end user ID (6-128 chars)
 }
 
 // ChatGLMSearchResponse represents the response from ChatGLM Web Search API
 type ChatGLMSearchResponse struct {
-	ID           string                   `json:"id"`
-	Created      int64                    `json:"created"`
-	RequestID    string                   `json:"request_id"`
-	SearchIntent []ChatGLMSearchIntent    `json:"search_intent"`
-	SearchResult []ChatGLMSearchResult    `json:"search_result"`
-	Error        *ChatGLMSearchError      `json:"error,omitempty"`
+	ID           string                `json:"id"`
+	Created      int64                 `json:"created"`
+	RequestID    string                `json:"request_id"`
+	SearchIntent []ChatGLMSearchIntent `json:"search_intent"`
+	SearchResult []ChatGLMSearchResult `json:"search_result"`
+	Error        *ChatGLMSearchError   `json:"error,omitempty"`
 }
 
 // ChatGLMSearchIntent represents a search intent result
 type ChatGLMSearchIntent struct {
 	Query    string `json:"query"`
-	Intent   string `json:"intent"`   // SEARCH_ALL, SEARCH_NONE, SEARCH_ALWAYS
+	Intent   string `json:"intent"` // SEARCH_ALL, SEARCH_NONE, SEARCH_ALWAYS
 	Keywords string `json:"keywords"`
 }
 
@@ -77,9 +77,9 @@ type ChatGLMSearchResult struct {
 	Title       string `json:"title"`
 	Content     string `json:"content"`
 	Link        string `json:"link"`
-	Media       string `json:"media"`       // website name
-	Icon        string `json:"icon"`        // website icon URL
-	Refer       string `json:"refer"`       // reference index
+	Media       string `json:"media"` // website name
+	Icon        string `json:"icon"`  // website icon URL
+	Refer       string `json:"refer"` // reference index
 	PublishDate string `json:"publish_date"`
 }
 
@@ -151,13 +151,13 @@ func (c *ChatGLMSearchClient) SearchWithCustomParams(query string, customParams 
 
 	// Build request body
 	reqBody := &ChatGLMSearchRequest{
-		SearchQuery:        query,
-		SearchEngine:       c.Config.SearchEngine,
-		SearchIntent:       c.Config.SearchIntent,
-		Count:              c.Config.MaxResults,
+		SearchQuery:         query,
+		SearchEngine:        c.Config.SearchEngine,
+		SearchIntent:        c.Config.SearchIntent,
+		Count:               c.Config.MaxResults,
 		SearchRecencyFilter: c.Config.SearchRecencyFilter,
-		ContentSize:        c.Config.ContentSize,
-		SearchDomainFilter: c.Config.SearchDomainFilter,
+		ContentSize:         c.Config.ContentSize,
+		SearchDomainFilter:  c.Config.SearchDomainFilter,
 	}
 
 	// Apply custom params overrides

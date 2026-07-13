@@ -1,13 +1,14 @@
 package match
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/suricata/data"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/suricata/rule"
 	"golang.org/x/exp/slices"
-	"strconv"
-	"strings"
 )
 
 func newPayloadMatcher(r *rule.ContentRule, mdf modifier.Modifier) matchHandler {

@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 )
 
 func (s *Server) GetAllFuzztagInfo(ctx context.Context, req *ypb.GetAllFuzztagInfoRequest) (*ypb.GetAllFuzztagInfoResponse, error) {

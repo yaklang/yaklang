@@ -9,8 +9,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
-
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"gopkg.in/yaml.v2"
 )
 

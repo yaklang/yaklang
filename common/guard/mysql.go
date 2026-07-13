@@ -3,9 +3,10 @@ package guard
 import (
 	"bytes"
 	"context"
+	"os/exec"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
-	"os/exec"
 )
 
 type MySQLServerDetail struct {

@@ -140,12 +140,14 @@ func sendMatchResultOrDrop(ctx context.Context, outC chan<- *fp.MatchResult, res
 // // 全连接扫描本机常见端口，对开放端口打印指纹与 CPE 信息
 // ch, err = servicescan.Scan("127.0.0.1", "22,80,443,3306")
 // die(err) // 启动失败时停止脚本
-// for result := range ch {
-//     if result.IsOpen() { // IsOpen 判断端口是否开放
-//         println(result.String())  // 可读摘要，含服务名与版本
-//         println(result.GetCPEs()) // CPE 列表
-//     }
-// }
+//
+//	for result := range ch {
+//	    if result.IsOpen() { // IsOpen 判断端口是否开放
+//	        println(result.String())  // 可读摘要，含服务名与版本
+//	        println(result.GetCPEs()) // CPE 列表
+//	    }
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 //
@@ -153,15 +155,19 @@ func sendMatchResultOrDrop(ctx context.Context, outC chan<- *fp.MatchResult, res
 // ```
 // // 目标端口较多时调大并发，并设置单个探测包超时
 // ch, err = servicescan.Scan("192.168.1.1/24", "1-1000",
-//     servicescan.concurrent(50),   // 50 个并发
-//     servicescan.probeTimeout(5),  // 单个探测包 5 秒超时
+//
+//	servicescan.concurrent(50),   // 50 个并发
+//	servicescan.probeTimeout(5),  // 单个探测包 5 秒超时
+//
 // )
 // die(err)
-// for result := range ch {
-//     if result.IsOpen() {
-//         println(result.String())
-//     }
-// }
+//
+//	for result := range ch {
+//	    if result.IsOpen() {
+//	        println(result.String())
+//	    }
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 //
@@ -170,11 +176,13 @@ func sendMatchResultOrDrop(ctx context.Context, outC chan<- *fp.MatchResult, res
 // // 只跑 Web 指纹规则，扫描常见 Web 端口
 // ch, err = servicescan.Scan("127.0.0.1", "80,443,8080,8443", servicescan.web())
 // die(err)
-// for result := range ch {
-//     if result.IsOpen() {
-//         println(result.String())
-//     }
-// }
+//
+//	for result := range ch {
+//	    if result.IsOpen() {
+//	        println(result.String())
+//	    }
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 func scanFingerprint(target string, port string, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {
@@ -197,10 +205,12 @@ func scanFingerprint(target string, port string, opts ...fp.ConfigOption) (chan 
 // // 同步扫描单个 host:port，直接拿到一个结果(端口关闭也会返回结果、不报错)
 // result, err = servicescan.ScanOne("127.0.0.1", 80, servicescan.probeTimeout(5))
 // die(err)
-// if result.IsOpen() {
-//     println(result.String())  // 可读摘要
-//     println(result.GetCPEs()) // CPE 列表
-// }
+//
+//	if result.IsOpen() {
+//	    println(result.String())  // 可读摘要
+//	    println(result.GetCPEs()) // CPE 列表
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 func scanOneFingerprint(target string, port int, opts ...fp.ConfigOption) (*fp.MatchResult, error) {
@@ -383,11 +393,13 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 // die(err)
 // fpResults, err = servicescan.ScanFromPing(pingResult, "22,80,443,3389")
 // die(err)
-// for result := range fpResults {
-//     if result.IsOpen() {
-//         println(result.String())
-//     }
-// }
+//
+//	for result := range fpResults {
+//	    if result.IsOpen() {
+//	        println(result.String())
+//	    }
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 func _scanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {
@@ -434,9 +446,11 @@ func _scanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...fp.
 // die(err)
 // fpResults, err = servicescan.ScanFromSynResult(synResult)
 // die(err)
-// for result := range fpResults {
-//     println(result.String())
-// }
+//
+//	for result := range fpResults {
+//	    println(result.String())
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 //
@@ -447,9 +461,11 @@ func _scanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...fp.
 // die(err)
 // fpResults, err = servicescan.ScanFromSpaceEngine(res)
 // die(err)
-// for result := range fpResults {
-//     println(result.String())
-// }
+//
+//	for result := range fpResults {
+//	    println(result.String())
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 //

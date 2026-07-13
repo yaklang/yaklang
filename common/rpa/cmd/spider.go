@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/yaklang/yaklang/common/rpa"
 	"github.com/yaklang/yaklang/common/rpa/cmd/semi"
 	"github.com/yaklang/yaklang/common/rpa/core"
 	"github.com/yaklang/yaklang/common/utils"
-	"os"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 )
 
 func main() {

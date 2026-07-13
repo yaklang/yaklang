@@ -1,12 +1,13 @@
 package webfingerprint
 
 import (
-	"github.com/yaklang/yaklang/common/log"
-	utils2 "github.com/yaklang/yaklang/common/utils"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	utils2 "github.com/yaklang/yaklang/common/utils"
 )
 
 type Config struct {

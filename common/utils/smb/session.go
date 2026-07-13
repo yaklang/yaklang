@@ -10,11 +10,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/netx"
 	"io"
 	"log"
 	"net"
 	"runtime/debug"
+
+	"github.com/yaklang/yaklang/common/netx"
 
 	"github.com/stacktitan/smb/gss"
 	"github.com/stacktitan/smb/ntlmssp"

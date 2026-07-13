@@ -2,6 +2,7 @@ package match
 
 import (
 	"bytes"
+
 	"github.com/yaklang/yaklang/common/suricata/data"
 )
 

@@ -93,12 +93,12 @@ type RAGServerConfig struct {
 // 关键词: rag-server default config, port 9093
 func NewDefaultConfig() *RAGServerConfig {
 	return &RAGServerConfig{
-		Host:         "0.0.0.0",
-		Port:         9093,
-		RoutePrefix:  "/api/rag-server",
-		AuthToken:    "",
-		Concurrent:   3,
-		Timeout:      180,
+		Host:          "0.0.0.0",
+		Port:          9093,
+		RoutePrefix:   "/api/rag-server",
+		AuthToken:     "",
+		Concurrent:    3,
+		Timeout:       180,
 		MaxIteration:  1,
 		Language:      "zh",
 		Title:         DefaultTitle,

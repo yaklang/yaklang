@@ -3,14 +3,15 @@ package bruteforce
 import (
 	"bufio"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/rpa/implement"
-	"github.com/yaklang/yaklang/common/rpa/web"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/rpa/implement"
+	"github.com/yaklang/yaklang/common/rpa/web"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/go-rod/rod"
 )

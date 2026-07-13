@@ -3,6 +3,7 @@ package ssareducer
 import (
 	"context"
 	"embed"
+
 	"github.com/yaklang/yaklang/common/yak/ssa/ssalog"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"

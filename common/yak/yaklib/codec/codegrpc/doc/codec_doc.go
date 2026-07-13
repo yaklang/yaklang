@@ -3,11 +3,12 @@ package main
 import (
 	"bytes"
 	"encoding/gob"
+	"io/ioutil"
+	"os"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec/codegrpc"
-	"io/ioutil"
-	"os"
 )
 
 func main() {

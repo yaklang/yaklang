@@ -453,9 +453,11 @@ func WithConnectionFilter(filter *ConnectionFilter) ConnectionMonitorOption {
 //
 // Example:
 // ```
-// monitor = hids.NewConnectionMonitor(hids.WithOnNewConnection(func(event) {
-//     println("new connection:", event.Connection.LocalAddr, "->", event.Connection.RemoteAddr)
-// }))
+//
+//	monitor = hids.NewConnectionMonitor(hids.WithOnNewConnection(func(event) {
+//	    println("new connection:", event.Connection.LocalAddr, "->", event.Connection.RemoteAddr)
+//	}))
+//
 // ```
 func WithOnNewConnection(callback func(event *ConnectionEvent)) ConnectionMonitorOption {
 	return func(m *ConnectionMonitor) {
@@ -473,9 +475,11 @@ func WithOnNewConnection(callback func(event *ConnectionEvent)) ConnectionMonito
 //
 // Example:
 // ```
-// monitor = hids.NewConnectionMonitor(hids.WithOnConnectionDisappear(func(event) {
-//     println("connection closed:", event.Connection.LocalAddr)
-// }))
+//
+//	monitor = hids.NewConnectionMonitor(hids.WithOnConnectionDisappear(func(event) {
+//	    println("connection closed:", event.Connection.LocalAddr)
+//	}))
+//
 // ```
 func WithOnConnectionDisappear(callback func(event *ConnectionEvent)) ConnectionMonitorOption {
 	return func(m *ConnectionMonitor) {

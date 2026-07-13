@@ -4,15 +4,16 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+	"unicode/utf8"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"net/http"
-	"strconv"
-	"strings"
-	"unicode/utf8"
 )
 
 //go:embed html/vul_cryoto_sm_sm4.html

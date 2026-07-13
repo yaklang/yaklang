@@ -2,10 +2,11 @@ package cvemodels
 
 import (
 	"encoding/json"
-	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type CVEYearFile struct {

@@ -3,13 +3,14 @@ package dnsutil
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
-	"time"
 )
 
 var (

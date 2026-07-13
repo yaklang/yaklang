@@ -1,8 +1,9 @@
 package ldapserver
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	ldap "github.com/lor00x/goldap/message"
 )

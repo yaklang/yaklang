@@ -46,9 +46,9 @@ type MemoryFlushBuffer struct {
 	firstIteration    int
 	lastIteration     int
 
-	jobs      *chanx.UnlimitedChan[memoryFlushAsyncJob]
+	jobs       *chanx.UnlimitedChan[memoryFlushAsyncJob]
 	workerOnce sync.Once
-	closeOnce sync.Once
+	closeOnce  sync.Once
 }
 
 func DefaultMemoryFlushBufferConfig() MemoryFlushBufferConfig {

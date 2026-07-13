@@ -2,14 +2,15 @@ package pcre
 
 import (
 	"fmt"
+	"regexp/syntax"
+	"strings"
+
 	regexp2 "github.com/VillanCh/go-pcre2-lite/regexp2"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata/data"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/utils/regen"
-	"regexp/syntax"
-	"strings"
 )
 
 type PCRE struct {

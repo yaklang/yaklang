@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
 	"io"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/log"
 
@@ -302,29 +303,29 @@ func (a *ToolCaller) invoke(
 		RuntimeID:             a.callToolId,
 		BrowserSessionTracker: browserTracker,
 		FeedBacker: func(result *ypb.ExecResult) error {
-				// 处理 risk 消息
-				risk, _ := handleRiskMessage(result)
-				if risk != nil {
-					e.EmitYakitRisk(risk.ID, risk.Title, risk.RuntimeId)
-					boundRisksMu.Lock()
-					boundRisks = append(boundRisks, risk)
-					boundRisksMu.Unlock()
-				}
-				httpFlow, _ := handleHTTPFlowMessage(result)
-				if httpFlow != nil {
-					e.EmitYakitHTTPFlow(httpFlow.RuntimeId, httpFlow.HiddenIndex)
-					return nil
-				}
-				if path, ok := handleFileWriteMessage(result); ok {
-					NotifySessionSnapshotFileWrite(a.config, path)
-				}
-				// 过滤文件 Stat/Read 等高频消息，避免对前端造成压力
-				if shouldIgnoreExecResultForEmit(result) {
-					return nil
-				}
-				e.EmitYakitExecResult(result)
+			// 处理 risk 消息
+			risk, _ := handleRiskMessage(result)
+			if risk != nil {
+				e.EmitYakitRisk(risk.ID, risk.Title, risk.RuntimeId)
+				boundRisksMu.Lock()
+				boundRisks = append(boundRisks, risk)
+				boundRisksMu.Unlock()
+			}
+			httpFlow, _ := handleHTTPFlowMessage(result)
+			if httpFlow != nil {
+				e.EmitYakitHTTPFlow(httpFlow.RuntimeId, httpFlow.HiddenIndex)
 				return nil
-			},
+			}
+			if path, ok := handleFileWriteMessage(result); ok {
+				NotifySessionSnapshotFileWrite(a.config, path)
+			}
+			// 过滤文件 Stat/Read 等高频消息，避免对前端造成压力
+			if shouldIgnoreExecResultForEmit(result) {
+				return nil
+			}
+			e.EmitYakitExecResult(result)
+			return nil
+		},
 	}
 	execResult, execErr := tool.InvokeWithParams(
 		params,

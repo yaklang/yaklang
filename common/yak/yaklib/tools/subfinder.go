@@ -4,16 +4,17 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/subdomain"
-	"github.com/yaklang/yaklang/common/utils"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/subdomain"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func contentToTmpFile(raw []byte) (string, error) {

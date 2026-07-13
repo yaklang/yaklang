@@ -15,8 +15,9 @@
 package log
 
 import (
-	"github.com/kataras/golog"
 	"time"
+
+	"github.com/kataras/golog"
 
 	"golang.org/x/time/rate"
 )

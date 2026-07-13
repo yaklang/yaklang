@@ -3,6 +3,10 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"strconv"
+	"strings"
+	"sync"
+
 	uuid "github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
@@ -11,9 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"strings"
-	"sync"
 )
 
 type HybridScanRequestStream interface {

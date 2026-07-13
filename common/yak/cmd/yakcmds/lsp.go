@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/log"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/lsp"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 )

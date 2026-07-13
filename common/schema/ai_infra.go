@@ -171,7 +171,7 @@ func (c *AiCheckpoint) CalcHash() string {
 	return utils.CalcSha256(c.CoordinatorUuid, c.Seq, c.Type)
 }
 
-func (c *AiCheckpoint) BeforeSave() error {
+func (c *AiCheckpoint) BeforeSave(tx *gorm.DB) error {
 	if c.Hash == "" {
 		c.Hash = c.CalcHash()
 	}
@@ -230,7 +230,7 @@ func (a *AIMemoryEntity) TableName() string {
 	return "ai_memory_entities_v1"
 }
 
-func (a *AIMemoryEntity) BeforeSave() error {
+func (a *AIMemoryEntity) BeforeSave(tx *gorm.DB) error {
 	if a.MemoryID == "" {
 		return utils.Errorf("memory_id must be set")
 	}

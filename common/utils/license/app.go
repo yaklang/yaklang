@@ -2,11 +2,12 @@ package license
 
 import (
 	"encoding/json"
+	"io/ioutil"
+	"time"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
-	"io/ioutil"
-	"time"
 )
 
 type Request struct {

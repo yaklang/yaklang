@@ -3,13 +3,14 @@ package vulinbox
 import (
 	_ "embed"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
 	"strconv"
 	"strings"
 	"text/template"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 //go:embed html/mall/vul_mall_register.html

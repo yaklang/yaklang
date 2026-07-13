@@ -3,11 +3,12 @@ package ai
 import (
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aibalance"
-	"github.com/yaklang/yaklang/common/ai/aid/aicache"
 	"io"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aibalance"
+	"github.com/yaklang/yaklang/common/ai/aid/aicache"
 
 	"github.com/yaklang/yaklang/common/ai/dashscopebase"
 	"github.com/yaklang/yaklang/common/ai/deepseek"

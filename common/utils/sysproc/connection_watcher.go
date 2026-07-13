@@ -3,11 +3,12 @@ package sysproc
 import (
 	"context"
 	"fmt"
-	"github.com/shirou/gopsutil/v4/net"
 	"log"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/shirou/gopsutil/v4/net"
 
 	"github.com/shirou/gopsutil/v4/process"
 )

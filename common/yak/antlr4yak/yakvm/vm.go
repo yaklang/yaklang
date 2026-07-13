@@ -2,8 +2,9 @@ package yakvm
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils/limitedmap"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/utils/limitedmap"
 
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 )

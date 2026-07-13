@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/ai/rag/generate_index_tool"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 )
 
 // clearCommand clear 命令处理函数

@@ -2,11 +2,12 @@ package hidsevent
 
 import (
 	"context"
+	"os/exec"
+	"strings"
+
 	"github.com/kevinburke/ssh_config"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
-	"os/exec"
-	"strings"
 
 	"os"
 )

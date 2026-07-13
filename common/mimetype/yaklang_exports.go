@@ -4,12 +4,13 @@ import (
 	"context"
 	jsonlib "encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"io"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 )
 
 // mimetype.DetectFile 读取指定文件并判断其具体 MIME 类型

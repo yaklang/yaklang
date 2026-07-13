@@ -79,8 +79,8 @@ type SingleFileModificationSuiteFactory struct {
 	fileChangedCb       FileChangedCallback
 	postSyntaxCleanHook PostSyntaxCleanHook
 	codePrettifyCb      CodePrettifyCallback
-	spinDetectionCb  func(loop *reactloops.ReActLoop, startLine, endLine int) (bool, string)
-	reflectionPrompt func(startLine, endLine int, reason string) string
+	spinDetectionCb     func(loop *reactloops.ReActLoop, startLine, endLine int) (bool, string)
+	reflectionPrompt    func(startLine, endLine int, reason string) string
 
 	// Runtime reference (set by GetActions)
 	runtime aicommon.AIInvokeRuntime

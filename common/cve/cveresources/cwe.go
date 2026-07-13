@@ -225,7 +225,7 @@ func formatCWEList(cweIds string) string {
 	return strings.Join(formatted, ", ")
 }
 
-func (c *CWE) BeforeSave() error {
+func (c *CWE) BeforeSave(tx *gorm.DB) error {
 	if c.Id <= 0 {
 		c.Id, _ = strconv.Atoi(c.IdStr)
 	}

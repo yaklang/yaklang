@@ -5,7 +5,6 @@ type Replacement struct {
 	DeletedRegion   Region           `json:"deletedRegion"`
 	InsertedContent *ArtifactContent `json:"insertedContent,omitempty"`
 	PropertyBag
-
 }
 
 // NewReplacement creates a new Replacement and returns a pointer to it

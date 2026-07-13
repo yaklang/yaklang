@@ -1,9 +1,10 @@
 package hidsevent
 
 import (
-	"github.com/fsnotify/fsnotify"
 	"os"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
 )
 
 type FileChangeInfo struct {

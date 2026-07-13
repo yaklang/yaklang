@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"net"
+	"time"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/jreader"
 	"github.com/yaklang/yaklang/common/yserx"
-	"net"
-	"time"
 )
 
 var serializationHeader = []byte{0xac, 0xed, 0x00, 0x05}

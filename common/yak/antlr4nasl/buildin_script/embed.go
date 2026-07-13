@@ -2,6 +2,7 @@ package buildin_script
 
 import (
 	"embed"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/gzip_embed"
 )

@@ -2,12 +2,13 @@ package codec
 
 import (
 	"bytes"
-	"golang.org/x/net/html"
-	"golang.org/x/net/html/charset"
-	"golang.org/x/text/encoding"
 	"io"
 	"regexp"
 	"strings"
+
+	"golang.org/x/net/html"
+	"golang.org/x/net/html/charset"
+	"golang.org/x/text/encoding"
 )
 
 func charsetFromMetaElement(s string) string {

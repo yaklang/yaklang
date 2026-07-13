@@ -75,7 +75,8 @@ const (
 // 不满足任一触发条件时返回 nil（透传），不会破坏既有路径。
 //
 // 关键词: aicache, hijackHighStatic, role:system 注入, AI_CACHE_SYSTEM 双标签兼容,
-//        3 段拆分, 缓存友好优先
+//
+//	3 段拆分, 缓存友好优先
 func hijackHighStatic(msg string) *aispec.ChatBaseMirrorResult {
 	if strings.TrimSpace(msg) == "" {
 		return nil
@@ -188,7 +189,8 @@ func build2SegmentMessages(res *aitag.SplitResult, systemContent string) *aispec
 // aibalance 检测到自带 cc 后 pass-through, 不做重叠注入。
 //
 // 关键词: aicache, hijacker, 3 段拆分, build3SegmentMessages, 双 cc 自管,
-//        frozen boundary 优先, timeline 内部解析退化, §7.7.7, §7.7.8
+//
+//	frozen boundary 优先, timeline 内部解析退化, §7.7.7, §7.7.8
 func build3SegmentMessages(res *aitag.SplitResult, systemContent string, timelineBlk *aitag.Block) *aispec.ChatBaseMirrorResult {
 	// 主路径: 先把所有非 high-static block.Raw 顺序拼接, 再用 frozen
 	// boundary 标签切割。这样不依赖 timeline 是否被识别为 PROMPT_SECTION,
@@ -260,7 +262,8 @@ func build3SegmentMessages(res *aitag.SplitResult, systemContent string, timelin
 // (功能仍可用但失去 §7.7.8 主路径的精度)。
 //
 // 关键词: aicache, frozen boundary 字面量, AI_CACHE_FROZEN, semi-dynamic,
-//        与 aicommon.TimelineFrozenBoundaryTagName 同步
+//
+//	与 aicommon.TimelineFrozenBoundaryTagName 同步
 const (
 	frozenBoundaryTagName  = "AI_CACHE_FROZEN"
 	frozenBoundaryNonce    = "semi-dynamic"
@@ -281,6 +284,7 @@ const (
 //   - user1 (frozen 段, ephemeral cc)
 //   - user2 (semi 段, ephemeral cc)
 //   - user3 (open + dynamic, 无 cc)
+//
 // frozen 边界缺失时只能切 3 段 (走 build3SegmentMessages 老路径), 不影响
 // semi 边界存在的退化能力.
 //
@@ -306,10 +310,12 @@ const (
 //   - user2 (semi-1 段, 无 cc)
 //   - user3 (semi-2 段, ephemeral cc)
 //   - user4 (open + dynamic, 无 cc)
+//
 // SEMI2 边界缺失时回退到 4 段 (走 build4SegmentMessages 老路径).
 //
 // 关键词: aicache, semi2 boundary 字面量, AI_CACHE_SEMI2, 5 段切分,
-//        semi-1 无 cc, semi-2 ephemeral cc, P1.1
+//
+//	semi-1 无 cc, semi-2 ephemeral cc, P1.1
 const (
 	semi2BoundaryTagName  = "AI_CACHE_SEMI2"
 	semi2BoundaryNonce    = "semi"
@@ -349,6 +355,7 @@ var minCachableUserSegmentBytes = 1024
 //   - 同时找到 START 与 END 标签 (一对完整)
 //   - END 在 START 之后
 //   - user1 与 user2 都非空 (TrimSpace 后)
+//
 // 任一条件不满足 -> ok=false 让上游退化路径。
 //
 // 用户给出的典型场景 (CACHE_BOUNDARY_GUIDE.md §1):
@@ -376,7 +383,8 @@ var minCachableUserSegmentBytes = 1024
 // 能以 user1 整体作为 prefix 命中缓存。
 //
 // 关键词: aicache, splitByFrozenBoundary, AI_CACHE_FROZEN 字符串 IndexOf 切割,
-//        prefix 字节边界, hijacker §7.7.8 主路径
+//
+//	prefix 字节边界, hijacker §7.7.8 主路径
 func splitByFrozenBoundary(res *aitag.SplitResult) (user1, user2 string, ok bool) {
 	if res == nil {
 		return "", "", false
@@ -424,6 +432,7 @@ func splitByFrozenBoundary(res *aitag.SplitResult) (user1, user2 string, ok bool
 //   - semi START / END 都存在, semi START 在 frozen END 之后, semi END 在
 //     semi START 之后
 //   - user1 / user2 / user3 三段都非空 (TrimSpace 后)
+//
 // 任一条件不满足 -> ok=false 让上游退化到 3 段或 2 段.
 //
 // 用户给出的典型 prompt 形态 (CACHE_BOUNDARY_GUIDE.md §4.5 双 cache 边界场景):
@@ -507,6 +516,7 @@ func splitBySemiBoundary(res *aitag.SplitResult) (user1, user2, user3 string, ok
 //   - semi START / END 都存在, semi START 在 frozen END 之后, semi END 在 semi START 之后
 //   - semi2 START / END 都存在, semi2 START 在 semi END 之后, semi2 END 在 semi2 START 之后
 //   - user1 / user2 / user3 / user4 四段都非空 (TrimSpace 后)
+//
 // 任一条件不满足 -> ok=false 让上游退化到 4 段或更低.
 //
 // 用户给出的典型 prompt 形态 (CACHE_BOUNDARY_GUIDE.md §4.5+ 三 cache 边界场景):
@@ -646,7 +656,8 @@ func build5SegmentMessages(res *aitag.SplitResult, systemContent string) *aispec
 //     minCachableUserSegmentBytes 注释.
 //
 // 关键词: aicache, hijacker, 4 段拆分, build4SegmentMessages, 双 cc 自管,
-//        frozen + semi 双边界, P1 双 cache 边界, P2.1 阈值合并
+//
+//	frozen + semi 双边界, P1 双 cache 边界, P2.1 阈值合并
 func build4SegmentMessages(res *aitag.SplitResult, systemContent string) *aispec.ChatBaseMirrorResult {
 	user1, user2, user3, ok := splitBySemiBoundary(res)
 	if !ok {
@@ -710,7 +721,8 @@ func build4SegmentMessages(res *aitag.SplitResult, systemContent string) *aispec
 // 并完整退让。
 //
 // 关键词: aicache, wrapTextWithEphemeralCC, ephemeral cache_control,
-//        hijacker 自管 cc, ChatContent 包装
+//
+//	hijacker 自管 cc, ChatContent 包装
 func wrapTextWithEphemeralCC(text string) []*aispec.ChatContent {
 	return []*aispec.ChatContent{
 		{
@@ -734,7 +746,8 @@ func wrapTextWithEphemeralCC(text string) []*aispec.ChatContent {
 //     返回 ("","") 让上游走 2 段路径
 //
 // 关键词: aicache, splitTimelineFrozenOpen, frozen open 边界识别,
-//        TIMELINE 内嵌标签, last-b-is-open 约定
+//
+//	TIMELINE 内嵌标签, last-b-is-open 约定
 func splitTimelineFrozenOpen(timelineBlk *aitag.Block) (frozenWrapped, openWrapped string) {
 	if timelineBlk == nil || !timelineBlk.IsTagged() {
 		return "", ""
@@ -845,7 +858,8 @@ func isHighStaticBlock(blk *aitag.Block) bool {
 // 切分会自然退化到 2 段, 安全无副作用。
 //
 // 关键词: aicache, isTimelineSectionBlock, PROMPT_SECTION_timeline 识别,
-//        PROMPT_SECTION_timeline-open 识别
+//
+//	PROMPT_SECTION_timeline-open 识别
 func isTimelineSectionBlock(blk *aitag.Block) bool {
 	if blk == nil || !blk.IsTagged() {
 		return false

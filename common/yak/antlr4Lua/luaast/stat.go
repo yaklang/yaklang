@@ -2,11 +2,12 @@ package luaast
 
 import (
 	"fmt"
+	"strings"
+
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	lua "github.com/yaklang/yaklang/common/yak/antlr4Lua/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
-	"strings"
 )
 
 func (l *LuaTranslator) VisitStat(raw lua.IStatContext) interface{} {

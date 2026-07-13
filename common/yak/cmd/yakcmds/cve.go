@@ -16,7 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/cve/cvequeryops"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/urfavecli"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"

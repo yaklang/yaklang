@@ -52,7 +52,7 @@ func (*LocalFs) Throw(filenames ...string) error {
 
 	_, _, err := shFileOperationWProc.Call(uintptr(unsafe.Pointer(param)))
 	if strings.Contains(err.Error(), "successfully") {
-		return nil 
+		return nil
 	}
 	return err
 }

@@ -7,10 +7,11 @@ package emission
 import (
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"os"
 	"reflect"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 // Default number of maximum listeners for an event.

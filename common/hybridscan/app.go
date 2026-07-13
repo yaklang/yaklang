@@ -2,12 +2,13 @@ package hybridscan
 
 import (
 	"context"
+	"net"
+	"sync"
+
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/synscan"
-	"net"
-	"sync"
 )
 
 type HyperScanCenter struct {

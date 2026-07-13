@@ -16,9 +16,10 @@ package stack
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/buffer"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"

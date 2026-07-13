@@ -7,4 +7,3 @@ package yakurl
 func createIrifyAction(schema string) Action {
 	return nil
 }
-

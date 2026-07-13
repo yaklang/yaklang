@@ -1,11 +1,12 @@
 package bruteutils
 
 import (
+	"strings"
+	"time"
+
 	"github.com/gosnmp/gosnmp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
-	"time"
 )
 
 func snmpV3BruteFactory(name string) *DefaultServiceAuthInfo {

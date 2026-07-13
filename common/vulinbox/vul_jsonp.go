@@ -2,8 +2,9 @@ package vulinbox
 
 import (
 	_ "embed"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"net/http"
+
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 func ForceEnsureCookie(writer http.ResponseWriter, r *http.Request, key, val string) bool {

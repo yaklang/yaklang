@@ -4,14 +4,15 @@ package crawlerx
 
 import (
 	"fmt"
+	u "net/url"
+	"regexp"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/crawlerx/tools"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	u "net/url"
-	"regexp"
-	"strings"
 )
 
 func repeatCheckFunctionGenerate(pageVisitFilter *tools.StringCountFilter) func(string) bool {

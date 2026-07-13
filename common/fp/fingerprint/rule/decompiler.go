@@ -2,9 +2,10 @@ package rule
 
 import (
 	"fmt"
+	"strconv"
+
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"strconv"
 )
 
 type tmpGeneralRule struct {

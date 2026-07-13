@@ -3,13 +3,14 @@ package codec
 import (
 	"bytes"
 	"fmt"
+	"strings"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mimetype"
 	"github.com/yaklang/yaklang/common/mimetype/mimeutil/mimecharset"
 	"golang.org/x/net/html/charset"
-	"strings"
 )
 
 func _mimeIsText(depth int, t *mimetype.MIME) bool {

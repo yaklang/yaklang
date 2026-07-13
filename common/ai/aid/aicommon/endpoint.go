@@ -2,11 +2,12 @@ package aicommon
 
 import (
 	"context"
+	"time"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"time"
 )
 
 type Endpoint struct {

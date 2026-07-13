@@ -2,6 +2,8 @@ package dnslogbrokers
 
 import (
 	"encoding/json"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -10,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"time"
 )
 
 type dnslogCNBroker struct {

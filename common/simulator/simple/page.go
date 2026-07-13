@@ -2,9 +2,10 @@ package simple
 
 import (
 	"encoding/base64"
+	"time"
+
 	"github.com/go-rod/rod"
 	"github.com/yaklang/yaklang/common/utils"
-	"time"
 )
 
 type VPage struct {

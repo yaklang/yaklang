@@ -3,8 +3,9 @@ package aicommon
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"strconv"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/utils/omap"
 )

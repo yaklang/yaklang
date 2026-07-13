@@ -1,8 +1,9 @@
 package aimem
 
 import (
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"

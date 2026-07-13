@@ -265,7 +265,7 @@ func parseDependency(line string) (string, error) {
 	}
 }
 
-func (p *Parser) Parse(fs fi.FileSystem,r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
+func (p *Parser) Parse(fs fi.FileSystem, r types.ReadSeekerAt) ([]types.Library, []types.Dependency, error) {
 	lineNumber := 1
 	var libs []types.Library
 

@@ -4,24 +4,22 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
-	"golang.org/x/net/html"
-	"golang.org/x/net/html/charset"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	netURL "net/url"
+	"regexp"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/net/html"
+	"golang.org/x/net/html/charset"
 )
 
 /* soup package implements a simple web scraper for Go,
 keeping it as similar as possible to BeautifulSoup
 */
-
-import (
-	"net/url"
-	"regexp"
-)
 
 // ErrorType defines types of errors that are possible from soup
 type ErrorType int

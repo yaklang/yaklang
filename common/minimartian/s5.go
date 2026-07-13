@@ -3,14 +3,15 @@ package minimartian
 import (
 	"context"
 	"encoding/binary"
-	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/utils/netutil"
 	"io"
 	"net"
 	"os"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/utils/netutil"
 
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"github.com/yaklang/yaklang/common/log"

@@ -38,15 +38,15 @@ type videoSegmentArchiver struct {
 // archiveManifest zip 顶层 manifest.json 的结构
 // 关键词: zip manifest 结构
 type archiveManifest struct {
-	SourceVideo      string                  `json:"source_video"`
-	Model            string                  `json:"model"`
-	KBName           string                  `json:"kb_name"`
-	CreatedAt        string                  `json:"created_at"`
-	Generator        string                  `json:"generator"`
-	GeneratorVersion string                  `json:"generator_version"`
-	Segments         []*archiveSegmentEntry  `json:"segments"`
-	ErrorCount       int                     `json:"error_count"`
-	Notes            map[string]string       `json:"notes,omitempty"`
+	SourceVideo      string                 `json:"source_video"`
+	Model            string                 `json:"model"`
+	KBName           string                 `json:"kb_name"`
+	CreatedAt        string                 `json:"created_at"`
+	Generator        string                 `json:"generator"`
+	GeneratorVersion string                 `json:"generator_version"`
+	Segments         []*archiveSegmentEntry `json:"segments"`
+	ErrorCount       int                    `json:"error_count"`
+	Notes            map[string]string      `json:"notes,omitempty"`
 }
 
 // archiveSegmentEntry 单个分片在 manifest 中的条目

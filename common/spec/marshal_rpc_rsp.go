@@ -2,6 +2,7 @@ package spec
 
 import (
 	"encoding/json"
+
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/spec/auditlog"
 	"github.com/yaklang/yaklang/common/spec/hidsevent"

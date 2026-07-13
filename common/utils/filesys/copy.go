@@ -1,13 +1,14 @@
 package filesys
 
 import (
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sync/atomic"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 // CopyToRefLocal 把一个源文件系统的全部内容拷贝到指定的本地目录，并返回指向该目录的文件系统对象

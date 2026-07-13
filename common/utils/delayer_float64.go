@@ -1,10 +1,11 @@
 package utils
 
 import (
-	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/log"
 	"math/rand"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 /* delay with range */

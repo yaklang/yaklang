@@ -7,7 +7,6 @@ type Exception struct {
 	Message         *string      `json:"message,omitempty"`
 	Stack           *Stack       `json:"stack,omitempty"`
 	PropertyBag
-
 }
 
 // NewException creates a new Exception and returns a pointer to it

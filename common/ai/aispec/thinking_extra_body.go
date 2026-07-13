@@ -47,9 +47,10 @@ func allThinkingMatchers() []ThinkingBodyMatcher {
 
 // ThinkingExtraBodyForProvider returns top-level JSON fields to merge into the request body
 // when the user has set EnableThinking (non-nil). Match order:
-//  1) every matcher’s MatchType(typeName)（厂商 / aispec 注册名）；
-//  2) every matcher’s MatchHost(baseURL, domain)；
-//  3) every matcher’s MatchModel(modelName)；
+//  1. every matcher’s MatchType(typeName)（厂商 / aispec 注册名）；
+//  2. every matcher’s MatchHost(baseURL, domain)；
+//  3. every matcher’s MatchModel(modelName)；
+//
 // 若仍无命中，默认 {"thinking":{"type":"enabled"|"disabled"}}。
 func ThinkingExtraBodyForProvider(typeName, modelName, baseURL, domain string, enabled bool) map[string]any {
 	// MiniMax 系模型（百炼直供 / 稀宇科技直供）忽略 enable_thinking，仅通过 thinking.type 控制思考。

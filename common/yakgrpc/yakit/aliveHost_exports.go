@@ -1,14 +1,15 @@
 package yakit
 
 import (
+	"os"
+	"sync"
+	"time"
+
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"os"
-	"sync"
-	"time"
 )
 
 type AliveHostParamsOpt func(r *schema.AliveHost)

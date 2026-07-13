@@ -2,12 +2,13 @@ package guard
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type Guard struct {

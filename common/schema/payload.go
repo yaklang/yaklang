@@ -45,17 +45,17 @@ func (p *Payload) CalcHash() string {
 	return utils.CalcSha1(p.Group, content, folder)
 }
 
-func (p *Payload) BeforeUpdate() error {
+func (p *Payload) BeforeUpdate(tx *gorm.DB) error {
 	p.Hash = p.CalcHash()
 	return nil
 }
 
-func (p *Payload) BeforeSave() error {
+func (p *Payload) BeforeSave(tx *gorm.DB) error {
 	p.Hash = p.CalcHash()
 	return nil
 }
 
-func (p *Payload) BeforeCreate() error {
+func (p *Payload) BeforeCreate(tx *gorm.DB) error {
 	p.Hash = p.CalcHash()
 	return nil
 }

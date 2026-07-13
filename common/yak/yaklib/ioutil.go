@@ -2,11 +2,12 @@ package yaklib
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils/bufpipe"
 	"io"
 	"io/ioutil"
 	"os"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/bufpipe"
 
 	"github.com/yaklang/yaklang/common/utils"
 )

@@ -3,12 +3,13 @@ package webfingerprint
 import (
 	"encoding/json"
 	"fmt"
-	log "github.com/yaklang/yaklang/common/log"
-	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
+
+	log "github.com/yaklang/yaklang/common/log"
+	"gopkg.in/yaml.v3"
 )
 
 func check(e error) {

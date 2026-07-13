@@ -2,12 +2,13 @@ package imageutils
 
 import (
 	"context"
+	"io"
+	"os"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mimetype"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"io"
-	"os"
 )
 
 // ExtractImage 从多种输入（io.Reader、字节、字符串）中提取内嵌的图片

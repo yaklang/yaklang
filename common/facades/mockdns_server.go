@@ -2,9 +2,10 @@ package facades
 
 import (
 	"context"
+	"time"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"time"
 )
 
 func MockDNSServerDefault(domain string, h func(record string, domain string) string) string {

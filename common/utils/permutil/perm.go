@@ -1,9 +1,10 @@
 package permutil
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"os"
 	"runtime"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func IAmAdmin() bool {

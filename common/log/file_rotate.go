@@ -1,11 +1,12 @@
 package log
 
 import (
-	rotatelogs "github.com/lestrrat/go-file-rotatelogs"
-	"github.com/pkg/errors"
 	"io"
 	"os"
 	"time"
+
+	rotatelogs "github.com/lestrrat/go-file-rotatelogs"
+	"github.com/pkg/errors"
 )
 
 func InitFileRotateLogger(baseLogPath string, logSaveDay int, logRotateHour int) error {

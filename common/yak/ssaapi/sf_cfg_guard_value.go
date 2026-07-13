@@ -115,8 +115,10 @@ func (f *GuardFieldValue) RegexpMatch(_ context.Context, mod ssadb.MatchMode, re
 	return false, sfvm.NewEmptyValues(), nil
 }
 
-func (f *GuardFieldValue) GetCalled() (sfvm.Values, error)                    { return sfvm.NewEmptyValues(), nil }
-func (f *GuardFieldValue) GetCallActualParams(int, bool) (sfvm.Values, error) { return sfvm.NewEmptyValues(), nil }
+func (f *GuardFieldValue) GetCalled() (sfvm.Values, error) { return sfvm.NewEmptyValues(), nil }
+func (f *GuardFieldValue) GetCallActualParams(int, bool) (sfvm.Values, error) {
+	return sfvm.NewEmptyValues(), nil
+}
 
 func (f *GuardFieldValue) GetFields() (sfvm.Values, error) {
 	// Member lookup happens on this node itself.
@@ -142,7 +144,9 @@ func (f *GuardFieldValue) ListIndex(int) (sfvm.ValueOperator, error) {
 	return nil, utils.Error("guard field is not list")
 }
 
-func (f *GuardFieldValue) AppendPredecessor(sfvm.ValueOperator, ...sfvm.AnalysisContextOption) error { return nil }
+func (f *GuardFieldValue) AppendPredecessor(sfvm.ValueOperator, ...sfvm.AnalysisContextOption) error {
+	return nil
+}
 func (f *GuardFieldValue) FileFilter(string, string, map[string]string, []string) (sfvm.Values, error) {
 	return sfvm.NewEmptyValues(), nil
 }
@@ -373,8 +377,10 @@ func (g *GuardPredicateValue) RegexpMatch(_ context.Context, mod ssadb.MatchMode
 	return g.matchPublicFieldsByKeyPred(mod, func(k string) bool { return utils.MatchAnyOfRegexp(k, re) })
 }
 
-func (g *GuardPredicateValue) GetCalled() (sfvm.Values, error)                    { return sfvm.NewEmptyValues(), nil }
-func (g *GuardPredicateValue) GetCallActualParams(int, bool) (sfvm.Values, error) { return sfvm.NewEmptyValues(), nil }
+func (g *GuardPredicateValue) GetCalled() (sfvm.Values, error) { return sfvm.NewEmptyValues(), nil }
+func (g *GuardPredicateValue) GetCallActualParams(int, bool) (sfvm.Values, error) {
+	return sfvm.NewEmptyValues(), nil
+}
 
 func (g *GuardPredicateValue) GetFields() (sfvm.Values, error) {
 	if g == nil || g.prog == nil {
@@ -389,8 +395,12 @@ func (g *GuardPredicateValue) GetFields() (sfvm.Values, error) {
 	return sfvm.NewValues(fields), nil
 }
 
-func (g *GuardPredicateValue) GetSyntaxFlowUse() (sfvm.Values, error) { return sfvm.NewEmptyValues(), nil }
-func (g *GuardPredicateValue) GetSyntaxFlowDef() (sfvm.Values, error) { return sfvm.NewEmptyValues(), nil }
+func (g *GuardPredicateValue) GetSyntaxFlowUse() (sfvm.Values, error) {
+	return sfvm.NewEmptyValues(), nil
+}
+func (g *GuardPredicateValue) GetSyntaxFlowDef() (sfvm.Values, error) {
+	return sfvm.NewEmptyValues(), nil
+}
 func (g *GuardPredicateValue) GetSyntaxFlowTopDef(*sfvm.SFFrameResult, *sfvm.Config, ...*sfvm.RecursiveConfigItem) (sfvm.Values, error) {
 	return sfvm.NewEmptyValues(), nil
 }
@@ -409,12 +419,16 @@ func (g *GuardPredicateValue) ListIndex(int) (sfvm.ValueOperator, error) {
 	return nil, utils.Error("guard predicate is not list")
 }
 
-func (g *GuardPredicateValue) AppendPredecessor(sfvm.ValueOperator, ...sfvm.AnalysisContextOption) error { return nil }
+func (g *GuardPredicateValue) AppendPredecessor(sfvm.ValueOperator, ...sfvm.AnalysisContextOption) error {
+	return nil
+}
 func (g *GuardPredicateValue) FileFilter(string, string, map[string]string, []string) (sfvm.Values, error) {
 	return sfvm.NewEmptyValues(), nil
 }
 
-func (g *GuardPredicateValue) CompareString(*sfvm.StringComparator) (sfvm.Values, []bool) { return sfvm.NewEmptyValues(), nil }
+func (g *GuardPredicateValue) CompareString(*sfvm.StringComparator) (sfvm.Values, []bool) {
+	return sfvm.NewEmptyValues(), nil
+}
 func (g *GuardPredicateValue) CompareOpcode(c *sfvm.OpcodeComparator) (sfvm.Values, []bool) {
 	if g == nil || c == nil {
 		return sfvm.NewEmptyValues(), []bool{false}
@@ -427,7 +441,7 @@ func (g *GuardPredicateValue) CompareOpcode(c *sfvm.OpcodeComparator) (sfvm.Valu
 	}
 	return sfvm.NewEmptyValues(), []bool{false}
 }
-func (g *GuardPredicateValue) CompareConst(*sfvm.ConstComparator) bool                     { return false }
+func (g *GuardPredicateValue) CompareConst(*sfvm.ConstComparator) bool { return false }
 
 func (g *GuardPredicateValue) GetAnchorBitVector() *utils.BitVector {
 	if g == nil || g.anchorBits == nil {
@@ -446,4 +460,3 @@ func (g *GuardPredicateValue) SetAnchorBitVector(bits *utils.BitVector) {
 	}
 	g.anchorBits = bits.Clone()
 }
-

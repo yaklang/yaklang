@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	yakRunOutputMaxBytes       = 8 * 1024
-	defaultYakRunSelfTestSec   = 30
+	yakRunOutputMaxBytes     = 8 * 1024
+	defaultYakRunSelfTestSec = 30
 
 	configYakRunSelfTestDisabled = "yaklang_auto_run_self_test_disabled"
 	configYakRunSelfTestTimeout  = "yaklang_run_self_test_timeout_sec"

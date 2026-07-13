@@ -4,12 +4,13 @@ package crawlerx
 
 import (
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/crawlerx/tools"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/crawlerx/tools"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 type OutputResults struct {

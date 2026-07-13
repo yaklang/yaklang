@@ -3,12 +3,13 @@ package subdomain
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
+
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
-	"sync"
 )
 
 func qualifyDomain(domain string) string {

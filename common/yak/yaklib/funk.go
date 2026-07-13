@@ -3,12 +3,13 @@ package yaklib
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/reducer"
 	"reflect"
 	"runtime"
 	"runtime/debug"
 	"sort"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/reducer"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"

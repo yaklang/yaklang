@@ -3,12 +3,13 @@ package base
 import (
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
-	"gopkg.in/yaml.v2"
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
+	"gopkg.in/yaml.v2"
 )
 
 const (

@@ -3,15 +3,16 @@ package pcapx
 import (
 	"encoding/binary"
 	"fmt"
+	"math/rand"
+	"net"
+	"time"
+
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
-	"math/rand"
-	"net"
-	"time"
 )
 
 type TCPIPFrame struct {

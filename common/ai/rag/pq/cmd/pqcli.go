@@ -49,8 +49,8 @@ func main() {
 		pq.WithMaxIters(50),
 		pq.WithTolerance(1e-6),
 		pq.WithRandomSeed(42),
-		pq.WithConcurrentKMeans(true), // 启用并行训练
-		pq.WithMaxWorkers(4),          // 使用4个worker
+		pq.WithConcurrentKMeans(true),     // 启用并行训练
+		pq.WithMaxWorkers(4),              // 使用4个worker
 		pq.WithParallelDistanceCalc(true)) // 启用并行距离计算
 
 	if err != nil {

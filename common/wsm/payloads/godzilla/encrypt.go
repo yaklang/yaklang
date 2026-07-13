@@ -2,12 +2,13 @@ package godzilla
 
 import (
 	"encoding/base64"
+	"net/url"
+	"regexp"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/wsm/payloads"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/url"
-	"regexp"
 )
 
 func Encryption(payload, key []byte, pass, encMode, script string, gzip bool) ([]byte, error) {

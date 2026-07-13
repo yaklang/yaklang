@@ -3,9 +3,10 @@ package progresswriter
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"strconv"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type ProgressWriter struct {

@@ -1,11 +1,12 @@
 package schema
 
 import (
+	"strconv"
+	"time"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"gorm.io/gorm"
-	"strconv"
-	"time"
 )
 
 type ExecHistory struct {
@@ -69,7 +70,7 @@ func (f *ExecHistory) CalcHash() string {
 	return utils.CalcSha1(f.Script, f.RuntimeId)
 }
 
-func (f *ExecHistory) BeforeSave() error {
+func (f *ExecHistory) BeforeSave(tx *gorm.DB) error {
 	f.Hash = f.CalcHash()
 	return nil
 }

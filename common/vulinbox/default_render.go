@@ -1,9 +1,10 @@
 package vulinbox
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 const defaultRenderPage = `<!doctype html>

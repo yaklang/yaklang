@@ -54,4 +54,3 @@ func (r *ReAct) SendConfigHotpatch(config map[string]interface{}) error {
 	}
 	return r.SendInputEvent(event)
 }
-

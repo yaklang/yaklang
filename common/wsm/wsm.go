@@ -1,10 +1,11 @@
 package wsm
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/wsm/payloads/behinder"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 )
 
 type ShellConfig func(info *ypb.WebShell)

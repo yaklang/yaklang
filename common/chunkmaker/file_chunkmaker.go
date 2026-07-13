@@ -3,10 +3,11 @@ package chunkmaker
 import (
 	"bytes"
 	"fmt"
+	"io/fs"
+
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/utils/fileparser"
 	"github.com/yaklang/yaklang/common/utils/fileparser/types"
-	"io/fs"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"

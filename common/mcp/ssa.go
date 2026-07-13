@@ -362,4 +362,3 @@ func writeSSAValues(sb *strings.Builder, values ssaapi.Values) {
 		}
 	}
 }
-

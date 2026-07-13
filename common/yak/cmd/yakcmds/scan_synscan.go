@@ -3,16 +3,17 @@ package yakcmds
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/urfavecli"
-	"github.com/yaklang/yaklang/common/fp"
-	"github.com/yaklang/yaklang/common/hybridscan"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/synscan"
-	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/fp"
+	"github.com/yaklang/yaklang/common/hybridscan"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/synscan"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var synscanCommand = cli.Command{

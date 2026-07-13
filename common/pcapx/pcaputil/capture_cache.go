@@ -2,9 +2,10 @@ package pcaputil
 
 import (
 	"context"
+	"sync"
+
 	"github.com/gopacket/gopacket"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"sync"
 )
 
 type pcapPacketHandler func(ctx context.Context, packet gopacket.Packet) error

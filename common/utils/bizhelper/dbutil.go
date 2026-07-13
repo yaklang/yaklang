@@ -1,6 +1,7 @@
 package bizhelper
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -22,7 +23,9 @@ var (
 )
 
 func createTempTestDatabase() (*gorm.DB, error) {
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	// 每次调用使用独立的命名内存数据库，避免不同测试共享 cache=shared 状态。
+	dbName := fmt.Sprintf("file:memdb_%s?mode=memory&cache=shared", utils.RandStringBytes(16))
+	db, err := gorm.Open(sqlite.Open(dbName), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
@@ -1183,6 +1186,7 @@ func FuzzSearchWithStringArrayOrEx(db *gorm.DB, fields []string, targets []strin
 
 // ilike sqliter not support
 func FuzzSearchNotEx(db *gorm.DB, fields []string, target string, ilike bool) *gorm.DB {
+	db = db.Session(&gorm.Session{Context: context.Background()})
 	if target == "" || len(fields) <= 0 {
 		return db
 	}
@@ -1331,14 +1335,27 @@ func YakitPagingQuery(db *gorm.DB, p *ypb.Paging, data any) (*Paginator, *gorm.D
 
 func GroupCount(db *gorm.DB, tableName string, column string) []*ypb.FieldGroup {
 	var res []*ypb.FieldGroup
-	db.Table(tableName).Select(fmt.Sprintf("%v as name , count(*) as total", column)).Group(column).Scan(&res)
+	db.Session(&gorm.Session{Context: context.Background()}).Table(tableName).Select(fmt.Sprintf("%v as name , count(*) as total", column)).Group(column).Scan(&res)
 	return res
 }
 
 func GroupColumn(db *gorm.DB, tableName string, column string) ([]any, error) {
 	var res []any
-	if db := db.Table(tableName).Select(column).Group(column).Pluck(column, &res); db.Error != nil {
-		return nil, db.Error
+	stmt := db.Session(&gorm.Session{Context: context.Background()}).Table(tableName).Select(column).Group(column)
+	rows, err := stmt.Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var v any
+		if err := rows.Scan(&v); err != nil {
+			return nil, err
+		}
+		res = append(res, v)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return res, nil
 }

@@ -2,10 +2,11 @@ package promptui
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/aireactdeps/promptui/screenbuf"
 	"io"
 	"strings"
 	"text/template"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/aireactdeps/promptui/screenbuf"
 
 	"github.com/chzyer/readline"
 )

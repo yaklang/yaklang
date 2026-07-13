@@ -2,6 +2,7 @@ package rag
 
 import (
 	"bytes"
+
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
 )

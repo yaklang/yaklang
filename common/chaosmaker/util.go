@@ -2,6 +2,7 @@ package chaosmaker
 
 import (
 	"encoding/json"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
@@ -57,8 +58,8 @@ func ParseRuleFromHTTPRequestRawJSON(content string) []*rule.Storage {
 	return rules
 }
 
-func MockCompleteTCPFlow(raw []byte,toClient bool, mtu int) [][]byte {
-	flows, err := pcapx.CompleteTCPFlow(raw,toClient, mtu)
+func MockCompleteTCPFlow(raw []byte, toClient bool, mtu int) [][]byte {
+	flows, err := pcapx.CompleteTCPFlow(raw, toClient, mtu)
 	if err != nil {
 		log.Errorf("create tcp flow failed: %v", err)
 		return nil

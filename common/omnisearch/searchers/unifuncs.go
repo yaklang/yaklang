@@ -26,18 +26,18 @@ const (
 // UnifuncsSearchRequest represents the request body for UniFuncs Web Search API
 type UnifuncsSearchRequest struct {
 	Query     string `json:"query"`               // Required: search keywords
-	Freshness string `json:"freshness,omitempty"`  // Optional: Day, Week, Month, Year
-	Count     int    `json:"count,omitempty"`      // Optional: number of results per page (1-50), default 10
-	Page      int    `json:"page,omitempty"`       // Optional: page number, default 1
-	Format    string `json:"format,omitempty"`     // Optional: json, markdown, md, text, txt (default: json)
+	Freshness string `json:"freshness,omitempty"` // Optional: Day, Week, Month, Year
+	Count     int    `json:"count,omitempty"`     // Optional: number of results per page (1-50), default 10
+	Page      int    `json:"page,omitempty"`      // Optional: page number, default 1
+	Format    string `json:"format,omitempty"`    // Optional: json, markdown, md, text, txt (default: json)
 }
 
 // UnifuncsSearchResponse represents the response from UniFuncs Web Search API
 type UnifuncsSearchResponse struct {
-	Code      int             `json:"code"`
-	Message   string          `json:"message"`
-	Data      *UnifuncsData   `json:"data"`
-	RequestID string          `json:"requestId"`
+	Code      int           `json:"code"`
+	Message   string        `json:"message"`
+	Data      *UnifuncsData `json:"data"`
+	RequestID string        `json:"requestId"`
 }
 
 // UnifuncsData represents the data field in the response

@@ -2,9 +2,10 @@ package aicommon
 
 import (
 	"context"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
-	"sync"
 )
 
 type WaitableAction struct {

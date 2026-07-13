@@ -3,6 +3,12 @@
 
 package main
 
+import (
+	"context"
+
+	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
+)
+
 func ListResources(
 	ctx context.Context,
 	request mcp.ListResourcesRequest,

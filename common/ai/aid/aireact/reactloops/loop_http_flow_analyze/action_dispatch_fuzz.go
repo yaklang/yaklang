@@ -2,8 +2,9 @@ package loop_http_flow_analyze
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"

@@ -23,10 +23,11 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"math/rand"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/atomicbitops"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/buffer"

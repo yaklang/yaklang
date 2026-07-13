@@ -2,6 +2,7 @@ package stream_parser
 
 import (
 	"errors"
+
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 )
 

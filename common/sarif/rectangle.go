@@ -8,7 +8,6 @@ type Rectangle struct {
 	Top     *float64 `json:"top,omitempty"`
 	Message *Message `json:"message,omitempty"`
 	PropertyBag
-
 }
 
 // NewRectangle creates a new Rectangle and returns a pointer to it

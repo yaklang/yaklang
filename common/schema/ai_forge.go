@@ -86,7 +86,7 @@ var FORGE_TYPE_YAK = "yak"
 var FORGE_TYPE_Config = "config"
 var FORGE_TYPE_SkillMD = "skillmd"
 
-func (a *AIForge) BeforeCreate() error {
+func (a *AIForge) BeforeCreate(tx *gorm.DB) error {
 	a.Author = NormalizeAIResourceAuthor(a.Author, AIResourceAuthorAnonymous)
 	return nil
 }

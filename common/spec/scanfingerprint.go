@@ -2,6 +2,7 @@ package spec
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/fp"
 )
 

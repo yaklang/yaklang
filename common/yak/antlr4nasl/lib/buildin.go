@@ -2,13 +2,14 @@ package lib
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor/nasl_type"
 	"math"
 	"net"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor/nasl_type"
 )
 
 //	libs := map[string][]*yakvm.Code{

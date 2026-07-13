@@ -1,12 +1,13 @@
 package mq
 
 import (
+	"sync"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/yaklang/yaklang/common/log"
-	"sync"
-	"time"
 )
 
 type Publisher struct {

@@ -1,9 +1,10 @@
 package ast
 
 import (
-	"golang.org/x/exp/maps"
 	"slices"
 	"strings"
+
+	"golang.org/x/exp/maps"
 
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/core"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/diagnostics"

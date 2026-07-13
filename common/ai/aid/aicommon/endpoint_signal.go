@@ -2,8 +2,9 @@ package aicommon
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/log"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type EndpointSignal struct {

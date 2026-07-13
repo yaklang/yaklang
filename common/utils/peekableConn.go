@@ -1,9 +1,10 @@
 package utils
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"net"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type bufferable interface {

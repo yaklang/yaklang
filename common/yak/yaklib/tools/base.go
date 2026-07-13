@@ -1,9 +1,10 @@
 package tools
 
 import (
+	"path"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bruteutils"
-	"path"
 )
 
 var homeDir string

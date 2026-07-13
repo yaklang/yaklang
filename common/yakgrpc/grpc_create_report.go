@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	_ "embed"
+
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"

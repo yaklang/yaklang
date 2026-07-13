@@ -1,9 +1,10 @@
 package crep
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type TransparentHijackManager struct {

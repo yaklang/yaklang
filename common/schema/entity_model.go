@@ -23,7 +23,7 @@ type EntityRepository struct {
 	Description    string
 }
 
-func (e *EntityRepository) BeforeSave() error {
+func (e *EntityRepository) BeforeSave(tx *gorm.DB) error {
 	if e.Uuid == "" {
 		e.Uuid = uuid.NewString()
 	}
@@ -80,7 +80,7 @@ func (e *ERModelEntity) TableName() string {
 	return "rag_entity_v1"
 }
 
-func (e *ERModelEntity) BeforeSave() error {
+func (e *ERModelEntity) BeforeSave(tx *gorm.DB) error {
 	if e.Uuid == "" {
 		e.Uuid = uuid.NewString()
 	}
@@ -292,7 +292,7 @@ func (r *ERModelRelationship) CalcHash() string {
 	)
 }
 
-func (r *ERModelRelationship) BeforeSave() error {
+func (r *ERModelRelationship) BeforeSave(tx *gorm.DB) error {
 	r.Hash = r.CalcHash()
 	if r.Uuid == "" {
 		r.Uuid = uuid.NewString()

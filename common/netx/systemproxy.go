@@ -3,10 +3,11 @@ package netx
 import (
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"os"
 	"runtime"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // SystemProxySetting represents systemwide proxy settings.

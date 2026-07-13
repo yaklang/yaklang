@@ -3,9 +3,10 @@ package aireact
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/jsonextractor"
 	"io"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/jsonextractor"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"

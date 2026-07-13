@@ -2,11 +2,12 @@ package schema
 
 import (
 	"encoding/json"
+	"strconv"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"gorm.io/gorm"
-	"strconv"
-	"sync"
 )
 
 var (

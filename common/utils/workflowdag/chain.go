@@ -143,7 +143,7 @@ func (c *ChainIterator[T]) GetStageIndex(nodeID string) int {
 // Execute is a convenience method that executes nodes following the dependency chain
 // It calls the provided handler for each node and automatically manages execution flow
 // The handler should return nil on success, or an error to stop execution
-// 
+//
 // Execution order: Dependencies are executed first (depth-first)
 // For A->B->C (A depends on B, B depends on C), execution order is: C, B, A
 func (c *ChainIterator[T]) Execute(handler func(node T) error) error {

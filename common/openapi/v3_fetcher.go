@@ -1,11 +1,12 @@
 package openapi
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/openapi/openapi3"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"strings"
 )
 
 func v3_requestBodyToValue(t openapi3.T, p any) (*openapi3.RequestBody, error) {

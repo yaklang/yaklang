@@ -761,10 +761,12 @@ func WithHeader(k, v string) ConfigOpt {
 //
 // Example:
 // ```
-// crawler.Start("https://example.com", crawler.urlExtractor(func(req) {
-//     // 自定义规则：从响应体(req.Response() 或 req.ResponseRaw())中提取额外的链接
-//     return re.FindAll(string(req.ResponseRaw()), `https?://[^\s"'<>]+`)
-// }))
+//
+//	crawler.Start("https://example.com", crawler.urlExtractor(func(req) {
+//	    // 自定义规则：从响应体(req.Response() 或 req.ResponseRaw())中提取额外的链接
+//	    return re.FindAll(string(req.ResponseRaw()), `https?://[^\s"'<>]+`)
+//	}))
+//
 // ```
 func WithUrlExtractor(f func(*Req) []interface{}) ConfigOpt {
 	return func(c *Config) {

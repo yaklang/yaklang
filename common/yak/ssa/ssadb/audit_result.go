@@ -83,20 +83,17 @@ func DeleteResultByID(resultID ...uint) (int64, error) {
 
 	db := GetDB()
 	// Delete edges using result_id directly
-	{
-		db := bizhelper.ExactQueryUIntArrayOr(db, "result_id", resultID)
-		if err := db.Unscoped().Delete(&AuditEdge{}).Error; err != nil {
-			return 0, err
-		}
-		// Delete nodes
-		if err := db.Unscoped().Delete(&AuditNode{}).Error; err != nil {
-			return 0, err
-		}
+	if err := bizhelper.ExactQueryUIntArrayOr(db, "result_id", resultID).Unscoped().Delete(&AuditEdge{}).Error; err != nil {
+		return 0, err
+	}
+	// Delete nodes
+	if err := bizhelper.ExactQueryUIntArrayOr(db, "result_id", resultID).Unscoped().Delete(&AuditNode{}).Error; err != nil {
+		return 0, err
 	}
 
 	// Delete results
-	db = db.Unscoped().Where("id IN (?)", resultID).Delete(&AuditResult{})
-	return db.RowsAffected, db.Error
+	resultDB := db.Unscoped().Where("id IN (?)", resultID).Delete(&AuditResult{})
+	return resultDB.RowsAffected, resultDB.Error
 }
 
 func CreateResult(TaskIDs ...string) *AuditResult {

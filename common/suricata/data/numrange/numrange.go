@@ -1,11 +1,12 @@
 package numrange
 
 import (
-	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/utils"
 	"math/rand"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type NumRange struct {

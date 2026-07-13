@@ -2,11 +2,12 @@ package utils
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"net/url"
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 // map[string][]string to query

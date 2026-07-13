@@ -64,7 +64,7 @@ func tokenizeMacroSourceWithState(src string, st *macroScanState) []macroToken {
 				out = append(out, macroToken{macroTokComment, src[start:]})
 				return out
 			}
-			out = append(out, macroToken{macroTokComment, src[start:i+2+j+2]})
+			out = append(out, macroToken{macroTokComment, src[start : i+2+j+2]})
 			i = start + 2 + j + 2
 			continue
 		}
@@ -75,7 +75,7 @@ func tokenizeMacroSourceWithState(src string, st *macroScanState) []macroToken {
 				out = append(out, macroToken{macroTokComment, src[start:]})
 				return out
 			}
-			out = append(out, macroToken{macroTokComment, src[start:i+j]})
+			out = append(out, macroToken{macroTokComment, src[start : i+j]})
 			i += j
 			continue
 		}

@@ -19,9 +19,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"golang.org/x/crypto/cryptobyte"
-	"strings"
 )
 
 // The marshalingFunction type is an adapter to allow the use of ordinary

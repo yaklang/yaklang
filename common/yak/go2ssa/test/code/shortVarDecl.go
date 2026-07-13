@@ -3,8 +3,10 @@
 
 package samples
 
-import "fmt"
-import "os"
+import (
+	"fmt"
+	"os"
+)
 
 func ShortVarDecls() {
 	a, b := 0, 10

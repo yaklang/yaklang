@@ -2,6 +2,10 @@ package openapi
 
 import (
 	"fmt"
+	"net/http"
+	"regexp"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/openapi/openapi3"
@@ -10,9 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"net/http"
-	"regexp"
-	"strings"
 )
 
 func applyParameters(data openapi3.T, param *openapi3.Parameter, methodRoot mutate.FuzzHTTPRequestIf, originPath string) (mutate.FuzzHTTPRequestIf, string) {

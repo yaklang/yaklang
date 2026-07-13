@@ -1,9 +1,10 @@
 package nasl_type
 
 import (
+	"reflect"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"reflect"
 )
 
 type NaslType interface {

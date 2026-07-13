@@ -123,7 +123,7 @@ func (s *YakScript) ToUpdateMap() map[string]interface{} {
 	}
 }
 
-func (s *YakScript) BeforeSave() error {
+func (s *YakScript) BeforeSave(tx *gorm.DB) error {
 	if s.ScriptName == "" {
 		return utils.Errorf("empty script name is denied")
 	}

@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yaklang/javajive/classparser/jarwar"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/javajive/classparser/jarwar"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )

@@ -28,16 +28,17 @@ import "time"
 // 分别独立计数, 命中率分析能区分两条路径的稳定性。
 //
 // 关键词: aicache, section, 切片类型, timeline / timeline-open 双段,
-//        semi-dynamic / semi-dynamic-1 / semi-dynamic-2 三段
+//
+//	semi-dynamic / semi-dynamic-1 / semi-dynamic-2 三段
 const (
-	SectionHighStatic    = "high-static"
-	SectionSemiDynamic   = "semi-dynamic"
-	SectionSemiDynamic1  = "semi-dynamic-1"
-	SectionSemiDynamic2  = "semi-dynamic-2"
-	SectionTimeline      = "timeline"
-	SectionTimelineOpen  = "timeline-open"
-	SectionDynamic       = "dynamic"
-	SectionRaw           = "raw"
+	SectionHighStatic   = "high-static"
+	SectionSemiDynamic  = "semi-dynamic"
+	SectionSemiDynamic1 = "semi-dynamic-1"
+	SectionSemiDynamic2 = "semi-dynamic-2"
+	SectionTimeline     = "timeline"
+	SectionTimelineOpen = "timeline-open"
+	SectionDynamic      = "dynamic"
+	SectionRaw          = "raw"
 )
 
 // Chunk 表示 prompt 切片后的一个最小单元

@@ -1,8 +1,9 @@
 package vulinbox
 
 import (
-	"gorm.io/gorm"
 	"math/rand"
+
+	"gorm.io/gorm"
 )
 
 type VulinUser struct {

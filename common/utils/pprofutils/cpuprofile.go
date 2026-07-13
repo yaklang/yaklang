@@ -2,12 +2,13 @@ package pprofutils
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // StartCPUProfile 开始 CPU 采样并将结果写入 profile 文件（导出名为 pprof.StartCPUProfile）

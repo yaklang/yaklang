@@ -73,12 +73,12 @@ func (d *AIYakTool) CalcHash() string {
 	return utils.CalcSha1(d.Name, d.Content, d.Params, d.Path, d.Description, d.Keywords, d.Usage)
 }
 
-func (d *AIYakTool) BeforeCreate() error {
+func (d *AIYakTool) BeforeCreate(tx *gorm.DB) error {
 	d.Author = NormalizeAIResourceAuthor(d.Author, AIResourceAuthorAnonymous)
 	return nil
 }
 
-func (d *AIYakTool) BeforeSave() error {
+func (d *AIYakTool) BeforeSave(tx *gorm.DB) error {
 	d.Hash = d.CalcHash()
 	return nil
 }

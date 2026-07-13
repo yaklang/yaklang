@@ -4,10 +4,11 @@ package crawlerx
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"net/url"
 	"regexp"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 var linkCompilerStr = `((?:[a-zA-Z]{1,10}://|//)[a-zA-Z0-9\-\_]{1,}\.[a-zA-Z]{2,}[^'"\s]{0,})|(\"(?:/|\./|\.\./)[^"'><,;|*()(%%$^/\\\[\]\s][a-zA-Z0-9\-_\.\~\!\*\(\);\:@&\=\+$,\/?#\[\]]{1,}\")|(\'(?:/|\./|\.\./)[^"'><,;|*()(%%$^/\\\[\]\s][a-zA-Z0-9\-_\.\~\!\*\(\);\:@&\=\+$,\/?#\[\]]{1,}\')|href="([a-zA-Z0-9\.\/][^'"\s]*?)"|src="([a-zA-Z0-9\.\/][^'"\s]*?)"|data-url="([a-zA-Z0-9\.\/][^'"\s]*?)"`

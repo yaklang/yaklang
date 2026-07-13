@@ -21,21 +21,21 @@ func (b *mvsBackend) simd() bool        { return false }
 
 func (b *mvsBackend) compile(patterns []*compiledPattern, cfg *config) (compiledDB, error) {
 	db := &mvsDB{
-		all:       patterns,
-		n:         len(patterns),
-		nfas:       make([]*mvsNFA, len(patterns)),
-		gate:       make([]bool, len(patterns)),
-		re2Loc:     make([]bool, len(patterns)),
-		windowable: make([]bool, len(patterns)),
-		batchable:  make([]bool, len(patterns)),
-		anchorable: make([]bool, len(patterns)),
-		win:        make([]litWindow, len(patterns)),
-		gateHead:   make([]int32, len(patterns)),
+		all:          patterns,
+		n:            len(patterns),
+		nfas:         make([]*mvsNFA, len(patterns)),
+		gate:         make([]bool, len(patterns)),
+		re2Loc:       make([]bool, len(patterns)),
+		windowable:   make([]bool, len(patterns)),
+		batchable:    make([]bool, len(patterns)),
+		anchorable:   make([]bool, len(patterns)),
+		win:          make([]litWindow, len(patterns)),
+		gateHead:     make([]int32, len(patterns)),
 		biAnchorable: make([]bool, len(patterns)),
 		revNFAs:      make([]*mvsNFA, len(patterns)),
-		reportLoc:  cfg.reportLocation,
+		reportLoc:    cfg.reportLocation,
 	}
-	perPatHeads := make(map[int]map[string]int32, len(patterns))         // 锚定式 pattern 的 per-literal head
+	perPatHeads := make(map[int]map[string]int32, len(patterns))        // 锚定式 pattern 的 per-literal head
 	perPatBiCover := make(map[int]map[string]litBiCover, len(patterns)) // 双向锚定 pattern 的 per-literal headF/tailR
 	for i := range db.win {
 		db.win[i] = litWindow{head: -1, tail: -1} // 默认不收窄 (整段)
@@ -322,12 +322,12 @@ func compileExprToNFA(expr string) *mvsNFA {
 type mvsDB struct {
 	all        []*compiledPattern // 按 idx 索引
 	n          int
-	nfas       []*mvsNFA // 按 idx; nil 表示该 pattern 走 verifier 兜底
-	gate       []bool    // 按 idx; true=该 NFA 为严格超集门, 命中须 regexp2 复核滤假阳
-	re2Loc     []bool    // 按 idx; true=精确定位交 regexp2 (regexp2-origin, 保 PCRE span 语义)
-	windowable []bool    // 按 idx; true=可在字面量命中点邻域窗口内做存在性验证 (有界宽 lean NFA)
-	batchable  []bool    // 按 idx; true=非断言且有 NFA (在 C blob 中), 可走 nfaExistsMany 批处理
-	anchorable []bool    // 按 idx; true=可走锚定式单趟存在性 (有界头/无界尾, 命中字面量后只在邻域注入起点)
+	nfas       []*mvsNFA   // 按 idx; nil 表示该 pattern 走 verifier 兜底
+	gate       []bool      // 按 idx; true=该 NFA 为严格超集门, 命中须 regexp2 复核滤假阳
+	re2Loc     []bool      // 按 idx; true=精确定位交 regexp2 (regexp2-origin, 保 PCRE span 语义)
+	windowable []bool      // 按 idx; true=可在字面量命中点邻域窗口内做存在性验证 (有界宽 lean NFA)
+	batchable  []bool      // 按 idx; true=非断言且有 NFA (在 C blob 中), 可走 nfaExistsMany 批处理
+	anchorable []bool      // 按 idx; true=可走锚定式单趟存在性 (有界头/无界尾, 命中字面量后只在邻域注入起点)
 	win        []litWindow // 按 idx; 命中字面量结尾两侧上下文界 (head/tail; -1=该侧无界不收窄)
 	nfaCount   int
 
@@ -729,6 +729,7 @@ func (d *mvsDB) verifyOne(idx int, data []byte, sc *scratch, handler MatchHandle
 // 故 data[winLo:] 上的判定与整段一致:
 //   - 无假阴: regexp2 真匹配整体落在 [winLo, n) 内 (其字面量结尾 >= firstHitEnd > winLo+head);
 //   - 无假阳: 子切片首位 (winLo) 起不了匹配 (前方 head 距内无该门字面量), 内部命中左上下文真实。
+//
 // gate 的 verifier 命中报 -1/-1, 偏移无需换算; 与整段 reportViaVerifier 同上报。
 func (d *mvsDB) verifyGateLocalized(idx int, data []byte, winLo int, sc *scratch, handler MatchHandler) bool {
 	sub := data

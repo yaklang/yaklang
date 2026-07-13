@@ -3,11 +3,12 @@ package yaklib
 import (
 	"bufio"
 	"bytes"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // Stream 向 Yakit 持续输出一个流（如实时日志、命令输出，导出名为 yakit.Stream）

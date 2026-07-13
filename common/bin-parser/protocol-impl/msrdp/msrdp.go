@@ -9,16 +9,17 @@ import (
 	"encoding/asn1"
 	"encoding/binary"
 	"errors"
+	"io"
+	"net"
+	"time"
+
 	"github.com/huin/asn1ber"
 	"github.com/yaklang/yaklang/common/bin-parser/parser"
-	"github.com/yaklang/yaklang/common/bin-parser/protocol-impl"
+	protocol_impl "github.com/yaklang/yaklang/common/bin-parser/protocol-impl"
 	utils2 "github.com/yaklang/yaklang/common/bin-parser/utils"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"io"
-	"net"
-	"time"
 )
 
 type RDPClient struct {

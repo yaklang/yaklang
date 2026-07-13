@@ -1,14 +1,15 @@
 package netstackvm
 
 import (
+	"net"
+	"net/netip"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/adapters/gonet"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
-	"net"
-	"net/netip"
 )
 
 func (vm *NetStackVirtualMachineEntry) ListenTCP(hostport string) (net.Listener, error) {

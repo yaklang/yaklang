@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
+	"strings"
+
 	"github.com/antchfx/xpath"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils/htmlquery"
 	"github.com/yaklang/yaklang/common/utils/jsonquery"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"gopkg.in/yaml.v3"
-	"strings"
 )
 
 type FileFilterXpathKind string

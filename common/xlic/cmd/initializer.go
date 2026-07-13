@@ -2,16 +2,17 @@ package main
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/urfavecli"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/xlic"
 	"io/ioutil"
 	"os"
 	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
+
+	"github.com/yaklang/yaklang/common/log"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/xlic"
 
 	oss "github.com/aliyun/aliyun-oss-go-sdk/oss"
 )

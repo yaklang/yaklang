@@ -3,13 +3,14 @@ package yaklib
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"math/rand"
 	"net"
 	"reflect"
 	"strconv"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"

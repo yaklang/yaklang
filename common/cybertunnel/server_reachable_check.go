@@ -3,12 +3,13 @@ package cybertunnel
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
-	"time"
 )
 
 func (s *TunnelServer) CheckServerReachable(ctx context.Context, req *tpb.CheckServerReachableRequest) (*tpb.CheckServerReachableResponse, error) {

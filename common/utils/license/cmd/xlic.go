@@ -2,10 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/urfavecli"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/license"
-	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"io/ioutil"
 	"os"
 	"os/signal"
@@ -13,6 +9,11 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	cli "github.com/yaklang/yaklang/common/urfavecli"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/license"
+	"github.com/yaklang/yaklang/common/utils/tlsutils"
 )
 
 var (

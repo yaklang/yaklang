@@ -2,6 +2,7 @@ package vectorstore
 
 import (
 	"context"
+
 	"github.com/yaklang/yaklang/common/log"
 	"gorm.io/gorm"
 )

@@ -2,9 +2,10 @@ package chatglm
 
 import (
 	"errors"
-	"github.com/dgrijalva/jwt-go"
 	"strings"
 	"time"
+
+	"github.com/dgrijalva/jwt-go"
 )
 
 const (

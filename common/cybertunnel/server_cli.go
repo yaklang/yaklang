@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/urfavecli"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"google.golang.org/grpc"
 
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"

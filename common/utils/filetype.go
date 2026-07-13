@@ -2,10 +2,11 @@ package utils
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/h2non/filetype/matchers"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mimetype"
-	"strings"
 )
 
 func IsImage(i []byte) bool {

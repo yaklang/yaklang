@@ -3,9 +3,10 @@ package utils
 import (
 	"bufio"
 	"bytes"
-	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 const (

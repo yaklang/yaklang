@@ -2,6 +2,7 @@ package ppp
 
 import (
 	"bytes"
+
 	binparser "github.com/yaklang/yaklang/common/bin-parser"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	"github.com/yaklang/yaklang/common/go-funk"

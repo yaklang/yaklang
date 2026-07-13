@@ -4,6 +4,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"runtime"
+	"strconv"
+	"strings"
+
 	"github.com/gopacket/gopacket"
 	"github.com/samber/lo"
 	"github.com/yaklang/pcap"
@@ -19,9 +23,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"runtime"
-	"strconv"
-	"strings"
 )
 
 func pcapIftoYpbIf(item *pcap.Interface, index int) (*ypb.NetInterface, bool) {

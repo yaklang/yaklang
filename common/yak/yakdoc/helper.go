@@ -3,7 +3,6 @@ package yakdoc
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"go/ast"
 	"go/build"
 	"go/parser"
@@ -14,6 +13,8 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/yaklang/yaklang/common/utils"

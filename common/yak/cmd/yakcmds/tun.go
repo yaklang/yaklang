@@ -18,12 +18,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/lowtun"
 	"github.com/yaklang/yaklang/common/minimartian"
 	"github.com/yaklang/yaklang/common/netstackvm"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
 )

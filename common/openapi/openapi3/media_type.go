@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/openapi/jsonpointer"
 	"sort"
+
+	"github.com/yaklang/yaklang/common/openapi/jsonpointer"
 )
 
 // MediaType is specified by OpenAPI/Swagger 3.0 standard.

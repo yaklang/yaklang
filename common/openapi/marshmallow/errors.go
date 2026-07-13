@@ -7,9 +7,10 @@ package marshmallow
 import (
 	"errors"
 	"fmt"
-	"github.com/mailru/easyjson/jlexer"
 	"reflect"
 	"strings"
+
+	"github.com/mailru/easyjson/jlexer"
 )
 
 var (

@@ -3,13 +3,14 @@ package yakgrpc
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"strings"
+	"time"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io/ioutil"
-	"strings"
-	"time"
 )
 
 func (s *Server) ExtractDataToFile(input ypb.Yak_ExtractDataToFileServer) error {

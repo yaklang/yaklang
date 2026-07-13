@@ -2,14 +2,15 @@ package netstackvm
 
 import (
 	"context"
+	"net"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/dhcp"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
 	"github.com/yaklang/yaklang/common/utils/arptable"
-	"net"
-	"time"
 )
 
 func (vm *NetStackVirtualMachineEntry) StartDHCP() error {

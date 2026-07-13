@@ -2,9 +2,10 @@ package netstack_exports
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils/chanx"
 	"net"
 	"reflect"
+
+	"github.com/yaklang/yaklang/common/utils/chanx"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/lowtun"

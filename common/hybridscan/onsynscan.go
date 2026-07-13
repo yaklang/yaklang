@@ -2,8 +2,9 @@ package hybridscan
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"net"
+
+	"github.com/pkg/errors"
 )
 
 func oPToStr(ip net.IP, port int) string {

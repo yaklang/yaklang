@@ -3,14 +3,15 @@ package lowhttp
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/utils"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/hpack"
 	"io"
 	"net"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/hpack"
 )
 
 type http2ConnectionConfig struct {

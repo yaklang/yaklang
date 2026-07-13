@@ -7,38 +7,38 @@ import (
 
 // SearchProfile defines RAG search parameters for one experiment run.
 type SearchProfile struct {
-	ID                     string   `json:"id"`
-	EnhancePlans           []string `json:"enhance_plans"`
-	Limit                  int      `json:"limit"`
-	SimilarityThreshold    float64  `json:"similarity_threshold"`
-	CollectionScoreLimit   float64  `json:"collection_score_limit"`
+	ID                   string   `json:"id"`
+	EnhancePlans         []string `json:"enhance_plans"`
+	Limit                int      `json:"limit"`
+	SimilarityThreshold  float64  `json:"similarity_threshold"`
+	CollectionScoreLimit float64  `json:"collection_score_limit"`
 }
 
 // CompressProfile defines compression parameters for one experiment run.
 type CompressProfile struct {
-	ID                  string  `json:"id"`
-	Enabled             bool    `json:"enabled"`
-	MaxChunkSizeBytes   int     `json:"max_chunk_size_bytes"`
-	MaxChunks           int     `json:"max_chunks"`
-	TargetTokenSize     int64   `json:"target_token_size"`
-	ScoreThreshold      float64 `json:"score_threshold"`
+	ID                string  `json:"id"`
+	Enabled           bool    `json:"enabled"`
+	MaxChunkSizeBytes int     `json:"max_chunk_size_bytes"`
+	MaxChunks         int     `json:"max_chunks"`
+	TargetTokenSize   int64   `json:"target_token_size"`
+	ScoreThreshold    float64 `json:"score_threshold"`
 }
 
 // RerankProfile defines rerank strategy for one experiment run.
 type RerankProfile struct {
-	ID           string `json:"id"`
-	Strategy     string `json:"strategy"` // "rrf_only", "rrf_llm_rerank", "rrf_llm_rerank_compress_top3"
-	RerankTopN   int    `json:"rerank_top_n"`
-	FinalTopK    int    `json:"final_top_k"`
+	ID         string `json:"id"`
+	Strategy   string `json:"strategy"` // "rrf_only", "rrf_llm_rerank", "rrf_llm_rerank_compress_top3"
+	RerankTopN int    `json:"rerank_top_n"`
+	FinalTopK  int    `json:"final_top_k"`
 }
 
 // IndexProfile defines indexing parameters (used for rebuild experiments).
 type IndexProfile struct {
-	ID                   string `json:"id"`
-	Fields               string `json:"fields"` // "title_summary_details", "title_summary", "title_keywords_summary"
-	MaxChunkSize         int    `json:"max_chunk_size"`
-	Overlap              int    `json:"overlap"`
-	EnableQuestionIndex  bool   `json:"enable_question_index"`
+	ID                  string `json:"id"`
+	Fields              string `json:"fields"` // "title_summary_details", "title_summary", "title_keywords_summary"
+	MaxChunkSize        int    `json:"max_chunk_size"`
+	Overlap             int    `json:"overlap"`
+	EnableQuestionIndex bool   `json:"enable_question_index"`
 }
 
 // RunConfig combines profiles for a single experiment run.
@@ -55,21 +55,21 @@ type RunMetrics struct {
 	RunID string `json:"run_id"`
 
 	// quality
-	RecallAt5      float64 `json:"recall_at_5"`
-	RecallAt10     float64 `json:"recall_at_10"`
-	MRR            float64 `json:"mrr"`
+	RecallAt5  float64 `json:"recall_at_5"`
+	RecallAt10 float64 `json:"recall_at_10"`
+	MRR        float64 `json:"mrr"`
 
 	// efficiency
-	TotalLatencyMs   int64 `json:"total_latency_ms"`
-	SearchLatencyMs  int64 `json:"search_latency_ms"`
+	TotalLatencyMs    int64 `json:"total_latency_ms"`
+	SearchLatencyMs   int64 `json:"search_latency_ms"`
 	CompressLatencyMs int64 `json:"compress_latency_ms"`
-	RerankLatencyMs  int64 `json:"rerank_latency_ms"`
-	AICallCount      int   `json:"ai_call_count"`
+	RerankLatencyMs   int64 `json:"rerank_latency_ms"`
+	AICallCount       int   `json:"ai_call_count"`
 
 	// token usage
-	RawResultBytes       int   `json:"raw_result_bytes"`
-	CompressedResultBytes int  `json:"compressed_result_bytes"`
-	FinalTokenCount      int   `json:"final_token_count"`
+	RawResultBytes        int `json:"raw_result_bytes"`
+	CompressedResultBytes int `json:"compressed_result_bytes"`
+	FinalTokenCount       int `json:"final_token_count"`
 
 	// per-query details
 	QueryResults []*QueryResult `json:"query_results"`

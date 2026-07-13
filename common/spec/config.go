@@ -2,8 +2,9 @@ package spec
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"runtime"
+
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 )
 
 type AMQPConfig struct {

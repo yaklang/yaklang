@@ -6,7 +6,6 @@ type ExternalPropertyFileReference struct {
 	ItemCount *int              `json:"itemCount,omitempty"`
 	Location  *ArtifactLocation `json:"location,omitempty"`
 	PropertyBag
-
 }
 
 // NewExternalPropertyFileReference creates a new ExternalPropertyFileReference and returns a pointer to it

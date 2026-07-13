@@ -2,9 +2,10 @@ package fp
 
 import (
 	"context"
+	"sync"
+
 	"github.com/pkg/errors"
 	utils2 "github.com/yaklang/yaklang/common/utils"
-	"sync"
 )
 
 type Pool struct {

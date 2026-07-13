@@ -27,10 +27,14 @@ func TestGroupColumn(t *testing.T) {
 
 	token1, token2, token3 := utils.RandStringBytes(10), utils.RandStringBytes(10), utils.RandStringBytes(10)
 	for i := 1; i < 6; i++ {
-		db.Save(&testData{Key: token1, Value: i})
-		db.Save(&testData{Key: token2, Value: i})
-		db.Save(&testData{Key: token3, Value: i})
+		require.NoError(t, db.Save(&testData{Key: token1, Value: i}).Error)
+		require.NoError(t, db.Save(&testData{Key: token2, Value: i}).Error)
+		require.NoError(t, db.Save(&testData{Key: token3, Value: i}).Error)
 	}
+
+	var count int64
+	require.NoError(t, db.Model(&testData{}).Count(&count).Error)
+	t.Logf("test_data rows: %d", count)
 
 	// test string
 	data, err := GroupColumn(db, "test_data", "Key")

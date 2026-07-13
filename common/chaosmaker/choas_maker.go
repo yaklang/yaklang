@@ -3,6 +3,10 @@ package chaosmaker
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -10,9 +14,6 @@ import (
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"net"
-	"strconv"
-	"strings"
 )
 
 type ChaosMaker struct {

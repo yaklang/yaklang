@@ -1,13 +1,14 @@
 package finscan
 
 import (
+	"math/rand"
+	"net"
+
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"math/rand"
-	"net"
 )
 
 var loopbackIP net.IP

@@ -15,9 +15,10 @@
 package header
 
 import (
-	"github.com/yaklang/yaklang/common/minimartian"
 	"net/http"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/minimartian"
 )
 
 // Hop-by-hop headers as defined by RFC2616.

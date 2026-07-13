@@ -3,12 +3,13 @@ package generate
 import (
 	"bytes"
 	"errors"
+	"math/rand"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"math/rand"
 )
 
 var _ Generator = (*HTTPGen)(nil)

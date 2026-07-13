@@ -3,10 +3,11 @@ package aiengine
 import (
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
-	"github.com/yaklang/yaklang/common/consts"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"

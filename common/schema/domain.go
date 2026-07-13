@@ -1,9 +1,10 @@
 package schema
 
 import (
+	"io/ioutil"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"gorm.io/gorm"
-	"io/ioutil"
 )
 
 type Domain struct {
@@ -24,7 +25,7 @@ func (d *Domain) CalcHash() string {
 	return utils.CalcSha1(d.Domain, d.IPAddr)
 }
 
-func (d *Domain) BeforeSave() error {
+func (d *Domain) BeforeSave(tx *gorm.DB) error {
 	d.Hash = d.CalcHash()
 	return nil
 }

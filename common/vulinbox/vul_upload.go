@@ -4,15 +4,16 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
-	"github.com/h2non/filetype"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"mime"
 	"net/http"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/h2non/filetype"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 //go:embed html/vul_upload_main.html

@@ -3,10 +3,11 @@ package aicommon
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type MemoryIntent string

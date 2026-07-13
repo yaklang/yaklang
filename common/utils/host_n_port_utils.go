@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/gobwas/glob"
 	"math/big"
 	"math/rand"
 	"net"
@@ -14,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/gobwas/glob"
 
 	"github.com/tidwall/gjson"
 

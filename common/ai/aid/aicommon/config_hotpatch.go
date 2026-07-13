@@ -77,9 +77,9 @@ func (c *Config) SimpleInfoMap() map[string]interface{} {
 		"AIAutoTransactionRetry":      c.AiTransactionAutoRetry,
 		"GenerateReport":              c.GenerateReport,
 		"ForgeName":                   c.ForgeName,
-		"EnablePlan":            c.GetEnablePlanAndExec(),
-		"SyncPerceptionTrigger": c.GetSyncPerceptionTrigger(),
-		"EnabledCapabilities":   c.GetEnabledCapabilities(),
+		"EnablePlan":                  c.GetEnablePlanAndExec(),
+		"SyncPerceptionTrigger":       c.GetSyncPerceptionTrigger(),
+		"EnabledCapabilities":         c.GetEnabledCapabilities(),
 	}
 }
 

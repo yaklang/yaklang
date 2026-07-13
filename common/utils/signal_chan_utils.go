@@ -1,10 +1,11 @@
 package utils
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func NewSignalChannel(targetSignal ...os.Signal) chan os.Signal {

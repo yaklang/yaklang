@@ -2,12 +2,13 @@ package subdomain
 
 import (
 	"context"
+	"strings"
+	"time"
+
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
-	"time"
 )
 
 func queryDNS(domain string, servers []string, ctx context.Context, timeout time.Duration, client *dns.Client, qType uint16) (_ *dns.Msg, _ time.Duration, server string, _ error) {

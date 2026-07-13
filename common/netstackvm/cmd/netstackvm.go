@@ -21,8 +21,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/netstackvm"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 )
 
 var (

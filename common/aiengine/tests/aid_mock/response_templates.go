@@ -159,4 +159,3 @@ func formatTemplate(template string, args ...interface{}) string {
 	// 在实际使用中，可以使用更复杂的模板引擎
 	return template // 实际实现中需要根据args进行格式化
 }
-

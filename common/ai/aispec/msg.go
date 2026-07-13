@@ -17,12 +17,12 @@ type ChatMessage struct {
 	Stream         bool         `json:"stream"`
 	EnableThinking bool         `json:"enable_thinking,omitempty"`
 	// 以下字段与 OpenAI-compatible chat/completions 对齐；指针/空串配合 omitempty，未配置则不序列化
-	MaxTokens          *int64   `json:"max_tokens,omitempty"`
-	Temperature        *float64 `json:"temperature,omitempty"`
-	TopP               *float64 `json:"top_p,omitempty"`
-	TopK               *int64   `json:"top_k,omitempty"`
-	FrequencyPenalty   *float64 `json:"frequency_penalty,omitempty"`
-	ReasoningEffort    string   `json:"reasoning_effort,omitempty"`
+	MaxTokens        *int64   `json:"max_tokens,omitempty"`
+	Temperature      *float64 `json:"temperature,omitempty"`
+	TopP             *float64 `json:"top_p,omitempty"`
+	TopK             *int64   `json:"top_k,omitempty"`
+	FrequencyPenalty *float64 `json:"frequency_penalty,omitempty"`
+	ReasoningEffort  string   `json:"reasoning_effort,omitempty"`
 	// Tools defines the available tools that the model may call
 	Tools []Tool `json:"tools,omitempty"`
 	// ToolChoice controls which (if any) tool is called by the model
@@ -53,14 +53,14 @@ type ToolFunction struct {
 }
 
 type ChatDetail struct {
-	Role         string        `json:"role"`
-	Name         string        `json:"name,omitempty"`
-	Content      any           `json:"content"`
+	Role    string `json:"role"`
+	Name    string `json:"name,omitempty"`
+	Content any    `json:"content"`
 	// ReasoningContent 用于上游兼容 OpenAI/DeepSeek 等协议的 assistant 消息
 	// 与可见 content 分离（如 R1 风格）；序列化为 reasoning_content。
-	ReasoningContent string      `json:"reasoning_content,omitempty"`
-	ToolCalls        []*ToolCall `json:"tool_calls,omitempty"`
-	ToolCallID       string      `json:"tool_call_id,omitempty"`
+	ReasoningContent string        `json:"reasoning_content,omitempty"`
+	ToolCalls        []*ToolCall   `json:"tool_calls,omitempty"`
+	ToolCallID       string        `json:"tool_call_id,omitempty"`
 	FunctionCall     *FunctionCall `json:"function_call,omitempty"`
 }
 
@@ -364,13 +364,13 @@ func (f *FunctionCall) Clone() *FunctionCall {
 
 func (detail ChatDetail) Clone() ChatDetail {
 	return ChatDetail{
-		Role:              detail.Role,
-		Name:              detail.Name,
-		Content:           detail.Content,
-		ReasoningContent:  detail.ReasoningContent,
-		ToolCalls:         lo.Map(detail.ToolCalls, func(tool *ToolCall, _ int) *ToolCall { return tool.Clone() }),
-		ToolCallID:        detail.ToolCallID,
-		FunctionCall:      detail.FunctionCall.Clone(),
+		Role:             detail.Role,
+		Name:             detail.Name,
+		Content:          detail.Content,
+		ReasoningContent: detail.ReasoningContent,
+		ToolCalls:        lo.Map(detail.ToolCalls, func(tool *ToolCall, _ int) *ToolCall { return tool.Clone() }),
+		ToolCallID:       detail.ToolCallID,
+		FunctionCall:     detail.FunctionCall.Clone(),
 	}
 }
 

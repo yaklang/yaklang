@@ -151,4 +151,3 @@ func WrapToAIEngineOperator(
 ) AIEngineOperator {
 	return NewAIEngineOperatorBase(sendInputEvent, wait, isFinished)
 }
-

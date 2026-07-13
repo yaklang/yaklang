@@ -176,13 +176,13 @@ func (s *subDirFS) ExtraInfo(key string) map[string]any {
 	return s.parent.ExtraInfo(key)
 }
 
-func (s *subDirFS) GetSeparators() rune             { return s.parent.GetSeparators() }
-func (s *subDirFS) Join(elem ...string) string       { return s.parent.Join(elem...) }
-func (s *subDirFS) Base(p string) string             { return s.parent.Base(p) }
+func (s *subDirFS) GetSeparators() rune                 { return s.parent.GetSeparators() }
+func (s *subDirFS) Join(elem ...string) string          { return s.parent.Join(elem...) }
+func (s *subDirFS) Base(p string) string                { return s.parent.Base(p) }
 func (s *subDirFS) PathSplit(p string) (string, string) { return s.parent.PathSplit(p) }
-func (s *subDirFS) Ext(p string) string              { return s.parent.Ext(p) }
-func (s *subDirFS) IsAbs(p string) bool              { return s.parent.IsAbs(p) }
-func (s *subDirFS) Getwd() (string, error)           { return s.dirName, nil }
+func (s *subDirFS) Ext(p string) string                 { return s.parent.Ext(p) }
+func (s *subDirFS) IsAbs(p string) bool                 { return s.parent.IsAbs(p) }
+func (s *subDirFS) Getwd() (string, error)              { return s.dirName, nil }
 func (s *subDirFS) Exists(p string) (bool, error) {
 	return s.parent.Exists(s.parent.Join(s.subDir, p))
 }
@@ -191,9 +191,13 @@ func (s *subDirFS) Rel(basepath, targpath string) (string, error) {
 }
 
 // Write operations are unsupported (read-only).
-func (s *subDirFS) Rename(string, string) error              { return utils.Error("read-only skill filesystem") }
-func (s *subDirFS) WriteFile(string, []byte, fs.FileMode) error { return utils.Error("read-only skill filesystem") }
-func (s *subDirFS) Delete(string) error                      { return utils.Error("read-only skill filesystem") }
-func (s *subDirFS) MkdirAll(string, fs.FileMode) error       { return utils.Error("read-only skill filesystem") }
+func (s *subDirFS) Rename(string, string) error { return utils.Error("read-only skill filesystem") }
+func (s *subDirFS) WriteFile(string, []byte, fs.FileMode) error {
+	return utils.Error("read-only skill filesystem")
+}
+func (s *subDirFS) Delete(string) error { return utils.Error("read-only skill filesystem") }
+func (s *subDirFS) MkdirAll(string, fs.FileMode) error {
+	return utils.Error("read-only skill filesystem")
+}
 
 var _ fi.FileSystem = (*subDirFS)(nil)

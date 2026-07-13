@@ -100,7 +100,7 @@ func (p *Executor) Execute(ctx context.Context, cmd string, opts ...ExecuteOptio
 	if isPrivileged() {
 		// 直接通过 shell 执行命令
 		cmder := exec.CommandContext(ctx, "sh", "-c", cmd)
-		
+
 		if config.DiscardStdoutStderr {
 			cmder.Stdout = nil
 			cmder.Stderr = nil
@@ -138,7 +138,7 @@ func (p *Executor) Execute(ctx context.Context, cmd string, opts ...ExecuteOptio
 		if config.DiscardStdoutStderr {
 			return nil, nil
 		}
-		
+
 		// 从 Stdout 中获取输出
 		if out, ok := cmder.Stdout.(*bytes.Buffer); ok {
 			return out.Bytes(), nil

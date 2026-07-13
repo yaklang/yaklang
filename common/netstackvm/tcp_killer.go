@@ -3,8 +3,9 @@ package netstackvm
 import (
 	"context"
 	"errors"
-	"github.com/yaklang/yaklang/common/utils/netutil"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/netutil"
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"

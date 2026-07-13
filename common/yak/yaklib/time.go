@@ -203,10 +203,12 @@ func _timeNewTimer(d float64) *time.Timer {
 // // 每 0.1 秒触发一次, 取 3 次后停止
 // ticker = time.NewTicker(0.1)
 // count = 0
-// for t in ticker.C {
-//     count++
-//     if count >= 3 { ticker.Stop(); break }
-// }
+//
+//	for t in ticker.C {
+//	    count++
+//	    if count >= 3 { ticker.Stop(); break }
+//	}
+//
 // ```
 func _timeNewTicker(d float64) *time.Ticker {
 	return time.NewTicker(utils.FloatSecondDuration(d))

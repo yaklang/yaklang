@@ -2,9 +2,10 @@ package yakit
 
 import (
 	"context"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"sync"
 )
 
 var YakitDuplexConnectionServer = &DuplexConnectionServer{

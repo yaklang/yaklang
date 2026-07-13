@@ -2,6 +2,7 @@ package match
 
 import (
 	"fmt"
+
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 )

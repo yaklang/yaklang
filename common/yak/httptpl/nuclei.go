@@ -446,7 +446,7 @@ func generateYakMatcher(rootNode *yaml.Node) (*YakMatcher, error) {
 		if scopeStr == "" {
 			scopeStr = nodeGetString(node, "part")
 		}
-		
+
 		switch scopeStr {
 		case "body":
 			match.Scope = "body"

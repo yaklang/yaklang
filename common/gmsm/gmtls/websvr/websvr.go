@@ -3,9 +3,10 @@ package websvr
 import (
 	"crypto/tls"
 	x "crypto/x509"
+	"io/ioutil"
+
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/gmsm/x509"
-	"io/ioutil"
 )
 
 const (

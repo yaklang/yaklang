@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/openapi/marshmallow"
 	"sort"
+
+	"github.com/yaklang/yaklang/common/openapi/marshmallow"
 
 	"github.com/yaklang/yaklang/common/openapi/jsonpointer"
 )

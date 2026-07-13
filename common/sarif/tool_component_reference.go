@@ -6,7 +6,6 @@ type ToolComponentReference struct {
 	Index *uint   `json:"index"`
 	Guid  *string `json:"guid"`
 	PropertyBag
-
 }
 
 // NewToolComponentReference creates a new ToolComponentReference and returns a pointer to it

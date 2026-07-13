@@ -2,13 +2,14 @@ package openapi
 
 import (
 	"encoding/json"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/openapi/openapi2"
 	"github.com/yaklang/yaklang/common/openapi/openapi3"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"strings"
 )
 
 func v2_parameterToValue(t openapi2.T, target any) (*openapi2.Parameter, error) {

@@ -7,15 +7,16 @@ import (
 	_ "github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"context"
-	"github.com/yaklang/yaklang/common/crawlerx/tools"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"net/url"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/yaklang/yaklang/common/crawlerx/tools"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type CrawlerCore struct {

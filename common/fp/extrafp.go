@@ -1,10 +1,11 @@
 package fp
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	utils2 "github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/extrafp"
-	"strings"
 )
 
 // 在这里可以做服务的修正，用来 ifelse 处理各种小问题

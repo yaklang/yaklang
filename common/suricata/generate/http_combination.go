@@ -2,13 +2,14 @@ package generate
 
 import (
 	"bytes"
+	"net/http"
+	"strconv"
+	"time"
+
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/regen"
 	"golang.org/x/exp/slices"
-	"net/http"
-	"strconv"
-	"time"
 )
 
 const Fallback modifier.Modifier = 1 << 20

@@ -5,6 +5,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os/exec"
+	"runtime"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/shirou/gopsutil/v4/cpu"
 	_ "github.com/shirou/gopsutil/v4/disk"
 	_ "github.com/shirou/gopsutil/v4/docker"
@@ -16,11 +22,6 @@ import (
 	"github.com/yaklang/yaklang/common/spec/health"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
-	"os/exec"
-	"runtime"
-	"strconv"
-	"strings"
-	"time"
 )
 
 var (

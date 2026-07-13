@@ -3,13 +3,14 @@ package lowhttp
 import (
 	"bufio"
 	"encoding/base64"
+	"net"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/protocol/nla"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"net"
-	"strings"
 )
 
 type Authentication interface {

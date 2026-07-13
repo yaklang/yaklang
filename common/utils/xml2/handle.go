@@ -3,9 +3,10 @@ package xml2
 import (
 	"bytes"
 	"encoding/xml"
-	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type XMLConfig struct {

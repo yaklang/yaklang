@@ -14,7 +14,7 @@ type cfgCacheKey struct {
 }
 
 type domCache struct {
-	idom      map[int64]int64
+	idom     map[int64]int64
 	postIDom map[int64]int64
 }
 

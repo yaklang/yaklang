@@ -2,9 +2,10 @@ package spec
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/dave/jennifer/jen"
 	"gopkg.in/yaml.v2"
-	"strings"
 )
 
 func JenGeneratePalmRpcByYaml(raw []byte) ([]byte, error) {

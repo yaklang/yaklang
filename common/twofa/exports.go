@@ -2,12 +2,13 @@ package twofa
 
 import (
 	"encoding/base32"
+	"net/url"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"net/url"
 	"rsc.io/qr"
-	"strings"
 )
 
 func NewTOTPConfig(secret string) *OTPConfig {

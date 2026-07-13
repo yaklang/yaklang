@@ -415,7 +415,7 @@ func (s *SyntaxFlowRule) CalcHash() string {
 	return s.Hash
 }
 
-func (s *SyntaxFlowRule) BeforeSave() error {
+func (s *SyntaxFlowRule) BeforeSave(tx *gorm.DB) error {
 	if s.RuleId == "" {
 		s.RuleId = uuid.NewString()
 	}
@@ -426,7 +426,7 @@ func (s *SyntaxFlowRule) BeforeSave() error {
 	return nil
 }
 
-func (s *SyntaxFlowRule) BeforeCreate() error {
+func (s *SyntaxFlowRule) BeforeCreate(tx *gorm.DB) error {
 	if s.RuleId == "" {
 		s.RuleId = uuid.NewString()
 	}

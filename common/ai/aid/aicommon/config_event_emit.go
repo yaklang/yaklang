@@ -5,7 +5,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
-
 func (c *Config) ReleaseInteractiveEvent(eventID string, invoke aitool.InvokeParams) {
 	c.EmitInteractiveRelease(eventID, invoke)
 	c.CallAfterInteractiveEventReleased(eventID, invoke)

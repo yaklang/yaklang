@@ -2,14 +2,15 @@ package main
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/urfavecli"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/mutate"
 	"os"
 	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mutate"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 )
 
 var (

@@ -2,6 +2,7 @@ package schema
 
 import (
 	"encoding/json"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"gorm.io/gorm"
@@ -43,7 +44,7 @@ func (w *WebShell) CalcHash() string {
 	return utils.CalcSha1(w.Url)
 }
 
-func (w *WebShell) BeforeSave() error {
+func (w *WebShell) BeforeSave(tx *gorm.DB) error {
 	if w.Url == "" {
 		return utils.Error("webshell url is empty")
 	}

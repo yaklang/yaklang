@@ -21,7 +21,6 @@ import (
 // 关键词: go:embed gzip frontend, smaller binary, decompress once
 //
 //go:generate sh -c "gzip -9 -c web/index.html > web/index.html.gz"
-//
 //go:embed web/index.html.gz
 var frontendHTMLGzip []byte
 

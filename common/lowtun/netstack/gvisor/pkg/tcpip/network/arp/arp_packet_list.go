@@ -1,9 +1,10 @@
 package arp
 
 import (
+	"time"
+
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
-	"time"
 )
 
 // ElementMapper provides an identity mapping by default.

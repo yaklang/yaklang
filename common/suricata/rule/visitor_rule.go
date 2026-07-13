@@ -1,12 +1,13 @@
 package rule
 
 import (
+	"strings"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata/parser"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
 )
 
 func (v *RuleSyntaxVisitor) Errorf(msg string, items ...interface{}) {

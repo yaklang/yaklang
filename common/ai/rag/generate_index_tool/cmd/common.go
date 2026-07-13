@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/urfavecli"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )

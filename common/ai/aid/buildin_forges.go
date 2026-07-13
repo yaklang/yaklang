@@ -2,10 +2,11 @@ package aid
 
 import (
 	"context"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"sync"
 )
 
 // buildinForges can make basic coordinator use some forge. magic!!!

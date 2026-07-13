@@ -2,9 +2,10 @@ package wsm
 
 import (
 	"errors"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/wsm/payloads/godzilla/plugin"
-	"strings"
 )
 
 // LoadSuo5Plugin load suo5 proxy with default memshell type as filter type

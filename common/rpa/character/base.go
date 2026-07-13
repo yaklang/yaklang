@@ -1,9 +1,10 @@
 package character
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func String2Vec(str string) []interface{} {

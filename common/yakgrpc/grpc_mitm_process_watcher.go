@@ -4,14 +4,15 @@ package yakgrpc
 
 import (
 	"context"
+	"sync"
+	"time"
+
 	"github.com/shirou/gopsutil/v4/net"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/sysproc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"sync"
-	"time"
 )
 
 func (s *Server) WatchProcessConnection(stream ypb.Yak_WatchProcessConnectionServer) error {

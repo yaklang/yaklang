@@ -1,19 +1,17 @@
 package webfingerprint
 
 import (
-	"net/url"
-	"regexp"
-	"strings"
-)
-
-import (
 	"crypto/tls"
 	"fmt"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"net/http"
+	"net/url"
+	"regexp"
 	"sort"
+	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 func HttpInsecureGet(url string) (*http.Response, error) {

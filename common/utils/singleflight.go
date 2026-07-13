@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+
 	"golang.org/x/sync/singleflight"
 )
 
@@ -55,4 +56,3 @@ func (s *SingleFlightCache[K, V]) Do(key K, loader func() (V, error)) (V, error)
 	var zero V
 	return zero, Errorf("unexpected result type from singleflight")
 }
-

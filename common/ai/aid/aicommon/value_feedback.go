@@ -59,20 +59,20 @@ type ValueFeedbackAction struct {
 // 的依据是 source=human, 而非 execution_policy.
 const (
 	ApprovalSourceHuman           = "human"            // 真人工裁决
-	ApprovalSourcePolicy          = "policy"            // 策略自动放行 (yolo/auto)
-	ApprovalSourceModelJudge      = "model_judge"       // AI 风控/助手判定
-	ApprovalSourceRule            = "rule"              // 规则判定
-	ApprovalSourceTimeoutFallback = "timeout_fallback"  // 超时兜底放行
+	ApprovalSourcePolicy          = "policy"           // 策略自动放行 (yolo/auto)
+	ApprovalSourceModelJudge      = "model_judge"      // AI 风控/助手判定
+	ApprovalSourceRule            = "rule"             // 规则判定
+	ApprovalSourceTimeoutFallback = "timeout_fallback" // 超时兜底放行
 )
 
 // approval.decision 枚举: 描述审批的客观结果.
 const (
-	ApprovalDecisionApprove        = "approve"           // 同意 (未改参数)
+	ApprovalDecisionApprove         = "approve"           // 同意 (未改参数)
 	ApprovalDecisionApproveWithEdit = "approve_with_edit" // 同意但修改了参数
-	ApprovalDecisionReject         = "reject"            // 拒绝
-	ApprovalDecisionCancel         = "cancel"            // 取消 (无最终参数)
-	ApprovalDecisionTimeout        = "timeout"           // 超时
-	ApprovalDecisionNotRequired    = "not_required"      // 无需审批 (策略自动放行)
+	ApprovalDecisionReject          = "reject"            // 拒绝
+	ApprovalDecisionCancel          = "cancel"            // 取消 (无最终参数)
+	ApprovalDecisionTimeout         = "timeout"           // 超时
+	ApprovalDecisionNotRequired     = "not_required"      // 无需审批 (策略自动放行)
 )
 
 // ValueFeedbackApproval 描述一次审批决策 (记录事实, 不预先下训练标签).

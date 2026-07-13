@@ -6,12 +6,12 @@ import "strings"
 type YakScriptKind string
 
 const (
-	YakScriptKindUnknown       YakScriptKind = "unknown"
-	YakScriptKindHookHotpatch    YakScriptKind = "hook_hotpatch"    // MITM / global / fuzzer hotpatch hooks
-	YakScriptKindCodecPlugin     YakScriptKind = "codec_plugin"     // right-click codec handle(input)
-	YakScriptKindNativePlugin    YakScriptKind = "native_plugin"    // yak plugin with cli + runPlugin
-	YakScriptKindCLITool         YakScriptKind = "cli_tool"         // top-level cli.check + network/file IO
-	YakScriptKindPureLogicScript YakScriptKind = "pure_logic"       // has runSelfTest or testable funcs, no live network in main
+	YakScriptKindUnknown         YakScriptKind = "unknown"
+	YakScriptKindHookHotpatch    YakScriptKind = "hook_hotpatch" // MITM / global / fuzzer hotpatch hooks
+	YakScriptKindCodecPlugin     YakScriptKind = "codec_plugin"  // right-click codec handle(input)
+	YakScriptKindNativePlugin    YakScriptKind = "native_plugin" // yak plugin with cli + runPlugin
+	YakScriptKindCLITool         YakScriptKind = "cli_tool"      // top-level cli.check + network/file IO
+	YakScriptKindPureLogicScript YakScriptKind = "pure_logic"    // has runSelfTest or testable funcs, no live network in main
 )
 
 // yakHookVarNames are MixPluginCaller hook assignment names (mirror*/hijack*/beforeRequest/...).
@@ -33,13 +33,13 @@ var yakHookVarNames = []string{
 
 // YakScriptRunPolicy describes whether/how the loop should run code after lint.
 type YakScriptRunPolicy struct {
-	Kind              YakScriptKind
-	HasYAKMain        bool
-	HasRunSelfTest    bool
-	ShouldExecuteRun  bool // run YAK_MAIN self-test now
+	Kind                YakScriptKind
+	HasYAKMain          bool
+	HasRunSelfTest      bool
+	ShouldExecuteRun    bool // run YAK_MAIN self-test now
 	BlockExitNoSelfTest bool // hook/codec missing YAK_MAIN block — ask AI to add runSelfTest
-	SkipReason        string
-	HintForAI         string
+	SkipReason          string
+	HintForAI           string
 }
 
 // ClassifyYakScriptRunPolicy decides auto-run behavior from full_code content.

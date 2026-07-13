@@ -15,9 +15,11 @@ package systemd
 // ```
 // // 生成一个最简单的 systemd 服务单元
 // fileName, content = systemd.Create("myapp",
-//     systemd.unit_description("My Application"),
-//     systemd.service_exec_start("/usr/bin/myapp --serve"),
-//     systemd.install_wanted_by("multi-user.target"),
+//
+//	systemd.unit_description("My Application"),
+//	systemd.service_exec_start("/usr/bin/myapp --serve"),
+//	systemd.install_wanted_by("multi-user.target"),
+//
 // )
 // assert fileName == "myapp.service"
 // assert str.Contains(content, "ExecStart=/usr/bin/myapp --serve")

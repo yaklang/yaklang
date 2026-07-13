@@ -2,12 +2,13 @@ package openapi
 
 import (
 	"context"
+	"strconv"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/openapi/openapi3"
 	"github.com/yaklang/yaklang/common/openapi/openapigen"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"strconv"
 )
 
 // GenerateHTTPFlows 根据 OpenAPI 2.0/3.0 文档生成对应的 HTTP 请求流

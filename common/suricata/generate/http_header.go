@@ -2,6 +2,7 @@ package generate
 
 import (
 	"bytes"
+
 	"github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )

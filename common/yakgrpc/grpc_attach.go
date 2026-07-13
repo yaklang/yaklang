@@ -2,11 +2,12 @@ package yakgrpc
 
 import (
 	"context"
+	"strings"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"sync"
 )
 
 var (

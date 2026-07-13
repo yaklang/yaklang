@@ -3,6 +3,7 @@ package tlsutils
 import (
 	"bufio"
 	"bytes"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )

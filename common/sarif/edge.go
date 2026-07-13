@@ -7,7 +7,6 @@ type Edge struct {
 	SourceNodeID string   `json:"sourceNodeId"`
 	TargetNodeID string   `json:"targetNodeId"`
 	PropertyBag
-
 }
 
 // NewEdge creates a new Edge and returns a pointer to it

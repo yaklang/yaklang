@@ -593,7 +593,7 @@ func TestQueryYakScript(t *testing.T) {
 
 	tests := []struct {
 		filedKeywords string
-		count         int
+		count         int64
 	}{
 		{
 			filedKeywords: "fileKeywords-test",

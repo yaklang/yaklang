@@ -1,12 +1,13 @@
 package cveresources
 
 import (
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"gorm.io/gorm"
 	"regexp"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 type ProductId struct {

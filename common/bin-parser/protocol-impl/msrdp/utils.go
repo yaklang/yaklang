@@ -2,11 +2,12 @@ package msrdp
 
 import (
 	"encoding/binary"
+	"io"
+	"unicode/utf16"
+
 	"github.com/yaklang/yaklang/common/bin-parser/parser"
 	utils2 "github.com/yaklang/yaklang/common/bin-parser/utils"
 	"golang.org/x/crypto/md4"
-	"io"
-	"unicode/utf16"
 )
 
 func convertUTF16ToLittleEndianBytes(u []uint16) []byte {

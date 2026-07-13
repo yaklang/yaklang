@@ -332,9 +332,9 @@ var compilerErrorHints = []compilerErrorHint{
 		Hint:     "channel 迭代/for-range 左侧只能有一个变量。改用 `for v = range ch` 形式。",
 	},
 	{
-		Name:   "FieldCallTargetError",
-		Globs:  []string{"* call target Error"},
-		Hint:   "方法/字段调用目标错误。确认调用对象非 nil 且类型支持该方法。",
+		Name:  "FieldCallTargetError",
+		Globs: []string{"* call target Error"},
+		Hint:  "方法/字段调用目标错误。确认调用对象非 nil 且类型支持该方法。",
 	},
 	{
 		Name:     "CallTargetNil",

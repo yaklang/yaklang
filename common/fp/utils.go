@@ -1,12 +1,13 @@
 package fp
 
 import (
-	"github.com/yaklang/yaklang/common/fp/fingerprint/parsers"
-	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
-	"github.com/yaklang/yaklang/common/log"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/yaklang/yaklang/common/fp/fingerprint/parsers"
+	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func FileOrDirToWebRules(dir string) []*rule.FingerPrintRule {

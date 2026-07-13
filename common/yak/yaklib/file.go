@@ -531,10 +531,12 @@ func _fileReadLines(i interface{}) []string {
 // p = file.Join(os.TempDir(), "yak-readlines-cb.txt")
 // file.Save(p, "line1\nline2\nline3")~
 // count = 0
-// file.ReadLinesWithCallback(p, func(line) {
-//     count++
-//     println("got line:", line) // 每读到一行就回调一次
-// })~
+//
+//	file.ReadLinesWithCallback(p, func(line) {
+//	    count++
+//	    println("got line:", line) // 每读到一行就回调一次
+//	})~
+//
 // assert count == 3, "should read 3 lines"
 // file.Remove(p)
 // ```
@@ -1069,9 +1071,11 @@ func _readDirInfoInDirectory(path string) ([]*utils.FileInfo, error) {
 // file.Save(f2, "456")~   // 第二个文件
 // m = file.NewMultiFileLineReader(f1, f2)~ // 跨多个文件连续按行读取
 // lines = []
-// for m.Next() {
-//     lines = append(lines, m.Text()) // 依次读到 "123" 和 "456"
-// }
+//
+//	for m.Next() {
+//	    lines = append(lines, m.Text()) // 依次读到 "123" 和 "456"
+//	}
+//
 // println("lines:", lines)
 // assert len(lines) == 2, "should read 2 lines across 2 files"
 // file.Remove(f1); file.Remove(f2)

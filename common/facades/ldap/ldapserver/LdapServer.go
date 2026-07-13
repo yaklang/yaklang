@@ -3,11 +3,12 @@ package ldapserver
 import (
 	"context"
 	"fmt"
+	"math/rand"
+	"net/http"
+
 	"github.com/lor00x/goldap/message"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"math/rand"
-	"net/http"
 )
 
 type LdapServer struct {

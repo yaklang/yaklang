@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
+	"sync"
+	"time"
+
 	uuid "github.com/google/uuid"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"net"
-	"sync"
-	"time"
 )
 
 // Connection Models

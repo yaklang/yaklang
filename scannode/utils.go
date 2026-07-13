@@ -3,10 +3,11 @@ package scannode
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/cybertunnel"
-	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"net/http"
+
+	"github.com/yaklang/yaklang/common/cybertunnel"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type IpEcho struct {

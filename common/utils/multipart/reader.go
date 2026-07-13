@@ -4,12 +4,13 @@ package multipart
 import (
 	"bufio"
 	"bytes"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"mime"
 	"net/textproto"
 	"path/filepath"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 const (

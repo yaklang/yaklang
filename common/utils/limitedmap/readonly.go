@@ -1,8 +1,9 @@
 package limitedmap
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type ReadOnlyMap struct {

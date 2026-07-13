@@ -2,12 +2,13 @@ package extrafp
 
 import (
 	"bytes"
+	"strconv"
+	"time"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"strconv"
-	"time"
 )
 
 // rdp_receive_packet

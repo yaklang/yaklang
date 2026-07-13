@@ -2,6 +2,10 @@ package simple
 
 import (
 	"context"
+	"runtime"
+	"strings"
+	"time"
+
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/cdp"
 	"github.com/go-rod/rod/lib/launcher"
@@ -10,9 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"runtime"
-	"strings"
-	"time"
 )
 
 type VBrowser struct {
@@ -106,14 +107,14 @@ func (browser *VBrowser) browserInit() error {
 			launch.Proxy(browser.proxyAddress)
 		}
 		launch = launch.Context(ctx).Set("disable-features", "HttpsUpgrades")
-		
+
 		// 在 Windows 上防止 Chrome 创建桌面快捷方式
 		if strings.Contains(runtime.GOOS, "windows") {
 			launch = launch.Set("no-first-run", "")
 			launch = launch.Set("no-default-browser-check", "")
 			launch = launch.Set("disable-default-apps", "")
 		}
-		
+
 		launch = launch.NoSandbox(browser.noSandBox).Headless(browser.headless).Leakless(browser.leakless)
 		serviceURL, header := launch.ClientHeader()
 		client, err := cdp.StartWithURL(ctx, serviceURL, header)
@@ -130,14 +131,14 @@ func (browser *VBrowser) browserInit() error {
 			launch.Proxy(browser.proxyAddress)
 		}
 		launch = launch.Set("disable-features", "HttpsUpgrades")
-		
+
 		// 在 Windows 上防止 Chrome 创建桌面快捷方式
 		if strings.Contains(runtime.GOOS, "windows") {
 			launch = launch.Set("no-first-run", "")
 			launch = launch.Set("no-default-browser-check", "")
 			launch = launch.Set("disable-default-apps", "")
 		}
-		
+
 		launch = launch.NoSandbox(browser.noSandBox).Headless(browser.headless).Leakless(browser.leakless)
 		controlUrl, err := launch.Launch()
 		if err != nil {

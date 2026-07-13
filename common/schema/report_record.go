@@ -58,8 +58,9 @@ func (r *ReportRecord) CalcHash() string {
 	return utils.CalcSha1(r.Title, r.PublishedAt.Format(utils.DefaultTimeFormat))
 }
 
-func (r *ReportRecord) BeforeSave() {
+func (r *ReportRecord) BeforeSave(tx *gorm.DB) error {
 	r.Hash = r.CalcHash()
+	return nil
 }
 
 type Report struct {

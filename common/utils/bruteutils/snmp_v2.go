@@ -1,10 +1,11 @@
 package bruteutils
 
 import (
+	"time"
+
 	"github.com/gosnmp/gosnmp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"time"
 )
 
 var snmp_v2Auth = &DefaultServiceAuthInfo{

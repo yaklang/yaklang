@@ -2,6 +2,7 @@ package schema
 
 import (
 	"encoding/json"
+
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"gorm.io/gorm"
 )

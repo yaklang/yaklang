@@ -1,8 +1,9 @@
 package pprofutils
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 var Exports = map[string]any{
@@ -37,10 +38,12 @@ var Exports = map[string]any{
 // memPath = file.Join(os.TempDir(), "cm_mem_demo.prof")
 // finished = 0
 // pprof.StartCPUAndMemoryProfile(
-//     pprof.cpuProfilePath(cpuPath),
-//     pprof.memProfilePath(memPath),
-//     pprof.timeout(1),
-//     pprof.callback(func(p) { finished++ }),
+//
+//	pprof.cpuProfilePath(cpuPath),
+//	pprof.memProfilePath(memPath),
+//	pprof.timeout(1),
+//	pprof.callback(func(p) { finished++ }),
+//
 // )
 // println(file.IsExisted(cpuPath) && file.IsExisted(memPath))   // OUT: true
 // assert file.IsExisted(cpuPath) && file.IsExisted(memPath), "should produce both CPU and memory profiles"

@@ -2,20 +2,17 @@ package tlsutils
 
 import (
 	"bytes"
+	"crypto/dsa"
 	"crypto/ecdsa"
 	"crypto/rsa"
-	"fmt"
-	"math/big"
-	"net"
-	"time"
-)
-
-import (
-	"crypto/dsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
+	"fmt"
+	"math/big"
+	"net"
+	"time"
 )
 
 // Extra ASN1 OIDs that we may need to handle

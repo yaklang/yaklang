@@ -1642,9 +1642,11 @@ func WithReplaceHttpPacketPath(path string) PocConfigOption {
 // <|EXAMPLE_START|> 示例：用回调函数改写请求路径(本地构建可验证)
 // ```
 // // 关键词: poc.replacePathFunc, 回调改写路径
-// raw = poc.BuildRequest(poc.BasicRequest(), poc.replacePathFunc(func(old){
-//     return old + "/api/poc" // old 是原始路径, 这里在其后追加
-// }))
+//
+//	raw = poc.BuildRequest(poc.BasicRequest(), poc.replacePathFunc(func(old){
+//	    return old + "/api/poc" // old 是原始路径, 这里在其后追加
+//	}))
+//
 // println(string(raw))
 // assert poc.GetHTTPRequestPath(raw).Contains("/api/poc"), "path should be rewritten by callback"
 // ```
@@ -1874,8 +1876,10 @@ func WithReplaceHttpPacketFormEncoded(key, value string) PocConfigOption {
 // ```
 // // 关键词: poc.replaceUploadFile, 文件上传, multipart
 // raw = poc.BuildRequest(poc.BasicRequest(),
-//     poc.replaceMethod("POST"),
-//     poc.replaceUploadFile("file", "phpinfo.php", "<?php phpinfo(); ?>", "application/x-php"), // 表单名/文件名/内容/类型
+//
+//	poc.replaceMethod("POST"),
+//	poc.replaceUploadFile("file", "phpinfo.php", "<?php phpinfo(); ?>", "application/x-php"), // 表单名/文件名/内容/类型
+//
 // )
 // println(string(raw))
 // assert string(raw).Contains("phpinfo.php"), "filename should be in the multipart body"
@@ -2093,8 +2097,10 @@ func WithAppendHttpPacketFormEncoded(key, value string) PocConfigOption {
 // ```
 // // 关键词: poc.appendUploadFile, 追加上传文件
 // raw = poc.BuildRequest(poc.BasicRequest(),
-//     poc.replaceMethod("POST"),
-//     poc.appendUploadFile("file", "phpinfo.php", "<?php phpinfo(); ?>", "image/jpeg"), // 表单名/文件名/内容/类型
+//
+//	poc.replaceMethod("POST"),
+//	poc.appendUploadFile("file", "phpinfo.php", "<?php phpinfo(); ?>", "image/jpeg"), // 表单名/文件名/内容/类型
+//
 // )
 // println(string(raw))
 // assert string(raw).Contains("phpinfo.php"), "filename should be in the multipart body"
@@ -2645,11 +2651,13 @@ func HTTPEx(i interface{}, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpRes
 // // 关键词: poc.BuildRequest, 本地构建报文, 选项链
 // // BuildRequest 只应用"修改请求报文"的选项并返回报文, 不会真正发请求, 适合本地拼包/调试。
 // raw = poc.BuildRequest(
-//     poc.BasicRequest(),                 // 基础 GET 模板
-//     poc.replaceHost("yaklang.com"),     // 改 Host
-//     poc.replacePath("/docs/api/poc"),   // 改路径
-//     poc.replaceMethod("POST"),          // 改方法
-//     poc.replaceBody("a=b", false),      // 改 body(第二个参数表示是否分块传输)
+//
+//	poc.BasicRequest(),                 // 基础 GET 模板
+//	poc.replaceHost("yaklang.com"),     // 改 Host
+//	poc.replacePath("/docs/api/poc"),   // 改路径
+//	poc.replaceMethod("POST"),          // 改方法
+//	poc.replaceBody("a=b", false),      // 改 body(第二个参数表示是否分块传输)
+//
 // )
 // println(string(raw))                     // 打印拼好的完整请求报文
 // assert string(raw).Contains("POST /docs/api/poc"), "first line should be rebuilt"

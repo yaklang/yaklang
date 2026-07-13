@@ -2,8 +2,9 @@ package synscan
 
 import (
 	"context"
-	"github.com/pkg/errors"
 	"net"
+
+	"github.com/pkg/errors"
 )
 
 type arpHandler func(ip net.IP, addr net.HardwareAddr)

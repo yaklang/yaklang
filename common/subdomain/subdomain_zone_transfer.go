@@ -3,13 +3,14 @@ package subdomain
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/miekg/dns"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dnsutil"
-	"strings"
-	"time"
 )
 
 var queryNs = dnsutil.QueryNSEx

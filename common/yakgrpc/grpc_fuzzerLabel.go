@@ -4,11 +4,12 @@ package yakgrpc
 
 import (
 	"context"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 )
 
 func (s *Server) SaveFuzzerLabel(ctx context.Context, req *ypb.SaveFuzzerLabelRequest) (*ypb.Empty, error) {

@@ -23,7 +23,7 @@ func (s *ScreenRecorder) CalcHash() string {
 	return s.Hash
 }
 
-func (s *ScreenRecorder) BeforeSave() error {
+func (s *ScreenRecorder) BeforeSave(tx *gorm.DB) error {
 	s.Hash = s.CalcHash()
 	return nil
 }

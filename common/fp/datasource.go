@@ -1,11 +1,12 @@
 package fp
 
 import (
+	"path"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/fp/fingerprint/parsers"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
-	"path"
-	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
@@ -16,11 +17,10 @@ var (
 	DefaultNmapServiceProbeRules     map[*NmapProbe][]*NmapMatch
 	DefaultNmapServiceProbeRulesOnce sync.Once
 	DefaultWebFingerprintRules       []*rule.FingerPrintRule
-	OldDefaultWebFingerprintRules       []*webfingerprint.WebRule
+	OldDefaultWebFingerprintRules    []*webfingerprint.WebRule
 
-	DefaultWebFingerprintRulesOnce   sync.Once
-	OldDefaultWebFingerprintRulesOnce   sync.Once
-
+	DefaultWebFingerprintRulesOnce    sync.Once
+	OldDefaultWebFingerprintRulesOnce sync.Once
 )
 
 func loadDefaultNmapServiceProbeRules() (map[*NmapProbe][]*NmapMatch, error) {

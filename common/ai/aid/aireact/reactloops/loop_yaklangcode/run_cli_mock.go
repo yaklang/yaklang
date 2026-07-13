@@ -35,16 +35,16 @@ var selfTestCLIAlwaysOverride = map[string]string{
 
 // selfTestCLINameMocks provides mock values by common parameter names.
 var selfTestCLINameMocks = map[string]string{
-	"target":     "http://127.0.0.1/",
-	"url":        "http://127.0.0.1/",
-	"host":       "127.0.0.1",
-	"hosts":      "127.0.0.1",
-	"network":    "127.0.0.1/32",
-	"net":        "127.0.0.1/32",
-	"sign-key":   "yaklang-self-test-mock-key",
-	"token":      "yaklang-self-test-mock-token",
-	"secret":     "yaklang-self-test-mock-secret",
-	"method":     "POST",
+	"target":      "http://127.0.0.1/",
+	"url":         "http://127.0.0.1/",
+	"host":        "127.0.0.1",
+	"hosts":       "127.0.0.1",
+	"network":     "127.0.0.1/32",
+	"net":         "127.0.0.1/32",
+	"sign-key":    "yaklang-self-test-mock-key",
+	"token":       "yaklang-self-test-mock-token",
+	"secret":      "yaklang-self-test-mock-secret",
+	"method":      "POST",
 	"body-params": "username=admin&password=123456",
 }
 

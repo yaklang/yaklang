@@ -4,6 +4,7 @@ package simulator
 
 import (
 	"encoding/base64"
+
 	"github.com/go-rod/rod"
 	"github.com/yaklang/yaklang/common/utils"
 )

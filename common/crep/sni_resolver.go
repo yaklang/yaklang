@@ -1,9 +1,10 @@
 package crep
 
 import (
+	"strings"
+
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/log"
-	"strings"
 )
 
 type sniGlobRule struct {

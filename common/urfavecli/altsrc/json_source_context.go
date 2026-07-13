@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 )
 
 // NewJSONSourceFromFlagFunc returns a func that takes a cli.Context

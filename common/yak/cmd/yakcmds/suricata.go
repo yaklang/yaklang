@@ -2,16 +2,17 @@ package yakcmds
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/urfavecli"
+	"os"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/chaosmaker"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
-	"os"
-	"strings"
 )
 
 var ChaosMakerAIHelperCommand = cli.Command{}

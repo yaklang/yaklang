@@ -3,13 +3,14 @@ package mailutil
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/smtp"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/netx"
 	"gopkg.in/gomail.v2"
-	"net"
-	"net/smtp"
-	"time"
 )
 
 type SMTPConfig struct {

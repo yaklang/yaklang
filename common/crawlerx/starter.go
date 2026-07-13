@@ -6,6 +6,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"runtime"
+	"strings"
+	"time"
+
 	"github.com/go-rod/rod/lib/cdp"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/launcher/flags"
@@ -13,10 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/embed"
-	"regexp"
-	"runtime"
-	"strings"
-	"time"
 
 	"github.com/go-rod/rod"
 	"github.com/yaklang/yaklang/common/crawlerx/tools"
@@ -252,14 +253,14 @@ func (starter *BrowserStarter) doLauncher(l *launcher.Launcher) *launcher.Launch
 		l = l.Proxy(starter.browserConfig.proxyAddress.String())
 	}
 	l = l.NoSandbox(true).Set(flags.Headless, "new").Set("disable-features", "HttpsUpgrades")
-	
+
 	// 在 Windows 上防止 Chrome 创建桌面快捷方式
 	if strings.Contains(runtime.GOOS, "windows") {
 		l = l.Set("no-first-run", "")
 		l = l.Set("no-default-browser-check", "")
 		l = l.Set("disable-default-apps", "")
 	}
-	
+
 	if (starter.baseConfig.leakless == "default" && strings.Contains(runtime.GOOS, "windows")) ||
 		starter.baseConfig.leakless == "false" {
 		l = l.Leakless(false)

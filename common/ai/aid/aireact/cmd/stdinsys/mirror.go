@@ -1,9 +1,10 @@
 package stdinsys
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type Mirror struct {

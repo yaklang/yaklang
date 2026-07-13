@@ -2,14 +2,15 @@ package randomforest
 
 import (
 	"bufio"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/rpa/character"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"math/rand"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/rpa/character"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func RandomNumberGenerate(start int, end int, count int) ([]int, error) {

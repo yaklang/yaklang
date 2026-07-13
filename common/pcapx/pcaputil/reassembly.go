@@ -3,12 +3,13 @@ package pcaputil
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/bufpipe"
 	"io"
 	"net"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/bufpipe"
 
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"

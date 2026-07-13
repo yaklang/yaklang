@@ -4,10 +4,11 @@ package preaction
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/yaklang/yaklang/common/utils"
-	"time"
 )
 
 type ActionType string

@@ -2,13 +2,14 @@ package rule
 
 import (
 	"errors"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/maps"
-	"strings"
 )
 
 type MatchResource struct {

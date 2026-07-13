@@ -3,9 +3,10 @@ package yaklib
 import (
 	"bufio"
 	"bytes"
-	"github.com/yaklang/yaklang/common/utils/bufpipe"
 	"io"
 	"reflect"
+
+	"github.com/yaklang/yaklang/common/utils/bufpipe"
 
 	"github.com/yaklang/yaklang/common/utils"
 )

@@ -11,7 +11,6 @@ type WebRequest struct {
 	Target     *string           `json:"target,omitempty"`
 	Version    *string           `json:"version,omitempty"`
 	PropertyBag
-
 }
 
 // NewWebRequest creates a new WebRequest and returns a pointer to it

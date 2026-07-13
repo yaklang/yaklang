@@ -3,6 +3,7 @@ package ser_parser
 import (
 	"errors"
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	"github.com/yaklang/yaklang/common/yserx"
 )

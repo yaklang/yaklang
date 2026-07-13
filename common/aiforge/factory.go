@@ -2,8 +2,9 @@ package aiforge
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"io"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/rag/rag_search_tool"

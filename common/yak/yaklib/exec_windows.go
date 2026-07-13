@@ -15,4 +15,3 @@ func setupProcessGroup(cmd *exec.Cmd) {
 	// The default exec.CommandContext behavior is sufficient.
 	// No additional setup needed.
 }
-

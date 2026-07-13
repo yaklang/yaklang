@@ -3,13 +3,14 @@ package fuzztag
 import (
 	"bytes"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/mixer"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/mixer"
 )
 
 const YakHotPatchErr = "__YakHotPatchErr@"

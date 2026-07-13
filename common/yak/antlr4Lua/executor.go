@@ -3,13 +3,14 @@ package antlr4Lua
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/antlr4Lua/luaast"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"math"
 	"os"
 	"reflect"
 	"sort"
 	"strconv"
+
+	"github.com/yaklang/yaklang/common/yak/antlr4Lua/luaast"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func init() {

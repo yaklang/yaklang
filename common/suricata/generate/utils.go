@@ -2,10 +2,11 @@ package generate
 
 import (
 	"bytes"
+	"math/rand"
+
 	"github.com/yaklang/yaklang/common/suricata/data"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/suricata/rule"
-	"math/rand"
 )
 
 func nocaseFilter(input []byte) []byte {

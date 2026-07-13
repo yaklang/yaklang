@@ -3,8 +3,9 @@ package fuzztag
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type FuzzTagAST struct {

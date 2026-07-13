@@ -294,7 +294,8 @@ func ratio(hit, total int) float64 {
 // markup 误识别。
 //
 // 关键词: upsertDynamicSubtagsLocked, dynamic 顶层子标签解析,
-//        AITag 漂移检测, prefix cache 诊断
+//
+//	AITag 漂移检测, prefix cache 诊断
 func (g *globalCache) upsertDynamicSubtagsLocked(dynamicContent string) {
 	dynamicContent = strings.TrimSpace(dynamicContent)
 	if dynamicContent == "" {

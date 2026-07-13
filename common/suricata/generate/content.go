@@ -2,13 +2,14 @@ package generate
 
 import (
 	"errors"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/suricata/bytemap"
-	"github.com/yaklang/yaklang/common/suricata/rule"
 	"math"
 	"math/rand"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/suricata/bytemap"
+	"github.com/yaklang/yaklang/common/suricata/rule"
 )
 
 type noiseFunc func() byte

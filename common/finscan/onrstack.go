@@ -2,10 +2,11 @@ package finscan
 
 import (
 	"context"
-	uuid "github.com/google/uuid"
-	"github.com/pkg/errors"
 	"net"
 	"time"
+
+	uuid "github.com/google/uuid"
+	"github.com/pkg/errors"
 )
 
 type rstAckHandler func(ip net.IP, port int)

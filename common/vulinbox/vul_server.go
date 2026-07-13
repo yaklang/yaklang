@@ -4,16 +4,17 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"net"
+	"net/http"
+	"sync"
+	"time"
+
 	"github.com/gorilla/mux"
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
-	"net"
-	"net/http"
-	"sync"
-	"time"
 )
 
 type VulinServer struct {

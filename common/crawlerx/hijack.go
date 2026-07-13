@@ -3,10 +3,11 @@
 package crawlerx
 
 import (
-	"github.com/go-rod/rod/lib/proto"
-	"github.com/ysmood/gson"
 	"net/http"
 	"net/url"
+
+	"github.com/go-rod/rod/lib/proto"
+	"github.com/ysmood/gson"
 )
 
 type HijackRequest interface {

@@ -15,10 +15,11 @@ package netroute
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"net"
 	"sort"
 	"syscall"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/gopacket/gopacket/routing"
 	"golang.org/x/net/route"

@@ -2,12 +2,13 @@ package pprofutils
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // StartMemoryProfile 在采样时长结束后写入一次堆内存 profile（导出名为 pprof.StartMemoryProfile）
@@ -75,4 +76,3 @@ func StartMemoryProfile(opts ...Option) error {
 
 	return nil
 }
-

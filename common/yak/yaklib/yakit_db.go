@@ -106,9 +106,11 @@ func queryDomainAssetByDomainKeyword(keyword string) (chan *schema.Domain, error
 // ```
 // // 按网站标题筛选后台类资产（依赖资产已带标题，示意性示例）
 // ch = db.QueryDomainsByTitle("admin")~
-// for domain in ch {
-//     println(domain.Domain, domain.HTTPTitle)
-// }
+//
+//	for domain in ch {
+//	    println(domain.Domain, domain.HTTPTitle)
+//	}
+//
 // ```
 func queryDomainAssetByHTMLTitle(title string) (chan *schema.Domain, error) {
 	db := consts.GetGormProjectDatabase()
@@ -269,9 +271,11 @@ func queryHostPortByTarget(target string) chan string {
 // ```
 // // 联动：把某网段已入库的开放端口取出，作为后续探测的目标列表（依赖已有端口资产，示意性示例）
 // targets = []
-// for hostport in db.QueryHostPortByNetwork("192.168.1.0/24") {
-//     targets = append(targets, hostport)   // 形如 "192.168.1.10:80"
-// }
+//
+//	for hostport in db.QueryHostPortByNetwork("192.168.1.0/24") {
+//	    targets = append(targets, hostport)   // 形如 "192.168.1.10:80"
+//	}
+//
 // yakit.Info("collected %d open host:port targets for next step", len(targets))
 // ```
 func queryHostPortByNetwork(network string) chan string {
@@ -501,11 +505,13 @@ func saveDomain(domain string, ip ...string) error {
 // Example:
 // ```
 // // 将服务扫描结果转换为端口资产对象（依赖扫描结果，示意性示例）
-// for result in servicescan.Scan("127.0.0.1", "80")~ {
-//     port = yakit.ObjToPort(result)~
-//     println(port.Host, port.Port)
-//     break
-// }
+//
+//	for result in servicescan.Scan("127.0.0.1", "80")~ {
+//	    port = yakit.ObjToPort(result)~
+//	    println(port.Host, port.Port)
+//	    break
+//	}
+//
 // ```
 func interfaceToPort(t interface{}) (*schema.Port, error) {
 	var r *schema.Port
@@ -544,15 +550,18 @@ func interfaceToPort(t interface{}) (*schema.Port, error) {
 // // 端口扫描依赖网络与目标，这里对目标存活做容错处理
 // runtimeId = "doc-demo-portscan"
 // target = "scanme.nmap.org"
-// for result in servicescan.Scan(target, "80,443")~ {
-//     db.SavePortFromResult(result, runtimeId)~   // 把每个开放端口结果落库
-//     yakit.Info("saved port asset: %v:%v", result.Target, result.Port)
-// }
+//
+//	for result in servicescan.Scan(target, "80,443")~ {
+//	    db.SavePortFromResult(result, runtimeId)~   // 把每个开放端口结果落库
+//	    yakit.Info("saved port asset: %v:%v", result.Target, result.Port)
+//	}
 //
 // // 按 runtimeId 取回本次扫描保存的端口资产
-// for port in db.QueryPortsByRuntimeId(runtimeId)~ {
-//     println(port.Host, port.Port, port.ServiceType)
-// }
+//
+//	for port in db.QueryPortsByRuntimeId(runtimeId)~ {
+//	    println(port.Host, port.Port, port.ServiceType)
+//	}
+//
 // ```
 func savePortFromObj(t interface{}, RuntimeId ...string) error {
 	r, err := interfaceToPort(t)
@@ -627,10 +636,12 @@ func queryUrlsByKeyword(k string) chan string {
 //
 // table = yakit.NewTable("URL", "Method", "Status")
 // hit = 0
-// for flow in db.QueryHTTPFlowsByKeyword(host) {
-//     table.Append(flow.Url, flow.Method, flow.StatusCode)
-//     hit++
-// }
+//
+//	for flow in db.QueryHTTPFlowsByKeyword(host) {
+//	    table.Append(flow.Url, flow.Method, flow.StatusCode)
+//	    hit++
+//	}
+//
 // yakit.Output(table)
 // assert hit >= 1, "the saved login flow should be found by keyword"
 // ```
@@ -725,13 +736,17 @@ func queryPortsByTaskName(taskName string) (chan *schema.Port, error) {
 // ```
 // // 与保存端 SavePortFromResult(result, runtimeId) 配对使用（依赖一次真实扫描，示意性示例）
 // runtimeId = "scan-"+uuid()
-// for result in servicescan.Scan("127.0.0.1", "1-100")~ {
-//     db.SavePortFromResult(result, runtimeId)~
-// }
+//
+//	for result in servicescan.Scan("127.0.0.1", "1-100")~ {
+//	    db.SavePortFromResult(result, runtimeId)~
+//	}
+//
 // table = yakit.NewTable("Host", "Port", "Service")
-// for port in db.QueryPortsByRuntimeId(runtimeId)~ {
-//     table.Append(port.Host, port.Port, port.ServiceType)
-// }
+//
+//	for port in db.QueryPortsByRuntimeId(runtimeId)~ {
+//	    table.Append(port.Host, port.Port, port.ServiceType)
+//	}
+//
 // yakit.Output(table)
 // ```
 func queryPortsByRuntimeId(runtimeID string) (chan *schema.Port, error) {
@@ -800,11 +815,13 @@ func queryHTTPFlowsByID(id ...int64) chan *schema.HTTPFlow {
 //
 // id = 0
 // for flow in db.QueryHTTPFlowsByKeyword(host) { id = flow.ID; break }
-// if id > 0 {
-//     one = db.QueryHTTPFlowByID(id)~
-//     println(one.Url)
-//     assert one.ID == id, "QueryHTTPFlowByID should return the same record"
-// }
+//
+//	if id > 0 {
+//	    one = db.QueryHTTPFlowByID(id)~
+//	    println(one.Url)
+//	    assert one.ID == id, "QueryHTTPFlowByID should return the same record"
+//	}
+//
 // ```
 func queryHTTPFlowByID(id int64) (*schema.HTTPFlow, error) {
 	db := consts.GetGormProjectDatabase()
@@ -976,13 +993,15 @@ func getPayloadGroups(group string) []string {
 // db.SavePayload("doc-all-2", ["c"])~
 // groups = db.GetAllPayloadGroupsName()
 // assert "doc-all-1" in groups && "doc-all-2" in groups, "both groups should be listed"
-// for g in groups {
-//     if g.HasPrefix("doc-all-") {
-//         cnt = 0
-//         for _ in db.YieldPayload(g) { cnt++ }
-//         println(g, cnt)
-//     }
-// }
+//
+//	for g in groups {
+//	    if g.HasPrefix("doc-all-") {
+//	        cnt = 0
+//	        for _ in db.YieldPayload(g) { cnt++ }
+//	        println(g, cnt)
+//	    }
+//	}
+//
 // db.DeletePayloadByGroup("doc-all-1"); db.DeletePayloadByGroup("doc-all-2")
 // ```
 func getAllPayloadGroupsName() []string {
@@ -1022,9 +1041,11 @@ func getAllPayloadGroupsName() []string {
 // assert len(seen) == 3, "merged unique usernames should be admin/root/guest"
 //
 // // 典型联动：用字典构造 HTTP 登录请求（此处仅构造，不发送）
-// for u in db.YieldPayload("doc-y-a") {
-//     _ = f`POST /login HTTP/1.1\r\nHost: target\r\n\r\nusername=${u}&password=test`
-// }
+//
+//	for u in db.YieldPayload("doc-y-a") {
+//	    _ = f`POST /login HTTP/1.1\r\nHost: target\r\n\r\nusername=${u}&password=test`
+//	}
+//
 // db.DeletePayloadByGroup("doc-y-a"); db.DeletePayloadByGroup("doc-y-b")
 // ```
 func YieldPayload(raw any, extra ...any) chan string {
@@ -1104,10 +1125,12 @@ func init() {
 // Example:
 // ```
 // // 遍历历史 HTTP 流量（依赖本地数据库已有数据，示意性示例）
-// for flow in yakit.QueryHTTPFlowsAll() {
-//     println(flow.Url)
-//     break
-// }
+//
+//	for flow in yakit.QueryHTTPFlowsAll() {
+//	    println(flow.Url)
+//	    break
+//	}
+//
 // ```
 func queryHTTPFlowsAll() chan *schema.HTTPFlow {
 	return queryHTTPFlowByKeyword("")
@@ -1139,10 +1162,12 @@ func deleteAllAIEvent() error {
 // Example:
 // ```
 // // 遍历项目库中的 AI 事件（依赖本地数据库已有数据，示意性示例）
-// for event in yakit.YieldAllAIEvent() {
-//     println(event.Type)
-//     break
-// }
+//
+//	for event in yakit.YieldAllAIEvent() {
+//	    println(event.Type)
+//	    break
+//	}
+//
 // ```
 func yieldAllAIEvent() chan *schema.AiOutputEvent {
 	db := consts.GetGormProjectDatabase()

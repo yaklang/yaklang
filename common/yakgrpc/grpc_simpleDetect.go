@@ -4,6 +4,12 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
@@ -11,11 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/network"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
 )
 
 //go:embed grpc_simple_detect_script.yak

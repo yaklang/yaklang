@@ -2,12 +2,13 @@ package yakurl
 
 import (
 	"fmt"
+	"sort"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"sort"
-	"strings"
 )
 
 type fuzzTagDocAction struct{}

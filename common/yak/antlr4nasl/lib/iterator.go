@@ -1,9 +1,10 @@
 package lib
 
 import (
+	"reflect"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor/nasl_type"
-	"reflect"
 )
 
 type IteratorInterface interface {

@@ -30,7 +30,7 @@ func (p *Port) CalcHash() string {
 	return utils.CalcSha1(p.Host, p.Port, p.Proto, p.TaskName, p.RuntimeId)
 }
 
-func (p *Port) BeforeSave() error {
+func (p *Port) BeforeSave(tx *gorm.DB) error {
 	if p.IPInteger <= 0 {
 		ipInt, _ := utils.IPv4ToUint64(p.Host)
 		p.IPInteger = int(ipInt)

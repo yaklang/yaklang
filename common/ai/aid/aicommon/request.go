@@ -1,8 +1,9 @@
 package aicommon
 
 import (
-	"github.com/yaklang/yaklang/common/schema"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 type ImageData struct {

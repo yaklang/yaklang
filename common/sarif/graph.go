@@ -6,7 +6,6 @@ type Graph struct {
 	Edges       []*Edge  `json:"edges,omitempty"`
 	Nodes       []*Node  `json:"nodes,omitempty"`
 	PropertyBag
-
 }
 
 // NewGraph creates a new Graph and returns a pointer to it

@@ -3,14 +3,15 @@ package pcaputil
 import (
 	"bytes"
 	"context"
+	"net"
+	"sync"
+	"time"
+
 	"github.com/gopacket/gopacket"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"net"
-	"sync"
-	"time"
 )
 
 var captureDaemonCache = utils.NewTTLCache[*daemonCache](30 * time.Second)

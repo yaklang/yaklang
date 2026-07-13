@@ -210,7 +210,7 @@ func (f *HTTPFlow) CalcCacheHash(full bool) string {
 	return utils.CalcSha1(f.ID, f.Hash, full)
 }
 
-func (f *HTTPFlow) BeforeSave() error {
+func (f *HTTPFlow) BeforeSave(tx *gorm.DB) error {
 	f.fixURL()
 	f.Hash = f.CalcHash()
 	return nil

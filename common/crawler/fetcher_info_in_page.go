@@ -3,12 +3,13 @@ package crawler
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"golang.org/x/net/html"
 	"mime"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/net/html"
 )
 
 type JavaScriptContent struct {

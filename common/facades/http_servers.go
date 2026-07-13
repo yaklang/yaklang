@@ -3,12 +3,13 @@ package facades
 import (
 	"bufio"
 	"errors"
+	"net"
+	"time"
+
 	"github.com/h2non/filetype"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"net"
-	"time"
 )
 
 const defaultHTTPFallback = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n\r\n\r\n"

@@ -1,9 +1,10 @@
 package utils
 
 import (
+	"time"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
-	"time"
 )
 
 func Retry(times int, f func() error) error {

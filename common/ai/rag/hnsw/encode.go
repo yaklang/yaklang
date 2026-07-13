@@ -5,9 +5,10 @@ import (
 	"cmp"
 	"encoding/binary"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
 	"io"
 	"os"
+
+	"github.com/yaklang/yaklang/common/consts"
 )
 
 // errorEncoder is a helper type to encode multiple values

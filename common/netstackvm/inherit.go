@@ -2,9 +2,10 @@ package netstackvm
 
 import (
 	"encoding/hex"
+	"net"
+
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
 	"github.com/yaklang/yaklang/common/utils/arptable"
-	"net"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"

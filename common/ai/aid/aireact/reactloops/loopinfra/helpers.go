@@ -2,8 +2,9 @@ package loopinfra
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/utils"

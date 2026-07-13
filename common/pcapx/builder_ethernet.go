@@ -1,11 +1,12 @@
 package pcapx
 
 import (
+	"net"
+	"strings"
+
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"net"
-	"strings"
 )
 
 var ethernetLayerExports = map[string]interface{}{

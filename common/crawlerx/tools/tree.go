@@ -3,8 +3,9 @@
 package tools
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type UrlNode struct {

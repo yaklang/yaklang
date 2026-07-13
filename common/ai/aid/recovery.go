@@ -2,6 +2,7 @@ package aid
 
 import (
 	"context"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
@@ -18,10 +19,10 @@ func NewRecoveredCoordinator(
 	if pt.Uuid == "" {
 		return nil, utils.Error("cannot recover coordinator at this time, no coordinator uuid")
 	}
-	return NewCoordinatorContext(ctx, pt.GetUserInput(), append(options, aicommon.WithID(pt.Uuid),aicommon.WithSequence(pt.Seq))...)
+	return NewCoordinatorContext(ctx, pt.GetUserInput(), append(options, aicommon.WithID(pt.Uuid), aicommon.WithSequence(pt.Seq))...)
 }
 
-func NewFastRecoverCoordinatorContext(ctx context.Context, uuid string, opt ...aicommon.ConfigOption,) (*Coordinator, error) {
+func NewFastRecoverCoordinatorContext(ctx context.Context, uuid string, opt ...aicommon.ConfigOption) (*Coordinator, error) {
 	rt, err := yakit.GetAgentRuntime(consts.GetGormProjectDatabase(), uuid)
 	if err != nil {
 		return nil, utils.Errorf("coordinator: get runtime failed: %v", err)
@@ -29,6 +30,6 @@ func NewFastRecoverCoordinatorContext(ctx context.Context, uuid string, opt ...a
 	return NewRecoveredCoordinator(ctx, rt, opt...)
 }
 
-func NewFastRecoverCoordinator(uuid string, opt ...aicommon.ConfigOption,) (*Coordinator, error) {
+func NewFastRecoverCoordinator(uuid string, opt ...aicommon.ConfigOption) (*Coordinator, error) {
 	return NewFastRecoverCoordinatorContext(context.Background(), uuid, opt...)
 }

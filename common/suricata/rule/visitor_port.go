@@ -1,15 +1,16 @@
 package rule
 
 import (
+	"math/rand"
+	"slices"
+	"sort"
+	"strings"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata/config"
 	"github.com/yaklang/yaklang/common/suricata/parser"
 	"github.com/yaklang/yaklang/common/utils"
-	"math/rand"
-	"slices"
-	"sort"
-	"strings"
 )
 
 type PortRule struct {

@@ -32,7 +32,7 @@ func (m *MenuItem) CalcHash() string {
 	return utils.CalcSha1(m.Group, m.Mode, key)
 }
 
-func (m *MenuItem) BeforeSave() error {
+func (m *MenuItem) BeforeSave(tx *gorm.DB) error {
 	if m.Group == "" {
 		m.Group = "UserDefined"
 	}

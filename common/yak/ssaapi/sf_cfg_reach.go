@@ -10,9 +10,9 @@ import (
 )
 
 type reachableOptions struct {
-	icfg     bool
-	maxDepth int
-	maxNodes int
+	icfg             bool
+	maxDepth         int
+	maxNodes         int
 	skipLoopBackedge bool
 }
 

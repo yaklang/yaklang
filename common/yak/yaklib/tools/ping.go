@@ -2,15 +2,16 @@ package tools
 
 import (
 	"context"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
 	"github.com/yaklang/yaklang/common/utils/network"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
-	"strings"
-	"sync"
-	"time"
 )
 
 type _pingConfig struct {

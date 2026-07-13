@@ -63,13 +63,13 @@ type options struct {
 
 	// Video slicing options (segment muxer based, time-based slicing)
 	// 用于按时间段把长视频切成若干段独立 mp4，配合 omni 模型做端到端理解
-	sliceDurationSeconds float64                       // 每段时长（秒），默认 120
-	sliceReencode        bool                          // 是否重编码（默认 false：流复制最快）
-	sliceMaxHeight       int                           // 重编码模式下最大高度，默认 720
-	sliceTargetFPS       float64                       // 重编码模式下目标 FPS，默认 2
-	sliceLoadRawData     bool                          // 是否随 channel 回吐字节内容，默认 false
-	sliceCallback        func(*VideoSliceResult)       // 实时回调，与 channel 双轨
-	sliceOutputDir       string                        // 切片输出目录（不指定则用临时目录）
+	sliceDurationSeconds float64                 // 每段时长（秒），默认 120
+	sliceReencode        bool                    // 是否重编码（默认 false：流复制最快）
+	sliceMaxHeight       int                     // 重编码模式下最大高度，默认 720
+	sliceTargetFPS       float64                 // 重编码模式下目标 FPS，默认 2
+	sliceLoadRawData     bool                    // 是否随 channel 回吐字节内容，默认 false
+	sliceCallback        func(*VideoSliceResult) // 实时回调，与 channel 双轨
+	sliceOutputDir       string                  // 切片输出目录（不指定则用临时目录）
 }
 
 // frameExtractionMode defines the method for frame extraction.
@@ -374,8 +374,10 @@ func WithSubtitlePadding(enable bool) Option {
 // ```
 // // 叠加时间戳的同时避免其干扰场景检测（需要真实视频文件，示意性示例）
 // result = ffmpeg.ExtractFineGrainedFramesFromVideo("video.mp4",
-//     ffmpeg.withTimestampOverlay(true),
-//     ffmpeg.withIgnoreBottomPaddingInSceneDetection(true),
+//
+//	ffmpeg.withTimestampOverlay(true),
+//	ffmpeg.withIgnoreBottomPaddingInSceneDetection(true),
+//
 // )~
 // ```
 func WithIgnoreBottomPaddingInSceneDetection(enable bool) Option {
@@ -545,9 +547,11 @@ func WithSliceDurationSeconds(seconds float64) Option {
 // ```
 // // 启用重编码切片以统一分辨率/帧率（需要真实视频文件，示意性示例）
 // ch = ffmpeg.ExtractVideoSliceFromVideo("video.mp4",
-//     ffmpeg.withSliceReencode(true),
-//     ffmpeg.withSliceMaxHeight(720),
-//     ffmpeg.withSliceTargetFPS(2),
+//
+//	ffmpeg.withSliceReencode(true),
+//	ffmpeg.withSliceMaxHeight(720),
+//	ffmpeg.withSliceTargetFPS(2),
+//
 // )~
 // ```
 func WithSliceReencode(enable bool) Option {
@@ -639,7 +643,9 @@ func WithSliceLoadRawData(enable bool) Option {
 // ```
 // // 边切片边记录路径（需要真实视频文件，示意性示例）
 // ch = ffmpeg.ExtractVideoSliceFromVideo("video.mp4",
-//     ffmpeg.withSliceCallback(func(r) { log.info("slice ready: %v", r.FilePath) }),
+//
+//	ffmpeg.withSliceCallback(func(r) { log.info("slice ready: %v", r.FilePath) }),
+//
 // )~
 // ```
 func WithSliceCallback(cb func(*VideoSliceResult)) Option {

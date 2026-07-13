@@ -70,11 +70,11 @@ func (e ObfEntry) EffectiveCategory() ObfCategory {
 // profile-driven function selection. Built-in presets and JSON files share the
 // same schema.
 type Profile struct {
-	Name          string     `json:"name,omitempty"`
-	Description   string     `json:"description,omitempty"`
-	SeedPolicy    SeedPolicy `json:"seed_policy,omitempty"`
-	SelectionSeed int64      `json:"selection_seed,omitempty"`
-	BuildSeedHex  string     `json:"build_seed_hex,omitempty"`
+	Name          string          `json:"name,omitempty"`
+	Description   string          `json:"description,omitempty"`
+	SeedPolicy    SeedPolicy      `json:"seed_policy,omitempty"`
+	SelectionSeed int64           `json:"selection_seed,omitempty"`
+	BuildSeedHex  string          `json:"build_seed_hex,omitempty"`
 	LLVMPacks     []string        `json:"llvm_packs,omitempty"`
 	Obfuscators   []ObfEntry      `json:"obfuscators,omitempty"`
 	LinkPrep      *LinkPrepConfig `json:"link_prep,omitempty"`

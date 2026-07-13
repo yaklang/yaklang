@@ -5,12 +5,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/bufpipe"
 	"io"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/yaklang/yaklang/common/utils/bufpipe"
 
 	"github.com/yaklang/yaklang/common/log"
 )

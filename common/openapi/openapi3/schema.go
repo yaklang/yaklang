@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/openapi/jsonpointer"
 	"math"
 	"math/big"
 	"reflect"
@@ -17,6 +15,9 @@ import (
 	"strings"
 	"sync"
 	"unicode/utf16"
+
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/openapi/jsonpointer"
 
 	"github.com/mohae/deepcopy"
 )

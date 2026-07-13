@@ -2,14 +2,15 @@ package aicommon
 
 import (
 	"context"
+	"sync"
+	"time"
+
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"sync"
-	"time"
 )
 
 func (c *Config) StartEventLoop(ctx context.Context) {

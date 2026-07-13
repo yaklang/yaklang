@@ -2,13 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/urfavecli"
-	"github.com/yaklang/pcap"
-	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/netutil"
 	"os"
 	"os/signal"
 	"runtime"
@@ -17,6 +10,14 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/pkg/errors"
+	"github.com/yaklang/pcap"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/netutil"
 )
 
 var (

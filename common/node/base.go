@@ -3,6 +3,9 @@ package node
 import (
 	"context"
 	"encoding/json"
+	"sync"
+	"time"
+
 	"github.com/pkg/errors"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/tevino/abool"
@@ -11,8 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/spec"
 	"github.com/yaklang/yaklang/common/utils/healthinfo"
 	"github.com/yaklang/yaklang/common/yak"
-	"sync"
-	"time"
 )
 
 type NodeBase struct {

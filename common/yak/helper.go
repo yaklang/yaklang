@@ -3,12 +3,13 @@ package yak
 import (
 	"bytes"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/olekukonko/tablewriter"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"reflect"
 	"sort"
 	"strings"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/olekukonko/tablewriter"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 )
 
 type PalmScriptEngineHelper struct {

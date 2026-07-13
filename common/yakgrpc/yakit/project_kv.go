@@ -1,9 +1,10 @@
 package yakit
 
 import (
-	"github.com/yaklang/yaklang/common/schema"
 	"strconv"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"

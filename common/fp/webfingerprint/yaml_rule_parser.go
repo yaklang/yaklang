@@ -1,11 +1,12 @@
 package webfingerprint
 
 import (
+	"io/ioutil"
+
 	"github.com/pkg/errors"
 	log "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/embed"
 	"gopkg.in/yaml.v3"
-	"io/ioutil"
 )
 
 func GetYamlWebFingerprintRules(yamlFilePath string) ([]*WebRule, error) {

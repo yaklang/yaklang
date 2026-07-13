@@ -1259,9 +1259,11 @@ func (c *CliApp) SetSelectOption(name, value string) SetCliExtraParam {
 // // 关键词: cli.setJsonSchema, 用 JSON Schema 在 Yakit 中渲染复杂表单
 // // 独立运行时仍按 JSON 解析; 这里用默认值演示解析过程(图形化中由 schema 驱动表单)
 // info = cli.Json("info",
-//     cli.setVerboseName("项目信息"),
-//     cli.setJsonSchema(`{"type":"object","properties":{"name":{"type":"string"}}}`),
-//     cli.setDefault(`{"name": "Chuck"}`),
+//
+//	cli.setVerboseName("项目信息"),
+//	cli.setJsonSchema(`{"type":"object","properties":{"name":{"type":"string"}}}`),
+//	cli.setDefault(`{"name": "Chuck"}`),
+//
 // )
 // println("name:", info["name"]) // 预期输出: name: Chuck
 // assert info["name"] == "Chuck", "json default should be parsed"

@@ -3,12 +3,13 @@ package permutil
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func LinuxPKExecSudo(cmd string, opt ...SudoOption) error {

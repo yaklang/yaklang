@@ -1,12 +1,13 @@
 package scannode
 
 import (
-	"github.com/yaklang/yaklang/common/urfavecli"
+	"io/ioutil"
+	"path/filepath"
+
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
-	"io/ioutil"
-	"path/filepath"
 )
 
 var DistYakCommand = cli.Command{

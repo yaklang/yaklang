@@ -2,11 +2,12 @@ package yakit
 
 import (
 	"context"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"gorm.io/gorm"
-	"strings"
 )
 
 type VectorDocumentFilter struct {

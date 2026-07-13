@@ -75,4 +75,3 @@ func BuildCapabilityInventoryPayloadFromSnapshot(snapshot *aicommon.SessionSnaps
 	}
 	return aicommon.CapabilityInventoryPayloadFromItems(snapshot.Capabilities, cfg)
 }
-

@@ -5,15 +5,16 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"io"
+	"runtime"
+	"text/template"
+	"time"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	"io"
-	"runtime"
-	"text/template"
-	"time"
 )
 
 func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyType, endpoint *Endpoint) {

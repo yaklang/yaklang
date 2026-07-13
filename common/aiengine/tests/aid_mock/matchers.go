@@ -165,4 +165,3 @@ func MatcherNotEmpty() PromptMatcherFunc {
 func MatcherFunc(fn func(string) bool) PromptMatcherFunc {
 	return fn
 }
-

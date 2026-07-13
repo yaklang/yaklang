@@ -2,9 +2,10 @@ package utils
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils/chanx"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/chanx"
 )
 
 type EventWatcherManager struct {

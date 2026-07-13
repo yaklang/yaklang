@@ -1,11 +1,12 @@
 package synscan
 
 import (
+	"time"
+
 	"github.com/gopacket/gopacket"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"time"
 )
 
 func (s *Scanner) sleepRateLimit() {

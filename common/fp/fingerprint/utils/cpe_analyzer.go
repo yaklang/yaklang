@@ -1,9 +1,10 @@
 package utils
 
 import (
+	"sync"
+
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/schema"
-	"sync"
 )
 
 type CPEAnalyzer struct {

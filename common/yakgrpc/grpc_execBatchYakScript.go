@@ -4,6 +4,14 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"io/ioutil"
+	"math"
+	"math/rand"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -14,13 +22,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io/ioutil"
-	"math"
-	"math/rand"
-	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 //go:embed grpc_execBatchYakScript_batch_exec.yak

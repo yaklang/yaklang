@@ -25,8 +25,9 @@ package context
 import (
 	"context"
 	"errors"
-	"github.com/yaklang/yaklang/common/log"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/waiter"
 )

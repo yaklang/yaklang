@@ -74,11 +74,11 @@ Bad: "端口扫描" - 不完整句式
 {{ .data }}
 <|USER_INPUT_END_{{ .nonce }}|>
 `, map[string]any{
-			"nonce":           nonce,
-			"data":            opts.userInput,
-			"workspacePath":   opts.workspacePath,
-			"hasGrepSearcher": opts.hasGrepSearcher,
-			"hasRAGSearcher":  opts.hasRAGSearcher,
+			"nonce":                 nonce,
+			"data":                  opts.userInput,
+			"workspacePath":         opts.workspacePath,
+			"hasGrepSearcher":       opts.hasGrepSearcher,
+			"hasRAGSearcher":        opts.hasRAGSearcher,
 			"librarySelectionIndex": librarySelectionIndex,
 		})
 	}

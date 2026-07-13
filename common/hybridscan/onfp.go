@@ -2,6 +2,7 @@ package hybridscan
 
 import (
 	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/fp"
 )

@@ -334,7 +334,7 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 		}
 	}
 	matchHelper := func(rsp *lowhttp.LowhttpResponse, index int) bool {
-		var flowMatchersResult []any  // flow result: includes all matchers
+		var flowMatchersResult []any // flow result: includes all matchers
 		for matcherIndex, matcher := range matchers {
 			if matcher.Id == 0 {
 				var reqPacket []byte
@@ -493,7 +493,7 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 				matchRes := matchHelper(rsp, index)
 				if matchRes && reqOrigin.StopAtFirstMatch {
 					// 第一次匹配就退出
-				return responses, matchResults, flowMatched, extracted, count
+					return responses, matchResults, flowMatched, extracted, count
 				}
 			}
 		}

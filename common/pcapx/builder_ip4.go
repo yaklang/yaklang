@@ -1,12 +1,13 @@
 package pcapx
 
 import (
+	"net"
+	"strings"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"net"
-	"strings"
 )
 
 var ipv4LayerExports = map[string]any{

@@ -2,13 +2,14 @@ package yakit
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	uuid "github.com/google/uuid"
 	"github.com/gopacket/gopacket"

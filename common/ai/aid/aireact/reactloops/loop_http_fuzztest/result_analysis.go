@@ -2,9 +2,10 @@ package loop_http_fuzztest
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"sort"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"

@@ -2,10 +2,11 @@ package utils
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"math/big"
 	"net"
 	"strconv"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func InetNtoA(ip int64) net.IP {

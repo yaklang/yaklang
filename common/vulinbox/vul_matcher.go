@@ -2,13 +2,14 @@ package vulinbox
 
 import (
 	"context"
+	"sync"
+
 	"github.com/gopacket/gopacket"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/suricata/match"
 	"github.com/yaklang/yaklang/common/suricata/rule"
 	"golang.org/x/exp/slices"
-	"sync"
 )
 
 type matcher struct {

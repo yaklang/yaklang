@@ -263,7 +263,7 @@ func (c *Storage) CalcHash() string {
 	return c.Hash
 }
 
-func (c *Storage) BeforeSave() error {
+func (c *Storage) BeforeSave(tx *gorm.DB) error {
 	if c.Hash == "" {
 		c.CalcHash()
 	}

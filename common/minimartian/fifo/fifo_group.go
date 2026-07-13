@@ -22,10 +22,11 @@ package fifo
 
 import (
 	"encoding/json"
-	martian "github.com/yaklang/yaklang/common/minimartian"
-	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
 	"sync"
+
+	martian "github.com/yaklang/yaklang/common/minimartian"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/log"
 )

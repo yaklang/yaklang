@@ -3,9 +3,10 @@ package utils
 import (
 	"errors"
 	"fmt"
-	"github.com/tevino/abool"
 	"sync"
 	"time"
+
+	"github.com/tevino/abool"
 )
 
 type CoolDownFetcher struct {

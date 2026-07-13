@@ -22,4 +22,3 @@ func setupProcessGroup(cmd *exec.Cmd) {
 		return nil
 	}
 }
-

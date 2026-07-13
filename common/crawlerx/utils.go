@@ -3,9 +3,10 @@
 package crawlerx
 
 import (
-	"github.com/go-rod/rod/lib/proto"
 	"regexp"
 	"strings"
+
+	"github.com/go-rod/rod/lib/proto"
 
 	"github.com/go-rod/rod"
 	"github.com/yaklang/yaklang/common/log"

@@ -23,7 +23,6 @@ type ExternalProperties struct {
 	WebRequests            []*WebRequest         `json:"webRequests,omitempty"`
 	WebResponses           []*WebResponse        `json:"webResponses,omitempty"`
 	PropertyBag
-
 }
 
 // NewExternalProperties creates a new ExternalProperties and returns a pointer to it

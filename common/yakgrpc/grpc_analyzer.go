@@ -2,11 +2,12 @@ package yakgrpc
 
 import (
 	"context"
+	"strings"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 )
 
 func (s *Server) HTTPRequestAnalyzer(ctx context.Context, req *ypb.HTTPRequestAnalysisMaterial) (*ypb.HTTPRequestAnalysis, error) {

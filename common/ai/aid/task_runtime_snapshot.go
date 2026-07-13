@@ -34,43 +34,43 @@ type TaskTextOutput struct {
 
 // TaskRuntimeEntry describes one task row in the runtime report.
 type TaskRuntimeEntry struct {
-	Scope              string           `json:"scope"`
-	ReActID            string           `json:"react_id,omitempty"`
-	CoordinatorID      string           `json:"coordinator_id,omitempty"`
-	TaskID             string           `json:"task_id"`
-	TaskIndex          string           `json:"task_index,omitempty"`
-	Name               string           `json:"name,omitempty"`
-	Status             string           `json:"status"`
-	AsyncMode          bool             `json:"async_mode"`
-	Executing          bool             `json:"executing"`
-	LoopName           string           `json:"loop_name,omitempty"`
-	ParentIndex        string           `json:"parent_index,omitempty"`
-	Goal               string           `json:"goal,omitempty"`
-	HasTimelineFork    bool             `json:"has_timeline_fork"`
-	RecentTextOutputs  []TaskTextOutput `json:"recent_text_outputs"`
+	Scope             string           `json:"scope"`
+	ReActID           string           `json:"react_id,omitempty"`
+	CoordinatorID     string           `json:"coordinator_id,omitempty"`
+	TaskID            string           `json:"task_id"`
+	TaskIndex         string           `json:"task_index,omitempty"`
+	Name              string           `json:"name,omitempty"`
+	Status            string           `json:"status"`
+	AsyncMode         bool             `json:"async_mode"`
+	Executing         bool             `json:"executing"`
+	LoopName          string           `json:"loop_name,omitempty"`
+	ParentIndex       string           `json:"parent_index,omitempty"`
+	Goal              string           `json:"goal,omitempty"`
+	HasTimelineFork   bool             `json:"has_timeline_fork"`
+	RecentTextOutputs []TaskTextOutput `json:"recent_text_outputs"`
 }
 
 // PlanExecutionRuntimeSnapshot summarizes one running plan-and-execute coordinator.
 type PlanExecutionRuntimeSnapshot struct {
 	CoordinatorID     string             `json:"coordinator_id"`
-	RootTaskName        string             `json:"root_task_name,omitempty"`
-	CurrentStage        int                `json:"current_stage"`
-	ActiveTaskIndexes   []string           `json:"active_task_indexes"`
-	CurrentTaskIndex    string             `json:"current_task_index,omitempty"`
-	TotalTasks          int                `json:"total_tasks"`
-	CompletedTasks      int                `json:"completed_tasks"`
-	AsyncReactTaskID    string             `json:"async_react_task_id,omitempty"`
-	Tasks               []TaskRuntimeEntry `json:"tasks"`
+	RootTaskName      string             `json:"root_task_name,omitempty"`
+	CurrentStage      int                `json:"current_stage"`
+	ActiveTaskIndexes []string           `json:"active_task_indexes"`
+	CurrentTaskIndex  string             `json:"current_task_index,omitempty"`
+	TotalTasks        int                `json:"total_tasks"`
+	CompletedTasks    int                `json:"completed_tasks"`
+	AsyncReactTaskID  string             `json:"async_react_task_id,omitempty"`
+	Tasks             []TaskRuntimeEntry `json:"tasks"`
 }
 
 // TaskRuntimeReport is the payload returned by list_async_tasks.
 type TaskRuntimeReport struct {
-	GeneratedAt        string                         `json:"generated_at"`
-	ReActID            string                         `json:"react_id,omitempty"`
-	AsyncTasks         []TaskRuntimeEntry             `json:"async_tasks"`
-	ExecutingTasks     []TaskRuntimeEntry             `json:"executing_tasks"`
-	QueuedReactTasks   []TaskRuntimeEntry             `json:"queued_react_tasks"`
-	PlanExecutions     []PlanExecutionRuntimeSnapshot `json:"plan_executions"`
+	GeneratedAt      string                         `json:"generated_at"`
+	ReActID          string                         `json:"react_id,omitempty"`
+	AsyncTasks       []TaskRuntimeEntry             `json:"async_tasks"`
+	ExecutingTasks   []TaskRuntimeEntry             `json:"executing_tasks"`
+	QueuedReactTasks []TaskRuntimeEntry             `json:"queued_react_tasks"`
+	PlanExecutions   []PlanExecutionRuntimeSnapshot `json:"plan_executions"`
 }
 
 // BuildTaskRuntimeReport aggregates async / executing tasks and recent timeline text.

@@ -6,4 +6,3 @@ package yakurl
 func createYakitAction(schema string) Action {
 	return nil
 }
-

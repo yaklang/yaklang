@@ -109,8 +109,8 @@ func (a *litWindowAcc) walk(re *syntax.Regexp, pre int, preB bool, suf int, sufB
 	case syntax.OpConcat:
 		k := len(re.Sub)
 		for i, sub := range re.Sub {
-			lw, lb := sumWidthRange(re.Sub, 0, i)      // 左兄弟总宽 (0..i-1)
-			rw, rb := sumWidthRange(re.Sub, i+1, k)    // 右兄弟总宽 (i+1..k-1)
+			lw, lb := sumWidthRange(re.Sub, 0, i)   // 左兄弟总宽 (0..i-1)
+			rw, rb := sumWidthRange(re.Sub, i+1, k) // 右兄弟总宽 (i+1..k-1)
 			a.walk(sub, addSat(pre, lw), preB && lb, addSat(suf, rw), sufB && rb)
 		}
 

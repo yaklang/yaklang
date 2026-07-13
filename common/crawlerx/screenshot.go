@@ -5,11 +5,12 @@ package crawlerx
 import (
 	"context"
 	"encoding/base64"
+	"strings"
+	"time"
+
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"strings"
-	"time"
 )
 
 func (starter *BrowserStarter) targetResponseReplace() error {

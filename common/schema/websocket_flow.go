@@ -1,11 +1,12 @@
 package schema
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"gorm.io/gorm"
-	"strconv"
-	"strings"
 )
 
 type WebsocketFlow struct {
@@ -52,7 +53,7 @@ func (f *WebsocketFlow) CalcHash() string {
 	return utils.CalcSha1(f.WebsocketRequestHash, f.FrameIndex)
 }
 
-func (f *WebsocketFlow) BeforeSave() error {
+func (f *WebsocketFlow) BeforeSave(tx *gorm.DB) error {
 	f.Hash = f.CalcHash()
 	return nil
 }

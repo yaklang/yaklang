@@ -3,12 +3,13 @@ package yakgit
 import (
 	"bytes"
 	"fmt"
+	"path/filepath"
+	"strings"
+
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"path/filepath"
-	"strings"
 )
 
 type BlameLine struct {

@@ -3,10 +3,11 @@ package vulinbox
 import (
 	_ "embed"
 	"fmt"
-	"github.com/gorilla/websocket"
-	"github.com/yaklang/yaklang/common/log"
 	"net/http"
 	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 //go:embed static/js/ws_jquery.min.js

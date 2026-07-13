@@ -3,11 +3,12 @@ package netx
 import (
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"net/http"
 	"net/url"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 /*

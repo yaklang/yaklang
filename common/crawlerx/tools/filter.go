@@ -4,11 +4,12 @@ package tools
 
 import (
 	"encoding/binary"
+	"sync"
+
 	"github.com/valyala/bytebufferpool"
 	"github.com/yaklang/yaklang/common/cuckoo"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/utils"
-	"sync"
 )
 
 var bufferPool = bytebufferpool.Pool{}

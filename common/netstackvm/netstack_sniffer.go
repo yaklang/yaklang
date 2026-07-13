@@ -1,14 +1,15 @@
 package netstackvm
 
 import (
+	"strings"
+	"sync"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/crypto/cryptobyte"
-	"strings"
-	"sync"
 )
 
 type sniffRawEndpoint struct {

@@ -7,14 +7,15 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/xdg-go/stringprep"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/sasl"
 	"hash"
 	"math/rand"
 	"net/smtp"
 	"strconv"
 	"strings"
+
+	"github.com/xdg-go/stringprep"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/sasl"
 
 	"github.com/pkg/errors"
 	"github.com/xdg-go/scram"

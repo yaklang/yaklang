@@ -2,10 +2,11 @@ package infrastructure
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type LabelTable struct {

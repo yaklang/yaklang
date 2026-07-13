@@ -1,8 +1,9 @@
 package yakast
 
 import (
-	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"strings"
+
+	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 )
 
 func (y *YakCompiler) VisitLineCommentStmt(i *yak.LineCommentStmtContext) interface{} {

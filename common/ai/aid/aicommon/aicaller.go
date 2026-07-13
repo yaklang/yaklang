@@ -2,9 +2,10 @@ package aicommon
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"

@@ -29,10 +29,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/openapi/swag"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/openapi/swag"
 )
 
 const (

@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
-	"github.com/yaklang/yaklang/common/urfavecli"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yserx"
-	"github.com/yaklang/yaklang/common/yso"
 	"os"
 	"path"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yserx"
+	"github.com/yaklang/yaklang/common/yso"
 )
 
 func main() {

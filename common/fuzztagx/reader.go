@@ -2,8 +2,9 @@ package fuzztagx
 
 import (
 	"errors"
-	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"io"
+
+	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 )
 
 type ReaderGenerator struct {

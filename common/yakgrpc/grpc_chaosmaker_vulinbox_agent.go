@@ -2,13 +2,14 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/vulinboxagentclient"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/vulinboxagentclient"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 var (

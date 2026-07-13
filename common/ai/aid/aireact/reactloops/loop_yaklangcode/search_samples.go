@@ -31,12 +31,12 @@ const (
 
 // SampleHit is a unified search result item for init and runtime pipelines.
 type SampleHit struct {
-	Source  string
-	Pattern string
+	Source   string
+	Pattern  string
 	FileName string
-	Line    int
-	Score   float64
-	Content string
+	Line     int
+	Score    float64
+	Content  string
 }
 
 // SearchManifest records queries covered during init pre-search.

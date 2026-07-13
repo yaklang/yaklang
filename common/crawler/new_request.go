@@ -1,11 +1,12 @@
 package crawler
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"golang.org/x/net/html"
-	"strings"
 )
 
 func NewHTTPRequest(https bool, req []byte, rsp []byte, urlString string) (bool, []byte, error) {

@@ -57,9 +57,11 @@ func (c *CfgCtxValue) RegexpMatch(context.Context, ssadb.MatchMode, string) (boo
 	return false, sfvm.NewEmptyValues(), nil
 }
 
-func (c *CfgCtxValue) GetCalled() (sfvm.Values, error)                    { return sfvm.NewEmptyValues(), nil }
-func (c *CfgCtxValue) GetCallActualParams(int, bool) (sfvm.Values, error) { return sfvm.NewEmptyValues(), nil }
-func (c *CfgCtxValue) GetFields() (sfvm.Values, error)                    { return sfvm.NewEmptyValues(), nil }
+func (c *CfgCtxValue) GetCalled() (sfvm.Values, error) { return sfvm.NewEmptyValues(), nil }
+func (c *CfgCtxValue) GetCallActualParams(int, bool) (sfvm.Values, error) {
+	return sfvm.NewEmptyValues(), nil
+}
+func (c *CfgCtxValue) GetFields() (sfvm.Values, error) { return sfvm.NewEmptyValues(), nil }
 
 func (c *CfgCtxValue) GetSyntaxFlowUse() (sfvm.Values, error) { return sfvm.NewEmptyValues(), nil }
 func (c *CfgCtxValue) GetSyntaxFlowDef() (sfvm.Values, error) { return sfvm.NewEmptyValues(), nil }
@@ -84,9 +86,13 @@ func (c *CfgCtxValue) FileFilter(string, string, map[string]string, []string) (s
 	return sfvm.NewEmptyValues(), nil
 }
 
-func (c *CfgCtxValue) CompareString(*sfvm.StringComparator) (sfvm.Values, []bool) { return sfvm.NewEmptyValues(), nil }
-func (c *CfgCtxValue) CompareOpcode(*sfvm.OpcodeComparator) (sfvm.Values, []bool) { return sfvm.NewEmptyValues(), nil }
-func (c *CfgCtxValue) CompareConst(*sfvm.ConstComparator) bool                     { return false }
+func (c *CfgCtxValue) CompareString(*sfvm.StringComparator) (sfvm.Values, []bool) {
+	return sfvm.NewEmptyValues(), nil
+}
+func (c *CfgCtxValue) CompareOpcode(*sfvm.OpcodeComparator) (sfvm.Values, []bool) {
+	return sfvm.NewEmptyValues(), nil
+}
+func (c *CfgCtxValue) CompareConst(*sfvm.ConstComparator) bool { return false }
 
 func (c *CfgCtxValue) NewConst(v any, ranges ...*memedit.Range) sfvm.ValueOperator {
 	if c == nil || c.prog == nil {
@@ -112,4 +118,3 @@ func (c *CfgCtxValue) SetAnchorBitVector(bits *utils.BitVector) {
 	}
 	c.anchorBits = bits.Clone()
 }
-

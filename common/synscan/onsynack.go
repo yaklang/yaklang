@@ -2,10 +2,11 @@ package synscan
 
 import (
 	"context"
-	uuid "github.com/google/uuid"
-	"github.com/pkg/errors"
 	"net"
 	"time"
+
+	uuid "github.com/google/uuid"
+	"github.com/pkg/errors"
 )
 
 type synAckHandler func(ip net.IP, port int)

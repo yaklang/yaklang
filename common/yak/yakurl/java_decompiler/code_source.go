@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/yaklang/javajive/classparser"
-	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	javaclassparser "github.com/yaklang/javajive/classparser"
 	"github.com/yaklang/yaklang/common/utils"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 // codeSource is a single JAR/WAR/EAR/ZIP archive or a local directory containing archives.

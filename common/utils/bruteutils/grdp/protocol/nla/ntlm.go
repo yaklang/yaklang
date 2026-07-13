@@ -6,8 +6,9 @@ import (
 	"crypto/rc4"
 	"encoding/binary"
 	"encoding/hex"
-	"github.com/yaklang/yaklang/common/log"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/lunixbochs/struc"
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/core"

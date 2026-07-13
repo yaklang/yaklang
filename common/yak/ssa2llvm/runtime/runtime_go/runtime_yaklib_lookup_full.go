@@ -9,10 +9,10 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-)
 
-// Trigger yaklang stdlib registration via yak package init for the full runtime.
-import _ "github.com/yaklang/yaklang/common/yak"
+	// Trigger yaklang stdlib registration via yak package init for the full runtime.
+	_ "github.com/yaklang/yaklang/common/yak"
+)
 
 func init() {
 	client := yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {

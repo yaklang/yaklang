@@ -3,9 +3,10 @@ package yakdocument
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"sort"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type YakLibDocCompletion struct {

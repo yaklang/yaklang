@@ -267,8 +267,8 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		gmTLS                   = option.GmTLS
 		onlyGMTLS               = option.GmTLSOnly
 		preferGMTLS             = option.GmTLSPrefer
-		gmTLSCipherSuites           = option.GmTLSCipherSuites
-		gmTLSDisableCompatMode      = option.GmTLSDisableCompatMode
+		gmTLSCipherSuites       = option.GmTLSCipherSuites
+		gmTLSDisableCompatMode  = option.GmTLSDisableCompatMode
 		host                    = option.Host
 		port                    = option.Port
 		requestPacket           = option.Packet

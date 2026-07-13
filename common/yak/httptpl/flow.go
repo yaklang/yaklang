@@ -208,9 +208,9 @@ func parseFlow(flow string) (*flowNode, error) {
 // execFlowResult holds the result of executing a single sequence in a flow.
 type execFlowResult struct {
 	responses  []*lowhttp.LowhttpResponse
-	vulnResult bool   // excludes internal matchers
-	flowResult bool   // includes internal matchers (for flow control)
-	extracted   map[string]interface{}
+	vulnResult bool // excludes internal matchers
+	flowResult bool // includes internal matchers (for flow control)
+	extracted  map[string]interface{}
 	reqCount   int64
 }
 
@@ -317,7 +317,7 @@ func (y *YakTemplate) execFlowWithUrl(u string, config *Config, opts []lowhttp.L
 			responses:  rsps,
 			vulnResult: vulnResult,
 			flowResult: flowMatched,
-			extracted:   extracted,
+			extracted:  extracted,
 			reqCount:   reqCount,
 		}, nil
 	}

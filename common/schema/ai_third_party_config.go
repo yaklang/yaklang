@@ -98,7 +98,7 @@ func optionalFloat64ForHash(p *float64) string {
 	return fmt.Sprintf("%g", *p)
 }
 
-func (c *AIThirdPartyConfig) BeforeSave() error {
+func (c *AIThirdPartyConfig) BeforeSave(tx *gorm.DB) error {
 	c.Hash = c.CalcHash()
 	return nil
 }

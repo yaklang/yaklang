@@ -3,9 +3,10 @@ package yak
 import (
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"os"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"

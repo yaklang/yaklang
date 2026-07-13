@@ -296,12 +296,12 @@ func (s *Scannerx) SubmitTargetFromPing(res chan string, ports string) <-chan *S
 				}
 				for _, port := range nonExcludedPorts {
 					s.rateLimit()
-				if s.config.maxOpenPorts > 0 {
-					v, ok := s.ipOpenPortMap.Load(host)
-					if ok && toUint16(v) >= s.config.maxOpenPorts {
-						break
+					if s.config.maxOpenPorts > 0 {
+						v, ok := s.ipOpenPortMap.Load(host)
+						if ok && toUint16(v) >= s.config.maxOpenPorts {
+							break
+						}
 					}
-				}
 					s.callOnSubmitTask(host, port)
 					proto, p := utils.ParsePortToProtoPort(port)
 					target := &SynxTarget{

@@ -89,14 +89,14 @@ func (m *Manager) init() error {
 	if m.config.browser_proxy != "" {
 		lh := launcher.New()
 		lh = lh.Set(flags.ProxyServer, m.config.browser_proxy)
-		
+
 		// 在 Windows 上防止 Chrome 创建桌面快捷方式
 		if strings.Contains(runtime.GOOS, "windows") {
 			lh = lh.Set("no-first-run", "")
 			lh = lh.Set("no-default-browser-check", "")
 			lh = lh.Set("disable-default-apps", "")
 		}
-		
+
 		controlURL, _ := lh.Launch()
 		m.Browser = m.Browser.ControlURL(controlURL)
 	}

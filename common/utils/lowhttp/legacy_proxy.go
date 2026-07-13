@@ -2,8 +2,9 @@ package lowhttp
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func BuildLegacyProxyRequest(req []byte, connectHTTPS ...bool) ([]byte, error) {

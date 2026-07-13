@@ -10,9 +10,9 @@ import (
 type NewAIEngineOperatorFunc func(opts ...ConfigOption) (AIEngineOperator, error)
 
 var (
-	operatorMu                      sync.RWMutex
-	newReActAIEngineOperatorFunc    NewAIEngineOperatorFunc
-	builtinToolsOpt                 ConfigOption
+	operatorMu                   sync.RWMutex
+	newReActAIEngineOperatorFunc NewAIEngineOperatorFunc
+	builtinToolsOpt              ConfigOption
 )
 
 // RegisterReActAIEngineOperator registers a function to create ReAct-based AIEngineOperator instances

@@ -5,10 +5,11 @@
 package gmtls
 
 import (
-	"github.com/yaklang/yaklang/common/gmsm/x509"
 	"runtime"
 	"sync"
 	"sync/atomic"
+
+	"github.com/yaklang/yaklang/common/gmsm/x509"
 )
 
 type cacheEntry struct {

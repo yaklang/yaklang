@@ -20,7 +20,6 @@ type ExternalPropertyFileReferences struct {
 	WebRequests            []*ExternalPropertyFileReference `json:"webRequests,omitempty"`
 	WebResponses           []*ExternalPropertyFileReference `json:"webResponses,omitempty"`
 	PropertyBag
-
 }
 
 // NewExternalPropertyFileReferences creates a new ExternalPropertyFileReferences and returns a pointer to it

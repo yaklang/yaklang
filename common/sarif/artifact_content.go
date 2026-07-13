@@ -1,7 +1,7 @@
 package sarif
 
 // ArtifactContent ...
-type ArtifactContent struct { 
+type ArtifactContent struct {
 	Text     *string                   `json:"text,omitempty"`
 	Binary   *string                   `json:"binary,omitempty"`
 	Rendered *MultiformatMessageString `json:"rendered,omitempty"`

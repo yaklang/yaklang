@@ -3,8 +3,10 @@
 
 package samples
 
-import "fmt"
-import . "time"
+import (
+	"fmt"
+	. "time"
+)
 
 func AnonymousMethods() {
 	lambd := func(s string) { Sleep(10); fmt.Println(s) }

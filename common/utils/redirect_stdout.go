@@ -3,9 +3,6 @@ package utils
 import (
 	"context"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/hpcloud/tail"
-	"github.com/yaklang/yaklang/common/log"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -13,6 +10,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/hpcloud/tail"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 var (

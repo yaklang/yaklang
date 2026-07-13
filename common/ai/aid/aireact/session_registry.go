@@ -153,7 +153,7 @@ func (r *ReAct) installRunningSessionRegistry() {
 	prevStart := r.config.EventLoopStartHook
 	prevDone := r.config.EventLoopDoneHook
 	prevHandler := r.config.EventHandler
-	
+
 	r.config.EventLoopStartHook = func() {
 		if prevStart != nil {
 			prevStart()

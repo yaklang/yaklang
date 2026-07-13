@@ -73,7 +73,7 @@ type HTTPFlow struct {
 	UploadOnline bool `json:"upload_online,omitempty"`
 }
 
-func (f *HTTPFlow) BeforeSave() error {
+func (f *HTTPFlow) BeforeSave(tx *gorm.DB) error {
 	f.Hash = ksuid.New().String()
 	return nil
 }
@@ -92,7 +92,7 @@ func TestExportAndImport(t *testing.T) {
 			Request:   ksuid.New().String(),
 			RuntimeId: runtimeID,
 		}
-		resultDB := db.Save(&flow)
+		resultDB := db.Save(flow)
 		require.NoError(t, resultDB.Error)
 		flows = append(flows, flow)
 	}
@@ -321,7 +321,7 @@ func TestZipIsValid(t *testing.T) {
 			Key:   ksuid.New().String(),
 			Value: i,
 		}
-		resultDB := db.Save(&flow)
+		resultDB := db.Create(flow)
 		require.NoError(t, resultDB.Error)
 	}
 	fp := filepath.Join(t.TempDir(), "test.zip")

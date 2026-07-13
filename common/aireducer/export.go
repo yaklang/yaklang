@@ -1,9 +1,10 @@
 package aireducer
 
 import (
+	"io"
+
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/utils"
-	"io"
 )
 
 var Exports = map[string]any{

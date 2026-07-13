@@ -3,10 +3,11 @@ package core
 import (
 	"bufio"
 	"bytes"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type RequestIf interface {

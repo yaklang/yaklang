@@ -130,11 +130,11 @@ var (
 	// 关键词: scenario tool names, ssa, syntaxflow, code audit focus
 	scenarioToolNames = map[string]struct{}{
 		// ssatools 包 Go 内建 (ssa_tools.go / syntaxflow.go)
-		"ssa-project-info":         {},
-		"ssa-list-files":           {},
-		"ssa-read-file":            {},
-		"ssa-grep":                 {},
-		"check-syntaxflow-syntax":  {},
+		"ssa-project-info":        {},
+		"ssa-list-files":          {},
+		"ssa-read-file":           {},
+		"ssa-grep":                {},
+		"check-syntaxflow-syntax": {},
 
 		// yakscriptforai/ssa/*.yak 脚本
 		"check_syntaxflow_syntax": {},
@@ -281,7 +281,8 @@ func UnregisterToolVisibility(name string) {
 // "只保留 normal".
 //
 // 关键词: FilterToolsByVisibility, default inventory entry filter,
-//        scenario whitelist, hidden drop
+//
+//	scenario whitelist, hidden drop
 func FilterToolsByVisibility(tools []*aitool.Tool, scenarioWhitelist []string) []*aitool.Tool {
 	if len(tools) == 0 {
 		return tools

@@ -2,13 +2,14 @@ package cybertunnel
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type tunnelDesc struct {

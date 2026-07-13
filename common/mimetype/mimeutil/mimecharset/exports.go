@@ -1,10 +1,11 @@
 package mimecharset
 
 import (
+	"strings"
+
 	"github.com/saintfish/chardet"
 	"github.com/yaklang/yaklang/common/mimetype/mimeutil/basic_charset"
 	"golang.org/x/net/html/charset"
-	"strings"
 )
 
 func fallback(raw []byte, wrapper func([]byte) string) string {

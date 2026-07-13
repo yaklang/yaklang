@@ -2,10 +2,11 @@ package t3
 
 import (
 	"bytes"
+	"text/template"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yserx"
-	"text/template"
 )
 
 // GenerateWeblogicJNDIPayload 生成一个用于 Weblogic JNDI 注入的 T3 序列化 payload 字节流

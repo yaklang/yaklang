@@ -3,6 +3,14 @@ package pcaputil
 import (
 	"errors"
 	"fmt"
+	"net"
+	"runtime"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+	"unicode/utf8"
+
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/samber/lo"
@@ -11,13 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"net"
-	"runtime"
-	"sort"
-	"strings"
-	"sync"
-	"time"
-	"unicode/utf8"
 )
 
 const WIN_DEV_LOOP = "\\Device\\NPF_Loopback"

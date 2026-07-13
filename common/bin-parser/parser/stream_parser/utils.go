@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"gopkg.in/yaml.v2"
 	"math"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"gopkg.in/yaml.v2"
 )
 
 func newListNodeValue(node *base.Node, children ...*base.NodeValue) *base.NodeValue {
@@ -534,52 +535,52 @@ func parseLengthByLengthConfig(node *base.Node) (uint64, bool, error) {
 		}
 		if !getLengthOK {
 			if node.Cfg.Has(CfgLengthFromField) {
-			// 从field 读取length
+				// 从field 读取length
 				if node.Cfg.Has(CfgLengthFromField) {
 					fieldName := node.Cfg.GetString(CfgLengthFromField)
-				target := getNodeByPath(node, fieldName)
-				if target.Cfg.Has(CfgNodeResult) {
-					res := GetResultByNode(target)
-					if v, ok := base.InterfaceToUint64(res); ok {
-						total := v
-						total = total * getMulti(node)
-						if node.Cfg.Has("length-from-field-multiply") {
-							imulti := node.Cfg.GetItem("length-from-field-multiply")
-							var multi uint64
-							switch imulti.(type) {
-							case string:
-								n, err := strconv.Atoi(imulti.(string))
-								if err != nil {
-									return 0, false, fmt.Errorf("length-from-field-multiply type error")
+					target := getNodeByPath(node, fieldName)
+					if target.Cfg.Has(CfgNodeResult) {
+						res := GetResultByNode(target)
+						if v, ok := base.InterfaceToUint64(res); ok {
+							total := v
+							total = total * getMulti(node)
+							if node.Cfg.Has("length-from-field-multiply") {
+								imulti := node.Cfg.GetItem("length-from-field-multiply")
+								var multi uint64
+								switch imulti.(type) {
+								case string:
+									n, err := strconv.Atoi(imulti.(string))
+									if err != nil {
+										return 0, false, fmt.Errorf("length-from-field-multiply type error")
+									}
+									multi = uint64(n)
+								default:
+									mul, ok := base.InterfaceToUint64(node.Cfg.GetItem("length-from-field-multiply"))
+									if !ok {
+										return 0, false, fmt.Errorf("length-from-field-multiply type error")
+									}
+									multi = mul
 								}
-								multi = uint64(n)
-							default:
-								mul, ok := base.InterfaceToUint64(node.Cfg.GetItem("length-from-field-multiply"))
-								if !ok {
-									return 0, false, fmt.Errorf("length-from-field-multiply type error")
-								}
-								multi = mul
+								total *= multi
 							}
-							total *= multi
+							length = total
+							getLengthOK = true
+							//if node.Cfg.Has("length-for-field") { // 当存在字段限制，且当前节点在限制范围内时，更新parentRemaininigLength
+							//	fieldsStr := node.Cfg.GetString("length-for-field")
+							//	fieldsInScope = strings.Split(fieldsStr, ",")
+							//	for _, field := range fieldsInScope {
+							//		if field == node.Name {
+							//			length = total
+							//			break
+							//		}
+							//	}
+							//} else {
+							//	length = total
+							//}
+						} else {
+							return 0, false, fmt.Errorf("field %s type error", fieldName)
 						}
-						length = total
-						getLengthOK = true
-						//if node.Cfg.Has("length-for-field") { // 当存在字段限制，且当前节点在限制范围内时，更新parentRemaininigLength
-						//	fieldsStr := node.Cfg.GetString("length-for-field")
-						//	fieldsInScope = strings.Split(fieldsStr, ",")
-						//	for _, field := range fieldsInScope {
-						//		if field == node.Name {
-						//			length = total
-						//			break
-						//		}
-						//	}
-						//} else {
-						//	length = total
-						//}
-					} else {
-						return 0, false, fmt.Errorf("field %s type error", fieldName)
 					}
-				}
 
 				}
 			}

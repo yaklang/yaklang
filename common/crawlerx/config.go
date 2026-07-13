@@ -6,13 +6,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"regexp"
+	"strings"
+
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/yaklang/yaklang/common/crawlerx/tools"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"net/url"
-	"regexp"
-	"strings"
 )
 
 type Config struct {

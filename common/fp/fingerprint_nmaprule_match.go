@@ -3,13 +3,14 @@ package fp
 import (
 	"context"
 	"fmt"
+	"net"
+	"sync"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	utils2 "github.com/yaklang/yaklang/common/utils"
-	"net"
-	"sync"
-	"time"
 )
 
 func tcpConnectionMaker(host string, port interface{}, proxy []string, timeout time.Duration) (net.Conn, error) {

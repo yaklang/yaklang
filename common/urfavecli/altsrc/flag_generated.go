@@ -4,7 +4,8 @@ package altsrc
 
 import (
 	"flag"
-	"github.com/yaklang/yaklang/common/urfavecli"
+
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 )
 
 // BoolFlag is the flag type that wraps cli.BoolFlag to allow
@@ -16,7 +17,7 @@ type BoolFlag struct {
 
 // NewBoolFlag creates a new BoolFlag
 func NewBoolFlag(fl cli.BoolFlag) *BoolFlag {
-	return &BoolFlag{ BoolFlag: fl, set: nil }
+	return &BoolFlag{BoolFlag: fl, set: nil}
 }
 
 // Apply saves the flagSet for later usage calls, then calls
@@ -42,7 +43,7 @@ type BoolTFlag struct {
 
 // NewBoolTFlag creates a new BoolTFlag
 func NewBoolTFlag(fl cli.BoolTFlag) *BoolTFlag {
-	return &BoolTFlag{ BoolTFlag: fl, set: nil }
+	return &BoolTFlag{BoolTFlag: fl, set: nil}
 }
 
 // Apply saves the flagSet for later usage calls, then calls
@@ -68,7 +69,7 @@ type DurationFlag struct {
 
 // NewDurationFlag creates a new DurationFlag
 func NewDurationFlag(fl cli.DurationFlag) *DurationFlag {
-	return &DurationFlag{ DurationFlag: fl, set: nil }
+	return &DurationFlag{DurationFlag: fl, set: nil}
 }
 
 // Apply saves the flagSet for later usage calls, then calls
@@ -94,7 +95,7 @@ type Float64Flag struct {
 
 // NewFloat64Flag creates a new Float64Flag
 func NewFloat64Flag(fl cli.Float64Flag) *Float64Flag {
-	return &Float64Flag{ Float64Flag: fl, set: nil }
+	return &Float64Flag{Float64Flag: fl, set: nil}
 }
 
 // Apply saves the flagSet for later usage calls, then calls
@@ -120,7 +121,7 @@ type GenericFlag struct {
 
 // NewGenericFlag creates a new GenericFlag
 func NewGenericFlag(fl cli.GenericFlag) *GenericFlag {
-	return &GenericFlag{ GenericFlag: fl, set: nil }
+	return &GenericFlag{GenericFlag: fl, set: nil}
 }
 
 // Apply saves the flagSet for later usage calls, then calls
@@ -146,7 +147,7 @@ type Int64Flag struct {
 
 // NewInt64Flag creates a new Int64Flag
 func NewInt64Flag(fl cli.Int64Flag) *Int64Flag {
-	return &Int64Flag{ Int64Flag: fl, set: nil }
+	return &Int64Flag{Int64Flag: fl, set: nil}
 }
 
 // Apply saves the flagSet for later usage calls, then calls
@@ -172,7 +173,7 @@ type IntFlag struct {
 
 // NewIntFlag creates a new IntFlag
 func NewIntFlag(fl cli.IntFlag) *IntFlag {
-	return &IntFlag{ IntFlag: fl, set: nil }
+	return &IntFlag{IntFlag: fl, set: nil}
 }
 
 // Apply saves the flagSet for later usage calls, then calls
@@ -198,7 +199,7 @@ type IntSliceFlag struct {
 
 // NewIntSliceFlag creates a new IntSliceFlag
 func NewIntSliceFlag(fl cli.IntSliceFlag) *IntSliceFlag {
-	return &IntSliceFlag{ IntSliceFlag: fl, set: nil }
+	return &IntSliceFlag{IntSliceFlag: fl, set: nil}
 }
 
 // Apply saves the flagSet for later usage calls, then calls
@@ -224,7 +225,7 @@ type Int64SliceFlag struct {
 
 // NewInt64SliceFlag creates a new Int64SliceFlag
 func NewInt64SliceFlag(fl cli.Int64SliceFlag) *Int64SliceFlag {
-	return &Int64SliceFlag{ Int64SliceFlag: fl, set: nil }
+	return &Int64SliceFlag{Int64SliceFlag: fl, set: nil}
 }
 
 // Apply saves the flagSet for later usage calls, then calls
@@ -250,7 +251,7 @@ type StringFlag struct {
 
 // NewStringFlag creates a new StringFlag
 func NewStringFlag(fl cli.StringFlag) *StringFlag {
-	return &StringFlag{ StringFlag: fl, set: nil }
+	return &StringFlag{StringFlag: fl, set: nil}
 }
 
 // Apply saves the flagSet for later usage calls, then calls
@@ -276,7 +277,7 @@ type StringSliceFlag struct {
 
 // NewStringSliceFlag creates a new StringSliceFlag
 func NewStringSliceFlag(fl cli.StringSliceFlag) *StringSliceFlag {
-	return &StringSliceFlag{ StringSliceFlag: fl, set: nil }
+	return &StringSliceFlag{StringSliceFlag: fl, set: nil}
 }
 
 // Apply saves the flagSet for later usage calls, then calls
@@ -302,7 +303,7 @@ type Uint64Flag struct {
 
 // NewUint64Flag creates a new Uint64Flag
 func NewUint64Flag(fl cli.Uint64Flag) *Uint64Flag {
-	return &Uint64Flag{ Uint64Flag: fl, set: nil }
+	return &Uint64Flag{Uint64Flag: fl, set: nil}
 }
 
 // Apply saves the flagSet for later usage calls, then calls
@@ -328,7 +329,7 @@ type UintFlag struct {
 
 // NewUintFlag creates a new UintFlag
 func NewUintFlag(fl cli.UintFlag) *UintFlag {
-	return &UintFlag{ UintFlag: fl, set: nil }
+	return &UintFlag{UintFlag: fl, set: nil}
 }
 
 // Apply saves the flagSet for later usage calls, then calls

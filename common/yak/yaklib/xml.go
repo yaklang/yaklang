@@ -1,7 +1,7 @@
 package yaklib
 
 import (
-	"github.com/yaklang/yaklang/common/utils/yakxml/xml-tools"
+	xml_tools "github.com/yaklang/yaklang/common/utils/yakxml/xml-tools"
 )
 
 var XMLExports = map[string]interface{}{

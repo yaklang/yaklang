@@ -1,12 +1,13 @@
 package schema
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
-	"gorm.io/gorm"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"gorm.io/gorm"
 )
 
 type RssFeed struct {
@@ -41,12 +42,12 @@ func (b *RssFeed) CalcHash() string {
 	)
 }
 
-func (b *RssFeed) BeforeSave() error {
+func (b *RssFeed) BeforeSave(tx *gorm.DB) error {
 	b.Hash = b.CalcHash()
 	return nil
 }
 
-func (b *Briefing) BeforeSave() error {
+func (b *Briefing) BeforeSave(tx *gorm.DB) error {
 	b.Hash = b.CalcHash()
 
 	rawMaterial := strings.Join([]string{b.Title, b.Description, b.Content, b.Link}, " ")

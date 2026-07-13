@@ -3,15 +3,16 @@
 package simulator
 
 import (
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
+
 	"github.com/PuerkitoBio/goquery"
 	"github.com/go-rod/rod"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"net/http"
-	"net/url"
-	"strings"
-	"time"
 )
 
 func ParseProxyStringToUrl(address, username, password string) *url.URL {

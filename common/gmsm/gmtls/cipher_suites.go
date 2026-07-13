@@ -24,9 +24,10 @@ import (
 	"crypto/rc4"
 	"crypto/sha1"
 	"crypto/sha256"
-	"golang.org/x/sys/cpu"
 	"hash"
 	"runtime"
+
+	"golang.org/x/sys/cpu"
 
 	"github.com/yaklang/yaklang/common/gmsm/x509"
 

@@ -415,7 +415,7 @@ func ImportCVE(filename string) error {
 	}
 
 	// Auto migrate CVE table
-	if err := db.AutoMigrate(&cveresources.CVE{}).Error; err != nil {
+	if err := db.AutoMigrate(&cveresources.CVE{}); err != nil {
 		return utils.Errorf("auto migrate CVE table failed: %v", err)
 	}
 

@@ -6,8 +6,9 @@ package marshmallow
 
 import (
 	"encoding/json"
-	"github.com/mailru/easyjson/jlexer"
 	"reflect"
+
+	"github.com/mailru/easyjson/jlexer"
 )
 
 // Unmarshal parses the JSON-encoded object in data and stores the values

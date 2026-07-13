@@ -1,9 +1,10 @@
 package reducer
 
 import (
+	"sync"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils/linktable"
-	"sync"
 )
 
 type ReduceFunction func([]string) string

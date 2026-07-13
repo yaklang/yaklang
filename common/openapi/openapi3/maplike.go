@@ -2,9 +2,10 @@ package openapi3
 
 import (
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/openapi/jsonpointer"
 	"sort"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/openapi/jsonpointer"
 )
 
 // NewResponsesWithCapacity builds a responses object of the given capacity.

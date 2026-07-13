@@ -1,8 +1,9 @@
 package utils
 
 import (
-	"github.com/yaklang/yaklang/common/utils/bufpipe"
 	"io"
+
+	"github.com/yaklang/yaklang/common/utils/bufpipe"
 )
 
 var NewPipe = bufpipe.NewPipe

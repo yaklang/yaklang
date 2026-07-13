@@ -2,10 +2,11 @@ package vulinbox
 
 import (
 	"encoding/base64"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/vulinboxagentproto"
 	"net"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/vulinboxagentproto"
 )
 
 func handlePing(_ []byte) (any, error) {

@@ -1,9 +1,10 @@
 package mq
 
 import (
+	"time"
+
 	uuid "github.com/google/uuid"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"time"
 )
 
 func (b *Broker) CreatePublisherFunc(exchange string, routingKey string) func(msg amqp.Publishing) error {

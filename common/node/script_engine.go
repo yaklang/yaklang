@@ -2,8 +2,9 @@ package node
 
 import (
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/spec"
 	"time"
+
+	"github.com/yaklang/yaklang/common/spec"
 )
 
 func (n *NodeBase) initScriptEngine() {

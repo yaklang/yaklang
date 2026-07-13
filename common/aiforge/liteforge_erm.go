@@ -3,12 +3,13 @@ package aiforge
 import (
 	_ "embed"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
-	"github.com/yaklang/yaklang/common/jsonextractor"
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
+	"github.com/yaklang/yaklang/common/jsonextractor"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/chunkmaker"

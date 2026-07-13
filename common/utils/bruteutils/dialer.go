@@ -3,9 +3,10 @@ package bruteutils
 import (
 	"context"
 	"crypto/tls"
-	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/netx"
 )

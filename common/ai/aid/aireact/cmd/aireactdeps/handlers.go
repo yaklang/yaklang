@@ -3,14 +3,15 @@ package aireactdeps
 import (
 	"context"
 	"fmt"
-	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/stdinsys"
-	"github.com/yaklang/yaklang/common/utils"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/stdinsys"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/jsonpath"
 

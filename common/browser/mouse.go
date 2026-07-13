@@ -3,8 +3,9 @@
 package browser
 
 import (
-	"github.com/go-rod/rod/lib/proto"
 	"time"
+
+	"github.com/go-rod/rod/lib/proto"
 )
 
 // mouse in page

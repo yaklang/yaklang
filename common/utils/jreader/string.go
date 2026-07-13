@@ -3,9 +3,10 @@ package jreader
 import (
 	"bytes"
 	"encoding/binary"
+	"io"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yserx"
-	"io"
 )
 
 func MarshalUTFString(str string) []byte {

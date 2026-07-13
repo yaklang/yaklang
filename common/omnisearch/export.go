@@ -127,9 +127,11 @@ func Search(query string, options ...ostype.SearchOption) ([]*ostype.OmniSearchR
 // Example:
 // ```
 // results = omnisearch.Search(
-//     "yaklang",
-//     omnisearch.type("mylocal"),
-//     omnisearch.customSearcher("mylocal", (query, cfg) => { return [f"hit-for-${query}"], nil }),
+//
+//	"yaklang",
+//	omnisearch.type("mylocal"),
+//	omnisearch.customSearcher("mylocal", (query, cfg) => { return [f"hit-for-${query}"], nil }),
+//
 // )~
 // println(len(results))   // OUT: 1
 // assert results[0].Content == "hit-for-yaklang", "type option should route to the local searcher"
@@ -151,9 +153,11 @@ func omnisearchType(name string) ostype.SearchOption {
 // Example:
 // ```
 // results = omnisearch.Search(
-//     "yaklang",
-//     omnisearch.type("mylocal"),
-//     omnisearch.customSearcher("mylocal", (query, cfg) => { return [f"hit-for-${query}"], nil }),
+//
+//	"yaklang",
+//	omnisearch.type("mylocal"),
+//	omnisearch.customSearcher("mylocal", (query, cfg) => { return [f"hit-for-${query}"], nil }),
+//
 // )~
 // println(results[0].Source)   // OUT: mylocal
 // assert results[0].Source == "mylocal", "customSearcher should produce results tagged with its name"
@@ -175,10 +179,12 @@ func omnisearchCustomSearcher(name string, handle CustomSearcherHandle) ostype.S
 // ```
 // // 此处用自定义搜索器离线演示 apikey 选项被正确接收并传入 Search
 // results = omnisearch.Search(
-//     "yaklang",
-//     omnisearch.type("mylocal"),
-//     omnisearch.apikey("demo-key-1", "demo-key-2"),
-//     omnisearch.customSearcher("mylocal", (query, cfg) => { return ["ok"], nil }),
+//
+//	"yaklang",
+//	omnisearch.type("mylocal"),
+//	omnisearch.apikey("demo-key-1", "demo-key-2"),
+//	omnisearch.customSearcher("mylocal", (query, cfg) => { return ["ok"], nil }),
+//
 // )~
 // println(len(results))   // OUT: 1
 // assert len(results) == 1, "apikey option should be accepted by Search"
@@ -200,10 +206,12 @@ func omnisearchAPIKey(keys ...string) ostype.SearchOption {
 // ```
 // // 此处用自定义搜索器离线演示 backendType 选项被正确接收并传入 Search
 // results = omnisearch.Search(
-//     "yaklang",
-//     omnisearch.type("mylocal"),
-//     omnisearch.backendType("custom"),
-//     omnisearch.customSearcher("mylocal", (query, cfg) => { return ["ok"], nil }),
+//
+//	"yaklang",
+//	omnisearch.type("mylocal"),
+//	omnisearch.backendType("custom"),
+//	omnisearch.customSearcher("mylocal", (query, cfg) => { return ["ok"], nil }),
+//
 // )~
 // println(len(results))   // OUT: 1
 // assert len(results) == 1, "backendType option should be accepted by Search"

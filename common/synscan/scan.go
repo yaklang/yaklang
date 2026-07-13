@@ -1,15 +1,16 @@
 package synscan
 
 import (
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/pcapx/arpx"
-	"github.com/yaklang/yaklang/common/utils"
 	"math/rand"
 	"net"
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/pcapx/arpx"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func (s *Scanner) OnSubmitTask(i func(addr string, port int)) {

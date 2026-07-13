@@ -5,7 +5,6 @@ type ConfigurationOverride struct {
 	Configuration *ReportingConfiguration       `json:"configuration,omitempty"`
 	Descriptor    *ReportingDescriptorReference `json:"descriptor,omitempty"`
 	PropertyBag
-
 }
 
 // NewConfigurationOverride creates a new ConfigurationOverride and returns a pointer to it

@@ -2,8 +2,9 @@ package pcapx
 
 import (
 	"errors"
-	"github.com/gopacket/gopacket/layers"
 	"net"
+
+	"github.com/gopacket/gopacket/layers"
 )
 
 var arpLayerExports = map[string]interface{}{

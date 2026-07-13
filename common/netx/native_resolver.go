@@ -2,9 +2,10 @@ package netx
 
 import (
 	"context"
+	"net"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"net"
 )
 
 /*

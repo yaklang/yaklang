@@ -2,6 +2,7 @@ package iiop
 
 import (
 	"encoding/binary"
+
 	"github.com/yaklang/yaklang/common/utils"
 )
 

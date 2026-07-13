@@ -5,7 +5,11 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"github.com/yaklang/javajive/classparser"
+	"net/http"
+	"strconv"
+	"strings"
+
+	javaclassparser "github.com/yaklang/javajive/classparser"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -15,9 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/wsm/payloads/godzilla"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/http"
-	"strconv"
-	"strings"
 )
 
 type Godzilla struct {

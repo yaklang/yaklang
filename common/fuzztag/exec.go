@@ -2,9 +2,10 @@ package fuzztag
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
 )
 
 type FuzzExecResult struct {

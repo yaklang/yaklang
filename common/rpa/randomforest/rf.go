@@ -2,6 +2,7 @@ package randomforest
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/rpa/character"
 	"github.com/yaklang/yaklang/common/utils"

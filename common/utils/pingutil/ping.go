@@ -3,19 +3,19 @@ package pingutil
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/icmp"
-	"github.com/yaklang/yaklang/common/netstackvm"
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"os"
 	"strings"
 	"sync"
 	"time"
-)
 
-import "github.com/tatsushid/go-fastping"
+	"github.com/tatsushid/go-fastping"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/icmp"
+	"github.com/yaklang/yaklang/common/netstackvm"
+	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 type PingResult struct {
 	IP     string

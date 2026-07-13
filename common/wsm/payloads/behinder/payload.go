@@ -5,12 +5,13 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"github.com/yaklang/javajive/classparser"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/wsm/payloads"
 	"regexp"
 	"strconv"
 	"strings"
+
+	javaclassparser "github.com/yaklang/javajive/classparser"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/wsm/payloads"
 )
 
 const (

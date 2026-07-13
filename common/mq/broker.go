@@ -2,13 +2,14 @@ package mq
 
 import (
 	"context"
+	"io"
+	"sync"
+	"time"
+
 	"github.com/pkg/errors"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/tevino/abool"
 	"github.com/yaklang/yaklang/common/log"
-	"io"
-	"sync"
-	"time"
 )
 
 type ChannelHandler func(broker *Broker, a *amqp.Channel) error

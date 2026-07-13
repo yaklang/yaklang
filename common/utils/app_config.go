@@ -2,11 +2,12 @@ package utils
 
 import (
 	"errors"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func ParseAppTagToOptions(template any, ext ...map[string]string) (configInfo []*ypb.ThirdPartyAppConfigItemTemplate, err error) {

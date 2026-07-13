@@ -4,8 +4,9 @@
 package utils
 
 import (
-	"golang.org/x/sys/windows/registry"
 	"strings"
+
+	"golang.org/x/sys/windows/registry"
 )
 
 func GetSystemDnsServers() ([]string, error) {

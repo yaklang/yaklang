@@ -2,6 +2,7 @@ package generate
 
 import (
 	"errors"
+
 	"github.com/yaklang/yaklang/common/suricata/data/protocol"
 	"github.com/yaklang/yaklang/common/suricata/rule"
 )

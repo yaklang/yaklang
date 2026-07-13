@@ -1,8 +1,9 @@
 package bot
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"os"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type Client struct {

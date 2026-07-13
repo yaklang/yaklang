@@ -2,6 +2,9 @@ package vulinbox
 
 import (
 	"context"
+	"net/http"
+	"sync"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gorilla/websocket"
 	"github.com/yaklang/yaklang/common/log"
@@ -9,8 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/vulinboxagentproto"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"net/http"
-	"sync"
 )
 
 type EvFunc func([]byte) (any, error)

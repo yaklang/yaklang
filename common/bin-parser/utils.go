@@ -5,15 +5,16 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"net"
+	"reflect"
+	"strconv"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"gopkg.in/yaml.v2"
-	"net"
-	"reflect"
-	"strconv"
-	"strings"
 )
 
 func getSubData(d any, key string) (any, bool) {

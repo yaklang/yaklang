@@ -3,12 +3,13 @@
 package crawlerx
 
 import (
-	"github.com/go-rod/rod"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/go-rod/rod"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func (starter *BrowserStarter) clickElementOnPageBySelector(page *rod.Page, selector string) bool {

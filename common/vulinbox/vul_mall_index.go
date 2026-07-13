@@ -2,8 +2,9 @@ package vulinbox
 
 import (
 	_ "embed"
-	"github.com/gorilla/mux"
 	"net/http"
+
+	"github.com/gorilla/mux"
 )
 
 //go:embed html/mall/vul_mall_index.html

@@ -5,16 +5,17 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/urfavecli"
-	"github.com/yaklang/yaklang/common/crawlerx"
-	"github.com/yaklang/yaklang/common/crawlerx/tools"
-	"github.com/yaklang/yaklang/common/crawlerx/tools/config"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/crawlerx"
+	"github.com/yaklang/yaklang/common/crawlerx/tools"
+	"github.com/yaklang/yaklang/common/crawlerx/tools/config"
+	"github.com/yaklang/yaklang/common/log"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func main() {

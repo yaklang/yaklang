@@ -2,10 +2,11 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/samber/lo"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/samber/lo"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata"

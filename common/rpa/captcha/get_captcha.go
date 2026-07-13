@@ -3,11 +3,12 @@ package captcha
 import (
 	"encoding/base64"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/rpa/web"
-	"github.com/yaklang/yaklang/common/utils"
 	"io/ioutil"
 	"net/http"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/rpa/web"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/go-rod/rod"
 )

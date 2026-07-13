@@ -4,14 +4,13 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	"hash"
+	"strings"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils/htmlquery"
 	"golang.org/x/net/html"
-	"hash"
-	"strings"
-)
 
-import (
 	twmbMMH3 "github.com/twmb/murmur3"
 )
 

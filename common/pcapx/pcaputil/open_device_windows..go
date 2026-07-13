@@ -2,6 +2,7 @@ package pcaputil
 
 import (
 	"fmt"
+
 	"golang.org/x/sys/windows/registry"
 )
 

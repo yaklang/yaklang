@@ -44,13 +44,15 @@ var Exports = map[string]interface{}{
 // // 真实功能示例：劫持每个连接的数据帧，转发到真实服务端，同时按方向统计流量（需要连接来源，示意性用法）
 // connChan = make(chan any, 16)
 // mitm = tcpmitm.Start(connChan,
-//     tcpmitm.dialer(func(addr) { return tcp.Connect("127.0.0.1", 3306)~ }), // 自定义到真实服务端的拨号
-//     tcpmitm.protocolAwareSplit(true),                                      // 按协议感知切分数据帧
-//     tcpmitm.maxBufferSize(16 * 1024),                                      // 单帧缓冲上限 16KB
-//     tcpmitm.hijackTCPFrame(func(flow, frame) {
-//         println(flow.String(), "frame bytes:", len(frame.GetRawBytes()))
-//         frame.Forward() // 放行；也可 frame.Drop() 丢弃，或 frame.SetRawBytes(newBytes) 改写
-//     }),
+//
+//	tcpmitm.dialer(func(addr) { return tcp.Connect("127.0.0.1", 3306)~ }), // 自定义到真实服务端的拨号
+//	tcpmitm.protocolAwareSplit(true),                                      // 按协议感知切分数据帧
+//	tcpmitm.maxBufferSize(16 * 1024),                                      // 单帧缓冲上限 16KB
+//	tcpmitm.hijackTCPFrame(func(flow, frame) {
+//	    println(flow.String(), "frame bytes:", len(frame.GetRawBytes()))
+//	    frame.Forward() // 放行；也可 frame.Drop() 丢弃，或 frame.SetRawBytes(newBytes) 改写
+//	}),
+//
 // )~
 // go mitm.Run()
 // // 后续把劫持到的连接写入 connChan 即可被中间人处理
@@ -135,11 +137,13 @@ func _withContext(ctx context.Context) Option {
 // // 真实功能示例：把所有劫持流量统一拨号到本地真实服务端（需要连接来源，示意性用法）
 // connChan = make(chan any, 16)
 // mitm = tcpmitm.Start(connChan,
-//     tcpmitm.dialer(func(addr) {
-//         println("dialing real server for:", addr)
-//         return tcp.Connect("127.0.0.1", 8080, tcp.clientTimeout(5))~
-//     }),
-//     tcpmitm.hijackTCPFrame(func(flow, frame) { frame.Forward() }),
+//
+//	tcpmitm.dialer(func(addr) {
+//	    println("dialing real server for:", addr)
+//	    return tcp.Connect("127.0.0.1", 8080, tcp.clientTimeout(5))~
+//	}),
+//	tcpmitm.hijackTCPFrame(func(flow, frame) { frame.Forward() }),
+//
 // )~
 // go mitm.Run()
 // ```
@@ -162,11 +166,13 @@ func _withDialer(dialer func(addr string) (net.Conn, error)) Option {
 // // 真实功能示例：以 100ms 静默间隔切分请求/响应帧（需要连接来源，示意性用法）
 // connChan = make(chan any, 16)
 // mitm = tcpmitm.Start(connChan,
-//     tcpmitm.timeGapThreshold(100 * time.Millisecond),
-//     tcpmitm.hijackTCPFrame(func(flow, frame) {
-//         println(flow.String(), "frame:", len(frame.GetRawBytes()))
-//         frame.Forward()
-//     }),
+//
+//	tcpmitm.timeGapThreshold(100 * time.Millisecond),
+//	tcpmitm.hijackTCPFrame(func(flow, frame) {
+//	    println(flow.String(), "frame:", len(frame.GetRawBytes()))
+//	    frame.Forward()
+//	}),
+//
 // )~
 // go mitm.Run()
 // ```
@@ -188,8 +194,10 @@ func _withTimeGapThreshold(d time.Duration) Option {
 // // 真实功能示例：限制单帧最大 16KB，避免大包占用过多内存（需要连接来源，示意性用法）
 // connChan = make(chan any, 16)
 // mitm = tcpmitm.Start(connChan,
-//     tcpmitm.maxBufferSize(16 * 1024),
-//     tcpmitm.hijackTCPFrame(func(flow, frame) { frame.Forward() }),
+//
+//	tcpmitm.maxBufferSize(16 * 1024),
+//	tcpmitm.hijackTCPFrame(func(flow, frame) { frame.Forward() }),
+//
 // )~
 // go mitm.Run()
 // ```
@@ -212,11 +220,13 @@ func _withMaxBufferSize(size int) Option {
 // // 真实功能示例：开启协议感知切分并打印每帧探测到的协议（需要连接来源，示意性用法）
 // connChan = make(chan any, 16)
 // mitm = tcpmitm.Start(connChan,
-//     tcpmitm.protocolAwareSplit(true),
-//     tcpmitm.hijackTCPFrame(func(flow, frame) {
-//         println(flow.String(), "protocol:", frame.GetDetectedProtocol())
-//         frame.Forward()
-//     }),
+//
+//	tcpmitm.protocolAwareSplit(true),
+//	tcpmitm.hijackTCPFrame(func(flow, frame) {
+//	    println(flow.String(), "protocol:", frame.GetDetectedProtocol())
+//	    frame.Forward()
+//	}),
+//
 // )~
 // go mitm.Run()
 // ```
@@ -239,16 +249,18 @@ func _withProtocolAwareSplit(enable bool) Option {
 // ```
 // // 真实功能示例：统计上行字节数并对包含敏感词的帧做改写（需要连接来源，示意性用法）
 // connChan = make(chan any, 16)
-// mitm = tcpmitm.Start(connChan, tcpmitm.hijackTCPFrame(func(flow, frame) {
-//     data = frame.GetRawBytes()
-//     if frame.GetDirection() == 0 { // 0 表示 client -> server
-//         println("client sent:", len(data), "bytes")
-//     }
-//     if str.Contains(string(data), "password") {
-//         frame.SetRawBytes([]byte(str.ReplaceAll(string(data), "password", "******")))
-//     }
-//     frame.Forward()
-// }))~
+//
+//	mitm = tcpmitm.Start(connChan, tcpmitm.hijackTCPFrame(func(flow, frame) {
+//	    data = frame.GetRawBytes()
+//	    if frame.GetDirection() == 0 { // 0 表示 client -> server
+//	        println("client sent:", len(data), "bytes")
+//	    }
+//	    if str.Contains(string(data), "password") {
+//	        frame.SetRawBytes([]byte(str.ReplaceAll(string(data), "password", "******")))
+//	    }
+//	    frame.Forward()
+//	}))~
+//
 // go mitm.Run()
 // ```
 func _hijackTCPFrame(callback FrameHijackCallback) Option {
@@ -272,13 +284,15 @@ func _hijackTCPFrame(callback FrameHijackCallback) Option {
 // ```
 // // 真实功能示例：按目标端口决定放行还是直接阻断连接（需要连接来源，示意性用法）
 // connChan = make(chan any, 16)
-// mitm = tcpmitm.Start(connChan, tcpmitm.hijackTCPConn(func(conn, operator) {
-//     flow = operator.GetFlow()
-//     println("new connection:", flow.String())
-//     if flow.GetServerPort() == 22 {
-//         operator.CloseHijackedConn() // 阻断到 22 端口的连接
-//     }
-// }))~
+//
+//	mitm = tcpmitm.Start(connChan, tcpmitm.hijackTCPConn(func(conn, operator) {
+//	    flow = operator.GetFlow()
+//	    println("new connection:", flow.String())
+//	    if flow.GetServerPort() == 22 {
+//	        operator.CloseHijackedConn() // 阻断到 22 端口的连接
+//	    }
+//	}))~
+//
 // go mitm.Run()
 // ```
 func _hijackTCPConn(callback ConnHijackCallback) Option {

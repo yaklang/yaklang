@@ -138,11 +138,13 @@ func system(i string) ([]byte, error) {
 // results = make([]string, 0)
 // lock = sync.NewMutex()
 // exec.SystemBatch("echo batch{{int(1-3)}}",
-//     exec.timeout(10),
-//     exec.concurrent(5),
-//     exec.callback(func(cmd, result) {
-//         lock.Lock(); results = append(results, string(result)); lock.Unlock()
-//     }),
+//
+//	exec.timeout(10),
+//	exec.concurrent(5),
+//	exec.callback(func(cmd, result) {
+//	    lock.Lock(); results = append(results, string(result)); lock.Unlock()
+//	}),
+//
 // )
 // println(len(results))   // OUT: 3
 // assert len(results) == 3, "SystemBatch should run the three expanded commands"
@@ -250,8 +252,10 @@ type execPoolOpt func(c *_execPoolConfig)
 // results = make([]string, 0)
 // lock = sync.NewMutex()
 // exec.SystemBatch("echo c{{int(1-3)}}",
-//     exec.concurrent(2),
-//     exec.callback(func(cmd, result) { lock.Lock(); results = append(results, string(result)); lock.Unlock() }),
+//
+//	exec.concurrent(2),
+//	exec.callback(func(cmd, result) { lock.Lock(); results = append(results, string(result)); lock.Unlock() }),
+//
 // )
 // println(len(results))   // OUT: 3
 // assert len(results) == 3, "concurrent option should still run all expanded commands"
@@ -276,8 +280,10 @@ func _execConcurrent(i int) execPoolOpt {
 // results = make([]string, 0)
 // lock = sync.NewMutex()
 // exec.SystemBatch("echo t{{int(1-2)}}",
-//     exec.timeout(10),
-//     exec.callback(func(cmd, result) { lock.Lock(); results = append(results, string(result)); lock.Unlock() }),
+//
+//	exec.timeout(10),
+//	exec.callback(func(cmd, result) { lock.Lock(); results = append(results, string(result)); lock.Unlock() }),
+//
 // )
 // println(len(results))   // OUT: 2
 // assert len(results) == 2, "timeout option should not affect fast commands"
@@ -302,7 +308,9 @@ func _execTimeout(i float64) execPoolOpt {
 // outputs = make([]string, 0)
 // lock = sync.NewMutex()
 // exec.SystemBatch("echo cb{{int(1-3)}}",
-//     exec.callback(func(cmd, result) { lock.Lock(); outputs = append(outputs, string(result)); lock.Unlock() }),
+//
+//	exec.callback(func(cmd, result) { lock.Lock(); outputs = append(outputs, string(result)); lock.Unlock() }),
+//
 // )
 // println(len(outputs))   // OUT: 3
 // assert len(outputs) == 3, "callback should be invoked once per expanded command"

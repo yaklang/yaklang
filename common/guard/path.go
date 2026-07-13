@@ -1,12 +1,13 @@
 package guard
 
 import (
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"io/ioutil"
 	"os"
 	"regexp"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type GuardFileInfo struct {

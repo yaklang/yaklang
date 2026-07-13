@@ -2,12 +2,13 @@ package aiforge
 
 import (
 	_ "embed"
+	"strings"
+	"text/template"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"text/template"
 )
 
 //go:embed forgeprompts/forge-arguments.txt

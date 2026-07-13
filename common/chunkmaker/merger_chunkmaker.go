@@ -2,8 +2,9 @@ package chunkmaker
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils/chanx"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/utils/chanx"
 )
 
 type MergerChunkMaker struct {

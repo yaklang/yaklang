@@ -2,10 +2,11 @@ package cvemodels
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/log"
 	"regexp"
 	"strings"
+
+	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type CpeStruct struct {

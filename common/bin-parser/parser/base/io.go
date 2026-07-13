@@ -3,8 +3,9 @@ package base
 import (
 	"bytes"
 	"errors"
-	"github.com/icza/bitio"
 	"io"
+
+	"github.com/icza/bitio"
 )
 
 type ConcatReader struct {

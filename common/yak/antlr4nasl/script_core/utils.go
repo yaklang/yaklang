@@ -1,10 +1,11 @@
 package script_core
 
 import (
+	"time"
+
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
-	"time"
 )
 
 func Ping(ctx *ExecContext) {

@@ -2,13 +2,14 @@ package netx
 
 import (
 	"context"
+	"io"
+	"net"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/miekg/dns"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"io"
-	"net"
-	"time"
 )
 
 func dnsRequestBytes(queryType uint16, domain string) ([]byte, error) {

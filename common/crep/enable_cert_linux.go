@@ -79,7 +79,7 @@ func WithdrawMITMRootCertFromSystem() error {
 // 支持多个发行版：Debian/Ubuntu, RHEL/CentOS/Fedora, Arch等
 func buildLinuxInstallCertScript(certPath string) string {
 	const certFileName = "yaklang-mitm-ca.crt"
-	
+
 	script := fmt.Sprintf(`#!/bin/bash
 # MITM Root Certificate Installation Script for Linux
 # Supports multiple distributions
@@ -194,7 +194,7 @@ echo "MITM certificate installation completed successfully!"
 // buildLinuxRemoveCertScript 构建 Linux 证书移除脚本
 func buildLinuxRemoveCertScript() string {
 	const certFileName = "yaklang-mitm-ca.crt"
-	
+
 	script := fmt.Sprintf(`#!/bin/bash
 # MITM Root Certificate Removal Script for Linux
 
@@ -264,4 +264,3 @@ echo "MITM certificate removal completed successfully!"
 
 	return script
 }
-

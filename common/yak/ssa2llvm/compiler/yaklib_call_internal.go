@@ -8,10 +8,10 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
-)
 
-// Ensure yaklang stdlib modules are visible during compile-time dispatch resolution.
-import _ "github.com/yaklang/yaklang/common/yak"
+	// Ensure yaklang stdlib modules are visible during compile-time dispatch resolution.
+	_ "github.com/yaklang/yaklang/common/yak"
+)
 
 func splitQualifiedName(name string) (pkg, method string, ok bool) {
 	name = strings.TrimSpace(name)

@@ -1,9 +1,10 @@
 package pcapfix
 
 import (
-	"github.com/yaklang/yaklang/common/utils/netutil"
 	"runtime"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/netutil"
 
 	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/log"

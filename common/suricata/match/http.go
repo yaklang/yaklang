@@ -3,7 +3,6 @@ package match
 import (
 	"bufio"
 	"bytes"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"math/rand"
 	"net/http"
@@ -11,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"

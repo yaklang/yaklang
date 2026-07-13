@@ -2,6 +2,7 @@ package test
 
 import (
 	"embed"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/gzip_embed"
 )

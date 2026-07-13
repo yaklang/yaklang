@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -16,6 +15,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 
 	"github.com/mattn/go-sqlite3"
 	"github.com/yaklang/yaklang/common/schema"

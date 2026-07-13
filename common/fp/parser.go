@@ -1,9 +1,10 @@
 package fp
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
 )
 
 func ParseNmapServiceProbeToRuleMap(raw []byte) (result map[*NmapProbe][]*NmapMatch, err error) {

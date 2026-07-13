@@ -2,11 +2,12 @@ package match
 
 import (
 	"errors"
-	"github.com/yaklang/yaklang/common/suricata/data/modifier"
-	"github.com/yaklang/yaklang/common/suricata/rule"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/suricata/data/modifier"
+	"github.com/yaklang/yaklang/common/suricata/rule"
 )
 
 // untested

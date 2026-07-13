@@ -2,9 +2,10 @@ package msrdp
 
 import (
 	"bytes"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"strings"
 )
 
 func CalcNTLMHash(password, user, domain string) ([]byte, []byte) {

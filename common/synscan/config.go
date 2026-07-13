@@ -1,13 +1,14 @@
 package synscan
 
 import (
+	"net"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
-	"net"
-	"time"
 )
 
 type Config struct {

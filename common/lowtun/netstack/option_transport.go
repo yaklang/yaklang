@@ -1,6 +1,9 @@
 package netstack
 
 import (
+	"net"
+	"time"
+
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/adapters/gonet"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
@@ -9,8 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/udp"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/waiter"
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/glog"
-	"net"
-	"time"
 )
 
 const (

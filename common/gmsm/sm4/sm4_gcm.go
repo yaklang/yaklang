@@ -19,9 +19,10 @@ package sm4
 
 import (
 	"errors"
-	"github.com/yaklang/yaklang/common/gmsm/sm4/padding"
 	"io"
 	"strconv"
+
+	"github.com/yaklang/yaklang/common/gmsm/sm4/padding"
 )
 
 // Sm4GCM SM4 GCM 加解密模式

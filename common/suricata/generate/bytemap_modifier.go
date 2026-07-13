@@ -1,10 +1,11 @@
 package generate
 
 import (
+	"math"
+
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/suricata/bytemap"
 	"github.com/yaklang/yaklang/common/suricata/pcre"
-	"math"
 )
 
 type ByteMapModifier interface {

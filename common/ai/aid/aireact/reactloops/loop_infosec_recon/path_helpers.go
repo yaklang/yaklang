@@ -15,7 +15,6 @@ const (
 	keySpinRecoveryHint      = "infosec_spin_recovery_hint"
 )
 
-
 func infosecTryStatLocalPath(p, wd string) (abs string, ok bool) {
 	p = strings.TrimSpace(p)
 	if p == "" {

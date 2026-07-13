@@ -63,22 +63,25 @@ func (d *SSADiffResult) CalcHash() string {
 	return utils.CalcSha1(d.BaseLine, d.Compare)
 }
 
-func (d *SSADiffResult) BeforeCreate() {
+func (d *SSADiffResult) BeforeCreate(tx *gorm.DB) error {
 	d.Hash = d.CalcHash()
 	d.CompareType = string(ValidSSADiffResultCompareType(d.CompareType))
 	d.DiffResultKind = string(ValidSSADiffResultKind(d.DiffResultKind))
+	return nil
 }
 
-func (d *SSADiffResult) BeforeUpdate() {
+func (d *SSADiffResult) BeforeUpdate(tx *gorm.DB) error {
 	d.Hash = d.CalcHash()
 	d.CompareType = string(ValidSSADiffResultCompareType(d.CompareType))
 	d.DiffResultKind = string(ValidSSADiffResultKind(d.DiffResultKind))
+	return nil
 }
 
-func (d *SSADiffResult) BeforeSave() {
+func (d *SSADiffResult) BeforeSave(tx *gorm.DB) error {
 	d.Hash = d.CalcHash()
 	d.CompareType = string(ValidSSADiffResultCompareType(d.CompareType))
 	d.DiffResultKind = string(ValidSSADiffResultKind(d.DiffResultKind))
+	return nil
 }
 
 // TableName ensures GORM uses the correct table name

@@ -2,14 +2,15 @@ package rule
 
 import (
 	"encoding/binary"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/suricata/config"
-	"github.com/yaklang/yaklang/common/suricata/parser"
-	"github.com/yaklang/yaklang/common/utils"
 	"math/big"
 	"math/rand"
 	"net/netip"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/suricata/config"
+	"github.com/yaklang/yaklang/common/suricata/parser"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type AddressRule struct {

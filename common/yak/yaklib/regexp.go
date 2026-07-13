@@ -257,9 +257,11 @@ func _findSubmatchAllIndex_extractByRegexp(origin interface{}, re string) [][]in
 //
 // Example:
 // ```
-// result = re.ReplaceAllWithFunc("yakit is programming language", "yak([a-z]+)", func(s) {
-//     return "yaklang"
-// })
+//
+//	result = re.ReplaceAllWithFunc("yakit is programming language", "yak([a-z]+)", func(s) {
+//	    return "yaklang"
+//	})
+//
 // println(result)   // OUT: yaklang is programming language
 // assert result == "yaklang is programming language", "ReplaceAllWithFunc should replace matched token"
 // ```

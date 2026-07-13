@@ -3,9 +3,10 @@ package aireactdeps
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/stdinsys"
 	"io"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/stdinsys"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/aireactdeps/promptui"
 	"github.com/yaklang/yaklang/common/log"

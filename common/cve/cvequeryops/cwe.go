@@ -136,7 +136,7 @@ func CWEUpdate(opts ...CWEUpdateOption) error {
 	}
 
 	// Auto migrate CWE table
-	if err := db.AutoMigrate(&cveresources.CWE{}).Error; err != nil {
+	if err := db.AutoMigrate(&cveresources.CWE{}); err != nil {
 		return utils.Errorf("auto migrate CWE table failed: %v", err)
 	}
 
@@ -709,7 +709,7 @@ func ImportCWE(filename string) error {
 	}
 
 	// Auto migrate CWE table
-	if err := db.AutoMigrate(&cveresources.CWE{}).Error; err != nil {
+	if err := db.AutoMigrate(&cveresources.CWE{}); err != nil {
 		return utils.Errorf("auto migrate CWE table failed: %v", err)
 	}
 

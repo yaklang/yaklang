@@ -2,6 +2,7 @@ package generate
 
 import (
 	"errors"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"

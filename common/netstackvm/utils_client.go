@@ -1,10 +1,11 @@
 package netstackvm
 
 import (
+	"sync"
+
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	icmpClient "github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/icmp"
-	"sync"
 )
 
 var defaultICMPClient *icmpClient.Client

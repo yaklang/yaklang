@@ -2,15 +2,16 @@ package synscanx
 
 import (
 	"fmt"
+	"math/rand"
+	"net"
+	"runtime"
+	"time"
+
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/utils"
-	"math/rand"
-	"net"
-	"runtime"
-	"time"
 )
 
 func (s *Scannerx) useLoopbackLikeLinkLayer(host string) bool {

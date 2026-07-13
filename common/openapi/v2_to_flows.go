@@ -3,6 +3,10 @@ package openapi
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"regexp"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/openapi/openapi2"
@@ -11,9 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"net/http"
-	"regexp"
-	"strings"
 )
 
 func v2Generator(t string, config *OpenAPIConfig) error {

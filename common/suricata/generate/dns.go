@@ -3,13 +3,14 @@ package generate
 import (
 	"errors"
 	"fmt"
+	"math/rand"
+
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/suricata/rule"
-	"math/rand"
 )
 
 var _ Generator = (*DNSGen)(nil)

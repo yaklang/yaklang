@@ -34,4 +34,3 @@ func (p *PythonParser) SetInterpreter(atn *antlr.ATN, decisionToDFA []*antlr.DFA
 	// do nothing, just to override the method
 	p.Interpreter = antlr.NewParserATNSimulator(p, atn, decisionToDFA, predictionContextCache)
 }
-

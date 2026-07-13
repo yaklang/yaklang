@@ -4,12 +4,13 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 //go:embed html/vul_fake_ip.html

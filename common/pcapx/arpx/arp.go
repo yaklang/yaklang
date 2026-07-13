@@ -2,12 +2,13 @@ package arpx
 
 import (
 	"context"
-	"github.com/gopacket/gopacket"
 	"net"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/gopacket/gopacket"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"

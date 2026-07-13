@@ -3,13 +3,14 @@ package mutate
 import (
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/fuzztagx"
 	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"strconv"
-	"strings"
 )
 
 type FuzztagArgumentType struct {

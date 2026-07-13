@@ -3,7 +3,6 @@ package openapi3
 import (
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"net/http"
 	"net/url"
@@ -11,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // ReadFromURIFunc defines a function which reads the contents of a resource

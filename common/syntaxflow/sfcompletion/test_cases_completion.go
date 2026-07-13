@@ -3,8 +3,9 @@ package sfcompletion
 import (
 	"context"
 	_ "embed"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"

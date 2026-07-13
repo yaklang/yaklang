@@ -7,9 +7,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/ai/localmodel"
 	"github.com/yaklang/yaklang/common/log"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 )
 
 var LocalModelCommands = []*cli.Command{

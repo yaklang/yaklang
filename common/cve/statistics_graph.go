@@ -3,12 +3,13 @@ package cve
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/cve/cveresources"
-	"github.com/yaklang/yaklang/common/log"
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/cve/cveresources"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type Graph struct {

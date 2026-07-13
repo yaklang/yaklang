@@ -8,7 +8,6 @@ type ThreadFlow struct {
 	Locations      []*ThreadFlowLocation                `json:"locations"`
 	Message        *Message                             `json:"message,omitempty"`
 	PropertyBag
-
 }
 
 // NewThreadFlow creates a new ThreadFlow and returns a pointer to it

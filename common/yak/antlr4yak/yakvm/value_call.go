@@ -17,7 +17,6 @@ func (v *Value) NativeCall(vm *Frame, wavy bool, vs ...*Value) interface{} {
 	return v.nativeCall(false, wavy, vm, vs...)
 }
 
-
 func (v *Value) nativeCall(asyncCall, wavy bool, vm *Frame, vs ...*Value) interface{} {
 	rets := reflect.ValueOf(v.Value)
 	funcType := rets.Type()

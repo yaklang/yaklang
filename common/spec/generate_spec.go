@@ -3,8 +3,9 @@ package spec
 import (
 	"bytes"
 	"fmt"
-	"gopkg.in/yaml.v2"
 	"html/template"
+
+	"gopkg.in/yaml.v2"
 )
 
 type PalmRpcApiSchema struct {

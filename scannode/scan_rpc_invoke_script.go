@@ -132,14 +132,14 @@ func (s *ScanNode) rpc_invokeScript(ctx context.Context, node string, req *scanr
 
 	taskId := fmt.Sprintf("script-task-%v", req.SubTaskId)
 	s.manager.Add(taskId, &Task{
-		TaskType: "script-task",
-		TaskId:   taskId,
+		TaskType:   "script-task",
+		TaskId:     taskId,
 		RootTaskID: req.TaskId,
-		SubTaskID: req.SubTaskId,
-		RuntimeID: req.RuntimeId,
-		Status:   "queued",
-		Ctx:      ctx,
-		Cancel:   cancel,
+		SubTaskID:  req.SubTaskId,
+		RuntimeID:  req.RuntimeId,
+		Status:     "queued",
+		Ctx:        ctx,
+		Cancel:     cancel,
 	})
 	defer s.manager.Remove(taskId)
 

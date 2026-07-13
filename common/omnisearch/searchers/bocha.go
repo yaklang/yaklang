@@ -27,25 +27,25 @@ const (
 // BochaSearchRequest represents the request body for Bocha Web Search API
 type BochaSearchRequest struct {
 	Query     string `json:"query"`               // Required: search keywords
-	Freshness string `json:"freshness,omitempty"`  // Optional: OneDay, OneWeek, OneMonth, OneYear, noLimit (default: noLimit)
-	Summary   bool   `json:"summary,omitempty"`    // Optional: whether to include summary (default: false)
-	Count     int    `json:"count,omitempty"`      // Optional: number of results, 1-50 (default: 10)
+	Freshness string `json:"freshness,omitempty"` // Optional: OneDay, OneWeek, OneMonth, OneYear, noLimit (default: noLimit)
+	Summary   bool   `json:"summary,omitempty"`   // Optional: whether to include summary (default: false)
+	Count     int    `json:"count,omitempty"`     // Optional: number of results, 1-50 (default: 10)
 }
 
 // BochaSearchResponse represents the response from Bocha Web Search API
 type BochaSearchResponse struct {
-	Code  int         `json:"code"`
-	LogID string      `json:"log_id"`
-	Msg   *string     `json:"msg"`
-	Data  *BochaData  `json:"data"`
+	Code  int        `json:"code"`
+	LogID string     `json:"log_id"`
+	Msg   *string    `json:"msg"`
+	Data  *BochaData `json:"data"`
 }
 
 // BochaData represents the data field in the response
 type BochaData struct {
-	Type         string            `json:"_type"`
+	Type         string             `json:"_type"`
 	QueryContext *BochaQueryContext `json:"queryContext"`
-	WebPages     *BochaWebPages    `json:"webPages"`
-	Images       *BochaImages      `json:"images"`
+	WebPages     *BochaWebPages     `json:"webPages"`
+	Images       *BochaImages       `json:"images"`
 }
 
 // BochaQueryContext represents the query context
@@ -81,17 +81,17 @@ type BochaImages struct {
 
 // BochaImageResult represents a single image result
 type BochaImageResult struct {
-	Name               string         `json:"name"`
-	WebSearchURL       string         `json:"webSearchUrl"`
-	ThumbnailURL       string         `json:"thumbnailUrl"`
-	DatePublished      string         `json:"datePublished"`
-	ContentURL         string         `json:"contentUrl"`
-	HostPageURL        string         `json:"hostPageUrl"`
-	ContentSize        string         `json:"contentSize"`
-	EncodingFormat     string         `json:"encodingFormat"`
-	HostPageDisplayURL string         `json:"hostPageDisplayUrl"`
-	Width              int            `json:"width"`
-	Height             int            `json:"height"`
+	Name               string          `json:"name"`
+	WebSearchURL       string          `json:"webSearchUrl"`
+	ThumbnailURL       string          `json:"thumbnailUrl"`
+	DatePublished      string          `json:"datePublished"`
+	ContentURL         string          `json:"contentUrl"`
+	HostPageURL        string          `json:"hostPageUrl"`
+	ContentSize        string          `json:"contentSize"`
+	EncodingFormat     string          `json:"encodingFormat"`
+	HostPageDisplayURL string          `json:"hostPageDisplayUrl"`
+	Width              int             `json:"width"`
+	Height             int             `json:"height"`
 	Thumbnail          *BochaThumbnail `json:"thumbnail,omitempty"`
 }
 
@@ -104,13 +104,13 @@ type BochaThumbnail struct {
 
 // BochaSearchConfig holds configuration for the Bocha web search client
 type BochaSearchConfig struct {
-	APIKey    string
-	BaseURL   string
-	Timeout   float64
+	APIKey     string
+	BaseURL    string
+	Timeout    float64
 	MaxResults int
-	Proxy     string
-	Freshness string // OneDay, OneWeek, OneMonth, OneYear, noLimit
-	Summary   bool   // whether to include summary
+	Proxy      string
+	Freshness  string // OneDay, OneWeek, OneMonth, OneYear, noLimit
+	Summary    bool   // whether to include summary
 }
 
 // BochaSearchClient is the client for Bocha Web Search API

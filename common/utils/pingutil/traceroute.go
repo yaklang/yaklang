@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net"
+	"os"
+	"time"
+
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
-	"net"
-	"os"
-	"time"
 )
 
 type TracerouteResponse struct {

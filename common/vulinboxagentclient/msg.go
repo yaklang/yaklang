@@ -1,10 +1,11 @@
 package vulinboxagentclient
 
 import (
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 	"strconv"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func (c *Client) Msg() *MsgPrepare {

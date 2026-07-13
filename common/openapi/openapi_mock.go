@@ -1,11 +1,12 @@
 package openapi
 
 import (
+	"strings"
+
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"strings"
 )
 
 func OpenAPITypeToMockDataLiteral(t string, defaults ...any) any {

@@ -116,7 +116,7 @@ func (m *YakFileMonitor) SetFileTree(fileTree *FileNode) {
 
 func WatchPath(ctx context.Context, path string, eventHandler MonitorEventHandler, opts ...WatchPathOption) (*YakFileMonitor, error) {
 	ctx, cancelFunc := context.WithCancel(ctx)
-	
+
 	config := &watchPathConfig{
 		PollInterval: 5 * time.Second,
 	}

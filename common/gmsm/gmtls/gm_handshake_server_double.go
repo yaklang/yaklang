@@ -14,9 +14,10 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"sync/atomic"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/gmsm/sm2"
 	"github.com/yaklang/yaklang/common/gmsm/x509"

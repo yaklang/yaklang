@@ -3,15 +3,16 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"io/ioutil"
+	"strconv"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io/ioutil"
-	"strconv"
-	"strings"
 )
 
 func (s *Server) AddToMenu(ctx context.Context, req *ypb.AddToMenuRequest) (*ypb.Empty, error) {

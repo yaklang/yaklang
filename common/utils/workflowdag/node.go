@@ -80,18 +80,18 @@ type ExecutableNode interface {
 
 // BaseNode provides a basic implementation of DAGNode
 type BaseNode struct {
-	ID          string
+	ID           string
 	Dependencies []string
-	Status      NodeStatus
-	AllowFail   bool
+	Status       NodeStatus
+	AllowFail    bool
 }
 
 func NewBaseNode(id string, deps ...string) *BaseNode {
 	return &BaseNode{
-		ID:          id,
+		ID:           id,
 		Dependencies: deps,
-		Status:      NodeStatusPending,
-		AllowFail:   false,
+		Status:       NodeStatusPending,
+		AllowFail:    false,
 	}
 }
 

@@ -1,6 +1,7 @@
 package ssadb
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -172,10 +173,10 @@ func GetIrTypeItemById(db *gorm.DB, progName string, id int64) *IrType {
 	// check cache
 	ir := &IrType{}
 	// db = db.Debug()
-	if db := db.Model(&IrType{}).
+	if err := db.Session(&gorm.Session{Context: context.Background()}).Model(&IrType{}).
 		Where("type_id = ?", id).
 		Where("program_name = ?", progName).
-		First(ir); db.Error != nil {
+		First(ir).Error; err != nil {
 		return nil
 	}
 	return ir

@@ -1,8 +1,10 @@
 // Package aicache 在 aispec.ChatBase 入口做镜像观测 + 可选 messages 改写。
 //
 // Observe 是合并后的入口：
+//
 //  1. 缓存分析（Split → Record → buildAdvices → 节流打印 → DEBUG 落盘）保持
 //     与原 mirror 行为一致
+//
 //  2. 在结尾尝试 hijackHighStatic：如果 prompt 包含 high-static 段，则把它
 //     拆出来包成 <|AI_CACHE_SYSTEM_high-static|>...<|AI_CACHE_SYSTEM_END_high-static|>
 //     作为 role:system 单独消息。
@@ -20,7 +22,8 @@
 //     string content，让 aibalance 走 baseline 单 cc 兜底。
 //
 // 关键词: aicache, Observe, mirror, hijack 合一, role:system 注入,
-//        3 段拆分, frozen/open 边界, §7.7, §7.7.7 hijacker 自管双 cc
+//
+//	3 段拆分, frozen/open 边界, §7.7, §7.7.7 hijacker 自管双 cc
 package aicache
 
 import (

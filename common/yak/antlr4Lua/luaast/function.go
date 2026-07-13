@@ -1,10 +1,11 @@
 package luaast
 
 import (
+	"strings"
+
 	uuid "github.com/google/uuid"
 	lua "github.com/yaklang/yaklang/common/yak/antlr4Lua/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
-	"strings"
 )
 
 // VisitFuncNameAndBody is used to visit vanilla named function declaration

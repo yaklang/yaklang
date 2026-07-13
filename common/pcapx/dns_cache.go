@@ -2,6 +2,8 @@ package pcapx
 
 import (
 	"context"
+	"net"
+
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/miekg/dns"
@@ -12,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/netutil"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
-	"net"
 )
 
 type PcapReserveDNSCache struct {

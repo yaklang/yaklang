@@ -2,13 +2,14 @@ package consts
 
 import (
 	"bytes"
-	"github.com/google/uuid"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
+
+	"github.com/google/uuid"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"

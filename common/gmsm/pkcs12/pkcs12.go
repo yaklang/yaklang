@@ -20,9 +20,10 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
+	"io/ioutil"
+
 	"github.com/yaklang/yaklang/common/gmsm/sm2"
 	x "github.com/yaklang/yaklang/common/gmsm/x509"
-	"io/ioutil"
 )
 
 var (

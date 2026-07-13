@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/cve/cveresources"
-	"github.com/yaklang/yaklang/common/log"
-	"gorm.io/gorm"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/cve/cveresources"
+	"github.com/yaklang/yaklang/common/log"
+	"gorm.io/gorm"
 )
 
 type CVEOption func(info *CVEQueryInfo)

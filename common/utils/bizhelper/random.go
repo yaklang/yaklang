@@ -1,9 +1,10 @@
 package bizhelper
 
 import (
-	"gorm.io/gorm"
 	"math/rand"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 func RandomQuery(db *gorm.DB, limit int, data interface{}) (int, error) {

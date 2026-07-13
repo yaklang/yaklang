@@ -28,7 +28,7 @@ func (a *AIMemoryCollection) TableName() string {
 	return "ai_memory_collections_v1"
 }
 
-func (a *AIMemoryCollection) BeforeSave() error {
+func (a *AIMemoryCollection) BeforeSave(tx *gorm.DB) error {
 	if a.Dimension == 0 {
 		a.Dimension = 7 // 默认7维
 	}

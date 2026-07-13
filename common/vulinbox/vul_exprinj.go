@@ -3,10 +3,11 @@ package vulinbox
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
-	"net/http"
 )
 
 func (s *VulinServer) registerExprInj() {

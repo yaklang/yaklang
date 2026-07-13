@@ -21,4 +21,3 @@ func (b *singleFileBuilder) ReadConst(name string) (ssa.Value, bool) {
 	v, ok := b.constMap[name]
 	return v, ok
 }
-

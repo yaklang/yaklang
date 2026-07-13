@@ -21,16 +21,19 @@ func (*SSARiskDisposals) TableName() string {
 	return TableSSARiskDisposals
 }
 
-func (s *SSARiskDisposals) BeforeCreate() {
+func (s *SSARiskDisposals) BeforeCreate(tx *gorm.DB) error {
 	s.Status = string(ValidSSARiskDisposalStatus(s.Status))
+	return nil
 }
 
-func (s *SSARiskDisposals) BeforeUpdate() {
+func (s *SSARiskDisposals) BeforeUpdate(tx *gorm.DB) error {
 	s.Status = string(ValidSSARiskDisposalStatus(s.Status))
+	return nil
 }
 
-func (s *SSARiskDisposals) BeforeSave() {
+func (s *SSARiskDisposals) BeforeSave(tx *gorm.DB) error {
 	s.Status = string(ValidSSARiskDisposalStatus(s.Status))
+	return nil
 }
 
 func (s *SSARiskDisposals) AfterCreate(tx *gorm.DB) error {

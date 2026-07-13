@@ -1,12 +1,13 @@
 package synscanx
 
 import (
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/hostsparser"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/hostsparser"
 )
 
 func (s *Scannerx) excludedHost(host string) bool {

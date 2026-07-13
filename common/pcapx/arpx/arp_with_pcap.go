@@ -4,6 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
@@ -11,10 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"net"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 func ArpWithPcapFirst(ctx context.Context, ifaceName string, target string) (net.HardwareAddr, error) {

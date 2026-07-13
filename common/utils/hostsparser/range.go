@@ -2,11 +2,12 @@ package hostsparser
 
 import (
 	"context"
-	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type ipRangeBlock struct {

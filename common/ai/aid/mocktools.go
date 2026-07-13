@@ -2,11 +2,12 @@ package aid
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"io"
 	"math/rand"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
 // 初始化随机数生成器

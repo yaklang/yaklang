@@ -1,8 +1,9 @@
 package yserx
 
 import (
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"math"
+
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 type JavaFieldValue struct {

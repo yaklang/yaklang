@@ -20,13 +20,14 @@ package arp
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/waiter"
 	"io"
 	"net"
 	"reflect"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/waiter"
 
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/atomicbitops"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/sync"

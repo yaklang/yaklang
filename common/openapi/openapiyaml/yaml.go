@@ -12,14 +12,11 @@ package openapiyaml
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	"strconv"
-)
-
-import (
-	"errors"
-	"io"
 
 	"gopkg.in/yaml.v3"
 )

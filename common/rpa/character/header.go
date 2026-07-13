@@ -3,10 +3,11 @@ package character
 import (
 	"bufio"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"os"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func AnalysisHeaders(s string) (map[string]string, error) {

@@ -1,12 +1,13 @@
 package jsp
 
 import (
+	"regexp"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	jspparser "github.com/yaklang/yaklang/common/yak/java/jsp/parser"
 	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
-	"regexp"
-	"strings"
 )
 
 var jspIfBlockPattern = regexp.MustCompile(`(?s)^<c:if\b([^>]*)>(.*)</c:if>$`)

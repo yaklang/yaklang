@@ -3,9 +3,10 @@ package tlsutils
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type HandshakeClientHello struct {

@@ -2,9 +2,10 @@ package utils
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"reflect"
 	"runtime"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func PrintCurrentGoroutineRuntimeStack() {

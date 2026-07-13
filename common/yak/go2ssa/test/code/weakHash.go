@@ -3,12 +3,14 @@
 
 package samples
 
-import "fmt"
-import "io"
-import "crypto/md5"
-import "crypto/sha256"
+import (
+	"crypto/md5"
+	"crypto/sha256"
+	"fmt"
+	"io"
 
-import "golang.org/x/crypto/blake2s"
+	"golang.org/x/crypto/blake2s"
+)
 
 // Trivial routine
 func WeakHash(a int32) {

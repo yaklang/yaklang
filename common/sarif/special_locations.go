@@ -4,7 +4,6 @@ package sarif
 type SpecialLocations struct {
 	DisplayBase *ArtifactLocation `json:"displayBase,omitempty"`
 	PropertyBag
-
 }
 
 // NewSpecialLocations ...

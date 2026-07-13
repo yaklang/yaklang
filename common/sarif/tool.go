@@ -4,7 +4,6 @@ package sarif
 type Tool struct {
 	Driver *ToolComponent `json:"driver"`
 	PropertyBag
-
 }
 
 // NewTool creates a new Tool and returns a pointer to it

@@ -4,9 +4,10 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"github.com/google/uuid"
 	"os"
 	"strings"
+
+	"github.com/google/uuid"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bruteutils"

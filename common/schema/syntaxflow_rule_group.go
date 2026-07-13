@@ -14,7 +14,7 @@ import (
 //	Hash      string `json:"hash" gorm:"uniqueIndex"`
 //}
 //
-//func (s *SyntaxFlowRuleGroup) BeforeSave() error {
+//func (s *SyntaxFlowRuleGroup) BeforeSave(tx *gorm.DB) error {
 //	s.CalcHash()
 //	return nil
 //}

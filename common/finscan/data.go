@@ -2,6 +2,7 @@ package finscan
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/utils"
 )
 

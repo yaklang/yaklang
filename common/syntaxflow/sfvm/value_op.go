@@ -30,9 +30,9 @@ const (
 	RecursiveConfig_Hook = "hook"
 	// RecursiveConfig_OnlyReachable / IncludeReachable / ExcludeReachable: CFG anchor by symbol (e.g. `` `$cfg` `` from <getCfg>),
 	// composable with until / include / exclude / hook. Positive keys keep defs whose SSA site can reach the anchor; exclude_reachable inverts.
-	RecursiveConfig_OnlyReachable     = "only_reachable"
-	RecursiveConfig_IncludeReachable  = "include_reachable"
-	RecursiveConfig_ExcludeReachable  = "exclude_reachable"
+	RecursiveConfig_OnlyReachable    = "only_reachable"
+	RecursiveConfig_IncludeReachable = "include_reachable"
+	RecursiveConfig_ExcludeReachable = "exclude_reachable"
 	// un-used now
 	RecursiveConfig_Filter = "filter"
 )

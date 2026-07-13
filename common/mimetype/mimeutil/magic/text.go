@@ -2,9 +2,10 @@ package magic
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/mimetype/mimeutil/mimecharset"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/mimetype/mimeutil/mimecharset"
 
 	"github.com/yaklang/yaklang/common/mimetype/mimeutil/json"
 )

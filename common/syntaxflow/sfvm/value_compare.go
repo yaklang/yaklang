@@ -2,11 +2,12 @@ package sfvm
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 
 	"github.com/yaklang/yaklang/common/utils"
 

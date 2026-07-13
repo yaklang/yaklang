@@ -7,9 +7,10 @@ import (
 	"sort"
 	"strings"
 
+	"net/url"
+
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/utils"
-	"net/url"
 )
 
 type WebsiteNode struct {

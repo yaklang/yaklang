@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var irSourceCache = utils.NewTTLCache[*memedit.MemEditor]()
@@ -179,8 +180,8 @@ func MarshalFolder(folderPaths []string) *IrSource {
 
 func (irSource *IrSource) Save(db *gorm.DB) error {
 	// log.Infof("save source: %v", irSource.SourceCodeHash)
-	// check existed
-	err := db.Save(irSource).Error
+	// Upsert by source_code_hash / program_name / folder_path / file_name.
+	err := db.Clauses(clause.OnConflict{UpdateAll: true}).Create(irSource).Error
 	if err != nil {
 		log.Errorf("save ir source failed: %v", err)
 		return utils.Wrapf(err, "save ir source failed")

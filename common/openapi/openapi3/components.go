@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/openapi/jsonpointer"
 	"sort"
+
+	"github.com/yaklang/yaklang/common/openapi/jsonpointer"
 )
 
 type (

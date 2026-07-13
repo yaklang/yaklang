@@ -2,9 +2,10 @@ package utils
 
 import (
 	"bufio"
-	"github.com/pkg/errors"
 	"io"
 	"os"
+
+	"github.com/pkg/errors"
 )
 
 type BruteDictParser struct {

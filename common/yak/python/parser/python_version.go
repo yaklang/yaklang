@@ -21,4 +21,3 @@ const (
 func (v PythonVersion) GetValue() int {
 	return int(v)
 }
-

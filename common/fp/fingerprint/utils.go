@@ -1,6 +1,8 @@
 package fingerprint
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/parsers"
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
@@ -9,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
-	"strings"
 )
 
 func LoadCPEFromWebfingerrintCPE(o *webfingerprint.CPE) *schema.CPE {

@@ -3,9 +3,10 @@ package protocol_impl
 import (
 	"encoding/json"
 	"errors"
+	"io"
+
 	"github.com/yaklang/yaklang/common/bin-parser/parser"
 	"github.com/yaklang/yaklang/common/bin-parser/utils"
-	"io"
 )
 
 type BERElementType struct {

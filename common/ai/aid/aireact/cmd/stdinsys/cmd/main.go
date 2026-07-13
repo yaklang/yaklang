@@ -3,9 +3,10 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"time"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/stdinsys"
 	"github.com/yaklang/yaklang/common/log"
-	"time"
 )
 
 func main() {

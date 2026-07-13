@@ -7,8 +7,9 @@ import (
 	"github.com/huin/asn1ber"
 
 	"errors"
-	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"net"
+
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 )
 
 type SocketLayer struct {

@@ -3,11 +3,12 @@ package xml_tools
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
 	"github.com/yaklang/yaklang/common/utils/yakxml"
-	"io"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
 	"golang.org/x/net/html/charset"

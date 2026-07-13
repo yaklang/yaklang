@@ -3,8 +3,6 @@ package permutil
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,6 +10,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func buildWindowsSudoBatchLines(cmd, stdoutTarget, stderrTarget, exitCodeFile string, writeExitCode bool, deleteSelf bool, workdir string, env map[string]string) []string {

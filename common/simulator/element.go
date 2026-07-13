@@ -3,12 +3,13 @@
 package simulator
 
 import (
+	"strings"
+
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/input"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
 )
 
 const maxParentLevel = 3

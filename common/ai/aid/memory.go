@@ -3,12 +3,13 @@ package aid
 import (
 	"bytes"
 	"fmt"
-	"github.com/google/uuid"
 	osRuntime "runtime"
 	"strings"
 	"sync"
 	"text/template"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 

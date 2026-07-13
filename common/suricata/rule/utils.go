@@ -1,11 +1,12 @@
 package rule
 
 import (
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"math/rand"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 var sRe = regexp.MustCompile(`(?i)\|(?P<single>[0-9a-f][0-9a-f])( (?P<after>[0-9a-f][0-9a-f]))*\|`)

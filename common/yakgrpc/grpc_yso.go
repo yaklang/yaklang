@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/yaklang/javajive/classparser"
 	"sort"
 	"strconv"
 	"strings"
+
+	javaclassparser "github.com/yaklang/javajive/classparser"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"

@@ -3,8 +3,9 @@ package openapi2
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/openapi/openapiyaml"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/openapi/openapiyaml"
 )
 
 func unmarshalError(jsonUnmarshalErr error) error {

@@ -8,7 +8,6 @@ type Suppression struct {
 	Guid          *string   `json:"guid"`
 	Justification *string   `json:"justification"`
 	PropertyBag
-
 }
 
 // NewSuppression creates a new Suppression and returns a pointer to it

@@ -7,7 +7,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 )
 
 // FlagInputSourceExtension is an extension interface of cli.Flag that

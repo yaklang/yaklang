@@ -1,13 +1,14 @@
 package generate
 
 import (
+	"math/rand"
+	"strings"
+
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/suricata/rule"
-	"math/rand"
-	"strings"
 )
 
 var _ Generator = (*TCPGen)(nil)

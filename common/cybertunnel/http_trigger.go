@@ -5,6 +5,12 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
+	"math/rand"
+	"net"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian/mitm"
@@ -12,11 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
-	"math/rand"
-	"net"
-	"strings"
-	"sync"
-	"time"
 )
 
 type HTTPTrigger struct {

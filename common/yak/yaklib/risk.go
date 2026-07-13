@@ -27,9 +27,11 @@ import (
 // Example:
 // ```
 // risk.NewRisk("http://example.com",
-//     risk.title("SQL Injection"),
-//     risk.type("sqli"),
-//     risk.severity("high"),
+//
+//	risk.title("SQL Injection"),
+//	risk.type("sqli"),
+//	risk.severity("high"),
+//
 // )
 // // 写入后可用 risk.YieldRiskByTarget 等查询（示意性示例）
 // ```

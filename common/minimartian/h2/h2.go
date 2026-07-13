@@ -21,11 +21,12 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"golang.org/x/net/http2"
 	"io"
 	"net/url"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/log"
+	"golang.org/x/net/http2"
 )
 
 var (

@@ -9,7 +9,7 @@ import (
 )
 
 type FastPaginator struct {
-	db          *gorm.DB
+	baseDB      *gorm.DB
 	ids         []int64
 	totalRecord int
 	size        int
@@ -92,18 +92,19 @@ func NewFastPaginator(db *gorm.DB, size int, opts ...FastPaginatorOpts) *FastPag
 			opt(paginator)
 		}
 	}
-	if paginator.OrderBy != "" {
-		db = db.Order(paginator.OrderBy)
-	}
+	paginator.baseDB = db
 
 	if len(paginator.ids) == 0 {
 		paginator.ids = make([]int64, 0)
-		if err := db.Pluck(paginator.IndexField, &paginator.ids).Error; err != nil {
+		pluckDB := db.Session(&gorm.Session{Context: context.Background()})
+		if paginator.OrderBy != "" {
+			pluckDB = pluckDB.Order(paginator.OrderBy)
+		}
+		if err := pluckDB.Pluck(paginator.IndexField, &paginator.ids).Error; err != nil {
 			log.Errorf("failed to get ids: %v", err)
 			return nil
 		}
 	}
-	paginator.db = db
 	paginator.totalRecord = len(paginator.ids)
 	paginator.offset = 0
 	paginator.page = 0
@@ -120,16 +121,16 @@ func (p *FastPaginator) Next(result any) (error, bool) {
 	}
 
 	var db *gorm.DB
+	pageDB := p.baseDB.Session(&gorm.Session{Context: context.Background()})
 	if p.size == -1 {
-		db = p.db.Find(result)
+		db = pageDB.Find(result)
 		p.offset = len(p.ids)
 	} else {
-		// p.db
 		end := p.offset + p.size
 		if end > len(p.ids) {
 			end = len(p.ids)
 		}
-		db = ExactQueryInt64ArrayOr(p.db, p.IndexField, p.ids[p.offset:end])
+		db = ExactQueryInt64ArrayOr(pageDB, p.IndexField, p.ids[p.offset:end])
 		db = db.Find(result)
 		p.page++
 		p.offset = end

@@ -16,8 +16,6 @@ package swag
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"net/http"
 	"net/url"
@@ -27,6 +25,9 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // LoadHTTPTimeout the default timeout for load requests

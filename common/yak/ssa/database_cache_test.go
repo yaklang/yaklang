@@ -261,7 +261,7 @@ func TestSourceStoreCloseDoesNotDuplicateRows(t *testing.T) {
 	prog := newProgramWithTTL(programName, 0, ProgramCacheDBWrite, vf)
 	editor := prog.CreateEditor([]byte("class Demo {}"), "/src/Demo.java", false)
 	hash := editor.GetIrSourceHash()
-	require.NoError(t, ssadb.GetDB().Save(ssadb.MarshalFile(editor, hash)).Error)
+	require.NoError(t, ssadb.GetDB().Create(ssadb.MarshalFile(editor, hash)).Error)
 
 	prog.SaveEditor(editor)
 	prog.SaveEditor(editor)
@@ -872,7 +872,7 @@ func TestInstruction2IrCodeReloadsSpilledBasicBlockAfterFinish(t *testing.T) {
 	block := builder.CurrentBlock
 	block.SetRange(rng)
 	sourceHash := editor.GetIrSourceHash()
-	require.NoError(t, ssadb.GetDB().Save(ssadb.MarshalFile(editor, sourceHash)).Error)
+	require.NoError(t, ssadb.GetDB().Create(ssadb.MarshalFile(editor, sourceHash)).Error)
 
 	builder.Finish()
 
@@ -1138,5 +1138,5 @@ func TestInstructionCache_SaveDeduplicatesSourcesWithinBatch(t *testing.T) {
 		Where("program_name = ? AND source_code_hash = ?", programName, editor.GetIrSourceHash()).
 		Count(&count).Error
 	require.NoError(t, err)
-	require.Equal(t, 1, count, "same editor hash should only be persisted once per batch")
+	require.Equal(t, int64(1), count, "same editor hash should only be persisted once per batch")
 }

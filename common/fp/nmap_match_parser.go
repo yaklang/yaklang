@@ -3,6 +3,7 @@ package fp
 import (
 	"bufio"
 	"bytes"
+
 	"github.com/pkg/errors"
 )
 

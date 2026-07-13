@@ -1,10 +1,11 @@
 package simple
 
 import (
-	"github.com/go-rod/rod"
-	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
 	"strings"
+
+	"github.com/go-rod/rod"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type ModifyTarget string

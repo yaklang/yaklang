@@ -5,8 +5,9 @@ import (
 	"crypto/cipher"
 	"crypto/des"
 	"fmt"
-	"github.com/yaklang/yaklang/common/gmsm/sm4"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/gmsm/sm4"
 )
 
 /* CMAC uses mac with no iv to compute the MAC.

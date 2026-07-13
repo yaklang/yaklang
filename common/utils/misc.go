@@ -2,9 +2,10 @@ package utils
 
 import (
 	"context"
-	"github.com/pkg/errors"
 	"net"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 func WaitConnect(addr string, timeout float64) error {

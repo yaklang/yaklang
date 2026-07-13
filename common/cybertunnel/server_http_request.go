@@ -2,10 +2,11 @@ package cybertunnel
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func (t *TunnelServer) RequireHTTPRequestTrigger(ctx context.Context, req *tpb.RequireHTTPRequestTriggerParams) (*tpb.RequireHTTPRequestTriggerResponse, error) {

@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/rag/generate_index_tool"
-	"github.com/yaklang/yaklang/common/urfavecli"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 )
 
 // infoCommand info 命令处理函数

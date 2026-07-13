@@ -45,9 +45,9 @@ func (r *SSAReportRecord) CalcHash() string {
 	return utils.CalcSha1(r.Title, r.PublishedAt.Format(utils.DefaultTimeFormat))
 }
 
-func (r *SSAReportRecord) BeforeSave() {
+func (r *SSAReportRecord) BeforeSave(tx *gorm.DB) error {
 	if r == nil {
-		return
+		return nil
 	}
 	if r.PublishedAt.IsZero() {
 		r.PublishedAt = time.Now()
@@ -55,4 +55,5 @@ func (r *SSAReportRecord) BeforeSave() {
 	if strings.TrimSpace(r.Hash) == "" {
 		r.Hash = r.CalcHash()
 	}
+	return nil
 }

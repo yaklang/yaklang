@@ -1,8 +1,9 @@
 package schema
 
 import (
-	"gorm.io/gorm"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type Briefing struct {

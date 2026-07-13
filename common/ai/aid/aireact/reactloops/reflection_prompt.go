@@ -186,4 +186,3 @@ func buildReflectionSchema() string {
 	)
 	return schema
 }
-

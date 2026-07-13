@@ -226,7 +226,7 @@ func (p *Risk) ToGRPCModel() *ypb.Risk {
 	}
 }
 
-func (p *Risk) BeforeSave() error {
+func (p *Risk) BeforeSave(tx *gorm.DB) error {
 	if p.Hash == "" {
 		p.Hash = uuid.New().String()
 	}

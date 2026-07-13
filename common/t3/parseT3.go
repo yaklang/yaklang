@@ -4,10 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yserx"
 	"io/ioutil"
 	"os"
 	"reflect"
+
+	"github.com/yaklang/yaklang/common/yserx"
 )
 
 type T3Header struct {

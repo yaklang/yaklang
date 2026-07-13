@@ -2,10 +2,11 @@ package protocol_impl
 
 import (
 	"errors"
+	"io"
+
 	"github.com/yaklang/yaklang/common/bin-parser/parser"
 	"github.com/yaklang/yaklang/common/bin-parser/utils"
 	utils2 "github.com/yaklang/yaklang/common/utils"
-	"io"
 )
 
 type TpktPacket struct {

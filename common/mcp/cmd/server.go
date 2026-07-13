@@ -3,8 +3,8 @@ package main
 import (
 	"os"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/mcp"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 )
 
 func main() {

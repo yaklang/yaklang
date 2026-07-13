@@ -5,7 +5,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/yaklang/javajive/classparser"
+	javaclassparser "github.com/yaklang/javajive/classparser"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -21,7 +21,6 @@ func displayEntryName(entry fs.DirEntry) string {
 	}
 	return entry.Name()
 }
-
 
 // listJarDirectory lists the contents of a directory in a JAR file
 // If hideInnerClasses is true, it will add hide=true and outerClass attributes to inner class resources

@@ -3,12 +3,13 @@ package promptui
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/aireactdeps/promptui/list"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/aireactdeps/promptui/screenbuf"
 	"io"
 	"os"
 	"text/tabwriter"
 	"text/template"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/aireactdeps/promptui/list"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/aireactdeps/promptui/screenbuf"
 
 	"github.com/chzyer/readline"
 )

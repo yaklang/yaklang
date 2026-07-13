@@ -1,14 +1,15 @@
 package implement
 
 import (
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/rpa/captcha"
-	"github.com/yaklang/yaklang/common/rpa/core"
-	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/rpa/captcha"
+	"github.com/yaklang/yaklang/common/rpa/core"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/input"
@@ -71,14 +72,14 @@ func (r *Runner) init() error {
 		r.timeout = 30
 	}
 	launch := launcher.New().Set("ignore-certificate-errors")
-	
+
 	// 在 Windows 上防止 Chrome 创建桌面快捷方式
 	if strings.Contains(runtime.GOOS, "windows") {
 		launch = launch.Set("no-first-run", "")
 		launch = launch.Set("no-default-browser-check", "")
 		launch = launch.Set("disable-default-apps", "")
 	}
-	
+
 	wsUrl, _ := launch.Launch()
 	browser := rod.New().ControlURL(wsUrl)
 	err := browser.Connect()

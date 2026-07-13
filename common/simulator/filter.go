@@ -3,11 +3,12 @@
 package simulator
 
 import (
+	"strings"
+
 	"github.com/go-rod/rod"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/maps"
-	"strings"
 )
 
 func CalculateRelevanceMatrix(elements rod.Elements, elementTypes []string) (map[string]*rod.Element, error) {

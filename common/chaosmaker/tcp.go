@@ -73,7 +73,7 @@ func (t *tcpGenerator) generator(count int) {
 			return
 		}
 		toClient := t.originRule.ContentRuleConfig.Flow != nil && t.originRule.ContentRuleConfig.Flow.ToClient
-		flow := MockCompleteTCPFlow(raw, toClient,1500)
+		flow := MockCompleteTCPFlow(raw, toClient, 1500)
 		for _, f := range flow {
 			t.out <- f
 		}

@@ -4,15 +4,6 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"github.com/yaklang/yaklang/common/urfavecli"
-	"github.com/yaklang/yaklang/common/fp"
-	"github.com/yaklang/yaklang/common/fp/cmd/scanfpcmd"
-	"github.com/yaklang/yaklang/common/fp/webfingerprint"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/pcapx/arpx"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/netutil"
-	"gopkg.in/yaml.v3"
 	"net/http"
 	"net/url"
 	"os"
@@ -21,6 +12,16 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/yaklang/yaklang/common/fp"
+	"github.com/yaklang/yaklang/common/fp/cmd/scanfpcmd"
+	"github.com/yaklang/yaklang/common/fp/webfingerprint"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/pcapx/arpx"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/netutil"
+	"gopkg.in/yaml.v3"
 )
 
 var (

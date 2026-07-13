@@ -2,12 +2,13 @@ package diagnosticwriter
 
 import (
 	"fmt"
-	"golang.org/x/exp/maps"
 	"io"
 	"sort"
 	"strconv"
 	"strings"
 	"unicode"
+
+	"golang.org/x/exp/maps"
 
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/ast"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/diagnostics"

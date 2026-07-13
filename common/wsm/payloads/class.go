@@ -2,10 +2,11 @@ package payloads
 
 import (
 	"encoding/base64"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"math/rand"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 var CLASS_NAMES = []string{

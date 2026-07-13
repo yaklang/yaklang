@@ -2,7 +2,7 @@ package yso
 
 import (
 	"github.com/samber/lo"
-	"github.com/yaklang/javajive/classparser"
+	javaclassparser "github.com/yaklang/javajive/classparser"
 	"github.com/yaklang/javajive/classparser/decompiler/core"
 )
 

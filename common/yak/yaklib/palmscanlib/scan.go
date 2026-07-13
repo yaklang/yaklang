@@ -2,9 +2,11 @@ package palmscanlib
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
-	"net/http"
+
 	//"palm/common/hybridscan"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/subdomain"

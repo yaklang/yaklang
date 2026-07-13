@@ -3,18 +3,19 @@ package crawlerx
 import (
 	"bytes"
 	"context"
-	"github.com/go-rod/rod"
-	"github.com/go-rod/rod/lib/proto"
-	"github.com/go-rod/rod/lib/utils"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/ysmood/gson"
 	"io"
 	"net/http"
 	"net/url"
 	"reflect"
 	"regexp"
 	"strings"
+
+	"github.com/go-rod/rod"
+	"github.com/go-rod/rod/lib/proto"
+	"github.com/go-rod/rod/lib/utils"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/ysmood/gson"
 )
 
 func NewBrowserHijackRequests(browser *rod.Browser) *CrawlerRouter {

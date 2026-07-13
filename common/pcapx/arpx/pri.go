@@ -2,12 +2,13 @@ package arpx
 
 import (
 	"fmt"
-	"github.com/yaklang/pcap"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"sort"
 	"strings"
+
+	"github.com/yaklang/pcap"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func _pcapInterfaceEqNetInterface(piface pcap.Interface, iface *net.Interface) bool {

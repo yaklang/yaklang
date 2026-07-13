@@ -3,12 +3,13 @@ package parsers
 import (
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var buildinOps = []string{"!==", "!=", "==", "=", "~="}

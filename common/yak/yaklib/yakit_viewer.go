@@ -246,14 +246,16 @@ func yakitStatusCard(id string, data interface{}, tags ...string) {
 // ```
 // // 在扫描循环中实时更新统计卡片，并用 tags 把卡片分组
 // total = 8; openPorts = 0; vulns = 0
-// for i = 0; i < total; i++ {
-//     openPorts += randn(0, 3)
-//     if randn(1, 100) > 80 { vulns++ }
-//     yakit.StatusCard("Scanned", sprintf("%d/%d", i + 1, total), "progress")
-//     yakit.StatusCard("Open Ports", openPorts, "stats")     // 相同 id 原地刷新
-//     yakit.StatusCard("Vulns",      vulns,     "stats")
-//     sleep(0.02)
-// }
+//
+//	for i = 0; i < total; i++ {
+//	    openPorts += randn(0, 3)
+//	    if randn(1, 100) > 80 { vulns++ }
+//	    yakit.StatusCard("Scanned", sprintf("%d/%d", i + 1, total), "progress")
+//	    yakit.StatusCard("Open Ports", openPorts, "stats")     // 相同 id 原地刷新
+//	    yakit.StatusCard("Vulns",      vulns,     "stats")
+//	    sleep(0.02)
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 func (c *YakitClient) StatusCard(id string, data interface{}, tags ...string) {

@@ -3,10 +3,11 @@ package hostsparser
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"strings"
+
+	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type hostsBlock interface {

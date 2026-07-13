@@ -1,9 +1,10 @@
 package mq
 
 import (
+	"io"
+
 	"github.com/pkg/errors"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"io"
 )
 
 type AmqpWriter struct {

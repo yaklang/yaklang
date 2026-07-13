@@ -1,9 +1,10 @@
 package utils
 
 import (
-	_ "github.com/yaklang/yaklang/common/utils/arptable"
 	"net"
 	"strings"
+
+	_ "github.com/yaklang/yaklang/common/utils/arptable"
 )
 
 var (

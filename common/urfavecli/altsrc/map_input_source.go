@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 )
 
 // MapInputSource implements InputSourceContext to return

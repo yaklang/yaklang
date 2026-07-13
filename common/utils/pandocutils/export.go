@@ -3,13 +3,14 @@ package pandocutils
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"sync"
+
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"os"
-	"path/filepath"
-	"sync"
 )
 
 // SimpleConvertMarkdownFileToDocxContext 将 Markdown 文件转换为 docx 文件（带上下文）

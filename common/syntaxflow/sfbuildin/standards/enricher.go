@@ -16,13 +16,13 @@ var mappingsFS embed.FS
 
 // StandardMappings 标准映射配置
 type StandardMappings struct {
-	Version           string                       `yaml:"version"`
-	UpdatedAt         string                       `yaml:"updated_at"`
-	CWEToOWASP2021    map[string][]string          `yaml:"cwe_to_owasp_2021"`
-	CWEToOWASP2017    map[string][]string          `yaml:"cwe_to_owasp_2017"`
-	CWENames          map[string]string            `yaml:"cwe_names"`
-	FrameworkGroups   []FrameworkGroupDef          `yaml:"framework_groups"`
-	CWETop25_2023     []string                     `yaml:"cwe_top_25_2023"`
+	Version         string              `yaml:"version"`
+	UpdatedAt       string              `yaml:"updated_at"`
+	CWEToOWASP2021  map[string][]string `yaml:"cwe_to_owasp_2021"`
+	CWEToOWASP2017  map[string][]string `yaml:"cwe_to_owasp_2017"`
+	CWENames        map[string]string   `yaml:"cwe_names"`
+	FrameworkGroups []FrameworkGroupDef `yaml:"framework_groups"`
+	CWETop25_2023   []string            `yaml:"cwe_top_25_2023"`
 }
 
 // FrameworkGroupDef 框架分组定义
@@ -40,9 +40,9 @@ type RuleMetadataEnricher struct {
 }
 
 var (
-	globalEnricher     *RuleMetadataEnricher
-	enricherInitOnce   sync.Once
-	enricherInitError  error
+	globalEnricher    *RuleMetadataEnricher
+	enricherInitOnce  sync.Once
+	enricherInitError error
 )
 
 // GetGlobalEnricher 获取全局单例增强器

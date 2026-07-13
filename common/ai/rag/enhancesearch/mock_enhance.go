@@ -2,6 +2,7 @@ package enhancesearch
 
 import (
 	"context"
+
 	"github.com/yaklang/yaklang/common/utils"
 )
 

@@ -2,12 +2,13 @@ package scanfpcmd
 
 import (
 	"context"
+	"os"
+
 	"github.com/olekukonko/tablewriter"
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/log"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bruteutils"
-	"os"
 )
 
 var BruteUtil = cli.Command{

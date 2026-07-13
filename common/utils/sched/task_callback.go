@@ -1,8 +1,9 @@
 package sched
 
 import (
-	"github.com/pkg/errors"
 	"sync"
+
+	"github.com/pkg/errors"
 )
 
 var (

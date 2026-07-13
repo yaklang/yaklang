@@ -1,9 +1,10 @@
 package comparer
 
 import (
+	"net/http"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
-	"net/http"
 )
 
 func compareCookies(c1, c2 []*http.Cookie) float64 {

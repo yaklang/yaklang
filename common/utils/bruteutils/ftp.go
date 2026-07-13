@@ -2,6 +2,7 @@ package bruteutils
 
 import (
 	"errors"
+
 	"github.com/jlaffaye/ftp"
 )
 

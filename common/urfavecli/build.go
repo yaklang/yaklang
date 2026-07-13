@@ -14,7 +14,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 )
 
 var packages = []string{"cli", "altsrc"}

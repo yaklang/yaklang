@@ -1,12 +1,13 @@
 package stdinsys
 
 import (
-	"github.com/segmentio/ksuid"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/segmentio/ksuid"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type StdinSys struct {

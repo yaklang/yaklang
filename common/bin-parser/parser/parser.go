@@ -1,11 +1,12 @@
 package parser
 
 import (
-	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	"io"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 )
 
 func ParseBinaryWithConfig(data io.Reader, rule string, config map[string]any, keys ...string) (*base.Node, error) {

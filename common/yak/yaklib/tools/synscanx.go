@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/synscanx"
@@ -25,9 +26,11 @@ import (
 // // 对本机常见端口做 SYN 扫描，遍历结果管道逐个打印开放端口
 // res, err = synscan.Scan("127.0.0.1", "22,80,443,3306,8080-8090")
 // die(err) // 启动失败(如缺少权限)时停止脚本
-// for result := range res {
-//     result.Show() // 打印 OPEN: host:port from synscan
-// }
+//
+//	for result := range res {
+//	    result.Show() // 打印 OPEN: host:port from synscan
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 //
@@ -36,9 +39,11 @@ import (
 // // SYN 扫描是批量发包后统一等待回包，wait 设置等待秒数(网络差可调大以减少漏报)
 // res, err = synscan.Scan("192.168.1.1/24", "1-65535", synscan.wait(5))
 // die(err)
-// for result := range res {
-//     println(f"open: ${result.Host}:${result.Port}")
-// }
+//
+//	for result := range res {
+//	    println(f"open: ${result.Host}:${result.Port}")
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 //
@@ -46,14 +51,18 @@ import (
 // ```
 // // 控制发包速率，并把开放端口写入文件，每行带 tcp:// 前缀便于后续处理
 // res, err = synscan.Scan("10.0.0.0/24", "80,443",
-//     synscan.rateLimit(1, 1000),          // 每 1 毫秒最多发送 1000 个包
-//     synscan.outputFile("open_ports.txt"),
-//     synscan.outputPrefix("tcp://"),
+//
+//	synscan.rateLimit(1, 1000),          // 每 1 毫秒最多发送 1000 个包
+//	synscan.outputFile("open_ports.txt"),
+//	synscan.outputPrefix("tcp://"),
+//
 // )
 // die(err)
-// for result := range res {
-//     result.Show()
-// }
+//
+//	for result := range res {
+//	    result.Show()
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 func _scanx(targets string, ports string, opts ...synscanx.SynxConfigOption) (chan *synscan.SynScanResult, error) {
@@ -81,9 +90,11 @@ func _scanx(targets string, ports string, opts ...synscanx.SynxConfigOption) (ch
 // die(err)
 // res, err = synscan.ScanFromPing(pingResult, "22,80,443,3389")
 // die(err)
-// for result := range res {
-//     result.Show()
-// }
+//
+//	for result := range res {
+//	    result.Show()
+//	}
+//
 // ```
 // <|EXAMPLE_END|>
 func _scanxFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...synscanx.SynxConfigOption) (chan *synscan.SynScanResult, error) {

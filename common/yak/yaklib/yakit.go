@@ -223,8 +223,8 @@ func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
 		"SetProgress":    client.YakitSetProgress,
 		"SetProgressEx":  client.YakitSetProgressEx,
 		"Stream":         client.Stream,
-		"SSAStream":     client.SSAStream,
-		"EmitSSAResult": client.EmitSSAResult,
+		"SSAStream":      client.SSAStream,
+		"EmitSSAResult":  client.EmitSSAResult,
 	}
 	if os.Getenv("YAK_DISABLE") == "output" {
 		// YakitExports["Info"] = func(a string, b ...interface{}) {}
@@ -283,10 +283,12 @@ func (c *YakitClient) EnableWebsiteTrees(targets string) {
 // // 实时端口扫描结果表：声明表 -> 边扫边写行（需在 Yakit 引擎环境下展示）
 // yakit.EnableTable("Port Result", ["host", "port", "service"])
 // findings = [["10.0.0.1", "80", "http"], ["10.0.0.1", "443", "https"], ["10.0.0.2", "22", "ssh"]]
-// for f in findings {
-//     yakit.TableData("Port Result", {"host": f[0], "port": f[1], "service": f[2]})
-//     yakit.Info("found %s:%s", f[0], f[1])
-// }
+//
+//	for f in findings {
+//	    yakit.TableData("Port Result", {"host": f[0], "port": f[1], "service": f[2]})
+//	    yakit.Info("found %s:%s", f[0], f[1])
+//	}
+//
 // ```
 func (c *YakitClient) EnableTable(tableName string, columns []string) {
 	c.Output(&YakitFeature{
@@ -770,9 +772,11 @@ type YakitTable struct {
 // // 把一批端口扫描结果汇总成一张表并展示（建表->逐行追加->输出 联动）
 // table = yakit.NewTable("Host", "Port", "Service")
 // rows = [["10.0.0.1", "80", "http"], ["10.0.0.1", "443", "https"], ["10.0.0.2", "22", "ssh"]]
-// for r in rows {
-//     table.Append(r[0], r[1], r[2])
-// }
+//
+//	for r in rows {
+//	    table.Append(r[0], r[1], r[2])
+//	}
+//
 // yakit.Output(table)
 // yakit.Info("rendered %d rows", len(rows))
 // ```
@@ -995,9 +999,11 @@ func NewLineGraph(graphName ...string) *YakitGraph {
 // // 联动：统计一批端口结果里各端口出现的次数，用柱状图对比
 // scanned = ["80", "443", "80", "22", "80", "443"]
 // counter = {}
-// for port in scanned {
-//     if port in counter { counter[port] = counter[port] + 1 } else { counter[port] = 1 }
-// }
+//
+//	for port in scanned {
+//	    if port in counter { counter[port] = counter[port] + 1 } else { counter[port] = 1 }
+//	}
+//
 // graph = yakit.NewBarGraph("ports distribution")
 // for p, c in counter { graph.Add(p, c) }
 // yakit.Output(graph)
@@ -1301,12 +1307,15 @@ func (c *YakitClient) YakitFile(fileName string, option ...interface{}) {
 // Example:
 // ```
 // // 捕获异常并把错误信息上报到 Yakit
-// try {
-//     rsp, req = poc.Get("http://127.0.0.1:1/", poc.timeout(1))~   // 故意失败
-//     yakit.Info("status: %v", rsp.RawPacket)
-// } catch err {
-//     yakit.Error("request failed: %v", err)
-// }
+//
+//	try {
+//	    rsp, req = poc.Get("http://127.0.0.1:1/", poc.timeout(1))~   // 故意失败
+//	    yakit.Info("status: %v", rsp.RawPacket)
+//	} catch err {
+//
+//	    yakit.Error("request failed: %v", err)
+//	}
+//
 // ```
 func (c *YakitClient) YakitError(tmp string, items ...interface{}) {
 	c.YakitLog("error", tmp, items...)
@@ -1339,10 +1348,12 @@ func (c *YakitClient) YakitError(tmp string, items ...interface{}) {
 // ```
 // // 插件里最常见的写法：一边查询一边汇报
 // total = 0
-// for u in db.QueryUrlsByKeyword("example.com") {
-//     total++
-//     yakit.Info("found url: %s", u)
-// }
+//
+//	for u in db.QueryUrlsByKeyword("example.com") {
+//	    total++
+//	    yakit.Info("found url: %s", u)
+//	}
+//
 // yakit.Info("collected %d urls in total", total)
 // ```
 // <|EXAMPLE_END|>
@@ -1381,13 +1392,15 @@ func (c *YakitClient) YakitDebug(tmp string, items ...interface{}) {
 // Example:
 // ```
 // // 对单个目标做容错时，用 Warn 记录被跳过的原因而不中断整体流程
-// for host in ["10.0.0.1", "10.0.0.2"] {
-//     if host == "10.0.0.2" {
-//         yakit.Warn("target %s unreachable, skipped", host)
-//         continue
-//     }
-//     yakit.Info("processing %s", host)
-// }
+//
+//	for host in ["10.0.0.1", "10.0.0.2"] {
+//	    if host == "10.0.0.2" {
+//	        yakit.Warn("target %s unreachable, skipped", host)
+//	        continue
+//	    }
+//	    yakit.Info("processing %s", host)
+//	}
+//
 // ```
 func (c *YakitClient) YakitWarn(tmp string, items ...interface{}) {
 	c.YakitLog("warn", tmp, items...)
@@ -1528,11 +1541,13 @@ func updateYakitStore() error {
 // Example:
 // ```
 // // 维护两条独立进度条，分别表示两个阶段的进度
-// for i = 0; i < 5; i++ {
-//     yakit.SetProgressEx("port-scan",   float(i + 1) / 5.0)
-//     yakit.SetProgressEx("fingerprint", float(i + 1) / 10.0)
-//     sleep(0.05)
-// }
+//
+//	for i = 0; i < 5; i++ {
+//	    yakit.SetProgressEx("port-scan",   float(i + 1) / 5.0)
+//	    yakit.SetProgressEx("fingerprint", float(i + 1) / 10.0)
+//	    sleep(0.05)
+//	}
+//
 // yakit.SetProgressEx("port-scan", 1.0)
 // ```
 func (c *YakitClient) YakitSetProgressEx(id string, f float64) {
@@ -1557,10 +1572,12 @@ func (c *YakitClient) YakitSetProgressEx(id string, f float64) {
 // ```
 // // 在循环中按 已完成/总数 刷新主进度条，结束时置满
 // targets = ["10.0.0.1", "10.0.0.2", "10.0.0.3", "10.0.0.4"]
-// for i = 0; i < len(targets); i++ {
-//     yakit.Info("scanning %s", targets[i])
-//     yakit.SetProgress(float(i + 1) / float(len(targets)))
-// }
+//
+//	for i = 0; i < len(targets); i++ {
+//	    yakit.Info("scanning %s", targets[i])
+//	    yakit.SetProgress(float(i + 1) / float(len(targets)))
+//	}
+//
 // yakit.SetProgress(1.0)
 // yakit.Success("scan completed")
 // ```

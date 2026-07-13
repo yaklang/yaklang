@@ -5,8 +5,9 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
-	"github.com/xdg-go/pbkdf2"
 	"hash"
+
+	"github.com/xdg-go/pbkdf2"
 )
 
 const DefaultPBKDF2Iterations = 10000

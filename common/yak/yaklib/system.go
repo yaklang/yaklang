@@ -1,10 +1,11 @@
 package yaklib
 
 import (
-	"github.com/yaklang/yaklang/common/utils/sysproc"
 	"net"
 	"os"
 	"runtime"
+
+	"github.com/yaklang/yaklang/common/utils/sysproc"
 
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"

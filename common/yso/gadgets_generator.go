@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/yaklang/javajive/classparser"
+	javaclassparser "github.com/yaklang/javajive/classparser"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yserx"
@@ -1066,16 +1066,18 @@ func GetSimplePrincipalCollectionJavaObject() (*JavaObject, error) {
 // Example:
 // ```
 // allGadgets = yso.GetAllGadget()
-// for _, gadget := range allGadgets {
-//     // 每个元素都是 gadget 生成函数：模板型接收 ...GenClassOptionFun，命令型接收命令字符串。
-//     // 此处演示模板型调用，命令型可改为 gadget("whoami")。
-//     obj, err := gadget(yso.useRuntimeExecEvilClass("whoami"))
-//     if err != nil {
-//         continue
-//     }
-//     objBytes, _ = yso.ToBytes(obj)
-//     // 发送 objBytes
-// }
+//
+//	for _, gadget := range allGadgets {
+//	    // 每个元素都是 gadget 生成函数：模板型接收 ...GenClassOptionFun，命令型接收命令字符串。
+//	    // 此处演示模板型调用，命令型可改为 gadget("whoami")。
+//	    obj, err := gadget(yso.useRuntimeExecEvilClass("whoami"))
+//	    if err != nil {
+//	        continue
+//	    }
+//	    objBytes, _ = yso.ToBytes(obj)
+//	    // 发送 objBytes
+//	}
+//
 // ```
 func GetAllGadget() []interface{} {
 	var allGadget []any

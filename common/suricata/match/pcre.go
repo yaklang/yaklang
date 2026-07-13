@@ -1,10 +1,11 @@
 package match
 
 import (
+	"time"
+
 	regexp2 "github.com/VillanCh/go-pcre2-lite/regexp2"
 	"github.com/yaklang/yaklang/common/suricata/data"
 	"github.com/yaklang/yaklang/common/suricata/rule"
-	"time"
 )
 
 func init() {

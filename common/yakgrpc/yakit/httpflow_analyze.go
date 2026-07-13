@@ -1,11 +1,12 @@
 package yakit
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"gorm.io/gorm"
-	"strings"
 )
 
 func HandleAnalyzedHTTPFlowsColorAndTag(db *gorm.DB, flow *schema.HTTPFlow, color string, extraTag ...string) error {

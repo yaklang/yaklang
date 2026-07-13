@@ -3,7 +3,7 @@ package altsrc
 import (
 	"time"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 )
 
 // InputSourceContext is an interface used to allow

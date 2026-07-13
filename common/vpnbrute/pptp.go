@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"net"
+	"time"
+
 	"github.com/gopacket/gopacket"
 	binparser "github.com/yaklang/yaklang/common/bin-parser"
 	"github.com/yaklang/yaklang/common/bin-parser/parser"
@@ -16,8 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/netutil"
 	"github.com/yaklang/yaklang/common/vpnbrute/ppp"
 	"golang.org/x/exp/rand"
-	"net"
-	"time"
 )
 
 var (

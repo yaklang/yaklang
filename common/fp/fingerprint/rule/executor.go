@@ -3,12 +3,13 @@ package rule
 import (
 	"errors"
 	"fmt"
+	"regexp"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"regexp"
-	"strings"
 )
 
 type OpFlag string

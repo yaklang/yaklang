@@ -3,14 +3,15 @@ package webextractor
 import (
 	"errors"
 	"fmt"
+	"regexp"
+	"strings"
+	"time"
+
 	"github.com/PuerkitoBio/goquery"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"golang.org/x/net/html"
-	"regexp"
-	"strings"
-	"time"
 )
 
 func ExtractPageLowhttp(url string) (string, error) {

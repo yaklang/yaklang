@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/ai/rag/generate_index_tool"
-	"github.com/yaklang/yaklang/common/urfavecli"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 
 	_ "github.com/yaklang/yaklang/common/ai/aid"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact"

@@ -4,6 +4,10 @@ package simulator
 
 import (
 	"context"
+	"runtime"
+	"strings"
+	"time"
+
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/cdp"
 	"github.com/go-rod/rod/lib/launcher"
@@ -13,9 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"runtime"
-	"strings"
-	"time"
 )
 
 type BrowserStarter struct {
@@ -92,14 +93,14 @@ func (starter *BrowserStarter) doLaunch(l *launcher.Launcher) *launcher.Launcher
 		l = l.Proxy(starter.config.proxy.String())
 	}
 	l = l.NoSandbox(true).Set(flags.Headless, "new").Set("disable-features", "HttpsUpgrades")
-	
+
 	// 在 Windows 上防止 Chrome 创建桌面快捷方式
 	if strings.Contains(runtime.GOOS, "windows") {
 		l = l.Set("no-first-run", "")
 		l = l.Set("no-default-browser-check", "")
 		l = l.Set("disable-default-apps", "")
 	}
-	
+
 	if starter.config.leakless == LeaklessOff {
 		l = l.Leakless(false)
 	} else if starter.config.leakless == LeaklessDefault && strings.Contains(runtime.GOOS, "windows") {

@@ -3,10 +3,11 @@ package utils
 import (
 	"bytes"
 	"errors"
-	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
-	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 	"reflect"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
+	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 )
 
 func NodeToStruct(node *base.Node, v any) error {

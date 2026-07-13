@@ -2,13 +2,14 @@ package yakgrpc
 
 import (
 	"context"
+	"strconv"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"strings"
 )
 
 func (s *Server) AddToNavigation(ctx context.Context, req *ypb.AddToNavigationRequest) (*ypb.Empty, error) {
