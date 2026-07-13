@@ -256,6 +256,11 @@ func TestMarshalInputSchema_StructArrayOptionalRequiredOmitted(t *testing.T) {
 	itemSchema, ok := itemsSchema["items"].(map[string]any)
 	require.True(t, ok, "items.items should be object schema")
 
+	itemProperties, ok := itemSchema["properties"].(map[string]any)
+	require.True(t, ok, "items.items.properties should be object")
+	_, hasName := itemProperties["name"]
+	require.True(t, hasName, "items.items.properties should contain name")
+
 	_, hasRequired := itemSchema["required"]
 	require.False(t, hasRequired, "array item required should be omitted when empty")
 }

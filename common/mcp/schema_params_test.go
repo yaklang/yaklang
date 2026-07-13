@@ -14,6 +14,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 // toolProps returns the flat map of property-name → schema-node for the named
@@ -64,11 +65,34 @@ func assertStructArrayProp(t *testing.T, toolName string, props map[string]map[s
 	items, _ := node["items"].(map[string]any)
 	require.NotNilf(t, items, "tool %q: %q.items must not be nil", toolName, paramName)
 
+	itemProps := schemaNodeProperties(items)
+	require.NotNilf(t, itemProps, "tool %q: %q.items.properties must not be nil", toolName, paramName)
+
 	for _, child := range childNames {
-		_, hasChild := items[child]
+		_, hasChild := itemProps[child]
 		assert.Truef(t, hasChild,
-			"tool %q: %q.items should contain child property %q", toolName, paramName, child)
+			"tool %q: %q.items.properties should contain child property %q", toolName, paramName, child)
 	}
+}
+
+func schemaNodeProperties(node map[string]any) map[string]any {
+	props := make(map[string]any)
+	raw := node["properties"]
+	switch p := raw.(type) {
+	case map[string]any:
+		return p
+	case *omap.OrderedMap[string, any]:
+		if p == nil {
+			return props
+		}
+		p.ForEach(func(k string, v any) bool {
+			if m, ok := v.(map[string]any); ok {
+				props[k] = m
+			}
+			return true
+		})
+	}
+	return props
 }
 
 // ---------------------------------------------------------------------------
