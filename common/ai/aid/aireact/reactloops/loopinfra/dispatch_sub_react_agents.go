@@ -113,20 +113,19 @@ func runForkedSubReactAgentJob(
 	// parent AI used to write every sub agent's full goal+contract up front —
 	// into a per-sub-agent step that runs with the forked timeline context and
 	// overlaps across the concurrently-dispatched sub agents.
-	var execErr error
+	var subAgentErr error
 	var elaboratedGoal, resultContract string
-	defer subTask.CallAsyncDeferCallback(execErr)
+	defer subTask.CallAsyncDeferCallback(subAgentErr)
 	subTask.SetStatus(aicommon.AITaskState_Processing)
-	elaboratedGoal, resultContract, execErr = elaborateSubReactAgentGoal(
+	elaboratedGoal, resultContract, subAgentErr = elaborateSubReactAgentGoal(
 		subTask.GetContext(), childInvoker, parentLoop, subTask.GetId(), job,
 	)
-	if execErr != nil {
-		log.Warnf("dispatch_sub_react_agents: elaborate goal for %s failed, falling back to brief intent: %v", subTask.GetId(), elabErr)
+	if subAgentErr != nil {
+		log.Warnf("dispatch_sub_react_agents: elaborate goal for %s failed, falling back to brief intent: %v", subTask.GetId(), subAgentErr)
 		elaboratedGoal = job.Goal
 		resultContract = ""
 	}
 	subTask.SetUserInput(buildSubAgentUserInput(elaboratedGoal, resultContract))
-
 
 	subLoop, err := reactloops.CreateLoopByName(loopName, childInvoker, buildSubReactLoopOptions()...)
 	if err != nil {
@@ -134,8 +133,8 @@ func runForkedSubReactAgentJob(
 		return result, nil
 	}
 
-	execErr = subLoop.ExecuteWithExistedTask(subTask)
-	result, _ := buildSubReactJobResult(job, startedAt, subTask, subLoop, fork, execErr)
+	subAgentErr = subLoop.ExecuteWithExistedTask(subTask)
+	result, _ := buildSubReactJobResult(job, startedAt, subTask, subLoop, fork, subAgentErr)
 	return result, nil
 }
 
@@ -546,25 +545,20 @@ func handleDispatchSubReactAgents(
 
 	var feedbackLines []string
 	successCount := 0
-	cancelledCount := 0
 	for _, result := range results {
 		if result == nil {
 			continue
 		}
-		switch result.Record.Status {
-		case "completed":
+		if result.Record.Status == "completed" {
 			successCount++
-		case "cancelled":
-			cancelledCount++
 		}
 		writeSubReactAgentTimelineRecord(invoker, loop, result.Record)
 		feedbackLines = append(feedbackLines, result.Feedback)
 	}
 
-	failedCount := len(results) - successCount - cancelledCount
 	summary := fmt.Sprintf(
-		"Dispatched %d sub react agents: %d succeeded, %d failed, %d cancelled.",
-		len(results), successCount, failedCount, cancelledCount,
+		"Dispatched %d sub react agents: %d succeeded, %d failed.",
+		len(results), successCount, len(results)-successCount,
 	)
 	invoker.AddToTimeline("[DISPATCH_SUB_REACT_AGENTS_DONE]", summary)
 	loopInfraActionFinish(loop, loopInfraNodeSubReactReport, summary)
