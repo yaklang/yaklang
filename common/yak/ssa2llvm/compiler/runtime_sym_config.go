@@ -14,17 +14,19 @@ func effectiveRandomizeRuntimeSymbols(cfg *CompileConfig) bool {
 	}
 	p := cfg.resolvedProfile
 	if p == nil {
-		// No --profile: keep legacy stable runtime symbols (tests, quick compiles).
+		// No --profile: keep stable runtime symbols (tests, quick compiles).
 		return false
 	}
-	if p.LinkPrep == nil {
-		// Profile loaded but link_prep omitted: default on for fingerprinting.
-		return true
-	}
-	if p.LinkPrep.RandomizeRuntimeSymbols == nil {
-		return true
-	}
-	return *p.LinkPrep.RandomizeRuntimeSymbols
+	// Runtime symbol randomization (link_prep) rewrites the embedded runtime
+	// archive's symbols using the host binutils (ar/objcopy/nm). That is a
+	// host-toolchain dependency incompatible with the zero-dependency
+	// self-contained build, which is now the only build mode. It is therefore
+	// disabled: obfuscation transforms (callret/virtualize/mba/...) from a
+	// profile still apply, but the runtime symbols are not randomized. The
+	// linkprep package and the profile LinkPrep config are retained for a future
+	// build mode that can assume host binutils.
+	_ = p.LinkPrep
+	return false
 }
 
 func finalizeRuntimeSymManifest(cfg *CompileConfig) error {

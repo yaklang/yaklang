@@ -1,5 +1,3 @@
-//go:build selfcontained
-
 package compiler
 
 import (
@@ -31,6 +29,12 @@ func cacheToolKeyPart(cfg *CompileConfig, write func(string)) {
 	add("libc=" + m.Libc)
 	add("libgcc=" + m.Libgcc)
 	add("libgcc_eh=" + m.LibgccEh)
+	// Include the variable set of extra cgo C static libraries (libpcap.a, ...)
+	// so the cache key reflects which module deps are embedded. extdepManifest is
+	// generated in stable order by build_runtime_embed.sh.
+	for _, ed := range assets.ExtdepManifest() {
+		add("extdep:" + ed.Name + "=" + ed.Sha)
+	}
 	write("embeddedRuntime=" + hex.EncodeToString(h.Sum(nil)))
 	write("llvm=18.1.3-selfcontained")
 }
