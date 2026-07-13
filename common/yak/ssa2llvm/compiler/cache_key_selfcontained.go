@@ -37,4 +37,7 @@ func cacheToolKeyPart(cfg *CompileConfig, write func(string)) {
 	}
 	write("embeddedRuntime=" + hex.EncodeToString(h.Sum(nil)))
 	write("llvm=18.1.3-selfcontained")
+	// Reflect the link-time options applied by CompileObjectToBinarySC so a
+	// change in stripping/gc-sections/icf invalidates cached artifacts.
+	write("linkOpts=gc-sections+icf-safe+strip")
 }

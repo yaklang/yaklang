@@ -87,6 +87,14 @@ func CompileObjectToBinarySC(objFile, binFile, workDir string, obfArchives []str
 	// the runtime + system libs so mutual references resolve regardless of order.
 	archives = append(archives, rp.ExtDeps...)
 
+	linkArgs := append([]string{}, extraArgs...)
+	// Link-time size reduction (no libyak.a change): drop unreferenced
+	// sections, fold identical functions, and strip debug info + the symbol
+	// table. The Go c-archive puts each object's code in a single .text, so
+	// gc-sections mainly reclaims unused C/cgo + libgcc code; stripping removes
+	// DWARF/symtab. Safe for a static AOT executable (Go reflection uses its own
+	// rodata itab/typelinks, not the ELF symtab).
+	linkArgs = append(linkArgs, "--gc-sections", "--icf=safe", "-s")
 	in := llvm.StaticLinkInput{
 		ObjectPath: objFile,
 		Archives:   archives,
@@ -94,7 +102,7 @@ func CompileObjectToBinarySC(objFile, binFile, workDir string, obfArchives []str
 		CRTEnd:     []string{rp.CrtEnd, rp.Crtn},
 		SystemLibs: []string{rp.Libc, rp.Libgcc, rp.LibgccEh},
 		OutputPath: binFile,
-		ExtraArgs:  extraArgs,
+		ExtraArgs:  linkArgs,
 	}
 	trace.PrintLink("ld.lld (in-process)", llvm.StaticLinkArgs(in))
 	if err := llvm.LinkExecutableStatic(in); err != nil {
