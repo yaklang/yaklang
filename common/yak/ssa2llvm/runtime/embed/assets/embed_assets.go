@@ -1,12 +1,9 @@
-//go:build selfcontained
-
 package assets
 
-import _ "embed"
+import "embed"
 
 // Embedded assets populated by scripts/build_runtime_embed.sh. The files must
-// exist in this directory at build time (run the script before
-// `go build -tags=selfcontained`).
+// exist in this directory at build time (run the script before building ssa2llvm).
 
 //go:embed libyak.a
 var embeddedLibyak []byte
@@ -37,6 +34,15 @@ var embeddedLibgcc []byte
 
 //go:embed libgcc_eh.a
 var embeddedLibgccEh []byte
+
+// embeddedExtDeps holds the extra cgo C static libraries (libpcap.a, libm.a,
+// libresolv.a, ...) that the registered yaklib modules pull in. The set is
+// variable (depends on SSA2LLVM_EMBED_MODULES), so the whole extdeps/ directory
+// is embedded; extdepManifest (generated alongside EmbeddedManifest) lists which
+// members to release/link and their SHA256. Populated by build_runtime_embed.sh.
+//
+//go:embed extdeps
+var embeddedExtDeps embed.FS
 
 // EmbeddedAvailable is true when the real embedded assets are compiled in.
 const EmbeddedAvailable = true

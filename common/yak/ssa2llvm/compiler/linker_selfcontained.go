@@ -1,5 +1,3 @@
-//go:build selfcontained
-
 package compiler
 
 import (
@@ -11,9 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/trace"
 )
 
-// This file provides the self-contained compile + link backend used when ssa2llvm
-// is built with -tags=selfcontained. It replaces the llc/clang subprocess calls
-// (compiler/linker.go, build tag !selfcontained) with in-process go-llvm
+// This file provides the compile + link backend: in-process go-llvm
 // TargetMachine emission (replacing llc) and in-process lld linking of the
 // embedded runtime archives + crt + static libc (replacing clang). The result is
 // a portable, fully-static AOT executable produced with zero external toolchain
@@ -82,9 +78,14 @@ func CompileObjectToBinarySC(objFile, binFile, workDir string, obfArchives []str
 	if err != nil {
 		return err
 	}
-	archives := make([]string, 0, 2+len(obfArchives))
+	archives := make([]string, 0, 2+len(obfArchives)+len(rp.ExtDeps))
 	archives = append(archives, rp.Libyak, rp.Libgc)
 	archives = append(archives, obfArchives...)
+	// Extra cgo C static libraries the registered yaklib modules pull in (e.g.
+	// libpcap.a for poc, libm.a, libresolv.a). They are embedded (see assets) so
+	// the link stays zero-host-dependency. They go inside the --start-group with
+	// the runtime + system libs so mutual references resolve regardless of order.
+	archives = append(archives, rp.ExtDeps...)
 
 	in := llvm.StaticLinkInput{
 		ObjectPath: objFile,

@@ -1,5 +1,3 @@
-//go:build selfcontained
-
 package compiler
 
 import (
@@ -37,9 +35,9 @@ func resolveDiskRuntimeArchive(cfg *CompileConfig) (string, error) {
 func prepareAndLinkBinary(comp *Compiler, finalLL, outputFile string, cfg *CompileConfig) (string, []string, error) {
 	// Runtime symbol randomization (profile link_prep) needs external ar/objcopy/nm
 	// (see linkprep/archive.go), which is incompatible with the zero-dep self-contained
-	// mode. It is supported in the legacy build (without -tags=selfcontained).
+	// mode and is therefore not supported.
 	if len(cfg.RuntimeSymManifest) > 0 {
-		return "", nil, fmt.Errorf("runtime symbol randomization is not supported in self-contained mode; rebuild ssa2llvm without -tags=selfcontained to use profiles with link_prep")
+		return "", nil, fmt.Errorf("runtime symbol randomization (link_prep) is not supported in the zero-dependency self-contained mode")
 	}
 	objPath := filepath.Join(cfg.WorkDir, "ssa2llvm-out.o")
 	if err := CompileModuleToObjectSC(comp.Mod, objPath); err != nil {
