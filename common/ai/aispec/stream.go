@@ -931,13 +931,26 @@ func handleResponsesSSEEvent(event map[string]any, outWriter io.Writer, reasonWr
 		}
 		delta := utils.MapGetString(event, "delta")
 		if delta != "" {
+			// Internal accumulation is kept for output_item.done / completed
+			// (non-stream) paths that need the full arguments snapshot.
 			tc.Function.Arguments += delta
 		}
 		if delta == "" {
 			return
 		}
 		if toolCallCallback != nil {
-			toolCallCallback([]*ToolCall{tc.Clone()})
+			// Feed the INCREMENTAL delta fragment to the callback, NOT the
+			// cumulative arguments. Downstream consumers (e.g. aibalance
+			// chat-completions writer) are built for OpenAI incremental
+			// tool_calls semantics and accumulate arguments themselves; feeding
+			// them the cumulative value caused double-accumulation and
+			// produced malformed JSON on the client (e.g. ZCode "Expected
+			// ':' after property name at position 4"). The clone carries only
+			// id/name + this delta's fragment as Arguments.
+			// 关键词: function_call_arguments.delta 增量语义, 避免双重累积
+			inc := tc.Clone()
+			inc.Function.Arguments = delta
+			toolCallCallback([]*ToolCall{inc})
 		} else {
 			outWriter.Write([]byte(delta))
 		}
