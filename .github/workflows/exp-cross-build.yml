@@ -56,8 +56,35 @@ jobs:
           name: raw_commit_message.txt
           path: /tmp/raw_commit_message.txt
 
-  build_and_upload_to_oss:
+  # Generate doc.gob.zst + codec.gob.zst once (OS-independent); matrix jobs download instead.
+  prepare_embed_docs:
     needs: check_commit_msg
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "./go.mod"
+          cache: false
+
+      - name: Generate Document
+        run: go run -gcflags=all="-N -l" common/yak/yakdoc/generate_doc/generate_doc.go common/yak/yakdoc/doc/doc.gob.zst
+
+      - name: Codec Methods Document
+        run: go run -gcflags=all="-N -l" common/yak/yaklib/codec/codegrpc/doc/codec_doc.go common/yak/yaklib/codec/codegrpc/codec.gob.zst
+
+      - name: Upload prepared embed docs
+        uses: actions/upload-artifact@v4
+        with:
+          name: yak-embed-docs
+          path: |
+            common/yak/yakdoc/doc/doc.gob.zst
+            common/yak/yaklib/codec/codegrpc/codec.gob.zst
+
+  build_and_upload_to_oss:
+    needs: [check_commit_msg, prepare_embed_docs]
     outputs:
       YAK_TAG: ${{ steps.get_tag.outputs.YAK_TAG}}
     strategy:
@@ -118,6 +145,11 @@ jobs:
     steps:
       # build
       - uses: actions/checkout@v2
+
+      - name: Download prepared embed docs
+        uses: actions/download-artifact@v4
+        with:
+          name: yak-embed-docs
 
       - name: Set up Go 1.x
         uses: actions/setup-go@v5
@@ -288,12 +320,6 @@ jobs:
       - name: Go module download (Linux)
         if: startsWith(matrix.os, 'linux')
         run: go mod download
-
-      - name: Generate Document
-        run: go run -gcflags=all="-N -l" common/yak/yakdoc/generate_doc/generate_doc.go common/yak/yakdoc/doc/doc.gob.zst
-
-      - name: Codec Methods Document
-        run: go run -gcflags=all="-N -l" common/yak/yaklib/codec/codegrpc/doc/codec_doc.go common/yak/yaklib/codec/codegrpc/codec.gob.zst
 
       - name: Sync Embed FS Hash to Code
         shell: bash
@@ -518,7 +544,7 @@ jobs:
           echo "build_slim=true" >> "$GITHUB_OUTPUT"
 
   build_slim_binaries:
-    needs: [check_commit_msg, resolve_slim_build]
+    needs: [check_commit_msg, resolve_slim_build, prepare_embed_docs]
     if: needs.resolve_slim_build.outputs.build_slim == 'true'
     strategy:
       fail-fast: false
@@ -536,6 +562,7 @@ jobs:
       build_type: yakslim
       ee: false
       sign: ${{ matrix.os == 'windows' || matrix.os == 'windows-arm64' }}
+      use_prepared_docs: true
     secrets: inherit
 
   upload_slim_binaries_to_oss:
