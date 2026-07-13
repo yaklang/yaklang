@@ -51,12 +51,22 @@ on:
         type: boolean
         description: whether to sign windows executable
         default: false 
+      use_prepared_docs:
+        type: boolean
+        description: download yak-embed-docs artifact instead of generating doc/codec locally
+        default: false
 
 jobs:
   build_and_upload_asset:
     runs-on: ${{ inputs.os == 'windows-arm64' && 'windows-11-arm' || ((inputs.os == 'windows' || inputs.os == 'windows7') && 'windows-latest') || (inputs.os == 'linux-amd64' && 'ubuntu-22.04') || (inputs.os == 'linux-arm64' && 'ubuntu-24.04-arm') || 'macos-14' }}
     steps:
       - uses: actions/checkout@v2
+
+      - name: Download prepared embed docs
+        if: inputs.use_prepared_docs
+        uses: actions/download-artifact@v4
+        with:
+          name: yak-embed-docs
       
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -233,9 +243,11 @@ jobs:
         run: go mod download
 
       - name: Generate Document
+        if: ${{ !inputs.use_prepared_docs }}
         run: go run -gcflags=all="-N -l" common/yak/yakdoc/generate_doc/generate_doc.go common/yak/yakdoc/doc/doc.gob.zst
 
       - name: Codec Methods Document
+        if: ${{ !inputs.use_prepared_docs }}
         run: go run -gcflags=all="-N -l" common/yak/yaklib/codec/codegrpc/doc/codec_doc.go common/yak/yaklib/codec/codegrpc/codec.gob.zst
 
       - name: Sync Embed FS Hash to Code
