@@ -197,7 +197,7 @@ jobs:
       - name: Get Repo tags
         shell: bash
         run: |
-          if [ -z "${YAK:-}" ] || [ ! -x "$YAK" ]; then
+          if [ -z "${YAK:-}" ] || [ ! -f "$YAK" ]; then
             echo "::error::YAK operator binary missing; OSS download step must succeed"
             exit 1
           fi
@@ -241,7 +241,7 @@ jobs:
       - name: Sync Embed FS Hash to Code
         shell: bash
         run: |
-          if [ -z "${YAK:-}" ] || [ ! -x "$YAK" ]; then
+          if [ -z "${YAK:-}" ] || [ ! -f "$YAK" ]; then
             echo "::error::YAK operator binary missing; OSS download step must succeed"
             exit 1
           fi
@@ -383,7 +383,7 @@ jobs:
       - name: Generate Checksums
         shell: bash
         run: |
-          if [ -z "${YAK:-}" ] || [ ! -x "$YAK" ]; then
+          if [ -z "${YAK:-}" ] || [ ! -f "$YAK" ]; then
             echo "::error::YAK operator binary missing; OSS download step must succeed"
             exit 1
           fi
