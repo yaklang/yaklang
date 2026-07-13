@@ -141,19 +141,19 @@ jobs:
       #     restore-keys: |
       #       go-modules-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
 
+      # Install to RUNNER_TEMP + export YAK=. Do NOT use sudo/~/.local/bin:
+      # Windows 11 ARM ships a disabled `sudo`; moving to ~/.local/bin then fails
+      # because the directory does not exist (amd64 often "works" only via
+      # continue-on-error + go build fallback).
       - name: Download Yak Binary (for repos-tag)
         id: download_yak
-        continue-on-error: true
         shell: bash
         run: |
           echo "::group::Downloading Yak binary from OSS"
-          
-          # 检测当前 runner 的操作系统和架构
-          # 我们需要下载与 runner 匹配的二进制，而不是与目标编译平台匹配的二进制
+
           RUNNER_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
           RUNNER_ARCH=$(uname -m)
-          
-          # 标准化 runner 架构名称
+
           if [ "$RUNNER_ARCH" = "x86_64" ]; then
             RUNNER_ARCH_NORM="amd64"
           elif [ "$RUNNER_ARCH" = "amd64" ]; then
@@ -163,135 +163,84 @@ jobs:
           else
             RUNNER_ARCH_NORM="$RUNNER_ARCH"
           fi
-          
-          # 标准化 runner OS 名称并构建二进制名称
+
           if [ "$RUNNER_OS" = "darwin" ]; then
-            RUNNER_OS_NORM="darwin"
-            BINARY_NAME="yak_darwin_${RUNNER_ARCH_NORM}"
-            # macOS 也尝试下载 amd64 版本（Rosetta 2 支持）
             BINARY_NAMES=("yak_darwin_${RUNNER_ARCH_NORM}" "yak_darwin_amd64")
           elif [ "$RUNNER_OS" = "linux" ]; then
-            RUNNER_OS_NORM="linux"
-            BINARY_NAME="yak_linux_${RUNNER_ARCH_NORM}"
             BINARY_NAMES=("yak_linux_${RUNNER_ARCH_NORM}")
           elif echo "$RUNNER_OS" | grep -qi "mingw\|msys\|cygwin"; then
-            RUNNER_OS_NORM="windows"
-            BINARY_NAME="yak_windows_${RUNNER_ARCH_NORM}.exe"
             BINARY_NAMES=("yak_windows_${RUNNER_ARCH_NORM}.exe")
           else
-            RUNNER_OS_NORM="$RUNNER_OS"
-            BINARY_NAME="yak_${RUNNER_OS_NORM}_${RUNNER_ARCH_NORM}"
-            BINARY_NAMES=("yak_${RUNNER_OS_NORM}_${RUNNER_ARCH_NORM}")
+            BINARY_NAMES=("yak_${RUNNER_OS}_${RUNNER_ARCH_NORM}")
           fi
-          
-          echo "Runner: $RUNNER_OS_NORM/$RUNNER_ARCH_NORM"
+
+          echo "Runner: $RUNNER_OS/$RUNNER_ARCH_NORM"
           echo "Will try to download binaries: ${BINARY_NAMES[*]}"
-          
-          # 尝试多个版本源：latest -> 从版本列表中获取第一个非 -yakit- 和 -irify- 的版本
+
           VERSIONS_TO_TRY=("latest")
-          
-          # 尝试从版本列表获取可用版本（排除 -yakit- 和 -irify-）
           if SELECTED_VERSION=$(bash ./scripts/get-yak-version.sh --quiet 2>/dev/null); then
-            # 如果找到合适的版本，添加到尝试列表
             if [ -n "$SELECTED_VERSION" ]; then
               echo "✅ Found suitable version: $SELECTED_VERSION"
               VERSIONS_TO_TRY+=("$SELECTED_VERSION")
             fi
           fi
-          
           echo "Will try versions: ${VERSIONS_TO_TRY[*]}"
-          
+
           YAK_OSS_BASE="https://yaklang.oss-accelerate.aliyuncs.com"
-          
-          # 依次尝试下载每个二进制名称和版本
+          INSTALL_DIR="${RUNNER_TEMP:-$HOME/.local/bin}"
+          mkdir -p "$INSTALL_DIR"
+
           for BINARY_NAME in "${BINARY_NAMES[@]}"; do
             for VERSION in "${VERSIONS_TO_TRY[@]}"; do
               DOWNLOAD_URL="${YAK_OSS_BASE}/yak/${VERSION}/${BINARY_NAME}"
               echo "Trying to download from: $DOWNLOAD_URL"
-              
-              # -# 输出进度条；stderr 保留在 CI 日志中便于排查
-              HTTP_CODE=$(curl -w "%{http_code}" -# -L "$DOWNLOAD_URL" -o yak)
+
+              HTTP_CODE=$(curl -w "%{http_code}" -# -L "$DOWNLOAD_URL" -o yak_dl)
               CURL_EXIT=$?
-              
-              # 检查 curl 是否成功
-              if [ $CURL_EXIT -ne 0 ]; then
-                echo "❌ curl failed with exit code: $CURL_EXIT"
-                rm -f yak
+              if [ $CURL_EXIT -ne 0 ] || [ "$HTTP_CODE" != "200" ]; then
+                echo "❌ download failed (curl=$CURL_EXIT http=$HTTP_CODE)"
+                rm -f yak_dl
                 continue
               fi
-              
-              # 检查 HTTP 状态码
-              if [ "$HTTP_CODE" != "200" ]; then
-                echo "❌ HTTP error: $HTTP_CODE"
-                rm -f yak
-                continue
-              fi
-              
-              # 检查文件是否存在且不为空
-              if [ ! -f "yak" ]; then
-                echo "❌ Downloaded file does not exist"
-                continue
-              fi
-              
-              if [ ! -s "yak" ]; then
+              if [ ! -s "yak_dl" ]; then
                 echo "❌ Downloaded file is empty"
-                rm -f yak
+                rm -f yak_dl
                 continue
               fi
-              
-              # 检查文件大小（至少应该大于 1MB）
-              FILE_SIZE=$(stat -f%z yak 2>/dev/null || stat -c%s yak 2>/dev/null || echo "0")
+
+              FILE_SIZE=$(stat -f%z yak_dl 2>/dev/null || stat -c%s yak_dl 2>/dev/null || echo "0")
               echo "Downloaded file size: ${FILE_SIZE} bytes"
               if [ "$FILE_SIZE" -lt 1048576 ]; then
                 echo "❌ Downloaded file is too small: ${FILE_SIZE} bytes (expected > 1MB)"
-                echo "File content (first 200 chars):"
-                head -c 200 yak | cat -A || true
-                rm -f yak
+                rm -f yak_dl
                 continue
               fi
-              
-              # 检查文件类型（应该是可执行文件）
-              FILE_TYPE=$(file yak 2>/dev/null || echo "unknown")
+
+              FILE_TYPE=$(file yak_dl 2>/dev/null || echo "unknown")
               echo "File type: $FILE_TYPE"
-              
-              # 设置执行权限
-              chmod +x yak || true
-              
-              # 验证二进制文件是否可执行
+
+              if [[ "$BINARY_NAME" == *.exe ]]; then
+                DEST="$INSTALL_DIR/yak.exe"
+              else
+                DEST="$INSTALL_DIR/yak"
+              fi
+              mv -f yak_dl "$DEST"
+              chmod +x "$DEST" || true
+
               echo "Verifying binary..."
-              VERSION_OUTPUT=$(./yak version 2>&1)
+              VERSION_OUTPUT=$("$DEST" version 2>&1)
               VERSION_EXIT=$?
-              
               if [ $VERSION_EXIT -ne 0 ]; then
                 echo "❌ Downloaded binary failed version check (exit code: $VERSION_EXIT)"
                 echo "Version command output: $VERSION_OUTPUT"
-                rm -f yak
+                rm -f "$DEST"
                 continue
               fi
-              
+
               echo "Version output: $VERSION_OUTPUT"
-              
-              # 将 yak 移动到 PATH 中，以便后续步骤可以直接使用 `yak` 命令
-              # 参考 diff-code-check.yml 的方式
-              if command -v sudo >/dev/null 2>&1; then
-                sudo mv yak /usr/local/bin/yak || sudo mv yak /usr/bin/yak || mv yak ~/.local/bin/yak
-              else
-                mv yak /usr/local/bin/yak 2>/dev/null || mv yak /usr/bin/yak 2>/dev/null || mv yak ~/.local/bin/yak
-              fi
-              
-              # 确保 yak 在 PATH 中
-              if ! command -v yak >/dev/null 2>&1; then
-                export PATH="$HOME/.local/bin:$PATH"
-              fi
-              
-              # 最终验证
-              if ! yak version >/dev/null 2>&1; then
-                echo "❌ Yak installation verification failed after moving to PATH"
-                rm -f /usr/local/bin/yak /usr/bin/yak ~/.local/bin/yak 2>/dev/null || true
-                continue
-              fi
-              
-              echo "✅ Successfully downloaded yak from version: $VERSION (file size: ${FILE_SIZE} bytes)"
+              echo "YAK=$DEST" >> "$GITHUB_ENV"
+              echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+              echo "✅ Successfully downloaded yak from version: $VERSION -> $DEST"
               echo "yak_downloaded=true" >> "$GITHUB_OUTPUT"
               echo "yak_version=$VERSION" >> "$GITHUB_OUTPUT"
               echo "yak_binary=$BINARY_NAME" >> "$GITHUB_OUTPUT"
@@ -299,9 +248,8 @@ jobs:
               exit 0
             done
           done
-          
-          echo "::error::Failed to download yak from all attempted versions"
-          echo "Tried ${#BINARY_NAMES[@]} binary name(s) and ${#VERSIONS_TO_TRY[@]} version(s)"
+
+          echo "::error::Failed to download yak from OSS (no compile fallback for operator binary)"
           echo "Binary names: ${BINARY_NAMES[*]}"
           echo "Versions: ${VERSIONS_TO_TRY[*]}"
           echo "yak_downloaded=false" >> "$GITHUB_OUTPUT"
@@ -312,16 +260,11 @@ jobs:
         id: get_tag
         shell: bash
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          if command -v yak >/dev/null 2>&1; then
-            YAK=yak
-          else
-            CGO_ENABLED="${CGO_ENABLED:-1}" go build -o ./yak_cli -v common/yak/cmd/yak.go
-            YAK=./yak_cli
-            [ -f ./yak_cli.exe ] && YAK=./yak_cli.exe
+          if [ -z "${YAK:-}" ] || [ ! -f "$YAK" ]; then
+            echo "::error::YAK operator binary missing; OSS download step must succeed"
+            exit 1
           fi
           "$YAK" repos-tag -o tags.txt
-          
           echo "$(cat tags.txt)"
           echo "YAK_TAG=$(cat tags.txt)" >> "$GITHUB_ENV"
           echo "YAK_TAG=$(cat tags.txt)" >> "$GITHUB_OUTPUT"
@@ -355,13 +298,9 @@ jobs:
       - name: Sync Embed FS Hash to Code
         shell: bash
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          if command -v yak >/dev/null 2>&1; then
-            YAK=yak
-          else
-            CGO_ENABLED="${CGO_ENABLED:-1}" go build -o ./yak_cli -v common/yak/cmd/yak.go
-            YAK=./yak_cli
-            [ -f ./yak_cli.exe ] && YAK=./yak_cli.exe
+          if [ -z "${YAK:-}" ] || [ ! -f "$YAK" ]; then
+            echo "::error::YAK operator binary missing; OSS download step must succeed"
+            exit 1
           fi
           "$YAK" embed-fs-hash --override --all
 
@@ -510,13 +449,9 @@ jobs:
       - name: Generate Checksums
         shell: bash
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          if command -v yak >/dev/null 2>&1; then
-            YAK=yak
-          else
-            CGO_ENABLED="${CGO_ENABLED:-1}" go build -o ./yak_cli -v common/yak/cmd/yak.go
-            YAK=./yak_cli
-            [ -f ./yak_cli.exe ] && YAK=./yak_cli.exe
+          if [ -z "${YAK:-}" ] || [ ! -f "$YAK" ]; then
+            echo "::error::YAK operator binary missing; OSS download step must succeed"
+            exit 1
           fi
           "$YAK" sha256 -f ${{ env.OUTPUT_BINARY }}
           echo "SHA256=${{ env.OUTPUT_BINARY }}.sha256.txt" >> $GITHUB_ENV
@@ -550,13 +485,9 @@ jobs:
           fi
           
           echo "Uploading files: ${UPLOAD_FILES}"
-          export PATH="$HOME/.local/bin:$PATH"
-          if command -v yak >/dev/null 2>&1; then
-            YAK=yak
-          else
-            CGO_ENABLED="${CGO_ENABLED:-1}" go build -o ./yak_cli -v common/yak/cmd/yak.go
-            YAK=./yak_cli
-            [ -f ./yak_cli.exe ] && YAK=./yak_cli.exe
+          if [ -z "${YAK:-}" ] || [ ! -f "$YAK" ]; then
+            echo "::error::YAK operator binary missing; OSS download step must succeed"
+            exit 1
           fi
           "$YAK" upload-oss --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f "${UPLOAD_FILES}"
 
@@ -579,21 +510,11 @@ jobs:
     outputs:
       build_slim: ${{ steps.detect.outputs.build_slim }}
     steps:
-      - uses: actions/checkout@v2
-
-      - name: Set up Go 1.x
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: "./go.mod"
-          cache: false
-
       - name: Detect whether to build yak-slim
         id: detect
         shell: bash
         run: |
-          go run common/yak/cmd/yak.go repos-tag -o tags.txt
-          YAK_TAG=$(cat tags.txt)
-          echo "YAK_TAG=$YAK_TAG"
+          # Always build slim alongside full; no need to compile yak just for this flag.
           echo "build_slim=true" >> "$GITHUB_OUTPUT"
 
   build_slim_binaries:
