@@ -579,21 +579,11 @@ jobs:
     outputs:
       build_slim: ${{ steps.detect.outputs.build_slim }}
     steps:
-      - uses: actions/checkout@v2
-
-      - name: Set up Go 1.x
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: "./go.mod"
-          cache: false
-
       - name: Detect whether to build yak-slim
         id: detect
         shell: bash
         run: |
-          go run common/yak/cmd/yak.go repos-tag -o tags.txt
-          YAK_TAG=$(cat tags.txt)
-          echo "YAK_TAG=$YAK_TAG"
+          # Always build slim alongside full; no need to compile yak just for this flag.
           echo "build_slim=true" >> "$GITHUB_OUTPUT"
 
   build_slim_binaries:

@@ -90,16 +90,116 @@ jobs:
           Get-Content "${{ github.workspace }}\.github\patch_go122\48042aa09c2f878c4faa576948b07fe625c4707a.diff" | patch --verbose -R -p 1
           cd ${{ github.workspace }}
 
+      # Same OSS download approach as exp-cross-build full builds; install to RUNNER_TEMP
+      # and export YAK= so later steps never fall back to compiling the engine.
+      - name: Download Yak Binary (for repos-tag / embed-fs-hash / sha256)
+        id: download_yak
+        shell: bash
+        run: |
+          echo "::group::Downloading Yak binary from OSS"
+
+          RUNNER_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+          RUNNER_ARCH=$(uname -m)
+
+          if [ "$RUNNER_ARCH" = "x86_64" ]; then
+            RUNNER_ARCH_NORM="amd64"
+          elif [ "$RUNNER_ARCH" = "amd64" ]; then
+            RUNNER_ARCH_NORM="amd64"
+          elif [ "$RUNNER_ARCH" = "aarch64" ] || [ "$RUNNER_ARCH" = "arm64" ]; then
+            RUNNER_ARCH_NORM="arm64"
+          else
+            RUNNER_ARCH_NORM="$RUNNER_ARCH"
+          fi
+
+          if [ "$RUNNER_OS" = "darwin" ]; then
+            BINARY_NAMES=("yak_darwin_${RUNNER_ARCH_NORM}" "yak_darwin_amd64")
+          elif [ "$RUNNER_OS" = "linux" ]; then
+            BINARY_NAMES=("yak_linux_${RUNNER_ARCH_NORM}")
+          elif echo "$RUNNER_OS" | grep -qi "mingw\|msys\|cygwin"; then
+            BINARY_NAMES=("yak_windows_${RUNNER_ARCH_NORM}.exe")
+          else
+            BINARY_NAMES=("yak_${RUNNER_OS}_${RUNNER_ARCH_NORM}")
+          fi
+
+          echo "Runner: $RUNNER_OS/$RUNNER_ARCH_NORM"
+          echo "Will try to download binaries: ${BINARY_NAMES[*]}"
+
+          VERSIONS_TO_TRY=("latest")
+          if SELECTED_VERSION=$(bash ./scripts/get-yak-version.sh --quiet 2>/dev/null); then
+            if [ -n "$SELECTED_VERSION" ]; then
+              echo "✅ Found suitable version: $SELECTED_VERSION"
+              VERSIONS_TO_TRY+=("$SELECTED_VERSION")
+            fi
+          fi
+          echo "Will try versions: ${VERSIONS_TO_TRY[*]}"
+
+          YAK_OSS_BASE="https://yaklang.oss-accelerate.aliyuncs.com"
+          INSTALL_DIR="${RUNNER_TEMP:-$HOME/.local/bin}"
+          mkdir -p "$INSTALL_DIR"
+
+          for BINARY_NAME in "${BINARY_NAMES[@]}"; do
+            for VERSION in "${VERSIONS_TO_TRY[@]}"; do
+              DOWNLOAD_URL="${YAK_OSS_BASE}/yak/${VERSION}/${BINARY_NAME}"
+              echo "Trying to download from: $DOWNLOAD_URL"
+
+              HTTP_CODE=$(curl -w "%{http_code}" -# -L "$DOWNLOAD_URL" -o yak_dl)
+              CURL_EXIT=$?
+              if [ $CURL_EXIT -ne 0 ] || [ "$HTTP_CODE" != "200" ]; then
+                echo "❌ download failed (curl=$CURL_EXIT http=$HTTP_CODE)"
+                rm -f yak_dl
+                continue
+              fi
+              if [ ! -s "yak_dl" ]; then
+                echo "❌ Downloaded file is empty"
+                rm -f yak_dl
+                continue
+              fi
+
+              FILE_SIZE=$(stat -f%z yak_dl 2>/dev/null || stat -c%s yak_dl 2>/dev/null || echo "0")
+              echo "Downloaded file size: ${FILE_SIZE} bytes"
+              if [ "$FILE_SIZE" -lt 1048576 ]; then
+                echo "❌ Downloaded file is too small: ${FILE_SIZE} bytes"
+                rm -f yak_dl
+                continue
+              fi
+
+              if [[ "$BINARY_NAME" == *.exe ]]; then
+                DEST="$INSTALL_DIR/yak.exe"
+              else
+                DEST="$INSTALL_DIR/yak"
+              fi
+              mv -f yak_dl "$DEST"
+              chmod +x "$DEST" || true
+
+              VERSION_OUTPUT=$("$DEST" version 2>&1)
+              VERSION_EXIT=$?
+              if [ $VERSION_EXIT -ne 0 ]; then
+                echo "❌ Downloaded binary failed version check: $VERSION_OUTPUT"
+                rm -f "$DEST"
+                continue
+              fi
+
+              echo "Version output: $VERSION_OUTPUT"
+              echo "YAK=$DEST" >> "$GITHUB_ENV"
+              echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+              echo "✅ Successfully downloaded yak from version: $VERSION -> $DEST"
+              echo "::endgroup::"
+              exit 0
+            done
+          done
+
+          echo "::error::Failed to download yak from OSS (slim builds do not compile operator yak)"
+          echo "Binary names: ${BINARY_NAMES[*]}"
+          echo "Versions: ${VERSIONS_TO_TRY[*]}"
+          echo "::endgroup::"
+          exit 1
+
       - name: Get Repo tags
         shell: bash
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          if command -v yak >/dev/null 2>&1; then
-            YAK=yak
-          else
-            CGO_ENABLED="${CGO_ENABLED:-1}" go build -o ./yak_cli -v common/yak/cmd/yak.go
-            YAK=./yak_cli
-            [ -f ./yak_cli.exe ] && YAK=./yak_cli.exe
+          if [ -z "${YAK:-}" ] || [ ! -x "$YAK" ]; then
+            echo "::error::YAK operator binary missing; OSS download step must succeed"
+            exit 1
           fi
           "$YAK" repos-tag -o tags.txt
           echo "YAK_TAG=$(cat tags.txt)" >> "$GITHUB_ENV"
@@ -141,13 +241,9 @@ jobs:
       - name: Sync Embed FS Hash to Code
         shell: bash
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          if command -v yak >/dev/null 2>&1; then
-            YAK=yak
-          else
-            CGO_ENABLED="${CGO_ENABLED:-1}" go build -o ./yak_cli -v common/yak/cmd/yak.go
-            YAK=./yak_cli
-            [ -f ./yak_cli.exe ] && YAK=./yak_cli.exe
+          if [ -z "${YAK:-}" ] || [ ! -x "$YAK" ]; then
+            echo "::error::YAK operator binary missing; OSS download step must succeed"
+            exit 1
           fi
           "$YAK" embed-fs-hash --override --all
 
@@ -287,13 +383,9 @@ jobs:
       - name: Generate Checksums
         shell: bash
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          if command -v yak >/dev/null 2>&1; then
-            YAK=yak
-          else
-            CGO_ENABLED="${CGO_ENABLED:-1}" go build -o ./yak_cli -v common/yak/cmd/yak.go
-            YAK=./yak_cli
-            [ -f ./yak_cli.exe ] && YAK=./yak_cli.exe
+          if [ -z "${YAK:-}" ] || [ ! -x "$YAK" ]; then
+            echo "::error::YAK operator binary missing; OSS download step must succeed"
+            exit 1
           fi
           "$YAK" sha256 -f ${{ env.OUTPUT_NAME }}
           echo "SHA256=${{ env.OUTPUT_NAME }}.sha256.txt" >> "$GITHUB_ENV"
