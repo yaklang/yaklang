@@ -113,11 +113,14 @@ func runForkedSubReactAgentJob(
 	// parent AI used to write every sub agent's full goal+contract up front —
 	// into a per-sub-agent step that runs with the forked timeline context and
 	// overlaps across the concurrently-dispatched sub agents.
+	var execErr error
+	var elaboratedGoal, resultContract string
+	defer subTask.CallAsyncDeferCallback(execErr)
 	subTask.SetStatus(aicommon.AITaskState_Processing)
-	elaboratedGoal, resultContract, elabErr := elaborateSubReactAgentGoal(
+	elaboratedGoal, resultContract, execErr = elaborateSubReactAgentGoal(
 		subTask.GetContext(), childInvoker, parentLoop, subTask.GetId(), job,
 	)
-	if elabErr != nil {
+	if execErr != nil {
 		log.Warnf("dispatch_sub_react_agents: elaborate goal for %s failed, falling back to brief intent: %v", subTask.GetId(), elabErr)
 		elaboratedGoal = job.Goal
 		resultContract = ""
@@ -131,7 +134,7 @@ func runForkedSubReactAgentJob(
 		return result, nil
 	}
 
-	execErr := subLoop.ExecuteWithExistedTask(subTask)
+	execErr = subLoop.ExecuteWithExistedTask(subTask)
 	result, _ := buildSubReactJobResult(job, startedAt, subTask, subLoop, fork, execErr)
 	return result, nil
 }
@@ -252,7 +255,28 @@ func buildSubReactJobResult(
 		DurationMs: time.Since(startedAt).Milliseconds(),
 	}
 
-	if execErr != nil {
+	// 用户取消场景：当主循环因 context 被取消而退出时，execErr 的信息中
+	// 会包含 "context canceled"（来自 ReActLoop 的 "task context done" 分支）。
+	// 这与子 Agent 自身执行失败（execErr 为真实失败原因）区分开，避免主循环
+	// 误判为错误而不断重试。另外，用户主动跳过（Skipped）也归入取消。
+	cancelled := false
+	if execErr != nil && strings.Contains(execErr.Error(), "context canceled") {
+		cancelled = true
+	} else if subTask.GetStatus() == aicommon.AITaskState_Skipped {
+		cancelled = true
+	}
+
+	if cancelled {
+		record.Status = "cancelled"
+		switch reason, hasErr := subTask.GetCancelReason(), execErr; {
+		case reason != "":
+			record.Error = reason
+		case hasErr != nil:
+			record.Error = execErr.Error()
+		default:
+			record.Error = "sub agent cancelled by user"
+		}
+	} else if execErr != nil {
 		record.Status = "failed"
 		record.Error = execErr.Error()
 	} else {
@@ -522,20 +546,25 @@ func handleDispatchSubReactAgents(
 
 	var feedbackLines []string
 	successCount := 0
+	cancelledCount := 0
 	for _, result := range results {
 		if result == nil {
 			continue
 		}
-		if result.Record.Status == "completed" {
+		switch result.Record.Status {
+		case "completed":
 			successCount++
+		case "cancelled":
+			cancelledCount++
 		}
 		writeSubReactAgentTimelineRecord(invoker, loop, result.Record)
 		feedbackLines = append(feedbackLines, result.Feedback)
 	}
 
+	failedCount := len(results) - successCount - cancelledCount
 	summary := fmt.Sprintf(
-		"Dispatched %d sub react agents: %d succeeded, %d failed.",
-		len(results), successCount, len(results)-successCount,
+		"Dispatched %d sub react agents: %d succeeded, %d failed, %d cancelled.",
+		len(results), successCount, failedCount, cancelledCount,
 	)
 	invoker.AddToTimeline("[DISPATCH_SUB_REACT_AGENTS_DONE]", summary)
 	loopInfraActionFinish(loop, loopInfraNodeSubReactReport, summary)

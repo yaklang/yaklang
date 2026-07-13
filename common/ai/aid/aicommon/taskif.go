@@ -69,7 +69,8 @@ type AIStatefulTask interface {
 	SetResult(string)
 	GetResult() string
 	GetContext() context.Context
-	Cancel()
+	Cancel(reasons ...string)
+	GetCancelReason() string
 	IsFinished() bool
 	GetUserInput() string
 	GetOriginUserInput() string
@@ -136,6 +137,8 @@ type AIStatefulTaskBase struct {
 
 	skipTaskStatusChangeEmit bool
 	isSubAgent               bool
+
+	cancelReason string
 }
 
 func (s *AIStatefulTaskBase) GetFocusMode() string {
@@ -417,11 +420,43 @@ func (s *AIStatefulTaskBase) GetContext() context.Context {
 	return s.ctx
 }
 
-func (s *AIStatefulTaskBase) Cancel() {
+func (s *AIStatefulTaskBase) Cancel(reasons ...string) {
+	if s == nil {
+		return
+	}
+	var reason string
+	if len(reasons) > 0 {
+		reason = reasons[0]
+	}
+	if s.taskMutex != nil {
+		s.taskMutex.Lock()
+		defer s.taskMutex.Unlock()
+	}
+	// first-writer-wins: 首个带原因的 Cancel 调用决定原因；后续 Cancel
+	// 调用不覆盖。注意 setStatus 进入终止态的兜底取消直接调用裸
+	// cancel()，不经此方法，因此不会写入原因，彻底消除顺序歧义。
+	if s.cancelReason == "" && reason != "" {
+		s.cancelReason = reason
+		log.Debugf("Task %s cancelled: %s", s.GetId(), reason)
+	}
 	if s.cancel == nil {
 		return
 	}
 	s.cancel()
+}
+
+// GetCancelReason 返回任务被取消时记录的原因。
+// 采用 first-writer-wins 语义：首个带原因的 Cancel 调用决定原因，
+// 后续调用（包括进入终止态时的自动取消）不会覆盖它。
+func (s *AIStatefulTaskBase) GetCancelReason() string {
+	if s == nil {
+		return ""
+	}
+	if s.taskMutex != nil {
+		s.taskMutex.Lock()
+		defer s.taskMutex.Unlock()
+	}
+	return s.cancelReason
 }
 
 func (s *AIStatefulTaskBase) IsFinished() bool {
@@ -473,7 +508,9 @@ func (s *AIStatefulTaskBase) setStatus(status AITaskState, force bool) {
 
 	defer func() {
 		if s.IsFinished() {
-			s.Cancel()
+			if s.cancel != nil {
+				s.cancel()
+			}
 		}
 	}()
 
