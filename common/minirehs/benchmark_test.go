@@ -82,6 +82,41 @@ func benchScanRecordsOpts(b *testing.B, patterns []Pattern, records [][]byte, op
 	_ = hits
 }
 
+func benchScanRecordsBatchOpts(b *testing.B, patterns []Pattern, records [][]byte, opts ...Option) {
+	b.Helper()
+	allOpts := append([]Option{WithLogger(silentLogger{})}, opts...)
+	db, err := Compile(patterns, allOpts...)
+	if err != nil {
+		b.Fatalf("compile: %v", err)
+	}
+	defer db.Close()
+	sc, err := db.NewScratch()
+	if err != nil {
+		b.Fatalf("scratch: %v", err)
+	}
+	defer sc.Close()
+	var total int64
+	for _, rec := range records {
+		total += int64(len(rec))
+	}
+	b.SetBytes(total)
+	b.ReportAllocs()
+	b.ResetTimer()
+	var hits int64
+	for i := 0; i < b.N; i++ {
+		cnt := 0
+		if err := db.ScanBatch(records, sc, func(_ int, _ Match) bool {
+			cnt++
+			return true
+		}); err != nil {
+			b.Fatal(err)
+		}
+		hits += int64(cnt)
+	}
+	b.StopTimer()
+	_ = hits
+}
+
 // BenchmarkMVSExistence 度量"仅判存在性"(WithReportLocation(false), 契合 MITM 打标只需"哪些规则
 // 命中"的场景)下 MVS 的吞吐: 走纯位运算快路径、不做 findAllLoc 定位. 带 -tags minirehs_mvs 时
 // MVS 存在性热路径改由纯 C99 内核执行 (per-pattern + 合并 always-on).
@@ -106,6 +141,10 @@ func BenchmarkMVSExistence(b *testing.B) {
 	b.Run("MVS_Exist_RE2only", func(b *testing.B) {
 		re2 := re2OnlyMITMPatterns(b)
 		benchScanRecordsOpts(b, re2, records, WithBackend(BackendMVS), WithReportLocation(false))
+	})
+	b.Run("MVS_Exist_RE2only_Batch2", func(b *testing.B) {
+		re2 := re2OnlyMITMPatterns(b)
+		benchScanRecordsBatchOpts(b, re2, records, WithBackend(BackendMVS), WithReportLocation(false))
 	})
 }
 
