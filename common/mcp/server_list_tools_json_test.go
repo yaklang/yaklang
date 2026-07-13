@@ -227,16 +227,28 @@ func TestMCPToolSchemaLint(t *testing.T) {
 			}
 		}
 
-		// --- Schema node lint (Gemini compat + recursive) ---
-		if tool.InputSchema.Properties != nil {
-			tool.InputSchema.Properties.ForEach(func(propName string, propVal any) bool {
-				prop, ok := propVal.(map[string]any)
-				if !ok {
-					return true
-				}
-				lintSchemaNode(toolPath+"."+propName, prop, &violations)
-				return true
-			})
+		// --- Schema node lint on marshaled JSON (wire format Claude/API clients see) ---
+		raw, err := json.Marshal(tool.InputSchema)
+		require.NoErrorf(t, err, "%s: marshal InputSchema", toolPath)
+
+		var schema map[string]any
+		require.NoErrorf(t, json.Unmarshal(raw, &schema), "%s: unmarshal marshaled InputSchema", toolPath)
+
+		if schemaType, _ := schema["type"].(string); schemaType != "object" {
+			violations = append(violations,
+				fmt.Sprintf("[spec-schema-type] %s: marshaled inputSchema.type must be \"object\", got %q", toolPath, schemaType))
+		}
+
+		props, ok := schema["properties"].(map[string]any)
+		if !ok {
+			continue
+		}
+		for propName, propVal := range props {
+			prop, ok := propVal.(map[string]any)
+			if !ok {
+				continue
+			}
+			lintSchemaNode(toolPath+"."+propName, prop, &violations)
 		}
 	}
 
@@ -279,16 +291,12 @@ func lintSchemaNode(path string, schema map[string]any, violations *[]string) {
 	}
 
 	// Recurse into nested object properties.
-	// WithStruct stores properties as *omap.OrderedMap; WithStructArray stores them
-	// as flat keys in the items map. Handle both cases.
 	lintPropertiesValue(path, schema["properties"], violations)
 
 	// Recurse into array items.
 	if items, ok := schema["items"].(map[string]any); ok {
+		lintArrayItemsObjectSchema(path+".items", items, violations)
 		lintSchemaNode(path+".items", items, violations)
-		// WithStructArray stores child properties directly in items (not under a
-		// "properties" sub-key), so also scan non-schema keys for child schemas.
-		lintStructArrayItems(path+".items", items, violations)
 	}
 	// Recurse into oneOf / anyOf sub-schemas.
 	for _, keyword := range []string{"oneOf", "anyOf"} {
@@ -327,8 +335,8 @@ func lintPropertiesValue(path string, raw any, violations *[]string) {
 	}
 }
 
-// knownSchemaKeys are top-level JSON Schema keywords; everything else in a
-// WithStructArray items map is a child property schema.
+// knownSchemaKeys are JSON Schema keywords used by lintArrayItemsObjectSchema to
+// distinguish schema metadata from misplaced flat property definitions.
 var knownSchemaKeys = map[string]struct{}{
 	"type": {}, "properties": {}, "items": {}, "required": {},
 	"enum": {}, "description": {}, "default": {}, "title": {},
@@ -336,15 +344,20 @@ var knownSchemaKeys = map[string]struct{}{
 	"pattern": {}, "multipleOf": {}, "oneOf": {}, "anyOf": {}, "allOf": {},
 }
 
-// lintStructArrayItems handles the flat-property layout produced by WithStructArray,
-// where child property schemas are stored directly as keys in the items map.
-func lintStructArrayItems(path string, items map[string]any, violations *[]string) {
+// lintArrayItemsObjectSchema rejects array item schemas that place child fields
+// directly on the items object instead of under items.properties (invalid JSON Schema).
+func lintArrayItemsObjectSchema(path string, items map[string]any, violations *[]string) {
+	fieldType, _ := items["type"].(string)
+	if fieldType != "object" {
+		return
+	}
 	for k, v := range items {
 		if _, known := knownSchemaKeys[k]; known {
 			continue
 		}
-		if child, ok := v.(map[string]any); ok {
-			lintSchemaNode(path+"."+k, child, violations)
+		if _, ok := v.(map[string]any); ok {
+			*violations = append(*violations,
+				fmt.Sprintf("[invalid-array-items-layout] %s: object items has flat property %q; use items.properties instead", path, k))
 		}
 	}
 }
@@ -404,6 +417,17 @@ func TestMCPToolSchemaLintRules(t *testing.T) {
 			name:           "number field with numeric enum values",
 			schema:         map[string]any{"type": "number", "enum": []any{0, 1, 2}},
 			wantRulePrefix: "[enum-non-string]",
+		},
+		{
+			name: "array items with flat properties",
+			schema: map[string]any{
+				"type": "array",
+				"items": map[string]any{
+					"type": "object",
+					"key":  map[string]any{"type": "string"},
+				},
+			},
+			wantRulePrefix: "[invalid-array-items-layout]",
 		},
 	}
 	for _, tc := range nodeCases {
