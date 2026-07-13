@@ -254,7 +254,7 @@ func (r *ReAct) HandleSyncTypeReactJumpQueueEvent(event *ypb.AIInputEvent) error
 		log.Infof("cancelling current task %s to allow jump queue for task %s", currentTask.GetId(), targetTaskId)
 
 		// 调用任务的 Cancel 方法，这会取消任务的 context
-		currentTask.Cancel()
+		currentTask.Cancel(fmt.Sprintf("jump_queue: cancelled to allow task %s to run first", targetTaskId))
 
 		// 设置任务状态为 Aborted
 		currentTask.SetStatus(aicommon.AITaskState_Aborted)
@@ -283,7 +283,6 @@ func (r *ReAct) HandleSyncTypeReactJumpQueueEvent(event *ypb.AIInputEvent) error
 }
 
 func (r *ReAct) CancelTask(task aicommon.AIStatefulTask, event *ypb.AIInputEvent) {
-
 	if task.IsAsyncMode() {
 		task.SetAsyncDeferCallback(func(err error) {
 			// 发送任务取消事件
@@ -293,19 +292,19 @@ func (r *ReAct) CancelTask(task aicommon.AIStatefulTask, event *ypb.AIInputEvent
 				"cancelled_at": time.Now(),
 			}, event.SyncID)
 			// 设置任务状态为 Aborted
-			task.SetStatus(aicommon.AITaskState_Aborted)
+			task.SetStatus(aicommon.AITaskState_Skipped)
 		})
 		// 调用任务的 Cancel 方法，这会取消任务的 context
-		task.Cancel()
+		task.Cancel("user requested cancellation")
 	} else {
-		task.Cancel()
+		task.Cancel("user requested cancellation")
 		r.EmitSyncEvent("react_task_cancelled", map[string]interface{}{
 			"task_id":      task.GetId(),
 			"user_input":   task.GetUserInput(),
 			"cancelled_at": time.Now(),
 		}, event.SyncID)
 		// 设置任务状态为 Aborted
-		task.SetStatus(aicommon.AITaskState_Aborted)
+		task.SetStatus(aicommon.AITaskState_Skipped)
 	}
 }
 
