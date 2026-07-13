@@ -49,12 +49,10 @@ func (s *Server) StartMcpServer(req *ypb.StartMcpServerRequest, stream ypb.Yak_S
 	}
 
 	if useGlobalStartupDefaults {
-		if globalCfg.GetEnableAIToolFramework() {
-			req.EnableAIToolFramework = true
-		}
-		if globalCfg.GetEnableBridgeExternalMCP() {
-			req.EnableBridgeExternalMCP = true
-		}
+		// When using configured defaults, global AI/bridge flags are the source of truth
+		// (assign, not OR) so disabling them in MCPGlobalConfig actually takes effect.
+		req.EnableAIToolFramework = globalCfg.GetEnableAIToolFramework()
+		req.EnableBridgeExternalMCP = globalCfg.GetEnableBridgeExternalMCP()
 	}
 
 	return launchMcpServer(stream.Context(), req, stream.Send, explicitToolSets)

@@ -246,6 +246,19 @@ func TestDeleteMCPClientToolConfigsByServerAndNames(t *testing.T) {
 
 func TestReconcileMCPBuiltinToolTierDefaults(t *testing.T) {
 	db := newToolConfigDB(t)
+	SetCachedMCPGlobalConfigForTest(nil)
+
+	RegisterMCPBuiltinToolDefaultEnableResolver(func(db *gorm.DB, toolName string) (bool, error) {
+		toolToSet := map[string]string{
+			"require_dnslog_domain": "reverse_platform",
+			"save_payload":          "payload",
+		}
+		setName, ok := toolToSet[toolName]
+		if !ok {
+			return false, nil
+		}
+		return IsToolSetEnabledByDefault(db, setName)
+	})
 
 	_, err := GetOrCreateMCPClientToolConfig(db, "require_dnslog_domain", schema.MCPClientToolSourceBuiltin, "", "")
 	require.NoError(t, err)

@@ -46,8 +46,9 @@ func legacyMCPToolSetOptions(toolSets, disableToolSets []string, enableAll bool)
 var MCPCommandUsage = `Start a mcp server for providing mcp service.
 
 By default only commonly used ToolSets are enabled (` + fmt.Sprintf("%d tools across %d sets", DefaultMCPToolCount(), len(DefaultMCPToolSets)) + `). Use --enable-all to expose every registered set.
+Profile MCP global config (if set) overrides these factory defaults for ToolSets/ResourceSets and EnableAI*/Bridge flags when corresponding CLI flags are omitted.
 
-Default ToolSets: ` + strings.Join(DefaultMCPToolSets, ", ") + `
+Factory Default ToolSets: ` + strings.Join(DefaultMCPToolSets, ", ") + `
 
 Optional ToolSets (enable with -t): ` + strings.Join(OptionalMCPToolSets, ", ") + `
 
@@ -93,8 +94,23 @@ var MCPCommand = &cli.Command{
 			item = strings.TrimSpace(item)
 			return item, item != ""
 		})
+
+		// When using profile defaults (no -t / --enable-all), inherit EnableAI* from
+		// MCP global config unless the user explicitly set the corresponding flags.
+		useProfileDefaults := !enableAllToolSets && len(toolSets) == 0
+		if useProfileDefaults {
+			if globalCfg, cfgErr := yakit.GetMCPGlobalConfig(consts.GetGormProfileDatabase()); cfgErr == nil && globalCfg != nil {
+				if !c.IsSet("enable-aitool-framework") {
+					enableAIToolFramework = globalCfg.GetEnableAIToolFramework()
+				}
+				if !c.IsSet("enable-bridge-external-mcp") {
+					enableBridgeExternalMCP = globalCfg.GetEnableBridgeExternalMCP()
+				}
+			}
+		}
+
 		resource, disableResource := c.String("resource"), c.String("disable-resource")
-		if resource == "" && !enableAllToolSets && len(toolSets) == 0 {
+		if resource == "" && useProfileDefaults {
 			resourceSetsFromProfile, err := yakit.EffectiveDefaultMCPResourceSets(consts.GetGormProfileDatabase())
 			if err != nil || len(resourceSetsFromProfile) == 0 {
 				resource = strings.Join(DefaultMCPResourceSets, ",")
@@ -154,6 +170,15 @@ var MCPCommand = &cli.Command{
 		disabledTools, dbErr := yakit.GetDisabledMCPClientToolNames(consts.GetGormProfileDatabase())
 		if dbErr != nil {
 			log.Warnf("mcp command: failed to load disabled tool list from DB: %v", dbErr)
+		}
+		// Explicit -t requests enable those sets; do not apply tier-default disable
+		// flags for tools belonging to the requested sets.
+		if len(toolSets) > 0 {
+			for _, setName := range toolSets {
+				for _, toolName := range ToolNamesInSet(setName) {
+					delete(disabledTools, toolName)
+				}
+			}
 		}
 		if len(disabledTools) > 0 {
 			opts = append(opts, WithDisabledToolNames(disabledTools))

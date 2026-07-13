@@ -1943,13 +1943,14 @@ message GetToolSetListResponse {
 }
 
 // MCPGlobalConfig stores user-customizable MCP startup defaults in profile DB.
-// When DefaultToolSets is empty on disk, GetMCPGlobalConfig returns catalog factory defaults.
+// Empty DefaultToolSets+DefaultResourceSets with both Enable* false on Set acts as Reset.
+// Empty set lists with Enable* set means "follow catalog sets" and UsesCatalogDefaults=true.
 message MCPGlobalConfig {
   repeated string DefaultToolSets = 1;
   repeated string DefaultResourceSets = 2;
   bool EnableAIToolFramework = 3;
   bool EnableBridgeExternalMCP = 4;
-  // True when no user config is persisted yet (factory catalog defaults are returned).
+  // True when no user config is persisted, or when persisted config follows catalog sets.
   bool UsesCatalogDefaults = 5;
 }
 

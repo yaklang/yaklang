@@ -83,16 +83,13 @@ func GetOrCreateMCPClientToolConfigWithDefaultEnable(db *gorm.DB, toolName, sour
 
 const mcpBuiltinTierDefaultsMigrationKey = "yak_mcp_builtin_tier_defaults_v1"
 
-// ReconcileMCPBuiltinToolTierDefaults aligns legacy builtin tool enable flags with
-// the effective default tool sets from MCP global config (one-time migration).
-func ReconcileMCPBuiltinToolTierDefaults(db *gorm.DB) error {
+// SyncBuiltinMCPClientToolEnablesToDefaults aligns every known builtin tool row's
+// Enable flag with the effective default tool sets from MCP global config.
+// Unlike ReconcileMCPBuiltinToolTierDefaults, this always runs (no one-time key).
+func SyncBuiltinMCPClientToolEnablesToDefaults(db *gorm.DB) error {
 	if db == nil {
 		return nil
 	}
-	if GetKey(db, mcpBuiltinTierDefaultsMigrationKey) == "true" {
-		return nil
-	}
-
 	var cfgs []*schema.MCPClientToolConfig
 	if err := db.Where("source = ?", schema.MCPClientToolSourceBuiltin).Find(&cfgs).Error; err != nil {
 		return utils.Errorf("fetch builtin mcp client tool configs: %s", err)
@@ -108,6 +105,21 @@ func ReconcileMCPBuiltinToolTierDefaults(db *gorm.DB) error {
 		if err := SetMCPClientToolEnabled(db, cfg.ToolName, enabled); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// ReconcileMCPBuiltinToolTierDefaults aligns legacy builtin tool enable flags with
+// the effective default tool sets from MCP global config (one-time migration).
+func ReconcileMCPBuiltinToolTierDefaults(db *gorm.DB) error {
+	if db == nil {
+		return nil
+	}
+	if GetKey(db, mcpBuiltinTierDefaultsMigrationKey) == "true" {
+		return nil
+	}
+	if err := SyncBuiltinMCPClientToolEnablesToDefaults(db); err != nil {
+		return err
 	}
 	return SetKey(db, mcpBuiltinTierDefaultsMigrationKey, "true")
 }

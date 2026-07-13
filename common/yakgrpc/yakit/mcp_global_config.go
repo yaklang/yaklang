@@ -17,12 +17,21 @@ var (
 	cachedMCPGlobalConfigLock sync.RWMutex
 
 	mcpBuiltinToolDefaultEnableResolver func(db *gorm.DB, toolName string) (bool, error)
+	mcpToolSetNamesValidator            func(names []string) error
+	mcpResourceSetNamesValidator        func(names []string) error
 )
 
 // RegisterMCPBuiltinToolDefaultEnableResolver wires builtin tool default-enable
 // resolution without importing common/mcp from yakit (avoids import cycles).
 func RegisterMCPBuiltinToolDefaultEnableResolver(fn func(db *gorm.DB, toolName string) (bool, error)) {
 	mcpBuiltinToolDefaultEnableResolver = fn
+}
+
+// RegisterMCPGlobalConfigValidators wires tool/resource set name validation
+// without importing common/mcp from yakit.
+func RegisterMCPGlobalConfigValidators(toolSets, resourceSets func(names []string) error) {
+	mcpToolSetNamesValidator = toolSets
+	mcpResourceSetNamesValidator = resourceSets
 }
 
 func setCachedMCPGlobalConfig(cfg *ypb.MCPGlobalConfig) {
@@ -71,18 +80,28 @@ func GetMCPGlobalConfig(db *gorm.DB) (*ypb.MCPGlobalConfig, error) {
 		return nil, utils.Error("no set database")
 	}
 	if !HasMCPGlobalConfig(db) {
-		return CatalogMCPGlobalConfig(), nil
+		cfg := CatalogMCPGlobalConfig()
+		setCachedMCPGlobalConfig(cfg)
+		return cfg, nil
 	}
 	raw := GetKey(db, consts.MCP_GLOBAL_CONFIG_KEY)
 	if raw == "" {
-		return CatalogMCPGlobalConfig(), nil
+		cfg := CatalogMCPGlobalConfig()
+		setCachedMCPGlobalConfig(cfg)
+		return cfg, nil
 	}
 	cfg := &ypb.MCPGlobalConfig{}
 	if err := json.Unmarshal([]byte(raw), cfg); err != nil {
 		return nil, err
 	}
 	normalizeMCPGlobalConfig(cfg)
-	cfg.UsesCatalogDefaults = false
+	if cfg.GetUsesCatalogDefaults() {
+		cfg.DefaultToolSets = append([]string{}, mcpcatalog.DefaultToolSetNames()...)
+		cfg.DefaultResourceSets = append([]string{}, mcpcatalog.DefaultResourceSetNames()...)
+	} else {
+		cfg.UsesCatalogDefaults = false
+	}
+	setCachedMCPGlobalConfig(cfg)
 	return cfg, nil
 }
 
@@ -93,9 +112,31 @@ func SetMCPGlobalConfig(db *gorm.DB, cfg *ypb.MCPGlobalConfig) (*ypb.MCPGlobalCo
 	if cfg == nil {
 		return nil, utils.Error("config is nil")
 	}
+
+	inputToolSets := dedupeNonEmptyStrings(cfg.DefaultToolSets)
+	inputResourceSets := dedupeNonEmptyStrings(cfg.DefaultResourceSets)
+	clearRequest := len(inputToolSets) == 0 &&
+		len(inputResourceSets) == 0 &&
+		!cfg.GetEnableAIToolFramework() &&
+		!cfg.GetEnableBridgeExternalMCP()
+	if clearRequest {
+		return ResetMCPGlobalConfig(db)
+	}
+
 	normalized := cloneMCPGlobalConfig(cfg)
+	followCatalogSets := len(inputToolSets) == 0 && len(inputResourceSets) == 0
 	normalizeMCPGlobalConfig(normalized)
-	normalized.UsesCatalogDefaults = false
+	if followCatalogSets {
+		normalized.UsesCatalogDefaults = true
+		normalized.DefaultToolSets = append([]string{}, mcpcatalog.DefaultToolSetNames()...)
+		normalized.DefaultResourceSets = append([]string{}, mcpcatalog.DefaultResourceSetNames()...)
+	} else {
+		normalized.UsesCatalogDefaults = false
+	}
+
+	if err := validateMCPGlobalConfigSets(normalized); err != nil {
+		return nil, err
+	}
 
 	data, err := json.Marshal(normalized)
 	if err != nil {
@@ -105,6 +146,9 @@ func SetMCPGlobalConfig(db *gorm.DB, cfg *ypb.MCPGlobalConfig) (*ypb.MCPGlobalCo
 		return nil, err
 	}
 	ApplyMCPGlobalConfig(normalized)
+	if err := SyncBuiltinMCPClientToolEnablesToDefaults(db); err != nil {
+		return nil, err
+	}
 	return normalized, nil
 }
 
@@ -115,6 +159,9 @@ func ResetMCPGlobalConfig(db *gorm.DB) (*ypb.MCPGlobalConfig, error) {
 	DelKey(db, consts.MCP_GLOBAL_CONFIG_KEY)
 	cfg := CatalogMCPGlobalConfig()
 	ApplyMCPGlobalConfig(cfg)
+	if err := SyncBuiltinMCPClientToolEnablesToDefaults(db); err != nil {
+		return nil, err
+	}
 	return cfg, nil
 }
 
@@ -170,16 +217,10 @@ func IsToolSetEnabledByDefault(db *gorm.DB, setName string) (bool, error) {
 	return ok, nil
 }
 
+// resolveMCPGlobalConfig always reloads from DB so StartMcpServer / GetToolSetList /
+// CLI share one source of truth and avoid stale in-memory cache.
 func resolveMCPGlobalConfig(db *gorm.DB) (*ypb.MCPGlobalConfig, error) {
-	if cached := GetCachedMCPGlobalConfig(); cached != nil {
-		return cached, nil
-	}
-	cfg, err := GetMCPGlobalConfig(db)
-	if err != nil {
-		return nil, err
-	}
-	setCachedMCPGlobalConfig(cfg)
-	return cfg, nil
+	return GetMCPGlobalConfig(db)
 }
 
 func normalizeMCPGlobalConfig(cfg *ypb.MCPGlobalConfig) {
@@ -194,6 +235,59 @@ func normalizeMCPGlobalConfig(cfg *ypb.MCPGlobalConfig) {
 	if len(cfg.DefaultResourceSets) == 0 {
 		cfg.DefaultResourceSets = append([]string{}, mcpcatalog.DefaultResourceSetNames()...)
 	}
+}
+
+func validateMCPGlobalConfigSets(cfg *ypb.MCPGlobalConfig) error {
+	if cfg == nil {
+		return nil
+	}
+	if mcpToolSetNamesValidator != nil {
+		if err := mcpToolSetNamesValidator(cfg.DefaultToolSets); err != nil {
+			return err
+		}
+	} else if err := validateToolSetNamesAgainstCatalog(cfg.DefaultToolSets); err != nil {
+		return err
+	}
+	if mcpResourceSetNamesValidator != nil {
+		if err := mcpResourceSetNamesValidator(cfg.DefaultResourceSets); err != nil {
+			return err
+		}
+	} else if err := validateResourceSetNamesAgainstCatalog(cfg.DefaultResourceSets); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateToolSetNamesAgainstCatalog(names []string) error {
+	known := make(map[string]struct{}, len(mcpcatalog.AllToolSetNames()))
+	for _, name := range mcpcatalog.AllToolSetNames() {
+		known[name] = struct{}{}
+	}
+	for _, name := range names {
+		if name == "" {
+			continue
+		}
+		if _, ok := known[name]; !ok {
+			return utils.Errorf("undefined tool set: %s", name)
+		}
+	}
+	return nil
+}
+
+func validateResourceSetNamesAgainstCatalog(names []string) error {
+	known := make(map[string]struct{}, len(mcpcatalog.DefaultResourceSetNames()))
+	for _, name := range mcpcatalog.DefaultResourceSetNames() {
+		known[name] = struct{}{}
+	}
+	for _, name := range names {
+		if name == "" {
+			continue
+		}
+		if _, ok := known[name]; !ok {
+			return utils.Errorf("undefined resource set: %s", name)
+		}
+	}
+	return nil
 }
 
 func dedupeNonEmptyStrings(items []string) []string {

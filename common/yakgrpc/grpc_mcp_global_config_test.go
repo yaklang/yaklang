@@ -96,3 +96,57 @@ func TestGRPC_ResetMCPGlobalConfig(t *testing.T) {
 	assert.True(t, reset.GetUsesCatalogDefaults())
 	assert.Equal(t, mcp.CatalogDefaultMCPToolSets, reset.GetDefaultToolSets())
 }
+
+func TestGRPC_SetMCPGlobalConfig_AppliesAIFlagsOnDefaultStart(t *testing.T) {
+	grpcSrv, err := NewServer()
+	require.NoError(t, err)
+	db := grpcSrv.GetProfileDatabase()
+	t.Cleanup(func() {
+		_, _ = yakit.ResetMCPGlobalConfig(db)
+		yakit.SetCachedMCPGlobalConfigForTest(nil)
+	})
+
+	_, err = grpcSrv.SetMCPGlobalConfig(context.Background(), &ypb.MCPGlobalConfig{
+		DefaultToolSets:         []string{"codec"},
+		EnableAIToolFramework:   false,
+		EnableBridgeExternalMCP: false,
+	})
+	require.NoError(t, err)
+
+	// Request tries to enable AI framework, but default-start assigns from global config.
+	names := startMCPListToolNames(t, &ypb.StartMcpServerRequest{
+		Host:                  "127.0.0.1",
+		Port:                  0,
+		EnableAll:             false,
+		EnableAIToolFramework: true,
+	})
+	assert.True(t, containsTool(names, "exec_codec"))
+}
+
+func TestGRPC_SetMCPGlobalConfig_SyncsToolEnableList(t *testing.T) {
+	grpcSrv, err := NewServer()
+	require.NoError(t, err)
+	db := grpcSrv.GetProfileDatabase()
+	t.Cleanup(func() {
+		_, _ = yakit.ResetMCPGlobalConfig(db)
+		yakit.SetCachedMCPGlobalConfigForTest(nil)
+	})
+
+	// Ensure rows exist via list sync path.
+	_, err = grpcSrv.GetMCPToolList(context.Background(), &ypb.GetMCPToolListRequest{})
+	require.NoError(t, err)
+
+	_, err = grpcSrv.SetMCPGlobalConfig(context.Background(), &ypb.MCPGlobalConfig{
+		DefaultToolSets: []string{"codec"},
+	})
+	require.NoError(t, err)
+
+	codec, err := yakit.GetMCPClientToolConfigByName(db, "exec_codec")
+	require.NoError(t, err)
+	assert.True(t, codec.Enable)
+
+	payload, err := yakit.GetMCPClientToolConfigByName(db, "save_payload")
+	require.NoError(t, err)
+	assert.False(t, payload.Enable)
+}
+
