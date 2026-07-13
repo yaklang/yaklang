@@ -101,6 +101,9 @@ type AIStatefulTask interface {
 
 	IsSubAgent() bool
 	SetSubAgent(isSubAgent bool)
+
+	IsUserCancelled() bool
+	SetUserCancelled()
 }
 
 type AIStatefulTaskBase struct {
@@ -139,6 +142,8 @@ type AIStatefulTaskBase struct {
 	isSubAgent               bool
 
 	cancelReason string
+
+	userCancelled bool
 }
 
 func (s *AIStatefulTaskBase) GetFocusMode() string {
@@ -457,6 +462,32 @@ func (s *AIStatefulTaskBase) GetCancelReason() string {
 		defer s.taskMutex.Unlock()
 	}
 	return s.cancelReason
+}
+
+// SetUserCancelled marks the task as cancelled by the user via a sync event
+// (e.g. cancel task, jump queue, skip subtask). When set, the ReAct loop's
+// abort() will skip setting Aborted / appending [Error] so the user-initiated
+// terminal state (Skipped) survives the race with the loop's own teardown.
+func (s *AIStatefulTaskBase) SetUserCancelled() {
+	if s == nil {
+		return
+	}
+	if s.taskMutex != nil {
+		s.taskMutex.Lock()
+		defer s.taskMutex.Unlock()
+	}
+	s.userCancelled = true
+}
+
+func (s *AIStatefulTaskBase) IsUserCancelled() bool {
+	if s == nil {
+		return false
+	}
+	if s.taskMutex != nil {
+		s.taskMutex.Lock()
+		defer s.taskMutex.Unlock()
+	}
+	return s.userCancelled
 }
 
 func (s *AIStatefulTaskBase) IsFinished() bool {

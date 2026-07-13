@@ -115,7 +115,7 @@ func runForkedSubReactAgentJob(
 	// overlaps across the concurrently-dispatched sub agents.
 	var subAgentErr error
 	var elaboratedGoal, resultContract string
-	defer subTask.CallAsyncDeferCallback(subAgentErr)
+	defer func() { subTask.CallAsyncDeferCallback(subAgentErr) }()
 	subTask.SetStatus(aicommon.AITaskState_Processing)
 	elaboratedGoal, resultContract, subAgentErr = elaborateSubReactAgentGoal(
 		subTask.GetContext(), childInvoker, parentLoop, subTask.GetId(), job,

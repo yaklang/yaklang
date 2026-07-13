@@ -661,6 +661,8 @@ func (c *Coordinator) HandleSkipSubtaskInPlan(event *ypb.AIInputEvent) error {
 		return nil
 	}
 
+	// 标记为用户主动取消，阻止 abort 覆盖为 Aborted
+	task.SetUserCancelled()
 	// 取消任务并设置为 Skipped 状态（区别于 Aborted，Skipped 专门表示用户主动跳过）
 	task.SetStatus(aicommon.AITaskState_Skipped)
 	if userReason != "" {
