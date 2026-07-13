@@ -15,7 +15,8 @@ func SaveAIYakTool(db *gorm.DB, tool *schema.AIYakTool) (int64, error) {
 	if tool == nil {
 		return 0, utils.Error("ai tool is nil")
 	}
-	if db := db.Where("name = ?", tool.Name).Assign(tool.ToUpdateMap()).FirstOrCreate(tool); db.Error != nil {
+	// gorm v2: FirstOrCreate 需要 db 的 Model 已就位，但 Where/Assign 累积进 Statement 无隔离风险(单 finisher)。
+	if db := db.Session(&gorm.Session{}).Where("name = ?", tool.Name).Assign(tool.ToUpdateMap()).FirstOrCreate(tool); db.Error != nil {
 		return 0, utils.Errorf("create/update AIYakTool failed: %s", db.Error)
 	}
 	return db.RowsAffected, nil
@@ -36,7 +37,8 @@ func UpdateAIYakToolByID(db *gorm.DB, tool *schema.AIYakTool) (int64, error) {
 
 	// 先查询获取现有记录的 CreatedAt
 	var existing schema.AIYakTool
-	if err := db.Where("id = ?", tool.ID).First(&existing).Error; err != nil {
+	// gorm v2: 上游 db 可能已被 Where 污染；First 用独立 Session 隔离。
+	if err := db.Session(&gorm.Session{}).Where("id = ?", tool.ID).First(&existing).Error; err != nil {
 		return 0, utils.Errorf("find AIYakTool failed: %s", err)
 	}
 
@@ -52,7 +54,7 @@ func UpdateAIYakToolByID(db *gorm.DB, tool *schema.AIYakTool) (int64, error) {
 func GetAIYakTool(db *gorm.DB, name string) (*schema.AIYakTool, error) {
 	db = db.Model(&schema.AIYakTool{})
 	var tool schema.AIYakTool
-	if err := db.Where("name = ?", name).First(&tool).Error; err != nil {
+	if err := db.Session(&gorm.Session{}).Where("name = ?", name).First(&tool).Error; err != nil {
 		return nil, err
 	}
 	return &tool, nil
@@ -61,7 +63,7 @@ func GetAIYakTool(db *gorm.DB, name string) (*schema.AIYakTool, error) {
 func GetAIYakToolByID(db *gorm.DB, id uint) (*schema.AIYakTool, error) {
 	db = db.Model(&schema.AIYakTool{})
 	var tool schema.AIYakTool
-	if err := db.Where("id = ?", id).First(&tool).Error; err != nil {
+	if err := db.Session(&gorm.Session{}).Where("id = ?", id).First(&tool).Error; err != nil {
 		return nil, err
 	}
 	return &tool, nil
@@ -181,14 +183,15 @@ func ToggleAIYakToolFavorite(db *gorm.DB, toolName string) (bool, error) {
 	db = db.Model(&schema.AIYakTool{})
 
 	var tool schema.AIYakTool
-	if err := db.Where("name = ?", toolName).First(&tool).Error; err != nil {
+	if err := db.Session(&gorm.Session{}).Where("name = ?", toolName).First(&tool).Error; err != nil {
 		return false, utils.Errorf("AI tool not found: %s", err)
 	}
 
 	// Toggle the favorite status
 	tool.IsFavorite = !tool.IsFavorite
 
-	if err := db.Save(&tool).Error; err != nil {
+	// gorm v2: Session({}) 仍 clone 已被 Model(&AIYakTool{}) 污染的 Statement(空主键)，Save 按 ID=0 走 UPDATE 无 WHERE 守卫报错。用 NewDB 拿全空 Statement，Save 正确按 tool.ID 走 UPDATE id=?。
+	if err := db.Session(&gorm.Session{NewDB: true}).Save(&tool).Error; err != nil {
 		return false, utils.Errorf("failed to update AI tool favorite status: %s", err)
 	}
 
@@ -200,14 +203,15 @@ func ToggleAIYakToolFavoriteByID(db *gorm.DB, toolID uint) (bool, error) {
 	db = db.Model(&schema.AIYakTool{})
 
 	var tool schema.AIYakTool
-	if err := db.Where("id = ?", toolID).First(&tool).Error; err != nil {
+	if err := db.Session(&gorm.Session{}).Where("id = ?", toolID).First(&tool).Error; err != nil {
 		return false, utils.Errorf("AI tool not found: %s", err)
 	}
 
 	// Toggle the favorite status
 	tool.IsFavorite = !tool.IsFavorite
 
-	if err := db.Save(&tool).Error; err != nil {
+	// gorm v2: Session({}) 仍 clone 已被 Model(&AIYakTool{}) 污染的 Statement(空主键)，Save 按 ID=0 走 UPDATE 无 WHERE 守卫报错。用 NewDB 拿全空 Statement，Save 正确按 tool.ID 走 UPDATE id=?。
+	if err := db.Session(&gorm.Session{NewDB: true}).Save(&tool).Error; err != nil {
 		return false, utils.Errorf("failed to update AI tool favorite status: %s", err)
 	}
 

@@ -37,7 +37,7 @@ func TestPluginOptionDefineFunc(t *testing.T) {
 		check(t, `
 		hijackSaveHTTPFlow = func(flow /* *schema.HTTPFlow */, modify /* func(modified *schema.HTTPFlow) */, drop/* func() */) {
 			responseBytes, _ = codec.StrconvUnquote(flow.Response)
-			a = flow.BeforeSave() //error
+			a = flow.BeforeSave(nil) //error // gorm v2 hook: BeforeSave(tx *gorm.DB)
 		}
 		`,
 			[]string{

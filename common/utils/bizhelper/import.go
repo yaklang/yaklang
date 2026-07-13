@@ -119,7 +119,8 @@ func NewTableImportTool[T any](ctx context.Context, db *gorm.DB, filepath string
 	}
 
 	return &tableImportTool[T]{
-		db:            db,
+		// gorm v2 默认共享 Statement：createOrUpdateByUniqueIndex 反复 Where(rule_id).First 再 Updates/Create，clone==0 会让这些 finisher 累积污染同一 Statement（WHERE/JOIN 串台触发 ambiguous column）。用 Session 拿 clone>=2，每次 finisher 各自 clone。
+		db:            db.Session(&gorm.Session{}),
 		ctx:           ctx,
 		unmarshalFunc: unmarshalFunc,
 		config:        config,

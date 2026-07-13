@@ -685,12 +685,12 @@ func TestMUSTPASS_ImportRAG_OneKnowledgeMultipleVectors(t *testing.T) {
 	var sourceVectorCount int64
 	sourceDB.Model(&schema.VectorStoreDocument{}).Count(&sourceVectorCount)
 	t.Logf("源数据库向量文档数量: %d", sourceVectorCount)
-	assert.Equal(t, 10, sourceVectorCount, "应该有10个向量文档")
+	assert.Equal(t, int64(10), sourceVectorCount, "应该有10个向量文档")
 
 	var sourceKnowledgeCount int64
 	sourceDB.Model(&schema.KnowledgeBaseEntry{}).Count(&sourceKnowledgeCount)
 	t.Logf("源数据库知识条目数量: %d", sourceKnowledgeCount)
-	assert.Equal(t, 1, sourceKnowledgeCount, "应该有1个知识条目")
+	assert.Equal(t, int64(1), sourceKnowledgeCount, "应该有1个知识条目")
 
 	// 导出 RAG 文件
 	tempFile, err := os.CreateTemp("", "test_one_knowledge_multi_vectors_*.rag")
@@ -716,12 +716,12 @@ func TestMUSTPASS_ImportRAG_OneKnowledgeMultipleVectors(t *testing.T) {
 	var targetVectorCount int64
 	targetDB.Model(&schema.VectorStoreDocument{}).Count(&targetVectorCount)
 	t.Logf("目标数据库向量文档数量: %d", targetVectorCount)
-	assert.Equal(t, 10, targetVectorCount, "导入后应该有10个向量文档")
+	assert.Equal(t, int64(10), targetVectorCount, "导入后应该有10个向量文档")
 
 	var targetKnowledgeCount int64
 	targetDB.Model(&schema.KnowledgeBaseEntry{}).Count(&targetKnowledgeCount)
 	t.Logf("目标数据库知识条目数量: %d", targetKnowledgeCount)
-	assert.Equal(t, 1, targetKnowledgeCount, "导入后应该只有1个知识条目（去重后）")
+	assert.Equal(t, int64(1), targetKnowledgeCount, "导入后应该只有1个知识条目（去重后）")
 
 	// 获取导入后的知识条目
 	var importedEntry schema.KnowledgeBaseEntry

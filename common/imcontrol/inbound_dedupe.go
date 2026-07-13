@@ -3,12 +3,13 @@ package imcontrol
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"strings"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/notify"
+	"gorm.io/gorm"
 )
 
 type inboundMessageRecord struct {
@@ -38,7 +39,7 @@ func (e *Engine) markPersistentInboundSeen(msg *notify.InboundMessage, messageID
 	if db == nil {
 		return false, nil
 	}
-	if err := db.AutoMigrate(&inboundMessageRecord{}).Error; err != nil {
+	if err := db.AutoMigrate(&inboundMessageRecord{}); err != nil {
 		return false, err
 	}
 	_ = db.Where("expires_at < ?", seenAt).Delete(&inboundMessageRecord{}).Error
@@ -49,7 +50,7 @@ func (e *Engine) markPersistentInboundSeen(msg *notify.InboundMessage, messageID
 	if err == nil {
 		return true, nil
 	}
-	if err != nil && !gorm.IsRecordNotFoundError(err) {
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return false, err
 	}
 

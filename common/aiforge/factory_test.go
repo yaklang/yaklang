@@ -322,7 +322,7 @@ func TestForgeFactory_DatabaseConnection(t *testing.T) {
 		log.Infof("found %d AIForge records in database after PostInit", count)
 
 		// PostInit 之后应该有一些数据
-		assert.Greater(t, count, 0, "database should contain some AIForge records after PostInit")
+		assert.Greater(t, count, int64(0), "database should contain some AIForge records after PostInit")
 	})
 }
 

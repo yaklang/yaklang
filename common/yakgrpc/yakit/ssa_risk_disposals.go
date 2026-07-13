@@ -235,9 +235,9 @@ func UpdateSSARiskDisposals(db *gorm.DB, req *ypb.UpdateSSARiskDisposalsRequest)
 			item.Comment = req.GetComment()
 			return item
 		})
-		tx = tx.Model(&schema.SSARiskDisposals{})
+		// gorm v2: tx.Model(&SSARiskDisposals{}) 让空 Model(ID=0) 覆盖 Save 的主键条件，触发 WHERE conditions required；且复用 clone==0 的 tx 跨多次 Save 会累积污染。每次 Save 用独立会话，由 dest 的主键生成 WHERE id=?。
 		for _, disposal := range toUpdate {
-			if err := tx.Save(&disposal).Error; err != nil {
+			if err := tx.Session(&gorm.Session{}).Save(&disposal).Error; err != nil {
 				return utils.Errorf("UpdateSSARiskDisposals failed during save: %v", err)
 			}
 		}

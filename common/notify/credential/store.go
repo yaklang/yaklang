@@ -11,9 +11,9 @@ import (
 	"io"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/notify"
+	"gorm.io/gorm"
 )
 
 // BotConfig 是一个 IM 平台 bot 的持久化凭证（每平台一条）。
@@ -132,11 +132,8 @@ func getDB() *gorm.DB {
 
 // migrateOnce 保证表结构存在（幂等）。
 func migrateOnce() error {
-	db := getDB().AutoMigrate(&BotConfig{})
-	if db != nil && db.Error != nil {
-		return db.Error
-	}
-	return nil
+	// gorm v2: AutoMigrate returns error directly
+	return getDB().AutoMigrate(&BotConfig{})
 }
 
 // SaveBotConfig 保存（按 Platform upsert）一条 bot 凭证，敏感字段加密落库。
@@ -181,10 +178,10 @@ func SaveBotConfig(cfg *BotConfig) (*BotConfig, error) {
 	db := getDB()
 	var existing BotConfig
 	err = db.Where("platform = ?", row.Platform).First(&existing).Error
-	if err != nil && !gorm.IsRecordNotFoundError(err) {
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, fmt.Errorf("query existing: %w", err)
 	}
-	if gorm.IsRecordNotFoundError(err) {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		row.CreatedAt = now
 		if e := db.Create(&row).Error; e != nil {
 			return nil, fmt.Errorf("create: %w", e)
@@ -242,7 +239,7 @@ func GetBotConfig(platform string) (*BotConfig, error) {
 	var row BotConfig
 	err := getDB().Where("platform = ?", platform).First(&row).Error
 	if err != nil {
-		if gorm.IsRecordNotFoundError(err) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err

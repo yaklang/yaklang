@@ -107,7 +107,8 @@ func FilterSyntaxFlowRule(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter, opt ...
 
 	db = db.Model(&schema.SyntaxFlowRule{})
 	if filter == nil {
-		return db
+		// gorm v2 默认共享 Statement：返回 clone>=2 的会话，避免调用方多次 finisher 污染过滤条件。
+		return db.Session(&gorm.Session{})
 	}
 
 	if len(filter.GetGroupNames()) > 0 {
@@ -167,7 +168,8 @@ func FilterSyntaxFlowRule(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter, opt ...
 	case FilterLibRuleFalse:
 		db = bizhelper.QueryByBool(db, "allow_included", false)
 	}
-	return db
+	// gorm v2 默认共享 Statement：返回 clone>=2 的会话，使调用方多次 finisher (Count/Find/Pluck) 各自 clone 而不污染过滤条件。
+	return db.Session(&gorm.Session{})
 }
 
 func QuerySyntaxFlowRule(db *gorm.DB, params *ypb.QuerySyntaxFlowRuleRequest) (*bizhelper.Paginator, []*schema.SyntaxFlowRule, error) {
@@ -282,7 +284,7 @@ func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.S
 	updateRule.NeedUpdate = true
 
 	groups := sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), rule.GetGroupNames())
-	if err := db.Model(&schema.SyntaxFlowRule{}).Updates(&updateRule).Error; err != nil {
+	if err := db.Model(&schema.SyntaxFlowRule{}).Where("rule_name = ?", updateRule.RuleName).Updates(&updateRule).Error; err != nil {
 		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
 	}
 	if err := db.Model(&updateRule).Association("Groups").Replace(groups); err != nil {

@@ -344,7 +344,7 @@ func (b *streamEventBuffer) appendDirect(outDb *gorm.DB, event *schema.AiOutputE
 	}
 	// Fallback to the original read-modify-write behavior.
 	var existingEvent schema.AiOutputEvent
-	if err := outDb.Where("event_uuid = ?", event.EventUUID).First(&existingEvent).Error; err != nil {
+	if err := outDb.Session(&gorm.Session{}).Where("event_uuid = ?", event.EventUUID).First(&existingEvent).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return saveAIEvent(outDb, event)
 		}
@@ -357,7 +357,7 @@ func (b *streamEventBuffer) appendDirect(outDb *gorm.DB, event *schema.AiOutputE
 func ensureStreamEventBase(outDb *gorm.DB, event *schema.AiOutputEvent) (created bool, _ error) {
 	// Use FirstOrCreate pattern without transaction to avoid "database is locked" errors.
 	var existingEvent schema.AiOutputEvent
-	if err := outDb.Where("event_uuid = ?", event.EventUUID).First(&existingEvent).Error; err != nil {
+	if err := outDb.Session(&gorm.Session{}).Where("event_uuid = ?", event.EventUUID).First(&existingEvent).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return true, saveAIEvent(outDb, event)
 		}
@@ -374,7 +374,7 @@ func appendStreamDelta(db *gorm.DB, eventUUID string, delta []byte) error {
 	// Optimized atomic append for sqlite (project DB). Fallback to read-modify-write on other dialects.
 	if db != nil && db.Dialector != nil {
 		switch db.Dialector.Name() {
-		case "sqlite3":
+		case "sqlite": // gorm v2 driver/sqlite Dialector.Name() returns sqlite (v1 was sqlite3)
 			// X'' is an empty BLOB literal in SQLite.
 			r := db.Model(&schema.AiOutputEvent{}).
 				Where("event_uuid = ?", eventUUID).

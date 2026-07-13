@@ -220,13 +220,10 @@ func (s *sourceStore) Flush() {
 	}
 
 	saveErr := utils.GormTransaction(s.db, func(tx *gorm.DB) error {
-		for _, source := range toSave {
-			if source == nil {
-				continue
-			}
-			if err := tx.Save(source).Error; err != nil {
-				return err
-			}
+		// gorm v2: 用 CreateInBatches 批量插入，把 N 次往返压缩为 ceil(N/batchSize) 次，
+		// 显著降低 SSA 编译期大量 source 落库的 SQLite 写锁/往返开销。BeforeSave hook 仍按记录逐条触发。
+		if err := tx.CreateInBatches(toSave, 500).Error; err != nil {
+			return err
 		}
 		return nil
 	})

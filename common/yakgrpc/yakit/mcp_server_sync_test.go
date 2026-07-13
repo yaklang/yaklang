@@ -114,7 +114,7 @@ func TestMUSTPASS_SyncAndCache_RemovedToolIsHardDeleted(t *testing.T) {
 	require.NoError(t, db.Unscoped().Model(&schema.MCPServerToolConfig{}).
 		Where("server_name = ? AND tool_name = ?", srv, "gone").
 		Count(&count).Error)
-	assert.Equal(t, 0, count, "hard-delete must leave no trace in the table")
+	assert.Equal(t, int64(0), count, "hard-delete must leave no trace in the table")
 }
 
 // TestSyncAndCache_MetadataUpdated verifies that description and params_json are
@@ -188,7 +188,7 @@ func TestMUSTPASS_SyncAndCache_ToolRename(t *testing.T) {
 	require.NoError(t, db.Unscoped().Model(&schema.MCPServerToolConfig{}).
 		Where("server_name = ? AND tool_name = ?", srv, "search_file").
 		Count(&count).Error)
-	assert.Equal(t, 0, count)
+	assert.Equal(t, int64(0), count)
 }
 
 // TestSyncAndCache_EmptyLiveList removes all tools when the server returns an

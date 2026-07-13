@@ -88,14 +88,14 @@ func TestSeedMCPServer_CleanupRemovesMCPServerToolConfigs(t *testing.T) {
 	var before int64
 	require.NoError(t, db.Model(&schema.MCPServerToolConfig{}).
 		Where("server_name = ?", srvName).Count(&before).Error)
-	require.Equal(t, 1, before)
+	require.Equal(t, int64(1), before)
 
 	cleanup()
 
 	var after int64
 	require.NoError(t, db.Model(&schema.MCPServerToolConfig{}).
 		Where("server_name = ?", srvName).Count(&after).Error)
-	assert.Equal(t, 0, after)
+	assert.Equal(t, int64(0), after)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -261,7 +261,8 @@ func CreateRuleByContentExWithDB(db *gorm.DB, ruleFileName string, content strin
 
 	// ⭐ 使用元数据增强器自动生成分组，同时添加默认的语言/严重性/目的分组
 	enrichedGroups := enrichRuleGroups(rule, filePath)
-	addGroupsForRule(db, rule, true, enrichedGroups...)
+	// gorm v2 共享 Statement：MigrateSyntaxFlowWithDB 可能已把 db 的 Table 固化，分组操作前用 NewDB 会话隔离，避免污染目标表。
+	addGroupsForRule(db.Session(&gorm.Session{NewDB: true}), rule, true, enrichedGroups...)
 	return rule, nil
 }
 
@@ -502,7 +503,9 @@ func createRuleEx(rule *schema.SyntaxFlowRule, needDefaultGroup bool, groups ...
 	if err := db.Create(&rule).Error; err != nil {
 		return nil, utils.Errorf("create syntaxFlow rule failed: %s", err)
 	}
-	addGroupsForRule(db, rule, needDefaultGroup, groups...)
+	// gorm v2 默认共享 Statement：db.Create 之后 db 的 Statement/Table 已固化为 syntax_flow_rules，
+	// 直接复用会污染后续分组查询/写入的目标表。用 NewDB 会话拿到干净 Statement（连接池保留）。
+	addGroupsForRule(db.Session(&gorm.Session{NewDB: true}), rule, needDefaultGroup, groups...)
 	return rule, nil
 }
 
@@ -530,10 +533,12 @@ func CreateOrUpdateRuleWithGroup(rule *schema.SyntaxFlowRule, groups ...string) 
 	})
 	groups = append(groups, backUp...)
 	rule.Groups = nil
-	if err := CreateOrUpdateSyntaxFlowRule(db, rule.RuleName, &rule); err != nil {
+	// gorm v2: Assign 需要 *struct/struct，传入 &rule(**struct) 会导致字段错位（rule_name 落空），传 rule 即可。
+	if err := CreateOrUpdateSyntaxFlowRule(db, rule.RuleName, rule); err != nil {
 		return nil, utils.Errorf("create syntaxFlow rule failed: %s", err)
 	}
-	CreateOrUpdateGroupsForRule(db, rule, groups...)
+	// 同 createRuleEx：避免上面 db 被固化为 syntax_flow_rules 的 Statement 污染分组操作。
+	CreateOrUpdateGroupsForRule(db.Session(&gorm.Session{NewDB: true}), rule, groups...)
 	return rule, nil
 }
 

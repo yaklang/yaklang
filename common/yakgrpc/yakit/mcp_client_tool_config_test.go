@@ -236,7 +236,7 @@ func TestDeleteMCPClientToolConfigsByServerAndNames(t *testing.T) {
 		var ghostCount int64
 		require.NoError(t, db.Unscoped().Model(&schema.MCPClientToolConfig{}).
 			Where("tool_name = ?", toolName).Count(&ghostCount).Error)
-		assert.Equal(t, 0, ghostCount)
+		assert.Equal(t, int64(0), ghostCount)
 
 		cfg, err := GetOrCreateMCPClientToolConfig(db, toolName, schema.MCPClientToolSourceBridge, srvRecycle, "v2")
 		require.NoError(t, err)

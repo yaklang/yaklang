@@ -934,10 +934,10 @@ func TestGRPCMUSTPASS_Delete_HTTPFlow(t *testing.T) {
 
 	var count int64
 	yakit.FilterHTTPFlow(db, &ypb.QueryHTTPFlowRequest{Keyword: token1}).Count(&count)
-	require.Equal(t, 0, count, "delete token1 fail")
+	require.Equal(t, int64(0), count, "delete token1 fail")
 
 	yakit.FilterHTTPFlow(db, &ypb.QueryHTTPFlowRequest{Keyword: token2}).Count(&count)
-	require.Equal(t, 100, count, "error delete token2")
+	require.Equal(t, int64(100), count, "error delete token2")
 
 	err = yakit.DeleteHTTPFlow(db, &ypb.DeleteHTTPFlowRequest{
 		Filter: &ypb.QueryHTTPFlowRequest{

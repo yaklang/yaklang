@@ -12,7 +12,7 @@ func FilterSyntaxFlowResult(rawDB *gorm.DB, filter *ypb.SyntaxFlowResultFilter) 
 	db := rawDB.Model(&ssadb.AuditResult{})
 	db = bizhelper.ExactQueryExcludeArrayOr(db, "kind", []any{string(schema.SFResultKindSearch)})
 	if filter == nil {
-		return db
+		return db.Session(&gorm.Session{})
 	}
 
 	/*
@@ -44,7 +44,7 @@ func FilterSyntaxFlowResult(rawDB *gorm.DB, filter *ypb.SyntaxFlowResultFilter) 
 		}, filter.GetKeyword(), false)
 	}
 
-	return db
+	return db.Session(&gorm.Session{})
 }
 
 func GetSyntaxFlowResultByTaskId(db *gorm.DB, taskId string) *gorm.DB {

@@ -3,9 +3,13 @@ package reactloops
 import (
 	"context"
 	"fmt"
+	"mime"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 const (
@@ -150,8 +154,6 @@ func (r *ReActLoop) ShouldTriggerPeriodicCheckpointOnIteration(iterationIndex in
 	return r.maxIterations > 0 && iterationIndex > 0 && iterationIndex == r.maxIterations
 }
 
-<<<<<<< HEAD
-=======
 // pushDeliveryFileToTimeline records a verification-confirmed output file as
 // an Open Timeline entry. Only the file path + lightweight metadata
 // (size / mime / mtime) is written; the file body is NEVER read or sampled.
@@ -235,7 +237,6 @@ func formatDeliveryFileSize(size int64) string {
 	}
 }
 
->>>>>>> 94ba0554a (style(gorm): apply gofmt to all files touched by gorm v2 migration)
 // ApplyVerificationResult stores verification side effects in the loop state.
 func (r *ReActLoop) ApplyVerificationResult(result *aicommon.VerifySatisfactionResult) {
 	if r == nil || result == nil {

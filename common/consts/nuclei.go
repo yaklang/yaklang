@@ -2,8 +2,6 @@ package consts
 
 import (
 	"path/filepath"
-
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 // GetPoCDir 获取本地 nuclei 模板(PoC)的默认存放目录

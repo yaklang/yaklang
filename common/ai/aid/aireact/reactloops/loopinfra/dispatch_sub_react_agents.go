@@ -10,8 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yaklang/yaklang/common/utils/chanx"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/subagent"
@@ -125,7 +123,6 @@ func runForkedSubReactAgentJob(
 		resultContract = ""
 	}
 	subTask.SetUserInput(buildSubAgentUserInput(elaboratedGoal, resultContract))
-
 
 	subLoop, err := reactloops.CreateLoopByName(loopName, childInvoker, buildSubReactLoopOptions()...)
 	if err != nil {

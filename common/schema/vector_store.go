@@ -201,7 +201,7 @@ type VectorStoreCollection struct {
 	ExportedAt time.Time `json:"exported_at"`
 }
 
-func (v *VectorStoreCollection) BeforeSave() error {
+func (v *VectorStoreCollection) BeforeSave(tx *gorm.DB) error {
 	if v.UUID == "" {
 		v.UUID = uuid.NewString()
 	}
@@ -229,7 +229,7 @@ type VectorStoreDocument struct {
 	CollectionID uint `gorm:"uniqueIndex:idx_document_id_collection_id;not null" json:"collection_id"`
 
 	// 所属集合的 UUID，唯一值
-	CollectionUUID string `gorm:"uniqueIndex"`
+	CollectionUUID string `gorm:"index"` // gorm v2: uniqueIndex 在 v1 被忽略(写法笔误)，v2 会真实创建唯一索引；同一集合的多条文档共享 collection_uuid，不能唯一，改为普通索引
 
 	// 文档元数据，以 JSON 格式存储，包含原始文本、来源等信息
 	Metadata MetadataMap `gorm:"type:text" json:"metadata"`
@@ -247,7 +247,7 @@ type VectorStoreDocument struct {
 	RuntimeID string
 }
 
-func (v *VectorStoreDocument) BeforeSave() error {
+func (v *VectorStoreDocument) BeforeSave(tx *gorm.DB) error {
 	if len(v.UID) == 0 {
 		m := md5.Sum([]byte(v.CollectionUUID + v.DocumentID))
 		v.UID = m[:]
@@ -424,7 +424,7 @@ func (e *KnowledgeBaseEntry) TableName() string {
 	return "rag_knowledge_entry_v1"
 }
 
-func (e *KnowledgeBaseEntry) BeforeSave() error {
+func (e *KnowledgeBaseEntry) BeforeSave(tx *gorm.DB) error {
 	if e.HiddenIndex == "" {
 		e.HiddenIndex = uuid.NewString()
 	}

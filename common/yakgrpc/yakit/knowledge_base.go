@@ -66,13 +66,11 @@ func UpdateKnowledgeBaseInfo(db *gorm.DB, id int64, knowledgeBase *schema.Knowle
 // DeleteKnowledgeBase 删除知识库和知识库条目
 func DeleteKnowledgeBase(db *gorm.DB, id int64) error {
 	return utils.GormTransaction(db, func(tx *gorm.DB) error {
-		tx = tx.Model(&schema.KnowledgeBaseInfo{})
-		err := tx.Where("id = ?", id).Unscoped().Delete(&schema.KnowledgeBaseInfo{}).Error
-		if err != nil {
+		// gorm v2 共享 Statement：复用同一 tx 跨多表 Delete 会累积 WHERE 且 Model 不随 Delete(&struct) 重置，导致列找不到/串表。每次 Delete 用独立会话，由 Delete(&struct) 推断目标表。
+		if err := tx.Session(&gorm.Session{}).Where("id = ?", id).Unscoped().Delete(&schema.KnowledgeBaseInfo{}).Error; err != nil {
 			return utils.Wrap(err, "delete KnowledgeBase failed")
 		}
-		err = tx.Where("knowledge_base_id = ?", id).Unscoped().Delete(&schema.KnowledgeBaseEntry{}).Error
-		if err != nil {
+		if err := tx.Session(&gorm.Session{}).Where("knowledge_base_id = ?", id).Unscoped().Delete(&schema.KnowledgeBaseEntry{}).Error; err != nil {
 			return utils.Wrap(err, "delete KnowledgeBaseEntry failed")
 		}
 		return nil
@@ -125,16 +123,14 @@ func GetKnowledgeBaseNameList(db *gorm.DB) ([]string, error) {
 func UpdateKnowledgeBaseEntryByHiddenIndex(db *gorm.DB, hiddenIndex string, knowledgeBase *schema.KnowledgeBaseEntry) error {
 	db = db.Model(&schema.KnowledgeBaseEntry{})
 	var count int64
-	db.Where("hidden_index = ?", hiddenIndex).Count(&count)
+	// gorm v2 共享 Statement：Count 会污染 db 的 WHERE/Selects，再 Updates 复用会累积导致 ambiguous column。两次操作各用独立会话。
+	if err := db.Session(&gorm.Session{}).Where("hidden_index = ?", hiddenIndex).Count(&count).Error; err != nil {
+		return utils.Wrap(err, "count KnowledgeBaseEntry failed")
+	}
 	if count == 0 {
 		return utils.Errorf("knowledge base entry not found")
-	} else {
-		err := db.Where("hidden_index = ?", hiddenIndex).Updates(knowledgeBase).Error
-		if err != nil {
-			return utils.Wrap(err, "update KnowledgeBase failed")
-		}
-		return nil
 	}
+	return db.Session(&gorm.Session{}).Where("hidden_index = ?", hiddenIndex).Updates(knowledgeBase).Error
 }
 
 // CreateKnowledgeBaseEntry 创建知识库条目
