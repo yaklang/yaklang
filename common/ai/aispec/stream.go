@@ -773,12 +773,21 @@ type responsesToolCallState struct {
 	streamedMessageID map[string]struct{}
 	anyTextStreamed    bool
 	anyReasonStreamed  bool
+	// streamedArgsIDs records function_call item ids whose arguments were
+	// already delivered incrementally via response.function_call_arguments.delta.
+	// response.output_item.done for such items must NOT re-emit the full
+	// arguments via toolCallCallback, otherwise downstream incremental
+	// accumulators (aibalance chatJSONChunkWriter) append the snapshot again
+	// and corrupt the assembled JSON (e.g. {"city":"Tokyo"}{"city":"Tokyo"}).
+	// 关键词: streamedArgsIDs, output_item.done 不重复发, 增量已发不再发全量
+	streamedArgsIDs map[string]bool
 }
 
 func newResponsesToolCallState() *responsesToolCallState {
 	return &responsesToolCallState{
 		byItemID:          make(map[string]*ToolCall),
 		streamedMessageID: make(map[string]struct{}),
+		streamedArgsIDs:   make(map[string]bool),
 	}
 }
 
@@ -820,7 +829,7 @@ func handleResponsesJSONPayload(body []byte, outWriter io.Writer, reasonWriter i
 	if len(obj) == 0 {
 		return false
 	}
-	extractResponsesOutputFromObject(obj, outWriter, reasonWriter, toolCallCallback)
+	extractResponsesOutputFromObject(obj, outWriter, reasonWriter, toolCallCallback, nil)
 	return true
 }
 
@@ -934,6 +943,11 @@ func handleResponsesSSEEvent(event map[string]any, outWriter io.Writer, reasonWr
 			// Internal accumulation is kept for output_item.done / completed
 			// (non-stream) paths that need the full arguments snapshot.
 			tc.Function.Arguments += delta
+			// Record that this item's arguments were streamed incrementally,
+			// so output_item.done does not re-emit the full snapshot via the
+			// callback (would double-accumulate downstream).
+			// 关键词: streamedArgsIDs mark, delta 已发标记
+			toolState.streamedArgsIDs[toolState.buildKey(itemID, outputIndex)] = true
 		}
 		if delta == "" {
 			return
@@ -965,7 +979,7 @@ func handleResponsesSSEEvent(event map[string]any, outWriter io.Writer, reasonWr
 		if !toolState.anyTextStreamed {
 			resp := utils.MapGetMapRaw(event, "response")
 			if len(resp) > 0 {
-				extractResponsesOutputFromObject(resp, outWriter, reasonWriter, toolCallCallback)
+				extractResponsesOutputFromObject(resp, outWriter, reasonWriter, toolCallCallback, toolState)
 			}
 		}
 	default:
@@ -1004,7 +1018,8 @@ func handleResponsesOutputItem(item map[string]any, outputIndex int, eventType s
 		if tc == nil {
 			return
 		}
-		streamTC := toolState.getOrCreate(utils.MapGetString(item, "id"), tc.Index)
+		itemID := utils.MapGetString(item, "id")
+		streamTC := toolState.getOrCreate(itemID, tc.Index)
 		if streamTC.ID == "" {
 			streamTC.ID = tc.ID
 		}
@@ -1020,6 +1035,17 @@ func handleResponsesOutputItem(item map[string]any, outputIndex int, eventType s
 		if eventType != "response.output_item.done" {
 			return
 		}
+		// If this item's arguments were already streamed incrementally via
+		// response.function_call_arguments.delta, do NOT re-emit the full
+		// snapshot via toolCallCallback — downstream incremental accumulators
+		// (aibalance) would append the snapshot again and corrupt the JSON
+		// (e.g. {"city":"Tokyo"}{"city":"Tokyo"}). Only deliver the done event
+		// for items whose arguments were NOT streamed (non-stream / completed-
+		// only upstreams), preserving the legacy completed-event path.
+		// 关键词: output_item.done 跳过已流式, 避免全量重发双重累积
+		if toolState.streamedArgsIDs[toolState.buildKey(itemID, tc.Index)] {
+			return
+		}
 		if toolCallCallback != nil {
 			toolCallCallback([]*ToolCall{streamTC.Clone()})
 		} else {
@@ -1028,7 +1054,7 @@ func handleResponsesOutputItem(item map[string]any, outputIndex int, eventType s
 	}
 }
 
-func extractResponsesOutputFromObject(obj map[string]any, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall)) {
+func extractResponsesOutputFromObject(obj map[string]any, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), toolState *responsesToolCallState) {
 	if nested := utils.MapGetMapRaw(obj, "response"); len(nested) > 0 {
 		obj = nested
 	}
@@ -1064,9 +1090,17 @@ func extractResponsesOutputFromObject(obj map[string]any, outWriter io.Writer, r
 			}
 		case "function_call":
 			tc := parseResponsesFunctionCall(item, index)
-			if tc != nil {
-				toolCalls = append(toolCalls, tc)
+			if tc == nil {
+				continue
 			}
+			// Skip items whose arguments were already streamed incrementally
+			// via response.function_call_arguments.delta; re-emitting the full
+			// snapshot here would double-accumulate downstream.
+			// 关键词: completed 跳过已流式 function_call, 避免三重累积
+			if toolState != nil && toolState.streamedArgsIDs[toolState.buildKey(utils.MapGetString(item, "id"), index)] {
+				continue
+			}
+			toolCalls = append(toolCalls, tc)
 		}
 	}
 	if len(toolCalls) > 0 {
