@@ -18,7 +18,7 @@ import (
 //
 // yaklang_code_change delivery (backend → frontend):
 //   - op=patch: code.content is the changed fragment; code.patch describes how to apply it
-//     (kind: line_range | snippet | insert | delete | full; optional old_snippet; 1-based file lines).
+//     (kind: line_range | snippet | insert | delete | full; optional old_snippet; 1-based absolute file lines).
 //   - op=create|replace: code.content is the full script (create for new files; replace on loop flush).
 //   - code.version / code.change_id: monotonic dedup for multi-round edits.
 //

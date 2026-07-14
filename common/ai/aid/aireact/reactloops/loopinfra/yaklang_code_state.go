@@ -41,7 +41,6 @@ type loopYaklangCodeChange struct {
 	ChangeReason  string
 	EventOp       string
 	Version       int
-	ResetBaseline bool
 	EmitEvent     bool
 	// DeliveryPatch when set records a fragment delivery for editor_sync (live patch events).
 	DeliveryPatch *YaklangCodeDeliveryPatch
@@ -50,20 +49,6 @@ type loopYaklangCodeChange struct {
 type loopYaklangCodeChangeResult struct {
 	PreviousState *loopYaklangCodeState
 	CurrentState  *loopYaklangCodeState
-}
-
-type loopYaklangCodeChangeEvent struct {
-	Op           string                         `json:"op"`
-	Code         loopYaklangCodeChangeEventCode `json:"code"`
-	Reason       string                         `json:"reason,omitempty"`
-	SourceAction string                         `json:"source_action,omitempty"`
-}
-
-type loopYaklangCodeChangeEventCode struct {
-	Content string `json:"content"`
-	Path    string `json:"path,omitempty"`
-	Summary string `json:"summary,omitempty"`
-	Version int    `json:"version"`
 }
 
 func cloneLoopYaklangCodeState(state *loopYaklangCodeState) *loopYaklangCodeState {
@@ -259,11 +244,7 @@ func (f *SingleFileModificationSuiteFactory) applyLoopYaklangCodeChange(loop *re
 	clearLoopCodeSeededOnly(loop)
 
 	if input.DeliveryPatch != nil {
-		patch := *input.DeliveryPatch
-		patch.SourceAction = currentState.SourceAction
-		patch.ChangeReason = currentState.ChangeReason
-		patch.Version = currentState.Version
-		SetLoopYaklangDeliveryPatch(loop, &patch)
+		SetLoopYaklangDeliveryPatch(loop, input.DeliveryPatch)
 	}
 
 	if input.EmitEvent {
@@ -280,18 +261,6 @@ func emitLoopYaklangCodeChangeEvent(loop *reactloops.ReActLoop, state *loopYakla
 	if loop == nil || loop.GetEmitter() == nil || state == nil || strings.TrimSpace(state.Content) == "" {
 		return
 	}
-	if op == "" {
-		op = loopYaklangCodeEventOpReplace
-	}
-	_, _ = loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE, loopYaklangCodeChangeEventNode, loopYaklangCodeChangeEvent{
-		Op: op,
-		Code: loopYaklangCodeChangeEventCode{
-			Content: state.Content,
-			Path:    state.Path,
-			Summary: state.Summary,
-			Version: state.Version,
-		},
-		Reason:       state.ChangeReason,
-		SourceAction: state.SourceAction,
-	})
+	payload := BuildYaklangFullChangeEvent(op, state.Path, state.Content, state.Version, state.SourceAction, state.ChangeReason)
+	_, _ = loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_CHANGE, loopYaklangCodeChangeEventNode, payload)
 }
