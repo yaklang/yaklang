@@ -19,8 +19,7 @@ const (
 	yaklangLastDeliveryPatchLoopKey = "yaklang_last_delivery_patch"
 )
 
-// YaklangCodePatchMeta describes a single frontend-applicable code fragment.
-// code.content carries PatchFragment; metadata lives in code.patch.
+// YaklangCodePatchMeta describes how to apply code.content (fragment) on the frontend.
 type YaklangCodePatchMeta struct {
 	Kind       string `json:"kind"`
 	StartLine  int    `json:"start_line,omitempty"`
@@ -30,13 +29,10 @@ type YaklangCodePatchMeta struct {
 }
 
 // YaklangCodeDeliveryPatch is stored on the loop when a yaklang file action commits.
+// Line numbers in Meta are already absolute (1-based file lines).
 type YaklangCodeDeliveryPatch struct {
-	Fragment   string
-	Meta       YaklangCodePatchMeta
-	LineBase   int
-	SourceAction string
-	ChangeReason string
-	Version    int
+	Fragment string
+	Meta     YaklangCodePatchMeta
 }
 
 // YaklangCodeChangeEventCode is the wire JSON shape for yaklang_code_change.code.
@@ -46,7 +42,6 @@ type YaklangCodeChangeEventCode struct {
 	Summary  string                `json:"summary,omitempty"`
 	Version  int                   `json:"version"`
 	ChangeID string                `json:"change_id,omitempty"`
-	LineBase int                   `json:"line_base,omitempty"`
 	Patch    *YaklangCodePatchMeta `json:"patch,omitempty"`
 }
 
@@ -71,7 +66,6 @@ func YaklangAbsoluteLine(relativeLine, lineBase int) int {
 func BuildYaklangPatchLineRange(fragment string, startLine, endLine int, oldSnippet string, lineBase int) *YaklangCodeDeliveryPatch {
 	return &YaklangCodeDeliveryPatch{
 		Fragment: strings.TrimSpace(fragment),
-		LineBase: lineBase,
 		Meta: YaklangCodePatchMeta{
 			Kind:       YaklangPatchKindLineRange,
 			StartLine:  YaklangAbsoluteLine(startLine, lineBase),
@@ -82,9 +76,9 @@ func BuildYaklangPatchLineRange(fragment string, startLine, endLine int, oldSnip
 }
 
 func BuildYaklangPatchSnippet(fragment, oldSnippet string, lineBase int) *YaklangCodeDeliveryPatch {
+	_ = lineBase // reserved for callers that pass seed offset; snippet match is text-based
 	return &YaklangCodeDeliveryPatch{
 		Fragment: strings.TrimSpace(fragment),
-		LineBase: lineBase,
 		Meta: YaklangCodePatchMeta{
 			Kind:       YaklangPatchKindSnippet,
 			OldSnippet: oldSnippet,
@@ -95,7 +89,6 @@ func BuildYaklangPatchSnippet(fragment, oldSnippet string, lineBase int) *Yaklan
 func BuildYaklangPatchInsert(fragment string, insertLine, lineBase int) *YaklangCodeDeliveryPatch {
 	return &YaklangCodeDeliveryPatch{
 		Fragment: strings.TrimSpace(fragment),
-		LineBase: lineBase,
 		Meta: YaklangCodePatchMeta{
 			Kind:       YaklangPatchKindInsert,
 			InsertLine: YaklangAbsoluteLine(insertLine, lineBase),
@@ -105,7 +98,6 @@ func BuildYaklangPatchInsert(fragment string, insertLine, lineBase int) *Yaklang
 
 func BuildYaklangPatchDelete(startLine, endLine int, oldSnippet string, lineBase int) *YaklangCodeDeliveryPatch {
 	return &YaklangCodeDeliveryPatch{
-		LineBase: lineBase,
 		Meta: YaklangCodePatchMeta{
 			Kind:       YaklangPatchKindDelete,
 			StartLine:  YaklangAbsoluteLine(startLine, lineBase),
@@ -169,13 +161,9 @@ func BuildYaklangPatchChangeEvent(path string, patch *YaklangCodeDeliveryPatch, 
 		return YaklangCodeChangeEvent{}
 	}
 	if version <= 0 {
-		version = patch.Version
-	}
-	if version <= 0 {
 		version = 1
 	}
-	sourceAction = firstNonEmptyYaklangString(sourceAction, patch.SourceAction)
-	reason = firstNonEmptyYaklangString(reason, patch.ChangeReason)
+	sourceAction = strings.TrimSpace(sourceAction)
 	meta := patch.Meta
 	return YaklangCodeChangeEvent{
 		Op: LoopYaklangCodeEventOpPatch,
@@ -185,10 +173,9 @@ func BuildYaklangPatchChangeEvent(path string, patch *YaklangCodeDeliveryPatch, 
 			Summary:  buildLoopYaklangCodeSummary(patch.Fragment),
 			Version:  version,
 			ChangeID: BuildYaklangCodeChangeID(sourceAction, version),
-			LineBase: patch.LineBase,
 			Patch:    &meta,
 		},
-		Reason:       reason,
+		Reason:       strings.TrimSpace(reason),
 		SourceAction: sourceAction,
 	}
 }

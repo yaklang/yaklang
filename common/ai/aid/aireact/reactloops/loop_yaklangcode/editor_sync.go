@@ -13,16 +13,15 @@ import (
 )
 
 const (
-	yaklangEditorSyncPendingLoopKey     = "yaklang_editor_sync_pending"
-	yaklangEditorSyncFlushingLoopKey    = "yaklang_editor_sync_flushing"
-	yaklangEditorLastEmittedContentKey  = "yaklang_editor_last_emitted_content"
-	yaklangEditorLastEmittedVersionKey  = "yaklang_editor_last_emitted_version"
-	yaklangEditorDeliveryPathLoopKey    = "yaklang_editor_delivery_path"
-	yaklangEditorDeliveryOpLoopKey      = "yaklang_editor_delivery_op"
-	yaklangCodeVersionLoopKey           = "yaklang_code_change_version"
-	yaklangCodeSourceActionLoopKey      = "current_yaklang_code_source_action"
-	yaklangCodeChangeReasonLoopKey      = "current_yaklang_code_change_reason"
-	yaklangCodeChangeEventNode          = "yaklang_code_change"
+	yaklangEditorSyncPendingLoopKey    = "yaklang_editor_sync_pending"
+	yaklangEditorSyncFlushingLoopKey   = "yaklang_editor_sync_flushing"
+	yaklangEditorLastEmittedContentKey = "yaklang_editor_last_emitted_content"
+	yaklangEditorLastEmittedVersionKey = "yaklang_editor_last_emitted_version"
+	yaklangEditorDeliveryPathLoopKey   = "yaklang_editor_delivery_path"
+	yaklangEditorDeliveryOpLoopKey     = "yaklang_editor_delivery_op"
+	yaklangCodeSourceActionLoopKey     = "current_yaklang_code_source_action"
+	yaklangCodeChangeReasonLoopKey     = "current_yaklang_code_change_reason"
+	yaklangCodeChangeEventNode         = "yaklang_code_change"
 )
 
 // withYaklangDeferredEditorSync installs the editor-sync event processor for the yaklang code loop.

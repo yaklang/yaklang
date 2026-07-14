@@ -12,7 +12,6 @@ func TestBuildYaklangPatchLineRange_AbsoluteLines(t *testing.T) {
 	patch := BuildYaklangPatchLineRange("new", 2, 2, "old", 9)
 	require.NotNil(t, patch)
 	assert.Equal(t, "new", patch.Fragment)
-	assert.Equal(t, 9, patch.LineBase)
 	assert.Equal(t, YaklangPatchKindLineRange, patch.Meta.Kind)
 	assert.Equal(t, 11, patch.Meta.StartLine)
 	assert.Equal(t, 11, patch.Meta.EndLine)
