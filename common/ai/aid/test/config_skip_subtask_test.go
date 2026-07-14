@@ -1237,3 +1237,937 @@ LOOP:
 	require.True(t, redoSent, "redo request should be sent")
 	require.True(t, errorReceived, "error should be received for missing user_message")
 }
+
+
+// ---------------------------------------------------------------------------
+// subtask_id based tests
+// ---------------------------------------------------------------------------
+
+// TestCoordinator_FindSubtaskBySubtaskId 验证 FindSubtaskBySubtaskId 能通过 TaskId 正确查找子任务
+func TestCoordinator_FindSubtaskBySubtaskId(t *testing.T) {
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 100)
+	outputChan := make(chan *schema.AiOutputEvent, 100)
+
+	var coordinator *aid.Coordinator
+
+	ins, err := aid.NewCoordinator(
+		"测试通过 subtask_id 查找子任务",
+		aicommon.WithAgreeYOLO(),
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithEnableSelfReflection(false),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithGenerateReport(false),
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
+			outputChan <- event
+		}),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := request.GetPrompt()
+
+			planJSON := `{
+    "@action": "plan_from_document",
+    "main_task": "主任务",
+    "main_task_goal": "测试 FindSubtaskBySubtaskId",
+    "tasks": [
+        {"subtask_name": "子任务A", "subtask_goal": "目标A"},
+        {"subtask_name": "子任务B", "subtask_goal": "目标B"},
+        {"subtask_name": "子任务C", "subtask_goal": "目标C"}
+    ]
+}`
+			if rsp, err := tryHandleNewPlanFlowPrompt(config, prompt, planJSON); rsp != nil {
+				return rsp, err
+			}
+
+			rsp := config.NewAIResponse()
+			defer rsp.Close()
+
+			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "status_summary": "s", "task_short_summary": "s", "task_long_summary": "s"}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "完成"}}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "完成"}`))
+				return rsp, nil
+			}
+
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+	coordinator = ins
+
+	go func() {
+		ins.Run()
+	}()
+
+	planReviewed := false
+	syncId := uuid.New().String()
+	taskFound := false
+
+	ctx := utils.TimeoutContextSeconds(10)
+
+LOOP:
+	for {
+		select {
+		case result := <-outputChan:
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+				planReviewed = true
+				inputChan.SafeFeed(SyncInputEventEx(aicommon.SYNC_TYPE_PLAN, syncId))
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+				continue
+			}
+
+			if result.Type == schema.EVENT_TYPE_TASK_REVIEW_REQUIRE || result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+				continue
+			}
+
+			if result.Type == schema.EVENT_TYPE_PLAN && result.SyncID == syncId {
+				var data aitool.InvokeParams
+				if err := json.Unmarshal([]byte(result.Content), &data); err == nil {
+					rootTask := data.GetObject("root_task")
+					subtasks := rootTask.GetObjectArray("subtasks")
+					require.Len(t, subtasks, 3)
+
+					// 先通过 index 拿到 task，再取它的 TaskId
+					task1 := coordinator.FindSubtaskByIndex("1-1")
+					require.NotNil(t, task1)
+					require.NotEmpty(t, task1.TaskId)
+
+					task2 := coordinator.FindSubtaskByIndex("1-2")
+					require.NotNil(t, task2)
+					require.NotEmpty(t, task2.TaskId)
+
+					task3 := coordinator.FindSubtaskByIndex("1-3")
+					require.NotNil(t, task3)
+					require.NotEmpty(t, task3.TaskId)
+
+					// 通过 subtask_id 查找
+					found1 := coordinator.FindSubtaskBySubtaskId(task1.TaskId)
+					require.NotNil(t, found1, "should find task by subtask_id: "+task1.TaskId)
+					require.Equal(t, "子任务A", found1.Name)
+
+					found2 := coordinator.FindSubtaskBySubtaskId(task2.TaskId)
+					require.NotNil(t, found2, "should find task by subtask_id: "+task2.TaskId)
+					require.Equal(t, "子任务B", found2.Name)
+
+					found3 := coordinator.FindSubtaskBySubtaskId(task3.TaskId)
+					require.NotNil(t, found3, "should find task by subtask_id: "+task3.TaskId)
+					require.Equal(t, "子任务C", found3.Name)
+
+					// 不存在的 subtask_id
+					notFound := coordinator.FindSubtaskBySubtaskId("non-existent-id")
+					require.Nil(t, notFound)
+
+					// 空 subtask_id
+					emptyNotFound := coordinator.FindSubtaskBySubtaskId("")
+					require.Nil(t, emptyNotFound)
+
+					taskFound = true
+					break LOOP
+				}
+			}
+
+		case <-ctx.Done():
+			t.Fatalf("timeout: planReviewed=%v, taskFound=%v", planReviewed, taskFound)
+		}
+	}
+
+	require.True(t, planReviewed, "plan should be reviewed")
+	require.True(t, taskFound, "tasks should be found by subtask_id")
+}
+
+// TestCoordinator_SkipSubtaskInPlan_BySubtaskId 验证通过 subtask_id 跳过子任务
+func TestCoordinator_SkipSubtaskInPlan_BySubtaskId(t *testing.T) {
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 100)
+	outputChan := make(chan *schema.AiOutputEvent, 100)
+
+	task1Started := false
+	var subtask2ID string
+
+	ins, err := aid.NewCoordinator(
+		"测试通过 subtask_id 跳过子任务",
+		aicommon.WithAgreeYOLO(),
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithEnableSelfReflection(false),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithGenerateReport(false),
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
+			outputChan <- event
+		}),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := request.GetPrompt()
+
+			planJSON := `{
+    "@action": "plan_from_document",
+    "main_task": "测试通过 subtask_id 跳过子任务",
+    "main_task_goal": "验证通过 subtask_id 跳过子任务",
+    "tasks": [
+        {"subtask_name": "第一个任务", "subtask_goal": "执行第一个任务"},
+        {"subtask_name": "第二个任务-需要跳过", "subtask_goal": "这个任务需要被跳过"},
+        {"subtask_name": "第三个任务", "subtask_goal": "执行第三个任务"}
+    ]
+}`
+			if rsp, err := tryHandleNewPlanFlowPrompt(config, prompt, planJSON); rsp != nil {
+				return rsp, err
+			}
+
+			rsp := config.NewAIResponse()
+			defer rsp.Close()
+
+			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "status_summary": "s", "task_short_summary": "s", "task_long_summary": "s"}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
+				if isCurrentTask(prompt, "第一个任务") {
+					task1Started = true
+				}
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "完成"}}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "完成"}`))
+				return rsp, nil
+			}
+
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	go func() {
+		ins.Run()
+	}()
+
+	skipSent := false
+	skipSuccess := false
+	planSyncId := uuid.New().String()
+	skipSyncId := uuid.New().String()
+	userReason := "通过 subtask_id 跳过此任务"
+
+	ctx := utils.TimeoutContextSeconds(15)
+
+LOOP:
+	for {
+		select {
+		case result := <-outputChan:
+			// plan review -> continue + 请求 plan sync 以获取 task_id
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+				inputChan.SafeFeed(SyncInputEventEx(aicommon.SYNC_TYPE_PLAN, planSyncId))
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+				continue
+			}
+
+			// 从 plan sync 响应中提取 subtask_id
+			if result.Type == schema.EVENT_TYPE_PLAN && result.SyncID == planSyncId {
+				var data aitool.InvokeParams
+				if err := json.Unmarshal([]byte(result.Content), &data); err == nil {
+					rootTask := data.GetObject("root_task")
+					subtasks := rootTask.GetObjectArray("subtasks")
+					require.Len(t, subtasks, 3)
+					if len(subtasks) >= 2 {
+						subtask2ID = subtasks[1].GetString("task_id")
+					}
+				}
+				continue
+			}
+
+			if result.Type == schema.EVENT_TYPE_TASK_REVIEW_REQUIRE || result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+				continue
+			}
+
+			// 当第一个任务开始后且拿到 subtask2ID，发送跳过请求
+			if task1Started && subtask2ID != "" && !skipSent {
+				skipSent = true
+				inputChan.SafeFeed(SyncInputEventWithJSON(
+					aicommon.SYNC_TYPE_SKIP_SUBTASK_IN_PLAN,
+					skipSyncId,
+					map[string]any{
+						"subtask_id": subtask2ID,
+						"reason":     userReason,
+					},
+				))
+			}
+
+			// 检查跳过响应
+			if result.Type == schema.EVENT_TYPE_STRUCTURED && result.SyncID == skipSyncId {
+				var data map[string]any
+				if err := json.Unmarshal([]byte(result.Content), &data); err == nil {
+					if success, ok := data["success"].(bool); ok && success {
+						skipSuccess = true
+						require.Equal(t, "1-2", data["subtask_index"])
+						require.Equal(t, subtask2ID, data["subtask_id"])
+						require.Equal(t, userReason, data["reason"])
+						require.Contains(t, data["message"], "用户主动跳过了当前子任务")
+						require.Contains(t, data["message"], userReason)
+					}
+				}
+			}
+
+			if result.Type == schema.EVENT_TYPE_STRUCTURED && utils.StringContainsAllOfSubString(string(result.Content), []string{"push_task", "1-3"}) {
+				if skipSuccess {
+					break LOOP
+				}
+			}
+
+		case <-ctx.Done():
+			t.Fatalf("timeout: task1Started=%v, skipSent=%v, skipSuccess=%v, subtask2ID=%s", task1Started, skipSent, skipSuccess, subtask2ID)
+		}
+	}
+
+	require.True(t, task1Started, "task1 should be started")
+	require.True(t, skipSent, "skip request should be sent")
+	require.True(t, skipSuccess, "skip by subtask_id should succeed")
+	require.NotEmpty(t, subtask2ID, "subtask2ID should be captured")
+}
+
+// TestCoordinator_SkipSubtaskInPlan_SubtaskIdNotFound 验证 subtask_id 不存在时返回错误
+func TestCoordinator_SkipSubtaskInPlan_SubtaskIdNotFound(t *testing.T) {
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 100)
+	outputChan := make(chan *schema.AiOutputEvent, 100)
+
+	ins, err := aid.NewCoordinator(
+		"测试 subtask_id 不存在",
+		aicommon.WithAgreeYOLO(),
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithEnableSelfReflection(false),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithGenerateReport(false),
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
+			outputChan <- event
+		}),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := request.GetPrompt()
+
+			planJSON := `{
+    "@action": "plan_from_document",
+    "main_task": "测试 subtask_id 不存在",
+    "main_task_goal": "验证 subtask_id 不存在时返回错误",
+    "tasks": [
+        {"subtask_name": "任务A", "subtask_goal": "目标A"}
+    ]
+}`
+			if rsp, err := tryHandleNewPlanFlowPrompt(config, prompt, planJSON); rsp != nil {
+				return rsp, err
+			}
+
+			rsp := config.NewAIResponse()
+			defer rsp.Close()
+
+			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "status_summary": "s", "task_short_summary": "s", "task_long_summary": "s"}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "完成"}}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "完成"}`))
+				return rsp, nil
+			}
+
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	go func() {
+		ins.Run()
+	}()
+
+	skipSent := false
+	errorReceived := false
+	syncId := uuid.New().String()
+
+	ctx := utils.TimeoutContextSeconds(10)
+
+LOOP:
+	for {
+		select {
+		case result := <-outputChan:
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+				continue
+			}
+
+			if result.Type == schema.EVENT_TYPE_TASK_REVIEW_REQUIRE || result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+				continue
+			}
+
+			// 等任务开始后发送 skip 请求
+			if !skipSent && result.Type == schema.EVENT_TYPE_STRUCTURED && strings.Contains(string(result.Content), "push_task") {
+				skipSent = true
+				inputChan.SafeFeed(SyncInputEventWithJSON(
+					aicommon.SYNC_TYPE_SKIP_SUBTASK_IN_PLAN,
+					syncId,
+					map[string]any{
+						"subtask_id": "non-existent-subtask-id-12345",
+					},
+				))
+			}
+
+			if result.Type == schema.EVENT_TYPE_STRUCTURED && result.SyncID == syncId {
+				var data map[string]any
+				if err := json.Unmarshal([]byte(result.Content), &data); err == nil {
+					if success, ok := data["success"].(bool); ok && !success {
+						if errMsg, ok := data["error"].(string); ok && strings.Contains(errMsg, "subtask not found by subtask_id") {
+							errorReceived = true
+							break LOOP
+						}
+					}
+				}
+			}
+
+		case <-ctx.Done():
+			t.Fatalf("timeout: skipSent=%v, errorReceived=%v", skipSent, errorReceived)
+		}
+	}
+
+	require.True(t, skipSent, "skip request should be sent")
+	require.True(t, errorReceived, "error should be received for non-existent subtask_id")
+}
+
+// TestCoordinator_SkipSubtaskInPlan_SubtaskIdTakesPrecedence 验证当同时提供 subtask_id 和 subtask_index 时，subtask_id 优先
+func TestCoordinator_SkipSubtaskInPlan_SubtaskIdTakesPrecedence(t *testing.T) {
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 100)
+	outputChan := make(chan *schema.AiOutputEvent, 100)
+
+	task1Started := false
+	var subtask3ID string
+
+	ins, err := aid.NewCoordinator(
+		"测试 subtask_id 优先级",
+		aicommon.WithAgreeYOLO(),
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithEnableSelfReflection(false),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithGenerateReport(false),
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
+			outputChan <- event
+		}),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := request.GetPrompt()
+
+			planJSON := `{
+    "@action": "plan_from_document",
+    "main_task": "测试 subtask_id 优先级",
+    "main_task_goal": "验证 subtask_id 优先于 subtask_index",
+    "tasks": [
+        {"subtask_name": "第一个任务", "subtask_goal": "执行第一个任务"},
+        {"subtask_name": "第二个任务", "subtask_goal": "执行第二个任务"},
+        {"subtask_name": "第三个任务-需要跳过", "subtask_goal": "这个任务需要被跳过"}
+    ]
+}`
+			if rsp, err := tryHandleNewPlanFlowPrompt(config, prompt, planJSON); rsp != nil {
+				return rsp, err
+			}
+
+			rsp := config.NewAIResponse()
+			defer rsp.Close()
+
+			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "status_summary": "s", "task_short_summary": "s", "task_long_summary": "s"}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
+				if isCurrentTask(prompt, "第一个任务") {
+					task1Started = true
+				}
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "完成"}}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "完成"}`))
+				return rsp, nil
+			}
+
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	go func() {
+		ins.Run()
+	}()
+
+	skipSent := false
+	skipSuccess := false
+	planSyncId := uuid.New().String()
+	skipSyncId := uuid.New().String()
+
+	ctx := utils.TimeoutContextSeconds(15)
+
+LOOP:
+	for {
+		select {
+		case result := <-outputChan:
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+				inputChan.SafeFeed(SyncInputEventEx(aicommon.SYNC_TYPE_PLAN, planSyncId))
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+				continue
+			}
+
+			// 从 plan sync 响应中提取第三个任务的 subtask_id
+			if result.Type == schema.EVENT_TYPE_PLAN && result.SyncID == planSyncId {
+				var data aitool.InvokeParams
+				if err := json.Unmarshal([]byte(result.Content), &data); err == nil {
+					rootTask := data.GetObject("root_task")
+					subtasks := rootTask.GetObjectArray("subtasks")
+					require.Len(t, subtasks, 3)
+					if len(subtasks) >= 3 {
+						subtask3ID = subtasks[2].GetString("task_id")
+					}
+				}
+				continue
+			}
+
+			if result.Type == schema.EVENT_TYPE_TASK_REVIEW_REQUIRE || result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+				continue
+			}
+
+			// 同时提供 subtask_id（指向 1-3）和 subtask_index（指向 1-2，错误）
+			// 应该使用 subtask_id 跳过 1-3 而不是 1-2
+			if task1Started && subtask3ID != "" && !skipSent {
+				skipSent = true
+				inputChan.SafeFeed(SyncInputEventWithJSON(
+					aicommon.SYNC_TYPE_SKIP_SUBTASK_IN_PLAN,
+					skipSyncId,
+					map[string]any{
+						"subtask_id":    subtask3ID,
+						"subtask_index": "1-2", // 故意指向不同的任务，验证 subtask_id 优先
+						"reason":        "subtask_id should take precedence",
+					},
+				))
+			}
+
+			if result.Type == schema.EVENT_TYPE_STRUCTURED && result.SyncID == skipSyncId {
+				var data map[string]any
+				if err := json.Unmarshal([]byte(result.Content), &data); err == nil {
+					if success, ok := data["success"].(bool); ok && success {
+						skipSuccess = true
+						// 应该跳过的是 1-3，而不是 1-2
+						require.Equal(t, "1-3", data["subtask_index"])
+						require.Equal(t, subtask3ID, data["subtask_id"])
+					}
+				}
+			}
+
+			if result.Type == schema.EVENT_TYPE_STRUCTURED && utils.StringContainsAllOfSubString(string(result.Content), []string{"push_task", "1-2"}) {
+				// 如果来到了 1-2，说明 1-3 被跳过了，1-2 正常执行
+				if skipSuccess {
+					break LOOP
+				}
+			}
+
+		case <-ctx.Done():
+			t.Fatalf("timeout: task1Started=%v, skipSent=%v, skipSuccess=%v, subtask3ID=%s", task1Started, skipSent, skipSuccess, subtask3ID)
+		}
+	}
+
+	require.True(t, task1Started, "task1 should be started")
+	require.True(t, skipSent, "skip request should be sent")
+	require.True(t, skipSuccess, "skip by subtask_id should succeed (taking precedence over subtask_index)")
+}
+
+// TestCoordinator_SkipSubtaskInPlan_NoIndexOrSubtaskId 验证既不提供 subtask_index 也不提供 subtask_id 时返回错误
+func TestCoordinator_SkipSubtaskInPlan_NoIndexOrSubtaskId(t *testing.T) {
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 100)
+	outputChan := make(chan *schema.AiOutputEvent, 100)
+
+	ins, err := aid.NewCoordinator(
+		"测试无 index 和 subtask_id",
+		aicommon.WithAgreeYOLO(),
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithEnableSelfReflection(false),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithGenerateReport(false),
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
+			outputChan <- event
+		}),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := request.GetPrompt()
+
+			planJSON := `{
+    "@action": "plan_from_document",
+    "main_task": "测试无 index 和 subtask_id",
+    "main_task_goal": "验证无定位参数时返回错误",
+    "tasks": [
+        {"subtask_name": "任务A", "subtask_goal": "目标A"}
+    ]
+}`
+			if rsp, err := tryHandleNewPlanFlowPrompt(config, prompt, planJSON); rsp != nil {
+				return rsp, err
+			}
+
+			rsp := config.NewAIResponse()
+			defer rsp.Close()
+
+			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "status_summary": "s", "task_short_summary": "s", "task_long_summary": "s"}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "完成"}}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "完成"}`))
+				return rsp, nil
+			}
+
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	go func() {
+		ins.Run()
+	}()
+
+	skipSent := false
+	errorReceived := false
+	syncId := uuid.New().String()
+
+	ctx := utils.TimeoutContextSeconds(10)
+
+LOOP:
+	for {
+		select {
+		case result := <-outputChan:
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+				continue
+			}
+
+			if result.Type == schema.EVENT_TYPE_TASK_REVIEW_REQUIRE || result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+				continue
+			}
+
+			if !skipSent && result.Type == schema.EVENT_TYPE_STRUCTURED && strings.Contains(string(result.Content), "push_task") {
+				skipSent = true
+				// 既不提供 subtask_index 也不提供 subtask_id，也不提供 skip_current_task
+				inputChan.SafeFeed(SyncInputEventWithJSON(
+					aicommon.SYNC_TYPE_SKIP_SUBTASK_IN_PLAN,
+					syncId,
+					map[string]any{
+						"reason": "no identifier",
+					},
+				))
+			}
+
+			if result.Type == schema.EVENT_TYPE_STRUCTURED && result.SyncID == syncId {
+				var data map[string]any
+				if err := json.Unmarshal([]byte(result.Content), &data); err == nil {
+					if success, ok := data["success"].(bool); ok && !success {
+						if errMsg, ok := data["error"].(string); ok && strings.Contains(errMsg, "subtask_index or subtask_id is required") {
+							errorReceived = true
+							break LOOP
+						}
+					}
+				}
+			}
+
+		case <-ctx.Done():
+			t.Fatalf("timeout: skipSent=%v, errorReceived=%v", skipSent, errorReceived)
+		}
+	}
+
+	require.True(t, skipSent, "skip request should be sent")
+	require.True(t, errorReceived, "error should be received when no subtask_index or subtask_id provided")
+}
+
+// TestCoordinator_RedoSubtaskInPlan_BySubtaskId 验证通过 subtask_id 重做子任务
+func TestCoordinator_RedoSubtaskInPlan_BySubtaskId(t *testing.T) {
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 100)
+	outputChan := make(chan *schema.AiOutputEvent, 100)
+
+	var subtask1ID string
+	// 当第二个任务开始执行时，说明第一个任务已完成
+	task2Started := false
+
+	ins, err := aid.NewCoordinator(
+		"测试通过 subtask_id 重做子任务",
+		aicommon.WithAgreeYOLO(),
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithEnableSelfReflection(false),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithGenerateReport(false),
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
+			outputChan <- event
+		}),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := request.GetPrompt()
+
+			planJSON := `{
+    "@action": "plan_from_document",
+    "main_task": "测试通过 subtask_id 重做子任务",
+    "main_task_goal": "验证通过 subtask_id 重做子任务",
+    "tasks": [
+        {"subtask_name": "第一个任务", "subtask_goal": "执行第一个任务"},
+        {"subtask_name": "第二个任务", "subtask_goal": "执行第二个任务"}
+    ]
+}`
+			if rsp, err := tryHandleNewPlanFlowPrompt(config, prompt, planJSON); rsp != nil {
+				return rsp, err
+			}
+
+			rsp := config.NewAIResponse()
+			defer rsp.Close()
+
+			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "status_summary": "s", "task_short_summary": "s", "task_long_summary": "s"}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
+				if isCurrentTask(prompt, "第二个任务") {
+					task2Started = true
+				}
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "完成"}}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "完成"}`))
+				return rsp, nil
+			}
+
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	go func() {
+		ins.Run()
+	}()
+
+	redoSent := false
+	redoSuccess := false
+	planSyncId := uuid.New().String()
+	redoSyncId := uuid.New().String()
+	userMessage := "请重新执行，关注更多细节"
+
+	ctx := utils.TimeoutContextSeconds(30)
+
+LOOP:
+	for {
+		select {
+		case result := <-outputChan:
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+				inputChan.SafeFeed(SyncInputEventEx(aicommon.SYNC_TYPE_PLAN, planSyncId))
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+				continue
+			}
+
+			// 从 plan sync 响应中提取第一个任务的 subtask_id
+			if result.Type == schema.EVENT_TYPE_PLAN && result.SyncID == planSyncId {
+				var data aitool.InvokeParams
+				if err := json.Unmarshal([]byte(result.Content), &data); err == nil {
+					rootTask := data.GetObject("root_task")
+					subtasks := rootTask.GetObjectArray("subtasks")
+					if len(subtasks) >= 1 {
+						subtask1ID = subtasks[0].GetString("task_id")
+					}
+				}
+				continue
+			}
+
+			if result.Type == schema.EVENT_TYPE_TASK_REVIEW_REQUIRE || result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+				continue
+			}
+
+			// 当第二个任务开始执行时（说明第一个任务已完成），发送 redo 请求重做第一个任务
+			if task2Started && subtask1ID != "" && !redoSent {
+				redoSent = true
+				inputChan.SafeFeed(SyncInputEventWithJSON(
+					aicommon.SYNC_TYPE_REDO_SUBTASK_IN_PLAN,
+					redoSyncId,
+					map[string]any{
+						"subtask_id":   subtask1ID,
+						"user_message": userMessage,
+					},
+				))
+			}
+
+			// 检查 redo 响应
+			if result.Type == schema.EVENT_TYPE_STRUCTURED && result.SyncID == redoSyncId {
+				var data map[string]any
+				if err := json.Unmarshal([]byte(result.Content), &data); err == nil {
+					if success, ok := data["success"].(bool); ok && success {
+						redoSuccess = true
+						require.Equal(t, "1-3", data["subtask_index"])
+						require.Equal(t, subtask1ID, data["subtask_id"])
+						require.Equal(t, userMessage, data["user_message"])
+						break LOOP
+					}
+				}
+			}
+
+		case <-ctx.Done():
+			t.Fatalf("timeout: task2Started=%v, redoSent=%v, redoSuccess=%v, subtask1ID=%s", task2Started, redoSent, redoSuccess, subtask1ID)
+		}
+	}
+
+	require.True(t, task2Started, "task2 should be started (meaning task1 completed)")
+	require.True(t, redoSent, "redo request should be sent")
+	require.True(t, redoSuccess, "redo by subtask_id should succeed")
+	require.NotEmpty(t, subtask1ID, "subtask1ID should be captured")
+}
+
+// TestCoordinator_RedoSubtaskInPlan_SubtaskIdNotFound 验证 redo 时 subtask_id 不存在返回错误
+func TestCoordinator_RedoSubtaskInPlan_SubtaskIdNotFound(t *testing.T) {
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 100)
+	outputChan := make(chan *schema.AiOutputEvent, 100)
+
+	ins, err := aid.NewCoordinator(
+		"测试 redo subtask_id 不存在",
+		aicommon.WithAgreeYOLO(),
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithEnableSelfReflection(false),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithGenerateReport(false),
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
+			outputChan <- event
+		}),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := request.GetPrompt()
+
+			planJSON := `{
+    "@action": "plan_from_document",
+    "main_task": "测试 redo subtask_id 不存在",
+    "main_task_goal": "验证 redo subtask_id 不存在时返回错误",
+    "tasks": [
+        {"subtask_name": "任务A", "subtask_goal": "目标A"}
+    ]
+}`
+			if rsp, err := tryHandleNewPlanFlowPrompt(config, prompt, planJSON); rsp != nil {
+				return rsp, err
+			}
+
+			rsp := config.NewAIResponse()
+			defer rsp.Close()
+
+			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "status_summary": "s", "task_short_summary": "s", "task_long_summary": "s"}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "完成"}}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "完成"}`))
+				return rsp, nil
+			}
+
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	go func() {
+		ins.Run()
+	}()
+
+	redoSent := false
+	errorReceived := false
+	syncId := uuid.New().String()
+
+	ctx := utils.TimeoutContextSeconds(10)
+
+LOOP:
+	for {
+		select {
+		case result := <-outputChan:
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+				continue
+			}
+
+			if result.Type == schema.EVENT_TYPE_TASK_REVIEW_REQUIRE || result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+				continue
+			}
+
+			if !redoSent && result.Type == schema.EVENT_TYPE_STRUCTURED && strings.Contains(string(result.Content), "push_task") {
+				redoSent = true
+				inputChan.SafeFeed(SyncInputEventWithJSON(
+					aicommon.SYNC_TYPE_REDO_SUBTASK_IN_PLAN,
+					syncId,
+					map[string]any{
+						"subtask_id":   "non-existent-redo-id-99999",
+						"user_message": "test redo not found",
+					},
+				))
+			}
+
+			if result.Type == schema.EVENT_TYPE_STRUCTURED && result.SyncID == syncId {
+				var data map[string]any
+				if err := json.Unmarshal([]byte(result.Content), &data); err == nil {
+					if success, ok := data["success"].(bool); ok && !success {
+						if errMsg, ok := data["error"].(string); ok && strings.Contains(errMsg, "subtask not found by subtask_id") {
+							errorReceived = true
+							break LOOP
+						}
+					}
+				}
+			}
+
+		case <-ctx.Done():
+			t.Fatalf("timeout: redoSent=%v, errorReceived=%v", redoSent, errorReceived)
+		}
+	}
+
+	require.True(t, redoSent, "redo request should be sent")
+	require.True(t, errorReceived, "error should be received for non-existent subtask_id")
+}
