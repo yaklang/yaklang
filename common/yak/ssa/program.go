@@ -54,7 +54,7 @@ func NewProgram(
 		Template:                make(map[string]tl.TemplateGeneratedInfo),
 		CurrentIncludingStack:   utils.NewStack[string](),
 		config:                  NewLanguageConfig(),
-		NameCache:               ssadb.NewNameCache(programName),
+		NameCache:               ssadb.NewNameCache(programName, databaseKind != ProgramCacheMemory),
 		compileConfig:           cfg,
 		deferredBuilds:          omap.NewEmptyOrderedMap[string, *deferredBuildTask](),
 	}
@@ -107,7 +107,7 @@ func NewTmpProgram(ProgramName string) *Program {
 		Template:                make(map[string]tl.TemplateGeneratedInfo),
 		CurrentIncludingStack:   utils.NewStack[string](),
 		config:                  NewLanguageConfig(),
-		NameCache:               ssadb.NewNameCache(ProgramName),
+		NameCache:               ssadb.NewNameCache(ProgramName, false),
 		deferredBuilds:          omap.NewEmptyOrderedMap[string, *deferredBuildTask](),
 	}
 	prog.Application = prog
