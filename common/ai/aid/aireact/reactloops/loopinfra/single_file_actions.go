@@ -278,7 +278,8 @@ GEN_CODE 解析行号：[%d-%d]
 
 			// Call file changed callback
 			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
-			runBlocked := f.applySyntaxLintResult(loop, op, hasBlockingErrors, f.ShouldExitWhenSyntaxClean())
+			// modify 操作不自动退出：AI 可能需要多次修改，由 AI 主动调用 finish 退出。
+			runBlocked := f.applySyntaxLintResult(loop, op, hasBlockingErrors, false)
 
 			// Check for spinning behavior
 			isSpinning, spinReason := f.DetectSpinning(loop, modifyStartLine, modifyEndLine)
@@ -409,7 +410,8 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 
 			// Call file changed callback
 			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
-			runBlocked := f.applySyntaxLintResult(loop, op, hasBlockingErrors, f.ShouldExitWhenSyntaxClean())
+			// insert 操作不自动退出：AI 可能需要多次修改，由 AI 主动调用 finish 退出。
+			runBlocked := f.applySyntaxLintResult(loop, op, hasBlockingErrors, false)
 			msg = utils.ShrinkTextBlock(fmt.Sprintf("inserted at line[%v]:\n", insertLine)+partialCode, 256)
 			if errMsg != "" {
 				msg += "\n\n--[linter]--\nWriting Code Linter Check:\n" + utils.PrefixLines(utils.ShrinkTextBlock(errMsg, 2048), "  ")
@@ -547,7 +549,8 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 
 			// Call file changed callback
 			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
-			runBlocked := f.applySyntaxLintResult(loop, op, hasBlockingErrors, f.ShouldExitWhenSyntaxClean())
+			// delete 操作不自动退出：AI 可能需要多次修改，由 AI 主动调用 finish 退出。
+			runBlocked := f.applySyntaxLintResult(loop, op, hasBlockingErrors, false)
 
 			if deleteEndLine > 0 {
 				msg = fmt.Sprintf("deleted lines[%v-%v]", deleteStartLine, deleteEndLine)

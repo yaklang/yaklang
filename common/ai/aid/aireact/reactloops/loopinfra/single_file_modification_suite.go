@@ -260,7 +260,9 @@ func (f *SingleFileModificationSuiteFactory) applySyntaxLintResult(
 	reactloops.EmitActionLog(loop, loopInfraNodeCodeVerify, "验证通过 / Code verification passed")
 	reactloops.EmitStatus(loop, "验证代码通过 / Code verification passed")
 
-	if exitOnClean && f.postSyntaxCleanHook != nil {
+	// postSyntaxCleanHook（如 YAK_MAIN 自测）与 exitOnClean 解耦：
+	// 语法通过时始终执行 hook，无论是否需要自动退出。
+	if f.postSyntaxCleanHook != nil {
 		feedback, blockExit := f.postSyntaxCleanHook(loop, op)
 		if blockExit {
 			if feedback != "" {
@@ -292,7 +294,8 @@ func (f *SingleFileModificationSuiteFactory) CommitAfterCodeEdit(
 	loop.Set(f.GetFullCodeVariableName(), fullCode)
 
 	errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
-	_ = f.applySyntaxLintResult(loop, op, hasBlockingErrors, f.ShouldExitWhenSyntaxClean())
+	// modify 操作不自动退出循环：AI 可能需要多次修改，由 AI 主动调用 finish 退出。
+	_ = f.applySyntaxLintResult(loop, op, hasBlockingErrors, false)
 
 	loop.GetEmitter().EmitPinFilename(filename)
 	_, _ = f.applyLoopYaklangCodeChange(loop, &loopYaklangCodeChange{
@@ -333,7 +336,33 @@ func (f *SingleFileModificationSuiteFactory) handleModifyByOldSnippet(
 	}
 
 	if strings.TrimSpace(newCode) == "" {
-		op.Fail("modify_code with old_snippet requires non-empty new code in GEN_CODE block")
+		const maxEmptySnippetRetry = 5
+		emptyCountVar := actionName + "_empty_modify_snippet_count"
+		emptyCount := loop.GetInt(emptyCountVar) + 1
+		loop.Set(emptyCountVar, fmt.Sprint(emptyCount))
+
+		failMsg := fmt.Sprintf("modify_code(old_snippet) GEN_CODE empty (attempt %d/%d)", emptyCount, maxEmptySnippetRetry)
+		runtime.AddToTimeline("error", failMsg)
+
+		if emptyCount >= maxEmptySnippetRetry {
+			op.Fail(fmt.Sprintf("%s — giving up. Switch to modify_start_line/modify_end_line line-range mode", failMsg))
+			return
+		}
+
+		var hint string
+		if emptyCount <= 2 {
+			hint = fmt.Sprintf("\n\nHINT: @action JSON 中指定了 old_snippet 但 %s 代码块为空。"+
+				"JSON 与代码块是同一条消息的一部分，不可分开。请在同一次回复中输出完整的代码块。"+
+				"\n如果无法生成代码块，请改用 modify_start_line/modify_end_line 行号模式："+
+				"只需在 @action JSON 中指定行号，将新代码写入 %s 代码块即可。", f.aiTagName, f.aiTagName)
+		} else {
+			hint = fmt.Sprintf("\n\n【警告】old_snippet 模式已连续 %d 次未能生成代码块（剩余 %d 次机会）。"+
+				"请立即改用行号模式: "+
+				`{"@action": "modify_code", "modify_start_line": <起始行>, "modify_end_line": <结束行>} `+
+				"+ %s 代码块。行号模式更可靠且不需要精确匹配旧代码。", emptyCount, maxEmptySnippetRetry-emptyCount, f.aiTagName)
+		}
+		op.Feedback(failMsg + hint)
+		op.Continue()
 		return
 	}
 
@@ -392,6 +421,10 @@ old_snippet 预览：
 	}
 
 	fullCode = editor.GetSourceCode()
+
+	// 成功修改后重置空代码计数器
+	emptyCountVar := actionName + "_empty_modify_snippet_count"
+	loop.Set(emptyCountVar, "0")
 
 	invoker.AddToTimeline("modify_code", fmt.Sprintf("replaced snippet (%d match(es), replace_all=%v)", len(matches), replaceAll))
 	if reason != "" {
