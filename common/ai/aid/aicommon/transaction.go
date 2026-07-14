@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -62,6 +63,11 @@ func callAITransaction(
 	var lastRsp *AIResponse
 	var lastReq *AIRequest
 
+	// attemptHistory records every attempt (including 429 rate-limit retries) so
+	// that the final failure message can expose the full retry history to the
+	// caller instead of only the last attempt.
+	var attemptHistory []transactionAttemptRecord
+
 	emitter := c.GetEmitter()
 	bindEmitter := func(rsp *AIResponse) *Emitter {
 		if rsp == nil {
@@ -107,6 +113,7 @@ func callAITransaction(
 
 			if is429Response(c.GetContext(), rsp) {
 				rspEmitter.EmitWarning("429 rate limit detected in transaction layer (seq=%d), will retry without counting attempt", seq)
+				attemptHistory = append(attemptHistory, buildAttemptRecord(i+1, finalPrompt, err, rsp))
 				select {
 				case <-c.GetContext().Done():
 					return err
@@ -116,6 +123,7 @@ func callAITransaction(
 			}
 
 			i++
+			attemptHistory = append(attemptHistory, buildAttemptRecord(i, finalPrompt, err, rsp))
 			rspEmitter.EmitError("call ai api error (attempt %d/%d): %v", i, trcRetry, err)
 			select {
 			case <-c.GetContext().Done():
@@ -129,6 +137,30 @@ func callAITransaction(
 			return utils.Errorf("context is done, cannot continue transaction")
 		}
 		lastRsp = rsp
+		// Inject capture hooks so that, after postHandler consumes the
+		// stream, we can record the *plain* AI output / reason text for
+		// this attempt. The hooks fire asynchronously when the stream
+		// finishes. We synchronise on the output-capture completion below
+		// (best-effort, bounded by the caller context) before reading the
+		// captured text so that the retry record contains the actual AI
+		// output even when the stream finishes slightly after postHandler
+		// returns.
+		var capturedOutput, capturedReason string
+		var capturedMu sync.Mutex
+		outputDone := make(chan struct{})
+		var outputDoneOnce sync.Once
+		rsp.SetOutputCapture(func(text string) {
+			capturedMu.Lock()
+			capturedOutput = text
+			capturedMu.Unlock()
+			outputDoneOnce.Do(func() { close(outputDone) })
+		})
+		rsp.SetReasonCapture(func(text string) {
+			capturedMu.Lock()
+			capturedReason = text
+			capturedMu.Unlock()
+			outputDoneOnce.Do(func() { close(outputDone) })
+		})
 		if !rsp.WaitForCallbackDone(c.GetContext()) {
 			return c.GetContext().Err()
 		}
@@ -138,6 +170,21 @@ func callAITransaction(
 		if postHandlerErr != nil {
 			lastErr = postHandlerErr
 			i++
+			// Best-effort wait for the output/reason capture to complete so
+			// the record carries the plain AI text. Falls back to raw HTTP
+			// dump when nothing was captured (e.g. stream not consumed).
+			select {
+			case <-outputDone:
+			case <-c.GetContext().Done():
+			case <-time.After(2 * time.Second):
+			}
+			rec := buildAttemptRecord(i, finalPrompt, nil, rsp)
+			rec.PostHandlerErr = postHandlerErr
+			capturedMu.Lock()
+			rec.PlainOutput = capturedOutput
+			rec.PlainReason = capturedReason
+			capturedMu.Unlock()
+			attemptHistory = append(attemptHistory, rec)
 			rspEmitter := bindEmitter(rsp)
 			rspEmitter.EmitError("ai transaction postHandler error (attempt %d/%d): %v", i, trcRetry, postHandlerErr)
 			select {
@@ -188,7 +235,22 @@ func callAITransaction(
 	if lastReq != nil {
 		tier = consts.ModelTier(lastReq.GetModelTier())
 	}
-	emittedStructuredFailure := EmitAICallFailureIfApplicable(c, tier, lastRsp, finalErr, failureExtra)
+	// Attach the full attempt history to the structured failure payload so clients
+	// can inspect every retry's error / response. Copy the map to avoid mutating
+	// the caller-supplied failureExtra.
+	structuredExtra := failureExtra
+	if len(attemptHistory) > 0 {
+		structuredExtra = make(map[string]any, len(failureExtra)+1)
+		for k, v := range failureExtra {
+			structuredExtra[k] = v
+		}
+		attempts := make([]map[string]any, 0, len(attemptHistory))
+		for _, r := range attemptHistory {
+			attempts = append(attempts, r.ToMap())
+		}
+		structuredExtra["attempts"] = attempts
+	}
+	emittedStructuredFailure := EmitAICallFailureIfApplicable(c, tier, lastRsp, finalErr, structuredExtra)
 	if !emittedStructuredFailure {
 		if lastRsp != nil {
 			rawDump := lastRsp.GetRawHTTPResponseDump()
@@ -196,11 +258,21 @@ func callAITransaction(
 				finalErrMsg += "\n\n--- Last Raw HTTP Response ---\n" + utils.ShrinkString(rawDump, 4096)
 			}
 		}
+		finalErrMsg += formatAttemptHistory(attemptHistory)
 		bindEmitter(lastRsp).EmitDefaultStreamEvent("ai-error", strings.NewReader(finalErrMsg), "")
 	}
 
-	if finalErr != nil {
-		return utils.Wrap(finalErr, fmt.Sprintf("max retry count[%v] reached in transaction", trcRetry))
+	// Build the final returned error. Append the full attempt history so the
+	// caller can inspect every retry's error / AI response directly from the
+	// returned error, regardless of whether a structured failure event was
+	// emitted.
+	historyStr := formatAttemptHistory(attemptHistory)
+	wrapMsg := fmt.Sprintf("max retry count[%v] reached in transaction", trcRetry)
+	if historyStr != "" {
+		wrapMsg += historyStr
 	}
-	return utils.Errorf("max retry count[%v] reached in transaction", trcRetry)
+	if finalErr != nil {
+		return utils.Wrap(finalErr, wrapMsg)
+	}
+	return utils.Errorf("%s", wrapMsg)
 }
