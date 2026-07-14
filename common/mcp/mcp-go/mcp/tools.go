@@ -473,38 +473,38 @@ func WithPaging(name string, fieldNames []string, opts ...PropertyOption) ToolOp
 	if len(fieldNames) > 0 {
 		orderBySchema["enum"] = fieldNames
 	}
+	props := omap.NewEmptyOrderedMap[string, any]()
+	props.Set("page", map[string]any{
+		"type": "number",
+	})
+	props.Set("limit", map[string]any{
+		"type": "number",
+	})
+	props.Set("order", map[string]any{
+		"type": "string",
+		"enum": []string{"asc", "desc"},
+	})
+	props.Set("orderby", orderBySchema)
 	schema := map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"page": map[string]any{
-				"type": "number",
-			},
-			"limit": map[string]any{
-				"type": "number",
-			},
-			"order": map[string]any{
-				"type": "string",
-				"enum": []string{"asc", "desc"},
-			},
-			"orderby": orderBySchema,
-		},
+		"type":       "object",
+		"properties": props,
 	}
 	return WithRaw(name, schema, opts...)
 }
 
 func WithKVPairs(name string, opts ...PropertyOption) ToolOption {
+	props := omap.NewEmptyOrderedMap[string, any]()
+	props.Set("key", map[string]any{
+		"type": "string",
+	})
+	props.Set("value", map[string]any{
+		"type": "string",
+	})
 	schema := map[string]any{
 		"type": "array",
 		"items": map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"key": map[string]any{
-					"type": "string",
-				},
-				"value": map[string]any{
-					"type": "string",
-				},
-			},
+			"type":       "object",
+			"properties": props,
 		},
 	}
 	return WithRaw(name, schema, opts...)
@@ -545,7 +545,10 @@ func (s *ToolInputSchema) ToMap() *omap.OrderedMap[string, any] {
 		s.Properties.ForEach(func(k string, v any) bool {
 			normalized := normalizeSchemaValue(v)
 			if m, ok := normalized.(map[string]any); ok {
-				if _, ok := m["required"]; ok {
+				// Only strip the internal bool "required" marker; preserve valid
+				// []string required arrays on nested object schemas (WithStruct,
+				// WithStructArray, etc.). This matches MarshalJSON's behavior.
+				if _, isBool := m["required"].(bool); isBool {
 					delete(m, "required")
 				}
 				properties[k] = m

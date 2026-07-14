@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 func requireSchemaWithoutNullRequired(t *testing.T, schema any) map[string]any {
@@ -377,4 +378,169 @@ func TestWithPagingSchema_EmptyFieldNamesOmitsEnum(t *testing.T) {
 	require.True(t, ok, "orderby should be object schema")
 	_, hasOrderByEnum := orderBySchema["enum"]
 	require.False(t, hasOrderByEnum, "orderby.enum should be omitted when fieldNames is empty")
+}
+
+// ---------------------------------------------------------------------------
+// ToMap vs MarshalJSON: nested required array preservation
+//
+// Bug (fixed): ToMap() unconditionally deleted the "required" key from every
+// top-level property node. This stripped valid []string required arrays
+// produced by WithStruct (e.g. {"required":["name"]}), while MarshalJSON
+// only stripped the internal bool "required" marker. The mismatch meant:
+//   - validateWithSchema (which uses ToMap) silently skipped required-field
+//     checks for nested object properties
+//   - yakscripttools/base.go persisted ToMap output to DB with required arrays
+//     missing, producing silently incomplete stored schemas
+//
+// The tests below are written as regression guards: each one would fail
+// against the pre-fix ToMap implementation.
+// ---------------------------------------------------------------------------
+
+// toMapJSON marshals ToMap() output to JSON then unmarshals to map[string]any,
+// producing the same plain-Go-types representation that callers like
+// validateWithSchema and yakscripttools/base.go work with.
+func toMapJSON(t *testing.T, schema ToolInputSchema) map[string]any {
+	t.Helper()
+	raw, err := json.Marshal(schema.ToMap())
+	require.NoError(t, err)
+	var m map[string]any
+	require.NoError(t, json.Unmarshal(raw, &m))
+	return m
+}
+
+// marshalJSON unmarshals MarshalJSON output to map[string]any — the schema
+// representation sent to external clients (LLMs / Claude Code).
+func marshalJSON(t *testing.T, schema ToolInputSchema) map[string]any {
+	t.Helper()
+	raw, err := json.Marshal(schema)
+	require.NoError(t, err)
+	var m map[string]any
+	require.NoError(t, json.Unmarshal(raw, &m))
+	return m
+}
+
+// TestToMap_PreservesStructRequiredArray is a regression test for the bug
+// where ToMap() stripped valid []string required arrays from WithStruct
+// properties. Before the fix, filter["required"] was deleted by ToMap,
+// causing validateWithSchema to not enforce required fields and DB-persisted
+// schemas to lose required constraints.
+func TestToMap_PreservesStructRequiredArray(t *testing.T) {
+	tool := NewTool("tool",
+		WithStruct("filter", nil,
+			WithString("name", Required()),
+			WithString("value"),
+		),
+	)
+
+	m := toMapJSON(t, tool.InputSchema)
+
+	props, ok := m["properties"].(map[string]any)
+	require.True(t, ok, "properties should be object")
+
+	filter, ok := props["filter"].(map[string]any)
+	require.True(t, ok, "filter should be object schema")
+
+	// Pre-fix: this assertion failed because ToMap deleted filter["required"]
+	// regardless of type, stripping the valid []string array.
+	required, hasRequired := filter["required"].([]any)
+	require.True(t, hasRequired,
+		"filter.required must be preserved as []string in ToMap output (pre-fix it was stripped), got: %v", filter)
+	require.ElementsMatch(t, []any{"name"}, required,
+		"filter.required should contain 'name'")
+}
+
+// TestToMap_MatchesMarshalJSON_ForStructRequired ensures ToMap and MarshalJSON
+// agree on required arrays for WithStruct properties. Before the fix, they
+// disagreed: MarshalJSON preserved required:["name"] while ToMap stripped it,
+// meaning the schema shown to the LLM and the schema used for internal
+// validation diverged.
+func TestToMap_MatchesMarshalJSON_ForStructRequired(t *testing.T) {
+	tool := NewTool("tool",
+		WithStruct("filter", nil,
+			WithString("name", Required()),
+		),
+	)
+
+	toMapResult := toMapJSON(t, tool.InputSchema)
+	marshalResult := marshalJSON(t, tool.InputSchema)
+
+	toMapProps := toMapResult["properties"].(map[string]any)
+	marshalProps := marshalResult["properties"].(map[string]any)
+
+	toMapFilter := toMapProps["filter"].(map[string]any)
+	marshalFilter := marshalProps["filter"].(map[string]any)
+
+	// Pre-fix: MarshalJSON had required (true), ToMap did not (false) → mismatch
+	_, toMapHasReq := toMapFilter["required"]
+	_, marshalHasReq := marshalFilter["required"]
+	require.Equal(t, marshalHasReq, toMapHasReq,
+		"ToMap and MarshalJSON must agree on struct required: MarshalJSON has %v, ToMap has %v",
+		marshalHasReq, toMapHasReq)
+}
+
+// ---------------------------------------------------------------------------
+// WithPaging / WithKVPairs internal representation consistency
+//
+// Bug (fixed): WithPaging and WithKVPairs built their inner "properties" as
+// plain Go map[string]any instead of *omap.OrderedMap. Every other builder
+// (WithStruct, WithStructArray, WithOneOfStruct, WithAnyOfStruct) uses
+// OrderedMap to preserve field insertion order. The inconsistency meant
+// WithPaging/WithKVPairs schema nodes had non-deterministic internal field
+// ordering, diverging from the OrderedMap convention used everywhere else.
+//
+// These tests verify the internal structure uses OrderedMap, so anyone
+// reading or iterating these schema nodes (e.g. buildStructOptionsFromMap,
+// normalizeSchemaValue) gets consistent, insertion-ordered fields.
+// ---------------------------------------------------------------------------
+
+// TestWithPaging_UsesOrderedMapForProperties is a regression test for the bug
+// where WithPaging used a plain map[string]any for its inner properties
+// instead of *omap.OrderedMap. Before the fix, the type assertion to
+// *omap.OrderedMap failed because paginationSchema["properties"] was a plain
+// map — inconsistent with WithStruct and other builders.
+func TestWithPaging_UsesOrderedMapForProperties(t *testing.T) {
+	tool := NewTool("query",
+		WithPaging("pagination", []string{"id"}),
+	)
+
+	paginationRaw, ok := tool.InputSchema.Properties.Get("pagination")
+	require.True(t, ok, "pagination should be registered")
+
+	paginationSchema, ok := paginationRaw.(map[string]any)
+	require.True(t, ok, "pagination should be a schema map")
+
+	// Pre-fix: this type assertion failed — properties was a plain map[string]any
+	props, ok := paginationSchema["properties"].(*omap.OrderedMap[string, any])
+	require.True(t, ok,
+		"WithPaging properties must be an OrderedMap for consistency with other builders (pre-fix it was a plain map), got %T",
+		paginationSchema["properties"])
+	require.Equal(t, []string{"page", "limit", "order", "orderby"}, props.Keys(),
+		"OrderedMap should preserve insertion order: page, limit, order, orderby")
+}
+
+// TestWithKVPairs_UsesOrderedMapForProperties is a regression test for the bug
+// where WithKVPairs used a plain map[string]any for its items.properties
+// instead of *omap.OrderedMap. Before the fix, the type assertion to
+// *omap.OrderedMap failed because items["properties"] was a plain map.
+func TestWithKVPairs_UsesOrderedMapForProperties(t *testing.T) {
+	tool := NewTool("tool",
+		WithKVPairs("headers"),
+	)
+
+	headersRaw, ok := tool.InputSchema.Properties.Get("headers")
+	require.True(t, ok, "headers should be registered")
+
+	headersSchema, ok := headersRaw.(map[string]any)
+	require.True(t, ok, "headers should be a schema map")
+
+	items, ok := headersSchema["items"].(map[string]any)
+	require.True(t, ok, "headers.items should be a map")
+
+	// Pre-fix: this type assertion failed — items.properties was a plain map[string]any
+	props, ok := items["properties"].(*omap.OrderedMap[string, any])
+	require.True(t, ok,
+		"WithKVPairs items.properties must be an OrderedMap for consistency with other builders (pre-fix it was a plain map), got %T",
+		items["properties"])
+	require.Equal(t, []string{"key", "value"}, props.Keys(),
+		"OrderedMap should preserve insertion order: key, value")
 }
