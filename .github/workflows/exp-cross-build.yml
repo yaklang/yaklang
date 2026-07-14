@@ -56,35 +56,9 @@ jobs:
           name: raw_commit_message.txt
           path: /tmp/raw_commit_message.txt
 
-  # Generate doc.gob.zst + codec.gob.zst once (OS-independent); matrix jobs download instead.
-  prepare_embed_docs:
-    needs: check_commit_msg
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Set up Go 1.x
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: "./go.mod"
-          cache: false
-
-      - name: Generate Document
-        run: go run -gcflags=all="-N -l" common/yak/yakdoc/generate_doc/generate_doc.go common/yak/yakdoc/doc/doc.gob.zst
-
-      - name: Codec Methods Document
-        run: go run -gcflags=all="-N -l" common/yak/yaklib/codec/codegrpc/doc/codec_doc.go common/yak/yaklib/codec/codegrpc/codec.gob.zst
-
-      - name: Upload prepared embed docs
-        uses: actions/upload-artifact@v4
-        with:
-          name: yak-embed-docs
-          path: |
-            common/yak/yakdoc/doc/doc.gob.zst
-            common/yak/yaklib/codec/codegrpc/codec.gob.zst
-
+  # Embed docs (doc/codec) are prepared on main by prepare-embed-docs.yml and fetched from OSS.
   build_and_upload_to_oss:
-    needs: [check_commit_msg, prepare_embed_docs]
+    needs: [check_commit_msg]
     outputs:
       YAK_TAG: ${{ steps.get_tag.outputs.YAK_TAG}}
     strategy:
@@ -145,11 +119,6 @@ jobs:
     steps:
       # build
       - uses: actions/checkout@v2
-
-      - name: Download prepared embed docs
-        uses: actions/download-artifact@v4
-        with:
-          name: yak-embed-docs
 
       - name: Set up Go 1.x
         uses: actions/setup-go@v5
@@ -320,6 +289,65 @@ jobs:
       - name: Go module download (Linux)
         if: startsWith(matrix.os, 'linux')
         run: go mod download
+
+      - name: Prepare Embed Docs (OSS or generate)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${YAK:-}" ] || [ ! -f "$YAK" ]; then
+            echo "::error::YAK operator binary missing; OSS download step must succeed"
+            exit 1
+          fi
+
+          MATRIX_OS="${{ matrix.os }}"
+          case "$MATRIX_OS" in
+            windows|windows7|windows-arm64|windows*) PLATFORM=windows ;;
+            linux|linux-amd64|linux-arm64|linux*) PLATFORM=linux ;;
+            macos*|darwin*|mac*) PLATFORM=darwin ;;
+            *)
+              echo "::error::cannot map matrix.os=$MATRIX_OS to embed-docs platform"
+              exit 1
+              ;;
+          esac
+          echo "matrix.os=$MATRIX_OS -> embed platform=$PLATFORM"
+
+          OSS_BASE="https://yaklang.oss-accelerate.aliyuncs.com/yak/embed-docs/latest"
+          DOC_OUT="common/yak/yakdoc/doc/doc.gob.zst"
+          CODEC_OUT="common/yak/yaklib/codec/codegrpc/codec.gob.zst"
+
+          verify_sha() {
+            local file="$1"
+            local expected actual
+            expected=$(tr -d ' \n\r' < "${file}.sha256.txt")
+            "$YAK" sha256 -f "$file"
+            actual=$(tr -d ' \n\r' < "${file}.sha256.txt")
+            echo -n "$expected" > "${file}.sha256.txt"
+            echo "verify $file expected=$expected actual=$actual"
+            [ "$expected" = "$actual" ]
+          }
+
+          try_oss() {
+            echo "Trying OSS embed docs for $PLATFORM ..."
+            curl -fsSL "${OSS_BASE}/${PLATFORM}/doc.gob.zst" -o "$DOC_OUT" || return 1
+            curl -fsSL "${OSS_BASE}/${PLATFORM}/doc.gob.zst.sha256.txt" -o "${DOC_OUT}.sha256.txt" || return 1
+            curl -fsSL "${OSS_BASE}/codec.gob.zst" -o "$CODEC_OUT" || return 1
+            curl -fsSL "${OSS_BASE}/codec.gob.zst.sha256.txt" -o "${CODEC_OUT}.sha256.txt" || return 1
+            verify_sha "$DOC_OUT" || return 1
+            verify_sha "$CODEC_OUT" || return 1
+            echo "Embed docs downloaded and verified for $PLATFORM"
+            return 0
+          }
+
+          generate_local() {
+            echo "::warning::OSS embed docs unavailable or hash mismatch; generating locally"
+            go run -gcflags=all="-N -l" common/yak/yakdoc/generate_doc/generate_doc.go "$DOC_OUT"
+            go run -gcflags=all="-N -l" common/yak/yaklib/codec/codegrpc/doc/codec_doc.go "$CODEC_OUT"
+            echo "Embed docs generated locally"
+          }
+
+          if ! try_oss; then
+            generate_local
+          fi
 
       - name: Sync Embed FS Hash to Code
         shell: bash
@@ -544,7 +572,7 @@ jobs:
           echo "build_slim=true" >> "$GITHUB_OUTPUT"
 
   build_slim_binaries:
-    needs: [check_commit_msg, resolve_slim_build, prepare_embed_docs]
+    needs: [check_commit_msg, resolve_slim_build]
     if: needs.resolve_slim_build.outputs.build_slim == 'true'
     strategy:
       fail-fast: false
@@ -562,7 +590,6 @@ jobs:
       build_type: yakslim
       ee: false
       sign: ${{ matrix.os == 'windows' || matrix.os == 'windows-arm64' }}
-      use_prepared_docs: true
     secrets: inherit
 
   upload_slim_binaries_to_oss:
