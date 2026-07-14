@@ -31,8 +31,8 @@ func TestIrNamePoolMultiProgramQuery(t *testing.T) {
 	require.NoError(t, db.Create(&IrNamePool{ProgramName: "progA", Name: "nameA"}).Error)
 	require.NoError(t, db.Create(&IrNamePool{ProgramName: "progB", Name: "nameB"}).Error)
 
-	cacheA := NewNameCache("progA")
-	cacheB := NewNameCache("progB")
+	cacheA := NewNameCache("progA", true)
+	cacheB := NewNameCache("progB", true)
 
 	require.Len(t, cacheA.GetIDsByPattern("nameA", ExactCompare), 1)
 	require.Len(t, cacheA.GetIDsByPattern("nameB", ExactCompare), 0)
@@ -49,8 +49,8 @@ func TestNameCacheProgramIsolation(t *testing.T) {
 	require.NoError(t, db.Create(&IrNamePool{ProgramName: "progB", Name: "nameB"}).Error)
 	require.NoError(t, db.Create(&IrNamePool{ProgramName: "progB", Name: "common"}).Error)
 
-	cacheA := NewNameCache("progA")
-	cacheB := NewNameCache("progB")
+	cacheA := NewNameCache("progA", true)
+	cacheB := NewNameCache("progB", true)
 
 	require.Len(t, cacheA.GetIDsByPattern("nameA", ExactCompare), 1)
 	require.Len(t, cacheA.GetIDsByPattern("nameB", ExactCompare), 0)
@@ -72,7 +72,7 @@ func TestNameCacheProgramIsolation(t *testing.T) {
 func TestNameCachePreloadWhenDBBecomesAvailable(t *testing.T) {
 	oldDB := GetDB()
 	SetDB(nil)
-	cache := NewNameCache("progA")
+	cache := NewNameCache("progA", true)
 
 	db, err := gorm.Open("sqlite3", ":memory:")
 	require.NoError(t, err)
