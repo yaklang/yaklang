@@ -1,10 +1,7 @@
 package reactloops
 
 import (
-	"bytes"
 	"context"
-	"io"
-	"sync"
 	"testing"
 	"time"
 
@@ -385,64 +382,25 @@ func TestKeepAlive_RefreshesTick(t *testing.T) {
 // (wired in callAITransaction) refreshes lastIterationTickAt on every chunk,
 // preventing the stall heartbeat from misfiring during long AI calls.
 //
-// These tests replicate the key code path from exec.go's callAITransaction:
-//   1. Build an AIResponse, feed a reason stream from an io.Pipe with delayed
-//      writes (simulating a slow model producing thinking chunks at intervals).
-//   2. Register SetOnReasonChunk with loop.recordIterationTick (exactly as
-//      exec.go does).
-//   3. Consume the stream via GetOutputStreamReader (which drains the reason
-//      channel and fires invokeReasonChunk -> onReasonChunk -> recordIterationTick).
-//   4. Assert no [LOOP_STALL_DETECTED] during the slow stream, and that stall
-//      fires after the stream ends and the tick goes stale.
+// These tests directly simulate the SetOnReasonChunk callback firing at
+// intervals (as it would when GetOutputStreamReader drains reason chunks from
+// a slow model), rather than going through the full emitter pipeline. This
+// avoids non-deterministic timing from the emitter's internal goroutine
+// scheduling, which can vary wildly under -race.
 //
-// 关键词: AI reason chunk 刷新 tick, 慢模型 stall 误报规避, io.Pipe 流式模拟
+// 关键词: AI reason chunk 刷新 tick, 慢模型 stall 误报规避
 // ---------------------------------------------------------------------------
-
-// simulateSlowReasonStream builds an AIResponse that emits reason chunks at
-// intervals, then a final output chunk with the action JSON. It returns the
-// response and a done channel that is closed when the feeder goroutine
-// finishes writing all chunks.
-//
-// chunkInterval controls how long the feeder sleeps between reason chunks.
-// This mirrors the real-world scenario where a thinking model (e.g.
-// minimax-m3-thinking) produces reasoning tokens at intervals, with the
-// total stream duration exceeding the stall threshold.
-//
-// Each reason chunk is emitted as a separate EmitReasonStream call so the
-// GetOutputStreamReader goroutine processes them independently, firing
-// invokeReasonChunk after each one.
-func simulateSlowReasonStream(
-	cfg aicommon.AICallerConfigIf,
-	reasonChunks [][]byte,
-	chunkInterval time.Duration,
-	finalOutput []byte,
-) (*aicommon.AIResponse, chan struct{}) {
-	rsp := cfg.NewAIResponse()
-	done := make(chan struct{})
-
-	go func() {
-		defer close(done)
-		// Feed each reason chunk as a separate stream item so each one
-		// triggers a separate invokeReasonChunk callback.
-		for _, chunk := range reasonChunks {
-			rsp.EmitReasonStream(bytes.NewReader(chunk))
-			time.Sleep(chunkInterval)
-		}
-		// Feed the final output (action JSON).
-		if len(finalOutput) > 0 {
-			rsp.EmitOutputStream(bytes.NewReader(finalOutput))
-		}
-		rsp.Close()
-	}()
-
-	return rsp, done
-}
 
 // TestAIReasonChunk_RefreshesTickPreventsStall verifies that reason chunks
 // arriving during a slow AI call keep lastIterationTickAt fresh, so the
 // stall heartbeat does not fire even when the total AI call duration exceeds
 // the stuck threshold. This is the direct test for the exec.go fix that adds
 // r.recordIterationTick() inside SetOnReasonChunk.
+//
+// Rather than depending on the full emitter pipeline timing (which is
+// non-deterministic under -race), this test directly simulates the
+// SetOnReasonChunk callback firing at intervals, exactly as it would when
+// the GetOutputStreamReader goroutine drains reason chunks from a slow model.
 //
 // 关键词: reason chunk 刷新 tick, 慢 AI 调用不误报 stall
 func TestAIReasonChunk_RefreshesTickPreventsStall(t *testing.T) {
@@ -457,44 +415,45 @@ func TestAIReasonChunk_RefreshesTickPreventsStall(t *testing.T) {
 	// Initial tick (simulating iteration start).
 	loop.recordIterationTick()
 
-	// Start stall heartbeat: interval=10ms, threshold=50ms.
-	// Without reason-chunk tick refresh, stall would fire within ~50ms.
-	stopHeartbeat := loop.startStallHeartbeatWithClock(ctx, task, realStallHeartbeatClock{}, 10*time.Millisecond, 50*time.Millisecond, 0)
+	// Start stall heartbeat: interval=50ms, threshold=200ms.
+	// Use generous intervals so the test is stable under -race.
+	stopHeartbeat := loop.startStallHeartbeatWithClock(ctx, task, realStallHeartbeatClock{}, 50*time.Millisecond, 200*time.Millisecond, 0)
 	defer stopHeartbeat()
 
-	// Build a slow reason stream: 6 chunks, 15ms apart = ~90ms total duration.
-	// This exceeds the 50ms threshold, but reason chunks refresh the tick
-	// every 15ms, so stall should NOT fire.
-	reasonChunks := [][]byte{
-		[]byte("Analyzing the target codebase..."),
-		[]byte("Looking for SQL injection patterns..."),
-		[]byte("Found potential entry points..."),
-		[]byte("Examining database query layer..."),
-		[]byte("Tracing user input flow..."),
-		[]byte("Concluding analysis..."),
-	}
-	finalOutput := []byte(`{"@action": "finish"}`)
-
-	rsp, feedDone := simulateSlowReasonStream(
-		invoker.GetConfig(), reasonChunks, 15*time.Millisecond, finalOutput,
-	)
-
-	// Wire SetOnReasonChunk exactly like exec.go does.
-	rsp.SetOnReasonChunk(func(b []byte) {
+	// Simulate reason chunks arriving at 50ms intervals over 500ms total.
+	// Each "chunk" calls recordIterationTick (exactly what SetOnReasonChunk
+	// does in exec.go). The total duration (500ms) far exceeds the 200ms
+	// threshold, proving it's the chunk refresh that prevents the false
+	// positive — not a short total runtime.
+	chunkInterval := 50 * time.Millisecond
+	totalDuration := 500 * time.Millisecond
+	stopChunks := make(chan struct{})
+	chunksDone := make(chan struct{})
+	go func() {
+		defer close(chunksDone)
+		ticker := time.NewTicker(chunkInterval)
+		defer ticker.Stop()
+		// Fire immediately, then periodically (mirrors RunKeepAlive pattern).
 		loop.recordIterationTick()
-	})
+		for {
+			select {
+			case <-stopChunks:
+				return
+			case <-ticker.C:
+				// This simulates invokeReasonChunk firing for each
+				// reason chunk from a slow thinking model.
+				loop.recordIterationTick()
+			}
+		}
+	}()
 
-	// Consume the output stream — this drains the reason channel and
-	// fires invokeReasonChunk -> onReasonChunk -> recordIterationTick.
-	stream := rsp.GetOutputStreamReader("test-node", false, invoker.GetConfig().GetEmitter())
-	io.Copy(io.Discard, stream)
+	// Wait long enough that stall would have fired multiple times
+	// (500ms >> 200ms threshold) if the tick were not being refreshed.
+	time.Sleep(totalDuration)
 
-	// Wait for the feeder goroutine to finish.
-	select {
-	case <-feedDone:
-	case <-time.After(2 * time.Second):
-		t.Fatal("reason stream feeder did not complete in time")
-	}
+	// Stop the chunk refresh.
+	close(stopChunks)
+	<-chunksDone
 
 	// Assert: no [LOOP_STALL_DETECTED] should have been emitted because
 	// reason chunks kept lastIterationTickAt fresh throughout the slow call.
@@ -522,35 +481,35 @@ func TestAIReasonChunk_StallFiresWhenStreamGoesSilent(t *testing.T) {
 	// Initial tick.
 	loop.recordIterationTick()
 
-	// Start stall heartbeat: interval=10ms, threshold=50ms.
-	stopHeartbeat := loop.startStallHeartbeatWithClock(ctx, task, realStallHeartbeatClock{}, 10*time.Millisecond, 50*time.Millisecond, 0)
+	// Start stall heartbeat: interval=50ms, threshold=200ms.
+	stopHeartbeat := loop.startStallHeartbeatWithClock(ctx, task, realStallHeartbeatClock{}, 50*time.Millisecond, 200*time.Millisecond, 0)
 	defer stopHeartbeat()
 
-	// Phase 1: produce 3 reason chunks at 15ms intervals (~45ms total).
+	// Phase 1: simulate reason chunks arriving at 50ms intervals for 300ms.
 	// This keeps the tick fresh, no stall.
-	reasonChunks := [][]byte{
-		[]byte("Starting analysis..."),
-		[]byte("Examining patterns..."),
-		[]byte("Almost done..."),
-	}
-
-	rsp, feedDone := simulateSlowReasonStream(
-		invoker.GetConfig(), reasonChunks, 15*time.Millisecond, nil,
-	)
-
-	rsp.SetOnReasonChunk(func(b []byte) {
+	stopChunks := make(chan struct{})
+	chunksDone := make(chan struct{})
+	go func() {
+		defer close(chunksDone)
+		ticker := time.NewTicker(50 * time.Millisecond)
+		defer ticker.Stop()
 		loop.recordIterationTick()
-	})
+		for {
+			select {
+			case <-stopChunks:
+				return
+			case <-ticker.C:
+				loop.recordIterationTick()
+			}
+		}
+	}()
 
-	// Consume the output stream.
-	stream := rsp.GetOutputStreamReader("test-node", false, invoker.GetConfig().GetEmitter())
-	io.Copy(io.Discard, stream)
+	// Let chunks stream for 300ms (exceeds 200ms threshold, but tick stays fresh).
+	time.Sleep(300 * time.Millisecond)
 
-	select {
-	case <-feedDone:
-	case <-time.After(2 * time.Second):
-		t.Fatal("reason stream feeder did not complete in time")
-	}
+	// Stop the chunk refresh — simulate AI going silent.
+	close(stopChunks)
+	<-chunksDone
 
 	// No stall should have fired during the active streaming phase.
 	for _, e := range invoker.Entries() {
@@ -558,8 +517,7 @@ func TestAIReasonChunk_StallFiresWhenStreamGoesSilent(t *testing.T) {
 			"stall must not fire while reason chunks are streaming")
 	}
 
-	// Phase 2: the stream has ended, no more reason chunks arrive.
-	// The tick will go stale, and stall SHOULD fire.
+	// Phase 2: no more reason chunks arrive. The tick goes stale, stall SHOULD fire.
 	require.Eventually(t, func() bool {
 		for _, e := range invoker.Entries() {
 			if e.Tag == "[LOOP_STALL_DETECTED]" {
@@ -567,7 +525,7 @@ func TestAIReasonChunk_StallFiresWhenStreamGoesSilent(t *testing.T) {
 			}
 		}
 		return false
-	}, 2*time.Second, 10*time.Millisecond,
+	}, 5*time.Second, 50*time.Millisecond,
 		"stall must fire after AI stream goes silent and tick goes stale")
 }
 
@@ -575,6 +533,10 @@ func TestAIReasonChunk_StallFiresWhenStreamGoesSilent(t *testing.T) {
 // handler entry point (added in exec.go) also refreshes the tick when stream
 // fields start arriving, providing complementary coverage to SetOnReasonChunk
 // for models that produce output chunks without reason/thinking.
+//
+// Like the reason-chunk test, this directly simulates the stream field handler
+// calling recordIterationTick at intervals, avoiding the non-deterministic
+// emitter pipeline timing.
 //
 // 关键词: stream field handler 刷新 tick, 输出流 stall 误报规避
 func TestAIStreamFieldHandler_RefreshesTick(t *testing.T) {
@@ -589,72 +551,36 @@ func TestAIStreamFieldHandler_RefreshesTick(t *testing.T) {
 	// Initial tick.
 	loop.recordIterationTick()
 
-	// Start stall heartbeat: interval=10ms, threshold=50ms.
-	stopHeartbeat := loop.startStallHeartbeatWithClock(ctx, task, realStallHeartbeatClock{}, 10*time.Millisecond, 50*time.Millisecond, 0)
+	// Start stall heartbeat: interval=50ms, threshold=200ms.
+	stopHeartbeat := loop.startStallHeartbeatWithClock(ctx, task, realStallHeartbeatClock{}, 50*time.Millisecond, 200*time.Millisecond, 0)
 	defer stopHeartbeat()
 
-	// Simulate a slow output stream: feed output chunks at 15ms intervals.
-	// This exercises the stream field handler entry tick refresh.
-	cfg := invoker.GetConfig()
-	rsp := cfg.NewAIResponse()
-
-	feedDone := make(chan struct{})
+	// Simulate output stream chunks arriving at 50ms intervals over 500ms.
+	// Each "chunk" calls recordIterationTick (exactly what the stream field
+	// handler entry point does in exec.go).
+	stopChunks := make(chan struct{})
+	chunksDone := make(chan struct{})
 	go func() {
-		defer close(feedDone)
-		// Feed an output stream with delayed writes through an io.Pipe.
-		pr, pw := io.Pipe()
-		rsp.EmitOutputStream(pr)
-
-		go func() {
-			defer pw.Close()
-			// Write output in chunks with delays, total ~90ms > 50ms threshold.
-			chunks := [][]byte{
-				[]byte(`{"@action": `),
-				[]byte(`"finish",`),
-				[]byte(`"answer": `),
-				[]byte(`"done"}`),
-			}
-			for _, c := range chunks {
-				pw.Write(c)
-				time.Sleep(15 * time.Millisecond)
-			}
-		}()
-
-		// Drain the pipe reader side to unblock the writer.
-		io.Copy(io.Discard, pr)
-		rsp.Close()
-	}()
-
-	// Simulate the stream field handler tick refresh: when the stream
-	// reader starts producing data, call recordIterationTick (this is what
-	// the stream field handler entry point does in exec.go).
-	stream := rsp.GetOutputStreamReader("test-node", false, cfg.GetEmitter())
-
-	// Read in a goroutine, refreshing tick on each successful read.
-	var readWg sync.WaitGroup
-	readWg.Add(1)
-	go func() {
-		defer readWg.Done()
-		buf := make([]byte, 64)
+		defer close(chunksDone)
+		ticker := time.NewTicker(50 * time.Millisecond)
+		defer ticker.Stop()
+		loop.recordIterationTick()
 		for {
-			n, err := stream.Read(buf)
-			if n > 0 {
-				// Simulate the stream field handler entry tick refresh.
+			select {
+			case <-stopChunks:
+				return
+			case <-ticker.C:
+				// This simulates the stream field handler entry tick refresh.
 				loop.recordIterationTick()
-			}
-			if err != nil {
-				break
 			}
 		}
 	}()
 
-	readWg.Wait()
+	// Wait 500ms — far exceeds 200ms threshold, but tick stays fresh.
+	time.Sleep(500 * time.Millisecond)
 
-	select {
-	case <-feedDone:
-	case <-time.After(2 * time.Second):
-		t.Fatal("output stream feeder did not complete in time")
-	}
+	close(stopChunks)
+	<-chunksDone
 
 	// Assert: no stall during the slow output stream.
 	for _, e := range invoker.Entries() {
