@@ -4,8 +4,10 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -20,6 +22,18 @@ import (
 )
 
 const savedGoFixtureMaxParseDuration = 30 * time.Second
+
+func goFixtureParseBudget() time.Duration {
+	raw := strings.TrimSpace(os.Getenv("YAK_GO_FIXTURE_PARSE_BUDGET_SEC"))
+	if raw == "" {
+		return savedGoFixtureMaxParseDuration
+	}
+	sec, err := strconv.Atoi(raw)
+	if err != nil || sec <= 0 {
+		return 0
+	}
+	return time.Duration(sec) * time.Second
+}
 
 //go:embed all:code
 var codeFs embed.FS
