@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -245,10 +246,10 @@ func (r *sfCheck) check(
 	// output. No per-path re-snapshot — re-snapshotting per path is what made
 	// Opt A over-skip (a key merged by an earlier path looked "inherited" to a
 	// later path, so the later path's re-bind of it was skipped).
-	nodeId := extractCheckNodeId(path)
+	cacheKey := extractCheckNodeId(path)
 	for _, it := range items {
-		if nodeId > 0 {
-			if cached, ok := it.matchCache.Load(nodeId); ok {
+		if cacheKey != "" {
+			if cached, ok := it.matchCache.Load(cacheKey); ok {
 				if !fn(it.Key, cached.(bool)) {
 					return
 				}
@@ -263,8 +264,8 @@ func (r *sfCheck) check(
 
 		match := isMatch(res)
 		r.clearup(res.GetSFResult())
-		if nodeId > 0 {
-			it.matchCache.Store(nodeId, match)
+		if cacheKey != "" {
+			it.matchCache.Store(cacheKey, match)
 		}
 		if !fn(it.Key, match) {
 			return
@@ -272,21 +273,27 @@ func (r *sfCheck) check(
 	}
 }
 
-// extractCheckNodeId gets a stable SSA node ID from the path values for
-// cache keying. Uses the first value's GetId() which is the SSA instruction
-// ID -- stable across different descent paths within the same program.
-func extractCheckNodeId(path sf.Values) int64 {
-	var id int64
+// extractCheckNodeId builds a cache key from the path values.
+// The path is a sequence of SSA nodes (e.g. A -> B -> C -> D -> E); using
+// only the first node's ID as the cache key is incorrect because two
+// different paths sharing the same first node but diverging later would
+// collide and return stale results. Instead, we collect the IDs of ALL
+// nodes in the path and join them into a string key, so the cache is
+// keyed by the full path identity.
+func extractCheckNodeId(path sf.Values) string {
+	var sb strings.Builder
 	path.Recursive(func(op sf.ValueOperator) error {
 		if v, ok := op.(interface{ GetId() int64 }); ok {
 			if i := v.GetId(); i > 0 {
-				id = i
-				return utils.Error("done")
+				if sb.Len() > 0 {
+					sb.WriteByte(',')
+				}
+				sb.Write(strconv.AppendInt(nil, i, 10))
 			}
 		}
 		return nil
 	})
-	return id
+	return sb.String()
 }
 
 func (item *checkItem) check(value sf.Values, opt ...QueryOption) (*SyntaxFlowResult, error) {
