@@ -42,6 +42,15 @@ type AIResponse struct {
 	consumptionCallback func(current int)
 	onOutputFinished    func(string)
 
+	// outputCapture / reasonCapture let external observers (e.g. the transaction
+	// retry layer) collect the *plain* AI output / reason text after the stream
+	// has been consumed, without disturbing the streaming semantics or the
+	// existing onOutputFinished callback. They are invoked from
+	// GetOutputStreamReader once the corresponding stream finishes.
+	outputCapture func(string)
+	reasonCapture func(string)
+	captureMu     sync.Mutex
+
 	respStartTime time.Time
 	reqStartTime  time.Time
 
@@ -153,6 +162,55 @@ func (a *AIResponse) SetOnReasonChunk(fn func([]byte)) {
 	a.onReasonChunkMu.Lock()
 	a.onReasonChunk = fn
 	a.onReasonChunkMu.Unlock()
+}
+
+// SetOutputCapture registers a callback invoked with the full plain output
+// text once the output stream has been fully consumed (via
+// GetOutputStreamReader). It does not replace onOutputFinished and is safe to
+// call before the stream starts being consumed. The transaction layer uses it
+// to record the actual AI output for retry diagnostics.
+func (a *AIResponse) SetOutputCapture(fn func(string)) {
+	if a == nil {
+		return
+	}
+	a.captureMu.Lock()
+	a.outputCapture = fn
+	a.captureMu.Unlock()
+}
+
+// SetReasonCapture registers a callback invoked with the full plain reason
+// (thinking) text once the reason stream finishes.
+func (a *AIResponse) SetReasonCapture(fn func(string)) {
+	if a == nil {
+		return
+	}
+	a.captureMu.Lock()
+	a.reasonCapture = fn
+	a.captureMu.Unlock()
+}
+
+func (a *AIResponse) invokeOutputCapture(text string) {
+	if a == nil {
+		return
+	}
+	a.captureMu.Lock()
+	fn := a.outputCapture
+	a.captureMu.Unlock()
+	if fn != nil {
+		fn(text)
+	}
+}
+
+func (a *AIResponse) invokeReasonCapture(text string) {
+	if a == nil {
+		return
+	}
+	a.captureMu.Lock()
+	fn := a.reasonCapture
+	a.captureMu.Unlock()
+	if fn != nil {
+		fn(text)
+	}
 }
 
 func (a *AIResponse) invokeReasonChunk(b []byte) {
@@ -541,7 +599,7 @@ func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, emitter *
 	pr, pw := utils.NewBufPipe(nil)
 	emitter = a.BindEmitter(emitter)
 	go func() {
-		cbBuffer := bytes.NewBuffer(make([]byte, 4096))
+		cbBuffer := bytes.NewBuffer(make([]byte, 0, 4096))
 		// 关键词: AIResponse output stream goroutine panic 兜底
 		// 这个后台 goroutine 在测试 cleanup / config ctx 取消后仍可能在循环
 		// 发 EmitSystemStreamEvent / EmitStreamEvent. 任何 emitter 路径下游
@@ -552,10 +610,12 @@ func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, emitter *
 			}
 		}()
 		defer func() {
+			outputText := cbBuffer.String()
 			if a.onOutputFinished != nil {
-				a.onOutputFinished(cbBuffer.String())
+				a.onOutputFinished(outputText)
 				// config.ProcessExtendedActionCallback(cbBuffer.String())
 			}
+			a.invokeOutputCapture(outputText)
 		}()
 		defer pw.Close()
 		wg := new(sync.WaitGroup)
@@ -575,7 +635,9 @@ func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, emitter *
 				reasonBuf := new(bytes.Buffer)
 				teedReason := io.TeeReader(i.out, reasonBuf)
 				emitter.EmitDefaultStreamEvent("thought", teedReason, a.GetTaskIndex(), func() {
-					a.invokeReasonChunk(reasonBuf.Bytes())
+					reasonBytes := reasonBuf.Bytes()
+					a.invokeReasonChunk(reasonBytes)
+					a.invokeReasonCapture(string(reasonBytes))
 					wg.Done()
 				})
 				continue
