@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net"
@@ -14,7 +15,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
@@ -32,19 +32,24 @@ const (
 )
 
 type WebsocketClientConfig struct {
-	Proxy                  []string
-	TotalTimeout           time.Duration
-	TLS                    bool
-	FromServerHandler      func([]byte)
-	UpgradeResponseHandler func(*http.Response, []byte, *WebsocketExtensions, error) []byte
-	FromServerHandlerEx    func(*WebsocketClient, []byte, []*Frame)
-	AllFrameHandler        func(*WebsocketClient, *Frame, []byte, func())
-	DisableReassembly      bool
-	Context                context.Context
-	cancel                 func()
-	strictMode             bool
-	serverMode             bool
-	compressionMode        CompressionMode
+	Proxy                         []string
+	TotalTimeout                  time.Duration
+	TLS                           bool
+	FromServerHandler             func([]byte)
+	UpgradeResponseHandler        func(*http.Response, []byte, *WebsocketExtensions, error) []byte
+	FromServerHandlerEx           func(*WebsocketClient, []byte, []*Frame)
+	AllFrameHandler               func(*WebsocketClient, *Frame, []byte, func())
+	DisableReassembly             bool
+	Context                       context.Context
+	cancel                        func()
+	strictMode                    bool
+	serverMode                    bool
+	compressionMode               CompressionMode
+	compressionConfigured         bool
+	compressionOffer              string
+	writeCompressionNoTakeover    bool
+	writeCompressionNoTakeoverSet bool
+	writeCompressionWindowBits    int
 
 	// Host Port
 	Host string
@@ -73,21 +78,53 @@ func WithWebsocketDisableReassembly(b bool) WebsocketClientOpt {
 
 func WithWebsocketCompress(b bool) WebsocketClientOpt {
 	return func(config *WebsocketClientConfig) {
+		config.compressionConfigured = true
 		if b {
 			config.compressionMode = EnableCompression
+			config.compressionOffer = websocketPermessageDeflate
+			config.writeCompressionNoTakeover = false
+			config.writeCompressionNoTakeoverSet = false
 		} else {
 			config.compressionMode = DisableCompression
+			config.compressionOffer = ""
+			config.writeCompressionNoTakeover = false
+			config.writeCompressionNoTakeoverSet = false
+			config.writeCompressionWindowBits = 0
 		}
 	}
 }
 
 func WithWebsocketCompressionContextTakeover(b bool) WebsocketClientOpt {
 	return func(config *WebsocketClientConfig) {
+		config.compressionConfigured = true
 		if b {
 			config.compressionMode = CompressionContextTakeover
+			config.compressionOffer = websocketPermessageDeflate
+			config.writeCompressionNoTakeover = false
+			config.writeCompressionNoTakeoverSet = false
 		} else {
 			config.compressionMode = NoCompressionContextTakeover
+			config.writeCompressionNoTakeover = true
+			config.writeCompressionNoTakeoverSet = true
+			config.compressionOffer = formatPermessageDeflateOffer(PermessageDeflateParameters{
+				ClientNoContextTakeover: true,
+				ServerNoContextTakeover: true,
+			})
 		}
+	}
+}
+
+func WithWebsocketRFC7692FullCompression() WebsocketClientOpt {
+	return func(config *WebsocketClientConfig) {
+		config.compressionConfigured = true
+		config.compressionMode = EnableCompression
+		config.writeCompressionNoTakeover = true
+		config.writeCompressionNoTakeoverSet = true
+		config.compressionOffer = formatPermessageDeflateOffer(PermessageDeflateParameters{
+			ClientNoContextTakeover: true,
+			ClientMaxWindowBitsSet:  true,
+			ClientMaxWindowBitsBare: true,
+		})
 	}
 }
 
@@ -155,22 +192,25 @@ func WithWebsocketStrictMode(b bool) WebsocketClientOpt {
 }
 
 type WebsocketClient struct {
-	conn                net.Conn
-	fr                  *FrameReader
-	fw                  *FrameWriter
-	Request             []byte
-	Response            []byte
-	ResponseInstance    *http.Response
-	StartOnce           *sync.Once
-	FromServerHandler   func([]byte)
-	FromServerHandlerEx func(*WebsocketClient, []byte, []*Frame)
-	AllFrameHandler     func(*WebsocketClient, *Frame, []byte, func())
-	DisableReassembly   bool
-	Extensions          *WebsocketExtensions
-	Context             context.Context
-	cancel              func()
-	strictMode          bool
-	serverMode          bool
+	conn                          net.Conn
+	fr                            *FrameReader
+	fw                            *FrameWriter
+	Request                       []byte
+	Response                      []byte
+	ResponseInstance              *http.Response
+	StartOnce                     *sync.Once
+	FromServerHandler             func([]byte)
+	FromServerHandlerEx           func(*WebsocketClient, []byte, []*Frame)
+	AllFrameHandler               func(*WebsocketClient, *Frame, []byte, func())
+	DisableReassembly             bool
+	Extensions                    *WebsocketExtensions
+	Context                       context.Context
+	cancel                        func()
+	strictMode                    bool
+	serverMode                    bool
+	writeCompressionNoTakeover    bool
+	writeCompressionNoTakeoverSet bool
+	writeCompressionWindowBits    int
 
 	// websocket扩展
 	// isDeflate bool
@@ -231,6 +271,10 @@ func (c *WebsocketClient) Start() {
 				c.cancel()
 				c.conn.Close()
 				c.fr.putFlateReader()
+				if c.fr.dict != nil {
+					c.fr.dict.close()
+					c.fr.dict = nil
+				}
 				c.fw.putFlateWriter()
 			}()
 
@@ -243,7 +287,9 @@ func (c *WebsocketClient) Start() {
 
 				frame, err := c.fr.ReadFrame()
 				if err != nil {
-					if !errors.Is(err, io.EOF) {
+					if isExpectedWebsocketReadError(err) {
+						log.Debugf("[ws fr] connection closed: %s", err)
+					} else {
 						log.Errorf("[ws fr]read frame failed: %s", err)
 					}
 					return
@@ -256,6 +302,13 @@ func (c *WebsocketClient) Start() {
 
 				// strict mode
 				if c.strictMode {
+					// RFC 6455 section 5.1: clients mask frames sent to servers,
+					// while servers must not mask frames sent to clients.
+					if frame.GetMask() != c.serverMode {
+						c.WriteCloseEx(CloseProtocolError, "")
+						return
+					}
+
 					// rfc6455: 5.5
 					// All control frames MUST have a payload length of 125 bytes or less and MUST NOT be fragmented.
 					if isControl && (len(frame.payload) > 125 || !frame.FIN()) {
@@ -270,7 +323,8 @@ func (c *WebsocketClient) Start() {
 					// the negotiated extensions defines the meaning of such a nonzero
 					// value, the receiving endpoint MUST _Fail the WebSocket
 					// Connection_.
-					if frame.HasRsv() && !c.HasExtensions() {
+					hasDeflate := c.Extensions != nil && c.Extensions.IsDeflate
+					if frame.RSV2() || frame.RSV3() || (rsv1 && !hasDeflate) {
 						c.WriteCloseEx(CloseProtocolError, "")
 						return
 					}
@@ -299,7 +353,7 @@ func (c *WebsocketClient) Start() {
 					// rfc7692 6.1
 					// An endpoint MUST NOT set the "Per-Message Compressed" bit of control frames and non-first fragments of a data message. An endpoint receiving such a frame MUST _Fail the WebSocket Connection_.
 					if rsv1 {
-						if isControl || (frameType == ContinueMessage && len(fragmentFrames) > 0) {
+						if isControl || frameType == ContinueMessage {
 							c.WriteCloseEx(CloseProtocolError, "")
 							return
 						}
@@ -314,25 +368,28 @@ func (c *WebsocketClient) Start() {
 					}
 					// rfc7692 6.1
 					// The payload data portion in frames generated by a PMCE is not subject to the constraints for the original data type.  For example, the concatenation of the output data corresponding to the application data portion of frames of a compressed text message is not required to be valid UTF-8.  At the receiver, the payload data portion after decompression is subject to the constraints for the original data type again.
-					if !inCompressState && !rsv1 && firstFragmentFrame == TextMessage {
-						// fin message so check the whole message payload
-						if frame.FIN() {
-							remindBytesBuffer.Reset()
-							if !utf8.Valid(frame.data) {
+					if firstFragmentFrame == TextMessage {
+						isFragmentedText := len(fragmentFrames) > 0 || !frame.FIN()
+						if inCompressState {
+							if frame.FIN() && !utf8.Valid(frame.data) {
 								c.WriteCloseEx(CloseInvalidFramePayloadData, "")
 								return
 							}
-						} else {
-							// fragmented message so maybe the payload is not complete, compatibility check
+						} else if isFragmentedText {
 							remindBytesBuffer.Write(frame.data)
-							bytes := remindBytesBuffer.Bytes()
-							valid, remindSize := IsValidUTF8WithRemind(bytes)
-							if !valid {
+							if frame.FIN() {
+								if !utf8.Valid(remindBytesBuffer.Bytes()) {
+									c.WriteCloseEx(CloseInvalidFramePayloadData, "")
+									return
+								}
+								remindBytesBuffer.Reset()
+							} else if valid, _ := IsValidUTF8WithRemind(remindBytesBuffer.Bytes()); !valid {
 								c.WriteCloseEx(CloseInvalidFramePayloadData, "")
 								return
-							} else if remindSize != -1 {
-								remindBytesBuffer.Next(len(bytes) - remindSize)
 							}
+						} else if !utf8.Valid(frame.data) {
+							c.WriteCloseEx(CloseInvalidFramePayloadData, "")
+							return
 						}
 					}
 				}
@@ -361,22 +418,40 @@ func (c *WebsocketClient) Start() {
 
 				// reassembly
 				plain := frame.data
-				fragmentFrames = append(fragmentFrames, frame)
+				if !isControl {
+					fragmentFrames = append(fragmentFrames, frame)
+				}
 
-				if !c.DisableReassembly && !isControl {
-					// only for un-permessage-deflate frame
-					if inFragment && !inCompressState {
-						plainTextBuffer.Write(plain)
-						if !frame.FIN() { // continue to read next frame
+				reassembleMessage := !c.DisableReassembly || inCompressState
+				if reassembleMessage && !isControl {
+					if inFragment {
+						if !inCompressState {
+							plainTextBuffer.Write(plain)
+							if frame.FIN() {
+								plain = plainTextBuffer.Bytes()
+								plainTextBuffer.Reset()
+							}
+						}
+						// A compressed fragmented message is decompressed by FrameReader
+						// only when its final continuation arrives. Do not expose the
+						// intermediate compressed octets as application messages.
+						if !frame.FIN() {
 							continue
 						}
-						plain = plainTextBuffer.Bytes()
-						plainTextBuffer.Reset()
 					}
 				}
 				if allFrameHandler != nil {
+					callbackFrame := frame
+					if reassembleMessage && !isControl && len(fragmentFrames) > 1 {
+						// Reassembly produces one complete message. Preserve the data
+						// opcode from its first fragment instead of forwarding the final
+						// continuation opcode.
+						reassembledFrame := *frame
+						reassembledFrame.SetOpcode(fragmentFrames[0].Type())
+						callbackFrame = &reassembledFrame
+					}
 					shouldReturn := false
-					allFrameHandler(c, frame, plain, func() {
+					allFrameHandler(c, callbackFrame, plain, func() {
 						shouldReturn = true
 					})
 					if shouldReturn {
@@ -397,8 +472,6 @@ func (c *WebsocketClient) Start() {
 					if !frame.FIN() {
 						continue
 					}
-					inCompressState = false
-					inFragment = false
 
 					if !isControl {
 						if fromServerHandler != nil {
@@ -412,14 +485,93 @@ func (c *WebsocketClient) Start() {
 					}
 				}
 
-				fragmentFrames = fragmentFrames[:0]
+				if !isControl && frame.FIN() {
+					inCompressState = false
+					inFragment = false
+					fragmentFrames = fragmentFrames[:0]
+				}
 			}
 		}()
 	})
 }
 
 func (c *WebsocketClient) HasExtensions() bool {
-	return len(c.Extensions.Extensions) > 0
+	return c.Extensions != nil && len(c.Extensions.Extensions) > 0
+}
+
+func (c *WebsocketClient) writeFlateContextTakeover() bool {
+	if c == nil || c.Extensions == nil || !c.Extensions.writeFlateContextTakeover(c.serverMode) {
+		return false
+	}
+	return !c.writeCompressionNoTakeoverSet || !c.writeCompressionNoTakeover
+}
+
+func (c *WebsocketClient) writeFlateWindowBits() int {
+	if c == nil {
+		return websocketDefaultWindowBits
+	}
+	if c.Extensions == nil {
+		return websocketDefaultWindowBits
+	}
+	negotiated := c.Extensions.writeFlateWindowBits(c.serverMode)
+	if c.serverMode || c.Extensions.PermessageDeflate == nil || c.Extensions.PermessageDeflate.ClientMaxWindowBitsSet {
+		return negotiated
+	}
+	if c.writeCompressionWindowBits >= 8 && c.writeCompressionWindowBits <= websocketDefaultWindowBits {
+		return c.writeCompressionWindowBits
+	}
+	return negotiated
+}
+
+func isExpectedWebsocketReadError(err error) bool {
+	return errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) || errors.Is(err, context.Canceled) || errors.Is(err, errInvalidWebsocketFrame)
+}
+
+func websocketHeaderContainsToken(headers http.Header, name, token string) bool {
+	for _, value := range websocketHeaderValues(headers, name) {
+		for _, current := range strings.Split(value, ",") {
+			if strings.EqualFold(strings.TrimSpace(current), token) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func validateWebsocketUpgradeResponse(requestRaw []byte, response *http.Response) error {
+	if response == nil || response.StatusCode != http.StatusSwitchingProtocols {
+		return utils.Error("websocket: expected HTTP 101 Switching Protocols")
+	}
+	if !websocketHeaderContainsToken(response.Header, "Upgrade", "websocket") {
+		return utils.Error("websocket: response is missing Upgrade: websocket")
+	}
+	if !websocketHeaderContainsToken(response.Header, "Connection", "upgrade") {
+		return utils.Error("websocket: response is missing Connection: Upgrade")
+	}
+	key := strings.TrimSpace(GetHTTPPacketHeader(requestRaw, "Sec-WebSocket-Key"))
+	decodedKey, err := base64.StdEncoding.DecodeString(key)
+	if err != nil || len(decodedKey) != 16 {
+		return utils.Error("websocket: request contains an invalid Sec-WebSocket-Key")
+	}
+	acceptValues := websocketHeaderValues(response.Header, "Sec-WebSocket-Accept")
+	if len(acceptValues) != 1 || strings.TrimSpace(acceptValues[0]) != ComputeWebsocketAcceptKey(key) {
+		return utils.Error("websocket: invalid Sec-WebSocket-Accept response")
+	}
+
+	selectedProtocols := websocketHeaderValues(response.Header, "Sec-WebSocket-Protocol")
+	if len(selectedProtocols) == 0 {
+		return nil
+	}
+	if len(selectedProtocols) != 1 || strings.Contains(selectedProtocols[0], ",") {
+		return utils.Error("websocket: server selected multiple subprotocols")
+	}
+	selected := strings.TrimSpace(selectedProtocols[0])
+	for _, offered := range strings.Split(GetHTTPPacketHeader(requestRaw, "Sec-WebSocket-Protocol"), ",") {
+		if selected != "" && strings.TrimSpace(offered) == selected {
+			return nil
+		}
+	}
+	return utils.Errorf("websocket: server selected unoffered subprotocol %q", selected)
 }
 
 func (c *WebsocketClient) Write(r []byte) error {
@@ -427,7 +579,7 @@ func (c *WebsocketClient) Write(r []byte) error {
 }
 
 func (c *WebsocketClient) WriteEx(r []byte, frameTyp int) error {
-	if err := c.fw.WriteEx(r, frameTyp, true); err != nil {
+	if err := c.fw.WriteEx(r, frameTyp, !c.serverMode); err != nil {
 		return errors.Wrap(err, "write text frame failed")
 	}
 
@@ -438,7 +590,7 @@ func (c *WebsocketClient) WriteEx(r []byte, frameTyp int) error {
 }
 
 func (c *WebsocketClient) WriteBinary(r []byte) error {
-	if err := c.fw.WriteBinary(r, true); err != nil {
+	if err := c.fw.WriteBinary(r, !c.serverMode); err != nil {
 		return errors.Wrap(err, "write binary frame failed")
 	}
 	if err := c.fw.Flush(); err != nil {
@@ -448,7 +600,7 @@ func (c *WebsocketClient) WriteBinary(r []byte) error {
 }
 
 func (c *WebsocketClient) WriteText(r []byte) error {
-	if err := c.fw.WriteText(r, true); err != nil {
+	if err := c.fw.WriteText(r, !c.serverMode); err != nil {
 		return errors.Wrap(err, "write text frame failed")
 	}
 	if err := c.fw.Flush(); err != nil {
@@ -478,7 +630,18 @@ func (c *WebsocketClient) WriteClose() error {
 }
 
 func (c *WebsocketClient) WriteCloseEx(closeCode int, message string) error {
-	if err := c.fw.WriteEx(GetClosePayloadFromCloseCode(closeCode), CloseMessage, true); err != nil {
+	if !utf8.ValidString(message) {
+		return utils.Error("websocket: close reason must be valid utf8")
+	}
+	if closeCode == 0 && message != "" {
+		return utils.Error("websocket: close reason requires a close code")
+	}
+	payload := []byte(nil)
+	if closeCode != 0 {
+		payload = GetClosePayloadFromCloseCode(closeCode)
+	}
+	payload = append(payload, message...)
+	if err := c.fw.WriteEx(payload, CloseMessage, !c.serverMode); err != nil {
 		return errors.Wrap(err, "write close frame failed")
 	}
 	if err := c.fw.Flush(); err != nil {
@@ -535,37 +698,13 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 		}
 	}
 
-	// 扩展压缩选项
-	if config.compressionMode > 0 {
-		value, valid := "", true
-		switch config.compressionMode {
-		case EnableCompression, NoCompressionContextTakeover:
-			value = "permessage-deflate"
-		case CompressionContextTakeover:
-			value = "permessage-deflate; server_no_context_takeover; client_no_context_takeover"
-		case DisableCompression:
-		default:
-			valid = false
-		}
-		// 修改websocket扩展选项请求头
-		if valid {
-			if value == "" {
-				packet = DeleteHTTPPacketHeader(packet, "Sec-WebSocket-Extensions")
-			} else {
-				packet = ReplaceHTTPPacketHeader(packet, "Sec-WebSocket-Extensions", value)
-			}
+	if config.compressionConfigured {
+		if config.compressionOffer == "" {
+			packet = DeleteHTTPPacketHeader(packet, "Sec-WebSocket-Extensions")
+		} else {
+			packet = ReplaceHTTPPacketHeader(packet, "Sec-WebSocket-Extensions", config.compressionOffer)
 		}
 	}
-	// 过滤client_max_window_bits，因为这个选项不支持
-	websocketExtensions := GetHTTPPacketHeader(packet, "Sec-WebSocket-Extensions")
-	filtered := lo.FilterMap(strings.Split(websocketExtensions, ";"), func(s string, _ int) (string, bool) {
-		trimed := strings.TrimSpace(s)
-		if trimed == "" || strings.Contains(trimed, "client_max_window_bits") {
-			return "", false
-		}
-		return trimed, true
-	})
-	packet = ReplaceHTTPPacketHeader(packet, "Sec-WebSocket-Extensions", strings.Join(filtered, "; "))
 
 	// 获取连接
 	addr := utils.HostPort(host, port)
@@ -601,7 +740,26 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 		}
 		return nil, utils.Errorf("read response failed: %s", err)
 	}
-	extensions := GetWebsocketExtensions(rsp.Header)
+	requestExtensions := make(http.Header)
+	if value := GetHTTPPacketHeader(requestRaw, "Sec-WebSocket-Extensions"); value != "" {
+		requestExtensions.Set("Sec-WebSocket-Extensions", value)
+	}
+	if _, offers, offerErr := parsedWebsocketExtensions(requestExtensions, false); offerErr == nil {
+		for _, offer := range offers {
+			if !config.writeCompressionNoTakeoverSet && offer.ClientNoContextTakeover {
+				config.writeCompressionNoTakeover = true
+				config.writeCompressionNoTakeoverSet = true
+			}
+			if config.writeCompressionWindowBits == 0 && offer.ClientMaxWindowBitsSet && !offer.ClientMaxWindowBitsBare {
+				config.writeCompressionWindowBits = offer.ClientMaxWindowBits
+			}
+		}
+	}
+	extensions, extensionErr := ValidateWebsocketExtensions(requestExtensions, rsp.Header)
+	if extensionErr != nil {
+		_ = conn.Close()
+		return nil, extensionErr
+	}
 	responseRaw := responseBuffer.Bytes()
 	if upgradeResponseHandler != nil {
 		newResponseRaw := upgradeResponseHandler(rsp, responseRaw, extensions, nil)
@@ -610,6 +768,11 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 			rsp, err = ParseBytesToHTTPResponse(responseRaw)
 			if err != nil {
 				return nil, utils.Errorf("parse fixed response failed: %s", err)
+			}
+			extensions, extensionErr = ValidateWebsocketExtensions(requestExtensions, rsp.Header)
+			if extensionErr != nil {
+				_ = conn.Close()
+				return nil, extensionErr
 			}
 		}
 	}
@@ -622,6 +785,12 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 
 	if rsp.StatusCode != 101 {
 		return nil, utils.Errorf("upgrade websocket failed(101 switch protocols failed): %s", rsp.Status)
+	}
+	if config.strictMode {
+		if err := validateWebsocketUpgradeResponse(requestRaw, rsp); err != nil {
+			_ = conn.Close()
+			return nil, err
+		}
 	}
 
 	var ctx context.Context
@@ -639,21 +808,24 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 	fw := NewFrameWriter(conn, extensions.IsDeflate)
 
 	client := &WebsocketClient{
-		conn:                conn,
-		fr:                  fr,
-		fw:                  fw,
-		Request:             requestRaw,
-		Response:            responseRaw,
-		ResponseInstance:    rsp,
-		FromServerHandler:   config.FromServerHandler,
-		FromServerHandlerEx: config.FromServerHandlerEx,
-		AllFrameHandler:     config.AllFrameHandler,
-		DisableReassembly:   config.DisableReassembly,
-		Extensions:          extensions,
-		Context:             ctx,
-		cancel:              cancel,
-		strictMode:          config.strictMode,
-		serverMode:          config.serverMode,
+		conn:                          conn,
+		fr:                            fr,
+		fw:                            fw,
+		Request:                       requestRaw,
+		Response:                      responseRaw,
+		ResponseInstance:              rsp,
+		FromServerHandler:             config.FromServerHandler,
+		FromServerHandlerEx:           config.FromServerHandlerEx,
+		AllFrameHandler:               config.AllFrameHandler,
+		DisableReassembly:             config.DisableReassembly,
+		Extensions:                    extensions,
+		Context:                       ctx,
+		cancel:                        cancel,
+		strictMode:                    config.strictMode,
+		serverMode:                    config.serverMode,
+		writeCompressionNoTakeover:    config.writeCompressionNoTakeover,
+		writeCompressionNoTakeoverSet: config.writeCompressionNoTakeoverSet,
+		writeCompressionWindowBits:    config.writeCompressionWindowBits,
 	}
 	fr.SetWebsocketClient(client)
 	fw.SetWebsocketClient(client)
@@ -689,18 +861,21 @@ func NewWebsocketClientIns(conn net.Conn, fr *FrameReader, fw *FrameWriter, ext 
 	}
 
 	client := &WebsocketClient{
-		conn:                conn,
-		fr:                  fr,
-		fw:                  fw,
-		FromServerHandler:   config.FromServerHandler,
-		FromServerHandlerEx: config.FromServerHandlerEx,
-		AllFrameHandler:     config.AllFrameHandler,
-		DisableReassembly:   config.DisableReassembly,
-		Extensions:          ext,
-		Context:             ctx,
-		cancel:              cancel,
-		strictMode:          config.strictMode,
-		serverMode:          config.serverMode,
+		conn:                          conn,
+		fr:                            fr,
+		fw:                            fw,
+		FromServerHandler:             config.FromServerHandler,
+		FromServerHandlerEx:           config.FromServerHandlerEx,
+		AllFrameHandler:               config.AllFrameHandler,
+		DisableReassembly:             config.DisableReassembly,
+		Extensions:                    ext,
+		Context:                       ctx,
+		cancel:                        cancel,
+		strictMode:                    config.strictMode,
+		serverMode:                    config.serverMode,
+		writeCompressionNoTakeover:    config.writeCompressionNoTakeover,
+		writeCompressionNoTakeoverSet: config.writeCompressionNoTakeoverSet,
+		writeCompressionWindowBits:    config.writeCompressionWindowBits,
 	}
 
 	fr.SetWebsocketClient(client)

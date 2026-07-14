@@ -276,8 +276,7 @@ func TestConnPool_H2_PingKeepalive_ServerResponds(t *testing.T) {
 	pool.h2Mu.Lock()
 	for _, pc := range pool.h2ConnMap {
 		if pc.alt != nil {
-			pc.alt.pingInterval = pingInterval
-			pc.alt.pingTimeout = pingInterval * 3
+			pc.alt.setPingConfig(pingInterval, pingInterval*3)
 		}
 	}
 	pool.h2Mu.Unlock()
@@ -454,7 +453,8 @@ func TestConnPool_H2_PingKeepalive_ServerSilent(t *testing.T) {
 	pool.h2Mu.Lock()
 	for _, pc := range pool.h2ConnMap {
 		if pc.alt != nil {
-			pc.alt.pingTimeout = pingTimeout
+			interval, _ := pc.alt.pingConfig()
+			pc.alt.setPingConfig(interval, pingTimeout)
 		}
 	}
 	pool.h2Mu.Unlock()

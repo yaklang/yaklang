@@ -300,13 +300,14 @@ Host: cybertunnel.run:8080
 }
 
 func TestPoCH2(t *testing.T) {
-	addr := utils.HostPort("127.0.0.1", utils.GetRandomAvailableTCPPort())
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer lis.Close()
+	addr := lis.Addr().String()
 	var buf bytes.Buffer
+	copyDone := make(chan struct{})
 	go func() {
-		lis, err := net.Listen("tcp", addr)
-		if err != nil {
-			panic(err)
-		}
+		defer close(copyDone)
 		conn, err := lis.Accept()
 		if err != nil {
 			return
@@ -319,7 +320,6 @@ func TestPoCH2(t *testing.T) {
 		}()
 		io.Copy(&buf, conn)
 	}()
-	time.Sleep(500 * time.Millisecond)
 	nConn, err := net.Dial("tcp", addr)
 	if err != nil {
 		panic(err)
@@ -338,6 +338,11 @@ asd
 f
 asdf
 asd`), false)
+	select {
+	case <-copyDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for HTTP/2 preface capture")
+	}
 	if !strings.HasPrefix(buf.String(), `PRI * HTTP/2.0`) && len(buf.String()) > 120 {
 		panic("HTTP2 not ready")
 	}

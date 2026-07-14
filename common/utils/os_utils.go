@@ -497,57 +497,36 @@ func RegisterDefaultTLSConfigGenerator(h func() (*tls.Config, *gmtls.Config, *gm
 }
 
 func GetDefaultTLSConfig(i float64) *tls.Config {
-	expectedEnd := time.Now().Add(FloatSecondDuration(i))
-	for {
-		if tlsTestConfig != nil {
-			log.Infof("fetch default tls config finished: %p", tlsTestConfig)
-			return tlsTestConfig
-		}
-		go tlsTestOnce.Do(func() {
-			tlsTestConfig, gmtlsTestConfig, onlyGmtlsTestConfig, mtlsTestConfig, mgmtlsTestConfig, clientCrt, clientKey = generator()
-		})
-		time.Sleep(50 * time.Millisecond)
-		if !expectedEnd.After(time.Now()) {
-			break
-		}
+	tlsTestOnce.Do(func() {
+		tlsTestConfig, gmtlsTestConfig, onlyGmtlsTestConfig, mtlsTestConfig, mgmtlsTestConfig, clientCrt, clientKey = generator()
+	})
+	if tlsTestConfig != nil {
+		log.Infof("fetch default tls config finished: %p", tlsTestConfig)
+		return tlsTestConfig
 	}
 	log.Error("fetch default tls config failed")
 	return nil
 }
 
 func GetDefaultGMTLSConfig(i float64) *gmtls.Config {
-	expectedEnd := time.Now().Add(FloatSecondDuration(i))
-	for {
-		if tlsTestConfig != nil {
-			log.Infof("fetch default gmtls config finished: %p", gmtlsTestConfig)
-			return gmtlsTestConfig
-		}
-		go tlsTestOnce.Do(func() {
-			tlsTestConfig, gmtlsTestConfig, onlyGmtlsTestConfig, mtlsTestConfig, mgmtlsTestConfig, clientCrt, clientKey = generator()
-		})
-		time.Sleep(50 * time.Millisecond)
-		if !expectedEnd.After(time.Now()) {
-			break
-		}
+	tlsTestOnce.Do(func() {
+		tlsTestConfig, gmtlsTestConfig, onlyGmtlsTestConfig, mtlsTestConfig, mgmtlsTestConfig, clientCrt, clientKey = generator()
+	})
+	if gmtlsTestConfig != nil {
+		log.Infof("fetch default gmtls config finished: %p", gmtlsTestConfig)
+		return gmtlsTestConfig
 	}
 	log.Error("fetch default gmtls config failed")
 	return nil
 }
 
 func GetDefaultOnlyGMTLSConfig(i float64) *gmtls.Config {
-	expectedEnd := time.Now().Add(FloatSecondDuration(i))
-	for {
-		if tlsTestConfig != nil {
-			log.Infof("fetch default gmtls only config finished: %p", onlyGmtlsTestConfig)
-			return onlyGmtlsTestConfig
-		}
-		go tlsTestOnce.Do(func() {
-			tlsTestConfig, gmtlsTestConfig, onlyGmtlsTestConfig, mtlsTestConfig, mgmtlsTestConfig, clientCrt, clientKey = generator()
-		})
-		time.Sleep(50 * time.Millisecond)
-		if !expectedEnd.After(time.Now()) {
-			break
-		}
+	tlsTestOnce.Do(func() {
+		tlsTestConfig, gmtlsTestConfig, onlyGmtlsTestConfig, mtlsTestConfig, mgmtlsTestConfig, clientCrt, clientKey = generator()
+	})
+	if onlyGmtlsTestConfig != nil {
+		log.Infof("fetch default gmtls only config finished: %p", onlyGmtlsTestConfig)
+		return onlyGmtlsTestConfig
 	}
 	log.Error("fetch default gmtls only config failed")
 	return nil
@@ -580,43 +559,52 @@ func TLSConfigSetCheckServerName(tlsConfig *tls.Config, host string) *tls.Config
 }
 
 func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string, https, h2, gmtlsFlag, onlyGmtls, keepAlive bool, checkServerName bool, handle func([]byte) []byte) (string, int) {
-	// Increase initial wait time for better stability in CI environments
-	time.Sleep(200 * time.Millisecond)
 	host, port, _ := ParseStringToHostPort(addr)
+	var (
+		lis net.Listener
+		err error
+	)
+	if https && !h2 && !gmtlsFlag && !onlyGmtls {
+		tlsConfig := GetDefaultTLSConfig(5)
+		if tlsConfig == nil {
+			panic(1)
+		}
+		if checkServerName {
+			TLSConfigSetCheckServerName(tlsConfig, host)
+		}
+		lis, err = tls.Listen("tcp", addr, tlsConfig)
+	} else if h2 {
+		origin := GetDefaultTLSConfig(5)
+		if origin == nil {
+			panic(1)
+		}
+		if checkServerName {
+			TLSConfigSetCheckServerName(origin, host)
+		}
+		copied := *origin
+		copied.NextProtos = []string{"h2"}
+		lis, err = tls.Listen("tcp", addr, &copied)
+	} else if onlyGmtls {
+		log.Infof("onlyGmtlsFlag: %v", onlyGmtls)
+		lis, err = gmtls.Listen("tcp", addr, GetDefaultOnlyGMTLSConfig(5))
+	} else if gmtlsFlag {
+		log.Infof("gmtlsFlag: %v", gmtlsFlag)
+		lis, err = gmtls.Listen("tcp", addr, GetDefaultGMTLSConfig(5))
+	} else {
+		lis, err = net.Listen("tcp", addr)
+	}
+	if err != nil {
+		panic(err)
+	}
+	if actualHost, actualPort, parseErr := ParseStringToHostPort(lis.Addr().String()); parseErr == nil {
+		if host == "" {
+			host = actualHost
+		}
+		port = actualPort
+	}
+	addr = HostPort(host, port)
+
 	go func() {
-		var (
-			lis net.Listener
-			err error
-		)
-		if https && !h2 && !gmtlsFlag && !onlyGmtls {
-			tlsConfig := GetDefaultTLSConfig(5)
-			if tlsConfig == nil {
-				panic(1)
-			}
-			if checkServerName {
-				TLSConfigSetCheckServerName(tlsConfig, host)
-			}
-			lis, err = tls.Listen("tcp", addr, tlsConfig)
-		} else if h2 {
-			origin := GetDefaultTLSConfig(5)
-			if checkServerName {
-				TLSConfigSetCheckServerName(origin, host)
-			}
-			copied := *origin
-			copied.NextProtos = []string{"h2"}
-			lis, err = tls.Listen("tcp", addr, &copied)
-		} else if onlyGmtls {
-			log.Infof("onlyGmtlsFlag: %v", onlyGmtls)
-			lis, err = gmtls.Listen("tcp", addr, GetDefaultOnlyGMTLSConfig(5))
-		} else if gmtlsFlag {
-			log.Infof("gmtlsFlag: %v", gmtlsFlag)
-			lis, err = gmtls.Listen("tcp", addr, GetDefaultGMTLSConfig(5))
-		} else {
-			lis, err = net.Listen("tcp", addr)
-		}
-		if err != nil {
-			panic(err)
-		}
 		go func() {
 			select {
 			case <-ctx.Done():
@@ -762,7 +750,7 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 		lis.Close()
 	}()
 
-	err := WaitConnect(addr, 3)
+	err = WaitConnect(addr, 3)
 	if err != nil {
 		panic(err)
 	}

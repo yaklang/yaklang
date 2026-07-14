@@ -92,6 +92,9 @@ Upgrade: websocket
 }
 
 func TestWEbsocket_AutobahnTestsuite(t *testing.T) {
+	if os.Getenv("AUTOBAHN_RUN_LEGACY") == "" {
+		t.Skip("set AUTOBAHN_RUN_LEGACY=1 to run the legacy manually enumerated suite")
+	}
 	if utils.InGithubActions() {
 		t.SkipNow()
 	}

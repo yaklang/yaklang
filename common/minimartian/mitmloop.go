@@ -37,14 +37,14 @@ func (p *Proxy) startConnLog(statusContext context.Context) (func(string, net.Co
 	connsCached := new(sync.Map)
 	cacheConns := func(uid string, c net.Conn) {
 		connsCached.Store(uid, c)
-		atomic.AddInt64(&currentConnCount, 1)
-		log.Debugf("record connection from cache: %v=>%v, current count: %v", c.LocalAddr(), c.RemoteAddr(), currentConnCount)
+		count := atomic.AddInt64(&currentConnCount, 1)
+		log.Debugf("record connection from cache: %v=>%v, current count: %v", c.LocalAddr(), c.RemoteAddr(), count)
 	}
 	removeConns := func(uid string, c net.Conn) {
 		connsCached.Delete(uid)
-		atomic.AddInt64(&currentConnCount, -1)
-		if c == nil {
-			log.Debugf("remove connection table from cache: %v=>%v, current coon: %v", c.LocalAddr(), c.RemoteAddr(), currentConnCount)
+		count := atomic.AddInt64(&currentConnCount, -1)
+		if c != nil {
+			log.Debugf("remove connection table from cache: %v=>%v, current count: %v", c.LocalAddr(), c.RemoteAddr(), count)
 		}
 	}
 
@@ -55,9 +55,10 @@ func (p *Proxy) startConnLog(statusContext context.Context) (func(string, net.Co
 			case <-statusContext.Done():
 				return
 			default:
-				if currentConnCount > 0 && lastCurrentConnCount != currentConnCount {
-					log.Infof("mitm frontend active connections count: %v", currentConnCount)
-					lastCurrentConnCount = currentConnCount
+				current := atomic.LoadInt64(&currentConnCount)
+				if current > 0 && lastCurrentConnCount != current {
+					log.Infof("mitm frontend active connections count: %v", current)
+					lastCurrentConnCount = current
 				}
 				time.Sleep(3 * time.Second)
 			}
@@ -482,6 +483,12 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, ctx *Context) {
 		conn.SetDeadline(time.Time{})
 		log.Debugf("waiting conn: %v", conn.RemoteAddr())
 		err := p.handle(ctx, timer, conn, brw, "")
+		// A hijacked connection is owned by the hijacker (for example the
+		// WebSocket frame tunnel). Do not start another HTTP request reader on
+		// the same bufio.Reader while that tunnel is still consuming frames.
+		if ctx.Session().Hijacked() {
+			return
+		}
 		if timer == nil {
 			timer = time.AfterFunc(timerInterval, func() {
 				conn.Close()
