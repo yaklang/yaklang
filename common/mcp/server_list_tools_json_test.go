@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"testing"
 
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	mcpserver "github.com/yaklang/yaklang/common/mcp/mcp-go/server"
@@ -559,5 +561,86 @@ func sortStrings(ss []string) {
 		for j := i; j > 0 && ss[j] < ss[j-1]; j-- {
 			ss[j], ss[j-1] = ss[j-1], ss[j]
 		}
+	}
+}
+
+// compileSchemaAgainstMetaSchema compiles the given schema map against the
+// JSON Schema 2020-12 meta-schema (the same draft Claude Code uses to validate
+// tool inputSchema). Returns nil if the schema is valid, or the compile error.
+//
+// The marshal/unmarshal round-trip converts omap.OrderedMap and other
+// non-standard types into plain Go JSON types, mirroring what an external MCP
+// client receives over the wire.
+func compileSchemaAgainstMetaSchema(schema any) error {
+	jsonBytes, err := json.Marshal(schema)
+	if err != nil {
+		return fmt.Errorf("marshal schema: %w", err)
+	}
+	var plain any
+	if err := json.Unmarshal(jsonBytes, &plain); err != nil {
+		return fmt.Errorf("unmarshal schema: %w", err)
+	}
+	compiler := jsonschema.NewCompiler()
+	compiler.DefaultDraft(jsonschema.Draft2020)
+	if err := compiler.AddResource("schema.json", plain); err != nil {
+		return fmt.Errorf("add resource: %w", err)
+	}
+	if _, err := compiler.Compile("schema.json"); err != nil {
+		return err
+	}
+	return nil
+}
+
+// TestMCPToolSchemaMetaSchemaCompliance validates every registered MCP tool's
+// inputSchema against the JSON Schema 2020-12 meta-schema. This catches
+// structural violations (e.g. a "type" field that is an object instead of a
+// string) that external MCP clients like Claude Code reject with HTTP 400.
+//
+// Known issue: WithStructArray flattens child properties directly into the
+// items map; a child named "type" overwrites the items' type string. This test
+// will report such tools as violations.
+func TestMCPToolSchemaMetaSchemaCompliance(t *testing.T) {
+	tools := collectAllRegisteredToolHandlers()
+	require.NotEmpty(t, tools, "no tools registered")
+
+	type violation struct {
+		tool string
+		err  string
+	}
+	var violations []violation
+
+	for _, twh := range tools {
+		tool := twh.tool
+		// Marshal/unmarshal to simulate wire format (OrderedMap -> map, etc.)
+		jsonBytes, err := json.Marshal(tool.InputSchema)
+		require.NoErrorf(t, err, "tool %q: failed to marshal InputSchema", tool.Name)
+		var wireSchema any
+		if err := json.Unmarshal(jsonBytes, &wireSchema); err != nil {
+			violations = append(violations, violation{
+				tool: tool.Name,
+				err:  fmt.Sprintf("unmarshal InputSchema: %v", err),
+			})
+			continue
+		}
+
+		if compileErr := compileSchemaAgainstMetaSchema(wireSchema); compileErr != nil {
+			violations = append(violations, violation{
+				tool: tool.Name,
+				err:  compileErr.Error(),
+			})
+		}
+	}
+
+	if len(violations) > 0 {
+		// Sort by tool name for stable output
+		sort.Slice(violations, func(i, j int) bool {
+			return violations[i].tool < violations[j].tool
+		})
+		var sb strings.Builder
+		for _, v := range violations {
+			sb.WriteString(fmt.Sprintf("  - tool %q: %s\n", v.tool, v.err))
+		}
+		t.Errorf("found %d tool(s) with invalid JSON Schema inputSchema "+
+			"(meta-schema: draft 2020-12):\n%s", len(violations), sb.String())
 	}
 }
