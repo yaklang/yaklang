@@ -181,13 +181,14 @@ func LoadYakScriptToAiTools(name string, content string) *schema.AIYakTool {
 	tool := yakcliconvert.ConvertCliParameterToTool(name, prog)
 	params, _ := json.Marshal(tool.InputSchema.ToMap())
 	return &schema.AIYakTool{
-		Name:        name,
-		VerboseName: ins.VerboseName,
-		Description: ins.Description,
-		Keywords:    strings.Join(ins.Keywords, ","),
-		Usage:       ins.Usage,
-		Content:     content,
-		Params:      string(params),
+		Name:          name,
+		VerboseName:   ins.VerboseName,
+		VerboseNameZh: ins.VerboseNameZh,
+		Description:   ins.Description,
+		Keywords:      strings.Join(ins.Keywords, ","),
+		Usage:         ins.Usage,
+		Content:       content,
+		Params:        string(params),
 	}
 }
 

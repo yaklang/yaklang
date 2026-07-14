@@ -1,5 +1,6 @@
 __DESC__ = "一个用于克隆Git远程仓库的工具，支持指定本地路径、分支、深度等选项。适用于代码下载、仓库同步等场景。"
-__VERBOSE_NAME__ = "Git克隆工具"
+__VERBOSE_NAME__ = "Git Clone Tool"
+__VERBOSE_NAME_ZH__ = "Git克隆工具"
 __KEYWORDS__ = "git clone,仓库克隆,代码下载,版本控制,git工具,仓库管理,代码同步,分支克隆,深度克隆"
 
 __USAGE__ = <<<USAGE_BLOCK

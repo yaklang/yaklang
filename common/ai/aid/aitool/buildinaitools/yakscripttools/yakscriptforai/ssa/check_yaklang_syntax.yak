@@ -1,5 +1,6 @@
 __DESC__ = "Performs a syntax check on Yaklang code. The code can be provided directly as a string ('yaklang-code') or by specifying a file path ('path')."
-__VERBOSE_NAME__ = "Yaklang 语法检查"
+__VERBOSE_NAME__ = "Yaklang Syntax Checker"
+__VERBOSE_NAME_ZH__ = "Yaklang 语法检查"
 __KEYWORDS__ = "yaklang, syntax check, linter, static analysis, code validation, Yaklang, 语法检查, 静态分析, 代码验证, 脚本检查"
 
 __USAGE__ = <<<USAGE_BLOCK

@@ -1,5 +1,6 @@
 __DESC__ = "【sf_rule_completion 子任务专用】读规则、liteforge 补全 desc/alert、内存合并并写入 suggested_path（默认 ~/yakit-projects/code/*-completed.sf）。勿在此脚本内 ExecuteForge。推荐外层走 sf_rule_completion 蓝图。"
-__VERBOSE_NAME__ = "SyntaxFlow 规则补全"
+__VERBOSE_NAME__ = "SyntaxFlow Rule Completion"
+__VERBOSE_NAME_ZH__ = "SyntaxFlow 规则补全"
 __KEYWORDS__ = "syntaxflow,规则补全,desc,alert,sf_rule_completion,SyntaxFlow"
 
 __USAGE__ = <<<USAGE_BLOCK

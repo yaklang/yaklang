@@ -1,5 +1,6 @@
 __DESC__ = "互联网搜索与内容精炼工具。搜索互联网获取信息，并发抓取页面内容，通过 AI 蒸馏压缩提取精华，交付高质量结果。Internet search and content refinement tool. Searches the internet, concurrently fetches page content, and uses AI distillation to extract key information."
-__VERBOSE_NAME__ = "互联网搜索与内容精炼工具"
+__VERBOSE_NAME__ = "Web Search & Content Refiner"
+__VERBOSE_NAME_ZH__ = "互联网搜索与内容精炼工具"
 __KEYWORDS__ = "web search,internet search,omnisearch,搜索互联网,互联网搜索,网页搜索,搜索引擎,网上搜索,在线搜索,上网搜索,search engine,web research,网页抓取,信息收集,话题调研,实时信息,content extraction,information gathering,百度搜索,谷歌搜索,search online,搜一下,帮我搜,帮我查"
 
 __USAGE__ = <<<USAGE_BLOCK

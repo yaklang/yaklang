@@ -39,8 +39,9 @@ type MCPClientCloser interface {
 type Tool struct {
 	*mcp.Tool
 	// A list of keywords for tool indexing and searching.
-	Keywords    []string `json:"keywords,omitempty"`
-	VerboseName string   `json:"verbose_name,omitempty"`
+	Keywords      []string `json:"keywords,omitempty"`
+	VerboseName   string   `json:"verbose_name,omitempty"`    // English display name
+	VerboseNameZh string   `json:"verbose_name_zh,omitempty"` // Chinese display name
 	// Usage 工具使用说明，在参数生成阶段(第2阶段)才披露给 AI，
 	// 包含使用原则、参数建议、关联使用等信息，帮助 AI 更好地使用工具参数。
 	Usage    string         `json:"usage,omitempty"`
@@ -107,6 +108,12 @@ func WithDescription(description string) ToolOption {
 func WithVerboseName(verboseName string) ToolOption {
 	return func(t *Tool) {
 		t.VerboseName = verboseName
+	}
+}
+
+func WithVerboseNameZh(verboseNameZh string) ToolOption {
+	return func(t *Tool) {
+		t.VerboseNameZh = verboseNameZh
 	}
 }
 
@@ -808,6 +815,10 @@ func (t *Tool) GetDescription() string {
 
 func (t *Tool) GetVerboseName() string {
 	return t.VerboseName
+}
+
+func (t *Tool) GetVerboseNameZh() string {
+	return t.VerboseNameZh
 }
 
 func (t *Tool) GetKeywords() []string {

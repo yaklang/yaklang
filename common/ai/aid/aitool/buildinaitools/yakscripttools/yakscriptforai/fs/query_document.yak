@@ -1,5 +1,6 @@
 __DESC__ = "智能文档阅读和理解工具，支持多种文档格式的深度分析。通过自适应分块和上下文保持技术，能够理解长文档的语义结构，回答复杂问题，生成摘要，提取关键信息。支持个性化阅读策略和多种输出格式。Analyzes a local text-based document to answer a user's specific question. This tool processes the document in chunks, maintaining contextual understanding to handle long-form content. It is ideal for when an AI agent needs to find specific information, extract key details, or get a conclusive answer from within a file's content. If no question is provided, it will summarize the document."
-__VERBOSE_NAME__ = "文件内容分析器"
+__VERBOSE_NAME__ = "File Content Analyzer"
+__VERBOSE_NAME_ZH__ = "文件内容分析器"
 __KEYWORDS__ = "file analysis, document qa, question answering, query, ask, find, search, retrieve, extract, RAG, retrieval augmented generation, contextual analysis, text chunking, semantic search, information extraction, document analysis, local file QA, content comprehension"
 
 __USAGE__ = <<<USAGE_BLOCK

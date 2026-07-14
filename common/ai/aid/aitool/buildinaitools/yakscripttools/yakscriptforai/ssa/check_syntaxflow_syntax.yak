@@ -1,5 +1,6 @@
 __DESC__ = "Performs a syntax check on SyntaxFlow rule. The rule can be provided directly as a string ('syntaxflow-code') or by specifying a file path ('path')."
-__VERBOSE_NAME__ = "SyntaxFlow 语法检测"
+__VERBOSE_NAME__ = "SyntaxFlow Syntax Checker"
+__VERBOSE_NAME_ZH__ = "SyntaxFlow 语法检测"
 __KEYWORDS__ = "syntaxflow, sf, syntax check, rule validation, static analysis, code audit, SyntaxFlow, 语法检测, 规则验证, 静态分析"
 
 __USAGE__ = <<<USAGE_BLOCK

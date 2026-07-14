@@ -1,5 +1,6 @@
 __DESC__ = "A line-based text file (Absolute File Path) reader with pagination support. Automatically detects binary file formats via mimetype (magic bytes) and redirects to appropriate built-in tools (read_excel_info, read_word_structure, parse_office_to_text, zip_viewer, analyze_pcap, etc.)."
 __VERBOSE_NAME__ = "Line-Based File Reader"
+__VERBOSE_NAME_ZH__ = "按行文件读取工具"
 __KEYWORDS__ = "file reading,line reading,log analysis,text processing,large file,line by line,pagination,streaming read,binary detection,mimetype,read_excel_info,parse_office_to_text"
 
 __USAGE__ = <<<USAGE_BLOCK

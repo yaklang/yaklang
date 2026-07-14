@@ -1,5 +1,6 @@
 __DESC__ = "接收一个SSA RiskID获取SSA Risk或者SSA RiskID关联的问题代码"
-__VERBOSE_NAME_ = "通过SSA Risk ID获取SSA Risk或者SSA RiskID关联的问题代码"
+__VERBOSE_NAME__ = "SSA Risk by ID Lookup"
+__VERBOSE_NAME_ZH__ = "通过SSA Risk ID获取SSA Risk或者SSA RiskID关联的问题代码"
 __KEYWORDS__ = "SSA, Risk, SSA Risk"
 
 __USAGE__ = <<<USAGE_BLOCK

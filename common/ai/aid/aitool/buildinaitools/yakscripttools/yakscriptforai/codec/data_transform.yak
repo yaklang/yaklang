@@ -1,5 +1,6 @@
 __DESC__ = "A structured data format conversion tool that converts between JSON, YAML, and XML. Supports auto-detection of input format, pretty printing, format validation, and reformatting."
 __VERBOSE_NAME__ = "Data Format Converter (JSON/YAML/XML)"
+__VERBOSE_NAME_ZH__ = "数据格式转换（JSON/YAML/XML）"
 __KEYWORDS__ = "json,yaml,xml,convert,transform,format,prettify,validate,data,config,structured data,serialization,deserialization"
 
 __USAGE__ = <<<USAGE_BLOCK

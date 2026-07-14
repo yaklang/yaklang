@@ -1,5 +1,6 @@
 __DESC__ = "一个基于指纹名称查找相关插件的工具，仅返回插件名中包含指纹名称的 Yak 插件，并给出可传给 Yak 插件调用器的调用标识。"
-__VERBOSE_NAME__ = "插件指纹查询工具"
+__VERBOSE_NAME__ = "Plugin Fingerprint Query"
+__VERBOSE_NAME_ZH__ = "插件指纹查询工具"
 __KEYWORDS__ = "插件查询,指纹匹配,相似度计算,插件搜索,数据库查询,模糊匹配,plugin query,fingerprint matching,similarity calculation,plugin search,database query,fuzzy matching,yak plugin,script search"
 
 __USAGE__ = <<<USAGE_BLOCK

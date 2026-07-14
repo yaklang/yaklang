@@ -1,5 +1,6 @@
 __DESC__ = "A unified text file (Absolute File Path) reader that supports line-based and byte-chunk reading modes. Automatically detects binary file formats via mimetype (magic bytes) and redirects to appropriate built-in tools (read_excel_info, query_excel_data, read_word_structure, parse_office_to_text, zip_viewer, analyze_pcap, etc.) or Python scripts."
 __VERBOSE_NAME__ = "Unified File Reader"
+__VERBOSE_NAME_ZH__ = "统一文件读取工具"
 __KEYWORDS__ = "memory management,file reading,large file,file handling,reading,data processing,buffer,performance,offset,chunk size,streaming,line reading,binary detection,mimetype,excel,xlsx,pdf,docx,zip,pcap,office,read_excel_info,query_excel_data,parse_office_to_text"
 
 __USAGE__ = <<<USAGE_BLOCK

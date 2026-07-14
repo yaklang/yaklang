@@ -15,6 +15,7 @@ Native alert/confirm/prompt: dialog text is returned to AI; use op=get subop=dia
 op=handle_dialog action=accept|dismiss (value for prompt). Do NOT ignore blocking dialogs.
 DESC_BLOCK
 __VERBOSE_NAME__ = "Browser Automation Tool"
+__VERBOSE_NAME_ZH__ = "浏览器自动化工具"
 __KEYWORDS__ = "browser,chrome,automation,click,fill,type,snapshot,screenshot,navigate,scrape,web,form,login,CDP,headless,accessibility,ref,DOM,page,wait,scroll,eval,tab,cookie,selector,javascript"
 
 __USAGE__ = <<<USAGE_BLOCK

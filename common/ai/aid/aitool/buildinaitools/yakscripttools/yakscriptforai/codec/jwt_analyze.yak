@@ -1,5 +1,6 @@
 __DESC__ = "A JWT (JSON Web Token) analysis tool that decodes header/payload, verifies signatures with provided or common weak keys, and performs security analysis including alg:none detection, weak key brute-force, and expiration checks."
 __VERBOSE_NAME__ = "JWT Token Analyzer"
+__VERBOSE_NAME_ZH__ = "JWT Token 分析工具"
 __KEYWORDS__ = "jwt,token,json web token,security,authentication,authorization,alg none,weak key,signature,claims,header,payload,decode,analyze,bearer"
 
 __USAGE__ = <<<USAGE_BLOCK

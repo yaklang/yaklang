@@ -1,5 +1,6 @@
 __DESC__ = "一个用于查看目录树形结构的工具，支持显示目录下的文件和子目录层级关系，默认排除 .git/node_modules 等噪声目录。支持名称黑白名单和扩展名黑白名单过滤。支持 dirs-only 模式只显示目录结构（不显示文件），适用于大型项目的快速结构概览。适用于目录结构分析、项目概览等场景。"
-__VERBOSE_NAME__ = "目录树形结构查看工具"
+__VERBOSE_NAME__ = "Directory Tree Viewer"
+__VERBOSE_NAME_ZH__ = "目录树形结构查看工具"
 __KEYWORDS__ = "directory tree,目录结构,树形结构,文件系统浏览,directory listing,文件夹结构,文件树,file hierarchy,目录浏览,directory navigation,exclude,include,extension filter,dirs-only,仅目录"
 
 __USAGE__ = <<<USAGE_BLOCK

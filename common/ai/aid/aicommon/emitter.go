@@ -484,12 +484,22 @@ func (r *Emitter) EmitToolCallWatcher(toolCallID string, id string, tool *aitool
 }
 
 func (r *Emitter) EmitToolCallStart(callToolId string, tool *aitool.Tool, startTime ...time.Time) (*schema.AiOutputEvent, error) {
+	// Frontend contract (Yakit ToolInvokerCard / AIToolResult):
+	//   tool.verbose_name    = English display name
+	//   tool.verbose_name_zh = Chinese display name
+	// Language selection:
+	//   zh* -> verbose_name_zh || verbose_name || name
+	//   en  -> verbose_name || verbose_name_zh || name
+	// Aligns with Focus AIFocus.VerboseName / VerboseNameZh.
 	toolMap := map[string]any{
 		"name":        tool.Name,
 		"description": tool.Description,
 	}
 	if verboseName := tool.GetVerboseName(); verboseName != "" {
 		toolMap["verbose_name"] = verboseName
+	}
+	if verboseNameZh := tool.GetVerboseNameZh(); verboseNameZh != "" {
+		toolMap["verbose_name_zh"] = verboseNameZh
 	}
 	data := map[string]any{
 		"call_tool_id": callToolId,
