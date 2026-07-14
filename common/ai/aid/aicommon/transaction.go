@@ -137,27 +137,23 @@ func callAITransaction(
 			return utils.Errorf("context is done, cannot continue transaction")
 		}
 		lastRsp = rsp
-		// Inject capture hooks so that, after postHandler consumes the
+		// Register capture hooks so that, after postHandler consumes the
 		// stream, we can record the *plain* AI output / reason text for
-		// this attempt. The hooks fire asynchronously when the stream
-		// finishes. We synchronise on the output-capture completion below
-		// (best-effort, bounded by the caller context) before reading the
-		// captured text so that the retry record contains the actual AI
-		// output even when the stream finishes slightly after postHandler
-		// returns.
+		// this attempt. The onOutputFinished callback fires when the output
+		// stream finishes; SetOnReasonChunk fires per reason payload.
 		var capturedOutput, capturedReason string
 		var capturedMu sync.Mutex
 		outputDone := make(chan struct{})
 		var outputDoneOnce sync.Once
-		rsp.SetOutputCapture(func(text string) {
+		rsp.SetOnOutputFinished(func(text string) {
 			capturedMu.Lock()
 			capturedOutput = text
 			capturedMu.Unlock()
 			outputDoneOnce.Do(func() { close(outputDone) })
 		})
-		rsp.SetReasonCapture(func(text string) {
+		rsp.SetOnReasonChunk(func(b []byte) {
 			capturedMu.Lock()
-			capturedReason = text
+			capturedReason = string(b)
 			capturedMu.Unlock()
 			outputDoneOnce.Do(func() { close(outputDone) })
 		})
@@ -252,12 +248,6 @@ func callAITransaction(
 	}
 	emittedStructuredFailure := EmitAICallFailureIfApplicable(c, tier, lastRsp, finalErr, structuredExtra)
 	if !emittedStructuredFailure {
-		if lastRsp != nil {
-			rawDump := lastRsp.GetRawHTTPResponseDump()
-			if rawDump != "" {
-				finalErrMsg += "\n\n--- Last Raw HTTP Response ---\n" + utils.ShrinkString(rawDump, 4096)
-			}
-		}
 		finalErrMsg += formatAttemptHistory(attemptHistory)
 		bindEmitter(lastRsp).EmitDefaultStreamEvent("ai-error", strings.NewReader(finalErrMsg), "")
 	}
@@ -266,9 +256,8 @@ func callAITransaction(
 	// caller can inspect every retry's error / AI response directly from the
 	// returned error, regardless of whether a structured failure event was
 	// emitted.
-	historyStr := formatAttemptHistory(attemptHistory)
 	wrapMsg := fmt.Sprintf("max retry count[%v] reached in transaction", trcRetry)
-	if historyStr != "" {
+	if historyStr := formatAttemptHistory(attemptHistory); historyStr != "" {
 		wrapMsg += historyStr
 	}
 	if finalErr != nil {

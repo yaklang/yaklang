@@ -41,15 +41,7 @@ type AIResponse struct {
 	enableDebug         bool
 	consumptionCallback func(current int)
 	onOutputFinished    func(string)
-
-	// outputCapture / reasonCapture let external observers (e.g. the transaction
-	// retry layer) collect the *plain* AI output / reason text after the stream
-	// has been consumed, without disturbing the streaming semantics or the
-	// existing onOutputFinished callback. They are invoked from
-	// GetOutputStreamReader once the corresponding stream finishes.
-	outputCapture func(string)
-	reasonCapture func(string)
-	captureMu     sync.Mutex
+	onOutputFinishedMu sync.Mutex
 
 	respStartTime time.Time
 	reqStartTime  time.Time
@@ -164,53 +156,18 @@ func (a *AIResponse) SetOnReasonChunk(fn func([]byte)) {
 	a.onReasonChunkMu.Unlock()
 }
 
-// SetOutputCapture registers a callback invoked with the full plain output
+// SetOnOutputFinished registers a callback invoked with the full plain output
 // text once the output stream has been fully consumed (via
-// GetOutputStreamReader). It does not replace onOutputFinished and is safe to
-// call before the stream starts being consumed. The transaction layer uses it
-// to record the actual AI output for retry diagnostics.
-func (a *AIResponse) SetOutputCapture(fn func(string)) {
+// GetOutputStreamReader). It replaces the default onOutputFinished callback
+// (which calls CallAIResponseOutputFinishedCallback). The transaction layer
+// uses it to record the actual AI output for retry diagnostics.
+func (a *AIResponse) SetOnOutputFinished(fn func(string)) {
 	if a == nil {
 		return
 	}
-	a.captureMu.Lock()
-	a.outputCapture = fn
-	a.captureMu.Unlock()
-}
-
-// SetReasonCapture registers a callback invoked with the full plain reason
-// (thinking) text once the reason stream finishes.
-func (a *AIResponse) SetReasonCapture(fn func(string)) {
-	if a == nil {
-		return
-	}
-	a.captureMu.Lock()
-	a.reasonCapture = fn
-	a.captureMu.Unlock()
-}
-
-func (a *AIResponse) invokeOutputCapture(text string) {
-	if a == nil {
-		return
-	}
-	a.captureMu.Lock()
-	fn := a.outputCapture
-	a.captureMu.Unlock()
-	if fn != nil {
-		fn(text)
-	}
-}
-
-func (a *AIResponse) invokeReasonCapture(text string) {
-	if a == nil {
-		return
-	}
-	a.captureMu.Lock()
-	fn := a.reasonCapture
-	a.captureMu.Unlock()
-	if fn != nil {
-		fn(text)
-	}
+	a.onOutputFinishedMu.Lock()
+	a.onOutputFinished = fn
+	a.onOutputFinishedMu.Unlock()
 }
 
 func (a *AIResponse) invokeReasonChunk(b []byte) {
@@ -611,11 +568,13 @@ func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, emitter *
 		}()
 		defer func() {
 			outputText := cbBuffer.String()
-			if a.onOutputFinished != nil {
-				a.onOutputFinished(outputText)
+			a.onOutputFinishedMu.Lock()
+			fn := a.onOutputFinished
+			a.onOutputFinishedMu.Unlock()
+			if fn != nil {
+				fn(outputText)
 				// config.ProcessExtendedActionCallback(cbBuffer.String())
 			}
-			a.invokeOutputCapture(outputText)
 		}()
 		defer pw.Close()
 		wg := new(sync.WaitGroup)
@@ -637,7 +596,6 @@ func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, emitter *
 				emitter.EmitDefaultStreamEvent("thought", teedReason, a.GetTaskIndex(), func() {
 					reasonBytes := reasonBuf.Bytes()
 					a.invokeReasonChunk(reasonBytes)
-					a.invokeReasonCapture(string(reasonBytes))
 					wg.Done()
 				})
 				continue
