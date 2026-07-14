@@ -220,13 +220,9 @@ jobs:
           esac
           
           echo "BUILD_TAGS=$BUILD_TAGS" >> "$GITHUB_ENV"
-          echo "OUTPUT_NAME_PREFIX=$OUTPUT_NAME_PREFIX" >> "$GITHUB_ENV" 
+          echo "OUTPUT_NAME_PREFIX=$OUTPUT_NAME_PREFIX" >> "$GITHUB_ENV"
 
-      - name: Slim gate test (irify_exclude)
-        if: contains(env.BUILD_TAGS, 'irify_exclude')
-        env:
-          MOCKEY_CHECK_GCFLAGS: "false"
-        run: go test -tags irify_exclude -run '^TestSlimGate_' -timeout 5m ./common/yakgrpc
+      # TestSlimGate_ stays in essential-tests.yml (regular CI only); skip during release slim builds.
 
       - name: Go module download (Linux)
         if: startsWith(inputs.os, 'linux')
