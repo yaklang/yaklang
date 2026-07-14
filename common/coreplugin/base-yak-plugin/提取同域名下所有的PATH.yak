@@ -1,0 +1,205 @@
+/*
+插件名称: 提取同域名下所有的PATH
+插件类型: codec
+用途: 在 Yakit History 中右键（单选/多选）流量，输入为 flow id，
+      自动查询该流量的域名，然后从 History 中捞出该域名下所有唯一 PATH（去 query、去重）。
+标签: allow-custom-context-menu-execute, allow-custom-single-history-mutate, allow-custom-multiple-history-mutate
+验证: yak extract-same-domain-paths.yak                  # 自测纯逻辑
+      yak extract-same-domain-paths.yak --real 1         # 用真实 History 跑
+契约要点:
+  - History 右键时 input = flow id（多选为逗号拼接 id）
+  - handle(input) 返回提取结果字符串
+  - flow.Request 是 strconv-quote 后的字符串，需 codec.StrconvUnquote 还原
+  - PATH 去重前先剥掉 query，避免 ?page=1 / ?page=2 被当成不同路径
+*/
+
+__DESC__ = `
+# 提取同域名下所有的 PATH（codec 右键插件）
+
+## 功能
+在 Yakit History 表格中选中一条或多条流量，右键 → 插件扩展 → 提取同域名下所有的PATH，
+插件自动查询选中流量对应的域名，从 History 数据库中捞出该域名下的所有唯一 PATH
+（去掉 scheme 与 query，只保留 host+path），去重后输出。
+
+## 使用方式
+1. 在 Yakit 插件管理新建 codec 类型插件，粘贴本脚本
+2. 开启开关: "用于数据包右键" / "用于history右键(单选)" / "用于history右键(多选)"
+3. 在 History 表格选中流量 → 右键 → 插件扩展 → 提取同域名下所有的PATH
+`
+
+yakit.AutoInitYakit()
+
+status = (text) => {
+    yakit.StatusCard("Status", text)
+}
+
+// ---- 纯函数（可自测） ----
+// 解析 input 中的 flow id（单选 "1287"，多选 "1287,1290,1305"）
+parseIds = func(input) {
+
+    
+
+    ids = []
+    for part in str.Split(input, ",") {
+        p = str.TrimSpace(part)
+        if p == "" { continue }
+        n, err = atoi(p)
+        if err != nil { continue }
+        if n > 0 { ids = append(ids, int64(n)) }
+    }
+    return ids
+}
+
+// 从完整 URL 提取 host（去掉 scheme 与端口）
+hostOf = func(rawURL) {
+    rest = str.TrimPrefix(str.TrimPrefix(rawURL, "https://"), "http://")
+    hostPart = str.SplitN(rest, "/", 2)[0]
+    // 去掉端口部分
+    return str.SplitN(hostPart, ":", 2)[0]
+}
+
+// 从完整 URL 提取 path（去 scheme + host + query），根路径返回 "/"
+pathOf = func(rawURL) {
+    rest = str.TrimPrefix(str.TrimPrefix(rawURL, "https://"), "http://")
+    idx = str.Index(rest, "/")
+    if idx < 0 { return "/" }
+    return str.SplitN(rest[idx:], "?", 2)[0]
+}
+
+// ---- 生产入口 ----
+// 关键词: handle, codec 插件入口
+handle = func(input) {
+    status("准备解析参数")
+    ids = parseIds(input)
+    if len(ids) == 0 { 
+        msg = "未找到有效的流量 ID: " + input 
+        status("失败：" + msg)
+        return msg
+    }
+
+    // step 1: flow id → 收集所有涉及的域名（去重）
+    hostSeen = {}
+    hosts = []
+    status("开始提取主机")
+    for flow in db.QueryHTTPFlowsByID(ids...) {
+        h = hostOf(flow.Url)
+        if h != "" && !(h in hostSeen) {
+            hostSeen[h] = true
+            hosts = append(hosts, h)
+        }
+    }
+    if len(hosts) == 0 { return "未找到对应流量: " + input }
+
+    pathSeen = {}
+    allPaths = []
+    allUrls = []
+    total = len(hosts)
+    done = 0
+    flowCount = 0
+    startTime = time.Now()
+
+    // 每秒输出一次吞吐统计
+    go func() {
+        lastCount = 0
+        for {
+            time.Sleep(1)
+            currentCount = flowCount
+            rate = currentCount - lastCount
+            lastCount = currentCount
+            elapsed = time.Since(startTime).Seconds()
+            log.info("进度: 已分析 %d 条流量 | 每秒 %d 条 | 已耗时 %.0fs | 域名 %d/%d",
+                currentCount, rate, elapsed, done, total)
+        }
+    }()
+
+    for host in hosts {
+        yakit.SetProgress(float(done) / float(total))
+        status(f"开始数据库中搜索相关流量: ${host}")
+        for f in db.QueryHTTPFlowsByKeyword(host) {
+            p = pathOf(f.Url)
+            if p != "" && !(p in pathSeen) {
+                pathSeen[p] = true
+                allPaths = append(allPaths, p)
+                allUrls = append(allUrls, f.Url)
+            }
+            flowCount++
+            if flowCount % 100 == 0 {
+                status(f"已分析: ${flowCount} 条流量")
+            }
+        }
+        done++
+    }
+    yakit.SetProgress(1.0)
+    status(f"分析完成: 共 ${flowCount} 条流量, ${len(allPaths)} 条唯一 PATH")
+
+    // 输出摘要
+    yakit.EnableText("提取结果（路径）")
+    yakit.TextTabData("提取结果（路径）", str.Join(allPaths, "\n"))
+
+    yakit.EnableText("提取结果（URL）")
+    yakit.TextTabData("提取结果（URL）", str.Join(allUrls, "\n"))
+
+    // 表格输出 PATH 列表
+    tableName = "同域名PATH列表"
+    yakit.EnableTable(tableName, ["序号", "PATH"])
+    for i, p := range allPaths {
+        yakit.TableData(tableName, {
+            "序号": sprintf("%d", i+1),
+            "PATH": p,
+            "uuid": uuid(),
+        })
+    }
+
+    return sprintf("域名: %s\n共 %d 条唯一 PATH\n耗时 %.1fs\n\n%s",
+        str.Join(hosts, ", "),
+        len(allPaths),
+        time.Since(startTime).Seconds(),
+        str.Join(allPaths, "\n"),
+    )
+}
+
+func runSelfTest() {
+    log.info("start extract-same-domain-paths self test")
+
+    // parseIds
+    ids1 := parseIds("1287")
+    assert len(ids1) == 1 && ids1[0] == 1287, "单选 parseIds 失败"
+    ids2 := parseIds("1287, 1290, 1305")
+    assert len(ids2) == 3 && ids2[2] == 1305, "多选 parseIds 失败"
+    ids3 := parseIds("")
+    assert len(ids3) == 0, "空字符串应返回空"
+
+    // hostOf
+    assert hostOf("https://shop.example.com/api/list") == "shop.example.com", "hostOf https failed"
+    assert hostOf("http://a.b.c:8080/x/y") == "a.b.c", "hostOf with port failed"
+    assert hostOf("http://localhost/admin") == "localhost", "hostOf localhost failed"
+
+    // pathOf
+    assert pathOf("https://shop.example.com/api/list") == "/api/list", "pathOf simple failed"
+    assert pathOf("https://shop.example.com/api/list?page=1&size=10") == "/api/list", "pathOf query strip failed"
+    assert pathOf("https://shop.example.com") == "/", "pathOf root failed"
+    assert pathOf("https://shop.example.com/?q=1") == "/", "pathOf root with query failed"
+
+    log.info("extract-same-domain-paths self test PASSED")
+}
+
+func runReal() {
+    args = cli.Args()
+    id = "1"
+    n = len(args)
+    i = 0
+    for i < n {
+        if args[i] == "--real" && i+1 < n { id = args[i+1] }
+        i++
+    }
+    log.info("run real handle: id=%s", id)
+    log.info("result:\n" + handle(id))
+}
+
+if YAK_MAIN {
+    if "--real" in cli.Args() {
+        runReal()
+    } else {
+        runSelfTest()
+    }
+}
