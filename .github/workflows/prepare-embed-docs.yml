@@ -1,0 +1,258 @@
+name: Prepare Embed Docs
+
+# Generate platform-specific doc.gob.zst (linux/windows/darwin) + shared codec.gob.zst,
+# hash with `yak sha256`, and upload to OSS only when hashes change.
+#
+# OSS layout:
+#   yak/embed-docs/latest/{linux,windows,darwin}/doc.gob.zst(+.sha256.txt)
+#   yak/embed-docs/latest/codec.gob.zst(+.sha256.txt)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'common/yak/yakdoc/**'
+      - 'common/yak/document.go'
+      - 'common/yak/yaklib/**'
+      - 'common/yak/yaklang/**'
+      - 'common/yak/script_engine.go'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/prepare-embed-docs.yml'
+  workflow_dispatch:
+    inputs:
+      force_upload:
+        description: 'Force upload even when OSS hashes match'
+        type: boolean
+        default: false
+
+jobs:
+  generate:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            runs-on: ubuntu-22.04
+          - platform: windows
+            runs-on: windows-latest
+          - platform: darwin
+            runs-on: macos-14
+    runs-on: ${{ matrix.runs-on }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: './go.mod'
+          cache: false
+
+      - name: Download Yak Binary (for sha256)
+        id: download_yak
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUNNER_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+          RUNNER_ARCH=$(uname -m)
+          if [ "$RUNNER_ARCH" = "x86_64" ] || [ "$RUNNER_ARCH" = "amd64" ]; then
+            RUNNER_ARCH_NORM="amd64"
+          elif [ "$RUNNER_ARCH" = "aarch64" ] || [ "$RUNNER_ARCH" = "arm64" ]; then
+            RUNNER_ARCH_NORM="arm64"
+          else
+            RUNNER_ARCH_NORM="$RUNNER_ARCH"
+          fi
+
+          if [ "$RUNNER_OS" = "darwin" ]; then
+            BINARY_NAMES=("yak_darwin_${RUNNER_ARCH_NORM}" "yak_darwin_amd64")
+          elif [ "$RUNNER_OS" = "linux" ]; then
+            BINARY_NAMES=("yak_linux_${RUNNER_ARCH_NORM}")
+          elif echo "$RUNNER_OS" | grep -qi "mingw\|msys\|cygwin"; then
+            BINARY_NAMES=("yak_windows_${RUNNER_ARCH_NORM}.exe")
+          else
+            echo "::error::unsupported runner OS: $RUNNER_OS"
+            exit 1
+          fi
+
+          YAK_OSS_BASE="https://yaklang.oss-accelerate.aliyuncs.com"
+          INSTALL_DIR="${RUNNER_TEMP:-/tmp}"
+          mkdir -p "$INSTALL_DIR"
+
+          for BINARY_NAME in "${BINARY_NAMES[@]}"; do
+            DOWNLOAD_URL="${YAK_OSS_BASE}/yak/latest/${BINARY_NAME}"
+            echo "Trying $DOWNLOAD_URL"
+            HTTP_CODE=$(curl -w "%{http_code}" -sL "$DOWNLOAD_URL" -o yak_dl)
+            if [ "$HTTP_CODE" != "200" ] || [ ! -s yak_dl ]; then
+              rm -f yak_dl
+              continue
+            fi
+            FILE_SIZE=$(stat -f%z yak_dl 2>/dev/null || stat -c%s yak_dl 2>/dev/null || echo 0)
+            if [ "$FILE_SIZE" -lt 1048576 ]; then
+              rm -f yak_dl
+              continue
+            fi
+            if [[ "$BINARY_NAME" == *.exe ]]; then
+              DEST="$INSTALL_DIR/yak.exe"
+            else
+              DEST="$INSTALL_DIR/yak"
+            fi
+            mv -f yak_dl "$DEST"
+            chmod +x "$DEST" || true
+            if ! "$DEST" version >/dev/null 2>&1; then
+              rm -f "$DEST"
+              continue
+            fi
+            echo "YAK=$DEST" >> "$GITHUB_ENV"
+            echo "downloaded $DEST"
+            exit 0
+          done
+          echo "::error::Failed to download yak from OSS"
+          exit 1
+
+      - name: Generate Document
+        run: go run -gcflags=all="-N -l" common/yak/yakdoc/generate_doc/generate_doc.go common/yak/yakdoc/doc/doc.gob.zst
+
+      - name: Codec Methods Document
+        if: matrix.platform == 'linux'
+        run: go run -gcflags=all="-N -l" common/yak/yaklib/codec/codegrpc/doc/codec_doc.go common/yak/yaklib/codec/codegrpc/codec.gob.zst
+
+      - name: Hash with yak sha256
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${YAK:-}" ] || [ ! -f "$YAK" ]; then
+            echo "::error::YAK missing"
+            exit 1
+          fi
+          "$YAK" sha256 -f common/yak/yakdoc/doc/doc.gob.zst
+          if [ "${{ matrix.platform }}" = "linux" ]; then
+            "$YAK" sha256 -f common/yak/yaklib/codec/codegrpc/codec.gob.zst
+          fi
+
+      - name: Stage artifact files
+        shell: bash
+        run: |
+          set -euo pipefail
+          STAGE="embed-staging/${{ matrix.platform }}"
+          mkdir -p "$STAGE"
+          cp common/yak/yakdoc/doc/doc.gob.zst "$STAGE/doc.gob.zst"
+          cp common/yak/yakdoc/doc/doc.gob.zst.sha256.txt "$STAGE/doc.gob.zst.sha256.txt"
+          if [ "${{ matrix.platform }}" = "linux" ]; then
+            cp common/yak/yaklib/codec/codegrpc/codec.gob.zst "$STAGE/codec.gob.zst"
+            cp common/yak/yaklib/codec/codegrpc/codec.gob.zst.sha256.txt "$STAGE/codec.gob.zst.sha256.txt"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: embed-doc-${{ matrix.platform }}
+          path: embed-staging/${{ matrix.platform }}/
+          if-no-files-found: error
+
+  publish:
+    needs: generate
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: embed-artifacts
+          pattern: embed-doc-*
+          merge-multiple: false
+
+      - name: Download Yak Binary (for upload-oss)
+        shell: bash
+        run: |
+          set -euo pipefail
+          YAK_OSS_BASE="https://yaklang.oss-accelerate.aliyuncs.com"
+          curl -fsSL "${YAK_OSS_BASE}/yak/latest/yak_linux_amd64" -o ./yak
+          chmod +x ./yak
+          ./yak version
+          echo "YAK=$(pwd)/yak" >> "$GITHUB_ENV"
+
+      - name: Compare hashes and upload if needed
+        shell: bash
+        env:
+          FORCE_UPLOAD: ${{ inputs.force_upload == true }}
+          OSS_KEY_ID: ${{ secrets.OSS_KEY_ID }}
+          OSS_KEY_SECRET: ${{ secrets.OSS_KEY_SECRET }}
+        run: |
+          set -euo pipefail
+          OSS_BASE="https://yaklang.oss-accelerate.aliyuncs.com/yak/embed-docs/latest"
+          REMOTE_PREFIX="yak/embed-docs/latest"
+
+          normalize_dir() {
+            local platform="$1"
+            if [ -d "embed-artifacts/embed-doc-${platform}" ]; then
+              echo "embed-artifacts/embed-doc-${platform}"
+            elif [ -d "embed-artifacts/${platform}" ]; then
+              echo "embed-artifacts/${platform}"
+            else
+              find embed-artifacts -type f -name doc.gob.zst | head -n1 | xargs dirname
+            fi
+          }
+
+          need_upload=false
+          if [ "${FORCE_UPLOAD}" = "true" ]; then
+            echo "FORCE_UPLOAD=true"
+            need_upload=true
+          fi
+
+          compare_one() {
+            local local_hash_file="$1"
+            local remote_url="$2"
+            local label="$3"
+            local local_hash remote_hash
+            local_hash=$(tr -d ' \n\r' < "$local_hash_file")
+            if curl -fsSL "$remote_url" -o /tmp/remote.sha256.txt; then
+              remote_hash=$(tr -d ' \n\r' < /tmp/remote.sha256.txt)
+            else
+              echo "$label: remote hash missing"
+              need_upload=true
+              return
+            fi
+            echo "$label: local=$local_hash remote=$remote_hash"
+            if [ "$local_hash" != "$remote_hash" ]; then
+              echo "$label: hash differs"
+              need_upload=true
+            fi
+          }
+
+          LINUX_DIR=$(normalize_dir linux)
+          WINDOWS_DIR=$(normalize_dir windows)
+          DARWIN_DIR=$(normalize_dir darwin)
+
+          compare_one "$LINUX_DIR/doc.gob.zst.sha256.txt" "$OSS_BASE/linux/doc.gob.zst.sha256.txt" "linux/doc"
+          compare_one "$WINDOWS_DIR/doc.gob.zst.sha256.txt" "$OSS_BASE/windows/doc.gob.zst.sha256.txt" "windows/doc"
+          compare_one "$DARWIN_DIR/doc.gob.zst.sha256.txt" "$OSS_BASE/darwin/doc.gob.zst.sha256.txt" "darwin/doc"
+          compare_one "$LINUX_DIR/codec.gob.zst.sha256.txt" "$OSS_BASE/codec.gob.zst.sha256.txt" "codec"
+
+          if [ "$need_upload" != "true" ]; then
+            echo "All embed-docs content hashes unchanged; skip OSS upload"
+            exit 0
+          fi
+
+          echo "Uploading embed-docs to OSS..."
+          UPLOAD_FILES=""
+          add_upload() {
+            local local_file="$1"
+            local remote_path="$2"
+            if [ -n "$UPLOAD_FILES" ]; then
+              UPLOAD_FILES="${UPLOAD_FILES};${local_file}:${remote_path}"
+            else
+              UPLOAD_FILES="${local_file}:${remote_path}"
+            fi
+          }
+
+          add_upload "$LINUX_DIR/doc.gob.zst" "${REMOTE_PREFIX}/linux/doc.gob.zst"
+          add_upload "$LINUX_DIR/doc.gob.zst.sha256.txt" "${REMOTE_PREFIX}/linux/doc.gob.zst.sha256.txt"
+          add_upload "$WINDOWS_DIR/doc.gob.zst" "${REMOTE_PREFIX}/windows/doc.gob.zst"
+          add_upload "$WINDOWS_DIR/doc.gob.zst.sha256.txt" "${REMOTE_PREFIX}/windows/doc.gob.zst.sha256.txt"
+          add_upload "$DARWIN_DIR/doc.gob.zst" "${REMOTE_PREFIX}/darwin/doc.gob.zst"
+          add_upload "$DARWIN_DIR/doc.gob.zst.sha256.txt" "${REMOTE_PREFIX}/darwin/doc.gob.zst.sha256.txt"
+          add_upload "$LINUX_DIR/codec.gob.zst" "${REMOTE_PREFIX}/codec.gob.zst"
+          add_upload "$LINUX_DIR/codec.gob.zst.sha256.txt" "${REMOTE_PREFIX}/codec.gob.zst.sha256.txt"
+
+          "$YAK" upload-oss --ak "$OSS_KEY_ID" --sk "$OSS_KEY_SECRET" -t 5 -f "${UPLOAD_FILES}"
+          echo "Upload complete"
