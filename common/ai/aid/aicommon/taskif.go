@@ -592,16 +592,23 @@ func (s *AIStatefulTaskBase) WithEmitterProcessor(processor EventProcesser, fn f
 	if fn == nil {
 		return
 	}
+	// Only hold the mutex during the emitter swap, not during fn().
+	// Holding the mutex for the entire fn() duration causes a deadlock
+	// when fn() triggers a long-running operation (e.g. tool execution)
+	// and another goroutine tries to call Cancel/SetStatus/SetUserCancelled
+	// (which also need the mutex) to cancel the task.
 	s.taskMutex.Lock()
-	defer s.taskMutex.Unlock()
 	prev := s.Emitter
 	if processor != nil && prev != nil {
 		s.Emitter = prev.PushEventProcesser(processor)
 	}
-	defer func() {
-		s.Emitter = prev
-	}()
+	s.taskMutex.Unlock()
+
 	fn()
+
+	s.taskMutex.Lock()
+	s.Emitter = prev
+	s.taskMutex.Unlock()
 }
 
 // EmitterTaskBase returns the concrete task base used for emitter push/pop scopes.

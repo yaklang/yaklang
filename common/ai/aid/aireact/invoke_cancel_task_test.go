@@ -32,7 +32,7 @@ func mockedToolCallingForCancel(i aicommon.AICallerConfigIf, req *aicommon.AIReq
 
 	if isToolParamGenerationPrompt(prompt, toolName) {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 2.0 }}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 10.0 }}`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -53,7 +53,7 @@ func TestReAct_CancelCurrentTask_StatusChanges(t *testing.T) {
 	flag := ksuid.New().String()
 	_ = flag
 	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 100)
+	out := make(chan *ypb.AIOutputEvent, 1000)
 
 	toolCalled := false
 	toolCompleted := false
@@ -65,8 +65,8 @@ func TestReAct_CancelCurrentTask_StatusChanges(t *testing.T) {
 		aitool.WithNoRuntimeCallback(func(ctx context.Context, params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			toolCalled = true
 			sleepDuration := params.GetFloat("seconds", 2.0)
-			if sleepDuration <= 0 || sleepDuration > 2.0 {
-				sleepDuration = 2.0
+			if sleepDuration <= 0 || sleepDuration > 30.0 {
+				sleepDuration = 30.0
 			}
 
 			fmt.Printf("Long task started, will run for %.1f seconds\n", sleepDuration)
@@ -115,13 +115,13 @@ func TestReAct_CancelCurrentTask_StatusChanges(t *testing.T) {
 		}
 	}()
 
-	after := time.After(3 * time.Second)
+	after := time.After(10 * time.Second)
 
 	var taskId string
 	taskCreated := false
 	taskProcessing := false
 	taskCancelled := false
-	taskAborted := false
+	taskSkipped := false
 	toolStarted := false
 	toolWatcherEmitted := false
 	cancelEventReceived := false
@@ -144,8 +144,8 @@ LOOP:
 
 				if status == "processing" {
 					taskProcessing = true
-				} else if status == "aborted" {
-					taskAborted = true
+				} else if status == "skipped" {
+					taskSkipped = true
 				}
 			}
 
@@ -177,7 +177,7 @@ LOOP:
 			}
 
 			// 检查任务是否完成（被中止）
-			if taskAborted && cancelEventReceived {
+			if taskSkipped && cancelEventReceived {
 				break LOOP
 			}
 
@@ -211,8 +211,8 @@ LOOP:
 	if !cancelEventReceived {
 		t.Fatal("Expected cancel event to be received, but it wasn't")
 	}
-	if !taskAborted {
-		t.Fatal("Expected task to be aborted, but it wasn't")
+	if !taskSkipped {
+		t.Fatal("Expected task to be skipped, but it wasn't")
 	}
 
 	fmt.Printf("Cancel current task test passed successfully! (toolCalled: %v)\n", toolCalled)

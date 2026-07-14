@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"testing"
@@ -270,7 +271,7 @@ LOOP:
 func TestReAct_CancelTask_InLoop(t *testing.T) {
 	// REACT 	输入输出
 	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 100)
 
 	var reactIns *ReAct
 
@@ -285,10 +286,20 @@ func TestReAct_CancelTask_InLoop(t *testing.T) {
 	mockToolName := "mock_cancel_tool_" + utils.RandStringBytes(16)
 	mockCancelTool, err := aitool.New(
 		mockToolName,
-		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+		aitool.WithNoRuntimeCallback(func(ctx context.Context, params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			firstCall = true
-			reactIns.GetCurrentTask().Cancel()
-			return "", nil
+			// Cancel the current task's context so the ReAct loop exits.
+			// The loop's abort() will then set the task status to Aborted.
+			// This is now safe because WithEmitterProcessor no longer holds
+			// taskMutex during the entire tool execution.
+			task := reactIns.GetCurrentTask()
+			if task != nil {
+				task.Cancel("tool triggered cancel")
+			}
+			// Block until the context is cancelled to keep the tool running
+			// until the cancel takes effect.
+			<-ctx.Done()
+			return "", ctx.Err()
 		}),
 	)
 	if err != nil {
