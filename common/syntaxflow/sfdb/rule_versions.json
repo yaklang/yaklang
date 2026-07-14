@@ -1320,12 +1320,6 @@
     "version": "20251230.0001"
   },
   {
-    "rule_id": "31093d24-ee2b-448b-ba5a-111d99bbf77c",
-    "rule_name": "检测Java Servlet和SpringMVC中的命令注入漏洞",
-    "hash": "2f1882b37e4be9b9d1598ed9cd873089b04d5cbcdd944fbb2b6f13d377281d6f",
-    "version": "20251230.0001"
-  },
-  {
     "rule_id": "40fc9df0-6e95-4b7a-b9f6-202b0356fef4",
     "rule_name": "检测Java Hibernate 数据库Connection资源未释放",
     "hash": "d442455605f40a2918642df483ea0af30cf8c5dca0cea618968ef412fad04c25",
@@ -1374,6 +1368,12 @@
     "version": "20251230.0001"
   },
   {
+    "rule_id": "31093d24-ee2b-448b-ba5a-111d99bbf77c",
+    "rule_name": "检测Java Servlet和SpringMVC中的命令注入漏洞",
+    "hash": "acb10114a9162d07c903d99b3222eed6c7dde617326cdb80dad166c4eb9612ff",
+    "version": "20260714.0001"
+  },
+  {
     "rule_id": "00b097ac-f408-4a9b-b2e3-88b5c2a0fe3e",
     "rule_name": "检测Java EE的XSS漏洞",
     "hash": "2ce6824cb854277c6bacad1662b0566715229f6792db1c85963e9b6e39406f7c",
@@ -1382,8 +1382,8 @@
   {
     "rule_id": "91441632-5409-4bfe-8c54-cb49e21c870d",
     "rule_name": "检测Java Servlet XSS漏洞",
-    "hash": "e45c7a7d973b384c61433a0ccb9057e645204d918f34d204e7cd027cc14547a5",
-    "version": "20260623.0001"
+    "hash": "1975d5c9feda1c3776645378aee05dbb0d80edff354f19b4bc38d10c4b791edf",
+    "version": "20260714.0001"
   },
   {
     "rule_id": "0a730078-cd82-4dc4-8bc9-b19b8a10fee9",
@@ -1418,8 +1418,8 @@
   {
     "rule_id": "b8ede24d-8ff0-4d81-ab97-903495a6cb61",
     "rule_name": "检测Java SQL注入漏洞",
-    "hash": "d481ac7a1692cdaf819c1bfd890a434a225afc16601fa29ea75392b7f40879f5",
-    "version": "20260127.0001"
+    "hash": "f5736ddf7fb49da6cd48f48914cf53a4abecb724db31a062251ab981476fcbcf",
+    "version": "20260714.0001"
   },
   {
     "rule_id": "e53aa369-2d16-445a-a9e9-fb2155791246",
@@ -1670,8 +1670,8 @@
   {
     "rule_id": "a258e671-339e-4d8f-af91-e2493a4e91dd",
     "rule_name": "审计Java Servlet用户输入",
-    "hash": "78e3e92755973e46162044b8da1a327382669261c7a38152d4163a2e0eb612ee",
-    "version": "20251230.0001"
+    "hash": "a200ed86bf28c3dc166c560b936eed1f2c7e430014948772ba3f1e4a198145ba",
+    "version": "20260714.0001"
   },
   {
     "rule_id": "1314089e-e030-4436-89d2-2aabe2758683",
