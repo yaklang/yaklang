@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/pkg/errors"
@@ -106,36 +107,59 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 	}
 
 	var (
-		toClient, toServer             *lowhttp.WebsocketClient
-		isClientClosed, isServerClosed bool
-		upgradeRspIns                  *http.Response
+		toClient, toServer        *lowhttp.WebsocketClient
+		isClientClosed            atomic.Bool
+		isServerClosed            atomic.Bool
+		upgradeRspIns             *http.Response
+		downstreamUpgradeWriteErr error
 	)
-	_, _ = isClientClosed, isServerClosed
+
+	forwardError := func(direction, frameType string, err error, shutdown func()) bool {
+		if err == nil {
+			return false
+		}
+		log.Errorf("websocket tunnel %s %s forwarding failed: %v", direction, frameType, err)
+		shutdown()
+		return true
+	}
 
 	serverAllFrameCallback := func(c *lowhttp.WebsocketClient, f *lowhttp.Frame, data []byte, shutdown func()) {
 		opcode := f.Type()
+		if isServerClosed.Load() && opcode != lowhttp.CloseMessage {
+			return
+		}
 		switch opcode {
 		case lowhttp.PingMessage:
-			c.WritePong(data, true)
+			if forwardError("upstream", "ping", c.WritePong(data, true), shutdown) {
+				return
+			}
 		case lowhttp.TextMessage, lowhttp.BinaryMessage:
+			var err error
 			if isHijack {
 				b := w.websocketResponseHijackHandler(data, upgradeRspIns.Request, upgradeRspIns, time.Now().UnixNano())
-				toClient.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), b)
+				err = toClient.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), b)
 			} else {
 				if w.websocketResponseMirror != nil {
 					go w.websocketResponseMirror(data)
 				}
-				toClient.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), data)
+				err = toClient.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), data)
+			}
+			if forwardError("upstream to downstream", "data", err, shutdown) {
+				return
 			}
 		case lowhttp.CloseMessage:
-			toClient.WriteCloseEx(f.GetCloseCode(), "")
-			isServerClosed = true
+			if forwardError("upstream to downstream", "close", toClient.WriteCloseEx(f.GetCloseCode(), string(f.GetData())), shutdown) {
+				return
+			}
+			isServerClosed.Store(true)
 			log.Debugf("[grpc-ws] [>server] write close message: %d %s", f.GetCloseCode(), f.GetData())
 		default:
-			toClient.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), data)
+			if forwardError("upstream to downstream", "control", toClient.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), data), shutdown) {
+				return
+			}
 			log.Debugf("[grpc-ws] [>server] write unknown message: %d", f.GetData())
 		}
-		if isClientClosed && isServerClosed {
+		if isClientClosed.Load() && isServerClosed.Load() {
 			c.Close()
 			toClient.Close()
 			log.Debugf("[grpc-ws] [>server] close client and server")
@@ -144,41 +168,53 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 
 	clientAllFrameCallback := func(c *lowhttp.WebsocketClient, f *lowhttp.Frame, data []byte, shutdown func()) {
 		opcode := f.Type()
+		if isClientClosed.Load() && opcode != lowhttp.CloseMessage {
+			return
+		}
 		switch opcode {
 		case lowhttp.PingMessage:
-			c.WritePong(data, true)
+			if forwardError("downstream", "ping", c.WritePong(data, false), shutdown) {
+				return
+			}
 		case lowhttp.TextMessage, lowhttp.BinaryMessage:
+			var err error
 			if isHijack {
 				b := w.websocketRequestHijackHandler(data, upgradeRspIns.Request, upgradeRspIns, time.Now().UnixNano())
-				toServer.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), b)
+				err = toServer.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), b)
 			} else {
 				if w.websocketRequestMirror != nil {
 					go w.websocketRequestMirror(data)
 				}
-				toServer.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), data)
+				err = toServer.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), data)
+			}
+			if forwardError("downstream to upstream", "data", err, shutdown) {
+				return
 			}
 		case lowhttp.CloseMessage:
-			toServer.WriteCloseEx(f.GetCloseCode(), "")
-			isClientClosed = true
+			if forwardError("downstream to upstream", "close", toServer.WriteCloseEx(f.GetCloseCode(), string(f.GetData())), shutdown) {
+				return
+			}
+			isClientClosed.Store(true)
 			log.Debugf("[grpc-ws] [>client] write close message: %d %s", f.GetCloseCode(), f.GetData())
 		default:
-			toServer.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), data)
+			if forwardError("downstream to upstream", "control", toServer.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), data), shutdown) {
+				return
+			}
 			log.Debugf("[grpc-ws] [>client] write unknown message: %d", f.GetData())
 		}
-		if isClientClosed && isServerClosed {
+		if isClientClosed.Load() && isServerClosed.Load() {
 			c.Close()
 			toServer.Close()
 			log.Debugf("[grpc-ws] [>client] close client and server")
 		}
 	}
 
-	toServer, err = lowhttp.NewWebsocketClientByUpgradeRequest(req,
-		lowhttp.WithWebsocketCompressionContextTakeover(true),
+	toServerOptions := []lowhttp.WebsocketClientOpt{
 		lowhttp.WithWebsocketHost(hostname),
 		lowhttp.WithWebsocketPort(port),
 		lowhttp.WithWebsocketProxy(w.ProxyStr...),
 		lowhttp.WithWebsocketTLS(isTLS),
-		lowhttp.WithWebsocketCompress(w.enableCompression.IsSet()),
+		lowhttp.WithWebsocketStrictMode(true),
 		lowhttp.WithWebsocketDisableReassembly(!isHijack), // if transparent mode, disable reassembly
 		lowhttp.WithWebsocketUpgradeResponseHandler(func(rsp *http.Response, rspRaw []byte, ext *lowhttp.WebsocketExtensions, err error) []byte {
 			if err != nil {
@@ -189,8 +225,11 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 			fixRspRaw := w.ResponseHijackCallback(req, rsp, rspRaw)
 
 			// write back to client
-			brw.Write(fixRspRaw)
-			brw.Flush()
+			if _, writeErr := brw.Write(fixRspRaw); writeErr != nil {
+				downstreamUpgradeWriteErr = errors.Wrap(writeErr, "write websocket upgrade response to downstream failed")
+			} else if flushErr := brw.Flush(); flushErr != nil {
+				downstreamUpgradeWriteErr = errors.Wrap(flushErr, "flush websocket upgrade response to downstream failed")
+			}
 			upgradeRspIns = rsp
 
 			// Save HTTPFlow
@@ -200,9 +239,17 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 			return fixRspRaw
 		}),
 		lowhttp.WithWebsocketAllFrameHandler(serverAllFrameCallback),
-	)
+	}
+	if !w.enableCompression.IsSet() {
+		toServerOptions = append(toServerOptions, lowhttp.WithWebsocketCompress(false))
+	}
+	toServer, err = lowhttp.NewWebsocketClientByUpgradeRequest(req, toServerOptions...)
 	if err != nil {
 		return err
+	}
+	if downstreamUpgradeWriteErr != nil {
+		_ = toServer.Close()
+		return downstreamUpgradeWriteErr
 	}
 
 	// init toClient
@@ -214,9 +261,10 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 		clientFrameReader,
 		clientFrameWriter,
 		toServer.Extensions,
+		lowhttp.WithWebsocketServerMode(true),
+		lowhttp.WithWebsocketStrictMode(true),
 		lowhttp.WithWebsocketDisableReassembly(!isHijack),
 		lowhttp.WithWebsocketAllFrameHandler(clientAllFrameCallback),
-		lowhttp.WithWebsocketCompress(w.enableCompression.IsSet()),
 	)
 
 	toServer.Start()

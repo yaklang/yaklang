@@ -60,6 +60,7 @@ const (
 	CloseInternalServerErr       = 1011
 	CloseServiceRestart          = 1012
 	CloseTryAgainLater           = 1013
+	CloseBadGateway              = 1014
 	CloseTLSHandshake            = 1015
 )
 
@@ -70,6 +71,8 @@ func GetClosePayloadFromCloseCode(closeCode int) []byte {
 }
 
 var keyGUID = []byte("258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
+
+var errInvalidWebsocketFrame = errors.New("websocket: invalid frame")
 
 type Frame struct {
 	raw           []byte
@@ -321,7 +324,7 @@ func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
 		CloseMessage, ContinueMessage:
 		break
 	default:
-		log.Errorf("unknown 0x%02x (FrameType)", frameType)
+		log.Debugf("unknown 0x%02x (FrameType)", frameType)
 	}
 
 	switch remaining {
@@ -345,6 +348,13 @@ func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
 		dataLength = uint64(remaining)
 	}
 	frame.payloadLength = dataLength
+	if fr.c != nil && fr.c.strictMode {
+		if remaining == TWO_BYTE_BIT && dataLength < 126 ||
+			remaining == EIGHT_BYTE_BIT && (dataLength < 65536 || dataLength&(uint64(1)<<63) != 0) {
+			_ = fr.c.WriteCloseEx(CloseProtocolError, "")
+			return frame, errors.Wrap(errInvalidWebsocketFrame, "non-canonical payload length")
+		}
+	}
 
 	// masking-key
 	if frame.mask {
@@ -386,45 +396,48 @@ func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
 
 func (fr *FrameReader) readFramePayload(dataLength uint64) (data []byte, err error) {
 	frame := fr.frame
-	frameType := frame.messageType
-	data = make([]byte, dataLength)
+	if frame.messageType == TextMessage && !frame.RSV1() && fr.flateReader == nil && fr.c != nil && fr.c.strictMode {
+		return fr.readStrictTextPayload(dataLength)
+	}
+	return fr.readPayloadN(dataLength)
+}
 
-	// fast failed for invalid utf8
-	if !fr.isDeflate && !frame.RSV1() && frameType == TextMessage && fr.c != nil && fr.c.strictMode {
-		if dataLength == 0 {
-			return make([]byte, 0), nil
-		}
-		offset := uint64(0)
-		for {
-			// read all buffered
-			bufferLen := uint64(fr.r.Buffered())
-			if bufferLen > 0 {
-				if offset+bufferLen > dataLength {
-					bufferLen = dataLength - offset
-				}
-				n, err := fr.r.Read(data[offset : offset+bufferLen])
-				if err != nil {
-					return nil, errors.Wrap(err, "read payload data failed")
-				}
-				offset += uint64(n)
-				if offset >= dataLength {
-					break
-				}
-				if valid, _ := IsValidUTF8WithRemind(data[:offset]); !valid {
-					fr.c.WriteCloseEx(CloseInvalidFramePayloadData, "")
-					return nil, errors.New("payload invalid utf8")
-				}
-			}
-			// peek to wait for next read
-			_, err = fr.r.Peek(1)
-			if err != nil {
+func (fr *FrameReader) readStrictTextPayload(dataLength uint64) ([]byte, error) {
+	frame := fr.frame
+	data := make([]byte, dataLength)
+	rawPayload := make([]byte, dataLength)
+	var offset uint64
+	for offset < dataLength {
+		if fr.r.Buffered() == 0 {
+			if _, err := fr.r.Peek(1); err != nil {
 				return nil, errors.Wrap(err, "read payload data failed")
 			}
 		}
-	} else {
-		data, err = fr.readPayloadN(dataLength)
+		chunkSize := uint64(fr.r.Buffered())
+		if chunkSize > dataLength-offset {
+			chunkSize = dataLength - offset
+		}
+		start, end := int(offset), int(offset+chunkSize)
+		if _, err := io.ReadFull(fr.r, rawPayload[start:end]); err != nil {
+			return nil, errors.Wrap(err, "read payload data failed")
+		}
+		copy(data[start:end], rawPayload[start:end])
+		if frame.mask {
+			for i := start; i < end; i++ {
+				data[i] ^= frame.maskingKey[i&3]
+			}
+		}
+		offset += chunkSize
+		if valid, _ := IsValidUTF8WithRemind(data[:end]); !valid {
+			_ = fr.c.WriteCloseEx(CloseInvalidFramePayloadData, "")
+			return nil, errors.Wrap(errInvalidWebsocketFrame, "payload invalid utf8")
+		}
 	}
-	return data, err
+	frame.rawPayload = rawPayload
+	if fr.fragmentBuffer != nil {
+		fr.fragmentBuffer.Write(data)
+	}
+	return data, nil
 }
 
 type FrameWriter struct {
@@ -450,7 +463,7 @@ func NewFrameWriterFromBufio(w *bufio.Writer, isDeflate bool) *FrameWriter {
 
 func (fw *FrameWriter) SetWebsocketClient(c *WebsocketClient) {
 	fw.c = c
-	if !c.Extensions.flateContextTakeover() {
+	if !c.writeFlateContextTakeover() {
 		fw.flateThreshold = 512
 	}
 }
@@ -560,13 +573,17 @@ func (fw *FrameWriter) WriteDirect(fin bool, flate bool, opcode int, mask bool, 
 
 	// masking key
 	if mask {
-		maskingKey, _ := generateMaskKey()
+		maskingKey, maskErr := generateMaskKey()
+		if maskErr != nil {
+			return n, errors.Wrap(maskErr, "generate websocket masking key")
+		}
 
 		nn, err := w.Write(maskingKey)
 		if err != nil {
 			return n + nn, err
 		}
 		n += nn
+		data = utils.BytesClone(data)
 		maskBytes(maskingKey, data, int(dataLength))
 	}
 
@@ -631,6 +648,14 @@ func maskBytes(key []byte, b []byte, length int) {
 
 func isValidCloseCode(closeCode int) bool {
 	// rfc 6455, section 7.4.2
-
-	return closeCode == CloseNormalClosure || closeCode == CloseGoingAway || closeCode == CloseProtocolError || closeCode == CloseUnsupportedData || closeCode == CloseInvalidFramePayloadData || closeCode == ClosePolicyViolation || closeCode == CloseMessageTooBig || closeCode == CloseMandatoryExtension || closeCode == CloseInternalServerErr || closeCode == CloseTLSHandshake || (closeCode >= 3000 && closeCode <= 4999)
+	switch closeCode {
+	case CloseNormalClosure, CloseGoingAway, CloseProtocolError,
+		CloseUnsupportedData, CloseInvalidFramePayloadData,
+		ClosePolicyViolation, CloseMessageTooBig,
+		CloseMandatoryExtension, CloseInternalServerErr,
+		CloseServiceRestart, CloseTryAgainLater, CloseBadGateway:
+		return true
+	default:
+		return closeCode >= 3000 && closeCode <= 4999
+	}
 }

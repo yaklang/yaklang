@@ -3,11 +3,463 @@ package lowhttp
 import (
 	"bufio"
 	"bytes"
+	"context"
+	"errors"
+	"io"
+	"net"
+	"net/http"
 	"os"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestWebsocketClientWriteMaskMatchesRole(t *testing.T) {
+	tests := []struct {
+		name       string
+		serverMode bool
+		wantMasked bool
+	}{
+		{name: "client frames are masked", wantMasked: true},
+		{name: "server frames are not masked", serverMode: true, wantMasked: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			for _, write := range []struct {
+				name string
+				fn   func(*WebsocketClient) error
+			}{
+				{name: "text", fn: func(c *WebsocketClient) error { return c.WriteText([]byte("hello")) }},
+				{name: "binary", fn: func(c *WebsocketClient) error { return c.WriteBinary([]byte("hello")) }},
+				{name: "close", fn: func(c *WebsocketClient) error { return c.WriteClose() }},
+			} {
+				t.Run(write.name, func(t *testing.T) {
+					var output bytes.Buffer
+					client := NewWebsocketClientIns(
+						nil,
+						NewFrameReader(bytes.NewReader(nil), false),
+						NewFrameWriter(&output, false),
+						GetWebsocketExtensions(nil),
+						WithWebsocketServerMode(test.serverMode),
+					)
+					defer client.cancel()
+
+					require.NoError(t, write.fn(client))
+					require.GreaterOrEqual(t, output.Len(), 2)
+					require.Equal(t, test.wantMasked, output.Bytes()[1]&MASKBIT != 0)
+				})
+			}
+		})
+	}
+}
+
+func TestWebsocketMaskedWriteDoesNotMutatePayload(t *testing.T) {
+	payload := []byte("caller-owned websocket payload")
+	want := bytes.Clone(payload)
+	_, err := NewFrameWriter(io.Discard, false).WriteDirect(true, false, TextMessage, true, payload)
+	require.NoError(t, err)
+	require.Equal(t, want, payload)
+}
+
+func TestIsExpectedWebsocketReadError(t *testing.T) {
+	require.True(t, isExpectedWebsocketReadError(io.EOF))
+	require.True(t, isExpectedWebsocketReadError(net.ErrClosed))
+	require.True(t, isExpectedWebsocketReadError(context.Canceled))
+	require.True(t, isExpectedWebsocketReadError(errors.Join(errors.New("read frame"), net.ErrClosed)))
+	require.False(t, isExpectedWebsocketReadError(errors.New("invalid websocket frame")))
+}
+
+func TestWebsocketClientWriteCloseReason(t *testing.T) {
+	var output bytes.Buffer
+	client := NewWebsocketClientIns(
+		nil,
+		NewFrameReader(bytes.NewReader(nil), false),
+		NewFrameWriter(&output, false),
+		GetWebsocketExtensions(nil),
+		WithWebsocketServerMode(true),
+	)
+	defer client.cancel()
+
+	require.NoError(t, client.WriteCloseEx(ClosePolicyViolation, "yak policy"))
+	frame, err := NewFrameReader(bytes.NewReader(output.Bytes()), false).ReadFrame()
+	require.NoError(t, err)
+	require.Equal(t, CloseMessage, frame.Type())
+	require.Equal(t, ClosePolicyViolation, frame.GetCloseCode())
+	require.Equal(t, "yak policy", string(frame.GetData()))
+	require.False(t, frame.GetMask())
+
+	require.Error(t, client.WriteCloseEx(CloseNormalClosure, string([]byte{0xff})))
+	require.Error(t, client.WriteCloseEx(0, "reason without code"))
+	require.Error(t, client.WriteCloseEx(CloseNormalClosure, strings.Repeat("x", 124)))
+}
+
+func TestValidateWebsocketUpgradeResponse(t *testing.T) {
+	const key = "dGhlIHNhbXBsZSBub25jZQ=="
+	request := []byte("GET /chat HTTP/1.1\r\n" +
+		"Host: example.com\r\n" +
+		"Sec-WebSocket-Key: " + key + "\r\n" +
+		"Sec-WebSocket-Protocol: chat, superchat\r\n\r\n")
+	valid := func() *http.Response {
+		return &http.Response{
+			StatusCode: http.StatusSwitchingProtocols,
+			Header: http.Header{
+				"Upgrade":                []string{"WebSocket"},
+				"Connection":             []string{"keep-alive, Upgrade"},
+				"Sec-WebSocket-Accept":   []string{ComputeWebsocketAcceptKey(key)},
+				"Sec-WebSocket-Protocol": []string{"superchat"},
+			},
+		}
+	}
+	require.NoError(t, validateWebsocketUpgradeResponse(request, valid()))
+
+	badAccept := valid()
+	badAccept.Header["Sec-WebSocket-Accept"] = []string{"invalid"}
+	require.Error(t, validateWebsocketUpgradeResponse(request, badAccept))
+
+	missingConnection := valid()
+	delete(missingConnection.Header, "Connection")
+	require.Error(t, validateWebsocketUpgradeResponse(request, missingConnection))
+
+	unofferedProtocol := valid()
+	unofferedProtocol.Header["Sec-WebSocket-Protocol"] = []string{"other"}
+	require.Error(t, validateWebsocketUpgradeResponse(request, unofferedProtocol))
+}
+
+func TestWebsocketPermessageDeflateNegotiation(t *testing.T) {
+	request := http.Header{}
+	request.Set("Sec-WebSocket-Extensions", "permessage-deflate; client_no_context_takeover; client_max_window_bits; server_no_context_takeover; server_max_window_bits=10, permessage-deflate; client_max_window_bits")
+	response := http.Header{}
+	response.Set("Sec-WebSocket-Extensions", "permessage-deflate; server_no_context_takeover; client_no_context_takeover; server_max_window_bits=9; client_max_window_bits=8")
+
+	ext, err := ValidateWebsocketExtensions(request, response)
+	require.NoError(t, err)
+	require.True(t, ext.IsDeflate)
+	require.False(t, ext.ClientContextTakeover)
+	require.False(t, ext.ServerContextTakeover)
+	require.Equal(t, 8, ext.ClientMaxWindowBits)
+	require.Equal(t, 9, ext.ServerMaxWindowBits)
+	require.Equal(t, 8, ext.writeFlateWindowBits(false))
+	require.Equal(t, 9, ext.writeFlateWindowBits(true))
+	require.Equal(t, 8, ext.readFlateWindowBits(true))
+	require.Equal(t, 9, ext.readFlateWindowBits(false))
+}
+
+func TestWebsocketPermessageDeflateOfferHintsDoNotBecomeNegotiatedResponseParams(t *testing.T) {
+	request := http.Header{"Sec-WebSocket-Extensions": []string{"permessage-deflate; client_no_context_takeover; client_max_window_bits=9"}}
+	response := http.Header{"Sec-WebSocket-Extensions": []string{"permessage-deflate"}}
+	ext, err := ValidateWebsocketExtensions(request, response)
+	require.NoError(t, err)
+	// The response did not agree to either optional client parameter. The
+	// sender may still honor its own offer hints, but the peer's receive state
+	// must follow the actual response and retain the RFC defaults.
+	require.True(t, ext.ClientContextTakeover)
+	require.Equal(t, websocketDefaultWindowBits, ext.ClientMaxWindowBits)
+}
+
+func TestWebsocketPermessageDeflateRejectsInvalidNegotiation(t *testing.T) {
+	tests := []struct {
+		name     string
+		request  string
+		response string
+	}{
+		{name: "unknown parameter", request: "permessage-deflate; x=y", response: "permessage-deflate"},
+		{name: "duplicate parameter", request: "permessage-deflate; server_max_window_bits=10; server_max_window_bits=9", response: "permessage-deflate"},
+		{name: "invalid window", request: "permessage-deflate; server_max_window_bits=7", response: "permessage-deflate"},
+		{name: "response client window without offer", request: "permessage-deflate", response: "permessage-deflate; client_max_window_bits=9"},
+		{name: "response bare client window", request: "permessage-deflate; client_max_window_bits", response: "permessage-deflate; client_max_window_bits"},
+		{name: "response violates server window", request: "permessage-deflate; server_max_window_bits=9", response: "permessage-deflate; server_max_window_bits=10"},
+		{name: "extension not offered", request: "", response: "x-example"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := http.Header{}
+			request.Set("Sec-WebSocket-Extensions", test.request)
+			response := http.Header{}
+			response.Set("Sec-WebSocket-Extensions", test.response)
+			_, err := ValidateWebsocketExtensions(request, response)
+			require.Error(t, err)
+		})
+	}
+}
+
+func TestWebsocketPermessageDeflateQuotedParameters(t *testing.T) {
+	request := http.Header{"Sec-WebSocket-Extensions": []string{`permessage-deflate; client_max_window_bits="9"`}}
+	response := http.Header{"Sec-WebSocket-Extensions": []string{`permessage-deflate; client_max_window_bits="9"`}}
+	ext, err := ValidateWebsocketExtensions(request, response)
+	require.NoError(t, err)
+	require.Equal(t, 9, ext.ClientMaxWindowBits)
+}
+
+func TestWebsocketPermessageDeflateOfferFormatting(t *testing.T) {
+	option := WithWebsocketRFC7692FullCompression()
+	config := &WebsocketClientConfig{}
+	option(config)
+	require.Equal(t, "permessage-deflate; client_no_context_takeover; client_max_window_bits", config.compressionOffer)
+}
+
+func TestStrictWebsocketReaderUnmasksTextBeforeValidation(t *testing.T) {
+	var packet bytes.Buffer
+	payload := []byte("masked text must be validated after decoding")
+	require.NoError(t, func() error {
+		_, err := NewFrameWriter(&packet, false).WriteDirect(true, false, TextMessage, true, bytes.Clone(payload))
+		return err
+	}())
+
+	client := NewWebsocketClientIns(
+		nil,
+		NewFrameReader(bytes.NewReader(packet.Bytes()), false),
+		NewFrameWriter(io.Discard, false),
+		GetWebsocketExtensions(nil),
+		WithWebsocketServerMode(true),
+		WithWebsocketStrictMode(true),
+	)
+	defer client.cancel()
+
+	frame, err := client.fr.ReadFrame()
+	require.NoError(t, err)
+	require.Equal(t, payload, frame.GetData())
+}
+
+func TestStrictWebsocketReaderRejectsInvalidLengthBeforePayloadRead(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		packet []byte
+	}{
+		{
+			name:   "non-minimal 16-bit length",
+			packet: []byte{DEFAULT_TEXT_MESSAGE_FISRT_BYTE, TWO_BYTE_BIT, 0, 125},
+		},
+		{
+			name:   "reserved high bit in 64-bit length",
+			packet: []byte{DEFAULT_TEXT_MESSAGE_FISRT_BYTE, EIGHT_BYTE_BIT, 0x80, 0, 0, 0, 0, 0, 0, 0},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var output bytes.Buffer
+			client := NewWebsocketClientIns(
+				nil,
+				NewFrameReader(bytes.NewReader(test.packet), false),
+				NewFrameWriter(&output, false),
+				GetWebsocketExtensions(nil),
+				WithWebsocketStrictMode(true),
+			)
+			defer client.cancel()
+
+			_, err := client.fr.ReadFrame()
+			require.ErrorIs(t, err, errInvalidWebsocketFrame)
+			closeFrame, err := NewFrameReader(bytes.NewReader(output.Bytes()), false).ReadFrame()
+			require.NoError(t, err)
+			require.Equal(t, CloseProtocolError, closeFrame.GetCloseCode())
+		})
+	}
+}
+
+func TestWebsocketReassemblyPreservesMessageOpcodeAcrossControlFrame(t *testing.T) {
+	var packet bytes.Buffer
+	writer := NewFrameWriter(&packet, false)
+	_, err := writer.WriteDirect(false, false, TextMessage, true, []byte("hello "))
+	require.NoError(t, err)
+	_, err = writer.WriteDirect(true, false, PingMessage, true, []byte("ping"))
+	require.NoError(t, err)
+	_, err = writer.WriteDirect(true, false, ContinueMessage, true, []byte("world"))
+	require.NoError(t, err)
+
+	type receivedFrame struct {
+		opcode int
+		data   []byte
+	}
+	received := make(chan receivedFrame, 2)
+	conn, peer := net.Pipe()
+	defer peer.Close()
+	client := NewWebsocketClientIns(
+		conn,
+		NewFrameReader(bytes.NewReader(packet.Bytes()), false),
+		NewFrameWriter(io.Discard, false),
+		GetWebsocketExtensions(nil),
+		WithWebsocketServerMode(true),
+		WithWebsocketStrictMode(true),
+		WithWebsocketDisableReassembly(false),
+		WithWebsocketAllFrameHandler(func(_ *WebsocketClient, frame *Frame, data []byte, _ func()) {
+			received <- receivedFrame{opcode: frame.Type(), data: bytes.Clone(data)}
+		}),
+	)
+	client.Start()
+
+	select {
+	case frame := <-received:
+		require.Equal(t, PingMessage, frame.opcode)
+		require.Equal(t, []byte("ping"), frame.data)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for interleaved ping")
+	}
+	select {
+	case frame := <-received:
+		require.Equal(t, TextMessage, frame.opcode)
+		require.Equal(t, []byte("hello world"), frame.data)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for reassembled text message")
+	}
+	client.Wait()
+}
+
+func TestCompressedFragmentsAreReassembledWhenRawReassemblyIsDisabled(t *testing.T) {
+	header := http.Header{}
+	header.Set("Sec-WebSocket-Extensions", "permessage-deflate")
+	ext := GetWebsocketExtensions(header)
+
+	var packet bytes.Buffer
+	compressingClient := NewWebsocketClientIns(
+		nil,
+		NewFrameReader(bytes.NewReader(nil), true),
+		NewFrameWriter(&packet, true),
+		ext,
+	)
+	defer compressingClient.cancel()
+	payload := []byte(strings.Repeat("compressed-fragment-message-", 256))
+	require.NoError(t, compressingClient.WriteText(payload))
+
+	type receivedFrame struct {
+		opcode int
+		data   []byte
+	}
+	received := make(chan receivedFrame, 2)
+	conn, peer := net.Pipe()
+	defer peer.Close()
+	receivingServer := NewWebsocketClientIns(
+		conn,
+		NewFrameReader(bytes.NewReader(packet.Bytes()), true),
+		NewFrameWriter(io.Discard, true),
+		ext,
+		WithWebsocketServerMode(true),
+		WithWebsocketStrictMode(true),
+		WithWebsocketDisableReassembly(true),
+		WithWebsocketAllFrameHandler(func(_ *WebsocketClient, frame *Frame, data []byte, _ func()) {
+			received <- receivedFrame{opcode: frame.Type(), data: bytes.Clone(data)}
+		}),
+	)
+	receivingServer.Start()
+
+	select {
+	case frame := <-received:
+		require.Equal(t, TextMessage, frame.opcode)
+		require.Equal(t, payload, frame.data)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for compressed message")
+	}
+	select {
+	case frame := <-received:
+		t.Fatalf("compressed fragments produced an extra callback: opcode=%d size=%d", frame.opcode, len(frame.data))
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
+func TestWebsocketCompressionUsesNegotiatedMinimumWindow(t *testing.T) {
+	header := http.Header{}
+	header.Set("Sec-WebSocket-Extensions", "permessage-deflate; client_max_window_bits=8; server_max_window_bits=8")
+	ext := GetWebsocketExtensions(header)
+	payload := []byte(strings.Repeat("eight-bit-window-", 512))
+
+	for _, test := range []struct {
+		name             string
+		senderServerMode bool
+	}{
+		{name: "client compressor"},
+		{name: "server compressor", senderServerMode: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var packet bytes.Buffer
+			sender := NewWebsocketClientIns(
+				nil,
+				NewFrameReader(bytes.NewReader(nil), true),
+				NewFrameWriter(&packet, true),
+				ext,
+				WithWebsocketServerMode(test.senderServerMode),
+			)
+			defer sender.cancel()
+			require.Equal(t, 8, sender.writeFlateWindowBits())
+			require.NoError(t, sender.WriteText(payload))
+
+			received := make(chan []byte, 1)
+			conn, peer := net.Pipe()
+			defer peer.Close()
+			receiver := NewWebsocketClientIns(
+				conn,
+				NewFrameReader(bytes.NewReader(packet.Bytes()), true),
+				NewFrameWriter(io.Discard, true),
+				ext,
+				WithWebsocketServerMode(!test.senderServerMode),
+				WithWebsocketStrictMode(true),
+				WithWebsocketFromServerHandler(func(data []byte) {
+					received <- bytes.Clone(data)
+				}),
+			)
+			receiver.Start()
+
+			select {
+			case got := <-received:
+				require.Equal(t, payload, got)
+			case <-time.After(time.Second):
+				t.Fatal("timed out waiting for minimum-window compressed message")
+			}
+		})
+	}
+}
+
+func TestWebsocketCompressionContextTakeoverInBothDirections(t *testing.T) {
+	header := http.Header{}
+	header.Set("Sec-WebSocket-Extensions", "permessage-deflate")
+	ext := GetWebsocketExtensions(header)
+	payload := []byte(strings.Repeat("context-takeover-history-", 512))
+
+	for _, senderServerMode := range []bool{false, true} {
+		name := "client compressor"
+		if senderServerMode {
+			name = "server compressor"
+		}
+		t.Run(name, func(t *testing.T) {
+			var packet bytes.Buffer
+			sender := NewWebsocketClientIns(
+				nil,
+				NewFrameReader(bytes.NewReader(nil), true),
+				NewFrameWriter(&packet, true),
+				ext,
+				WithWebsocketServerMode(senderServerMode),
+			)
+			defer sender.cancel()
+			require.True(t, sender.writeFlateContextTakeover())
+			require.NoError(t, sender.WriteText(payload))
+			require.NoError(t, sender.WriteText(payload))
+
+			received := make(chan []byte, 2)
+			conn, peer := net.Pipe()
+			defer peer.Close()
+			receiver := NewWebsocketClientIns(
+				conn,
+				NewFrameReader(bytes.NewReader(packet.Bytes()), true),
+				NewFrameWriter(io.Discard, true),
+				ext,
+				WithWebsocketServerMode(!senderServerMode),
+				WithWebsocketStrictMode(true),
+				WithWebsocketFromServerHandler(func(data []byte) {
+					received <- bytes.Clone(data)
+				}),
+			)
+			receiver.Start()
+
+			for i := 0; i < 2; i++ {
+				select {
+				case got := <-received:
+					require.Equal(t, payload, got)
+				case <-time.After(time.Second):
+					t.Fatalf("timed out waiting for context-takeover message %d", i+1)
+				}
+			}
+		})
+	}
+}
 
 func TestIsValidUTF8(t *testing.T) {
 	t.Run("valid utf8", func(t *testing.T) {

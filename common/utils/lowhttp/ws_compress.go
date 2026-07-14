@@ -27,11 +27,13 @@ package lowhttp
 
 import (
 	"bytes"
-	"compress/flate"
+	stdlibflate "compress/flate"
 	"errors"
 	"fmt"
 	"io"
 	"sync"
+
+	kflate "github.com/klauspost/compress/flate"
 )
 
 var compressionTail = []byte{
@@ -155,9 +157,9 @@ var flateReaderPool sync.Pool
 func getFlateReader(r io.Reader, dict []byte) io.Reader {
 	fr, ok := flateReaderPool.Get().(io.Reader)
 	if !ok {
-		return flate.NewReaderDict(r, dict)
+		return stdlibflate.NewReaderDict(r, dict)
 	}
-	fr.(flate.Resetter).Reset(r, dict)
+	fr.(stdlibflate.Resetter).Reset(r, dict)
 	return fr
 }
 
@@ -165,21 +167,27 @@ func putFlateReader(fr io.Reader) {
 	flateReaderPool.Put(fr)
 }
 
-var flateWriterPool sync.Pool
+var flateWriterPools [websocketDefaultWindowBits + 1]sync.Pool
 
-func getFlateWriter(w io.Writer) *flate.Writer {
-	fw, ok := flateWriterPool.Get().(*flate.Writer)
+func getFlateWriter(w io.Writer, windowBits int) *kflate.Writer {
+	if windowBits < 8 || windowBits > websocketDefaultWindowBits {
+		windowBits = websocketDefaultWindowBits
+	}
+	fw, ok := flateWriterPools[windowBits].Get().(*kflate.Writer)
 	if !ok {
-		fw, _ = flate.NewWriter(w, flate.DefaultCompression)
+		fw, _ = kflate.NewWriterWindow(w, 1<<windowBits)
 		return fw
 	}
 	fw.Reset(w)
 	return fw
 }
 
-func putFlateWriter(w io.Writer) {
-	if fw, ok := w.(*flate.Writer); ok {
-		flateWriterPool.Put(fw)
+func putFlateWriter(w io.Writer, windowBits int) {
+	if windowBits < 8 || windowBits > websocketDefaultWindowBits {
+		windowBits = websocketDefaultWindowBits
+	}
+	if fw, ok := w.(*kflate.Writer); ok {
+		flateWriterPools[windowBits].Put(fw)
 	}
 }
 
@@ -206,6 +214,14 @@ func (w *msgWriter) Reset(dest io.Writer) {
 	} else {
 		w.c = w.ctor(&w.tr)
 	}
+}
+
+// Takeover switches the frame destination while preserving the compressor's
+// LZ77 history across WebSocket messages.
+func (w *msgWriter) Takeover(dest io.Writer) {
+	w.err = nil
+	w.dest = dest
+	w.tr.reset(dest)
 }
 
 // Write implements io.Writer.
@@ -281,12 +297,12 @@ func (fr *FrameReader) resetFlate() {
 	}
 	var buf []byte
 
-	contextTakeover := c.Extensions.flateContextTakeover()
+	contextTakeover := c.Extensions.readFlateContextTakeover(c.serverMode)
 	if contextTakeover {
 		if fr.dict == nil {
 			fr.dict = &slidingWindow{}
 		}
-		fr.dict.init(32768)
+		fr.dict.init(1 << c.Extensions.readFlateWindowBits(c.serverMode))
 		buf = fr.dict.buf
 	}
 
@@ -339,7 +355,7 @@ func (fr *FrameReader) readPayloadN(n uint64) ([]byte, error) {
 			err = nil
 		}
 
-		if c != nil && c.Extensions.flateContextTakeover() {
+		if c != nil && c.Extensions.readFlateContextTakeover(c.serverMode) {
 			fr.dict.write(p)
 		}
 
@@ -357,26 +373,42 @@ func (fw *FrameWriter) reset(opcode int, resetFlate bool) {
 }
 
 func (fw *FrameWriter) resetFlate() {
+	windowBits := websocketDefaultWindowBits
+	contextTakeover := false
+	if fw.c != nil {
+		windowBits = fw.c.writeFlateWindowBits()
+		contextTakeover = fw.c.writeFlateContextTakeover()
+	}
+	destination := WriterFunc(fw.writeContinueDeflateFrame)
 	if fw.fw == nil {
-		fw.fw = NewWriter(WriterFunc(fw.writeContinueDeflateFrame), func(w io.Writer) Compressor {
-			return getFlateWriter(w)
+		fw.fw = NewWriter(destination, func(w io.Writer) Compressor {
+			return getFlateWriter(w, windowBits)
 		})
+	} else if contextTakeover {
+		fw.fw.Takeover(destination)
 	} else {
-		fw.fw.Reset(WriterFunc(fw.writeContinueDeflateFrame))
+		fw.fw.Reset(destination)
 	}
 }
 
 func (fw *FrameWriter) putFlateWriter() {
 	if fw.fw != nil {
-		putFlateWriter(fw.fw.c)
+		windowBits := websocketDefaultWindowBits
+		if fw.c != nil {
+			windowBits = fw.c.writeFlateWindowBits()
+		}
+		putFlateWriter(fw.fw.c, windowBits)
 		fw.fw = nil
 	}
 }
 
 func (fw *FrameWriter) writeContinueDeflateFrame(data []byte) (int, error) {
-	// todo: mask: client or server?
+	mask := true
+	if fw.c != nil {
+		mask = !fw.c.serverMode
+	}
 	// only first frame need to set rsv1
-	n, err := fw.WriteDirect(false, fw.opcode != ContinueMessage, fw.opcode, true, data)
+	n, err := fw.WriteDirect(false, fw.opcode != ContinueMessage, fw.opcode, mask, data)
 	if err != nil {
 		return n, err
 	}
@@ -397,11 +429,15 @@ func (fw *FrameWriter) writeDeflateFrame(data []byte) (int, error) {
 		return n, err
 	}
 
-	if c := fw.c; c != nil && !c.Extensions.flateContextTakeover() {
+	if c := fw.c; c != nil && !c.writeFlateContextTakeover() {
 		fw.putFlateWriter()
 	}
 	// write fin frame
-	fw.WriteDirect(true, false, ContinueMessage, true, nil)
+	mask := true
+	if fw.c != nil {
+		mask = !fw.c.serverMode
+	}
+	fw.WriteDirect(true, false, ContinueMessage, mask, nil)
 
 	return n, nil
 }
