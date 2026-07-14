@@ -51,7 +51,7 @@ type stallHeartbeatTimeProvider interface {
 
 type realStallHeartbeatClock struct{}
 
-func (realStallHeartbeatClock) Now() time.Time                       { return time.Now() }
+func (realStallHeartbeatClock) Now() time.Time                         { return time.Now() }
 func (realStallHeartbeatClock) NewTicker(d time.Duration) *time.Ticker { return time.NewTicker(d) }
 
 // recordIterationTick 在主循环每轮 iteration 开始时调用, 让 stall heartbeat
@@ -59,6 +59,16 @@ func (realStallHeartbeatClock) NewTicker(d time.Duration) *time.Ticker { return 
 //
 // 关键词: recordIterationTick, lastIterationTickAt 写入
 func (r *ReActLoop) recordIterationTick() {
+	if r == nil {
+		return
+	}
+	r.lastIterationTickAt.Store(time.Now().UnixNano())
+}
+
+// KeepAlive 刷新 stall heartbeat 的 iteration tick, 让心跳协程知道主循环
+// 仍然存活. 供外部阻塞式操作 (如等待 forked sub-agent 完成) 在等待期间定期调用,
+// 避免因长时间阻塞在 sub-agent 等待上而触发 [LOOP_STALL_DETECTED] 误报.
+func (r *ReActLoop) KeepAlive() {
 	if r == nil {
 		return
 	}
@@ -82,7 +92,8 @@ func (r *ReActLoop) recordIterationTick() {
 //   - 复用 task 的 context, 任务取消立刻退出.
 //
 // 关键词: startStallHeartbeat, 主循环卡死兜底, [LOOP_STALL_DETECTED],
-//   [LOOP_STALL_HARD_ABORT], task.Cancel
+//
+//	[LOOP_STALL_HARD_ABORT], task.Cancel
 func (r *ReActLoop) startStallHeartbeat(ctx context.Context, task aicommon.AIStatefulTask) func() {
 	return r.startStallHeartbeatWithClock(
 		ctx, task, realStallHeartbeatClock{},
@@ -191,7 +202,8 @@ func (r *ReActLoop) reportLoopStall(task aicommon.AIStatefulTask, gap time.Durat
 // 在现有架构中已经成立, 不需要本函数额外接线.
 //
 // 关键词: hardAbortLoopStall, [LOOP_STALL_HARD_ABORT], task.Cancel,
-//   主循环抢断兜底
+//
+//	主循环抢断兜底
 func (r *ReActLoop) hardAbortLoopStall(task aicommon.AIStatefulTask, gap time.Duration) {
 	iteration := r.GetCurrentIterationIndex()
 	taskID := "<unknown>"

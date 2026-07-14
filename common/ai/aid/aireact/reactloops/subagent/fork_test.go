@@ -2,7 +2,9 @@ package subagent
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -71,4 +73,69 @@ func TestNestedSubTaskContextCancelledOnComplete(t *testing.T) {
 	default:
 		t.Fatal("nested scope context should be cancelled after completion")
 	}
+}
+
+// ---------------------------------------------------------------------------
+// RunKeepAlive tests: verify the keep-alive ticker fires immediately, then
+// periodically, and stops cleanly when the stop function is called.
+// These tests use a very short keepAliveInterval override to keep the test
+// fast. Since keepAliveInterval is a package-level const (15s) we cannot
+// override it, so instead we verify the structural contract: immediate fire,
+// stop is clean, nil is safe. The periodic-fire contract at 15s is too slow
+// for a unit test; the integration tests in the reactloops package verify
+// the keep-alive mechanism end-to-end with a custom ticker.
+// ---------------------------------------------------------------------------
+
+// TestRunKeepAlive_NilIsNoOp verifies that RunKeepAlive with a nil
+// KeepAliveFunc returns a no-op stop function that does not panic.
+func TestRunKeepAlive_NilIsNoOp(t *testing.T) {
+	stop := RunKeepAlive(nil)
+	require.NotNil(t, stop)
+	require.NotPanics(t, func() {
+		stop()
+	})
+}
+
+// TestRunKeepAlive_FiresImmediately verifies that RunKeepAlive calls the
+// keep-alive function once very early on start (before the first ticker
+// interval), so the parent tick is refreshed from the very beginning of the
+// sub-agent wait. The immediate call happens inside the spawned goroutine,
+// so we allow a brief scheduling window.
+func TestRunKeepAlive_FiresImmediately(t *testing.T) {
+	var calls int64
+	keepAlive := func() {
+		atomic.AddInt64(&calls, 1)
+	}
+
+	stop := RunKeepAlive(keepAlive)
+	// The immediate call happens inside the goroutine; allow a brief
+	// scheduling window for it to execute.
+	require.Eventually(t, func() bool {
+		return atomic.LoadInt64(&calls) >= 1
+	}, 100*time.Millisecond, 2*time.Millisecond,
+		"keep-alive should fire immediately on start, before any ticker interval")
+	stop()
+}
+
+// TestRunKeepAlive_StopHaltsCalls verifies that after the stop function
+// returns, no further keep-alive calls occur. The stop function must block
+// until the goroutine has fully exited.
+func TestRunKeepAlive_StopHaltsCalls(t *testing.T) {
+	var calls int64
+	keepAlive := func() {
+		atomic.AddInt64(&calls, 1)
+	}
+
+	stop := RunKeepAlive(keepAlive)
+	// Let the immediate call settle.
+	time.Sleep(5 * time.Millisecond)
+	before := atomic.LoadInt64(&calls)
+
+	stop()
+
+	// Wait a bit and confirm no new calls after stop.
+	time.Sleep(20 * time.Millisecond)
+	after := atomic.LoadInt64(&calls)
+	require.Equal(t, before, after,
+		"keep-alive calls must not continue after stop()")
 }

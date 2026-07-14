@@ -291,7 +291,13 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			if ctxCanceled.IsSet() {
 				return nil
 			}
+			// 在 AI reasoning chunk 到达时刷新 stall heartbeat tick, 让心跳协程
+			// 知道 "AI 还在思考/产出, 不是卡死". 这解决了慢模型 (如 minimax-m3
+			// first-byte 60s+) 导致单次 CallAITransaction 超过 stall 90s 阈值
+			// 而触发 [LOOP_STALL_DETECTED] 误报的问题.
+			// 关键词: AI 流式 chunk 刷新 tick, callAITransaction stall 误报规避
 			resp.SetOnReasonChunk(func(b []byte) {
+				r.recordIterationTick()
 				r.appendModelThinkingChunk(b)
 			})
 			boundEmitter := resp.BindEmitter(r.GetEmitter())
@@ -317,6 +323,9 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 					streamFields.Keys(),
 					func(key string, reader io.Reader) {
 						streamWg.Add(1)
+						// 流字段开始到达说明 AI 正在产出结构化数据, 刷新 tick 防止
+						// 慢模型的 stall 误报 (与 SetOnReasonChunk 的 tick 刷新互补).
+						r.recordIterationTick()
 						doneOnce := utils.NewOnce()
 						done := func() {
 							doneOnce.Do(func() {

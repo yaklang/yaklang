@@ -94,6 +94,7 @@ func runAllFindingVerifications(
 				childInvoker, state, verifyJob.finding, verifyJob.index, verifyJob.total,
 			)
 		},
+		loop.KeepAlive,
 	)
 
 	sort.Slice(forkResults, func(i, j int) bool {

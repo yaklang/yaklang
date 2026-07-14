@@ -124,7 +124,6 @@ func runForkedSubReactAgentJob(
 	}
 	subTask.SetUserInput(buildSubAgentUserInput(elaboratedGoal, resultContract))
 
-
 	subLoop, err := reactloops.CreateLoopByName(loopName, childInvoker, buildSubReactLoopOptions()...)
 	if err != nil {
 		result, _ := buildSubReactJobResult(job, startedAt, subTask, nil, fork, err)
@@ -551,7 +550,16 @@ func runDispatchSubReactJobsConcurrently(
 	jobs []subReactDispatchJob,
 	concurrency int,
 ) []*subReactAgentJobResult {
+	// keepAlive refreshes the parent loop's stall-heartbeat tick so the stall
+	// detector does not misfire while we block on sub-agent completion.
+	var keepAlive subagent.KeepAliveFunc
+	if parentLoop != nil {
+		keepAlive = parentLoop.KeepAlive
+	}
+
 	if concurrency <= 1 {
+		stopKA := subagent.RunKeepAlive(keepAlive)
+		defer stopKA()
 		results := make([]*subReactAgentJobResult, 0, len(jobs))
 		for _, job := range jobs {
 			result, err := subReactAgentRunner.Run(parentInvoker, parentLoop, parentTask, job)
@@ -610,7 +618,13 @@ func runDispatchSubReactJobsConcurrently(
 		jobsCh <- job
 	}
 	close(jobsCh)
+
+	// Start keep-alive ticker on the parent goroutine while it blocks on
+	// workers.Wait(), preventing the stall detector from misfiring.
+	stopKA := subagent.RunKeepAlive(keepAlive)
 	workers.Wait()
+	stopKA()
+
 	close(resultsCh)
 
 	results := make([]*subReactAgentJobResult, 0, len(jobs))

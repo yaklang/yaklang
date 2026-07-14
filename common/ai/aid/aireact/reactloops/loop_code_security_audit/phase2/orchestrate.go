@@ -87,6 +87,7 @@ func runAllCategoryScans(
 			}
 			return catLoop, err
 		},
+		loop.KeepAlive,
 	)
 
 	sort.Slice(forkResults, func(i, j int) bool {
@@ -219,7 +220,7 @@ func tryResumeCategoryScanPhaseB(
 			scanStates.Store(category.ID, scan)
 		}
 		return catLoop, err
-	})
+	}, loop.KeepAlive)
 	if resumeErr != nil {
 		log.Warnf("[CodeAudit/Phase2] Category '%s' resume fork failed: %v", category.ID, resumeErr)
 		return false

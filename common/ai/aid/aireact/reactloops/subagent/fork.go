@@ -11,6 +11,52 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+// KeepAliveFunc is called periodically while the parent loop is blocked waiting
+// for forked sub-agents to finish. Its purpose is to refresh the parent loop's
+// stall-heartbeat tick so that the stall detector does not misfire during
+// legitimate long-running sub-agent waits. A nil KeepAliveFunc means no
+// keep-alive signalling is needed (e.g. the caller has no stall heartbeat).
+type KeepAliveFunc func()
+
+// keepAliveInterval is the period between KeepAliveFunc calls while waiting for
+// sub-agents. It is shorter than the stall-heartbeat interval (30s) so the
+// parent tick stays fresh well before the 90s stuck threshold.
+const keepAliveInterval = 15 * time.Second
+
+// RunKeepAlive starts a goroutine that periodically calls keepAlive until
+// the returned stop function is called. If keepAlive is nil it returns a
+// no-op stop function. The stop function closes the internal stop channel
+// and waits for the goroutine to exit.
+//
+// This is exported so that callers outside the subagent package (e.g.
+// loopinfra's dispatch concurrency pool) can reuse the same keep-alive
+// ticker pattern while blocking on sub-agent completion.
+func RunKeepAlive(keepAlive KeepAliveFunc) func() {
+	if keepAlive == nil {
+		return func() {}
+	}
+	stopCh := make(chan struct{})
+	doneCh := make(chan struct{})
+	go func() {
+		defer close(doneCh)
+		ticker := time.NewTicker(keepAliveInterval)
+		defer ticker.Stop()
+		keepAlive() // fire immediately so the tick is fresh from the start
+		for {
+			select {
+			case <-stopCh:
+				return
+			case <-ticker.C:
+				keepAlive()
+			}
+		}
+	}()
+	return func() {
+		close(stopCh)
+		<-doneCh
+	}
+}
+
 // RunForkInvokerCallback executes fn on a timeline-forked child invoker.
 func RunForkInvokerCallback(
 	parentInvoker aicommon.AIInvokeRuntime,
@@ -38,10 +84,16 @@ func RunForkJob(
 	parentTask aicommon.AIStatefulTask,
 	job ForkJob,
 	factory ForkLoopFactory,
+	keepAlive KeepAliveFunc,
 ) (*ForkResult, error) {
 	startedAt := time.Now()
 	if factory == nil {
 		return nil, utils.Error("fork sub-loop factory is nil")
+	}
+
+	// Refresh the parent tick before entering the potentially long sub-loop.
+	if keepAlive != nil {
+		keepAlive()
 	}
 
 	childInvoker, subTask, fork, jobCancel, err := PrepareForkedSubAgent(parentInvoker, parentTask, job)
@@ -72,6 +124,12 @@ func RunForkJob(
 
 	subTask.SetStatus(aicommon.AITaskState_Processing)
 	execErr := subLoop.ExecuteWithExistedTask(subTask)
+
+	// Refresh again after the sub-loop returns so the parent tick is current.
+	if keepAlive != nil {
+		keepAlive()
+	}
+
 	return &ForkResult{
 		Order:      job.Order,
 		Identifier: job.Identifier,
@@ -91,6 +149,7 @@ func RunForkJobsConcurrently(
 	jobs []ForkJob,
 	concurrency int,
 	factory ForkLoopFactory,
+	keepAlive KeepAliveFunc,
 ) []*ForkResult {
 	if len(jobs) == 0 {
 		return nil
@@ -98,9 +157,11 @@ func RunForkJobsConcurrently(
 	concurrency = normalizeForkConcurrency(concurrency, len(jobs))
 
 	if concurrency <= 1 {
+		stopKeepAlive := RunKeepAlive(keepAlive)
+		defer stopKeepAlive()
 		results := make([]*ForkResult, 0, len(jobs))
 		for _, job := range jobs {
-			result, err := RunForkJob(parentInvoker, parentTask, job, factory)
+			result, err := RunForkJob(parentInvoker, parentTask, job, factory, keepAlive)
 			if err != nil && result == nil {
 				result = &ForkResult{
 					Order:      job.Order,
@@ -121,7 +182,7 @@ func RunForkJobsConcurrently(
 		go func() {
 			defer workers.Done()
 			for job := range jobsCh {
-				result, err := RunForkJob(parentInvoker, parentTask, job, factory)
+				result, err := RunForkJob(parentInvoker, parentTask, job, factory, nil)
 				if err != nil && result == nil {
 					result = &ForkResult{
 						Order:      job.Order,
@@ -137,7 +198,14 @@ func RunForkJobsConcurrently(
 		jobsCh <- job
 	}
 	close(jobsCh)
+
+	// Start keep-alive ticker on the parent goroutine while it blocks on
+	// workers.Wait(). Each worker calls RunForkJob with keepAlive=nil because
+	// the ticker here already covers the whole wait.
+	stopKeepAlive := RunKeepAlive(keepAlive)
 	workers.Wait()
+	stopKeepAlive()
+
 	close(resultsCh)
 
 	results := make([]*ForkResult, 0, len(jobs))
