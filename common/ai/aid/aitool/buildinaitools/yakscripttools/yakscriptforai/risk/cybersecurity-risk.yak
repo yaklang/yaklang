@@ -1,5 +1,6 @@
 __DESC__ = "Create structured security risk records from a compact set of plain string parameters. This tool is for persisting verified or strongly-supported security findings while avoiding title-only records. It keeps the disclosure simple: target, title, summary, optional type/severity, small proof fields, and optional direct raw request/response or file references."
 __VERBOSE_NAME__ = "Cybersecurity Risk Output Tool"
+__VERBOSE_NAME_ZH__ = "网络安全风险输出工具"
 __KEYWORDS__ = "security risk,vulnerability report,risk output,security audit,risk management,pentest finding,sqli,xss,rce,security finding,evidence,remediation"
 
 __USAGE__ = <<<USAGE_BLOCK

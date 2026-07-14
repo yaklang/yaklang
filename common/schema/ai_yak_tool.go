@@ -10,9 +10,11 @@ type AIYakTool struct {
 	gorm.Model
 
 	Name string `json:"name" gorm:"unique_index"`
-	// 展示给用户的名称
+	// 展示给用户的名称（英文，对齐 Focus VerboseName）
 	VerboseName string `json:"verbose_name"`
-	Description string `json:"description" gorm:"type:text;index"`
+	// 展示给用户的中文名称（对齐 Focus VerboseNameZh）
+	VerboseNameZh string `json:"verbose_name_zh"`
+	Description   string `json:"description" gorm:"type:text;index"`
 	Keywords    string `json:"keywords" gorm:"type:text;index"`
 	// 工具使用说明，在参数生成阶段披露给 AI（2阶段披露），帮助 AI 更好地使用参数
 	Usage      string `json:"usage" gorm:"type:text"`
@@ -35,6 +37,7 @@ func (a *AIYakTool) ToUpdateMap() map[string]interface{} {
 	return map[string]interface{}{
 		"name":                 a.Name,
 		"verbose_name":         a.VerboseName,
+		"verbose_name_zh":      a.VerboseNameZh,
 		"description":          a.Description,
 		"keywords":             a.Keywords,
 		"usage":                a.Usage,

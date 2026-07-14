@@ -1,5 +1,6 @@
 __DESC__ = "Compares two HTTP responses to detect differences. Supports URL mode (send GET to two URLs) and Packet mode (send two raw HTTP packets). Shows status code comparison, content-length difference, and unified diff of response content. Essential for auth bypass detection, WAF analysis, and logic vulnerability verification."
 __VERBOSE_NAME__ = "HTTP Response Diff"
+__VERBOSE_NAME_ZH__ = "HTTP响应差异比较"
 __KEYWORDS__ = "http,response,diff,compare,difference,authentication,bypass,waf,security,status code,body,headers,content-length"
 
 __USAGE__ = <<<USAGE_BLOCK

@@ -1,5 +1,6 @@
 __DESC__ = "一个强大的Git文件系统提取工具，支持从单个提交、提交范围、日期或日期范围中提取文件系统内容并复制到本地临时目录。适用于代码版本分析、历史快照查看、特定时间点代码恢复等场景。"
-__VERBOSE_NAME__ = "Git文件系统提取工具"
+__VERBOSE_NAME__ = "Git Filesystem Extractor"
+__VERBOSE_NAME_ZH__ = "Git文件系统提取工具"
 __KEYWORDS__ = "git,文件系统,提交提取,日期范围,版本控制,代码管理,文件快照,git工具,commit range,date range"
 
 __USAGE__ = <<<USAGE_BLOCK

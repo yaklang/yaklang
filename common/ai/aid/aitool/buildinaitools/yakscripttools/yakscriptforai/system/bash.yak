@@ -1,5 +1,6 @@
 __DESC__ = "跨平台Shell命令执行工具，支持bash/cmd/powershell，具备超时控制和输出捕获。bash 默认以登录 shell 执行以加载系统和用户 profile 中的 PATH/环境变量，不额外启用 set -e 或命令追踪，行为更接近原生终端执行。注意：对于文件创建/写入操作，应优先使用 write_file 工具；对于文件局部修改，应优先使用 modify_file 工具。仅当专用工具无法满足需求时，才使用 bash 的 cat/echo 重定向操作文件。对于已通过 ExcelCLI 入库的数据分析任务，应优先使用 `excelcli query` 命令通过 SQL 分析，而非编写 Python 脚本。"
-__VERBOSE_NAME__ = "跨平台Shell命令执行工具"
+__VERBOSE_NAME__ = "Cross-Platform Shell Executor"
+__VERBOSE_NAME_ZH__ = "跨平台Shell命令执行工具"
 __KEYWORDS__ = "shell command,bash,cmd,powershell,命令行工具,系统管理,自动化脚本,运维工具,shell script,command execution,系统操作,终端命令,system administration,automation tools,操作系统,跨平台命令,timeout,超时控制,python script,pandas,data analysis,excel analysis,csv cache,data cache,批量分析,write_file优先,文件操作优先,modify_file优先"
 
 __USAGE__ = <<<USAGE_BLOCK

@@ -1,5 +1,6 @@
 __DESC__ = "一个专门用于解密和分析网络工具相关PCAP数据包的工具，支持数据帧重组、提取隐藏流量、解密加密通信、识别恶意行为等高级功能。"
-__VERBOSE_NAME__ = "PCAP解密分析工具"
+__VERBOSE_NAME__ = "PCAP Decrypt Analyzer"
+__VERBOSE_NAME_ZH__ = "PCAP解密分析工具"
 __KEYWORDS__ = "pcap,decrypt,解密,网络工具,流量分析,加密通信,恶意行为,隐蔽通道,协议逆向,数据包解密,数据帧重组"
 
 __USAGE__ = <<<USAGE_BLOCK

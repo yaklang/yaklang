@@ -1,5 +1,6 @@
 __DESC__ = "专门用于分析chall.pcapng等网络安全挑战PCAP文件的工具，支持解密隐蔽通信、提取flag、识别网络工具行为。"
-__VERBOSE_NAME__ = "挑战PCAP分析工具"
+__VERBOSE_NAME__ = "Challenge PCAP Analyzer"
+__VERBOSE_NAME_ZH__ = "挑战PCAP分析工具"
 __KEYWORDS__ = "challenge,ctf,网络安全挑战,隐蔽通信,flag提取,网络工具分析,流量解密,恶意行为检测"
 
 __USAGE__ = <<<USAGE_BLOCK

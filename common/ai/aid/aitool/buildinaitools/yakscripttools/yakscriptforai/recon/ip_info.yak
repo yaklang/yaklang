@@ -1,5 +1,6 @@
 __DESC__ = "Queries IP address geolocation, ASN, and ISP information using local MMDB databases (GeoIP2). Supports batch IP queries with comma-separated input. Falls back to amap API if MMDB is unavailable. Provides country, city, coordinates, timezone, ASN, and ISP details."
 __VERBOSE_NAME__ = "IP Geolocation & ASN Lookup"
+__VERBOSE_NAME_ZH__ = "IP 地理位置与 ASN 查询"
 __KEYWORDS__ = "ip,geolocation,geoip,asn,isp,location,country,city,mmdb,maxmind,whois,autonomous system,latitude,longitude"
 
 __USAGE__ = <<<USAGE_BLOCK

@@ -1,5 +1,6 @@
 __DESC__ = "Searches network assets using space search engines (FOFA, Shodan, ZoomEye, Hunter, Quake, Zone). Discovers hosts, services, and fingerprints matching the query filter. Requires API key configuration in Yakit settings."
 __VERBOSE_NAME__ = "Network Space Search Engine"
+__VERBOSE_NAME_ZH__ = "网络空间搜索引擎"
 __KEYWORDS__ = "fofa,shodan,zoomeye,hunter,quake,zone,零零测绘,space engine,network search,asset discovery,fingerprint,reconnaissance,internet scanning"
 
 __USAGE__ = <<<USAGE_BLOCK

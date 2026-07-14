@@ -1,5 +1,6 @@
 __DESC__ = "一个用于增量修改现有文件内容的工具，是修改已有文件时优先于 write_file 的首选方案。支持按行号精准插入或替换内容，content 参数支持多行文本，适用于增加注释、修复 bug、插入代码块、调整配置项等高效编辑场景。"
-__VERBOSE_NAME__ = "文件内容修改工具"
+__VERBOSE_NAME__ = "File Content Modifier"
+__VERBOSE_NAME_ZH__ = "文件内容修改工具"
 __KEYWORDS__ = "file modify,文件修改,文件编辑,file editing,content modification,行编辑,line editing,字符串替换,string replacement,文件处理,text processing,insert content,replace content,add comments,增加注释,代码注释,edit existing file,修改现有文件,incremental edit,增量编辑"
 
 __USAGE__ = <<<USAGE_BLOCK

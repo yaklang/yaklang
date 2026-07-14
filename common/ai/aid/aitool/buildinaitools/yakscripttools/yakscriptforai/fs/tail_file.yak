@@ -1,5 +1,6 @@
 __DESC__ = "一个用于显示指定文件尾部内容的工具。支持按字节数或按行数读取，支持显示行号、十六进制转储等功能。"
-__VERBOSE_NAME__ = "文件尾部内容查看"
+__VERBOSE_NAME__ = "File Tail Viewer"
+__VERBOSE_NAME_ZH__ = "文件尾部内容查看"
 __KEYWORDS__ = "file,tail,bytes,lines,文件读取,文本处理,十六进制转储,行号显示,内容预览,last bytes,last lines"
 
 __USAGE__ = <<<USAGE_BLOCK

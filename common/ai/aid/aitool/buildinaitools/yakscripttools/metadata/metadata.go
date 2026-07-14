@@ -21,10 +21,11 @@ func GetYakScript(fs embed.FS, name string) (string, error) {
 }
 
 type YakScriptMetadata struct {
-	Name        string
-	VerboseName string
-	Description string
-	Keywords    []string
+	Name          string
+	VerboseName   string // English display name (Align Focus __VERBOSE_NAME__)
+	VerboseNameZh string // Chinese display name (Align Focus __VERBOSE_NAME_ZH__)
+	Description   string
+	Keywords      []string
 	// Usage 工具使用说明，在参数生成阶段(第2阶段)披露给 AI
 	Usage       string
 	EnableForAI bool
@@ -54,7 +55,7 @@ func ParseYakScriptMetadataProg(name string, prog *ssaapi.Program) (*YakScriptMe
 		}
 		keywords = append(keywords, strings.Split(data, ",")...)
 	})
-	// __VERBOSE_NAME__
+	// __VERBOSE_NAME__ (English)
 	var verboseName string
 	prog.Ref("__VERBOSE_NAME__").ForEach(func(value *ssaapi.Value) {
 		if !value.IsConstInst() {
@@ -66,6 +67,21 @@ func ParseYakScriptMetadataProg(name string, prog *ssaapi.Program) (*YakScriptMe
 		}
 		if verboseName == "" {
 			verboseName = data
+		}
+	})
+
+	// __VERBOSE_NAME_ZH__ (Chinese)
+	var verboseNameZh string
+	prog.Ref("__VERBOSE_NAME_ZH__").ForEach(func(value *ssaapi.Value) {
+		if !value.IsConstInst() {
+			return
+		}
+		data, err := strconv.Unquote(value.String())
+		if err != nil {
+			data = value.String()
+		}
+		if verboseNameZh == "" {
+			verboseNameZh = data
 		}
 	})
 
@@ -94,12 +110,13 @@ func ParseYakScriptMetadataProg(name string, prog *ssaapi.Program) (*YakScriptMe
 	})
 
 	return &YakScriptMetadata{
-		Name:        name,
-		VerboseName: verboseName,
-		Description: strings.Join(desc, "; "),
-		Keywords:    keywords,
-		Usage:       strings.Join(usage, "; "),
-		EnableForAI: enableForAI,
+		Name:          name,
+		VerboseName:   verboseName,
+		VerboseNameZh: verboseNameZh,
+		Description:   strings.Join(desc, "; "),
+		Keywords:      keywords,
+		Usage:         strings.Join(usage, "; "),
+		EnableForAI:   enableForAI,
 	}, nil
 }
 

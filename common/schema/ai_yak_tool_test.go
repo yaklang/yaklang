@@ -28,7 +28,7 @@ func TestAIYakToolToUpdateMap_OnlyMutableFieldsIncluded(t *testing.T) {
 	}).ToUpdateMap()
 
 	mutableFields := []string{
-		"name", "verbose_name", "description", "keywords", "usage", "content",
+		"name", "verbose_name", "verbose_name_zh", "description", "keywords", "usage", "content",
 		"params", "path", "is_builtin", "hash", "is_favorite", "enable_ai_output_log",
 	}
 	require.Len(t, updateMap, len(mutableFields))

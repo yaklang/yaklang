@@ -1,5 +1,6 @@
 __DESC__ = "POC模板搜索工具，根据漏洞类型和攻击向量搜索和提供相应的Python POC模板，为POC生成提供代码框架参考。"
-__VERBOSE_NAME__ = "POC模板搜索工具"
+__VERBOSE_NAME__ = "PoC Template Searcher"
+__VERBOSE_NAME_ZH__ = "POC模板搜索工具"
 __KEYWORDS__ = "POC模板,漏洞利用模板,Python POC,代码模板,攻击向量,漏洞利用框架,安全测试模板"
 
 __USAGE__ = <<<USAGE_BLOCK

@@ -1,5 +1,6 @@
 __DESC__ = "Word document structured reader. Extracts and organizes content from .docx files into separate sections: text body, tables, and attachments (images, charts, OLE objects). Provides cleaner output than parse_office_to_text by separating content types and offering optional table-only or text-only extraction."
 __VERBOSE_NAME__ = "Word Document Structure Reader"
+__VERBOSE_NAME_ZH__ = "Word 文档结构读取"
 __KEYWORDS__ = "word,docx,document,text extraction,table extraction,word structure,document analysis,word reader,office document,doc parsing,word tables,word content,document sections"
 
 __USAGE__ = <<<USAGE_BLOCK

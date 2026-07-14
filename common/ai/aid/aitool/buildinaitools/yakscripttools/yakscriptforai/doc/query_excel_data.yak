@@ -1,5 +1,6 @@
 __DESC__ = "Excel 数据查询工具，适用于简单的一次性查询：列选择、行过滤、排序、单维度聚合、分页。性能警告：每次调用都会重新解析整个文件（40MB 文件约需 30 秒）。对于需要 3 次以上查询的多步骤分析，如果数据已通过 ExcelCLI 入库，应优先使用 `excelcli query` 命令通过 SQL 进行批量分析。仅当 ExcelCLI 不可用时，才使用 Python pandas 作为兜底方案。"
-__VERBOSE_NAME__ = "Excel 数据查询"
+__VERBOSE_NAME__ = "Excel Data Query"
+__VERBOSE_NAME_ZH__ = "Excel 数据查询"
 __KEYWORDS__ = "excel query,data filter,sort,aggregate,sum,count,avg,group by,xlsx,spreadsheet,data analysis,column select,pagination,excel search,transaction analysis,financial data,excel read,excelcli,query,SQL 分析,excelcli query,数据库查询,批量分析"
 
 __USAGE__ = <<<USAGE_BLOCK

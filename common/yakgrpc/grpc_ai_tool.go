@@ -384,6 +384,9 @@ func fixAIToolMetadata(tool *schema.AIYakTool) error {
 	if tool.VerboseName == "" {
 		tool.VerboseName = parsedAITool.VerboseName
 	}
+	if tool.VerboseNameZh == "" {
+		tool.VerboseNameZh = parsedAITool.VerboseNameZh
+	}
 	if tool.Keywords == "" {
 		tool.Keywords = parsedAITool.Keywords
 	}
