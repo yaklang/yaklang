@@ -198,3 +198,26 @@ func TestGRPCMUSTPASS_OpenAPIYakURLHistory(t *testing.T) {
 		require.Equal(t, "openapi-document", resource.GetResourceType())
 	}
 }
+
+func TestGRPCMUSTPASS_OpenAPIYakURLUploadCancel(t *testing.T) {
+	setupOpenAPIGRPCTest(t)
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	content := readOpenAPIDemoFixture(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err = client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
+		Method: "POST",
+		Url: &ypb.YakURL{
+			Schema:   "openapi",
+			Location: "upload",
+			Path:     "/",
+			Query: []*ypb.KVPair{
+				{Key: "parse_task_id", Value: "test-cancel-task"},
+			},
+		},
+		Body: content,
+	})
+	require.Error(t, err)
+}

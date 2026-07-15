@@ -45,6 +45,7 @@ var (
 	ServerPushType_Fuzzer       = "fuzzer_server_push"
 	ServerPushType_WebFuzzerTab = "web_fuzzer_tab"
 	ServerPushType_Project      = "project"
+	ServerPushType_OpenAPIParse = "openapi_parse"
 
 	ProjectPushActionPromptEnter = "prompt_enter"
 	ProjectPushActionAutoEnter   = "auto_enter"

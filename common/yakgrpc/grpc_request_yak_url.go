@@ -2,11 +2,12 @@ package yakgrpc
 
 import (
 	"context"
+	"net/http"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yakurl"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/http"
-	"strings"
 )
 
 func (s *Server) RequestYakURL(ctx context.Context, req *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
@@ -23,7 +24,11 @@ func (s *Server) RequestYakURL(ctx context.Context, req *ypb.RequestYakURLParams
 	if action == nil {
 		return nil, utils.Errorf("unsupported schema: %s", req.GetUrl().GetSchema())
 	}
-	switch ret := strings.ToUpper(req.GetMethod()); ret {
+	method := strings.ToUpper(req.GetMethod())
+	if withCtx, ok := action.(yakurl.ActionWithContext); ok {
+		return withCtx.Handle(ctx, method, req)
+	}
+	switch method {
 	case http.MethodGet:
 		return action.Get(req)
 	case http.MethodPost:
@@ -35,7 +40,7 @@ func (s *Server) RequestYakURL(ctx context.Context, req *ypb.RequestYakURLParams
 	case http.MethodHead:
 		return action.Head(req)
 	default:
-		return nil, utils.Errorf("not implemented method: %v", ret)
+		return nil, utils.Errorf("not implemented method: %v", method)
 	}
 
 }
