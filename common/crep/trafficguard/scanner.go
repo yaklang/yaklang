@@ -2,6 +2,7 @@ package trafficguard
 
 import (
 	"sync"
+	"unicode/utf8"
 
 	pcre2 "github.com/VillanCh/go-pcre2-lite"
 	"github.com/yaklang/yaklang/common/log"
@@ -121,6 +122,13 @@ func (s *Scanner) scanBuffer(host string, data []byte, direction, surface string
 	// 纯净流量(绝大多数)在预过滤阶段即被排除, NFA 不需推进, 开销极低。
 	matched := s.exist.MatchedIndexes(data)
 	if len(matched) == 0 {
+		return out
+	}
+	// Extractors are compiled in PCRE2 UTF mode. Binary HTTP bodies may pass
+	// the byte-oriented existence scan but cannot be searched by those
+	// extractors; skipping preserves the existing fail-open behavior without
+	// emitting an error for normal binary traffic.
+	if !utf8.Valid(data) {
 		return out
 	}
 	// 阶段二: 对命中的规则精确定位(冷路径, 命中极少)。

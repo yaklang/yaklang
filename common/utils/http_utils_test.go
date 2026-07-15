@@ -113,3 +113,8 @@ func TestHttpUtilsUrl2String(t *testing.T) {
 	fmt.Println(Url2UnEscapeString(u))
 	require.True(t, Url2UnEscapeString(u) == "http://127.0.0.1:7788/${eval(danger)}/#${eval(danger)}")
 }
+
+func TestGetHTTPHeaderArbitraryCase(t *testing.T) {
+	headers := http.Header{"cOnNeCtIoN": []string{"Upgrade"}}
+	require.Equal(t, "Upgrade", GetHTTPHeader(headers, "connection"))
+}
