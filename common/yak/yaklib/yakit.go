@@ -419,6 +419,7 @@ func (c *YakitClient) EmitSSAResult(result *ssaapi.SyntaxFlowResult) (int, int, 
 		sfreport.WithStreamShowDataflowPath(true),
 		sfreport.WithStreamShowFileContent(true),
 		sfreport.WithStreamWithFile(true),
+		sfreport.WithStreamDataflowDetailLevel(sfreport.DataflowDetailFull),
 	)
 	parts, err := sfreport.ConvertSingleResultToSSAResultParts(result, opts)
 	if err != nil {
