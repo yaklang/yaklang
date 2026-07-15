@@ -459,10 +459,10 @@ func TestVerificationWatchdog_SuppressedDuringToolBlocking(t *testing.T) {
 	loop.startVerificationWatchdog(task)
 	defer loop.stopVerificationWatchdogForTask(task)
 
-	loop.beginVerificationWatchdogToolSuppression()
+	loop.BeginVerificationWatchdogToolSuppression()
 	time.Sleep(80 * time.Millisecond)
 	require.Equal(t, 0, invoker.verifyCalls, "watchdog must not fire while tool blocking suppression is active")
-	loop.endVerificationWatchdogToolSuppression()
+	loop.EndVerificationWatchdogToolSuppression()
 
 	require.Eventually(t, func() bool {
 		return invoker.verifyCalls >= 1

@@ -647,8 +647,8 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 		if inv := r.GetInvoker(); inv != nil {
 			if cfg, ok := inv.GetConfig().(*aicommon.Config); ok {
 				cfg.SetVerificationWatchdogToolBlockingHooks(
-					r.beginVerificationWatchdogToolSuppression,
-					r.endVerificationWatchdogToolSuppression,
+					r.BeginVerificationWatchdogToolSuppression,
+					r.EndVerificationWatchdogToolSuppression,
 				)
 				clearWatchdogToolHooks = func() {
 					cfg.SetVerificationWatchdogToolBlockingHooks(nil, nil)

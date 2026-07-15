@@ -134,6 +134,16 @@ func (r *ReActLoop) startStallHeartbeatWithClock(
 				if gap < threshold {
 					continue
 				}
+				// 子 Agent 进度旁路: 如果主循环因等待 dispatch_sub_react_agents
+				// 而不推进, 但 registry 中有活跃子 Agent 仍在工作 (LastActivityAt
+				// 距今 < threshold), 则视为有进度, 跳过 stall 报警和硬抢断.
+				// 关键词: stall heartbeat sub-agent 旁路, dispatch 等待不误报
+				if registry := r.GetSubAgentProgressRegistry(); registry != nil && registry.IsAnyActive() {
+					subActivity := registry.AggregateLastActivityAt()
+					if !subActivity.IsZero() && now.Sub(subActivity) < threshold {
+						continue
+					}
+				}
 				// 硬抢断路径: gap 超过 hardAbort 阈值时主动 cancel task,
 				// 然后 heartbeat goroutine 自身也退出 (ctx 很快会 done,
 				// 但显式 return 让边界更清晰).
