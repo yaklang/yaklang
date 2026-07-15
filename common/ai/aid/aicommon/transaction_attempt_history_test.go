@@ -78,10 +78,10 @@ func TestCallAITransaction_AttemptHistoryPlainOutput(t *testing.T) {
 	errMsg := err.Error()
 	t.Logf("error message:\n%s", errMsg)
 
-	assert.Contains(t, errMsg, "Attempt History", "error should contain attempt history section")
-	assert.Contains(t, errMsg, outputMarker, "error should contain the plain AI output text")
-	assert.Contains(t, errMsg, reasonMarker, "error should contain the plain AI reason text")
-	assert.Contains(t, errMsg, "action type is empty", "error should contain postHandler error")
+	// The returned error no longer wraps the full attempt history; it is emitted
+	// via EmitAICallFailureIfApplicable instead. Verify the concise error.
+	assert.Contains(t, errMsg, "max retry count[1] reached in transaction")
+	assert.Contains(t, errMsg, "action type is empty", "error should contain the underlying postHandler error")
 }
 
 // TestCallAITransaction_AttemptHistoryInErrorMessage verifies that the final
@@ -111,13 +111,11 @@ func TestCallAITransaction_AttemptHistoryInErrorMessage(t *testing.T) {
 	errMsg := err.Error()
 	t.Logf("error message:\n%s", errMsg)
 
-	for n := int64(1); n <= 3; n++ {
-		assert.Contains(t, errMsg, fmt.Sprintf("attempt-%d-failure", n),
-			"error should contain call-ai error for attempt %d", n)
-		assert.Contains(t, errMsg, fmt.Sprintf("attempt-%d-marker", n),
-			"error should contain raw response marker for attempt %d", n)
-	}
-	assert.Contains(t, errMsg, "Attempt History")
+	// The returned error no longer wraps the full attempt history; it is emitted
+	// via EmitAICallFailureIfApplicable instead. Verify only the concise error
+	// that carries the last underlying failure.
+	assert.Contains(t, errMsg, "max retry count[3] reached in transaction")
+	assert.Contains(t, errMsg, "attempt-3-failure", "error should contain the last call-ai error")
 }
 
 // TestCallAITransaction_AttemptHistoryStructuredPayload verifies the structured

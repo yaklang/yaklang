@@ -75,6 +75,8 @@ func buildAttemptRecord(attempt int64, prompt string, callAiErr error, rsp *AIRe
 		rec.ModelName = rsp.GetModelName()
 		rec.RawHTTPResponseDump = rsp.GetRawHTTPResponseDump()
 		rec.AsyncCallbackErr = rsp.GetError()
+		rec.PlainOutput = rsp.GetPlainOutput()
+		rec.PlainReason = rsp.GetPlainReason()
 	}
 	return rec
 }
@@ -102,6 +104,20 @@ func (r transactionAttemptRecord) ToMap() map[string]any {
 		m["async_callback_error"] = r.AsyncCallbackErr.Error()
 	}
 	return m
+}
+
+// FailedAIOutput returns a shrunk copy of the AI output text that caused this
+// attempt to fail. It prefers the plain output, then the plain reason. The
+// raw HTTP response dump is intentionally excluded — showing raw HTTP to the
+// AI is meaningless for retry correction.
+func (r transactionAttemptRecord) FailedAIOutput() string {
+	if r.PlainOutput != "" {
+		return utils.ShrinkString(r.PlainOutput, 2048)
+	}
+	if r.PlainReason != "" {
+		return utils.ShrinkString(r.PlainReason, 2048)
+	}
+	return ""
 }
 
 // String renders a human-readable summary of a single attempt for inclusion in
