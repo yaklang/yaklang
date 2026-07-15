@@ -226,6 +226,15 @@ type ReActLoop struct {
 	// producing Topics/Keywords/Summary that dynamically adjust the
 	// possibility space throughout the loop lifecycle.
 	perception *perceptionController
+
+	// subAgentProgressRegistry 跟踪当前由 dispatch_sub_react_agents 下发
+	// 的活跃子 Agent, 供 stall heartbeat / verification watchdog 读取子 Agent
+	// 进度, 避免主循环在等待子 Agent 时被误判为卡死. 该字段由 dispatch
+	// action handler 在下发子 Agent 时创建和注册, 在子 Agent 结束时注销.
+	// 指针本身只在 dispatch handler 入口赋值一次 (主循环线程, 同步), 之后不再
+	// 变更; registry 内部并发安全 (自带 mutex).
+	// 关键词: subAgentProgressRegistry, 子 Agent 进度追踪, stall heartbeat 旁路
+	subAgentProgressRegistry *ProgressRegistry
 }
 
 // GetScenarioToolWhitelist 返回当前 loop 声明的 scenario 工具拉回名单.
@@ -505,6 +514,23 @@ func (r *ReActLoop) GetEmitter() *aicommon.Emitter {
 
 func (r *ReActLoop) GetConfig() aicommon.AICallerConfigIf {
 	return r.config
+}
+
+// GetSubAgentProgressRegistry returns the sub-agent progress registry.
+// nil if no sub-agents have been dispatched.
+func (r *ReActLoop) GetSubAgentProgressRegistry() *ProgressRegistry {
+	if r == nil {
+		return nil
+	}
+	return r.subAgentProgressRegistry
+}
+
+// SetSubAgentProgressRegistry sets the sub-agent progress registry.
+func (r *ReActLoop) SetSubAgentProgressRegistry(reg *ProgressRegistry) {
+	if r == nil || reg == nil {
+		return
+	}
+	r.subAgentProgressRegistry = reg
 }
 
 func (r *ReActLoop) GetMemoryTriage() aicommon.MemoryTriage {
