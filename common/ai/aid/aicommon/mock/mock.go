@@ -159,6 +159,15 @@ func (m *MockedAIConfig) CallAIResponseConsumptionCallback(current int) {
 }
 
 func (m *MockedAIConfig) GetAITransactionAutoRetryCount() int64 {
+	// Honor a caller-supplied "AiTransactionAutoRetry" value (set via
+	// SetConfig) when present so tests can control the retry count without
+	// having to re-implement AICallerConfigIf. Falls back to the historical
+	// default of 3 when unset.
+	if v, ok := m.GetConfig("AiTransactionAutoRetry"); ok {
+		if n := utils.InterfaceToInt(v); n > 0 {
+			return int64(n)
+		}
+	}
 	return 3
 }
 
