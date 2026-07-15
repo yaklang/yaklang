@@ -64,7 +64,8 @@ REFERENCE
 check $sink;
 
 $sink #{
-    include: `* & $source`
+    include: `* & $source`,
+    exclude: `*?{<cfgGuards(opcode: return)>} `
 }-> as $high
 
 alert $high for {
