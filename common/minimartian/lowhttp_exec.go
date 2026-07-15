@@ -101,6 +101,7 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 
 	// In strong host mode, disable connection pool
 	// Strong host connections must not be reused from pool
+	upstreamPortModified := httpctx.GetUpstreamPortIsModified(req)
 	opts := append(
 		p.lowhttpConfig,
 		lowhttp.WithRequest(reqBytes),
@@ -151,20 +152,21 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 	//	}
 	//}
 
-	connectedPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
-	if connectedPort > 0 {
-		opts = append(opts, lowhttp.WithPort(connectedPort))
+	connectedHost := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
+	if isStrongHostMode || !upstreamPortModified {
+		connectedPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
+		if connectedPort > 0 {
+			opts = append(opts, lowhttp.WithPort(connectedPort))
+		}
 	}
 
-	connectedHost := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
-
-	// Determine the hostname to use for connection target
+	// Preserve the original connection host so Host-header rewriting continues to support
+	// virtual-host testing. Only an explicitly edited port changes the socket target.
 	if connectedHost != "" {
 		opts = append(opts, lowhttp.WithHost(connectedHost))
 	}
 
-	// Set TLS SNI if available and different from connection host
-	// This is important when connectedHost is an IP but we need a domain for SNI
+	// Host-header rewriting must not implicitly change TLS SNI.
 	tlsSNI := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_TLS_SNI)
 	if isHttps && tlsSNI != "" && tlsSNI != connectedHost {
 		opts = append(opts, lowhttp.WithSNI(tlsSNI))
