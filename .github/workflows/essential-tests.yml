@@ -405,7 +405,8 @@ jobs:
           - name: "Test lowhttp / DNSX"
             test_configs: |
               [
-                {"package": "./common/utils/lowhttp", "timeout": "3m", "skip": "TestComputeDigestResponseFromRequest|TestComputeDigestResponseFromRequestEx|TestLowhttpResponse2", "retry": 2, "retry_delay": 5},
+                {"package": "./common/utils/lowhttp", "timeout": "6m", "skip": "TestComputeDigestResponseFromRequest|TestComputeDigestResponseFromRequestEx|TestLowhttpResponse2|TestGoroutineLeak_ConnPool_StressMaxGoroutines", "retry": 1, "retry_delay": 5},
+                {"package": "./common/utils/lowhttp", "timeout": "3m", "run": "TestGoroutineLeak_ConnPool_StressMaxGoroutines", "retry": 1, "retry_delay": 5},
                 {"package": "./common/utils/lowhttp/poc", "timeout": "20s"},
                 {"package": "./common/facades/...", "timeout": "30s"}
               ]
