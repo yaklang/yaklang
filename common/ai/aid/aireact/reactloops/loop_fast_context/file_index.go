@@ -7,6 +7,9 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 const (
@@ -17,7 +20,23 @@ const (
 	loopVarGrepBatchSearches  = "fastcontext_grep_batch_searches"
 )
 
-var grepFileLinePattern = regexp.MustCompile(`^\[file\s+\d+\]\s+(.+?)\s+\(\d+\s+matches\)\s*$`)
+// Allow optional log prefixes (e.g. "[info]   ") before "[file N]".
+var grepFileLinePattern = regexp.MustCompile(`\[file\s+\d+\]\s+(.+?)\s+\(\d+\s+matches\)\s*$`)
+
+// toolOutputString extracts capture stdout from a tool result Data payload.
+// InterfaceToString(*ToolExecutionResult) JSON-marshals the struct and breaks line parsers.
+func toolOutputString(data any) string {
+	if data == nil {
+		return ""
+	}
+	if exec, ok := data.(*aitool.ToolExecutionResult); ok {
+		if exec.CombinedOutput != "" {
+			return exec.CombinedOutput
+		}
+		return exec.Stdout + exec.Stderr
+	}
+	return utils.InterfaceToString(data)
+}
 
 func mergePathsIntoFileIndex(loop interface {
 	Get(string) string
@@ -80,11 +99,17 @@ func parseGrepFilesWithMatchesOutput(content string) []string {
 			paths = append(paths, strings.TrimSpace(m[1]))
 			continue
 		}
-		if strings.HasPrefix(line, "/") && !strings.Contains(line, "===") {
-			if idx := strings.Index(line, " ("); idx > 0 {
-				line = line[:idx]
-			}
-			paths = append(paths, strings.TrimSpace(line))
+		if strings.Contains(line, "===") {
+			continue
+		}
+		candidate := line
+		if idx := strings.Index(line, " ("); idx > 0 {
+			candidate = line[:idx]
+		}
+		candidate = strings.TrimSpace(candidate)
+		// Unix (/...) and Windows (C:\...) absolute paths.
+		if filepath.IsAbs(candidate) || strings.HasPrefix(candidate, "/") {
+			paths = append(paths, candidate)
 		}
 	}
 	return paths

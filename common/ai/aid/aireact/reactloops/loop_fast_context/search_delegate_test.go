@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/subagent"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
@@ -73,6 +74,19 @@ func TestParseGrepFilesWithMatchesOutput(t *testing.T) {
 	if len(paths) != 2 {
 		t.Fatalf("expected 2 paths, got %d", len(paths))
 	}
+}
+
+func TestToolOutputString_ExtractsStdout(t *testing.T) {
+	exec := &aitool.ToolExecutionResult{
+		Stdout: "[file 1] C:\\tmp\\a.go (1 matches)\n",
+	}
+	out := toolOutputString(exec)
+	require.Equal(t, exec.Stdout, out)
+	paths := parseGrepFilesWithMatchesOutput(out)
+	require.Equal(t, []string{`C:\tmp\a.go`}, paths)
+
+	// JSON blob (old InterfaceToString path) must not be preferred when Data is typed.
+	require.NotContains(t, out, `"stdout"`)
 }
 
 func TestFilterAuditCandidatePaths(t *testing.T) {
