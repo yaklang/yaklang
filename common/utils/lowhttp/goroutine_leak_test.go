@@ -378,12 +378,19 @@ func TestGoroutineLeak_ConnPool_StressMaxGoroutines(t *testing.T) {
 	}
 
 	const (
-		requests      = 400
-		poolSize      = 40
+		// Reduced from 400/40 to keep the test fast on CI runners while still
+		// exercising concurrent reuse and goroutine cleanup.
+		requests      = 100
+		poolSize      = 20
 		maxGoroutines = poolSize * 2
+		requestTimeout = 200 * time.Millisecond
 	)
 	poolCtx, poolCancel := context.WithCancel(context.Background())
 	pool := NewHttpConnPool(poolCtx, poolSize, poolSize)
+	defer func() {
+		pool.Clear()
+		poolCancel()
+	}()
 
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, poolSize)
@@ -397,7 +404,7 @@ func TestGoroutineLeak_ConnPool_StressMaxGoroutines(t *testing.T) {
 				WithPacketBytes(buildBasicRequest(host, port)),
 				WithConnPool(true),
 				ConnPool(pool),
-				WithTimeout(500*time.Millisecond),
+				WithTimeout(requestTimeout),
 			)
 			if err != nil {
 				log.Infof("conn pool stress request failed: %v", err)

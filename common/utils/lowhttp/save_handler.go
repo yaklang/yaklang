@@ -30,9 +30,11 @@ func RegisterSaveHTTPFlowHandler(h saveHTTPFlowHandler) {
 
 func SaveLowHTTPResponse(r *LowhttpResponse, saveFlowSync bool) {
 	if saveHTTPFlowFunc == nil {
-		utils.Debug(func() {
+		// Avoid spamming tests/CI with the same warning on every request.
+		// Only emit it when the user explicitly enabled debug mode.
+		if utils.InDebugMode() {
 			log.Warn("SaveResponse failed because yakit.RegisterSaveHTTPFlowHandler is not finished")
-		})
+		}
 		return
 	}
 
