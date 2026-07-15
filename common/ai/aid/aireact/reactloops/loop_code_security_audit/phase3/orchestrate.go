@@ -9,8 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/emit"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/util"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/subagent"
-	"github.com/yaklang/yaklang/common/log"
+		"github.com/yaklang/yaklang/common/log"
 )
 
 const DefaultFindingVerifyConcurrency = 5
@@ -40,7 +39,7 @@ func runAllFindingVerifications(
 		return nil
 	}
 
-	jobs := make([]subagent.ForkJob, 0, len(findings))
+	jobs := make([]reactloops.ForkJob, 0, len(findings))
 	catalog := make(map[string]findingVerifyJob, len(findings))
 	skipped := 0
 	for i, finding := range findings {
@@ -53,7 +52,7 @@ func runAllFindingVerifications(
 			continue
 		}
 		goal := fmt.Sprintf("Phase 3 verify: %s — %s", finding.ID, finding.Title)
-		jobs = append(jobs, subagent.ForkJob{
+		jobs = append(jobs, reactloops.ForkJob{
 			Order:      i + 1,
 			Identifier: finding.ID,
 			TaskName:   goal,
@@ -83,9 +82,9 @@ func runAllFindingVerifications(
 
 	artifacts := newFindingArtifactStore(state)
 
-	forkResults := subagent.RunForkJobsConcurrently(
+	forkResults := reactloops.RunForkJobsConcurrently(
 		r, task, jobs, concurrency,
-		func(childInvoker aicommon.AIInvokeRuntime, job subagent.ForkJob) (*reactloops.ReActLoop, error) {
+		func(childInvoker aicommon.AIInvokeRuntime, job reactloops.ForkJob) (*reactloops.ReActLoop, error) {
 			verifyJob, ok := catalog[job.Identifier]
 			if !ok {
 				return nil, fmt.Errorf("unknown finding job %q", job.Identifier)
@@ -133,7 +132,7 @@ func finalizeFindingVerifyAfterFork(
 	loop *reactloops.ReActLoop,
 	state *model.AuditState,
 	job findingVerifyJob,
-	forkResult *subagent.ForkResult,
+	forkResult *reactloops.ForkResult,
 ) findingVerifyOutcome {
 	finding := job.finding
 	if forkResult.ExecErr != nil {

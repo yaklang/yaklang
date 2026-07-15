@@ -9,8 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/subagent"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+		"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -139,7 +138,7 @@ func buildSingleFindingVerifyLoop(
 		registerPhase3ReadReconNotesAction(r, state),
 	}
 
-	preset = append(preset, subagent.DefaultForkOptions()...)
+	preset = append(preset, reactloops.DefaultForkOptions()...)
 
 	loopName := fmt.Sprintf("code_audit_verify_%s", finding.ID)
 	return reactloops.NewReActLoop(loopName, r, preset...)

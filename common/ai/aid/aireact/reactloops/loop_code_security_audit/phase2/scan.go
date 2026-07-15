@@ -15,8 +15,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/subagent"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+		"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -918,7 +917,7 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 	}
 
 	preset = append(preset, buildPhase2WhitelistFSToolOptions(r)...)
-	preset = append(preset, subagent.DefaultForkOptions()...)
+	preset = append(preset, reactloops.DefaultForkOptions()...)
 
 	loopName := fmt.Sprintf("code_audit_scan_%s", category.ID)
 	loop, err := reactloops.NewReActLoop(loopName, r, preset...)
@@ -1008,7 +1007,7 @@ func planScanCategories(r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask
 	prompt := fmt.Sprintf(planPromptTemplate, defaultDesc.String(), userInput)
 
 	var action *aicommon.Action
-	planErr := subagent.RunForkInvokerCallback(r, task, subagent.ForkJob{
+	planErr := reactloops.RunForkInvokerCallback(r, task, reactloops.ForkJob{
 		Identifier: "scan-plan",
 		TaskName:   "Determine code audit vulnerability scan categories",
 		Goal:       "Determine code audit vulnerability scan categories",

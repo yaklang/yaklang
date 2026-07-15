@@ -6,8 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/subagent"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+		"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -46,7 +45,7 @@ func RunFastContextSearch(
 		return SearchResult{Error: utils.Error("parent task is nil")}
 	}
 
-	subLoop, err := subagent.RunNestedLoop(
+	subLoop, err := reactloops.RunNestedLoop(
 		invoker,
 		parentTask,
 		"fast-context",
