@@ -45,21 +45,11 @@ var savePayloadToolOptions = []mcp.ToolOption{
 	mcp.WithBool("saveAsFile",
 		mcp.Description("Whether to save the payload as a file"),
 	),
-	mcp.WithOneOfStruct("source", []mcp.PropertyOption{
-		mcp.Description("source from content or file"),
-		mcp.Required(),
-	}, []mcp.ToolOption{
-		mcp.WithString("content",
-			mcp.Description("The raw content of the payload. Can be multiple lines of content, with one payload per line."),
-			mcp.Required(),
-		),
-	},
-		[]mcp.ToolOption{
-			mcp.WithStringArray("filename",
-				mcp.Description("The filename(s) of the payload that want to import"),
-				mcp.Required(),
-			),
-		},
+	mcp.WithString("content",
+		mcp.Description("The raw content of the payload. Can be multiple lines of content, with one payload per line."),
+	),
+	mcp.WithStringArray("filename",
+		mcp.Description("The filename(s) of the payload that want to import"),
 	),
 }
 
@@ -274,26 +264,25 @@ func handleSavePayload(s *MCPServer) server.ToolHandlerFunc {
 		ctx context.Context,
 		request mcp.CallToolRequest,
 	) (*mcp.CallToolResult, error) {
-		args := request.Params.Arguments
-		group, folder := utils.MapGetString(args, "group"), utils.MapGetString(args, "folder")
-		isNew, saveAsFile := utils.MapGetBool(args, "isNew"), utils.MapGetBool(args, "saveAsFile")
-		source := utils.MapGetRaw(args, "source")
-		sourceMap, ok := source.(map[string]any)
-		if !ok {
-			return nil, utils.Error("invalid argument: source")
-		}
-		content, fileName := utils.MapGetString(sourceMap, "content"), utils.MapGetStringSlice(sourceMap, "filename")
-		req := ypb.SavePayloadRequest{
-			Group:  group,
-			Folder: folder,
-			IsNew:  isNew,
-		}
-		if content != "" {
-			req.Content = content
-		} else if len(fileName) > 0 {
-			req.FileName = fileName
-			req.IsFile = true
-		}
+	args := request.Params.Arguments
+	group, folder := utils.MapGetString(args, "group"), utils.MapGetString(args, "folder")
+	isNew, saveAsFile := utils.MapGetBool(args, "isNew"), utils.MapGetBool(args, "saveAsFile")
+	content, fileName := utils.MapGetString(args, "content"), utils.MapGetStringSlice(args, "filename")
+	if content == "" && len(fileName) == 0 {
+		return nil, utils.Error("invalid argument: source is required (provide content or filename)")
+	}
+	req := ypb.SavePayloadRequest{
+		Group:  group,
+		Folder: folder,
+		IsNew:  isNew,
+	}
+	if content != "" {
+		req.Content = content
+	} else {
+		req.FileName = fileName
+		req.IsFile = true
+	}
+
 
 		var progressToken mcp.ProgressToken
 		meta := request.Params.Meta
