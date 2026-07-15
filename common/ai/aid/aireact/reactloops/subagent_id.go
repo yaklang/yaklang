@@ -1,4 +1,4 @@
-package subagent
+package reactloops
 
 import (
 	"fmt"

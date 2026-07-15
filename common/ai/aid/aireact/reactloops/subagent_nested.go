@@ -1,11 +1,10 @@
-package subagent
+package reactloops
 
 import (
 	"context"
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -71,9 +70,9 @@ func RunNestedLoop(
 	parentTask aicommon.AIStatefulTask,
 	scopeName string,
 	loopName string,
-	configure func(subLoop *reactloops.ReActLoop),
-	opts ...reactloops.ReActLoopOption,
-) (*reactloops.ReActLoop, error) {
+	configure func(subLoop *ReActLoop),
+	opts ...ReActLoopOption,
+) (*ReActLoop, error) {
 	if invoker == nil {
 		return nil, utils.Error("invoker is nil")
 	}
@@ -97,7 +96,7 @@ func RunNestedLoop(
 		}
 	}
 
-	factory, ok := reactloops.GetLoopFactory(loopName)
+	factory, ok := GetLoopFactory(loopName)
 	if !ok || factory == nil {
 		return nil, utils.Errorf("reactloop[%s] not found", loopName)
 	}
@@ -123,9 +122,9 @@ func RunNestedLoop(
 	nestedTask := newNestedSubTask(parentTask, scopeName)
 
 	prevInvokerTask := invoker.GetCurrentTask()
-	var prevParentLoop *reactloops.ReActLoop
+	var prevParentLoop *ReActLoop
 	if prevInvokerTask != nil {
-		if parent, ok := prevInvokerTask.GetReActLoop().(*reactloops.ReActLoop); ok {
+		if parent, ok := prevInvokerTask.GetReActLoop().(*ReActLoop); ok {
 			prevParentLoop = parent
 		}
 	}
