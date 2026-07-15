@@ -23,19 +23,12 @@ func init() {
 				mcp.EnumString(bruteutils.GetBuildinAvailableBruteType()...),
 				mcp.Required(),
 			),
-			mcp.WithOneOfStruct("target",
-				[]mcp.PropertyOption{
-					mcp.Required(),
-				},
-				[]mcp.ToolOption{
-					mcp.WithStringArray("targets",
-						mcp.Description("Targets for the brute force attack"),
-						mcp.Required(),
-					), mcp.WithString("targetFile",
-						mcp.Description("File containing targets for the brute force attack"),
-						mcp.Required(),
-					),
-				}),
+			mcp.WithStringArray("targets",
+				mcp.Description("Targets for the brute force attack"),
+			),
+			mcp.WithString("targetFile",
+				mcp.Description("File containing targets for the brute force attack"),
+			),
 			mcp.WithBool("replaceDefaultUsernameDict",
 				mcp.Description("If false, default username dictionary will be added"),
 				mcp.Required(),
@@ -46,30 +39,18 @@ func init() {
 				mcp.Required(),
 				mcp.Default(true),
 			),
-			mcp.WithOneOfStruct("user-dict",
-				[]mcp.PropertyOption{
-					mcp.Required(),
-				},
-				[]mcp.ToolOption{
-					mcp.WithStringArray("usernames",
-						mcp.Description("List of usernames to use in the brute force attack"),
-					),
-					mcp.WithString("usernameFile",
-						mcp.Description("File containing usernames for the brute force attack"),
-					),
-				}),
-			mcp.WithOneOfStruct("pass-dict",
-				[]mcp.PropertyOption{
-					mcp.Required(),
-				},
-				[]mcp.ToolOption{
-					mcp.WithStringArray("passwords",
-						mcp.Description("List of passwords to use in the brute force attack"),
-					),
-					mcp.WithString("passwordFile",
-						mcp.Description("File containing passwords for the brute force attack"),
-					),
-				}),
+			mcp.WithStringArray("usernames",
+				mcp.Description("List of usernames to use in the brute force attack"),
+			),
+			mcp.WithString("usernameFile",
+				mcp.Description("File containing usernames for the brute force attack"),
+			),
+			mcp.WithStringArray("passwords",
+				mcp.Description("List of passwords to use in the brute force attack"),
+			),
+			mcp.WithString("passwordFile",
+				mcp.Description("File containing passwords for the brute force attack"),
+			),
 			mcp.WithNumber("timeout",
 				mcp.Description("Timeout for the brute force attack"),
 			),
@@ -102,40 +83,39 @@ func handleBrute(s *MCPServer) server.ToolHandlerFunc {
 		ctx context.Context,
 		request mcp.CallToolRequest,
 	) (*mcp.CallToolResult, error) {
-		args := request.Params.Arguments
-		target := utils.MapGetRaw(args, "target")
-		targetMap, ok := target.(map[string]any)
-		if !ok {
-			return nil, utils.Error("invalid argument: target")
-		}
-		username := utils.MapGetRaw(args, "user-dict")
-		usernameMap, ok := username.(map[string]any)
-		if !ok {
-			return nil, utils.Error("invalid argument: user-dict")
-		}
-		password := utils.MapGetRaw(args, "pass-dict")
-		passwordMap, ok := password.(map[string]any)
-		if !ok {
-			return nil, utils.Error("invalid argument: pass-dict")
-		}
-		req := ypb.StartBruteParams{
-			Type:                       utils.MapGetString(args, "type"),
-			Targets:                    strings.Join(utils.MapGetStringSlice(targetMap, "targets"), "\n"),
-			TargetFile:                 utils.MapGetString(targetMap, "targetFile"),
-			Usernames:                  utils.MapGetStringSlice(usernameMap, "usernames"),
-			UsernameFile:               utils.MapGetString(usernameMap, "usernameFile"),
-			Passwords:                  utils.MapGetStringSlice(passwordMap, "passwords"),
-			PasswordFile:               utils.MapGetString(passwordMap, "passwordFile"),
-			ReplaceDefaultUsernameDict: utils.MapGetBool(args, "replaceDefaultUsernameDict"),
-			ReplaceDefaultPasswordDict: utils.MapGetBool(args, "replaceDefaultPasswordDict"),
-			Timeout:                    float32(utils.InterfaceToFloat64(utils.MapGetRaw(args, "timeout"))),
-			Concurrent:                 utils.MapGetInt64(args, "concurrent"),
-			Retry:                      utils.MapGetInt64(args, "retry"),
-			TargetTaskConcurrent:       utils.MapGetInt64(args, "targetTaskConcurrent"),
-			OkToStop:                   utils.MapGetBool(args, "okToStop"),
-			DelayMin:                   utils.MapGetInt64(args, "delayMin"),
-			DelayMax:                   utils.MapGetInt64(args, "delayMax"),
-		}
+	args := request.Params.Arguments
+	targets := utils.MapGetStringSlice(args, "targets")
+	targetFile := utils.MapGetString(args, "targetFile")
+	if len(targets) == 0 && targetFile == "" {
+		return nil, utils.Error("invalid argument: target is required (provide targets or targetFile)")
+	}
+	usernames := utils.MapGetStringSlice(args, "usernames")
+	usernameFile := utils.MapGetString(args, "usernameFile")
+	passwords := utils.MapGetStringSlice(args, "passwords")
+	passwordFile := utils.MapGetString(args, "passwordFile")
+	if (len(usernames) == 0 && usernameFile == "") || (len(passwords) == 0 && passwordFile == "") {
+		return nil, utils.Error("invalid argument: user-dict and pass-dict are required")
+	}
+
+	req := ypb.StartBruteParams{
+		Type:                       utils.MapGetString(args, "type"),
+		Targets:                    strings.Join(targets, "\n"),
+		TargetFile:                 targetFile,
+		Usernames:                  usernames,
+		UsernameFile:               usernameFile,
+		Passwords:                  passwords,
+		PasswordFile:               passwordFile,
+		ReplaceDefaultUsernameDict: utils.MapGetBool(args, "replaceDefaultUsernameDict"),
+		ReplaceDefaultPasswordDict: utils.MapGetBool(args, "replaceDefaultPasswordDict"),
+		Timeout:                    float32(utils.InterfaceToFloat64(utils.MapGetRaw(args, "timeout"))),
+		Concurrent:                 utils.MapGetInt64(args, "concurrent"),
+		Retry:                      utils.MapGetInt64(args, "retry"),
+		TargetTaskConcurrent:       utils.MapGetInt64(args, "targetTaskConcurrent"),
+		OkToStop:                   utils.MapGetBool(args, "okToStop"),
+		DelayMin:                   utils.MapGetInt64(args, "delayMin"),
+		DelayMax:                   utils.MapGetInt64(args, "delayMax"),
+	}
+
 
 		var progressToken mcp.ProgressToken
 		meta := request.Params.Meta
