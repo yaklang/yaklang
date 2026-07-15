@@ -37,11 +37,11 @@ const iterationExtensionCountVar = "__iteration_extension_count__"
 // 作为 suggestion 回传; 这里同时把 value 与中文标题都作为匹配候选, 避免前端
 // 回传格式差异导致漏判. 任一命中即视为同意扩充, delta 由 value 决定.
 var iterationExtensionOptionValues = map[string]int{
-	"+5":          5,
-	"+10":         10,
-	"翻倍":         0, // 0 表示"取当前 maxIterations", 由调用方换算
-	"double":      0,
-	"x2":          0,
+	"+5":     5,
+	"+10":    10,
+	"翻倍":     0, // 0 表示"取当前 maxIterations", 由调用方换算
+	"double": 0,
+	"x2":     0,
 }
 
 // requestIterationExtension 在 ReActLoop 触及迭代上限时, 复用 review 基建
@@ -65,10 +65,16 @@ func (r *ReActLoop) requestIterationExtension(
 	if r == nil || utils.IsNil(task) {
 		return false, 0, nil
 	}
-	cfg := r.config
+	cfg := r.GetConfig()
 	if utils.IsNil(cfg) {
 		return false, 0, nil
 	}
+
+	if cfg.GetConfigBool(aicommon.DisableIncreaseIteration) {
+		log.Infof("ReactLoop[%v] iteration extension disabled by config, fallback to soft interrupt", r.loopName)
+		return false, 0, nil
+	}
+
 	// 防自旋: 累计扩充次数已达上限, 不再询问.
 	if r.getIterationExtensionCount() >= maxIterationExtensionCount {
 		log.Infof("ReactLoop[%v] iteration extension cap (%d) reached, fallback to soft interrupt",
@@ -131,14 +137,14 @@ func (r *ReActLoop) requestIterationExtension(
 	ep.SetDefaultSuggestionContinue()
 
 	reqs := map[string]any{
-		"id":               ep.GetId(),
-		"prompt":           question,
-		"options":          options,
-		"reason":           "reached max iterations, ask user for temporary extension",
-		"iteration_count":  iterationCount,
-		"max_iterations":   maxIterations,
-		"extension_count":  r.getIterationExtensionCount(),
-		"extension_cap":    maxIterationExtensionCount,
+		"id":              ep.GetId(),
+		"prompt":          question,
+		"options":         options,
+		"reason":          "reached max iterations, ask user for temporary extension",
+		"iteration_count": iterationCount,
+		"max_iterations":  maxIterations,
+		"extension_count": r.getIterationExtensionCount(),
+		"extension_cap":   maxIterationExtensionCount,
 	}
 	ep.SetReviewMaterials(reqs)
 	if submitErr := cfg.SubmitCheckpointRequest(ep.GetCheckpoint(), reqs); submitErr != nil {
@@ -243,4 +249,3 @@ func (r *ReActLoop) incrementIterationExtensionCount() {
 	}
 	r.Set(iterationExtensionCountVar, r.getIterationExtensionCount()+1)
 }
-

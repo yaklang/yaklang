@@ -345,9 +345,10 @@ type Config struct {
 	verificationWatchdogToolBlockingEnd   func()
 
 	// iteration limit
-	MaxIterationCount int64
-	EnableGoalMode    bool
-	GoalMinIterations int64
+	MaxIterationCount        int64
+	EnableGoalMode           bool
+	GoalMinIterations        int64
+	DisableIncreaseIteration bool
 
 	// task config
 	EnhanceKnowledgeManager            *EnhanceKnowledgeManager
@@ -2314,6 +2315,21 @@ func WithMaxIterationCount(n int64) ConfigOption {
 	}
 }
 
+var DisableIncreaseIteration string = "DisableIncreaseIteration"
+
+func WithDisableIncreaseIteration(disable bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.DisableIncreaseIteration = disable
+		c.m.Unlock()
+		c.SetConfig(DisableIncreaseIteration, disable)
+		return nil
+	}
+}
+
 func WithEnableGoalMode(enable bool) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -3970,6 +3986,9 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	}
 	if i.MaxIterationCount > 0 {
 		opts = append(opts, WithMaxIterationCount(i.MaxIterationCount))
+	}
+	if i.DisableIncreaseIteration {
+		opts = append(opts, WithDisableIncreaseIteration(i.DisableIncreaseIteration))
 	}
 	opts = append(opts, WithDisableToolCallerIntervalReview(i.DisableIntervalReview))
 	if i.IntervalReviewDuration > 0 {
