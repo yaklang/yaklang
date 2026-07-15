@@ -302,6 +302,7 @@ type mockStats_forWriteAndModify struct {
 	writeDone    bool
 	modifyDone   bool
 	verifyCalled bool
+	answerDone   bool
 }
 
 func mockedYaklangWritingAndModify(t *testing.T, i aicommon.AICallerConfigIf, req *aicommon.AIRequest, code string, stat *mockStats_forWriteAndModify) (*aicommon.AIResponse, error) {
@@ -364,7 +365,16 @@ func mockedYaklangWritingAndModify(t *testing.T, i aicommon.AICallerConfigIf, re
 		return rsp, nil
 	}
 
+	// modify 不再自动退出循环：先 directly_answer 总结，再 finish 退出
+	if stat.modifyDone && stat.answerDone {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
 	if rsp, ok := mockYaklangFinalizeDirectlyAnswer(t, i, prompt); ok {
+		stat.answerDone = true
 		return rsp, nil
 	}
 

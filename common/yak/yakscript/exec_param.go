@@ -75,7 +75,7 @@ func ExecScriptWithExecParam(script *schema.YakScript, input string, stream Stre
 	}
 	switch strings.ToLower(scriptType) {
 	case "codec":
-		tabName := "Codec结果"
+		tabName := "执行结果"
 		subEngine, err := engine.ExecuteExWithContext(streamCtx, script.Content, map[string]any{
 			"CTX":          streamCtx,
 			"PLUGIN_NAME":  scriptName,

@@ -330,7 +330,7 @@ func TestModifyAction_Verifier_InvalidParams(t *testing.T) {
 	assert.Error(t, verifyErr)
 }
 
-func TestModifyAction_ExitWhenSyntaxClean(t *testing.T) {
+func TestModifyAction_ContinuesAfterSyntaxClean(t *testing.T) {
 	runtime := newTestRuntimeForSingleFile(t)
 	loop, factory, task := newLoopAndFactory(t, runtime,
 		WithActionSuffix("code"),
@@ -349,8 +349,9 @@ func TestModifyAction_ExitWhenSyntaxClean(t *testing.T) {
 		"modify_end_line":   2,
 	}), op)
 
+	// modify 操作不再自动退出：AI 需要通过 finish 主动退出循环
 	terminated, failErr := op.IsTerminated()
-	assert.True(t, terminated)
+	assert.False(t, terminated)
 	assert.NoError(t, failErr)
 	assert.Equal(t, "true", loop.Get(factory.GetLintStatusVariableName()))
 }
@@ -776,4 +777,150 @@ func TestModifyAction_OldSnippet_Ambiguous_Continue(t *testing.T) {
 
 	assert.True(t, op.IsContinued())
 	assert.True(t, runtime.timelineContains("modify_snippet_ambiguous"))
+}
+
+// TestModifyAction_OldSnippet_EmptyCode_SingleRetry verifies that a single empty
+// GEN_CODE block does NOT fail the task — it feeds back a correction hint (guiding
+// toward line-range mode) and continues, giving the AI a chance to retry.
+func TestModifyAction_OldSnippet_EmptyCode_SingleRetry(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, factory, task := newLoopAndFactory(t, runtime, WithActionSuffix("code"), WithExitAfterWrite(false))
+	filename := filepath.Join(runtime.tmpDir, "empty_snippet.yak")
+	loop.Set(factory.GetFilenameVariableName(), filename)
+	loop.Set(factory.GetFullCodeVariableName(), "a = 1\nb = 2\n")
+	loop.Set(factory.GetCodeVariableName(), "") // empty code
+
+	action := mustBuildAction(t, factory.GetActionName("modify"), map[string]any{
+		"old_snippet": "a = 1",
+	})
+	ac, _ := loop.GetActionHandler(factory.GetActionName("modify"))
+	op := reactloops.NewActionHandlerOperator(task)
+	ac.ActionHandler(loop, action, op)
+
+	terminated, failErr := op.IsTerminated()
+	assert.False(t, terminated, "single empty old_snippet modify should NOT abort")
+	assert.NoError(t, failErr)
+	assert.True(t, op.IsContinued(), "should continue for retry")
+	feedback := op.GetFeedback().String()
+	assert.Contains(t, feedback, "GEN_CODE")
+	assert.Contains(t, feedback, "modify_start_line", "feedback should suggest line-range alternative")
+	assert.True(t, runtime.timelineContains("error"))
+
+	// full_code must remain unchanged
+	assert.Equal(t, "a = 1\nb = 2\n", loop.Get(factory.GetFullCodeVariableName()))
+}
+
+// TestModifyAction_OldSnippet_EmptyCode_EscalatesToLineRangeHint verifies that
+// after 3+ consecutive empty GEN_CODE blocks, feedback escalates to a stronger
+// warning insisting the AI switch to line-range mode.
+func TestModifyAction_OldSnippet_EmptyCode_EscalatesToLineRangeHint(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, factory, task := newLoopAndFactory(t, runtime, WithActionSuffix("code"), WithExitAfterWrite(false))
+	filename := filepath.Join(runtime.tmpDir, "escalate.yak")
+	loop.Set(factory.GetFilenameVariableName(), filename)
+	loop.Set(factory.GetFullCodeVariableName(), "a = 1\nb = 2\n")
+
+	ac, _ := loop.GetActionHandler(factory.GetActionName("modify"))
+	actionName := factory.GetActionName("modify")
+
+	// Fire 3 consecutive empty old_snippet modifies
+	for i := 0; i < 3; i++ {
+		loop.Set(factory.GetCodeVariableName(), "")
+		op := reactloops.NewActionHandlerOperator(task)
+		ac.ActionHandler(loop, mustBuildAction(t, actionName, map[string]any{
+			"old_snippet": "a = 1",
+		}), op)
+		terminated, _ := op.IsTerminated()
+		assert.False(t, terminated, "attempt %d should not abort", i+1)
+		assert.True(t, op.IsContinued())
+	}
+
+	// 4th attempt should have escalated feedback
+	loop.Set(factory.GetCodeVariableName(), "")
+	op := reactloops.NewActionHandlerOperator(task)
+	ac.ActionHandler(loop, mustBuildAction(t, actionName, map[string]any{
+		"old_snippet": "a = 1",
+	}), op)
+	terminated, _ := op.IsTerminated()
+	assert.False(t, terminated, "4th attempt should still not abort")
+	feedback := op.GetFeedback().String()
+	assert.Contains(t, feedback, "改用行号模式", "escalated feedback should insist on line-range mode")
+}
+
+// TestModifyAction_OldSnippet_EmptyCode_EventuallyFails verifies that after
+// maxEmptySnippetRetry (5) consecutive empty attempts, the action does Fail
+// to prevent infinite loops.
+func TestModifyAction_OldSnippet_EmptyCode_EventuallyFails(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, factory, task := newLoopAndFactory(t, runtime, WithActionSuffix("code"), WithExitAfterWrite(false))
+	filename := filepath.Join(runtime.tmpDir, "fail.yak")
+	loop.Set(factory.GetFilenameVariableName(), filename)
+	loop.Set(factory.GetFullCodeVariableName(), "a = 1\nb = 2\n")
+
+	ac, _ := loop.GetActionHandler(factory.GetActionName("modify"))
+	actionName := factory.GetActionName("modify")
+
+	var lastOp *reactloops.LoopActionHandlerOperator
+	for i := 0; i < 10; i++ {
+		loop.Set(factory.GetCodeVariableName(), "")
+		lastOp = reactloops.NewActionHandlerOperator(task)
+		ac.ActionHandler(loop, mustBuildAction(t, actionName, map[string]any{
+			"old_snippet": "a = 1",
+		}), lastOp)
+		if done, _ := lastOp.IsTerminated(); done {
+			break
+		}
+	}
+
+	terminated, failErr := lastOp.IsTerminated()
+	assert.True(t, terminated, "should eventually fail after max retries")
+	assert.Error(t, failErr)
+	assert.Contains(t, failErr.Error(), "modify_start_line", "final error should suggest line-range alternative")
+}
+
+// TestModifyAction_OldSnippet_EmptyCode_ResetAfterSuccess verifies that a
+// successful old_snippet modify resets the empty-code retry counter, so
+// a later empty attempt gets a fresh set of retries.
+func TestModifyAction_OldSnippet_EmptyCode_ResetAfterSuccess(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, factory, task := newLoopAndFactory(t, runtime, WithActionSuffix("code"), WithExitAfterWrite(false))
+	filename := filepath.Join(runtime.tmpDir, "reset.yak")
+	loop.Set(factory.GetFilenameVariableName(), filename)
+	loop.Set(factory.GetFullCodeVariableName(), "a = 1\nb = 2\n")
+
+	ac, _ := loop.GetActionHandler(factory.GetActionName("modify"))
+	actionName := factory.GetActionName("modify")
+
+	// 2 consecutive empty attempts
+	for i := 0; i < 2; i++ {
+		loop.Set(factory.GetCodeVariableName(), "")
+		op := reactloops.NewActionHandlerOperator(task)
+		ac.ActionHandler(loop, mustBuildAction(t, actionName, map[string]any{
+			"old_snippet": "a = 1",
+		}), op)
+		terminated, _ := op.IsTerminated()
+		assert.False(t, terminated)
+	}
+
+	// Successful modify resets the counter
+	loop.Set(factory.GetCodeVariableName(), "a = 42")
+	successOp := reactloops.NewActionHandlerOperator(task)
+	ac.ActionHandler(loop, mustBuildAction(t, actionName, map[string]any{
+		"old_snippet": "a = 1",
+	}), successOp)
+	terminated, failErr := successOp.IsTerminated()
+	assert.False(t, terminated)
+	assert.NoError(t, failErr)
+	assert.Contains(t, loop.Get(factory.GetFullCodeVariableName()), "a = 42")
+
+	// After success, empty counter should be reset; next empty should not immediately fail
+	loop.Set(factory.GetCodeVariableName(), "")
+	retryOp := reactloops.NewActionHandlerOperator(task)
+	ac.ActionHandler(loop, mustBuildAction(t, actionName, map[string]any{
+		"old_snippet": "a = 42",
+	}), retryOp)
+	terminated, failErr = retryOp.IsTerminated()
+	assert.False(t, terminated, "after a successful modify, the counter should be reset")
+	assert.NoError(t, failErr)
+	assert.True(t, retryOp.IsContinued())
 }

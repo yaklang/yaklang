@@ -499,6 +499,17 @@ func syncCorePluginEmbedInternal() error {
 		withPluginHelp("强制同步内置规则，包括 SyntaxFlow 规则、Core 插件、AI Forge"),
 		withPluginEnableGenerateParam(true),
 	)
+
+	registerBuildInPlugin(
+		"codec", "提取同域名下所有的PATH",
+		withPluginHelp("在 Yakit History 中右键选中流量，自动查询该流量域名并从 History 中提取该域名下所有唯一 PATH（去 query、去重）"),
+		withPluginAuthors("V1ll4n"),
+		withPluginTags([]string{
+			"web安全", "信息收集", "历史分析", "路径提取", "YakScript",
+			"allow-custom-single-history-mutate",
+			"allow-custom-multiple-history-mutate",
+		}),
+	)
 	return nil
 }
 
