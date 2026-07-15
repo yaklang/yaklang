@@ -130,7 +130,7 @@ func IsErrorNetOpTimeout(err error) bool {
 	result := errors.As(err, &netOpError) && netOpError != nil && netOpError.Timeout()
 	if !result {
 		// check context exceeded
-		if errors.As(err, &context.DeadlineExceeded) || errors.Is(err, context.DeadlineExceeded) {
+		if errors.Is(err, context.DeadlineExceeded) {
 			return true
 		}
 	}

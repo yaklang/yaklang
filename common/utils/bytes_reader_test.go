@@ -42,6 +42,38 @@ func TestReadConnWithContextTimeout(t *testing.T) {
 	conn.Close()
 }
 
+func TestIsErrorNetOpTimeoutConcurrent(t *testing.T) {
+	const (
+		workers    = 16
+		iterations = 100
+	)
+
+	var wg sync.WaitGroup
+	failed := make(chan struct{}, 1)
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < iterations; j++ {
+				if !IsErrorNetOpTimeout(fmt.Errorf("wrapped: %w", context.DeadlineExceeded)) {
+					select {
+					case failed <- struct{}{}:
+					default:
+					}
+					return
+				}
+			}
+		}()
+	}
+	wg.Wait()
+
+	select {
+	case <-failed:
+		t.Fatal("wrapped context deadline error was not recognized as a timeout")
+	default:
+	}
+}
+
 func TestReadConnWithTimeout(t *testing.T) {
 	var listener net.Listener
 	host, port := DebugMockTCPEx(func(ctx context.Context, lis net.Listener, conn net.Conn) {
