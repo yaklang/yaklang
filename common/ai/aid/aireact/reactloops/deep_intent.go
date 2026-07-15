@@ -44,6 +44,9 @@ func ExecuteDeepIntentRecognition(r aicommon.AIInvokeRuntime, loop *ReActLoop, t
 		opts = append(opts, option)
 	}
 
+	// default aicommon config options for deep intent recognition loop
+	opts = append(opts, aicommon.WithDisableIncreaseIteration(true))
+
 	var intentLoop *ReActLoop
 	opts = append(opts, WithOnLoopInstanceCreated(func(l *ReActLoop) {
 		intentLoop = l

@@ -17,6 +17,7 @@ func NewTestReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		aicommon.WithGenerateReport(false),
 		aicommon.WithDisableDynamicPlanning(true),
 		aicommon.WithPeriodicVerificationInterval(0),
+		aicommon.WithDisableIncreaseIteration(true),
 	}
 	basicOption = append(basicOption, opts...)
 	ins, err := NewReAct(
