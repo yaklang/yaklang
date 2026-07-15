@@ -21,6 +21,11 @@ func GetHTTPHeader(headers http.Header, key string) string {
 	if values := headers[key]; len(values) > 0 {
 		return values[0]
 	}
+	for currentKey, values := range headers {
+		if strings.EqualFold(currentKey, key) && len(values) > 0 {
+			return values[0]
+		}
+	}
 	return ""
 }
 

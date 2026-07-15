@@ -574,6 +574,12 @@ func validateWebsocketUpgradeResponse(requestRaw []byte, response *http.Response
 	return utils.Errorf("websocket: server selected unoffered subprotocol %q", selected)
 }
 
+// ValidateWebsocketUpgradeResponse validates the server side of an RFC 6455
+// opening handshake against the request bytes sent on the wire.
+func ValidateWebsocketUpgradeResponse(requestRaw []byte, response *http.Response) error {
+	return validateWebsocketUpgradeResponse(requestRaw, response)
+}
+
 func (c *WebsocketClient) Write(r []byte) error {
 	return c.WriteText(r)
 }

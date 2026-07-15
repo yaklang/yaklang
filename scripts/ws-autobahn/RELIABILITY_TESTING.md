@@ -222,6 +222,25 @@ go run scripts/ws-autobahn/check_report.go \
 6. `use of closed network connection`：先寻找更早的握手、协议或写入错误；该错误通常
    是一侧已经关闭后的二次读写结果。
 
+Windows 上的
+`wsasend: An established connection was aborted by the software in your host machine`
+如果来自 `handle ordinary request`，表示浏览器取消了某个普通 HTTP 响应的回写，不能
+单独证明 WebSocket 隧道失败。该类预期断开现在降为 debug 日志。二进制 HTTP 正文也
+不会再因为 PCRE2 UTF 模式产生 `invalid UTF-8 in subject` 错误噪声。
+
+WebSocket 隧道日志使用同一个 `id` 串联生命周期，并且只记录 host/path，不记录查询
+参数。排查时按以下顺序查找：
+
+1. `starting`：请求已被识别为 WebSocket 并进入专用隧道。
+2. `handshake status=101`：写给浏览器的握手已经通过状态码、Upgrade/Connection、
+   Accept、子协议和扩展协商校验。
+3. 两个方向的 `first-frame`：分别证明上游和浏览器至少发送过一个帧。
+4. `closed-by`：指出首先结束读取循环的一侧，并附带双向帧数和字节数。
+
+如果响应劫持、替换器或热加载规则生成了无效握手，引擎会记录
+`modified websocket handshake is invalid, using upstream response`，并回退到校验通过的
+上游原始 `101`，避免把损坏的握手先发给浏览器。
+
 复现客户环境问题时至少收集：
 
 - 浏览器 Network 中握手 request/response headers。

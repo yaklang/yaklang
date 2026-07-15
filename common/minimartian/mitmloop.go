@@ -1010,7 +1010,12 @@ func (p *Proxy) handleRequest(conn net.Conn, req *http.Request, ctx *Context) er
 	responseBytes, err = utils.DumpHTTPResponse(res, true, brw)
 	_ = responseBytes
 	if err != nil {
-		log.Errorf("handle ordinary request: got error while writing response back to client: %v", err)
+		if isExpectedDownstreamWriteError(err) {
+			closing = errClose
+			log.Debugf("ordinary response client disconnected while writing: method=%s target=%s status=%d error=%v", req.Method, ordinaryRequestLogTarget(req), res.StatusCode, err)
+		} else {
+			log.Errorf("handle ordinary request: got error while writing response back to client: method=%s target=%s status=%d error=%v", req.Method, ordinaryRequestLogTarget(req), res.StatusCode, err)
+		}
 	}
 
 	// Handle proxy getting stuck when upstream stops responding midway
@@ -1021,7 +1026,12 @@ func (p *Proxy) handleRequest(conn net.Conn, req *http.Request, ctx *Context) er
 
 	err = brw.Flush()
 	if err != nil {
-		log.Errorf("handle ordinary request: got error while flushing response back to client: %v", err)
+		if isExpectedDownstreamWriteError(err) {
+			closing = errClose
+			log.Debugf("ordinary response client disconnected while flushing: method=%s target=%s status=%d error=%v", req.Method, ordinaryRequestLogTarget(req), res.StatusCode, err)
+		} else {
+			log.Errorf("handle ordinary request: got error while flushing response back to client: method=%s target=%s status=%d error=%v", req.Method, ordinaryRequestLogTarget(req), res.StatusCode, err)
+		}
 	}
 	if errors.Is(err, io.ErrUnexpectedEOF) {
 		closing = errClose
@@ -1031,6 +1041,43 @@ func (p *Proxy) handleRequest(conn net.Conn, req *http.Request, ctx *Context) er
 	}
 
 	return closing
+}
+
+func ordinaryRequestLogTarget(req *http.Request) string {
+	if req == nil || req.URL == nil {
+		return "unknown"
+	}
+	host := req.URL.Host
+	if host == "" {
+		host = req.Host
+	}
+	path := req.URL.EscapedPath()
+	if path == "" {
+		path = "/"
+	}
+	return host + path
+}
+
+func isExpectedDownstreamWriteError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, net.ErrClosed) || errors.Is(err, context.Canceled) {
+		return true
+	}
+	message := strings.ToLower(err.Error())
+	for _, expected := range []string{
+		"broken pipe",
+		"connection reset by peer",
+		"use of closed network connection",
+		"an established connection was aborted by the software in your host machine",
+		"forcibly closed by the remote host",
+	} {
+		if strings.Contains(message, expected) {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *Proxy) TLSHandshake(ctx context.Context, conn net.Conn, serverUseH2 bool) (net.Conn, bool, error) {
