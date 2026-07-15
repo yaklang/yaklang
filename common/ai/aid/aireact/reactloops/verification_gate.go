@@ -218,7 +218,7 @@ func (r *ReActLoop) VerifyUserSatisfactionNow(
 // beginVerificationWatchdogToolSuppression marks the start of a synchronous blocking
 // tool invocation on the ReAct thread. While the depth is >0, the verification watchdog
 // timer must not fire or be rescheduled via touchVerificationWatchdog.
-func (r *ReActLoop) beginVerificationWatchdogToolSuppression() {
+func (r *ReActLoop) BeginVerificationWatchdogToolSuppression() {
 	if r == nil || r.verificationMutex == nil {
 		return
 	}
@@ -233,7 +233,7 @@ func (r *ReActLoop) beginVerificationWatchdogToolSuppression() {
 
 // endVerificationWatchdogToolSuppression pairs with beginVerificationWatchdogToolSuppression.
 // When the outermost tool call finishes, the watchdog timer is restarted from idle timeout.
-func (r *ReActLoop) endVerificationWatchdogToolSuppression() {
+func (r *ReActLoop) EndVerificationWatchdogToolSuppression() {
 	if r == nil || r.verificationMutex == nil {
 		return
 	}
@@ -402,6 +402,14 @@ func (r *ReActLoop) triggerVerificationWatchdog(task aicommon.AIStatefulTask) {
 		if suppressed {
 			return
 		}
+	}
+	// 子 Agent 进度旁路: 如果有活跃子 Agent 在运行 (dispatch_sub_react_agents
+	// 阻塞了主循环), 跳过自动验证 — 此时主循环在等子 Agent, 不应误判任务已完成.
+	// 关键词: verification watchdog sub-agent 旁路, dispatch 等待不误触发
+	if registry := r.GetSubAgentProgressRegistry(); registry != nil && registry.IsAnyActive() {
+		r.GetInvoker().AddToTimeline("[VERIFICATION_WATCHDOG_SUB_AGENT_ACTIVE]",
+			"sub-agent(s) still active, verification watchdog skipped to avoid premature task finish")
+		return
 	}
 	select {
 	case <-task.GetContext().Done():

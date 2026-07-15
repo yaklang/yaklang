@@ -83,6 +83,15 @@ func handleDispatchSubReactAgents(
 
 	loopInfraStatus(loop, "子 Agent 执行中/ Sub Agents Running...")
 
+	// Pause the verification watchdog while sub-agents are running. This is a
+	// double-insurance alongside the sub-agent progress bypass in
+	// triggerVerificationWatchdog: even if the watchdog timer fires during
+	// the blocking RunJobsConcurrently call, the suppression depth > 0
+	// prevents it from triggering a premature task.Finish.
+	// 关键词: dispatch watchdog suppression, begin/end pair
+	loop.BeginVerificationWatchdogToolSuppression()
+	defer loop.EndVerificationWatchdogToolSuppression()
+
 	results := reactloops.RunJobsConcurrently(invoker, loop, parentTask, jobs, concurrency, registry)
 
 	reactloops.SortJobResults(results)
