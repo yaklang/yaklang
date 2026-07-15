@@ -943,6 +943,10 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			}
 		}
 
+		if httpctx.IsWebsocketOpeningHandshake(req) {
+			return rsp
+		}
+
 		ptr := fmt.Sprintf("%p", req)
 		if !httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest) {
 			return rsp

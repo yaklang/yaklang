@@ -241,6 +241,21 @@ WebSocket 隧道日志使用同一个 `id` 串联生命周期，并且只记录 
 `modified websocket handshake is invalid, using upstream response`，并回退到校验通过的
 上游原始 `101`，避免把损坏的握手先发给浏览器。
 
+WebSocket opening handshake 是浏览器建立连接的时延敏感控制报文。即使用户在 WS 请求
+上选择了“继续劫持响应”，引擎也不会再把 `101` 放入普通 HTTP 手工响应等待队列；规则、
+热加载修改、握手校验和后续 WebSocket 帧手工劫持仍然保留。日志中的
+`manual-response-bypassed=true` 表示本次确实跳过了这一阻塞点。
+
+握手日志还包含 `dial`、`request-write`、`response-read`、`response-hook` 和
+`downstream-write` 五段耗时。若仍有长延迟，可直接区分 DNS/TCP/TLS 建连、上游等待、
+本地规则处理或浏览器写回。关闭日志中的 `upstream-error` / `downstream-error` 记录首先
+结束一侧的实际帧读取错误。
+
+底层读取器必须在进入 HTTP response hook 前，把 `101` 报文字节和同一次 TCP 读取中
+预取的 WebSocket 帧严格分离。否则服务端随 `101` 立即发送的首帧会被误当成 HTTP 响应
+尾部参与修改，甚至存在重复下发风险。回归测试会将 `101 + 首帧` 一次写入，并验证 hook
+只看到 `101`、帧解析器只收到一次首帧。
+
 复现客户环境问题时至少收集：
 
 - 浏览器 Network 中握手 request/response headers。

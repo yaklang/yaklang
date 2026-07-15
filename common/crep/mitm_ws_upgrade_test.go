@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 )
 
 func websocketUpgradeTestRequest(t *testing.T) *http.Request {
@@ -68,4 +69,24 @@ func TestWebsocketLogTargetOmitsQuery(t *testing.T) {
 	target := websocketLogTarget(websocketUpgradeTestRequest(t))
 	require.Equal(t, "example.com/ws", target)
 	require.False(t, strings.Contains(target, "secret"))
+}
+
+func TestModifyWebsocketOpeningHandshakeMarksOnlyCallbackWindow(t *testing.T) {
+	req := websocketUpgradeTestRequest(t)
+	httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, true)
+	called := false
+	modifier := &WebSocketModifier{
+		ResponseHijackCallback: func(gotReq *http.Request, rsp *http.Response, raw []byte) []byte {
+			called = true
+			require.Same(t, req, gotReq)
+			require.True(t, httpctx.IsWebsocketOpeningHandshake(req))
+			require.True(t, httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest))
+			return raw
+		},
+	}
+	raw := []byte("HTTP/1.1 101 Switching Protocols\r\n\r\n")
+	require.Equal(t, raw, modifier.modifyWebsocketOpeningHandshake(req, nil, raw))
+	require.True(t, called)
+	require.False(t, httpctx.IsWebsocketOpeningHandshake(req))
+	require.True(t, httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest))
 }

@@ -2,6 +2,7 @@ package crep
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -117,6 +118,30 @@ func selectWebsocketUpgradeResponse(req *http.Request, originalRaw, candidateRaw
 	return originalRaw, originalRsp, utils.Errorf("modified websocket handshake is invalid, using upstream response: %v", candidateErr)
 }
 
+func (w *WebSocketModifier) modifyWebsocketOpeningHandshake(req *http.Request, rsp *http.Response, rspRaw []byte) []byte {
+	httpctx.SetWebsocketOpeningHandshake(req, true)
+	defer httpctx.SetWebsocketOpeningHandshake(req, false)
+	return w.ResponseHijackCallback(req, rsp, rspRaw)
+}
+
+func websocketTerminalError(err error) string {
+	if err == nil {
+		return "none"
+	}
+	return err.Error()
+}
+
+func websocketPacketFingerprint(raw []byte) string {
+	if len(raw) == 0 {
+		return "none"
+	}
+	hash := utils.CalcSha1(raw)
+	if len(hash) > 12 {
+		return hash[:12]
+	}
+	return hash
+}
+
 func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 	var err error
 	tunnelID := websocketTunnelSequence.Add(1)
@@ -192,6 +217,13 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 		downstreamBytes           atomic.Uint64
 		firstUpstreamFrame        sync.Once
 		firstDownstreamFrame      sync.Once
+		handshakeTimings          lowhttp.WebsocketHandshakeTimings
+		responseHookDuration      time.Duration
+		downstreamWriteDuration   time.Duration
+		manualResponseBypassed    bool
+		upstreamResponseRaw       []byte
+		downstreamResponseRaw     []byte
+		downstreamWriteBytes      int
 	)
 
 	forwardError := func(direction, frameType string, err error, shutdown func()) bool {
@@ -306,14 +338,21 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 		lowhttp.WithWebsocketTLS(isTLS),
 		lowhttp.WithWebsocketStrictMode(true),
 		lowhttp.WithWebsocketDisableReassembly(!isHijack), // if transparent mode, disable reassembly
+		lowhttp.WithWebsocketHandshakeTimingsHandler(func(timings lowhttp.WebsocketHandshakeTimings) {
+			handshakeTimings = timings
+		}),
 		lowhttp.WithWebsocketUpgradeResponseHandler(func(rsp *http.Response, rspRaw []byte, ext *lowhttp.WebsocketExtensions, err error) []byte {
 			if err != nil {
 				rsp = proxyutil.NewResponse(502, nil, req)
 				rspRaw, _ = utils.DumpHTTPResponse(rsp, true)
 				downstreamUpgradeWriteErr = utils.Wrap(err, "read upstream websocket upgrade response")
 			} else {
+				upstreamResponseRaw = bytes.Clone(rspRaw)
 				httpctx.SetBareResponseBytes(req, rspRaw)
-				fixRspRaw := w.ResponseHijackCallback(req, rsp, rspRaw)
+				manualResponseBypassed = httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest)
+				responseHookStartedAt := time.Now()
+				fixRspRaw := w.modifyWebsocketOpeningHandshake(req, rsp, rspRaw)
+				responseHookDuration = time.Since(responseHookStartedAt)
 				selectedRaw, selectedRsp, selectionErr := selectWebsocketUpgradeResponse(req, rspRaw, fixRspRaw)
 				if selectionErr != nil {
 					if selectedRaw == nil {
@@ -332,14 +371,21 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 			}
 
 			// write back to client
-			if _, writeErr := brw.Write(rspRaw); writeErr != nil {
+			downstreamResponseRaw = bytes.Clone(rspRaw)
+			downstreamWriteStartedAt := time.Now()
+			written, writeErr := brw.Write(rspRaw)
+			downstreamWriteBytes = written
+			if writeErr != nil {
 				downstreamUpgradeWriteErr = errors.Wrap(writeErr, "write websocket upgrade response to downstream failed")
-			} else if flushErr := brw.Flush(); flushErr != nil {
-				downstreamUpgradeWriteErr = errors.Wrap(flushErr, "flush websocket upgrade response to downstream failed")
+			} else {
+				if flushErr := brw.Flush(); flushErr != nil {
+					downstreamUpgradeWriteErr = errors.Wrap(flushErr, "flush websocket upgrade response to downstream failed")
+				}
 			}
+			downstreamWriteDuration = time.Since(downstreamWriteStartedAt)
 			upgradeRspIns = rsp
 			if rsp != nil {
-				log.Infof("websocket tunnel id=%d target=%s handshake status=%d subprotocol=%q extensions=%q", tunnelID, target, rsp.StatusCode, utils.GetHTTPHeader(rsp.Header, "Sec-WebSocket-Protocol"), utils.GetHTTPHeader(rsp.Header, "Sec-WebSocket-Extensions"))
+				log.Infof("websocket tunnel id=%d target=%s handshake status=%d proto=%s connection=%q upgrade=%q subprotocol=%q extensions=%q content-length=%d transfer-encoding=%q headers=%d manual-response-bypassed=%t response-modified=%t upstream-response-bytes=%d upstream-response-fingerprint=%s downstream-response-bytes=%d downstream-response-fingerprint=%s downstream-written=%d dial=%s request-write=%s response-read=%s response-hook=%s downstream-write=%s", tunnelID, target, rsp.StatusCode, rsp.Proto, utils.GetHTTPHeader(rsp.Header, "Connection"), utils.GetHTTPHeader(rsp.Header, "Upgrade"), utils.GetHTTPHeader(rsp.Header, "Sec-WebSocket-Protocol"), utils.GetHTTPHeader(rsp.Header, "Sec-WebSocket-Extensions"), rsp.ContentLength, strings.Join(rsp.TransferEncoding, ","), len(rsp.Header), manualResponseBypassed, !bytes.Equal(upstreamResponseRaw, downstreamResponseRaw), len(upstreamResponseRaw), websocketPacketFingerprint(upstreamResponseRaw), len(downstreamResponseRaw), websocketPacketFingerprint(downstreamResponseRaw), downstreamWriteBytes, handshakeTimings.DialDuration.Round(time.Millisecond), handshakeTimings.RequestWriteDuration.Round(time.Millisecond), handshakeTimings.ResponseReadDuration.Round(time.Millisecond), responseHookDuration.Round(time.Millisecond), downstreamWriteDuration.Round(time.Millisecond))
 			}
 
 			// Save HTTPFlow
@@ -361,6 +407,13 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 		_ = toServer.Close()
 		return downstreamUpgradeWriteErr
 	}
+	outgoingReq, parseOutgoingErr := lowhttp.ParseBytesToHttpRequest(toServer.Request)
+	if parseOutgoingErr != nil {
+		log.Warnf("websocket tunnel id=%d target=%s parse outbound request for diagnostics failed: %v", tunnelID, target, parseOutgoingErr)
+	} else {
+		bareRequest := httpctx.GetBareRequestBytes(req)
+		log.Infof("websocket tunnel id=%d target=%s outbound-request proto=%s host=%q origin=%q connection=%q upgrade=%q version=%q subprotocol=%q extensions=%q headers=%d bytes=%d fingerprint=%s browser-request-bytes=%d browser-request-fingerprint=%s same-as-browser=%t upstream-local=%q upstream-remote=%q buffered-after-handshake=%d", tunnelID, target, outgoingReq.Proto, outgoingReq.Host, utils.GetHTTPHeader(outgoingReq.Header, "Origin"), utils.GetHTTPHeader(outgoingReq.Header, "Connection"), utils.GetHTTPHeader(outgoingReq.Header, "Upgrade"), utils.GetHTTPHeader(outgoingReq.Header, "Sec-WebSocket-Version"), utils.GetHTTPHeader(outgoingReq.Header, "Sec-WebSocket-Protocol"), utils.GetHTTPHeader(outgoingReq.Header, "Sec-WebSocket-Extensions"), len(outgoingReq.Header), len(toServer.Request), websocketPacketFingerprint(toServer.Request), len(bareRequest), websocketPacketFingerprint(bareRequest), bytes.Equal(lowhttp.FixHTTPRequest(bareRequest), toServer.Request), toServer.HandshakeTimings.LocalAddr, toServer.HandshakeTimings.RemoteAddr, toServer.BufferedAfterHandshake)
+	}
 
 	// init toClient
 	isDeflate := toServer.Extensions.IsDeflate
@@ -381,15 +434,18 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 	toClient.Start()
 
 	closedBy := "upstream"
+	var upstreamTerminalErr, downstreamTerminalErr error
 	select { // server or client closed, another side should be closed too
 	case <-toServer.WaitChannel():
+		upstreamTerminalErr = toServer.TerminalError()
 	case <-toClient.WaitChannel():
 		closedBy = "downstream"
+		downstreamTerminalErr = toClient.TerminalError()
 	}
 	toServer.Close()
 	toClient.Close()
 
-	logger.Infof("websocket tunnel id=%d target=%s closed-by=%s duration=%s upstream-frames=%d upstream-bytes=%d downstream-frames=%d downstream-bytes=%d", tunnelID, target, closedBy, time.Since(startedAt).Round(time.Millisecond), upstreamFrames.Load(), upstreamBytes.Load(), downstreamFrames.Load(), downstreamBytes.Load())
+	logger.Infof("websocket tunnel id=%d target=%s closed-by=%s duration=%s upstream-error=%q downstream-error=%q upstream-frames=%d upstream-bytes=%d downstream-frames=%d downstream-bytes=%d", tunnelID, target, closedBy, time.Since(startedAt).Round(time.Millisecond), websocketTerminalError(upstreamTerminalErr), websocketTerminalError(downstreamTerminalErr), upstreamFrames.Load(), upstreamBytes.Load(), downstreamFrames.Load(), downstreamBytes.Load())
 	return nil
 }
 

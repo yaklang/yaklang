@@ -981,6 +981,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			rsp = rsp1
 		}
 		httpctx.AppendMatchedRule(req, rules...)
+		if httpctx.IsWebsocketOpeningHandshake(req) {
+			return rsp
+		}
 		responseCounter := time.Now().UnixNano()
 
 		ptr := fmt.Sprintf("%p", req)
