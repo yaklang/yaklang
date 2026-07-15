@@ -198,5 +198,7 @@ func (irSource *IrSource) BeforeSave(tx *gorm.DB) error {
 	if irSource.FolderPath == "" {
 		irSource.FolderPath = "/"
 	}
+	// Strip NUL bytes from string fields (PostgreSQL rejects them at protocol level)
+	sanitizeStructStringsForPG(irSource)
 	return nil
 }
