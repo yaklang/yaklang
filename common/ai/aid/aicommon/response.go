@@ -66,6 +66,15 @@ type AIResponse struct {
 
 	usageInfo *aispec.ChatUsage
 
+	// plainOutput / plainReason hold the pure AI output / thinking text
+	// captured automatically as the stream is consumed by
+	// GetOutputStreamReader / the reason-stream goroutine. They are read via
+	// GetPlainOutput / GetPlainReason so callers no longer need to register
+	// custom callbacks to obtain the final AI text.
+	plainOutput   string
+	plainReason   string
+	plainTextMu   sync.RWMutex
+
 	onReasonChunk   func([]byte)
 	onReasonChunkMu sync.Mutex
 
@@ -159,8 +168,7 @@ func (a *AIResponse) SetOnReasonChunk(fn func([]byte)) {
 // SetOnOutputFinished registers a callback invoked with the full plain output
 // text once the output stream has been fully consumed (via
 // GetOutputStreamReader). It replaces the default onOutputFinished callback
-// (which calls CallAIResponseOutputFinishedCallback). The transaction layer
-// uses it to record the actual AI output for retry diagnostics.
+// (which calls CallAIResponseOutputFinishedCallback).
 func (a *AIResponse) SetOnOutputFinished(fn func(string)) {
 	if a == nil {
 		return
@@ -174,6 +182,9 @@ func (a *AIResponse) invokeReasonChunk(b []byte) {
 	if a == nil || len(b) == 0 {
 		return
 	}
+	a.plainTextMu.Lock()
+	a.plainReason += string(b)
+	a.plainTextMu.Unlock()
 	a.onReasonChunkMu.Lock()
 	fn := a.onReasonChunk
 	a.onReasonChunkMu.Unlock()
@@ -458,6 +469,31 @@ func (a *AIResponse) Debug(i ...bool) {
 	a.enableDebug = i[0]
 }
 
+// GetPlainOutput returns the pure AI output text captured automatically
+// while the output stream is consumed via GetOutputStreamReader. It may be
+// empty when the stream was never consumed or callAi failed before any output
+// arrived.
+func (a *AIResponse) GetPlainOutput() string {
+	if a == nil {
+		return ""
+	}
+	a.plainTextMu.RLock()
+	defer a.plainTextMu.RUnlock()
+	return a.plainOutput
+}
+
+// GetPlainReason returns the pure AI thinking / reason text captured
+// automatically while the reason stream is consumed. It may be empty when no
+// reason payload was produced.
+func (a *AIResponse) GetPlainReason() string {
+	if a == nil {
+		return ""
+	}
+	a.plainTextMu.RLock()
+	defer a.plainTextMu.RUnlock()
+	return a.plainReason
+}
+
 func (a *AIResponse) GetUnboundStreamReaderEx(onFirstByte func(), onClose func(), onError func()) (io.Reader, io.Reader) {
 	reasonReader, reasonWriter := utils.NewBufPipe(nil)
 	outputReader, outputWriter := utils.NewBufPipe(nil)
@@ -568,12 +604,14 @@ func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, emitter *
 		}()
 		defer func() {
 			outputText := cbBuffer.String()
+			a.plainTextMu.Lock()
+			a.plainOutput = outputText
+			a.plainTextMu.Unlock()
 			a.onOutputFinishedMu.Lock()
 			fn := a.onOutputFinished
 			a.onOutputFinishedMu.Unlock()
 			if fn != nil {
 				fn(outputText)
-				// config.ProcessExtendedActionCallback(cbBuffer.String())
 			}
 		}()
 		defer pw.Close()
