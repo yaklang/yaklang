@@ -46,7 +46,7 @@ func makeIndexSearchAction(
 
 				content := ""
 				if result != nil {
-					content = utils.InterfaceToString(result.Data)
+					content = toolOutputString(result.Data)
 				}
 				paths := parseOutput(content)
 				added := mergePathsIntoFileIndex(loop, paths...)

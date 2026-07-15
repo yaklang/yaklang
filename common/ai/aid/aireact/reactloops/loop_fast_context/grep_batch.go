@@ -185,7 +185,7 @@ func runGrepBatch(
 				return
 			}
 
-			paths := parseGrepFilesWithMatchesOutput(utils.InterfaceToString(toolResult.Data))
+			paths := parseGrepFilesWithMatchesOutput(toolOutputString(toolResult.Data))
 			added := mergePathsIntoFileIndex(loop, paths...)
 			mu.Lock()
 			result.BatchAdded += added
