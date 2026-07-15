@@ -310,6 +310,7 @@ const (
 	RESPONSE_CONTEXT_KEY_ReaderOffset                = "rsp_reader_offset"
 	RESPONSE_CONTEXT_KEY_Timestamp                   = "timestamp_response"
 	REQUEST_CONTEXT_KEY_RequestIsModified            = "requestIsModified"
+	REQUEST_CONTEXT_KEY_UpstreamPortIsModified       = "upstreamPortIsModified"
 	REQUEST_CONTEXT_KEY_ResponseIsModified           = "responseIsModified"
 	REQUEST_CONTEXT_KEY_RequestModifiedBy            = "requestIsModifiedBy"
 	REQUEST_CONTEXT_KEY_ResponseModifiedBy           = "responseIsModifiedBy"
@@ -656,6 +657,14 @@ func SetRequestModified(req *http.Request, by ...string) {
 
 func GetRequestIsModified(req *http.Request) bool {
 	return GetContextBoolInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestIsModified)
+}
+
+func SetUpstreamPortModified(req *http.Request, modified bool) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_UpstreamPortIsModified, modified)
+}
+
+func GetUpstreamPortIsModified(req *http.Request) bool {
+	return GetContextBoolInfoFromRequest(req, REQUEST_CONTEXT_KEY_UpstreamPortIsModified)
 }
 
 func SetResponseModified(req *http.Request, by ...string) {

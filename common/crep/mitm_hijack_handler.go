@@ -22,6 +22,24 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 )
 
+func getRequestUpstreamPort(req *http.Request, isHTTPS bool) (int, bool, bool) {
+	if req == nil {
+		return 0, false, false
+	}
+
+	reqCopy := req.Clone(req.Context())
+	targetURL, err := lowhttp.ExtractURLFromHTTPRequest(reqCopy, isHTTPS)
+	if err != nil || targetURL == nil {
+		return 0, false, false
+	}
+
+	host, port, err := utils.ParseStringToHostPort(targetURL.String())
+	if err != nil || host == "" || port <= 0 {
+		return 0, false, false
+	}
+	return port, targetURL.Port() != "", true
+}
+
 func (m *MITMServer) setHijackHandler(rootCtx context.Context) {
 	group := fifo.NewGroup()
 
@@ -135,6 +153,7 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 	httpctx.SetRequestHTTPS(req, isHttps)
 
 	if m.requestHijackHandler != nil {
+		originalPort, _, originalPortOK := getRequestUpstreamPort(req, isHttps)
 		hijackedRaw := httpctx.GetBareRequestBytes(req)
 		if hijackedRaw == nil || len(hijackedRaw) == 0 {
 			hijackedRaw, err := utils.DumpHTTPRequest(req, true)
@@ -179,6 +198,8 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 			if isHttps {
 				hijackedReq.TLS = req.TLS
 			}
+			hijackedPort, hijackedPortExplicit, hijackedPortOK := getRequestUpstreamPort(hijackedReq, isHttps)
+			httpctx.SetUpstreamPortModified(req, originalPortOK && hijackedPortOK && hijackedPortExplicit && originalPort != hijackedPort)
 			hijackedReq.RemoteAddr = req.RemoteAddr
 			if req.ProtoMajor != 2 {
 				hijackedReq.Proto = "HTTP/1.1"
