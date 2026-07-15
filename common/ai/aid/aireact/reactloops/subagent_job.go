@@ -1,8 +1,7 @@
-package subagent
+package reactloops
 
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 )
 
 // ForkJob describes one programmatic sub-agent run (InitTask / orchestrator driven).
@@ -16,7 +15,7 @@ type ForkJob struct {
 }
 
 // ForkLoopFactory builds the ReAct loop executed inside a forked sub-agent.
-type ForkLoopFactory func(childInvoker aicommon.AIInvokeRuntime, job ForkJob) (*reactloops.ReActLoop, error)
+type ForkLoopFactory func(childInvoker aicommon.AIInvokeRuntime, job ForkJob) (*ReActLoop, error)
 
 // ForkResult is returned after a forked sub-loop run completes.
 type ForkResult struct {
@@ -24,7 +23,7 @@ type ForkResult struct {
 	Identifier string
 	SubTaskID  string
 	SubTask    aicommon.AIStatefulTask
-	SubLoop    *reactloops.ReActLoop
+	SubLoop    *ReActLoop
 	Fork       *aicommon.TimelineFork
 	ExecErr    error
 	DurationMs int64
