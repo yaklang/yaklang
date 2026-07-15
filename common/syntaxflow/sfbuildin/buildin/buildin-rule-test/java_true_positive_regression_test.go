@@ -97,9 +97,11 @@ func runJavaBuiltinRule(t *testing.T, ruleContent, filename, code string) alertC
 // Add one positive row + one paired negative row whenever a sink/source is
 // extended, so broader coverage cannot silently flag safe code.
 func TestJavaTruePositiveRegressionRules(t *testing.T) {
-	const cmdiRule = "java/cwe-78-os-command-injection/java-servlet-n-spring-direct-command-injection.sf"
-	const sqliRule = "java/cwe-89-sql-injection/java-execute-query-string-add-out-of-control.sf"
-	const xssRule  = "java/cwe-79-xss/java-servlet-xss.sf"
+	const cmdiRule  = "java/cwe-78-os-command-injection/java-servlet-n-spring-direct-command-injection.sf"
+	const sqliRule  = "java/cwe-89-sql-injection/java-execute-query-string-add-out-of-control.sf"
+	const xssRule   = "java/cwe-79-xss/java-servlet-xss.sf"
+	const ldapRule  = "java/cwe-90-ldap-injection/java-ldap-injection.sf"
+	const xpathRule = "java/cwe-643-xpath-injection/java-direct-xpath-injection.sf"
 
 	cases := []struct {
 		name          string
@@ -347,6 +349,178 @@ public class FakeWriter {
         FakeWriter fw = new FakeWriter();
         PrintWriter w = fw.getWriter();
         w.println(str);
+    }
+}`,
+		},
+		// ---------------- CWE-90: LDAP Injection ----------------
+		{
+			name:     "ldap_dircontext_search_tainted_is_detected",
+			rulePath: ldapRule,
+			fileName: "LdapSearch.java",
+			wantHigh: 1,
+			code: `
+package org.owasp.benchmark.testcode;
+
+import java.io.IOException;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+@WebServlet(value = "/ldapi-00/LdapSearch")
+public class LdapSearch extends HttpServlet {
+    private static final long serialVersionUID = 1L;
+
+    @Override
+    public void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        response.setContentType("text/html;charset=UTF-8");
+
+        String param = "";
+        java.util.Enumeration<String> headers = request.getHeaders("LdapSearch");
+        if (headers != null && headers.hasMoreElements()) {
+            param = headers.nextElement();
+        }
+        param = java.net.URLDecoder.decode(param, "UTF-8");
+
+        try {
+            String base = "ou=users,ou=system";
+            javax.naming.directory.SearchControls sc = new javax.naming.directory.SearchControls();
+            sc.setSearchScope(javax.naming.directory.SearchControls.SUBTREE_SCOPE);
+            String filter = "(&(objectclass=person))(|(uid=" + param + ")(street={0}))";
+            Object[] filters = new Object[] {"The streetz 4 Ms bar"};
+            javax.naming.directory.DirContext ctx = new javax.naming.directory.InitialDirContext();
+            javax.naming.NamingEnumeration<javax.naming.directory.SearchResult> results =
+                    ctx.search(base, filter, filters, sc);
+        } catch (Exception e) {
+            System.out.println("LDAP search failed");
+        }
+    }
+}`,
+		},
+		{
+			// Known precision gap: parameterized LDAP search with {0} placeholders
+			// still triggers because taint flows through Object[] filters into
+			// .search(). The rule cannot distinguish {0} placeholders from string
+			// concatenation at the SyntaxFlow level. Documented as a known FP;
+			// remove this row when the rule gains Object[] arg sanitizer logic.
+			name:          "ldap_parameterized_search_known_fp_gap",
+			rulePath:      ldapRule,
+			fileName:      "SafeLdapSearch.java",
+			allowZeroHigh: false,
+			wantHigh:      1, // intentionally expect the FP to be reported; flip to negative when fixed
+			code: `
+package org.owasp.benchmark.testcode;
+
+import java.io.IOException;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+@WebServlet(value = "/ldapi-00/SafeLdapSearch")
+public class SafeLdapSearch extends HttpServlet {
+    private static final long serialVersionUID = 1L;
+
+    @Override
+    public void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        response.setContentType("text/html;charset=UTF-8");
+
+        String username = request.getParameter("username");
+
+        try {
+            String base = "ou=users,ou=system";
+            javax.naming.directory.SearchControls sc = new javax.naming.directory.SearchControls();
+            sc.setSearchScope(javax.naming.directory.SearchControls.SUBTREE_SCOPE);
+            String filter = "(&(objectclass=person)(uid={0}))";
+            Object[] filters = new Object[] {username};
+            javax.naming.directory.DirContext ctx = new javax.naming.directory.InitialDirContext();
+            javax.naming.NamingEnumeration<javax.naming.directory.SearchResult> results =
+                    ctx.search(base, filter, filters, sc);
+        } catch (Exception e) {
+            System.out.println("LDAP search failed");
+        }
+    }
+}`,
+		},
+		// ---------------- CWE-643: XPath Injection ----------------
+		{
+			name:     "xpath_compile_tainted_is_detected",
+			rulePath: xpathRule,
+			fileName: "XPathCompile.java",
+			wantHigh: 1,
+			code: `
+package org.owasp.benchmark.testcode;
+
+import java.io.IOException;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+@WebServlet(value = "/xpathi-00/XPathCompile")
+public class XPathCompile extends HttpServlet {
+    private static final long serialVersionUID = 1L;
+
+    @Override
+    public void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        response.setContentType("text/html;charset=UTF-8");
+
+        String param = request.getParameter("userInput");
+
+        try {
+            javax.xml.xpath.XPathFactory xpf = javax.xml.xpath.XPathFactory.newInstance();
+            javax.xml.xpath.XPath xp = xpf.newXPath();
+            String expression = "/Employees/Employee[@emplid='" + param + "']";
+            org.w3c.dom.NodeList nodeList =
+                    (org.w3c.dom.NodeList)
+                            xp.compile(expression)
+                                    .evaluate(new org.w3c.dom.Document() {}, javax.xml.xpath.XPathConstants.NODESET);
+        } catch (Exception e) {
+            System.out.println("XPath query failed");
+        }
+    }
+}`,
+		},
+		{
+			name:     "xpath_static_expression_not_reported",
+			rulePath: xpathRule,
+			fileName: "SafeXPath.java",
+			negative: true,
+			code: `
+package org.owasp.benchmark.testcode;
+
+import java.io.IOException;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+@WebServlet(value = "/xpathi-00/SafeXPath")
+public class SafeXPath extends HttpServlet {
+    private static final long serialVersionUID = 1L;
+
+    @Override
+    public void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        response.setContentType("text/html;charset=UTF-8");
+
+        try {
+            javax.xml.xpath.XPathFactory xpf = javax.xml.xpath.XPathFactory.newInstance();
+            javax.xml.xpath.XPath xp = xpf.newXPath();
+            String expression = "/Employees/Employee[@emplid='12345']";
+            org.w3c.dom.NodeList nodeList =
+                    (org.w3c.dom.NodeList)
+                            xp.evaluate(expression, new org.w3c.dom.Document() {}, javax.xml.xpath.XPathConstants.NODESET);
+        } catch (Exception e) {
+            System.out.println("XPath query failed");
+        }
     }
 }`,
 		},

@@ -62,6 +62,7 @@ REFERENCE
 <include('java-servlet-param')> as $source;
 
 .evaluate?{<typeName>?{have:'javax.xml.xpath.XPath'}}(* as $sink);
+.compile?{<typeName>?{have:'javax.xml.xpath.XPath'}}(* as $sink);
 check $sink;
 
 $sink #{
