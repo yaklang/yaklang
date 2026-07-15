@@ -1,491 +1,28 @@
 package loopinfra
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"sort"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/subagent"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+		"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 const (
-	subAgentDepthLoopVar               = reactloops.SubAgentDepthLoopVar
-	dispatchSubReactJobsLoopKey        = "dispatch_sub_react_jobs"
-	dispatchSubReactConcurrencyLoopKey = "dispatch_sub_react_concurrency"
-
-	maxDispatchSubReactJobs    = 30
-	defaultDispatchConcurrency = 5
-	maxDispatchConcurrency     = 10
+	dispatchSubReactJobsLoopKey        = reactloops.DispatchSubReactJobsLoopKey
+	dispatchSubReactConcurrencyLoopKey = reactloops.DispatchSubReactConcurrencyLoopKey
 )
-
-type subReactDispatchJob struct {
-	Order      int    `json:"order"`
-	Identifier string `json:"identifier"`
-	Goal       string `json:"goal"`
-	TaskName   string `json:"task_name"`
-	LoopName   string `json:"loop_name"`
-}
-
-type subReactProcessStats struct {
-	Iterations      int    `json:"iterations"`
-	Actions         int    `json:"actions"`
-	ToolCalls       int    `json:"tool_calls"`
-	TimelineItems   int    `json:"timeline_items"`
-	BranchDiffBytes int    `json:"branch_diff_bytes"`
-	FinalAction     string `json:"final_action,omitempty"`
-}
-
-type subReactAgentTimelineRecord struct {
-	SubAgentID      string               `json:"sub_agent_id"`
-	Order           int                  `json:"order"`
-	LoopName        string               `json:"loop_name"`
-	Goal            string               `json:"goal"`
-	Status          string               `json:"status"`
-	Error           string               `json:"error,omitempty"`
-	DurationMs      int64                `json:"duration_ms"`
-	Result          string               `json:"result,omitempty"`
-	ResultReference string               `json:"result_reference,omitempty"`
-	ProcessStats    subReactProcessStats `json:"process_stats"`
-	TracePreview    string               `json:"trace_preview,omitempty"`
-}
-
-type subReactAgentJobResult struct {
-	Order    int
-	Job      subReactDispatchJob
-	Record   subReactAgentTimelineRecord
-	Feedback string
-}
-
-type subReactAgentJobRunner interface {
-	Run(
-		parentInvoker aicommon.AIInvokeRuntime,
-		parentLoop *reactloops.ReActLoop,
-		parentTask aicommon.AIStatefulTask,
-		job subReactDispatchJob,
-	) (*subReactAgentJobResult, error)
-}
-
-type forkedSubReactAgentRunner struct{}
-
-var subReactAgentRunner subReactAgentJobRunner = forkedSubReactAgentRunner{}
-
-func (forkedSubReactAgentRunner) Run(
-	parentInvoker aicommon.AIInvokeRuntime,
-	parentLoop *reactloops.ReActLoop,
-	parentTask aicommon.AIStatefulTask,
-	job subReactDispatchJob,
-) (*subReactAgentJobResult, error) {
-	return runForkedSubReactAgentJob(parentInvoker, parentLoop, parentTask, job)
-}
-
-func runForkedSubReactAgentJob(
-	parentInvoker aicommon.AIInvokeRuntime,
-	parentLoop *reactloops.ReActLoop,
-	parentTask aicommon.AIStatefulTask,
-	job subReactDispatchJob,
-) (*subReactAgentJobResult, error) {
-	startedAt := time.Now()
-	loopName := job.LoopName
-	forkJob := forkJobFromDispatch(job)
-
-	childInvoker, subTask, fork, jobCancel, err := subagent.PrepareForkedSubAgent(parentInvoker, parentTask, forkJob)
-	if jobCancel != nil {
-		defer jobCancel()
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	// Elaborate the brief intent (job.Goal) into a complete, self-contained goal
-	// plus a result contract right before the sub agent runs. This moves the
-	// long-form generation out of the (linear) dispatch action call — where the
-	// parent AI used to write every sub agent's full goal+contract up front —
-	// into a per-sub-agent step that runs with the forked timeline context and
-	// overlaps across the concurrently-dispatched sub agents.
-	var subAgentErr error
-	var elaboratedGoal, resultContract string
-	defer func() { subTask.CallAsyncDeferCallback(subAgentErr) }()
-	subTask.SetStatus(aicommon.AITaskState_Processing)
-	elaboratedGoal, resultContract, subAgentErr = elaborateSubReactAgentGoal(
-		subTask.GetContext(), childInvoker, parentLoop, subTask.GetId(), job,
-	)
-	if subAgentErr != nil {
-		log.Warnf("dispatch_sub_react_agents: elaborate goal for %s failed, falling back to brief intent: %v", subTask.GetId(), subAgentErr)
-		elaboratedGoal = job.Goal
-		resultContract = ""
-	}
-	subTask.SetUserInput(buildSubAgentUserInput(elaboratedGoal, resultContract))
-
-	subLoop, err := reactloops.CreateLoopByName(loopName, childInvoker, buildSubReactLoopOptions()...)
-	if err != nil {
-		result, _ := buildSubReactJobResult(job, startedAt, subTask, nil, fork, err)
-		return result, nil
-	}
-
-	subAgentErr = subLoop.ExecuteWithExistedTask(subTask)
-	result, _ := buildSubReactJobResult(job, startedAt, subTask, subLoop, fork, subAgentErr)
-	return result, nil
-}
-
-// subReactGoalElaborationPrompt is rendered with the parent loop's base frame
-// context (CurrentTime/OSArch/WorkingDir/Timeline) plus the sub agent's name,
-// identifier and brief intent, and asks the model to produce a complete,
-// self-contained task goal and an optional result contract for the sub agent.
-const subReactGoalElaborationPrompt = `You are preparing a task brief for an autonomous sub ReAct agent that will run in an isolated timeline fork, inheriting the parent agent's current context snapshot.
-
-Parent context (the sub agent will see this snapshot):
-- Current time: {{.CurrentTime}}
-- OS/Arch: {{.OSArch}}{{ if .WorkingDir }}
-- Working directory: {{.WorkingDir}}{{end}}
-
-Parent timeline snapshot (the sub agent inherits this as its starting context):
-{{ if .Timeline }}{{.Timeline}}{{else}}<empty>{{end}}
-
-The parent agent has decided to dispatch a sub agent with the following brief intent. Your job is to elaborate that brief intent into a COMPLETE, self-contained task goal the sub agent can execute without re-reading the parent's reasoning, plus a result contract describing the output format / acceptance criteria the sub agent's final answer should satisfy.
-
-Sub agent name: {{ if .SubTaskName }}{{.SubTaskName}}{{else}}<unspecified>{{end}}
-Sub agent identifier: {{ if .SubTaskIdentifier }}{{.SubTaskIdentifier}}{{else}}<unspecified>{{end}}
-Brief intent: {{ if .BriefGoal }}{{.BriefGoal}}{{else}}<unspecified>{{end}}
-
-Write the elaborated goal so it stands alone (the sub agent does not see this prompt). Keep it focused and actionable; do not invent scope beyond the intent. The result contract is optional — omit it if no specific output format is needed.`
-
-// elaborateSubReactAgentGoal expands a sub agent's brief intent into a complete,
-// self-contained goal and an optional result contract via a QualityPriority
-// LiteForge call. The "goal" field is streamed to the sub agent's own thread
-// (sub_react_agent_goal node) through the child invoker's forwarding emitter.
-func elaborateSubReactAgentGoal(
-	ctx context.Context,
-	childInvoker aicommon.AITaskInvokeRuntime,
-	parentLoop *reactloops.ReActLoop,
-	subTaskId string,
-	job subReactDispatchJob,
-) (goal, resultContract string, err error) {
-	if childInvoker == nil {
-		return "", "", utils.Error("child invoker is nil")
-	}
-	templateData := map[string]any{}
-	if parentLoop != nil {
-		for k, v := range parentLoop.GetBaseFrameContext() {
-			templateData[k] = v
-		}
-	}
-	templateData["SubTaskName"] = strings.TrimSpace(job.TaskName)
-	templateData["SubTaskIdentifier"] = strings.TrimSpace(job.Identifier)
-	templateData["BriefGoal"] = strings.TrimSpace(job.Goal)
-
-	prompt, err := utils.RenderTemplate(subReactGoalElaborationPrompt, templateData)
-	if err != nil {
-		return "", "", utils.Wrap(err, "render sub react goal elaboration prompt failed")
-	}
-
-	action, err := childInvoker.InvokeQualityPriorityLiteForge(
-		ctx,
-		"sub_react_agent_goal_elaboration",
-		prompt,
-		[]aitool.ToolOption{
-			aitool.WithStringParam("goal",
-				aitool.WithParam_Required(true),
-				aitool.WithParam_Description("Elaborated, self-contained task goal for the sub agent."),
-			),
-			aitool.WithStringParam("result_contract",
-				aitool.WithParam_Description("Optional acceptance criteria / output format for the sub agent result."),
-			),
-		},
-		aicommon.WithGeneralConfigStreamableFieldEmitterCallback(
-			[]string{"goal"},
-			func(key string, r io.Reader, emitter *aicommon.Emitter) {
-				r = utils.JSONStringReader(r)
-				if emitter == nil {
-					io.Copy(io.Discard, r)
-					return
-				}
-				emitter.EmitTextPlainTextStreamEvent(loopInfraNodeSubReactGoal, r, subTaskId)
-			},
-		),
-	)
-	if err != nil {
-		return "", "", err
-	}
-	if action == nil {
-		return "", "", utils.Error("sub react goal elaboration returned nil action")
-	}
-	goal = strings.TrimSpace(action.GetString("goal"))
-	resultContract = strings.TrimSpace(action.GetString("result_contract"))
-	if goal == "" {
-		return "", "", utils.Error("sub react goal elaboration returned empty goal")
-	}
-	return goal, resultContract, nil
-}
-
-// BuildSubReactForwardingEmitter derives a sub-agent emitter from the parent config
-// emitter (not the parent task emitter) via PushEventProcesser.
-func BuildSubReactForwardingEmitter(parentEmitter *aicommon.Emitter, subTaskId string) *aicommon.Emitter {
-	return subagent.BuildForwardingEmitter(parentEmitter, subTaskId)
-}
-
-func buildSubReactLoopOptions() []reactloops.ReActLoopOption {
-	return subagent.DefaultForkOptions()
-}
-
-func buildSubReactJobResult(
-	job subReactDispatchJob,
-	startedAt time.Time,
-	subTask aicommon.AIStatefulTask,
-	subLoop *reactloops.ReActLoop,
-	fork *aicommon.TimelineFork,
-	execErr error,
-) (*subReactAgentJobResult, error) {
-	record := subReactAgentTimelineRecord{
-		SubAgentID: subTask.GetId(),
-		Order:      job.Order,
-		LoopName:   job.LoopName,
-		Goal:       job.Goal,
-		DurationMs: time.Since(startedAt).Milliseconds(),
-	}
-
-	// 用户取消场景：当主循环因 context 被取消而退出时，execErr 的信息中
-	// 会包含 "context canceled"（来自 ReActLoop 的 "task context done" 分支）。
-	// 这与子 Agent 自身执行失败（execErr 为真实失败原因）区分开，避免主循环
-	// 误判为错误而不断重试。另外，用户主动跳过（Skipped）也归入取消。
-	cancelled := false
-	if execErr != nil && strings.Contains(execErr.Error(), "context canceled") {
-		cancelled = true
-	} else if subTask.GetStatus() == aicommon.AITaskState_Skipped {
-		cancelled = true
-	}
-
-	if cancelled {
-		record.Status = "cancelled"
-		switch reason, hasErr := subTask.GetCancelReason(), execErr; {
-		case reason != "":
-			record.Error = reason
-		case hasErr != nil:
-			record.Error = execErr.Error()
-		default:
-			record.Error = "sub agent cancelled by user"
-		}
-	} else if execErr != nil {
-		record.Status = "failed"
-		record.Error = execErr.Error()
-	} else {
-		record.Status = "completed"
-	}
-
-	resultText := strings.TrimSpace(subTask.GetResult())
-	if resultText == "" && subLoop != nil {
-		resultText = strings.TrimSpace(subLoop.Get("directly_answer_payload"))
-	}
-	record.Result = utils.ShrinkTextBlock(resultText, 4000)
-
-	tracePreview, branchDiffBytes := summarizeForkDiff(fork)
-	record.TracePreview = tracePreview
-	record.ProcessStats = collectSubReactProcessStats(subLoop, fork, branchDiffBytes)
-
-	feedback := fmt.Sprintf("[%d] %s (%s): %s", job.Order, job.Identifier, record.Status, utils.ShrinkString(record.Result, 240))
-	if record.Error != "" {
-		feedback = fmt.Sprintf("[%d] %s (%s): %s", job.Order, job.Identifier, record.Status, record.Error)
-	}
-
-	return &subReactAgentJobResult{
-		Order:    job.Order,
-		Job:      job,
-		Record:   record,
-		Feedback: feedback,
-	}, nil
-}
-
-func collectSubReactProcessStats(subLoop *reactloops.ReActLoop, fork *aicommon.TimelineFork, branchDiffBytes int) subReactProcessStats {
-	stats := subReactProcessStats{
-		BranchDiffBytes: branchDiffBytes,
-		TimelineItems:   countBranchTimelineItems(fork),
-	}
-	if subLoop == nil {
-		return stats
-	}
-
-	stats.Iterations = subLoop.GetCurrentIterationIndex()
-	records := subLoop.GetAllExistedActionRecord()
-	stats.Actions = len(records)
-	stats.ToolCalls = countToolCallsFromActionRecords(records)
-	if last := subLoop.GetLastAction(); last != nil {
-		stats.FinalAction = last.ActionType
-	}
-	return stats
-}
-
-func countToolCallsFromActionRecords(records []*reactloops.ActionRecord) int {
-	count := 0
-	for _, record := range records {
-		if record == nil {
-			continue
-		}
-		switch record.ActionType {
-		case schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
-			schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
-			schema.AI_REACT_LOOP_ACTION_TOOL_COMPOSE:
-			count++
-		}
-	}
-	return count
-}
-
-func countBranchTimelineItems(fork *aicommon.TimelineFork) int {
-	if fork == nil || fork.Branch == nil {
-		return 0
-	}
-	count := 0
-	for _, id := range fork.Branch.GetTimelineItemIDs() {
-		if id > fork.BaseMaxID {
-			count++
-		}
-	}
-	return count
-}
-
-func summarizeForkDiff(fork *aicommon.TimelineFork) (preview string, bytes int) {
-	if fork == nil {
-		return "", 0
-	}
-	diff, err := fork.Diff()
-	if err != nil {
-		return "", 0
-	}
-	diff = strings.TrimSpace(diff)
-	if diff == "" {
-		return "", 0
-	}
-	return utils.ShrinkTextBlock(diff, 1200), len(diff)
-}
-
-func buildSubReactSubTaskID(parentTask aicommon.AIStatefulTask, job subReactDispatchJob) string {
-	return subagent.BuildForkTaskID(parentTask, forkJobFromDispatch(job))
-}
-
-func forkJobFromDispatch(job subReactDispatchJob) subagent.ForkJob {
-	return subagent.ForkJob{
-		Order:      job.Order,
-		Identifier: job.Identifier,
-		Goal:       job.Goal,
-		TaskName:   job.TaskName,
-	}
-}
-
-func sanitizeSubReactIDSegment(s string) string {
-	return subagent.SanitizeIDSegment(s)
-}
-
-func buildSubAgentUserInput(goal, resultContract string) string {
-	goal = strings.TrimSpace(goal)
-	var sb strings.Builder
-	sb.WriteString(goal)
-	if contract := strings.TrimSpace(resultContract); contract != "" {
-		sb.WriteString("\n\n## Result Contract\n\n")
-		sb.WriteString(contract)
-	}
-	return sb.String()
-}
-
-func parseSubReactDispatchJobs(action *aicommon.Action) ([]subReactDispatchJob, error) {
-	jobs, err := parseSubReactDispatchJobsFromArray(action.GetInvokeParamsArray("dispatches"))
-	if err != nil {
-		return nil, err
-	}
-	if len(jobs) > 0 {
-		return jobs, nil
-	}
-
-	raw := strings.TrimSpace(action.GetString("dispatches"))
-	if raw == "" {
-		return nil, utils.Error("dispatches is required and must be a non-empty array")
-	}
-	if err := json.Unmarshal([]byte(raw), &jobs); err != nil {
-		return nil, utils.Wrap(err, "dispatches must be a valid array")
-	}
-	return normalizeSubReactDispatchJobs(jobs)
-}
-
-func parseSubReactDispatchJobsFromArray(raw []aitool.InvokeParams) ([]subReactDispatchJob, error) {
-	if len(raw) == 0 {
-		return nil, nil
-	}
-	jobs := make([]subReactDispatchJob, 0, len(raw))
-	for _, item := range raw {
-		if item == nil {
-			continue
-		}
-		jobs = append(jobs, subReactDispatchJob{
-			Identifier: strings.TrimSpace(item.GetString("identifier")),
-			Goal:       strings.TrimSpace(item.GetString("goal")),
-			TaskName:   strings.TrimSpace(item.GetString("task_name")),
-			LoopName:   strings.TrimSpace(item.GetString("loop_name")),
-		})
-	}
-	return normalizeSubReactDispatchJobs(jobs)
-}
-
-func normalizeSubReactDispatchJobs(jobs []subReactDispatchJob) ([]subReactDispatchJob, error) {
-	if len(jobs) == 0 {
-		return nil, utils.Error("dispatches must contain at least one sub agent job")
-	}
-	if len(jobs) > maxDispatchSubReactJobs {
-		return nil, utils.Errorf("dispatches supports at most %d sub agents per call", maxDispatchSubReactJobs)
-	}
-
-	for i := range jobs {
-		jobs[i].Order = i + 1
-		jobs[i].Goal = strings.TrimSpace(jobs[i].Goal)
-		if jobs[i].Goal == "" {
-			return nil, utils.Errorf("dispatches[%d].goal is required", i)
-		}
-		jobs[i].LoopName = strings.TrimSpace(jobs[i].LoopName)
-		if jobs[i].LoopName == "" {
-			jobs[i].LoopName = schema.AI_REACT_LOOP_NAME_DEFAULT
-		}
-		if _, ok := reactloops.GetLoopFactory(jobs[i].LoopName); !ok {
-			return nil, utils.Errorf("dispatches[%d].loop_name %q is not registered", i, jobs[i].LoopName)
-		}
-		jobs[i].Identifier = strings.TrimSpace(jobs[i].Identifier)
-		if jobs[i].Identifier == "" {
-			jobs[i].Identifier = fmt.Sprintf("sub_agent_%d", jobs[i].Order)
-		}
-		jobs[i].TaskName = strings.TrimSpace(jobs[i].TaskName)
-	}
-	return jobs, nil
-}
-
-func parseDispatchConcurrency(action *aicommon.Action, jobCount int) int {
-	concurrency := action.GetInt("concurrency")
-	if concurrency <= 0 {
-		concurrency = defaultDispatchConcurrency
-		if jobCount < concurrency {
-			concurrency = jobCount
-		}
-	}
-	if concurrency > maxDispatchConcurrency {
-		concurrency = maxDispatchConcurrency
-	}
-	if concurrency > jobCount {
-		concurrency = jobCount
-	}
-	return concurrency
-}
 
 func getSubAgentDepth(loop *reactloops.ReActLoop) int {
 	if loop == nil {
 		return 0
 	}
-	return loop.GetInt(subagent.DepthLoopVar)
+	return loop.GetInt(reactloops.SubAgentDepthLoopVar)
 }
 
 func verifyDispatchSubReactAgents(loop *reactloops.ReActLoop, action *aicommon.Action) error {
@@ -493,12 +30,12 @@ func verifyDispatchSubReactAgents(loop *reactloops.ReActLoop, action *aicommon.A
 		return utils.Error("dispatch_sub_react_agents is only available in top-level agent; sub agents cannot dispatch more sub agents")
 	}
 
-	jobs, err := parseSubReactDispatchJobs(action)
+	jobs, err := reactloops.ParseDispatchJobs(action)
 	if err != nil {
 		return err
 	}
 
-	concurrency := parseDispatchConcurrency(action, len(jobs))
+	concurrency := reactloops.ParseConcurrency(action, len(jobs))
 	encoded, err := json.Marshal(jobs)
 	if err != nil {
 		return err
@@ -524,7 +61,7 @@ func handleDispatchSubReactAgents(
 		operator.Fail(utils.Error("dispatch_sub_react_agents verifier state missing; retry the action"))
 		return
 	}
-	var jobs []subReactDispatchJob
+	var jobs []reactloops.DispatchJob
 	if err := json.Unmarshal([]byte(rawJobs), &jobs); err != nil {
 		operator.Fail(err)
 		return
@@ -532,16 +69,23 @@ func handleDispatchSubReactAgents(
 
 	concurrency := loop.GetInt(dispatchSubReactConcurrencyLoopKey)
 	if concurrency <= 0 {
-		concurrency = parseDispatchConcurrency(action, len(jobs))
+		concurrency = reactloops.ParseConcurrency(action, len(jobs))
+	}
+
+	// Create or reuse a sub-agent progress registry on the parent loop so
+	// stall heartbeat and verification watchdog can observe sub-agent activity
+	// while this action handler blocks waiting for all sub-agents to finish.
+	registry := loop.GetSubAgentProgressRegistry()
+	if registry == nil {
+		registry = reactloops.NewProgressRegistry()
+		loop.SetSubAgentProgressRegistry(registry)
 	}
 
 	loopInfraStatus(loop, "子 Agent 执行中/ Sub Agents Running...")
 
-	results := runDispatchSubReactJobsConcurrently(invoker, loop, parentTask, jobs, concurrency)
+	results := reactloops.RunJobsConcurrently(invoker, loop, parentTask, jobs, concurrency, registry)
 
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].Order < results[j].Order
-	})
+	reactloops.SortJobResults(results)
 
 	var feedbackLines []string
 	successCount := 0
@@ -567,86 +111,10 @@ func handleDispatchSubReactAgents(
 	operator.Continue()
 }
 
-func runDispatchSubReactJobsConcurrently(
-	parentInvoker aicommon.AIInvokeRuntime,
-	parentLoop *reactloops.ReActLoop,
-	parentTask aicommon.AIStatefulTask,
-	jobs []subReactDispatchJob,
-	concurrency int,
-) []*subReactAgentJobResult {
-	if concurrency <= 1 {
-		results := make([]*subReactAgentJobResult, 0, len(jobs))
-		for _, job := range jobs {
-			result, err := subReactAgentRunner.Run(parentInvoker, parentLoop, parentTask, job)
-			if err != nil {
-				result = &subReactAgentJobResult{
-					Order: job.Order,
-					Job:   job,
-					Record: subReactAgentTimelineRecord{
-						SubAgentID: buildSubReactSubTaskID(parentTask, job),
-						Order:      job.Order,
-						LoopName:   job.LoopName,
-						Goal:       job.Goal,
-						Status:     "failed",
-						Error:      err.Error(),
-					},
-					Feedback: fmt.Sprintf("[%d] %s (failed): %s", job.Order, job.Identifier, err.Error()),
-				}
-			}
-			results = append(results, result)
-		}
-		return results
-	}
-
-	jobsCh := make(chan subReactDispatchJob)
-	resultsCh := make(chan *subReactAgentJobResult, len(jobs))
-	var workers sync.WaitGroup
-
-	workerCount := concurrency
-	for i := 0; i < workerCount; i++ {
-		workers.Add(1)
-		go func() {
-			defer workers.Done()
-			for job := range jobsCh {
-				result, err := subReactAgentRunner.Run(parentInvoker, parentLoop, parentTask, job)
-				if err != nil {
-					result = &subReactAgentJobResult{
-						Order: job.Order,
-						Job:   job,
-						Record: subReactAgentTimelineRecord{
-							SubAgentID: buildSubReactSubTaskID(parentTask, job),
-							Order:      job.Order,
-							LoopName:   job.LoopName,
-							Goal:       job.Goal,
-							Status:     "failed",
-							Error:      err.Error(),
-						},
-						Feedback: fmt.Sprintf("[%d] %s (failed): %s", job.Order, job.Identifier, err.Error()),
-					}
-				}
-				resultsCh <- result
-			}
-		}()
-	}
-
-	for _, job := range jobs {
-		jobsCh <- job
-	}
-	close(jobsCh)
-	workers.Wait()
-	close(resultsCh)
-
-	results := make([]*subReactAgentJobResult, 0, len(jobs))
-	for result := range resultsCh {
-		results = append(results, result)
-	}
-	return results
-}
-
 func writeSubReactAgentTimelineRecord(
 	invoker aicommon.AIInvokeRuntime,
 	parentLoop *reactloops.ReActLoop,
-	record subReactAgentTimelineRecord,
+	record reactloops.TimelineRecord,
 ) {
 	if invoker == nil {
 		return
@@ -707,7 +175,7 @@ var loopAction_DispatchSubReactAgents = &reactloops.LoopAction{
 		),
 		aitool.WithIntegerParam(
 			"concurrency",
-			aitool.WithParam_Description(fmt.Sprintf("Parallelism for sub agent execution. Default min(len(dispatches), %d), max %d.", defaultDispatchConcurrency, maxDispatchConcurrency)),
+			aitool.WithParam_Description(fmt.Sprintf("Parallelism for sub agent execution. Default min(len(dispatches), %d), max %d.", reactloops.DefaultDispatchConcurrency, reactloops.MaxDispatchConcurrency)),
 		),
 	},
 	StreamFields: []*reactloops.LoopStreamField{

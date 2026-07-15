@@ -220,3 +220,25 @@ func (r *ReActLoop) hardAbortLoopStall(task aicommon.AIStatefulTask, gap time.Du
 		task.Cancel(fmt.Sprintf("loop_stall_hard_abort: main loop stalled for %v at iteration %d", gap, iteration))
 	}
 }
+
+// GetLastIterationTickAt 返回主循环最近一次推进的单调时间戳 (unix nanoseconds).
+// 0 表示主循环尚未 tick 过. 该方法是并发安全的 (atomic 读), 供 SubAgentHandle
+// 等外部观察者读取子 Agent 的进度信号.
+//
+// 关键词: GetLastIterationTickAt, lastIterationTickAt 原子读, 子 Agent 进度旁路
+func (r *ReActLoop) GetLastIterationTickAt() int64 {
+	if r == nil {
+		return 0
+	}
+	return r.lastIterationTickAt.Load()
+}
+
+// SetLastIterationTickAtForTest sets the last iteration tick value for testing
+// purposes. This is only meant for unit tests in other packages that need to
+// simulate a ReActLoop with a specific tick value.
+func (r *ReActLoop) SetLastIterationTickAtForTest(val int64) {
+	if r == nil {
+		return
+	}
+	r.lastIterationTickAt.Store(val)
+}
