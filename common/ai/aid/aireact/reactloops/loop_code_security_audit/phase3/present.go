@@ -9,8 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/emit"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/subagent"
-	"github.com/yaklang/yaklang/common/log"
+		"github.com/yaklang/yaklang/common/log"
 )
 
 const forkGoalDetermineVerifyScope = "Determine code audit vulnerability verification scope"
@@ -28,7 +27,7 @@ func presentVerifyScope(
 	}
 	summary := formatVerifyScopeSummary(findings)
 	byCategory := findingsByCategoryMap(findings)
-	err := subagent.RunForkInvokerCallback(r, task, subagent.ForkJob{
+	err := reactloops.RunForkInvokerCallback(r, task, reactloops.ForkJob{
 		Identifier: "verify-scope",
 		TaskName:   forkGoalDetermineVerifyScope,
 		Goal:       forkGoalDetermineVerifyScope,

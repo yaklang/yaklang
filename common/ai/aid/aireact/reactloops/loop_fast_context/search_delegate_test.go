@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/subagent"
 	"github.com/yaklang/yaklang/common/schema"
 )
@@ -21,7 +22,7 @@ func TestSwapInvokerEmitterForNestedScope(t *testing.T) {
 	invoker.SetConfig(cfg)
 
 	const categorySubID = "parent-cat-sub-sql_injection-abcd"
-	categoryEmitter := subagent.BuildForwardingEmitter(parentEmitter, categorySubID)
+	categoryEmitter := reactloops.BuildForwardingEmitter(parentEmitter, categorySubID)
 	parent := aicommon.NewSubTaskBaseWithOptions(
 		aicommon.NewStatefulTaskBase("orchestrator", "audit", context.Background(), parentEmitter, true),
 		categorySubID,
@@ -46,7 +47,7 @@ func TestNestedScopeEmitter_UsesCategorySubAgentTaskId(t *testing.T) {
 	rootCfg := aicommon.NewConfig(context.Background(), aicommon.WithEmitter(rootEmitter))
 
 	const categorySubID = "parent-phase2-sub-sql_injection-abcd"
-	categoryEmitter := subagent.BuildForwardingEmitter(rootCfg.GetEmitter(), categorySubID)
+	categoryEmitter := reactloops.BuildForwardingEmitter(rootCfg.GetEmitter(), categorySubID)
 
 	categoryTask := aicommon.NewSubTaskBaseWithOptions(
 		aicommon.NewStatefulTaskBase("orchestrator", "audit", context.Background(), rootCfg.GetEmitter(), true),

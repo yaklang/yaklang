@@ -10,8 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/emit"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/util"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/subagent"
-	"github.com/yaklang/yaklang/common/log"
+		"github.com/yaklang/yaklang/common/log"
 )
 
 const defaultCategoryScanConcurrency = 3
@@ -42,11 +41,11 @@ func runAllCategoryScans(
 		return nil
 	}
 
-	jobs := make([]subagent.ForkJob, 0, len(categories))
+	jobs := make([]reactloops.ForkJob, 0, len(categories))
 	catalog := make(map[string]categoryScanJob, len(categories))
 	for i, category := range categories {
 		goal := fmt.Sprintf("Phase 2 category scan: %s (%s)", category.Name, category.ID)
-		jobs = append(jobs, subagent.ForkJob{
+		jobs = append(jobs, reactloops.ForkJob{
 			Order:      i + 1,
 			Identifier: category.ID,
 			TaskName:   goal,
@@ -72,9 +71,9 @@ func runAllCategoryScans(
 
 	var scanStates sync.Map
 
-	forkResults := subagent.RunForkJobsConcurrently(
+	forkResults := reactloops.RunForkJobsConcurrently(
 		r, task, jobs, concurrency,
-		func(childInvoker aicommon.AIInvokeRuntime, job subagent.ForkJob) (*reactloops.ReActLoop, error) {
+		func(childInvoker aicommon.AIInvokeRuntime, job reactloops.ForkJob) (*reactloops.ReActLoop, error) {
 			catJob, ok := catalog[job.Identifier]
 			if !ok {
 				return nil, fmt.Errorf("unknown category job %q", job.Identifier)
@@ -128,7 +127,7 @@ func finalizeCategoryScanAfterFork(
 	task aicommon.AIStatefulTask,
 	state *model.AuditState,
 	catJob categoryScanJob,
-	forkResult *subagent.ForkResult,
+	forkResult *reactloops.ForkResult,
 	scanState *ScanState,
 	scanStates *sync.Map,
 	artifacts *categoryArtifactStore,
@@ -207,13 +206,13 @@ func tryResumeCategoryScanPhaseB(
 		fmt.Sprintf("阶段A 未完成，已从 %d 个目标恢复阶段B", len(locked)))
 
 	resumeGoal := fmt.Sprintf("Phase 2 category scan resume: %s", category.Name)
-	resumeJob := subagent.ForkJob{
+	resumeJob := reactloops.ForkJob{
 		Order:      catJob.index,
 		Identifier: category.ID + "-resume",
 		TaskName:   resumeGoal,
 		Goal:       resumeGoal,
 	}
-	resumeResult, resumeErr := subagent.RunForkJob(r, task, resumeJob, func(childInvoker aicommon.AIInvokeRuntime, _ subagent.ForkJob) (*reactloops.ReActLoop, error) {
+	resumeResult, resumeErr := reactloops.RunForkJob(r, task, resumeJob, func(childInvoker aicommon.AIInvokeRuntime, _ reactloops.ForkJob) (*reactloops.ReActLoop, error) {
 		catLoop, scan, err := buildSingleCategoryScanLoop(childInvoker, state, category, catJob.index, catJob.total, scanState, artifacts)
 		if scan != nil {
 			scanStates.Store(category.ID, scan)

@@ -8,8 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/emit"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit/internal/model"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/subagent"
-	"github.com/yaklang/yaklang/common/log"
+		"github.com/yaklang/yaklang/common/log"
 )
 
 const forkGoalDetermineAuditVulnerabilityTypes = "Determine code audit vulnerability types"
@@ -25,7 +24,7 @@ func presentAuditVulnerabilityTypes(
 		return
 	}
 	summary := formatAuditVulnerabilityTypesSummary(categories)
-	err := subagent.RunForkInvokerCallback(r, task, subagent.ForkJob{
+	err := reactloops.RunForkInvokerCallback(r, task, reactloops.ForkJob{
 		Identifier: "audit-vuln-types",
 		TaskName:   forkGoalDetermineAuditVulnerabilityTypes,
 		Goal:       forkGoalDetermineAuditVulnerabilityTypes,
