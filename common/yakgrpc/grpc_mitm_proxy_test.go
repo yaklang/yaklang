@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -206,8 +207,8 @@ func TemplateTestGRPCMUSTPASS_MITM_Proxy_Template(t *testing.T) {
 
 func TestGRPCMUSTPASS_MITM_Proxy(t *testing.T) {
 	var (
-		networkIsPassed  bool
-		downstreamPassed bool
+		networkIsPassed  atomic.Bool
+		downstreamPassed atomic.Bool
 		token            = utils.RandNumberStringBytes(10)
 	)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -215,8 +216,7 @@ func TestGRPCMUSTPASS_MITM_Proxy(t *testing.T) {
 
 	mockHost, mockPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Query().Get("u") == token {
-			networkIsPassed = true
-			cancel()
+			networkIsPassed.Store(true)
 		}
 		writer.Write([]byte("Hello Token"))
 	})
@@ -225,7 +225,7 @@ func TestGRPCMUSTPASS_MITM_Proxy(t *testing.T) {
 	port := utils.GetRandomAvailableTCPPort()
 	server, err := crep.NewMITMServer(crep.MITM_SetHTTPRequestHijack(func(https bool, req *http.Request) *http.Request {
 		if req.URL.Query().Get("u") == token {
-			downstreamPassed = true
+			downstreamPassed.Store(true)
 		}
 		return req
 	}))
@@ -273,15 +273,16 @@ poc.Get(mockUrl, poc.proxy(mitmProxy), poc.replaceQueryParam("u", token))~`,
 					}); err != nil {
 					t.Fatalf("execute script failed: %v", err)
 				}
+				cancel()
 			}
 		}
 	}
 
-	if !downstreamPassed {
+	if !downstreamPassed.Load() {
 		t.Fatalf("Downstream proxy not passed")
 	}
 
-	if !networkIsPassed {
+	if !networkIsPassed.Load() {
 		t.Fatalf("Network not passed")
 	}
 }
