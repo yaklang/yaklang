@@ -38,3 +38,30 @@ func TestAIYakToolToUpdateMap_OnlyMutableFieldsIncluded(t *testing.T) {
 
 	require.NotContains(t, updateMap, "author")
 }
+
+func TestAIYakToolVerboseNameToI18nAndToGRPC(t *testing.T) {
+	require.Nil(t, (*AIYakTool)(nil).VerboseNameToI18n())
+	require.Nil(t, (&AIYakTool{}).VerboseNameToI18n())
+	require.Nil(t, NewI18n("", ""))
+
+	tool := &AIYakTool{
+		Name:          "grep",
+		VerboseName:   "Text Grep Tool",
+		VerboseNameZh: "文本查找工具",
+	}
+	i18n := tool.VerboseNameToI18n()
+	require.NotNil(t, i18n)
+	require.Equal(t, "文本查找工具", i18n.Zh)
+	require.Equal(t, "Text Grep Tool", i18n.En)
+	require.Equal(t, map[string]string{"Zh": "文本查找工具", "En": "Text Grep Tool"}, i18n.ToAIOutputMap())
+
+	grpcTool := tool.ToGRPC()
+	require.Equal(t, "Text Grep Tool", grpcTool.VerboseName)
+	require.NotNil(t, grpcTool.VerboseNameI18N)
+	require.Equal(t, "文本查找工具", grpcTool.VerboseNameI18N.Zh)
+	require.Equal(t, "Text Grep Tool", grpcTool.VerboseNameI18N.En)
+
+	onlyZh := (&AIYakTool{VerboseNameZh: "仅中文"}).VerboseNameToI18n()
+	require.Equal(t, "仅中文", onlyZh.Zh)
+	require.Equal(t, "仅中文", onlyZh.En)
+}

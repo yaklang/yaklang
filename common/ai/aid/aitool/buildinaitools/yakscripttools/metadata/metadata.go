@@ -22,8 +22,8 @@ func GetYakScript(fs embed.FS, name string) (string, error) {
 
 type YakScriptMetadata struct {
 	Name          string
-	VerboseName   string // English display name (Align Focus __VERBOSE_NAME__)
-	VerboseNameZh string // Chinese display name (Align Focus __VERBOSE_NAME_ZH__)
+	VerboseName   string // English display (__VERBOSE_NAME__)
+	VerboseNameZh string // Chinese display (__VERBOSE_NAME_ZH__)
 	Description   string
 	Keywords      []string
 	// Usage 工具使用说明，在参数生成阶段(第2阶段)披露给 AI
@@ -31,9 +31,24 @@ type YakScriptMetadata struct {
 	EnableForAI bool
 }
 
-func ParseYakScriptMetadataProg(name string, prog *ssaapi.Program) (*YakScriptMetadata, error) {
-	var desc []string
-	prog.Ref("__DESC__").ForEach(func(value *ssaapi.Value) {
+func firstConstString(prog *ssaapi.Program, ref string) string {
+	var out string
+	prog.Ref(ref).ForEach(func(value *ssaapi.Value) {
+		if out != "" || !value.IsConstInst() {
+			return
+		}
+		data, err := strconv.Unquote(value.String())
+		if err != nil {
+			data = value.String()
+		}
+		out = data
+	})
+	return out
+}
+
+func appendConstStrings(prog *ssaapi.Program, ref string) []string {
+	var out []string
+	prog.Ref(ref).ForEach(func(value *ssaapi.Value) {
 		if !value.IsConstInst() {
 			return
 		}
@@ -41,62 +56,22 @@ func ParseYakScriptMetadataProg(name string, prog *ssaapi.Program) (*YakScriptMe
 		if err != nil {
 			data = value.String()
 		}
-		desc = append(desc, data)
+		out = append(out, data)
 	})
+	return out
+}
+
+func ParseYakScriptMetadataProg(name string, prog *ssaapi.Program) (*YakScriptMetadata, error) {
+	desc := appendConstStrings(prog, "__DESC__")
 
 	var keywords []string
-	prog.Ref("__KEYWORDS__").ForEach(func(value *ssaapi.Value) {
-		if !value.IsConstInst() {
-			return
-		}
-		data, err := strconv.Unquote(value.String())
-		if err != nil {
-			data = value.String()
-		}
+	for _, data := range appendConstStrings(prog, "__KEYWORDS__") {
 		keywords = append(keywords, strings.Split(data, ",")...)
-	})
-	// __VERBOSE_NAME__ (English)
-	var verboseName string
-	prog.Ref("__VERBOSE_NAME__").ForEach(func(value *ssaapi.Value) {
-		if !value.IsConstInst() {
-			return
-		}
-		data, err := strconv.Unquote(value.String())
-		if err != nil {
-			data = value.String()
-		}
-		if verboseName == "" {
-			verboseName = data
-		}
-	})
+	}
 
-	// __VERBOSE_NAME_ZH__ (Chinese)
-	var verboseNameZh string
-	prog.Ref("__VERBOSE_NAME_ZH__").ForEach(func(value *ssaapi.Value) {
-		if !value.IsConstInst() {
-			return
-		}
-		data, err := strconv.Unquote(value.String())
-		if err != nil {
-			data = value.String()
-		}
-		if verboseNameZh == "" {
-			verboseNameZh = data
-		}
-	})
-
-	// __USAGE__ - 工具使用说明，在参数生成阶段(第2阶段)披露
-	var usage []string
-	prog.Ref("__USAGE__").ForEach(func(value *ssaapi.Value) {
-		if !value.IsConstInst() {
-			return
-		}
-		data, err := strconv.Unquote(value.String())
-		if err != nil {
-			data = value.String()
-		}
-		usage = append(usage, data)
-	})
+	verboseName := firstConstString(prog, "__VERBOSE_NAME__")
+	verboseNameZh := firstConstString(prog, "__VERBOSE_NAME_ZH__")
+	usage := appendConstStrings(prog, "__USAGE__")
 
 	var enableForAI bool
 	prog.Ref("__ENABLE_FOR_AI__").ForEach(func(value *ssaapi.Value) {

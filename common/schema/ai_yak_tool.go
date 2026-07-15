@@ -10,10 +10,8 @@ type AIYakTool struct {
 	gorm.Model
 
 	Name string `json:"name" gorm:"unique_index"`
-	// 展示给用户的名称（英文，对齐 Focus VerboseName）
-	VerboseName string `json:"verbose_name"`
-	// 展示给用户的中文名称（对齐 Focus VerboseNameZh）
-	VerboseNameZh string `json:"verbose_name_zh"`
+	VerboseName   string `json:"verbose_name"`    // English; UI bilingual pair via VerboseNameToI18n
+	VerboseNameZh string `json:"verbose_name_zh"` // Chinese
 	Description   string `json:"description" gorm:"type:text;index"`
 	Keywords    string `json:"keywords" gorm:"type:text;index"`
 	// 工具使用说明，在参数生成阶段披露给 AI（2阶段披露），帮助 AI 更好地使用参数
@@ -51,8 +49,16 @@ func (a *AIYakTool) ToUpdateMap() map[string]interface{} {
 	}
 }
 
+// VerboseNameToI18n builds AIOutputI18n-compatible Zh/En for list / event UIs.
+func (a *AIYakTool) VerboseNameToI18n() *I18n {
+	if a == nil {
+		return nil
+	}
+	return NewI18n(a.VerboseNameZh, a.VerboseName)
+}
+
 func (a *AIYakTool) ToGRPC() *ypb.AITool {
-	return &ypb.AITool{
+	out := &ypb.AITool{
 		Name:        a.Name,
 		Description: a.Description,
 		Content:     a.Content,
@@ -66,6 +72,10 @@ func (a *AIYakTool) ToGRPC() *ypb.AITool {
 		CreatedAt:   a.CreatedAt.Unix(),
 		UpdatedAt:   a.UpdatedAt.Unix(),
 	}
+	if i18n := a.VerboseNameToI18n(); i18n != nil {
+		out.VerboseNameI18N = i18n.I18nToYPB_I18n()
+	}
+	return out
 }
 
 func (*AIYakTool) TableName() string {

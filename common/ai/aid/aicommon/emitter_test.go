@@ -2,11 +2,15 @@ package aicommon
 
 import (
 	"bytes"
+	"encoding/json"
+	"io"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -214,4 +218,44 @@ func TestTypeWriterCopyWithUTF8Reader(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestToolVerboseNameI18nMap(t *testing.T) {
+	require.Nil(t, schema.NewI18n("", ""))
+	require.Equal(t, map[string]string{"Zh": "仅中文", "En": "仅中文"}, schema.NewI18n("仅中文", "").ToAIOutputMap())
+	require.Equal(t, map[string]string{"Zh": "文本查找工具", "En": "Text Grep Tool"},
+		schema.NewI18n("文本查找工具", "Text Grep Tool").ToAIOutputMap())
+}
+
+func TestEmitToolCallStart_VerboseNameI18n(t *testing.T) {
+	var captured []*schema.AiOutputEvent
+	emitter := NewEmitter("test-id", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		captured = append(captured, e)
+		return e, nil
+	})
+
+	tool, err := aitool.New("grep",
+		aitool.WithDescription("grep files"),
+		aitool.WithVerboseName("Text Grep Tool"),
+		aitool.WithVerboseNameZh("文本查找工具"),
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			return nil, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	_, err = emitter.EmitToolCallStart("call-1", tool)
+	require.NoError(t, err)
+	require.Len(t, captured, 1)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(captured[0].Content, &payload))
+	toolObj, ok := payload["tool"].(map[string]any)
+	require.True(t, ok)
+	verbose, ok := toolObj["verbose_name"].(map[string]any)
+	require.True(t, ok, "verbose_name should be AIOutputI18n object, got %#v", toolObj["verbose_name"])
+	require.Equal(t, "文本查找工具", verbose["Zh"])
+	require.Equal(t, "Text Grep Tool", verbose["En"])
+	_, hasZhField := toolObj["verbose_name_zh"]
+	require.False(t, hasZhField, "legacy verbose_name_zh must not be emitted")
 }
