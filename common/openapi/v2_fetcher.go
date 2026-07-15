@@ -11,22 +11,15 @@ import (
 	"strings"
 )
 
+// maxMockSchemaDepth caps schema mock expansion for deep/circular graphs.
+const maxMockSchemaDepth = 32
+
 func v2_parameterToValue(t openapi2.T, target any) (*openapi2.Parameter, error) {
 	if target == nil {
 		return nil, nil
 	}
 
 	switch param := target.(type) {
-	//case *openapi2.ParameterRef:
-	//	if param == nil {
-	//		return nil, nil
-	//	}
-	//	if param.Ref != "" {
-	//		ret := strings.TrimPrefix(param.Ref, "#/parameters/")
-	//		ret = strings.TrimPrefix(ret, "#/components/parameters/")
-	//		return v2_parameterToValue(t, t.Parameters[ret])
-	//	}
-	//	return param.Value, nil
 	case *openapi2.Parameter:
 		return param, nil
 	case string:
@@ -50,7 +43,18 @@ func v2_SchemeRefToBytes(t openapi2.T, target any) []byte {
 }
 
 func v2_SchemeRefToObject(t openapi2.T, target any, fields ...string) any {
-	if target == nil {
+	return v2_SchemeRefToObjectVisited(t, target, make(map[string]struct{}), make(map[*openapi3.Schema]struct{}), 0, fields...)
+}
+
+func v2_SchemeRefToObjectVisited(
+	t openapi2.T,
+	target any,
+	visitedRefs map[string]struct{},
+	visitedSchemas map[*openapi3.Schema]struct{},
+	depth int,
+	fields ...string,
+) any {
+	if target == nil || depth > maxMockSchemaDepth {
 		return nil
 	}
 
@@ -65,24 +69,28 @@ func v2_SchemeRefToObject(t openapi2.T, target any, fields ...string) any {
 		ref = codec.AnyToString(target)
 	case *openapi3.SchemaRef:
 		result, ok := target.(*openapi3.SchemaRef)
-		if !ok {
-			return nil
-		}
-
-		if result == nil {
+		if !ok || result == nil {
 			return nil
 		}
 		ref = result.Ref
 		if ref == "" {
-			return schemaValue(t, target.(*openapi3.SchemaRef).Value, field)
+			return schemaValueVisited(t, result.Value, visitedRefs, visitedSchemas, depth, field)
 		}
 	case *openapi3.Schema:
-		return schemaValue(t, target.(*openapi3.Schema), field)
+		return schemaValueVisited(t, target.(*openapi3.Schema), visitedRefs, visitedSchemas, depth, field)
 	default:
 		log.Warnf("unsupported ref type: %T", target)
 		return "{}"
 	}
 	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		return nil
+	}
+	if _, seen := visitedRefs[ref]; seen {
+		return map[string]any{}
+	}
+	visitedRefs[ref] = struct{}{}
+	defer delete(visitedRefs, ref)
 
 	trimDef := strings.TrimPrefix(ref, "#/definitions/")
 	obj, ok := t.Definitions[trimDef]
@@ -90,20 +98,34 @@ func v2_SchemeRefToObject(t openapi2.T, target any, fields ...string) any {
 		return nil
 	}
 	if obj.Ref != "" {
-		return v2_SchemeRefToObject(t, obj.Ref, field)
+		return v2_SchemeRefToObjectVisited(t, obj.Ref, visitedRefs, visitedSchemas, depth+1, field)
 	}
-
 	if obj.Value == nil {
 		return nil
 	}
-	val := obj.Value
-	return schemaValue(t, val, field)
+	return schemaValueVisited(t, obj.Value, visitedRefs, visitedSchemas, depth+1, field)
 }
 
 func schemaValue(data openapi2.T, i *openapi3.Schema, fieldName ...string) any {
-	if i == nil {
+	return schemaValueVisited(data, i, make(map[string]struct{}), make(map[*openapi3.Schema]struct{}), 0, fieldName...)
+}
+
+func schemaValueVisited(
+	data openapi2.T,
+	i *openapi3.Schema,
+	visitedRefs map[string]struct{},
+	visitedSchemas map[*openapi3.Schema]struct{},
+	depth int,
+	fieldName ...string,
+) any {
+	if i == nil || depth > maxMockSchemaDepth {
 		return nil
 	}
+	if _, seen := visitedSchemas[i]; seen {
+		return map[string]any{}
+	}
+	visitedSchemas[i] = struct{}{}
+	defer delete(visitedSchemas, i)
 
 	var field string
 	if len(fieldName) > 0 {
@@ -117,18 +139,21 @@ func schemaValue(data openapi2.T, i *openapi3.Schema, fieldName ...string) any {
 			return m
 		}
 		if i.Items.Ref != "" {
-			m.Add(v2_SchemeRefToObject(data, i.Items.Ref))
+			m.Add(v2_SchemeRefToObjectVisited(data, i.Items.Ref, visitedRefs, visitedSchemas, depth+1))
 			return m
 		}
-		m.Add(schemaValue(data, i.Items.Value, field))
+		m.Add(schemaValueVisited(data, i.Items.Value, visitedRefs, visitedSchemas, depth+1, field))
 		return m
 	case "object":
 		m := omap.NewGeneralOrderedMap()
-		for field, pt := range i.Properties {
+		for propName, pt := range i.Properties {
+			if pt == nil {
+				continue
+			}
 			if pt.Ref != "" {
-				m.Set(field, v2_SchemeRefToObject(data, pt.Ref, field))
+				m.Set(propName, v2_SchemeRefToObjectVisited(data, pt.Ref, visitedRefs, visitedSchemas, depth+1, propName))
 			} else {
-				m.Set(field, schemaValue(data, pt.Value, field))
+				m.Set(propName, schemaValueVisited(data, pt.Value, visitedRefs, visitedSchemas, depth+1, propName))
 			}
 		}
 		return m

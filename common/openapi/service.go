@@ -1,6 +1,7 @@
 package openapi
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -72,16 +73,31 @@ type ParsedDocument struct {
 	Warnings    []string `json:"warnings,omitempty"`
 }
 
+// ParseProgress reports OpenAPI document parse/import status.
+type ParseProgress struct {
+	Stage   string  // normalize | swagger2 | openapi3 | lenient | operations | import
+	Current int
+	Total   int
+	Message string
+	Percent float64 // 0.0 - 1.0
+}
+
 type ParseOptions struct {
 	OverrideDomain string
 	OverrideHTTPS  *bool
+	// Context cancels long-running parse/import work when cancelled.
+	Context context.Context
+	// OnProgress receives stage updates; may be called frequently.
+	OnProgress func(ParseProgress)
 }
 
 type BuildOptions struct {
-	OverrideDomain           string
-	OverrideHTTPS            *bool
-	RequestBodyContentType   string
-	ParameterValues          map[string]string // name -> value override
+	OverrideDomain         string
+	OverrideHTTPS          *bool
+	RequestBodyContentType string
+	ParameterValues        map[string]string // name -> value override
+	Context                context.Context
+	OnProgress             func(ParseProgress)
 }
 
 func normalizeOpenAPIContent(content string) string {
@@ -92,24 +108,65 @@ func normalizeOpenAPIContent(content string) string {
 	return content
 }
 
+func parseContext(opts *ParseOptions) context.Context {
+	if opts != nil && opts.Context != nil {
+		return opts.Context
+	}
+	return context.Background()
+}
+
+func reportParseProgress(opts *ParseOptions, p ParseProgress) {
+	if opts == nil || opts.OnProgress == nil {
+		return
+	}
+	opts.OnProgress(p)
+}
+
+func errIfParseCanceled(opts *ParseOptions) error {
+	ctx := parseContext(opts)
+	if err := ctx.Err(); err != nil {
+		return utils.Errorf("openapi parse canceled: %v", err)
+	}
+	return nil
+}
+
 func ParseDocument(content string, opts *ParseOptions) (*ParsedDocument, error) {
+	if err := errIfParseCanceled(opts); err != nil {
+		return nil, err
+	}
+	reportParseProgress(opts, ParseProgress{Stage: "normalize", Message: "normalizing OpenAPI content", Percent: 0.05})
 	content = normalizeOpenAPIContent(content)
 	if strings.TrimSpace(content) == "" {
 		return nil, utils.Error("openapi document content is empty")
 	}
+	if err := errIfParseCanceled(opts); err != nil {
+		return nil, err
+	}
+	reportParseProgress(opts, ParseProgress{Stage: "swagger2", Message: "trying Swagger 2.0 parse", Percent: 0.15})
 	doc, err := parseSwaggerV2Document(content, opts)
 	if err == nil {
 		sanitizeParsedDocument(doc)
+		reportParseProgress(opts, ParseProgress{Stage: "operations", Current: len(doc.Operations), Total: len(doc.Operations), Message: "parse completed", Percent: 1})
 		return doc, nil
 	}
 	v2err := err
+	if err := errIfParseCanceled(opts); err != nil {
+		return nil, err
+	}
+	reportParseProgress(opts, ParseProgress{Stage: "openapi3", Message: "trying OpenAPI 3.x parse", Percent: 0.35})
 	doc, err2 := parseOpenAPIV3Document(content, opts)
 	if err2 == nil {
 		sanitizeParsedDocument(doc)
+		reportParseProgress(opts, ParseProgress{Stage: "operations", Current: len(doc.Operations), Total: len(doc.Operations), Message: "parse completed", Percent: 1})
 		return doc, nil
 	}
+	if err := errIfParseCanceled(opts); err != nil {
+		return nil, err
+	}
+	reportParseProgress(opts, ParseProgress{Stage: "lenient", Message: "trying lenient parse", Percent: 0.55})
 	if doc, _, lerr := tryLenientParseDocument(content, opts); lerr == nil {
 		sanitizeParsedDocument(doc)
+		reportParseProgress(opts, ParseProgress{Stage: "operations", Current: len(doc.Operations), Total: len(doc.Operations), Message: "parse completed", Percent: 1})
 		return doc, nil
 	}
 	return nil, describeParseFailure(content, v2err, err2)
@@ -139,13 +196,33 @@ func BuildOperationRequests(content string, path, method string, opts *BuildOpti
 }
 
 func ImportAllOperationRequests(content string, opts *BuildOptions) ([]*OperationRequest, error) {
-	parsed, err := ParseDocument(content, parseOptionsFromBuild(opts))
+	parseOpts := parseOptionsFromBuild(opts)
+	parsed, err := ParseDocument(content, parseOpts)
 	if err != nil {
 		return nil, err
 	}
+	total := len(parsed.Operations)
 	var results []*OperationRequest
 	var skipped []string
-	for _, op := range parsed.Operations {
+	for idx, op := range parsed.Operations {
+		if opts != nil && opts.Context != nil {
+			if err := opts.Context.Err(); err != nil {
+				return nil, utils.Errorf("openapi import canceled: %v", err)
+			}
+		}
+		if opts != nil && opts.OnProgress != nil {
+			percent := 0.6
+			if total > 0 {
+				percent = 0.6 + 0.4*float64(idx)/float64(total)
+			}
+			opts.OnProgress(ParseProgress{
+				Stage:   "import",
+				Current: idx + 1,
+				Total:   total,
+				Message: fmt.Sprintf("building %s %s", op.Method, op.Path),
+				Percent: percent,
+			})
+		}
 		reqs, isHttps, err := BuildOperationRequests(content, op.Path, op.Method, opts)
 		if err != nil {
 			skipped = append(skipped, fmt.Sprintf("%s %s: %v", op.Method, op.Path, err))
@@ -173,6 +250,9 @@ func ImportAllOperationRequests(content string, opts *BuildOptions) ([]*Operatio
 	if len(skipped) > 0 {
 		log.Warnf("openapi import skipped %d operation(s): %s", len(skipped), strings.Join(skipped, "; "))
 	}
+	if opts != nil && opts.OnProgress != nil {
+		opts.OnProgress(ParseProgress{Stage: "import", Current: total, Total: total, Message: "import completed", Percent: 1})
+	}
 	return results, nil
 }
 
@@ -190,6 +270,8 @@ func parseOptionsFromBuild(opts *BuildOptions) *ParseOptions {
 	return &ParseOptions{
 		OverrideDomain: opts.OverrideDomain,
 		OverrideHTTPS:  opts.OverrideHTTPS,
+		Context:        opts.Context,
+		OnProgress:     opts.OnProgress,
 	}
 }
 
@@ -276,7 +358,22 @@ func parseSwaggerV2Document(content string, opts *ParseOptions) (*ParsedDocument
 	applyParseOptions(&info, opts)
 
 	var operations []OperationInfo
+	pathCount := len(data.Paths)
+	pathIdx := 0
 	for pathStr, pathItem := range data.Paths {
+		if err := errIfParseCanceled(opts); err != nil {
+			return nil, err
+		}
+		pathIdx++
+		if pathCount > 0 {
+			reportParseProgress(opts, ParseProgress{
+				Stage:   "operations",
+				Current: pathIdx,
+				Total:   pathCount,
+				Message: fmt.Sprintf("summarizing swagger path %s", pathStr),
+				Percent: 0.2 + 0.7*float64(pathIdx)/float64(pathCount),
+			})
+		}
 		for method, op := range pathItem.Operations() {
 			operations = append(operations, swaggerV2OperationSummary(data, pathStr, method, op))
 		}
@@ -355,6 +452,7 @@ func swaggerV2OperationSummary(data openapi2.T, path, method string, op *openapi
 func parseOpenAPIV3Document(content string, opts *ParseOptions) (*ParsedDocument, error) {
 	loader := openapi3.NewLoader()
 	loader.IsExternalRefsAllowed = true
+	loader.Context = parseContext(opts)
 	doc, err := loader.LoadFromData([]byte(content))
 	if err != nil {
 		return nil, err
@@ -388,7 +486,21 @@ func parseOpenAPIV3Document(content string, opts *ParseOptions) (*ParsedDocument
 	applyParseOptions(&info, opts)
 
 	var operations []OperationInfo
-	for _, pathStr := range doc.Paths.InMatchingOrder() {
+	pathOrder := doc.Paths.InMatchingOrder()
+	pathCount := len(pathOrder)
+	for pathIdx, pathStr := range pathOrder {
+		if err := errIfParseCanceled(opts); err != nil {
+			return nil, err
+		}
+		if pathCount > 0 {
+			reportParseProgress(opts, ParseProgress{
+				Stage:   "operations",
+				Current: pathIdx + 1,
+				Total:   pathCount,
+				Message: fmt.Sprintf("summarizing openapi path %s", pathStr),
+				Percent: 0.4 + 0.55*float64(pathIdx+1)/float64(pathCount),
+			})
+		}
 		pathItem := doc.Paths.Value(pathStr)
 		for method, op := range pathItem.Operations() {
 			operations = append(operations, openAPIV3OperationSummary(*doc, pathStr, method, op))

@@ -1,8 +1,10 @@
 package yakurl
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"sort"
 	"strings"
@@ -12,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/openapi"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -19,20 +22,21 @@ const (
 	openAPIUploadLocation      = "upload"
 	openAPIHistoryLocation     = "history"
 	openAPIQueryOp             = "op"
-	openAPIQueryMethod        = "method"
-	openAPIQueryPath          = "path"
-	openAPIQueryOperationID   = "operationId"
+	openAPIQueryMethod         = "method"
+	openAPIQueryPath           = "path"
+	openAPIQueryOperationID    = "operationId"
 	openAPIQueryOverrideDomain = "overrideDomain"
-	openAPIQueryOverrideHTTPS = "overrideIsHttps"
-	openAPIQueryContentType   = "requestBodyContentType"
+	openAPIQueryOverrideHTTPS  = "overrideIsHttps"
+	openAPIQueryContentType    = "requestBodyContentType"
+	openAPIQueryParseTaskID    = "parse_task_id"
 
 	openAPIOpBuild     = "build"
 	openAPIOpImportAll = "import-all"
 	openAPIOpDetail    = "detail"
 
-	openAPIResourceDocument = "openapi-document"
+	openAPIResourceDocument  = "openapi-document"
 	openAPIResourceOperation = "openapi-operation"
-	openAPIResourceRequest  = "fuzzer-request"
+	openAPIResourceRequest   = "fuzzer-request"
 )
 
 type cachedOpenAPIDocument struct {
@@ -52,6 +56,11 @@ func newOpenAPIAction() *openapiAction {
 }
 
 func (a *openapiAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+	return a.GetWithContext(context.Background(), params)
+}
+
+func (a *openapiAction) GetWithContext(ctx context.Context, params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+	_ = ctx
 	u := params.GetUrl()
 	if u == nil {
 		return nil, utils.Error("url is nil")
@@ -85,6 +94,10 @@ func (a *openapiAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURL
 }
 
 func (a *openapiAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+	return a.PostWithContext(context.Background(), params)
+}
+
+func (a *openapiAction) PostWithContext(ctx context.Context, params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	u := params.GetUrl()
 	if u == nil {
 		return nil, utils.Error("url is nil")
@@ -93,7 +106,7 @@ func (a *openapiAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYakUR
 	query := openAPIQueryValues(u.GetQuery())
 
 	if location == "" || location == openAPIUploadLocation {
-		return uploadOpenAPIDocument(params)
+		return uploadOpenAPIDocument(ctx, params)
 	}
 
 	doc, err := loadCachedOpenAPIDocument(location)
@@ -103,19 +116,29 @@ func (a *openapiAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYakUR
 
 	switch strings.TrimSpace(query.Get(openAPIQueryOp)) {
 	case openAPIOpBuild:
-		return buildOpenAPIOperationRequests(location, doc, params)
+		return buildOpenAPIOperationRequests(ctx, location, doc, params)
 	case openAPIOpImportAll:
-		return importAllOpenAPIRequests(location, doc, params)
+		return importAllOpenAPIRequests(ctx, location, doc, params)
 	default:
 		return nil, utils.Errorf("unsupported openapi op %q, want %q or %q", query.Get(openAPIQueryOp), openAPIOpBuild, openAPIOpImportAll)
 	}
 }
 
 func (a *openapiAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+	return a.PutWithContext(context.Background(), params)
+}
+
+func (a *openapiAction) PutWithContext(ctx context.Context, params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+	_ = ctx
 	return nil, utils.Error("not implemented")
 }
 
 func (a *openapiAction) Delete(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+	return a.DeleteWithContext(context.Background(), params)
+}
+
+func (a *openapiAction) DeleteWithContext(ctx context.Context, params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+	_ = ctx
 	u := params.GetUrl()
 	if u == nil {
 		return nil, utils.Error("url is nil")
@@ -134,6 +157,11 @@ func (a *openapiAction) Delete(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 }
 
 func (a *openapiAction) Head(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+	return a.HeadWithContext(context.Background(), params)
+}
+
+func (a *openapiAction) HeadWithContext(ctx context.Context, params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+	_ = ctx
 	return nil, utils.Error("not implemented")
 }
 
@@ -141,7 +169,24 @@ func (a *openapiAction) Do(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLR
 	return a.Post(params)
 }
 
-func uploadOpenAPIDocument(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+func (a *openapiAction) Handle(ctx context.Context, method string, params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+	switch strings.ToUpper(method) {
+	case http.MethodGet:
+		return a.GetWithContext(ctx, params)
+	case http.MethodPost:
+		return a.PostWithContext(ctx, params)
+	case http.MethodPut:
+		return a.PutWithContext(ctx, params)
+	case http.MethodDelete:
+		return a.DeleteWithContext(ctx, params)
+	case http.MethodHead:
+		return a.HeadWithContext(ctx, params)
+	default:
+		return nil, utils.Errorf("not implemented method: %v", method)
+	}
+}
+
+func uploadOpenAPIDocument(ctx context.Context, params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	content := strings.TrimSpace(string(params.GetBody()))
 	if content == "" {
 		return nil, utils.Error("openapi document content is empty")
@@ -149,7 +194,11 @@ func uploadOpenAPIDocument(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLR
 
 	u := params.GetUrl()
 	query := openAPIQueryValues(u.GetQuery())
-	parseOpts := &openapi.ParseOptions{OverrideDomain: query.Get(openAPIQueryOverrideDomain)}
+	parseOpts := &openapi.ParseOptions{
+		OverrideDomain: query.Get(openAPIQueryOverrideDomain),
+		Context:        ctx,
+		OnProgress:     openAPIParseProgressBroadcaster(query.Get(openAPIQueryParseTaskID)),
+	}
 	if parseBoolQuery(query.Get(openAPIQueryOverrideHTTPS)) {
 		v := true
 		parseOpts.OverrideHTTPS = &v
@@ -176,6 +225,12 @@ func uploadOpenAPIDocument(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLR
 	root, err := listOpenAPIDocumentResources(docID, parsed)
 	if err != nil {
 		return nil, err
+	}
+	if taskID := strings.TrimSpace(query.Get(openAPIQueryParseTaskID)); taskID != "" && len(root.GetResources()) > 0 {
+		root.Resources[0].Extra = append(root.Resources[0].GetExtra(), &ypb.KVPair{
+			Key:   openAPIQueryParseTaskID,
+			Value: taskID,
+		})
 	}
 	return root, nil
 }
@@ -276,7 +331,8 @@ func listOpenAPIDocumentResources(docID string, parsed *openapi.ParsedDocument) 
 	}, nil
 }
 
-func buildOpenAPIOperationRequests(docID string, doc *cachedOpenAPIDocument, params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+func buildOpenAPIOperationRequests(ctx context.Context, docID string, doc *cachedOpenAPIDocument, params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+	_ = docID
 	query := openAPIQueryValues(params.GetUrl().GetQuery())
 	op, err := resolveOpenAPIOperation(doc.Parsed, query)
 	if err != nil {
@@ -287,6 +343,7 @@ func buildOpenAPIOperationRequests(docID string, doc *cachedOpenAPIDocument, par
 	if err != nil {
 		return nil, err
 	}
+	buildOpts.Context = ctx
 
 	rawRequests, isHTTPS, err := openapi.BuildOperationRequests(doc.Content, op.Path, op.Method, buildOpts)
 	if err != nil {
@@ -308,12 +365,15 @@ func buildOpenAPIOperationRequests(docID string, doc *cachedOpenAPIDocument, par
 	}, nil
 }
 
-func importAllOpenAPIRequests(docID string, doc *cachedOpenAPIDocument, params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+func importAllOpenAPIRequests(ctx context.Context, docID string, doc *cachedOpenAPIDocument, params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+	_ = docID
 	query := openAPIQueryValues(params.GetUrl().GetQuery())
 	buildOpts, err := parseOpenAPIBuildOptions(params, query)
 	if err != nil {
 		return nil, err
 	}
+	buildOpts.Context = ctx
+	buildOpts.OnProgress = openAPIParseProgressBroadcaster(query.Get(openAPIQueryParseTaskID))
 
 	all, err := openapi.ImportAllOperationRequests(doc.Content, buildOpts)
 	if err != nil {
@@ -574,5 +634,32 @@ func parseBoolQuery(raw string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+// openAPIParseProgressPush is pushed via DuplexConnection for parse/import progress.
+type openAPIParseProgressPush struct {
+	TaskID  string  `json:"task_id"`
+	Percent float64 `json:"percent"`
+	Stage   string  `json:"stage"`
+	Message string  `json:"message"`
+	Current int     `json:"current"`
+	Total   int     `json:"total"`
+}
+
+func openAPIParseProgressBroadcaster(taskID string) func(openapi.ParseProgress) {
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return nil
+	}
+	return func(p openapi.ParseProgress) {
+		yakit.BroadcastData(yakit.ServerPushType_OpenAPIParse, &openAPIParseProgressPush{
+			TaskID:  taskID,
+			Percent: p.Percent,
+			Stage:   p.Stage,
+			Message: p.Message,
+			Current: p.Current,
+			Total:   p.Total,
+		})
 	}
 }

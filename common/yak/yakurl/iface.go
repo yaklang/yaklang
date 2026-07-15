@@ -18,6 +18,11 @@ type Action interface {
 	Do(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error)
 }
 
+// ActionWithContext is optionally implemented by actions that honor request cancellation.
+type ActionWithContext interface {
+	Handle(ctx context.Context, method string, params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error)
+}
+
 type ActionService struct {
 	actions map[string]Action
 	mutex   sync.Mutex
