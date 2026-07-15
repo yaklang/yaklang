@@ -325,6 +325,7 @@ const (
 	REQUEST_CONTEXT_KEY_ResponseHijackedBytes        = "responseHijackedBytes"
 	REQUEST_CONTEXT_KEY_RequestIsStrippedGzip        = "requestIsStrippedGzip"
 	RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest = "shouldBeHijackedFromRequest"
+	RESPONSE_CONTEXT_KEY_WebsocketOpeningHandshake   = "websocketOpeningHandshake"
 	REQUEST_CONTEXT_KEY_ProcessName                  = "ProcessName"
 	REQUEST_CONTEXT_ConnectToHTTPS                   = "connectTOHTTPS" // used for CONNECT to HTTPS request
 	REQUEST_CONTEXT_KEY_ConnectedTo                  = "connectedTo"
@@ -788,6 +789,14 @@ func GetIsWebWebsocketRequest(r *http.Request) bool {
 
 func SetIsWebWebsocketRequest(r *http.Request) {
 	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_IsWebsocketRequest, true)
+}
+
+func SetWebsocketOpeningHandshake(r *http.Request, active bool) {
+	SetContextValueInfoFromRequest(r, RESPONSE_CONTEXT_KEY_WebsocketOpeningHandshake, active)
+}
+
+func IsWebsocketOpeningHandshake(r *http.Request) bool {
+	return GetContextBoolInfoFromRequest(r, RESPONSE_CONTEXT_KEY_WebsocketOpeningHandshake)
 }
 
 func SetPluginContext(r *http.Request, ctx context.Context) {

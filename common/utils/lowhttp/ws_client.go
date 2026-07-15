@@ -50,10 +50,19 @@ type WebsocketClientConfig struct {
 	writeCompressionNoTakeover    bool
 	writeCompressionNoTakeoverSet bool
 	writeCompressionWindowBits    int
+	HandshakeTimingsHandler       func(WebsocketHandshakeTimings)
 
 	// Host Port
 	Host string
 	Port int
+}
+
+type WebsocketHandshakeTimings struct {
+	DialDuration         time.Duration
+	RequestWriteDuration time.Duration
+	ResponseReadDuration time.Duration
+	LocalAddr            string
+	RemoteAddr           string
 }
 
 type WebsocketClientOpt func(config *WebsocketClientConfig)
@@ -146,6 +155,12 @@ func WithWebsocketUpgradeResponseHandler(f func(*http.Response, []byte, *Websock
 	}
 }
 
+func WithWebsocketHandshakeTimingsHandler(f func(WebsocketHandshakeTimings)) WebsocketClientOpt {
+	return func(config *WebsocketClientConfig) {
+		config.HandshakeTimingsHandler = f
+	}
+}
+
 func WithWebsocketFromServerHandler(f func([]byte)) WebsocketClientOpt {
 	return func(config *WebsocketClientConfig) {
 		config.FromServerHandler = f
@@ -198,6 +213,8 @@ type WebsocketClient struct {
 	Request                       []byte
 	Response                      []byte
 	ResponseInstance              *http.Response
+	HandshakeTimings              WebsocketHandshakeTimings
+	BufferedAfterHandshake        int
 	StartOnce                     *sync.Once
 	FromServerHandler             func([]byte)
 	FromServerHandlerEx           func(*WebsocketClient, []byte, []*Frame)
@@ -211,9 +228,23 @@ type WebsocketClient struct {
 	writeCompressionNoTakeover    bool
 	writeCompressionNoTakeoverSet bool
 	writeCompressionWindowBits    int
+	terminalErrorMu               sync.RWMutex
+	terminalError                 error
 
 	// websocket扩展
 	// isDeflate bool
+}
+
+func (c *WebsocketClient) setTerminalError(err error) {
+	c.terminalErrorMu.Lock()
+	c.terminalError = err
+	c.terminalErrorMu.Unlock()
+}
+
+func (c *WebsocketClient) TerminalError() error {
+	c.terminalErrorMu.RLock()
+	defer c.terminalErrorMu.RUnlock()
+	return c.terminalError
 }
 
 func (c *WebsocketClient) Wait() {
@@ -287,6 +318,7 @@ func (c *WebsocketClient) Start() {
 
 				frame, err := c.fr.ReadFrame()
 				if err != nil {
+					c.setTerminalError(err)
 					if isExpectedWebsocketReadError(err) {
 						log.Debugf("[ws fr] connection closed: %s", err)
 					} else {
@@ -671,6 +703,15 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 	for _, p := range opt {
 		p(config)
 	}
+	var handshakeTimings WebsocketHandshakeTimings
+	var reportHandshakeTimingsOnce sync.Once
+	reportHandshakeTimings := func() {
+		reportHandshakeTimingsOnce.Do(func() {
+			if config.HandshakeTimingsHandler != nil {
+				config.HandshakeTimingsHandler(handshakeTimings)
+			}
+		})
+	}
 
 	port := config.Port
 	host := config.Host
@@ -715,23 +756,37 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 	// 获取连接
 	addr := utils.HostPort(host, port)
 	var conn net.Conn
+	dialStartedAt := time.Now()
 	if config.TLS {
 		conn, err = netx.DialTLSTimeout(30*time.Second, addr, nil, config.Proxy...)
+		handshakeTimings.DialDuration = time.Since(dialStartedAt)
 		if err != nil {
+			reportHandshakeTimings()
 			return nil, utils.Errorf("dial tls-conn failed: %s", err)
 		}
 	} else {
 		conn, err = netx.DialTCPTimeout(30*time.Second, addr, config.Proxy...)
+		handshakeTimings.DialDuration = time.Since(dialStartedAt)
 		if err != nil {
+			reportHandshakeTimings()
 			return nil, utils.Errorf("dial conn failed: %s", err)
 		}
+	}
+	if conn.LocalAddr() != nil {
+		handshakeTimings.LocalAddr = conn.LocalAddr().String()
+	}
+	if conn.RemoteAddr() != nil {
+		handshakeTimings.RemoteAddr = conn.RemoteAddr().String()
 	}
 
 	// 判断websocket扩展
 	requestRaw := FixHTTPRequest(packet)
 	// 发送请求
+	requestWriteStartedAt := time.Now()
 	_, err = conn.Write(requestRaw)
+	handshakeTimings.RequestWriteDuration = time.Since(requestWriteStartedAt)
 	if err != nil {
+		reportHandshakeTimings()
 		return nil, utils.Errorf("write conn[ws] failed: %s", err)
 	}
 
@@ -739,12 +794,29 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 	var responseBuffer bytes.Buffer
 	upgradeResponseHandler := config.UpgradeResponseHandler
 	bufioReader := bufio.NewReaderSize(io.TeeReader(conn, &responseBuffer), 4096)
+	responseReadStartedAt := time.Now()
 	rsp, err := utils.ReadHTTPResponseFromBufioReader(bufioReader, req)
+	handshakeTimings.ResponseReadDuration = time.Since(responseReadStartedAt)
+	reportHandshakeTimings()
 	if err != nil {
 		if upgradeResponseHandler != nil {
 			upgradeResponseHandler(nil, nil, nil, err)
 		}
 		return nil, utils.Errorf("read response failed: %s", err)
+	}
+	bufferedAfterHandshake := bufioReader.Buffered()
+	responseAndBufferedFrames := responseBuffer.Bytes()
+	if bufferedAfterHandshake > len(responseAndBufferedFrames) {
+		_ = conn.Close()
+		return nil, utils.Errorf("websocket: buffered frame bytes exceed captured upgrade response")
+	}
+	responseRaw := bytes.Clone(responseAndBufferedFrames[:len(responseAndBufferedFrames)-bufferedAfterHandshake])
+	remindBytes := make([]byte, bufferedAfterHandshake)
+	if len(remindBytes) > 0 {
+		if _, err := io.ReadFull(bufioReader, remindBytes); err != nil {
+			_ = conn.Close()
+			return nil, utils.Wrap(err, "read websocket frames buffered after upgrade response")
+		}
 	}
 	requestExtensions := make(http.Header)
 	if value := GetHTTPPacketHeader(requestRaw, "Sec-WebSocket-Extensions"); value != "" {
@@ -766,7 +838,6 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 		_ = conn.Close()
 		return nil, extensionErr
 	}
-	responseRaw := responseBuffer.Bytes()
 	if upgradeResponseHandler != nil {
 		newResponseRaw := upgradeResponseHandler(rsp, responseRaw, extensions, nil)
 		if !bytes.Equal(newResponseRaw, responseRaw) {
@@ -781,12 +852,6 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 				return nil, extensionErr
 			}
 		}
-	}
-
-	remindBytes := make([]byte, bufioReader.Buffered())
-	if len(remindBytes) > 0 {
-		// write buffered data to remindBuffer
-		bufioReader.Read(remindBytes)
 	}
 
 	if rsp.StatusCode != 101 {
@@ -820,6 +885,8 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 		Request:                       requestRaw,
 		Response:                      responseRaw,
 		ResponseInstance:              rsp,
+		HandshakeTimings:              handshakeTimings,
+		BufferedAfterHandshake:        len(remindBytes),
 		FromServerHandler:             config.FromServerHandler,
 		FromServerHandlerEx:           config.FromServerHandlerEx,
 		AllFrameHandler:               config.AllFrameHandler,
