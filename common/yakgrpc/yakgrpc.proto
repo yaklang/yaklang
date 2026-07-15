@@ -2014,11 +2014,12 @@ message AITool {
   repeated string Keywords = 5;
   bool IsFavorite = 6;
   int64 ID = 7;
-  string VerboseName = 8; // 给用户看的展示名称
+  string VerboseName = 8; // 英文展示名（兼容旧前端 / 检索）；UI 语言切换请用 VerboseNameI18n
   string Author = 9;
   int64 CreatedAt = 10;
   int64 UpdatedAt = 11;
   bool IsBuiltin = 12;
+  I18n VerboseNameI18n = 13; // 中英双语展示名，对齐 AIOutputEvent.NodeIdVerbose / AIOutputI18n
 }
 
 message GetAIToolListResponse {

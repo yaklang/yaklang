@@ -15,6 +15,32 @@ type I18n struct {
 	En string `json:"en"`
 }
 
+// NewI18n builds a bilingual pair for AIOutputI18n / NodeIdVerbose.
+// Empty side is filled from the other; both empty returns nil.
+func NewI18n(zh, en string) *I18n {
+	if zh == "" && en == "" {
+		return nil
+	}
+	if en == "" {
+		en = zh
+	}
+	if zh == "" {
+		zh = en
+	}
+	return &I18n{Zh: zh, En: en}
+}
+
+// ToAIOutputMap returns keys matching Front AIOutputI18n / useAINodeLabel (Zh / En).
+func (i18n *I18n) ToAIOutputMap() map[string]string {
+	if i18n == nil {
+		return nil
+	}
+	return map[string]string{
+		"Zh": i18n.Zh,
+		"En": i18n.En,
+	}
+}
+
 type i18nCacheEntry struct {
 	once   sync.Once
 	result *I18n
