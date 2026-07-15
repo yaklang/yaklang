@@ -20,6 +20,15 @@ import (
 )
 
 func (s *Server) QueryCVE(ctx context.Context, req *ypb.QueryCVERequest) (*ypb.QueryCVEResponse, error) {
+	// Ensure response pagination is non-nil so callers (MCP/GUI) always get
+	// the effective paging parameters. QueryCVE fills in defaults for empty
+	// OrderBy / Order, but a nil Pagination in the request would otherwise
+	// produce a nil Pagination in the response.
+	params := req.GetPagination()
+	if params == nil {
+		params = &ypb.Paging{}
+	}
+
 	paging, data, err := cveresources.QueryCVE(consts.GetGormCVEDatabase(), req)
 	if err != nil {
 		return nil, err
@@ -29,7 +38,7 @@ func (s *Server) QueryCVE(ctx context.Context, req *ypb.QueryCVERequest) (*ypb.Q
 		results = append(results, c.ToGPRCModel())
 	}
 	return &ypb.QueryCVEResponse{
-		Pagination: req.GetPagination(),
+		Pagination: params,
 		Total:      int64(paging.TotalRecord),
 		Data:       results,
 	}, nil
