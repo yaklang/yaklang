@@ -211,60 +211,59 @@ func TestGRPCMUSTPASS_MITM_WebSocket_Payload(t *testing.T) {
 	stream.Send(&ypb.MITMRequest{SetAutoForward: true, AutoForwardValue: false})
 	hijackClientPayload := false
 	hijackServerPayload := false
-	state := 0
+	handshakeForwarded := false
 	for {
 		rpcResponse, err := stream.Recv()
 		if err != nil {
 			break
 		}
 		rspMsg := string(rpcResponse.GetMessage().GetMessage())
-		if len(rpcResponse.GetRequest()) > 0 {
-			switch state {
-			case 0:
-				// hijack http response
-				stream.Send(&ypb.MITMRequest{
-					Id:             rpcResponse.GetId(),
-					HijackResponse: true,
-				})
-				// forward http request
-				stream.Send(&ypb.MITMRequest{
-					Id:      rpcResponse.GetId(),
-					Request: rpcResponse.GetRequest(),
-				})
-				state++
-			case 1:
-				// skip other request, like JustContentReplacer
-				if len(rpcResponse.GetResponse()) == 0 {
-					continue
-				}
+		if rpcResponse.GetIsWebsocket() && len(rpcResponse.GetPayload()) > 0 {
+			payload := rpcResponse.GetPayload()
+			require.NotNil(t, rpcResponse.GetRequest(), "rpcResponse.GetRequest() is nil")
 
-				// forward http response
-				stream.Send(&ypb.MITMRequest{
-					Id:         rpcResponse.GetId(),
-					ResponseId: rpcResponse.GetResponseId(),
-					Response:   rpcResponse.GetResponse(),
-				})
-				state++
-			case 2:
-				payload := rpcResponse.GetPayload()
-				require.Greater(t, len(payload), 0, "payload is empty")
-				require.NotNil(t, rpcResponse.GetRequest(), "rcpResponse.GetRequest() is nil")
-
-				log.Infof("recv payload: %s", payload)
-				if string(payload) == token {
-					hijackClientPayload = true
-				} else if string(payload) == "server: "+token {
-					hijackServerPayload = true
-				}
-
-				// forward payload
-				stream.Send(&ypb.MITMRequest{
-					Id:         rpcResponse.GetId(),
-					ResponseId: rpcResponse.GetResponseId(),
-					Request:    payload,
-					Response:   payload,
-				})
+			log.Infof("recv payload: %s", payload)
+			if string(payload) == token {
+				hijackClientPayload = true
+			} else if string(payload) == "server: "+token {
+				hijackServerPayload = true
 			}
+
+			// Request carries client frames and Response carries server frames.
+			forward := &ypb.MITMRequest{
+				Id:         rpcResponse.GetId(),
+				ResponseId: rpcResponse.GetResponseId(),
+			}
+			if rpcResponse.GetForResponse() {
+				forward.Response = payload
+			} else {
+				forward.Request = payload
+			}
+			require.NoError(t, stream.Send(forward))
+			continue
+		}
+
+		if len(rpcResponse.GetResponse()) > 0 {
+			require.NoError(t, stream.Send(&ypb.MITMRequest{
+				Id:         rpcResponse.GetId(),
+				ResponseId: rpcResponse.GetResponseId(),
+				Response:   rpcResponse.GetResponse(),
+			}))
+			continue
+		}
+
+		if !handshakeForwarded && len(rpcResponse.GetRequest()) > 0 {
+			// Request manual response interception, then forward the opening request.
+			// A 101 response is intentionally bypassed and may not produce a response event.
+			require.NoError(t, stream.Send(&ypb.MITMRequest{
+				Id:             rpcResponse.GetId(),
+				HijackResponse: true,
+			}))
+			require.NoError(t, stream.Send(&ypb.MITMRequest{
+				Id:      rpcResponse.GetId(),
+				Request: rpcResponse.GetRequest(),
+			}))
+			handshakeForwarded = true
 		}
 		if strings.Contains(rspMsg, `starting mitm serve`) {
 			go func() {

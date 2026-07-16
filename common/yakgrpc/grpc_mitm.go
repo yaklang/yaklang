@@ -383,7 +383,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			HaveNotification:    true,
 			NotificationContent: []byte("MITM 插件去重缓存已重置"),
 		})
-		log.Errorf("send reset filter cache failed: %s", err)
+		if err != nil {
+			log.Errorf("send reset filter cache failed: %s", err)
+		}
 	})
 
 	clearPluginHTTPFlowCache := func() {
@@ -982,6 +984,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 		httpctx.AppendMatchedRule(req, rules...)
 		if httpctx.IsWebsocketOpeningHandshake(req) {
+			// The 101 response must not enter ordinary HTTP response hijacking, but
+			// the opening request still owns the current manual hijack task. Release
+			// it here so subsequent WebSocket frame tasks can be dequeued.
+			controller.finishHijack(utils.CalcSha1(fmt.Sprintf("%p", req)))
 			return rsp
 		}
 		responseCounter := time.Now().UnixNano()
