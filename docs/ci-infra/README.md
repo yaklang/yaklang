@@ -159,11 +159,12 @@ sudo chown "$(whoami):$(whoami)" /data/ci-ssa
 1. `checkout` **`main`**
 2. `install-yak-ci.sh` — 从 OSS 拉取与 diff-check 相同策略的 yak 版本
 3. `yak sf-import` — 导入 `common/ssa_bootstrapping/ci_rule/`
-4. `yak ssa-compile --config ci-yaklang-base-compile.json --database $SSA_DATABASE_RAW --re-compile`
-5. `ensure-base-program.sh` — 确认 `ci-yaklang-base` 已写入 DB
-6. `write-local-manifest.sh` — 写入数据目录 manifest + 重置 pointer 为 `ci-yaklang-base`
-7. `cleanup-stale-overlay-programs.sh` — 删除 `ci-yaklang-promote-*` / `ci-yaklang-diff-pr-*`
-8. 上传 artifact **ci-ssa-manifest**
+4. **获取 DB 写锁**（`acquire-db-lock.sh`，flock 排他锁）
+5. `yak ssa-compile --config ci-yaklang-base-compile.json --database $SSA_DATABASE_RAW --re-compile`
+6. `ensure-base-program.sh` — 确认 `ci-yaklang-base` 已写入 DB，并校验 manifest/pointer/DB 一致
+7. `write-local-manifest.sh` — 写入数据目录 manifest + 重置 pointer 为 `ci-yaklang-base`（`overlay_depth=0`）
+8. `cleanup-stale-overlay-programs.sh` — 删除 `ci-yaklang-promote-*` / `ci-yaklang-diff-pr-*`
+9. 上传 artifact **ci-ssa-manifest**
 
 全量配置见 [ci-yaklang-base-compile.json](../../scripts/ci-ssa/ci-yaklang-base-compile.json)。
 
@@ -186,13 +187,16 @@ sudo chown "$(whoami):$(whoami)" /data/ci-ssa
 [ci-ssa-base-promote.yml](../../.github/workflows/ci-ssa-base-promote.yml)：
 
 1. `checkout` / 同步 `origin/main`
-2. 读取 `$SSA_CI_DATA_DIR/manifest.json` 的 `main_sha`
-3. `yak gitefs --start $OLD_SHA --end $NEW_SHA`
-4. 若 diff 非空：`yak ssa-compile` 增量写入 `ci-yaklang-promote-{sha8}`（base = 当前 pointer）
-5. 更新 pointer + 本地 manifest
-6. `cleanup-pr-diff-programs.sh` 删除该 PR 的 `ci-yaklang-diff-pr-{N}-*`
+2. 读取 `$SSA_CI_DATA_DIR/manifest.json` 的 `main_sha` / `overlay_depth`
+3. **获取 DB 写锁**（`acquire-db-lock.sh`，flock 排他锁）
+4. `yak gitefs --start $OLD_SHA --end $NEW_SHA`
+5. 若 diff 非空：`yak ssa-compile` 增量写入 `ci-yaklang-promote-{sha8}`（base = 当前 pointer），`overlay_depth + 1`
+6. 更新 pointer + 本地 manifest（含新 `overlay_depth`）
+7. `cleanup-pr-diff-programs.sh` 删除该 PR 的 `ci-yaklang-diff-pr-{N}-*`
 
-空 diff（仅文档等）时只推进 `main_sha`，不新建 overlay。
+空 diff（仅文档等）时只推进 `main_sha`，不新建 overlay，`overlay_depth` 不变。
+
+当 `overlay_depth` 超过阈值（默认 5，`CI_SSA_OVERLAY_DEPTH_LIMIT` 可调）时，promote 会发 `::warning` 提示触发 weekly 压平，但**不阻塞合并**。引擎暂无 flatten API，层数只能靠 weekly 全量回收。
 
 ---
 
@@ -202,7 +206,8 @@ sudo chown "$(whoami):$(whoami)" /data/ci-ssa
 |------|------|------|
 | [export-ssa-db-env.sh](../../scripts/ci-ssa/export-ssa-db-env.sh) | Shell | `source` 后设置路径与有效 `CI_SSA_BASE_PROGRAM` |
 | [install-yak-ci.sh](../../scripts/ci-ssa/install-yak-ci.sh) | Shell | 下载安装 yak |
-| [ensure-base-program.sh](../../scripts/ci-ssa/ensure-base-program.sh) | Shell | 检查 DB 与有效基线 program |
+| [acquire-db-lock.sh](../../scripts/ci-ssa/acquire-db-lock.sh) | Shell | flock 排他锁，保护 DB 写操作（weekly/promote） |
+| [ensure-base-program.sh](../../scripts/ci-ssa/ensure-base-program.sh) | Shell | 检查 DB 与有效基线 program；校验 manifest/pointer/DB 三者一致 |
 | [generate-diff-scan-config.sh](../../scripts/ci-ssa/generate-diff-scan-config.sh) | Shell | 生成 PR 扫描 config（含动态 base） |
 | [write-local-manifest.sh](../../scripts/ci-ssa/write-local-manifest.sh) | Shell | 写本地 manifest + pointer |
 | [promote-base-on-merge.sh](../../scripts/ci-ssa/promote-base-on-merge.sh) | Shell | 合并后增量 promote |
@@ -221,6 +226,7 @@ sudo chown "$(whoami):$(whoami)" /data/ci-ssa
   "version": "1",
   "base_program_name": "ci-yaklang-base",
   "main_sha": "<有效基线对应的 main git SHA>",
+  "overlay_depth": 0,
   "yak_version": "<yak version 输出>",
   "database": {
     "url": "local:///data/ci-ssa/default-yakssa.db",
@@ -232,6 +238,8 @@ sudo chown "$(whoami):$(whoami)" /data/ci-ssa
 }
 ```
 
+`overlay_depth`：当前有效基线之上的 promote overlay 层数。weekly 全量重置为 0，每次 promote +1。超过 `CI_SSA_OVERLAY_DEPTH_LIMIT`（默认 5）时 promote 发告警。
+
 `database.url` 以 `local://` 开头表示库在自建机本地；[ci-infra-smoke](../../.github/workflows/ci-infra-smoke.yml) 的 storage-probe 会跳过此类 URL。
 
 ---
@@ -242,6 +250,8 @@ sudo chown "$(whoami):$(whoami)" /data/ci-ssa
 |------|----------|------|
 | Job 一直 **pending** | Runner 离线或缺少 label | 检查 `self-hosted` / `linux` / `ssa-ci` |
 | `Base program ... not found` | 未跑 weekly 或 pointer 指向已删 program | 手动 **CI SSA Base Weekly**；检查 `base-program-name` |
+| `Base pointer drift detected` | manifest / pointer / env 三者不一致（weekly 或 promote 写库被中断） | 跑 **CI SSA Base Weekly** 重新压平 |
+| `Overlay chain depth N exceeds limit` | promote 叠层过多，PR 扫描变慢 | 手动触发 **CI SSA Base Weekly** 压平，或调高 `CI_SSA_OVERLAY_DEPTH_LIMIT` |
 | `Local manifest not found` | 未跑过新版 weekly（未写本地 manifest） | 跑一次 **CI SSA Base Weekly** |
 | `SSA database not found` | `/data/ci-ssa` 未创建 | 建目录并赋权 runner 用户 |
 | Promote 失败 / ancestor 检查失败 | main 历史改写或基线过旧 | 跑 weekly 全量纠偏 |
