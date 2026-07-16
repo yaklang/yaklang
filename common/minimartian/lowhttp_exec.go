@@ -56,7 +56,16 @@ func (p *Proxy) doHTTPRequest(ctx *Context, req *http.Request) (*http.Response, 
 }
 
 func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, error) {
-	bareBytes := httpctx.GetRequestBytes(req)
+	// PlainRequestBytes is the decoded representation used by the UI, history,
+	// and plugins. It must not replace the wire packet during transparent
+	// forwarding. Explicitly hijacked bytes still take precedence.
+	bareBytes := httpctx.GetHijackedRequestBytes(req)
+	if len(bareBytes) == 0 {
+		bareBytes = httpctx.GetBareRequestBytes(req)
+	}
+	if len(bareBytes) == 0 {
+		bareBytes = httpctx.GetRequestBytes(req)
+	}
 	reqBytes := lowhttp.FixHTTPRequest(bareBytes)
 
 	isHttps := httpctx.GetRequestHTTPS(req)
