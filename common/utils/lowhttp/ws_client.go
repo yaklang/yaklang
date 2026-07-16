@@ -793,9 +793,21 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 	// 接收响应并判断
 	var responseBuffer bytes.Buffer
 	upgradeResponseHandler := config.UpgradeResponseHandler
-	bufioReader := bufio.NewReaderSize(io.TeeReader(conn, &responseBuffer), 4096)
+	bufioReader := bufio.NewReaderSize(conn, 4096)
 	responseReadStartedAt := time.Now()
-	rsp, err := utils.ReadHTTPResponseFromBufioReader(bufioReader, req)
+	var rsp *http.Response
+	for informationalResponses := 0; ; informationalResponses++ {
+		if informationalResponses >= 16 {
+			err = utils.Error("websocket: too many informational responses before upgrade")
+			break
+		}
+		responseBuffer.Reset()
+		responseReader := io.TeeReader(bufioReader, &responseBuffer)
+		rsp, err = utils.ReadSingleHTTPResponseFromBufioReader(responseReader, req)
+		if err != nil || rsp.StatusCode < 100 || rsp.StatusCode >= 200 || rsp.StatusCode == http.StatusSwitchingProtocols {
+			break
+		}
+	}
 	handshakeTimings.ResponseReadDuration = time.Since(responseReadStartedAt)
 	reportHandshakeTimings()
 	if err != nil {
@@ -805,19 +817,7 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 		return nil, utils.Errorf("read response failed: %s", err)
 	}
 	bufferedAfterHandshake := bufioReader.Buffered()
-	responseAndBufferedFrames := responseBuffer.Bytes()
-	if bufferedAfterHandshake > len(responseAndBufferedFrames) {
-		_ = conn.Close()
-		return nil, utils.Errorf("websocket: buffered frame bytes exceed captured upgrade response")
-	}
-	responseRaw := bytes.Clone(responseAndBufferedFrames[:len(responseAndBufferedFrames)-bufferedAfterHandshake])
-	remindBytes := make([]byte, bufferedAfterHandshake)
-	if len(remindBytes) > 0 {
-		if _, err := io.ReadFull(bufioReader, remindBytes); err != nil {
-			_ = conn.Close()
-			return nil, utils.Wrap(err, "read websocket frames buffered after upgrade response")
-		}
-	}
+	responseRaw := bytes.Clone(responseBuffer.Bytes())
 	requestExtensions := make(http.Header)
 	if value := GetHTTPPacketHeader(requestRaw, "Sec-WebSocket-Extensions"); value != "" {
 		requestExtensions.Set("Sec-WebSocket-Extensions", value)
@@ -875,7 +875,7 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 	if cancel == nil {
 		ctx, cancel = context.WithCancel(ctx)
 	}
-	fr := NewFrameReader(io.MultiReader(bytes.NewBuffer(remindBytes), conn), extensions.IsDeflate)
+	fr := NewFrameReaderFromBufio(bufioReader, extensions.IsDeflate)
 	fw := NewFrameWriter(conn, extensions.IsDeflate)
 
 	client := &WebsocketClient{
@@ -886,7 +886,7 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 		Response:                      responseRaw,
 		ResponseInstance:              rsp,
 		HandshakeTimings:              handshakeTimings,
-		BufferedAfterHandshake:        len(remindBytes),
+		BufferedAfterHandshake:        bufferedAfterHandshake,
 		FromServerHandler:             config.FromServerHandler,
 		FromServerHandlerEx:           config.FromServerHandlerEx,
 		AllFrameHandler:               config.AllFrameHandler,

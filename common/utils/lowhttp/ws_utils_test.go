@@ -123,6 +123,26 @@ func TestValidateWebsocketUpgradeResponse(t *testing.T) {
 	delete(missingConnection.Header, "Connection")
 	require.Error(t, validateWebsocketUpgradeResponse(request, missingConnection))
 
+	invalidUpgrade := valid()
+	invalidUpgrade.Header["Upgrade"] = []string{"h2c"}
+	require.Error(t, validateWebsocketUpgradeResponse(request, invalidUpgrade))
+
+	invalidConnection := valid()
+	invalidConnection.Header["Connection"] = []string{"keep-alive"}
+	require.Error(t, validateWebsocketUpgradeResponse(request, invalidConnection))
+
+	duplicateUpgrade := valid()
+	duplicateUpgrade.Header["Upgrade"] = []string{"websocket", "WebSocket"}
+	require.NoError(t, validateWebsocketUpgradeResponse(request, duplicateUpgrade))
+
+	duplicateConnection := valid()
+	duplicateConnection.Header["Connection"] = []string{"keep-alive, Upgrade", "upgrade"}
+	require.NoError(t, validateWebsocketUpgradeResponse(request, duplicateConnection))
+
+	duplicateAccept := valid()
+	duplicateAccept.Header["Sec-WebSocket-Accept"] = []string{ComputeWebsocketAcceptKey(key), ComputeWebsocketAcceptKey(key)}
+	require.Error(t, validateWebsocketUpgradeResponse(request, duplicateAccept))
+
 	unofferedProtocol := valid()
 	unofferedProtocol.Header["Sec-WebSocket-Protocol"] = []string{"other"}
 	require.Error(t, validateWebsocketUpgradeResponse(request, unofferedProtocol))

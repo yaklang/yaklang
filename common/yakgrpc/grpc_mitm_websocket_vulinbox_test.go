@@ -25,42 +25,56 @@ func startWebsocketMITMProxy(t *testing.T, ctx context.Context, cancel context.C
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 
-	mitmPort := utils.GetRandomAvailableTCPPort()
-	stream, err := client.MITM(ctx)
-	require.NoError(t, err)
-	request := &ypb.MITMRequest{
-		Host:             "127.0.0.1",
-		Port:             uint32(mitmPort),
-		SetAutoForward:   true,
-		AutoForwardValue: true,
-	}
-	if len(filterWebsocket) > 0 && filterWebsocket[0] {
-		request.FilterWebsocket = true
-		request.UpdateFilterWebsocket = true
-	}
-	require.NoError(t, stream.Send(request))
-
-	ready := make(chan struct{})
-	recvDone := make(chan struct{})
-	var readyOnce sync.Once
-	go func() {
-		defer close(recvDone)
-		for {
-			response, err := stream.Recv()
-			if err != nil {
-				return
-			}
-			if message := response.GetMessage(); message != nil && strings.Contains(string(message.GetMessage()), "starting mitm serve") {
-				readyOnce.Do(func() { close(ready) })
-			}
+	var mitmPort int
+	var recvDone chan struct{}
+	started := false
+	for attempt := 0; attempt < 10; attempt++ {
+		mitmPort = utils.GetRandomAvailableTCPPort()
+		stream, streamErr := client.MITM(ctx)
+		require.NoError(t, streamErr)
+		request := &ypb.MITMRequest{
+			Host:             "127.0.0.1",
+			Port:             uint32(mitmPort),
+			SetAutoForward:   true,
+			AutoForwardValue: true,
 		}
-	}()
+		if len(filterWebsocket) > 0 && filterWebsocket[0] {
+			request.FilterWebsocket = true
+			request.UpdateFilterWebsocket = true
+		}
+		require.NoError(t, stream.Send(request))
 
-	select {
-	case <-ready:
-	case <-time.After(10 * time.Second):
+		ready := make(chan struct{})
+		attemptDone := make(chan struct{})
+		var readyOnce sync.Once
+		go func() {
+			defer close(attemptDone)
+			for {
+				response, recvErr := stream.Recv()
+				if recvErr != nil {
+					return
+				}
+				if message := response.GetMessage(); message != nil && strings.Contains(string(message.GetMessage()), "starting mitm serve") {
+					readyOnce.Do(func() { close(ready) })
+				}
+			}
+		}()
+
+		select {
+		case <-ready:
+			recvDone = attemptDone
+			started = true
+		case <-attemptDone:
+			continue
+		case <-time.After(10 * time.Second):
+			cancel()
+			t.Fatal("MITM proxy did not become ready")
+		}
+		break
+	}
+	if !started {
 		cancel()
-		t.Fatal("MITM proxy did not become ready")
+		t.Fatal("MITM proxy could not bind an available port after retries")
 	}
 
 	t.Cleanup(func() {
