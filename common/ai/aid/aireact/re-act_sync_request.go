@@ -117,7 +117,7 @@ func (r *ReAct) HandleSyncTypeKnowledgeEvent(event *ypb.AIInputEvent) error {
 func (r *ReAct) HandleSyncTypeRecoveryPlanAndExecEvent(event *ypb.AIInputEvent) error {
 	sessionID := r.config.PersistentSessionId
 	coordinatorID := ""
-	startTaskIndex := ""
+	startTaskID := ""
 	if event.SyncJsonInput != "" {
 		var params map[string]interface{}
 		if err := json.Unmarshal([]byte(event.SyncJsonInput), &params); err != nil {
@@ -130,8 +130,8 @@ func (r *ReAct) HandleSyncTypeRecoveryPlanAndExecEvent(event *ypb.AIInputEvent) 
 		if cid, ok := params["coordinator_id"].(string); ok && cid != "" {
 			coordinatorID = cid
 		}
-		if idx, ok := params["start_task_index"].(string); ok && idx != "" {
-			startTaskIndex = idx
+		if id, ok := params["start_task_id"].(string); ok && id != "" {
+			startTaskID = id
 		}
 	}
 	if coordinatorID == "" {
@@ -152,13 +152,13 @@ func (r *ReAct) HandleSyncTypeRecoveryPlanAndExecEvent(event *ypb.AIInputEvent) 
 		return nil
 	}
 	r.EmitSyncEvent("recover_plan_and_exec", map[string]interface{}{
-		"started":          true,
-		"session_id":       sessionID,
-		"coordinator_id":   coordinatorID,
-		"start_task_index": startTaskIndex,
+		"started":        true,
+		"session_id":     sessionID,
+		"coordinator_id": coordinatorID,
+		"start_task_id":  startTaskID,
 	}, event.SyncID)
 
-	go r.AsyncRecoverPlanAndExecute(r.config.Ctx, coordinatorID, startTaskIndex, func(err error) {
+	go r.AsyncRecoverPlanAndExecute(r.config.Ctx, coordinatorID, startTaskID, func(err error) {
 		if err != nil {
 			log.Errorf("recover plan-and-exec failed: %v", err)
 		}
@@ -253,10 +253,12 @@ func (r *ReAct) HandleSyncTypeReactJumpQueueEvent(event *ypb.AIInputEvent) error
 	if currentTask != nil {
 		log.Infof("cancelling current task %s to allow jump queue for task %s", currentTask.GetId(), targetTaskId)
 
+		// 标记为用户主动取消，阻止 abort 覆盖为 Aborted
+		currentTask.SetUserCancelled()
 		// 调用任务的 Cancel 方法，这会取消任务的 context
-		currentTask.Cancel()
+		currentTask.Cancel(fmt.Sprintf("jump_queue: cancelled to allow task %s to run first; do NOT re-dispatch or retry this cancelled sub agent", targetTaskId))
 
-		// 设置任务状态为 Aborted
+		// 设置任务状态为 Aborted（插队场景设 Aborted 而非 Skipped）
 		currentTask.SetStatus(aicommon.AITaskState_Aborted)
 
 		// 发送任务取消事件
@@ -283,7 +285,6 @@ func (r *ReAct) HandleSyncTypeReactJumpQueueEvent(event *ypb.AIInputEvent) error
 }
 
 func (r *ReAct) CancelTask(task aicommon.AIStatefulTask, event *ypb.AIInputEvent) {
-
 	if task.IsAsyncMode() {
 		task.SetAsyncDeferCallback(func(err error) {
 			// 发送任务取消事件
@@ -292,20 +293,24 @@ func (r *ReAct) CancelTask(task aicommon.AIStatefulTask, event *ypb.AIInputEvent
 				"user_input":   task.GetUserInput(),
 				"cancelled_at": time.Now(),
 			}, event.SyncID)
-			// 设置任务状态为 Aborted
-			task.SetStatus(aicommon.AITaskState_Aborted)
+			// 设置任务状态为 Skipped（用户主动取消）
+			task.SetStatus(aicommon.AITaskState_Skipped)
 		})
+		// 标记为用户主动取消，阻止 abort 覆盖为 Aborted
+		task.SetUserCancelled()
 		// 调用任务的 Cancel 方法，这会取消任务的 context
-		task.Cancel()
+		task.Cancel("user requested cancellation; do NOT re-dispatch or retry this cancelled sub agent")
 	} else {
-		task.Cancel()
+		// 标记为用户主动取消，阻止 abort 覆盖为 Aborted
+		task.SetUserCancelled()
+		task.Cancel("user requested cancellation; do NOT re-dispatch or retry this cancelled sub agent")
 		r.EmitSyncEvent("react_task_cancelled", map[string]interface{}{
 			"task_id":      task.GetId(),
 			"user_input":   task.GetUserInput(),
 			"cancelled_at": time.Now(),
 		}, event.SyncID)
-		// 设置任务状态为 Aborted
-		task.SetStatus(aicommon.AITaskState_Aborted)
+		// 设置任务状态为 Skipped（用户主动取消）
+		task.SetStatus(aicommon.AITaskState_Skipped)
 	}
 }
 

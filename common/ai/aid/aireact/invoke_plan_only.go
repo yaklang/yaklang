@@ -267,8 +267,8 @@ func (r *ReAct) invokePlanExecuteOnly(doneChannel chan struct{}, ctx context.Con
 	defer r.config.HotPatchBroadcaster.Unsubscribe(hotpatchChan)
 
 	baseOpts := buildPlanExecBaseOptions(r, uid, planCtx, inputChannel, hotpatchChan)
-	if cfg.startTaskIndex != "" {
-		baseOpts = append(baseOpts, aid.WithRecoveryStartTaskIndex(cfg.startTaskIndex))
+	if cfg.startTaskID != "" {
+		baseOpts = append(baseOpts, aid.WithRecoveryStartTaskID(cfg.startTaskID))
 	}
 
 	cod, err := newCoordinatorContextForPlanExec(planCtx, "", baseOpts...)

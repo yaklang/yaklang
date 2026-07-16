@@ -108,6 +108,12 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 			// WithFastAICallback 路径, 让 raw ai.Chat 末帧 token usage (含 cached_tokens)
 			// 也能触达用户脚本.
 			// 关键词: AIChatToAICallbackType, original callback usage 透传, ai.usageCallback
+			// 把 caller config 的 context 透传给底层 AI gateway (openai/gemini),
+			// 这样 task cancel 时底层 HTTP 请求能被立即中断，而不是等到 HTTP 超时。
+			// 关键词: context 透传, cancel 即时中断, HTTP 超时修复
+			if ctx := aicf.GetContext(); ctx != nil {
+				optList = append(optList, aispec.WithContext(ctx))
+			}
 			optList = append(optList, extractUserUsageCallbackOpts(aicf)...)
 			// 上报本次请求的模型用途类型(tier)，供 aibalance gateway 注入
 			// X-Yak-AI-Model-Usage-Type 头给中转层做用量保护降级。空 tier 不上报。

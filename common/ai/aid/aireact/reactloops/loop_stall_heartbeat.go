@@ -217,6 +217,6 @@ func (r *ReActLoop) hardAbortLoopStall(task aicommon.AIStatefulTask, gap time.Du
 	}
 
 	if task != nil {
-		task.Cancel()
+		task.Cancel(fmt.Sprintf("loop_stall_hard_abort: main loop stalled for %v at iteration %d", gap, iteration))
 	}
 }

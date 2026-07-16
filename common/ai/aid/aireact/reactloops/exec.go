@@ -665,13 +665,16 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 
 	done := utils.NewOnce()
 	abort := func(err error) {
-		result := task.GetResult()
-		result += "\n\n[Error]: " + err.Error()
-		task.SetResult(result)
 		done.Do(func() {
-			if !testIsFinished(task) {
-				task.SetStatus(aicommon.AITaskState_Aborted)
+			// 用户通过 sync 事件主动取消/跳过时，不覆盖已设的终止状态，
+			// 也不追加 [Error] 到 result，避免污染用户可见的取消语义。
+			if task.IsUserCancelled() || testIsFinished(task) {
+				return
 			}
+			result := task.GetResult()
+			result += "\n\n[Error]: " + err.Error()
+			task.SetResult(result)
+			task.SetStatus(aicommon.AITaskState_Aborted)
 		})
 	}
 	complete := func(err any) {

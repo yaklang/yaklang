@@ -25,7 +25,7 @@ import (
 // PlanExecutingLoadingStatusKey is the key used to emit loading status events for plan execution
 // Similar to ReActLoadingStatusKey in reactloops, this allows UI to show current execution phase
 const PlanExecutingLoadingStatusKey = "plan-executing-loading-status-key"
-const RecoveryStartTaskIndexConfigKey = "recovery_start_task_index"
+const RecoveryStartTaskIDConfigKey = "recovery_start_task_id"
 
 // CoordinatorOption 定义配置 Coordinator 的选项接口
 type CoordinatorOption func(c *Coordinator)
@@ -92,12 +92,12 @@ func WithPlanMocker(i func(coordinator *Coordinator) *PlanResponse) aicommon.Con
 	}
 }
 
-func WithRecoveryStartTaskIndex(index string) aicommon.ConfigOption {
+func WithRecoveryStartTaskID(id string) aicommon.ConfigOption {
 	return func(config *aicommon.Config) error {
 		if config == nil {
 			return nil
 		}
-		config.SetConfig(RecoveryStartTaskIndexConfigKey, strings.TrimSpace(index))
+		config.SetConfig(RecoveryStartTaskIDConfigKey, strings.TrimSpace(id))
 		return nil
 	}
 }
@@ -241,11 +241,11 @@ func (c *Coordinator) GetContextProvider() *PromptContextProvider {
 	return c.ContextProvider
 }
 
-func (c *Coordinator) getRecoveryStartTaskIndex() string {
+func (c *Coordinator) getRecoveryStartTaskID() string {
 	if c == nil || c.Config == nil {
 		return ""
 	}
-	return strings.TrimSpace(c.GetConfigString(RecoveryStartTaskIndexConfigKey))
+	return strings.TrimSpace(c.GetConfigString(RecoveryStartTaskIDConfigKey))
 }
 
 func (c *Coordinator) getCurrentTaskPlan() *AiTask {
@@ -406,8 +406,8 @@ func (c *Coordinator) Run() error {
 	c.EmitCurrentConfigInfo()
 	c.emitBaseCapabilityInventory()
 
-	recoveryStartTaskIndex := c.getRecoveryStartTaskIndex()
-	recovered, err := c.tryRecoverAndExecute(recoveryStartTaskIndex)
+	recoveryStartTaskID := c.getRecoveryStartTaskID()
+	recovered, err := c.tryRecoverAndExecute(recoveryStartTaskID)
 	if err != nil {
 		return err
 	}
@@ -558,6 +558,40 @@ func (c *Coordinator) FindSubtaskByIndex(index string) *AiTask {
 	return nil
 }
 
+// FindSubtaskBySubtaskId 根据任务的稳定逻辑 ID (TaskId) 查找子任务
+// TaskId 在任务树创建时生成，并在索引重新生成后保持不变。
+func (c *Coordinator) FindSubtaskBySubtaskId(subtaskId string) *AiTask {
+	if c.rootTask == nil || subtaskId == "" {
+		return nil
+	}
+
+	taskLink := DFSOrderAiTask(c.rootTask)
+	for i := 0; i < taskLink.Len(); i++ {
+		task, ok := taskLink.Get(i)
+		if !ok {
+			continue
+		}
+		if task.TaskId == subtaskId || task.GetId() == subtaskId {
+			return task
+		}
+	}
+	return nil
+}
+
+// FindSubtask 根据索引或 subtaskId 查找子任务。
+// 当指定 subtaskId 且非空时，优先通过 subtaskId 进行查找；否则回退到索引。
+func (c *Coordinator) FindSubtask(index, subtaskId string) *AiTask {
+	if subtaskId != "" {
+		if task := c.FindSubtaskBySubtaskId(subtaskId); task != nil {
+			return task
+		}
+	}
+	if index != "" {
+		return c.FindSubtaskByIndex(index)
+	}
+	return nil
+}
+
 func (c *Coordinator) AppendTask(t *AiTask) {
 	if t == nil {
 		return
@@ -584,8 +618,9 @@ func (c *Coordinator) AppendTask(t *AiTask) {
 
 // HandleSkipSubtaskInPlan 处理跳过子任务的同步事件
 // 输入参数:
-//   - subtask_index: 子任务的索引，如 "1-1", "1-2" （当 current task 为false的时候必须）
-//   - skip_current_task: 跳过当前任务（可选）
+//   - subtask_index: 子任务的索引，如 "1-1", "1-2" （当 subtask_id 和 skip_current_task 均未提供时必须）
+//   - subtask_id: 子任务的稳定逻辑 ID（可选，优先于 subtask_index）
+//   - skip_current_task: 跳过当前任务（可选，当 subtask_index/subtask_id 均未提供时使用）
 //   - reason: 用户跳过该任务的理由（可选）
 //
 // 注意：此函数不会返回错误导致整体中断，而是通过同步响应返回失败信息
@@ -627,43 +662,56 @@ func (c *Coordinator) HandleSkipSubtaskInPlan(event *ypb.AIInputEvent) error {
 	}
 
 	subtaskIndex := utils.InterfaceToString(params["subtask_index"])
-	if subtaskIndex == "" {
-		if utils.InterfaceToBoolean(params["skip_current_task"]) {
-			currentTask, err := c.runtime.currentInteractiveTask()
-			if err != nil || currentTask == nil {
-				if err != nil {
-					sendFailResponse("no unambiguous current task found to skip: " + err.Error())
-				} else {
-					sendFailResponse("no current task found to skip")
-				}
-				return nil
-			}
-			subtaskIndex = currentTask.Index
-		} else {
-			sendFailResponse("subtask_index is required for skip_subtask_in_plan")
-			return nil
-		}
-	}
+	subtaskID := utils.InterfaceToString(params["subtask_id"])
 
 	// 获取用户理由（可选）
 	userReason := utils.InterfaceToString(params["reason"])
 
-	// 查找子任务
-	task := c.FindSubtaskByIndex(subtaskIndex)
-	if task == nil {
-		sendFailResponse("subtask not found by index: " + subtaskIndex)
+	// 查找子任务：优先使用 subtask_id，其次使用 subtask_index，最后回退到当前任务
+	var task *AiTask
+	if subtaskID != "" {
+		task = c.FindSubtaskBySubtaskId(subtaskID)
+		if task == nil {
+			sendFailResponse("subtask not found by subtask_id: " + subtaskID)
+			return nil
+		}
+	} else if subtaskIndex != "" {
+		task = c.FindSubtaskByIndex(subtaskIndex)
+		if task == nil {
+			sendFailResponse("subtask not found by index: " + subtaskIndex)
+			return nil
+		}
+	} else if utils.InterfaceToBoolean(params["skip_current_task"]) {
+		currentTask, err := c.runtime.currentInteractiveTask()
+		if err != nil || currentTask == nil {
+			if err != nil {
+				sendFailResponse("no unambiguous current task found to skip: " + err.Error())
+			} else {
+				sendFailResponse("no current task found to skip")
+			}
+			return nil
+		}
+		task = currentTask
+	} else {
+		sendFailResponse("subtask_index or subtask_id is required for skip_subtask_in_plan")
 		return nil
 	}
 
 	// 幂等检查：如果任务已经是 Skipped 状态，不重复处理
 	if task.GetStatus() == aicommon.AITaskState_Skipped {
-		sendFailResponse("subtask already skipped: " + subtaskIndex)
+		sendFailResponse("subtask already skipped: " + task.Index)
 		return nil
 	}
 
+	// 标记为用户主动取消，阻止 abort 覆盖为 Aborted
+	task.SetUserCancelled()
 	// 取消任务并设置为 Skipped 状态（区别于 Aborted，Skipped 专门表示用户主动跳过）
 	task.SetStatus(aicommon.AITaskState_Skipped)
-	task.Cancel()
+	if userReason != "" {
+		task.Cancel("user skipped subtask: " + userReason + "; do NOT re-dispatch or retry this cancelled sub agent")
+	} else {
+		task.Cancel("user skipped subtask; do NOT re-dispatch or retry this cancelled sub agent")
+	}
 
 	// 构建 timeline 消息
 	baseMessage := "用户主动跳过了当前子任务，可能是用户觉得当前任务意义不重要，或者当前信息已经足够作出决定了，请你不要质疑，直接开始执行下一个子任务"
@@ -679,7 +727,8 @@ func (c *Coordinator) HandleSkipSubtaskInPlan(event *ypb.AIInputEvent) error {
 	// 发送同步响应
 	c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "skip_subtask_in_plan", map[string]any{
 		"success":       true,
-		"subtask_index": subtaskIndex,
+		"subtask_index": task.Index,
+		"subtask_id":    task.TaskId,
 		"subtask_name":  task.Name,
 		"reason":        userReason,
 		"message":       timelineMessage,
@@ -691,7 +740,8 @@ func (c *Coordinator) HandleSkipSubtaskInPlan(event *ypb.AIInputEvent) error {
 // HandleRedoSubtaskInPlan 处理重做子任务的同步事件
 // 用户可以中断当前子任务，添加额外信息到 timeline，然后重新执行该任务
 // 输入参数:
-//   - subtask_index: 子任务的索引，如 "1-1", "1-2"（必需）
+//   - subtask_index: 子任务的索引，如 "1-1", "1-2"（与 subtask_id 二选一）
+//   - subtask_id: 子任务的稳定逻辑 ID（可选，优先于 subtask_index）
 //   - user_message: 用户提供的额外信息，用于辅助 AI 更好地执行任务（必需）
 //
 // 注意：此函数不会返回错误导致整体中断，而是通过同步响应返回失败信息
@@ -733,10 +783,7 @@ func (c *Coordinator) HandleRedoSubtaskInPlan(event *ypb.AIInputEvent) error {
 	}
 
 	subtaskIndex := utils.InterfaceToString(params["subtask_index"])
-	if subtaskIndex == "" {
-		sendFailResponse("subtask_index is required for redo_subtask_in_plan")
-		return nil
-	}
+	subtaskID := utils.InterfaceToString(params["subtask_id"])
 
 	// 用户消息是必须的
 	userMessage := utils.InterfaceToString(params["user_message"])
@@ -745,17 +792,30 @@ func (c *Coordinator) HandleRedoSubtaskInPlan(event *ypb.AIInputEvent) error {
 		return nil
 	}
 
-	// 查找子任务
-	task := c.FindSubtaskByIndex(subtaskIndex)
-	if task == nil {
-		sendFailResponse("subtask not found by index: " + subtaskIndex)
+	// 查找子任务：优先使用 subtask_id，其次使用 subtask_index
+	var task *AiTask
+	if subtaskID != "" {
+		task = c.FindSubtaskBySubtaskId(subtaskID)
+		if task == nil {
+			sendFailResponse("subtask not found by subtask_id: " + subtaskID)
+			return nil
+		}
+	} else if subtaskIndex != "" {
+		task = c.FindSubtaskByIndex(subtaskIndex)
+		if task == nil {
+			sendFailResponse("subtask not found by index: " + subtaskIndex)
+			return nil
+		}
+	} else {
+		sendFailResponse("subtask_index or subtask_id is required for redo_subtask_in_plan")
 		return nil
 	}
 
 	if task.GetStatus() != aicommon.AITaskState_Completed {
 		c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "redo_subtask_in_plan", map[string]any{
 			"success":       false,
-			"subtask_index": subtaskIndex,
+			"subtask_index": task.Index,
+			"subtask_id":    task.TaskId,
 			"subtask_name":  task.Name,
 			"user_message":  userMessage,
 			"message":       "only completed subtasks can be redone",
@@ -785,7 +845,8 @@ func (c *Coordinator) HandleRedoSubtaskInPlan(event *ypb.AIInputEvent) error {
 	// 发送同步响应
 	c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "redo_subtask_in_plan", map[string]any{
 		"success":       true,
-		"subtask_index": subtaskIndex,
+		"subtask_index": task.Index,
+		"subtask_id":    task.TaskId,
 		"subtask_name":  task.Name,
 		"user_message":  userMessage,
 		"message":       timelineMessage,
