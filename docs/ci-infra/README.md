@@ -196,7 +196,39 @@ sudo chown "$(whoami):$(whoami)" /data/ci-ssa
 
 空 diff（仅文档等）时只推进 `main_sha`，不新建 overlay，`overlay_depth` 不变。
 
-当 `overlay_depth` 超过阈值（默认 5，`CI_SSA_OVERLAY_DEPTH_LIMIT` 可调）时，promote 会发 `::warning` 提示触发 weekly 压平，但**不阻塞合并**。引擎暂无 flatten API，层数只能靠 weekly 全量回收。
+当 `overlay_depth` 超过阈值（默认 5，`CI_SSA_OVERLAY_DEPTH_LIMIT` 可调）时，promote 会**自动触发 flatten**：运行 `flatten-overlay.yak` 把整个 overlay 链重编译为单个自包含 program，重置 `overlay_depth=0`。flatten 是一次全量重编译（与 weekly 同量级），仅在超阈值时触发，不阻塞合并（失败时保留原 overlay 链，下次 weekly 兜底压平）。
+
+---
+
+## Overlay Flatten（按需压平）
+
+[flatten-overlay.yak](../../scripts/ci-ssa/flatten-overlay.yak) 把多层 overlay 链合并为一个自包含的单层 program：
+
+1. `ssa.SetDatabase(database)` 切换到目标 SSA 库
+2. `ssa.GetOverlayFiles(program)` 提取 overlay 的聚合文件系统（遮蔽/删除已解析）
+3. 把文件写到临时目录
+4. `ssa.ParseProject` 非增量全量重编译为单层 program（`IsOverlay=false`，无 `OverlayLayers`）
+5. 删除原 overlay 链的 `ci-yaklang-promote-*` / `ci-yaklang-diff-pr-*` 释放磁盘
+6. 清理临时目录
+
+手动运行：
+
+```bash
+yak scripts/ci-ssa/flatten-overlay.yak \
+  --program ci-yaklang-promote-abcd1234 \
+  --output ci-yaklang-base \
+  --database sqlite:///data/ci-ssa/default-yakssa.db \
+  --config scripts/ci-ssa/ci-yaklang-base-compile.json
+```
+
+Go 桥接函数（`ssaapi.Exports`，脚本可调用 `ssa.*`）：
+
+| 导出名 | Go 函数 | 说明 |
+|--------|---------|------|
+| `ssa.SetDatabase` | `SetDatabase` | 设置活跃 SSA 库（等价 `--database`） |
+| `ssa.GetOverlayFiles` | `GetOverlayFiles` | 提取 overlay 聚合 FS 为 `{path: content}` |
+| `ssa.DeleteProgram` | `DeleteProgram` | 删除 program 及其全部数据行 |
+| `ssa.ListPrograms` | `ListPrograms` | 列出库中所有 program 名 |
 
 ---
 
@@ -210,7 +242,8 @@ sudo chown "$(whoami):$(whoami)" /data/ci-ssa
 | [ensure-base-program.sh](../../scripts/ci-ssa/ensure-base-program.sh) | Shell | 检查 DB 与有效基线 program；校验 manifest/pointer/DB 三者一致 |
 | [generate-diff-scan-config.sh](../../scripts/ci-ssa/generate-diff-scan-config.sh) | Shell | 生成 PR 扫描 config（含动态 base） |
 | [write-local-manifest.sh](../../scripts/ci-ssa/write-local-manifest.sh) | Shell | 写本地 manifest + pointer |
-| [promote-base-on-merge.sh](../../scripts/ci-ssa/promote-base-on-merge.sh) | Shell | 合并后增量 promote |
+| [promote-base-on-merge.sh](../../scripts/ci-ssa/promote-base-on-merge.sh) | Shell | 合并后增量 promote；超深度时自动触发 flatten |
+| [flatten-overlay.yak](../../scripts/ci-ssa/flatten-overlay.yak) | Yak 脚本 | 把 overlay 链重编译为单个自包含 program（flatten） |
 | [cleanup-pr-diff-programs.sh](../../scripts/ci-ssa/cleanup-pr-diff-programs.sh) | Shell | 清理某 PR 的 diff program |
 | [cleanup-stale-overlay-programs.sh](../../scripts/ci-ssa/cleanup-stale-overlay-programs.sh) | Shell | weekly 后清理 promote/diff |
 | [ci-yaklang-base-compile.json](../../scripts/ci-ssa/ci-yaklang-base-compile.json) | 配置 | 周五全量编译 |
@@ -251,7 +284,7 @@ sudo chown "$(whoami):$(whoami)" /data/ci-ssa
 | Job 一直 **pending** | Runner 离线或缺少 label | 检查 `self-hosted` / `linux` / `ssa-ci` |
 | `Base program ... not found` | 未跑 weekly 或 pointer 指向已删 program | 手动 **CI SSA Base Weekly**；检查 `base-program-name` |
 | `Base pointer drift detected` | manifest / pointer / env 三者不一致（weekly 或 promote 写库被中断） | 跑 **CI SSA Base Weekly** 重新压平 |
-| `Overlay chain depth N exceeds limit` | promote 叠层过多，PR 扫描变慢 | 手动触发 **CI SSA Base Weekly** 压平，或调高 `CI_SSA_OVERLAY_DEPTH_LIMIT` |
+| `Overlay chain depth N exceeds limit` | promote 叠层过多 | 自动触发 `flatten-overlay.yak` 压平；若 flatten 失败看日志，下次 weekly 兜底 |
 | `Local manifest not found` | 未跑过新版 weekly（未写本地 manifest） | 跑一次 **CI SSA Base Weekly** |
 | `SSA database not found` | `/data/ci-ssa` 未创建 | 建目录并赋权 runner 用户 |
 | Promote 失败 / ancestor 检查失败 | main 历史改写或基线过旧 | 跑 weekly 全量纠偏 |
@@ -270,7 +303,7 @@ sudo chown "$(whoami):$(whoami)" /data/ci-ssa
 | **托管 runner + cache** | 无自建机时从 OSS 拉库 |
 | **缩小全量范围** | 将 `local_file` 从 `.` 改为子目录 |
 | **manifest 入仓** | bot commit `manifest.json`，便于审计 `main_sha` |
-| **真正 rename/flatten API** | 引擎侧把 overlay 压成单 program，减少层数（当前靠周五全量压平） |
+| **引擎层 flatten** | 当前 flatten 靠 `flatten-overlay.yak` 重编译聚合 FS；可演进为引擎层 `ssa-flatten` CLI / row-level merge，省去重编译开销 |
 
 ---
 
