@@ -75,6 +75,13 @@ func NewKeyWordSearcher[T AISearchable](chatToAiFunc func(string) (io.Reader, er
 			if verboseName != "" {
 				keywords = append(keywords, verboseName)
 			}
+			var verboseNameZh string
+			if zg, ok := any(tool).(interface{ GetVerboseNameZh() string }); ok {
+				verboseNameZh = strings.TrimSpace(zg.GetVerboseNameZh())
+				if verboseNameZh != "" {
+					keywords = append(keywords, verboseNameZh)
+				}
+			}
 
 			if len(keywords) == 0 {
 				continue
@@ -87,6 +94,9 @@ func NewKeyWordSearcher[T AISearchable](chatToAiFunc func(string) (io.Reader, er
 			toolMap[tool.GetName()] = tool
 			if verboseName != "" {
 				toolMap[verboseName] = tool
+			}
+			if verboseNameZh != "" {
+				toolMap[verboseNameZh] = tool
 			}
 		}
 

@@ -40,8 +40,8 @@ type Tool struct {
 	*mcp.Tool
 	// A list of keywords for tool indexing and searching.
 	Keywords      []string `json:"keywords,omitempty"`
-	VerboseName   string   `json:"verbose_name,omitempty"`    // English; emit/list use schema.I18n {Zh,En}
-	VerboseNameZh string   `json:"verbose_name_zh,omitempty"` // Chinese
+	VerboseName   string   `json:"verbose_name,omitempty"`    // English string（事件/列表同名字段保持 string）
+	VerboseNameZh string   `json:"verbose_name_zh,omitempty"` // Chinese；对外双语走 verbose_name_i18n / VerboseNameI18n
 	// Usage 工具使用说明，在参数生成阶段(第2阶段)才披露给 AI，
 	// 包含使用原则、参数建议、关联使用等信息，帮助 AI 更好地使用工具参数。
 	Usage    string         `json:"usage,omitempty"`

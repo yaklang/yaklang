@@ -43,14 +43,14 @@ func FilterAIYakTools(db *gorm.DB, filter *AIYakToolFilter) *gorm.DB {
 		}
 		keywords = append(keywords, kw)
 	}
-	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{"name", "keywords", "description", "path"}, keywords, false)
+	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{"name", "verbose_name", "verbose_name_zh", "keywords", "description", "path"}, keywords, false)
 	return db
 }
 
 var defaultAIYakToolFTS5 = &bizhelper.SQLiteFTS5Config{
 	BaseModel: &schema.AIYakTool{},
 	FTSTable:  AIYakToolVTableName(),
-	Columns:   []string{"name", "verbose_name", "description", "keywords", "path"},
+	Columns:   []string{"name", "verbose_name", "verbose_name_zh", "description", "keywords", "path"},
 	// Use external content mode to keep the FTS index consistent and avoid FTS5 maintenance commands
 	// that are not supported by all SQLite builds for contentful FTS tables.
 	ContentTable: "ai_yak_tools",
