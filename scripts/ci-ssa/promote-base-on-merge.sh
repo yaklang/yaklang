@@ -48,15 +48,14 @@ if [ -z "$OLD_BASE" ] || [ "$OLD_BASE" = "null" ]; then
 fi
 
 # Overlay chain depth guard. Each successful promote adds one layer on top of
-# the effective base. The engine has no flatten API, so layers only get
-# reclaimed by the weekly full recompile. Warn (do not fail) past the threshold
-# so merging is not blocked, but surface that PR scans will get slower.
+# the effective base. When the chain exceeds the limit, flatten it into a
+# single self-contained program via flatten-overlay.yak (recompiles the
+# aggregated filesystem, so this is heavy — only triggers past the threshold).
 OVERLAY_DEPTH_LIMIT="${CI_SSA_OVERLAY_DEPTH_LIMIT:-5}"
 NEW_DEPTH=$((OLD_DEPTH + 1))
 if [ "$NEW_DEPTH" -gt "$OVERLAY_DEPTH_LIMIT" ]; then
-  echo "::warning::Overlay chain depth $NEW_DEPTH exceeds limit $OVERLAY_DEPTH_LIMIT."
-  echo "::warning::PR scans load every layer via ProgramOverLay; consider triggering"
-  echo "::warning::'CI SSA Base Weekly' to flatten the chain back to ci-yaklang-base."
+  echo "::notice::Overlay chain depth $NEW_DEPTH exceeds limit $OVERLAY_DEPTH_LIMIT; will flatten after promote."
+  echo "::notice::flatten-overlay.yak recompiles the aggregated filesystem into a single program."
 fi
 
 echo "Promote: $OLD_SHA ($OLD_BASE) -> $NEW_SHA"
@@ -148,3 +147,33 @@ if [ -n "$PR_NUMBER" ]; then
 fi
 
 echo "Promote complete: effective base is now $NEW_PROG @ $NEW_SHA"
+
+# If the overlay chain exceeds the depth limit, flatten it into a single
+# self-contained program. This is a heavy full recompile (same order as
+# weekly), so it only runs past the threshold. After flatten the effective
+# base is a single-layer program and overlay_depth resets to 0.
+if [ "$NEW_DEPTH" -gt "$OVERLAY_DEPTH_LIMIT" ]; then
+  echo "::group::Flattening overlay chain (depth=$NEW_DEPTH > limit=$OVERLAY_DEPTH_LIMIT)"
+  FLAT_NAME="ci-yaklang-flat-${SHORT_SHA}"
+  FLATTEN_SCRIPT="$SCRIPT_DIR/flatten-overlay.yak"
+  if [ -f "$FLATTEN_SCRIPT" ]; then
+    if yak "$FLATTEN_SCRIPT" \
+      --program "$NEW_PROG" \
+      --output "$FLAT_NAME" \
+      --database "$SSA_DATABASE_RAW" \
+      --config "$SCRIPT_DIR/ci-yaklang-base-compile.json"; then
+      # Flatten succeeded: update pointer to the single-layer program, reset depth.
+      export CI_SSA_BASE_PROGRAM="$FLAT_NAME"
+      "$SCRIPT_DIR/write-local-manifest.sh" "$NEW_SHA" "$FLAT_NAME" "" "0"
+      echo "::endgroup::"
+      echo "Flatten complete: effective base is now $FLAT_NAME @ $NEW_SHA (single-layer, depth=0)"
+    else
+      echo "::endgroup::"
+      echo "::warning::Flatten failed; keeping overlay chain at depth $NEW_DEPTH."
+      echo "::warning::PR scans will still work but will load $NEW_DEPTH layers. Next weekly will re-flatten."
+    fi
+  else
+    echo "::endgroup::"
+    echo "::warning::flatten-overlay.yak not found at $FLATTEN_SCRIPT; skipping flatten."
+  fi
+fi
