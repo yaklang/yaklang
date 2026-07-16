@@ -70,7 +70,7 @@ func TestRuleSyncClientDownloadSnapshotBundleUsesCache(t *testing.T) {
 
 	requestCount := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/ssa-rule-sync/snapshots/rulesnapshot-a" {
+		if r.URL.Path != "/v1/ssa-rule-sync-node/snapshots/rulesnapshot-a" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		requestCount++
