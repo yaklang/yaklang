@@ -252,10 +252,44 @@ func TestEmitToolCallStart_VerboseNameI18n(t *testing.T) {
 	require.NoError(t, json.Unmarshal(captured[0].Content, &payload))
 	toolObj, ok := payload["tool"].(map[string]any)
 	require.True(t, ok)
-	verbose, ok := toolObj["verbose_name"].(map[string]any)
-	require.True(t, ok, "verbose_name should be AIOutputI18n object, got %#v", toolObj["verbose_name"])
-	require.Equal(t, "文本查找工具", verbose["Zh"])
-	require.Equal(t, "Text Grep Tool", verbose["En"])
+	require.Equal(t, "Text Grep Tool", toolObj["verbose_name"], "verbose_name must stay string for old frontend")
+	verboseI18n, ok := toolObj["verbose_name_i18n"].(map[string]any)
+	require.True(t, ok, "verbose_name_i18n should be AIOutputI18n object, got %#v", toolObj["verbose_name_i18n"])
+	require.Equal(t, "文本查找工具", verboseI18n["Zh"])
+	require.Equal(t, "Text Grep Tool", verboseI18n["En"])
+	_, hasObjectVerboseName := toolObj["verbose_name"].(map[string]any)
+	require.False(t, hasObjectVerboseName, "verbose_name must not be I18n object")
 	_, hasZhField := toolObj["verbose_name_zh"]
 	require.False(t, hasZhField, "legacy verbose_name_zh must not be emitted")
+}
+
+func TestEmitToolCallStart_VerboseNameZhOnlyStillString(t *testing.T) {
+	var captured []*schema.AiOutputEvent
+	emitter := NewEmitter("test-id", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		captured = append(captured, e)
+		return e, nil
+	})
+
+	tool, err := aitool.New("bash",
+		aitool.WithDescription("shell"),
+		aitool.WithVerboseNameZh("跨平台Shell命令执行工具"),
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			return nil, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	_, err = emitter.EmitToolCallStart("call-2", tool)
+	require.NoError(t, err)
+	require.Len(t, captured, 1)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(captured[0].Content, &payload))
+	toolObj := payload["tool"].(map[string]any)
+	require.Equal(t, "跨平台Shell命令执行工具", toolObj["verbose_name"])
+	_, isObj := toolObj["verbose_name"].(map[string]any)
+	require.False(t, isObj)
+	verboseI18n := toolObj["verbose_name_i18n"].(map[string]any)
+	require.Equal(t, "跨平台Shell命令执行工具", verboseI18n["Zh"])
+	require.Equal(t, "跨平台Shell命令执行工具", verboseI18n["En"])
 }

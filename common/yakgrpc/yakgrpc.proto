@@ -2019,7 +2019,7 @@ message AITool {
   int64 CreatedAt = 10;
   int64 UpdatedAt = 11;
   bool IsBuiltin = 12;
-  I18n VerboseNameI18n = 13; // 中英双语展示名，对齐 AIOutputEvent.NodeIdVerbose / AIOutputI18n
+  I18n VerboseNameI18n = 13; // 中英双语展示名
 }
 
 message GetAIToolListResponse {

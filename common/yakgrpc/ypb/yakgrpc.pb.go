@@ -9558,12 +9558,12 @@ type AITool struct {
 	Keywords        []string               `protobuf:"bytes,5,rep,name=Keywords,proto3" json:"Keywords,omitempty"`
 	IsFavorite      bool                   `protobuf:"varint,6,opt,name=IsFavorite,proto3" json:"IsFavorite,omitempty"`
 	ID              int64                  `protobuf:"varint,7,opt,name=ID,proto3" json:"ID,omitempty"`
-	VerboseName     string                 `protobuf:"bytes,8,opt,name=VerboseName,proto3" json:"VerboseName,omitempty"` // 英文展示名（兼容旧前端 / 检索）；UI 语言切换请用 VerboseNameI18n
+	VerboseName     string                 `protobuf:"bytes,8,opt,name=VerboseName,proto3" json:"VerboseName,omitempty"` // string 英文展示名；事件里同名 JSON 也是 string，双语见 VerboseNameI18n / verbose_name_i18n
 	Author          string                 `protobuf:"bytes,9,opt,name=Author,proto3" json:"Author,omitempty"`
 	CreatedAt       int64                  `protobuf:"varint,10,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
 	UpdatedAt       int64                  `protobuf:"varint,11,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
 	IsBuiltin       bool                   `protobuf:"varint,12,opt,name=IsBuiltin,proto3" json:"IsBuiltin,omitempty"`
-	VerboseNameI18N *I18N                  `protobuf:"bytes,13,opt,name=VerboseNameI18n,proto3" json:"VerboseNameI18n,omitempty"` // 中英双语展示名，对齐 AIOutputEvent.NodeIdVerbose / AIOutputI18n
+	VerboseNameI18N *I18N                  `protobuf:"bytes,13,opt,name=VerboseNameI18n,proto3" json:"VerboseNameI18n,omitempty"` // GetAIToolList 双语；TOOL_CALL_START 对应 tool.verbose_name_i18n（勿占用 verbose_name）
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }

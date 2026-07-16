@@ -484,13 +484,22 @@ func (r *Emitter) EmitToolCallWatcher(toolCallID string, id string, tool *aitool
 }
 
 func (r *Emitter) EmitToolCallStart(callToolId string, tool *aitool.Tool, startTime ...time.Time) (*schema.AiOutputEvent, error) {
-	// tool.verbose_name = AIOutputI18n {Zh, En} (same pick rules as NodeIdVerbose / useAINodeLabel)
+	// TOOL_CALL_START.tool 契约（勿与 GetAIToolList 字段混用）：
+	//   verbose_name      = string，旧前端直接当标题渲染，类型绝不能改成 object
+	//   verbose_name_i18n = {Zh, En}，对齐 NodeIdVerbose / AIOutputI18n
+	// GetAIToolList: AITool.VerboseName(string) + AITool.VerboseNameI18n(I18n)
 	toolMap := map[string]any{
 		"name":        tool.Name,
 		"description": tool.Description,
 	}
-	if i18n := schema.NewI18n(tool.GetVerboseNameZh(), tool.GetVerboseName()); i18n != nil {
-		toolMap["verbose_name"] = i18n.ToAIOutputMap()
+	en, zh := tool.GetVerboseName(), tool.GetVerboseNameZh()
+	if i18n := schema.NewI18n(zh, en); i18n != nil {
+		title := en
+		if title == "" {
+			title = i18n.En // 仅有中文时用回填后的展示串，仍保证是 string
+		}
+		toolMap["verbose_name"] = title
+		toolMap["verbose_name_i18n"] = i18n.ToAIOutputMap()
 	}
 	data := map[string]any{
 		"call_tool_id": callToolId,

@@ -78,7 +78,7 @@ func FilterAIYakTool(db *gorm.DB, filter *ypb.AIToolFilter) *gorm.DB {
 		db = bizhelper.ExactQueryInt64(db, "id", filter.GetID())
 	}
 	if filter.GetKeyword() != "" {
-		db = bizhelper.FuzzSearchEx(db, []string{"name", "keywords", "description", "path"}, filter.GetKeyword(), false)
+		db = bizhelper.FuzzSearchEx(db, []string{"name", "verbose_name", "verbose_name_zh", "keywords", "description", "path"}, filter.GetKeyword(), false)
 	}
 	if filter.GetOnlyFavorites() {
 		db = db.Where("is_favorite = ?", true)
@@ -99,7 +99,7 @@ func SearchAIYakTool(db *gorm.DB, keywords string) ([]*schema.AIYakTool, error) 
 	db = db.Model(&schema.AIYakTool{})
 	var tools []*schema.AIYakTool
 	if keywords != "" {
-		db = bizhelper.FuzzSearchEx(db, []string{"name", "keywords", "description", "path"}, keywords, false)
+		db = bizhelper.FuzzSearchEx(db, []string{"name", "verbose_name", "verbose_name_zh", "keywords", "description", "path"}, keywords, false)
 	}
 
 	if err := db.Find(&tools).Error; err != nil {
@@ -149,7 +149,7 @@ func SearchAIYakToolWithPagination(db *gorm.DB, keywords string, onlyFavorites b
 
 	// Apply fuzzy search if keywords provided
 	if keywords != "" {
-		db = bizhelper.FuzzSearchEx(db, []string{"name", "keywords", "description", "path"}, keywords, false)
+		db = bizhelper.FuzzSearchEx(db, []string{"name", "verbose_name", "verbose_name_zh", "keywords", "description", "path"}, keywords, false)
 	}
 
 	// Apply favorite filter if requested
