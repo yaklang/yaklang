@@ -26,17 +26,17 @@ type runtime struct {
 	graphDirty        bool
 	currentStage      int
 	stageAnchorTaskID string
-	activeTaskIndexes []string
+	activeTaskIDs     []string
 }
 
 type runtimeProgressSnapshot struct {
-	totalTasks       int
-	totalStages      int
-	completedStages  int
-	currentStage     int
-	currentIndex     int
-	currentTaskIndex string
-	activeTaskIDs    []string
+	totalTasks      int
+	totalStages     int
+	completedStages int
+	currentStage    int
+	currentIndex    int
+	currentTaskID   string
+	activeTaskIDs   []string
 }
 
 type stageExecutionResult struct {
@@ -227,7 +227,7 @@ func (r *runtime) progressSnapshot() runtimeProgressSnapshot {
 	graph := r.execGraph
 	root := r.RootTask
 	currentStage := r.currentStage
-	activeTaskIDs := append([]string(nil), r.activeTaskIndexes...)
+	activeTaskIDs := append([]string(nil), r.activeTaskIDs...)
 	r.statusMutex.Unlock()
 
 	if graph == nil && root != nil {
@@ -275,12 +275,12 @@ func (r *runtime) progressSnapshot() runtimeProgressSnapshot {
 
 	switch {
 	case len(activeTaskIDs) > 0:
-		snapshot.currentTaskIndex = activeTaskIDs[0]
+		snapshot.currentTaskID = activeTaskIDs[0]
 	case completedStages < snapshot.totalStages && completedStages >= 0:
 		stage := graph.stages[completedStages]
 		if len(stage) > 0 && stage[0] != nil {
 			snapshot.currentStage = completedStages
-			snapshot.currentTaskIndex = stage[0].id
+			snapshot.currentTaskID = stage[0].id
 		}
 	}
 	if snapshot.currentStage < 0 {
@@ -288,8 +288,8 @@ func (r *runtime) progressSnapshot() runtimeProgressSnapshot {
 			if stage, ok := graph.StageOf(activeTaskIDs[0]); ok {
 				snapshot.currentStage = stage
 			}
-		} else if snapshot.currentTaskIndex != "" {
-			if stage, ok := graph.StageOf(snapshot.currentTaskIndex); ok {
+		} else if snapshot.currentTaskID != "" {
+			if stage, ok := graph.StageOf(snapshot.currentTaskID); ok {
 				snapshot.currentStage = stage
 			}
 		}
@@ -303,7 +303,7 @@ func (r *runtime) setActiveStage(stageIdx int, nodes []*executableTaskNode) {
 	defer r.statusMutex.Unlock()
 
 	r.currentStage = stageIdx
-	r.activeTaskIndexes = r.activeTaskIndexes[:0]
+	r.activeTaskIDs = r.activeTaskIDs[:0]
 	r.stageAnchorTaskID = ""
 	for _, node := range nodes {
 		if node == nil || node.task == nil {
@@ -312,32 +312,32 @@ func (r *runtime) setActiveStage(stageIdx int, nodes []*executableTaskNode) {
 		if r.stageAnchorTaskID == "" {
 			r.stageAnchorTaskID = node.id
 		}
-		r.activeTaskIndexes = append(r.activeTaskIndexes, node.id)
+		r.activeTaskIDs = append(r.activeTaskIDs, node.id)
 	}
 }
 
-func (r *runtime) finishActiveTask(taskIndex string) {
+func (r *runtime) finishActiveTask(taskID string) {
 	r.statusMutex.Lock()
 	defer r.statusMutex.Unlock()
 
-	if taskIndex == "" || len(r.activeTaskIndexes) == 0 {
+	if taskID == "" || len(r.activeTaskIDs) == 0 {
 		return
 	}
-	filtered := r.activeTaskIndexes[:0]
-	for _, active := range r.activeTaskIndexes {
-		if active == taskIndex {
+	filtered := r.activeTaskIDs[:0]
+	for _, active := range r.activeTaskIDs {
+		if active == taskID {
 			continue
 		}
 		filtered = append(filtered, active)
 	}
-	r.activeTaskIndexes = filtered
+	r.activeTaskIDs = filtered
 }
 
 func (r *runtime) clearActiveStage() {
 	r.statusMutex.Lock()
 	r.currentStage = -1
 	r.stageAnchorTaskID = ""
-	r.activeTaskIndexes = nil
+	r.activeTaskIDs = nil
 	r.statusMutex.Unlock()
 }
 
@@ -347,10 +347,10 @@ func (r *runtime) representativeTask() *AiTask {
 		return nil
 	}
 	snapshot := r.progressSnapshot()
-	if snapshot.currentTaskIndex == "" {
+	if snapshot.currentTaskID == "" {
 		return nil
 	}
-	node, ok := graph.Node(snapshot.currentTaskIndex)
+	node, ok := graph.Node(snapshot.currentTaskID)
 	if !ok || node == nil {
 		return nil
 	}
@@ -650,7 +650,7 @@ func (r *runtime) executeStage(stageIdx int, stageNodes []*executableTaskNode, t
 	return r.executeStageWithHandler(stageIdx, stageNodes, totalTasks, totalStages, r.invokeTask)
 }
 
-func (r *runtime) Invoke(task *AiTask, startTaskIndex string) (retErr error) {
+func (r *runtime) Invoke(task *AiTask, startTaskID string) (retErr error) {
 	if r.RootTask == nil {
 		r.RootTask = task
 	}
@@ -662,7 +662,7 @@ func (r *runtime) Invoke(task *AiTask, startTaskIndex string) (retErr error) {
 		r.config.savePlanAndExecState(phase, currentTask)
 	}()
 
-	validatedStartTask := strings.TrimSpace(startTaskIndex)
+	validatedStartTask := strings.TrimSpace(startTaskID)
 	for {
 		if r.RootTask != nil {
 			r.config.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{

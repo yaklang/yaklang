@@ -15,32 +15,32 @@ import (
 func buildManualExecutableGraph(t *testing.T, nodes ...*executableTaskNode) *executableTaskGraph {
 	t.Helper()
 
-	stageByTaskIndex, stages, err := calculateStrictExecutableStages(nodes)
+	stageByTaskID, stages, err := calculateStrictExecutableStages(nodes)
 	require.NoError(t, err)
 
 	nodeByID := make(map[string]*executableTaskNode, len(nodes))
 	dependents := make(map[string][]string, len(nodes))
 	order := make([]*AiTask, 0, len(nodes))
-	orderIndexByTask := make(map[string]int, len(nodes))
+	orderIndexByTaskID := make(map[string]int, len(nodes))
 	for i, node := range nodes {
 		require.NotNil(t, node)
 		nodeByID[node.id] = node
-		node.stage = stageByTaskIndex[node.id]
+		node.stage = stageByTaskID[node.id]
 		order = append(order, node.task)
-		orderIndexByTask[node.id] = i
+		orderIndexByTaskID[node.id] = i
 		for _, depID := range node.deps {
 			dependents[depID] = append(dependents[depID], node.id)
 		}
 	}
 
 	return &executableTaskGraph{
-		nodes:            nodes,
-		nodeByID:         nodeByID,
-		dependents:       dependents,
-		stages:           stages,
-		stageByTaskIndex: stageByTaskIndex,
-		order:            order,
-		orderIndexByTask: orderIndexByTask,
+		nodes:              nodes,
+		nodeByID:           nodeByID,
+		dependents:         dependents,
+		stages:             stages,
+		stageByTaskID:      stageByTaskID,
+		order:              order,
+		orderIndexByTaskID: orderIndexByTaskID,
 	}
 }
 
