@@ -2,7 +2,6 @@ package ssa
 
 import (
 	"path/filepath"
-	"sort"
 	"strings"
 
 	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
@@ -36,8 +35,7 @@ func NewProgram(
 		UpStream:                omap.NewEmptyOrderedMap[string, *Program](),
 		DownStream:              make(map[string]*Program),
 		errors:                  make([]*SSAError, 0),
-		OffsetMap:               make(map[int]*OffsetItem),
-		OffsetSortedSlice:       make([]int, 0),
+		offsets:                 newOffsetStore(),
 		Funcs:                   omap.NewEmptyOrderedMap[string, *Function](),
 		Blueprint:               omap.NewEmptyOrderedMap[string, *Blueprint](),
 		BlueprintStack:          utils.NewStack[*Blueprint](),
@@ -85,8 +83,7 @@ func NewTmpProgram(ProgramName string) *Program {
 		UpStream:                omap.NewEmptyOrderedMap[string, *Program](),
 		DownStream:              make(map[string]*Program),
 		errors:                  make([]*SSAError, 0),
-		OffsetMap:               make(map[int]*OffsetItem),
-		OffsetSortedSlice:       make([]int, 0),
+		offsets:                 newOffsetStore(),
 		Funcs:                   omap.NewEmptyOrderedMap[string, *Function](),
 		Blueprint:               omap.NewEmptyOrderedMap[string, *Blueprint](),
 		BlueprintStack:          utils.NewStack[*Blueprint](),
@@ -369,31 +366,17 @@ func (prog *Program) Finish() {
 }
 
 func (prog *Program) SearchIndexAndOffsetByOffset(searchOffset int) (index int, offset int) {
-	index = sort.Search(len(prog.OffsetSortedSlice), func(i int) bool {
-		return prog.OffsetSortedSlice[i] >= searchOffset
-	})
-	if index >= len(prog.OffsetSortedSlice) && len(prog.OffsetSortedSlice) > 0 {
-		index = len(prog.OffsetSortedSlice) - 1
-	}
-	if len(prog.OffsetSortedSlice) > 0 {
-		offset = prog.OffsetSortedSlice[index]
-	}
-	return
+	return prog.offsets.searchIndexAndOffset(searchOffset)
 }
 
 func (prog *Program) GetFrontValueByOffset(searchOffset int) (offset int, value Value) {
-	index, offset := prog.SearchIndexAndOffsetByOffset(searchOffset)
-	// 如果二分查找的结果是大于目标值的，那么就需要回退一个
-	if offset > searchOffset {
-		if index > 0 {
-			index -= 1
-		}
-		offset = prog.OffsetSortedSlice[index]
-	}
-	if item, ok := prog.OffsetMap[offset]; ok {
-		value = item.GetValue()
-	}
-	return offset, value
+	return prog.offsets.getFrontValue(searchOffset)
+}
+
+// GetAllOffsetItemsBefore returns all OffsetItems with a variable set
+// at offsets before the given offset. Used by ssaapi for variable matching.
+func (prog *Program) GetAllOffsetItemsBefore(offset int) []*OffsetItem {
+	return prog.offsets.getAllOffsetItemsBefore(offset)
 }
 
 func (p *Program) ShouldVisit(path string) bool {

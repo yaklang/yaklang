@@ -308,8 +308,7 @@ type Program struct {
 	importDeclares *omap.OrderedMap[string, *importDeclareItem]
 
 	// offset
-	OffsetMap         map[int]*OffsetItem
-	OffsetSortedSlice []int
+	offsets *offsetStore
 
 	// package Loader
 	Loader      *ssautil.PackageFileLoader

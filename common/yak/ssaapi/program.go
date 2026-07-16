@@ -3,7 +3,6 @@ package ssaapi
 import (
 	"context"
 	"fmt"
-	"sort"
 	"time"
 
 	"go.uber.org/atomic"
@@ -241,21 +240,7 @@ func (p *Program) refWithExcludeFiles(name string, excludeFiles []string) Values
 }
 
 func (p *Program) GetAllOffsetItemsBefore(offset int) []*ssa.OffsetItem {
-	offsetSortedSlice := p.Program.OffsetSortedSlice
-	index := sort.SearchInts(offsetSortedSlice, offset)
-	if index < len(offsetSortedSlice) && offsetSortedSlice[index] > offset && index > 0 {
-		index--
-	}
-	beforeSlice := offsetSortedSlice[:index]
-
-	return lo.Filter(
-		lo.Map(beforeSlice, func(offset int, _ int) *ssa.OffsetItem {
-			return p.Program.OffsetMap[offset]
-		}),
-		func(v *ssa.OffsetItem, _ int) bool {
-			return v.GetVariable() != nil
-		},
-	)
+	return p.Program.GetAllOffsetItemsBefore(offset)
 }
 
 func (v *Value) NewConstValue(i any, rng ...*memedit.Range) *Value {

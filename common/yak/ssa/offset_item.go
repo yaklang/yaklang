@@ -1,7 +1,6 @@
 package ssa
 
 import (
-	"fmt"
 	"sort"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -40,57 +39,21 @@ func InsertSortedIntSlice(ts []int, t int) []int {
 }
 
 func (prog *Program) ShowOffsetMap() {
-	for i := 0; i < len(prog.OffsetSortedSlice); i++ {
-		offset := prog.OffsetSortedSlice[i]
-		value := prog.OffsetMap[offset].GetValue()
-		if value == nil {
-		}
-		fmt.Printf("%d: %s\n", offset, value.String())
-	}
+	prog.offsets.showAll()
 }
 
 func (prog *Program) SetOffsetVariable(v *Variable, r *memedit.Range) {
-	if r == nil {
-		return
-	}
-	endOffset := r.GetEndOffset()
-
-	// If it already exists, then the trust range is smaller
-	if item, ok := prog.OffsetMap[endOffset]; ok && item.rangeLength <= r.Len() {
-		return
-	}
-
-	prog.OffsetSortedSlice = InsertSortedIntSlice(prog.OffsetSortedSlice, endOffset)
-	prog.OffsetMap[endOffset] = &OffsetItem{
-		variable:    v,
-		value:       v.GetValue(),
-		rangeLength: r.Len(),
-	}
+	prog.offsets.setVariable(v, r)
 }
 
 func (prog *Program) ForceSetOffsetValue(v Value, r *memedit.Range) {
-	prog.SetOffsetValueEx(v, r, true)
+	prog.offsets.setValue(v, r, true)
 }
 
 func (prog *Program) SetOffsetValue(v Value, r *memedit.Range) {
-	prog.SetOffsetValueEx(v, r, false)
+	prog.offsets.setValue(v, r, false)
 }
 
 func (prog *Program) SetOffsetValueEx(v Value, r *memedit.Range, force bool) {
-	if r == nil {
-		return
-	}
-	endOffset := r.GetEndOffset()
-
-	// If it already exists, then the trust range is smaller
-	if item, ok := prog.OffsetMap[endOffset]; !force && ok && item.rangeLength <= r.Len() {
-		return
-	}
-
-	prog.OffsetSortedSlice = InsertSortedIntSlice(prog.OffsetSortedSlice, endOffset)
-	prog.OffsetMap[endOffset] = &OffsetItem{
-		variable:    nil,
-		value:       v,
-		rangeLength: r.Len(),
-	}
+	prog.offsets.setValue(v, r, force)
 }
