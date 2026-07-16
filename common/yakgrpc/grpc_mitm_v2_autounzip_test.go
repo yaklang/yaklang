@@ -61,6 +61,65 @@ func TestGRPCMUSTPASS_MITMV2_ManualHijack_AutoUnzip_ViewPlainRequestAndResponse_
 	})
 }
 
+func TestGRPCMUSTPASS_MITMV2_AutoForward_PreserveMagicGzipRequest(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	plainBody := append([]byte{0xac, 0xed, 0x00, 0x05}, []byte("serialized-request-"+uuid.NewString())...)
+	gzipBody, err := utils.GzipCompress(plainBody)
+	require.NoError(t, err)
+
+	seenCh := make(chan []byte, 1)
+	mockHost, mockPort := utils.DebugMockHTTPExContext(ctx, func(req []byte) []byte {
+		select {
+		case seenCh <- bytes.Clone(req):
+		default:
+		}
+		return []byte("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nOK")
+	})
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	stream, err := client.MITMV2(ctx)
+	require.NoError(t, err)
+	require.NoError(t, stream.Send(&ypb.MITMV2Request{
+		Host:             "127.0.0.1",
+		Port:             uint32(mitmPort),
+		SetAutoForward:   true,
+		AutoForwardValue: true,
+	}))
+	require.True(t, waitMITMV2Started(stream, 20*time.Second), "MITMV2 server did not start in time")
+
+	target := "http://" + utils.HostPort(mockHost, mockPort) + "/magic-gzip"
+	proxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
+	_, _, err = poc.DoPOST(target,
+		poc.WithProxy(proxy),
+		poc.WithTimeout(10),
+		poc.WithNoRedirect(true),
+		poc.WithBody(gzipBody),
+		poc.WithReplaceHttpPacketHeader("Content-Type", "gzip"),
+	)
+	require.NoError(t, err)
+
+	select {
+	case seen := <-seenCh:
+		require.Equal(t, "gzip", lowhttp.GetHTTPPacketHeader(seen, "Content-Type"))
+		require.Empty(t, lowhttp.GetHTTPPacketHeader(seen, "Content-Encoding"))
+		require.Equal(t, len(gzipBody), codec.Atoi(lowhttp.GetHTTPPacketHeader(seen, "Content-Length")))
+
+		wireBody := lowhttp.GetHTTPPacketBody(seen)
+		require.Equal(t, gzipBody, wireBody)
+		require.True(t, utils.IsGzip(wireBody))
+		decoded, err := utils.GzipDeCompress(wireBody)
+		require.NoError(t, err)
+		require.Equal(t, plainBody, decoded)
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for request at the upstream server")
+	}
+}
+
 func runMITMV2ManualHijackAutoUnzipCase(t *testing.T, cfg autoUnzipCaseConfig) {
 	t.Helper()
 
