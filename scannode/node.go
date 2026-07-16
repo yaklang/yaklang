@@ -33,6 +33,25 @@ func NewScanNode(cfg node.BaseConfig) (*ScanNode, error) {
 		cfg.StatusProvider = agent
 	}
 
+	// Register a post-bootstrap hook so the rule sync client gets valid node
+	// session credentials as soon as the node registers with the platform.
+	// The node-accessible snapshot endpoints authenticate via node_session_id
+	// query param + Bearer session token; without this hook the client would
+	// send empty credentials and get 401 on every sync. The hook is set before
+	// NewNodeBase so it is captured into the NodeBase lifecycle.
+	agent.ruleSyncClient = NewRuleSyncClient(&RuleSyncConfig{
+		ServerURL:   cfg.PlatformAPIBaseURL,
+		SyncEnabled: true,
+		Client:      cfg.HTTPClient,
+	})
+	existingHook := cfg.PostBootstrapHook
+	cfg.PostBootstrapHook = func(session node.SessionState) {
+		agent.updateRuleSyncCredentials(session)
+		if existingHook != nil {
+			existingHook(session)
+		}
+	}
+
 	base, err := node.NewNodeBase(cfg)
 	if err != nil {
 		return nil, err
@@ -43,11 +62,6 @@ func NewScanNode(cfg node.BaseConfig) (*ScanNode, error) {
 		NodeIDProvider: base.CurrentNodeID,
 		BaseDir:        base.BaseDir(),
 		RootContext:    base.GetRootContext(),
-	})
-	agent.ruleSyncClient = NewRuleSyncClient(&RuleSyncConfig{
-		ServerURL:   cfg.PlatformAPIBaseURL,
-		SyncEnabled: true,
-		Client:      cfg.HTTPClient,
 	})
 	agent.httpClient = cfg.HTTPClient
 	agent.initInvokeLimiter()
@@ -60,6 +74,18 @@ func (s *ScanNode) Run() {
 		go s.bridge.Run(s.node.GetRootContext())
 	}
 	s.node.Serve()
+}
+
+// updateRuleSyncCredentials feeds the node session id + session token into the
+// rule sync client so it can authenticate against the node-accessible snapshot
+// endpoints. Called from the PostBootstrapHook after the node registers.
+func (s *ScanNode) updateRuleSyncCredentials(session node.SessionState) {
+	client, ok := s.ruleSyncClient.(*RuleSyncClient)
+	if !ok || client == nil {
+		return
+	}
+	client.UpdateCredentials(session.SessionID, session.SessionToken)
+	log.Infof("rule sync client credentials updated: node_session_id=%s", session.SessionID)
 }
 
 func (s *ScanNode) Shutdown() {
