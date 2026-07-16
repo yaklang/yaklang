@@ -1861,8 +1861,11 @@ func GetParamsFromBody(contentType string, body []byte) (params *OrderedParams, 
 	}
 
 	// try post values
+	// 请求体在 header 分隔后可能带前导空行（例如用户多打了一个空行），
+	// 直接 ParseQueryParams 会把 \nsql 当成 key，进而在 POST→GET 变形时污染请求行。
 	if len(params.Items) == 0 {
-		queryParams := ParseQueryParams(string(body))
+		bodyForQuery := strings.TrimLeft(string(body), "\r\n \t")
+		queryParams := ParseQueryParams(bodyForQuery)
 		if len(queryParams.Items) > 0 {
 			for _, item := range queryParams.Items {
 				if len(item.Key) == 0 {
