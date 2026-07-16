@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/ci-infra-smoke.yml"
       - ".github/workflows/ci-ssa-base-weekly.yml"
+      - ".github/workflows/ci-ssa-base-promote.yml"
       - "scripts/ci-ssa/**"
       - "docs/ci-infra/**"
 

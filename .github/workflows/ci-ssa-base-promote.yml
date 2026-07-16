@@ -1,0 +1,83 @@
+name: CI SSA Base Promote
+
+# After a PR merges to main: incremental-compile tip relative to the last
+# maintained base, switch the base pointer, clean that PR's diff programs.
+# Shares DB write lock with weekly full compile.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+    paths:
+      - "common/**"
+      - ".github/workflows/diff-code-check.yml"
+      - ".github/workflows/ci-ssa-base-weekly.yml"
+      - ".github/workflows/ci-ssa-base-promote.yml"
+      - "common/ssa_bootstrapping/ci_rule/**"
+      - "scripts/ci-ssa/**"
+      - "scripts/get-yak-version.sh"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-ssa-database
+  cancel-in-progress: false
+
+jobs:
+  promote-base:
+    runs-on: [self-hosted, linux, ssa-ci]
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    env:
+      SKIP_SYNC_EMBED_RULE_IN_GITHUB: "true"
+    steps:
+      - name: Resolve PR number
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+          else
+            echo "PR_NUMBER=" >> $GITHUB_ENV
+          fi
+
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Sync main and resolve sha
+        run: |
+          git fetch origin main
+          git checkout main
+          git reset --hard origin/main
+          TARGET_SHA=$(git rev-parse HEAD)
+          echo "TARGET_SHA=$TARGET_SHA" >> $GITHUB_ENV
+          echo "Promoting SSA base to $TARGET_SHA (PR=${PR_NUMBER:-manual})"
+
+      - name: Prepare CI scripts
+        run: chmod +x ./scripts/ci-ssa/*.sh
+
+      - name: Export SSA database paths
+        run: |
+          source ./scripts/ci-ssa/export-ssa-db-env.sh
+          echo "SSA_CI_DATA_DIR=$SSA_CI_DATA_DIR" >> $GITHUB_ENV
+          echo "SSA_DATABASE_RAW=$SSA_DATABASE_RAW" >> $GITHUB_ENV
+          echo "CI_SSA_BASE_PROGRAM=$CI_SSA_BASE_PROGRAM" >> $GITHUB_ENV
+
+      - name: Install Yak
+        run: bash ./scripts/ci-ssa/install-yak-ci.sh
+
+      - name: Promote base (incremental)
+        run: |
+          bash ./scripts/ci-ssa/promote-base-on-merge.sh \
+            "$TARGET_SHA" \
+            "${PR_NUMBER:-}"
+
+      - name: Upload updated manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-ssa-manifest-promote
+          path: ${{ env.SSA_CI_DATA_DIR }}/manifest.json
+          retention-days: 30
+          if-no-files-found: warn

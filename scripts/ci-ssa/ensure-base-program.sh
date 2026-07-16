@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Fail fast if weekly base program is missing from the CI SSA database.
+# Fail fast if the effective base program is missing from the CI SSA database.
 set -euo pipefail
 
-BASE_PROGRAM="${CI_SSA_BASE_PROGRAM:-ci-yaklang-base}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=export-ssa-db-env.sh
 source "$SCRIPT_DIR/export-ssa-db-env.sh"
+
+BASE_PROGRAM="${CI_SSA_BASE_PROGRAM:-ci-yaklang-base}"
 
 if [ ! -f "$SSA_DATABASE_RAW" ]; then
   echo "::error::SSA database not found: $SSA_DATABASE_RAW"

@@ -8,6 +8,7 @@ on:
       - "common/**"
       - ".github/workflows/diff-code-check.yml"
       - ".github/workflows/ci-ssa-base-weekly.yml"
+      - ".github/workflows/ci-ssa-base-promote.yml"
       - ".github/actions/security-commenter/action.yml"
       - "common/ssa_bootstrapping/ci_rule/**"
       - "scripts/ssa-risk-tools/**"
@@ -128,6 +129,7 @@ jobs:
           source ./scripts/ci-ssa/export-ssa-db-env.sh
           echo "SSA_CI_DATA_DIR=$SSA_CI_DATA_DIR" >> $GITHUB_ENV
           echo "SSA_DATABASE_RAW=$SSA_DATABASE_RAW" >> $GITHUB_ENV
+          echo "CI_SSA_BASE_PROGRAM=$CI_SSA_BASE_PROGRAM" >> $GITHUB_ENV
 
       - name: Generate Prog
         if: steps.validate.outputs.should_skip != 'true'
