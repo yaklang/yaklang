@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/openapi"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -261,20 +260,10 @@ func loadOpenAPIDocumentFromDisk(docID string) (*cachedOpenAPIDocument, error) {
 	if err != nil {
 		return nil, utils.Wrap(err, "read openapi spec file")
 	}
-	content := string(contentRaw)
-	parsed, err := openapi.ParseDocument(content, nil)
-	if err != nil {
-		return nil, utils.Wrap(err, "parse openapi document from disk")
-	}
-	if strings.TrimSpace(session.Title) == "" || session.Title == docID {
-		session.Title = strings.TrimSpace(parsed.Info.Title)
-		if session.Title == "" {
-			session.Title = docID
-		}
-	}
+	// 懒加载：磁盘加载只读元信息 + spec 内容，不调用 ParseDocument。
+	// Parsed 留空，首次需要时由 EnsureParsed() 按需解析并缓存。
 	return &cachedOpenAPIDocument{
-		Content: content,
-		Parsed:  parsed,
+		Content: string(contentRaw),
 		Session: session,
 	}, nil
 }
@@ -289,13 +278,51 @@ func removeOpenAPIDocument(docID string) error {
 	return deleteOpenAPIDocumentFromDisk(docID)
 }
 
+// saveOpenAPIDocumentSessionToDisk writes only session.json without rewriting the
+// (potentially large) spec file. Used by touchOpenAPIDocumentLastUsed so that
+// frequent detail accesses don't trigger full spec rewrites.
+func saveOpenAPIDocumentSessionToDisk(docID string, doc *cachedOpenAPIDocument) error {
+	if doc == nil {
+		return utils.Error("openapi document is nil")
+	}
+	docDir, err := openAPIDocumentDocDir(docID)
+	if err != nil {
+		return err
+	}
+	if doc.Session.SessionID == "" {
+		doc.Session.SessionID = docID
+	}
+	if doc.Session.Source == "" {
+		doc.Session.Source = openAPIDocumentSource
+	}
+	sessionRaw, err := json.Marshal(doc.Session)
+	if err != nil {
+		return utils.Wrap(err, "marshal openapi document session")
+	}
+	sessionPath := filepath.Join(docDir, openAPIDocumentSessionFile)
+	return os.WriteFile(sessionPath, sessionRaw, 0o644)
+}
+
+// openAPIDocumentLastUsedFlushInterval caps how often last_used_at is persisted
+// to disk. Within the interval, only the in-memory cache is updated, avoiding
+// repeated spec + session file rewrites on every detail access.
+const openAPIDocumentLastUsedFlushInterval = 60 // seconds
+
 func touchOpenAPIDocumentLastUsed(docID string, doc *cachedOpenAPIDocument) {
 	if doc == nil {
 		return
 	}
+	now := time.Now().Unix()
+	// 节流：距上次持久化不足阈值时只更新内存，避免每次详情访问都重写磁盘
+	if now-doc.Session.LastUsedAt < openAPIDocumentLastUsedFlushInterval {
+		doc.Session.LastUsedAt = now
+		doc.Session.UpdatedAt = now
+		openAPIDocumentStore.Store(docID, doc)
+		return
+	}
 	doc.Session.touchLastUsed()
 	openAPIDocumentStore.Store(docID, doc)
-	if err := saveOpenAPIDocumentToDisk(docID, doc); err != nil {
+	if err := saveOpenAPIDocumentSessionToDisk(docID, doc); err != nil {
 		log.Warnf("update openapi document last_used_at failed: %v", err)
 	}
 }

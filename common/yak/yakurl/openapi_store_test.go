@@ -36,7 +36,11 @@ func TestOpenAPIDocumentDiskRoundTrip(t *testing.T) {
 	loaded, err := loadOpenAPIDocumentFromDisk(docID)
 	require.NoError(t, err)
 	require.Equal(t, content, loaded.Content)
-	require.Equal(t, "Disk Demo", loaded.Parsed.Info.Title)
+	// 懒加载：磁盘加载不解析，Parsed 初始为 nil，EnsureParsed 后才有值
+	require.Nil(t, loaded.Parsed)
+	parsed, err := loaded.EnsureParsed()
+	require.NoError(t, err)
+	require.Equal(t, "Disk Demo", parsed.Info.Title)
 	require.Equal(t, "Disk Demo", loaded.Session.Title)
 	require.Equal(t, "disk-demo.json", loaded.Session.FileName)
 	require.Equal(t, openAPIDocumentSource, loaded.Session.Source)
@@ -60,5 +64,10 @@ func TestOpenAPIDocumentLegacyMetaMigration(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(1710000000), loaded.Session.CreatedAt)
 	require.Equal(t, "legacy.json", loaded.Session.FileName)
+	// 懒加载：legacy meta 无 title，初始为 docID；EnsureParsed 后回填为文档标题
+	require.Equal(t, docID, loaded.Session.Title)
+	parsed, err := loaded.EnsureParsed()
+	require.NoError(t, err)
+	require.Equal(t, "Legacy Demo", parsed.Info.Title)
 	require.Equal(t, "Legacy Demo", loaded.Session.Title)
 }

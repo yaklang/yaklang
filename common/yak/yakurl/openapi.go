@@ -43,6 +43,37 @@ type cachedOpenAPIDocument struct {
 	Content string
 	Parsed  *openapi.ParsedDocument
 	Session openAPIDocumentSession
+
+	// lazy parse: Parsed is populated on first access via EnsureParsed.
+	parseOnce sync.Once
+	parseErr  error
+}
+
+// EnsureParsed lazily parses the document content on first use and caches the
+// result. Subsequent calls return the cached ParsedDocument without re-parsing.
+// This keeps startup / history listing cheap — only spec files + session.json
+// are read from disk, and full ParseDocument (including schema mock expansion)
+// is deferred until an operation list / detail / build request actually needs it.
+func (d *cachedOpenAPIDocument) EnsureParsed() (*openapi.ParsedDocument, error) {
+	if d == nil {
+		return nil, utils.Error("nil openapi document cache")
+	}
+	if d.Parsed != nil {
+		return d.Parsed, nil
+	}
+	d.parseOnce.Do(func() {
+		d.Parsed, d.parseErr = openapi.ParseDocument(d.Content, nil)
+		if d.Parsed != nil {
+			title := strings.TrimSpace(d.Session.Title)
+			if title == "" || title == d.Session.SessionID {
+				d.Session.Title = strings.TrimSpace(d.Parsed.Info.Title)
+				if d.Session.Title == "" {
+					d.Session.Title = d.Session.SessionID
+				}
+			}
+		}
+	})
+	return d.Parsed, d.parseErr
 }
 
 var (
@@ -81,7 +112,11 @@ func (a *openapiAction) GetWithContext(ctx context.Context, params *ypb.RequestY
 	}
 
 	if query.Get(openAPIQueryOp) == openAPIOpDetail || (query.Get(openAPIQueryMethod) != "" && query.Get(openAPIQueryPath) != "") {
-		op, err := resolveOpenAPIOperation(doc.Parsed, query)
+		parsed, err := doc.EnsureParsed()
+		if err != nil {
+			return nil, err
+		}
+		op, err := resolveOpenAPIOperation(parsed, query)
 		if err != nil {
 			return nil, err
 		}
@@ -90,7 +125,11 @@ func (a *openapiAction) GetWithContext(ctx context.Context, params *ypb.RequestY
 		}, nil
 	}
 
-	return listOpenAPIDocumentResources(location, doc.Parsed)
+	parsed, err := doc.EnsureParsed()
+	if err != nil {
+		return nil, err
+	}
+	return listOpenAPIDocumentResources(location, parsed)
 }
 
 func (a *openapiAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
@@ -248,7 +287,7 @@ func listOpenAPIDocumentHistory() (*ypb.RequestYakURLResponse, error) {
 			return true
 		}
 		doc, ok := value.(*cachedOpenAPIDocument)
-		if !ok || doc == nil || doc.Parsed == nil {
+		if !ok || doc == nil {
 			return true
 		}
 		items = append(items, historyItem{docID: docID, doc: doc})
@@ -263,7 +302,13 @@ func listOpenAPIDocumentHistory() (*ypb.RequestYakURLResponse, error) {
 
 	resources := make([]*ypb.YakURLResource, 0, len(items))
 	for _, item := range items {
-		resource := openAPIDocumentRootResource(item.docID, item.doc.Parsed)
+		// title 缺失（空或等于 docID）时才触发解析回填；正常上传时 title 已存盘，零解析开销
+		parsed := item.doc.Parsed
+		title := strings.TrimSpace(item.doc.Session.Title)
+		if parsed == nil && (title == "" || title == item.docID) {
+			parsed, _ = item.doc.EnsureParsed()
+		}
+		resource := openAPIDocumentRootResource(item.docID, parsed)
 		resource.Extra = append(resource.GetExtra(), openAPIDocumentHistoryExtras(item.docID, item.doc)...)
 		resources = append(resources, resource)
 	}
@@ -334,7 +379,11 @@ func listOpenAPIDocumentResources(docID string, parsed *openapi.ParsedDocument) 
 func buildOpenAPIOperationRequests(ctx context.Context, docID string, doc *cachedOpenAPIDocument, params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	_ = docID
 	query := openAPIQueryValues(params.GetUrl().GetQuery())
-	op, err := resolveOpenAPIOperation(doc.Parsed, query)
+	parsed, err := doc.EnsureParsed()
+	if err != nil {
+		return nil, err
+	}
+	op, err := resolveOpenAPIOperation(parsed, query)
 	if err != nil {
 		return nil, err
 	}
@@ -490,7 +539,14 @@ func parseOpenAPIBuildOptions(params *ypb.RequestYakURLParams, query url.Values)
 }
 
 func openAPIDocumentRootResource(docID string, parsed *openapi.ParsedDocument) *ypb.YakURLResource {
-	info := parsed.Info
+	var info openapi.DocumentInfo
+	var operationCount int
+	var warnings []string
+	if parsed != nil {
+		info = parsed.Info
+		operationCount = len(parsed.Operations)
+		warnings = parsed.Warnings
+	}
 	title := strings.TrimSpace(info.Title)
 	if title == "" {
 		title = docID
@@ -502,13 +558,13 @@ func openAPIDocumentRootResource(docID string, parsed *openapi.ParsedDocument) *
 		VerboseName:       title,
 		Path:              "/",
 		YakURLVerbose:     fmt.Sprintf("openapi://%s/", docID),
-		HaveChildrenNodes: len(parsed.Operations) > 0,
+		HaveChildrenNodes: operationCount > 0,
 		Url: &ypb.YakURL{
 			Schema:   "openapi",
 			Location: docID,
 			Path:     "/",
 		},
-		Extra: openAPIDocumentInfoExtras(info, len(parsed.Operations), parsed.Warnings),
+		Extra: openAPIDocumentInfoExtras(info, operationCount, warnings),
 	}
 }
 
