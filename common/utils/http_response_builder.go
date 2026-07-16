@@ -46,7 +46,19 @@ func ParseHTTPResponseLine(line string) (string, int, string, bool) {
 }
 
 func ReadHTTPResponseFromBufioReader(reader io.Reader, req *http.Request) (*http.Response, error) {
-	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, nil)
+	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, nil, true)
+	if err != nil {
+		return nil, err
+	}
+	rsp.Request = req
+	return rsp, nil
+}
+
+// ReadSingleHTTPResponseFromBufioReader reads exactly one HTTP response,
+// including informational responses. Most callers should use
+// ReadHTTPResponseFromBufioReader, which skips non-terminal 1xx responses.
+func ReadSingleHTTPResponseFromBufioReader(reader io.Reader, req *http.Request) (*http.Response, error) {
+	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, nil, false)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +96,7 @@ func OpenTempFile(s string) (*os.File, error) {
 }
 
 func ReadHTTPResponseFromBufioReaderConn(reader io.Reader, conn net.Conn, req *http.Request) (*http.Response, error) {
-	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, conn)
+	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, conn, true)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +105,7 @@ func ReadHTTPResponseFromBufioReaderConn(reader io.Reader, conn net.Conn, req *h
 }
 
 func ReadHTTPResponseFromBytes(raw []byte, req *http.Request) (*http.Response, error) {
-	rsp, err := readHTTPResponseFromBufioReader(bytes.NewReader(raw), true, req, nil)
+	rsp, err := readHTTPResponseFromBufioReader(bytes.NewReader(raw), true, req, nil, true)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +113,13 @@ func ReadHTTPResponseFromBytes(raw []byte, req *http.Request) (*http.Response, e
 	return rsp, nil
 }
 
-func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bool, req *http.Request, conn net.Conn) (*http.Response, error) {
+func responseStatusHasNoBody(statusCode int) bool {
+	return statusCode >= 100 && statusCode < 200 ||
+		statusCode == http.StatusNoContent ||
+		statusCode == http.StatusNotModified
+}
+
+func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bool, req *http.Request, conn net.Conn, skipInformational bool) (*http.Response, error) {
 	rawPacket := new(bytes.Buffer)
 	var nobodyReqMethod bool
 	if req != nil { // some request method will not have body
@@ -118,24 +136,37 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 	}
 
 	var statusText string
-	rsp.Proto, rsp.StatusCode, statusText, _ = ParseHTTPResponseLine(string(firstLine))
+	informationalResponses := 0
+	for {
+		rsp.Proto, rsp.StatusCode, statusText, _ = ParseHTTPResponseLine(string(firstLine))
+		if !skipInformational || rsp.StatusCode < 100 || rsp.StatusCode >= 200 || rsp.StatusCode == http.StatusSwitchingProtocols {
+			break
+		}
+		informationalResponses++
+		if informationalResponses >= 16 {
+			return nil, Error("too many informational HTTP responses")
+		}
 
-HandleExpect100Continue:
-	// Expect: 100-continue cause the first line is not the real first line
-	if rsp.StatusCode == 100 && strings.ToLower(statusText) == "continue" {
+		// Informational responses have no body. Consume their header section and
+		// continue with the next response on the same connection.
 		for {
 			firstLine, err = ReadLine(headerReader)
 			if err != nil {
 				return nil, errors.Wrap(err, "read HTTPResponse firstline failed")
 			}
-			if string(bytes.TrimSpace(firstLine)) == "" {
-				continue
-			} else {
+			if len(bytes.TrimSpace(firstLine)) == 0 {
 				break
 			}
 		}
-		rsp.Proto, rsp.StatusCode, statusText, _ = ParseHTTPResponseLine(string(firstLine))
-		goto HandleExpect100Continue
+		for {
+			firstLine, err = ReadLine(headerReader)
+			if err != nil {
+				return nil, errors.Wrap(err, "read HTTPResponse firstline failed")
+			}
+			if len(bytes.TrimSpace(firstLine)) > 0 {
+				break
+			}
+		}
 	}
 	rawPacket.Write(firstLine)
 	rawPacket.WriteString(CRLF)
@@ -239,7 +270,9 @@ HandleExpect100Continue:
 	}()
 
 	bodyRawBuf := new(bytes.Buffer)
-	if fixContentLength {
+	if responseStatusHasNoBody(rsp.StatusCode) {
+		rsp.ContentLength = 0
+	} else if fixContentLength {
 		// just for bytes condition
 		// by reader
 		raw := []byte{}
