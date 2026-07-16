@@ -33,8 +33,9 @@ func extractCurrentTaskContentFromPrompt(t *testing.T, prompt string) string {
 }
 
 func newRecoveryTaskForReAct(name, goal string) *aid.AiTask {
+	taskID := "plan-task-" + uuid.NewString()
 	base := aicommon.NewStatefulTaskBase(
-		"plan-task-"+uuid.NewString(),
+		taskID,
 		"任务名称: "+name+"\n任务目标: "+goal,
 		context.Background(),
 		nil,
@@ -43,6 +44,7 @@ func newRecoveryTaskForReAct(name, goal string) *aid.AiTask {
 	base.SetName(name)
 	return &aid.AiTask{
 		AIStatefulTaskBase: base,
+		TaskId:             taskID,
 		Name:               name,
 		Goal:               goal,
 	}
@@ -342,7 +344,7 @@ func TestReAct_RecoveryPlanAndExec_StartFromSpecifiedTask(t *testing.T) {
 	in <- &ypb.AIInputEvent{
 		IsSyncMessage: true,
 		SyncType:      SYNC_TYPE_RECOVERY_PLAN_AND_EXEC,
-		SyncJsonInput: `{"coordinator_id":"` + coordinatorID + `","start_task_index":"` + startTask.Index + `"}`,
+		SyncJsonInput: `{"coordinator_id":"` + coordinatorID + `","start_task_id":"` + startTask.TaskId + `"}`,
 		SyncID:        syncID,
 	}
 
@@ -368,7 +370,7 @@ LOOP:
 					if started, ok := payload["started"].(bool); ok && started {
 						syncStarted = true
 					}
-					if gotIndex, ok := payload["start_task_index"].(string); ok && gotIndex == startTask.Index {
+					if gotID, ok := payload["start_task_id"].(string); ok && gotID == startTask.TaskId {
 						startIndexSyncOK = true
 					}
 				}
@@ -380,7 +382,7 @@ LOOP:
 					planStarted = true
 					var payload map[string]any
 					if err := json.Unmarshal(e.Content, &payload); err == nil {
-						if gotIndex, ok := payload["start_task_index"].(string); ok && gotIndex == startTask.Index {
+						if gotID, ok := payload["start_task_id"].(string); ok && gotID == startTask.TaskId {
 							startIndexPlanOK = true
 						}
 					}
@@ -401,14 +403,14 @@ LOOP:
 	close(in)
 
 	require.True(t, syncStarted, "expected recovery sync event to start")
-	require.True(t, startIndexSyncOK, "expected recovery sync to carry start_task_index")
+	require.True(t, startIndexSyncOK, "expected recovery sync to carry start_task_id")
 	require.True(t, planStarted, "expected recovery plan execution to start")
-	require.True(t, startIndexPlanOK, "expected plan execution event to carry start_task_index")
+	require.True(t, startIndexPlanOK, "expected plan execution event to carry start_task_id")
 	require.True(t, planEnded, "expected recovery plan execution to end")
 
 	mu.Lock()
 	defer mu.Unlock()
-	require.Equal(t, 0, firstCalls, "tasks before start_task_index should not trigger AI calls")
-	require.Greater(t, startCalls, 0, "specified start_task_index should trigger AI calls")
-	require.Greater(t, lastCalls, 0, "tasks after start_task_index should continue executing")
+	require.Equal(t, 0, firstCalls, "tasks before start_task_id should not trigger AI calls")
+	require.Greater(t, startCalls, 0, "specified start_task_id should trigger AI calls")
+	require.Greater(t, lastCalls, 0, "tasks after start_task_id should continue executing")
 }

@@ -116,7 +116,7 @@ func TestBuildTaskRuntimeReport_PlanExecutionCoordinator(t *testing.T) {
 	report := BuildTaskRuntimeReport(&mockReactRuntimeSource{reactID: "react-1"})
 	require.Len(t, report.PlanExecutions, 1)
 	require.Equal(t, "coord-1", report.PlanExecutions[0].CoordinatorID)
-	require.Contains(t, report.PlanExecutions[0].ActiveTaskIndexes, "1")
+	require.Contains(t, report.PlanExecutions[0].ActiveTaskIDs, "1")
 
 	var childEntry *TaskRuntimeEntry
 	for _, entry := range report.PlanExecutions[0].Tasks {
