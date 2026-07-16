@@ -25,16 +25,38 @@ if [ ! -f "$MANIFEST" ]; then
   exit 1
 fi
 
+# Acquire DB write lock before any compile/cleanup. GitHub concurrency group is
+# a soft, single-runner assumption; flock guards the SQLite file when multiple
+# self-hosted runners share the `ssa-ci` label. Must be sourced (not executed)
+# so fd 9 stays open for this script's lifetime and the lock is not released
+# when the helper subshell exits.
+# shellcheck source=acquire-db-lock.sh
+source "$SCRIPT_DIR/acquire-db-lock.sh"
+
 "$SCRIPT_DIR/ensure-base-program.sh"
 
 OLD_SHA=$(jq -r '.main_sha // empty' "$MANIFEST")
 OLD_BASE=$(jq -r '.base_program_name // empty' "$MANIFEST")
+OLD_DEPTH=$(jq -r '.overlay_depth // 0' "$MANIFEST" 2>/dev/null || echo 0)
+case "$OLD_DEPTH" in ''|*[!0-9]*|null) OLD_DEPTH=0 ;; esac
 if [ -z "$OLD_SHA" ] || [ "$OLD_SHA" = "null" ]; then
   echo "::error::manifest.main_sha is empty; run CI SSA Base Weekly first"
   exit 1
 fi
 if [ -z "$OLD_BASE" ] || [ "$OLD_BASE" = "null" ]; then
   OLD_BASE="${CI_SSA_BASE_PROGRAM:-ci-yaklang-base}"
+fi
+
+# Overlay chain depth guard. Each successful promote adds one layer on top of
+# the effective base. The engine has no flatten API, so layers only get
+# reclaimed by the weekly full recompile. Warn (do not fail) past the threshold
+# so merging is not blocked, but surface that PR scans will get slower.
+OVERLAY_DEPTH_LIMIT="${CI_SSA_OVERLAY_DEPTH_LIMIT:-5}"
+NEW_DEPTH=$((OLD_DEPTH + 1))
+if [ "$NEW_DEPTH" -gt "$OVERLAY_DEPTH_LIMIT" ]; then
+  echo "::warning::Overlay chain depth $NEW_DEPTH exceeds limit $OVERLAY_DEPTH_LIMIT."
+  echo "::warning::PR scans load every layer via ProgramOverLay; consider triggering"
+  echo "::warning::'CI SSA Base Weekly' to flatten the chain back to ci-yaklang-base."
 fi
 
 echo "Promote: $OLD_SHA ($OLD_BASE) -> $NEW_SHA"
@@ -81,7 +103,7 @@ if [ "$FILE_COUNT" -eq 0 ]; then
   ZIP_SIZE=$(stat -c%s "$FS_ZIP" 2>/dev/null || stat -f%z "$FS_ZIP" || echo 0)
   if [ "${ZIP_SIZE:-0}" -lt 64 ]; then
     echo "Empty diff; advancing manifest.main_sha without new overlay"
-    "$SCRIPT_DIR/write-local-manifest.sh" "$NEW_SHA" "$CI_SSA_BASE_PROGRAM"
+    "$SCRIPT_DIR/write-local-manifest.sh" "$NEW_SHA" "$CI_SSA_BASE_PROGRAM" "" "$OLD_DEPTH"
     if [ -n "$PR_NUMBER" ]; then
       "$SCRIPT_DIR/cleanup-pr-diff-programs.sh" "$PR_NUMBER" || true
     fi
@@ -119,7 +141,7 @@ if ! yak ssa-program "$NEW_PROG" --database "$SSA_DATABASE_RAW" 2>/dev/null | gr
 fi
 
 export CI_SSA_BASE_PROGRAM="$NEW_PROG"
-"$SCRIPT_DIR/write-local-manifest.sh" "$NEW_SHA" "$NEW_PROG"
+"$SCRIPT_DIR/write-local-manifest.sh" "$NEW_SHA" "$NEW_PROG" "" "$NEW_DEPTH"
 
 if [ -n "$PR_NUMBER" ]; then
   "$SCRIPT_DIR/cleanup-pr-diff-programs.sh" "$PR_NUMBER" || true

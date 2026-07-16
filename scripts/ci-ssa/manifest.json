@@ -2,6 +2,7 @@
   "version": "0",
   "base_program_name": "ci-yaklang-base",
   "main_sha": "",
+  "overlay_depth": 0,
   "yak_version": "",
   "database": {
     "url": "local://PLACEHOLDER/run-ci-ssa-base-weekly-first",

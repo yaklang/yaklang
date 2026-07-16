@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Write CI SSA manifest to the self-hosted data dir (and optional extra path).
-# Usage: write-local-manifest.sh <main_sha> <base_program_name> [extra_out_path]
+# Usage: write-local-manifest.sh <main_sha> <base_program_name> [extra_out_path] [overlay_depth]
 set -euo pipefail
 
 MAIN_SHA="${1:?main_sha required}"
 BASE_PROGRAM="${2:?base_program_name required}"
 EXTRA_OUT="${3:-}"
+OVERLAY_DEPTH="${4:-0}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=export-ssa-db-env.sh
@@ -29,11 +30,13 @@ jq -n \
   --arg yak "$YAK_VER" \
   --arg path "$SSA_DATABASE_RAW" \
   --argjson size "$DB_SIZE" \
+  --argjson depth "$OVERLAY_DEPTH" \
   --arg now "$NOW" \
   '{
     version: $version,
     base_program_name: $base,
     main_sha: $sha,
+    overlay_depth: $depth,
     yak_version: $yak,
     database: {
       url: ("local://" + $path),
@@ -51,5 +54,5 @@ if [ -n "$EXTRA_OUT" ]; then
   cp "$OUT" "$EXTRA_OUT"
 fi
 
-echo "Wrote $OUT (base=$BASE_PROGRAM main_sha=$MAIN_SHA)"
+echo "Wrote $OUT (base=$BASE_PROGRAM main_sha=$MAIN_SHA overlay_depth=$OVERLAY_DEPTH)"
 cat "$OUT"
