@@ -23,10 +23,16 @@ import (
 )
 
 const (
-	activeRuleSnapshotEndpointPath = "/v1/ssa-rule-sync/active-snapshot"
-	ruleSnapshotBundleEndpointFmt  = "/v1/ssa-rule-sync/snapshots/%s"
+	// activeRuleSnapshotEndpointPath is the node-accessible active-snapshot
+	// manifest endpoint. It authenticates the node via the node_session_id
+	// query parameter + Bearer session token (no platform user session needed).
+	activeRuleSnapshotEndpointPath = "/v1/ssa-rule-sync-node/active-snapshot"
+	ruleSnapshotBundleEndpointFmt  = "/v1/ssa-rule-sync-node/snapshots/%s"
 	ruleSnapshotBundleFormatJSON   = "json"
 	ruleSnapshotSchemaVersionV1    = "ssa_rule_snapshot_bundle.v1"
+	// nodeSessionIDQueryParam is the query parameter carrying the node session
+	// id used by the server to authenticate the node.
+	nodeSessionIDQueryParam = "node_session_id"
 )
 
 type ruleSyncer interface {
@@ -39,10 +45,14 @@ type RuleSyncBundleImporter func(context.Context, RuleSnapshotBundle) (int, erro
 type RuleSyncConfig struct {
 	ServerURL   string                 `json:"server_url"`
 	BearerToken string                 `json:"bearer_token,omitempty"`
-	SyncEnabled bool                   `json:"sync_enabled"`
-	CacheDir    string                 `json:"cache_dir,omitempty"`
-	Client      *http.Client           `json:"-"`
-	Importer    RuleSyncBundleImporter `json:"-"`
+	// NodeSessionID is the node session id sent as the node_session_id query
+	// parameter so the server can authenticate the node via its session token.
+	// It is populated after bootstrap completes (see UpdateCredentials).
+	NodeSessionID string               `json:"node_session_id,omitempty"`
+	SyncEnabled   bool                 `json:"sync_enabled"`
+	CacheDir      string               `json:"cache_dir,omitempty"`
+	Client        *http.Client         `json:"-"`
+	Importer      RuleSyncBundleImporter `json:"-"`
 }
 
 type RuleSyncClient struct {
@@ -378,11 +388,29 @@ func (c *RuleSyncClient) getJSON(ctx context.Context, path string, target any) e
 
 func (c *RuleSyncClient) getRaw(ctx context.Context, path string) ([]byte, error) {
 	baseURL := strings.TrimRight(strings.TrimSpace(c.config.ServerURL), "/")
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+path, nil)
+
+	// Build the request URL with the node_session_id query parameter so the
+	// server can authenticate the node via its session token.
+	requestURL := baseURL + path
+	c.mu.RLock()
+	sessionID := strings.TrimSpace(c.config.NodeSessionID)
+	c.mu.RUnlock()
+	if sessionID != "" {
+		separator := "&"
+		if !strings.Contains(requestURL, "?") {
+			separator = "?"
+		}
+		requestURL = requestURL + separator + nodeSessionIDQueryParam + "=" + url.QueryEscape(sessionID)
+	}
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
 	if err != nil {
 		return nil, utils.Wrap(err, "build rule sync request failed")
 	}
-	if token := strings.TrimSpace(c.config.BearerToken); token != "" {
+	c.mu.RLock()
+	token := strings.TrimSpace(c.config.BearerToken)
+	c.mu.RUnlock()
+	if token != "" {
 		request.Header.Set("Authorization", "Bearer "+token)
 	}
 
@@ -401,6 +429,16 @@ func (c *RuleSyncClient) getRaw(ctx context.Context, path string) ([]byte, error
 		return nil, utils.Wrap(err, "read rule sync response failed")
 	}
 	return body, nil
+}
+
+// UpdateCredentials updates the node session credentials used to authenticate
+// rule sync requests. It is called after bootstrap completes so the client
+// can talk to the node-accessible snapshot endpoints with a valid session.
+func (c *RuleSyncClient) UpdateCredentials(nodeSessionID, sessionToken string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.config.BearerToken = strings.TrimSpace(sessionToken)
+	c.config.NodeSessionID = strings.TrimSpace(nodeSessionID)
 }
 
 func readRuleSyncHTTPError(response *http.Response) error {
