@@ -797,9 +797,11 @@ func DebugMockHTTPWithTimeout(du time.Duration, rsp []byte) (string, int) {
 }
 
 func DebugMockEchoWs(point string) (string, int) {
-	addr := GetRandomLocalAddr()
-	time.Sleep(time.Millisecond * 300)
-	host, port, _ := ParseStringToHostPort(addr)
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		panic(err)
+	}
+	host, port, _ := ParseStringToHostPort(lis.Addr().String())
 
 	upgrader := ws.Upgrader{
 		ReadBufferSize:    1024,
@@ -807,7 +809,8 @@ func DebugMockEchoWs(point string) (string, int) {
 		EnableCompression: true, // 启用压缩
 	}
 
-	http.HandleFunc("/"+point, func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/"+point, func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Println(err)
@@ -834,27 +837,24 @@ func DebugMockEchoWs(point string) (string, int) {
 		}
 	})
 
-	server := &http.Server{Addr: addr}
+	server := &http.Server{Handler: mux}
 
 	go func() {
-		err := server.ListenAndServe()
+		err := server.Serve(lis)
 		if err != nil && err != http.ErrServerClosed {
-			log.Fatal(err)
+			log.Errorf("serve mock websocket failed: %v", err)
 		}
 	}()
-
-	err := WaitConnect(addr, 3)
-	if err != nil {
-		panic(err)
-	}
 
 	return host, port
 }
 
 func DebugMockEchoWss(point string) (string, int) {
-	addr := GetRandomLocalAddr()
-	time.Sleep(time.Millisecond * 300)
-	host, port, _ := ParseStringToHostPort(addr)
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		panic(err)
+	}
+	host, port, _ := ParseStringToHostPort(lis.Addr().String())
 
 	upgrader := ws.Upgrader{
 		ReadBufferSize:    1024,
@@ -862,7 +862,8 @@ func DebugMockEchoWss(point string) (string, int) {
 		EnableCompression: true, // 启用压缩
 	}
 
-	http.HandleFunc("/"+point, func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/"+point, func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Println(err)
@@ -889,38 +890,17 @@ func DebugMockEchoWss(point string) (string, int) {
 		}
 	})
 
-	server := &http.Server{Addr: addr}
+	server := &http.Server{Handler: mux}
 
 	go func() {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
 		origin := GetDefaultTLSConfig(5)
 		copied := *origin
-		lis, err := tls.Listen("tcp", HostPort(host, port), &copied)
-		if err != nil {
-			panic(err)
-		}
-		go func() {
-			select {
-			case <-ctx.Done():
-			}
-			lis.Close()
-		}()
-
-		go func() {
-			log.Infof("START TO SERVE HTTP2")
-		}()
-
-		err = server.Serve(lis)
-		if err != nil && err != http.ErrServerClosed {
-			log.Fatal(err)
+		tlsListener := tls.NewListener(lis, &copied)
+		serveErr := server.Serve(tlsListener)
+		if serveErr != nil && serveErr != http.ErrServerClosed {
+			log.Errorf("serve mock secure websocket failed: %v", serveErr)
 		}
 	}()
-
-	err := WaitConnect(addr, 3)
-	if err != nil {
-		panic(err)
-	}
 
 	return host, port
 }
