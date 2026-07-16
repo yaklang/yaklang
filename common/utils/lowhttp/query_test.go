@@ -46,3 +46,13 @@ func TestQueryParams1(t *testing.T) {
 	params.Set("ddd", "cc31==+&")
 	test.Equal("a=22&c=3&c=5&ac2224*(&*&&*&*((&*&ccc=&&&&ddd=cc31%3D%3D%2B%26", params.Encode())
 }
+
+func TestQueryParamsNoAutoEncodeEscapesCRLF(t *testing.T) {
+	params := NewQueryParams().DisableAutoEncode(true)
+	params.Add("\nsql", "1")
+	params.Add("a", "b\nc")
+	encoded := params.Encode()
+	assert.Equal(t, "%0Asql=1&a=b%0Ac", encoded)
+	assert.NotContains(t, encoded, "\n")
+	assert.NotContains(t, encoded, "\r")
+}

@@ -3002,6 +3002,26 @@ Content-Disposition: form-data; name="b"
 				err:    nil,
 			},
 		},
+		{
+			name:        "form-urlencoded-leading-blank-lines",
+			contentType: "application/x-www-form-urlencoded",
+			body:        "\n\nsql=1",
+			expected: &Excepted{
+				params: map[string][]string{"sql": {"1"}},
+				useRaw: false,
+				err:    nil,
+			},
+		},
+		{
+			name:        "form-urlencoded-leading-crlf",
+			contentType: "application/x-www-form-urlencoded",
+			body:        "\r\n\r\nsql=1&a=2",
+			expected: &Excepted{
+				params: map[string][]string{"sql": {"1"}, "a": {"2"}},
+				useRaw: false,
+				err:    nil,
+			},
+		},
 	}
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {

@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/authhack"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
@@ -309,4 +311,22 @@ func TestSM2PrivateKeyTryDecode(t *testing.T) {
 	err = flow.SM2Decrypt(codec.EncodeBase64(priKey), "C1C2C3")
 	require.NoError(t, err)
 	require.Equal(t, plaintext, flow.Text)
+}
+
+func TestHTTPRequestMutate_PostToGetWithLeadingBlankLinesInBody(t *testing.T) {
+	// 用户反馈：body 前多一个空行时，POST→GET 会污染请求行：
+	// GET /path? HTTP/1.1
+	// sql=1 HTTP/1.1
+	raw := []byte("POST /WebServiceEx.asmx/GetDataTableBySql HTTP/1.1\nHost: \nContent-Type: application/x-www-form-urlencoded\n\n\nsql=1")
+	flow := NewCodecExecFlow(raw, nil)
+	err := flow.HTTPRequestMutate("GET")
+	require.NoError(t, err)
+
+	result := string(flow.Text)
+	// 请求行必须完整：?sql=1 在同一行，不能被拆成第二行 "sql=1 HTTP/1.1"
+	require.True(t, strings.HasPrefix(result, "GET /WebServiceEx.asmx/GetDataTableBySql?sql=1 HTTP/1.1"), "got: %q", result)
+	require.False(t, strings.Contains(result, "?\r\nsql=") || strings.Contains(result, "?\nsql="), "request-line should not be split by query CR/LF, got: %q", result)
+	require.Equal(t, "GET", lowhttp.GetHTTPRequestMethod(flow.Text))
+	require.Equal(t, map[string][]string{"sql": {"1"}}, lowhttp.GetFullHTTPRequestQueryParams(flow.Text))
+	require.Empty(t, strings.TrimSpace(string(lowhttp.GetHTTPPacketBody(flow.Text))))
 }

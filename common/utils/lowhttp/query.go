@@ -57,11 +57,32 @@ type QueryParamItem struct {
 	Position        HttpParamPositionType
 }
 
+// escapeQueryStructuralChars keeps NoAutoEncode semantics for most characters,
+// but always percent-encodes CR/LF so they cannot break the HTTP request-line.
+func escapeQueryStructuralChars(s string) string {
+	if !strings.ContainsAny(s, "\r\n") {
+		return s
+	}
+	var buf bytes.Buffer
+	buf.Grow(len(s) + 8)
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '\r':
+			buf.WriteString("%0D")
+		case '\n':
+			buf.WriteString("%0A")
+		default:
+			buf.WriteByte(s[i])
+		}
+	}
+	return buf.String()
+}
+
 func (item *QueryParamItem) Encode() string {
 	var buf bytes.Buffer
 	if item.Key == "" && item.Value == "" {
 		if item.NoAutoEncode {
-			buf.WriteString(item.Raw)
+			buf.WriteString(escapeQueryStructuralChars(item.Raw))
 		} else {
 			buf.WriteString(codec.QueryEscape(item.Raw))
 		}
@@ -69,13 +90,13 @@ func (item *QueryParamItem) Encode() string {
 	}
 
 	if item.NoAutoEncode {
-		buf.WriteString(item.Key)
+		buf.WriteString(escapeQueryStructuralChars(item.Key))
 	} else {
 		buf.WriteString(codec.QueryEscape(item.Key))
 	}
 	buf.WriteByte('=')
 	if item.NoAutoEncode {
-		buf.WriteString(item.Value)
+		buf.WriteString(escapeQueryStructuralChars(item.Value))
 	} else {
 		buf.WriteString(codec.QueryEscape(item.Value))
 	}
