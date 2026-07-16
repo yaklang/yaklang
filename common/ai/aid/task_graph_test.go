@@ -67,26 +67,26 @@ func TestBuildStrictExecutableTaskGraph_LeafNodesStayExecutableOnlyWithoutImplic
 	graph, err := buildStrictExecutableTaskGraph(root)
 	require.NoError(t, err)
 
-	require.Equal(t, []string{parse.Index, enrich.Index, review.Index}, []string{
+	require.Equal(t, []string{parse.TaskId, enrich.TaskId, review.TaskId}, []string{
 		graph.nodes[0].id,
 		graph.nodes[1].id,
 		graph.nodes[2].id,
 	})
-	_, exists := graph.Node(root.Index)
+	_, exists := graph.Node(root.TaskId)
 	assert.False(t, exists, "root structure task must not become executable")
-	_, exists = graph.Node(group.Index)
+	_, exists = graph.Node(group.TaskId)
 	assert.False(t, exists, "non-leaf structure task must not become executable")
 
-	assert.Empty(t, graphDeps(t, graph, parse.Index))
-	assert.Empty(t, graphDeps(t, graph, enrich.Index))
-	assert.Empty(t, graphDeps(t, graph, review.Index))
-	assert.NotContains(t, graphDeps(t, graph, enrich.Index), group.Index)
-	assert.NotContains(t, graphDeps(t, graph, review.Index), root.Index)
+	assert.Empty(t, graphDeps(t, graph, parse.TaskId))
+	assert.Empty(t, graphDeps(t, graph, enrich.TaskId))
+	assert.Empty(t, graphDeps(t, graph, review.TaskId))
+	assert.NotContains(t, graphDeps(t, graph, enrich.TaskId), group.Index)
+	assert.NotContains(t, graphDeps(t, graph, review.TaskId), root.Index)
 	assert.Equal(t, 0, graph.nodes[0].stage)
 	assert.Equal(t, 0, graph.nodes[1].stage)
 	assert.Equal(t, 0, graph.nodes[2].stage)
 	require.Len(t, graph.stages, 1)
-	require.Equal(t, []string{parse.Index, enrich.Index, review.Index}, []string{
+	require.Equal(t, []string{parse.TaskId, enrich.TaskId, review.TaskId}, []string{
 		graph.stages[0][0].id,
 		graph.stages[0][1].id,
 		graph.stages[0][2].id,
@@ -127,10 +127,10 @@ func TestBuildStrictExecutableTaskGraph_ExpandsStructuralDependencies(t *testing
 	graph, err := buildStrictExecutableTaskGraph(root)
 	require.NoError(t, err)
 
-	assert.Equal(t, []string{fetch.Index}, graphDeps(t, graph, normalize.Index))
-	assert.ElementsMatch(t, []string{fetch.Index, normalize.Index}, graphDeps(t, graph, analyze.Index))
-	assert.Equal(t, []string{analyze.Index}, graphDeps(t, graph, draft.Index))
-	assert.Equal(t, []string{draft.Index}, graphDeps(t, graph, finalize.Index))
+	assert.Equal(t, []string{fetch.TaskId}, graphDeps(t, graph, normalize.TaskId))
+	assert.ElementsMatch(t, []string{fetch.TaskId, normalize.TaskId}, graphDeps(t, graph, analyze.TaskId))
+	assert.Equal(t, []string{analyze.TaskId}, graphDeps(t, graph, draft.TaskId))
+	assert.Equal(t, []string{draft.TaskId}, graphDeps(t, graph, finalize.TaskId))
 }
 
 func TestBuildStrictExecutableTaskGraph_CalculatesStages(t *testing.T) {
@@ -153,11 +153,11 @@ func TestBuildStrictExecutableTaskGraph_CalculatesStages(t *testing.T) {
 	graph, err := buildStrictExecutableTaskGraph(root)
 	require.NoError(t, err)
 
-	stageA, ok := graph.StageOf(a.Index)
+	stageA, ok := graph.StageOf(a.TaskId)
 	require.True(t, ok)
-	stageB, ok := graph.StageOf(b.Index)
+	stageB, ok := graph.StageOf(b.TaskId)
 	require.True(t, ok)
-	stageC, ok := graph.StageOf(c.Index)
+	stageC, ok := graph.StageOf(c.TaskId)
 	require.True(t, ok)
 
 	assert.Equal(t, 0, stageA)
@@ -179,9 +179,9 @@ func TestBuildStrictExecutableTaskGraph_UnknownDependencyWarnsAndIgnores(t *test
 
 	graph, err := buildStrictExecutableTaskGraph(root)
 	require.NoError(t, err)
-	assert.Equal(t, []string{a.Index}, graphDeps(t, graph, b.Index))
-	stageA, _ := graph.StageOf(a.Index)
-	stageB, _ := graph.StageOf(b.Index)
+	assert.Equal(t, []string{a.TaskId}, graphDeps(t, graph, b.TaskId))
+	stageA, _ := graph.StageOf(a.TaskId)
+	stageB, _ := graph.StageOf(b.TaskId)
 	assert.Equal(t, 0, stageA)
 	assert.Equal(t, 1, stageB)
 }

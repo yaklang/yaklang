@@ -25,7 +25,7 @@ import (
 // PlanExecutingLoadingStatusKey is the key used to emit loading status events for plan execution
 // Similar to ReActLoadingStatusKey in reactloops, this allows UI to show current execution phase
 const PlanExecutingLoadingStatusKey = "plan-executing-loading-status-key"
-const RecoveryStartTaskIndexConfigKey = "recovery_start_task_index"
+const RecoveryStartTaskIDConfigKey = "recovery_start_task_id"
 
 // CoordinatorOption 定义配置 Coordinator 的选项接口
 type CoordinatorOption func(c *Coordinator)
@@ -92,12 +92,12 @@ func WithPlanMocker(i func(coordinator *Coordinator) *PlanResponse) aicommon.Con
 	}
 }
 
-func WithRecoveryStartTaskIndex(index string) aicommon.ConfigOption {
+func WithRecoveryStartTaskID(id string) aicommon.ConfigOption {
 	return func(config *aicommon.Config) error {
 		if config == nil {
 			return nil
 		}
-		config.SetConfig(RecoveryStartTaskIndexConfigKey, strings.TrimSpace(index))
+		config.SetConfig(RecoveryStartTaskIDConfigKey, strings.TrimSpace(id))
 		return nil
 	}
 }
@@ -241,11 +241,11 @@ func (c *Coordinator) GetContextProvider() *PromptContextProvider {
 	return c.ContextProvider
 }
 
-func (c *Coordinator) getRecoveryStartTaskIndex() string {
+func (c *Coordinator) getRecoveryStartTaskID() string {
 	if c == nil || c.Config == nil {
 		return ""
 	}
-	return strings.TrimSpace(c.GetConfigString(RecoveryStartTaskIndexConfigKey))
+	return strings.TrimSpace(c.GetConfigString(RecoveryStartTaskIDConfigKey))
 }
 
 func (c *Coordinator) getCurrentTaskPlan() *AiTask {
@@ -406,8 +406,8 @@ func (c *Coordinator) Run() error {
 	c.EmitCurrentConfigInfo()
 	c.emitBaseCapabilityInventory()
 
-	recoveryStartTaskIndex := c.getRecoveryStartTaskIndex()
-	recovered, err := c.tryRecoverAndExecute(recoveryStartTaskIndex)
+	recoveryStartTaskID := c.getRecoveryStartTaskID()
+	recovered, err := c.tryRecoverAndExecute(recoveryStartTaskID)
 	if err != nil {
 		return err
 	}

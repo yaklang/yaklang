@@ -325,6 +325,7 @@ func (c *Coordinator) generateAITask(params aitool.InvokeParams) *AiTask {
 }
 
 func (c *Coordinator) generateAITaskWithName(name, goal string) *AiTask {
+	taskID := "plan-task" + uuid.NewString()
 	task := &AiTask{
 		Coordinator: c,
 		Name:        name,
@@ -332,13 +333,14 @@ func (c *Coordinator) generateAITaskWithName(name, goal string) *AiTask {
 	}
 
 	taskBase := aicommon.NewStatefulTaskBase(
-		"plan-task"+uuid.NewString(),
+		taskID,
 		fmt.Sprintf("任务名称: %s\n任务目标: %s", task.Name, task.Goal),
 		c.Ctx,
 		c.Emitter,
 		true,
 	)
 	task.AIStatefulTaskBase = taskBase
+	task.TaskId = taskID
 	taskBase.SetName(name)
 
 	// Generate semantic identifier for directory naming

@@ -51,8 +51,8 @@ func TestPlanAndExecProgressCountsExecutableLeavesAndStages(t *testing.T) {
 		RootTask:          root,
 		execGraph:         graph,
 		currentStage:      0,
-		stageAnchorTaskID: sub1.Index,
-		activeTaskIndexes: []string{sub2.Index},
+		stageAnchorTaskID: sub1.TaskId,
+		activeTaskIDs:    []string{sub2.TaskId},
 	}
 	c.runtime = r
 
@@ -66,10 +66,10 @@ func TestPlanAndExecProgressCountsExecutableLeavesAndStages(t *testing.T) {
 	require.Equal(t, 0, progress.CompletedStages)
 	require.Equal(t, 0, progress.CurrentStage)
 	require.Equal(t, 2, progress.CurrentIndex)
-	require.Equal(t, sub2.Index, progress.CurrentTaskIndex)
+	require.Equal(t, sub2.TaskId, progress.CurrentTaskID)
 	require.Equal(t, sub2.Name, progress.CurrentTask)
 	require.Equal(t, sub2.Goal, progress.CurrentGoal)
-	require.Equal(t, []string{sub2.Index}, progress.ActiveTaskIndexes)
+	require.Equal(t, []string{sub2.TaskId}, progress.ActiveTaskIDs)
 	require.Equal(t, "executing", progress.Phase)
 }
 

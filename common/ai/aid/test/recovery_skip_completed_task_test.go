@@ -23,8 +23,9 @@ import (
 )
 
 func newRawTaskForRecovery(name, goal string) *aid.AiTask {
+	taskID := "plan-task-" + uuid.NewString()
 	base := aicommon.NewStatefulTaskBase(
-		"plan-task-"+uuid.NewString(),
+		taskID,
 		"任务名称: "+name+"\n任务目标: "+goal,
 		context.Background(),
 		nil,
@@ -33,6 +34,7 @@ func newRawTaskForRecovery(name, goal string) *aid.AiTask {
 	base.SetName(name)
 	return &aid.AiTask{
 		AIStatefulTaskBase: base,
+		TaskId:             taskID,
 		Name:               name,
 		Goal:               goal,
 	}
@@ -326,7 +328,7 @@ func TestRecovery_StartFromSpecifiedTask(t *testing.T) {
 		aicommon.WithGenerateReport(false),
 		aicommon.WithDisableAutoSkills(true),
 		aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
-		aid.WithRecoveryStartTaskIndex(startTask.Index),
+		aid.WithRecoveryStartTaskID(startTask.TaskId),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			if event == nil {
 				return
@@ -480,7 +482,7 @@ func TestRecovery_StartEarlierThanPreviousCursorResetsCompletedTasks(t *testing.
 		TaskTree:      string(utils.Jsonify(root)),
 		TaskProgress: string(utils.Jsonify(&aid.PlanAndExecProgress{
 			Phase:            "executing",
-			CurrentTaskIndex: fourthTask.Index,
+			CurrentTaskID: fourthTask.TaskId,
 		})),
 	}
 	require.NoError(t, yakit.CreateOrUpdateAISessionPlanAndExec(db, record))
@@ -510,7 +512,7 @@ func TestRecovery_StartEarlierThanPreviousCursorResetsCompletedTasks(t *testing.
 		aicommon.WithGenerateReport(false),
 		aicommon.WithDisableAutoSkills(true),
 		aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
-		aid.WithRecoveryStartTaskIndex(secondTask.Index),
+		aid.WithRecoveryStartTaskID(secondTask.TaskId),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			if event == nil {
 				return
@@ -726,7 +728,7 @@ func TestRecovery_CancelledTaskPersistsAbortedState(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(record.TaskProgress), &persistedProgress))
 	require.Equal(t, 1, persistedProgress.AbortedTasks, "cancelled task should be counted as aborted")
 	require.Equal(t, 0, persistedProgress.CompletedTasks, "cancelled task should not be counted as completed")
-	require.Equal(t, "1-1", persistedProgress.CurrentTaskIndex)
+	require.Equal(t, cancelTask.TaskId, persistedProgress.CurrentTaskID)
 
 	inMemoryRoot := coordinatorRootTaskForTest(t, ins)
 	require.NotNil(t, inMemoryRoot)

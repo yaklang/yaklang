@@ -33,7 +33,7 @@ type invokePlanAndExecuteOptions struct {
 	forgeName        string
 	forgeParams      any
 	coordinatorID    string
-	startTaskIndex   string
+	startTaskID      string
 	executePlanInput *aicommon.ExecutePlanInput
 }
 
@@ -64,9 +64,9 @@ func WithInvokePlanAndExecuteCoordinatorID(coordinatorID string) InvokePlanAndEx
 	}
 }
 
-func WithInvokePlanAndExecuteStartTaskIndex(startTaskIndex string) InvokePlanAndExecuteOption {
+func WithInvokePlanAndExecuteStartTaskID(startTaskID string) InvokePlanAndExecuteOption {
 	return func(cfg *invokePlanAndExecuteOptions) {
-		cfg.startTaskIndex = startTaskIndex
+		cfg.startTaskID = startTaskID
 	}
 }
 
@@ -213,7 +213,7 @@ func (r *ReAct) AsyncPlanAndExecute(ctx context.Context, planPayload string, onF
 	}
 }
 
-func (r *ReAct) AsyncRecoverPlanAndExecute(ctx context.Context, coordinatorID string, startTaskIndex string, onFinished func(error), opts ...InvokePlanAndExecuteOption) {
+func (r *ReAct) AsyncRecoverPlanAndExecute(ctx context.Context, coordinatorID string, startTaskID string, onFinished func(error), opts ...InvokePlanAndExecuteOption) {
 	cb := utils.NewCondBarrierContext(ctx)
 	startupBarrier := cb.CreateBarrier("startup")
 
@@ -236,7 +236,7 @@ func (r *ReAct) AsyncRecoverPlanAndExecute(ctx context.Context, coordinatorID st
 		invokeOpts := []InvokePlanAndExecuteOption{
 			WithInvokePlanAndExecuteTask(recoveryTask),
 			WithInvokePlanAndExecuteCoordinatorID(coordinatorID),
-			WithInvokePlanAndExecuteStartTaskIndex(startTaskIndex),
+			WithInvokePlanAndExecuteStartTaskID(startTaskID),
 		}
 		invokeOpts = append(invokeOpts, opts...)
 		finalError = r.invokePlanAndExecute(taskDone, recoveryTask.GetContext(), invokeOpts...)
@@ -266,7 +266,7 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 	forgeName := cfg.forgeName
 	forgeParams := cfg.forgeParams
 	coordinatorID := cfg.coordinatorID
-	startTaskIndex := cfg.startTaskIndex
+	startTaskID := cfg.startTaskID
 
 	doneOnce := new(sync.Once)
 	done := func() {
@@ -297,10 +297,10 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 		reactTaskID = task.GetId()
 	}
 	params := map[string]any{
-		"re-act_id":        r.config.Id,
-		"re-act_task":      reactTaskID,
-		"coordinator_id":   uid,
-		"start_task_index": startTaskIndex,
+		"re-act_id":      r.config.Id,
+		"re-act_task":    reactTaskID,
+		"coordinator_id": uid,
+		"start_task_id":  startTaskID,
 	}
 	r.EmitJSON(schema.EVENT_TYPE_START_PLAN_AND_EXECUTION, r.config.Id, params)
 	defer func() {
@@ -392,8 +392,8 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 			r.config.EventHandler(e)
 		}),
 	)
-	if startTaskIndex != "" {
-		baseOpts = append(baseOpts, aid.WithRecoveryStartTaskIndex(startTaskIndex))
+	if startTaskID != "" {
+		baseOpts = append(baseOpts, aid.WithRecoveryStartTaskID(startTaskID))
 	}
 	baseOpts = appendApprovedPlanArtifactOptions(baseOpts, cfg.executePlanInput)
 
