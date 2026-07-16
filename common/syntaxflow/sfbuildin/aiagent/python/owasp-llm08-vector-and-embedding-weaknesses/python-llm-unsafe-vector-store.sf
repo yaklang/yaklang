@@ -1,0 +1,71 @@
+desc(
+	title: "AI Agent Vector and Embedding Weaknesses: Unsafe Vector Store Operations"
+	title_zh: "AI Agent 向量与嵌入弱点：不安全的向量存储操作"
+	type: vuln
+	level: middle
+	risk: "向量与嵌入安全"
+	desc: <<<DESC
+检测 AI Agent RAG 系统中向量存储和嵌入操作的安全弱点（OWASP LLM08:2025 Vector and Embedding Weaknesses）。
+
+常见风险：
+1. 向量数据库未做访问控制，任何用户都可以写入/删除向量
+2. 嵌入模型使用不受信任来源的预训练权重
+3. 向量数据库中存储的内容未经清洗，可能包含 prompt injection
+4. 未对相似度搜索结果做来源验证
+5. 向量维度/配置不当导致信息泄露
+DESC
+	solution: <<<SOLUTION
+1. 对向量数据库实施访问控制（认证 + 授权）
+2. 嵌入模型使用可信来源
+3. 入库前对原始内容做 prompt injection 检测
+4. 对搜索结果做来源审计
+5. 正确配置向量维度和距离度量
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM08:2025 Vector and Embedding Weaknesses](https://genai.owasp.org/llm-top-10/)
+[CWE-20: Improper Input Validation](https://cwe.mitre.org/data/definitions/20.html)
+REFERENCE
+	rule_id: "a1000001-0002-0008-0001-000000000001"
+)
+
+// Vector store operations without auth context
+chromadb.PersistentClient as $output
+chromadb.HttpClient as $output
+pinecone.Pinecone as $output
+faiss.IndexFlatL2 as $output
+*.from_texts as $output
+*.similarity_search as $output
+*.add_texts as $output
+*.delete as $output
+
+// Embedding model loading
+HuggingFaceEmbeddings as $output
+SentenceTransformer as $output
+OpenAIEmbeddings as $output
+
+alert $output for {
+	title: "AI Agent Vector Store / Embedding Operation"
+	title_zh: "AI Agent 向量存储 / 嵌入操作"
+	level: "info"
+	type: "audit"
+	risk: "检测到向量存储或嵌入操作，请验证访问控制和内容安全。"
+	message: "识别到向量/嵌入操作。"
+	name: "sink"
+}
+
+desc(
+	lang: python
+	alert_middle: 1
+	'file://unsafe_vector.py': <<<UNSAFE
+import chromadb
+from langchain.embeddings import HuggingFaceEmbeddings
+
+client = chromadb.PersistentClient("/data/vectors")
+collection = client.create_collection("unfiltered")
+collection.add(documents=[user_input], embeddings=[embed(user_input)])
+UNSAFE
+	'safefile://safe_vector.py': <<<SAFE
+def safe_function():
+    return 1 + 1
+SAFE
+)

@@ -21,3 +21,9 @@ const ExistedBuildInForgeEmbedFSHash string = "4a290214fd240617f7efb5907df3814af
 // This hash is used to verify the integrity of AI-related tools and configurations embedded in the binary.
 // These tools include AI-powered analysis engines and machine learning models for security testing.
 const ExistedBuildInAIToolEmbedFSHash string = "c3c1c5c0def76cad2015af30b59a8716294532a632dfe5aa309b5a6b230045b2"
+
+// ExistedAIAgentEmbedFSHash contains the SHA256 hash of the embedded AI Agent
+// SyntaxFlow rule pack. This pack is separate from the main builtin rules and
+// covers AI/LLM agent-specific security risks (OWASP LLM Top 10, prompt
+// injection, tool poisoning, etc.).
+const ExistedAIAgentEmbedFSHash string = "0000000000000000000000000000000000000000000000000000000000000000"

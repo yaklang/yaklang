@@ -1,0 +1,52 @@
+desc(
+	title: "AI Agent System Prompt Handling (JS/TS)"
+	title_zh: "AI Agent 系统提示处理标注（JS/TS）"
+	type: audit
+	level: info
+	risk: "系统提示处理标注"
+	desc: <<<DESC
+标注 JS/TS AI Agent 代码中涉及 system prompt 处理的位置。
+Agent 使用 system prompt 是正常功能，本规则只做信息标注。
+DESC
+	solution: <<<SOLUTION
+此规则做信息标注。审计时关注 system prompt 是否泄露给用户或攻击者。
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM07:2025 System Prompt Leakage](https://genai.owasp.org/llm-top-10/)
+REFERENCE
+	rule_id: "a1000001-0002-0007-0001-000000000010"
+)
+
+systemPrompt as $sys_prompt
+SYSTEM_PROMPT as $sys_prompt_const
+system_prompt as $sys_prompt_snake
+
+alert $sys_prompt for {
+	title: "AI Agent systemPrompt Reference (JS/TS)"
+	title_zh: "AI Agent systemPrompt 引用（JS/TS）"
+	level: "info"
+	type: "audit"
+	risk: "系统提示处理标注"
+	message: "识别到 systemPrompt 引用，标注位置供审计参考。"
+	name: "sys_prompt"
+}
+
+alert $sys_prompt_const for {
+	title: "AI Agent SYSTEM_PROMPT Constant (JS/TS)"
+	title_zh: "AI Agent SYSTEM_PROMPT 常量（JS/TS）"
+	level: "info"
+	type: "audit"
+	risk: "系统提示处理标注"
+	message: "识别到 SYSTEM_PROMPT 常量，标注位置供审计参考。"
+	name: "sys_prompt_const"
+}
+
+alert $sys_prompt_snake for {
+	title: "AI Agent system_prompt Reference (JS/TS)"
+	title_zh: "AI Agent system_prompt 引用（JS/TS）"
+	level: "info"
+	type: "audit"
+	risk: "系统提示处理标注"
+	message: "识别到 system_prompt 引用，标注位置供审计参考。"
+	name: "sys_prompt_snake"
+}

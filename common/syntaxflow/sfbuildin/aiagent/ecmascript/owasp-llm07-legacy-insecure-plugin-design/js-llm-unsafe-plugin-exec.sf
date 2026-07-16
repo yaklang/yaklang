@@ -1,0 +1,59 @@
+desc(
+	title: "AI Agent Insecure Plugin Design: LLM Output to Dynamic Exec (JS/TS)"
+	title_zh: "AI Agent 不安全插件设计：LLM 输出流入动态执行（JS/TS）"
+	type: vuln
+	level: middle
+	risk: "不安全插件"
+	desc: <<<DESC
+检测 JS/TS AI Agent 中 LLM 返回值流入 eval/new Function/vm.runInNewContext 的模式（OWASP LLM07 legacy）。
+只有当 LLM API 输出驱动这些执行函数时才报警。
+DESC
+	solution: <<<SOLUTION
+1. 插件代码在沙箱中执行
+2. 对 LLM 返回的代码做白名单校验
+3. 使用 vm sandbox 而非 eval
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM07:2025 System Prompt Leakage](https://genai.owasp.org/llm-top-10/)
+[CWE-913: Improper Control of Dynamically-Managed Code Resources](https://cwe.mitre.org/data/definitions/913.html)
+REFERENCE
+	rule_id: "a1000001-0002-0007-0001-000000000010"
+)
+
+<include("aiagent-js-llm-sources")> as $llm
+
+eval as $eval_sink
+new Function as $func_sink
+vm.runInNewContext as $vm_sink
+vm.runInContext as $vm_ctx_sink
+
+$eval_sink(* #{until: `* & $llm`}->) as $high
+$func_sink(* #{until: `* & $llm`}->) as $high
+$vm_sink(* #{until: `* & $llm`}->) as $high
+$vm_ctx_sink(* #{until: `* & $llm`}->) as $high
+
+alert $high for {
+	title: "AI Agent LLM Output to Dynamic Exec (JS/TS)"
+	title_zh: "AI Agent LLM 输出流入动态执行（JS/TS）"
+	level: "middle"
+	type: "vuln"
+	risk: "LLM 返回值驱动 eval/Function/vm 执行，prompt injection 可导致 RCE。"
+	message: "检测到 LLM API 返回值流入动态执行函数。"
+	name: "sink"
+}
+
+desc(
+	lang: "js"
+	alert_middle: 1
+	'file://unsafe_plugin.js': <<<UNSAFE
+import OpenAI from "openai";
+const client = new OpenAI();
+async function pluginAgent() {
+    const r = await client.chat.completions.create({ model: "gpt-4", messages: [{ role: "user", content: "write JS code" }] });
+    eval(r.choices[0].message.content);
+}
+UNSAFE
+	'safefile://safe_plugin.js': <<<SAFE
+function safe() { return 1 + 1; }
+SAFE
+)

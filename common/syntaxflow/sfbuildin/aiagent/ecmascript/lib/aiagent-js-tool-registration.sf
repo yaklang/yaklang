@@ -1,0 +1,63 @@
+desc(
+	title: "AI Agent tool registration patterns (JS/TS lib)"
+	title_zh: "AI Agent 工具注册模式（JS/TS 库规则）"
+	type: audit
+	level: info
+	lib: "aiagent-js-tool-registration"
+	risk: "AI Agent 工具注册"
+	desc: <<<DESC
+标记 JS/TS AI Agent 中工具注册的模式。工具注册是 Agent 的正常功能，本规则只做信息标注。
+DESC
+	solution: <<<SOLUTION
+此规则为 lib 库规则，标注工具注册位置。
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM06:2025 Excessive Agency](https://genai.owasp.org/llm-top-10/)
+REFERENCE
+	rule_id: "a1000001-0001-0001-0001-000000000013"
+)
+
+// Vercel AI SDK
+tool as $output
+defineTool as $output
+
+// LangChain.js
+DynamicStructuredTool as $output
+Tool as $output
+new Tool as $output
+
+// MCP
+registerTool as $output
+McpServer as $output
+server.tool as $output
+
+// Generic
+tools.* as $output
+functionDeclarations.* as $output
+
+alert $output for {
+	title: "AI Agent tool registration (JS/TS)"
+	title_zh: "AI Agent 工具注册（JS/TS）"
+	level: "info"
+	type: "audit"
+	risk: "AI Agent 工具注册"
+	message: "识别到工具注册模式，标注位置供审计参考。"
+	name: "output"
+}
+
+desc(
+	lang: "js"
+	alert_min: 0
+	'file://tool_reg.js': <<<UNSAFE
+import { tool } from "ai";
+import { z } from "zod";
+const myTool = tool({
+    description: "Search files",
+    parameters: z.object({ query: z.string() }),
+    execute: async ({ query }) => { return "results"; }
+});
+UNSAFE
+	'safefile://safe_tool.js': <<<SAFE
+function safe() { return 1 + 1; }
+SAFE
+)

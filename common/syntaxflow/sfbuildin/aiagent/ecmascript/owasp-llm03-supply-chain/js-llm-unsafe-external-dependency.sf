@@ -1,0 +1,43 @@
+desc(
+	title: "AI Agent External LLM SDK Import (JS/TS)"
+	title_zh: "AI Agent 外部 LLM SDK 导入标注（JS/TS）"
+	type: audit
+	level: info
+	risk: "外部依赖标注"
+	desc: <<<DESC
+标注 JS/TS AI Agent 中外部 LLM SDK 导入的位置。
+Agent 使用第三方 SDK 是正常功能，本规则只做信息标注。
+审计时关注：SDK 来源是否可信，版本是否有已知漏洞。
+DESC
+	solution: <<<SOLUTION
+此规则做信息标注。审计时关注依赖来源和版本安全。
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM03:2025 Supply Chain](https://genai.owasp.org/llm-top-10/)
+REFERENCE
+	rule_id: "a1000001-0002-0003-0001-000000000010"
+)
+
+require as $output
+import as $output
+
+alert $output for {
+	title: "AI Agent External SDK Import (JS/TS)"
+	title_zh: "AI Agent 外部 SDK 导入（JS/TS）"
+	level: "info"
+	type: "audit"
+	risk: "外部依赖标注"
+	message: "识别到外部模块导入，标注位置供审计参考。"
+	name: "output"
+}
+
+desc(
+	lang: "js"
+	alert_min: 0
+	'file://dep.js': <<<UNSAFE
+import OpenAI from "openai";
+UNSAFE
+	'safefile://safe_dep.js': <<<SAFE
+function safe() { return 1 + 1; }
+SAFE
+)

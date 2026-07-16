@@ -1,0 +1,57 @@
+desc(
+	title: "AI Agent Excessive Agency: LLM-Driven Tool Execution (JS/TS)"
+	title_zh: "AI Agent 过度代理：LLM 驱动的工具执行（JS/TS）"
+	type: vuln
+	level: middle
+	risk: "过度代理"
+	desc: <<<DESC
+检测 JS/TS AI Agent 中 LLM 返回值直接流入命令执行或代码执行的场景（OWASP LLM06:2025）。
+只有当 LLM API 输出真正驱动了工具执行时才报警，不单独检测 exec/eval 调用。
+DESC
+	solution: <<<SOLUTION
+1. 对 LLM 返回的 tool_calls 参数做 output validation
+2. 对命令执行实施 approval gate
+3. 使用 tool allowlist/denylist
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM06:2025 Excessive Agency](https://genai.owasp.org/llm-top-10/)
+REFERENCE
+	rule_id: "a1000001-0002-0006-0001-000000000010"
+)
+
+<include("aiagent-js-llm-sources")> as $llm
+<include("aiagent-js-tool-exec-sinks")> as $sink
+
+$sink(* #{until: `* & $llm`}->) as $high
+
+alert $high for {
+	title: "AI Agent Excessive Agency: LLM-Driven Tool (JS/TS)"
+	title_zh: "AI Agent 过度代理：LLM 驱动的工具执行（JS/TS）"
+	level: "middle"
+	type: "vuln"
+	risk: "LLM 返回值直接驱动工具执行，且无 approval gate。"
+	message: "检测到 LLM API 返回值流入工具执行 sink。"
+	name: "sink"
+}
+
+desc(
+	lang: "js"
+	alert_middle: 1
+	'file://excessive_agent.js': <<<UNSAFE
+import OpenAI from "openai";
+import { exec } from "child_process";
+const client = new OpenAI();
+async function runAgent() {
+    const r = await client.chat.completions.create({ model: "gpt-4", messages: [{ role: "user", content: "list files" }] });
+    exec(r.choices[0].message.content, () => {});
+}
+UNSAFE
+	'safefile://safe_agent.js': <<<SAFE
+import OpenAI from "openai";
+const client = new OpenAI();
+async function safe() {
+    const r = await client.chat.completions.create({ model: "gpt-4", messages: [{ role: "user", content: "Hi" }] });
+    return r.choices[0].message.content;
+}
+SAFE
+)

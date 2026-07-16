@@ -1,0 +1,61 @@
+desc(
+	title: "AI Agent Misinformation: LLM Output to Database (JS/TS)"
+	title_zh: "AI Agent 错误信息：LLM 输出写入数据库（JS/TS）"
+	type: vuln
+	level: middle
+	risk: "错误信息"
+	desc: <<<DESC
+检测 JS/TS AI Agent 将 LLM 输出直接写入数据库且无验证的情况（OWASP LLM09:2025）。
+只有当 LLM API 返回值流入数据库写入操作时才报警。
+DESC
+	solution: <<<SOLUTION
+1. 对 LLM 输出做事实核查
+2. 对关键决策要求人工审核
+3. 标注 AI 生成内容
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM09:2025 Misinformation](https://genai.owasp.org/llm-top-10/)
+REFERENCE
+	rule_id: "a1000001-0002-0009-0001-000000000011"
+)
+
+<include("aiagent-js-llm-sources")> as $llm
+
+*.insertOne as $db_write
+*.insert as $db_insert
+
+$db_write(* #{until: `* & $llm`}->) as $medium
+$db_insert(* #{until: `* & $llm`}->) as $medium
+
+alert $medium for {
+	title: "AI Agent Misinformation (JS/TS)"
+	title_zh: "AI Agent 错误信息（JS/TS）"
+	level: "middle"
+	type: "vuln"
+	risk: "LLM 输出未经验证写入数据库。"
+	message: "检测到 LLM 输出写入数据库。"
+	name: "sink"
+}
+
+desc(
+	lang: "js"
+	alert_middle: 1
+	'file://misinfo.js': <<<UNSAFE
+import OpenAI from "openai";
+const client = new OpenAI();
+async function agentFact() {
+    const r = await client.chat.completions.create({ model: "gpt-4", messages: [{ role: "user", content: "What is the capital of France?" }] });
+    const fact = r.choices[0].message.content;
+    await db.collection("facts").insertOne({ fact });
+    return fact;
+}
+UNSAFE
+	'safefile://safe_fact.js': <<<SAFE
+import OpenAI from "openai";
+const client = new OpenAI();
+async function safe() {
+    const r = await client.chat.completions.create({ model: "gpt-4", messages: [{ role: "user", content: "Hi" }] });
+    return r.choices[0].message.content;
+}
+SAFE
+)

@@ -1,0 +1,51 @@
+desc(
+	title: "AI Agent MCP client patterns (Python lib)"
+	title_zh: "AI Agent MCP 客户端模式（Python 库规则）"
+	type: audit
+	level: info
+	lib: "aiagent-mcp-client"
+	risk: "AI Agent MCP 客户端"
+	desc: <<<DESC
+标记 AI Agent 中 Model Context Protocol (MCP) 客户端的使用模式。MCP 连接外部工具服务器是正常功能。
+本规则只做信息标注，不做漏洞报警。审计时关注 MCP 服务器来源是否可信。
+DESC
+	solution: <<<SOLUTION
+此规则为 lib 库规则，标注 MCP 客户端位置。
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM07:2025 System Prompt Leakage](https://genai.owasp.org/llm-top-10/)
+REFERENCE
+	rule_id: "a1000001-0001-0001-0001-000000000005"
+)
+
+mcp.ClientSession as $output
+mcp.StdioServerParameters as $output
+stdio_client as $output
+sse_client as $output
+mcp_client as $output
+MCPClient as $output
+
+alert $output for {
+	title: "AI Agent MCP client"
+	title_zh: "AI Agent MCP 客户端"
+	level: "info"
+	type: "audit"
+	risk: "AI Agent MCP 客户端"
+	message: "识别到 MCP 客户端模式，标注位置供审计参考。"
+	name: "output"
+}
+
+desc(
+	lang: python
+	alert_min: 0
+	'file://mcp_client.py': <<<UNSAFE
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+
+server_params = StdioServerParameters(command="npx", args=["-y", "@modelcontextprotocol/server-filesystem", "/tmp"])
+UNSAFE
+	'safefile://safe_mcp.py': <<<SAFE
+def safe_function():
+    return 1 + 1
+SAFE
+)

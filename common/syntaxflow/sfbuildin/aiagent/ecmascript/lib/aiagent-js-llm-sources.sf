@@ -1,0 +1,63 @@
+desc(
+	title: "AI Agent LLM API call sources (JS/TS lib)"
+	title_zh: "AI Agent LLM API 调用源（JS/TS 库规则）"
+	type: audit
+	level: info
+	lib: "aiagent-js-llm-sources"
+	risk: "AI Agent LLM 调用"
+	desc: <<<DESC
+标记 JS/TS 中所有主流 LLM SDK 的 API 调用入口。这是 AI Agent 的核心功能——调用 LLM 是正常行为，
+本规则只做信息标注，不做漏洞报警。
+DESC
+	solution: <<<SOLUTION
+此规则为 lib 库规则，不直接报告漏洞。
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM01:2025 Prompt Injection](https://genai.owasp.org/llm-top-10/)
+REFERENCE
+	rule_id: "a1000001-0001-0001-0001-000000000010"
+)
+
+openai.chat.completions.create as $output
+*.chat.completions.create as $output
+openai.responses.create as $output
+*.responses.create as $output
+openai.embeddings.create as $output
+
+anthropic.messages.create as $output
+*.messages.create as $output
+
+// Vercel AI SDK
+generateText as $output
+streamText as $output
+generateObject as $output
+
+// LangChain.js
+ChatOpenAI as $output
+ChatAnthropic as $output
+chain.invoke as $output
+agent.invoke as $output
+AgentExecutor as $output
+
+alert $output for {
+	title: "AI Agent LLM API call (JS/TS)"
+	title_zh: "AI Agent LLM API 调用（JS/TS）"
+	level: "info"
+	type: "audit"
+	risk: "AI Agent LLM 调用"
+	message: "识别到 LLM API 调用入口，这是 Agent 的正常功能，标注位置供审计参考。"
+	name: "output"
+}
+
+desc(
+	lang: "js"
+	alert_min: 1
+	'file://openai_agent.js': <<<UNSAFE
+import OpenAI from "openai";
+const client = new OpenAI();
+const response = await client.chat.completions.create({ model: "gpt-4", messages: [{ role: "user", content: "hello" }] });
+UNSAFE
+	'safefile://safe_llm.js': <<<SAFE
+function safe() { return 1 + 1; }
+SAFE
+)

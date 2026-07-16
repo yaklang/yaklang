@@ -1,0 +1,66 @@
+desc(
+	title: "AI Agent Misinformation: LLM Output Written to Database Without Verification"
+	title_zh: "AI Agent 错误信息：LLM 输出写入数据库且无验证"
+	type: vuln
+	level: middle
+	risk: "错误信息"
+	desc: <<<DESC
+检测 AI Agent 将 LLM 输出直接写入数据库且无验证的情况（OWASP LLM09:2025 Misinformation）。
+只有当 LLM API 返回值流入数据库写入操作时才报警，不单独检测数据库写入调用。
+DESC
+	solution: <<<SOLUTION
+1. 对 LLM 输出做事实核查
+2. 对关键决策要求人工审核
+3. 标注 AI 生成内容
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM09:2025 Misinformation](https://genai.owasp.org/llm-top-10/)
+[CWE-345: Insufficient Verification of Data Authenticity](https://cwe.mitre.org/data/definitions/345.html)
+REFERENCE
+	rule_id: "a1000001-0002-0009-0001-000000000002"
+)
+
+<include("aiagent-llm-sources")> as $llm
+
+// LLM output flowing to database execute without verification
+cursor.execute as $db_write
+session.add as $db_add
+session.commit as $db_commit
+
+$db_write(* #{until: `* & $llm`}->) as $medium
+$db_add(* #{until: `* & $llm`}->) as $medium
+
+alert $medium for {
+	title: "AI Agent Misinformation: LLM Output to Database"
+	title_zh: "AI Agent 错误信息：LLM 输出写入数据库"
+	level: "middle"
+	type: "vuln"
+	risk: "LLM 输出可能包含幻觉/错误信息，直接写入数据库可能传播错误信息。"
+	message: "检测到 LLM 输出未经验证写入数据库。"
+	name: "sink"
+}
+
+desc(
+	lang: python
+	alert_middle: 1
+	'file://misinfo.py': <<<UNSAFE
+from openai import OpenAI
+import sqlite3
+
+client = OpenAI()
+conn = sqlite3.connect("facts.db")
+
+def agent_fact():
+    response = client.chat.completions.create(model="gpt-4", messages=[{"role": "user", "content": "What is the capital of France?"}])
+    fact = response.choices[0].message.content
+    conn.execute(f"INSERT INTO facts VALUES ('{fact}')")
+    return fact
+UNSAFE
+	'safefile://safe_fact.py': <<<SAFE
+from openai import OpenAI
+client = OpenAI()
+def safe_agent():
+    response = client.chat.completions.create(model="gpt-4", messages=[{"role": "user", "content": "Hi"}])
+    return response.choices[0].message.content + " (AI generated, verify independently)"
+SAFE
+)

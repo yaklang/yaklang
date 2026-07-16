@@ -1,0 +1,87 @@
+desc(
+	title: "AI Agent Vector Store Operations (General)"
+	title_zh: "AI Agent 向量存储操作标注（通用）"
+	type: audit
+	level: info
+	language: general
+	risk: "向量存储操作标注"
+	desc: <<<DESC
+标注 AI Agent 中涉及向量存储操作的位置。
+Agent 使用向量数据库做 RAG 是正常功能，本规则只做信息标注。
+审计时关注：向量数据库是否配置了认证，入库内容是否做了清洗。
+DESC
+	solution: <<<SOLUTION
+此规则做信息标注。审计时关注向量数据库认证和内容安全。
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM08:2025 Vector and Embedding Weaknesses](https://genai.owasp.org/llm-top-10/)
+REFERENCE
+	rule_id: "a1000001-0003-0002-0008-0001-000000000001"
+)
+
+"chromadb" as $chroma
+"pinecone" as $pinecone
+"weaviate" as $weaviate
+"qdrant" as $qdrant
+"milvus" as $milvus
+"faiss" as $faiss
+
+alert $chroma for {
+	title: "AI Agent ChromaDB Usage"
+	title_zh: "AI Agent ChromaDB 使用"
+	level: "info"
+	type: "audit"
+	risk: "向量存储操作标注"
+	message: "识别到 ChromaDB 引用，标注位置供审计参考。"
+	name: "chroma"
+}
+
+alert $pinecone for {
+	title: "AI Agent Pinecone Usage"
+	title_zh: "AI Agent Pinecone 使用"
+	level: "info"
+	type: "audit"
+	risk: "向量存储操作标注"
+	message: "识别到 Pinecone 引用，标注位置供审计参考。"
+	name: "pinecone"
+}
+
+alert $weaviate for {
+	title: "AI Agent Weaviate Usage"
+	title_zh: "AI Agent Weaviate 使用"
+	level: "info"
+	type: "audit"
+	risk: "向量存储操作标注"
+	message: "识别到 Weaviate 引用，标注位置供审计参考。"
+	name: "weaviate"
+}
+
+alert $qdrant for {
+	title: "AI Agent Qdrant Usage"
+	title_zh: "AI Agent Qdrant 使用"
+	level: "info"
+	type: "audit"
+	risk: "向量存储操作标注"
+	message: "识别到 Qdrant 引用，标注位置供审计参考。"
+	name: "qdrant"
+}
+
+alert $milvus for {
+	title: "AI Agent Milvus Usage"
+	title_zh: "AI Agent Milvus 使用"
+	level: "info"
+	type: "audit"
+	risk: "向量存储操作标注"
+	message: "识别到 Milvus 引用，标注位置供审计参考。"
+	name: "milvus"
+}
+
+alert $faiss for {
+	title: "AI Agent FAISS Usage"
+	title_zh: "AI Agent FAISS 使用"
+	level: "info"
+	type: "audit"
+	risk: "向量存储操作标注"
+	message: "识别到 FAISS 引用，标注位置供审计参考。"
+	name: "faiss"
+}

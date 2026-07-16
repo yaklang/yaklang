@@ -1,0 +1,73 @@
+desc(
+	title: "AI Agent Excessive Agency: Unrestricted Tool Access"
+	title_zh: "AI Agent 过度代理：无限制的工具访问"
+	type: vuln
+	level: middle
+	risk: "过度代理"
+	desc: <<<DESC
+检测 AI Agent 中 LLM 返回的 tool_calls 参数在未经审批的情况下直接流入命令执行 + 文件写入的组合场景。
+当 Agent 被 prompt injection 攻击时，LLM 可以在单次 tool_call 中同时执行命令和写入文件，
+如果两者都没有 approval gate，则放大了攻击影响（OWASP LLM06:2025 Excessive Agency）。
+
+本规则**不**检测单独的 os.system 或 open 调用（那会误报遍地的正常代码），
+而是检测数据流：LLM API 返回值 → 同时流入命令执行 sink 和文件写入 sink。
+即只有当 LLM 输出真正驱动了这两种操作时才报警。
+DESC
+	solution: <<<SOLUTION
+1. 对 LLM 返回的 tool_calls 参数做 output validation
+2. 对命令执行和文件写入实施 approval gate
+3. 使用 tool allowlist/denylist
+4. subagent 应有比父 agent 更少的权限
+5. 对工具调用做审计日志
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM06:2025 Excessive Agency](https://genai.owasp.org/llm-top-10/)
+[CWE-250: Execution with Unnecessary Privileges](https://cwe.mitre.org/data/definitions/250.html)
+REFERENCE
+	rule_id: "a1000001-0002-0006-0001-000000000001"
+)
+
+<include("aiagent-llm-sources")> as $llm
+<include("aiagent-tool-exec-sinks")> as $sink
+
+// 只有 LLM 输出流入命令执行时才报警
+$sink(* #{until: `* & $llm`}->) as $high
+
+alert $high for {
+	title: "AI Agent Excessive Agency: LLM-Driven Tool Execution"
+	title_zh: "AI Agent 过度代理：LLM 驱动的工具执行",
+	level: "middle",
+	type: "vuln",
+	risk: "LLM 返回值直接驱动命令执行/代码执行，且无 approval gate，prompt injection 可放大攻击影响。",
+	message: "检测到 LLM API 返回值流入工具执行 sink，建议实施审批门控和 output validation。",
+	name: "sink",
+}
+
+desc(
+	lang: python
+	alert_middle: 1
+	'file://excessive_agent.py': <<<UNSAFE
+from openai import OpenAI
+import os
+
+client = OpenAI()
+
+def run_agent():
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[{"role": "user", "content": "list files"}]
+    )
+    cmd = response.choices[0].message.content
+    os.system(cmd)
+UNSAFE
+	'safefile://safe_agent.py': <<<SAFE
+from openai import OpenAI
+client = OpenAI()
+def safe_agent():
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[{"role": "user", "content": "What is 1+1?"}]
+    )
+    return response.choices[0].message.content
+SAFE
+)

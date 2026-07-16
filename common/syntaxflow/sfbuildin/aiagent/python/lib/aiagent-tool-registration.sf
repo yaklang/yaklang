@@ -1,0 +1,62 @@
+desc(
+	title: "AI Agent tool registration patterns (Python lib)"
+	title_zh: "AI Agent 工具注册模式（Python 库规则）"
+	type: audit
+	level: info
+	lib: "aiagent-tool-registration"
+	risk: "AI Agent 工具注册"
+	desc: <<<DESC
+标记 AI Agent 中工具注册的模式。工具注册是 Agent 暴露能力的入口，这是正常功能。
+本规则只做信息标注，不做漏洞报警。标注位置帮助审计者了解 Agent 暴露了哪些工具。
+DESC
+	solution: <<<SOLUTION
+此规则为 lib 库规则，标注工具注册位置。审计时关注是否注册了危险工具（命令执行、文件写入等）。
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM06:2025 Excessive Agency](https://genai.owasp.org/llm-top-10/)
+REFERENCE
+	rule_id: "a1000001-0001-0001-0001-000000000004"
+)
+
+// LangChain tool registration
+@tool as $output
+BaseTool as $output
+StructuredTool.from_function as $output
+Tool as $output
+
+// OpenAI function/tool schema
+tools.*.function as $output
+
+// MCP tool registration
+register_tool as $output
+mcp.tool as $output
+
+// Generic tool definition
+tool_registry.register as $output
+register_function as $output
+
+alert $output for {
+	title: "AI Agent tool registration"
+	title_zh: "AI Agent 工具注册"
+	level: "info"
+	type: "audit"
+	risk: "AI Agent 工具注册"
+	message: "识别到工具注册模式，这是 Agent 暴露能力的入口，标注位置供审计参考。"
+	name: "output"
+}
+
+desc(
+	lang: python
+	alert_min: 0
+	'file://tool_reg.py': <<<UNSAFE
+from langchain.tools import tool
+
+@tool
+def search_files(query: str) -> str:
+    return "results"
+UNSAFE
+	'safefile://safe_tool.py': <<<SAFE
+def safe_function():
+    return 1 + 1
+SAFE
+)

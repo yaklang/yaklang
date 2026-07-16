@@ -1,0 +1,62 @@
+desc(
+	title: "AI Agent LLM API endpoint patterns (General - cross-language)"
+	title_zh: "AI Agent LLM API 端点模式（通用 - 跨语言）"
+	type: audit
+	level: info
+	language: general
+	risk: "AI Agent LLM API 调用"
+	desc: <<<DESC
+检测所有语言中 AI Agent 通过 HTTP 调用 LLM 的通用模式。
+当 Agent 不使用官方 SDK 而是自行封装 HTTP 请求时（如 Java/Go/Ruby 等），
+通过匹配 API 端点路径来识别 LLM 调用。
+
+本规则只检测字符串常量中包含 LLM API 端点路径的模式，用于信息标注，
+不做数据流分析（数据流分析留给各语言的 lib 规则组合检测）。
+
+覆盖的 API 端点路径：
+- "chat/completions" → OpenAI Chat Completions
+- "/v1/messages" → Anthropic Messages
+- "/v1/responses" → OpenAI Responses API
+DESC
+	solution: <<<SOLUTION
+对自封装的 LLM HTTP API 调用，同样需要对 prompt 内容做来源校验和 injection 防护。
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM01:2025 Prompt Injection](https://genai.owasp.org/llm-top-10/)
+REFERENCE
+	rule_id: "a1000001-0003-0001-0001-000000000001"
+)
+
+"chat/completions" as $chat_completions
+"/v1/messages" as $messages_endpoint
+"/v1/responses" as $responses_endpoint
+
+alert $chat_completions for {
+	title: "AI Agent Chat Completions endpoint"
+	title_zh: "AI Agent Chat Completions 端点"
+	level: "info"
+	type: "audit"
+	risk: "AI Agent LLM 调用"
+	message: "识别到 chat/completions 端点路径，用于 LLM API 调用。"
+	name: "chat_completions"
+}
+
+alert $messages_endpoint for {
+	title: "AI Agent Messages endpoint"
+	title_zh: "AI Agent Messages 端点"
+	level: "info"
+	type: "audit"
+	risk: "AI Agent LLM 调用"
+	message: "识别到 /v1/messages 端点路径，用于 LLM API 调用。"
+	name: "messages_endpoint"
+}
+
+alert $responses_endpoint for {
+	title: "AI Agent Responses endpoint"
+	title_zh: "AI Agent Responses 端点"
+	level: "info"
+	type: "audit"
+	risk: "AI Agent LLM 调用"
+	message: "识别到 /v1/responses 端点路径，用于 LLM API 调用。"
+	name: "responses_endpoint"
+}

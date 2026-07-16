@@ -175,3 +175,15 @@ custom_rule_groups:
           display_name: "配置检查"
         - name: "security"
           display_name: "安全检查"
+
+    - category: "AI Agent 安全"
+      groups:
+        - name: "AI Agent - OWASP LLM Top 10"
+          display_name: "OWASP LLM Top 10"
+        - name: "AI Agent - Python"
+          display_name: "Python Agent"
+        - name: "AI Agent - JavaScript/TypeScript"
+          display_name: "JS/TS Agent"
+        - name: "AI Agent - General"
+          display_name: "通用 Agent"
+

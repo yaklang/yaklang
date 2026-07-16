@@ -1,0 +1,52 @@
+desc(
+	title: "AI Agent Data and Model Poisoning: External Data Source (JS/TS)"
+	title_zh: "AI Agent 数据与模型污染：未验证的外部数据源（JS/TS）"
+	type: vuln
+	level: middle
+	risk: "数据/模型污染"
+	desc: <<<DESC
+检测 JS/TS AI Agent 从不受信任的外部来源加载数据用于 RAG 上下文注入的情况（OWASP LLM04:2025）。
+DESC
+	solution: <<<SOLUTION
+1. 对所有外部数据源做内容验证
+2. RAG 数据入库前做 prompt injection 检测
+3. 对用户提交的知识库内容做隔离
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM04:2025 Data and Model Poisoning](https://genai.owasp.org/llm-top-10/)
+REFERENCE
+	rule_id: "a1000001-0002-0004-0001-000000000010"
+)
+
+// RAG data ingestion from external sources (JS/TS)
+*.addDocuments as $output
+*.loadDocuments as $output
+*.upsert as $output
+*.fromDocuments as $output
+
+// Vector store ingestion
+PineconeClient.*.upsert as $output
+chromadb.*.add as $output
+
+alert $output for {
+	title: "AI Agent Data Poisoning (JS/TS)"
+	title_zh: "AI Agent 数据污染（JS/TS）"
+	level: "middle"
+	type: "vuln"
+	risk: "从不受信任来源加载数据用于 RAG，可能被污染。"
+	message: "检测到外部数据源加载。"
+	name: "sink"
+}
+
+desc(
+	lang: "js"
+	alert_middle: 1
+	'file://rag_poison.js': <<<UNSAFE
+import { WebBaseLoader } from "langchain/document_loaders/web";
+const loader = new WebBaseLoader("https://untrusted.com/docs");
+const docs = await loader.load();
+UNSAFE
+	'safefile://safe_rag.js': <<<SAFE
+function safe() { return 1 + 1; }
+SAFE
+)

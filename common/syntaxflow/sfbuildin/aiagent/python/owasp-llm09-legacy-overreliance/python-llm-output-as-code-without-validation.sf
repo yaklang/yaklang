@@ -1,0 +1,69 @@
+desc(
+	title: "AI Agent Overreliance: LLM Output Used as Code Without Validation"
+	title_zh: "AI Agent 过度依赖：LLM 输出作为代码执行且无验证"
+	type: vuln
+	level: middle
+	risk: "过度依赖"
+	desc: <<<DESC
+检测 AI Agent 将 LLM 输出直接作为代码执行（exec/eval/compile）且无 output validation 的模式。
+LLM 输出本质上不可信，可能包含错误或恶意代码。将 LLM 输出直接作为代码执行是过度依赖 LLM 的典型表现（OWASP LLM09）。
+
+常见场景：
+1. code_execution_tool 模式：LLM 生成 Python 代码后直接 exec()
+2. LLM 返回的代码片段直接 compile() 后执行
+3. Agent 自动修复代码时直接应用 LLM 生成的 patch
+DESC
+	solution: <<<SOLUTION
+1. 对 LLM 生成的代码做 syntax 检查和安全扫描
+2. 在沙箱中执行 LLM 生成的代码
+3. 限制可用的标准库模块
+4. 对 LLM 输出做 format validation
+5. 不要在生产环境直接执行 LLM 生成的代码
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM09:2023 Overreliance](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
+[CWE-94: Code Injection](https://cwe.mitre.org/data/definitions/94.html)
+REFERENCE
+	rule_id: "a1000001-0002-0009-0001-000000000001"
+)
+
+<include("aiagent-llm-sources")> as $llm
+
+// LLM output flowing to code execution
+exec as $exec_sink
+eval as $eval_sink
+compile as $compile_sink
+
+$exec_sink(* #{until: `* & $llm`}->) as $high
+$eval_sink(* #{until: `* & $llm`}->) as $high
+$compile_sink(* #{until: `* & $llm`}->) as $high
+
+alert $high for {
+	title: "AI Agent Overreliance: LLM Output to Code",
+	title_zh: "AI Agent 过度依赖：LLM 输出作为代码",
+	level: "middle",
+	type: "vuln",
+	risk: "LLM 输出直接作为代码执行且无验证，可能导致 RCE。",
+	message: "检测到 LLM 输出流入代码执行函数，请使用沙箱和 output validation。",
+	name: "sink",
+}
+
+desc(
+	lang: python
+	alert_middle: 1
+	'file://overreliance.py': <<<UNSAFE
+from openai import OpenAI
+client = OpenAI()
+def code_agent():
+    response = client.chat.completions.create(model="gpt-4", messages=[{"role": "user", "content": "write python code"}])
+    code = response.choices[0].message.content
+    exec(code)
+UNSAFE
+	'safefile://safe_agent.py': <<<SAFE
+from openai import OpenAI
+client = OpenAI()
+def safe_agent():
+    response = client.chat.completions.create(model="gpt-4", messages=[{"role": "user", "content": "What is 1+1?"}])
+    return response.choices[0].message.content
+SAFE
+)

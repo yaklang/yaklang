@@ -1,0 +1,74 @@
+desc(
+	title: "AI Agent Data and Model Poisoning: External Data Source Without Validation"
+	title_zh: "AI Agent 数据与模型污染：未验证的外部数据源"
+	type: vuln
+	level: middle
+	risk: "数据/模型污染"
+	desc: <<<DESC
+检测 AI Agent 从不受信任的外部来源加载数据用于训练、微调或 RAG 上下文注入的情况。
+攻击者可以污染这些数据源，在训练数据或 RAG 上下文中植入恶意内容，
+使 LLM 在后续推理中表现出被污染的行为（OWASP LLM04:2025 Data and Model Poisoning）。
+
+常见场景：
+1. RAG 系统从公开网页抓取数据，未做内容验证就入库
+2. 微调数据集从不信任来源下载，未做清洗
+3. Agent 将用户提交的内容直接存入知识库，其他用户查询时被注入
+DESC
+	solution: <<<SOLUTION
+1. 对所有外部数据源做内容验证和清洗
+2. RAG 数据入库前做 prompt injection 检测
+3. 训练/微调数据做来源审计和签名验证
+4. 对用户提交的知识库内容做隔离和审核
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM04:2025 Data and Model Poisoning](https://genai.owasp.org/llm-top-10/)
+[CWE-20: Improper Input Validation](https://cwe.mitre.org/data/definitions/20.html)
+REFERENCE
+	rule_id: "a1000001-0002-0004-0001-000000000002"
+)
+
+// RAG data ingestion from external sources
+langchain.document_loaders.WebBaseLoader as $output
+langchain.document_loaders.GitHubIssuesLoader as $output
+*.load_documents as $output
+*.add_documents as $output
+*.ingest as $output
+*.upsert as $output
+
+// Vector store ingestion
+chromadb.Collection.add as $output
+pinecone.Index.upsert as $output
+faiss.add as $output
+*.add_texts as $output
+*.from_documents as $output
+
+// Training/fine-tuning data loading
+datasets.load_dataset as $output
+*.load_from_disk as $output
+
+alert $output for {
+	title: "AI Agent Data Poisoning: External Source"
+	title_zh: "AI Agent 数据污染：外部数据源"
+	level: "middle"
+	type: "vuln"
+	risk: "从不受信任来源加载数据用于 RAG 或训练，可能被污染。"
+	message: "检测到外部数据源加载，请做内容验证和清洗。"
+	name: "sink"
+}
+
+desc(
+	lang: python
+	alert_middle: 1
+	'file://rag_poison.py': <<<UNSAFE
+from langchain.document_loaders import WebBaseLoader
+from langchain.vectorstores import Chroma
+
+loader = WebBaseLoader("https://untrusted-wiki.com/agent-instructions")
+docs = loader.load()
+vectorstore = Chroma.from_documents(docs, embeddings)
+UNSAFE
+	'safefile://safe_rag.py': <<<SAFE
+def safe_function():
+    return 1 + 1
+SAFE
+)

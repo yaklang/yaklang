@@ -1,0 +1,63 @@
+desc(
+	title: "AI Agent tool execution sinks (Python lib)"
+	title_zh: "AI Agent 工具执行入口（Python 库规则）"
+	type: audit
+	level: info
+	lib: "aiagent-tool-exec-sinks"
+	risk: "AI Agent 工具执行"
+	desc: <<<DESC
+标记 AI Agent 中所有可能执行外部操作的工具调用入口：subprocess/os 命令执行、eval/exec 代码执行。
+当 LLM 返回的 tool_calls 参数可控时，这些 sink 可能被利用进行命令注入、代码注入。
+注意：本规则只标注 sink 位置，不单独报警。需要配合 aiagent-llm-sources 做数据流分析。
+DESC
+	solution: <<<SOLUTION
+对 LLM 返回的 tool_calls 参数做严格白名单校验；命令执行避免 shell=True；代码执行使用沙箱隔离。
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM05:2025 Improper Output Handling](https://genai.owasp.org/llm-top-10/)
+[CWE-78: OS Command Injection](https://cwe.mitre.org/data/definitions/78.html)
+[CWE-94: Code Injection](https://cwe.mitre.org/data/definitions/94.html)
+REFERENCE
+	rule_id: "a1000001-0001-0001-0001-000000000002"
+)
+
+// Command execution sinks
+os.system as $output
+os.popen as $output
+subprocess.Popen as $output
+subprocess.call as $output
+subprocess.run as $output
+subprocess.check_output as $output
+subprocess.check_call as $output
+
+// Code execution sinks
+eval as $output
+exec as $output
+compile as $output
+
+alert $output for {
+	title: "AI Agent tool execution sink"
+	title_zh: "AI Agent 工具执行入口"
+	level: "info"
+	type: "audit"
+	risk: "AI Agent 工具执行"
+	message: "识别到可被 tool_calls 利用的执行入口，请检查参数来源是否经过校验。"
+	name: "output"
+}
+
+desc(
+	lang: python
+	alert_min: 0
+	'file://agent_exec.py': <<<UNSAFE
+import subprocess
+import os
+
+def execute_tool(command):
+    os.system(command)
+    subprocess.Popen(command, shell=True)
+UNSAFE
+	'safefile://safe_agent.py': <<<SAFE
+def safe_function():
+    return 1 + 1
+SAFE
+)

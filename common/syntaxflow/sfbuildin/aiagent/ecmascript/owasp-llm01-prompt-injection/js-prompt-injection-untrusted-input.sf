@@ -1,0 +1,66 @@
+desc(
+	title: "AI Agent Prompt Injection via Untrusted Input (JS/TS)"
+	title_zh: "AI Agent Prompt 注入（不可信输入，JS/TS）"
+	type: vuln
+	level: middle
+	risk: "Prompt 注入"
+	desc: <<<DESC
+检测用户可控输入在未经过滤的情况下直接拼接到 LLM 的 prompt/messages 中（JavaScript/TypeScript）。
+攻击者可以通过构造恶意输入来劫持 Agent 的行为（OWASP LLM01）。
+DESC
+	solution: <<<SOLUTION
+1. 对不可信输入做 prompt injection 检测和过滤
+2. 使用结构化 prompt 模板和边界标记
+3. 对 tool result 做 sanitize
+4. 限制 Agent 工具权限
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM01:2023 Prompt Injections](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
+REFERENCE
+	rule_id: "a1000001-0002-0001-0001-000000000010"
+)
+
+<include("js-param")> as $input
+<include("aiagent-js-llm-sources")> as $llm
+
+$llm(* #{until: `* & $input`}->) as $high
+
+alert $high for {
+	title: "AI Agent Prompt Injection (JS/TS)",
+	title_zh: "AI Agent Prompt 注入（JS/TS）",
+	level: "middle",
+	type: "vuln",
+	risk: "用户可控输入未经净化直接流入 LLM API 调用。",
+	message: "检测到不可信输入流入 LLM API 调用，可能被用于 prompt injection。",
+	name: "sink",
+}
+
+desc(
+	lang: "js"
+	alert_middle: 1
+	'file://prompt_injection.js': <<<UNSAFE
+import OpenAI from "openai";
+import express from "express";
+const client = new OpenAI();
+const app = express();
+
+app.get("/chat", async (req, res) => {
+    const response = await client.chat.completions.create({
+        model: "gpt-4",
+        messages: [{ role: "user", content: req.query.q }]
+    });
+    res.send(response.choices[0].message.content);
+});
+UNSAFE
+	'safefile://safe_prompt.js': <<<SAFE
+import OpenAI from "openai";
+const client = new OpenAI();
+async function safe() {
+    const response = await client.chat.completions.create({
+        model: "gpt-4",
+        messages: [{ role: "user", content: "What is 1+1?" }]
+    });
+    return response.choices[0].message.content;
+}
+SAFE
+)

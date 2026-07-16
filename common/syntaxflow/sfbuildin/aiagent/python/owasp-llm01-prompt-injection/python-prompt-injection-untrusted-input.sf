@@ -1,0 +1,75 @@
+desc(
+	title: "AI Agent Prompt Injection via Untrusted Input"
+	title_zh: "AI Agent Prompt 注入（不可信输入）"
+	type: vuln
+	level: middle
+	risk: "Prompt 注入"
+	desc: <<<DESC
+检测用户可控输入在未经过滤的情况下直接拼接到 LLM 的 prompt/messages 中。
+攻击者可以通过构造恶意输入来劫持 Agent 的行为，绕过安全限制、执行未授权操作或泄露敏感信息。
+这是 AI Agent 面临的最核心安全风险（OWASP LLM01）。
+
+常见场景：
+1. 将用户输入直接作为 user message 传给 LLM
+2. 将工具返回结果（可能包含恶意指令）直接拼接到 prompt
+3. 将文件内容、网页内容等不可信数据注入 system prompt
+DESC
+	solution: <<<SOLUTION
+1. 对所有不可信输入做 prompt injection 检测和过滤
+2. 使用结构化的 prompt 模板，将用户输入放在明确的边界标记内
+3. 对 tool result 做 sanitize，过滤可能的指令注入
+4. 实施 output validation，验证 LLM 输出是否符合预期格式
+5. 限制 Agent 的工具权限，遵循最小权限原则
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM01:2023 Prompt Injections](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
+[CWE-94: Code Injection](https://cwe.mitre.org/data/definitions/94.html)
+REFERENCE
+	rule_id: "a1000001-0002-0001-0001-000000000001"
+)
+
+<include("python-user-input")> as $input
+<include("aiagent-llm-sources")> as $llm
+
+$llm(* #{until: `* & $input`}->) as $high
+
+alert $high for {
+	title: "AI Agent Prompt Injection via Untrusted Input",
+	title_zh: "AI Agent Prompt 注入（不可信输入）",
+	level: "middle",
+	type: "vuln",
+	risk: "用户可控输入未经净化直接流入 LLM API 调用，可能导致 prompt injection。",
+	message: "检测到不可信输入流入 LLM API 调用，可能被用于 prompt injection 攻击。",
+	name: "sink",
+}
+
+desc(
+	lang: python
+	alert_middle: 1
+	'file://prompt_injection.py': <<<UNSAFE
+from openai import OpenAI
+from flask import request
+
+client = OpenAI()
+
+def chat():
+    user_input = request.args.get("q", "")
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[{"role": "user", "content": user_input}]
+    )
+    return response.choices[0].message.content
+UNSAFE
+	'safefile://safe_prompt.py': <<<SAFE
+from openai import OpenAI
+
+client = OpenAI()
+
+def safe_chat():
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[{"role": "user", "content": "What is 1+1?"}]
+    )
+    return response.choices[0].message.content
+SAFE
+)

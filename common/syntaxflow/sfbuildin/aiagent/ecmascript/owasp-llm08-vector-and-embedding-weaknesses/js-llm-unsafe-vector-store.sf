@@ -1,0 +1,49 @@
+desc(
+	title: "AI Agent Vector and Embedding Weaknesses (JS/TS)"
+	title_zh: "AI Agent 向量与嵌入弱点（JS/TS）"
+	type: vuln
+	level: middle
+	risk: "向量与嵌入安全"
+	desc: <<<DESC
+检测 JS/TS AI Agent RAG 系统中向量存储和嵌入操作的安全弱点（OWASP LLM08:2025）。
+DESC
+	solution: <<<SOLUTION
+1. 对向量数据库实施访问控制
+2. 嵌入模型使用可信来源
+3. 入库前做内容清洗
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM08:2025 Vector and Embedding Weaknesses](https://genai.owasp.org/llm-top-10/)
+REFERENCE
+	rule_id: "a1000001-0002-0008-0001-000000000010"
+)
+
+PineconeClient as $output
+*.upsert as $output
+*.query as $output
+*.addDocuments as $output
+*.similaritySearch as $output
+OpenAIEmbeddings as $output
+
+alert $output for {
+	title: "AI Agent Vector Store / Embedding (JS/TS)"
+	title_zh: "AI Agent 向量存储 / 嵌入（JS/TS）"
+	level: "info"
+	type: "audit"
+	risk: "检测到向量/嵌入操作。"
+	message: "识别到向量/嵌入操作。"
+	name: "sink"
+}
+
+desc(
+	lang: "js"
+	alert_middle: 1
+	'file://unsafe_vector.js': <<<UNSAFE
+import { PineconeClient } from "@pinecone-database/pinecone";
+const client = new PineconeClient();
+await client.upsert({ upsertRequest: { vectors: [userEmbedding] } });
+UNSAFE
+	'safefile://safe_vector.js': <<<SAFE
+function safe() { return 1 + 1; }
+SAFE
+)

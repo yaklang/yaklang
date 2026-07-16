@@ -1,0 +1,55 @@
+desc(
+	title: "AI Agent System Prompt Handling (General)"
+	title_zh: "AI Agent 系统提示处理标注（通用）"
+	type: audit
+	level: info
+	language: general
+	risk: "系统提示处理标注"
+	desc: <<<DESC
+标注 AI Agent 代码中涉及 system prompt 处理的位置。
+Agent 使用 system prompt 是正常功能，本规则只做信息标注。
+审计时关注：system prompt 是否被写入用户可访问的文件，或拼接到 HTTP 响应中。
+DESC
+	solution: <<<SOLUTION
+此规则做信息标注。审计时关注 system prompt 是否泄露给用户或攻击者。
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM07:2025 System Prompt Leakage](https://genai.owasp.org/llm-top-10/)
+[CWE-200: Information Exposure](https://cwe.mitre.org/data/definitions/200.html)
+REFERENCE
+	rule_id: "a1000001-0003-0002-0007-0001-000000000003"
+)
+
+"system_prompt" as $sys_prompt
+"SYSTEM_PROMPT" as $sys_prompt_upper
+"systemPrompt" as $sys_prompt_camel
+
+alert $sys_prompt for {
+	title: "AI Agent System Prompt Handling"
+	title_zh: "AI Agent 系统提示处理"
+	level: "info"
+	type: "audit"
+	risk: "系统提示处理标注"
+	message: "识别到 system_prompt 引用，标注位置供审计参考。"
+	name: "sys_prompt"
+}
+
+alert $sys_prompt_upper for {
+	title: "AI Agent SYSTEM_PROMPT Constant"
+	title_zh: "AI Agent SYSTEM_PROMPT 常量"
+	level: "info"
+	type: "audit"
+	risk: "系统提示处理标注"
+	message: "识别到 SYSTEM_PROMPT 常量，标注位置供审计参考。"
+	name: "sys_prompt_upper"
+}
+
+alert $sys_prompt_camel for {
+	title: "AI Agent systemPrompt Reference"
+	title_zh: "AI Agent systemPrompt 引用"
+	level: "info"
+	type: "audit"
+	risk: "系统提示处理标注"
+	message: "识别到 systemPrompt 引用，标注位置供审计参考。"
+	name: "sys_prompt_camel"
+}

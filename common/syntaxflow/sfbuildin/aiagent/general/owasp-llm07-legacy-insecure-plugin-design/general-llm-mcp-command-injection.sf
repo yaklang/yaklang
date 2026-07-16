@@ -1,0 +1,44 @@
+desc(
+	title: "AI Agent MCP stdio configuration (General)"
+	title_zh: "AI Agent MCP stdio 配置标注（通用）"
+	type: audit
+	level: info
+	language: general
+	risk: "MCP 配置标注"
+	desc: <<<DESC
+标注 MCP (Model Context Protocol) stdio transport 的配置位置。
+MCP 连接外部工具服务器是 Agent 的正常功能，本规则只做信息标注。
+审计时关注：MCP server 的 command 是否来自可信来源，args 是否有注入风险。
+DESC
+	solution: <<<SOLUTION
+此规则做信息标注。审计时关注 MCP server 来源是否可信、command/args 是否有注入风险。
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM07:2025 System Prompt Leakage](https://genai.owasp.org/llm-top-10/)
+REFERENCE
+	rule_id: "a1000001-0003-0002-0007-0001-000000000002"
+)
+
+"mcpServers" as $mcp_config
+"StdioServerParameters" as $stdio_params
+"stdio_client" as $stdio_client
+
+alert $mcp_config for {
+	title: "AI Agent MCP Servers Configuration"
+	title_zh: "AI Agent MCP 服务器配置"
+	level: "info"
+	type: "audit"
+	risk: "MCP 配置标注"
+	message: "识别到 mcpServers 配置，标注位置供审计参考。"
+	name: "mcp_config"
+}
+
+alert $stdio_params for {
+	title: "AI Agent MCP StdioServerParameters"
+	title_zh: "AI Agent MCP StdioServerParameters 使用"
+	level: "info"
+	type: "audit"
+	risk: "MCP 配置标注"
+	message: "识别到 MCP StdioServerParameters，标注位置供审计参考。"
+	name: "stdio_params"
+}

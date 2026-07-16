@@ -1,0 +1,76 @@
+desc(
+	title: "AI Agent Insecure Output Handling: LLM Output to Command Execution"
+	title_zh: "AI Agent 不安全输出处理：LLM 输出流入命令执行"
+	type: vuln
+	level: middle
+	risk: "LLM 输出驱动的命令注入"
+	desc: <<<DESC
+检测 LLM API 返回的内容在未经校验的情况下流入命令执行函数（os.system、subprocess 等）。
+当 Agent 被 prompt injection 攻击时，LLM 可能返回恶意命令字符串，
+若直接执行则导致任意命令执行（RCE）。这是 OWASP LLM02 的核心风险。
+
+常见场景：
+1. Agent 解析 LLM 返回的 tool_calls 后直接执行命令
+2. 将 LLM 输出作为 shell 命令的一部分执行
+3. code_execution_tool 模式下 LLM 生成的代码直接运行
+DESC
+	solution: <<<SOLUTION
+1. 对 LLM 返回的所有内容做 output validation
+2. 命令执行使用参数列表（shell=False），避免字符串拼接
+3. 对 LLM 生成的代码使用沙箱隔离执行
+4. 实施命令白名单，只允许预定义的安全命令
+5. 对敏感操作要求用户审批（approval gate）
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM02:2023 Insecure Output Handling](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
+[CWE-78: OS Command Injection](https://cwe.mitre.org/data/definitions/78.html)
+REFERENCE
+	rule_id: "a1000001-0002-0002-0001-000000000001"
+)
+
+<include("aiagent-llm-sources")> as $llm
+<include("aiagent-tool-exec-sinks")> as $sink
+
+$sink(* #{until: `* & $llm`}->) as $critical
+
+alert $critical for {
+	title: "AI Agent LLM Output to Command Execution",
+	title_zh: "AI Agent LLM 输出流入命令执行",
+	level: "middle",
+	type: "vuln",
+	risk: "LLM 返回内容未经校验直接执行，prompt injection 可导致任意命令执行。",
+	message: "检测到 LLM API 返回值流入命令执行函数，可能被利用进行 RCE。",
+	name: "sink",
+}
+
+desc(
+	lang: python
+	alert_middle: 1
+	'file://llm_cmd_exec.py': <<<UNSAFE
+from openai import OpenAI
+import os
+
+client = OpenAI()
+
+def run_agent():
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[{"role": "user", "content": "list files"}]
+    )
+    cmd = response.choices[0].message.content
+    os.system(cmd)
+UNSAFE
+	'safefile://safe_agent.py': <<<SAFE
+from openai import OpenAI
+import subprocess
+
+client = OpenAI()
+
+def safe_agent():
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[{"role": "user", "content": "What is 1+1?"}]
+    )
+    return response.choices[0].message.content
+SAFE
+)

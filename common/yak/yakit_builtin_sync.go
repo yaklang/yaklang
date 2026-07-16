@@ -14,6 +14,7 @@ func init() {
 	yaklib.YakitExports["ForceSyncSyntaxFlowRule"] = forceSyncSyntaxFlowRule
 	yaklib.YakitExports["ForceSyncCorePlugin"] = forceSyncCorePlugin
 	yaklib.YakitExports["ForceSyncBuildInForge"] = forceSyncBuildInForge
+	yaklib.YakitExports["ForceSyncAIAgentRule"] = forceSyncAIAgentRule
 }
 
 // ForceSyncSyntaxFlowRule 强制把内置的 SyntaxFlow 规则同步到数据库（导出名为 yakit.ForceSyncSyntaxFlowRule）
@@ -88,4 +89,22 @@ func forceSyncBuildInForge(notify func(float64, string)) error {
 		return fmt.Errorf("同步内置 AI Forge 到数据库失败: %w", err)
 	}
 	return nil
+}
+
+// ForceSyncAIAgentRule 强制把 AI Agent 规则包同步到数据库（导出名为 yakit.ForceSyncAIAgentRule）
+// 适用于初始化或升级后刷新 AI Agent 检测规则；可传入回调以接收同步进度
+//
+// 参数:
+//   - notify: 进度回调 func(progress float64, message string)，可为 nil
+//
+// 返回值:
+//   - 错误信息（同步失败时返回）
+//
+// Example:
+// ```
+// // 同步 AI Agent 规则包到数据库（会写库，示意性示例）
+// yakit.ForceSyncAIAgentRule(func(p, msg) { println(msg) })
+// ```
+func forceSyncAIAgentRule(notify func(float64, string)) error {
+	return sfbuildin.ForceSyncAIAgentEmbedRule(notify)
 }

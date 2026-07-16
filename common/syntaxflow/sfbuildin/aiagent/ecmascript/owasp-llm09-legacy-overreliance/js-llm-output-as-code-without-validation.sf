@@ -1,0 +1,62 @@
+desc(
+	title: "AI Agent Overreliance: LLM Output as Code Without Validation (JS/TS)"
+	title_zh: "AI Agent 过度依赖：LLM 输出作为代码且无验证（JS/TS）"
+	type: vuln
+	level: middle
+	risk: "过度依赖"
+	desc: <<<DESC
+检测 JS/TS AI Agent 将 LLM 输出直接作为代码执行（eval/new Function/vm）且无 output validation 的模式（OWASP LLM09）。
+DESC
+	solution: <<<SOLUTION
+1. 对 LLM 生成代码做安全扫描
+2. 在沙箱中执行
+3. 不要在生产环境直接执行
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM09:2023 Overreliance](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
+[CWE-94: Code Injection](https://cwe.mitre.org/data/definitions/94.html)
+REFERENCE
+	rule_id: "a1000001-0002-0009-0001-000000000010"
+)
+
+<include("aiagent-js-llm-sources")> as $llm
+
+eval as $eval_sink
+new Function as $func_sink
+vm.runInNewContext as $vm_sink
+
+$eval_sink(* #{until: `* & $llm`}->) as $high
+$func_sink(* #{until: `* & $llm`}->) as $high
+$vm_sink(* #{until: `* & $llm`}->) as $high
+
+alert $high for {
+	title: "AI Agent Overreliance: LLM Output to Code (JS/TS)",
+	title_zh: "AI Agent 过度依赖：LLM 输出作为代码（JS/TS）",
+	level: "middle",
+	type: "vuln",
+	risk: "LLM 输出直接作为代码执行且无验证。",
+	message: "检测到 LLM 输出流入代码执行函数。",
+	name: "sink",
+}
+
+desc(
+	lang: "js"
+	alert_middle: 1
+	'file://overreliance.js': <<<UNSAFE
+import OpenAI from "openai";
+const client = new OpenAI();
+async function codeAgent() {
+    const r = await client.chat.completions.create({ model: "gpt-4", messages: [{ role: "user", content: "write JS code" }] });
+    const code = r.choices[0].message.content;
+    eval(code);
+}
+UNSAFE
+	'safefile://safe_agent.js': <<<SAFE
+import OpenAI from "openai";
+const client = new OpenAI();
+async function safe() {
+    const r = await client.chat.completions.create({ model: "gpt-4", messages: [{ role: "user", content: "Hi" }] });
+    return r.choices[0].message.content;
+}
+SAFE
+)

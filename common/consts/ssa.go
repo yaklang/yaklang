@@ -18,6 +18,7 @@ import (
 )
 
 const EmbedSfBuildInRuleKey = "e18179b8cbbea727589cd210c8204306"
+const EmbedSfAIAgentRuleKey = "f2b280c9dccfb836689de321d9315417"
 
 const (
 	ENV_SSA_DATABASE_RAW = "SSA_DATABASE_RAW"

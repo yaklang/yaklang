@@ -352,6 +352,30 @@ framework_groups:
       - "**/nodejs/**"
     tags: ["language", "javascript"]
 
+
+  - group_name: "AI Agent - OWASP LLM Top 10"
+    description: "AI/LLM Agent 安全检测规则（基于 OWASP LLM Top 10）"
+    path_patterns:
+      - "**/aiagent/**"
+    tags: ["aiagent", "llm", "owasp-llm"]
+
+  - group_name: "AI Agent - Python"
+    description: "Python AI Agent 安全规则"
+    path_patterns:
+      - "**/aiagent/python/**"
+    tags: ["aiagent", "python"]
+
+  - group_name: "AI Agent - JavaScript/TypeScript"
+    description: "JavaScript/TypeScript AI Agent 安全规则"
+    path_patterns:
+      - "**/aiagent/ecmascript/**"
+    tags: ["aiagent", "javascript"]
+
+  - group_name: "AI Agent - General"
+    description: "跨语言通用 AI Agent 安全规则"
+    path_patterns:
+      - "**/aiagent/general/**"
+    tags: ["aiagent", "general"]
   - group_name: "Code Style"
     description: "代码风格和最佳实践检查"
     path_patterns:

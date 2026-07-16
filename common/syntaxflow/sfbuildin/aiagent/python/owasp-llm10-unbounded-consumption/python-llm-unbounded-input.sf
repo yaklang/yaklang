@@ -1,0 +1,57 @@
+desc(
+	title: "AI Agent Model DoS: Unbounded Input to LLM"
+	title_zh: "AI Agent 模型 DoS：无限制输入传入 LLM"
+	type: vuln
+	level: middle
+	risk: "模型拒绝服务"
+	desc: <<<DESC
+检测用户可控输入在未限制长度的情况下直接传入 LLM。攻击者可以发送超长输入消耗大量 token，导致 API 费用暴涨或服务不可用（OWASP LLM04）。
+DESC
+	solution: <<<SOLUTION
+1. 对所有传入 LLM 的输入做长度限制
+2. 设置 Agent 最大迭代轮次（max_iterations）
+3. 设置 token budget 和超时
+4. 实施 rate limiting
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM04:2023 Model DoS](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
+[CWE-400: Uncontrolled Resource Consumption](https://cwe.mitre.org/data/definitions/400.html)
+REFERENCE
+	rule_id: "a1000001-0002-0004-0001-000000000001"
+)
+
+<include("python-user-input")> as $input
+<include("aiagent-llm-sources")> as $llm
+
+$llm(* #{until: `* & $input`}->) as $medium
+
+alert $medium for {
+	title: "AI Agent Model DoS: Unbounded Input",
+	title_zh: "AI Agent 模型 DoS：无限制输入",
+	level: "middle",
+	type: "vuln",
+	risk: "未限制长度的用户输入传入 LLM，可能导致资源耗尽。",
+	message: "检测到未限制的用户输入流入 LLM，可能导致 DoS。",
+	name: "sink",
+}
+
+desc(
+	lang: python
+	alert_middle: 1
+	'file://dos_agent.py': <<<UNSAFE
+from openai import OpenAI
+from flask import request
+client = OpenAI()
+def chat():
+    user_input = request.args.get("q", "")
+    response = client.chat.completions.create(model="gpt-4", messages=[{"role": "user", "content": user_input}])
+    return response.choices[0].message.content
+UNSAFE
+	'safefile://safe_dos.py': <<<SAFE
+from openai import OpenAI
+client = OpenAI()
+def safe_chat():
+    response = client.chat.completions.create(model="gpt-4", messages=[{"role": "user", "content": "What is 1+1?"}])
+    return response.choices[0].message.content
+SAFE
+)

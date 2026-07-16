@@ -1,0 +1,66 @@
+desc(
+	title: "AI Agent Context File Prompt Injection (General)"
+	title_zh: "AI Agent 上下文文件 Prompt 注入（通用）"
+	type: audit
+	level: info
+	language: general
+	risk: "上下文文件注入"
+	desc: <<<DESC
+检测 AI Agent 加载上下文文件（AGENTS.md、.cursorrules、SOUL.md 等）时
+未做 prompt injection 检测的模式。这些文件可能包含恶意指令，
+被注入到 system prompt 后可劫持 Agent 行为。
+
+本规则只检测字符串常量中包含已知 prompt injection 模式的代码，
+用于信息标注，辅助判断 Agent 是否对上下文文件做了防护。
+
+注意：本规则会产生 info 级别提示，不直接判断漏洞，需要人工审查
+命中点是否已经做了 injection 防护。
+DESC
+	solution: <<<SOLUTION
+1. 对所有上下文文件做 prompt injection 检测
+2. 过滤不可见 Unicode 字符
+3. 将不可信内容放在明确的边界标记内
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM01:2025 Prompt Injection](https://genai.owasp.org/llm-top-10/)
+REFERENCE
+	rule_id: "a1000001-0003-0001-0001-000000000002"
+)
+
+// 只检测字符串常量中包含已知注入模式的场景
+"ignore previous instructions" as $pi_ignore
+"ignore all instructions" as $pi_ignore_all
+"ignore above instructions" as $pi_ignore_above
+"disregard your instructions" as $pi_disregard
+"disregard all rules" as $pi_disregard_all
+"system prompt override" as $pi_sys_override
+
+alert $pi_ignore for {
+	title: "AI Agent Context: 'ignore previous instructions' pattern"
+	title_zh: "AI Agent 上下文：'ignore previous instructions' 模式"
+	level: "info"
+	type: "audit"
+	risk: "代码中包含 prompt injection 检测模式字符串。"
+	message: "识别到 'ignore previous instructions' 字符串。若用于检测防护则为安全实践，若用于构建 prompt 则为风险。"
+	name: "pi_ignore"
+}
+
+alert $pi_disregard for {
+	title: "AI Agent Context: 'disregard your instructions' pattern"
+	title_zh: "AI Agent 上下文：'disregard your instructions' 模式"
+	level: "info"
+	type: "audit"
+	risk: "代码中包含 prompt injection 检测模式字符串。"
+	message: "识别到 'disregard your instructions' 字符串。"
+	name: "pi_disregard"
+}
+
+alert $pi_sys_override for {
+	title: "AI Agent Context: 'system prompt override' pattern"
+	title_zh: "AI Agent 上下文：'system prompt override' 模式"
+	level: "info"
+	type: "audit"
+	risk: "代码中包含 prompt injection 检测模式字符串。"
+	message: "识别到 'system prompt override' 字符串。"
+	name: "pi_sys_override"
+}

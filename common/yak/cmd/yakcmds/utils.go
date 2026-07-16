@@ -108,7 +108,7 @@ var UtilsCommands = []*cli.Command{
 
 			rets := []string{strings.ToLower(c.String("type"))}
 			if c.Bool("all") {
-				rets = []string{"yak", "syntaxflow", "forge", "aitool"}
+				rets = []string{"yak", "syntaxflow", "forge", "aitool", "aiagent"}
 			}
 			for _, ret := range rets {
 				switch ret {
@@ -231,6 +231,38 @@ var UtilsCommands = []*cli.Command{
 						}
 
 						re := regexp.MustCompile(`(const ExistedBuildInAIToolEmbedFSHash string = ")([a-zA-Z0-9]*)(")`)
+						newContent := re.ReplaceAllString(string(templ), "${1}"+result+"${3}")
+						err = os.RemoveAll(template + ".bak")
+						if err != nil {
+							return err
+						}
+						err = os.Rename(template, template+".bak")
+						if err != nil {
+							return err
+						}
+						err = os.WriteFile(template, []byte(newContent), 0o644)
+						if err != nil {
+							return err
+						}
+					}
+				case "aiagent":
+					result, err := sfbuildin.AIAgentRuleHash()
+					if err != nil {
+						return err
+					}
+					fmt.Println(result)
+					if c.Bool("override") {
+						if consts.ExistedAIAgentEmbedFSHash == result {
+							continue
+						}
+						if matched, _ := regexp_utils.NewYakRegexpUtils("[0-9a-fA-F]+").MatchString(result); !matched {
+							return utils.Errorf("invalid hash: %v", result)
+						}
+						templ, err := os.ReadFile(template)
+						if err != nil {
+							return err
+						}
+						re := regexp.MustCompile(`(const ExistedAIAgentEmbedFSHash string = ")([a-zA-Z0-9]*)(")`)
 						newContent := re.ReplaceAllString(string(templ), "${1}"+result+"${3}")
 						err = os.RemoveAll(template + ".bak")
 						if err != nil {

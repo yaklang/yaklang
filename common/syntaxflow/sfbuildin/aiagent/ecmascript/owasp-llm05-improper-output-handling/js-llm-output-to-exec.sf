@@ -1,0 +1,67 @@
+desc(
+	title: "AI Agent Insecure Output Handling: LLM Output to Execution (JS/TS)"
+	title_zh: "AI Agent 不安全输出处理：LLM 输出流入执行（JS/TS）"
+	type: vuln
+	level: middle
+	risk: "LLM 输出驱动的代码/命令执行"
+	desc: <<<DESC
+检测 LLM API 返回的内容在未经校验的情况下流入命令执行（child_process）或代码执行（eval/Function/vm）函数。
+当 Agent 被 prompt injection 攻击时，LLM 可能返回恶意代码或命令（OWASP LLM02）。
+DESC
+	solution: <<<SOLUTION
+1. 对 LLM 返回内容做 output validation
+2. 命令执行使用参数列表，避免字符串拼接
+3. 代码执行使用沙箱隔离
+4. 实施命令白名单和 approval gate
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM02:2023 Insecure Output Handling](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
+[CWE-78: OS Command Injection](https://cwe.mitre.org/data/definitions/78.html)
+REFERENCE
+	rule_id: "a1000001-0002-0002-0001-000000000010"
+)
+
+<include("aiagent-js-llm-sources")> as $llm
+<include("aiagent-js-tool-exec-sinks")> as $sink
+
+$sink(* #{until: `* & $llm`}->) as $critical
+
+alert $critical for {
+	title: "AI Agent LLM Output to Execution (JS/TS)",
+	title_zh: "AI Agent LLM 输出流入执行（JS/TS）",
+	level: "middle",
+	type: "vuln",
+	risk: "LLM 返回内容未经校验直接执行，可能导致 RCE。",
+	message: "检测到 LLM API 返回值流入执行函数，可能被利用进行 RCE。",
+	name: "sink",
+}
+
+desc(
+	lang: "js"
+	alert_middle: 1
+	'file://llm_exec.js': <<<UNSAFE
+import OpenAI from "openai";
+import { exec } from "child_process";
+const client = new OpenAI();
+
+async function runAgent() {
+    const response = await client.chat.completions.create({
+        model: "gpt-4",
+        messages: [{ role: "user", content: "list files" }]
+    });
+    const cmd = response.choices[0].message.content;
+    exec(cmd, (err, stdout) => {});
+}
+UNSAFE
+	'safefile://safe_agent.js': <<<SAFE
+import OpenAI from "openai";
+const client = new OpenAI();
+async function safe() {
+    const response = await client.chat.completions.create({
+        model: "gpt-4",
+        messages: [{ role: "user", content: "What is 1+1?" }]
+    });
+    return response.choices[0].message.content;
+}
+SAFE
+)

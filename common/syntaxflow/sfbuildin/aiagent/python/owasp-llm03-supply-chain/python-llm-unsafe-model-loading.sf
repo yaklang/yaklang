@@ -1,0 +1,49 @@
+desc(
+	title: "AI Agent Model Loading (Python)"
+	title_zh: "AI Agent 模型加载标注（Python）"
+	type: audit
+	level: info
+	risk: "模型加载标注"
+	desc: <<<DESC
+标注 Python AI Agent 中模型加载的位置（from_pretrained、torch.load 等）。
+Agent 加载模型做推理是正常功能，本规则只做信息标注。
+审计时关注：模型来源是否可信，是否使用 pickle 格式（有 RCE 风险）。
+DESC
+	solution: <<<SOLUTION
+此规则做信息标注。审计时关注模型来源和加载格式安全。
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM03:2025 Supply Chain](https://genai.owasp.org/llm-top-10/)
+[CWE-502: Deserialization of Untrusted Data](https://cwe.mitre.org/data/definitions/502.html)
+REFERENCE
+	rule_id: "a1000001-0002-0003-0001-000000000001"
+)
+
+AutoModel.from_pretrained as $output
+AutoTokenizer.from_pretrained as $output
+*.from_pretrained as $output
+torch.load as $output
+pipeline as $output
+
+alert $output for {
+	title: "AI Agent Model Loading"
+	title_zh: "AI Agent 模型加载"
+	level: "info"
+	type: "audit"
+	risk: "模型加载标注"
+	message: "识别到模型加载操作，标注位置供审计参考。"
+	name: "output"
+}
+
+desc(
+	lang: python
+	alert_min: 0
+	'file://model_load.py': <<<UNSAFE
+from transformers import AutoModel
+model = AutoModel.from_pretrained("bert-base-uncased")
+UNSAFE
+	'safefile://safe_model.py': <<<SAFE
+def safe_function():
+    return 1 + 1
+SAFE
+)

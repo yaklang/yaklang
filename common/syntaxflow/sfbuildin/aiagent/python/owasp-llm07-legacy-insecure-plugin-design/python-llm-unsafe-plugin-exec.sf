@@ -1,0 +1,64 @@
+desc(
+	title: "AI Agent Insecure Plugin Design: LLM Output to Dynamic Import"
+	title_zh: "AI Agent 不安全插件设计：LLM 输出流入动态导入"
+	type: vuln
+	level: middle
+	risk: "不安全插件"
+	desc: <<<DESC
+检测 AI Agent 中 LLM 返回值流入动态导入/执行函数的模式（OWASP LLM07 legacy Insecure Plugin Design）。
+只有当 LLM API 输出驱动 importlib.import_module / exec / eval 时才报警，
+不单独检测这些函数调用（否则正常代码会大量误报）。
+DESC
+	solution: <<<SOLUTION
+1. 插件代码在沙箱中执行
+2. 对插件来源做验证
+3. 对 LLM 返回的模块名/代码做白名单校验
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP LLM07:2025 System Prompt Leakage](https://genai.owasp.org/llm-top-10/)
+[CWE-913: Improper Control of Dynamically-Managed Code Resources](https://cwe.mitre.org/data/definitions/913.html)
+REFERENCE
+	rule_id: "a1000001-0002-0007-0001-000000000001"
+)
+
+<include("aiagent-llm-sources")> as $llm
+
+importlib.import_module as $import_sink
+exec as $exec_sink
+eval as $eval_sink
+compile as $compile_sink
+
+$import_sink(* #{until: `* & $llm`}->) as $high
+$exec_sink(* #{until: `* & $llm`}->) as $high
+$eval_sink(* #{until: `* & $llm`}->) as $high
+$compile_sink(* #{until: `* & $llm`}->) as $high
+
+alert $high for {
+	title: "AI Agent LLM Output to Dynamic Plugin Execution"
+	title_zh: "AI Agent LLM 输出流入动态插件执行"
+	level: "middle"
+	type: "vuln"
+	risk: "LLM 返回值驱动动态导入/代码执行，prompt injection 可导致 RCE。"
+	message: "检测到 LLM API 返回值流入动态导入/执行函数。"
+	name: "sink"
+}
+
+desc(
+	lang: python
+	alert_middle: 1
+	'file://unsafe_plugin.py': <<<UNSAFE
+from openai import OpenAI
+import importlib
+client = OpenAI()
+def plugin_agent():
+    response = client.chat.completions.create(model="gpt-4", messages=[{"role": "user", "content": "which module to load?"}])
+    module_name = response.choices[0].message.content
+    mod = importlib.import_module(module_name)
+UNSAFE
+	'safefile://safe_plugin.py': <<<SAFE
+import importlib
+def safe_plugin():
+    mod = importlib.import_module("known_safe_module")
+    return mod
+SAFE
+)
