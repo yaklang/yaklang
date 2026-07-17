@@ -54,7 +54,21 @@ if YAK_MAIN {
 <|GEN_CODE_END_CURRENT_NONCE|>
 
 ### 2. modify_code（精确替换现有代码）—— 必须带 GEN_CODE 代码块
-优先 old_snippet 精确匹配；行号替换用 modify_start_line/modify_end_line。
+**优先 Patch**：GEN_CODE 内写 `*** Begin Patch` … `*** End Patch`（系统应用到 full_code 后再投递完整源码给前端）。无 patch 时回退 old_snippet / 行号。
+```json
+{"@action": "modify_code", "modify_code_reason": "类型不匹配：poc.Split 收 []byte，把 rsp 改为 rsp.RawPacket"}
+```
+<|GEN_CODE_CURRENT_NONCE|>
+*** Begin Patch
+*** Update File: current
+@@ poc.Split
+-header, body := poc.Split(rsp)
++header, body := poc.Split(rsp.RawPacket)
+ yakit.Info("body len: %d", len(body))
+*** End Patch
+<|GEN_CODE_END_CURRENT_NONCE|>
+
+#### 回退：行号模式（仅当无法输出 Patch）
 ```json
 {"@action": "modify_code", "modify_start_line": 18, "modify_end_line": 22, "modify_code_reason": "类型不匹配：poc.Split 收 []byte，把 rsp 改为 rsp.RawPacket"}
 ```
