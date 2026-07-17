@@ -1068,6 +1068,9 @@ func (l *JavaScriptLexer) Action(localctx antlr.RuleContext, ruleIndex, actionIn
 }
 
 func (l *JavaScriptLexer) HashBangLine_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 0:
 		l.IsStartOfFile()
@@ -1077,6 +1080,9 @@ func (l *JavaScriptLexer) HashBangLine_Action(localctx antlr.RuleContext, action
 	}
 }
 func (l *JavaScriptLexer) OpenBrace_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 1:
 		l.ProcessOpenBrace()
@@ -1086,6 +1092,9 @@ func (l *JavaScriptLexer) OpenBrace_Action(localctx antlr.RuleContext, actionInd
 	}
 }
 func (l *JavaScriptLexer) CloseBrace_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 2:
 		l.ProcessCloseBrace()
@@ -1095,6 +1104,9 @@ func (l *JavaScriptLexer) CloseBrace_Action(localctx antlr.RuleContext, actionIn
 	}
 }
 func (l *JavaScriptLexer) StringLiteral_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 3:
 		l.ProcessStringLiteral()
@@ -1104,6 +1116,9 @@ func (l *JavaScriptLexer) StringLiteral_Action(localctx antlr.RuleContext, actio
 	}
 }
 func (l *JavaScriptLexer) BackTick_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 4:
 		l.IncreaseTemplateDepth()
@@ -1113,6 +1128,9 @@ func (l *JavaScriptLexer) BackTick_Action(localctx antlr.RuleContext, actionInde
 	}
 }
 func (l *JavaScriptLexer) BackTickInside_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 5:
 		l.DecreaseTemplateDepth()
@@ -1169,9 +1187,12 @@ func (l *JavaScriptLexer) Sempred(localctx antlr.RuleContext, ruleIndex, predInd
 }
 
 func (p *JavaScriptLexer) RegularExpressionLiteral_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 0:
-		return p.IsRegexPossible()
+		return this.IsRegexPossible()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1179,9 +1200,12 @@ func (p *JavaScriptLexer) RegularExpressionLiteral_Sempred(localctx antlr.RuleCo
 }
 
 func (p *JavaScriptLexer) TemplateCloseBrace_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 1:
-		return p.IsInTemplateString()
+		return this.IsInTemplateString()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1189,9 +1213,12 @@ func (p *JavaScriptLexer) TemplateCloseBrace_Sempred(localctx antlr.RuleContext,
 }
 
 func (p *JavaScriptLexer) OctalIntegerLiteral_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 2:
-		return !p.IsStrictMode()
+		return !this.IsStrictMode()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1199,9 +1226,12 @@ func (p *JavaScriptLexer) OctalIntegerLiteral_Sempred(localctx antlr.RuleContext
 }
 
 func (p *JavaScriptLexer) Implements_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 3:
-		return p.IsStrictMode()
+		return this.IsStrictMode()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1209,9 +1239,12 @@ func (p *JavaScriptLexer) Implements_Sempred(localctx antlr.RuleContext, predInd
 }
 
 func (p *JavaScriptLexer) StrictLet_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 4:
-		return p.IsStrictMode()
+		return this.IsStrictMode()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1219,9 +1252,12 @@ func (p *JavaScriptLexer) StrictLet_Sempred(localctx antlr.RuleContext, predInde
 }
 
 func (p *JavaScriptLexer) NonStrictLet_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 5:
-		return !p.IsStrictMode()
+		return !this.IsStrictMode()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1229,9 +1265,12 @@ func (p *JavaScriptLexer) NonStrictLet_Sempred(localctx antlr.RuleContext, predI
 }
 
 func (p *JavaScriptLexer) Private_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 6:
-		return p.IsStrictMode()
+		return this.IsStrictMode()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1239,9 +1278,12 @@ func (p *JavaScriptLexer) Private_Sempred(localctx antlr.RuleContext, predIndex 
 }
 
 func (p *JavaScriptLexer) Public_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 7:
-		return p.IsStrictMode()
+		return this.IsStrictMode()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1249,9 +1291,12 @@ func (p *JavaScriptLexer) Public_Sempred(localctx antlr.RuleContext, predIndex i
 }
 
 func (p *JavaScriptLexer) Interface_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 8:
-		return p.IsStrictMode()
+		return this.IsStrictMode()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1259,9 +1304,12 @@ func (p *JavaScriptLexer) Interface_Sempred(localctx antlr.RuleContext, predInde
 }
 
 func (p *JavaScriptLexer) Package_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 9:
-		return p.IsStrictMode()
+		return this.IsStrictMode()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1269,9 +1317,12 @@ func (p *JavaScriptLexer) Package_Sempred(localctx antlr.RuleContext, predIndex 
 }
 
 func (p *JavaScriptLexer) Protected_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 10:
-		return p.IsStrictMode()
+		return this.IsStrictMode()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1279,9 +1330,12 @@ func (p *JavaScriptLexer) Protected_Sempred(localctx antlr.RuleContext, predInde
 }
 
 func (p *JavaScriptLexer) Static_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 11:
-		return p.IsStrictMode()
+		return this.IsStrictMode()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1289,9 +1343,12 @@ func (p *JavaScriptLexer) Static_Sempred(localctx antlr.RuleContext, predIndex i
 }
 
 func (p *JavaScriptLexer) LineTerminatorNoHide_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 12:
-		return p.afterKeyword()
+		return this.afterKeyword()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))

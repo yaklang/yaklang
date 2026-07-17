@@ -763,6 +763,9 @@ func (s *FlowContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) Flow() (localctx IFlowContext) {
+	this := p
+	_ = this
+
 	localctx = NewFlowContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, SyntaxFlowParserRULE_flow)
 	p.EnterOuterAlt(localctx, 1)
@@ -899,6 +902,9 @@ func (s *StatementsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) Statements() (localctx IStatementsContext) {
+	this := p
+	_ = this
+
 	localctx = NewStatementsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 2, SyntaxFlowParserRULE_statements)
 	var _alt int
@@ -1403,6 +1409,9 @@ func (s *AlertContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) Statement() (localctx IStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 4, SyntaxFlowParserRULE_statement)
 	p.SetState(177)
@@ -1709,6 +1718,9 @@ func (s *FileFilterContentStatementContext) Accept(visitor antlr.ParseTreeVisito
 }
 
 func (p *SyntaxFlowParser) FileFilterContentStatement() (localctx IFileFilterContentStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewFileFilterContentStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, SyntaxFlowParserRULE_fileFilterContentStatement)
 	var _la int
@@ -1894,6 +1906,9 @@ func (s *FileFilterContentInputContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 func (p *SyntaxFlowParser) FileFilterContentInput() (localctx IFileFilterContentInputContext) {
+	this := p
+	_ = this
+
 	localctx = NewFileFilterContentInputContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 8, SyntaxFlowParserRULE_fileFilterContentInput)
 	p.EnterOuterAlt(localctx, 1)
@@ -2029,6 +2044,9 @@ func (s *FileFilterContentMethodContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 func (p *SyntaxFlowParser) FileFilterContentMethod() (localctx IFileFilterContentMethodContext) {
+	this := p
+	_ = this
+
 	localctx = NewFileFilterContentMethodContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 10, SyntaxFlowParserRULE_fileFilterContentMethod)
 	var _la int
@@ -2246,6 +2264,9 @@ func (s *FileFilterContentMethodParamContext) Accept(visitor antlr.ParseTreeVisi
 }
 
 func (p *SyntaxFlowParser) FileFilterContentMethodParam() (localctx IFileFilterContentMethodParamContext) {
+	this := p
+	_ = this
+
 	localctx = NewFileFilterContentMethodParamContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 12, SyntaxFlowParserRULE_fileFilterContentMethodParam)
 	var _la int
@@ -2474,6 +2495,9 @@ func (s *FileFilterContentMethodParamItemContext) Accept(visitor antlr.ParseTree
 }
 
 func (p *SyntaxFlowParser) FileFilterContentMethodParamItem() (localctx IFileFilterContentMethodParamItemContext) {
+	this := p
+	_ = this
+
 	localctx = NewFileFilterContentMethodParamItemContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 14, SyntaxFlowParserRULE_fileFilterContentMethodParamItem)
 	p.EnterOuterAlt(localctx, 1)
@@ -2581,6 +2605,9 @@ func (s *FileFilterContentMethodParamKeyContext) Accept(visitor antlr.ParseTreeV
 }
 
 func (p *SyntaxFlowParser) FileFilterContentMethodParamKey() (localctx IFileFilterContentMethodParamKeyContext) {
+	this := p
+	_ = this
+
 	localctx = NewFileFilterContentMethodParamKeyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 16, SyntaxFlowParserRULE_fileFilterContentMethodParamKey)
 	p.EnterOuterAlt(localctx, 1)
@@ -2712,6 +2739,9 @@ func (s *FileFilterContentMethodParamValueContext) Accept(visitor antlr.ParseTre
 }
 
 func (p *SyntaxFlowParser) FileFilterContentMethodParamValue() (localctx IFileFilterContentMethodParamValueContext) {
+	this := p
+	_ = this
+
 	localctx = NewFileFilterContentMethodParamValueContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 18, SyntaxFlowParserRULE_fileFilterContentMethodParamValue)
 	p.SetState(235)
@@ -2860,6 +2890,9 @@ func (s *FileNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) FileName() (localctx IFileNameContext) {
+	this := p
+	_ = this
+
 	localctx = NewFileNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 20, SyntaxFlowParserRULE_fileName)
 	var _alt int
@@ -3146,6 +3179,9 @@ func (s *RefFilterExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *SyntaxFlowParser) FilterStatement() (localctx IFilterStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewFilterStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 22, SyntaxFlowParserRULE_filterStatement)
 	var _la int
@@ -3333,6 +3369,9 @@ func (s *CommentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) Comment() (localctx ICommentContext) {
+	this := p
+	_ = this
+
 	localctx = NewCommentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 24, SyntaxFlowParserRULE_comment)
 	p.EnterOuterAlt(localctx, 1)
@@ -3444,6 +3483,9 @@ func (s *EosContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) Eos() (localctx IEosContext) {
+	this := p
+	_ = this
+
 	localctx = NewEosContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 26, SyntaxFlowParserRULE_eos)
 	p.SetState(267)
@@ -3558,6 +3600,9 @@ func (s *LineContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) Line() (localctx ILineContext) {
+	this := p
+	_ = this
+
 	localctx = NewLineContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 28, SyntaxFlowParserRULE_line)
 	p.EnterOuterAlt(localctx, 1)
@@ -3690,6 +3735,9 @@ func (s *LinesContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) Lines() (localctx ILinesContext) {
+	this := p
+	_ = this
+
 	localctx = NewLinesContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 30, SyntaxFlowParserRULE_lines)
 	var _alt int
@@ -3858,6 +3906,9 @@ func (s *DescriptionStatementContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *SyntaxFlowParser) DescriptionStatement() (localctx IDescriptionStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewDescriptionStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 32, SyntaxFlowParserRULE_descriptionStatement)
 	var _la int
@@ -4151,6 +4202,9 @@ func (s *DescriptionItemsContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *SyntaxFlowParser) DescriptionItems() (localctx IDescriptionItemsContext) {
+	this := p
+	_ = this
+
 	localctx = NewDescriptionItemsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 34, SyntaxFlowParserRULE_descriptionItems)
 	var _la int
@@ -4355,6 +4409,9 @@ func (s *DescriptionItemContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *SyntaxFlowParser) DescriptionItem() (localctx IDescriptionItemContext) {
+	this := p
+	_ = this
+
 	localctx = NewDescriptionItemContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 36, SyntaxFlowParserRULE_descriptionItem)
 	p.SetState(316)
@@ -4500,6 +4557,9 @@ func (s *DescriptionSepContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *SyntaxFlowParser) DescriptionSep() (localctx IDescriptionSepContext) {
+	this := p
+	_ = this
+
 	localctx = NewDescriptionSepContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 38, SyntaxFlowParserRULE_descriptionSep)
 	var _la int
@@ -4676,6 +4736,9 @@ func (s *DescriptionItemValueContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *SyntaxFlowParser) DescriptionItemValue() (localctx IDescriptionItemValueContext) {
+	this := p
+	_ = this
+
 	localctx = NewDescriptionItemValueContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 40, SyntaxFlowParserRULE_descriptionItemValue)
 	p.SetState(328)
@@ -4815,6 +4878,9 @@ func (s *CrlfHereDocContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *SyntaxFlowParser) CrlfHereDoc() (localctx ICrlfHereDocContext) {
+	this := p
+	_ = this
+
 	localctx = NewCrlfHereDocContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 42, SyntaxFlowParserRULE_crlfHereDoc)
 	var _la int
@@ -4955,6 +5021,9 @@ func (s *LfHereDocContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) LfHereDoc() (localctx ILfHereDocContext) {
+	this := p
+	_ = this
+
 	localctx = NewLfHereDocContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 44, SyntaxFlowParserRULE_lfHereDoc)
 	var _la int
@@ -5078,6 +5147,9 @@ func (s *CrlfTextContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) CrlfText() (localctx ICrlfTextContext) {
+	this := p
+	_ = this
+
 	localctx = NewCrlfTextContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 46, SyntaxFlowParserRULE_crlfText)
 	var _la int
@@ -5195,6 +5267,9 @@ func (s *LfTextContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) LfText() (localctx ILfTextContext) {
+	this := p
+	_ = this
+
 	localctx = NewLfTextContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 48, SyntaxFlowParserRULE_lfText)
 	var _la int
@@ -5346,6 +5421,9 @@ func (s *HereDocContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) HereDoc() (localctx IHereDocContext) {
+	this := p
+	_ = this
+
 	localctx = NewHereDocContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 50, SyntaxFlowParserRULE_hereDoc)
 	p.EnterOuterAlt(localctx, 1)
@@ -5537,6 +5615,9 @@ func (s *AlertStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *SyntaxFlowParser) AlertStatement() (localctx IAlertStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewAlertStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 52, SyntaxFlowParserRULE_alertStatement)
 	var _la int
@@ -5745,6 +5826,9 @@ func (s *CheckStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *SyntaxFlowParser) CheckStatement() (localctx ICheckStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewCheckStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 54, SyntaxFlowParserRULE_checkStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -5884,6 +5968,9 @@ func (s *ThenExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) ThenExpr() (localctx IThenExprContext) {
+	this := p
+	_ = this
+
 	localctx = NewThenExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 56, SyntaxFlowParserRULE_thenExpr)
 	p.EnterOuterAlt(localctx, 1)
@@ -5999,6 +6086,9 @@ func (s *ElseExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) ElseExpr() (localctx IElseExprContext) {
+	this := p
+	_ = this
+
 	localctx = NewElseExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 58, SyntaxFlowParserRULE_elseExpr)
 	p.EnterOuterAlt(localctx, 1)
@@ -6124,6 +6214,9 @@ func (s *RefVariableContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *SyntaxFlowParser) RefVariable() (localctx IRefVariableContext) {
+	this := p
+	_ = this
+
 	localctx = NewRefVariableContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 60, SyntaxFlowParserRULE_refVariable)
 	p.EnterOuterAlt(localctx, 1)
@@ -6459,6 +6552,9 @@ func (s *NativeCallFilterContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *SyntaxFlowParser) FilterItemFirst() (localctx IFilterItemFirstContext) {
+	this := p
+	_ = this
+
 	localctx = NewFilterItemFirstContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 62, SyntaxFlowParserRULE_filterItemFirst)
 	var _la int
@@ -6657,6 +6753,9 @@ func (s *ConstSearchPrefixContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *SyntaxFlowParser) ConstSearchPrefix() (localctx IConstSearchPrefixContext) {
+	this := p
+	_ = this
+
 	localctx = NewConstSearchPrefixContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 64, SyntaxFlowParserRULE_constSearchPrefix)
 	var _la int
@@ -7450,6 +7549,9 @@ func (s *FirstContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) FilterItem() (localctx IFilterItemContext) {
+	this := p
+	_ = this
+
 	localctx = NewFilterItemContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 66, SyntaxFlowParserRULE_filterItem)
 	var _la int
@@ -7934,6 +8036,9 @@ func (s *FilterExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) FilterExpr() (localctx IFilterExprContext) {
+	this := p
+	_ = this
+
 	localctx = NewFilterExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 68, SyntaxFlowParserRULE_filterExpr)
 	var _alt int
@@ -8075,6 +8180,9 @@ func (s *NativeCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) NativeCall() (localctx INativeCallContext) {
+	this := p
+	_ = this
+
 	localctx = NewNativeCallContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 70, SyntaxFlowParserRULE_nativeCall)
 	p.EnterOuterAlt(localctx, 1)
@@ -8210,6 +8318,9 @@ func (s *UseNativeCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *SyntaxFlowParser) UseNativeCall() (localctx IUseNativeCallContext) {
+	this := p
+	_ = this
+
 	localctx = NewUseNativeCallContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 72, SyntaxFlowParserRULE_useNativeCall)
 	var _la int
@@ -8348,6 +8459,9 @@ func (s *UseDefCalcParamsContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *SyntaxFlowParser) UseDefCalcParams() (localctx IUseDefCalcParamsContext) {
+	this := p
+	_ = this
+
 	localctx = NewUseDefCalcParamsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 74, SyntaxFlowParserRULE_useDefCalcParams)
 	var _la int
@@ -8603,6 +8717,9 @@ func (s *NativeCallActualParamsContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 func (p *SyntaxFlowParser) NativeCallActualParams() (localctx INativeCallActualParamsContext) {
+	this := p
+	_ = this
+
 	localctx = NewNativeCallActualParamsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 76, SyntaxFlowParserRULE_nativeCallActualParams)
 	var _la int
@@ -8831,6 +8948,9 @@ func (s *NativeCallActualParamContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *SyntaxFlowParser) NativeCallActualParam() (localctx INativeCallActualParamContext) {
+	this := p
+	_ = this
+
 	localctx = NewNativeCallActualParamContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 78, SyntaxFlowParserRULE_nativeCallActualParam)
 	var _la int
@@ -8958,6 +9078,9 @@ func (s *NativeCallActualParamKeyContext) Accept(visitor antlr.ParseTreeVisitor)
 }
 
 func (p *SyntaxFlowParser) NativeCallActualParamKey() (localctx INativeCallActualParamKeyContext) {
+	this := p
+	_ = this
+
 	localctx = NewNativeCallActualParamKeyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 80, SyntaxFlowParserRULE_nativeCallActualParamKey)
 	p.EnterOuterAlt(localctx, 1)
@@ -9109,6 +9232,9 @@ func (s *NativeCallActualParamValueContext) Accept(visitor antlr.ParseTreeVisito
 }
 
 func (p *SyntaxFlowParser) NativeCallActualParamValue() (localctx INativeCallActualParamValueContext) {
+	this := p
+	_ = this
+
 	localctx = NewNativeCallActualParamValueContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 82, SyntaxFlowParserRULE_nativeCallActualParamValue)
 	var _la int
@@ -9436,6 +9562,9 @@ func (s *EveryParamContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) ActualParam() (localctx IActualParamContext) {
+	this := p
+	_ = this
+
 	localctx = NewActualParamContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 84, SyntaxFlowParserRULE_actualParam)
 	var _la int
@@ -9632,6 +9761,9 @@ func (s *ActualParamFilterContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *SyntaxFlowParser) ActualParamFilter() (localctx IActualParamFilterContext) {
+	this := p
+	_ = this
+
 	localctx = NewActualParamFilterContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 86, SyntaxFlowParserRULE_actualParamFilter)
 	p.SetState(551)
@@ -9815,6 +9947,9 @@ func (s *SingleParamContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *SyntaxFlowParser) SingleParam() (localctx ISingleParamContext) {
+	this := p
+	_ = this
+
 	localctx = NewSingleParamContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 88, SyntaxFlowParserRULE_singleParam)
 	var _la int
@@ -10042,6 +10177,9 @@ func (s *ConfigContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) Config() (localctx IConfigContext) {
+	this := p
+	_ = this
+
 	localctx = NewConfigContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 90, SyntaxFlowParserRULE_config)
 	var _la int
@@ -10280,6 +10418,9 @@ func (s *RecursiveConfigItemContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *SyntaxFlowParser) RecursiveConfigItem() (localctx IRecursiveConfigItemContext) {
+	this := p
+	_ = this
+
 	localctx = NewRecursiveConfigItemContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 92, SyntaxFlowParserRULE_recursiveConfigItem)
 	var _la int
@@ -10483,6 +10624,9 @@ func (s *RecursiveConfigItemValueContext) Accept(visitor antlr.ParseTreeVisitor)
 }
 
 func (p *SyntaxFlowParser) RecursiveConfigItemValue() (localctx IRecursiveConfigItemValueContext) {
+	this := p
+	_ = this
+
 	localctx = NewRecursiveConfigItemValueContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 94, SyntaxFlowParserRULE_recursiveConfigItemValue)
 	p.SetState(597)
@@ -10664,6 +10808,9 @@ func (s *SliceCallItemContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *SyntaxFlowParser) SliceCallItem() (localctx ISliceCallItemContext) {
+	this := p
+	_ = this
+
 	localctx = NewSliceCallItemContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 96, SyntaxFlowParserRULE_sliceCallItem)
 	p.SetState(601)
@@ -10808,6 +10955,9 @@ func (s *NameFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) NameFilter() (localctx INameFilterContext) {
+	this := p
+	_ = this
+
 	localctx = NewNameFilterContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 98, SyntaxFlowParserRULE_nameFilter)
 	p.SetState(606)
@@ -11138,6 +11288,9 @@ func (s *BuildMapContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) ChainFilter() (localctx IChainFilterContext) {
+	this := p
+	_ = this
+
 	localctx = NewChainFilterContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 100, SyntaxFlowParserRULE_chainFilter)
 	var _la int
@@ -11475,6 +11628,9 @@ func (s *StringLiteralWithoutStarGroupContext) Accept(visitor antlr.ParseTreeVis
 }
 
 func (p *SyntaxFlowParser) StringLiteralWithoutStarGroup() (localctx IStringLiteralWithoutStarGroupContext) {
+	this := p
+	_ = this
+
 	localctx = NewStringLiteralWithoutStarGroupContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 102, SyntaxFlowParserRULE_stringLiteralWithoutStarGroup)
 	var _alt int
@@ -11623,6 +11779,9 @@ func (s *NegativeConditionContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *SyntaxFlowParser) NegativeCondition() (localctx INegativeConditionContext) {
+	this := p
+	_ = this
+
 	localctx = NewNegativeConditionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 104, SyntaxFlowParserRULE_negativeCondition)
 	var _la int
@@ -12562,6 +12721,9 @@ func (p *SyntaxFlowParser) ConditionExpression() (localctx IConditionExpressionC
 }
 
 func (p *SyntaxFlowParser) conditionExpression(_p int) (localctx IConditionExpressionContext) {
+	this := p
+	_ = this
+
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 
 	_parentState := p.GetState()
@@ -13149,6 +13311,9 @@ func (s *VersionInExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *SyntaxFlowParser) VersionInExpression() (localctx IVersionInExpressionContext) {
+	this := p
+	_ = this
+
 	localctx = NewVersionInExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 108, SyntaxFlowParserRULE_versionInExpression)
 	var _alt int
@@ -13330,6 +13495,9 @@ func (s *VersionIntervalContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *SyntaxFlowParser) VersionInterval() (localctx IVersionIntervalContext) {
+	this := p
+	_ = this
+
 	localctx = NewVersionIntervalContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 110, SyntaxFlowParserRULE_versionInterval)
 	var _la int
@@ -13488,6 +13656,9 @@ func (s *VstartContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) Vstart() (localctx IVstartContext) {
+	this := p
+	_ = this
+
 	localctx = NewVstartContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 112, SyntaxFlowParserRULE_vstart)
 	p.EnterOuterAlt(localctx, 1)
@@ -13590,6 +13761,9 @@ func (s *VendContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) Vend() (localctx IVendContext) {
+	this := p
+	_ = this
+
 	localctx = NewVendContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 114, SyntaxFlowParserRULE_vend)
 	p.EnterOuterAlt(localctx, 1)
@@ -13723,6 +13897,9 @@ func (s *VersionBlockElementContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *SyntaxFlowParser) VersionBlockElement() (localctx IVersionBlockElementContext) {
+	this := p
+	_ = this
+
 	localctx = NewVersionBlockElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 116, SyntaxFlowParserRULE_versionBlockElement)
 	var _la int
@@ -13844,6 +14021,9 @@ func (s *VersionSuffixContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *SyntaxFlowParser) VersionSuffix() (localctx IVersionSuffixContext) {
+	this := p
+	_ = this
+
 	localctx = NewVersionSuffixContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 118, SyntaxFlowParserRULE_versionSuffix)
 	var _la int
@@ -13991,6 +14171,9 @@ func (s *VersionBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *SyntaxFlowParser) VersionBlock() (localctx IVersionBlockContext) {
+	this := p
+	_ = this
+
 	localctx = NewVersionBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 120, SyntaxFlowParserRULE_versionBlock)
 	var _la int
@@ -14140,6 +14323,9 @@ func (s *VersionStringContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *SyntaxFlowParser) VersionString() (localctx IVersionStringContext) {
+	this := p
+	_ = this
+
 	localctx = NewVersionStringContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 122, SyntaxFlowParserRULE_versionString)
 	p.SetState(761)
@@ -14279,6 +14465,9 @@ func (s *OpcodesConditionContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *SyntaxFlowParser) OpcodesCondition() (localctx IOpcodesConditionContext) {
+	this := p
+	_ = this
+
 	localctx = NewOpcodesConditionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 124, SyntaxFlowParserRULE_opcodesCondition)
 	p.SetState(765)
@@ -14403,6 +14592,9 @@ func (s *NumberLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *SyntaxFlowParser) NumberLiteral() (localctx INumberLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewNumberLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 126, SyntaxFlowParserRULE_numberLiteral)
 	var _la int
@@ -14519,6 +14711,9 @@ func (s *StringLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *SyntaxFlowParser) StringLiteral() (localctx IStringLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewStringLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 128, SyntaxFlowParserRULE_stringLiteral)
 	p.SetState(771)
@@ -14662,6 +14857,9 @@ func (s *StringLiteralWithoutStarContext) Accept(visitor antlr.ParseTreeVisitor)
 }
 
 func (p *SyntaxFlowParser) StringLiteralWithoutStar() (localctx IStringLiteralWithoutStarContext) {
+	this := p
+	_ = this
+
 	localctx = NewStringLiteralWithoutStarContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 130, SyntaxFlowParserRULE_stringLiteralWithoutStar)
 	p.SetState(775)
@@ -14772,6 +14970,9 @@ func (s *RegexpLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *SyntaxFlowParser) RegexpLiteral() (localctx IRegexpLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewRegexpLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 132, SyntaxFlowParserRULE_regexpLiteral)
 	p.EnterOuterAlt(localctx, 1)
@@ -14888,6 +15089,9 @@ func (s *IdentifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) Identifier() (localctx IIdentifierContext) {
+	this := p
+	_ = this
+
 	localctx = NewIdentifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 134, SyntaxFlowParserRULE_identifier)
 	p.SetState(782)
@@ -15109,6 +15313,9 @@ func (s *KeywordsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) Keywords() (localctx IKeywordsContext) {
+	this := p
+	_ = this
+
 	localctx = NewKeywordsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 136, SyntaxFlowParserRULE_keywords)
 	p.SetState(797)
@@ -15361,6 +15568,9 @@ func (s *OpcodesContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) Opcodes() (localctx IOpcodesContext) {
+	this := p
+	_ = this
+
 	localctx = NewOpcodesContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 138, SyntaxFlowParserRULE_opcodes)
 	var _la int
@@ -15480,6 +15690,9 @@ func (s *TypesContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SyntaxFlowParser) Types() (localctx ITypesContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypesContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 140, SyntaxFlowParserRULE_types)
 	var _la int
@@ -15579,6 +15792,9 @@ func (s *BoolLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *SyntaxFlowParser) BoolLiteral() (localctx IBoolLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewBoolLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 142, SyntaxFlowParserRULE_boolLiteral)
 	p.EnterOuterAlt(localctx, 1)
@@ -15619,6 +15835,9 @@ func (p *SyntaxFlowParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIn
 }
 
 func (p *SyntaxFlowParser) ConditionExpression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 0:
 		return p.Precpred(p.GetParserRuleContext(), 2)

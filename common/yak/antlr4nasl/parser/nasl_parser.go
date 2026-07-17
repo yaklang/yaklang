@@ -462,6 +462,9 @@ func (s *ProgramContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *NaslParser) Program() (localctx IProgramContext) {
+	this := p
+	_ = this
+
 	localctx = NewProgramContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, NaslParserRULE_program)
 	var _la int
@@ -610,6 +613,9 @@ func (s *StatementListContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *NaslParser) StatementList() (localctx IStatementListContext) {
+	this := p
+	_ = this
+
 	localctx = NewStatementListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 2, NaslParserRULE_statementList)
 	var _la int
@@ -900,6 +906,9 @@ func (s *StatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *NaslParser) Statement() (localctx IStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 4, NaslParserRULE_statement)
 	p.SetState(84)
@@ -1128,6 +1137,9 @@ func (s *BlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *NaslParser) Block() (localctx IBlockContext) {
+	this := p
+	_ = this
+
 	localctx = NewBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, NaslParserRULE_block)
 	var _la int
@@ -1318,6 +1330,9 @@ func (s *VariableDeclarationStatementContext) Accept(visitor antlr.ParseTreeVisi
 }
 
 func (p *NaslParser) VariableDeclarationStatement() (localctx IVariableDeclarationStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewVariableDeclarationStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 8, NaslParserRULE_variableDeclarationStatement)
 	var _la int
@@ -1498,6 +1513,9 @@ func (s *VariableAssignStatementContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 func (p *NaslParser) VariableAssignStatement() (localctx IVariableAssignStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewVariableAssignStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 10, NaslParserRULE_variableAssignStatement)
 	var _la int
@@ -1635,6 +1653,9 @@ func (s *ExpressionStatementContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *NaslParser) ExpressionStatement() (localctx IExpressionStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewExpressionStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 12, NaslParserRULE_expressionStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -1817,6 +1838,9 @@ func (s *IfStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *NaslParser) IfStatement() (localctx IIfStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewIfStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 14, NaslParserRULE_ifStatement)
 	var _la int
@@ -2322,6 +2346,9 @@ func (s *ForEachContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *NaslParser) IterationStatement() (localctx IIterationStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewIterationStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 16, NaslParserRULE_iterationStatement)
 	var _la int
@@ -2632,6 +2659,9 @@ func (s *ContinueStatementContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *NaslParser) ContinueStatement() (localctx IContinueStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewContinueStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 18, NaslParserRULE_continueStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -2726,6 +2756,9 @@ func (s *BreakStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *NaslParser) BreakStatement() (localctx IBreakStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewBreakStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 20, NaslParserRULE_breakStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -2847,6 +2880,9 @@ func (s *ReturnStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *NaslParser) ReturnStatement() (localctx IReturnStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewReturnStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 22, NaslParserRULE_returnStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -3025,6 +3061,9 @@ func (s *ArgumentListContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *NaslParser) ArgumentList() (localctx IArgumentListContext) {
+	this := p
+	_ = this
+
 	localctx = NewArgumentListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 24, NaslParserRULE_argumentList)
 	var _la int
@@ -3179,6 +3218,9 @@ func (s *ArgumentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *NaslParser) Argument() (localctx IArgumentContext) {
+	this := p
+	_ = this
+
 	localctx = NewArgumentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 26, NaslParserRULE_argument)
 	p.EnterOuterAlt(localctx, 1)
@@ -3337,6 +3379,9 @@ func (s *ExpressionSequenceContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *NaslParser) ExpressionSequence() (localctx IExpressionSequenceContext) {
+	this := p
+	_ = this
+
 	localctx = NewExpressionSequenceContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 28, NaslParserRULE_expressionSequence)
 	var _la int
@@ -3518,6 +3563,9 @@ func (s *FunctionDeclarationStatementContext) Accept(visitor antlr.ParseTreeVisi
 }
 
 func (p *NaslParser) FunctionDeclarationStatement() (localctx IFunctionDeclarationStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewFunctionDeclarationStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 30, NaslParserRULE_functionDeclarationStatement)
 	var _la int
@@ -3700,6 +3748,9 @@ func (s *ParameterListContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *NaslParser) ParameterList() (localctx IParameterListContext) {
+	this := p
+	_ = this
+
 	localctx = NewParameterListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 32, NaslParserRULE_parameterList)
 	var _la int
@@ -3842,6 +3893,9 @@ func (s *ArrayLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *NaslParser) ArrayLiteral() (localctx IArrayLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewArrayLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 34, NaslParserRULE_arrayLiteral)
 	var _la int
@@ -4008,6 +4062,9 @@ func (s *ElementListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *NaslParser) ElementList() (localctx IElementListContext) {
+	this := p
+	_ = this
+
 	localctx = NewElementListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 36, NaslParserRULE_elementList)
 	var _la int
@@ -4178,6 +4235,9 @@ func (s *ArrayElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *NaslParser) ArrayElement() (localctx IArrayElementContext) {
+	this := p
+	_ = this
+
 	localctx = NewArrayElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 38, NaslParserRULE_arrayElement)
 	p.EnterOuterAlt(localctx, 1)
@@ -6058,6 +6118,9 @@ func (p *NaslParser) SingleExpression() (localctx ISingleExpressionContext) {
 }
 
 func (p *NaslParser) singleExpression(_p int) (localctx ISingleExpressionContext) {
+	this := p
+	_ = this
+
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 
 	_parentState := p.GetState()
@@ -6841,6 +6904,9 @@ func (s *LiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *NaslParser) Literal() (localctx ILiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 42, NaslParserRULE_literal)
 	p.SetState(335)
@@ -6998,6 +7064,9 @@ func (s *NumericLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *NaslParser) NumericLiteral() (localctx INumericLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewNumericLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 44, NaslParserRULE_numericLiteral)
 	var _la int
@@ -7102,6 +7171,9 @@ func (s *IdentifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *NaslParser) Identifier() (localctx IIdentifierContext) {
+	this := p
+	_ = this
+
 	localctx = NewIdentifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 46, NaslParserRULE_identifier)
 	var _la int
@@ -7246,6 +7318,9 @@ func (s *AssignmentOperatorContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *NaslParser) AssignmentOperator() (localctx IAssignmentOperatorContext) {
+	this := p
+	_ = this
+
 	localctx = NewAssignmentOperatorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 48, NaslParserRULE_assignmentOperator)
 	var _la int
@@ -7350,6 +7425,9 @@ func (s *EosContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *NaslParser) Eos() (localctx IEosContext) {
+	this := p
+	_ = this
+
 	localctx = NewEosContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 50, NaslParserRULE_eos)
 	var _la int
@@ -7408,6 +7486,9 @@ func (p *NaslParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex in
 }
 
 func (p *NaslParser) SingleExpression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 0:
 		return p.Precpred(p.GetParserRuleContext(), 15)

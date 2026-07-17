@@ -989,6 +989,9 @@ func (s *ProgramContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) Program() (localctx IProgramContext) {
+	this := p
+	_ = this
+
 	localctx = NewProgramContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, YaklangParserRULE_program)
 	var _alt int
@@ -1154,6 +1157,9 @@ func (s *StatementListContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *YaklangParser) StatementList() (localctx IStatementListContext) {
+	this := p
+	_ = this
+
 	localctx = NewStatementListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 2, YaklangParserRULE_statementList)
 	var _alt int
@@ -1603,6 +1609,9 @@ func (s *StatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) Statement() (localctx IStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 4, YaklangParserRULE_statement)
 	p.SetState(223)
@@ -1945,6 +1954,9 @@ func (s *TryStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) TryStmt() (localctx ITryStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewTryStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, YaklangParserRULE_tryStmt)
 	var _la int
@@ -2109,6 +2121,9 @@ func (s *ExpressionStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *YaklangParser) ExpressionStmt() (localctx IExpressionStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewExpressionStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 8, YaklangParserRULE_expressionStmt)
 	p.EnterOuterAlt(localctx, 1)
@@ -2211,6 +2226,9 @@ func (s *AssignExpressionStmtContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *YaklangParser) AssignExpressionStmt() (localctx IAssignExpressionStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewAssignExpressionStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 10, YaklangParserRULE_assignExpressionStmt)
 	p.EnterOuterAlt(localctx, 1)
@@ -2306,6 +2324,9 @@ func (s *LineCommentStmtContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *YaklangParser) LineCommentStmt() (localctx ILineCommentStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewLineCommentStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 12, YaklangParserRULE_lineCommentStmt)
 	var _la int
@@ -2410,6 +2431,9 @@ func (s *IncludeStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *YaklangParser) IncludeStmt() (localctx IIncludeStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewIncludeStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 14, YaklangParserRULE_includeStmt)
 	p.EnterOuterAlt(localctx, 1)
@@ -2563,6 +2587,9 @@ func (s *DeferStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) DeferStmt() (localctx IDeferStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewDeferStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 16, YaklangParserRULE_deferStmt)
 	p.EnterOuterAlt(localctx, 1)
@@ -2702,6 +2729,9 @@ func (s *GoStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) GoStmt() (localctx IGoStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewGoStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 18, YaklangParserRULE_goStmt)
 	p.EnterOuterAlt(localctx, 1)
@@ -2853,6 +2883,9 @@ func (s *AssertStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) AssertStmt() (localctx IAssertStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewAssertStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 20, YaklangParserRULE_assertStmt)
 	var _la int
@@ -2981,6 +3014,9 @@ func (s *FallthroughStmtContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *YaklangParser) FallthroughStmt() (localctx IFallthroughStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewFallthroughStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 22, YaklangParserRULE_fallthroughStmt)
 	p.EnterOuterAlt(localctx, 1)
@@ -3075,6 +3111,9 @@ func (s *BreakStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) BreakStmt() (localctx IBreakStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewBreakStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 24, YaklangParserRULE_breakStmt)
 	p.EnterOuterAlt(localctx, 1)
@@ -3169,6 +3208,9 @@ func (s *ContinueStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *YaklangParser) ContinueStmt() (localctx IContinueStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewContinueStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 26, YaklangParserRULE_continueStmt)
 	p.EnterOuterAlt(localctx, 1)
@@ -3280,6 +3322,9 @@ func (s *ReturnStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) ReturnStmt() (localctx IReturnStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewReturnStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 28, YaklangParserRULE_returnStmt)
 	var _la int
@@ -3419,6 +3464,9 @@ func (s *CallExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) CallExpr() (localctx ICallExprContext) {
+	this := p
+	_ = this
+
 	localctx = NewCallExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 30, YaklangParserRULE_callExpr)
 	p.SetState(275)
@@ -3540,6 +3588,9 @@ func (s *FunctionCallExprContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *YaklangParser) FunctionCallExpr() (localctx IFunctionCallExprContext) {
+	this := p
+	_ = this
+
 	localctx = NewFunctionCallExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 32, YaklangParserRULE_functionCallExpr)
 	p.EnterOuterAlt(localctx, 1)
@@ -3691,6 +3742,9 @@ func (s *ForStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) ForStmt() (localctx IForStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewForStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 34, YaklangParserRULE_forStmt)
 	p.EnterOuterAlt(localctx, 1)
@@ -3889,6 +3943,9 @@ func (s *ForStmtCondContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *YaklangParser) ForStmtCond() (localctx IForStmtCondContext) {
+	this := p
+	_ = this
+
 	localctx = NewForStmtCondContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 36, YaklangParserRULE_forStmtCond)
 	var _la int
@@ -4062,6 +4119,9 @@ func (s *ForFirstExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *YaklangParser) ForFirstExpr() (localctx IForFirstExprContext) {
+	this := p
+	_ = this
+
 	localctx = NewForFirstExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 38, YaklangParserRULE_forFirstExpr)
 	p.SetState(303)
@@ -4200,6 +4260,9 @@ func (s *ForThirdExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *YaklangParser) ForThirdExpr() (localctx IForThirdExprContext) {
+	this := p
+	_ = this
+
 	localctx = NewForThirdExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 40, YaklangParserRULE_forThirdExpr)
 	p.SetState(307)
@@ -4380,6 +4443,9 @@ func (s *ForRangeStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *YaklangParser) ForRangeStmt() (localctx IForRangeStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewForRangeStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 42, YaklangParserRULE_forRangeStmt)
 	var _la int
@@ -4734,6 +4800,9 @@ func (s *SwitchStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) SwitchStmt() (localctx ISwitchStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewSwitchStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 44, YaklangParserRULE_switchStmt)
 	var _la int
@@ -5081,6 +5150,9 @@ func (s *PanicStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) PanicStmt() (localctx IPanicStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewPanicStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 46, YaklangParserRULE_panicStmt)
 	var _la int
@@ -5247,6 +5319,9 @@ func (s *RecoverStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *YaklangParser) RecoverStmt() (localctx IRecoverStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewRecoverStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 48, YaklangParserRULE_recoverStmt)
 	p.EnterOuterAlt(localctx, 1)
@@ -5492,6 +5567,9 @@ func (s *IfStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) IfStmt() (localctx IIfStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewIfStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 50, YaklangParserRULE_ifStmt)
 	var _la int
@@ -5708,6 +5786,9 @@ func (s *IfStmtInitContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) IfStmtInit() (localctx IIfStmtInitContext) {
+	this := p
+	_ = this
+
 	localctx = NewIfStmtInitContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 52, YaklangParserRULE_ifStmtInit)
 	p.SetState(412)
@@ -5858,6 +5939,9 @@ func (s *ElseBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) ElseBlock() (localctx IElseBlockContext) {
+	this := p
+	_ = this
+
 	localctx = NewElseBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 54, YaklangParserRULE_elseBlock)
 	p.EnterOuterAlt(localctx, 1)
@@ -6040,6 +6124,9 @@ func (s *BlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) Block() (localctx IBlockContext) {
+	this := p
+	_ = this
+
 	localctx = NewBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 56, YaklangParserRULE_block)
 	var _la int
@@ -6227,6 +6314,9 @@ func (s *EmptyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) Empty() (localctx IEmptyContext) {
+	this := p
+	_ = this
+
 	localctx = NewEmptyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 58, YaklangParserRULE_empty)
 	p.SetState(440)
@@ -6402,6 +6492,9 @@ func (s *InplaceAssignOperatorContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *YaklangParser) InplaceAssignOperator() (localctx IInplaceAssignOperatorContext) {
+	this := p
+	_ = this
+
 	localctx = NewInplaceAssignOperatorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 60, YaklangParserRULE_inplaceAssignOperator)
 	var _la int
@@ -6601,6 +6694,9 @@ func (s *AssignExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *YaklangParser) AssignExpression() (localctx IAssignExpressionContext) {
+	this := p
+	_ = this
+
 	localctx = NewAssignExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 62, YaklangParserRULE_assignExpression)
 	var _la int
@@ -6765,6 +6861,9 @@ func (s *DeclareVariableExpressionStmtContext) Accept(visitor antlr.ParseTreeVis
 }
 
 func (p *YaklangParser) DeclareVariableExpressionStmt() (localctx IDeclareVariableExpressionStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewDeclareVariableExpressionStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 64, YaklangParserRULE_declareVariableExpressionStmt)
 	p.EnterOuterAlt(localctx, 1)
@@ -6884,6 +6983,9 @@ func (s *DeclareVariableExpressionContext) Accept(visitor antlr.ParseTreeVisitor
 }
 
 func (p *YaklangParser) DeclareVariableExpression() (localctx IDeclareVariableExpressionContext) {
+	this := p
+	_ = this
+
 	localctx = NewDeclareVariableExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 66, YaklangParserRULE_declareVariableExpression)
 	p.SetState(461)
@@ -7013,6 +7115,9 @@ func (s *DeclareVariableOnlyContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *YaklangParser) DeclareVariableOnly() (localctx IDeclareVariableOnlyContext) {
+	this := p
+	_ = this
+
 	localctx = NewDeclareVariableOnlyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 68, YaklangParserRULE_declareVariableOnly)
 	var _la int
@@ -7193,6 +7298,9 @@ func (s *DeclareAndAssignExpressionContext) Accept(visitor antlr.ParseTreeVisito
 }
 
 func (p *YaklangParser) DeclareAndAssignExpression() (localctx IDeclareAndAssignExpressionContext) {
+	this := p
+	_ = this
+
 	localctx = NewDeclareAndAssignExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 70, YaklangParserRULE_declareAndAssignExpression)
 	var _la int
@@ -7356,6 +7464,9 @@ func (s *LeftExpressionListContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *YaklangParser) LeftExpressionList() (localctx ILeftExpressionListContext) {
+	this := p
+	_ = this
+
 	localctx = NewLeftExpressionListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 72, YaklangParserRULE_leftExpressionList)
 	var _la int
@@ -7506,6 +7617,9 @@ func (s *UnaryOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *YaklangParser) UnaryOperator() (localctx IUnaryOperatorContext) {
+	this := p
+	_ = this
+
 	localctx = NewUnaryOperatorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 74, YaklangParserRULE_unaryOperator)
 	var _la int
@@ -7630,6 +7744,9 @@ func (s *BitBinaryOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *YaklangParser) BitBinaryOperator() (localctx IBitBinaryOperatorContext) {
+	this := p
+	_ = this
+
 	localctx = NewBitBinaryOperatorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 76, YaklangParserRULE_bitBinaryOperator)
 	var _la int
@@ -7734,6 +7851,9 @@ func (s *AdditiveBinaryOperatorContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 func (p *YaklangParser) AdditiveBinaryOperator() (localctx IAdditiveBinaryOperatorContext) {
+	this := p
+	_ = this
+
 	localctx = NewAdditiveBinaryOperatorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 78, YaklangParserRULE_additiveBinaryOperator)
 	var _la int
@@ -7843,6 +7963,9 @@ func (s *MultiplicativeBinaryOperatorContext) Accept(visitor antlr.ParseTreeVisi
 }
 
 func (p *YaklangParser) MultiplicativeBinaryOperator() (localctx IMultiplicativeBinaryOperatorContext) {
+	this := p
+	_ = this
+
 	localctx = NewMultiplicativeBinaryOperatorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 80, YaklangParserRULE_multiplicativeBinaryOperator)
 	var _la int
@@ -7972,6 +8095,9 @@ func (s *ComparisonBinaryOperatorContext) Accept(visitor antlr.ParseTreeVisitor)
 }
 
 func (p *YaklangParser) ComparisonBinaryOperator() (localctx IComparisonBinaryOperatorContext) {
+	this := p
+	_ = this
+
 	localctx = NewComparisonBinaryOperatorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 82, YaklangParserRULE_comparisonBinaryOperator)
 	var _la int
@@ -8088,6 +8214,9 @@ func (s *LeftExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *YaklangParser) LeftExpression() (localctx ILeftExpressionContext) {
+	this := p
+	_ = this
+
 	localctx = NewLeftExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 84, YaklangParserRULE_leftExpression)
 	p.SetState(497)
@@ -8608,6 +8737,9 @@ func (p *YaklangParser) Expression() (localctx IExpressionContext) {
 }
 
 func (p *YaklangParser) expression(_p int) (localctx IExpressionContext) {
+	this := p
+	_ = this
+
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 
 	_parentState := p.GetState()
@@ -9350,6 +9482,9 @@ func (s *ParenExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *YaklangParser) ParenExpression() (localctx IParenExpressionContext) {
+	this := p
+	_ = this
+
 	localctx = NewParenExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 88, YaklangParserRULE_parenExpression)
 	var _la int
@@ -9560,6 +9695,9 @@ func (s *MakeExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *YaklangParser) MakeExpression() (localctx IMakeExpressionContext) {
+	this := p
+	_ = this
+
 	localctx = NewMakeExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 90, YaklangParserRULE_makeExpression)
 	var _la int
@@ -9799,6 +9937,9 @@ func (s *TypeLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *YaklangParser) TypeLiteral() (localctx ITypeLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 92, YaklangParserRULE_typeLiteral)
 	p.SetState(667)
@@ -9968,6 +10109,9 @@ func (s *SliceTypeLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *YaklangParser) SliceTypeLiteral() (localctx ISliceTypeLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewSliceTypeLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 94, YaklangParserRULE_sliceTypeLiteral)
 	p.EnterOuterAlt(localctx, 1)
@@ -10127,6 +10271,9 @@ func (s *MapTypeLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *YaklangParser) MapTypeLiteral() (localctx IMapTypeLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewMapTypeLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 96, YaklangParserRULE_mapTypeLiteral)
 	p.EnterOuterAlt(localctx, 1)
@@ -10262,6 +10409,9 @@ func (s *InstanceCodeContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *YaklangParser) InstanceCode() (localctx IInstanceCodeContext) {
+	this := p
+	_ = this
+
 	localctx = NewInstanceCodeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 98, YaklangParserRULE_instanceCode)
 	p.EnterOuterAlt(localctx, 1)
@@ -10448,6 +10598,9 @@ func (s *AnonymousFunctionDeclContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *YaklangParser) AnonymousFunctionDecl() (localctx IAnonymousFunctionDeclContext) {
+	this := p
+	_ = this
+
 	localctx = NewAnonymousFunctionDeclContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 100, YaklangParserRULE_anonymousFunctionDecl)
 	var _la int
@@ -10691,6 +10844,9 @@ func (s *FunctionNameDeclContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *YaklangParser) FunctionNameDecl() (localctx IFunctionNameDeclContext) {
+	this := p
+	_ = this
+
 	localctx = NewFunctionNameDeclContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 102, YaklangParserRULE_functionNameDecl)
 	p.EnterOuterAlt(localctx, 1)
@@ -10848,6 +11004,9 @@ func (s *FunctionParamDeclContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *YaklangParser) FunctionParamDecl() (localctx IFunctionParamDeclContext) {
+	this := p
+	_ = this
+
 	localctx = NewFunctionParamDeclContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 104, YaklangParserRULE_functionParamDecl)
 	var _la int
@@ -11155,6 +11314,9 @@ func (s *FunctionCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *YaklangParser) FunctionCall() (localctx IFunctionCallContext) {
+	this := p
+	_ = this
+
 	localctx = NewFunctionCallContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 106, YaklangParserRULE_functionCall)
 	var _la int
@@ -11385,6 +11547,9 @@ func (s *OrdinaryArgumentsContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *YaklangParser) OrdinaryArguments() (localctx IOrdinaryArgumentsContext) {
+	this := p
+	_ = this
+
 	localctx = NewOrdinaryArgumentsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 108, YaklangParserRULE_ordinaryArguments)
 	var _la int
@@ -11667,6 +11832,9 @@ func (s *MemberCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) MemberCall() (localctx IMemberCallContext) {
+	this := p
+	_ = this
+
 	localctx = NewMemberCallContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 110, YaklangParserRULE_memberCall)
 	var _la int
@@ -11832,6 +12000,9 @@ func (s *SliceCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) SliceCall() (localctx ISliceCallContext) {
+	this := p
+	_ = this
+
 	localctx = NewSliceCallContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 112, YaklangParserRULE_sliceCall)
 	var _la int
@@ -12242,6 +12413,9 @@ func (s *LiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) Literal() (localctx ILiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 114, YaklangParserRULE_literal)
 	p.SetState(847)
@@ -12427,6 +12601,9 @@ func (s *NumericLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *YaklangParser) NumericLiteral() (localctx INumericLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewNumericLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 116, YaklangParserRULE_numericLiteral)
 	var _la int
@@ -12585,6 +12762,9 @@ func (s *StringLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *YaklangParser) StringLiteral() (localctx IStringLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewStringLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 118, YaklangParserRULE_stringLiteral)
 	var _la int
@@ -12796,6 +12976,9 @@ func (s *CrlfHereDocContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *YaklangParser) CrlfHereDoc() (localctx ICrlfHereDocContext) {
+	this := p
+	_ = this
+
 	localctx = NewCrlfHereDocContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 120, YaklangParserRULE_crlfHereDoc)
 	var _la int
@@ -12913,6 +13096,9 @@ func (s *LfHereDocContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) LfHereDoc() (localctx ILfHereDocContext) {
+	this := p
+	_ = this
+
 	localctx = NewLfHereDocContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 122, YaklangParserRULE_lfHereDoc)
 	var _la int
@@ -13073,6 +13259,9 @@ func (s *TemplateSingleQuoteStringLiteralContext) Accept(visitor antlr.ParseTree
 }
 
 func (p *YaklangParser) TemplateSingleQuoteStringLiteral() (localctx ITemplateSingleQuoteStringLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewTemplateSingleQuoteStringLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 124, YaklangParserRULE_templateSingleQuoteStringLiteral)
 	var _la int
@@ -13245,6 +13434,9 @@ func (s *TemplateDoubleQuoteStringLiteralContext) Accept(visitor antlr.ParseTree
 }
 
 func (p *YaklangParser) TemplateDoubleQuoteStringLiteral() (localctx ITemplateDoubleQuoteStringLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewTemplateDoubleQuoteStringLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 126, YaklangParserRULE_templateDoubleQuoteStringLiteral)
 	var _la int
@@ -13417,6 +13609,9 @@ func (s *TemplateBackTickStringLiteralContext) Accept(visitor antlr.ParseTreeVis
 }
 
 func (p *YaklangParser) TemplateBackTickStringLiteral() (localctx ITemplateBackTickStringLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewTemplateBackTickStringLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 128, YaklangParserRULE_templateBackTickStringLiteral)
 	var _la int
@@ -13587,6 +13782,9 @@ func (s *TemplateStringLiteralContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *YaklangParser) TemplateStringLiteral() (localctx ITemplateStringLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewTemplateStringLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 130, YaklangParserRULE_templateStringLiteral)
 	p.SetState(908)
@@ -13736,6 +13934,9 @@ func (s *TemplateSingleQuoteStringAtomContext) Accept(visitor antlr.ParseTreeVis
 }
 
 func (p *YaklangParser) TemplateSingleQuoteStringAtom() (localctx ITemplateSingleQuoteStringAtomContext) {
+	this := p
+	_ = this
+
 	localctx = NewTemplateSingleQuoteStringAtomContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 132, YaklangParserRULE_templateSingleQuoteStringAtom)
 	var _alt int
@@ -13922,6 +14123,9 @@ func (s *TemplateDoubleQuoteStringAtomContext) Accept(visitor antlr.ParseTreeVis
 }
 
 func (p *YaklangParser) TemplateDoubleQuoteStringAtom() (localctx ITemplateDoubleQuoteStringAtomContext) {
+	this := p
+	_ = this
+
 	localctx = NewTemplateDoubleQuoteStringAtomContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 134, YaklangParserRULE_templateDoubleQuoteStringAtom)
 	var _alt int
@@ -14108,6 +14312,9 @@ func (s *TemplateBackTickStringAtomContext) Accept(visitor antlr.ParseTreeVisito
 }
 
 func (p *YaklangParser) TemplateBackTickStringAtom() (localctx ITemplateBackTickStringAtomContext) {
+	this := p
+	_ = this
+
 	localctx = NewTemplateBackTickStringAtomContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 136, YaklangParserRULE_templateBackTickStringAtom)
 	var _alt int
@@ -14267,6 +14474,9 @@ func (s *BoolLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *YaklangParser) BoolLiteral() (localctx IBoolLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewBoolLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 138, YaklangParserRULE_boolLiteral)
 	var _la int
@@ -14366,6 +14576,9 @@ func (s *CharacterLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *YaklangParser) CharacterLiteral() (localctx ICharacterLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewCharacterLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 140, YaklangParserRULE_characterLiteral)
 	p.EnterOuterAlt(localctx, 1)
@@ -14525,6 +14738,9 @@ func (s *SliceLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *YaklangParser) SliceLiteral() (localctx ISliceLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewSliceLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 142, YaklangParserRULE_sliceLiteral)
 	var _la int
@@ -14779,6 +14995,9 @@ func (s *SliceTypedLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *YaklangParser) SliceTypedLiteral() (localctx ISliceTypedLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewSliceTypedLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 144, YaklangParserRULE_sliceTypedLiteral)
 	var _la int
@@ -15016,6 +15235,9 @@ func (s *ExpressionListContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *YaklangParser) ExpressionList() (localctx IExpressionListContext) {
+	this := p
+	_ = this
+
 	localctx = NewExpressionListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 146, YaklangParserRULE_expressionList)
 	var _la int
@@ -15254,6 +15476,9 @@ func (s *ExpressionListMultilineContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 func (p *YaklangParser) ExpressionListMultiline() (localctx IExpressionListMultilineContext) {
+	this := p
+	_ = this
+
 	localctx = NewExpressionListMultilineContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 148, YaklangParserRULE_expressionListMultiline)
 	var _la int
@@ -15508,6 +15733,9 @@ func (s *MapLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) MapLiteral() (localctx IMapLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewMapLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 150, YaklangParserRULE_mapLiteral)
 	var _la int
@@ -15800,6 +16028,9 @@ func (s *MapTypedLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *YaklangParser) MapTypedLiteral() (localctx IMapTypedLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewMapTypedLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 152, YaklangParserRULE_mapTypedLiteral)
 	var _la int
@@ -16080,6 +16311,9 @@ func (s *MapPairsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) MapPairs() (localctx IMapPairsContext) {
+	this := p
+	_ = this
+
 	localctx = NewMapPairsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 154, YaklangParserRULE_mapPairs)
 	var _la int
@@ -16290,6 +16524,9 @@ func (s *MapPairContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) MapPair() (localctx IMapPairContext) {
+	this := p
+	_ = this
+
 	localctx = NewMapPairContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 156, YaklangParserRULE_mapPair)
 	p.EnterOuterAlt(localctx, 1)
@@ -16417,6 +16654,9 @@ func (s *WsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) Ws() (localctx IWsContext) {
+	this := p
+	_ = this
+
 	localctx = NewWsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 158, YaklangParserRULE_ws)
 	var _la int
@@ -16560,6 +16800,9 @@ func (s *EosContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *YaklangParser) Eos() (localctx IEosContext) {
+	this := p
+	_ = this
+
 	localctx = NewEosContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 160, YaklangParserRULE_eos)
 	var _alt int
@@ -16670,6 +16913,9 @@ func (p *YaklangParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex
 }
 
 func (p *YaklangParser) Expression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 0:
 		return p.Precpred(p.GetParserRuleContext(), 9)

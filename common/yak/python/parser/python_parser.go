@@ -921,6 +921,9 @@ func (s *RootContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Root() (localctx IRootContext) {
+	this := p
+	_ = this
+
 	localctx = NewRootContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, PythonParserRULE_root)
 	p.SetState(134)
@@ -1106,6 +1109,9 @@ func (s *Single_inputContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *PythonParser) Single_input() (localctx ISingle_inputContext) {
+	this := p
+	_ = this
+
 	localctx = NewSingle_inputContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 2, PythonParserRULE_single_input)
 	p.SetState(141)
@@ -1282,6 +1288,9 @@ func (s *File_inputContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) File_input() (localctx IFile_inputContext) {
+	this := p
+	_ = this
+
 	localctx = NewFile_inputContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 4, PythonParserRULE_file_input)
 	var _alt int
@@ -1440,6 +1449,9 @@ func (s *Eval_inputContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Eval_input() (localctx IEval_inputContext) {
+	this := p
+	_ = this
+
 	localctx = NewEval_inputContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, PythonParserRULE_eval_input)
 	var _la int
@@ -1585,6 +1597,9 @@ func (s *StmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Stmt() (localctx IStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 8, PythonParserRULE_stmt)
 	p.SetState(158)
@@ -2446,6 +2461,9 @@ func (s *Match_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Compound_stmt() (localctx ICompound_stmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewCompound_stmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 10, PythonParserRULE_compound_stmt)
 	var _la int
@@ -2898,8 +2916,8 @@ func (p *PythonParser) Compound_stmt() (localctx ICompound_stmtContext) {
 		p.EnterOuterAlt(localctx, 6)
 		p.SetState(240)
 
-		if !(p.IsSoftKeyword("match")) {
-			p.SetError(antlr.NewFailedPredicateException(p, "p.IsSoftKeyword(\"match\")", ""))
+		if !(this.IsSoftKeyword("match")) {
+			p.SetError(antlr.NewFailedPredicateException(p, "this.IsSoftKeyword(\"match\")", ""))
 			goto errorExit
 		}
 		{
@@ -3176,6 +3194,9 @@ func (s *SuiteContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Suite() (localctx ISuiteContext) {
+	this := p
+	_ = this
+
 	localctx = NewSuiteContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 12, PythonParserRULE_suite)
 	var _alt int
@@ -3382,6 +3403,9 @@ func (s *DecoratorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Decorator() (localctx IDecoratorContext) {
+	this := p
+	_ = this
+
 	localctx = NewDecoratorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 14, PythonParserRULE_decorator)
 	var _la int
@@ -3569,6 +3593,9 @@ func (s *Elif_clauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PythonParser) Elif_clause() (localctx IElif_clauseContext) {
+	this := p
+	_ = this
+
 	localctx = NewElif_clauseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 16, PythonParserRULE_elif_clause)
 	p.EnterOuterAlt(localctx, 1)
@@ -3701,6 +3728,9 @@ func (s *Else_clauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PythonParser) Else_clause() (localctx IElse_clauseContext) {
+	this := p
+	_ = this
+
 	localctx = NewElse_clauseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 18, PythonParserRULE_else_clause)
 	p.EnterOuterAlt(localctx, 1)
@@ -3829,6 +3859,9 @@ func (s *Finally_clauseContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PythonParser) Finally_clause() (localctx IFinally_clauseContext) {
+	this := p
+	_ = this
+
 	localctx = NewFinally_clauseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 20, PythonParserRULE_finally_clause)
 	p.EnterOuterAlt(localctx, 1)
@@ -3969,6 +4002,9 @@ func (s *With_itemContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) With_item() (localctx IWith_itemContext) {
+	this := p
+	_ = this
+
 	localctx = NewWith_itemContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 22, PythonParserRULE_with_item)
 	var _la int
@@ -4190,6 +4226,9 @@ func (s *Case_clauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PythonParser) Case_clause() (localctx ICase_clauseContext) {
+	this := p
+	_ = this
+
 	localctx = NewCase_clauseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 24, PythonParserRULE_case_clause)
 	var _la int
@@ -4197,8 +4236,8 @@ func (p *PythonParser) Case_clause() (localctx ICase_clauseContext) {
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(306)
 
-	if !(p.IsSoftKeyword("case")) {
-		p.SetError(antlr.NewFailedPredicateException(p, "p.IsSoftKeyword(\"case\")", ""))
+	if !(this.IsSoftKeyword("case")) {
+		p.SetError(antlr.NewFailedPredicateException(p, "this.IsSoftKeyword(\"case\")", ""))
 		goto errorExit
 	}
 	{
@@ -4390,6 +4429,9 @@ func (s *Case_patternContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *PythonParser) Case_pattern() (localctx ICase_patternContext) {
+	this := p
+	_ = this
+
 	localctx = NewCase_patternContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 26, PythonParserRULE_case_pattern)
 	p.SetState(325)
@@ -4566,6 +4608,9 @@ func (s *Except_clauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PythonParser) Except_clause() (localctx IExcept_clauseContext) {
+	this := p
+	_ = this
+
 	localctx = NewExcept_clauseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 28, PythonParserRULE_except_clause)
 	var _la int
@@ -4597,8 +4642,8 @@ func (p *PythonParser) Except_clause() (localctx IExcept_clauseContext) {
 		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 32, p.GetParserRuleContext()) == 1 {
 			p.SetState(329)
 
-			if !(p.CheckVersion(2)) {
-				p.SetError(antlr.NewFailedPredicateException(p, "p.CheckVersion(2)", ""))
+			if !(this.CheckVersion(2)) {
+				p.SetError(antlr.NewFailedPredicateException(p, "this.CheckVersion(2)", ""))
 				goto errorExit
 			}
 			{
@@ -4613,15 +4658,15 @@ func (p *PythonParser) Except_clause() (localctx IExcept_clauseContext) {
 				p.SetState(331)
 				p.Name()
 			}
-			p.SetVersion(2)
+			this.SetVersion(2)
 
 		} else if p.HasError() { // JIM
 			goto errorExit
 		} else if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 32, p.GetParserRuleContext()) == 2 {
 			p.SetState(334)
 
-			if !(p.CheckVersion(3)) {
-				p.SetError(antlr.NewFailedPredicateException(p, "p.CheckVersion(3)", ""))
+			if !(this.CheckVersion(3)) {
+				p.SetError(antlr.NewFailedPredicateException(p, "this.CheckVersion(3)", ""))
 				goto errorExit
 			}
 			{
@@ -4636,7 +4681,7 @@ func (p *PythonParser) Except_clause() (localctx IExcept_clauseContext) {
 				p.SetState(336)
 				p.Name()
 			}
-			p.SetVersion(3)
+			this.SetVersion(3)
 
 		} else if p.HasError() { // JIM
 			goto errorExit
@@ -4821,6 +4866,9 @@ func (s *ClassdefContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Classdef() (localctx IClassdefContext) {
+	this := p
+	_ = this
+
 	localctx = NewClassdefContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 30, PythonParserRULE_classdef)
 	var _la int
@@ -5097,6 +5145,9 @@ func (s *FuncdefContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Funcdef() (localctx IFuncdefContext) {
+	this := p
+	_ = this
+
 	localctx = NewFuncdefContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 32, PythonParserRULE_funcdef)
 	var _la int
@@ -5351,6 +5402,9 @@ func (s *Type_paramsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PythonParser) Type_params() (localctx IType_paramsContext) {
+	this := p
+	_ = this
+
 	localctx = NewType_paramsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 34, PythonParserRULE_type_params)
 	var _la int
@@ -5569,6 +5623,9 @@ func (s *TypedargslistContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PythonParser) Typedargslist() (localctx ITypedargslistContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypedargslistContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 36, PythonParserRULE_typedargslist)
 	var _la int
@@ -5812,6 +5869,9 @@ func (s *ArgsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Args() (localctx IArgsContext) {
+	this := p
+	_ = this
+
 	localctx = NewArgsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 38, PythonParserRULE_args)
 	p.EnterOuterAlt(localctx, 1)
@@ -5927,6 +5987,9 @@ func (s *KwargsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Kwargs() (localctx IKwargsContext) {
+	this := p
+	_ = this
+
 	localctx = NewKwargsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 40, PythonParserRULE_kwargs)
 	p.EnterOuterAlt(localctx, 1)
@@ -6073,6 +6136,9 @@ func (s *Def_parametersContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PythonParser) Def_parameters() (localctx IDef_parametersContext) {
+	this := p
+	_ = this
+
 	localctx = NewDef_parametersContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 42, PythonParserRULE_def_parameters)
 	var _alt int
@@ -6244,6 +6310,9 @@ func (s *Def_parameterContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PythonParser) Def_parameter() (localctx IDef_parameterContext) {
+	this := p
+	_ = this
+
 	localctx = NewDef_parameterContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 44, PythonParserRULE_def_parameter)
 	var _la int
@@ -6427,6 +6496,9 @@ func (s *Named_parameterContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PythonParser) Named_parameter() (localctx INamed_parameterContext) {
+	this := p
+	_ = this
+
 	localctx = NewNamed_parameterContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 46, PythonParserRULE_named_parameter)
 	var _la int
@@ -6599,6 +6671,9 @@ func (s *Simple_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PythonParser) Simple_stmt() (localctx ISimple_stmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewSimple_stmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 48, PythonParserRULE_simple_stmt)
 	var _la int
@@ -7757,6 +7832,9 @@ func (s *Return_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PythonParser) Small_stmt() (localctx ISmall_stmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewSmall_stmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 50, PythonParserRULE_small_stmt)
 	var _la int
@@ -7775,8 +7853,8 @@ func (p *PythonParser) Small_stmt() (localctx ISmall_stmtContext) {
 		p.EnterOuterAlt(localctx, 1)
 		p.SetState(459)
 
-		if !(p.IsSoftKeyword("type")) {
-			p.SetError(antlr.NewFailedPredicateException(p, "p.IsSoftKeyword(\"type\")", ""))
+		if !(this.IsSoftKeyword("type")) {
+			p.SetError(antlr.NewFailedPredicateException(p, "this.IsSoftKeyword(\"type\")", ""))
 			goto errorExit
 		}
 		{
@@ -7829,8 +7907,8 @@ func (p *PythonParser) Small_stmt() (localctx ISmall_stmtContext) {
 		p.EnterOuterAlt(localctx, 3)
 		p.SetState(469)
 
-		if !(p.CheckVersion(2)) {
-			p.SetError(antlr.NewFailedPredicateException(p, "p.CheckVersion(2)", ""))
+		if !(this.CheckVersion(2)) {
+			p.SetError(antlr.NewFailedPredicateException(p, "this.CheckVersion(2)", ""))
 			goto errorExit
 		}
 		{
@@ -7978,7 +8056,7 @@ func (p *PythonParser) Small_stmt() (localctx ISmall_stmtContext) {
 			p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
 			goto errorExit
 		}
-		p.SetVersion(2)
+		this.SetVersion(2)
 
 	case 4:
 		localctx = NewDel_stmtContext(p, localctx)
@@ -8364,8 +8442,8 @@ func (p *PythonParser) Small_stmt() (localctx ISmall_stmtContext) {
 		p.EnterOuterAlt(localctx, 14)
 		p.SetState(558)
 
-		if !(p.CheckVersion(2)) {
-			p.SetError(antlr.NewFailedPredicateException(p, "p.CheckVersion(2)", ""))
+		if !(this.CheckVersion(2)) {
+			p.SetError(antlr.NewFailedPredicateException(p, "this.CheckVersion(2)", ""))
 			goto errorExit
 		}
 		{
@@ -8424,7 +8502,7 @@ func (p *PythonParser) Small_stmt() (localctx ISmall_stmtContext) {
 			}
 
 		}
-		p.SetVersion(2)
+		this.SetVersion(2)
 
 	case 15:
 		localctx = NewAssert_stmtContext(p, localctx)
@@ -8469,8 +8547,8 @@ func (p *PythonParser) Small_stmt() (localctx ISmall_stmtContext) {
 		p.EnterOuterAlt(localctx, 16)
 		p.SetState(577)
 
-		if !(p.CheckVersion(3)) {
-			p.SetError(antlr.NewFailedPredicateException(p, "p.CheckVersion(3)", ""))
+		if !(this.CheckVersion(3)) {
+			p.SetError(antlr.NewFailedPredicateException(p, "this.CheckVersion(3)", ""))
 			goto errorExit
 		}
 		{
@@ -8513,7 +8591,7 @@ func (p *PythonParser) Small_stmt() (localctx ISmall_stmtContext) {
 			}
 			_la = p.GetTokenStream().LA(1)
 		}
-		p.SetVersion(3)
+		this.SetVersion(3)
 
 	case antlr.ATNInvalidAltNumber:
 		goto errorExit
@@ -8709,6 +8787,9 @@ func (s *Testlist_star_exprContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *PythonParser) Testlist_star_expr() (localctx ITestlist_star_exprContext) {
+	this := p
+	_ = this
+
 	localctx = NewTestlist_star_exprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 52, PythonParserRULE_testlist_star_expr)
 	var _alt int
@@ -8906,6 +8987,9 @@ func (s *Star_exprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Star_expr() (localctx IStar_exprContext) {
+	this := p
+	_ = this
+
 	localctx = NewStar_exprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 54, PythonParserRULE_star_expr)
 	p.EnterOuterAlt(localctx, 1)
@@ -9184,6 +9268,9 @@ func (s *Assign_partContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PythonParser) Assign_part() (localctx IAssign_partContext) {
+	this := p
+	_ = this
+
 	localctx = NewAssign_partContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 56, PythonParserRULE_assign_part)
 	var _la int
@@ -9292,8 +9379,8 @@ func (p *PythonParser) Assign_part() (localctx IAssign_partContext) {
 		p.EnterOuterAlt(localctx, 2)
 		p.SetState(627)
 
-		if !(p.CheckVersion(3)) {
-			p.SetError(antlr.NewFailedPredicateException(p, "p.CheckVersion(3)", ""))
+		if !(this.CheckVersion(3)) {
+			p.SetError(antlr.NewFailedPredicateException(p, "this.CheckVersion(3)", ""))
 			goto errorExit
 		}
 		{
@@ -9330,7 +9417,7 @@ func (p *PythonParser) Assign_part() (localctx IAssign_partContext) {
 			}
 
 		}
-		p.SetVersion(3)
+		this.SetVersion(3)
 
 	case 3:
 		p.EnterOuterAlt(localctx, 3)
@@ -9553,6 +9640,9 @@ func (s *ExprlistContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Exprlist() (localctx IExprlistContext) {
+	this := p
+	_ = this
+
 	localctx = NewExprlistContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 58, PythonParserRULE_exprlist)
 	var _la int
@@ -9786,6 +9876,9 @@ func (s *Import_as_namesContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PythonParser) Import_as_names() (localctx IImport_as_namesContext) {
+	this := p
+	_ = this
+
 	localctx = NewImport_as_namesContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 60, PythonParserRULE_import_as_names)
 	var _la int
@@ -9976,6 +10069,9 @@ func (s *Import_as_nameContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PythonParser) Import_as_name() (localctx IImport_as_nameContext) {
+	this := p
+	_ = this
+
 	localctx = NewImport_as_nameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 62, PythonParserRULE_import_as_name)
 	var _la int
@@ -10138,6 +10234,9 @@ func (s *Dotted_as_namesContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PythonParser) Dotted_as_names() (localctx IDotted_as_namesContext) {
+	this := p
+	_ = this
+
 	localctx = NewDotted_as_namesContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 64, PythonParserRULE_dotted_as_names)
 	var _la int
@@ -10292,6 +10391,9 @@ func (s *Dotted_as_nameContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PythonParser) Dotted_as_name() (localctx IDotted_as_nameContext) {
+	this := p
+	_ = this
+
 	localctx = NewDotted_as_nameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 66, PythonParserRULE_dotted_as_name)
 	var _la int
@@ -10529,6 +10631,9 @@ func (s *TestContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Test() (localctx ITestContext) {
+	this := p
+	_ = this
+
 	localctx = NewTestContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 68, PythonParserRULE_test)
 	var _la int
@@ -10805,6 +10910,9 @@ func (s *VarargslistContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PythonParser) Varargslist() (localctx IVarargslistContext) {
+	this := p
+	_ = this
+
 	localctx = NewVarargslistContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 70, PythonParserRULE_varargslist)
 	var _la int
@@ -11079,6 +11187,9 @@ func (s *Vardef_parametersContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *PythonParser) Vardef_parameters() (localctx IVardef_parametersContext) {
+	this := p
+	_ = this
+
 	localctx = NewVardef_parametersContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 72, PythonParserRULE_vardef_parameters)
 	var _alt int
@@ -11250,6 +11361,9 @@ func (s *Vardef_parameterContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *PythonParser) Vardef_parameter() (localctx IVardef_parameterContext) {
+	this := p
+	_ = this
+
 	localctx = NewVardef_parameterContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 74, PythonParserRULE_vardef_parameter)
 	var _la int
@@ -11416,6 +11530,9 @@ func (s *VarargsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Varargs() (localctx IVarargsContext) {
+	this := p
+	_ = this
+
 	localctx = NewVarargsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 76, PythonParserRULE_varargs)
 	p.EnterOuterAlt(localctx, 1)
@@ -11531,6 +11648,9 @@ func (s *VarkwargsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Varkwargs() (localctx IVarkwargsContext) {
+	this := p
+	_ = this
+
 	localctx = NewVarkwargsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 78, PythonParserRULE_varkwargs)
 	p.EnterOuterAlt(localctx, 1)
@@ -11714,6 +11834,9 @@ func (p *PythonParser) Logical_test() (localctx ILogical_testContext) {
 }
 
 func (p *PythonParser) logical_test(_p int) (localctx ILogical_testContext) {
+	this := p
+	_ = this
+
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 
 	_parentState := p.GetState()
@@ -12047,6 +12170,9 @@ func (p *PythonParser) Comparison() (localctx IComparisonContext) {
 }
 
 func (p *PythonParser) comparison(_p int) (localctx IComparisonContext) {
+	this := p
+	_ = this
+
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 
 	_parentState := p.GetState()
@@ -12519,6 +12645,9 @@ func (p *PythonParser) Expr() (localctx IExprContext) {
 }
 
 func (p *PythonParser) expr(_p int) (localctx IExprContext) {
+	this := p
+	_ = this
+
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 
 	_parentState := p.GetState()
@@ -13111,6 +13240,9 @@ func (s *AtomContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Atom() (localctx IAtomContext) {
+	this := p
+	_ = this
+
 	localctx = NewAtomContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 86, PythonParserRULE_atom)
 	var _la int
@@ -13612,6 +13744,9 @@ func (s *DictorsetmakerContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PythonParser) Dictorsetmaker() (localctx IDictorsetmakerContext) {
+	this := p
+	_ = this
+
 	localctx = NewDictorsetmakerContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 88, PythonParserRULE_dictorsetmaker)
 	var _la int
@@ -13987,6 +14122,9 @@ func (s *Testlist_compContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PythonParser) Testlist_comp() (localctx ITestlist_compContext) {
+	this := p
+	_ = this
+
 	localctx = NewTestlist_compContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 90, PythonParserRULE_testlist_comp)
 	var _la int
@@ -14239,6 +14377,9 @@ func (s *TestlistContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Testlist() (localctx ITestlistContext) {
+	this := p
+	_ = this
+
 	localctx = NewTestlistContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 92, PythonParserRULE_testlist)
 	var _alt int
@@ -14420,6 +14561,9 @@ func (p *PythonParser) Dotted_name() (localctx IDotted_nameContext) {
 }
 
 func (p *PythonParser) dotted_name(_p int) (localctx IDotted_nameContext) {
+	this := p
+	_ = this
+
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 
 	_parentState := p.GetState()
@@ -14587,6 +14731,9 @@ func (s *NameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Name() (localctx INameContext) {
+	this := p
+	_ = this
+
 	localctx = NewNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 96, PythonParserRULE_name)
 	var _la int
@@ -14708,6 +14855,9 @@ func (s *NumberContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Number() (localctx INumberContext) {
+	this := p
+	_ = this
+
 	localctx = NewNumberContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 98, PythonParserRULE_number)
 	p.SetState(962)
@@ -14848,6 +14998,9 @@ func (s *IntegerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Integer() (localctx IIntegerContext) {
+	this := p
+	_ = this
+
 	localctx = NewIntegerContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 100, PythonParserRULE_integer)
 	var _la int
@@ -14964,6 +15117,9 @@ func (s *Yield_exprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Yield_expr() (localctx IYield_exprContext) {
+	this := p
+	_ = this
+
 	localctx = NewYield_exprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 102, PythonParserRULE_yield_expr)
 	var _la int
@@ -15108,6 +15264,9 @@ func (s *Yield_argContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Yield_arg() (localctx IYield_argContext) {
+	this := p
+	_ = this
+
 	localctx = NewYield_argContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 104, PythonParserRULE_yield_arg)
 	p.SetState(973)
@@ -15260,6 +15419,9 @@ func (s *TrailerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Trailer() (localctx ITrailerContext) {
+	this := p
+	_ = this
+
 	localctx = NewTrailerContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 106, PythonParserRULE_trailer)
 	p.SetState(981)
@@ -15439,6 +15601,9 @@ func (s *ArgumentsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Arguments() (localctx IArgumentsContext) {
+	this := p
+	_ = this
+
 	localctx = NewArgumentsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 108, PythonParserRULE_arguments)
 	var _la int
@@ -15641,6 +15806,9 @@ func (s *ArglistContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Arglist() (localctx IArglistContext) {
+	this := p
+	_ = this
+
 	localctx = NewArglistContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 110, PythonParserRULE_arglist)
 	var _la int
@@ -15858,6 +16026,9 @@ func (s *ArgumentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Argument() (localctx IArgumentContext) {
+	this := p
+	_ = this
+
 	localctx = NewArgumentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 112, PythonParserRULE_argument)
 	var _la int
@@ -16059,6 +16230,9 @@ func (s *SubscriptlistContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PythonParser) Subscriptlist() (localctx ISubscriptlistContext) {
+	this := p
+	_ = this
+
 	localctx = NewSubscriptlistContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 114, PythonParserRULE_subscriptlist)
 	var _la int
@@ -16271,6 +16445,9 @@ func (s *SubscriptContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Subscript() (localctx ISubscriptContext) {
+	this := p
+	_ = this
+
 	localctx = NewSubscriptContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 116, PythonParserRULE_subscript)
 	var _la int
@@ -16488,6 +16665,9 @@ func (s *SliceopContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Sliceop() (localctx ISliceopContext) {
+	this := p
+	_ = this
+
 	localctx = NewSliceopContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 118, PythonParserRULE_sliceop)
 	var _la int
@@ -16654,6 +16834,9 @@ func (s *Comp_forContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Comp_for() (localctx IComp_forContext) {
+	this := p
+	_ = this
+
 	localctx = NewComp_forContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 120, PythonParserRULE_comp_for)
 	var _la int
@@ -16831,6 +17014,9 @@ func (s *Comp_iterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PythonParser) Comp_iter() (localctx IComp_iterContext) {
+	this := p
+	_ = this
+
 	localctx = NewComp_iterContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 122, PythonParserRULE_comp_iter)
 	var _la int
@@ -16967,9 +17153,12 @@ func (p *PythonParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex 
 }
 
 func (p *PythonParser) Compound_stmt_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 0:
-		return p.IsSoftKeyword("match")
+		return this.IsSoftKeyword("match")
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -16977,9 +17166,12 @@ func (p *PythonParser) Compound_stmt_Sempred(localctx antlr.RuleContext, predInd
 }
 
 func (p *PythonParser) Case_clause_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 1:
-		return p.IsSoftKeyword("case")
+		return this.IsSoftKeyword("case")
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -16987,12 +17179,15 @@ func (p *PythonParser) Case_clause_Sempred(localctx antlr.RuleContext, predIndex
 }
 
 func (p *PythonParser) Except_clause_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 2:
-		return p.CheckVersion(2)
+		return this.CheckVersion(2)
 
 	case 3:
-		return p.CheckVersion(3)
+		return this.CheckVersion(3)
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -17000,18 +17195,21 @@ func (p *PythonParser) Except_clause_Sempred(localctx antlr.RuleContext, predInd
 }
 
 func (p *PythonParser) Small_stmt_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 4:
-		return p.IsSoftKeyword("type")
+		return this.IsSoftKeyword("type")
 
 	case 5:
-		return p.CheckVersion(2)
+		return this.CheckVersion(2)
 
 	case 6:
-		return p.CheckVersion(2)
+		return this.CheckVersion(2)
 
 	case 7:
-		return p.CheckVersion(3)
+		return this.CheckVersion(3)
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -17019,9 +17217,12 @@ func (p *PythonParser) Small_stmt_Sempred(localctx antlr.RuleContext, predIndex 
 }
 
 func (p *PythonParser) Assign_part_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 8:
-		return p.CheckVersion(3)
+		return this.CheckVersion(3)
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -17029,6 +17230,9 @@ func (p *PythonParser) Assign_part_Sempred(localctx antlr.RuleContext, predIndex
 }
 
 func (p *PythonParser) Logical_test_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 9:
 		return p.Precpred(p.GetParserRuleContext(), 2)
@@ -17042,6 +17246,9 @@ func (p *PythonParser) Logical_test_Sempred(localctx antlr.RuleContext, predInde
 }
 
 func (p *PythonParser) Comparison_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 11:
 		return p.Precpred(p.GetParserRuleContext(), 2)
@@ -17052,6 +17259,9 @@ func (p *PythonParser) Comparison_Sempred(localctx antlr.RuleContext, predIndex 
 }
 
 func (p *PythonParser) Expr_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 12:
 		return p.Precpred(p.GetParserRuleContext(), 8)
@@ -17080,6 +17290,9 @@ func (p *PythonParser) Expr_Sempred(localctx antlr.RuleContext, predIndex int) b
 }
 
 func (p *PythonParser) Dotted_name_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 19:
 		return p.Precpred(p.GetParserRuleContext(), 2)

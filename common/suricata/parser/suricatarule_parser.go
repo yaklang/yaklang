@@ -394,6 +394,9 @@ func (s *RulesContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Rules() (localctx IRulesContext) {
+	this := p
+	_ = this
+
 	localctx = NewRulesContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, SuricataRuleParserRULE_rules)
 	var _la int
@@ -634,6 +637,9 @@ func (s *RuleContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Rule_() (localctx IRuleContext) {
+	this := p
+	_ = this
+
 	localctx = NewRuleContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 2, SuricataRuleParserRULE_rule)
 	var _la int
@@ -761,6 +767,9 @@ func (s *ActionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Action_() (localctx IActionContext) {
+	this := p
+	_ = this
+
 	localctx = NewActionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 4, SuricataRuleParserRULE_action)
 	p.EnterOuterAlt(localctx, 1)
@@ -855,6 +864,9 @@ func (s *ProtocolContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Protocol() (localctx IProtocolContext) {
+	this := p
+	_ = this
+
 	localctx = NewProtocolContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, SuricataRuleParserRULE_protocol)
 	p.EnterOuterAlt(localctx, 1)
@@ -961,6 +973,9 @@ func (s *Src_addressContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *SuricataRuleParser) Src_address() (localctx ISrc_addressContext) {
+	this := p
+	_ = this
+
 	localctx = NewSrc_addressContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 8, SuricataRuleParserRULE_src_address)
 	p.EnterOuterAlt(localctx, 1)
@@ -1063,6 +1078,9 @@ func (s *Dest_addressContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *SuricataRuleParser) Dest_address() (localctx IDest_addressContext) {
+	this := p
+	_ = this
+
 	localctx = NewDest_addressContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 10, SuricataRuleParserRULE_dest_address)
 	p.EnterOuterAlt(localctx, 1)
@@ -1272,6 +1290,9 @@ func (s *AddressContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Address() (localctx IAddressContext) {
+	this := p
+	_ = this
+
 	localctx = NewAddressContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 12, SuricataRuleParserRULE_address)
 	var _la int
@@ -1537,6 +1558,9 @@ func (s *Ipv4Context) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Ipv4() (localctx IIpv4Context) {
+	this := p
+	_ = this
+
 	localctx = NewIpv4Context(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 14, SuricataRuleParserRULE_ipv4)
 	var _la int
@@ -1687,6 +1711,9 @@ func (s *Ipv4blockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Ipv4block() (localctx IIpv4blockContext) {
+	this := p
+	_ = this
+
 	localctx = NewIpv4blockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 16, SuricataRuleParserRULE_ipv4block)
 	p.EnterOuterAlt(localctx, 1)
@@ -1781,6 +1808,9 @@ func (s *Ipv4maskContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Ipv4mask() (localctx IIpv4maskContext) {
+	this := p
+	_ = this
+
 	localctx = NewIpv4maskContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 18, SuricataRuleParserRULE_ipv4mask)
 	p.EnterOuterAlt(localctx, 1)
@@ -1880,6 +1910,9 @@ func (s *Environment_varContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *SuricataRuleParser) Environment_var() (localctx IEnvironment_varContext) {
+	this := p
+	_ = this
+
 	localctx = NewEnvironment_varContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 20, SuricataRuleParserRULE_environment_var)
 	p.EnterOuterAlt(localctx, 1)
@@ -2033,6 +2066,9 @@ func (s *Ipv6Context) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Ipv6() (localctx IIpv6Context) {
+	this := p
+	_ = this
+
 	localctx = NewIpv6Context(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 22, SuricataRuleParserRULE_ipv6)
 	var _la int
@@ -2213,6 +2249,9 @@ func (s *Ipv6fullContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Ipv6full() (localctx IIpv6fullContext) {
+	this := p
+	_ = this
+
 	localctx = NewIpv6fullContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 24, SuricataRuleParserRULE_ipv6full)
 	p.EnterOuterAlt(localctx, 1)
@@ -2430,6 +2469,9 @@ func (s *Ipv6compactContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *SuricataRuleParser) Ipv6compact() (localctx IIpv6compactContext) {
+	this := p
+	_ = this
+
 	localctx = NewIpv6compactContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 26, SuricataRuleParserRULE_ipv6compact)
 	p.EnterOuterAlt(localctx, 1)
@@ -2570,6 +2612,9 @@ func (p *SuricataRuleParser) Ipv6part() (localctx IIpv6partContext) {
 }
 
 func (p *SuricataRuleParser) ipv6part(_p int) (localctx IIpv6partContext) {
+	this := p
+	_ = this
+
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 
 	_parentState := p.GetState()
@@ -2730,6 +2775,9 @@ func (s *Ipv6blockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Ipv6block() (localctx IIpv6blockContext) {
+	this := p
+	_ = this
+
 	localctx = NewIpv6blockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 30, SuricataRuleParserRULE_ipv6block)
 	var _la int
@@ -2829,6 +2877,9 @@ func (s *Ipv6maskContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Ipv6mask() (localctx IIpv6maskContext) {
+	this := p
+	_ = this
+
 	localctx = NewIpv6maskContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 32, SuricataRuleParserRULE_ipv6mask)
 	p.EnterOuterAlt(localctx, 1)
@@ -2935,6 +2986,9 @@ func (s *Src_portContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Src_port() (localctx ISrc_portContext) {
+	this := p
+	_ = this
+
 	localctx = NewSrc_portContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 34, SuricataRuleParserRULE_src_port)
 	p.EnterOuterAlt(localctx, 1)
@@ -3037,6 +3091,9 @@ func (s *Dest_portContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Dest_port() (localctx IDest_portContext) {
+	this := p
+	_ = this
+
 	localctx = NewDest_portContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 36, SuricataRuleParserRULE_dest_port)
 	p.EnterOuterAlt(localctx, 1)
@@ -3227,6 +3284,9 @@ func (s *PortContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Port() (localctx IPortContext) {
+	this := p
+	_ = this
+
 	localctx = NewPortContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 38, SuricataRuleParserRULE_port)
 	var _la int
@@ -3585,6 +3645,9 @@ func (s *ParamsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Params() (localctx IParamsContext) {
+	this := p
+	_ = this
+
 	localctx = NewParamsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 40, SuricataRuleParserRULE_params)
 	var _la int
@@ -3774,6 +3837,9 @@ func (s *ParamContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Param() (localctx IParamContext) {
+	this := p
+	_ = this
+
 	localctx = NewParamContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 42, SuricataRuleParserRULE_param)
 	var _la int
@@ -3888,6 +3954,9 @@ func (s *KeywordContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Keyword() (localctx IKeywordContext) {
+	this := p
+	_ = this
+
 	localctx = NewKeywordContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 44, SuricataRuleParserRULE_keyword)
 	p.EnterOuterAlt(localctx, 1)
@@ -4030,6 +4099,9 @@ func (s *SettingContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Setting() (localctx ISettingContext) {
+	this := p
+	_ = this
+
 	localctx = NewSettingContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 46, SuricataRuleParserRULE_setting)
 	var _la int
@@ -4184,6 +4256,9 @@ func (s *SingleSettingContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *SuricataRuleParser) SingleSetting() (localctx ISingleSettingContext) {
+	this := p
+	_ = this
+
 	localctx = NewSingleSettingContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 48, SuricataRuleParserRULE_singleSetting)
 	var _la int
@@ -4314,6 +4389,9 @@ func (s *NegativeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Negative() (localctx INegativeContext) {
+	this := p
+	_ = this
+
 	localctx = NewNegativeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 50, SuricataRuleParserRULE_negative)
 	p.EnterOuterAlt(localctx, 1)
@@ -4423,6 +4501,9 @@ func (s *SettingcontentContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *SuricataRuleParser) Settingcontent() (localctx ISettingcontentContext) {
+	this := p
+	_ = this
+
 	localctx = NewSettingcontentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 52, SuricataRuleParserRULE_settingcontent)
 	var _la int
@@ -4574,6 +4655,9 @@ func (s *SepContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SuricataRuleParser) Sep() (localctx ISepContext) {
+	this := p
+	_ = this
+
 	localctx = NewSepContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 54, SuricataRuleParserRULE_sep)
 	var _la int
@@ -4619,6 +4703,9 @@ func (p *SuricataRuleParser) Sempred(localctx antlr.RuleContext, ruleIndex, pred
 }
 
 func (p *SuricataRuleParser) Ipv6part_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 0:
 		return p.Precpred(p.GetParserRuleContext(), 1)

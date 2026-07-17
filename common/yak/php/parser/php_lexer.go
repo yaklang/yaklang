@@ -1621,6 +1621,9 @@ func (l *PHPLexer) Action(localctx antlr.RuleContext, ruleIndex, actionIndex int
 }
 
 func (l *PHPLexer) HtmlScriptOpen_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 0:
 		l._scriptTag = true
@@ -1630,6 +1633,9 @@ func (l *PHPLexer) HtmlScriptOpen_Action(localctx antlr.RuleContext, actionIndex
 	}
 }
 func (l *PHPLexer) HtmlStyleOpen_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 1:
 		l._styleTag = true
@@ -1639,60 +1645,75 @@ func (l *PHPLexer) HtmlStyleOpen_Action(localctx antlr.RuleContext, actionIndex 
 	}
 }
 func (l *PHPLexer) HtmlClose_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 2:
-		l.PushModeOnHtmlClose()
+		this.PushModeOnHtmlClose()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *PHPLexer) CloseCurlyBracket_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 3:
-		l.PopModeOnCurlyBracketClose()
+		this.PopModeOnCurlyBracketClose()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *PHPLexer) CurlyDollar_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 4:
-		l.SetInsideString()
+		this.SetInsideString()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *PHPLexer) CurlyOpen_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 5:
-		l.SetInsideString()
+		this.SetInsideString()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *PHPLexer) HereDocIdentiferName_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 6:
-		l.startRecordHereDocLabel()
+		this.startRecordHereDocLabel()
 
 	case 7:
-		l.endRecordHereDocLabel()
+		this.endRecordHereDocLabel()
 
 	case 8:
-		l.startRecordHereDocLabel()
+		this.startRecordHereDocLabel()
 
 	case 9:
-		l.endRecordHereDocLabel()
+		this.endRecordHereDocLabel()
 
 	case 10:
-		l.startRecordHereDocLabel()
+		this.startRecordHereDocLabel()
 
 	case 11:
-		l.endRecordHereDocLabel()
+		this.endRecordHereDocLabel()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
@@ -1731,9 +1752,12 @@ func (l *PHPLexer) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int)
 }
 
 func (p *PHPLexer) Shebang_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 0:
-		return p.IsNewLineOrStart(-2)
+		return this.IsNewLineOrStart(-2)
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1741,12 +1765,15 @@ func (p *PHPLexer) Shebang_Sempred(localctx antlr.RuleContext, predIndex int) bo
 }
 
 func (p *PHPLexer) PHPEnd_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 1:
-		return p.HasAspTags()
+		return this.HasAspTags()
 
 	case 2:
-		return p.HasPhpScriptTag()
+		return this.HasPhpScriptTag()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1754,9 +1781,12 @@ func (p *PHPLexer) PHPEnd_Sempred(localctx antlr.RuleContext, predIndex int) boo
 }
 
 func (p *PHPLexer) CurlyDollar_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 3:
-		return p.IsCurlyDollarInterpolationOpen(1)
+		return this.IsCurlyDollarInterpolationOpen(1)
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1764,9 +1794,12 @@ func (p *PHPLexer) CurlyDollar_Sempred(localctx antlr.RuleContext, predIndex int
 }
 
 func (p *PHPLexer) CurlyOpen_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 4:
-		return p.IsComplexInterpolationCurlyOpen()
+		return this.IsComplexInterpolationCurlyOpen()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1774,9 +1807,12 @@ func (p *PHPLexer) CurlyOpen_Sempred(localctx antlr.RuleContext, predIndex int) 
 }
 
 func (p *PHPLexer) EndDoc_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 5:
-		return p.DocIsEnd()
+		return this.DocIsEnd()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1784,12 +1820,15 @@ func (p *PHPLexer) EndDoc_Sempred(localctx antlr.RuleContext, predIndex int) boo
 }
 
 func (p *PHPLexer) HereDocText_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 6:
-		return !p.DocIsEnd()
+		return !this.DocIsEnd()
 
 	case 7:
-		return !p.DocIsEnd()
+		return !this.DocIsEnd()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1797,9 +1836,12 @@ func (p *PHPLexer) HereDocText_Sempred(localctx antlr.RuleContext, predIndex int
 }
 
 func (p *PHPLexer) PhpStartEchoFragment_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 8:
-		return p.HasAspTags()
+		return this.HasAspTags()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -1807,9 +1849,12 @@ func (p *PHPLexer) PhpStartEchoFragment_Sempred(localctx antlr.RuleContext, pred
 }
 
 func (p *PHPLexer) PhpStartFragment_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 9:
-		return p.HasAspTags()
+		return this.HasAspTags()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))

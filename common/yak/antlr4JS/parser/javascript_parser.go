@@ -957,6 +957,9 @@ func (s *ProgramContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Program() (localctx IProgramContext) {
+	this := p
+	_ = this
+
 	localctx = NewProgramContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, JavaScriptParserRULE_program)
 	var _la int
@@ -1123,6 +1126,9 @@ func (s *StatementsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Statements() (localctx IStatementsContext) {
+	this := p
+	_ = this
+
 	localctx = NewStatementsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 2, JavaScriptParserRULE_statements)
 	var _la int
@@ -1571,6 +1577,9 @@ func (s *StatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Statement() (localctx IStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 4, JavaScriptParserRULE_statement)
 	p.SetState(213)
@@ -1836,6 +1845,9 @@ func (s *BlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Block() (localctx IBlockContext) {
+	this := p
+	_ = this
+
 	localctx = NewBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, JavaScriptParserRULE_block)
 	var _la int
@@ -1971,6 +1983,9 @@ func (s *ImportStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) ImportStatement() (localctx IImportStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewImportStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 8, JavaScriptParserRULE_importStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -2154,6 +2169,9 @@ func (s *ImportFromBlockContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) ImportFromBlock() (localctx IImportFromBlockContext) {
+	this := p
+	_ = this
+
 	localctx = NewImportFromBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 10, JavaScriptParserRULE_importFromBlock)
 	p.SetState(236)
@@ -2369,6 +2387,9 @@ func (s *ImportModuleItemsContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaScriptParser) ImportModuleItems() (localctx IImportModuleItemsContext) {
+	this := p
+	_ = this
+
 	localctx = NewImportModuleItemsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 12, JavaScriptParserRULE_importModuleItems)
 	var _la int
@@ -2576,6 +2597,9 @@ func (s *ImportAliasNameContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) ImportAliasName() (localctx IImportAliasNameContext) {
+	this := p
+	_ = this
+
 	localctx = NewImportAliasNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 14, JavaScriptParserRULE_importAliasName)
 	var _la int
@@ -2707,6 +2731,9 @@ func (s *ModuleExportNameContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaScriptParser) ModuleExportName() (localctx IModuleExportNameContext) {
+	this := p
+	_ = this
+
 	localctx = NewModuleExportNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 16, JavaScriptParserRULE_moduleExportName)
 	p.SetState(262)
@@ -2831,6 +2858,9 @@ func (s *ImportedBindingContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) ImportedBinding() (localctx IImportedBindingContext) {
+	this := p
+	_ = this
+
 	localctx = NewImportedBindingContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 18, JavaScriptParserRULE_importedBinding)
 	var _la int
@@ -2947,6 +2977,9 @@ func (s *ImportDefaultContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *JavaScriptParser) ImportDefault() (localctx IImportDefaultContext) {
+	this := p
+	_ = this
+
 	localctx = NewImportDefaultContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 20, JavaScriptParserRULE_importDefault)
 	p.EnterOuterAlt(localctx, 1)
@@ -3093,6 +3126,9 @@ func (s *ImportNamespaceContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) ImportNamespace() (localctx IImportNamespaceContext) {
+	this := p
+	_ = this
+
 	localctx = NewImportNamespaceContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 22, JavaScriptParserRULE_importNamespace)
 	var _la int
@@ -3235,6 +3271,9 @@ func (s *ImportFromContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) ImportFrom() (localctx IImportFromContext) {
+	this := p
+	_ = this
+
 	localctx = NewImportFromContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 24, JavaScriptParserRULE_importFrom)
 	p.EnterOuterAlt(localctx, 1)
@@ -3380,6 +3419,9 @@ func (s *AliasNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) AliasName() (localctx IAliasNameContext) {
+	this := p
+	_ = this
+
 	localctx = NewAliasNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 26, JavaScriptParserRULE_aliasName)
 	var _la int
@@ -3632,6 +3674,9 @@ func (s *ExportDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaScriptParser) ExportStatement() (localctx IExportStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewExportStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 28, JavaScriptParserRULE_exportStatement)
 	p.SetState(300)
@@ -3872,6 +3917,9 @@ func (s *ExportFromBlockContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) ExportFromBlock() (localctx IExportFromBlockContext) {
+	this := p
+	_ = this
+
 	localctx = NewExportFromBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 30, JavaScriptParserRULE_exportFromBlock)
 	p.SetState(312)
@@ -4064,6 +4112,9 @@ func (s *ExportModuleItemsContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaScriptParser) ExportModuleItems() (localctx IExportModuleItemsContext) {
+	this := p
+	_ = this
+
 	localctx = NewExportModuleItemsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 32, JavaScriptParserRULE_exportModuleItems)
 	var _la int
@@ -4280,6 +4331,9 @@ func (s *ExportAliasNameContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) ExportAliasName() (localctx IExportAliasNameContext) {
+	this := p
+	_ = this
+
 	localctx = NewExportAliasNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 34, JavaScriptParserRULE_exportAliasName)
 	var _la int
@@ -4440,6 +4494,9 @@ func (s *DeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JavaScriptParser) Declaration() (localctx IDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 36, JavaScriptParserRULE_declaration)
 	p.SetState(339)
@@ -4586,6 +4643,9 @@ func (s *VariableStatementContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaScriptParser) VariableStatement() (localctx IVariableStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewVariableStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 38, JavaScriptParserRULE_variableStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -4759,6 +4819,9 @@ func (s *VariableDeclarationListContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 func (p *JavaScriptParser) VariableDeclarationList() (localctx IVariableDeclarationListContext) {
+	this := p
+	_ = this
+
 	localctx = NewVariableDeclarationListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 40, JavaScriptParserRULE_variableDeclarationList)
 	var _la int
@@ -4940,6 +5003,9 @@ func (s *VariableDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *JavaScriptParser) VariableDeclaration() (localctx IVariableDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewVariableDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 42, JavaScriptParserRULE_variableDeclaration)
 	p.EnterOuterAlt(localctx, 1)
@@ -5050,6 +5116,9 @@ func (s *EmptyStatement_Context) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) EmptyStatement_() (localctx IEmptyStatement_Context) {
+	this := p
+	_ = this
+
 	localctx = NewEmptyStatement_Context(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 44, JavaScriptParserRULE_emptyStatement_)
 	p.EnterOuterAlt(localctx, 1)
@@ -5282,6 +5351,9 @@ func (s *IfStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JavaScriptParser) IfStatement() (localctx IIfStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewIfStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 46, JavaScriptParserRULE_ifStatement)
 	var _alt int
@@ -5494,6 +5566,9 @@ func (s *ElseBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) ElseBlock() (localctx IElseBlockContext) {
+	this := p
+	_ = this
+
 	localctx = NewElseBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 48, JavaScriptParserRULE_elseBlock)
 	p.EnterOuterAlt(localctx, 1)
@@ -5621,6 +5696,9 @@ func (s *ForFirstContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) ForFirst() (localctx IForFirstContext) {
+	this := p
+	_ = this
+
 	localctx = NewForFirstContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 50, JavaScriptParserRULE_forFirst)
 	p.SetState(385)
@@ -5742,6 +5820,9 @@ func (s *ForSecondContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) ForSecond() (localctx IForSecondContext) {
+	this := p
+	_ = this
+
 	localctx = NewForSecondContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 52, JavaScriptParserRULE_forSecond)
 	p.EnterOuterAlt(localctx, 1)
@@ -5844,6 +5925,9 @@ func (s *ForThirdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) ForThird() (localctx IForThirdContext) {
+	this := p
+	_ = this
+
 	localctx = NewForThirdContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 54, JavaScriptParserRULE_forThird)
 	p.EnterOuterAlt(localctx, 1)
@@ -6428,6 +6512,9 @@ func (s *ForOfStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JavaScriptParser) IterationStatement() (localctx IIterationStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewIterationStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 56, JavaScriptParserRULE_iterationStatement)
 	var _la int
@@ -6895,6 +6982,9 @@ func (s *ContinueStatementContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaScriptParser) ContinueStatement() (localctx IContinueStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewContinueStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 58, JavaScriptParserRULE_continueStatement)
 	var _alt int
@@ -7082,6 +7172,9 @@ func (s *BreakStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JavaScriptParser) BreakStatement() (localctx IBreakStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewBreakStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 60, JavaScriptParserRULE_breakStatement)
 	var _alt int
@@ -7269,6 +7362,9 @@ func (s *ReturnStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) ReturnStatement() (localctx IReturnStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewReturnStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 62, JavaScriptParserRULE_returnStatement)
 	var _alt int
@@ -7456,6 +7552,9 @@ func (s *YieldStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JavaScriptParser) YieldStatement() (localctx IYieldStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewYieldStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 64, JavaScriptParserRULE_yieldStatement)
 	var _alt int
@@ -7643,6 +7742,9 @@ func (s *WithStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *JavaScriptParser) WithStatement() (localctx IWithStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewWithStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 66, JavaScriptParserRULE_withStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -7805,6 +7907,9 @@ func (s *SwitchStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) SwitchStatement() (localctx ISwitchStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewSwitchStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 68, JavaScriptParserRULE_switchStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -7988,6 +8093,9 @@ func (s *CaseBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) CaseBlock() (localctx ICaseBlockContext) {
+	this := p
+	_ = this
+
 	localctx = NewCaseBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 70, JavaScriptParserRULE_caseBlock)
 	var _la int
@@ -8172,6 +8280,9 @@ func (s *CaseClausesContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JavaScriptParser) CaseClauses() (localctx ICaseClausesContext) {
+	this := p
+	_ = this
+
 	localctx = NewCaseClausesContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 72, JavaScriptParserRULE_caseClauses)
 	var _la int
@@ -8319,6 +8430,9 @@ func (s *CaseClauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) CaseClause() (localctx ICaseClauseContext) {
+	this := p
+	_ = this
+
 	localctx = NewCaseClauseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 74, JavaScriptParserRULE_caseClause)
 	var _la int
@@ -8463,6 +8577,9 @@ func (s *DefaultClauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *JavaScriptParser) DefaultClause() (localctx IDefaultClauseContext) {
+	this := p
+	_ = this
+
 	localctx = NewDefaultClauseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 76, JavaScriptParserRULE_defaultClause)
 	var _la int
@@ -8615,6 +8732,9 @@ func (s *LabelledStatementContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaScriptParser) LabelledStatement() (localctx ILabelledStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewLabelledStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 78, JavaScriptParserRULE_labelledStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -8761,6 +8881,9 @@ func (s *ThrowStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JavaScriptParser) ThrowStatement() (localctx IThrowStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewThrowStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 80, JavaScriptParserRULE_throwStatement)
 	var _la int
@@ -8940,6 +9063,9 @@ func (s *TryStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JavaScriptParser) TryStatement() (localctx ITryStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewTryStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 82, JavaScriptParserRULE_tryStatement)
 	var _la int
@@ -9121,6 +9247,9 @@ func (s *CatchProductionContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) CatchProduction() (localctx ICatchProductionContext) {
+	this := p
+	_ = this
+
 	localctx = NewCatchProductionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 84, JavaScriptParserRULE_catchProduction)
 	var _la int
@@ -9278,6 +9407,9 @@ func (s *FinallyProductionContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaScriptParser) FinallyProduction() (localctx IFinallyProductionContext) {
+	this := p
+	_ = this
+
 	localctx = NewFinallyProductionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 86, JavaScriptParserRULE_finallyProduction)
 	p.EnterOuterAlt(localctx, 1)
@@ -9393,6 +9525,9 @@ func (s *DebuggerStatementContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaScriptParser) DebuggerStatement() (localctx IDebuggerStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewDebuggerStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 88, JavaScriptParserRULE_debuggerStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -9562,6 +9697,9 @@ func (s *FunctionDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *JavaScriptParser) FunctionDeclaration() (localctx IFunctionDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewFunctionDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 90, JavaScriptParserRULE_functionDeclaration)
 	var _la int
@@ -9766,6 +9904,9 @@ func (s *ClassDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaScriptParser) ClassDeclaration() (localctx IClassDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewClassDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 92, JavaScriptParserRULE_classDeclaration)
 	p.EnterOuterAlt(localctx, 1)
@@ -9938,6 +10079,9 @@ func (s *ClassTailContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) ClassTail() (localctx IClassTailContext) {
+	this := p
+	_ = this
+
 	localctx = NewClassTailContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 94, JavaScriptParserRULE_classTail)
 	var _la int
@@ -10140,6 +10284,9 @@ func (s *ClassElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JavaScriptParser) ClassElement() (localctx IClassElementContext) {
+	this := p
+	_ = this
+
 	localctx = NewClassElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 96, JavaScriptParserRULE_classElement)
 	p.SetState(618)
@@ -10417,6 +10564,9 @@ func (s *MethodDefinitionContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaScriptParser) MethodDefinition() (localctx IMethodDefinitionContext) {
+	this := p
+	_ = this
+
 	localctx = NewMethodDefinitionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 98, JavaScriptParserRULE_methodDefinition)
 	var _la int
@@ -10746,6 +10896,9 @@ func (s *FieldDefinitionContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaScriptParser) FieldDefinition() (localctx IFieldDefinitionContext) {
+	this := p
+	_ = this
+
 	localctx = NewFieldDefinitionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 100, JavaScriptParserRULE_fieldDefinition)
 	var _la int
@@ -10881,6 +11034,9 @@ func (s *ClassElementNameContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaScriptParser) ClassElementName() (localctx IClassElementNameContext) {
+	this := p
+	_ = this
+
 	localctx = NewClassElementNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 102, JavaScriptParserRULE_classElementName)
 	p.SetState(667)
@@ -11008,6 +11164,9 @@ func (s *PrivateIdentifierContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaScriptParser) PrivateIdentifier() (localctx IPrivateIdentifierContext) {
+	this := p
+	_ = this
+
 	localctx = NewPrivateIdentifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 104, JavaScriptParserRULE_privateIdentifier)
 	p.EnterOuterAlt(localctx, 1)
@@ -11171,6 +11330,9 @@ func (s *FormalParameterListContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *JavaScriptParser) FormalParameterList() (localctx IFormalParameterListContext) {
+	this := p
+	_ = this
+
 	localctx = NewFormalParameterListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 106, JavaScriptParserRULE_formalParameterList)
 	var _la int
@@ -11376,6 +11538,9 @@ func (s *FormalParameterArgContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *JavaScriptParser) FormalParameterArg() (localctx IFormalParameterArgContext) {
+	this := p
+	_ = this
+
 	localctx = NewFormalParameterArgContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 108, JavaScriptParserRULE_formalParameterArg)
 	var _la int
@@ -11507,6 +11672,9 @@ func (s *LastFormalParameterArgContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 func (p *JavaScriptParser) LastFormalParameterArg() (localctx ILastFormalParameterArgContext) {
+	this := p
+	_ = this
+
 	localctx = NewLastFormalParameterArgContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 110, JavaScriptParserRULE_lastFormalParameterArg)
 	p.EnterOuterAlt(localctx, 1)
@@ -11627,6 +11795,9 @@ func (s *FunctionBodyContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JavaScriptParser) FunctionBody() (localctx IFunctionBodyContext) {
+	this := p
+	_ = this
+
 	localctx = NewFunctionBodyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 112, JavaScriptParserRULE_functionBody)
 	var _la int
@@ -11767,6 +11938,9 @@ func (s *ArrayLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JavaScriptParser) ArrayLiteral() (localctx IArrayLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewArrayLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 114, JavaScriptParserRULE_arrayLiteral)
 	p.EnterOuterAlt(localctx, 1)
@@ -11921,6 +12095,9 @@ func (s *ElementListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JavaScriptParser) ElementList() (localctx IElementListContext) {
+	this := p
+	_ = this
+
 	localctx = NewElementListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 116, JavaScriptParserRULE_elementList)
 	var _la int
@@ -12148,6 +12325,9 @@ func (s *ArrayElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JavaScriptParser) ArrayElement() (localctx IArrayElementContext) {
+	this := p
+	_ = this
+
 	localctx = NewArrayElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 118, JavaScriptParserRULE_arrayElement)
 	var _la int
@@ -12681,6 +12861,9 @@ func (s *FunctionPropertyContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaScriptParser) PropertyAssignment() (localctx IPropertyAssignmentContext) {
+	this := p
+	_ = this
+
 	localctx = NewPropertyAssignmentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 120, JavaScriptParserRULE_propertyAssignment)
 	var _la int
@@ -13057,6 +13240,9 @@ func (s *PropertyNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JavaScriptParser) PropertyName() (localctx IPropertyNameContext) {
+	this := p
+	_ = this
+
 	localctx = NewPropertyNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 122, JavaScriptParserRULE_propertyName)
 	p.SetState(784)
@@ -13259,6 +13445,9 @@ func (s *ArgumentsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Arguments() (localctx IArgumentsContext) {
+	this := p
+	_ = this
+
 	localctx = NewArgumentsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 124, JavaScriptParserRULE_arguments)
 	var _la int
@@ -13466,6 +13655,9 @@ func (s *ArgumentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Argument() (localctx IArgumentContext) {
+	this := p
+	_ = this
+
 	localctx = NewArgumentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 126, JavaScriptParserRULE_argument)
 	var _la int
@@ -13642,6 +13834,9 @@ func (s *ExpressionSequenceContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *JavaScriptParser) ExpressionSequence() (localctx IExpressionSequenceContext) {
+	this := p
+	_ = this
+
 	localctx = NewExpressionSequenceContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 128, JavaScriptParserRULE_expressionSequence)
 	var _alt int
@@ -13815,6 +14010,9 @@ func (s *SpecificExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *JavaScriptParser) SpecificExpression() (localctx ISpecificExpressionContext) {
+	this := p
+	_ = this
+
 	localctx = NewSpecificExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 130, JavaScriptParserRULE_specificExpression)
 	p.SetState(820)
@@ -13937,6 +14135,9 @@ func (s *QuestionDotContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JavaScriptParser) QuestionDot() (localctx IQuestionDotContext) {
+	this := p
+	_ = this
+
 	localctx = NewQuestionDotContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 132, JavaScriptParserRULE_questionDot)
 	p.EnterOuterAlt(localctx, 1)
@@ -14293,6 +14494,9 @@ func (s *ImportExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaScriptParser) KeywordSingleExpression() (localctx IKeywordSingleExpressionContext) {
+	this := p
+	_ = this
+
 	localctx = NewKeywordSingleExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 134, JavaScriptParserRULE_keywordSingleExpression)
 	p.SetState(841)
@@ -16409,6 +16613,9 @@ func (p *JavaScriptParser) SingleExpression() (localctx ISingleExpressionContext
 }
 
 func (p *JavaScriptParser) singleExpression(_p int) (localctx ISingleExpressionContext) {
+	this := p
+	_ = this
+
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 
 	_parentState := p.GetState()
@@ -17221,6 +17428,9 @@ func (s *PreUnaryOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaScriptParser) PreUnaryOperator() (localctx IPreUnaryOperatorContext) {
+	this := p
+	_ = this
+
 	localctx = NewPreUnaryOperatorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 138, JavaScriptParserRULE_preUnaryOperator)
 	var _la int
@@ -17397,6 +17607,9 @@ func (s *InitializerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JavaScriptParser) Initializer() (localctx IInitializerContext) {
+	this := p
+	_ = this
+
 	localctx = NewInitializerContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 140, JavaScriptParserRULE_initializer)
 	p.EnterOuterAlt(localctx, 1)
@@ -17541,6 +17754,9 @@ func (s *AssignableContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Assignable() (localctx IAssignableContext) {
+	this := p
+	_ = this
+
 	localctx = NewAssignableContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 142, JavaScriptParserRULE_assignable)
 	p.SetState(946)
@@ -17721,6 +17937,9 @@ func (s *ObjectLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *JavaScriptParser) ObjectLiteral() (localctx IObjectLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewObjectLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 144, JavaScriptParserRULE_objectLiteral)
 	var _la int
@@ -18062,6 +18281,9 @@ func (s *ArrowFunctionContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *JavaScriptParser) AnonymousFunction() (localctx IAnonymousFunctionContext) {
+	this := p
+	_ = this
+
 	localctx = NewAnonymousFunctionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 146, JavaScriptParserRULE_anonymousFunction)
 	var _la int
@@ -18330,6 +18552,9 @@ func (s *ArrowFunctionParametersContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 func (p *JavaScriptParser) ArrowFunctionParameters() (localctx IArrowFunctionParametersContext) {
+	this := p
+	_ = this
+
 	localctx = NewArrowFunctionParametersContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 148, JavaScriptParserRULE_arrowFunctionParameters)
 	var _la int
@@ -18497,6 +18722,9 @@ func (s *ArrowFunctionBodyContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaScriptParser) ArrowFunctionBody() (localctx IArrowFunctionBodyContext) {
+	this := p
+	_ = this
+
 	localctx = NewArrowFunctionBodyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 150, JavaScriptParserRULE_arrowFunctionBody)
 	p.SetState(1002)
@@ -18666,6 +18894,9 @@ func (s *AssignmentOperatorContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *JavaScriptParser) AssignmentOperator() (localctx IAssignmentOperatorContext) {
+	this := p
+	_ = this
+
 	localctx = NewAssignmentOperatorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 152, JavaScriptParserRULE_assignmentOperator)
 	var _la int
@@ -18831,6 +19062,9 @@ func (s *LiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Literal() (localctx ILiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 154, JavaScriptParserRULE_literal)
 	p.SetState(1013)
@@ -19040,6 +19274,9 @@ func (s *TemplateStringLiteralContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *JavaScriptParser) TemplateStringLiteral() (localctx ITemplateStringLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewTemplateStringLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 156, JavaScriptParserRULE_templateStringLiteral)
 	var _la int
@@ -19191,6 +19428,9 @@ func (s *TemplateStringAtomContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *JavaScriptParser) TemplateStringAtom() (localctx ITemplateStringAtomContext) {
+	this := p
+	_ = this
+
 	localctx = NewTemplateStringAtomContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 158, JavaScriptParserRULE_templateStringAtom)
 	p.SetState(1029)
@@ -19341,6 +19581,9 @@ func (s *NumericLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JavaScriptParser) NumericLiteral() (localctx INumericLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewNumericLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 160, JavaScriptParserRULE_numericLiteral)
 	var _la int
@@ -19455,6 +19698,9 @@ func (s *BigintLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *JavaScriptParser) BigintLiteral() (localctx IBigintLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewBigintLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 162, JavaScriptParserRULE_bigintLiteral)
 	var _la int
@@ -19571,6 +19817,9 @@ func (s *GetterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Getter() (localctx IGetterContext) {
+	this := p
+	_ = this
+
 	localctx = NewGetterContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 164, JavaScriptParserRULE_getter)
 	p.EnterOuterAlt(localctx, 1)
@@ -19686,6 +19935,9 @@ func (s *SetterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Setter() (localctx ISetterContext) {
+	this := p
+	_ = this
+
 	localctx = NewSetterContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 166, JavaScriptParserRULE_setter)
 	p.EnterOuterAlt(localctx, 1)
@@ -19823,6 +20075,9 @@ func (s *IdentifierNameContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JavaScriptParser) IdentifierName() (localctx IIdentifierNameContext) {
+	this := p
+	_ = this
+
 	localctx = NewIdentifierNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 168, JavaScriptParserRULE_identifierName)
 	p.SetState(1045)
@@ -20184,6 +20439,9 @@ func (s *WordContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Word() (localctx IWordContext) {
+	this := p
+	_ = this
+
 	localctx = NewWordContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 170, JavaScriptParserRULE_word)
 	var _la int
@@ -20318,6 +20576,9 @@ func (s *IdentifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Identifier() (localctx IIdentifierContext) {
+	this := p
+	_ = this
+
 	localctx = NewIdentifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 172, JavaScriptParserRULE_identifier)
 	var _la int
@@ -20461,6 +20722,9 @@ func (s *OptionalChainMemberContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *JavaScriptParser) OptionalChainMember() (localctx IOptionalChainMemberContext) {
+	this := p
+	_ = this
+
 	localctx = NewOptionalChainMemberContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 174, JavaScriptParserRULE_optionalChainMember)
 	var _la int
@@ -20612,6 +20876,9 @@ func (s *EosContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaScriptParser) Eos() (localctx IEosContext) {
+	this := p
+	_ = this
+
 	localctx = NewEosContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 176, JavaScriptParserRULE_eos)
 	p.SetState(1064)
@@ -20698,6 +20965,9 @@ func (p *JavaScriptParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIn
 }
 
 func (p *JavaScriptParser) IterationStatement_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 0:
 		return p.p("of")
@@ -20708,6 +20978,9 @@ func (p *JavaScriptParser) IterationStatement_Sempred(localctx antlr.RuleContext
 }
 
 func (p *JavaScriptParser) SingleExpression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 1:
 		return p.Precpred(p.GetParserRuleContext(), 12)
@@ -20769,6 +21042,9 @@ func (p *JavaScriptParser) SingleExpression_Sempred(localctx antlr.RuleContext, 
 }
 
 func (p *JavaScriptParser) Eos_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 19:
 		return p.isEOS()
