@@ -9,7 +9,7 @@ const (
 	maxForkConcurrency     = 10
 )
 
-// DefaultForkOptions returns loop options applied to programmatic forked sub-agents.
+// DefaultForkOptions 返回应用于编程式 fork 子 Agent 的 loop 选项。
 func DefaultForkOptions() []ReActLoopOption {
 	return []ReActLoopOption{
 		WithVar(SubAgentDepthLoopVar, 1),
@@ -22,6 +22,7 @@ func DefaultForkOptions() []ReActLoopOption {
 	}
 }
 
+// normalizeForkConcurrency 将并发数归一化到合法范围。
 func normalizeForkConcurrency(concurrency, jobCount int) int {
 	if concurrency <= 0 {
 		concurrency = defaultForkConcurrency

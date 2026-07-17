@@ -8,9 +8,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// nestedSubTask is a short-lived inner task for nested loops (e.g. fast_context).
-// It keeps parent TaskId/UUID for UI aggregation while using an isolated context
-// so the inner loop finishing does not cancel the parent scan.
+// nestedSubTask 是 nested loop（如 fast_context）使用的短生命周期内部任务。
+// 它保留父任务的 TaskId/UUID 供 UI 聚合，同时使用独立的 context，使内部 loop
+// 结束不会取消父扫描。
 type nestedSubTask struct {
 	*aicommon.AIStatefulTaskBase
 	parent aicommon.AIStatefulTask
@@ -62,15 +62,14 @@ func (n *nestedSubTask) GetUUID() string {
 	return n.parent.GetUUID()
 }
 
-// RunNestedLoop executes a registered sub-loop under the parent's TaskId without
-// creating a new UI card. Timeline entries created during the run are rolled back.
+// RunNestedLoop 在父任务的 TaskId 下执行一个已注册的子 loop，不创建新的 UI 卡片。
+// 运行期间产生的 timeline 条目会在结束后回滚。
 //
-// It is the no-registry counterpart of runNestedInPlace: it shares the parent
-// timeline (rolling back entries afterwards), forwards the parent task emitter,
-// swaps the invoker's current task to a nested sub-task for the run, and leaves a
-// rollback checkpoint. It differs from runNestedInPlace only in that it does not
-// register a SubAgentHandle (callers that need the stall-heartbeat bypass should
-// use RunNestedJobWithProgress / RunNestedJobsConcurrentlyWithProgress instead).
+// 它是 runNestedInPlace 的无-registry 版本：共享父 timeline（结束后回滚条目）、
+// 转发父任务 emitter、把 invoker 的 current task 切换为 nested 子任务，并保留一个
+// 回滚 checkpoint。与 runNestedInPlace 的唯一区别是不注册 SubAgentHandle——需要
+// stall-heartbeat 旁路的调用方应改用 RunNestedJobWithProgress /
+// RunNestedJobsConcurrentlyWithProgress。
 func RunNestedLoop(
 	invoker aicommon.AIInvokeRuntime,
 	parentTask aicommon.AIStatefulTask,
@@ -115,6 +114,7 @@ func RunNestedLoop(
 	return subLoop, nil
 }
 
+// countTimelineIDsAfter 统计 timeline 中 id 大于 checkpoint 的条目数量。
 func countTimelineIDsAfter(timeline *aicommon.Timeline, checkpoint int64) int {
 	if timeline == nil {
 		return 0
