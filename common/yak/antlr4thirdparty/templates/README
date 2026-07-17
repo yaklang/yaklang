@@ -1,0 +1,8 @@
+# Patched ANTLR Go codegen templates (ANTLR 4.13.2 Go.stg + yaklang import).
+
+# Diff vs upstream jar: only
+#   github.com/antlr4-go/antlr/v4  ->  github.com/yaklang/antlr/v4
+# (6 occurrences). Everything else is identical to 4.13.2.
+#
+# Do not invoke java -cp here directly from language scripts.
+# Use: common/yak/antlr4util/antlr4  (see that wrapper).

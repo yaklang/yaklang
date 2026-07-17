@@ -1,2 +1,2 @@
-java -jar ../antlr4thirdparty/antlr-4.13.2-complete.jar -Dlanguage=Go ./CLexer.g4 ./CParser.g4 -o parser -package c -no-listener -visitor
+../antlr4util/antlr4 -Dlanguage=Go ./CLexer.g4 ./CParser.g4 -o parser -package c -no-listener -visitor
 pause
