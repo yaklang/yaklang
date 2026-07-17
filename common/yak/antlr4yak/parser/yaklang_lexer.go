@@ -850,96 +850,126 @@ func (l *YaklangLexer) Action(localctx antlr.RuleContext, ruleIndex, actionIndex
 }
 
 func (l *YaklangLexer) TemplateSingleQuoteStringStart_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 0:
-		l.IncreaseTemplateDepth()
+		this.IncreaseTemplateDepth()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *YaklangLexer) TemplateDoubleQuoteStringStart_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 1:
-		l.IncreaseTemplateDepth()
+		this.IncreaseTemplateDepth()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *YaklangLexer) TemplateBackTickStringStart_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 2:
-		l.IncreaseTemplateDepth()
+		this.IncreaseTemplateDepth()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *YaklangLexer) TemplateSingleQuoteStringCharacterStringEnd_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 3:
-		l.DecreaseTemplateDepth()
+		this.DecreaseTemplateDepth()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *YaklangLexer) TemplateDoubleQuoteStringCharacterStringEnd_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 4:
-		l.DecreaseTemplateDepth()
+		this.DecreaseTemplateDepth()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *YaklangLexer) TemplateBackTickStringCharacterStringEnd_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 5:
-		l.DecreaseTemplateDepth()
+		this.DecreaseTemplateDepth()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *YaklangLexer) HereDocIdentifierName_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 6:
-		l.recordHereDocLabel()
+		this.recordHereDocLabel()
 
 	case 7:
-		l.recordHereDocLabel()
+		this.recordHereDocLabel()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *YaklangLexer) HereDocIdentifierBreak_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 8:
-		l.recordHereDocLF()
+		this.recordHereDocLF()
 
 	case 9:
-		l.hereDocModeDistribute()
+		this.hereDocModeDistribute()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *YaklangLexer) CRLFEndDoc_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 10:
-		l.DocEndDistribute()
+		this.DocEndDistribute()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *YaklangLexer) LFEndDoc_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 11:
-		l.DocEndDistribute()
+		this.DocEndDistribute()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
@@ -957,9 +987,12 @@ func (l *YaklangLexer) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex 
 }
 
 func (p *YaklangLexer) TemplateCloseBrace_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 0:
-		return p.IsInTemplateString()
+		return this.IsInTemplateString()
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))

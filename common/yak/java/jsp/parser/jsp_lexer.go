@@ -632,12 +632,15 @@ func (l *JSPLexer) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int)
 }
 
 func (p *JSPLexer) JSP_STATIC_CONTENT_CHAR_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 0:
-		return p.GetInputStream().LA(1) != '{'
+		return this.GetInputStream().LA(1) != '{'
 
 	case 1:
-		return p.GetInputStream().LA(1) != '{'
+		return this.GetInputStream().LA(1) != '{'
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))

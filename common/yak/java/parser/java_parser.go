@@ -1545,6 +1545,9 @@ func (s *CompilationUnitContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaParser) CompilationUnit() (localctx ICompilationUnitContext) {
+	this := p
+	_ = this
+
 	localctx = NewCompilationUnitContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, JavaParserRULE_compilationUnit)
 	var _la int
@@ -1832,6 +1835,9 @@ func (s *PackageDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *JavaParser) PackageDeclaration() (localctx IPackageDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewPackageDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 2, JavaParserRULE_packageDeclaration)
 	var _la int
@@ -2045,6 +2051,9 @@ func (s *PackageNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JavaParser) PackageName() (localctx IPackageNameContext) {
+	this := p
+	_ = this
+
 	localctx = NewPackageNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 4, JavaParserRULE_packageName)
 	var _la int
@@ -2269,6 +2278,9 @@ func (s *ImportDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaParser) ImportDeclaration() (localctx IImportDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewImportDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, JavaParserRULE_importDeclaration)
 	var _la int
@@ -2544,6 +2556,9 @@ func (s *TypeDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaParser) TypeDeclaration() (localctx ITypeDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 8, JavaParserRULE_typeDeclaration)
 	var _alt int
@@ -2737,6 +2752,9 @@ func (s *ModifiersContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) Modifiers() (localctx IModifiersContext) {
+	this := p
+	_ = this
+
 	localctx = NewModifiersContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 10, JavaParserRULE_modifiers)
 	var _alt int
@@ -2898,6 +2916,9 @@ func (s *ModifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) Modifier() (localctx IModifierContext) {
+	this := p
+	_ = this
+
 	localctx = NewModifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 12, JavaParserRULE_modifier)
 	p.SetState(362)
@@ -3029,6 +3050,9 @@ func (s *StaticModifierContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JavaParser) StaticModifier() (localctx IStaticModifierContext) {
+	this := p
+	_ = this
+
 	localctx = NewStaticModifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 14, JavaParserRULE_staticModifier)
 	var _la int
@@ -3157,6 +3181,9 @@ func (s *ClassOrInterfaceModifierContext) Accept(visitor antlr.ParseTreeVisitor)
 }
 
 func (p *JavaParser) ClassOrInterfaceModifier() (localctx IClassOrInterfaceModifierContext) {
+	this := p
+	_ = this
+
 	localctx = NewClassOrInterfaceModifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 16, JavaParserRULE_classOrInterfaceModifier)
 	p.SetState(368)
@@ -3306,6 +3333,9 @@ func (s *StaticClassModifierContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *JavaParser) StaticClassModifier() (localctx IStaticClassModifierContext) {
+	this := p
+	_ = this
+
 	localctx = NewStaticClassModifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 18, JavaParserRULE_staticClassModifier)
 	var _la int
@@ -3422,6 +3452,9 @@ func (s *VariableModifierContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaParser) VariableModifier() (localctx IVariableModifierContext) {
+	this := p
+	_ = this
+
 	localctx = NewVariableModifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 20, JavaParserRULE_variableModifier)
 	p.SetState(374)
@@ -3662,6 +3695,9 @@ func (s *ClassDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaParser) ClassDeclaration() (localctx IClassDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewClassDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 22, JavaParserRULE_classDeclaration)
 	var _la int
@@ -3904,6 +3940,9 @@ func (s *TypeParametersContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JavaParser) TypeParameters() (localctx ITypeParametersContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeParametersContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 24, JavaParserRULE_typeParameters)
 	var _la int
@@ -4117,6 +4156,9 @@ func (s *TypeParameterContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *JavaParser) TypeParameter() (localctx ITypeParameterContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeParameterContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 26, JavaParserRULE_typeParameter)
 	var _la int
@@ -4335,6 +4377,9 @@ func (s *TypeBoundContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) TypeBound() (localctx ITypeBoundContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeBoundContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 28, JavaParserRULE_typeBound)
 	var _la int
@@ -4543,6 +4588,9 @@ func (s *EnumDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaParser) EnumDeclaration() (localctx IEnumDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewEnumDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 30, JavaParserRULE_enumDeclaration)
 	var _la int
@@ -4775,6 +4823,9 @@ func (s *EnumConstantsContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *JavaParser) EnumConstants() (localctx IEnumConstantsContext) {
+	this := p
+	_ = this
+
 	localctx = NewEnumConstantsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 32, JavaParserRULE_enumConstants)
 	var _alt int
@@ -4991,6 +5042,9 @@ func (s *EnumConstantContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JavaParser) EnumConstant() (localctx IEnumConstantContext) {
+	this := p
+	_ = this
+
 	localctx = NewEnumConstantContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 34, JavaParserRULE_enumConstant)
 	var _la int
@@ -5183,6 +5237,9 @@ func (s *EnumBodyDeclarationsContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *JavaParser) EnumBodyDeclarations() (localctx IEnumBodyDeclarationsContext) {
+	this := p
+	_ = this
+
 	localctx = NewEnumBodyDeclarationsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 36, JavaParserRULE_enumBodyDeclarations)
 	var _la int
@@ -5408,6 +5465,9 @@ func (s *InterfaceDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *JavaParser) InterfaceDeclaration() (localctx IInterfaceDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewInterfaceDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 38, JavaParserRULE_interfaceDeclaration)
 	var _la int
@@ -5636,6 +5696,9 @@ func (s *ClassBodyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) ClassBody() (localctx IClassBodyContext) {
+	this := p
+	_ = this
+
 	localctx = NewClassBodyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 40, JavaParserRULE_classBody)
 	var _la int
@@ -5808,6 +5871,9 @@ func (s *InterfaceBodyContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *JavaParser) InterfaceBody() (localctx IInterfaceBodyContext) {
+	this := p
+	_ = this
+
 	localctx = NewInterfaceBodyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 42, JavaParserRULE_interfaceBody)
 	var _la int
@@ -5988,6 +6054,9 @@ func (s *ClassBodyDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *JavaParser) ClassBodyDeclaration() (localctx IClassBodyDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewClassBodyDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 44, JavaParserRULE_classBodyDeclaration)
 	var _la int
@@ -6297,6 +6366,9 @@ func (s *MemberDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaParser) MemberDeclaration() (localctx IMemberDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewMemberDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 46, JavaParserRULE_memberDeclaration)
 	p.SetState(533)
@@ -6567,6 +6639,9 @@ func (s *MethodDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaParser) MethodDeclaration() (localctx IMethodDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewMethodDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 48, JavaParserRULE_methodDeclaration)
 	var _la int
@@ -6742,6 +6817,9 @@ func (s *MethodBodyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) MethodBody() (localctx IMethodBodyContext) {
+	this := p
+	_ = this
+
 	localctx = NewMethodBodyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 50, JavaParserRULE_methodBody)
 	p.SetState(553)
@@ -6873,6 +6951,9 @@ func (s *TypeTypeOrVoidContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JavaParser) TypeTypeOrVoid() (localctx ITypeTypeOrVoidContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeTypeOrVoidContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 52, JavaParserRULE_typeTypeOrVoid)
 	p.SetState(557)
@@ -7016,6 +7097,9 @@ func (s *GenericMethodDeclarationContext) Accept(visitor antlr.ParseTreeVisitor)
 }
 
 func (p *JavaParser) GenericMethodDeclaration() (localctx IGenericMethodDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewGenericMethodDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 54, JavaParserRULE_genericMethodDeclaration)
 	p.EnterOuterAlt(localctx, 1)
@@ -7139,6 +7223,9 @@ func (s *GenericConstructorDeclarationContext) Accept(visitor antlr.ParseTreeVis
 }
 
 func (p *JavaParser) GenericConstructorDeclaration() (localctx IGenericConstructorDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewGenericConstructorDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 56, JavaParserRULE_genericConstructorDeclaration)
 	p.EnterOuterAlt(localctx, 1)
@@ -7312,6 +7399,9 @@ func (s *ConstructorDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 func (p *JavaParser) ConstructorDeclaration() (localctx IConstructorDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewConstructorDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 58, JavaParserRULE_constructorDeclaration)
 	var _la int
@@ -7498,6 +7588,9 @@ func (s *CompactConstructorDeclarationContext) Accept(visitor antlr.ParseTreeVis
 }
 
 func (p *JavaParser) CompactConstructorDeclaration() (localctx ICompactConstructorDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewCompactConstructorDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 60, JavaParserRULE_compactConstructorDeclaration)
 	p.EnterOuterAlt(localctx, 1)
@@ -7633,6 +7726,9 @@ func (s *FieldDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaParser) FieldDeclaration() (localctx IFieldDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewFieldDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 62, JavaParserRULE_fieldDeclaration)
 	p.EnterOuterAlt(localctx, 1)
@@ -7769,6 +7865,9 @@ func (s *InterfaceBodyDeclarationContext) Accept(visitor antlr.ParseTreeVisitor)
 }
 
 func (p *JavaParser) InterfaceBodyDeclaration() (localctx IInterfaceBodyDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewInterfaceBodyDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 64, JavaParserRULE_interfaceBodyDeclaration)
 	p.SetState(585)
@@ -8018,6 +8117,9 @@ func (s *InterfaceMemberDeclarationContext) Accept(visitor antlr.ParseTreeVisito
 }
 
 func (p *JavaParser) InterfaceMemberDeclaration() (localctx IInterfaceMemberDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewInterfaceMemberDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 66, JavaParserRULE_interfaceMemberDeclaration)
 	p.SetState(595)
@@ -8239,6 +8341,9 @@ func (s *ConstDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaParser) ConstDeclaration() (localctx IConstDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewConstDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 68, JavaParserRULE_constDeclaration)
 	var _la int
@@ -8425,6 +8530,9 @@ func (s *ConstantDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *JavaParser) ConstantDeclarator() (localctx IConstantDeclaratorContext) {
+	this := p
+	_ = this
+
 	localctx = NewConstantDeclaratorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 70, JavaParserRULE_constantDeclarator)
 	var _la int
@@ -8616,6 +8724,9 @@ func (s *InterfaceMethodDeclarationContext) Accept(visitor antlr.ParseTreeVisito
 }
 
 func (p *JavaParser) InterfaceMethodDeclaration() (localctx IInterfaceMethodDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewInterfaceMethodDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 72, JavaParserRULE_interfaceMethodDeclaration)
 	var _alt int
@@ -8772,6 +8883,9 @@ func (s *InterfaceMethodModifierContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 func (p *JavaParser) InterfaceMethodModifier() (localctx IInterfaceMethodModifierContext) {
+	this := p
+	_ = this
+
 	localctx = NewInterfaceMethodModifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 74, JavaParserRULE_interfaceMethodModifier)
 	p.SetState(633)
@@ -9002,6 +9116,9 @@ func (s *GenericInterfaceMethodDeclarationContext) Accept(visitor antlr.ParseTre
 }
 
 func (p *JavaParser) GenericInterfaceMethodDeclaration() (localctx IGenericInterfaceMethodDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewGenericInterfaceMethodDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 76, JavaParserRULE_genericInterfaceMethodDeclaration)
 	var _la int
@@ -9266,6 +9383,9 @@ func (s *InterfaceCommonBodyDeclarationContext) Accept(visitor antlr.ParseTreeVi
 }
 
 func (p *JavaParser) InterfaceCommonBodyDeclaration() (localctx IInterfaceCommonBodyDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewInterfaceCommonBodyDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 78, JavaParserRULE_interfaceCommonBodyDeclaration)
 	var _la int
@@ -9501,6 +9621,9 @@ func (s *VariableDeclaratorsContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *JavaParser) VariableDeclarators() (localctx IVariableDeclaratorsContext) {
+	this := p
+	_ = this
+
 	localctx = NewVariableDeclaratorsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 80, JavaParserRULE_variableDeclarators)
 	var _la int
@@ -9655,6 +9778,9 @@ func (s *VariableDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *JavaParser) VariableDeclarator() (localctx IVariableDeclaratorContext) {
+	this := p
+	_ = this
+
 	localctx = NewVariableDeclaratorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 82, JavaParserRULE_variableDeclarator)
 	var _la int
@@ -9801,6 +9927,9 @@ func (s *VariableDeclaratorIdContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *JavaParser) VariableDeclaratorId() (localctx IVariableDeclaratorIdContext) {
+	this := p
+	_ = this
+
 	localctx = NewVariableDeclaratorIdContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 84, JavaParserRULE_variableDeclaratorId)
 	var _la int
@@ -9954,6 +10083,9 @@ func (s *VariableInitializerContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *JavaParser) VariableInitializer() (localctx IVariableInitializerContext) {
+	this := p
+	_ = this
+
 	localctx = NewVariableInitializerContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 86, JavaParserRULE_variableInitializer)
 	p.SetState(689)
@@ -10122,6 +10254,9 @@ func (s *ArrayInitializerContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaParser) ArrayInitializer() (localctx IArrayInitializerContext) {
+	this := p
+	_ = this
+
 	localctx = NewArrayInitializerContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 88, JavaParserRULE_arrayInitializer)
 	var _la int
@@ -10403,6 +10538,9 @@ func (s *ClassOrInterfaceTypeContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *JavaParser) ClassOrInterfaceType() (localctx IClassOrInterfaceTypeContext) {
+	this := p
+	_ = this
+
 	localctx = NewClassOrInterfaceTypeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 90, JavaParserRULE_classOrInterfaceType)
 	var _la int
@@ -10628,6 +10766,9 @@ func (s *TypeArgumentContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JavaParser) TypeArgument() (localctx ITypeArgumentContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeArgumentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 92, JavaParserRULE_typeArgument)
 	var _la int
@@ -10836,6 +10977,9 @@ func (s *QualifiedNameListContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaParser) QualifiedNameList() (localctx IQualifiedNameListContext) {
+	this := p
+	_ = this
+
 	localctx = NewQualifiedNameListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 94, JavaParserRULE_qualifiedNameList)
 	var _la int
@@ -11000,6 +11144,9 @@ func (s *FormalParametersContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaParser) FormalParameters() (localctx IFormalParametersContext) {
+	this := p
+	_ = this
+
 	localctx = NewFormalParametersContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 96, JavaParserRULE_formalParameters)
 	var _la int
@@ -11244,6 +11391,9 @@ func (s *ReceiverParameterContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaParser) ReceiverParameter() (localctx IReceiverParameterContext) {
+	this := p
+	_ = this
+
 	localctx = NewReceiverParameterContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 98, JavaParserRULE_receiverParameter)
 	var _la int
@@ -11437,6 +11587,9 @@ func (s *FormalParameterListContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *JavaParser) FormalParameterList() (localctx IFormalParameterListContext) {
+	this := p
+	_ = this
+
 	localctx = NewFormalParameterListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 100, JavaParserRULE_formalParameterList)
 	var _la int
@@ -11679,6 +11832,9 @@ func (s *FormalParameterContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaParser) FormalParameter() (localctx IFormalParameterContext) {
+	this := p
+	_ = this
+
 	localctx = NewFormalParameterContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 102, JavaParserRULE_formalParameter)
 	var _alt int
@@ -11922,6 +12078,9 @@ func (s *LastFormalParameterContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *JavaParser) LastFormalParameter() (localctx ILastFormalParameterContext) {
+	this := p
+	_ = this
+
 	localctx = NewLastFormalParameterContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 104, JavaParserRULE_lastFormalParameter)
 	var _la int
@@ -12123,6 +12282,9 @@ func (s *LambdaLVTIListContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JavaParser) LambdaLVTIList() (localctx ILambdaLVTIListContext) {
+	this := p
+	_ = this
+
 	localctx = NewLambdaLVTIListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 106, JavaParserRULE_lambdaLVTIList)
 	var _la int
@@ -12303,6 +12465,9 @@ func (s *LambdaLVTIParameterContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *JavaParser) LambdaLVTIParameter() (localctx ILambdaLVTIParameterContext) {
+	this := p
+	_ = this
+
 	localctx = NewLambdaLVTIParameterContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 108, JavaParserRULE_lambdaLVTIParameter)
 	var _alt int
@@ -12478,6 +12643,9 @@ func (s *QualifiedNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *JavaParser) QualifiedName() (localctx IQualifiedNameContext) {
+	this := p
+	_ = this
+
 	localctx = NewQualifiedNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 110, JavaParserRULE_qualifiedName)
 	var _alt int
@@ -12659,6 +12827,9 @@ func (s *LiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) Literal() (localctx ILiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 112, JavaParserRULE_literal)
 	p.SetState(843)
@@ -12839,6 +13010,9 @@ func (s *IntegerLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JavaParser) IntegerLiteral() (localctx IIntegerLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewIntegerLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 114, JavaParserRULE_integerLiteral)
 	var _la int
@@ -12943,6 +13117,9 @@ func (s *FloatLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JavaParser) FloatLiteral() (localctx IFloatLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewFloatLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 116, JavaParserRULE_floatLiteral)
 	var _la int
@@ -13095,6 +13272,9 @@ func (s *AltAnnotationQualifiedNameContext) Accept(visitor antlr.ParseTreeVisito
 }
 
 func (p *JavaParser) AltAnnotationQualifiedName() (localctx IAltAnnotationQualifiedNameContext) {
+	this := p
+	_ = this
+
 	localctx = NewAltAnnotationQualifiedNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 118, JavaParserRULE_altAnnotationQualifiedName)
 	var _la int
@@ -13301,6 +13481,9 @@ func (s *AnnotationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) Annotation() (localctx IAnnotationContext) {
+	this := p
+	_ = this
+
 	localctx = NewAnnotationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 120, JavaParserRULE_annotation)
 	var _la int
@@ -13513,6 +13696,9 @@ func (s *ElementValuePairsContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaParser) ElementValuePairs() (localctx IElementValuePairsContext) {
+	this := p
+	_ = this
+
 	localctx = NewElementValuePairsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 122, JavaParserRULE_elementValuePairs)
 	var _la int
@@ -13667,6 +13853,9 @@ func (s *ElementValuePairContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaParser) ElementValuePair() (localctx IElementValuePairContext) {
+	this := p
+	_ = this
+
 	localctx = NewElementValuePairContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 124, JavaParserRULE_elementValuePair)
 	p.EnterOuterAlt(localctx, 1)
@@ -13815,6 +14004,9 @@ func (s *ElementValueContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JavaParser) ElementValue() (localctx IElementValueContext) {
+	this := p
+	_ = this
+
 	localctx = NewElementValueContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 126, JavaParserRULE_elementValue)
 	p.SetState(888)
@@ -13989,6 +14181,9 @@ func (s *ElementValueArrayInitializerContext) Accept(visitor antlr.ParseTreeVisi
 }
 
 func (p *JavaParser) ElementValueArrayInitializer() (localctx IElementValueArrayInitializerContext) {
+	this := p
+	_ = this
+
 	localctx = NewElementValueArrayInitializerContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 128, JavaParserRULE_elementValueArrayInitializer)
 	var _la int
@@ -14201,6 +14396,9 @@ func (s *AnnotationTypeDeclarationContext) Accept(visitor antlr.ParseTreeVisitor
 }
 
 func (p *JavaParser) AnnotationTypeDeclaration() (localctx IAnnotationTypeDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewAnnotationTypeDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 130, JavaParserRULE_annotationTypeDeclaration)
 	p.EnterOuterAlt(localctx, 1)
@@ -14359,6 +14557,9 @@ func (s *AnnotationTypeBodyContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *JavaParser) AnnotationTypeBody() (localctx IAnnotationTypeBodyContext) {
+	this := p
+	_ = this
+
 	localctx = NewAnnotationTypeBodyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 132, JavaParserRULE_annotationTypeBody)
 	var _la int
@@ -14517,6 +14718,9 @@ func (s *AnnotationTypeElementDeclarationContext) Accept(visitor antlr.ParseTree
 }
 
 func (p *JavaParser) AnnotationTypeElementDeclaration() (localctx IAnnotationTypeElementDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewAnnotationTypeElementDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 134, JavaParserRULE_annotationTypeElementDeclaration)
 	p.SetState(924)
@@ -14754,6 +14958,9 @@ func (s *AnnotationTypeElementRestContext) Accept(visitor antlr.ParseTreeVisitor
 }
 
 func (p *JavaParser) AnnotationTypeElementRest() (localctx IAnnotationTypeElementRestContext) {
+	this := p
+	_ = this
+
 	localctx = NewAnnotationTypeElementRestContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 136, JavaParserRULE_annotationTypeElementRest)
 	p.SetState(950)
@@ -15012,6 +15219,9 @@ func (s *AnnotationMethodOrConstantRestContext) Accept(visitor antlr.ParseTreeVi
 }
 
 func (p *JavaParser) AnnotationMethodOrConstantRest() (localctx IAnnotationMethodOrConstantRestContext) {
+	this := p
+	_ = this
+
 	localctx = NewAnnotationMethodOrConstantRestContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 138, JavaParserRULE_annotationMethodOrConstantRest)
 	p.SetState(954)
@@ -15160,6 +15370,9 @@ func (s *AnnotationMethodRestContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *JavaParser) AnnotationMethodRest() (localctx IAnnotationMethodRestContext) {
+	this := p
+	_ = this
+
 	localctx = NewAnnotationMethodRestContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 140, JavaParserRULE_annotationMethodRest)
 	var _la int
@@ -15294,6 +15507,9 @@ func (s *AnnotationConstantRestContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 func (p *JavaParser) AnnotationConstantRest() (localctx IAnnotationConstantRestContext) {
+	this := p
+	_ = this
+
 	localctx = NewAnnotationConstantRestContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 142, JavaParserRULE_annotationConstantRest)
 	p.EnterOuterAlt(localctx, 1)
@@ -15401,6 +15617,9 @@ func (s *DefaultValueContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JavaParser) DefaultValue() (localctx IDefaultValueContext) {
+	this := p
+	_ = this
+
 	localctx = NewDefaultValueContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 144, JavaParserRULE_defaultValue)
 	p.EnterOuterAlt(localctx, 1)
@@ -15538,6 +15757,9 @@ func (s *ModuleDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaParser) ModuleDeclaration() (localctx IModuleDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewModuleDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 146, JavaParserRULE_moduleDeclaration)
 	var _la int
@@ -15708,6 +15930,9 @@ func (s *ModuleBodyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) ModuleBody() (localctx IModuleBodyContext) {
+	this := p
+	_ = this
+
 	localctx = NewModuleBodyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 148, JavaParserRULE_moduleBody)
 	var _la int
@@ -15953,6 +16178,9 @@ func (s *ModuleDirectiveContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaParser) ModuleDirective() (localctx IModuleDirectiveContext) {
+	this := p
+	_ = this
+
 	localctx = NewModuleDirectiveContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 150, JavaParserRULE_moduleDirective)
 	var _la int
@@ -16256,6 +16484,9 @@ func (s *RequiresModifierContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaParser) RequiresModifier() (localctx IRequiresModifierContext) {
+	this := p
+	_ = this
+
 	localctx = NewRequiresModifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 152, JavaParserRULE_requiresModifier)
 	var _la int
@@ -16445,6 +16676,9 @@ func (s *RecordDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaParser) RecordDeclaration() (localctx IRecordDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewRecordDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 154, JavaParserRULE_recordDeclaration)
 	var _la int
@@ -16611,6 +16845,9 @@ func (s *RecordHeaderContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JavaParser) RecordHeader() (localctx IRecordHeaderContext) {
+	this := p
+	_ = this
+
 	localctx = NewRecordHeaderContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 156, JavaParserRULE_recordHeader)
 	var _la int
@@ -16777,6 +17014,9 @@ func (s *RecordComponentListContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *JavaParser) RecordComponentList() (localctx IRecordComponentListContext) {
+	this := p
+	_ = this
+
 	localctx = NewRecordComponentListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 158, JavaParserRULE_recordComponentList)
 	var _la int
@@ -16926,6 +17166,9 @@ func (s *RecordComponentContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaParser) RecordComponent() (localctx IRecordComponentContext) {
+	this := p
+	_ = this
+
 	localctx = NewRecordComponentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 160, JavaParserRULE_recordComponent)
 	p.EnterOuterAlt(localctx, 1)
@@ -17111,6 +17354,9 @@ func (s *RecordBodyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) RecordBody() (localctx IRecordBodyContext) {
+	this := p
+	_ = this
+
 	localctx = NewRecordBodyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 162, JavaParserRULE_recordBody)
 	var _la int
@@ -17282,6 +17528,9 @@ func (s *BlockOrStateContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JavaParser) BlockOrState() (localctx IBlockOrStateContext) {
+	this := p
+	_ = this
+
 	localctx = NewBlockOrStateContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 164, JavaParserRULE_blockOrState)
 	p.SetState(1064)
@@ -17413,6 +17662,9 @@ func (s *BlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) Block() (localctx IBlockContext) {
+	this := p
+	_ = this
+
 	localctx = NewBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 166, JavaParserRULE_block)
 	var _la int
@@ -17548,6 +17800,9 @@ func (s *ElseBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) ElseBlock() (localctx IElseBlockContext) {
+	this := p
+	_ = this
+
 	localctx = NewElseBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 168, JavaParserRULE_elseBlock)
 	p.EnterOuterAlt(localctx, 1)
@@ -17685,6 +17940,9 @@ func (s *ElseIfBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JavaParser) ElseIfBlock() (localctx IElseIfBlockContext) {
+	this := p
+	_ = this
+
 	localctx = NewElseIfBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 170, JavaParserRULE_elseIfBlock)
 	p.EnterOuterAlt(localctx, 1)
@@ -17833,6 +18091,9 @@ func (s *BlockStatementListContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *JavaParser) BlockStatementList() (localctx IBlockStatementListContext) {
+	this := p
+	_ = this
+
 	localctx = NewBlockStatementListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 172, JavaParserRULE_blockStatementList)
 	var _la int
@@ -17992,6 +18253,9 @@ func (s *BlockStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JavaParser) BlockStatement() (localctx IBlockStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewBlockStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 174, JavaParserRULE_blockStatement)
 	p.SetState(1090)
@@ -18232,6 +18496,9 @@ func (s *LocalVariableDeclarationContext) Accept(visitor antlr.ParseTreeVisitor)
 }
 
 func (p *JavaParser) LocalVariableDeclaration() (localctx ILocalVariableDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewLocalVariableDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 176, JavaParserRULE_localVariableDeclaration)
 	var _alt int
@@ -18473,6 +18740,9 @@ func (s *IdentifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) Identifier() (localctx IIdentifierContext) {
+	this := p
+	_ = this
+
 	localctx = NewIdentifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 178, JavaParserRULE_identifier)
 	var _la int
@@ -18642,6 +18912,9 @@ func (s *TypeIdentifierContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JavaParser) TypeIdentifier() (localctx ITypeIdentifierContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeIdentifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 180, JavaParserRULE_typeIdentifier)
 	var _la int
@@ -18830,6 +19103,9 @@ func (s *LocalTypeDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *JavaParser) LocalTypeDeclaration() (localctx ILocalTypeDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewLocalTypeDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 182, JavaParserRULE_localTypeDeclaration)
 	var _alt int
@@ -20146,6 +20422,9 @@ func (s *ContinueStatementContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaParser) Statement() (localctx IStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 184, JavaParserRULE_statement)
 	var _la int
@@ -20817,6 +21096,9 @@ func (s *StatementListContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *JavaParser) StatementList() (localctx IStatementListContext) {
+	this := p
+	_ = this
+
 	localctx = NewStatementListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 186, JavaParserRULE_statementList)
 	var _la int
@@ -21055,6 +21337,9 @@ func (s *SwitchStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *JavaParser) SwitchStatement() (localctx ISwitchStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewSwitchStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 188, JavaParserRULE_switchStatement)
 	var _la int
@@ -21297,6 +21582,9 @@ func (s *SwitchBlockStatementGroupContext) Accept(visitor antlr.ParseTreeVisitor
 }
 
 func (p *JavaParser) SwitchBlockStatementGroup() (localctx ISwitchBlockStatementGroupContext) {
+	this := p
+	_ = this
+
 	localctx = NewSwitchBlockStatementGroupContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 190, JavaParserRULE_switchBlockStatementGroup)
 	var _la int
@@ -21430,6 +21718,9 @@ func (s *SwitchLabelContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JavaParser) SwitchLabel() (localctx ISwitchLabelContext) {
+	this := p
+	_ = this
+
 	localctx = NewSwitchLabelContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 192, JavaParserRULE_switchLabel)
 	p.SetState(1258)
@@ -21662,6 +21953,9 @@ func (s *IfstmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) Ifstmt() (localctx IIfstmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewIfstmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 194, JavaParserRULE_ifstmt)
 	var _alt int
@@ -21917,6 +22211,9 @@ func (s *CatchClauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JavaParser) CatchClause() (localctx ICatchClauseContext) {
+	this := p
+	_ = this
+
 	localctx = NewCatchClauseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 196, JavaParserRULE_catchClause)
 	var _alt int
@@ -22116,6 +22413,9 @@ func (s *CatchTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) CatchType() (localctx ICatchTypeContext) {
+	this := p
+	_ = this
+
 	localctx = NewCatchTypeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 198, JavaParserRULE_catchType)
 	var _la int
@@ -22253,6 +22553,9 @@ func (s *FinallyBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JavaParser) FinallyBlock() (localctx IFinallyBlockContext) {
+	this := p
+	_ = this
+
 	localctx = NewFinallyBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 200, JavaParserRULE_finallyBlock)
 	p.EnterOuterAlt(localctx, 1)
@@ -22378,6 +22681,9 @@ func (s *ResourceSpecificationContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *JavaParser) ResourceSpecification() (localctx IResourceSpecificationContext) {
+	this := p
+	_ = this
+
 	localctx = NewResourceSpecificationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 202, JavaParserRULE_resourceSpecification)
 	var _la int
@@ -22552,6 +22858,9 @@ func (s *ResourcesContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) Resources() (localctx IResourcesContext) {
+	this := p
+	_ = this
+
 	localctx = NewResourcesContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 204, JavaParserRULE_resources)
 	var _alt int
@@ -22812,6 +23121,9 @@ func (s *ResourceContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) Resource() (localctx IResourceContext) {
+	this := p
+	_ = this
+
 	localctx = NewResourceContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 206, JavaParserRULE_resource)
 	var _alt int
@@ -23076,6 +23388,9 @@ func (s *ForControlContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) ForControl() (localctx IForControlContext) {
+	this := p
+	_ = this
+
 	localctx = NewForControlContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 208, JavaParserRULE_forControl)
 	var _la int
@@ -23273,6 +23588,9 @@ func (s *ForInitContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) ForInit() (localctx IForInitContext) {
+	this := p
+	_ = this
+
 	localctx = NewForInitContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 210, JavaParserRULE_forInit)
 	p.SetState(1348)
@@ -23481,6 +23799,9 @@ func (s *EnhancedForControlContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *JavaParser) EnhancedForControl() (localctx IEnhancedForControlContext) {
+	this := p
+	_ = this
+
 	localctx = NewEnhancedForControlContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 212, JavaParserRULE_enhancedForControl)
 	var _alt int
@@ -23665,6 +23986,9 @@ func (s *ParExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *JavaParser) ParExpression() (localctx IParExpressionContext) {
+	this := p
+	_ = this
+
 	localctx = NewParExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 214, JavaParserRULE_parExpression)
 	var _la int
@@ -23813,6 +24137,9 @@ func (s *ParExpressionListContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaParser) ParExpressionList() (localctx IParExpressionListContext) {
+	this := p
+	_ = this
+
 	localctx = NewParExpressionListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 216, JavaParserRULE_parExpressionList)
 	p.EnterOuterAlt(localctx, 1)
@@ -23967,6 +24294,9 @@ func (s *ExpressionListContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JavaParser) ExpressionList() (localctx IExpressionListContext) {
+	this := p
+	_ = this
+
 	localctx = NewExpressionListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 218, JavaParserRULE_expressionList)
 	var _la int
@@ -24153,6 +24483,9 @@ func (s *MethodCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) MethodCall() (localctx IMethodCallContext) {
+	this := p
+	_ = this
+
 	localctx = NewMethodCallContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 220, JavaParserRULE_methodCall)
 	p.EnterOuterAlt(localctx, 1)
@@ -26884,6 +27217,9 @@ func (p *JavaParser) Expression() (localctx IExpressionContext) {
 }
 
 func (p *JavaParser) expression(_p int) (localctx IExpressionContext) {
+	this := p
+	_ = this
+
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 
 	_parentState := p.GetState()
@@ -28247,6 +28583,9 @@ func (s *LeftMemberCallContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JavaParser) LeftMemberCall() (localctx ILeftMemberCallContext) {
+	this := p
+	_ = this
+
 	localctx = NewLeftMemberCallContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 224, JavaParserRULE_leftMemberCall)
 	p.EnterOuterAlt(localctx, 1)
@@ -28367,6 +28706,9 @@ func (s *LeftSliceCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *JavaParser) LeftSliceCall() (localctx ILeftSliceCallContext) {
+	this := p
+	_ = this
+
 	localctx = NewLeftSliceCallContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 226, JavaParserRULE_leftSliceCall)
 	p.EnterOuterAlt(localctx, 1)
@@ -28588,6 +28930,9 @@ func (s *PatternContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) Pattern() (localctx IPatternContext) {
+	this := p
+	_ = this
+
 	localctx = NewPatternContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 228, JavaParserRULE_pattern)
 	var _alt int
@@ -28772,6 +29117,9 @@ func (s *LambdaExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaParser) LambdaExpression() (localctx ILambdaExpressionContext) {
+	this := p
+	_ = this
+
 	localctx = NewLambdaExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 230, JavaParserRULE_lambdaExpression)
 	p.EnterOuterAlt(localctx, 1)
@@ -29093,6 +29441,9 @@ func (s *FormalLambdaParametersContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 func (p *JavaParser) LambdaParameters() (localctx ILambdaParametersContext) {
+	this := p
+	_ = this
+
 	localctx = NewLambdaParametersContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 232, JavaParserRULE_lambdaParameters)
 	var _la int
@@ -29347,6 +29698,9 @@ func (s *LambdaBodyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) LambdaBody() (localctx ILambdaBodyContext) {
+	this := p
+	_ = this
+
 	localctx = NewLambdaBodyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 234, JavaParserRULE_lambdaBody)
 	p.SetState(1616)
@@ -29606,6 +29960,9 @@ func (s *PrimaryContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) Primary() (localctx IPrimaryContext) {
+	this := p
+	_ = this
+
 	localctx = NewPrimaryContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 236, JavaParserRULE_primary)
 	var _la int
@@ -29927,6 +30284,9 @@ func (s *SwitchExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaParser) SwitchExpression() (localctx ISwitchExpressionContext) {
+	this := p
+	_ = this
+
 	localctx = NewSwitchExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 238, JavaParserRULE_switchExpression)
 	var _la int
@@ -30143,6 +30503,9 @@ func (s *SwitchLabeledRuleContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaParser) SwitchLabeledRule() (localctx ISwitchLabeledRuleContext) {
+	this := p
+	_ = this
+
 	localctx = NewSwitchLabeledRuleContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 240, JavaParserRULE_switchLabeledRule)
 	var _la int
@@ -30313,6 +30676,9 @@ func (s *DefaultLabeledRuleContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *JavaParser) DefaultLabeledRule() (localctx IDefaultLabeledRuleContext) {
+	this := p
+	_ = this
+
 	localctx = NewDefaultLabeledRuleContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 242, JavaParserRULE_defaultLabeledRule)
 	var _la int
@@ -30623,6 +30989,9 @@ func (p *JavaParser) GuardedPattern() (localctx IGuardedPatternContext) {
 }
 
 func (p *JavaParser) guardedPattern(_p int) (localctx IGuardedPatternContext) {
+	this := p
+	_ = this
+
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 
 	_parentState := p.GetState()
@@ -30952,6 +31321,9 @@ func (s *SwitchRuleOutcomeContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JavaParser) SwitchRuleOutcome() (localctx ISwitchRuleOutcomeContext) {
+	this := p
+	_ = this
+
 	localctx = NewSwitchRuleOutcomeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 246, JavaParserRULE_switchRuleOutcome)
 	var _la int
@@ -31173,6 +31545,9 @@ func (s *ClassTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) ClassType() (localctx IClassTypeContext) {
+	this := p
+	_ = this
+
 	localctx = NewClassTypeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 248, JavaParserRULE_classType)
 	var _la int
@@ -31391,6 +31766,9 @@ func (s *CreatorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) Creator() (localctx ICreatorContext) {
+	this := p
+	_ = this
+
 	localctx = NewCreatorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 250, JavaParserRULE_creator)
 	var _la int
@@ -31632,6 +32010,9 @@ func (s *CreatedNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JavaParser) CreatedName() (localctx ICreatedNameContext) {
+	this := p
+	_ = this
+
 	localctx = NewCreatedNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 252, JavaParserRULE_createdName)
 	var _la int
@@ -31846,6 +32227,9 @@ func (s *InnerCreatorContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JavaParser) InnerCreator() (localctx IInnerCreatorContext) {
+	this := p
+	_ = this
+
 	localctx = NewInnerCreatorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 254, JavaParserRULE_innerCreator)
 	var _la int
@@ -32031,6 +32415,9 @@ func (s *ArrayCreatorRestContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaParser) ArrayCreatorRest() (localctx IArrayCreatorRestContext) {
+	this := p
+	_ = this
+
 	localctx = NewArrayCreatorRestContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 256, JavaParserRULE_arrayCreatorRest)
 	var _la int
@@ -32282,6 +32669,9 @@ func (s *ClassCreatorRestContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JavaParser) ClassCreatorRest() (localctx IClassCreatorRestContext) {
+	this := p
+	_ = this
+
 	localctx = NewClassCreatorRestContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 258, JavaParserRULE_classCreatorRest)
 	p.EnterOuterAlt(localctx, 1)
@@ -32413,6 +32803,9 @@ func (s *ExplicitGenericInvocationContext) Accept(visitor antlr.ParseTreeVisitor
 }
 
 func (p *JavaParser) ExplicitGenericInvocation() (localctx IExplicitGenericInvocationContext) {
+	this := p
+	_ = this
+
 	localctx = NewExplicitGenericInvocationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 260, JavaParserRULE_explicitGenericInvocation)
 	p.EnterOuterAlt(localctx, 1)
@@ -32529,6 +32922,9 @@ func (s *TypeArgumentsOrDiamondContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 func (p *JavaParser) TypeArgumentsOrDiamond() (localctx ITypeArgumentsOrDiamondContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeArgumentsOrDiamondContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 262, JavaParserRULE_typeArgumentsOrDiamond)
 	p.SetState(1796)
@@ -32672,6 +33068,9 @@ func (s *NonWildcardTypeArgumentsOrDiamondContext) Accept(visitor antlr.ParseTre
 }
 
 func (p *JavaParser) NonWildcardTypeArgumentsOrDiamond() (localctx INonWildcardTypeArgumentsOrDiamondContext) {
+	this := p
+	_ = this
+
 	localctx = NewNonWildcardTypeArgumentsOrDiamondContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 264, JavaParserRULE_nonWildcardTypeArgumentsOrDiamond)
 	p.SetState(1801)
@@ -32815,6 +33214,9 @@ func (s *NonWildcardTypeArgumentsContext) Accept(visitor antlr.ParseTreeVisitor)
 }
 
 func (p *JavaParser) NonWildcardTypeArguments() (localctx INonWildcardTypeArgumentsContext) {
+	this := p
+	_ = this
+
 	localctx = NewNonWildcardTypeArgumentsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 266, JavaParserRULE_nonWildcardTypeArguments)
 	p.EnterOuterAlt(localctx, 1)
@@ -32969,6 +33371,9 @@ func (s *TypeListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) TypeList() (localctx ITypeListContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 268, JavaParserRULE_typeList)
 	var _la int
@@ -33181,6 +33586,9 @@ func (s *TypeTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) TypeType() (localctx ITypeTypeContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeTypeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 270, JavaParserRULE_typeType)
 	var _la int
@@ -33415,6 +33823,9 @@ func (s *PrimitiveTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *JavaParser) PrimitiveType() (localctx IPrimitiveTypeContext) {
+	this := p
+	_ = this
+
 	localctx = NewPrimitiveTypeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 272, JavaParserRULE_primitiveType)
 	var _la int
@@ -33572,6 +33983,9 @@ func (s *TypeArgumentsContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *JavaParser) TypeArguments() (localctx ITypeArgumentsContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeArgumentsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 274, JavaParserRULE_typeArguments)
 	var _la int
@@ -33818,6 +34232,9 @@ func (s *SuperSuffixIdentifierContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *JavaParser) SuperSuffix() (localctx ISuperSuffixContext) {
+	this := p
+	_ = this
+
 	localctx = NewSuperSuffixContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 276, JavaParserRULE_superSuffix)
 	var _la int
@@ -33990,6 +34407,9 @@ func (s *ArgumentsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JavaParser) Arguments() (localctx IArgumentsContext) {
+	this := p
+	_ = this
+
 	localctx = NewArgumentsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 278, JavaParserRULE_arguments)
 	var _la int
@@ -34061,6 +34481,9 @@ func (p *JavaParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex in
 }
 
 func (p *JavaParser) Expression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 0:
 		return p.Precpred(p.GetParserRuleContext(), 17)
@@ -34122,6 +34545,9 @@ func (p *JavaParser) Expression_Sempred(localctx antlr.RuleContext, predIndex in
 }
 
 func (p *JavaParser) GuardedPattern_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 18:
 		return p.Precpred(p.GetParserRuleContext(), 1)

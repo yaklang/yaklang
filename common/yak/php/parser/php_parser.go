@@ -1990,6 +1990,9 @@ func (s *HtmlDocumentContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *PHPParser) HtmlDocument() (localctx IHtmlDocumentContext) {
+	this := p
+	_ = this
+
 	localctx = NewHtmlDocumentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, PHPParserRULE_htmlDocument)
 	var _la int
@@ -2196,6 +2199,9 @@ func (s *HtmlDocumentElementContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *PHPParser) HtmlDocumentElement() (localctx IHtmlDocumentElementContext) {
+	this := p
+	_ = this
+
 	localctx = NewHtmlDocumentElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 2, PHPParserRULE_htmlDocumentElement)
 	var _alt int
@@ -2388,6 +2394,9 @@ func (s *InlineHtmlContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) InlineHtml() (localctx IInlineHtmlContext) {
+	this := p
+	_ = this
+
 	localctx = NewInlineHtmlContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 4, PHPParserRULE_inlineHtml)
 	var _la int
@@ -2636,6 +2645,9 @@ func (s *HtmlElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
+	this := p
+	_ = this
+
 	localctx = NewHtmlElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, PHPParserRULE_htmlElement)
 	var _la int
@@ -3013,6 +3025,9 @@ func (s *ScriptTextContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) ScriptText() (localctx IScriptTextContext) {
+	this := p
+	_ = this
+
 	localctx = NewScriptTextContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 8, PHPParserRULE_scriptText)
 	var _la int
@@ -3474,6 +3489,9 @@ func (s *PhpBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) PhpBlock() (localctx IPhpBlockContext) {
+	this := p
+	_ = this
+
 	localctx = NewPhpBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 10, PHPParserRULE_phpBlock)
 	var _la int
@@ -3713,6 +3731,9 @@ func (s *ImportStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) ImportStatement() (localctx IImportStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewImportStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 12, PHPParserRULE_importStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -3941,6 +3962,9 @@ func (s *TopStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *PHPParser) TopStatement() (localctx ITopStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewTopStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 14, PHPParserRULE_topStatement)
 	p.SetState(443)
@@ -4128,6 +4152,9 @@ func (s *UseDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) UseDeclaration() (localctx IUseDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewUseDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 16, PHPParserRULE_useDeclaration)
 	var _la int
@@ -4310,6 +4337,9 @@ func (s *UseDeclarationContentListContext) Accept(visitor antlr.ParseTreeVisitor
 }
 
 func (p *PHPParser) UseDeclarationContentList() (localctx IUseDeclarationContentListContext) {
+	this := p
+	_ = this
+
 	localctx = NewUseDeclarationContentListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 18, PHPParserRULE_useDeclarationContentList)
 	var _la int
@@ -4478,6 +4508,9 @@ func (s *NamespacePathContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) NamespacePath() (localctx INamespacePathContext) {
+	this := p
+	_ = this
+
 	localctx = NewNamespacePathContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 20, PHPParserRULE_namespacePath)
 	var _la int
@@ -4716,6 +4749,9 @@ func (s *NamespaceDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *PHPParser) NamespaceDeclaration() (localctx INamespaceDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewNamespaceDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 22, PHPParserRULE_namespaceDeclaration)
 	var _la int
@@ -4982,6 +5018,9 @@ func (s *NamespaceDeclarationSemiContext) Accept(visitor antlr.ParseTreeVisitor)
 }
 
 func (p *PHPParser) NamespaceDeclarationSemi() (localctx INamespaceDeclarationSemiContext) {
+	this := p
+	_ = this
+
 	localctx = NewNamespaceDeclarationSemiContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 24, PHPParserRULE_namespaceDeclarationSemi)
 	var _la int
@@ -5207,6 +5246,9 @@ func (s *NamespaceStatementContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *PHPParser) NamespaceStatement() (localctx INamespaceStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewNamespaceStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 26, PHPParserRULE_namespaceStatement)
 	p.SetState(511)
@@ -5382,6 +5424,9 @@ func (s *NamespaceDeclarationBodyContext) Accept(visitor antlr.ParseTreeVisitor)
 }
 
 func (p *PHPParser) NamespaceDeclarationBody() (localctx INamespaceDeclarationBodyContext) {
+	this := p
+	_ = this
+
 	localctx = NewNamespaceDeclarationBodyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 28, PHPParserRULE_namespaceDeclarationBody)
 	var _la int
@@ -5528,6 +5573,9 @@ func (s *NamespaceUseDeclarationsContext) Accept(visitor antlr.ParseTreeVisitor)
 }
 
 func (p *PHPParser) NamespaceUseDeclarations() (localctx INamespaceUseDeclarationsContext) {
+	this := p
+	_ = this
+
 	localctx = NewNamespaceUseDeclarationsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 30, PHPParserRULE_namespaceUseDeclarations)
 	var _la int
@@ -5746,6 +5794,9 @@ func (s *FunctionDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *PHPParser) FunctionDeclaration() (localctx IFunctionDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewFunctionDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 32, PHPParserRULE_functionDeclaration)
 	var _la int
@@ -6117,6 +6168,9 @@ func (s *ClassDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *PHPParser) ClassDeclaration() (localctx IClassDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewClassDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 34, PHPParserRULE_classDeclaration)
 	var _la int
@@ -6411,6 +6465,9 @@ func (s *ClassEntryTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) ClassEntryType() (localctx IClassEntryTypeContext) {
+	this := p
+	_ = this
+
 	localctx = NewClassEntryTypeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 36, PHPParserRULE_classEntryType)
 	var _la int
@@ -6558,6 +6615,9 @@ func (s *InterfaceListContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) InterfaceList() (localctx IInterfaceListContext) {
+	this := p
+	_ = this
+
 	localctx = NewInterfaceListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 38, PHPParserRULE_interfaceList)
 	var _la int
@@ -6726,6 +6786,9 @@ func (s *TypeParameterListContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *PHPParser) TypeParameterList() (localctx ITypeParameterListContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeParameterListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 40, PHPParserRULE_typeParameterList)
 	var _la int
@@ -6894,6 +6957,9 @@ func (s *TypeParameterWithDefaultsListContext) Accept(visitor antlr.ParseTreeVis
 }
 
 func (p *PHPParser) TypeParameterWithDefaultsList() (localctx ITypeParameterWithDefaultsListContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeParameterWithDefaultsListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 42, PHPParserRULE_typeParameterWithDefaultsList)
 	var _la int
@@ -7043,6 +7109,9 @@ func (s *TypeParameterDeclContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *PHPParser) TypeParameterDecl() (localctx ITypeParameterDeclContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeParameterDeclContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 44, PHPParserRULE_typeParameterDecl)
 	var _la int
@@ -7217,6 +7286,9 @@ func (s *TypeParameterWithDefaultDeclContext) Accept(visitor antlr.ParseTreeVisi
 }
 
 func (p *PHPParser) TypeParameterWithDefaultDecl() (localctx ITypeParameterWithDefaultDeclContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeParameterWithDefaultDeclContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 46, PHPParserRULE_typeParameterWithDefaultDecl)
 	var _la int
@@ -7375,6 +7447,9 @@ func (s *CallableIdentifierContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *PHPParser) CallableIdentifier() (localctx ICallableIdentifierContext) {
+	this := p
+	_ = this
+
 	localctx = NewCallableIdentifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 48, PHPParserRULE_callableIdentifier)
 	p.SetState(626)
@@ -7538,6 +7613,9 @@ func (s *AttributesContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Attributes() (localctx IAttributesContext) {
+	this := p
+	_ = this
+
 	localctx = NewAttributesContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 50, PHPParserRULE_attributes)
 	var _la int
@@ -7726,6 +7804,9 @@ func (s *AttributeGroupContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) AttributeGroup() (localctx IAttributeGroupContext) {
+	this := p
+	_ = this
+
 	localctx = NewAttributeGroupContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 52, PHPParserRULE_attributeGroup)
 	var _la int
@@ -7911,6 +7992,9 @@ func (s *AttributeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Attribute() (localctx IAttributeContext) {
+	this := p
+	_ = this
+
 	localctx = NewAttributeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 54, PHPParserRULE_attribute)
 	var _la int
@@ -8055,6 +8139,9 @@ func (s *InnerStatementListContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *PHPParser) InnerStatementList() (localctx IInnerStatementListContext) {
+	this := p
+	_ = this
+
 	localctx = NewInnerStatementListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 56, PHPParserRULE_innerStatementList)
 	var _alt int
@@ -8216,6 +8303,9 @@ func (s *InnerStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) InnerStatement() (localctx IInnerStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewInnerStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 58, PHPParserRULE_innerStatement)
 	p.SetState(662)
@@ -8337,6 +8427,9 @@ func (s *LabelStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) LabelStatement() (localctx ILabelStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewLabelStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 60, PHPParserRULE_labelStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -8830,6 +8923,9 @@ func (s *StatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Statement() (localctx IStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 62, PHPParserRULE_statement)
 	p.SetState(692)
@@ -9094,6 +9190,9 @@ func (s *EmptyStatement_Context) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) EmptyStatement_() (localctx IEmptyStatement_Context) {
+	this := p
+	_ = this
+
 	localctx = NewEmptyStatement_Context(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 64, PHPParserRULE_emptyStatement_)
 	p.EnterOuterAlt(localctx, 1)
@@ -9210,6 +9309,9 @@ func (s *BlockStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) BlockStatement() (localctx IBlockStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewBlockStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 66, PHPParserRULE_blockStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -9502,6 +9604,9 @@ func (s *IfStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PHPParser) IfStatement() (localctx IIfStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewIfStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 68, PHPParserRULE_ifStatement)
 	var _la int
@@ -9770,6 +9875,9 @@ func (s *ElseIfStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) ElseIfStatement() (localctx IElseIfStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewElseIfStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 70, PHPParserRULE_elseIfStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -9911,6 +10019,9 @@ func (s *ElseIfColonStatementContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *PHPParser) ElseIfColonStatement() (localctx IElseIfColonStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewElseIfColonStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 72, PHPParserRULE_elseIfColonStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -10038,6 +10149,9 @@ func (s *ElseStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) ElseStatement() (localctx IElseStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewElseStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 74, PHPParserRULE_elseStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -10158,6 +10272,9 @@ func (s *ElseColonStatementContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *PHPParser) ElseColonStatement() (localctx IElseColonStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewElseColonStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 76, PHPParserRULE_elseColonStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -10330,6 +10447,9 @@ func (s *WhileStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) WhileStatement() (localctx IWhileStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewWhileStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 78, PHPParserRULE_whileStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -10519,6 +10639,9 @@ func (s *DoWhileStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *PHPParser) DoWhileStatement() (localctx IDoWhileStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewDoWhileStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 80, PHPParserRULE_doWhileStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -10752,6 +10875,9 @@ func (s *ForStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *PHPParser) ForStatement() (localctx IForStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewForStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 82, PHPParserRULE_forStatement)
 	var _la int
@@ -10981,6 +11107,9 @@ func (s *ForInitContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) ForInit() (localctx IForInitContext) {
+	this := p
+	_ = this
+
 	localctx = NewForInitContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 84, PHPParserRULE_forInit)
 	p.EnterOuterAlt(localctx, 1)
@@ -11083,6 +11212,9 @@ func (s *ForUpdateContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) ForUpdate() (localctx IForUpdateContext) {
+	this := p
+	_ = this
+
 	localctx = NewForUpdateContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 86, PHPParserRULE_forUpdate)
 	p.EnterOuterAlt(localctx, 1)
@@ -11306,6 +11438,9 @@ func (s *SwitchStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) SwitchStatement() (localctx ISwitchStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewSwitchStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 88, PHPParserRULE_switchStatement)
 	var _la int
@@ -11624,6 +11759,9 @@ func (s *SwitchCaseBlockContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) SwitchCaseBlock() (localctx ISwitchCaseBlockContext) {
+	this := p
+	_ = this
+
 	localctx = NewSwitchCaseBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 90, PHPParserRULE_switchCaseBlock)
 	var _la int
@@ -11804,6 +11942,9 @@ func (s *SwitchDefaultBlockContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *PHPParser) SwitchDefaultBlock() (localctx ISwitchDefaultBlockContext) {
+	this := p
+	_ = this
+
 	localctx = NewSwitchDefaultBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 92, PHPParserRULE_switchDefaultBlock)
 	var _la int
@@ -12043,6 +12184,9 @@ func (s *SwitchBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PHPParser) SwitchBlock() (localctx ISwitchBlockContext) {
+	this := p
+	_ = this
+
 	localctx = NewSwitchBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 94, PHPParserRULE_switchBlock)
 	var _la int
@@ -12258,6 +12402,9 @@ func (s *BreakStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) BreakStatement() (localctx IBreakStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewBreakStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 96, PHPParserRULE_breakStatement)
 	var _la int
@@ -12398,6 +12545,9 @@ func (s *ContinueStatementContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *PHPParser) ContinueStatement() (localctx IContinueStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewContinueStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 98, PHPParserRULE_continueStatement)
 	var _la int
@@ -12538,6 +12688,9 @@ func (s *ReturnStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) ReturnStatement() (localctx IReturnStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewReturnStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 100, PHPParserRULE_returnStatement)
 	var _la int
@@ -12673,6 +12826,9 @@ func (s *ExpressionStatementContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *PHPParser) ExpressionStatement() (localctx IExpressionStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewExpressionStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 102, PHPParserRULE_expressionStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -12803,6 +12959,9 @@ func (s *UnsetStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) UnsetStatement() (localctx IUnsetStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewUnsetStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 104, PHPParserRULE_unsetStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -13130,6 +13289,9 @@ func (s *ForeachStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *PHPParser) ForeachStatement() (localctx IForeachStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewForeachStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 106, PHPParserRULE_foreachStatement)
 	var _la int
@@ -13782,6 +13944,9 @@ func (s *TryCatchFinallyContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) TryCatchFinally() (localctx ITryCatchFinallyContext) {
+	this := p
+	_ = this
+
 	localctx = NewTryCatchFinallyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 108, PHPParserRULE_tryCatchFinally)
 	var _la int
@@ -14045,6 +14210,9 @@ func (s *CatchClauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PHPParser) CatchClause() (localctx ICatchClauseContext) {
+	this := p
+	_ = this
+
 	localctx = NewCatchClauseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 110, PHPParserRULE_catchClause)
 	var _la int
@@ -14228,6 +14396,9 @@ func (s *FinallyStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *PHPParser) FinallyStatement() (localctx IFinallyStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewFinallyStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 112, PHPParserRULE_finallyStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -14348,6 +14519,9 @@ func (s *ThrowStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) ThrowStatement() (localctx IThrowStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewThrowStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 114, PHPParserRULE_throwStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -14476,6 +14650,9 @@ func (s *GotoStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) GotoStatement() (localctx IGotoStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewGotoStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 116, PHPParserRULE_gotoStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -14658,6 +14835,9 @@ func (s *DeclareStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *PHPParser) DeclareStatement() (localctx IDeclareStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewDeclareStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 118, PHPParserRULE_declareStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -14867,6 +15047,9 @@ func (s *InlineHtmlStatementContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *PHPParser) InlineHtmlStatement() (localctx IInlineHtmlStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewInlineHtmlStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 120, PHPParserRULE_inlineHtmlStatement)
 	var _alt int
@@ -15052,6 +15235,9 @@ func (s *DeclareListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PHPParser) DeclareList() (localctx IDeclareListContext) {
+	this := p
+	_ = this
+
 	localctx = NewDeclareListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 122, PHPParserRULE_declareList)
 	var _la int
@@ -15214,6 +15400,9 @@ func (s *DirectiveContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Directive() (localctx IDirectiveContext) {
+	this := p
+	_ = this
+
 	localctx = NewDirectiveContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 124, PHPParserRULE_directive)
 	p.SetState(1048)
@@ -15454,6 +15643,9 @@ func (s *FormalParameterListContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *PHPParser) FormalParameterList() (localctx IFormalParameterListContext) {
+	this := p
+	_ = this
+
 	localctx = NewFormalParameterListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 126, PHPParserRULE_formalParameterList)
 	var _la int
@@ -15715,6 +15907,9 @@ func (s *FormalParameterContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) FormalParameter() (localctx IFormalParameterContext) {
+	this := p
+	_ = this
+
 	localctx = NewFormalParameterContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 128, PHPParserRULE_formalParameter)
 	var _la int
@@ -15964,6 +16159,9 @@ func (s *TypeHintContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) TypeHint() (localctx ITypeHintContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeHintContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 130, PHPParserRULE_typeHint)
 	p.SetState(1089)
@@ -16114,6 +16312,9 @@ func (s *TypeHintAtomContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *PHPParser) TypeHintAtom() (localctx ITypeHintAtomContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeHintAtomContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 132, PHPParserRULE_typeHintAtom)
 	p.SetState(1094)
@@ -16282,6 +16483,9 @@ func (s *TypeHintIntersectionContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *PHPParser) TypeHintIntersection() (localctx ITypeHintIntersectionContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeHintIntersectionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 134, PHPParserRULE_typeHintIntersection)
 	var _alt int
@@ -16456,6 +16660,9 @@ func (s *TypeHintUnionContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) TypeHintUnion() (localctx ITypeHintUnionContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeHintUnionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 136, PHPParserRULE_typeHintUnion)
 	var _la int
@@ -16634,6 +16841,9 @@ func (s *GlobalStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) GlobalStatement() (localctx IGlobalStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewGlobalStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 138, PHPParserRULE_globalStatement)
 	var _la int
@@ -16792,6 +17002,9 @@ func (s *EchoStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) EchoStatement() (localctx IEchoStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewEchoStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 140, PHPParserRULE_echoStatement)
 	p.EnterOuterAlt(localctx, 1)
@@ -16956,6 +17169,9 @@ func (s *StaticVariableStatementContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 func (p *PHPParser) StaticVariableStatement() (localctx IStaticVariableStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewStaticVariableStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 142, PHPParserRULE_staticVariableStatement)
 	var _la int
@@ -17564,6 +17780,9 @@ func (s *PropertyModifiersVariableContext) Accept(visitor antlr.ParseTreeVisitor
 }
 
 func (p *PHPParser) ClassStatement() (localctx IClassStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewClassStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 144, PHPParserRULE_classStatement)
 	var _la int
@@ -18026,6 +18245,9 @@ func (s *TraitAdaptationsContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *PHPParser) TraitAdaptations() (localctx ITraitAdaptationsContext) {
+	this := p
+	_ = this
+
 	localctx = NewTraitAdaptationsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 146, PHPParserRULE_traitAdaptations)
 	var _la int
@@ -18203,6 +18425,9 @@ func (s *TraitAdaptationStatementContext) Accept(visitor antlr.ParseTreeVisitor)
 }
 
 func (p *PHPParser) TraitAdaptationStatement() (localctx ITraitAdaptationStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewTraitAdaptationStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 148, PHPParserRULE_traitAdaptationStatement)
 	p.SetState(1215)
@@ -18373,6 +18598,9 @@ func (s *TraitPrecedenceContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) TraitPrecedence() (localctx ITraitPrecedenceContext) {
+	this := p
+	_ = this
+
 	localctx = NewTraitPrecedenceContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 150, PHPParserRULE_traitPrecedence)
 	p.EnterOuterAlt(localctx, 1)
@@ -18551,6 +18779,9 @@ func (s *TraitAliasContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) TraitAlias() (localctx ITraitAliasContext) {
+	this := p
+	_ = this
+
 	localctx = NewTraitAliasContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 152, PHPParserRULE_traitAlias)
 	p.EnterOuterAlt(localctx, 1)
@@ -18725,6 +18956,9 @@ func (s *TraitMethodReferenceContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *PHPParser) TraitMethodReference() (localctx ITraitMethodReferenceContext) {
+	this := p
+	_ = this
+
 	localctx = NewTraitMethodReferenceContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 154, PHPParserRULE_traitMethodReference)
 	p.EnterOuterAlt(localctx, 1)
@@ -18869,6 +19103,9 @@ func (s *BaseCtorCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *PHPParser) BaseCtorCall() (localctx IBaseCtorCallContext) {
+	this := p
+	_ = this
+
 	localctx = NewBaseCtorCallContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 156, PHPParserRULE_baseCtorCall)
 	var _la int
@@ -19005,6 +19242,9 @@ func (s *ReturnTypeDeclContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) ReturnTypeDecl() (localctx IReturnTypeDeclContext) {
+	this := p
+	_ = this
+
 	localctx = NewReturnTypeDeclContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 158, PHPParserRULE_returnTypeDecl)
 	var _la int
@@ -19140,6 +19380,9 @@ func (s *MethodBodyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) MethodBody() (localctx IMethodBodyContext) {
+	this := p
+	_ = this
+
 	localctx = NewMethodBodyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 160, PHPParserRULE_methodBody)
 	p.SetState(1255)
@@ -19271,6 +19514,9 @@ func (s *PropertyModifiersContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *PHPParser) PropertyModifiers() (localctx IPropertyModifiersContext) {
+	this := p
+	_ = this
+
 	localctx = NewPropertyModifiersContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 162, PHPParserRULE_propertyModifiers)
 	p.SetState(1259)
@@ -19423,6 +19669,9 @@ func (s *MemberModifiersContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) MemberModifiers() (localctx IMemberModifiersContext) {
+	this := p
+	_ = this
+
 	localctx = NewMemberModifiersContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 164, PHPParserRULE_memberModifiers)
 	var _alt int
@@ -19559,6 +19808,9 @@ func (s *VariableInitializerContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *PHPParser) VariableInitializer() (localctx IVariableInitializerContext) {
+	this := p
+	_ = this
+
 	localctx = NewVariableInitializerContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 166, PHPParserRULE_variableInitializer)
 	var _la int
@@ -19711,6 +19963,9 @@ func (s *IdentifierInitializerContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *PHPParser) IdentifierInitializer() (localctx IIdentifierInitializerContext) {
+	this := p
+	_ = this
+
 	localctx = NewIdentifierInitializerContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 168, PHPParserRULE_identifierInitializer)
 	p.EnterOuterAlt(localctx, 1)
@@ -19888,6 +20143,9 @@ func (s *GlobalConstantDeclarationContext) Accept(visitor antlr.ParseTreeVisitor
 }
 
 func (p *PHPParser) GlobalConstantDeclaration() (localctx IGlobalConstantDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewGlobalConstantDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 170, PHPParserRULE_globalConstantDeclaration)
 	var _la int
@@ -20145,6 +20403,9 @@ func (s *EnumDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) EnumDeclaration() (localctx IEnumDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewEnumDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 172, PHPParserRULE_enumDeclaration)
 	var _la int
@@ -20541,6 +20802,9 @@ func (s *EnumItemContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) EnumItem() (localctx IEnumItemContext) {
+	this := p
+	_ = this
+
 	localctx = NewEnumItemContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 174, PHPParserRULE_enumItem)
 	var _la int
@@ -20862,6 +21126,9 @@ func (s *ExpressionListContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) ExpressionList() (localctx IExpressionListContext) {
+	this := p
+	_ = this
+
 	localctx = NewExpressionListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 176, PHPParserRULE_expressionList)
 	var _la int
@@ -21004,6 +21271,9 @@ func (s *ParenthesesContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PHPParser) Parentheses() (localctx IParenthesesContext) {
+	this := p
+	_ = this
+
 	localctx = NewParenthesesContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 178, PHPParserRULE_parentheses)
 	p.EnterOuterAlt(localctx, 1)
@@ -21158,6 +21428,9 @@ func (s *FullyQualifiedNamespaceExprContext) Accept(visitor antlr.ParseTreeVisit
 }
 
 func (p *PHPParser) FullyQualifiedNamespaceExpr() (localctx IFullyQualifiedNamespaceExprContext) {
+	this := p
+	_ = this
+
 	localctx = NewFullyQualifiedNamespaceExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 180, PHPParserRULE_fullyQualifiedNamespaceExpr)
 	var _la int
@@ -21346,6 +21619,9 @@ func (s *StaticClassExprContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) StaticClassExpr() (localctx IStaticClassExprContext) {
+	this := p
+	_ = this
+
 	localctx = NewStaticClassExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 182, PHPParserRULE_staticClassExpr)
 	p.SetState(1375)
@@ -21489,6 +21765,9 @@ func (s *StaticClassExprFunctionMemberContext) Accept(visitor antlr.ParseTreeVis
 }
 
 func (p *PHPParser) StaticClassExprFunctionMember() (localctx IStaticClassExprFunctionMemberContext) {
+	this := p
+	_ = this
+
 	localctx = NewStaticClassExprFunctionMemberContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 184, PHPParserRULE_staticClassExprFunctionMember)
 	p.EnterOuterAlt(localctx, 1)
@@ -21625,6 +21904,9 @@ func (s *StaticClassExprVariableMemberContext) Accept(visitor antlr.ParseTreeVis
 }
 
 func (p *PHPParser) StaticClassExprVariableMember() (localctx IStaticClassExprVariableMemberContext) {
+	this := p
+	_ = this
+
 	localctx = NewStaticClassExprVariableMemberContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 186, PHPParserRULE_staticClassExprVariableMember)
 	p.EnterOuterAlt(localctx, 1)
@@ -21790,6 +22072,9 @@ func (s *StaticClassContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PHPParser) StaticClass() (localctx IStaticClassContext) {
+	this := p
+	_ = this
+
 	localctx = NewStaticClassContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 188, PHPParserRULE_staticClass)
 	p.SetState(1389)
@@ -21996,6 +22281,9 @@ func (s *MemberCallKeyContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) MemberCallKey() (localctx IMemberCallKeyContext) {
+	this := p
+	_ = this
+
 	localctx = NewMemberCallKeyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 190, PHPParserRULE_memberCallKey)
 	p.SetState(1400)
@@ -22204,6 +22492,9 @@ func (s *IndexMemberCallKeyContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *PHPParser) IndexMemberCallKey() (localctx IIndexMemberCallKeyContext) {
+	this := p
+	_ = this
+
 	localctx = NewIndexMemberCallKeyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 192, PHPParserRULE_indexMemberCallKey)
 	p.SetState(1405)
@@ -22371,6 +22662,9 @@ func (s *DynamicStaticClassExprContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 func (p *PHPParser) DynamicStaticClassExpr() (localctx IDynamicStaticClassExprContext) {
+	this := p
+	_ = this
+
 	localctx = NewDynamicStaticClassExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 194, PHPParserRULE_dynamicStaticClassExpr)
 	p.SetState(1415)
@@ -22576,6 +22870,9 @@ func (s *DynamicStaticReceiverContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *PHPParser) DynamicStaticReceiver() (localctx IDynamicStaticReceiverContext) {
+	this := p
+	_ = this
+
 	localctx = NewDynamicStaticReceiverContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 196, PHPParserRULE_dynamicStaticReceiver)
 	var _la int
@@ -22753,6 +23050,9 @@ func (s *DynamicStaticReceiverBaseContext) Accept(visitor antlr.ParseTreeVisitor
 }
 
 func (p *PHPParser) DynamicStaticReceiverBase() (localctx IDynamicStaticReceiverBaseContext) {
+	this := p
+	_ = this
+
 	localctx = NewDynamicStaticReceiverBaseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 198, PHPParserRULE_dynamicStaticReceiverBase)
 	p.SetState(1430)
@@ -22925,6 +23225,9 @@ func (s *DynamicStaticReceiverAccessContext) Accept(visitor antlr.ParseTreeVisit
 }
 
 func (p *PHPParser) DynamicStaticReceiverAccess() (localctx IDynamicStaticReceiverAccessContext) {
+	this := p
+	_ = this
+
 	localctx = NewDynamicStaticReceiverAccessContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 200, PHPParserRULE_dynamicStaticReceiverAccess)
 	var _la int
@@ -25641,6 +25944,9 @@ func (p *PHPParser) Expression() (localctx IExpressionContext) {
 }
 
 func (p *PHPParser) expression(_p int) (localctx IExpressionContext) {
+	this := p
+	_ = this
+
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 
 	_parentState := p.GetState()
@@ -27328,6 +27634,9 @@ func (p *PHPParser) FlexiVariable() (localctx IFlexiVariableContext) {
 }
 
 func (p *PHPParser) flexiVariable(_p int) (localctx IFlexiVariableContext) {
+	this := p
+	_ = this
+
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 
 	_parentState := p.GetState()
@@ -27639,6 +27948,9 @@ func (s *DefineExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) DefineExpr() (localctx IDefineExprContext) {
+	this := p
+	_ = this
+
 	localctx = NewDefineExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 206, PHPParserRULE_defineExpr)
 	p.SetState(1660)
@@ -28050,6 +28362,9 @@ func (s *MemberCallVariableContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *PHPParser) Variable() (localctx IVariableContext) {
+	this := p
+	_ = this
+
 	localctx = NewVariableContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 208, PHPParserRULE_variable)
 	var _la int
@@ -28358,6 +28673,9 @@ func (s *IncludeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Include() (localctx IIncludeContext) {
+	this := p
+	_ = this
+
 	localctx = NewIncludeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 210, PHPParserRULE_include)
 	var _la int
@@ -28517,6 +28835,9 @@ func (s *LeftArrayCreationContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *PHPParser) LeftArrayCreation() (localctx ILeftArrayCreationContext) {
+	this := p
+	_ = this
+
 	localctx = NewLeftArrayCreationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 212, PHPParserRULE_leftArrayCreation)
 	var _la int
@@ -28688,6 +29009,9 @@ func (s *AssignableContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Assignable() (localctx IAssignableContext) {
+	this := p
+	_ = this
+
 	localctx = NewAssignableContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 214, PHPParserRULE_assignable)
 	p.SetState(1712)
@@ -28844,6 +29168,9 @@ func (s *ArrayCreationContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) ArrayCreation() (localctx IArrayCreationContext) {
+	this := p
+	_ = this
+
 	localctx = NewArrayCreationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 216, PHPParserRULE_arrayCreation)
 	var _la int
@@ -29174,6 +29501,9 @@ func (s *ArrayDestructuringContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *PHPParser) ArrayDestructuring() (localctx IArrayDestructuringContext) {
+	this := p
+	_ = this
+
 	localctx = NewArrayDestructuringContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 218, PHPParserRULE_arrayDestructuring)
 	var _la int
@@ -29504,6 +29834,9 @@ func (s *IndexedDestructItemContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *PHPParser) IndexedDestructItem() (localctx IIndexedDestructItemContext) {
+	this := p
+	_ = this
+
 	localctx = NewIndexedDestructItemContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 220, PHPParserRULE_indexedDestructItem)
 	var _la int
@@ -29653,6 +29986,9 @@ func (s *KeyedDestructItemContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *PHPParser) KeyedDestructItem() (localctx IKeyedDestructItemContext) {
+	this := p
+	_ = this
+
 	localctx = NewKeyedDestructItemContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 222, PHPParserRULE_keyedDestructItem)
 	var _la int
@@ -29908,6 +30244,9 @@ func (s *LambdaFunctionExprContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *PHPParser) LambdaFunctionExpr() (localctx ILambdaFunctionExprContext) {
+	this := p
+	_ = this
+
 	localctx = NewLambdaFunctionExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 224, PHPParserRULE_lambdaFunctionExpr)
 	var _la int
@@ -30321,6 +30660,9 @@ func (s *MatchExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) MatchExpr() (localctx IMatchExprContext) {
+	this := p
+	_ = this
+
 	localctx = NewMatchExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 226, PHPParserRULE_matchExpr)
 	var _la int
@@ -30565,6 +30907,9 @@ func (s *MatchItemContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) MatchItem() (localctx IMatchItemContext) {
+	this := p
+	_ = this
+
 	localctx = NewMatchItemContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 228, PHPParserRULE_matchItem)
 	var _la int
@@ -30775,6 +31120,9 @@ func (s *NewExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) NewExpr() (localctx INewExprContext) {
+	this := p
+	_ = this
+
 	localctx = NewNewExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 230, PHPParserRULE_newExpr)
 	p.SetState(1878)
@@ -30977,6 +31325,9 @@ func (s *AssignmentOperatorContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *PHPParser) AssignmentOperator() (localctx IAssignmentOperatorContext) {
+	this := p
+	_ = this
+
 	localctx = NewAssignmentOperatorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 232, PHPParserRULE_assignmentOperator)
 	var _la int
@@ -31129,6 +31480,9 @@ func (s *YieldExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) YieldExpression() (localctx IYieldExpressionContext) {
+	this := p
+	_ = this
+
 	localctx = NewYieldExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 234, PHPParserRULE_yieldExpression)
 	var _la int
@@ -31325,6 +31679,9 @@ func (s *ArrayItemListContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) ArrayItemList() (localctx IArrayItemListContext) {
+	this := p
+	_ = this
+
 	localctx = NewArrayItemListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 236, PHPParserRULE_arrayItemList)
 	var _alt int
@@ -31538,6 +31895,9 @@ func (s *ArrayItemContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) ArrayItem() (localctx IArrayItemContext) {
+	this := p
+	_ = this
+
 	localctx = NewArrayItemContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 238, PHPParserRULE_arrayItem)
 	var _la int
@@ -31777,6 +32137,9 @@ func (s *LambdaFunctionUseVarsContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *PHPParser) LambdaFunctionUseVars() (localctx ILambdaFunctionUseVarsContext) {
+	this := p
+	_ = this
+
 	localctx = NewLambdaFunctionUseVarsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 240, PHPParserRULE_lambdaFunctionUseVars)
 	var _la int
@@ -31926,6 +32289,9 @@ func (s *LambdaFunctionUseVarContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *PHPParser) LambdaFunctionUseVar() (localctx ILambdaFunctionUseVarContext) {
+	this := p
+	_ = this
+
 	localctx = NewLambdaFunctionUseVarContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 242, PHPParserRULE_lambdaFunctionUseVar)
 	var _la int
@@ -32057,6 +32423,9 @@ func (s *QualifiedStaticTypeRefContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 func (p *PHPParser) QualifiedStaticTypeRef() (localctx IQualifiedStaticTypeRefContext) {
+	this := p
+	_ = this
+
 	localctx = NewQualifiedStaticTypeRefContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 244, PHPParserRULE_qualifiedStaticTypeRef)
 	p.SetState(1938)
@@ -32272,6 +32641,9 @@ func (s *TypeRefContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) TypeRef() (localctx ITypeRefContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeRefContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 246, PHPParserRULE_typeRef)
 	p.SetState(1947)
@@ -32612,6 +32984,9 @@ func (s *AnonymousClassContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) AnonymousClass() (localctx IAnonymousClassContext) {
+	this := p
+	_ = this
+
 	localctx = NewAnonymousClassContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 248, PHPParserRULE_anonymousClass)
 	var _la int
@@ -32945,6 +33320,9 @@ func (s *IndirectTypeRefContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) IndirectTypeRef() (localctx IIndirectTypeRefContext) {
+	this := p
+	_ = this
+
 	localctx = NewIndirectTypeRefContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 250, PHPParserRULE_indirectTypeRef)
 	p.EnterOuterAlt(localctx, 1)
@@ -33064,6 +33442,9 @@ func (s *QualifiedNamespaceNameContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 func (p *PHPParser) QualifiedNamespaceName() (localctx IQualifiedNamespaceNameContext) {
+	this := p
+	_ = this
+
 	localctx = NewQualifiedNamespaceNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 252, PHPParserRULE_qualifiedNamespaceName)
 	p.EnterOuterAlt(localctx, 1)
@@ -33226,6 +33607,9 @@ func (s *NamespaceUseDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 func (p *PHPParser) NamespaceUseDeclaration() (localctx INamespaceUseDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewNamespaceUseDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 254, PHPParserRULE_namespaceUseDeclaration)
 	var _la int
@@ -33429,6 +33813,9 @@ func (s *NamespaceUseTailContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *PHPParser) NamespaceUseTail() (localctx INamespaceUseTailContext) {
+	this := p
+	_ = this
+
 	localctx = NewNamespaceUseTailContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 256, PHPParserRULE_namespaceUseTail)
 	var _la int
@@ -33648,6 +34035,9 @@ func (s *NamespaceUseClauseContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *PHPParser) NamespaceUseClause() (localctx INamespaceUseClauseContext) {
+	this := p
+	_ = this
+
 	localctx = NewNamespaceUseClauseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 258, PHPParserRULE_namespaceUseClause)
 	var _la int
@@ -33841,6 +34231,9 @@ func (s *QualifiedNamespaceNameListContext) Accept(visitor antlr.ParseTreeVisito
 }
 
 func (p *PHPParser) QualifiedNamespaceNameList() (localctx IQualifiedNamespaceNameListContext) {
+	this := p
+	_ = this
+
 	localctx = NewQualifiedNamespaceNameListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 260, PHPParserRULE_qualifiedNamespaceNameList)
 	var _la int
@@ -34024,6 +34417,9 @@ func (s *ArgumentsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Arguments() (localctx IArgumentsContext) {
+	this := p
+	_ = this
+
 	localctx = NewArgumentsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 262, PHPParserRULE_arguments)
 	var _la int
@@ -34319,6 +34715,9 @@ func (s *ActualArgumentContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) ActualArgument() (localctx IActualArgumentContext) {
+	this := p
+	_ = this
+
 	localctx = NewActualArgumentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 264, PHPParserRULE_actualArgument)
 	var _la int
@@ -34508,6 +34907,9 @@ func (s *ArgumentNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *PHPParser) ArgumentName() (localctx IArgumentNameContext) {
+	this := p
+	_ = this
+
 	localctx = NewArgumentNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 266, PHPParserRULE_argumentName)
 	p.EnterOuterAlt(localctx, 1)
@@ -34833,6 +35235,9 @@ func (s *ArrayInitializerContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *PHPParser) ConstantInitializer() (localctx IConstantInitializerContext) {
+	this := p
+	_ = this
+
 	localctx = NewConstantInitializerContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 268, PHPParserRULE_constantInitializer)
 	var _la int
@@ -35134,6 +35539,9 @@ func (s *ConstantStringContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) ConstantString() (localctx IConstantStringContext) {
+	this := p
+	_ = this
+
 	localctx = NewConstantStringContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 270, PHPParserRULE_constantString)
 	p.SetState(2113)
@@ -35278,6 +35686,9 @@ func (s *ConstantContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Constant() (localctx IConstantContext) {
+	this := p
+	_ = this
+
 	localctx = NewConstantContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 272, PHPParserRULE_constant)
 	p.SetState(2118)
@@ -35438,6 +35849,9 @@ func (s *LiteralConstantContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) LiteralConstant() (localctx ILiteralConstantContext) {
+	this := p
+	_ = this
+
 	localctx = NewLiteralConstantContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 274, PHPParserRULE_literalConstant)
 	p.SetState(2124)
@@ -35585,6 +35999,9 @@ func (s *NumericConstantContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) NumericConstant() (localctx INumericConstantContext) {
+	this := p
+	_ = this
+
 	localctx = NewNumericConstantContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 276, PHPParserRULE_numericConstant)
 	var _la int
@@ -35803,6 +36220,9 @@ func (s *ClassConstantContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) ClassConstant() (localctx IClassConstantContext) {
+	this := p
+	_ = this
+
 	localctx = NewClassConstantContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 278, PHPParserRULE_classConstant)
 	var _la int
@@ -36031,6 +36451,9 @@ func (s *StringConstantContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) StringConstant() (localctx IStringConstantContext) {
+	this := p
+	_ = this
+
 	localctx = NewStringConstantContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 280, PHPParserRULE_stringConstant)
 	p.EnterOuterAlt(localctx, 1)
@@ -36215,6 +36638,9 @@ func (s *StringContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) String_() (localctx IStringContext) {
+	this := p
+	_ = this
+
 	localctx = NewStringContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 282, PHPParserRULE_string)
 	var _la int
@@ -36426,6 +36852,9 @@ func (s *HereDocContentContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) HereDocContent() (localctx IHereDocContentContext) {
+	this := p
+	_ = this
+
 	localctx = NewHereDocContentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 284, PHPParserRULE_hereDocContent)
 	var _la int
@@ -36592,6 +37021,9 @@ func (s *InterpolatedStringPartContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 func (p *PHPParser) InterpolatedStringPart() (localctx IInterpolatedStringPartContext) {
+	this := p
+	_ = this
+
 	localctx = NewInterpolatedStringPartContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 286, PHPParserRULE_interpolatedStringPart)
 	p.SetState(2184)
@@ -36811,6 +37243,9 @@ func (s *ChainListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) ChainList() (localctx IChainListContext) {
+	this := p
+	_ = this
+
 	localctx = NewChainListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 288, PHPParserRULE_chainList)
 	var _la int
@@ -36960,6 +37395,9 @@ func (s *ChainContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Chain() (localctx IChainContext) {
+	this := p
+	_ = this
+
 	localctx = NewChainContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 290, PHPParserRULE_chain)
 	p.SetState(2196)
@@ -37158,6 +37596,9 @@ func (s *AssignableChainContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) AssignableChain() (localctx IAssignableChainContext) {
+	this := p
+	_ = this
+
 	localctx = NewAssignableChainContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 292, PHPParserRULE_assignableChain)
 	var _alt int
@@ -37357,6 +37798,9 @@ func (s *FunctionCallAssignableContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 func (p *PHPParser) FunctionCallAssignable() (localctx IFunctionCallAssignableContext) {
+	this := p
+	_ = this
+
 	localctx = NewFunctionCallAssignableContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 294, PHPParserRULE_functionCallAssignable)
 	var _la int
@@ -37498,6 +37942,9 @@ func (s *FunctionCallAssignableAccessContext) Accept(visitor antlr.ParseTreeVisi
 }
 
 func (p *PHPParser) FunctionCallAssignableAccess() (localctx IFunctionCallAssignableAccessContext) {
+	this := p
+	_ = this
+
 	localctx = NewFunctionCallAssignableAccessContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 296, PHPParserRULE_functionCallAssignableAccess)
 	p.SetState(2216)
@@ -37654,6 +38101,9 @@ func (s *AssignableChainOriginContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *PHPParser) AssignableChainOrigin() (localctx IAssignableChainOriginContext) {
+	this := p
+	_ = this
+
 	localctx = NewAssignableChainOriginContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 298, PHPParserRULE_assignableChainOrigin)
 	p.SetState(2221)
@@ -37799,6 +38249,9 @@ func (s *AssignableChainAccessContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *PHPParser) AssignableChainAccess() (localctx IAssignableChainAccessContext) {
+	this := p
+	_ = this
+
 	localctx = NewAssignableChainAccessContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 300, PHPParserRULE_assignableChainAccess)
 	p.SetState(2225)
@@ -37938,6 +38391,9 @@ func (s *StaticMethodCallContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *PHPParser) StaticMethodCall() (localctx IStaticMethodCallContext) {
+	this := p
+	_ = this
+
 	localctx = NewStaticMethodCallContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 302, PHPParserRULE_staticMethodCall)
 	p.EnterOuterAlt(localctx, 1)
@@ -38088,6 +38544,9 @@ func (s *ChainOriginContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PHPParser) ChainOrigin() (localctx IChainOriginContext) {
+	this := p
+	_ = this
+
 	localctx = NewChainOriginContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 304, PHPParserRULE_chainOrigin)
 	p.SetState(2236)
@@ -38254,6 +38713,9 @@ func (s *MemberAccessContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *PHPParser) MemberAccess() (localctx IMemberAccessContext) {
+	this := p
+	_ = this
+
 	localctx = NewMemberAccessContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 306, PHPParserRULE_memberAccess)
 	p.EnterOuterAlt(localctx, 1)
@@ -38393,6 +38855,9 @@ func (s *FunctionCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *PHPParser) FunctionCall() (localctx IFunctionCallContext) {
+	this := p
+	_ = this
+
 	localctx = NewFunctionCallContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 308, PHPParserRULE_functionCall)
 	p.EnterOuterAlt(localctx, 1)
@@ -38555,6 +39020,9 @@ func (s *FunctionCallNameContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *PHPParser) FunctionCallName() (localctx IFunctionCallNameContext) {
+	this := p
+	_ = this
+
 	localctx = NewFunctionCallNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 310, PHPParserRULE_functionCallName)
 	p.SetState(2251)
@@ -38770,6 +39238,9 @@ func (s *ActualArgumentsContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *PHPParser) ActualArguments() (localctx IActualArgumentsContext) {
+	this := p
+	_ = this
+
 	localctx = NewActualArgumentsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 312, PHPParserRULE_actualArguments)
 	var _alt int
@@ -38971,6 +39442,9 @@ func (s *ChainBaseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) ChainBase() (localctx IChainBaseContext) {
+	this := p
+	_ = this
+
 	localctx = NewChainBaseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 314, PHPParserRULE_chainBase)
 	var _la int
@@ -39146,6 +39620,9 @@ func (s *KeyedFieldNameContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) KeyedFieldName() (localctx IKeyedFieldNameContext) {
+	this := p
+	_ = this
+
 	localctx = NewKeyedFieldNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 316, PHPParserRULE_keyedFieldName)
 	p.SetState(2277)
@@ -39338,6 +39815,9 @@ func (s *KeyedSimpleFieldNameContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *PHPParser) KeyedSimpleFieldName() (localctx IKeyedSimpleFieldNameContext) {
+	this := p
+	_ = this
+
 	localctx = NewKeyedSimpleFieldNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 318, PHPParserRULE_keyedSimpleFieldName)
 	var _alt int
@@ -39572,6 +40052,9 @@ func (s *KeyedVariableContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) KeyedVariable() (localctx IKeyedVariableContext) {
+	this := p
+	_ = this
+
 	localctx = NewKeyedVariableContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 320, PHPParserRULE_keyedVariable)
 	var _alt int
@@ -39801,6 +40284,9 @@ func (s *SquareCurlyExpressionContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *PHPParser) SquareCurlyExpression() (localctx ISquareCurlyExpressionContext) {
+	this := p
+	_ = this
+
 	localctx = NewSquareCurlyExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 322, PHPParserRULE_squareCurlyExpression)
 	var _la int
@@ -40003,6 +40489,9 @@ func (s *AssignmentListContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) AssignmentList() (localctx IAssignmentListContext) {
+	this := p
+	_ = this
+
 	localctx = NewAssignmentListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 324, PHPParserRULE_assignmentList)
 	var _la int
@@ -40204,6 +40693,9 @@ func (s *AssignmentListElementContext) Accept(visitor antlr.ParseTreeVisitor) in
 }
 
 func (p *PHPParser) AssignmentListElement() (localctx IAssignmentListElementContext) {
+	this := p
+	_ = this
+
 	localctx = NewAssignmentListElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 326, PHPParserRULE_assignmentListElement)
 	p.SetState(2342)
@@ -40349,6 +40841,9 @@ func (s *ModifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Modifier() (localctx IModifierContext) {
+	this := p
+	_ = this
+
 	localctx = NewModifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 328, PHPParserRULE_modifier)
 	var _la int
@@ -40465,6 +40960,9 @@ func (s *IdentifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Identifier() (localctx IIdentifierContext) {
+	this := p
+	_ = this
+
 	localctx = NewIdentifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 330, PHPParserRULE_identifier)
 	p.SetState(2348)
@@ -41144,6 +41642,9 @@ func (s *KeyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *PHPParser) Key() (localctx IKeyContext) {
+	this := p
+	_ = this
+
 	localctx = NewKeyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 332, PHPParserRULE_key)
 	var _la int
@@ -41273,6 +41774,9 @@ func (s *MemberModifierContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *PHPParser) MemberModifier() (localctx IMemberModifierContext) {
+	this := p
+	_ = this
+
 	localctx = NewMemberModifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 334, PHPParserRULE_memberModifier)
 	var _la int
@@ -41407,6 +41911,9 @@ func (s *MagicConstantContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) MagicConstant() (localctx IMagicConstantContext) {
+	this := p
+	_ = this
+
 	localctx = NewMagicConstantContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 336, PHPParserRULE_magicConstant)
 	var _la int
@@ -41581,6 +42088,9 @@ func (s *MagicMethodContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *PHPParser) MagicMethod() (localctx IMagicMethodContext) {
+	this := p
+	_ = this
+
 	localctx = NewMagicMethodContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 338, PHPParserRULE_magicMethod)
 	var _la int
@@ -41715,6 +42225,9 @@ func (s *PrimitiveTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) PrimitiveType() (localctx IPrimitiveTypeContext) {
+	this := p
+	_ = this
+
 	localctx = NewPrimitiveTypeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 340, PHPParserRULE_primitiveType)
 	var _la int
@@ -41889,6 +42402,9 @@ func (s *CastOperationContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *PHPParser) CastOperation() (localctx ICastOperationContext) {
+	this := p
+	_ = this
+
 	localctx = NewCastOperationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 342, PHPParserRULE_castOperation)
 	var _la int
@@ -41941,6 +42457,9 @@ func (p *PHPParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int
 }
 
 func (p *PHPParser) Expression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 0:
 		return p.Precpred(p.GetParserRuleContext(), 24)
@@ -42017,6 +42536,9 @@ func (p *PHPParser) Expression_Sempred(localctx antlr.RuleContext, predIndex int
 }
 
 func (p *PHPParser) FlexiVariable_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 23:
 		return p.Precpred(p.GetParserRuleContext(), 3)

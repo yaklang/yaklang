@@ -572,48 +572,63 @@ func (l *SyntaxFlowLexer) Action(localctx antlr.RuleContext, ruleIndex, actionIn
 }
 
 func (l *SyntaxFlowLexer) HereDocIdentifierName_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 0:
-		l.recordHereDocLabel()
+		this.recordHereDocLabel()
 
 	case 1:
-		l.recordHereDocLabel()
+		this.recordHereDocLabel()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *SyntaxFlowLexer) CRLFHereDocIdentifierBreak_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 2:
-		l.recordHereDocLF()
+		this.recordHereDocLF()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *SyntaxFlowLexer) LFHereDocIdentifierBreak_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 3:
-		l.recordHereDocLF()
+		this.recordHereDocLF()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *SyntaxFlowLexer) CRLFEndDoc_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 4:
-		l.DocEndDistribute()
+		this.DocEndDistribute()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *SyntaxFlowLexer) LFEndDoc_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 5:
-		l.DocEndDistribute()
+		this.DocEndDistribute()
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
@@ -634,9 +649,12 @@ func (l *SyntaxFlowLexer) Sempred(localctx antlr.RuleContext, ruleIndex, predInd
 }
 
 func (p *SyntaxFlowLexer) LtEq_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 0:
-		return p.GetInputStream().LA(1) != '='
+		return this.GetInputStream().LA(1) != '='
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))
@@ -644,9 +662,12 @@ func (p *SyntaxFlowLexer) LtEq_Sempred(localctx antlr.RuleContext, predIndex int
 }
 
 func (p *SyntaxFlowLexer) GtEq_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 1:
-		return p.GetInputStream().LA(1) != '='
+		return this.GetInputStream().LA(1) != '='
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))

@@ -486,6 +486,9 @@ func (s *TemplateContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *FreemarkerParser) Template() (localctx ITemplateContext) {
+	this := p
+	_ = this
+
 	localctx = NewTemplateContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, FreemarkerParserRULE_template)
 	p.EnterOuterAlt(localctx, 1)
@@ -622,6 +625,9 @@ func (s *ElementsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *FreemarkerParser) Elements() (localctx IElementsContext) {
+	this := p
+	_ = this
+
 	localctx = NewElementsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 2, FreemarkerParserRULE_elements)
 	var _alt int
@@ -863,6 +869,9 @@ func (s *DirectiveElementContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *FreemarkerParser) Element() (localctx IElementContext) {
+	this := p
+	_ = this
+
 	localctx = NewElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 4, FreemarkerParserRULE_element)
 	p.SetState(81)
@@ -1004,6 +1013,9 @@ func (s *RawTextContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *FreemarkerParser) RawText() (localctx IRawTextContext) {
+	this := p
+	_ = this
+
 	localctx = NewRawTextContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, FreemarkerParserRULE_rawText)
 	var _alt int
@@ -1270,6 +1282,9 @@ func (s *DirectiveContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *FreemarkerParser) Directive() (localctx IDirectiveContext) {
+	this := p
+	_ = this
+
 	localctx = NewDirectiveContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 8, FreemarkerParserRULE_directive)
 	p.SetState(97)
@@ -1621,6 +1636,9 @@ func (s *DirectiveIfContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *FreemarkerParser) DirectiveIf() (localctx IDirectiveIfContext) {
+	this := p
+	_ = this
+
 	localctx = NewDirectiveIfContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 10, FreemarkerParserRULE_directiveIf)
 	var _la int
@@ -1875,6 +1893,9 @@ func (s *DirectiveIfTrueElementsContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 func (p *FreemarkerParser) DirectiveIfTrueElements() (localctx IDirectiveIfTrueElementsContext) {
+	this := p
+	_ = this
+
 	localctx = NewDirectiveIfTrueElementsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 12, FreemarkerParserRULE_directiveIfTrueElements)
 	p.EnterOuterAlt(localctx, 1)
@@ -1977,6 +1998,9 @@ func (s *DirectiveIfElseIfElementsContext) Accept(visitor antlr.ParseTreeVisitor
 }
 
 func (p *FreemarkerParser) DirectiveIfElseIfElements() (localctx IDirectiveIfElseIfElementsContext) {
+	this := p
+	_ = this
+
 	localctx = NewDirectiveIfElseIfElementsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 14, FreemarkerParserRULE_directiveIfElseIfElements)
 	p.EnterOuterAlt(localctx, 1)
@@ -2079,6 +2103,9 @@ func (s *DirectiveIfElseElementsContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 func (p *FreemarkerParser) DirectiveIfElseElements() (localctx IDirectiveIfElseElementsContext) {
+	this := p
+	_ = this
+
 	localctx = NewDirectiveIfElseElementsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 16, FreemarkerParserRULE_directiveIfElseElements)
 	p.EnterOuterAlt(localctx, 1)
@@ -2181,6 +2208,9 @@ func (s *TagExprElseIfsContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *FreemarkerParser) TagExprElseIfs() (localctx ITagExprElseIfsContext) {
+	this := p
+	_ = this
+
 	localctx = NewTagExprElseIfsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 18, FreemarkerParserRULE_tagExprElseIfs)
 	p.EnterOuterAlt(localctx, 1)
@@ -2345,6 +2375,9 @@ func (s *DirectiveAssignContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *FreemarkerParser) DirectiveAssign() (localctx IDirectiveAssignContext) {
+	this := p
+	_ = this
+
 	localctx = NewDirectiveAssignContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 20, FreemarkerParserRULE_directiveAssign)
 	var _la int
@@ -2683,6 +2716,9 @@ func (s *DirectiveListContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *FreemarkerParser) DirectiveList() (localctx IDirectiveListContext) {
+	this := p
+	_ = this
+
 	localctx = NewDirectiveListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 22, FreemarkerParserRULE_directiveList)
 	var _la int
@@ -2940,6 +2976,9 @@ func (s *DirectiveListBodyElementsContext) Accept(visitor antlr.ParseTreeVisitor
 }
 
 func (p *FreemarkerParser) DirectiveListBodyElements() (localctx IDirectiveListBodyElementsContext) {
+	this := p
+	_ = this
+
 	localctx = NewDirectiveListBodyElementsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 24, FreemarkerParserRULE_directiveListBodyElements)
 	p.EnterOuterAlt(localctx, 1)
@@ -3042,6 +3081,9 @@ func (s *DirectiveListElseElementsContext) Accept(visitor antlr.ParseTreeVisitor
 }
 
 func (p *FreemarkerParser) DirectiveListElseElements() (localctx IDirectiveListElseElementsContext) {
+	this := p
+	_ = this
+
 	localctx = NewDirectiveListElseElementsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 26, FreemarkerParserRULE_directiveListElseElements)
 	p.EnterOuterAlt(localctx, 1)
@@ -3159,6 +3201,9 @@ func (s *DirectiveIncludeContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *FreemarkerParser) DirectiveInclude() (localctx IDirectiveIncludeContext) {
+	this := p
+	_ = this
+
 	localctx = NewDirectiveIncludeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 28, FreemarkerParserRULE_directiveInclude)
 	p.EnterOuterAlt(localctx, 1)
@@ -3310,6 +3355,9 @@ func (s *DirectiveImportContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *FreemarkerParser) DirectiveImport() (localctx IDirectiveImportContext) {
+	this := p
+	_ = this
+
 	localctx = NewDirectiveImportContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 30, FreemarkerParserRULE_directiveImport)
 	p.EnterOuterAlt(localctx, 1)
@@ -3492,6 +3540,9 @@ func (s *DirectiveMacroContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *FreemarkerParser) DirectiveMacro() (localctx IDirectiveMacroContext) {
+	this := p
+	_ = this
+
 	localctx = NewDirectiveMacroContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 32, FreemarkerParserRULE_directiveMacro)
 	var _la int
@@ -3727,6 +3778,9 @@ func (s *DirectiveNestedContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *FreemarkerParser) DirectiveNested() (localctx IDirectiveNestedContext) {
+	this := p
+	_ = this
+
 	localctx = NewDirectiveNestedContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 34, FreemarkerParserRULE_directiveNested)
 	var _la int
@@ -3891,6 +3945,9 @@ func (s *DirectiveReturnContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *FreemarkerParser) DirectiveReturn() (localctx IDirectiveReturnContext) {
+	this := p
+	_ = this
+
 	localctx = NewDirectiveReturnContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 36, FreemarkerParserRULE_directiveReturn)
 	p.EnterOuterAlt(localctx, 1)
@@ -4115,6 +4172,9 @@ func (s *DirectiveUserContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *FreemarkerParser) DirectiveUser() (localctx IDirectiveUserContext) {
+	this := p
+	_ = this
+
 	localctx = NewDirectiveUserContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 38, FreemarkerParserRULE_directiveUser)
 	p.SetState(238)
@@ -4311,6 +4371,9 @@ func (s *DirectiveUserIdContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *FreemarkerParser) DirectiveUserId() (localctx IDirectiveUserIdContext) {
+	this := p
+	_ = this
+
 	localctx = NewDirectiveUserIdContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 40, FreemarkerParserRULE_directiveUserId)
 	var _la int
@@ -4507,6 +4570,9 @@ func (s *DirectiveUserParamsContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *FreemarkerParser) DirectiveUserParams() (localctx IDirectiveUserParamsContext) {
+	this := p
+	_ = this
+
 	localctx = NewDirectiveUserParamsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 42, FreemarkerParserRULE_directiveUserParams)
 	var _la int
@@ -4718,6 +4784,9 @@ func (s *DirectiveUserLoopParamsContext) Accept(visitor antlr.ParseTreeVisitor) 
 }
 
 func (p *FreemarkerParser) DirectiveUserLoopParams() (localctx IDirectiveUserLoopParamsContext) {
+	this := p
+	_ = this
+
 	localctx = NewDirectiveUserLoopParamsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 44, FreemarkerParserRULE_directiveUserLoopParams)
 	var _la int
@@ -4876,6 +4945,9 @@ func (s *TagExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *FreemarkerParser) TagExpr() (localctx ITagExprContext) {
+	this := p
+	_ = this
+
 	localctx = NewTagExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 46, FreemarkerParserRULE_tagExpr)
 	p.EnterOuterAlt(localctx, 1)
@@ -4978,6 +5050,9 @@ func (s *InlineExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *FreemarkerParser) InlineExpr() (localctx IInlineExprContext) {
+	this := p
+	_ = this
+
 	localctx = NewInlineExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 48, FreemarkerParserRULE_inlineExpr)
 	p.EnterOuterAlt(localctx, 1)
@@ -5142,6 +5217,9 @@ func (s *SingleQuoteContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *FreemarkerParser) String_() (localctx IStringContext) {
+	this := p
+	_ = this
+
 	localctx = NewStringContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 50, FreemarkerParserRULE_string)
 	p.SetState(287)
@@ -6433,6 +6511,9 @@ func (p *FreemarkerParser) Expr() (localctx IExprContext) {
 }
 
 func (p *FreemarkerParser) expr(_p int) (localctx IExprContext) {
+	this := p
+	_ = this
+
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 
 	_parentState := p.GetState()
@@ -7105,6 +7186,9 @@ func (s *FunctionParamsContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *FreemarkerParser) FunctionParams() (localctx IFunctionParamsContext) {
+	this := p
+	_ = this
+
 	localctx = NewFunctionParamsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 54, FreemarkerParserRULE_functionParams)
 	var _la int
@@ -7277,6 +7361,9 @@ func (s *BooleanRelationalOperatorContext) Accept(visitor antlr.ParseTreeVisitor
 }
 
 func (p *FreemarkerParser) BooleanRelationalOperator() (localctx IBooleanRelationalOperatorContext) {
+	this := p
+	_ = this
+
 	localctx = NewBooleanRelationalOperatorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 56, FreemarkerParserRULE_booleanRelationalOperator)
 	var _la int
@@ -7434,6 +7521,9 @@ func (s *StructContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *FreemarkerParser) Struct_() (localctx IStructContext) {
+	this := p
+	_ = this
+
 	localctx = NewStructContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 58, FreemarkerParserRULE_struct)
 	var _la int
@@ -7619,6 +7709,9 @@ func (s *Struct_pairContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *FreemarkerParser) Struct_pair() (localctx IStruct_pairContext) {
+	this := p
+	_ = this
+
 	localctx = NewStruct_pairContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 60, FreemarkerParserRULE_struct_pair)
 	p.EnterOuterAlt(localctx, 1)
@@ -7832,6 +7925,9 @@ func (s *Single_quote_stringContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *FreemarkerParser) Single_quote_string() (localctx ISingle_quote_stringContext) {
+	this := p
+	_ = this
+
 	localctx = NewSingle_quote_stringContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 62, FreemarkerParserRULE_single_quote_string)
 	var _la int
@@ -8093,6 +8189,9 @@ func (s *Double_quote_stringContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *FreemarkerParser) Double_quote_string() (localctx IDouble_quote_stringContext) {
+	this := p
+	_ = this
+
 	localctx = NewDouble_quote_stringContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 64, FreemarkerParserRULE_double_quote_string)
 	var _la int
@@ -8212,6 +8311,9 @@ func (p *FreemarkerParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIn
 }
 
 func (p *FreemarkerParser) Expr_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 0:
 		return p.Precpred(p.GetParserRuleContext(), 6)

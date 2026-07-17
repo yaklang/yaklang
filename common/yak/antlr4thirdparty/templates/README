@@ -1,8 +1,11 @@
-# Patched ANTLR Go codegen templates (ANTLR 4.13.2 Go.stg + yaklang import).
+# Patched ANTLR Go codegen templates (ANTLR 4.13.2 Go.stg + yaklang patches).
 
-# Diff vs upstream jar: only
-#   github.com/antlr4-go/antlr/v4  ->  github.com/yaklang/antlr/v4
-# (6 occurrences). Everything else is identical to 4.13.2.
+# Diff vs upstream jar Go.stg:
+# 1) github.com/antlr4-go/antlr/v4 -> github.com/yaklang/antlr/v4 (6 places)
+# 2) Restore 4.11.x "this := receiver" aliases in RuleActionFunction,
+#    RuleSempredFunction, RuleFunction, and LeftRecursiveRuleFunction.
+#    Upstream 4.13.2 dropped these, but grammars still use Java-style "this"
+#    in actions/predicates (antlr/antlr4#4311 / grammars-v4#2177).
 #
 # Do not invoke java -cp here directly from language scripts.
-# Use: common/yak/antlr4util/antlr4  (see that wrapper).
+# Use: common/yak/antlr4util/antlr4

@@ -490,6 +490,9 @@ func (s *JspDocumentsContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JSPParser) JspDocuments() (localctx IJspDocumentsContext) {
+	this := p
+	_ = this
+
 	localctx = NewJspDocumentsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, JSPParserRULE_jspDocuments)
 	var _la int
@@ -715,6 +718,9 @@ func (s *JspDocumentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JSPParser) JspDocument() (localctx IJspDocumentContext) {
+	this := p
+	_ = this
+
 	localctx = NewJspDocumentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 2, JSPParserRULE_jspDocument)
 	p.SetState(92)
@@ -862,6 +868,9 @@ func (s *JspStartContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) JspStart() (localctx IJspStartContext) {
+	this := p
+	_ = this
+
 	localctx = NewJspStartContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 4, JSPParserRULE_jspStart)
 	p.SetState(96)
@@ -1155,6 +1164,9 @@ func (s *JspElementsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JSPParser) JspElements() (localctx IJspElementsContext) {
+	this := p
+	_ = this
+
 	localctx = NewJspElementsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, JSPParserRULE_jspElements)
 	p.EnterOuterAlt(localctx, 1)
@@ -1345,6 +1357,9 @@ func (s *HtmlMiscsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) HtmlMiscs() (localctx IHtmlMiscsContext) {
+	this := p
+	_ = this
+
 	localctx = NewHtmlMiscsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 8, JSPParserRULE_htmlMiscs)
 	var _alt int
@@ -1489,6 +1504,9 @@ func (s *JspScriptContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) JspScript() (localctx IJspScriptContext) {
+	this := p
+	_ = this
+
 	localctx = NewJspScriptContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 10, JSPParserRULE_jspScript)
 	p.SetState(118)
@@ -1665,6 +1683,9 @@ func (s *HtmlElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JSPParser) HtmlElement() (localctx IHtmlElementContext) {
+	this := p
+	_ = this
+
 	localctx = NewHtmlElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 12, JSPParserRULE_htmlElement)
 	p.SetState(139)
@@ -1886,6 +1907,9 @@ func (s *HtmlCloseElementContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JSPParser) HtmlCloseElement() (localctx IHtmlCloseElementContext) {
+	this := p
+	_ = this
+
 	localctx = NewHtmlCloseElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 14, JSPParserRULE_htmlCloseElement)
 	p.EnterOuterAlt(localctx, 1)
@@ -2052,6 +2076,9 @@ func (s *HtmlBeginContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) HtmlBegin() (localctx IHtmlBeginContext) {
+	this := p
+	_ = this
+
 	localctx = NewHtmlBeginContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 16, JSPParserRULE_htmlBegin)
 	var _la int
@@ -2218,6 +2245,9 @@ func (s *HtmlBeginElementContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JSPParser) HtmlBeginElement() (localctx IHtmlBeginElementContext) {
+	this := p
+	_ = this
+
 	localctx = NewHtmlBeginElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 18, JSPParserRULE_htmlBeginElement)
 	p.SetState(156)
@@ -2334,6 +2364,9 @@ func (s *TagJspFragmentContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JSPParser) TagJspFragment() (localctx ITagJspFragmentContext) {
+	this := p
+	_ = this
+
 	localctx = NewTagJspFragmentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 20, JSPParserRULE_tagJspFragment)
 	p.EnterOuterAlt(localctx, 1)
@@ -2471,6 +2504,9 @@ func (s *HtmlTagContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) HtmlTag() (localctx IHtmlTagContext) {
+	this := p
+	_ = this
+
 	localctx = NewHtmlTagContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 22, JSPParserRULE_htmlTag)
 	var _la int
@@ -2660,6 +2696,9 @@ func (s *JspDirectiveContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JSPParser) JspDirective() (localctx IJspDirectiveContext) {
+	this := p
+	_ = this
+
 	localctx = NewJspDirectiveContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 24, JSPParserRULE_jspDirective)
 	var _la int
@@ -2902,6 +2941,9 @@ func (s *HtmlContentsContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JSPParser) HtmlContents() (localctx IHtmlContentsContext) {
+	this := p
+	_ = this
+
 	localctx = NewHtmlContentsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 26, JSPParserRULE_htmlContents)
 	var _alt int
@@ -3200,6 +3242,9 @@ func (s *HtmlContentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JSPParser) HtmlContent() (localctx IHtmlContentContext) {
+	this := p
+	_ = this
+
 	localctx = NewHtmlContentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 28, JSPParserRULE_htmlContent)
 	p.SetState(212)
@@ -3337,6 +3382,9 @@ func (s *JspIfBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) JspIfBlock() (localctx IJspIfBlockContext) {
+	this := p
+	_ = this
+
 	localctx = NewJspIfBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 30, JSPParserRULE_jspIfBlock)
 	p.EnterOuterAlt(localctx, 1)
@@ -3441,6 +3489,9 @@ func (s *ElExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JSPParser) ElExpression() (localctx IElExpressionContext) {
+	this := p
+	_ = this
+
 	localctx = NewElExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 32, JSPParserRULE_elExpression)
 	p.EnterOuterAlt(localctx, 1)
@@ -3689,6 +3740,9 @@ func (s *JSPExpressionAttributeContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 func (p *JSPParser) HtmlAttribute() (localctx IHtmlAttributeContext) {
+	this := p
+	_ = this
+
 	localctx = NewHtmlAttributeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 34, JSPParserRULE_htmlAttribute)
 	p.SetState(226)
@@ -3835,6 +3889,9 @@ func (s *HtmlAttributeNameContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *JSPParser) HtmlAttributeName() (localctx IHtmlAttributeNameContext) {
+	this := p
+	_ = this
+
 	localctx = NewHtmlAttributeNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 36, JSPParserRULE_htmlAttributeName)
 	var _la int
@@ -4011,6 +4068,9 @@ func (s *HtmlAttributeValueContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *JSPParser) HtmlAttributeValue() (localctx IHtmlAttributeValueContext) {
+	this := p
+	_ = this
+
 	localctx = NewHtmlAttributeValueContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 38, JSPParserRULE_htmlAttributeValue)
 	var _la int
@@ -4247,6 +4307,9 @@ func (s *HtmlAttributeValueElementContext) Accept(visitor antlr.ParseTreeVisitor
 }
 
 func (p *JSPParser) HtmlAttributeValueElement() (localctx IHtmlAttributeValueElementContext) {
+	this := p
+	_ = this
+
 	localctx = NewHtmlAttributeValueElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 40, JSPParserRULE_htmlAttributeValueElement)
 	p.SetState(254)
@@ -4388,6 +4451,9 @@ func (s *HtmlTagNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JSPParser) HtmlTagName() (localctx IHtmlTagNameContext) {
+	this := p
+	_ = this
+
 	localctx = NewHtmlTagNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 42, JSPParserRULE_htmlTagName)
 	p.EnterOuterAlt(localctx, 1)
@@ -4487,6 +4553,9 @@ func (s *HtmlChardataContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JSPParser) HtmlChardata() (localctx IHtmlChardataContext) {
+	this := p
+	_ = this
+
 	localctx = NewHtmlChardataContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 44, JSPParserRULE_htmlChardata)
 	var _la int
@@ -4654,6 +4723,9 @@ func (s *HtmlMiscContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) HtmlMisc() (localctx IHtmlMiscContext) {
+	this := p
+	_ = this
+
 	localctx = NewHtmlMiscContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 46, JSPParserRULE_htmlMisc)
 	p.SetState(265)
@@ -4793,6 +4865,9 @@ func (s *HtmlCommentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *JSPParser) HtmlComment() (localctx IHtmlCommentContext) {
+	this := p
+	_ = this
+
 	localctx = NewHtmlCommentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 48, JSPParserRULE_htmlComment)
 	var _la int
@@ -4892,6 +4967,9 @@ func (s *XhtmlCDATAContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) XhtmlCDATA() (localctx IXhtmlCDATAContext) {
+	this := p
+	_ = this
+
 	localctx = NewXhtmlCDATAContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 50, JSPParserRULE_xhtmlCDATA)
 	p.EnterOuterAlt(localctx, 1)
@@ -5078,6 +5156,9 @@ func (s *DtdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) Dtd() (localctx IDtdContext) {
+	this := p
+	_ = this
+
 	localctx = NewDtdContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 52, JSPParserRULE_dtd)
 	var _la int
@@ -5246,6 +5327,9 @@ func (s *DtdElementNameContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JSPParser) DtdElementName() (localctx IDtdElementNameContext) {
+	this := p
+	_ = this
+
 	localctx = NewDtdElementNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 54, JSPParserRULE_dtdElementName)
 	p.EnterOuterAlt(localctx, 1)
@@ -5340,6 +5424,9 @@ func (s *PublicIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) PublicId() (localctx IPublicIdContext) {
+	this := p
+	_ = this
+
 	localctx = NewPublicIdContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 56, JSPParserRULE_publicId)
 	p.EnterOuterAlt(localctx, 1)
@@ -5434,6 +5521,9 @@ func (s *SystemIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) SystemId() (localctx ISystemIdContext) {
+	this := p
+	_ = this
+
 	localctx = NewSystemIdContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 58, JSPParserRULE_systemId)
 	p.EnterOuterAlt(localctx, 1)
@@ -5626,6 +5716,9 @@ func (s *XmlContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) Xml() (localctx IXmlContext) {
+	this := p
+	_ = this
+
 	localctx = NewXmlContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 60, JSPParserRULE_xml)
 	var _alt int
@@ -5814,6 +5907,9 @@ func (s *JspScriptletContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *JSPParser) JspScriptlet() (localctx IJspScriptletContext) {
+	this := p
+	_ = this
+
 	localctx = NewJspScriptletContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 62, JSPParserRULE_jspScriptlet)
 	p.SetState(308)
@@ -5945,6 +6041,9 @@ func (s *JspExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *JSPParser) JspExpression() (localctx IJspExpressionContext) {
+	this := p
+	_ = this
+
 	localctx = NewJspExpressionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 64, JSPParserRULE_jspExpression)
 	p.EnterOuterAlt(localctx, 1)
@@ -6048,6 +6147,9 @@ func (s *ScriptletStartContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *JSPParser) ScriptletStart() (localctx IScriptletStartContext) {
+	this := p
+	_ = this
+
 	localctx = NewScriptletStartContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 66, JSPParserRULE_scriptletStart)
 	var _la int
@@ -6152,6 +6254,9 @@ func (s *ScriptletContentContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *JSPParser) ScriptletContent() (localctx IScriptletContentContext) {
+	this := p
+	_ = this
+
 	localctx = NewScriptletContentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 68, JSPParserRULE_scriptletContent)
 	p.EnterOuterAlt(localctx, 1)
@@ -6264,6 +6369,9 @@ func (s *JavaScriptContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) JavaScript() (localctx IJavaScriptContext) {
+	this := p
+	_ = this
+
 	localctx = NewJavaScriptContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 70, JSPParserRULE_javaScript)
 	var _la int
@@ -6381,6 +6489,9 @@ func (s *StyleContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *JSPParser) Style() (localctx IStyleContext) {
+	this := p
+	_ = this
+
 	localctx = NewStyleContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 72, JSPParserRULE_style)
 	var _la int

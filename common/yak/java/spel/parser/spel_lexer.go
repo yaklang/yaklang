@@ -542,20 +542,26 @@ func (l *SpelLexer) Action(localctx antlr.RuleContext, ruleIndex, actionIndex in
 }
 
 func (l *SpelLexer) LCURLY_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 0:
-		l.indent++
+		this.indent++
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))
 	}
 }
 func (l *SpelLexer) RCURLY_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 1:
 
-		if l.indent > 0 {
-			l.indent--
+		if this.indent > 0 {
+			this.indent--
 		}
 
 	default:
@@ -563,9 +569,12 @@ func (l *SpelLexer) RCURLY_Action(localctx antlr.RuleContext, actionIndex int) {
 	}
 }
 func (l *SpelLexer) SPEL_IN_TEMPLATE_STRING_OPEN_Action(localctx antlr.RuleContext, actionIndex int) {
+	this := l
+	_ = this
+
 	switch actionIndex {
 	case 2:
-		l.indent++
+		this.indent++
 
 	default:
 		panic("No registered action for: " + fmt.Sprint(actionIndex))

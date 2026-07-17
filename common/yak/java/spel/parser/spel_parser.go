@@ -411,6 +411,9 @@ func (s *ScriptContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SpelParser) Script() (localctx IScriptContext) {
+	this := p
+	_ = this
+
 	localctx = NewScriptContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, SpelParserRULE_script)
 	p.EnterOuterAlt(localctx, 1)
@@ -761,6 +764,9 @@ func (p *SpelParser) SpelExpr() (localctx ISpelExprContext) {
 }
 
 func (p *SpelParser) spelExpr(_p int) (localctx ISpelExprContext) {
+	this := p
+	_ = this
+
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 
 	_parentState := p.GetState()
@@ -1253,6 +1259,9 @@ func (s *NodeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SpelParser) Node() (localctx INodeContext) {
+	this := p
+	_ = this
+
 	localctx = NewNodeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 4, SpelParserRULE_node)
 	p.SetState(113)
@@ -1419,6 +1428,9 @@ func (s *NonDottedNodeContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *SpelParser) NonDottedNode() (localctx INonDottedNodeContext) {
+	this := p
+	_ = this
+
 	localctx = NewNonDottedNodeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, SpelParserRULE_nonDottedNode)
 	p.SetState(121)
@@ -1624,6 +1636,9 @@ func (s *DottedNodeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SpelParser) DottedNode() (localctx IDottedNodeContext) {
+	this := p
+	_ = this
+
 	localctx = NewDottedNodeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 8, SpelParserRULE_dottedNode)
 	var _la int
@@ -1783,6 +1798,9 @@ func (s *FunctionOrVarContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *SpelParser) FunctionOrVar() (localctx IFunctionOrVarContext) {
+	this := p
+	_ = this
+
 	localctx = NewFunctionOrVarContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 10, SpelParserRULE_functionOrVar)
 	p.SetState(135)
@@ -1942,6 +1960,9 @@ func (s *MethodArgsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SpelParser) MethodArgs() (localctx IMethodArgsContext) {
+	this := p
+	_ = this
+
 	localctx = NewMethodArgsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 12, SpelParserRULE_methodArgs)
 	p.EnterOuterAlt(localctx, 1)
@@ -2096,6 +2117,9 @@ func (s *ArgsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SpelParser) Args() (localctx IArgsContext) {
+	this := p
+	_ = this
+
 	localctx = NewArgsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 14, SpelParserRULE_args)
 	var _la int
@@ -2243,6 +2267,9 @@ func (s *MethodOrPropertyContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *SpelParser) MethodOrProperty() (localctx IMethodOrPropertyContext) {
+	this := p
+	_ = this
+
 	localctx = NewMethodOrPropertyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 16, SpelParserRULE_methodOrProperty)
 	p.SetState(154)
@@ -2386,6 +2413,9 @@ func (s *ProjectionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SpelParser) Projection() (localctx IProjectionContext) {
+	this := p
+	_ = this
+
 	localctx = NewProjectionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 18, SpelParserRULE_projection)
 	p.EnterOuterAlt(localctx, 1)
@@ -2524,6 +2554,9 @@ func (s *SelectionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SpelParser) Selection() (localctx ISelectionContext) {
+	this := p
+	_ = this
+
 	localctx = NewSelectionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 20, SpelParserRULE_selection)
 	var _la int
@@ -2851,6 +2884,9 @@ func (s *StartNodeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SpelParser) StartNode() (localctx IStartNodeContext) {
+	this := p
+	_ = this
+
 	localctx = NewStartNodeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 22, SpelParserRULE_startNode)
 	p.SetState(177)
@@ -3065,6 +3101,9 @@ func (s *LiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SpelParser) Literal() (localctx ILiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 24, SpelParserRULE_literal)
 	p.SetState(183)
@@ -3206,6 +3245,9 @@ func (s *NumericLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *SpelParser) NumericLiteral() (localctx INumericLiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewNumericLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 26, SpelParserRULE_numericLiteral)
 	var _la int
@@ -3327,6 +3369,9 @@ func (s *ParenspelExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *SpelParser) ParenspelExpr() (localctx IParenspelExprContext) {
+	this := p
+	_ = this
+
 	localctx = NewParenspelExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 28, SpelParserRULE_parenspelExpr)
 	p.EnterOuterAlt(localctx, 1)
@@ -3480,6 +3525,9 @@ func (s *TypeReferenceContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *SpelParser) TypeReference() (localctx ITypeReferenceContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeReferenceContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 30, SpelParserRULE_typeReference)
 	var _la int
@@ -3643,6 +3691,9 @@ func (s *PossiblyQualifiedIdContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *SpelParser) PossiblyQualifiedId() (localctx IPossiblyQualifiedIdContext) {
+	this := p
+	_ = this
+
 	localctx = NewPossiblyQualifiedIdContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 32, SpelParserRULE_possiblyQualifiedId)
 	var _la int
@@ -3771,6 +3822,9 @@ func (s *NullReferenceContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *SpelParser) NullReference() (localctx INullReferenceContext) {
+	this := p
+	_ = this
+
 	localctx = NewNullReferenceContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 34, SpelParserRULE_nullReference)
 	p.EnterOuterAlt(localctx, 1)
@@ -3979,6 +4033,9 @@ func (s *ConstructorReferenceContext) Accept(visitor antlr.ParseTreeVisitor) int
 }
 
 func (p *SpelParser) ConstructorReference() (localctx IConstructorReferenceContext) {
+	this := p
+	_ = this
+
 	localctx = NewConstructorReferenceContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 36, SpelParserRULE_constructorReference)
 	var _la int
@@ -4198,6 +4255,9 @@ func (s *ConstructorArgsContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *SpelParser) ConstructorArgs() (localctx IConstructorArgsContext) {
+	this := p
+	_ = this
+
 	localctx = NewConstructorArgsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 38, SpelParserRULE_constructorArgs)
 	p.EnterOuterAlt(localctx, 1)
@@ -4348,6 +4408,9 @@ func (s *InlineListOrMapContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *SpelParser) InlineListOrMap() (localctx IInlineListOrMapContext) {
+	this := p
+	_ = this
+
 	localctx = NewInlineListOrMapContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 40, SpelParserRULE_inlineListOrMap)
 	p.SetState(250)
@@ -4605,6 +4668,9 @@ func (s *ListBindingsContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *SpelParser) ListBindings() (localctx IListBindingsContext) {
+	this := p
+	_ = this
+
 	localctx = NewListBindingsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 42, SpelParserRULE_listBindings)
 	var _la int
@@ -4745,6 +4811,9 @@ func (s *ListBindingContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *SpelParser) ListBinding() (localctx IListBindingContext) {
+	this := p
+	_ = this
+
 	localctx = NewListBindingContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 44, SpelParserRULE_listBinding)
 	p.EnterOuterAlt(localctx, 1)
@@ -4905,6 +4974,9 @@ func (s *MapBindingsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *SpelParser) MapBindings() (localctx IMapBindingsContext) {
+	this := p
+	_ = this
+
 	localctx = NewMapBindingsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 46, SpelParserRULE_mapBindings)
 	var _la int
@@ -5098,6 +5170,9 @@ func (s *MapBindingContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *SpelParser) MapBinding() (localctx IMapBindingContext) {
+	this := p
+	_ = this
+
 	localctx = NewMapBindingContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 48, SpelParserRULE_mapBinding)
 	p.EnterOuterAlt(localctx, 1)
@@ -5221,6 +5296,9 @@ func (s *BeanReferenceContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *SpelParser) BeanReference() (localctx IBeanReferenceContext) {
+	this := p
+	_ = this
+
 	localctx = NewBeanReferenceContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 50, SpelParserRULE_beanReference)
 	var _la int
@@ -5341,6 +5419,9 @@ func (s *InputParameterContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *SpelParser) InputParameter() (localctx IInputParameterContext) {
+	this := p
+	_ = this
+
 	localctx = NewInputParameterContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 52, SpelParserRULE_inputParameter)
 	p.EnterOuterAlt(localctx, 1)
@@ -5451,6 +5532,9 @@ func (s *PropertyPlaceHolderContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 func (p *SpelParser) PropertyPlaceHolder() (localctx IPropertyPlaceHolderContext) {
+	this := p
+	_ = this
+
 	localctx = NewPropertyPlaceHolderContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 54, SpelParserRULE_propertyPlaceHolder)
 	p.EnterOuterAlt(localctx, 1)
@@ -5491,6 +5575,9 @@ func (p *SpelParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex in
 }
 
 func (p *SpelParser) SpelExpr_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 0:
 		return p.Precpred(p.GetParserRuleContext(), 11)

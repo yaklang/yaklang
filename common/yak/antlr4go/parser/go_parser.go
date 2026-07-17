@@ -1382,6 +1382,9 @@ func (s *SourceFileContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) SourceFile() (localctx ISourceFileContext) {
+	this := p
+	_ = this
+
 	localctx = NewSourceFileContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, GoParserRULE_sourceFile)
 	var _la int
@@ -1695,6 +1698,9 @@ func (s *PackageClauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *GoParser) PackageClause() (localctx IPackageClauseContext) {
+	this := p
+	_ = this
+
 	localctx = NewPackageClauseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 2, GoParserRULE_packageClause)
 	var _alt int
@@ -1822,6 +1828,9 @@ func (s *PackageNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *GoParser) PackageName() (localctx IPackageNameContext) {
+	this := p
+	_ = this
+
 	localctx = NewPackageNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 4, GoParserRULE_packageName)
 	p.EnterOuterAlt(localctx, 1)
@@ -2012,6 +2021,9 @@ func (s *ImportDeclContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) ImportDecl() (localctx IImportDeclContext) {
+	this := p
+	_ = this
+
 	localctx = NewImportDeclContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, GoParserRULE_importDecl)
 	var _la int
@@ -2236,6 +2248,9 @@ func (s *ImportSpecContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) ImportSpec() (localctx IImportSpecContext) {
+	this := p
+	_ = this
+
 	localctx = NewImportSpecContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 8, GoParserRULE_importSpec)
 	var _la int
@@ -2368,6 +2383,9 @@ func (s *ImportPathContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) ImportPath() (localctx IImportPathContext) {
+	this := p
+	_ = this
+
 	localctx = NewImportPathContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 10, GoParserRULE_importPath)
 	p.EnterOuterAlt(localctx, 1)
@@ -2504,6 +2522,9 @@ func (s *DeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *GoParser) Declaration() (localctx IDeclarationContext) {
+	this := p
+	_ = this
+
 	localctx = NewDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 12, GoParserRULE_declaration)
 	p.SetState(297)
@@ -2717,6 +2738,9 @@ func (s *ConstDeclContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) ConstDecl() (localctx IConstDeclContext) {
+	this := p
+	_ = this
+
 	localctx = NewConstDeclContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 14, GoParserRULE_constDecl)
 	var _la int
@@ -3051,6 +3075,9 @@ func (s *ConstSpecContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) ConstSpec() (localctx IConstSpecContext) {
+	this := p
+	_ = this
+
 	localctx = NewConstSpecContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 16, GoParserRULE_constSpec)
 	var _la int
@@ -3302,6 +3329,9 @@ func (s *IdentifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) Identifier() (localctx IIdentifierContext) {
+	this := p
+	_ = this
+
 	localctx = NewIdentifierContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 18, GoParserRULE_identifier)
 	var _la int
@@ -3492,6 +3522,9 @@ func (s *IdentifierListContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *GoParser) IdentifierList() (localctx IIdentifierListContext) {
+	this := p
+	_ = this
+
 	localctx = NewIdentifierListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 20, GoParserRULE_identifierList)
 	var _la int
@@ -3723,6 +3756,9 @@ func (s *ExpressionListContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *GoParser) ExpressionList() (localctx IExpressionListContext) {
+	this := p
+	_ = this
+
 	localctx = NewExpressionListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 22, GoParserRULE_expressionList)
 	var _la int
@@ -3968,6 +4004,9 @@ func (s *TypeDeclContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) TypeDecl() (localctx ITypeDeclContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeDeclContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 24, GoParserRULE_typeDecl)
 	var _la int
@@ -4188,6 +4227,9 @@ func (s *TypeSpecContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) TypeSpec() (localctx ITypeSpecContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeSpecContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 26, GoParserRULE_typeSpec)
 	p.SetState(433)
@@ -4379,6 +4421,9 @@ func (s *AliasDeclContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) AliasDecl() (localctx IAliasDeclContext) {
+	this := p
+	_ = this
+
 	localctx = NewAliasDeclContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 28, GoParserRULE_aliasDecl)
 	var _la int
@@ -4575,6 +4620,9 @@ func (s *TypeDefContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) TypeDef() (localctx ITypeDefContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeDefContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 30, GoParserRULE_typeDef)
 	p.EnterOuterAlt(localctx, 1)
@@ -4786,6 +4834,9 @@ func (s *TypeParametersContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *GoParser) TypeParameters() (localctx ITypeParametersContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeParametersContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 32, GoParserRULE_typeParameters)
 	var _la int
@@ -5081,6 +5132,9 @@ func (s *TypeParameterDeclContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *GoParser) TypeParameterDecl() (localctx ITypeParameterDeclContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeParameterDeclContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 34, GoParserRULE_typeParameterDecl)
 	var _la int
@@ -5288,6 +5342,9 @@ func (s *TypeElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *GoParser) TypeElement() (localctx ITypeElementContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 36, GoParserRULE_typeElement)
 	var _la int
@@ -5474,6 +5531,9 @@ func (s *TypeTermContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) TypeTerm() (localctx ITypeTermContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeTermContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 38, GoParserRULE_typeTerm)
 	var _la int
@@ -5683,6 +5743,9 @@ func (s *FunctionDeclContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *GoParser) FunctionDecl() (localctx IFunctionDeclContext) {
+	this := p
+	_ = this
+
 	localctx = NewFunctionDeclContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 40, GoParserRULE_functionDecl)
 	var _la int
@@ -5964,6 +6027,9 @@ func (s *MethodDeclContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) MethodDecl() (localctx IMethodDeclContext) {
+	this := p
+	_ = this
+
 	localctx = NewMethodDeclContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 42, GoParserRULE_methodDecl)
 	var _la int
@@ -6145,6 +6211,9 @@ func (s *ReceiverContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) Receiver() (localctx IReceiverContext) {
+	this := p
+	_ = this
+
 	localctx = NewReceiverContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 44, GoParserRULE_receiver)
 	p.EnterOuterAlt(localctx, 1)
@@ -6331,6 +6400,9 @@ func (s *VarDeclContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) VarDecl() (localctx IVarDeclContext) {
+	this := p
+	_ = this
+
 	localctx = NewVarDeclContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 46, GoParserRULE_varDecl)
 	var _la int
@@ -6636,6 +6708,9 @@ func (s *VarSpecContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) VarSpec() (localctx IVarSpecContext) {
+	this := p
+	_ = this
+
 	localctx = NewVarSpecContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 48, GoParserRULE_varSpec)
 	var _la int
@@ -6915,6 +6990,9 @@ func (s *BlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) Block() (localctx IBlockContext) {
+	this := p
+	_ = this
+
 	localctx = NewBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 50, GoParserRULE_block)
 	var _la int
@@ -7163,6 +7241,9 @@ func (s *StatementListContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *GoParser) StatementList() (localctx IStatementListContext) {
+	this := p
+	_ = this
+
 	localctx = NewStatementListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 52, GoParserRULE_statementList)
 	var _la int
@@ -7550,6 +7631,9 @@ func (s *StatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) Statement() (localctx IStatementContext) {
+	this := p
+	_ = this
+
 	localctx = NewStatementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 54, GoParserRULE_statement)
 	p.SetState(661)
@@ -7796,6 +7880,9 @@ func (s *SimpleStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) SimpleStmt() (localctx ISimpleStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewSimpleStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 56, GoParserRULE_simpleStmt)
 	p.SetState(666)
@@ -8020,6 +8107,9 @@ func (s *ExprSimpleStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *GoParser) ExprSimpleStmt() (localctx IExprSimpleStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewExprSimpleStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 58, GoParserRULE_exprSimpleStmt)
 	var _la int
@@ -8218,6 +8308,9 @@ func (s *Assign_opContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) Assign_op() (localctx IAssign_opContext) {
+	this := p
+	_ = this
+
 	localctx = NewAssign_opContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 60, GoParserRULE_assign_op)
 	var _la int
@@ -8400,6 +8493,9 @@ func (s *SendStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) SendStmt() (localctx ISendStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewSendStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 62, GoParserRULE_sendStmt)
 	p.EnterOuterAlt(localctx, 1)
@@ -8585,6 +8681,9 @@ func (s *ShortVarDeclContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *GoParser) ShortVarDecl() (localctx IShortVarDeclContext) {
+	this := p
+	_ = this
+
 	localctx = NewShortVarDeclContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 64, GoParserRULE_shortVarDecl)
 	var _la int
@@ -8774,6 +8873,9 @@ func (s *LabeledStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *GoParser) LabeledStmt() (localctx ILabeledStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewLabeledStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 66, GoParserRULE_labeledStmt)
 	var _alt int
@@ -8934,6 +9036,9 @@ func (s *ReturnStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) ReturnStmt() (localctx IReturnStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewReturnStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 68, GoParserRULE_returnStmt)
 	p.EnterOuterAlt(localctx, 1)
@@ -9045,6 +9150,9 @@ func (s *BreakStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) BreakStmt() (localctx IBreakStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewBreakStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 70, GoParserRULE_breakStmt)
 	p.EnterOuterAlt(localctx, 1)
@@ -9160,6 +9268,9 @@ func (s *ContinueStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *GoParser) ContinueStmt() (localctx IContinueStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewContinueStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 72, GoParserRULE_continueStmt)
 	p.EnterOuterAlt(localctx, 1)
@@ -9275,6 +9386,9 @@ func (s *GotoStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) GotoStmt() (localctx IGotoStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewGotoStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 74, GoParserRULE_gotoStmt)
 	p.EnterOuterAlt(localctx, 1)
@@ -9377,6 +9491,9 @@ func (s *FallthroughStmtContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *GoParser) FallthroughStmt() (localctx IFallthroughStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewFallthroughStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 76, GoParserRULE_fallthroughStmt)
 	p.EnterOuterAlt(localctx, 1)
@@ -9488,6 +9605,9 @@ func (s *DeferStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) DeferStmt() (localctx IDeferStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewDeferStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 78, GoParserRULE_deferStmt)
 	p.EnterOuterAlt(localctx, 1)
@@ -9738,6 +9858,9 @@ func (s *IfStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) IfStmt() (localctx IIfStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewIfStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 80, GoParserRULE_ifStmt)
 	var _la int
@@ -10019,6 +10142,9 @@ func (s *SwitchStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) SwitchStmt() (localctx ISwitchStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewSwitchStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 82, GoParserRULE_switchStmt)
 	p.SetState(770)
@@ -10268,6 +10394,9 @@ func (s *ExprSwitchStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *GoParser) ExprSwitchStmt() (localctx IExprSwitchStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewExprSwitchStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 84, GoParserRULE_exprSwitchStmt)
 	var _la int
@@ -10634,6 +10763,9 @@ func (s *ExprCaseClauseContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *GoParser) ExprCaseClause() (localctx IExprCaseClauseContext) {
+	this := p
+	_ = this
+
 	localctx = NewExprCaseClauseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 86, GoParserRULE_exprCaseClause)
 	var _la int
@@ -10842,6 +10974,9 @@ func (s *ExprSwitchCaseContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *GoParser) ExprSwitchCase() (localctx IExprSwitchCaseContext) {
+	this := p
+	_ = this
+
 	localctx = NewExprSwitchCaseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 88, GoParserRULE_exprSwitchCase)
 	var _la int
@@ -11126,6 +11261,9 @@ func (s *TypeSwitchStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *GoParser) TypeSwitchStmt() (localctx ITypeSwitchStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeSwitchStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 90, GoParserRULE_typeSwitchStmt)
 	var _la int
@@ -11420,6 +11558,9 @@ func (s *TypeSwitchGuardContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *GoParser) TypeSwitchGuard() (localctx ITypeSwitchGuardContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeSwitchGuardContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 92, GoParserRULE_typeSwitchGuard)
 	p.EnterOuterAlt(localctx, 1)
@@ -11643,6 +11784,9 @@ func (s *TypeCaseClauseContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *GoParser) TypeCaseClause() (localctx ITypeCaseClauseContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeCaseClauseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 94, GoParserRULE_typeCaseClause)
 	var _la int
@@ -11851,6 +11995,9 @@ func (s *TypeSwitchCaseContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *GoParser) TypeSwitchCase() (localctx ITypeSwitchCaseContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeSwitchCaseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 96, GoParserRULE_typeSwitchCase)
 	var _la int
@@ -12096,6 +12243,9 @@ func (s *TypeListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) TypeList() (localctx ITypeListContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 98, GoParserRULE_typeList)
 	var _la int
@@ -12387,6 +12537,9 @@ func (s *SelectStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) SelectStmt() (localctx ISelectStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewSelectStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 100, GoParserRULE_selectStmt)
 	var _la int
@@ -12645,6 +12798,9 @@ func (s *CommClauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) CommClause() (localctx ICommClauseContext) {
+	this := p
+	_ = this
+
 	localctx = NewCommClauseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 102, GoParserRULE_commClause)
 	var _la int
@@ -12827,6 +12983,9 @@ func (s *CommCaseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) CommCase() (localctx ICommCaseContext) {
+	this := p
+	_ = this
+
 	localctx = NewCommCaseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 104, GoParserRULE_commCase)
 	p.SetState(966)
@@ -13034,6 +13193,9 @@ func (s *RecvStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) RecvStmt() (localctx IRecvStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewRecvStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 106, GoParserRULE_recvStmt)
 	p.EnterOuterAlt(localctx, 1)
@@ -13274,6 +13436,9 @@ func (s *ForStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) ForStmt() (localctx IForStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewForStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 108, GoParserRULE_forStmt)
 	var _la int
@@ -13591,6 +13756,9 @@ func (s *ForClauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) ForClause() (localctx IForClauseContext) {
+	this := p
+	_ = this
+
 	localctx = NewForClauseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 110, GoParserRULE_forClause)
 	var _la int
@@ -13840,6 +14008,9 @@ func (s *RangeClauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *GoParser) RangeClause() (localctx IRangeClauseContext) {
+	this := p
+	_ = this
+
 	localctx = NewRangeClauseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 112, GoParserRULE_rangeClause)
 	p.EnterOuterAlt(localctx, 1)
@@ -13991,6 +14162,9 @@ func (s *GoStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) GoStmt() (localctx IGoStmtContext) {
+	this := p
+	_ = this
+
 	localctx = NewGoStmtContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 114, GoParserRULE_goStmt)
 	p.EnterOuterAlt(localctx, 1)
@@ -14162,6 +14336,9 @@ func (s *Type_Context) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) Type_() (localctx IType_Context) {
+	this := p
+	_ = this
+
 	localctx = NewType_Context(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 116, GoParserRULE_type_)
 	p.SetState(1046)
@@ -14334,6 +14511,9 @@ func (s *TypeArgsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) TypeArgs() (localctx ITypeArgsContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeArgsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 118, GoParserRULE_typeArgs)
 	var _la int
@@ -14477,6 +14657,9 @@ func (s *TypeNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) TypeName() (localctx ITypeNameContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 120, GoParserRULE_typeName)
 	p.SetState(1057)
@@ -14721,6 +14904,9 @@ func (s *TypeLitContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) TypeLit() (localctx ITypeLitContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeLitContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 122, GoParserRULE_typeLit)
 	p.SetState(1067)
@@ -14911,6 +15097,9 @@ func (s *ArrayTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) ArrayType() (localctx IArrayTypeContext) {
+	this := p
+	_ = this
+
 	localctx = NewArrayTypeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 124, GoParserRULE_arrayType)
 	p.EnterOuterAlt(localctx, 1)
@@ -15033,6 +15222,9 @@ func (s *ArrayLengthContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *GoParser) ArrayLength() (localctx IArrayLengthContext) {
+	this := p
+	_ = this
+
 	localctx = NewArrayLengthContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 126, GoParserRULE_arrayLength)
 	p.EnterOuterAlt(localctx, 1)
@@ -15135,6 +15327,9 @@ func (s *ElementTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *GoParser) ElementType() (localctx IElementTypeContext) {
+	this := p
+	_ = this
+
 	localctx = NewElementTypeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 128, GoParserRULE_elementType)
 	p.EnterOuterAlt(localctx, 1)
@@ -15242,6 +15437,9 @@ func (s *PointerTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *GoParser) PointerType() (localctx IPointerTypeContext) {
+	this := p
+	_ = this
+
 	localctx = NewPointerTypeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 130, GoParserRULE_pointerType)
 	p.EnterOuterAlt(localctx, 1)
@@ -15479,6 +15677,9 @@ func (s *InterfaceTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *GoParser) InterfaceType() (localctx IInterfaceTypeContext) {
+	this := p
+	_ = this
+
 	localctx = NewInterfaceTypeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 132, GoParserRULE_interfaceType)
 	var _la int
@@ -15691,6 +15892,9 @@ func (s *SliceTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) SliceType() (localctx ISliceTypeContext) {
+	this := p
+	_ = this
+
 	localctx = NewSliceTypeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 134, GoParserRULE_sliceType)
 	p.EnterOuterAlt(localctx, 1)
@@ -15841,6 +16045,9 @@ func (s *MapTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) MapType() (localctx IMapTypeContext) {
+	this := p
+	_ = this
+
 	localctx = NewMapTypeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 136, GoParserRULE_mapType)
 	p.EnterOuterAlt(localctx, 1)
@@ -15981,6 +16188,9 @@ func (s *ChannelTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *GoParser) ChannelType() (localctx IChannelTypeContext) {
+	this := p
+	_ = this
+
 	localctx = NewChannelTypeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 138, GoParserRULE_channelType)
 	p.EnterOuterAlt(localctx, 1)
@@ -16161,6 +16371,9 @@ func (s *MethodSpecContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) MethodSpec() (localctx IMethodSpecContext) {
+	this := p
+	_ = this
+
 	localctx = NewMethodSpecContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 140, GoParserRULE_methodSpec)
 	p.SetState(1131)
@@ -16307,6 +16520,9 @@ func (s *FunctionTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *GoParser) FunctionType() (localctx IFunctionTypeContext) {
+	this := p
+	_ = this
+
 	localctx = NewFunctionTypeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 142, GoParserRULE_functionType)
 	p.EnterOuterAlt(localctx, 1)
@@ -16434,6 +16650,9 @@ func (s *SignatureContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) Signature() (localctx ISignatureContext) {
+	this := p
+	_ = this
+
 	localctx = NewSignatureContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 144, GoParserRULE_signature)
 	p.EnterOuterAlt(localctx, 1)
@@ -16565,6 +16784,9 @@ func (s *ResultContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) Result() (localctx IResultContext) {
+	this := p
+	_ = this
+
 	localctx = NewResultContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 146, GoParserRULE_result)
 	p.SetState(1142)
@@ -16775,6 +16997,9 @@ func (s *ParametersContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) Parameters() (localctx IParametersContext) {
+	this := p
+	_ = this
+
 	localctx = NewParametersContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 148, GoParserRULE_parameters)
 	var _la int
@@ -17103,6 +17328,9 @@ func (s *ParameterDeclContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *GoParser) ParameterDecl() (localctx IParameterDeclContext) {
+	this := p
+	_ = this
+
 	localctx = NewParameterDeclContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 150, GoParserRULE_parameterDecl)
 	var _la int
@@ -17476,6 +17704,9 @@ func (p *GoParser) Expression() (localctx IExpressionContext) {
 }
 
 func (p *GoParser) expression(_p int) (localctx IExpressionContext) {
+	this := p
+	_ = this
+
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 
 	_parentState := p.GetState()
@@ -18095,6 +18326,9 @@ func (p *GoParser) PrimaryExpr() (localctx IPrimaryExprContext) {
 }
 
 func (p *GoParser) primaryExpr(_p int) (localctx IPrimaryExprContext) {
+	this := p
+	_ = this
+
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 
 	_parentState := p.GetState()
@@ -18426,6 +18660,9 @@ func (s *ConversionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) Conversion() (localctx IConversionContext) {
+	this := p
+	_ = this
+
 	localctx = NewConversionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 156, GoParserRULE_conversion)
 	var _la int
@@ -18698,6 +18935,9 @@ func (s *OperandContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) Operand() (localctx IOperandContext) {
+	this := p
+	_ = this
+
 	localctx = NewOperandContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 158, GoParserRULE_operand)
 	p.SetState(1318)
@@ -18888,6 +19128,9 @@ func (s *LiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) Literal() (localctx ILiteralContext) {
+	this := p
+	_ = this
+
 	localctx = NewLiteralContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 160, GoParserRULE_literal)
 	p.SetState(1323)
@@ -19061,6 +19304,9 @@ func (s *BasicLitContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) BasicLit() (localctx IBasicLitContext) {
+	this := p
+	_ = this
+
 	localctx = NewBasicLitContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 162, GoParserRULE_basicLit)
 	p.SetState(1330)
@@ -19220,6 +19466,9 @@ func (s *IntegerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) Integer() (localctx IIntegerContext) {
+	this := p
+	_ = this
+
 	localctx = NewIntegerContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 164, GoParserRULE_integer)
 	var _la int
@@ -19319,6 +19568,9 @@ func (s *OperandNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *GoParser) OperandName() (localctx IOperandNameContext) {
+	this := p
+	_ = this
+
 	localctx = NewOperandNameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 166, GoParserRULE_operandName)
 	p.EnterOuterAlt(localctx, 1)
@@ -19466,6 +19718,9 @@ func (s *QualifiedIdentContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *GoParser) QualifiedIdent() (localctx IQualifiedIdentContext) {
+	this := p
+	_ = this
+
 	localctx = NewQualifiedIdentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 168, GoParserRULE_qualifiedIdent)
 	var _la int
@@ -19647,6 +19902,9 @@ func (s *CompositeLitContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *GoParser) CompositeLit() (localctx ICompositeLitContext) {
+	this := p
+	_ = this
+
 	localctx = NewCompositeLitContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 170, GoParserRULE_compositeLit)
 	p.EnterOuterAlt(localctx, 1)
@@ -19870,6 +20128,9 @@ func (s *LiteralTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *GoParser) LiteralType() (localctx ILiteralTypeContext) {
+	this := p
+	_ = this
+
 	localctx = NewLiteralTypeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 172, GoParserRULE_literalType)
 	var _la int
@@ -20117,6 +20378,9 @@ func (s *LiteralValueContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *GoParser) LiteralValue() (localctx ILiteralValueContext) {
+	this := p
+	_ = this
+
 	localctx = NewLiteralValueContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 174, GoParserRULE_literalValue)
 	var _la int
@@ -20418,6 +20682,9 @@ func (s *ElementListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *GoParser) ElementList() (localctx IElementListContext) {
+	this := p
+	_ = this
+
 	localctx = NewElementListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 176, GoParserRULE_elementList)
 	var _alt int
@@ -20649,6 +20916,9 @@ func (s *KeyedElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *GoParser) KeyedElement() (localctx IKeyedElementContext) {
+	this := p
+	_ = this
+
 	localctx = NewKeyedElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 178, GoParserRULE_keyedElement)
 	var _la int
@@ -20879,6 +21149,9 @@ func (s *KeyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) Key() (localctx IKeyContext) {
+	this := p
+	_ = this
+
 	localctx = NewKeyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 180, GoParserRULE_key)
 	p.SetState(1441)
@@ -21018,6 +21291,9 @@ func (s *ElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) Element() (localctx IElementContext) {
+	this := p
+	_ = this
+
 	localctx = NewElementContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 182, GoParserRULE_element)
 	p.SetState(1445)
@@ -21224,6 +21500,9 @@ func (s *StructTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) StructType() (localctx IStructTypeContext) {
+	this := p
+	_ = this
+
 	localctx = NewStructTypeContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 184, GoParserRULE_structType)
 	var _la int
@@ -21470,6 +21749,9 @@ func (s *FieldDeclContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) FieldDecl() (localctx IFieldDeclContext) {
+	this := p
+	_ = this
+
 	localctx = NewFieldDeclContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 186, GoParserRULE_fieldDecl)
 	var _la int
@@ -21606,6 +21888,9 @@ func (s *String_Context) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) String_() (localctx IString_Context) {
+	this := p
+	_ = this
+
 	localctx = NewString_Context(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 188, GoParserRULE_string_)
 	var _la int
@@ -21705,6 +21990,9 @@ func (s *Char_Context) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) Char_() (localctx IChar_Context) {
+	this := p
+	_ = this
+
 	localctx = NewChar_Context(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 190, GoParserRULE_char_)
 	p.EnterOuterAlt(localctx, 1)
@@ -21833,6 +22121,9 @@ func (s *EmbeddedFieldContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *GoParser) EmbeddedField() (localctx IEmbeddedFieldContext) {
+	this := p
+	_ = this
+
 	localctx = NewEmbeddedFieldContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 192, GoParserRULE_embeddedField)
 	var _la int
@@ -21991,6 +22282,9 @@ func (s *FunctionLitContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *GoParser) FunctionLit() (localctx IFunctionLitContext) {
+	this := p
+	_ = this
+
 	localctx = NewFunctionLitContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 194, GoParserRULE_functionLit)
 	p.EnterOuterAlt(localctx, 1)
@@ -22115,6 +22409,9 @@ func (s *IndexContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) Index() (localctx IIndexContext) {
+	this := p
+	_ = this
+
 	localctx = NewIndexContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 196, GoParserRULE_index)
 	p.EnterOuterAlt(localctx, 1)
@@ -22312,6 +22609,9 @@ func (s *Slice_Context) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) Slice_() (localctx ISlice_Context) {
+	this := p
+	_ = this
+
 	localctx = NewSlice_Context(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 198, GoParserRULE_slice_)
 	var _la int
@@ -22546,6 +22846,9 @@ func (s *TypeAssertionContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *GoParser) TypeAssertion() (localctx ITypeAssertionContext) {
+	this := p
+	_ = this
+
 	localctx = NewTypeAssertionContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 200, GoParserRULE_typeAssertion)
 	p.EnterOuterAlt(localctx, 1)
@@ -22757,6 +23060,9 @@ func (s *ArgumentsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) Arguments() (localctx IArgumentsContext) {
+	this := p
+	_ = this
+
 	localctx = NewArgumentsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 202, GoParserRULE_arguments)
 	var _la int
@@ -23067,6 +23373,9 @@ func (s *MethodExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) MethodExpr() (localctx IMethodExprContext) {
+	this := p
+	_ = this
+
 	localctx = NewMethodExprContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 204, GoParserRULE_methodExpr)
 	p.EnterOuterAlt(localctx, 1)
@@ -23188,6 +23497,9 @@ func (s *WsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) Ws() (localctx IWsContext) {
+	this := p
+	_ = this
+
 	localctx = NewWsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 206, GoParserRULE_ws)
 	var _alt int
@@ -23346,6 +23658,9 @@ func (s *EosContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *GoParser) Eos() (localctx IEosContext) {
+	this := p
+	_ = this
+
 	localctx = NewEosContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 208, GoParserRULE_eos)
 	var _la int
@@ -23398,6 +23713,9 @@ func (p *GoParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int)
 }
 
 func (p *GoParser) Expression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 0:
 		return p.Precpred(p.GetParserRuleContext(), 6)
@@ -23420,6 +23738,9 @@ func (p *GoParser) Expression_Sempred(localctx antlr.RuleContext, predIndex int)
 }
 
 func (p *GoParser) PrimaryExpr_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 5:
 		return p.Precpred(p.GetParserRuleContext(), 1)

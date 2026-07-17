@@ -496,6 +496,9 @@ func (s *ChunkContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Chunk() (localctx IChunkContext) {
+	this := p
+	_ = this
+
 	localctx = NewChunkContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, LuaParserRULE_chunk)
 	p.EnterOuterAlt(localctx, 1)
@@ -649,6 +652,9 @@ func (s *BlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Block() (localctx IBlockContext) {
+	this := p
+	_ = this
+
 	localctx = NewBlockContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 2, LuaParserRULE_block)
 	var _la int
@@ -1107,6 +1113,9 @@ func (s *StatContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Stat() (localctx IStatContext) {
+	this := p
+	_ = this
+
 	localctx = NewStatContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 4, LuaParserRULE_stat)
 	var _la int
@@ -1737,6 +1746,9 @@ func (s *AttnamelistContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *LuaParser) Attnamelist() (localctx IAttnamelistContext) {
+	this := p
+	_ = this
+
 	localctx = NewAttnamelistContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, LuaParserRULE_attnamelist)
 	var _la int
@@ -1883,6 +1895,9 @@ func (s *AttribContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Attrib() (localctx IAttribContext) {
+	this := p
+	_ = this
+
 	localctx = NewAttribContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 8, LuaParserRULE_attrib)
 	var _la int
@@ -2037,6 +2052,9 @@ func (s *LaststatContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Laststat() (localctx ILaststatContext) {
+	this := p
+	_ = this
+
 	localctx = NewLaststatContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 10, LuaParserRULE_laststat)
 	var _la int
@@ -2210,6 +2228,9 @@ func (s *LabelContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Label() (localctx ILabelContext) {
+	this := p
+	_ = this
+
 	localctx = NewLabelContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 12, LuaParserRULE_label)
 	p.EnterOuterAlt(localctx, 1)
@@ -2340,6 +2361,9 @@ func (s *FuncnameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Funcname() (localctx IFuncnameContext) {
+	this := p
+	_ = this
+
 	localctx = NewFuncnameContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 14, LuaParserRULE_funcname)
 	var _la int
@@ -2542,6 +2566,9 @@ func (s *VarlistContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Varlist() (localctx IVarlistContext) {
+	this := p
+	_ = this
+
 	localctx = NewVarlistContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 16, LuaParserRULE_varlist)
 	var _la int
@@ -2677,6 +2704,9 @@ func (s *NamelistContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Namelist() (localctx INamelistContext) {
+	this := p
+	_ = this
+
 	localctx = NewNamelistContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 18, LuaParserRULE_namelist)
 	var _alt int
@@ -2860,6 +2890,9 @@ func (s *ExplistContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Explist() (localctx IExplistContext) {
+	this := p
+	_ = this
+
 	localctx = NewExplistContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 20, LuaParserRULE_explist)
 	var _alt int
@@ -3287,6 +3320,9 @@ func (p *LuaParser) Exp() (localctx IExpContext) {
 }
 
 func (p *LuaParser) exp(_p int) (localctx IExpContext) {
+	this := p
+	_ = this
+
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
 
 	_parentState := p.GetState()
@@ -3709,6 +3745,9 @@ func (s *PrefixexpContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Prefixexp() (localctx IPrefixexpContext) {
+	this := p
+	_ = this
+
 	localctx = NewPrefixexpContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 24, LuaParserRULE_prefixexp)
 	var _alt int
@@ -3883,6 +3922,9 @@ func (s *FunctioncallContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 func (p *LuaParser) Functioncall() (localctx IFunctioncallContext) {
+	this := p
+	_ = this
+
 	localctx = NewFunctioncallContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 26, LuaParserRULE_functioncall)
 	var _alt int
@@ -4040,6 +4082,9 @@ func (s *VarOrExpContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) VarOrExp() (localctx IVarOrExpContext) {
+	this := p
+	_ = this
+
 	localctx = NewVarOrExpContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 28, LuaParserRULE_varOrExp)
 	p.SetState(307)
@@ -4235,6 +4280,9 @@ func (s *VarContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Var_() (localctx IVarContext) {
+	this := p
+	_ = this
+
 	localctx = NewVarContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 30, LuaParserRULE_var)
 	var _alt int
@@ -4472,6 +4520,9 @@ func (s *VarSuffixContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) VarSuffix() (localctx IVarSuffixContext) {
+	this := p
+	_ = this
+
 	localctx = NewVarSuffixContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 32, LuaParserRULE_varSuffix)
 	var _la int
@@ -4653,6 +4704,9 @@ func (s *NameAndArgsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *LuaParser) NameAndArgs() (localctx INameAndArgsContext) {
+	this := p
+	_ = this
+
 	localctx = NewNameAndArgsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 34, LuaParserRULE_nameAndArgs)
 	var _la int
@@ -4827,6 +4881,9 @@ func (s *ArgsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Args() (localctx IArgsContext) {
+	this := p
+	_ = this
+
 	localctx = NewArgsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 36, LuaParserRULE_args)
 	var _la int
@@ -4989,6 +5046,9 @@ func (s *FunctiondefContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *LuaParser) Functiondef() (localctx IFunctiondefContext) {
+	this := p
+	_ = this
+
 	localctx = NewFunctiondefContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 38, LuaParserRULE_functiondef)
 	p.EnterOuterAlt(localctx, 1)
@@ -5131,6 +5191,9 @@ func (s *FuncbodyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Funcbody() (localctx IFuncbodyContext) {
+	this := p
+	_ = this
+
 	localctx = NewFuncbodyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 40, LuaParserRULE_funcbody)
 	var _la int
@@ -5283,6 +5346,9 @@ func (s *ParlistContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Parlist() (localctx IParlistContext) {
+	this := p
+	_ = this
+
 	localctx = NewParlistContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 42, LuaParserRULE_parlist)
 	var _la int
@@ -5447,6 +5513,9 @@ func (s *TableconstructorContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 func (p *LuaParser) Tableconstructor() (localctx ITableconstructorContext) {
+	this := p
+	_ = this
+
 	localctx = NewTableconstructorContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 44, LuaParserRULE_tableconstructor)
 	var _la int
@@ -5646,6 +5715,9 @@ func (s *FieldlistContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Fieldlist() (localctx IFieldlistContext) {
+	this := p
+	_ = this
+
 	localctx = NewFieldlistContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 46, LuaParserRULE_fieldlist)
 	var _la int
@@ -5843,6 +5915,9 @@ func (s *FieldContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Field() (localctx IFieldContext) {
+	this := p
+	_ = this
+
 	localctx = NewFieldContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 48, LuaParserRULE_field)
 	p.SetState(399)
@@ -6008,6 +6083,9 @@ func (s *FieldsepContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Fieldsep() (localctx IFieldsepContext) {
+	this := p
+	_ = this
+
 	localctx = NewFieldsepContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 50, LuaParserRULE_fieldsep)
 	var _la int
@@ -6107,6 +6185,9 @@ func (s *OperatorOrContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) OperatorOr() (localctx IOperatorOrContext) {
+	this := p
+	_ = this
+
 	localctx = NewOperatorOrContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 52, LuaParserRULE_operatorOr)
 	p.EnterOuterAlt(localctx, 1)
@@ -6201,6 +6282,9 @@ func (s *OperatorAndContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *LuaParser) OperatorAnd() (localctx IOperatorAndContext) {
+	this := p
+	_ = this
+
 	localctx = NewOperatorAndContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 54, LuaParserRULE_operatorAnd)
 	p.EnterOuterAlt(localctx, 1)
@@ -6320,6 +6404,9 @@ func (s *OperatorComparisonContext) Accept(visitor antlr.ParseTreeVisitor) inter
 }
 
 func (p *LuaParser) OperatorComparison() (localctx IOperatorComparisonContext) {
+	this := p
+	_ = this
+
 	localctx = NewOperatorComparisonContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 56, LuaParserRULE_operatorComparison)
 	var _la int
@@ -6419,6 +6506,9 @@ func (s *OperatorStrcatContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *LuaParser) OperatorStrcat() (localctx IOperatorStrcatContext) {
+	this := p
+	_ = this
+
 	localctx = NewOperatorStrcatContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 58, LuaParserRULE_operatorStrcat)
 	p.EnterOuterAlt(localctx, 1)
@@ -6518,6 +6608,9 @@ func (s *OperatorAddSubContext) Accept(visitor antlr.ParseTreeVisitor) interface
 }
 
 func (p *LuaParser) OperatorAddSub() (localctx IOperatorAddSubContext) {
+	this := p
+	_ = this
+
 	localctx = NewOperatorAddSubContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 60, LuaParserRULE_operatorAddSub)
 	var _la int
@@ -6632,6 +6725,9 @@ func (s *OperatorMulDivModContext) Accept(visitor antlr.ParseTreeVisitor) interf
 }
 
 func (p *LuaParser) OperatorMulDivMod() (localctx IOperatorMulDivModContext) {
+	this := p
+	_ = this
+
 	localctx = NewOperatorMulDivModContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 62, LuaParserRULE_operatorMulDivMod)
 	var _la int
@@ -6751,6 +6847,9 @@ func (s *OperatorBitwiseContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 func (p *LuaParser) OperatorBitwise() (localctx IOperatorBitwiseContext) {
+	this := p
+	_ = this
+
 	localctx = NewOperatorBitwiseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 64, LuaParserRULE_operatorBitwise)
 	var _la int
@@ -6865,6 +6964,9 @@ func (s *OperatorUnaryContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *LuaParser) OperatorUnary() (localctx IOperatorUnaryContext) {
+	this := p
+	_ = this
+
 	localctx = NewOperatorUnaryContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 66, LuaParserRULE_operatorUnary)
 	var _la int
@@ -6964,6 +7066,9 @@ func (s *OperatorPowerContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 func (p *LuaParser) OperatorPower() (localctx IOperatorPowerContext) {
+	this := p
+	_ = this
+
 	localctx = NewOperatorPowerContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 68, LuaParserRULE_operatorPower)
 	p.EnterOuterAlt(localctx, 1)
@@ -7073,6 +7178,9 @@ func (s *NumberContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) Number() (localctx INumberContext) {
+	this := p
+	_ = this
+
 	localctx = NewNumberContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 70, LuaParserRULE_number)
 	var _la int
@@ -7182,6 +7290,9 @@ func (s *StringContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *LuaParser) String_() (localctx IStringContext) {
+	this := p
+	_ = this
+
 	localctx = NewStringContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 72, LuaParserRULE_string)
 	var _la int
@@ -7227,6 +7338,9 @@ func (p *LuaParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int
 }
 
 func (p *LuaParser) Exp_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+	this := p
+	_ = this
+
 	switch predIndex {
 	case 0:
 		return p.Precpred(p.GetParserRuleContext(), 9)
