@@ -1,0 +1,25 @@
+#!/bin/sh
+# Unified ANTLR 4 Go codegen entrypoint for yaklang.
+# Keeps java -cp / jar / template overlay in one place; language gen scripts just call this.
+#
+# Usage (from a grammar directory):
+#   ../antlr4util/antlr4 -Dlanguage=Go ./FooLexer.g4 ./FooParser.g4 -o parser -no-listener -visitor
+
+set -e
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+THIRDPARTY_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/../antlr4thirdparty" && pwd)
+TEMPLATES_DIR="$THIRDPARTY_DIR/templates"
+JAR="$THIRDPARTY_DIR/antlr-4.13.2-complete.jar"
+
+if [ ! -f "$JAR" ]; then
+	echo "antlr4: missing jar: $JAR" >&2
+	exit 1
+fi
+if [ ! -d "$TEMPLATES_DIR/org/antlr/v4/tool/templates/codegen/Go" ]; then
+	echo "antlr4: missing Go templates overlay: $TEMPLATES_DIR" >&2
+	exit 1
+fi
+
+# Patched Go.stg (yaklang/antlr import) must precede the jar on the classpath.
+exec java -cp "$TEMPLATES_DIR:$JAR" org.antlr.v4.Tool "$@"

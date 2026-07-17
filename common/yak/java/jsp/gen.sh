@@ -2,4 +2,4 @@
 
 rm ./parser/*.tokens
 rm ./parser/*.interp
-java -jar ../../antlr4thirdparty/antlr-4.13.2-complete.jar -Dlanguage=Go -package jspparser ./JSPLexer.g4 ./JSPParser.g4 -o parser -no-listener -visitor
+../../antlr4util/antlr4 -Dlanguage=Go -package jspparser ./JSPLexer.g4 ./JSPParser.g4 -o parser -no-listener -visitor
