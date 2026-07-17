@@ -143,15 +143,16 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 	actionName := f.GetActionName("modify")
 	return reactloops.WithRegisterLoopActionWithStreamField(
 		actionName,
-		`Modify existing code. Two modes (use one):
-1) Line range: modify_start_line + modify_end_line (1-based, inclusive).
-2) Snippet: old_snippet (exact text match) + optional replace_all for multiple matches.
-
-Prefer old_snippet for small precise fixes; use line range for larger blocks.`,
+		`Modify existing code. Preferred mode:
+1) Patch (default): put a Cursor-style Apply Patch in the GEN_CODE / content tag
+   (*** Begin Patch ... *** End Patch). System applies it to full_code then emits the merged full file (never raw patch) to the frontend.
+Legacy fallbacks when GEN_CODE is NOT a patch:
+2) Snippet: old_snippet (exact text match) + optional replace_all.
+3) Line range: modify_start_line + modify_end_line (1-based, inclusive).`,
 		[]aitool.ToolOption{
-			aitool.WithIntegerParam("modify_start_line", aitool.WithParam_Description("Start line for line-range mode (required unless old_snippet is set)")),
-			aitool.WithIntegerParam("modify_end_line", aitool.WithParam_Description("End line for line-range mode (required unless old_snippet is set)")),
-			aitool.WithStringParam("old_snippet", aitool.WithParam_Description("Exact snippet from full_code to replace (snippet mode)")),
+			aitool.WithIntegerParam("modify_start_line", aitool.WithParam_Description("Legacy line-range start (optional if GEN_CODE is a patch or old_snippet is set)")),
+			aitool.WithIntegerParam("modify_end_line", aitool.WithParam_Description("Legacy line-range end (optional if GEN_CODE is a patch or old_snippet is set)")),
+			aitool.WithStringParam("old_snippet", aitool.WithParam_Description("Legacy exact snippet from full_code to replace when GEN_CODE is not a patch")),
 			aitool.WithBoolParam("replace_all", aitool.WithParam_Description("Replace all old_snippet matches (snippet mode, default false)")),
 			aitool.WithStringParam("modify_code_reason", aitool.WithParam_Description(`Fix code errors or issues, and summarize the fixing approach and lessons learned, keeping the original code content for future reference value`)),
 		},
@@ -168,8 +169,13 @@ Prefer old_snippet for small precise fixes; use line range for larger blocks.`,
 			}
 			start := action.GetInt("modify_start_line")
 			end := action.GetInt("modify_end_line")
+			// Patch mode: JSON may omit line range / old_snippet; GEN_CODE is validated after WaitStream.
+			if start == 0 && end == 0 {
+				loopInfraStatus(l, "准备以 Patch 修改文件 / Preparing Patch Modify")
+				return nil
+			}
 			if start <= 0 || end <= 0 || end < start {
-				return utils.Error("modify_code action must have valid 'modify_start_line' and 'modify_end_line' parameters, or provide 'old_snippet'")
+				return utils.Error("modify_code action must have a GEN_CODE patch (*** Begin Patch), valid 'modify_start_line'/'modify_end_line', or 'old_snippet'")
 			}
 			loopInfraStatus(l, fmt.Sprintf("准备修改文件行 %d-%d / Preparing File Modify Lines %d-%d", start, end, start, end))
 			return nil
@@ -189,8 +195,37 @@ Prefer old_snippet for small precise fixes; use line range for larger blocks.`,
 
 			action.WaitStream(op.GetContext())
 
+			// Preferred path: Cursor-style patch inside GEN_CODE (ignores old_snippet / line range).
+			if LooksLikeCodePatch(loop.Get(codeVar)) {
+				f.handleModifyByPatch(loop, action, op, actionName, filename, fullCodeVar, codeVar)
+				return
+			}
+
 			if strings.TrimSpace(action.GetString("old_snippet")) != "" {
 				f.handleModifyByOldSnippet(loop, action, op, actionName, filename, fullCodeVar, codeVar)
+				return
+			}
+
+			start := action.GetInt("modify_start_line")
+			end := action.GetInt("modify_end_line")
+			if start <= 0 || end <= 0 || end < start {
+				msg := fmt.Sprintf(`【modify_code 失败】GEN_CODE 不是 Patch（缺少 *** Begin Patch），且未提供 old_snippet / 有效行号。
+
+请优先输出 Cursor 风格 Patch：
+{"@action":"modify_code","modify_code_reason":"..."}
+<|%s_<nonce>|>
+*** Begin Patch
+*** Update File: current
+@@ context
+-old
++new
+*** End Patch
+<|%s_END_<nonce>|>
+
+或回退：old_snippet / modify_start_line+modify_end_line。`, f.aiTagName, f.aiTagName)
+				runtime.AddToTimeline("modify_no_locator", msg)
+				op.Feedback(msg)
+				op.Continue()
 				return
 			}
 
