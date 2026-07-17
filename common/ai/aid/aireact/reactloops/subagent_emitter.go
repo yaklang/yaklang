@@ -5,10 +5,9 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
-// BuildForwardingEmitter derives a sub-agent emitter from the parent config emitter
-// (not the parent task emitter) via PushEventProcesser. The derived emitter shares
-// the parent's frontend sink while a processor stamps every event's TaskId with the
-// sub-task id — the marker the frontend uses to aggregate sub-agent messages.
+// BuildForwardingEmitter 通过 PushEventProcesser 从父 config 的 emitter（而非
+// 父任务 emitter）派生子 Agent emitter。派生 emitter 共享父前端 sink，同时
+// processor 会给每个事件的 TaskId 打上子任务 ID——前端据此聚合子 Agent 消息。
 func BuildForwardingEmitter(parentEmitter *aicommon.Emitter, subTaskID string) *aicommon.Emitter {
 	if parentEmitter == nil {
 		return aicommon.NewDummyEmitter()
@@ -21,8 +20,8 @@ func BuildForwardingEmitter(parentEmitter *aicommon.Emitter, subTaskID string) *
 	})
 }
 
-// BuildForwardingEmitterForTask stamps both TaskId and TaskUUID so tool cards nest
-// under the sub-agent card created by react_task_created.
+// BuildForwardingEmitterForTask 同时打上 TaskId 和 TaskUUID，使工具卡片嵌套在
+// react_task_created 创建的子 Agent 卡片下。
 func BuildForwardingEmitterForTask(parentEmitter *aicommon.Emitter, task aicommon.AIStatefulTask) *aicommon.Emitter {
 	if task == nil {
 		return BuildForwardingEmitter(parentEmitter, "")

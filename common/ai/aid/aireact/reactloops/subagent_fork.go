@@ -10,7 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// RunForkInvokerCallback executes fn on a timeline-forked child invoker.
+// RunForkInvokerCallback 在 timeline fork 出的子 invoker 上执行 fn。
 func RunForkInvokerCallback(
 	parentInvoker aicommon.AIInvokeRuntime,
 	parentTask aicommon.AIStatefulTask,
@@ -31,7 +31,7 @@ func RunForkInvokerCallback(
 	return fn(childInvoker, childTask)
 }
 
-// RunForkJob runs one ReAct loop inside a timeline-forked sub-agent.
+// RunForkJob 在 timeline fork 出的子 Agent 中运行一个 ReAct loop。
 func RunForkJob(
 	parentInvoker aicommon.AIInvokeRuntime,
 	parentTask aicommon.AIStatefulTask,
@@ -55,11 +55,11 @@ func RunForkJob(
 	if err != nil {
 		return &SubAgentResult{
 			SubAgentJob: job,
-			SubTaskID: subTask.GetId(),
-			SubTask:   subTask,
-			Fork:      fork,
-			ExecErr:   err,
-			DurationMs: time.Since(startedAt).Milliseconds(),
+			SubTaskID:   subTask.GetId(),
+			SubTask:     subTask,
+			Fork:        fork,
+			ExecErr:     err,
+			DurationMs:  time.Since(startedAt).Milliseconds(),
 		}, nil
 	}
 
@@ -67,23 +67,21 @@ func RunForkJob(
 	execErr := subLoop.ExecuteWithExistedTask(subTask)
 	return &SubAgentResult{
 		SubAgentJob: job,
-		SubTaskID: subTask.GetId(),
-		SubTask:   subTask,
-		SubLoop:   subLoop,
-		Fork:      fork,
-		ExecErr:   execErr,
-		DurationMs: time.Since(startedAt).Milliseconds(),
+		SubTaskID:   subTask.GetId(),
+		SubTask:     subTask,
+		SubLoop:     subLoop,
+		Fork:        fork,
+		ExecErr:     execErr,
+		DurationMs:  time.Since(startedAt).Milliseconds(),
 	}, nil
 }
 
-// RunForkJobsConcurrently runs multiple forked sub-loops with a worker pool.
+// RunForkJobsConcurrently 通过 worker 池并发运行多个 fork 子 loop。
 //
-// Because runJobsConcurrently is generic over a single type that is both the
-// job carrier and the result, each SubAgentJob is first wrapped into a SubAgentResult
-// (carrying the job identity via the embedded SubAgentJob) and then runSingle
-// executes the fork and fills in the outcome. This keeps the public API
-// ([]SubAgentJob -> []*SubAgentResult) unchanged while letting the concurrency helper
-// operate on a single type.
+// 由于 runJobsConcurrently 直接操作统一的 SubAgentResult 类型，这里先把每个
+// SubAgentJob 包装成 SubAgentResult（经内嵌 SubAgentJob 携带任务身份），再由
+// runSingle 执行 fork 并填入结果。这样公共 API（[]SubAgentJob -> []SubAgentResult）
+// 保持不变，同时让并发辅助只面向单一类型。
 func RunForkJobsConcurrently(
 	parentInvoker aicommon.AIInvokeRuntime,
 	parentTask aicommon.AIStatefulTask,
@@ -110,8 +108,8 @@ func RunForkJobsConcurrently(
 	return runJobsConcurrently(wrapped, concurrency, runSingle)
 }
 
-// PrepareForkedSubAgent forks the parent timeline and returns a child invoker plus sub-task.
-// Callers may mutate sub-task input (e.g. dispatch goal elaboration) before starting a loop.
+// PrepareForkedSubAgent fork 父 timeline 并返回子 invoker 和子任务。调用方可在
+// 启动 loop 之前修改子任务输入（如 dispatch goal 润色）。
 func PrepareForkedSubAgent(
 	parentInvoker aicommon.AIInvokeRuntime,
 	parentTask aicommon.AIStatefulTask,
@@ -156,9 +154,9 @@ func PrepareForkedSubAgent(
 		userInput = buildForkUserInput(job)
 	}
 
-	// Derive a per-sub-agent task context from jobCtx. Do not bind jobCancel directly to
-	// the sub-task: nested loops (e.g. fast_context) may finish a child task while the
-	// category scan must keep running phase A→B on the same job scope.
+	// 从 jobCtx 派生子 Agent 的任务 context。不要把 jobCancel 直接绑定到子任务：
+	// nested loop（如 fast_context）可能在某子任务结束时让该 child task 完成，
+	// 但类别扫描仍需在同一 job scope 上继续运行 phase A→B。
 	subTask := aicommon.NewSubTaskBaseWithOptions(
 		parentTask,
 		subTaskID,
@@ -170,9 +168,8 @@ func PrepareForkedSubAgent(
 	taskEmitter := BuildForwardingEmitterForTask(parentCfg.GetEmitter(), subTask)
 	subTask.SetEmitter(taskEmitter)
 
-	// Use subTask.GetContext() (not jobCtx) for the child config so that
-	// subTask.Cancel() directly cancels the child config's context — this
-	// ensures the underlying AI HTTP requests abort immediately on cancel.
+	// 使用 subTask.GetContext()（而非 jobCtx）构造子 config，使 subTask.Cancel()
+	// 能直接取消子 config 的 context——确保取消时底层 AI HTTP 请求立即中止。
 	childInvoker, err := BuildForkReactInvoker(parentCfg, fork, subTask.GetContext(), taskEmitter)
 	if err != nil {
 		jobCancel()
@@ -188,6 +185,7 @@ func PrepareForkedSubAgent(
 	return childInvoker, subTask, fork, jobCancel, nil
 }
 
+// buildForkUserInput 拼接 fork 子 Agent 的用户输入：Goal + 可选的 ResultContract。
 func buildForkUserInput(job SubAgentJob) string {
 	var sb strings.Builder
 	sb.WriteString(strings.TrimSpace(job.Goal))
@@ -198,6 +196,7 @@ func buildForkUserInput(job SubAgentJob) string {
 	return sb.String()
 }
 
+// BuildForkReactInvoker 根据 fork 分支和父 config 构建子 Agent 的 invoker。
 func BuildForkReactInvoker(
 	parentCfg *aicommon.Config,
 	fork *aicommon.TimelineFork,
@@ -215,11 +214,10 @@ func BuildForkReactInvoker(
 		aicommon.WithSessionPromptState(parentCfg.SessionPromptState.ForkForSubAgent()),
 	)
 
-	// Sub agents must not inherit any top-level execution strategy. Even though
-	// ConvertConfigToOptions already omits EnableDispatchSubReactAgents /
-	// PreferDispatchSubReactAgents / EnableGoalMode, we disable plan and goal
-	// mode explicitly here so the sub-agent contract is self-documenting and does
-	// not silently regress if ConvertConfigToOptions propagation changes.
+	// 子 Agent 不得继承任何顶层执行策略。尽管 ConvertConfigToOptions 已省略
+	// EnableDispatchSubReactAgents / PreferDispatchSubReactAgents /
+	// EnableGoalMode，这里仍显式关闭 plan 和 goal mode，使子 Agent 契约自文档
+	// 化，且在 ConvertConfigToOptions 传播逻辑变化时不会静默回退。
 	baseOpts = append(baseOpts, buildSubAgentStrategyOptions()...)
 
 	childInvoker, err := aicommon.AIRuntimeInvokerGetter(jobCtx, baseOpts...)
@@ -229,6 +227,7 @@ func BuildForkReactInvoker(
 	return childInvoker, nil
 }
 
+// buildSubAgentStrategyOptions 返回子 Agent 强制关闭的顶层策略选项。
 func buildSubAgentStrategyOptions() []aicommon.ConfigOption {
 	return []aicommon.ConfigOption{
 		aicommon.WithEnablePlanAndExec(false),

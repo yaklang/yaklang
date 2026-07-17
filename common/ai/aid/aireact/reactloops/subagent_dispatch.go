@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	// DispatchSubReactJobsLoopKey stores the JSON-encoded dispatch jobs in loop vars.
+	// DispatchSubReactJobsLoopKey 在 loop vars 中存储 JSON 编码的 dispatch 任务。
 	DispatchSubReactJobsLoopKey        = "dispatch_sub_react_jobs"
 	DispatchSubReactConcurrencyLoopKey = "dispatch_sub_react_concurrency"
 
@@ -25,7 +25,7 @@ const (
 	MaxDispatchConcurrency     = 10
 )
 
-// ProcessStats summarizes the runtime activity of a completed sub-agent.
+// ProcessStats 汇总已完成子 Agent 的运行期活动数据。
 type ProcessStats struct {
 	Iterations      int    `json:"iterations"`
 	Actions         int    `json:"actions"`
@@ -35,7 +35,7 @@ type ProcessStats struct {
 	FinalAction     string `json:"final_action,omitempty"`
 }
 
-// TimelineRecord is the structured result written back to the parent timeline.
+// TimelineRecord 是写回父 timeline 的结构化结果。
 type TimelineRecord struct {
 	SubAgentID      string       `json:"sub_agent_id"`
 	Order           int          `json:"order"`
@@ -50,9 +50,8 @@ type TimelineRecord struct {
 	TracePreview    string       `json:"trace_preview,omitempty"`
 }
 
-// JobRunner is the interface for executing a single sub-agent dispatch job.
-// The default implementation (ForkedRunner) forks the parent timeline and runs
-// a full ReAct loop in the child. Tests can provide a mock implementation.
+// JobRunner 是执行单个子 Agent dispatch 任务的接口。默认实现（ForkedRunner）
+// 会 fork 父 timeline 并在子分支中运行完整 ReAct loop。测试可提供 mock 实现。
 type JobRunner interface {
 	Run(
 		parentInvoker aicommon.AIInvokeRuntime,
@@ -63,16 +62,15 @@ type JobRunner interface {
 	) (*SubAgentResult, error)
 }
 
-// ForkedRunner is the default JobRunner that forks the parent timeline and
-// runs a full ReAct loop in the child.
+// ForkedRunner 是默认的 JobRunner，fork 父 timeline 并在子分支中运行完整
+// ReAct loop。
 type ForkedRunner struct{}
 
-// DefaultRunner is the package-level runner instance used by RunJobsConcurrently.
-// Tests may swap this to inject mock behaviour.
+// DefaultRunner 是 RunJobsConcurrently 使用的包级 runner 实例。测试可替换
+// 此变量以注入 mock 行为。
 var DefaultRunner JobRunner = ForkedRunner{}
 
-// Run executes one sub-agent job by forking the parent timeline and running
-// a full ReAct loop in the child.
+// Run 执行单个子 Agent 任务：fork 父 timeline 并在子分支中运行完整 ReAct loop。
 func (ForkedRunner) Run(
 	parentInvoker aicommon.AIInvokeRuntime,
 	parentLoop *ReActLoop,
@@ -83,8 +81,8 @@ func (ForkedRunner) Run(
 	return RunForkedJob(parentInvoker, parentLoop, parentTask, job, registry)
 }
 
-// RunForkedJob forks the parent timeline, elaborates the brief goal, registers
-// a progress handle, runs the sub-loop, and returns a SubAgentResult.
+// RunForkedJob fork 父 timeline，润色简要 goal，注册 progress handle，运行子
+// loop，并返回 SubAgentResult。
 func RunForkedJob(
 	parentInvoker aicommon.AIInvokeRuntime,
 	parentLoop *ReActLoop,
@@ -108,8 +106,8 @@ func RunForkedJob(
 		return nil, err
 	}
 
-	// Elaborate the brief intent (job.Goal) into a complete, self-contained goal
-	// plus a result contract right before the sub agent runs.
+	// 在子 Agent 运行前，把简要意图（job.Goal）润色成完整、自包含的 goal 加上
+	// result contract。
 	subTask.SetStatus(aicommon.AITaskState_Processing)
 	elaboratedGoal, resultContract, elabErr := elaborateGoal(
 		subTask.GetContext(), childInvoker, parentLoop, subTask.GetId(), job,
@@ -129,12 +127,11 @@ func RunForkedJob(
 	return result, nil
 }
 
-// RunJobsConcurrently runs multiple sub-agent dispatch jobs with a worker pool.
+// RunJobsConcurrently 通过 worker 池并发运行多个子 Agent dispatch 任务。
 //
-// Because runJobsConcurrently is generic over a single type that is both the
-// job carrier and the result, each SubAgentJob is first wrapped into a
-// SubAgentResult (carrying the job via the embedded SubAgentJob) and then runSingle
-// executes the runner and fills in the outcome.
+// 由于 runJobsConcurrently 直接操作统一的 SubAgentResult 类型，这里先把每个
+// SubAgentJob 包装成 SubAgentResult（经内嵌 SubAgentJob 携带任务身份），再由
+// runSingle 执行 runner 并填入结果。
 func RunJobsConcurrently(
 	parentInvoker aicommon.AIInvokeRuntime,
 	parentLoop *ReActLoop,
@@ -158,9 +155,9 @@ func RunJobsConcurrently(
 	return runJobsConcurrently(wrapped, concurrency, runSingle)
 }
 
-// failedJobResult builds a SubAgentResult describing a job that failed before it
-// could produce a normal result (e.g. fork preparation error). It is shared by
-// RunJobsConcurrently and any runner that needs to surface a setup-level error.
+// failedJobResult 构建一个描述任务在产出正常结果前就已失败的 SubAgentResult
+//（如 fork 准备阶段出错）。供 RunJobsConcurrently 及需要暴露 setup 级错误的
+// runner 共用。
 func failedJobResult(parentTask aicommon.AIStatefulTask, job SubAgentJob, err error) *SubAgentResult {
 	return &SubAgentResult{
 		SubAgentJob: job,
@@ -179,7 +176,7 @@ func failedJobResult(parentTask aicommon.AIStatefulTask, job SubAgentJob, err er
 	}
 }
 
-// BuildJobResult constructs a SubAgentResult from the sub-task and sub-loop state.
+// BuildJobResult 根据子任务和子 loop 状态构造 SubAgentResult。
 func BuildJobResult(
 	job SubAgentJob,
 	startedAt time.Time,
@@ -225,7 +222,7 @@ func BuildJobResult(
 	}, nil
 }
 
-// CollectProcessStats gathers iteration / action / tool-call stats from the sub-loop.
+// CollectProcessStats 从子 loop 中收集 iteration / action / tool-call 统计数据。
 func CollectProcessStats(subLoop *ReActLoop, fork *aicommon.TimelineFork, branchDiffBytes int) ProcessStats {
 	stats := ProcessStats{
 		BranchDiffBytes: branchDiffBytes,
@@ -261,7 +258,7 @@ func countToolCallsFromActionRecords(records []*ActionRecord) int {
 	return count
 }
 
-// CountBranchTimelineItems counts timeline items added to the fork branch.
+// CountBranchTimelineItems 统计 fork 分支中新增的 timeline 条目数。
 func CountBranchTimelineItems(fork *aicommon.TimelineFork) int {
 	if fork == nil || fork.Branch == nil {
 		return 0
@@ -275,7 +272,7 @@ func CountBranchTimelineItems(fork *aicommon.TimelineFork) int {
 	return count
 }
 
-// SummarizeForkDiff returns a trimmed preview and byte count of the fork diff.
+// SummarizeForkDiff 返回 fork diff 的截断预览和字节计数。
 func SummarizeForkDiff(fork *aicommon.TimelineFork) (preview string, bytes int) {
 	if fork == nil {
 		return "", 0
@@ -302,7 +299,7 @@ func buildUserInput(goal, resultContract string) string {
 	return sb.String()
 }
 
-// --- goal elaboration ---
+// --- goal 润色 ---
 
 const goalElaborationPrompt = `You are preparing a task brief for an autonomous sub ReAct agent that will run in an isolated timeline fork, inheriting the parent agent's current context snapshot.
 
@@ -386,9 +383,9 @@ func elaborateGoal(
 	return goal, resultContract, nil
 }
 
-// --- parsing ---
+// --- 解析 ---
 
-// ParseDispatchJobs extracts dispatch jobs from an AI action's "dispatches" parameter.
+// ParseDispatchJobs 从 AI action 的 "dispatches" 参数中提取 dispatch 任务。
 func ParseDispatchJobs(action *aicommon.Action) ([]SubAgentJob, error) {
 	jobs, err := parseDispatchJobsFromArray(action.GetInvokeParamsArray("dispatches"))
 	if err != nil {
@@ -427,7 +424,7 @@ func parseDispatchJobsFromArray(raw []aitool.InvokeParams) ([]SubAgentJob, error
 	return NormalizeDispatchJobs(jobs)
 }
 
-// NormalizeDispatchJobs validates and normalizes dispatch jobs.
+// NormalizeDispatchJobs 校验并规范化 dispatch 任务。
 func NormalizeDispatchJobs(jobs []SubAgentJob) ([]SubAgentJob, error) {
 	if len(jobs) == 0 {
 		return nil, utils.Error("dispatches must contain at least one sub agent job")
@@ -458,7 +455,7 @@ func NormalizeDispatchJobs(jobs []SubAgentJob) ([]SubAgentJob, error) {
 	return jobs, nil
 }
 
-// ParseConcurrency extracts and clamps the concurrency parameter from an AI action.
+// ParseConcurrency 从 AI action 中提取并发参数并限制到合法范围。
 func ParseConcurrency(action *aicommon.Action, jobCount int) int {
 	concurrency := action.GetInt("concurrency")
 	if concurrency <= 0 {
@@ -476,32 +473,28 @@ func ParseConcurrency(action *aicommon.Action, jobCount int) int {
 	return concurrency
 }
 
-// SortJobResults sorts job results by Order ascending (in-place).
+// SortJobResults 按 Order 升序原地排序 job 结果。
 func SortJobResults(results []*SubAgentResult) {
 	sortSubAgentResultsByOrder(results)
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Programmatic nested sub-agent dispatch (by loop name, fork toggle)
+// 编程式 nested 子 Agent dispatch（按 loop name，可选 fork）
 //
-// Unlike the AI-driven dispatch_sub_react_agents action, these helpers are
-// called directly by orchestrator loops (e.g. code audit phase2 fast_context)
-// to run a *specified* registered ReAct loop as a sub-agent. The caller
-// chooses whether to fork the parent timeline (timeline isolation) or run
-// in-place (timeline entries rolled back after the run).
+// 与 AI 驱动的 dispatch_sub_react_agents action 不同，这些辅助函数由
+// orchestrator loop（如 code audit phase2 fast_context）直接调用，以运行一个
+// *指定* 的已注册 ReAct loop 作为子 Agent。调用方自行选择是 fork 父 timeline
+//（timeline 隔离）还是原地运行（运行结束后回滚 timeline 条目）。
 //
-// Crucially, every run registers a SubAgentHandle into the parent loop's
-// ProgressRegistry so the stall-heartbeat sub-agent bypass (see
-// loop_stall_heartbeat.go:141) treats the parent's blocking wait as
-// "still progressing". Without this registration, a parent loop that blocks
-// on a nested sub-loop (e.g. fast_context) would have no active sub-agent in
-// the registry, causing IsAnyActive() to return false and the stall heartbeat
-// to fire a false [LOOP_STALL_DETECTED] / hard abort.
+// 关键点：每次运行都会向父 loop 的 ProgressRegistry 注册一个 SubAgentHandle，
+// 使 stall-heartbeat 子 Agent 旁路（见 loop_stall_heartbeat.go:141）将父 loop 的
+// 阻塞等待视为"仍在推进"。若不注册，父 loop 在阻塞等待 nested 子 loop
+//（如 fast_context）时 registry 中将没有活跃子 Agent，IsAnyActive() 返回 false，
+// stall heartbeat 会误报 [LOOP_STALL_DETECTED] / hard abort。
 // ─────────────────────────────────────────────────────────────────────
 
-// ensureSubAgentProgressRegistry returns the parent loop's existing
-// ProgressRegistry, or creates and installs one if none is set. This lets
-// the stall heartbeat / verification watchdog observe sub-agent activity.
+// ensureSubAgentProgressRegistry 返回父 loop 已有的 ProgressRegistry，若未设置
+// 则创建并安装一个。使 stall heartbeat / verification watchdog 能观察子 Agent 活动。
 func ensureSubAgentProgressRegistry(parentLoop *ReActLoop) *ProgressRegistry {
 	if parentLoop == nil {
 		return nil
@@ -514,18 +507,16 @@ func ensureSubAgentProgressRegistry(parentLoop *ReActLoop) *ProgressRegistry {
 	return registry
 }
 
-// RunNestedJobWithProgress runs a single nested sub-agent loop (by registered
-// loop name) and registers its progress into parentLoop's ProgressRegistry so
-// the stall-heartbeat sub-agent bypass treats the parent's blocking wait as
-// "still progressing".
+// RunNestedJobWithProgress 运行单个 nested 子 Agent loop（按已注册 loop name），
+// 并将其进度注册到 parentLoop 的 ProgressRegistry，使 stall-heartbeat 子 Agent
+// 旁路将父 loop 的阻塞等待视为"仍在推进"。
 //
-// When job.ForkTimeline is true, the parent timeline is forked (timeline
-// isolation, branch diff available). When false, the sub-loop runs in-place
-// on the parent timeline and any timeline entries created during the run are
-// rolled back (truncated) afterward — matching the semantics of RunNestedLoop.
+// 当 job.ForkTimeline 为 true 时 fork 父 timeline（timeline 隔离，分支 diff 可用）。
+// 为 false 时子 loop 在父 timeline 上原地运行，运行期间产生的 timeline 条目会在
+// 结束后回滚（截断）——与 RunNestedLoop 语义一致。
 //
-// The returned SubAgentResult.SubLoop is always the executed ReActLoop (even
-// on error, so callers can read loop variables / deliverables).
+// 返回的 SubAgentResult.SubLoop 始终是执行过的 ReActLoop（即使出错也保留，以便
+// 调用方读取 loop 变量 / 交付物）。
 func RunNestedJobWithProgress(
 	parentInvoker aicommon.AIInvokeRuntime,
 	parentLoop *ReActLoop,
@@ -546,8 +537,8 @@ func RunNestedJobWithProgress(
 		return nil, err
 	}
 
-	// Ensure the parent loop has a progress registry so the stall heartbeat
-	// sub-agent bypass can observe this sub-agent while the parent blocks.
+	// 确保父 loop 有 progress registry，使 stall heartbeat 子 Agent 旁路能在父
+	// loop 阻塞期间观察此子 Agent。
 	registry := ensureSubAgentProgressRegistry(parentLoop)
 
 	if job.ForkTimeline {
@@ -555,14 +546,12 @@ func RunNestedJobWithProgress(
 	}
 	return runNestedInPlace(parentInvoker, parentTask, job, registry, configure, opts, startedAt)
 }
-// RunNestedJobsConcurrentlyWithProgress runs multiple nested sub-agent jobs
-// with a worker pool. Each job runs via RunNestedJobWithProgress. Results are
-// sorted by Order ascending.
+// RunNestedJobsConcurrentlyWithProgress 通过 worker 池并发运行多个 nested 子 Agent
+// 任务。每个任务经 RunNestedJobWithProgress 执行。结果按 Order 升序排序。
 //
-// Because runJobsConcurrently is generic over a single type that is both the
-// job carrier and the result, each SubAgentJob is first wrapped into a
-// SubAgentResult (carrying the job via the embedded SubAgentJob) and then
-// runSingle executes the nested run and fills in the outcome.
+// 由于 runJobsConcurrently 直接操作统一的 SubAgentResult 类型，这里先把每个
+// SubAgentJob 包装成 SubAgentResult（经内嵌 SubAgentJob 携带任务身份），再由
+// runSingle 执行 nested 运行并填入结果。
 func RunNestedJobsConcurrentlyWithProgress(
 	parentInvoker aicommon.AIInvokeRuntime,
 	parentLoop *ReActLoop,

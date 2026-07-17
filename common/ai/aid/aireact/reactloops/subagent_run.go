@@ -9,8 +9,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// swapEmitterForRun forwards the parent task's emitter to the parent config for
-// the duration of an in-place nested run, returning a restore function (or nil).
+// swapEmitterForRun 在 in-place nested 运行期间将父任务的 emitter 转发到父
+// config，返回恢复函数（无需恢复时返回 nil）。
 func swapEmitterForRun(parentInvoker aicommon.AIInvokeRuntime, parentTask aicommon.AIStatefulTask) func() {
 	if parentTask == nil {
 		return nil
@@ -23,9 +23,9 @@ func swapEmitterForRun(parentInvoker aicommon.AIInvokeRuntime, parentTask aicomm
 	return nil
 }
 
-// runWithCurrentTask swaps the invoker's (and parent loop's) current task to the
-// sub-task for the duration of run, restoring both afterwards. Returns run's
-// result. Used by in-place nested runs that share the parent timeline.
+// runWithCurrentTask 在 run 执行期间将 invoker（及父 loop）的 current task 切换
+// 为子任务，执行结束后恢复两者。返回 run 的结果。被共享父 timeline 的 in-place
+// nested 运行使用。
 func runWithCurrentTask[T any](
 	parentInvoker aicommon.AIInvokeRuntime,
 	subTask aicommon.AIStatefulTask,
@@ -48,9 +48,9 @@ func runWithCurrentTask[T any](
 	return run()
 }
 
-// timelineRollbackCheckpoint captures the parent timeline's max id and returns a
-// restore function that truncates any entries added after the checkpoint. If the
-// parent invoker has no usable timeline, the returned restore is a no-op.
+// timelineRollbackCheckpoint 记录父 timeline 的 max id 并返回一个恢复函数，该
+// 函数会截断 checkpoint 之后新增的所有条目。若父 invoker 没有可用的 timeline，
+// 返回的恢复函数为 no-op。
 func timelineRollbackCheckpoint(parentInvoker aicommon.AIInvokeRuntime) func() {
 	if cfg := parentInvoker.GetConfig(); cfg != nil {
 		if c, ok := cfg.(*aicommon.Config); ok && c.Timeline != nil {
@@ -68,12 +68,11 @@ func timelineRollbackCheckpoint(parentInvoker aicommon.AIInvokeRuntime) func() {
 	return func() {}
 }
 
-// runSubLoopWithHandle builds (via CreateLoopByName) and executes a sub-loop,
-// registering a progress handle so the parent's stall heartbeat / verification
-// watchdog can observe the sub-agent. The handle is unregistered on completion
-// or error. opts are the loop options; configure optionally configures the loop
-// before execution. Returns the executed sub-loop and its execution error. When
-// loop creation fails, createErr != nil and subLoop is nil.
+// runSubLoopWithHandle 通过 CreateLoopByName 构建并执行一个子 loop，同时注册
+// progress handle，使父 loop 的 stall heartbeat / verification watchdog 能观察
+// 子 Agent 的活动。完成或出错时注销 handle。opts 为 loop 选项；configure 可在
+// 执行前配置 loop。返回执行完成的子 loop 及其执行错误；loop 创建失败时
+// createErr != nil 且 subLoop 为 nil。
 func runSubLoopWithHandle(
 	invoker aicommon.AIInvokeRuntime,
 	loopName string,
@@ -104,7 +103,8 @@ func runSubLoopWithHandle(
 	return loop, execErr
 }
 
-// forkJobFromNested converts a SubAgentJob to the SubAgentJob used by the fork path.
+// forkJobFromNested 将 SubAgentJob 转换为 fork 路径所用的 SubAgentJob（当前为
+// 透传，保留以便未来字段裁剪）。
 func forkJobFromNested(job SubAgentJob) SubAgentJob {
 	return SubAgentJob{
 		Order:      job.Order,
@@ -115,13 +115,13 @@ func forkJobFromNested(job SubAgentJob) SubAgentJob {
 	}
 }
 
-// nestedScopeName derives the nested sub-task scope name from a SubAgentJob.
+// nestedScopeName 从 SubAgentJob 推导 nested 子任务的 scope 名。
 func nestedScopeName(job SubAgentJob) string {
 	return deriveScopeName(job.LoopName, job.TaskName, job.Identifier)
 }
 
-// validateNestedJob checks the invariants required before a nested run. It
-// trims job.LoopName in place and verifies the loop factory exists.
+// validateNestedJob 检查 nested 运行前需要满足的不变式：原地 trim
+// job.LoopName 并验证 loop factory 存在。
 func validateNestedJob(job *SubAgentJob) error {
 	if job == nil {
 		return utils.Error("nested job is nil")
@@ -136,8 +136,8 @@ func validateNestedJob(job *SubAgentJob) error {
 	return nil
 }
 
-// runNestedForked runs one SubAgentJob in a forked timeline branch and registers
-// its progress into registry. Shared by RunNestedJobWithProgress (ForkTimeline).
+// runNestedForked 在 fork 出的 timeline 分支中运行一个 SubAgentJob，并将其进度
+// 注册到 registry。供 RunNestedJobWithProgress（ForkTimeline = true）使用。
 func runNestedForked(
 	parentInvoker aicommon.AIInvokeRuntime,
 	parentTask aicommon.AIStatefulTask,
@@ -164,9 +164,9 @@ func runNestedForked(
 	}, nil
 }
 
-// runNestedInPlace runs one SubAgentJob on the parent timeline (no fork), rolling
-// back any timeline entries created during the run, and registers its progress
-// into registry. Shared by RunNestedJobWithProgress (!ForkTimeline).
+// runNestedInPlace 在父 timeline 上（不 fork）运行一个 SubAgentJob，运行结束后
+// 回滚期间新增的 timeline 条目，并将其进度注册到 registry。供
+// RunNestedJobWithProgress（ForkTimeline = false）使用。
 func runNestedInPlace(
 	parentInvoker aicommon.AIInvokeRuntime,
 	parentTask aicommon.AIStatefulTask,

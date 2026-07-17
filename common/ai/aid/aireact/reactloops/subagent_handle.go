@@ -7,11 +7,10 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
 
-// registerHandle creates a SubAgentHandle for the given sub-task and registers
-// it in the registry, returning the handle (or nil when registry is nil). The
-// returned handle.SubLoop field must be set by the caller once the sub-loop is
-// created. Callers MUST call unregisterHandle(...) afterwards to remove the
-// handle and mark it finished when the sub-loop completes or fails.
+// registerHandle 为给定子任务创建 SubAgentHandle 并注册到 registry，返回 handle
+//（registry 为 nil 时返回 nil）。调用方在子 loop 创建后需自行设置
+// handle.SubLoop 字段。子 loop 结束或失败后，调用方必须调用
+// unregisterHandle(...) 移除 handle 并标记为已完成。
 func registerHandle(
 	registry *ProgressRegistry,
 	subTaskID, identifier string,
@@ -24,8 +23,8 @@ func registerHandle(
 	return registry.Register(NewSubAgentHandle(subTaskID, identifier, subTask, startedAt))
 }
 
-// unregisterHandle removes the handle from the registry (if any) and marks it
-// finished with the given error. Safe to call with a nil handle / nil registry.
+// unregisterHandle 从 registry 移除 handle（如果存在）并以给定错误标记其为已
+// 完成。handle 或 registry 为 nil 时安全调用。
 func unregisterHandle(handle *SubAgentHandle, registry *ProgressRegistry, subTaskID string, execErr error) {
 	if handle == nil || registry == nil {
 		return
@@ -33,10 +32,9 @@ func unregisterHandle(handle *SubAgentHandle, registry *ProgressRegistry, subTas
 	registry.Unregister(subTaskID, execErr)
 }
 
-// deriveScopeName picks a non-empty display name from the supplied candidates,
-// falling back to the given default. Each candidate is trimmed before use.
-// Used by nested-loop helpers (RunNestedLoop / runNestedInPlace) to derive a
-// sub-task scope name from job.TaskName / job.Identifier / job.LoopName.
+// deriveScopeName 从候选列表中选取第一个非空的（trim 后）显示名，全部为空时
+// 回退到 def。被 nested-loop 辅助函数（RunNestedLoop / runNestedInPlace）用来从
+// job.TaskName / job.Identifier / job.LoopName 推导子任务的 scope 名。
 func deriveScopeName(def string, candidates ...string) string {
 	for _, c := range candidates {
 		if s := strings.TrimSpace(c); s != "" {
