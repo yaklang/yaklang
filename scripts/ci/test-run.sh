@@ -441,7 +441,9 @@ reason_is_low_signal() {
 
 extract_panic_reason() {
   local log="$1"
-  grep -aom1 -E 'panic:.*|fatal error:.*' "$log" | sed -E 's/.*(panic:.*|fatal error:.*)/\1/' || true
+  # Only real Go panic/fatal lines (start of line). Do not match subtest names
+  # like "TestHandlerError/panic:_keywords_...".
+  grep -aom1 -E '^panic: .*|^fatal error: .*' "$log" | head -n1 || true
 }
 
 extract_panic_test_name() {
@@ -452,7 +454,7 @@ extract_panic_test_name() {
 extract_panic_location() {
   local log="$1"
   awk '
-    /panic:|fatal error:/ { capture=1; next }
+    /panic: |fatal error: / { capture=1; next }
     capture {
       line=$0
       gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
@@ -651,7 +653,7 @@ else
   echo "Failed tests:"
   # 列出所有包含失败标记的日志
   while IFS= read -r log; do
-    if grep -aEq "^FAIL:|^--- FAIL:|^FAIL$|test timed out|panic:|fatal error:" "$log"; then
+    if grep -aEq "^FAIL:|^--- FAIL:|^FAIL$|test timed out|^panic: |^fatal error: " "$log"; then
       test_name="$(basename "$log" .run.log)"
       failed_cases="$(extract_failed_test_names "$log")"
       failure_reason="$(extract_failure_reason "$log")"

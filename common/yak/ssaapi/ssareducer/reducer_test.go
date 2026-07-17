@@ -290,7 +290,10 @@ func TestFilesHandler_OutOfOrderWaitsForConsumerBeforeParsingNextAST(t *testing.
 
 	first := <-out
 	require.NotNil(t, first)
-	require.Equal(t, int64(1), atomic.LoadInt64(&parsed))
+	// Window is 1 with an unbuffered parse pipe: before the first receive at
+	// most one AST is parsed. Once the consumer frees that slot, the worker
+	// may immediately start the next file, so parsed can already be 2 here.
+	require.LessOrEqual(t, atomic.LoadInt64(&parsed), int64(2))
 
 	for i := 0; i < 3; i++ {
 		_, ok := <-out
