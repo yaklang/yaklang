@@ -27,7 +27,7 @@ func presentVerifyScope(
 	}
 	summary := formatVerifyScopeSummary(findings)
 	byCategory := findingsByCategoryMap(findings)
-	err := reactloops.RunForkInvokerCallback(r, task, reactloops.ForkJob{
+	err := reactloops.RunForkInvokerCallback(r, task, reactloops.SubAgentJob{
 		Identifier: "verify-scope",
 		TaskName:   forkGoalDetermineVerifyScope,
 		Goal:       forkGoalDetermineVerifyScope,

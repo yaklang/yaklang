@@ -61,7 +61,7 @@ func handleDispatchSubReactAgents(
 		operator.Fail(utils.Error("dispatch_sub_react_agents verifier state missing; retry the action"))
 		return
 	}
-	var jobs []reactloops.DispatchJob
+	var jobs []reactloops.SubAgentJob
 	if err := json.Unmarshal([]byte(rawJobs), &jobs); err != nil {
 		operator.Fail(err)
 		return

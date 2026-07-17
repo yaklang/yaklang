@@ -24,7 +24,7 @@ func presentAuditVulnerabilityTypes(
 		return
 	}
 	summary := formatAuditVulnerabilityTypesSummary(categories)
-	err := reactloops.RunForkInvokerCallback(r, task, reactloops.ForkJob{
+	err := reactloops.RunForkInvokerCallback(r, task, reactloops.SubAgentJob{
 		Identifier: "audit-vuln-types",
 		TaskName:   forkGoalDetermineAuditVulnerabilityTypes,
 		Goal:       forkGoalDetermineAuditVulnerabilityTypes,

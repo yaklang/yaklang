@@ -9,7 +9,7 @@ import (
 )
 
 // BuildForkTaskID builds a stable sub-agent task id from the parent task and job identifier.
-func BuildForkTaskID(parentTask aicommon.AIStatefulTask, job ForkJob) string {
+func BuildForkTaskID(parentTask aicommon.AIStatefulTask, job SubAgentJob) string {
 	parentID := "sub-agent"
 	if parentTask != nil && parentTask.GetId() != "" {
 		parentID = parentTask.GetId()

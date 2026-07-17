@@ -10,7 +10,7 @@ import (
 
 func TestBuildForkTaskID_StableSegment(t *testing.T) {
 	task := aicommon.NewStatefulTaskBase("parent-abc", "x", context.Background(), aicommon.NewDummyEmitter(), true)
-	id := BuildForkTaskID(task, ForkJob{
+	id := BuildForkTaskID(task, SubAgentJob{
 		Order:      1,
 		Identifier: "sql_injection",
 	})

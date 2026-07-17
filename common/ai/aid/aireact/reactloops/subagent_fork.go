@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -15,7 +14,7 @@ import (
 func RunForkInvokerCallback(
 	parentInvoker aicommon.AIInvokeRuntime,
 	parentTask aicommon.AIStatefulTask,
-	job ForkJob,
+	job SubAgentJob,
 	fn ForkInvokerCallback,
 ) error {
 	if fn == nil {
@@ -36,9 +35,9 @@ func RunForkInvokerCallback(
 func RunForkJob(
 	parentInvoker aicommon.AIInvokeRuntime,
 	parentTask aicommon.AIStatefulTask,
-	job ForkJob,
+	job SubAgentJob,
 	factory ForkLoopFactory,
-) (*ForkResult, error) {
+) (*SubAgentResult, error) {
 	startedAt := time.Now()
 	if factory == nil {
 		return nil, utils.Error("fork sub-loop factory is nil")
@@ -49,102 +48,66 @@ func RunForkJob(
 		defer jobCancel()
 	}
 	if err != nil {
-		return &ForkResult{
-			Order:      job.Order,
-			Identifier: job.Identifier,
-			ExecErr:    err,
-			DurationMs: time.Since(startedAt).Milliseconds(),
-		}, nil
+		return &SubAgentResult{SubAgentJob: job, ExecErr: err, DurationMs: time.Since(startedAt).Milliseconds()}, nil
 	}
 
 	subLoop, err := factory(childInvoker, job)
 	if err != nil {
-		return &ForkResult{
-			Order:      job.Order,
-			Identifier: job.Identifier,
-			SubTaskID:  subTask.GetId(),
-			SubTask:    subTask,
-			Fork:       fork,
-			ExecErr:    err,
+		return &SubAgentResult{
+			SubAgentJob: job,
+			SubTaskID: subTask.GetId(),
+			SubTask:   subTask,
+			Fork:      fork,
+			ExecErr:   err,
 			DurationMs: time.Since(startedAt).Milliseconds(),
 		}, nil
 	}
 
 	subTask.SetStatus(aicommon.AITaskState_Processing)
 	execErr := subLoop.ExecuteWithExistedTask(subTask)
-	return &ForkResult{
-		Order:      job.Order,
-		Identifier: job.Identifier,
-		SubTaskID:  subTask.GetId(),
-		SubTask:    subTask,
-		SubLoop:    subLoop,
-		Fork:       fork,
-		ExecErr:    execErr,
+	return &SubAgentResult{
+		SubAgentJob: job,
+		SubTaskID: subTask.GetId(),
+		SubTask:   subTask,
+		SubLoop:   subLoop,
+		Fork:      fork,
+		ExecErr:   execErr,
 		DurationMs: time.Since(startedAt).Milliseconds(),
 	}, nil
 }
 
 // RunForkJobsConcurrently runs multiple forked sub-loops with a worker pool.
+//
+// Because runJobsConcurrently is generic over a single type that is both the
+// job carrier and the result, each SubAgentJob is first wrapped into a SubAgentResult
+// (carrying the job identity via the embedded SubAgentJob) and then runSingle
+// executes the fork and fills in the outcome. This keeps the public API
+// ([]SubAgentJob -> []*SubAgentResult) unchanged while letting the concurrency helper
+// operate on a single type.
 func RunForkJobsConcurrently(
 	parentInvoker aicommon.AIInvokeRuntime,
 	parentTask aicommon.AIStatefulTask,
-	jobs []ForkJob,
+	jobs []SubAgentJob,
 	concurrency int,
 	factory ForkLoopFactory,
-) []*ForkResult {
+) []*SubAgentResult {
 	if len(jobs) == 0 {
 		return nil
 	}
 	concurrency = normalizeForkConcurrency(concurrency, len(jobs))
 
-	if concurrency <= 1 {
-		results := make([]*ForkResult, 0, len(jobs))
-		for _, job := range jobs {
-			result, err := RunForkJob(parentInvoker, parentTask, job, factory)
-			if err != nil && result == nil {
-				result = &ForkResult{
-					Order:      job.Order,
-					Identifier: job.Identifier,
-					ExecErr:    err,
-				}
-			}
-			results = append(results, result)
+	wrapped := make([]*SubAgentResult, len(jobs))
+	for i, job := range jobs {
+		wrapped[i] = &SubAgentResult{SubAgentJob: job}
+	}
+	runSingle := func(r *SubAgentResult) *SubAgentResult {
+		result, err := RunForkJob(parentInvoker, parentTask, r.SubAgentJob, factory)
+		if err != nil && result == nil {
+			return &SubAgentResult{SubAgentJob: r.SubAgentJob, ExecErr: err}
 		}
-		return results
+		return result
 	}
-
-	jobsCh := make(chan ForkJob)
-	resultsCh := make(chan *ForkResult, len(jobs))
-	var workers sync.WaitGroup
-	for i := 0; i < concurrency; i++ {
-		workers.Add(1)
-		go func() {
-			defer workers.Done()
-			for job := range jobsCh {
-				result, err := RunForkJob(parentInvoker, parentTask, job, factory)
-				if err != nil && result == nil {
-					result = &ForkResult{
-						Order:      job.Order,
-						Identifier: job.Identifier,
-						ExecErr:    err,
-					}
-				}
-				resultsCh <- result
-			}
-		}()
-	}
-	for _, job := range jobs {
-		jobsCh <- job
-	}
-	close(jobsCh)
-	workers.Wait()
-	close(resultsCh)
-
-	results := make([]*ForkResult, 0, len(jobs))
-	for result := range resultsCh {
-		results = append(results, result)
-	}
-	return results
+	return runJobsConcurrently(wrapped, concurrency, runSingle)
 }
 
 // PrepareForkedSubAgent forks the parent timeline and returns a child invoker plus sub-task.
@@ -152,7 +115,7 @@ func RunForkJobsConcurrently(
 func PrepareForkedSubAgent(
 	parentInvoker aicommon.AIInvokeRuntime,
 	parentTask aicommon.AIStatefulTask,
-	job ForkJob,
+	job SubAgentJob,
 ) (aicommon.AITaskInvokeRuntime, aicommon.AIStatefulTask, *aicommon.TimelineFork, context.CancelFunc, error) {
 	parentCfg, ok := parentInvoker.GetConfig().(*aicommon.Config)
 	if !ok || parentCfg == nil {
@@ -225,7 +188,7 @@ func PrepareForkedSubAgent(
 	return childInvoker, subTask, fork, jobCancel, nil
 }
 
-func buildForkUserInput(job ForkJob) string {
+func buildForkUserInput(job SubAgentJob) string {
 	var sb strings.Builder
 	sb.WriteString(strings.TrimSpace(job.Goal))
 	if contract := strings.TrimSpace(job.ResultContract); contract != "" {

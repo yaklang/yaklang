@@ -63,7 +63,7 @@ func buildFastContextAction(
 			r.AddToTimeline("[FAST_CONTEXT_START]",
 				fmt.Sprintf("[Phase2/%s] 启动 FastContext 嵌套搜索（共用 category SubAgent TaskId）", category.ID))
 
-			result := loop_fast_context.RunFastContextSearch(r, loop.GetCurrentTask(), loop_fast_context.SearchInput{
+			result := loop_fast_context.RunFastContextSearch(r, loop, loop.GetCurrentTask(), loop_fast_context.SearchInput{
 				Query:             query,
 				WorkDir:           workDir,
 				ReferenceMaterial: refMaterial,

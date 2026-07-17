@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -65,6 +64,13 @@ func (n *nestedSubTask) GetUUID() string {
 
 // RunNestedLoop executes a registered sub-loop under the parent's TaskId without
 // creating a new UI card. Timeline entries created during the run are rolled back.
+//
+// It is the no-registry counterpart of runNestedInPlace: it shares the parent
+// timeline (rolling back entries afterwards), forwards the parent task emitter,
+// swaps the invoker's current task to a nested sub-task for the run, and leaves a
+// rollback checkpoint. It differs from runNestedInPlace only in that it does not
+// register a SubAgentHandle (callers that need the stall-heartbeat bypass should
+// use RunNestedJobWithProgress / RunNestedJobsConcurrentlyWithProgress instead).
 func RunNestedLoop(
 	invoker aicommon.AIInvokeRuntime,
 	parentTask aicommon.AIStatefulTask,
@@ -79,34 +85,14 @@ func RunNestedLoop(
 	if parentTask == nil {
 		return nil, utils.Error("parent task is nil")
 	}
-
-	var timeline *aicommon.Timeline
-	var checkpoint int64
-	if cfg := invoker.GetConfig(); cfg != nil {
-		if c, ok := cfg.(*aicommon.Config); ok && c.Timeline != nil {
-			timeline = c.Timeline
-			checkpoint = timeline.GetMaxID()
-			defer func() {
-				removed := countTimelineIDsAfter(timeline, checkpoint)
-				timeline.TruncateAfter(checkpoint)
-				if removed > 0 {
-					log.Infof("[SubAgent] nested loop %s timeline rollback: removed %d entries", scopeName, removed)
-				}
-			}()
-		}
-	}
-
 	factory, ok := GetLoopFactory(loopName)
 	if !ok || factory == nil {
 		return nil, utils.Errorf("reactloop[%s] not found", loopName)
 	}
 
-	var restoreEmitter func()
-	if cfg, ok := invoker.GetConfig().(*aicommon.Config); ok && cfg != nil {
-		if parentTask.GetEmitter() != nil {
-			restoreEmitter = cfg.SwapEmitter(parentTask.GetEmitter())
-		}
-	}
+	defer timelineRollbackCheckpoint(invoker)()
+
+	restoreEmitter := swapEmitterForRun(invoker, parentTask)
 	if restoreEmitter != nil {
 		defer restoreEmitter()
 	}
@@ -120,24 +106,11 @@ func RunNestedLoop(
 	}
 
 	nestedTask := newNestedSubTask(parentTask, scopeName)
-
-	prevInvokerTask := invoker.GetCurrentTask()
-	var prevParentLoop *ReActLoop
-	if prevInvokerTask != nil {
-		if parent, ok := prevInvokerTask.GetReActLoop().(*ReActLoop); ok {
-			prevParentLoop = parent
-		}
-	}
-	invoker.SetCurrentTask(nestedTask)
-	defer invoker.SetCurrentTask(prevInvokerTask)
-	defer func() {
-		if prevParentLoop != nil {
-			prevParentLoop.SetCurrentTask(prevInvokerTask)
-		}
-	}()
-
-	if err := subLoop.ExecuteWithExistedTask(nestedTask); err != nil {
-		return subLoop, utils.Wrap(err, "execute nested sub-loop")
+	execErr := runWithCurrentTask(invoker, nestedTask, func() error {
+		return subLoop.ExecuteWithExistedTask(nestedTask)
+	})
+	if execErr != nil {
+		return subLoop, utils.Wrap(execErr, "execute nested sub-loop")
 	}
 	return subLoop, nil
 }
