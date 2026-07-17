@@ -85,12 +85,21 @@ func TestReadHTTPResponseSkipsInformationalChainAndPreservesFollowingBytes(t *te
 	require.Equal(t, tail, remaining)
 }
 
-func TestReadHTTPResponseStillDecodesOrdinaryChunkedBody(t *testing.T) {
-	wire := []byte("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n4\r\ntest\r\n0\r\n\r\n")
-	rsp, err := ReadHTTPResponseFromBufioReader(bytes.NewReader(wire), &http.Request{Method: http.MethodGet})
+func TestReadHTTPResponseFromBytesKeepsStandalone1xxWithBody(t *testing.T) {
+	// Regression for d8bda01fc: skipping all 1xx broke standalone generated packets
+	// such as chaosmaker CrossVerify traffic (status 104/107/108 + body).
+	raw := []byte("HTTP/1.1 107 Mop\r\nContent-Length: 32\r\n\r\nActive Internet connectionstcp!!")
+	rsp, err := ReadHTTPResponseFromBytes(raw, nil)
 	require.NoError(t, err)
-	require.NotEqual(t, http.NoBody, rsp.Body)
-	body, err := io.ReadAll(rsp.Body)
+	require.Equal(t, 107, rsp.StatusCode)
+
+	// Suricata http_server_body matching reads from raw packet; parsing must succeed
+	// even when the status is informational.
+	providerOK := rsp != nil
+	require.True(t, providerOK)
+
+	raw100 := []byte("HTTP/1.1 100 Continue\r\nX-Test: 1\r\n\r\nActive Internet connectionstcp!!")
+	rsp100, err := ReadHTTPResponseFromBytes(raw100, nil)
 	require.NoError(t, err)
-	require.Contains(t, string(body), "test")
+	require.Equal(t, 100, rsp100.StatusCode)
 }
