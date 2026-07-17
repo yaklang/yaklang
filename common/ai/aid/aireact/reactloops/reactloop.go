@@ -59,7 +59,8 @@ type ReActLoop struct {
 	config  aicommon.AICallerConfigIf
 	emitter *aicommon.Emitter
 
-	maxIterations int
+	maxIterations                 int
+	disableIncreaseIterationCount bool
 
 	loopName string
 
