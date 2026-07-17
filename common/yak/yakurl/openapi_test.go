@@ -258,5 +258,7 @@ func TestOpenAPIYakURLPersistence(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, historyResp.GetResources(), 1)
 	require.Equal(t, docID, historyResp.GetResources()[0].GetResourceName())
+	require.Equal(t, "Yakit OpenAPI Demo API", historyResp.GetResources()[0].GetVerboseName())
+	require.Equal(t, "Yakit OpenAPI Demo API", yakurl.GetQueryParam(historyResp.GetResources()[0].GetExtra(), "title"))
 	require.Equal(t, "swagger-demo.json", yakurl.GetQueryParam(historyResp.GetResources()[0].GetExtra(), "file_name"))
 }

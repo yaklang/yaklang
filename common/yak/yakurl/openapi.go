@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/openapi"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -302,13 +303,21 @@ func listOpenAPIDocumentHistory() (*ypb.RequestYakURLResponse, error) {
 
 	resources := make([]*ypb.YakURLResource, 0, len(items))
 	for _, item := range items {
-		// title 缺失（空或等于 docID）时才触发解析回填；正常上传时 title 已存盘，零解析开销
+		// title 已存盘时零解析；仅 title 缺失（空或等于 docID）时才解析回填。
+		// 展示优先用 Session.Title，避免 Parsed==nil 时 VerboseName/Extra.title 退化成 docID。
 		parsed := item.doc.Parsed
-		title := strings.TrimSpace(item.doc.Session.Title)
-		if parsed == nil && (title == "" || title == item.docID) {
+		titleBefore := strings.TrimSpace(item.doc.Session.Title)
+		if parsed == nil && (titleBefore == "" || titleBefore == item.docID) {
 			parsed, _ = item.doc.EnsureParsed()
+			titleAfter := strings.TrimSpace(item.doc.Session.Title)
+			if titleAfter != "" && titleAfter != titleBefore {
+				if err := saveOpenAPIDocumentSessionToDisk(item.docID, item.doc); err != nil {
+					log.Warnf("persist openapi document title backfill for %q failed: %v", item.docID, err)
+				}
+			}
 		}
-		resource := openAPIDocumentRootResource(item.docID, parsed)
+		title := strings.TrimSpace(item.doc.Session.Title)
+		resource := openAPIDocumentRootResource(item.docID, parsed, title)
 		resource.Extra = append(resource.GetExtra(), openAPIDocumentHistoryExtras(item.docID, item.doc)...)
 		resources = append(resources, resource)
 	}
@@ -353,7 +362,7 @@ func listOpenAPIDocumentResources(docID string, parsed *openapi.ParsedDocument) 
 	}
 
 	resources := []*ypb.YakURLResource{
-		openAPIDocumentRootResource(docID, parsed),
+		openAPIDocumentRootResource(docID, parsed, ""),
 	}
 	for _, op := range parsed.Operations {
 		resources = append(resources, openAPIOperationListResource(docID, op))
@@ -538,7 +547,7 @@ func parseOpenAPIBuildOptions(params *ypb.RequestYakURLParams, query url.Values)
 	return opts, nil
 }
 
-func openAPIDocumentRootResource(docID string, parsed *openapi.ParsedDocument) *ypb.YakURLResource {
+func openAPIDocumentRootResource(docID string, parsed *openapi.ParsedDocument, sessionTitle string) *ypb.YakURLResource {
 	var info openapi.DocumentInfo
 	var operationCount int
 	var warnings []string
@@ -549,7 +558,15 @@ func openAPIDocumentRootResource(docID string, parsed *openapi.ParsedDocument) *
 	}
 	title := strings.TrimSpace(info.Title)
 	if title == "" {
+		title = strings.TrimSpace(sessionTitle)
+	}
+	if title == "" {
 		title = docID
+	}
+	// Extra.title 与 VerboseName 保持一致，避免 Parsed==nil 时 Extra 先写出空 title，
+	// 前端 GetQueryParam 取到第一个空值。
+	if strings.TrimSpace(info.Title) == "" {
+		info.Title = title
 	}
 	return &ypb.YakURLResource{
 		ResourceType:      openAPIResourceDocument,
