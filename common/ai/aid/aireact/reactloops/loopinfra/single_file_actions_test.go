@@ -741,6 +741,26 @@ func TestModifyAction_OldSnippet_UniqueMatch(t *testing.T) {
 	assert.True(t, runtime.timelineContains("modify_success"))
 }
 
+func TestModifyAction_OldSnippet_NormalizedUniqueMatch(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, factory, task := newLoopAndFactory(t, runtime, WithActionSuffix("code"), WithExitAfterWrite(false))
+	filename := filepath.Join(runtime.tmpDir, "snippet_normalized.yak")
+	loop.Set(factory.GetFilenameVariableName(), filename)
+	loop.Set(factory.GetFullCodeVariableName(), "before\r\nx = 1  \r\nafter\r\n")
+	loop.Set(factory.GetCodeVariableName(), "before\nx = 42\nafter")
+
+	action := mustBuildAction(t, factory.GetActionName("modify"), map[string]any{
+		"old_snippet": "before\nx = 1\nafter",
+	})
+	ac, err := loop.GetActionHandler(factory.GetActionName("modify"))
+	require.NoError(t, err)
+	op := reactloops.NewActionHandlerOperator(task)
+	ac.ActionHandler(loop, action, op)
+
+	assert.Equal(t, "before\nx = 42\nafter\r\n", loop.Get(factory.GetFullCodeVariableName()))
+	assert.True(t, runtime.timelineContains("modify_success"))
+}
+
 func TestModifyAction_OldSnippet_NotFound_Continue(t *testing.T) {
 	runtime := newTestRuntimeForSingleFile(t)
 	loop, factory, task := newLoopAndFactory(t, runtime, WithActionSuffix("code"), WithExitAfterWrite(false))
@@ -758,6 +778,8 @@ func TestModifyAction_OldSnippet_NotFound_Continue(t *testing.T) {
 
 	assert.True(t, op.IsContinued())
 	assert.True(t, runtime.timelineContains("modify_snippet_not_found"))
+	assert.Contains(t, op.GetFeedback().String(), "CURRENT_CODE")
+	assert.Contains(t, op.GetFeedback().String(), "Cursor Patch")
 }
 
 func TestModifyAction_OldSnippet_Ambiguous_Continue(t *testing.T) {
@@ -1001,6 +1023,40 @@ func TestModifyAction_Patch_ApplyFailed_LeavesFileUnchanged(t *testing.T) {
 
 	assert.True(t, op.IsContinued())
 	assert.True(t, runtime.timelineContains("modify_patch_apply_failed"))
+	assert.Contains(t, op.GetFeedback().String(), "CURRENT_CODE")
+	assert.Equal(t, orig, loop.Get(factory.GetFullCodeVariableName()))
+	disk, readErr := os.ReadFile(filename)
+	require.NoError(t, readErr)
+	assert.Equal(t, orig, string(disk))
+}
+
+func TestModifyAction_RejectsLargeNonPatchCode(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, factory, task := newLoopAndFactory(t, runtime, WithActionSuffix("code"), WithExitAfterWrite(false))
+	filename := filepath.Join(runtime.tmpDir, "reject_full_file.yak")
+	orig := "yakit.AutoInitYakit()\n\nbeforeRequest = func(req) {\n    return req\n}\n"
+	loop.Set(factory.GetFilenameVariableName(), filename)
+	loop.Set(factory.GetFullCodeVariableName(), orig)
+	require.NoError(t, os.WriteFile(filename, []byte(orig), 0o644))
+	loop.Set(factory.GetCodeVariableName(), `yakit.AutoInitYakit()
+
+beforeRequest = func(req) {
+    reqStr = string(req)
+    modified = re.ReplaceAll(reqStr, "a=1111", "a=2222")
+    yakit.Info("replaced")
+    return []byte(modified)
+}`)
+
+	ac, err := loop.GetActionHandler(factory.GetActionName("modify"))
+	require.NoError(t, err)
+	op := reactloops.NewActionHandlerOperator(task)
+	ac.ActionHandler(loop, mustBuildAction(t, factory.GetActionName("modify"), map[string]any{
+		"modify_code_reason": "replace query value",
+	}), op)
+
+	assert.True(t, op.IsContinued())
+	assert.True(t, runtime.timelineContains("modify_non_patch_full_code"))
+	assert.Contains(t, op.GetFeedback().String(), "*** Begin Patch")
 	assert.Equal(t, orig, loop.Get(factory.GetFullCodeVariableName()))
 	disk, readErr := os.ReadFile(filename)
 	require.NoError(t, readErr)

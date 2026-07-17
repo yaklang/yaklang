@@ -138,8 +138,9 @@ func ParseCodePatch(s string) ([]CodePatchHunk, error) {
 	return hunks, nil
 }
 
-// ApplyCodePatch applies hunks to fullCode. Every hunk's OldText must match exactly
-// once; any miss or ambiguous match fails the whole apply (file unchanged).
+// ApplyCodePatch applies hunks to fullCode. Every hunk's OldText must match
+// exactly once. If byte-for-byte matching misses, a safe normalized match is
+// attempted (line endings and trailing horizontal whitespace only).
 func ApplyCodePatch(fullCode string, hunks []CodePatchHunk) (string, error) {
 	if len(hunks) == 0 {
 		return "", utils.Error("no hunks to apply")
@@ -161,7 +162,7 @@ func ApplyCodePatch(fullCode string, hunks []CodePatchHunk) (string, error) {
 			return "", utils.Errorf("hunk %d (@@ %s): empty old text — add context/- lines to locate the insert", i+1, h.Header)
 		}
 
-		matches := findAllSubstrings(fullCode, oldText)
+		matches := findCodeMatchRanges(fullCode, oldText)
 		if len(matches) == 0 {
 			return "", utils.Errorf("hunk %d (@@ %s): old text not found.\nPreview:\n%s",
 				i+1, h.Header, utils.ShrinkTextBlock(oldText, 300))
@@ -170,10 +171,10 @@ func ApplyCodePatch(fullCode string, hunks []CodePatchHunk) (string, error) {
 			return "", utils.Errorf("hunk %d (@@ %s): old text matched %d times — enlarge @@ context for uniqueness",
 				i+1, h.Header, len(matches))
 		}
-		start := matches[0]
+		match := matches[0]
 		plans = append(plans, codePatchPlan{
-			start:   start,
-			end:     start + len(oldText),
+			start:   match.start,
+			end:     match.end,
 			newText: newText,
 			hunkIdx: i,
 		})
@@ -250,6 +251,89 @@ func findAllSubstrings(haystack, needle string) []int {
 		}
 	}
 	return out
+}
+
+type codeTextRange struct {
+	start int
+	end   int
+}
+
+// findCodeMatchRanges first uses exact byte matching. Only when there are no
+// exact matches does it normalize CRLF/CR to LF and ignore trailing spaces/tabs.
+// The normalized offsets are mapped back to the original source so replacements
+// preserve all text outside the matched range.
+func findCodeMatchRanges(fullCode, oldText string) []codeTextRange {
+	exact := findAllSubstrings(fullCode, oldText)
+	if len(exact) > 0 {
+		ranges := make([]codeTextRange, 0, len(exact))
+		for _, start := range exact {
+			ranges = append(ranges, codeTextRange{start: start, end: start + len(oldText)})
+		}
+		return ranges
+	}
+
+	normalizedFull, offsets := normalizeCodeForMatchWithOffsets(fullCode)
+	normalizedOld := normalizeCodeForMatch(oldText)
+	if normalizedOld == "" {
+		return nil
+	}
+	normalizedMatches := findAllSubstrings(normalizedFull, normalizedOld)
+	ranges := make([]codeTextRange, 0, len(normalizedMatches))
+	for _, start := range normalizedMatches {
+		end := start + len(normalizedOld)
+		if start < 0 || end >= len(offsets) {
+			continue
+		}
+		ranges = append(ranges, codeTextRange{start: offsets[start], end: offsets[end]})
+	}
+	return ranges
+}
+
+func normalizeCodeForMatch(s string) string {
+	normalized, _ := normalizeCodeForMatchWithOffsets(s)
+	return normalized
+}
+
+// normalizeCodeForMatchWithOffsets returns normalized code and a boundary map:
+// offsets[i] is the exclusive original end after consuming normalized[:i].
+func normalizeCodeForMatchWithOffsets(s string) (string, []int) {
+	var b strings.Builder
+	// offsets[i] is the exclusive original end after consuming normalized[:i].
+	offsets := []int{0}
+
+	for i := 0; i < len(s); {
+		lineStart := i
+		for i < len(s) && s[i] != '\r' && s[i] != '\n' {
+			i++
+		}
+		lineEnd := i
+		trimmedEnd := lineEnd
+		for trimmedEnd > lineStart && (s[trimmedEnd-1] == ' ' || s[trimmedEnd-1] == '\t') {
+			trimmedEnd--
+		}
+		wroteContent := trimmedEnd > lineStart
+		for j := lineStart; j < trimmedEnd; j++ {
+			b.WriteByte(s[j])
+			offsets = append(offsets, j+1)
+		}
+		// Ending a match at this line's normalized EOL should consume trailing spaces.
+		if wroteContent {
+			offsets[len(offsets)-1] = lineEnd
+		}
+
+		if i >= len(s) {
+			break
+		}
+		if s[i] == '\r' && i+1 < len(s) && s[i+1] == '\n' {
+			i += 2
+		} else {
+			i++
+		}
+		b.WriteByte('\n')
+		offsets = append(offsets, i)
+	}
+
+	return b.String(), offsets
 }
 
 type codePatchPlan struct {
