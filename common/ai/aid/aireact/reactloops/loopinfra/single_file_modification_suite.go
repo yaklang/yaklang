@@ -317,6 +317,88 @@ func (f *SingleFileModificationSuiteFactory) CommitAfterCodeEdit(
 	return nil
 }
 
+// handleModifyByPatch applies a Cursor-style Apply Patch from GEN_CODE onto full_code.
+// Frontend / yaklang_code_change always receive the merged full file — never raw patch text.
+func (f *SingleFileModificationSuiteFactory) handleModifyByPatch(
+	loop *reactloops.ReActLoop,
+	action *aicommon.Action,
+	op *reactloops.LoopActionHandlerOperator,
+	actionName, filename, fullCodeVar, codeVar string,
+) {
+	runtime := f.GetRuntime()
+	invoker := loop.GetInvoker()
+	reason := action.GetString("modify_code_reason")
+	patchBody := loop.Get(codeVar)
+
+	_, _, codeSegment, fixedCode := f.PrettifyCode(patchBody)
+	if fixedCode {
+		patchBody = codeSegment
+	}
+
+	if strings.TrimSpace(patchBody) == "" {
+		msg := "modify_code(patch) GEN_CODE empty"
+		runtime.AddToTimeline("error", msg)
+		op.Feedback(msg + "\n\n请在同一次回复中输出完整的 *** Begin Patch ... *** End Patch 块。")
+		op.Continue()
+		return
+	}
+
+	hunks, err := ParseCodePatch(patchBody)
+	if err != nil {
+		msg := fmt.Sprintf("【modify_code 失败】Patch 解析失败: %v", err)
+		invoker.AddToTimeline("modify_patch_parse_failed", msg)
+		op.Feedback(msg)
+		op.Continue()
+		return
+	}
+
+	fullCode := loop.Get(fullCodeVar)
+	newFull, err := ApplyCodePatch(fullCode, hunks)
+	if err != nil {
+		msg := fmt.Sprintf(`【modify_code 失败】Patch 应用失败（文件未改动）: %v
+
+请加长 @@ 上下文使 old 文本在 full_code 中唯一匹配，或改用 old_snippet / 行号回退。`, err)
+		invoker.AddToTimeline("modify_patch_apply_failed", msg)
+		op.Feedback(msg)
+		op.Continue()
+		return
+	}
+
+	invoker.AddToTimeline("modify_code", fmt.Sprintf("applied patch (%d hunk(s))", len(hunks)))
+	if reason != "" {
+		runtime.AddToTimeline("modify_reason", reason)
+	}
+
+	loopInfraActionStart(loop, loopInfraNodeSingleFileModify,
+		fmt.Sprintf("Patch 修改文件: %s (%d hunks) / Patch modify: %s (%d hunks)", filename, len(hunks), filename, len(hunks)),
+		"修改文件中 / Modifying File...")
+
+	editorSummary := SummarizeAppliedPatch(hunks)
+	successMsg := fmt.Sprintf("SUCCESS: applied patch (%d hunks), wrote %d bytes to file: %s", len(hunks), len(newFull), filename)
+	if err := f.CommitAfterCodeEdit(
+		loop, op, filename, newFull, actionName, reason, editorSummary,
+		"modify_success", "modify_write_failed", successMsg,
+		BuildYaklangPatchFull(newFull),
+	); err != nil {
+		op.Fail(fmt.Sprintf("failed to write patched content: %v", err))
+		return
+	}
+
+	loopInfraAddFileOpSuccessTimeline(loop, loopInfraFileOpTimeline{
+		Op:         "modify",
+		Filename:   filename,
+		NewSegment: editorSummary,
+		Deferred:   f.ShouldDeferDiskWrite(),
+	})
+
+	log.Infof("modify_code (patch) done: %d hunks", len(hunks))
+	loopInfraStatus(loop, "文件修改完成 / File Modify Complete")
+	loopInfraActionFinish(loop, loopInfraNodeSingleFileModify,
+		fmt.Sprintf("Patch 修改完成: %s / Patch applied: %s", filename, filename),
+		utils.ShrinkTextBlock(editorSummary, 256))
+	op.Continue()
+}
+
 // handleModifyByOldSnippet replaces exact text matches via modify_code + old_snippet.
 func (f *SingleFileModificationSuiteFactory) handleModifyByOldSnippet(
 	loop *reactloops.ReActLoop,

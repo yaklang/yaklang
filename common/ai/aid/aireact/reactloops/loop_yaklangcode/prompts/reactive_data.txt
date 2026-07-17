@@ -30,7 +30,7 @@
 {{ .CurrentCodeWithLineNumber }}
 <|CURRENT_CODE_END_{{ .Nonce }}|>
 
-调试可用 `desc(instance)` 看类型、`log.Info(...)` 打日志。修改优先 `modify_code` + old_snippet（精确匹配），大块用 modify_start_line/modify_end_line。
+调试可用 `desc(instance)` 看类型、`log.Info(...)` 打日志。修改优先 `modify_code` + GEN_CODE 内 Cursor 风格 Patch（`*** Begin Patch`）；系统应用后前端只拿到完整源码。无 patch 时回退 `old_snippet`，大块才用行号。
 {{ else }}## 当前没有代码（create 模式）
 要新建 Yak 脚本，用 `@action: write_code`。**JSON 行和紧随其后的代码块是同一次输出、不可分割**：输出完 JSON 不要停，必须紧接着把下面这段写完整：
 ```

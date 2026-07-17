@@ -924,3 +924,106 @@ func TestModifyAction_OldSnippet_EmptyCode_ResetAfterSuccess(t *testing.T) {
 	assert.NoError(t, failErr)
 	assert.True(t, retryOp.IsContinued())
 }
+
+func TestModifyAction_Verifier_AllowsPatchOnlyParams(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, factory, _ := newLoopAndFactory(t, runtime, WithActionSuffix("code"))
+	ac, err := loop.GetActionHandler(factory.GetActionName("modify"))
+	require.NoError(t, err)
+
+	action := mustBuildAction(t, factory.GetActionName("modify"), map[string]any{
+		"modify_code_reason": "apply patch",
+	})
+	require.NoError(t, ac.ActionVerifier(loop, action))
+}
+
+func TestModifyAction_Patch_Success_FullCodeHasNoPatchMarkers(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, factory, task := newLoopAndFactory(t, runtime, yaklangSingleFileOpts(WithExitAfterWrite(false))...)
+	filename := filepath.Join(runtime.tmpDir, "patch_ok.yak")
+	orig := "a = 1\nb = 2\nc = 3\n"
+	loop.Set(factory.GetFilenameVariableName(), filename)
+	loop.Set(factory.GetFullCodeVariableName(), orig)
+	loop.Set(factory.GetCodeVariableName(), `*** Begin Patch
+*** Update File: patch_ok.yak
+@@ replace b
+ a = 1
+-b = 2
++b = 42
+ c = 3
+*** End Patch`)
+
+	action := mustBuildAction(t, factory.GetActionName("modify"), map[string]any{
+		"modify_code_reason": "bump b",
+	})
+	ac, err := loop.GetActionHandler(factory.GetActionName("modify"))
+	require.NoError(t, err)
+	op := reactloops.NewActionHandlerOperator(task)
+	ac.ActionHandler(loop, action, op)
+
+	full := loop.Get(factory.GetFullCodeVariableName())
+	assert.Equal(t, "a = 1\nb = 42\nc = 3\n", full)
+	assert.NotContains(t, full, "*** Begin Patch")
+	assert.True(t, runtime.timelineContains("modify_success"))
+
+	disk, readErr := os.ReadFile(filename)
+	require.NoError(t, readErr)
+	assert.Equal(t, "a = 1\nb = 42\nc = 3\n", string(disk))
+	assert.NotContains(t, string(disk), "*** Begin Patch")
+
+	state := getLoopYaklangCodeState(loop, factory.GetFullCodeVariableName(), factory.GetFilenameVariableName())
+	require.NotNil(t, state)
+	assert.Equal(t, full, state.Content)
+	assert.NotContains(t, state.Content, "*** Begin Patch")
+}
+
+func TestModifyAction_Patch_ApplyFailed_LeavesFileUnchanged(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, factory, task := newLoopAndFactory(t, runtime, WithActionSuffix("code"), WithExitAfterWrite(false))
+	filename := filepath.Join(runtime.tmpDir, "patch_fail.yak")
+	orig := "a = 1\n"
+	loop.Set(factory.GetFilenameVariableName(), filename)
+	loop.Set(factory.GetFullCodeVariableName(), orig)
+	_ = os.WriteFile(filename, []byte(orig), 0o644)
+	loop.Set(factory.GetCodeVariableName(), `*** Begin Patch
+@@ miss
+-missing_line
++x
+*** End Patch`)
+
+	action := mustBuildAction(t, factory.GetActionName("modify"), map[string]any{
+		"modify_code_reason": "will fail",
+	})
+	ac, err := loop.GetActionHandler(factory.GetActionName("modify"))
+	require.NoError(t, err)
+	op := reactloops.NewActionHandlerOperator(task)
+	ac.ActionHandler(loop, action, op)
+
+	assert.True(t, op.IsContinued())
+	assert.True(t, runtime.timelineContains("modify_patch_apply_failed"))
+	assert.Equal(t, orig, loop.Get(factory.GetFullCodeVariableName()))
+	disk, readErr := os.ReadFile(filename)
+	require.NoError(t, readErr)
+	assert.Equal(t, orig, string(disk))
+}
+
+func TestModifyAction_LegacyLineRange_StillWorksWithoutPatch(t *testing.T) {
+	runtime := newTestRuntimeForSingleFile(t)
+	loop, factory, task := newLoopAndFactory(t, runtime, WithActionSuffix("code"), WithExitAfterWrite(false))
+	filename := filepath.Join(runtime.tmpDir, "legacy_line.yak")
+	loop.Set(factory.GetFilenameVariableName(), filename)
+	loop.Set(factory.GetFullCodeVariableName(), "a\nold\nc")
+	loop.Set(factory.GetCodeVariableName(), "new")
+
+	ac, err := loop.GetActionHandler(factory.GetActionName("modify"))
+	require.NoError(t, err)
+	op := reactloops.NewActionHandlerOperator(task)
+	ac.ActionHandler(loop, mustBuildAction(t, factory.GetActionName("modify"), map[string]any{
+		"modify_start_line": 2,
+		"modify_end_line":   2,
+	}), op)
+
+	assert.Contains(t, loop.Get(factory.GetFullCodeVariableName()), "new")
+	assert.NotContains(t, loop.Get(factory.GetFullCodeVariableName()), "*** Begin Patch")
+	assert.True(t, runtime.timelineContains("modify_success"))
+}
