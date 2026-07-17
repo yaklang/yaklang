@@ -70,4 +70,31 @@ func TestOpenAPIDocumentLegacyMetaMigration(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "Legacy Demo", parsed.Info.Title)
 	require.Equal(t, "Legacy Demo", loaded.Session.Title)
+
+	// 模拟重启：磁盘上 title 仍是 docID；history 应解析回填、展示正确标题并落盘
+	ResetOpenAPIDocumentStoreForTest()
+	reloaded, err := loadOpenAPIDocumentFromDisk(docID)
+	require.NoError(t, err)
+	require.Nil(t, reloaded.Parsed)
+	require.Equal(t, docID, reloaded.Session.Title)
+	openAPIDocumentStore.Store(docID, reloaded)
+
+	historyResp, err := listOpenAPIDocumentHistory()
+	require.NoError(t, err)
+	require.Len(t, historyResp.GetResources(), 1)
+	require.Equal(t, "Legacy Demo", historyResp.GetResources()[0].GetVerboseName())
+	require.Equal(t, "Legacy Demo", GetQueryParam(historyResp.GetResources()[0].GetExtra(), "title"))
+
+	ResetOpenAPIDocumentStoreForTest()
+	persisted, err := loadOpenAPIDocumentFromDisk(docID)
+	require.NoError(t, err)
+	require.Nil(t, persisted.Parsed)
+	require.Equal(t, "Legacy Demo", persisted.Session.Title)
+
+	// title 已落盘后，再次 history 不再触发解析
+	openAPIDocumentStore.Store(docID, persisted)
+	historyResp, err = listOpenAPIDocumentHistory()
+	require.NoError(t, err)
+	require.Equal(t, "Legacy Demo", historyResp.GetResources()[0].GetVerboseName())
+	require.Nil(t, persisted.Parsed)
 }

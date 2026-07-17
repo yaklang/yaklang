@@ -44,7 +44,7 @@ func LoadAll(dir string) map[string]string {
 		res[name] = strings.TrimSpace(string(content))
 	}
 	if len(res) > 0 {
-		log.Infof("loaded %d module overview(s) from %s", len(res), dir)
+		log.Infof("loaded %d yakdoc module overview(s) from %s", len(res), dir)
 	}
 	return res
 }
