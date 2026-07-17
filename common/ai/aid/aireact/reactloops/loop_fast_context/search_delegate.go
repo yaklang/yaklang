@@ -28,8 +28,14 @@ type SearchResult struct {
 }
 
 // RunFastContextSearch runs fast_context as a nested sub-loop under the parent TaskId.
+//
+// parentLoop is the enclosing ReActLoop (used to register the fast_context
+// sub-agent into the parent's ProgressRegistry so the stall-heartbeat sub-agent
+// bypass treats the parent's blocking wait as "still progressing"). May be nil
+// when called outside a ReActLoop context (registry registration is skipped).
 func RunFastContextSearch(
 	invoker aicommon.AIInvokeRuntime,
+	parentLoop *reactloops.ReActLoop,
 	parentTask aicommon.AIStatefulTask,
 	input SearchInput,
 ) SearchResult {
@@ -45,11 +51,17 @@ func RunFastContextSearch(
 		return SearchResult{Error: utils.Error("parent task is nil")}
 	}
 
-	subLoop, err := reactloops.RunNestedLoop(
+	result, err := reactloops.RunNestedJobWithProgress(
 		invoker,
+		parentLoop,
 		parentTask,
-		"fast-context",
-		schema.AI_REACT_LOOP_NAME_FAST_CONTEXT,
+		reactloops.SubAgentJob{
+			Order:        1,
+			Identifier:  "fast-context",
+			TaskName:    "fast-context",
+			LoopName:    schema.AI_REACT_LOOP_NAME_FAST_CONTEXT,
+			ForkTimeline: false,
+		},
 		func(loop *reactloops.ReActLoop) {
 			ConfigureSubLoop(loop, input)
 		},
@@ -58,10 +70,17 @@ func RunFastContextSearch(
 	if err != nil {
 		return SearchResult{Error: utils.Wrap(err, "fast_context nested run")}
 	}
+	if result == nil {
+		return SearchResult{Error: utils.Error("fast_context nested run returned nil result")}
+	}
+	if result.ExecErr != nil {
+		return SearchResult{Error: utils.Wrap(result.ExecErr, "fast_context nested run")}
+	}
+	subLoop := result.SubLoop
 
-	result := ExtractSearchResult(subLoop)
-	log.Infof("[FastContext] nested search done paths=%d err=%v", len(result.FilePaths), result.Error)
-	return result
+	searchResult := ExtractSearchResult(subLoop)
+	log.Infof("[FastContext] nested search done paths=%d err=%v", len(searchResult.FilePaths), searchResult.Error)
+	return searchResult
 }
 
 // ConfigureSubLoop sets loop variables before execution.

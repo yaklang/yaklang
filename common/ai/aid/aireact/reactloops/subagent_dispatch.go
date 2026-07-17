@@ -5,9 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -26,15 +24,6 @@ const (
 	DefaultDispatchConcurrency = 5
 	MaxDispatchConcurrency     = 10
 )
-
-// DispatchJob describes one sub-agent dispatch entry parsed from the AI action.
-type DispatchJob struct {
-	Order      int    `json:"order"`
-	Identifier string `json:"identifier"`
-	Goal       string `json:"goal"`
-	TaskName   string `json:"task_name"`
-	LoopName   string `json:"loop_name"`
-}
 
 // ProcessStats summarizes the runtime activity of a completed sub-agent.
 type ProcessStats struct {
@@ -61,14 +50,6 @@ type TimelineRecord struct {
 	TracePreview    string       `json:"trace_preview,omitempty"`
 }
 
-// JobResult is returned by a runner after a single sub-agent job completes.
-type JobResult struct {
-	Order    int
-	Job      DispatchJob
-	Record   TimelineRecord
-	Feedback string
-}
-
 // JobRunner is the interface for executing a single sub-agent dispatch job.
 // The default implementation (ForkedRunner) forks the parent timeline and runs
 // a full ReAct loop in the child. Tests can provide a mock implementation.
@@ -77,9 +58,9 @@ type JobRunner interface {
 		parentInvoker aicommon.AIInvokeRuntime,
 		parentLoop *ReActLoop,
 		parentTask aicommon.AIStatefulTask,
-		job DispatchJob,
+		job SubAgentJob,
 		registry *ProgressRegistry,
-	) (*JobResult, error)
+	) (*SubAgentResult, error)
 }
 
 // ForkedRunner is the default JobRunner that forks the parent timeline and
@@ -96,24 +77,23 @@ func (ForkedRunner) Run(
 	parentInvoker aicommon.AIInvokeRuntime,
 	parentLoop *ReActLoop,
 	parentTask aicommon.AIStatefulTask,
-	job DispatchJob,
+	job SubAgentJob,
 	registry *ProgressRegistry,
-) (*JobResult, error) {
+) (*SubAgentResult, error) {
 	return RunForkedJob(parentInvoker, parentLoop, parentTask, job, registry)
 }
 
 // RunForkedJob forks the parent timeline, elaborates the brief goal, registers
-// a progress handle, runs the sub-loop, and returns a JobResult.
+// a progress handle, runs the sub-loop, and returns a SubAgentResult.
 func RunForkedJob(
 	parentInvoker aicommon.AIInvokeRuntime,
 	parentLoop *ReActLoop,
 	parentTask aicommon.AIStatefulTask,
-	job DispatchJob,
+	job SubAgentJob,
 	registry *ProgressRegistry,
-) (*JobResult, error) {
+) (*SubAgentResult, error) {
 	startedAt := time.Now()
-	loopName := job.LoopName
-	forkJob := ForkJob{
+	forkJob := SubAgentJob{
 		Order:      job.Order,
 		Identifier: job.Identifier,
 		Goal:       job.Goal,
@@ -141,130 +121,73 @@ func RunForkedJob(
 	}
 	subTask.SetUserInput(buildUserInput(elaboratedGoal, resultContract))
 
-	// Register sub-agent progress handle so stall heartbeat / verification
-	// watchdog can observe sub-agent activity while the parent loop blocks.
-	var handle *SubAgentHandle
-	if registry != nil {
-		handle = registry.Register(NewSubAgentHandle(
-			subTask.GetId(), job.Identifier, subTask, startedAt,
-		))
-	}
-
-	subLoop, err := CreateLoopByName(loopName, childInvoker, DefaultForkOptions()...)
-	if err != nil {
-		if handle != nil && registry != nil {
-			registry.Unregister(subTask.GetId(), err)
-		}
-		result, _ := BuildJobResult(job, startedAt, subTask, nil, fork, err)
-		return result, nil
-	}
-
-	if handle != nil {
-		handle.SubLoop = subLoop
-	}
-
-	execErr := subLoop.ExecuteWithExistedTask(subTask)
+	subLoop, execErr := runSubLoopWithHandle(
+		childInvoker, job.LoopName, subTask, job.Identifier, registry, startedAt,
+		DefaultForkOptions(), nil,
+	)
 	result, _ := BuildJobResult(job, startedAt, subTask, subLoop, fork, execErr)
-	if handle != nil && registry != nil {
-		registry.Unregister(subTask.GetId(), execErr)
-	}
 	return result, nil
 }
 
 // RunJobsConcurrently runs multiple sub-agent dispatch jobs with a worker pool.
+//
+// Because runJobsConcurrently is generic over a single type that is both the
+// job carrier and the result, each SubAgentJob is first wrapped into a
+// SubAgentResult (carrying the job via the embedded SubAgentJob) and then runSingle
+// executes the runner and fills in the outcome.
 func RunJobsConcurrently(
 	parentInvoker aicommon.AIInvokeRuntime,
 	parentLoop *ReActLoop,
 	parentTask aicommon.AIStatefulTask,
-	jobs []DispatchJob,
+	jobs []SubAgentJob,
 	concurrency int,
 	registry *ProgressRegistry,
-) []*JobResult {
+) []*SubAgentResult {
 	runner := DefaultRunner
-	if concurrency <= 1 {
-		results := make([]*JobResult, 0, len(jobs))
-		for _, job := range jobs {
-			result, err := runner.Run(parentInvoker, parentLoop, parentTask, job, registry)
-			if err != nil {
-				result = &JobResult{
-					Order: job.Order,
-					Job:   job,
-					Record: TimelineRecord{
-						SubAgentID: BuildForkTaskID(parentTask, ForkJob{
-							Order:      job.Order,
-							Identifier: job.Identifier,
-						}),
-						Order:    job.Order,
-						LoopName: job.LoopName,
-						Goal:     job.Goal,
-						Status:   "failed",
-						Error:    err.Error(),
-					},
-					Feedback: fmt.Sprintf("[%d] %s (failed): %s", job.Order, job.Identifier, err.Error()),
-				}
-			}
-			results = append(results, result)
+	wrapped := make([]*SubAgentResult, len(jobs))
+	for i, job := range jobs {
+		wrapped[i] = &SubAgentResult{SubAgentJob: job}
+	}
+	runSingle := func(r *SubAgentResult) *SubAgentResult {
+		result, err := runner.Run(parentInvoker, parentLoop, parentTask, r.SubAgentJob, registry)
+		if err != nil {
+			return failedJobResult(parentTask, r.SubAgentJob, err)
 		}
-		return results
+		return result
 	}
-
-	jobsCh := make(chan DispatchJob)
-	resultsCh := make(chan *JobResult, len(jobs))
-	var workers sync.WaitGroup
-
-	workerCount := concurrency
-	for i := 0; i < workerCount; i++ {
-		workers.Add(1)
-		go func() {
-			defer workers.Done()
-			for job := range jobsCh {
-				result, err := runner.Run(parentInvoker, parentLoop, parentTask, job, registry)
-				if err != nil {
-					result = &JobResult{
-						Order: job.Order,
-						Job:   job,
-						Record: TimelineRecord{
-							SubAgentID: BuildForkTaskID(parentTask, ForkJob{
-								Order:      job.Order,
-								Identifier: job.Identifier,
-							}),
-							Order:    job.Order,
-							LoopName: job.LoopName,
-							Goal:     job.Goal,
-							Status:   "failed",
-							Error:    err.Error(),
-						},
-						Feedback: fmt.Sprintf("[%d] %s (failed): %s", job.Order, job.Identifier, err.Error()),
-					}
-				}
-				resultsCh <- result
-			}
-		}()
-	}
-
-	for _, job := range jobs {
-		jobsCh <- job
-	}
-	close(jobsCh)
-	workers.Wait()
-	close(resultsCh)
-
-	results := make([]*JobResult, 0, len(jobs))
-	for result := range resultsCh {
-		results = append(results, result)
-	}
-	return results
+	return runJobsConcurrently(wrapped, concurrency, runSingle)
 }
 
-// BuildJobResult constructs a JobResult from the sub-task and sub-loop state.
+// failedJobResult builds a SubAgentResult describing a job that failed before it
+// could produce a normal result (e.g. fork preparation error). It is shared by
+// RunJobsConcurrently and any runner that needs to surface a setup-level error.
+func failedJobResult(parentTask aicommon.AIStatefulTask, job SubAgentJob, err error) *SubAgentResult {
+	return &SubAgentResult{
+		SubAgentJob: job,
+		Record: TimelineRecord{
+			SubAgentID: BuildForkTaskID(parentTask, SubAgentJob{
+				Order:      job.Order,
+				Identifier: job.Identifier,
+			}),
+			Order:    job.Order,
+			LoopName: job.LoopName,
+			Goal:     job.Goal,
+			Status:   "failed",
+			Error:    err.Error(),
+		},
+		Feedback: fmt.Sprintf("[%d] %s (failed): %s", job.Order, job.Identifier, err.Error()),
+	}
+}
+
+// BuildJobResult constructs a SubAgentResult from the sub-task and sub-loop state.
 func BuildJobResult(
-	job DispatchJob,
+	job SubAgentJob,
 	startedAt time.Time,
 	subTask aicommon.AIStatefulTask,
 	subLoop *ReActLoop,
 	fork *aicommon.TimelineFork,
 	execErr error,
-) (*JobResult, error) {
+) (*SubAgentResult, error) {
 	record := TimelineRecord{
 		SubAgentID: subTask.GetId(),
 		Order:      job.Order,
@@ -295,9 +218,8 @@ func BuildJobResult(
 		feedback = fmt.Sprintf("[%d] %s (%s): %s", job.Order, job.Identifier, record.Status, record.Error)
 	}
 
-	return &JobResult{
-		Order:    job.Order,
-		Job:      job,
+	return &SubAgentResult{
+		SubAgentJob: job,
 		Record:   record,
 		Feedback: feedback,
 	}, nil
@@ -405,7 +327,7 @@ func elaborateGoal(
 	childInvoker aicommon.AITaskInvokeRuntime,
 	parentLoop *ReActLoop,
 	subTaskId string,
-	job DispatchJob,
+	job SubAgentJob,
 ) (goal, resultContract string, err error) {
 	if childInvoker == nil {
 		return "", "", utils.Error("child invoker is nil")
@@ -467,7 +389,7 @@ func elaborateGoal(
 // --- parsing ---
 
 // ParseDispatchJobs extracts dispatch jobs from an AI action's "dispatches" parameter.
-func ParseDispatchJobs(action *aicommon.Action) ([]DispatchJob, error) {
+func ParseDispatchJobs(action *aicommon.Action) ([]SubAgentJob, error) {
 	jobs, err := parseDispatchJobsFromArray(action.GetInvokeParamsArray("dispatches"))
 	if err != nil {
 		return nil, err
@@ -486,16 +408,16 @@ func ParseDispatchJobs(action *aicommon.Action) ([]DispatchJob, error) {
 	return NormalizeDispatchJobs(jobs)
 }
 
-func parseDispatchJobsFromArray(raw []aitool.InvokeParams) ([]DispatchJob, error) {
+func parseDispatchJobsFromArray(raw []aitool.InvokeParams) ([]SubAgentJob, error) {
 	if len(raw) == 0 {
 		return nil, nil
 	}
-	jobs := make([]DispatchJob, 0, len(raw))
+	jobs := make([]SubAgentJob, 0, len(raw))
 	for _, item := range raw {
 		if item == nil {
 			continue
 		}
-		jobs = append(jobs, DispatchJob{
+		jobs = append(jobs, SubAgentJob{
 			Identifier: strings.TrimSpace(item.GetString("identifier")),
 			Goal:       strings.TrimSpace(item.GetString("goal")),
 			TaskName:   strings.TrimSpace(item.GetString("task_name")),
@@ -506,7 +428,7 @@ func parseDispatchJobsFromArray(raw []aitool.InvokeParams) ([]DispatchJob, error
 }
 
 // NormalizeDispatchJobs validates and normalizes dispatch jobs.
-func NormalizeDispatchJobs(jobs []DispatchJob) ([]DispatchJob, error) {
+func NormalizeDispatchJobs(jobs []SubAgentJob) ([]SubAgentJob, error) {
 	if len(jobs) == 0 {
 		return nil, utils.Error("dispatches must contain at least one sub agent job")
 	}
@@ -555,8 +477,119 @@ func ParseConcurrency(action *aicommon.Action, jobCount int) int {
 }
 
 // SortJobResults sorts job results by Order ascending (in-place).
-func SortJobResults(results []*JobResult) {
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].Order < results[j].Order
-	})
+func SortJobResults(results []*SubAgentResult) {
+	sortSubAgentResultsByOrder(results)
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Programmatic nested sub-agent dispatch (by loop name, fork toggle)
+//
+// Unlike the AI-driven dispatch_sub_react_agents action, these helpers are
+// called directly by orchestrator loops (e.g. code audit phase2 fast_context)
+// to run a *specified* registered ReAct loop as a sub-agent. The caller
+// chooses whether to fork the parent timeline (timeline isolation) or run
+// in-place (timeline entries rolled back after the run).
+//
+// Crucially, every run registers a SubAgentHandle into the parent loop's
+// ProgressRegistry so the stall-heartbeat sub-agent bypass (see
+// loop_stall_heartbeat.go:141) treats the parent's blocking wait as
+// "still progressing". Without this registration, a parent loop that blocks
+// on a nested sub-loop (e.g. fast_context) would have no active sub-agent in
+// the registry, causing IsAnyActive() to return false and the stall heartbeat
+// to fire a false [LOOP_STALL_DETECTED] / hard abort.
+// ─────────────────────────────────────────────────────────────────────
+
+// ensureSubAgentProgressRegistry returns the parent loop's existing
+// ProgressRegistry, or creates and installs one if none is set. This lets
+// the stall heartbeat / verification watchdog observe sub-agent activity.
+func ensureSubAgentProgressRegistry(parentLoop *ReActLoop) *ProgressRegistry {
+	if parentLoop == nil {
+		return nil
+	}
+	registry := parentLoop.GetSubAgentProgressRegistry()
+	if registry == nil {
+		registry = NewProgressRegistry()
+		parentLoop.SetSubAgentProgressRegistry(registry)
+	}
+	return registry
+}
+
+// RunNestedJobWithProgress runs a single nested sub-agent loop (by registered
+// loop name) and registers its progress into parentLoop's ProgressRegistry so
+// the stall-heartbeat sub-agent bypass treats the parent's blocking wait as
+// "still progressing".
+//
+// When job.ForkTimeline is true, the parent timeline is forked (timeline
+// isolation, branch diff available). When false, the sub-loop runs in-place
+// on the parent timeline and any timeline entries created during the run are
+// rolled back (truncated) afterward — matching the semantics of RunNestedLoop.
+//
+// The returned SubAgentResult.SubLoop is always the executed ReActLoop (even
+// on error, so callers can read loop variables / deliverables).
+func RunNestedJobWithProgress(
+	parentInvoker aicommon.AIInvokeRuntime,
+	parentLoop *ReActLoop,
+	parentTask aicommon.AIStatefulTask,
+	job SubAgentJob,
+	configure func(subLoop *ReActLoop),
+	opts ...ReActLoopOption,
+) (*SubAgentResult, error) {
+	startedAt := time.Now()
+
+	if parentInvoker == nil {
+		return nil, utils.Error("parent invoker is nil")
+	}
+	if parentTask == nil {
+		return nil, utils.Error("parent task is nil")
+	}
+	if err := validateNestedJob(&job); err != nil {
+		return nil, err
+	}
+
+	// Ensure the parent loop has a progress registry so the stall heartbeat
+	// sub-agent bypass can observe this sub-agent while the parent blocks.
+	registry := ensureSubAgentProgressRegistry(parentLoop)
+
+	if job.ForkTimeline {
+		return runNestedForked(parentInvoker, parentTask, job, registry, configure, opts, startedAt)
+	}
+	return runNestedInPlace(parentInvoker, parentTask, job, registry, configure, opts, startedAt)
+}
+// RunNestedJobsConcurrentlyWithProgress runs multiple nested sub-agent jobs
+// with a worker pool. Each job runs via RunNestedJobWithProgress. Results are
+// sorted by Order ascending.
+//
+// Because runJobsConcurrently is generic over a single type that is both the
+// job carrier and the result, each SubAgentJob is first wrapped into a
+// SubAgentResult (carrying the job via the embedded SubAgentJob) and then
+// runSingle executes the nested run and fills in the outcome.
+func RunNestedJobsConcurrentlyWithProgress(
+	parentInvoker aicommon.AIInvokeRuntime,
+	parentLoop *ReActLoop,
+	parentTask aicommon.AIStatefulTask,
+	jobs []SubAgentJob,
+	concurrency int,
+	configure func(subLoop *ReActLoop),
+	opts ...ReActLoopOption,
+) []*SubAgentResult {
+	if len(jobs) == 0 {
+		return nil
+	}
+	concurrency = normalizeForkConcurrency(concurrency, len(jobs))
+
+	wrapped := make([]*SubAgentResult, len(jobs))
+	for i, job := range jobs {
+		wrapped[i] = &SubAgentResult{SubAgentJob: job}
+	}
+	runSingle := func(r *SubAgentResult) *SubAgentResult {
+		result, err := RunNestedJobWithProgress(parentInvoker, parentLoop, parentTask, r.SubAgentJob, configure, opts...)
+		if err != nil && result == nil {
+			return &SubAgentResult{SubAgentJob: r.SubAgentJob, ExecErr: err}
+		}
+		return result
+	}
+
+	results := runJobsConcurrently(wrapped, concurrency, runSingle)
+	sortSubAgentResultsByOrder(results)
+	return results
 }

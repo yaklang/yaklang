@@ -39,7 +39,7 @@ func runAllFindingVerifications(
 		return nil
 	}
 
-	jobs := make([]reactloops.ForkJob, 0, len(findings))
+	jobs := make([]reactloops.SubAgentJob, 0, len(findings))
 	catalog := make(map[string]findingVerifyJob, len(findings))
 	skipped := 0
 	for i, finding := range findings {
@@ -52,7 +52,7 @@ func runAllFindingVerifications(
 			continue
 		}
 		goal := fmt.Sprintf("Phase 3 verify: %s — %s", finding.ID, finding.Title)
-		jobs = append(jobs, reactloops.ForkJob{
+		jobs = append(jobs, reactloops.SubAgentJob{
 			Order:      i + 1,
 			Identifier: finding.ID,
 			TaskName:   goal,
@@ -84,7 +84,7 @@ func runAllFindingVerifications(
 
 	forkResults := reactloops.RunForkJobsConcurrently(
 		r, task, jobs, concurrency,
-		func(childInvoker aicommon.AIInvokeRuntime, job reactloops.ForkJob) (*reactloops.ReActLoop, error) {
+		func(childInvoker aicommon.AIInvokeRuntime, job reactloops.SubAgentJob) (*reactloops.ReActLoop, error) {
 			verifyJob, ok := catalog[job.Identifier]
 			if !ok {
 				return nil, fmt.Errorf("unknown finding job %q", job.Identifier)
@@ -132,7 +132,7 @@ func finalizeFindingVerifyAfterFork(
 	loop *reactloops.ReActLoop,
 	state *model.AuditState,
 	job findingVerifyJob,
-	forkResult *reactloops.ForkResult,
+	forkResult *reactloops.SubAgentResult,
 ) findingVerifyOutcome {
 	finding := job.finding
 	if forkResult.ExecErr != nil {

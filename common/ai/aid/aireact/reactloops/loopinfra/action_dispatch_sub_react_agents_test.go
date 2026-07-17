@@ -133,7 +133,7 @@ func TestVerifyDispatchSubReactAgents_AcceptsValidPayload(t *testing.T) {
 
 type mockSubReactAgentRunner struct {
 	mu    sync.Mutex
-	calls []reactloops.DispatchJob
+	calls []reactloops.SubAgentJob
 	delay time.Duration
 }
 
@@ -141,9 +141,9 @@ func (m *mockSubReactAgentRunner) Run(
 	_ aicommon.AIInvokeRuntime,
 	_ *reactloops.ReActLoop,
 	_ aicommon.AIStatefulTask,
-	job reactloops.DispatchJob,
+	job reactloops.SubAgentJob,
 	_ *reactloops.ProgressRegistry,
-) (*reactloops.JobResult, error) {
+) (*reactloops.SubAgentResult, error) {
 	m.mu.Lock()
 	m.calls = append(m.calls, job)
 	m.mu.Unlock()
@@ -152,9 +152,8 @@ func (m *mockSubReactAgentRunner) Run(
 		time.Sleep(m.delay)
 	}
 
-	return &reactloops.JobResult{
-		Order: job.Order,
-		Job:   job,
+	return &reactloops.SubAgentResult{
+		SubAgentJob: job,
 		Record: reactloops.TimelineRecord{
 			SubAgentID: "mock-" + job.Identifier,
 			Order:      job.Order,
@@ -219,7 +218,7 @@ func TestRunDispatchSubReactJobsConcurrently_PreservesInputOrderInResults(t *tes
 	loop := reactloops.NewMinimalReActLoop(invoker.GetConfig(), invoker)
 	task := aicommon.NewStatefulTaskBase("parent-task", "parent input", context.Background(), invoker.GetConfig().GetEmitter(), true)
 
-	jobs := []reactloops.DispatchJob{
+	jobs := []reactloops.SubAgentJob{
 		{Order: 1, Identifier: "slow_a", Goal: "A", LoopName: schema.AI_REACT_LOOP_NAME_DEFAULT},
 		{Order: 2, Identifier: "slow_b", Goal: "B", LoopName: schema.AI_REACT_LOOP_NAME_DEFAULT},
 	}
@@ -300,13 +299,12 @@ func (m *partialFailSubReactRunner) Run(
 	_ aicommon.AIInvokeRuntime,
 	_ *reactloops.ReActLoop,
 	_ aicommon.AIStatefulTask,
-	job reactloops.DispatchJob,
+	job reactloops.SubAgentJob,
 	_ *reactloops.ProgressRegistry,
-) (*reactloops.JobResult, error) {
+) (*reactloops.SubAgentResult, error) {
 	if _, ok := m.failIdentifiers[job.Identifier]; ok {
-		return &reactloops.JobResult{
-			Order: job.Order,
-			Job:   job,
+		return &reactloops.SubAgentResult{
+			SubAgentJob: job,
 			Record: reactloops.TimelineRecord{
 				SubAgentID: "mock-" + job.Identifier,
 				Order:      job.Order,
@@ -318,9 +316,8 @@ func (m *partialFailSubReactRunner) Run(
 			Feedback: "fail:" + job.Identifier,
 		}, nil
 	}
-	return &reactloops.JobResult{
-		Order: job.Order,
-		Job:   job,
+	return &reactloops.SubAgentResult{
+		SubAgentJob: job,
 		Record: reactloops.TimelineRecord{
 			SubAgentID: "mock-" + job.Identifier,
 			Order:      job.Order,
@@ -416,9 +413,9 @@ func (r *forkIsolationSubReactRunner) Run(
 	parentInvoker aicommon.AIInvokeRuntime,
 	_ *reactloops.ReActLoop,
 	_ aicommon.AIStatefulTask,
-	job reactloops.DispatchJob,
+	job reactloops.SubAgentJob,
 	_ *reactloops.ProgressRegistry,
-) (*reactloops.JobResult, error) {
+) (*reactloops.SubAgentResult, error) {
 	parentCfg, ok := parentInvoker.GetConfig().(*aicommon.Config)
 	if !ok || parentCfg == nil || parentCfg.GetTimeline() == nil {
 		return nil, utils.Error("timeline isolation test requires *aicommon.Config with timeline")
@@ -432,9 +429,8 @@ func (r *forkIsolationSubReactRunner) Run(
 	fork.Branch.PushText(parentCfg.AcquireId(), secret)
 	r.branchSecrets = append(r.branchSecrets, secret)
 
-	return &reactloops.JobResult{
-		Order: job.Order,
-		Job:   job,
+	return &reactloops.SubAgentResult{
+		SubAgentJob: job,
 		Record: reactloops.TimelineRecord{
 			SubAgentID: "fork-" + job.Identifier,
 			Order:      job.Order,
@@ -1035,7 +1031,7 @@ func TestRunForkedSubReactAgentJob_SetsProcessingBeforeElaboration(t *testing.T)
 		"parent-task", "parent input", context.Background(), parentCfg.GetEmitter(), true,
 	)
 
-	job := reactloops.DispatchJob{
+	job := reactloops.SubAgentJob{
 		Order:      1,
 		Identifier: "agent_a",
 		Goal:       "task A",

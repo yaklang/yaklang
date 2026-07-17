@@ -41,11 +41,11 @@ func runAllCategoryScans(
 		return nil
 	}
 
-	jobs := make([]reactloops.ForkJob, 0, len(categories))
+	jobs := make([]reactloops.SubAgentJob, 0, len(categories))
 	catalog := make(map[string]categoryScanJob, len(categories))
 	for i, category := range categories {
 		goal := fmt.Sprintf("Phase 2 category scan: %s (%s)", category.Name, category.ID)
-		jobs = append(jobs, reactloops.ForkJob{
+		jobs = append(jobs, reactloops.SubAgentJob{
 			Order:      i + 1,
 			Identifier: category.ID,
 			TaskName:   goal,
@@ -73,7 +73,7 @@ func runAllCategoryScans(
 
 	forkResults := reactloops.RunForkJobsConcurrently(
 		r, task, jobs, concurrency,
-		func(childInvoker aicommon.AIInvokeRuntime, job reactloops.ForkJob) (*reactloops.ReActLoop, error) {
+		func(childInvoker aicommon.AIInvokeRuntime, job reactloops.SubAgentJob) (*reactloops.ReActLoop, error) {
 			catJob, ok := catalog[job.Identifier]
 			if !ok {
 				return nil, fmt.Errorf("unknown category job %q", job.Identifier)
@@ -127,7 +127,7 @@ func finalizeCategoryScanAfterFork(
 	task aicommon.AIStatefulTask,
 	state *model.AuditState,
 	catJob categoryScanJob,
-	forkResult *reactloops.ForkResult,
+	forkResult *reactloops.SubAgentResult,
 	scanState *ScanState,
 	scanStates *sync.Map,
 	artifacts *categoryArtifactStore,
@@ -206,13 +206,13 @@ func tryResumeCategoryScanPhaseB(
 		fmt.Sprintf("阶段A 未完成，已从 %d 个目标恢复阶段B", len(locked)))
 
 	resumeGoal := fmt.Sprintf("Phase 2 category scan resume: %s", category.Name)
-	resumeJob := reactloops.ForkJob{
+	resumeJob := reactloops.SubAgentJob{
 		Order:      catJob.index,
 		Identifier: category.ID + "-resume",
 		TaskName:   resumeGoal,
 		Goal:       resumeGoal,
 	}
-	resumeResult, resumeErr := reactloops.RunForkJob(r, task, resumeJob, func(childInvoker aicommon.AIInvokeRuntime, _ reactloops.ForkJob) (*reactloops.ReActLoop, error) {
+	resumeResult, resumeErr := reactloops.RunForkJob(r, task, resumeJob, func(childInvoker aicommon.AIInvokeRuntime, _ reactloops.SubAgentJob) (*reactloops.ReActLoop, error) {
 		catLoop, scan, err := buildSingleCategoryScanLoop(childInvoker, state, category, catJob.index, catJob.total, scanState, artifacts)
 		if scan != nil {
 			scanStates.Store(category.ID, scan)

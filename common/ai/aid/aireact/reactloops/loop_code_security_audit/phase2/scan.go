@@ -1007,7 +1007,7 @@ func planScanCategories(r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask
 	prompt := fmt.Sprintf(planPromptTemplate, defaultDesc.String(), userInput)
 
 	var action *aicommon.Action
-	planErr := reactloops.RunForkInvokerCallback(r, task, reactloops.ForkJob{
+	planErr := reactloops.RunForkInvokerCallback(r, task, reactloops.SubAgentJob{
 		Identifier: "scan-plan",
 		TaskName:   "Determine code audit vulnerability scan categories",
 		Goal:       "Determine code audit vulnerability scan categories",
