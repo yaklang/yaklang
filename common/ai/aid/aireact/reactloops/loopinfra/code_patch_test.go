@@ -75,6 +75,34 @@ func TestApply_Ambiguous(t *testing.T) {
 	assert.Contains(t, err.Error(), "matched")
 }
 
+func TestApply_NormalizesLineEndingsAndTrailingWhitespace(t *testing.T) {
+	full := "before\r\nx = 1  \r\nafter\r\n"
+	patch := `*** Begin Patch
+@@ normalize
+ before
+-x = 1
++x = 42
+ after
+*** End Patch`
+
+	out, err := ApplyCodePatchFromString(full, patch)
+	require.NoError(t, err)
+	assert.Equal(t, "before\nx = 42\nafter\r\n", out)
+}
+
+func TestApply_NormalizedMatchStillRequiresUniqueness(t *testing.T) {
+	full := "x = 1  \r\nmiddle\r\nx = 1\t\r\n"
+	patch := `*** Begin Patch
+@@ ambiguous after normalization
+-x = 1
++x = 2
+*** End Patch`
+
+	_, err := ApplyCodePatchFromString(full, patch)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "matched 2 times")
+}
+
 func TestApply_DeletionHunk(t *testing.T) {
 	full := "keep\nDROP_ME\nkeep2\n"
 	patch := `*** Begin Patch
