@@ -147,8 +147,9 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 1) Patch (default): put a Cursor-style Apply Patch in the GEN_CODE / content tag
    (*** Begin Patch ... *** End Patch). System applies it to full_code then emits the merged full file (never raw patch) to the frontend.
 Legacy fallbacks when GEN_CODE is NOT a patch:
-2) Snippet: old_snippet (exact text match) + optional replace_all.
-3) Line range: modify_start_line + modify_end_line (1-based, inclusive).`,
+2) Small snippet only: old_snippet + optional replace_all.
+3) Small line range only: modify_start_line + modify_end_line (1-based, inclusive).
+Never emit a full file or complete function body in non-patch modify_code.`,
 		[]aitool.ToolOption{
 			aitool.WithIntegerParam("modify_start_line", aitool.WithParam_Description("Legacy line-range start (optional if GEN_CODE is a patch or old_snippet is set)")),
 			aitool.WithIntegerParam("modify_end_line", aitool.WithParam_Description("Legacy line-range end (optional if GEN_CODE is a patch or old_snippet is set)")),
@@ -198,6 +199,27 @@ Legacy fallbacks when GEN_CODE is NOT a patch:
 			// Preferred path: Cursor-style patch inside GEN_CODE (ignores old_snippet / line range).
 			if LooksLikeCodePatch(loop.Get(codeVar)) {
 				f.handleModifyByPatch(loop, action, op, actionName, filename, fullCodeVar, codeVar)
+				return
+			}
+
+			generatedCode := loop.Get(codeVar)
+			if looksLikeLargeNonPatchModify(loop.Get(fullCodeVar), generatedCode) {
+				msg := fmt.Sprintf(`【modify_code 失败】检测到 GEN_CODE 是完整文件或大段源码，但缺少 *** Begin Patch。
+
+modify_code 必须输出 Cursor 风格 Patch；禁止直接输出完整 beforeRequest、runSelfTest、完整函数或整份脚本。
+请基于本轮 CURRENT_CODE 原样复制上下文和删除行，重新输出：
+*** Begin Patch
+*** Update File: current
+@@ context
+-old
++new
+*** End Patch
+
+GEN_CODE 预览：
+%s`, utils.ShrinkTextBlock(generatedCode, 300))
+				runtime.AddToTimeline("modify_non_patch_full_code", msg)
+				op.Feedback(msg)
+				op.Continue()
 				return
 			}
 
@@ -364,6 +386,36 @@ GEN_CODE 解析行号：[%d-%d]
 			}
 		},
 	)
+}
+
+// looksLikeLargeNonPatchModify protects existing files from accidental full-file
+// or whole-function replacement when the model omitted the required patch envelope.
+// Legacy old_snippet/line-range mode remains available for genuinely small edits.
+func looksLikeLargeNonPatchModify(fullCode, generated string) bool {
+	generated = strings.TrimSpace(generated)
+	if generated == "" || LooksLikeCodePatch(generated) {
+		return false
+	}
+	if strings.Contains(generated, "yakit.AutoInitYakit()") {
+		return true
+	}
+
+	generatedLines := countNonEmptyLines(generated)
+	fullLines := countNonEmptyLines(fullCode)
+	if generatedLines >= 8 {
+		return true
+	}
+	return generatedLines >= 4 && fullLines > 0 && generatedLines*4 >= fullLines*3
+}
+
+func countNonEmptyLines(s string) int {
+	count := 0
+	for _, line := range strings.Split(strings.ReplaceAll(s, "\r\n", "\n"), "\n") {
+		if strings.TrimSpace(line) != "" {
+			count++
+		}
+	}
+	return count
 }
 
 // buildInsertAction creates the insert_{suffix} action (e.g., insert_code, insert_content)
