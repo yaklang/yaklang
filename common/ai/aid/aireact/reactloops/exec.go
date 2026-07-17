@@ -792,18 +792,20 @@ LOOP:
 			// 用户同意 -> 提升 maxIterations 并 continue 主循环 (有扩充次数护栏防自旋);
 			// 用户拒绝 / 未启用交互 / 已达扩充上限 -> 回退到原"软性中断"退出.
 			// 关键词: iteration extend, 临时扩充迭代上限, 软性中断回退
-			agreed, extDelta, extErr := r.requestIterationExtension(task, iterationCount, maxIterations)
-			if extErr != nil {
-				log.Warnf("ReactLoop[%v] request iteration extension error (fallback to soft interrupt): %v", r.loopName, extErr)
-			}
-			if agreed && extDelta > 0 {
-				// 用户同意扩充: 提升上限, 不推进 iterationCount (本轮仍属于"超限"那一轮,
-				// 但 maxIterations 已提高, 下一次 iterationCount > maxIterations 判断自然通过).
-				maxIterations += extDelta
-				r.loadingStatus(fmt.Sprintf("迭代上限已临时扩充至 %d / iteration limit extended to %d", maxIterations, maxIterations))
-				// 注意: 这里不 break, 也不推进 iterationCount, 直接 continue 让下一轮
-				// 重新走主循环逻辑 (生成 prompt / 调 AI / 执行 action).
-				continue
+			if !r.disableIncreaseIterationCount {
+				agreed, extDelta, extErr := r.requestIterationExtension(task, iterationCount, maxIterations)
+				if extErr != nil {
+					log.Warnf("ReactLoop[%v] request iteration extension error (fallback to soft interrupt): %v", r.loopName, extErr)
+				}
+				if agreed && extDelta > 0 {
+					// 用户同意扩充: 提升上限, 不推进 iterationCount (本轮仍属于"超限"那一轮,
+					// 但 maxIterations 已提高, 下一次 iterationCount > maxIterations 判断自然通过).
+					maxIterations += extDelta
+					r.loadingStatus(fmt.Sprintf("迭代上限已临时扩充至 %d / iteration limit extended to %d", maxIterations, maxIterations))
+					// 注意: 这里不 break, 也不推进 iterationCount, 直接 continue 让下一轮
+					// 重新走主循环逻辑 (生成 prompt / 调 AI / 执行 action).
+					continue
+				}
 			}
 			// 未扩充: 走原"软性中断"处理 (保持既有语义不变).
 			// 到达迭代上限属于"软性中断", 框架层统一按"自然结束"处理, 不再当作

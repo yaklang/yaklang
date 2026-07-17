@@ -36,6 +36,7 @@ func init() {
 				reactloops.WithUseSpeedPriorityAICallback(true),
 				reactloops.WithInitTask(buildInitTask(r)),
 				reactloops.WithMaxIterations(1),
+				reactloops.WithDisableIncreaseIteration(true),
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
 				reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {

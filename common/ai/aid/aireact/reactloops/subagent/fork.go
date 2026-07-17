@@ -271,5 +271,6 @@ func buildSubAgentStrategyOptions() []aicommon.ConfigOption {
 		aicommon.WithEnablePlanAndExec(false),
 		aicommon.WithEnableGoalMode(false),
 		aicommon.WithPreferDispatchSubReactAgents(false),
+		aicommon.WithDisableIncreaseIteration(true),
 	}
 }
