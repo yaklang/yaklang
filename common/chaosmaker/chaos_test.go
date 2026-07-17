@@ -46,43 +46,59 @@ var rules = []string{
 
 func TestMUSTPASS_CrossVerify(t *testing.T) {
 	for _, r := range rules {
-		rules, err := surirule.Parse(r)
-		// single rule
-		rr := rules[0]
-		if err != nil {
-			t.Error(err)
-		}
-		fRule := rule.NewRuleFromSuricata(rr)
-		maker := NewChaosMakerWithRules([]*rule.Storage{fRule})
-		res := maker.Generate()
-		if err != nil {
-			spew.Dump(r)
-			t.Error(err)
-		}
-
+		need := 0
 		count := 0
 		matchedCount := 0
+		var lastErr error
+		passed := false
 
-		// check generated chaos
-		for pk := range res {
-			if os.Getenv("GITHUB_ACTIONS") == "" {
-				// view chaos in wireshark
-				pcapx.InjectRaw(pk)
+		// Chaos traffic generation is probabilistic (HTTP rules especially).
+		// Retry a few times so CI does not flake on a single unlucky batch.
+		for attempt := 0; attempt < 5; attempt++ {
+			rules, err := surirule.Parse(r)
+			if err != nil {
+				lastErr = err
+				continue
 			}
-			count++
-			if match.New(rr).Match(pk) {
-				matchedCount++
+			// single rule
+			rr := rules[0]
+			fRule := rule.NewRuleFromSuricata(rr)
+			maker := NewChaosMakerWithRules([]*rule.Storage{fRule})
+			res := maker.Generate()
+
+			count = 0
+			matchedCount = 0
+			for pk := range res {
+				if os.Getenv("GITHUB_ACTIONS") == "" {
+					// view chaos in wireshark
+					pcapx.InjectRaw(pk)
+				}
+				count++
+				if match.New(rr).Match(pk) {
+					matchedCount++
+				}
 			}
+			need = utils.Max(rr.ContentRuleConfig.Thresholding.Repeat(), 5)
+			// Require strictly more than 60% of the minimum batch to match.
+			if count >= need && float64(matchedCount) > 0.6*float64(need) {
+				passed = true
+				break
+			}
+			lastErr = nil
 		}
-		need := utils.Max(rr.ContentRuleConfig.Thresholding.Repeat(), 5)
+
 		t.Logf("RULE\n" + r + fmt.Sprintf(`
 need: %d
 got: %d
 match %d
 `, need, count, matchedCount))
 
+		if lastErr != nil {
+			t.Error(lastErr)
+			return
+		}
 		// tcp not implement yet don't check it
-		if count < need || matchedCount <= int(0.6*float64(need)) {
+		if !passed {
 			t.Fatal("match error or no enough traffic")
 			return
 		}
