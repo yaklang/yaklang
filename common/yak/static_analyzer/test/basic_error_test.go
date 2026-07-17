@@ -344,7 +344,7 @@ results.discard.Header = append(results.discard.Header, "1")
 		check(t, code, []string{"map literal not have map pairs"})
 	})
 
-	t.Run("panic: keywords cause freevalue fail generation in loop", func(t *testing.T) {
+	t.Run("keywords cause freevalue fail generation in loop", func(t *testing.T) {
 		check(t, `
 func assignParam(Packet,Pname,Pvalue,funcname){
     pap := "ReplaceHTTPPacketQueryParam"
