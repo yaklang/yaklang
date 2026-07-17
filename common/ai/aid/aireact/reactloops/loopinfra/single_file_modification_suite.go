@@ -12,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
 // LoopVarCodeLineBase is the loop variable storing the 0-based offset between full_code line
@@ -357,7 +356,8 @@ func (f *SingleFileModificationSuiteFactory) handleModifyByPatch(
 	if err != nil {
 		msg := fmt.Sprintf(`【modify_code 失败】Patch 应用失败（文件未改动）: %v
 
-请加长 @@ 上下文使 old 文本在 full_code 中唯一匹配，或改用 old_snippet / 行号回退。`, err)
+请基于本轮 CURRENT_CODE 重新生成 Patch：context 与 '-' 行必须从最新代码原样复制，不要复用 rebase/上一轮修改前的旧片段。
+系统已尝试兼容 CRLF/LF 与行尾空格；若仍失败，请加长 @@ 上下文确保唯一匹配。`, err)
 		invoker.AddToTimeline("modify_patch_apply_failed", msg)
 		op.Feedback(msg)
 		op.Continue()
@@ -451,19 +451,13 @@ func (f *SingleFileModificationSuiteFactory) handleModifyByOldSnippet(
 	}
 
 	fullCode := loop.Get(fullCodeVar)
-	editor := memedit.NewMemEditor(fullCode)
-
-	var matches []*memedit.Range
-	_ = editor.FindStringRange(oldSnippet, func(r *memedit.Range) error {
-		matches = append(matches, r)
-		return nil
-	})
+	matches := findCodeMatchRanges(fullCode, oldSnippet)
 
 	if len(matches) == 0 {
 		msg := fmt.Sprintf(`【modify_code 失败】未找到 old_snippet。
 
-请确保 old_snippet 与 full_code 完全一致（含空格与换行）。
-可改用行号 modify_start_line/modify_end_line，或扩大上下文后重试。
+请基于本轮 CURRENT_CODE 重新生成 Cursor Patch；不要复用修改前或 rebase 前的旧片段。
+系统已尝试兼容 CRLF/LF 与行尾空格差异，但仍未找到唯一对应内容。
 
 old_snippet 预览：
 %s`, utils.ShrinkTextBlock(oldSnippet, 300))
@@ -476,8 +470,8 @@ old_snippet 预览：
 	if len(matches) > 1 && !replaceAll {
 		var lines []string
 		for i, r := range matches {
-			pos := editor.GetPositionByOffset(r.GetStartOffset())
-			lines = append(lines, fmt.Sprintf("  match %d: line %d", i+1, pos.GetLine()))
+			line := strings.Count(fullCode[:r.start], "\n") + 1
+			lines = append(lines, fmt.Sprintf("  match %d: line %d", i+1, line))
 		}
 		msg := fmt.Sprintf(`【modify_code 失败】old_snippet 匹配 %d 处，不唯一。
 
@@ -490,21 +484,14 @@ old_snippet 预览：
 		return
 	}
 
-	if replaceAll {
-		for i := len(matches) - 1; i >= 0; i-- {
-			if err := editor.UpdateTextByRange(matches[i], newCode); err != nil {
-				op.Fail("failed to replace snippet: " + err.Error())
-				return
-			}
-		}
-	} else {
-		if err := editor.UpdateTextByRange(matches[0], newCode); err != nil {
-			op.Fail("failed to replace snippet: " + err.Error())
-			return
-		}
+	if !replaceAll {
+		matches = matches[:1]
 	}
-
-	fullCode = editor.GetSourceCode()
+	// Apply from the end so offsets of earlier matches remain stable.
+	for i := len(matches) - 1; i >= 0; i-- {
+		r := matches[i]
+		fullCode = fullCode[:r.start] + newCode + fullCode[r.end:]
+	}
 
 	// 成功修改后重置空代码计数器
 	emptyCountVar := actionName + "_empty_modify_snippet_count"
