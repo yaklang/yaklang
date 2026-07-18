@@ -36,14 +36,14 @@ func buildFinishBlockedByGoalModeMessage(currentIteration, goalMinIterations int
 var loopAction_Finish = &LoopAction{
 	ActionType: "finish",
 	Description: "Mark the current task as finished and exit the loop IMMEDIATELY. " +
-		"This is the ONLY action that terminates the ReAct loop — no other action ends the task implicitly. " +
-		"PREFERRED completion action whenever evidence/results are already present in the timeline " +
+		"Use this explicit terminator whenever evidence/results are already present in the timeline " +
 		"(tool outputs are captured automatically and the system will synthesize a summary). " +
 		"Do NOT precede this action with bash echo/cat/tee/printf calls that only restate facts " +
 		"already produced by earlier tool calls — that wastes iterations. " +
 		"CRITICAL: if the current task still owns active TODO items, finish will be rejected until those TODOs are explicitly closed. " +
-		"If the user needs a structured Markdown answer emitted to the chat, use 'directly_answer' first " +
-		"(it delivers the answer but does NOT end the task), then call 'finish'. " +
+		"If the user needs a structured Markdown answer emitted to the chat, use 'directly_answer'; " +
+		"a final answer automatically ends the task when no active TODO or next movement remains. " +
+		"Set 'continue_after_answer=true' only for a progress answer that must continue executing. " +
 		"Add 'human_readable_thought' only if a brief closing note is needed.",
 	ActionHandler: func(loop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {
 		if loop.ShouldBlockFinishAtIteration(loop.GetCurrentIterationIndex()) {
@@ -68,13 +68,17 @@ var loopAction_Finish = &LoopAction{
 var loopAction_DirectlyAnswer = &LoopAction{
 	ActionType: "directly_answer",
 	Description: "Emit a direct answer to the user via 'answer_payload' or FINAL_ANSWER tag. For simple direct answers, omit 'human_readable_thought'. " +
-		"IMPORTANT: directly_answer ONLY delivers the answer; the loop CONTINUES afterwards and this action does NOT end the task. " +
-		"To terminate the ReAct loop you MUST use the 'finish' action (the only terminator). " +
+		"By default the loop ends after a successful answer when no active TODO remains. " +
+		"Set continue_after_answer=true only for a progress update that must be followed by more work. " +
 		"OPTIONAL: carry a non-empty 'next_movements' delta alongside the answer to schedule follow-up TODO updates.",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"answer_payload",
 			aitool.WithParam_Description(`USE THIS FIELD ONLY IF @action is 'directly_answer' AND answer is short (≤200 chars). For long answers, leave this empty and use '<|FINAL_ANSWER_...|>' tags after JSON. CRITICAL: answer_payload and <|FINAL_ANSWER_...|> are STRICTLY MUTUALLY EXCLUSIVE - never use both simultaneously.`),
+		),
+		aitool.WithBoolParam(
+			"continue_after_answer",
+			aitool.WithParam_Description(`Optional. Set true only when this is a progress update and the agent must continue executing after delivering it. Omit/false for the final answer.`),
 		),
 	},
 	AITagStreamFields: []*LoopAITagField{
@@ -126,10 +130,8 @@ var loopAction_DirectlyAnswer = &LoopAction{
 			return
 		}
 
-		// directly_answer 绝不 Exit: 无论是否有未关闭 TODO, 都先把答复 emit
-		// 出去, 再交给 DirectlyAnswerContinue 追加 timeline + 续跑. 真正终结
-		// 整个 ReAct 只能由显式 finish action 完成, 不存在任何隐式 Exit.
-		// 关键词: directly_answer 永不 Exit, answer-then-continue, finish 唯一终结器
+		// 答复始终先 emit, 再由 DirectlyAnswerContinue 根据 TODO、next_movements、
+		// goal mode 与 continue_after_answer 决定自动结束或继续执行.
 		invoker.EmitFileArtifactWithExt("directly_answer", ".md", payload)
 		invoker.EmitResultAfterStream(payload)
 		invoker.AddToTimeline(TimelineEntryAssistantOutput, fmt.Sprintf("user input: \n"+

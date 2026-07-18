@@ -1,0 +1,230 @@
+__DESC__ = "通过 SSH 在授权远程主机上执行命令或脚本，用于远程主机体检、系统信息采集、进程/端口/服务/配置检查和运维诊断。支持用户名密码或私钥路径认证，支持 sh/bash/cmd/powershell/raw 执行模式、可选 sudo、远程 timeout 包装、输出截断和结构化结果输出。不会在日志中打印密码。"
+__VERBOSE_NAME__ = "SSH 远程命令执行"
+__KEYWORDS__ = "ssh,remote shell,远程执行,远程主机体检,主机体检,系统巡检,运维诊断,远程命令,linux,windows,bash,powershell,system audit,host health check,配置检查,进程检查,端口检查"
+
+__USAGE__ = <<<USAGE_BLOCK
+SSH Remote Command Execution Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  host              (string)  SSH target host, e.g. "192.168.1.10" or "server.example.com".
+  username          (string)  SSH login username.
+  command           (string)  Command or multi-line script to execute on the remote host.
+
+Authentication Parameters:
+  password          (string)  SSH password. Use this for username/password login.
+  private-key       (string)  Local private key path. Use this instead of password for key auth.
+  key-passphrase    (string)  Optional passphrase for encrypted private key.
+
+Optional Parameters:
+  port              (int)     SSH port. Default: 22.
+  shell             (string)  Execution shell: "sh" | "bash" | "cmd" | "powershell" | "raw".
+                              Default: "sh".
+                              Use "raw" only when the command is already fully formed for sshd.
+  sudo              (bool)    Prefix Unix command with non-interactive sudo -n. Default: false.
+  timeout           (int)     Remote command timeout seconds. Default: 60.
+                              For Unix shells this uses the remote "timeout" command when available.
+                              SSH connection timeout is best-effort in the underlying SSH client.
+  max-output-bytes  (int)     Truncate captured output to this many bytes. Default: 20000.
+
+Examples:
+  Linux system info:
+    {"host":"10.0.0.5","username":"root","password":"***","command":"uname -a; uptime; df -h","shell":"sh"}
+
+  Linux listening ports:
+    {"host":"10.0.0.5","username":"ops","password":"***","command":"ss -tulnp || netstat -tulnp","sudo":true}
+
+  Read remote config:
+    {"host":"10.0.0.5","username":"ops","password":"***","command":"test -f /etc/ssh/sshd_config && sed -n '1,220p' /etc/ssh/sshd_config"}
+
+  Windows host:
+    {"host":"10.0.0.8","username":"Administrator","password":"***","command":"systeminfo","shell":"cmd"}
+
+Notes:
+  - This tool is for authorized remote administration and host health checks.
+  - It logs target/user/shell/timeout, but never prints password or key passphrase.
+  - For destructive operations, use explicit user approval outside this tool.
+USAGE_BLOCK
+
+yakit.AutoInitYakit()
+
+host := cli.String("host", cli.setRequired(true), cli.setHelp("SSH target host, e.g. 192.168.1.10 or server.example.com"))
+port := cli.Int("port", cli.setDefault(22), cli.setHelp("SSH port, default 22"))
+username := cli.String("username", cli.setRequired(true), cli.setHelp("SSH login username"))
+password := cli.String("password", cli.setHelp("SSH login password. Use either password or private-key. This value is never printed."))
+privateKey := cli.String("private-key", cli.setHelp("Local private key path for SSH key authentication"))
+keyPassphrase := cli.String("key-passphrase", cli.setHelp("Optional passphrase for encrypted private key. This value is never printed."))
+command := cli.String("command", cli.setRequired(true), cli.setHelp("Remote command or multi-line script to execute"))
+shellType := cli.String("shell", cli.setDefault("sh"), cli.setHelp("Remote shell: sh|bash|cmd|powershell|raw. Default sh"))
+sudo := cli.Bool("sudo", cli.setDefault(false), cli.setHelp("Use non-interactive sudo -n for Unix shells"))
+timeoutSec := cli.Int("timeout", cli.setDefault(60), cli.setHelp("Remote command timeout seconds, default 60"))
+maxOutputBytes := cli.Int("max-output-bytes", cli.setDefault(20000), cli.setHelp("Maximum output bytes to keep, default 20000"))
+
+cli.check()
+
+host = str.TrimSpace(host)
+username = str.TrimSpace(username)
+privateKey = str.TrimSpace(privateKey)
+shellType = str.ToLower(str.TrimSpace(shellType))
+
+if port <= 0 {
+    port = 22
+}
+if timeoutSec <= 0 {
+    timeoutSec = 60
+}
+if maxOutputBytes <= 0 {
+    maxOutputBytes = 20000
+}
+if password == "" && privateKey == "" {
+    yakit.Error("ssh_exec requires either password or private-key")
+    return
+}
+if shellType == "" {
+    shellType = "sh"
+}
+
+quoteForSh := func(s) {
+    if s == "" {
+        return "''"
+    }
+    return "'" + str.ReplaceAll(s, "'", "'\\''") + "'"
+}
+
+quoteForPowerShell := func(s) {
+    if s == "" {
+        return "''"
+    }
+    return "'" + str.ReplaceAll(s, "'", "''") + "'"
+}
+
+quoteForCmd := func(s) {
+    return "\"" + str.ReplaceAll(s, "\"", "\\\"") + "\""
+}
+
+buildUnixCommand := func(shellName, cmdText, useSudo, timeoutSeconds) {
+    shellBin := "sh"
+    if shellName == "bash" {
+        shellBin = "bash"
+    }
+
+    base := shellBin + " -lc " + quoteForSh(cmdText)
+    if useSudo {
+        base = "sudo -n " + base
+    }
+
+    if timeoutSeconds > 0 {
+        return "if command -v timeout >/dev/null 2>&1; then timeout " + sprint(timeoutSeconds) + "s " + base + "; else " + base + "; fi 2>&1"
+    }
+    return base + " 2>&1"
+}
+
+buildRemoteCommand := func(shellName, cmdText) {
+    switch shellName {
+    case "raw":
+        return cmdText
+    case "bash":
+        return buildUnixCommand("bash", cmdText, sudo, timeoutSec)
+    case "sh":
+        return buildUnixCommand("sh", cmdText, sudo, timeoutSec)
+    case "cmd":
+        if sudo {
+            yakit.Warn("sudo=true is ignored for cmd shell")
+        }
+        return "cmd.exe /d /s /c " + quoteForCmd(cmdText + " 2>&1")
+    case "powershell":
+        if sudo {
+            yakit.Warn("sudo=true is ignored for powershell shell")
+        }
+        return "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command " + quoteForPowerShell(cmdText)
+    default:
+        yakit.Warn("unknown shell %q, fallback to sh", shellName)
+        return buildUnixCommand("sh", cmdText, sudo, timeoutSec)
+    }
+}
+
+target := host
+if !str.Contains(host, ":") {
+    target = sprintf("%s:%d", host, port)
+}
+
+yakit.Info("================== SSH 远程执行 ==================")
+yakit.Info("目标: %s", target)
+yakit.Info("用户: %s", username)
+authType := "password"
+if privateKey != "" {
+    authType = "private-key"
+}
+yakit.Info("认证: %s", authType)
+yakit.Info("Shell: %s", shellType)
+yakit.Info("sudo: %v", sudo)
+yakit.Info("远程命令超时: %ds", timeoutSec)
+yakit.Info("输出上限: %d bytes", maxOutputBytes)
+
+client = nil
+connErr = nil
+if privateKey != "" {
+    if keyPassphrase != "" {
+        client, connErr = ssh.Connect(target, ssh.username(username), ssh.privateKey(privateKey), ssh.keyPassphrase(keyPassphrase), ssh.timeout(float64(timeoutSec)))
+    } else {
+        client, connErr = ssh.Connect(target, ssh.username(username), ssh.privateKey(privateKey), ssh.timeout(float64(timeoutSec)))
+    }
+} else {
+    client, connErr = ssh.Connect(target, ssh.username(username), ssh.password(password), ssh.timeout(float64(timeoutSec)))
+}
+if connErr != nil {
+    yakit.Error("SSH connect failed: %v", connErr)
+    yakit.Output({
+        "ok": false,
+        "target": target,
+        "username": username,
+        "shell": shellType,
+        "error": sprint(connErr),
+    })
+    return
+}
+defer client.Close()
+
+remoteCommand := buildRemoteCommand(shellType, command)
+yakit.Info("开始执行远程命令...")
+
+startTime := time.Now()
+output, runErr := client.Run(remoteCommand)
+elapsedMs := int(time.Since(startTime).Milliseconds())
+output = codec.FixUTF8(output)
+
+truncated := false
+originalBytes := len(output)
+if originalBytes > maxOutputBytes {
+    output = output[:maxOutputBytes] + sprintf("\n\n[ssh_exec output truncated: original=%d bytes, kept=%d bytes]", originalBytes, maxOutputBytes)
+    truncated = true
+}
+
+if output != "" {
+    yakit.Info("%s", output)
+} else {
+    yakit.Info("远程命令无输出")
+}
+
+errorText := ""
+if runErr != nil {
+    errorText = sprint(runErr)
+    yakit.Error("remote command failed: %v", runErr)
+} else {
+    yakit.Info("远程命令执行完成")
+}
+
+yakit.Output({
+    "ok": runErr == nil,
+    "target": target,
+    "username": username,
+    "shell": shellType,
+    "sudo": sudo,
+    "timeout_seconds": timeoutSec,
+    "elapsed_ms": elapsedMs,
+    "output": output,
+    "output_bytes": len(output),
+    "original_output_bytes": originalBytes,
+    "truncated": truncated,
+    "error": errorText,
+})
+yakit.Info("================== SSH 执行结束（耗时 %dms）==================", elapsedMs)

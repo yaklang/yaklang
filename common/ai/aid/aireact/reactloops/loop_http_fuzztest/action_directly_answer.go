@@ -13,12 +13,16 @@ import (
 var loopActionDirectlyAnswerHTTPFuzztest = &reactloops.LoopAction{
 	ActionType: "directly_answer",
 	Description: "用于回答 HTTP 安全测试过程中的阶段性结论或简短问题。短答案可用 answer_payload；需要 Markdown 分段、列表、表格或更复杂展示时，使用 FINAL_ANSWER AITAG。若已验证漏洞或存在应落库风险，必须先调用 generate_risk 保存 Risk；回答漏洞结论时必须包含证据链。" +
-		" 重要: directly_answer 只负责发出答复, 之后循环会继续, 它不会结束任务。要终结整个流程必须使用 finish 动作。" +
+		" 默认情况下, 答复发出且没有活跃 TODO 时流程自动结束。仅阶段性进度答复需要设置 continue_after_answer=true。" +
 		" 可选: 如同时携带非空的 next_movements 增量, 用于安排后续 TODO 更新。",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"answer_payload",
 			aitool.WithParam_Description(`仅在回答简短测试过程问答时使用。若答案较长、包含多段 Markdown、列表、表格或复杂结构，请留空此字段并改用 <|FINAL_ANSWER_...|> 标签。answer_payload 与 <|FINAL_ANSWER_...|> 互斥，不要同时使用。不要把 fuzz、改包、整包生成或 generate_risk 动作伪装成 directly_answer。已验证漏洞时必须先保存 Risk，并在答案中包含证据链。`),
+		),
+		aitool.WithBoolParam(
+			"continue_after_answer",
+			aitool.WithParam_Description(`可选。仅当这是阶段性进度答复且后续仍需继续 fuzz/验证时设为 true；最终答复省略或设为 false。`),
 		),
 	},
 	AITagStreamFields: []*reactloops.LoopAITagField{
@@ -106,9 +110,7 @@ var loopActionDirectlyAnswerHTTPFuzztest = &reactloops.LoopAction{
 		}
 		invoker.AddToTimeline(reactloops.TimelineEntryAssistantOutput, timeline.String())
 
-		// directly_answer 绝不 Exit: emit 完答复后统一交给 DirectlyAnswerContinue
-		// 追加 timeline + 续跑, 终结只能由显式 finish action 完成. 与 buildin 对齐.
-		// 关键词: directly_answer 永不 Exit, http_fuzztest 复用单源, finish 唯一终结器
+		// 交给统一收口决策: 最终答复自动结束, 阶段性答复显式续跑.
 		reactloops.DirectlyAnswerContinue(loop, action, operator)
 	},
 }

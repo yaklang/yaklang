@@ -69,6 +69,12 @@ var loopAction_AdjustTodolist = &reactloops.LoopAction{
 					"Do NOT translate to English. This text sits next to verification.next_movements output in the same panel; "+
 					"language drift between the two channels will look broken to the user."),
 			),
+			aitool.WithStringParam("evidence",
+				aitool.WithParam_Description("Required when closing an evidence-bound security TODO with op=done. Cite the concrete response, status, artifact path, or finding that proves completion."),
+			),
+			aitool.WithBoolParam("evidence_required",
+				aitool.WithParam_Description("Set true on add when this TODO represents a security probe, exploit, or validation that must not be completed without concrete evidence."),
+			),
 		),
 	},
 	StreamFields: []*reactloops.LoopStreamField{

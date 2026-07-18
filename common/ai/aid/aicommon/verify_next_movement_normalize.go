@@ -47,9 +47,11 @@ func NormalizeVerifyNextMovements(action *Action) []VerifyNextMovement {
 			continue
 		}
 		nextMovements = append(nextMovements, VerifyNextMovement{
-			Op:      op,
-			Content: content,
-			ID:      id,
+			Op:               op,
+			Content:          content,
+			ID:               id,
+			Evidence:         strings.TrimSpace(movement.GetString("evidence")),
+			EvidenceRequired: movement.GetBool("evidence_required"),
 		})
 	}
 	if len(nextMovements) > 0 {

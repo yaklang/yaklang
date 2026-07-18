@@ -104,9 +104,18 @@ func handleToolCallResult(
 		}
 	}
 
+	informationGain := loop.ObserveToolInformationGain(toolPayload, result)
+	if informationGain.NewlyDetected {
+		invoker.AddToTimeline("[LOW_INFORMATION_GAIN]", informationGain.Hint)
+	}
+
 	task := loop.GetCurrentTask()
 	if task == nil {
-		operator.Continue()
+		if informationGain.ShouldSwitch {
+			operator.Feedback(informationGain.Hint)
+		} else {
+			operator.Continue()
+		}
 		return
 	}
 
@@ -116,7 +125,11 @@ func handleToolCallResult(
 		return
 	}
 	if !triggered || verifyResult == nil {
-		operator.Continue()
+		if informationGain.ShouldSwitch {
+			operator.Feedback(informationGain.Hint)
+		} else {
+			operator.Continue()
+		}
 		return
 	}
 
@@ -128,6 +141,9 @@ func handleToolCallResult(
 	feedbackMsg := fmt.Sprintf("[Verification] Task not yet satisfied.\nReasoning: %s", verifyResult.Reasoning)
 	if summary := aicommon.FormatVerifyNextMovementsSummary(verifyResult.NextMovements); summary != "" {
 		feedbackMsg += fmt.Sprintf("\nNext Steps: %s", summary)
+	}
+	if informationGain.ShouldSwitch {
+		feedbackMsg += "\n" + informationGain.Hint
 	}
 	operator.Feedback(feedbackMsg)
 	operator.Continue()

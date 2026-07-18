@@ -89,8 +89,8 @@ func TestMaybeVerifyUserSatisfaction_UsesFirstFireThreshold(t *testing.T) {
 	require.Nil(t, result)
 	require.Equal(t, 0, invoker.verifyCalls)
 
-	// iter=3 达到 firstFireThreshold, 立即 fire
-	loop.currentIterationIndex = 3
+	// 达到 firstFireThreshold, 立即 fire
+	loop.currentIterationIndex = verificationFirstFireIterationThreshold
 	result, triggered, err = loop.MaybeVerifyUserSatisfaction(context.Background(), "query", true, "tool")
 	require.NoError(t, err)
 	require.True(t, triggered)
@@ -99,7 +99,7 @@ func TestMaybeVerifyUserSatisfaction_UsesFirstFireThreshold(t *testing.T) {
 	require.Len(t, loop.historySatisfactionReasons, 1)
 	require.NotNil(t, loop.GetVerificationRuntimeSnapshot())
 	require.Equal(t, 100, loop.GetVerificationRuntimeSnapshot().LoopPromptTokens)
-	require.Equal(t, 3, loop.GetVerificationRuntimeSnapshot().IterationIndex)
+	require.Equal(t, verificationFirstFireIterationThreshold, loop.GetVerificationRuntimeSnapshot().IterationIndex)
 }
 
 // TestMaybeVerifyUserSatisfaction_SkipsWhenPromptDeltaIsSmall 验证软 token 门
@@ -116,8 +116,8 @@ func TestMaybeVerifyUserSatisfaction_SkipsWhenPromptDeltaIsSmall(t *testing.T) {
 	loop.perception = newPerceptionController(loop.periodicVerificationInterval)
 	loop.historySatisfactionReasons = make([]*SatisfactionRecord, 0)
 
-	// iter=3 命中首次提前门, 写入 baseline (iter=3, tokens=100)
-	loop.currentIterationIndex = 3
+	// 命中首次提前门, 写入 baseline
+	loop.currentIterationIndex = verificationFirstFireIterationThreshold
 	loop.SetLastPromptObservation(&PromptObservation{PromptTokens: 100})
 	result, triggered, err := loop.MaybeVerifyUserSatisfaction(context.Background(), "query", true, "tool")
 	require.NoError(t, err)
@@ -126,14 +126,14 @@ func TestMaybeVerifyUserSatisfaction_SkipsWhenPromptDeltaIsSmall(t *testing.T) {
 
 	// iter=4, iter delta=1, 处于冷静期 (3) 内; 即便 token delta=1499
 	// 也已经被 cooldown 提前 short-circuit, 不会触发软门
-	loop.currentIterationIndex = 4
+	loop.currentIterationIndex = verificationFirstFireIterationThreshold + 1
 	loop.SetLastPromptObservation(&PromptObservation{PromptTokens: 100 + verificationAutoTriggerMinPromptDelta - 1})
 	result, triggered, err = loop.MaybeVerifyUserSatisfaction(context.Background(), "query", true, "tool")
 	require.NoError(t, err)
 	require.False(t, triggered)
 	require.Nil(t, result)
 	require.Equal(t, 1, invoker.verifyCalls)
-	require.Equal(t, 3, loop.GetVerificationRuntimeSnapshot().IterationIndex)
+	require.Equal(t, verificationFirstFireIterationThreshold, loop.GetVerificationRuntimeSnapshot().IterationIndex)
 	require.Equal(t, 100, loop.GetVerificationRuntimeSnapshot().LoopPromptTokens)
 }
 
@@ -156,8 +156,8 @@ func TestMaybeVerifyUserSatisfaction_TriggersWhenPromptDeltaIsLarge(t *testing.T
 		IterationIndex:   2,
 		LoopPromptTokens: 120,
 	})
-	// iter delta = 5-2 = 3, 等于 cooldown, 软门解禁
-	loop.currentIterationIndex = 5
+	// iter delta 等于 cooldown, 软门解禁
+	loop.currentIterationIndex = 2 + verificationTokenGateMinIterCooldown
 	loop.SetLastPromptObservation(&PromptObservation{PromptTokens: 120 + verificationAutoTriggerMinPromptDelta})
 
 	result, triggered, err := loop.MaybeVerifyUserSatisfaction(context.Background(), "query", true, "tool")
@@ -165,7 +165,7 @@ func TestMaybeVerifyUserSatisfaction_TriggersWhenPromptDeltaIsLarge(t *testing.T
 	require.True(t, triggered)
 	require.NotNil(t, result)
 	require.Equal(t, 1, invoker.verifyCalls)
-	require.Equal(t, 5, loop.GetVerificationRuntimeSnapshot().IterationIndex)
+	require.Equal(t, 2+verificationTokenGateMinIterCooldown, loop.GetVerificationRuntimeSnapshot().IterationIndex)
 }
 
 func TestMaybeVerifyUserSatisfaction_TriggersWhenIterationDeltaIsLarge(t *testing.T) {
@@ -286,8 +286,8 @@ func TestMaybeVerifyUserSatisfaction_TokenGateSuppressedDuringCooldown(t *testin
 	require.False(t, triggered, "iter delta=2 仍在冷静期内, 软门必须被抑制")
 	require.Equal(t, 0, invoker.verifyCalls)
 
-	// iter delta = 3 (== cooldown), 冷静期结束, 软门解禁, token delta=1500 即可触发
-	loop.currentIterationIndex = 6
+	// iter delta == cooldown, 冷静期结束, 软门解禁
+	loop.currentIterationIndex = 3 + verificationTokenGateMinIterCooldown
 	loop.SetLastPromptObservation(&PromptObservation{PromptTokens: baselineTokens + verificationAutoTriggerMinPromptDelta})
 	_, triggered, err = loop.MaybeVerifyUserSatisfaction(context.Background(), "query", true, "tool")
 	require.NoError(t, err)
@@ -353,8 +353,8 @@ func TestMaybeVerifyUserSatisfaction_IterGateStillFiresAfterCooldown(t *testing.
 		LoopPromptTokens: baselineTokens,
 	})
 
-	// iter delta = 6 (== periodic), token 完全无变化, 应该走 iter 兜底门
-	loop.currentIterationIndex = 8
+	// iter delta == periodic, token 完全无变化, 应该走 iter 兜底门
+	loop.currentIterationIndex = 2 + verificationIterationTriggerInterval
 	loop.SetLastPromptObservation(&PromptObservation{PromptTokens: baselineTokens})
 	_, triggered, err := loop.MaybeVerifyUserSatisfaction(context.Background(), "query", true, "tool")
 	require.NoError(t, err)

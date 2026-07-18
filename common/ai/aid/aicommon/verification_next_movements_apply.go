@@ -17,7 +17,11 @@ func BuildDoneMovementsForActiveTodos(items []VerificationTodoItem) []VerifyNext
 		if id == "" {
 			continue
 		}
-		movements = append(movements, VerifyNextMovement{Op: "done", ID: id})
+		op := "done"
+		if item.EvidenceRequired {
+			op = "skip"
+		}
+		movements = append(movements, VerifyNextMovement{Op: op, ID: id})
 	}
 	return movements
 }

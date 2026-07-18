@@ -12,10 +12,9 @@ import (
 // 之后调它代替裸 operator.Exit(), 让 "改 directly_answer 很简单".
 //
 // 核心约定 (与 high_static_section.txt 的 "## 任务状态机制: next_movements"
-// 以及 "统一入口与终结" 对齐): directly_answer 绝不 Exit. 它只负责把答复发
-// 出去, 然后追加一条 timeline 表明 "回答已交付, 循环继续", 并 Continue. 真正
-// 结束整个 ReAct 循环只能由显式的 finish action 完成 (见 loopAction_Finish),
-// 系统里不存在任何隐式 Exit.
+// 以及 "统一入口与终结" 对齐): directly_answer 先交付答复, 随后根据 runtime
+// 状态决定自动结束或继续. 无活跃 TODO / next_movements / 显式续跑请求时直接
+// Exit, 避免额外消耗一轮只输出 finish; 阶段性答复则 Continue.
 //
 // 语义分支:
 //   - 携带 next_movements 增量: timeline 标注循环将继续推进这些 TODO 更新.
@@ -27,7 +26,7 @@ import (
 // applyNextMovementsBottomLine) 在 ActionHandler 之前完成, 所以这里
 // GetBlockingVerificationTodoItems 读到的就是 apply 之后的状态.
 //
-// 关键词: directly_answer 永不 Exit, answer-then-continue, finish 唯一终结器,
+// 关键词: directly_answer 自动结束, continue_after_answer, finish-only round elimination,
 //
 //	directly_answer 改起来很简单
 const loopIntentHintSimpleQuery = "simple_query"
@@ -40,17 +39,20 @@ const (
 	TimelineAssistantOutputLabel     = "assistant output:"
 )
 
-// ShouldAutoFinishAfterSimpleQueryDirectlyAnswer reports whether a directly_answer
-// on a greeting/status (simple_query) task should terminate the loop immediately
-// after emitting the user-visible answer. No extra LLM round for finish/post-summary.
-func ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop *ReActLoop, action *aicommon.Action) bool {
+// ShouldAutoFinishAfterDirectlyAnswer reports whether a delivered answer can end
+// the loop without spending another model round on the mechanical finish action.
+// Models can explicitly keep the loop alive with continue_after_answer=true.
+func ShouldAutoFinishAfterDirectlyAnswer(loop *ReActLoop, action *aicommon.Action) bool {
 	if loop == nil || action == nil {
 		return false
 	}
-	if strings.TrimSpace(loop.Get("intent_hint")) != loopIntentHintSimpleQuery {
+	if action.GetBool("continue_after_answer") || action.GetInvokeParams("next_action").GetBool("continue_after_answer") {
 		return false
 	}
 	if len(aicommon.NormalizeVerifyNextMovements(action)) > 0 {
+		return false
+	}
+	if loop.ShouldBlockFinishAtIteration(loop.GetCurrentIterationIndex()) {
 		return false
 	}
 	cfg := loop.GetConfig()
@@ -81,12 +83,12 @@ func DirectlyAnswerContinue(loop *ReActLoop, action *aicommon.Action, operator *
 		operator.Continue()
 		return
 	}
-	if ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action) {
+	if ShouldAutoFinishAfterDirectlyAnswer(loop, action) {
 		if !utils.IsNil(invoker) {
 			invoker.AddToTimeline(
 				TimelineEntryAssistantOutputNote,
-				"simple query: greeting reply delivered to the user; CURRENT-TASK has no further work. "+
-					"Terminating the ReAct loop (do not repeat the same greeting reply).",
+				"assistant output delivered and CURRENT-TASK has no active TODO or requested continuation; "+
+					"terminating the ReAct loop without an extra finish-only model round.",
 			)
 		}
 		operator.Exit()

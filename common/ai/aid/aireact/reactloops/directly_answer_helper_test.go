@@ -147,15 +147,15 @@ func TestActionBuiltinDirectlyAnswerVerifier_HasPayloadPasses(t *testing.T) {
 		"payload 应被透传到 directly_answer_payload, 让 ActionHandler 能直接 emit")
 }
 
-func TestShouldAutoFinishAfterSimpleQueryDirectlyAnswer(t *testing.T) {
+func TestShouldAutoFinishAfterDirectlyAnswer(t *testing.T) {
 	loop, _, _, _ := newTodoGateTestLoop(t, nil)
 	loop.Set("intent_hint", loopIntentHintSimpleQuery)
 	action, err := aicommon.ExtractAction(`{"@action":"directly_answer","answer_payload":"你好"}`, "directly_answer")
 	require.NoError(t, err)
-	assert.True(t, ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action))
+	assert.True(t, ShouldAutoFinishAfterDirectlyAnswer(loop, action))
 
 	loop.Set("intent_hint", "capabilities_matched")
-	assert.False(t, ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action))
+	assert.True(t, ShouldAutoFinishAfterDirectlyAnswer(loop, action))
 
 	loop.Set("intent_hint", loopIntentHintSimpleQuery)
 	actionWithNM, err := aicommon.ExtractAction(
@@ -163,7 +163,14 @@ func TestShouldAutoFinishAfterSimpleQueryDirectlyAnswer(t *testing.T) {
 		"directly_answer",
 	)
 	require.NoError(t, err)
-	assert.False(t, ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, actionWithNM))
+	assert.False(t, ShouldAutoFinishAfterDirectlyAnswer(loop, actionWithNM))
+
+	actionContinue, err := aicommon.ExtractAction(
+		`{"@action":"directly_answer","answer_payload":"progress","continue_after_answer":true}`,
+		"directly_answer",
+	)
+	require.NoError(t, err)
+	assert.False(t, ShouldAutoFinishAfterDirectlyAnswer(loop, actionContinue))
 }
 
 func TestDirectlyAnswerContinue_AutoFinishesSimpleQuery(t *testing.T) {
@@ -180,5 +187,5 @@ func TestDirectlyAnswerContinue_AutoFinishesSimpleQuery(t *testing.T) {
 	require.True(t, terminated)
 	require.NoError(t, termErr)
 	require.False(t, op.IsContinued())
-	assert.Contains(t, invoker.timelineString(), "simple query")
+	assert.Contains(t, invoker.timelineString(), "without an extra finish-only model round")
 }

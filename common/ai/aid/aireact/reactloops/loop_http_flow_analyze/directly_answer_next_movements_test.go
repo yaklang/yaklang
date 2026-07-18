@@ -101,11 +101,9 @@ func TestFlowAnalyzeDirectlyAnswer_ContinuesWithNextMovements(t *testing.T) {
 	assert.Equal(t, "阶段性结论", invoker.results[0])
 }
 
-// TestFlowAnalyzeDirectlyAnswer_ContinuesWithoutNextMovements 验证去 Exit 化:
-// 不携带 next_movements 时, http_flow_analyze 专用 directly_answer 同样只
-// emit + Continue, 绝不 Exit. 终结改由显式 finish 负责.
-// 关键词: directly_answer 永不 Exit, http_flow_analyze 无增量也续跑
-func TestFlowAnalyzeDirectlyAnswer_ContinuesWithoutNextMovements(t *testing.T) {
+// TestFlowAnalyzeDirectlyAnswer_AutoFinishesWithoutNextMovements verifies that
+// a final traffic-analysis answer does not require another finish-only LLM turn.
+func TestFlowAnalyzeDirectlyAnswer_AutoFinishesWithoutNextMovements(t *testing.T) {
 	loop, invoker, task := newFlowAnalyzeTodoLoop(t, nil)
 	action, err := aicommon.ExtractAction(
 		`{"@action":"directly_answer","answer_payload":"最终结论"}`,
@@ -117,10 +115,10 @@ func TestFlowAnalyzeDirectlyAnswer_ContinuesWithoutNextMovements(t *testing.T) {
 	op := reactloops.NewActionHandlerOperator(task)
 	loopActionDirectlyAnswerHTTPFlowAnalyze.ActionHandler(loop, action, op)
 
-	require.True(t, op.IsContinued())
 	terminated, termErr := op.IsTerminated()
-	require.False(t, terminated)
+	require.True(t, terminated)
 	require.NoError(t, termErr)
+	require.False(t, op.IsContinued())
 	require.Len(t, invoker.results, 1)
 	assert.Equal(t, "最终结论", invoker.results[0])
 }

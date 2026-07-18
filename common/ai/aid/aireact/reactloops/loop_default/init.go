@@ -50,23 +50,21 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			scale := ClassifyInputScale(userInput)
 			log.Infof("input scale classified as %s for input length %d runes", scale.String(), len([]rune(userInput)))
 
-			needsDeepIntent := false
+			// Lean fast-path: deterministic/BM25 capability matching is cheap and
+			// useful for every input size. Deep intent recognition is now opt-in
+			// because it adds an LLM round before the first real action and can
+			// prematurely anchor security tasks to a generic workflow.
+			loop.LoadingStatus("快速意图识别 / Fast intent recognition")
+			result := FastIntentMatch(r, userInput)
+			if result != nil {
+				applyCapabilityMatchesToFastMatchResult(result, capabilityNameMatches)
+				applyFastMatchResult(r, loop, result)
+			}
 
-			if scale.IsMicroOrSmall() {
-				loop.LoadingStatus("快速意图识别 / Fast intent recognition")
-				result := FastIntentMatch(r, userInput)
-				if result != nil {
-					applyCapabilityMatchesToFastMatchResult(result, capabilityNameMatches)
-					applyFastMatchResult(r, loop, result)
-					if result.IsSimpleQuery {
-						log.Infof("simple query detected, skipping deep intent recognition")
-					} else if result.NeedsDeepAnalysis() {
-						log.Infof("short input with no fast matches detected, escalating to deep intent recognition")
-						needsDeepIntent = true
-					}
-				}
-			} else {
-				needsDeepIntent = true
+			needsDeepIntent := shouldRunDeepIntentRecognition(config, result)
+			if !needsDeepIntent && (result == nil || (!result.IsSimpleQuery && !result.HasMatches())) {
+				loop.Set("intent_hint", "lean_fast_path")
+				log.Infof("lean intent fast-path selected; proceeding directly to execution")
 			}
 
 			if needsDeepIntent {
@@ -82,4 +80,16 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			}
 		}
 	}
+}
+
+const enableDeepIntentRecognitionKey = "EnableDeepIntentRecognition"
+
+func shouldRunDeepIntentRecognition(config aicommon.KeyValueConfigIf, result *FastMatchResult) bool {
+	if config == nil || !config.GetConfigBool(enableDeepIntentRecognitionKey, false) {
+		return false
+	}
+	if result == nil {
+		return true
+	}
+	return !result.IsSimpleQuery && !result.HasMatches()
 }

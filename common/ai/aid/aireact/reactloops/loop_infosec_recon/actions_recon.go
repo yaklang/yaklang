@@ -222,9 +222,23 @@ var (
 	)
 	batchHTTPAction = makeToolForwardAction(
 		"batch_do_http_request", "batch_do_http_request",
-		"Batch HTTP requests with constrained concurrency.",
+		"Batch HTTP requests for two or more paths. Prefer this over repeated single-request calls when probing a public attack surface.",
 		[]aitool.ToolOption{
-			aitool.WithStringParam("requests", aitool.WithParam_Description("Batch request spec per tool docs.")),
+			aitool.WithStringParam("base-url", aitool.WithParam_Description("Base URL for URL mode, e.g. https://target.example.com.")),
+			aitool.WithStringParam("paths", aitool.WithParam_Required(true), aitool.WithParam_Description("Newline-separated paths to request in one batch.")),
+			aitool.WithStringParam("packet", aitool.WithParam_Description("Optional raw HTTP template containing {{PATH}}; use instead of base-url for exact replay.")),
+			aitool.WithStringParam("method", aitool.WithParam_Default("GET")),
+			aitool.WithStringParam("headers", aitool.WithParam_Description("Optional shared request headers.")),
+			aitool.WithStringParam("body", aitool.WithParam_Description("Optional shared request body.")),
+			aitool.WithStringParam("content-type"),
+			aitool.WithStringParam("query-params"),
+			aitool.WithStringParam("https", aitool.WithParam_Default("auto")),
+			aitool.WithIntegerParam("concurrent", aitool.WithParam_Default(5)),
+			aitool.WithIntegerParam("timeout", aitool.WithParam_Default(10)),
+			aitool.WithIntegerParam("redirect-times", aitool.WithParam_Default(3)),
+			aitool.WithStringParam("include-code"),
+			aitool.WithStringParam("exclude-code"),
+			aitool.WithIntegerParam("max-body-size", aitool.WithParam_Default(4096)),
 		},
 	)
 	urlSummaryAction = makeToolForwardAction(

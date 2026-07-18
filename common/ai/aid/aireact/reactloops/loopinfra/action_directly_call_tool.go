@@ -306,19 +306,18 @@ func directlyCallParamKeys(params aitool.InvokeParams) []string {
 
 var loopAction_directlyCallTool = &reactloops.LoopAction{
 	ActionType: schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
-	Description: "directly call a recently used tool (skip require & param-generation phases). " +
-		"Use this ONLY when the exact tool you need is already listed in the CACHE_TOOL_CALL block. " +
-		"If CACHE_TOOL_CALL is empty or does not contain a matching tool, choose require_tool instead; " +
-		"selecting directly_call_tool without a cached match will be rejected by the verifier and force a retry. " +
+	Description: "directly call an enabled tool and skip the separate require/param-generation phase. " +
+		"Prefer this when the tool is listed in CACHE_TOOL_CALL, or when the tool is visible in Tool Inventory and you confidently know its parameters. " +
+		"The runtime validates parameters and automatically falls back to require_tool when they do not match the tool schema. " +
 		"Provide directly_call_tool_name AND directly_call_tool_params together.",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"directly_call_tool_name",
-			aitool.WithParam_Description(`MUST set when @action is "directly_call_tool". The name of the tool to call. Must be one of the cached recently-used tools.`),
+			aitool.WithParam_Description(`MUST set when @action is "directly_call_tool". The name of an enabled tool from CACHE_TOOL_CALL or Tool Inventory.`),
 		),
 		aitool.WithStringParam(
 			"directly_call_tool_params",
-			aitool.WithParam_Description(`MUST set when @action is "directly_call_tool". A JSON object containing the tool invocation parameters. Refer to the cached tool's Params Schema in the CACHE_TOOL_CALL block for the correct structure.`),
+			aitool.WithParam_Description(`MUST set when @action is "directly_call_tool". A JSON object containing invocation parameters. Use CACHE_TOOL_CALL schema when available; if parameter shape is uncertain, use require_tool instead.`),
 		),
 		aitool.WithStringParam(
 			"directly_call_identifier",

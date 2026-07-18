@@ -36,6 +36,11 @@ var toolParamAITagStartRegexp = regexp.MustCompile(`<\|TOOL_PARAM_([A-Za-z0-9_]+
 
 const toolParamAITagActionKeyPrefix = "__aitag__"
 
+const (
+	ConfigEnableAIToolCallReason       = "EnableAIToolCallReason"
+	ConfigEnableLowRiskToolAutoApprove = "EnableLowRiskToolAutoApprove"
+)
+
 // RecentToolCacheStableNonce 是 CACHE_TOOL_CALL 块及其内部所有 AITAG (TOOL_xxx /
 // TOOL_PARAM_xxx) 渲染时使用的稳定 nonce 字面量. 跨 react turn 不变, 让承载
 // 该块的 prompt 段保持字节级稳定, 进入 prefix cache.
@@ -596,7 +601,7 @@ func (t *ToolCaller) emitStart(tool *aitool.Tool) {
 	t.emitter.EmitToolCallStart(t.callToolId, tool, t.startTime)
 	if t.reason != "" {
 		t.emitter.EmitToolCallReason(t.callToolId, t.reason)
-	} else if t.invokeRuntime != nil && !utils.IsNil(t.invokeRuntime) {
+	} else if t.invokeRuntime != nil && !utils.IsNil(t.invokeRuntime) && t.config.GetConfigBool(ConfigEnableAIToolCallReason, false) {
 		// No preset reason: ask the lightweight model for a one-line reason so
 		// the card isn't blank. Run async so emitStart (and the require path's
 		// param generation right after) isn't blocked on the model call. The
@@ -1117,8 +1122,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	t.emitter.EmitInfo("start to invoke callback function for tool:%v", tool.Name)
 	epm := t.config.GetEndpointManager()
 	config := t.config
-	// DANGER: NoNeedUserReview
-	if tool.NoNeedUserReview {
+	if tool.NoNeedUserReview || shouldSkipLowRiskToolReview(tool, invokeParams, config) {
 		t.emitter.EmitInfo("tool[%v] (internal helper tool) no need user review, skip review", tool.Name)
 	} else {
 		t.emitter.EmitInfo("start to require review for tool use: %v", tool.Name)

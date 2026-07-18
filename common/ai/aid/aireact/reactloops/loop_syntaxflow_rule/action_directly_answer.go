@@ -15,12 +15,16 @@ import (
 var loopAction_DirectlyAnswerSyntaxFlow = &reactloops.LoopAction{
 	ActionType: "directly_answer",
 	Description: "Directly answer with the 'answer_payload' field. " +
-		"IMPORTANT: directly_answer ONLY delivers the answer; the loop CONTINUES afterwards and this action does NOT end the task. Use the 'finish' action to terminate. " +
+		"A successful final answer ends the loop automatically when no active TODO remains. Set continue_after_answer=true only for a progress update. " +
 		"OPTIONAL: carry a non-empty 'next_movements' delta alongside the answer to schedule follow-up TODO updates.",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"answer_payload",
 			aitool.WithParam_Description(`USE THIS FIELD ONLY IF @action is 'directly_answer' AND answer is short (≤200 chars). For long answers, leave this empty and use '<|FINAL_ANSWER_...|>' tags after JSON. ⚠️ CRITICAL: answer_payload and <|FINAL_ANSWER_...|> are STRICTLY MUTUALLY EXCLUSIVE - never use both simultaneously.`),
+		),
+		aitool.WithBoolParam(
+			"continue_after_answer",
+			aitool.WithParam_Description(`Optional. Set true only when more rule generation or verification must continue after this progress update. Omit/false for the final answer.`),
 		),
 	},
 	AITagStreamFields: []*reactloops.LoopAITagField{
@@ -100,8 +104,6 @@ func directlyAnswerSyntaxFlowHandler(loop *reactloops.ReActLoop, action *aicommo
 		answerPath,
 	))
 
-	// directly_answer 绝不 Exit: emit 完答复后统一交给 DirectlyAnswerContinue
-	// 追加 timeline + 续跑, 终结只能由显式 finish action 完成. 与 buildin 对齐.
-	// 关键词: directly_answer 永不 Exit, syntaxflow_rule 复用单源, finish 唯一终结器
+	// 交给统一收口决策: 最终答复自动结束, 阶段性答复显式续跑.
 	reactloops.DirectlyAnswerContinue(loop, action, operator)
 }

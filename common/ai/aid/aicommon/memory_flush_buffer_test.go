@@ -84,7 +84,7 @@ func TestMemoryFlushBuffer_FlushOnEndIterationMilestone(t *testing.T) {
 	timeline := NewTimeline(nil, nil)
 	differ := NewTimelineDiffer(timeline)
 	differ.SetBaseline()
-	buffer := NewMemoryFlushBuffer("test", differ, &MemoryFlushBufferConfig{MaxPendingIterations: 3, MaxPendingBytes: 4096})
+	buffer := NewMemoryFlushBuffer("test", differ, &MemoryFlushBufferConfig{MaxPendingIterations: 3, MaxPendingBytes: 4096, FlushOnIterationEnd: true})
 	task := NewStatefulTaskBase("task-1", "test-input", context.Background(), nil, true)
 
 	timeline.PushText(1, "milestone diff")
@@ -100,6 +100,23 @@ func TestMemoryFlushBuffer_FlushOnEndIterationMilestone(t *testing.T) {
 	}
 	if !strings.Contains(payload.ContextualInput, "milestone reached") {
 		t.Fatalf("expected contextual input to include milestone reason")
+	}
+}
+
+func TestMemoryFlushBuffer_DefaultDoesNotFlushEveryIterationEnd(t *testing.T) {
+	timeline := NewTimeline(nil, nil)
+	differ := NewTimelineDiffer(timeline)
+	differ.SetBaseline()
+	buffer := NewMemoryFlushBuffer("test", differ, nil)
+	task := NewStatefulTaskBase("task-1", "test-input", context.Background(), nil, true)
+
+	timeline.PushText(1, "pending diff")
+	payload, err := buffer.Capture(MemoryFlushSignal{Iteration: 1, Task: task, ShouldEndIteration: true})
+	if err != nil {
+		t.Fatalf("capture failed: %v", err)
+	}
+	if payload != nil {
+		t.Fatalf("default policy should batch iteration-end diffs, got %#v", payload)
 	}
 }
 

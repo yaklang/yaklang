@@ -16,7 +16,7 @@ const (
 	// 仅在 3 分钟无 verify 时才走时间门, 平时主要由 iter 门 / token 门掌控节奏.
 	// 关键词: verificationAutoTriggerMaxSnapshotAge 180s, 时间门进一步放宽,
 	//        iter+冷静期主导节流
-	verificationAutoTriggerMaxSnapshotAge = 180 * time.Second
+	verificationAutoTriggerMaxSnapshotAge = 300 * time.Second
 
 	// verificationAutoTriggerMinPromptDelta 控制软 token 门 (加速器门) 的触发阈值.
 	// 保持 1500, 但语义变化: 仅当 iter 差 >= verificationTokenGateMinIterCooldown
@@ -24,7 +24,7 @@ const (
 	// 必须等冷静期过完软门才能 fire, 避免 token 门反复打断 iter 基础节拍.
 	// 关键词: verificationAutoTriggerMinPromptDelta 1500 软门, 受冷静期约束,
 	//        token 门反复打断 iter 节拍修复
-	verificationAutoTriggerMinPromptDelta = 1500
+	verificationAutoTriggerMinPromptDelta = 3000
 
 	// verificationIterationTriggerInterval 控制 iter 门 (每 N 轮强制 verify 兜底).
 	// 引用 aicommon.DefaultPeriodicVerificationInterval (已调整为 6), 作为
@@ -41,7 +41,7 @@ const (
 	// 既保留对数据爆炸的响应性又避免每 iter 都触发.
 	// 关键词: verificationTokenGateMinIterCooldown 3, token 门冷静期,
 	//        iter 节拍优先, 数据爆炸场景修复
-	verificationTokenGateMinIterCooldown = 3
+	verificationTokenGateMinIterCooldown = 5
 
 	// verificationAutoTriggerHardPromptDelta 是 token 门的"硬阈值"上界:
 	// 当单次 prompt token 增量 >= 此值时, 视为单次超大数据爆炸 (例如
@@ -50,7 +50,7 @@ const (
 	// 既能覆盖单 iter 大爆炸又不会被中等 token 增量误触.
 	// 关键词: verificationAutoTriggerHardPromptDelta 5000, 硬门兜底,
 	//        单次爆炸豁免冷静期
-	verificationAutoTriggerHardPromptDelta = 5000
+	verificationAutoTriggerHardPromptDelta = 8000
 
 	// verificationFirstFireIterationThreshold 控制 baseline 未建立时的"首次提前触发"门:
 	// 当 previous == nil (从未 verify 过) 且 current iter >= 此阈值时立即 fire,
@@ -60,7 +60,7 @@ const (
 	// 数值对齐, 减少认知负担.
 	// 关键词: verificationFirstFireIterationThreshold 3, 首次提前触发,
 	//        baseline 早期建立, AI 早期校准
-	verificationFirstFireIterationThreshold = 3
+	verificationFirstFireIterationThreshold = 5
 )
 
 var verificationWatchdogIdleTimeout = 2 * time.Minute

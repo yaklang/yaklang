@@ -52,11 +52,13 @@ func (s VerificationTodoScope) IsZero() bool {
 
 // VerificationTodoItem captures a single TODO entry tracked across rounds.
 type VerificationTodoItem struct {
-	ID        string                 `json:"id"`
-	Content   string                 `json:"content"`
-	Status    VerificationTodoStatus `json:"status"`
-	CreatedAt int                    `json:"created_at"`
-	UpdatedAt int                    `json:"updated_at"`
+	ID               string                 `json:"id"`
+	Content          string                 `json:"content"`
+	Status           VerificationTodoStatus `json:"status"`
+	CreatedAt        int                    `json:"created_at"`
+	UpdatedAt        int                    `json:"updated_at"`
+	Evidence         string                 `json:"evidence,omitempty"`
+	EvidenceRequired bool                   `json:"evidence_required,omitempty"`
 
 	ScopeTaskID    string `json:"scope_task_id,omitempty"`
 	ScopeTaskIndex string `json:"scope_task_index,omitempty"`
@@ -304,6 +306,8 @@ func (s *VerificationTodoStore) applyAdd(movement VerifyNextMovement, scope Veri
 		item = &VerificationTodoItem{ID: id, CreatedAt: roundIndex}
 		item.applyScope(scope)
 		item.Content = content
+		item.EvidenceRequired = movement.EvidenceRequired || RequiresEvidenceForSecurityTodo(id, content)
+		item.Evidence = strings.TrimSpace(movement.Evidence)
 		item.Status = VerificationTodoStatusPending
 		item.UpdatedAt = roundIndex
 		s.Items = append(s.Items, item)
@@ -315,6 +319,8 @@ func (s *VerificationTodoStore) applyAdd(movement VerifyNextMovement, scope Veri
 		return todoApplyFailure(movement, "redundant add: todo already pending with same content")
 	}
 	item.Content = content
+	item.EvidenceRequired = movement.EvidenceRequired || RequiresEvidenceForSecurityTodo(id, content)
+	item.Evidence = strings.TrimSpace(movement.Evidence)
 	item.Status = VerificationTodoStatusPending
 	item.UpdatedAt = roundIndex
 	return todoApplySuccess(movement)
@@ -336,12 +342,21 @@ func (s *VerificationTodoStore) applyStatusMutation(
 	if item == nil {
 		return todoApplyFailure(movement, s.mutationFailureReason(scope, id))
 	}
+	if target == VerificationTodoStatusDone && item.EvidenceRequired {
+		evidence := strings.TrimSpace(movement.Evidence)
+		if evidence == "" {
+			return todoApplyFailure(movement, "done requires evidence for this security TODO; provide a result, status, artifact, or finding reference")
+		}
+	}
 	newContent := strings.TrimSpace(movement.Content)
 	contentUnchanged := !allowContent || newContent == "" || newContent == item.Content
 	// 冗余: 目标状态已是 target 且 content 未变更 → 失败, 不推进 UpdatedAt.
 	// 关键词: 冗余 doing/done/delete/skip, 空转轮次识别
 	if item.Status == target && contentUnchanged {
 		return todoApplyFailure(movement, redundantTodoMutationReason(target))
+	}
+	if target == VerificationTodoStatusDone && item.EvidenceRequired {
+		item.Evidence = strings.TrimSpace(movement.Evidence)
 	}
 	item.claimLegacyScope(scope)
 	if allowContent && newContent != "" {
@@ -354,6 +369,22 @@ func (s *VerificationTodoStore) applyStatusMutation(
 		resultMovement.Content = item.Content
 	}
 	return todoApplySuccess(resultMovement)
+}
+
+// RequiresEvidenceForSecurityTodo marks execution-oriented security TODOs as
+// evidence-bearing. It is deliberately conservative: generic planning or unit
+// test TODOs keep the historical completion semantics.
+func RequiresEvidenceForSecurityTodo(id, content string) bool {
+	text := strings.ToLower(strings.TrimSpace(id + " " + content))
+	for _, keyword := range []string{
+		"pentest", "recon", "exploit", "vuln", "probe", "scan", "idor", "sqli", "xss", "ssrf", "rce", "auth bypass",
+		"漏洞", "渗透", "扫描", "探测", "越权", "利用", "未授权", "攻击面",
+	} {
+		if strings.Contains(text, keyword) {
+			return true
+		}
+	}
+	return false
 }
 
 func (i *VerificationTodoItem) scope() VerificationTodoScope {

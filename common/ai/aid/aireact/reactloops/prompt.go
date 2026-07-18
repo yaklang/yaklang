@@ -40,7 +40,8 @@ func renderRecentToolRoutingHint() string {
 # Fast Tool Routing
 - Before using require_tool, check CACHE_TOOL_CALL first.
 - If the exact tool you need is already listed in CACHE_TOOL_CALL, prefer directly_call_tool for faster execution.
-- Use require_tool only when the needed tool is not in the recent cache, or when you still need normal tool discovery.
+- If an enabled tool is visible in Tool Inventory and you confidently know its parameters, directly_call_tool may use it even before it enters the recent cache; runtime validation falls back safely.
+- Use require_tool when the tool is unknown or its parameter shape is uncertain.
 <|DIRECT_TOOL_ROUTING_END_{{ .Nonce }}|>
 	`, map[string]any{
 		"Nonce": aicommon.RecentToolCacheStableNonce,
@@ -77,11 +78,9 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 	// 第一次工具调用前后 schema enum / desc 都不变, semi-dynamic 段 hash 跨 turn
 	// 一致, 让 dashscope prefix 缓存能持续命中.
 	//
-	// 安全兜底: 当 LLM 在没有 recent tools 时选 directly_call_tool, 该 action
-	// 的 ActionVerifier (loopinfra/action_directly_call_tool.go) 会通过
-	// IsRecentlyUsedTool 检查报错 "tool 'xxx' is not in the recently-used cache;
-	// use require_tool instead", 触发 aiTransaction 重试, 让 LLM 改选 require_tool,
-	// 行为与原 disable 路径等价.
+	// 安全兜底: 当 LLM 在没有 recent tools 时选 directly_call_tool, handler 会
+	// 解析任意已启用工具并校验参数; 参数不匹配时复用同一工具卡自动回退
+	// require_tool 参数生成路径, 不再用一次 transaction 重试做纯路由纠错.
 	//
 	// 关键词: P2.1, schema 字节稳定, HasRecentlyUsedTools 跳变消除, verifier 兜底
 	toolManager := r.config.GetAiToolManager()

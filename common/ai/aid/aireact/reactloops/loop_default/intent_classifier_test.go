@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -512,6 +513,24 @@ func TestEscalationFlow_InputScaleToDecision(t *testing.T) {
 	scale := ClassifyInputScale(mediumInput)
 	if scale.IsMicroOrSmall() {
 		t.Errorf("medium input should not be Micro/Small, got %s", scale.String())
+	}
+}
+
+func TestShouldRunDeepIntentRecognitionIsOptIn(t *testing.T) {
+	cfg := aicommon.NewKeyValueConfig()
+	noMatch := &FastMatchResult{}
+	if shouldRunDeepIntentRecognition(cfg, noMatch) {
+		t.Fatal("deep intent must be disabled by default for the lean fast-path")
+	}
+
+	cfg.SetConfig(enableDeepIntentRecognitionKey, true)
+	if !shouldRunDeepIntentRecognition(cfg, noMatch) {
+		t.Fatal("explicit opt-in should enable deep intent when fast matching has no result")
+	}
+
+	matched := &FastMatchResult{MatchedTools: []*schema.AIYakTool{{Name: "read_file"}}}
+	if shouldRunDeepIntentRecognition(cfg, matched) {
+		t.Fatal("a deterministic capability match should not trigger another intent LLM round")
 	}
 }
 

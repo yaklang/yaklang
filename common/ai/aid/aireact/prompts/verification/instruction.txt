@@ -121,7 +121,8 @@
 - `next_movements` 是 TODO 增量操作数组（不再是自由文本），无论 `user_satisfied` 为 true 还是 false 都遵循同一份语法：
     - `{"op": "add", "id": "stable_id", "content": "新增一个短链路 TODO"}`
     - `{"op": "doing", "id": "stable_id"}`
-    - `{"op": "done", "id": "stable_id"}`
+    - `{"op": "done", "id": "stable_id"}`；若该安全 TODO 要求证据，则必须写成 `{"op":"done","id":"stable_id","evidence":"具体响应/状态码/产物/发现引用"}`
+    - 漏洞验证、渗透探测、扫描、利用、越权/未授权检查等执行型安全 TODO 在 `add` 时应带 `"evidence_required": true`。系统会拒绝无 `evidence` 的 `done`，不要用推测代替实测结果。
     - `{"op": "delete", "id": "stable_id"}`
     - `{"op": "skip", "id": "stable_id"}`
     - `doing` 用于标记某个已有 TODO 当前正在进行中，通常只需要 `id`。

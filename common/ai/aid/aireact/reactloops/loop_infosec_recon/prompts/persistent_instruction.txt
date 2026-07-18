@@ -60,6 +60,8 @@
 
 ### 辅助步骤（不替代上述三步，服从顺序）
 
+- **批量优先**：当需要验证两个及以上公开路径/API 时，优先一次调用 `batch_do_http_request`，不要连续调用多个 `do_http_request`。若同一路径连续得到语义等价的验证码、登录页、拒绝页或空结果，立即停止重试并切换攻击面：公开 API/OpenAPI/Swagger → CORS/未授权端点 → 静态资源与 JS 发现 → 其它在授权范围内的入口。
+
 - **注册与范围**：**`recon_register_seed`** — `seed_url`，可选 `scope_hosts`、爬深、探活并发等。
 - **聚合写入池**：**`api_pool_merge`** — `findings_json` 为 JSON 数组，每项含 `url`、`method`（可省略，默认 GET）、`source`、`evidence`。可在 JS 链路产出后与其它发现合并。
 - **被动 / 网络（按需）**：`web_search`、`dig`、`subdomain_scan`、`network_space_search`（需密钥）、`scan_port`、`banner_grab`。通常**不妨碍**在注册后优先执行 **JS 获取**。

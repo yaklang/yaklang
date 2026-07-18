@@ -125,6 +125,7 @@ var (
 		`搜索引擎|百度搜索|谷歌搜索|搜一下|搜一搜|帮我搜|帮我查一下|` +
 		`search\s*(the\s*)?(internet|web|online)|web\s*search|internet\s*search|google\s*search` +
 		`)`)
+	securityWebTestingPatterns = regexp.MustCompile(`(?i)(渗透测试|漏洞挖掘|安全测试|接口安全|未授权|越权|攻击面|pentest|penetration\s+test|vulnerability|security\s+test|idor)`)
 )
 
 // countSentences counts the approximate number of sentences in the input.
@@ -152,6 +153,9 @@ type FastMatchResult struct {
 
 	// WebSearchKeywordDetected indicates explicit web search keywords were found in input
 	WebSearchKeywordDetected bool
+
+	// SecurityWebTestingDetected enables deterministic batch-first guidance.
+	SecurityWebTestingDetected bool
 
 	// MatchedTools contains tools found via BM25 search
 	MatchedTools []*schema.AIYakTool
@@ -220,6 +224,7 @@ func FastIntentMatch(r aicommon.AIInvokeRuntime, input string) *FastMatchResult 
 
 	// Step 2a: Web search keyword shortcut — bypass BM25 ranking issues
 	webSearchKeywordDetected := webSearchPatterns.MatchString(trimmed)
+	securityWebTestingDetected := securityWebTestingPatterns.MatchString(trimmed) && urlPattern.MatchString(trimmed)
 	if webSearchKeywordDetected {
 		log.Infof("fast intent match: web search keyword detected in input: %s", trimmed)
 	}
@@ -253,6 +258,23 @@ func FastIntentMatch(r aicommon.AIInvokeRuntime, input string) *FastMatchResult 
 				if wsErr == nil && len(webSearchTools) > 0 {
 					result.MatchedTools = append(result.MatchedTools, webSearchTools[0])
 					log.Infof("fast intent match: forcibly added web_search tool via keyword shortcut")
+				}
+			}
+		}
+		if securityWebTestingDetected {
+			for _, toolName := range []string{"batch_do_http_request", "do_http_request"} {
+				hasTool := false
+				for _, tool := range result.MatchedTools {
+					if tool != nil && tool.Name == toolName {
+						hasTool = true
+						break
+					}
+				}
+				if !hasTool {
+					matched, matchErr := yakit.SearchAIYakToolBM25(db, &yakit.AIYakToolFilter{Keywords: []string{toolName}}, 1, 0)
+					if matchErr == nil && len(matched) > 0 {
+						result.MatchedTools = append(result.MatchedTools, matched[0])
+					}
 				}
 			}
 		}
@@ -308,6 +330,7 @@ func FastIntentMatch(r aicommon.AIInvokeRuntime, input string) *FastMatchResult 
 	}
 
 	result.WebSearchKeywordDetected = webSearchKeywordDetected
+	result.SecurityWebTestingDetected = securityWebTestingDetected
 
 	// Build context summary
 	if result.HasMatches() {
@@ -491,6 +514,10 @@ func applyFastMatchResult(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop
 					"Do NOT use do_http_request with placeholder URLs. "+
 					"Do NOT rely solely on knowledge_enhance_answer. "+
 					"The user is requesting real-time internet search results.")
+		}
+		if result.SecurityWebTestingDetected {
+			r.AddToTimeline("security_batch_fast_path",
+				"Security web-testing intent with an explicit URL detected. Probe two or more public paths in one batch_do_http_request call. If results are semantically repetitive, stop retrying and switch attack surface: OpenAPI/Swagger, CORS or unauthenticated APIs, then static JS-discovered routes.")
 		}
 
 		for _, schTool := range result.MatchedTools {

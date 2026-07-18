@@ -1,0 +1,336 @@
+__DESC__ = "通过 SMTP 发送邮件（测试 / 通知 / 告警场景）。支持自定义发件人、收件人、抄送、密送、主题、正文（纯文本 + HTML）、附件、自定义邮件头，可配置 SMTP 服务器、端口、认证方式（自动/LOGIN/CRAM-MD5/无认证）与 TLS 模式（SSL 直连 / STARTTLS / 明文 / 自动按端口推断），可选跳过证书校验，支持 dry-run 预览。不会在日志中打印密码。"
+__VERBOSE_NAME__ = "SMTP 邮件发送工具"
+__KEYWORDS__ = "email,smtp,mail,send,sender,发送邮件,邮件发送,smtp client,notification,alert,通知,告警,test email,html mail,attachment,附件,抄送,密送"
+
+__USAGE__ = <<<USAGE_BLOCK
+SMTP Email Sender Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  server            (string)  SMTP server host, e.g. "smtp.qq.com", "smtp.gmail.com", "smtp.163.com".
+  from              (string)  Sender address, e.g. "you@example.com". Defaults to username if omitted.
+  to                (string)  Recipient address(es), comma-separated, e.g. "a@x.com,b@y.com".
+  subject           (string)  Email subject line.
+
+Connection / Auth Parameters:
+  port              (int)     SMTP port. Default: 465.
+                              Common: 465 (SSL direct), 587 (STARTTLS), 25 (plain).
+  username          (string)  SMTP auth username. Defaults to the from address.
+                              This value is never printed.
+  password          (string)  SMTP auth password / authorization code.
+                              This value is never printed.
+  tls-mode          (string)  TLS mode: "auto" | "ssl" | "starttls" | "notls". Default: "auto".
+                              "auto" infers: port 465 -> ssl, port 587 -> starttls, otherwise plain + opportunistic STARTTLS.
+  skip-verify       (bool)    Skip TLS certificate verification (self-signed / intranet servers). Default: false.
+  auth-method       (string)  Auth method: "auto"(default) | "login" | "cram-md5" | "none".
+                              Use "none" for unauthenticated relays; "login" for some Exchange / enterprise servers.
+
+Content Parameters (at least one of body / html recommended; defaults to a short test text):
+  cc                (string)  Cc recipients, comma-separated. Optional.
+  bcc               (string)  Bcc recipients, comma-separated. Optional.
+  body              (string)  Plain-text body. Optional.
+  html              (string)  HTML body. If both html and body are set, html is the main part and body is the text alternative.
+  attach            (string)  Attachment file path(s), comma-separated. Missing files are skipped with a warning.
+  header            (string)  Custom mail header(s), comma-separated, each "Key: Value" or "Key=Value".
+                              Example: "Reply-To: ops@example.com,X-Mailer: yak-send-email".
+
+Misc Parameters:
+  dry-run           (bool)    Print the resolved send config without actually sending. Default: false.
+
+Examples:
+  QQ / 163 mail (SSL on 465, auth code as password):
+    {"server":"smtp.qq.com","port":465,"from":"you@qq.com","username":"you@qq.com","password":"AUTHCODE",
+     "to":"target@example.com","subject":"Test","body":"hello from yak"}
+
+  Gmail (STARTTLS on 587):
+    {"server":"smtp.gmail.com","port":587,"from":"you@gmail.com","password":"APPPASSWORD",
+     "to":"target@example.com","subject":"Hi","html":"<b>hello</b>"}
+
+  Internal relay, no auth, skip self-signed cert:
+    {"server":"10.0.0.5","port":25,"from":"monitor@corp","to":"ops@corp",
+     "subject":"[Alert] disk full","body":"...","auth-method":"none","skip-verify":true}
+
+  Preview without sending:
+    {"server":"smtp.qq.com","port":465,"from":"you@qq.com","password":"AUTHCODE",
+     "to":"a@b.com","subject":"x","dry-run":true}
+
+Notes:
+  - This tool is for legitimate email sending (tests, notifications, alerts).
+  - It logs server/from/to/cc/subject but never prints password.
+USAGE_BLOCK
+
+/*
+SMTP 邮件发送工具
+
+功能：
+1. functional-options 风格封装 common/mail 库的 mail.Send，对标 crawler / servicescan 等库
+2. 支持 SSL 直连(465) / STARTTLS(587) / 明文(25) / 自动按端口推断
+3. 支持认证：auto(PLAIN) / LOGIN / CRAM-MD5 / 无认证（内网中继）
+4. 支持纯文本 + HTML 正文（同时给定时，HTML 为主、文本为降级替代）
+5. 支持附件、抄送、密送、自定义邮件头（如 Reply-To / X-Mailer）
+6. dry-run 模式：只打印解析后的发送配置，不实际发信
+7. 不打印密码，发送结果结构化输出
+
+使用示例：
+  yak send_email.yak --server smtp.qq.com --port 465 --from you@qq.com \
+      --to a@example.com --subject 测试 --password 授权码 --body "hello"
+
+  yak send_email.yak --server smtp.qq.com --port 465 --from you@qq.com \
+      --to a@x.com,b@y.com --subject 测试 --password 授权码 \
+      --html "<b>hello</b>" --attach ./report.pdf --dry-run
+*/
+
+yakit.AutoInitYakit()
+
+// ===== 读取 CLI 参数 =====
+server := cli.String("server", cli.setRequired(true), cli.setHelp("SMTP 服务器主机，如 smtp.qq.com / smtp.gmail.com"))
+port := cli.Int("port", cli.setDefault(465), cli.setHelp("SMTP 端口，默认 465（常见：465=SSL，587=STARTTLS，25=明文）"))
+from := cli.String("from", cli.setHelp("发件人地址，留空时取 username"))
+to := cli.StringSlice("to", cli.setHelp("收件人，逗号分隔多个：a@x.com,b@y.com"))
+cc := cli.StringSlice("cc", cli.setHelp("抄送，逗号分隔"))
+bcc := cli.StringSlice("bcc", cli.setHelp("密送，逗号分隔"))
+subject := cli.String("subject", cli.setRequired(true), cli.setHelp("邮件主题"))
+body := cli.String("body", cli.setHelp("纯文本正文（与 html 二选一或同时给）"))
+html := cli.String("html", cli.setHelp("HTML 正文（同时给 body 时，HTML 为主，文本为降级替代）"))
+attach := cli.StringSlice("attach", cli.setHelp("附件路径，逗号分隔（缺失文件会被跳过并告警）"))
+header := cli.StringSlice("header", cli.setHelp("自定义邮件头，逗号分隔，每项 Key: Value 或 Key=Value"))
+username := cli.String("username", cli.setHelp("认证用户名，留空时默认取 from。该项从不打印"))
+password := cli.String("password", cli.setHelp("认证密码 / 授权码。该项从不打印"))
+tlsModeRaw := cli.String("tls-mode", cli.setDefault("auto"), cli.setHelp("TLS 模式：auto|ssl|starttls|notls，默认 auto（按端口推断：465→ssl，587→starttls）"))
+skipVerify := cli.Bool("skip-verify", cli.setDefault(false), cli.setHelp("跳过 TLS 证书校验（自签名 / 内网邮件服务器常用）"))
+authMethodRaw := cli.String("auth-method", cli.setDefault("auto"), cli.setHelp("认证方式：auto|login|cram-md5|none，默认 auto"))
+dryRun := cli.Bool("dry-run", cli.setDefault(false), cli.setHelp("只预览发送配置，不实际发信"))
+
+cli.check()
+
+// ===== 规范化 / 校验 =====
+server = str.TrimSpace(server)
+from = str.TrimSpace(from)
+subject = str.TrimSpace(subject)
+username = str.TrimSpace(username)
+password = str.TrimSpace(password)
+tlsMode := str.ToLower(str.TrimSpace(tlsModeRaw))
+authMethod := str.ToLower(str.TrimSpace(authMethodRaw))
+if tlsMode == "" {
+    tlsMode = "auto"
+}
+if authMethod == "" {
+    authMethod = "auto"
+}
+
+if server == "" {
+    yakit.Error("缺少 SMTP 服务器（--server）")
+    yakit.Output({"ok": false, "error": "missing smtp server"})
+    return
+}
+// from / username 互相兜底：from 留空取 username；username 留空（且非无认证）取 from
+if from == "" {
+    from = username
+}
+if username == "" && authMethod != "none" {
+    username = from
+}
+if from == "" {
+    yakit.Error("需要指定发件人（--from）或用户名（--username）")
+    yakit.Output({"ok": false, "error": "missing from/username"})
+    return
+}
+if len(to) == 0 {
+    yakit.Error("需要至少一个收件人（--to）")
+    yakit.Output({"ok": false, "error": "missing recipient"})
+    return
+}
+if port <= 0 {
+    port = 465
+}
+
+// TLS 自动推断
+effectiveTLS := tlsMode
+if tlsMode == "auto" {
+    switch port {
+    case 465:
+        effectiveTLS = "ssl"
+    case 587:
+        effectiveTLS = "starttls"
+    default:
+        effectiveTLS = "auto"
+    }
+}
+if authMethod == "none" {
+    yakit.Info("认证方式为 none：将不进行 SMTP 认证（适用于开放中继 / 内网邮件服务器）")
+} else if password == "" {
+    yakit.Warn("密码为空，多数服务器会拒绝认证（如需匿名中继请用 --auth-method none）")
+}
+
+// 解析自定义邮件头：支持 "Key: Value" 或 "Key=Value"
+parseHeaderKV := func(h) {
+    h = str.TrimSpace(h)
+    if str.Contains(h, ":") {
+        kv = str.SplitN(h, ":", 2)
+        if len(kv) == 2 {
+            return str.TrimSpace(kv[0]), str.TrimSpace(kv[1])
+        }
+    }
+    if str.Contains(h, "=") {
+        kv = str.SplitN(h, "=", 2)
+        if len(kv) == 2 {
+            return str.TrimSpace(kv[0]), str.TrimSpace(kv[1])
+        }
+    }
+    return "", ""
+}
+
+// ===== 构建 mail.Send 选项（functional options，按需累加后展开传给变参）=====
+opts = []
+opts = append(opts, mail.server(server, port))
+opts = append(opts, mail.from(from))
+opts = append(opts, mail.subject(subject))
+opts = append(opts, mail.to(to...))
+if len(cc) > 0 {
+    opts = append(opts, mail.cc(cc...))
+}
+if len(bcc) > 0 {
+    opts = append(opts, mail.bcc(bcc...))
+}
+if authMethod != "none" {
+    opts = append(opts, mail.username(username))
+    opts = append(opts, mail.password(password))
+}
+
+switch effectiveTLS {
+case "ssl":
+    opts = append(opts, mail.ssl())
+case "starttls":
+    opts = append(opts, mail.starttls())
+case "notls":
+    opts = append(opts, mail.notls())
+}
+if skipVerify {
+    opts = append(opts, mail.skipVerify())
+}
+if authMethod != "auto" && authMethod != "none" {
+    opts = append(opts, mail.authMethod(authMethod))
+}
+
+// 正文：html 优先；都没有则给默认测试正文
+if html != "" {
+    opts = append(opts, mail.html(html))
+} else if body != "" {
+    opts = append(opts, mail.text(body))
+} else {
+    opts = append(opts, mail.text("这是一封来自 Yak send_email 工具的测试邮件。"))
+}
+
+// 附件：缺失则跳过并告警
+attachOK := []
+for p in attach {
+    p = str.TrimSpace(p)
+    if p == "" {
+        continue
+    }
+    if file.IsExisted(p) {
+        opts = append(opts, mail.attach(p))
+        attachOK = append(attachOK, p)
+    } else {
+        yakit.Warn("附件不存在，已跳过：%s", p)
+    }
+}
+
+// 自定义邮件头
+headerOK := []
+for h in header {
+    h = str.TrimSpace(h)
+    if h == "" {
+        continue
+    }
+    k, v = parseHeaderKV(h)
+    if k == "" {
+        yakit.Warn("无法解析的自定义头，已跳过：%s", h)
+        continue
+    }
+    opts = append(opts, mail.header(k, v))
+    headerOK = append(headerOK, sprintf("%s: %s", k, v))
+}
+
+// ===== 发送摘要（不含密码）=====
+yakit.Info("================== SMTP 邮件发送 ==================")
+yakit.Info("服务器:    %s:%d", server, port)
+yakit.Info("TLS:       %s", effectiveTLS)
+yakit.Info("发件人:    %s", from)
+yakit.Info("收件人:    %v", to)
+if len(cc) > 0 {
+    yakit.Info("抄送:      %v", cc)
+}
+if len(bcc) > 0 {
+    yakit.Info("密送:      %v", bcc)
+}
+yakit.Info("主题:      %s", subject)
+yakit.Info("正文:      %s", ternary(html != "", "HTML", "text"))
+yakit.Info("附件:      %d 个", len(attachOK))
+for a in attachOK {
+    yakit.Info("  - %s", a)
+}
+if len(headerOK) > 0 {
+    yakit.Info("自定义头:")
+    for h in headerOK {
+        yakit.Info("  %s", h)
+    }
+}
+yakit.Info("认证方式:  %s", ternary(authMethod == "none", "none（无认证）", authMethod))
+yakit.Info("跳过校验:  %v", skipVerify)
+
+if dryRun {
+    yakit.Warn("dry-run 模式：仅预览，不实际发送")
+    yakit.Output({
+        "ok": true,
+        "dry_run": true,
+        "server": server,
+        "port": port,
+        "tls": effectiveTLS,
+        "from": from,
+        "to": to,
+        "cc": cc,
+        "bcc": bcc,
+        "subject": subject,
+        "body_type": ternary(html != "", "html", "text"),
+        "attachments": attachOK,
+        "headers": headerOK,
+        "auth_method": authMethod,
+        "skip_verify": skipVerify,
+    })
+    return
+}
+
+// ===== 发送 =====
+startTime := time.Now()
+err = mail.Send(opts...)
+elapsedMs := int(time.Since(startTime).Milliseconds())
+
+if err != nil {
+    yakit.Error("邮件发送失败：%v", err)
+    yakit.Output({
+        "ok": false,
+        "server": server,
+        "port": port,
+        "from": from,
+        "to": to,
+        "subject": subject,
+        "elapsed_ms": elapsedMs,
+        "error": sprint(err),
+    })
+    return
+}
+
+yakit.Info("邮件发送成功！（耗时 %dms）", elapsedMs)
+yakit.Output({
+    "ok": true,
+    "server": server,
+    "port": port,
+    "from": from,
+    "to": to,
+    "cc": cc,
+    "bcc": bcc,
+    "subject": subject,
+    "attachments": attachOK,
+    "elapsed_ms": elapsedMs,
+})
+yakit.Info("================== 发送结束 ==================")

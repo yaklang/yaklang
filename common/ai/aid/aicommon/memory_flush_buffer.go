@@ -12,6 +12,7 @@ import (
 type MemoryFlushBufferConfig struct {
 	MaxPendingIterations int
 	MaxPendingBytes      int
+	FlushOnIterationEnd  bool
 }
 
 type MemoryFlushSignal struct {
@@ -46,15 +47,15 @@ type MemoryFlushBuffer struct {
 	firstIteration    int
 	lastIteration     int
 
-	jobs      *chanx.UnlimitedChan[memoryFlushAsyncJob]
+	jobs       *chanx.UnlimitedChan[memoryFlushAsyncJob]
 	workerOnce sync.Once
-	closeOnce sync.Once
+	closeOnce  sync.Once
 }
 
 func DefaultMemoryFlushBufferConfig() MemoryFlushBufferConfig {
 	return MemoryFlushBufferConfig{
-		MaxPendingIterations: 3,
-		MaxPendingBytes:      4096,
+		MaxPendingIterations: 8,
+		MaxPendingBytes:      16 * 1024,
 	}
 }
 
@@ -67,6 +68,7 @@ func NewMemoryFlushBuffer(label string, differ *TimelineDiffer, config *MemoryFl
 		if config.MaxPendingBytes > 0 {
 			resolved.MaxPendingBytes = config.MaxPendingBytes
 		}
+		resolved.FlushOnIterationEnd = config.FlushOnIterationEnd
 	}
 	return &MemoryFlushBuffer{
 		label:  label,
@@ -162,7 +164,7 @@ func (b *MemoryFlushBuffer) resolveFlushReason(signal MemoryFlushSignal) string 
 	if signal.IsDone {
 		return "task_done"
 	}
-	if signal.ShouldEndIteration {
+	if signal.ShouldEndIteration && b.config.FlushOnIterationEnd {
 		return "milestone_end_iteration"
 	}
 	if b.config.MaxPendingIterations > 0 && b.pendingIterations >= b.config.MaxPendingIterations {

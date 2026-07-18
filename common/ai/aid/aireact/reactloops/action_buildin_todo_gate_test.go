@@ -176,12 +176,33 @@ func TestFinish_BlockedByGoalMode(t *testing.T) {
 	assert.Contains(t, invoker.timelineString(), "[GOAL_MODE_FINISH_BLOCKED]")
 }
 
-// TestDirectlyAnswer_EmitsAndContinuesWhenTodosClosed 验证无 open TODO 时
-// directly_answer 同样只 emit + Continue, 不再 Exit. 终结改由显式 finish 负责.
-// 关键词: directly_answer 永不 Exit, 无 TODO 也续跑
-func TestDirectlyAnswer_EmitsAndContinuesWhenTodosClosed(t *testing.T) {
+// TestDirectlyAnswer_AutoFinishesWhenTodosClosed verifies the lean fast-path:
+// once the final answer is delivered and no TODO remains, do not spend another
+// model round emitting a mechanical finish action.
+func TestDirectlyAnswer_AutoFinishesWhenTodosClosed(t *testing.T) {
 	loop, invoker, _, task := newTodoGateTestLoop(t, nil)
 	action, err := aicommon.ExtractAction(`{"@action":"directly_answer","answer_payload":"final"}`, "directly_answer")
+	require.NoError(t, err)
+	require.NoError(t, loopAction_DirectlyAnswer.ActionVerifier(loop, action))
+
+	op := NewActionHandlerOperator(task)
+	loopAction_DirectlyAnswer.ActionHandler(loop, action, op)
+
+	terminated, termErr := op.IsTerminated()
+	require.True(t, terminated)
+	require.NoError(t, termErr)
+	require.False(t, op.IsContinued())
+	require.Len(t, invoker.results, 1)
+	assert.Equal(t, "final", invoker.results[0])
+	assert.Contains(t, invoker.timelineString(), TimelineEntryAssistantOutput)
+}
+
+func TestDirectlyAnswer_ExplicitContinueAfterAnswer(t *testing.T) {
+	loop, invoker, _, task := newTodoGateTestLoop(t, nil)
+	action, err := aicommon.ExtractAction(
+		`{"@action":"directly_answer","answer_payload":"progress","continue_after_answer":true}`,
+		"directly_answer",
+	)
 	require.NoError(t, err)
 	require.NoError(t, loopAction_DirectlyAnswer.ActionVerifier(loop, action))
 
@@ -193,8 +214,6 @@ func TestDirectlyAnswer_EmitsAndContinuesWhenTodosClosed(t *testing.T) {
 	require.False(t, terminated)
 	require.NoError(t, termErr)
 	require.Len(t, invoker.results, 1)
-	assert.Equal(t, "final", invoker.results[0])
-	assert.Contains(t, invoker.timelineString(), TimelineEntryAssistantOutput)
 }
 
 // TestDirectlyAnswer_ContinuesWhenNextMovementsLeaveOpenTodos 验证携带

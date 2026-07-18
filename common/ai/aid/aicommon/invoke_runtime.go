@@ -10,9 +10,11 @@ import (
 )
 
 type VerifyNextMovement struct {
-	Op      string `json:"op"`
-	Content string `json:"content,omitempty"`
-	ID      string `json:"id"`
+	Op               string `json:"op"`
+	Content          string `json:"content,omitempty"`
+	ID               string `json:"id"`
+	Evidence         string `json:"evidence,omitempty"`
+	EvidenceRequired bool   `json:"evidence_required,omitempty"`
 }
 
 type EvidenceOperation struct {
