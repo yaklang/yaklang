@@ -27,13 +27,9 @@ type PromptMaterials struct {
 	//     但仍属可缓存半动态前缀的内容
 	SkillsContext        string
 	PromotedSemiDynamic1 string
-	// Deprecated: recent-tool prompt visibility is projected from Timeline
-	// promotion state. This field remains only for source compatibility and is
-	// intentionally ignored by all shared templates.
-	RecentToolsCache  string
-	PlanHelp          string
-	OriginalUserInput string
-	StableInstruction string
+	PlanHelp             string
+	OriginalUserInput    string
+	StableInstruction    string
 
 	// ForcedSkills 是「用户强制加载」SKILL 满内容, 进 frozen_block 顶部 (最高优先级).
 	// 空时 frozen_block 顶部子块不渲染.
@@ -226,9 +222,10 @@ func RenderTimelineFrozenOpen(timeline *Timeline) TimelineFrozenOpenBlocks {
 		break
 	}
 	promotedSemi1, openDeltas := timeline.projectPromoted(sealedBeforeID)
+	promptBlocks := projectTimelineRenderableBlocksForPrompt(rb)
 	return TimelineFrozenOpenBlocks{
-		Frozen:               rb.RenderFrozenOnly(TimelineDumpDefaultAITagName),
-		Open:                 rb.RenderOpenOnly(TimelineDumpDefaultAITagName),
+		Frozen:               promptBlocks.RenderFrozenOnly(TimelineDumpDefaultAITagName),
+		Open:                 promptBlocks.RenderOpenOnly(TimelineDumpDefaultAITagName),
 		PromotedOpen:         openDeltas,
 		PromotedSemiDynamic1: promotedSemi1,
 		FrozenTimeUnix:       timelineFrozenTimeUnixFromRenderable(rb),

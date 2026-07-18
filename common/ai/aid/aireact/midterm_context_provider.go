@@ -26,7 +26,7 @@ type midtermTimelineSearchQuery struct {
 func buildTimelineDumpWithMidtermMemory(react *ReAct, timeline *aicommon.Timeline) string {
 	baseTimeline := ""
 	if timeline != nil {
-		baseTimeline = timeline.Dump()
+		baseTimeline = timeline.DumpForPrompt()
 	}
 	queries := react.consumePendingMidtermTimelineQueries()
 	if len(queries) == 0 {

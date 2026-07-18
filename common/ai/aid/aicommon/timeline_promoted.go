@@ -198,6 +198,76 @@ func (m *Timeline) HasPromotableKind(kind string) bool {
 	return false
 }
 
+// effectivePromotedKeys returns the current materialized membership for one
+// promotion namespace, including mutations that are still in Timeline Open.
+// It is deliberately read-only: session restore must not seal buckets or move
+// the promotion watermark merely to rebuild execution-side authorization.
+//
+// Ordering follows the latest mutation source ID. Reuse of an unchanged tool
+// does not create a prompt mutation, so exact execution-side LRU touches are
+// intentionally not persisted across process restarts.
+func (m *Timeline) effectivePromotedKeys(targetSection, kind string) []string {
+	if m == nil || strings.TrimSpace(targetSection) == "" || strings.TrimSpace(kind) == "" {
+		return nil
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	type activePromotion struct {
+		key      string
+		sourceID int64
+	}
+	active := make(map[string]activePromotion)
+	watermark := int64(0)
+	if m.promotedState != nil {
+		watermark = m.promotedState.Watermark
+		if kinds := m.promotedState.Entries[targetSection]; kinds != nil {
+			for key, entry := range kinds[kind] {
+				if entry == nil {
+					continue
+				}
+				active[key] = activePromotion{key: key, sourceID: entry.SourceItemID}
+			}
+		}
+	}
+	ids := append([]int64(nil), m.idToTimelineItem.Keys()...)
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	for _, id := range ids {
+		if id <= watermark {
+			continue
+		}
+		item, ok := m.idToTimelineItem.Get(id)
+		if !ok || item == nil || item.deleted {
+			continue
+		}
+		control, ok := item.value.(*PromotableTimelineItem)
+		if !ok || control == nil || control.TargetSection != targetSection || control.Kind != kind {
+			continue
+		}
+		if control.Operation == TimelinePromotedOperationDelete {
+			delete(active, control.Key)
+			continue
+		}
+		active[control.Key] = activePromotion{key: control.Key, sourceID: id}
+	}
+
+	ordered := make([]activePromotion, 0, len(active))
+	for _, entry := range active {
+		ordered = append(ordered, entry)
+	}
+	sort.Slice(ordered, func(i, j int) bool {
+		if ordered[i].sourceID == ordered[j].sourceID {
+			return ordered[i].key < ordered[j].key
+		}
+		return ordered[i].sourceID < ordered[j].sourceID
+	})
+	keys := make([]string, 0, len(ordered))
+	for _, entry := range ordered {
+		keys = append(keys, entry.key)
+	}
+	return keys
+}
+
 func (m *Timeline) projectPromoted(sealedBeforeID int64) (string, string) {
 	if m == nil {
 		return "", ""

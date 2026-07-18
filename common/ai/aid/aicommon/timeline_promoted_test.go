@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 )
 
 func injectPromotable(tl *Timeline, id int64, ts time.Time, operation, key, payload string) {
@@ -123,6 +124,49 @@ func TestTimelinePromotedStateStableOrdering(t *testing.T) {
 	b := RenderTimelineFrozenOpen(tl).PromotedSemiDynamic1
 	require.Equal(t, a, b)
 	require.Less(t, strings.Index(a, "## Tool: alpha"), strings.Index(a, "## Tool: zeta"))
+}
+
+func TestTimelineEffectivePromotedKeysRestoresSealedAndPendingStateWithoutMutation(t *testing.T) {
+	base := time.Date(2026, 7, 18, 11, 30, 0, 0, time.UTC)
+	tl := NewTimeline(nil, nil)
+	injectPromotable(tl, 1, base, TimelinePromotedOperationUpsert, "alpha", "## Tool: alpha")
+	injectPromotable(tl, 2, base.Add(time.Second), TimelinePromotedOperationUpsert, "beta", "## Tool: beta")
+	tl.ForcePromoteAll()
+	require.Equal(t, int64(2), tl.promotedState.Watermark)
+
+	// Pending journal changes overlay the sealed snapshot without advancing the
+	// watermark or forcing a Timeline seal.
+	injectPromotable(tl, 3, base.Add(2*time.Second), TimelinePromotedOperationDelete, "alpha", "")
+	injectPromotable(tl, 4, base.Add(3*time.Second), TimelinePromotedOperationUpsert, "gamma", "## Tool: gamma")
+	beforeWatermark := tl.promotedState.Watermark
+	beforeDump := tl.Dump()
+	require.Equal(t, []string{"beta", "gamma"}, tl.effectivePromotedKeys(TimelinePromotedTargetSemiDynamic1, TimelinePromotedKindRecentTool))
+	require.Equal(t, beforeWatermark, tl.promotedState.Watermark)
+	require.Equal(t, beforeDump, tl.Dump())
+
+	beta := aitool.NewWithoutCallback("beta", aitool.WithDescription("beta"), aitool.WithStringParam("value"))
+	gamma := aitool.NewWithoutCallback("gamma", aitool.WithDescription("gamma"), aitool.WithStringParam("value"))
+	manager := buildinaitools.NewToolManagerByToolGetter(func() []*aitool.Tool { return []*aitool.Tool{beta, gamma} }, buildinaitools.WithEnableAllTools())
+	cfg := NewConfig(context.Background(), WithToolManager(manager))
+	cfg.Timeline = tl
+	cfg.restoreRecentToolsFromTimeline()
+	require.False(t, manager.IsRecentlyUsedTool("alpha"))
+	require.True(t, manager.IsRecentlyUsedTool("beta"))
+	require.True(t, manager.IsRecentlyUsedTool("gamma"))
+	require.Equal(t, beforeWatermark, tl.promotedState.Watermark)
+	require.Equal(t, beforeDump, tl.Dump())
+
+	raw, err := MarshalTimeline(tl)
+	require.NoError(t, err)
+	restored, err := UnmarshalTimeline(raw)
+	require.NoError(t, err)
+	nextID := int64(100)
+	restored.ReassignIDs(func() int64 {
+		nextID++
+		return nextID
+	})
+	require.Len(t, restored.idToTimelineItem.Keys(), 4, "restoring must not collapse multiple timeline entries onto one ID")
+	require.Equal(t, []string{"beta", "gamma"}, restored.effectivePromotedKeys(TimelinePromotedTargetSemiDynamic1, TimelinePromotedKindRecentTool))
 }
 
 func TestTimelineForkMergesPromotionJournalWithoutDiffNoise(t *testing.T) {

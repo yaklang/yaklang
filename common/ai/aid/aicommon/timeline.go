@@ -6,6 +6,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -841,7 +842,7 @@ func (m *Timeline) renderSummaryPrompt(result *TimelineItem) string {
 	var nonce = strings.ToLower(utils.RandStringBytes(6))
 
 	// Get timeline dump and truncate if too large
-	timelineDump := m.Dump()
+	timelineDump := m.DumpForPrompt()
 	if len(timelineDump) > MaxSummaryPromptTimelineSize {
 		log.Warnf("summary prompt: timeline dump too large (%d > %d), truncating",
 			len(timelineDump), MaxSummaryPromptTimelineSize)
@@ -914,6 +915,22 @@ func (m *Timeline) Dump() string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.dumpLocked()
+}
+
+// DumpForPrompt renders the same raw bucket topology as Dump while applying
+// prompt-only bookkeeping noise reduction to interval items.
+func (m *Timeline) DumpForPrompt() string {
+	if m == nil {
+		return ""
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	blocks := m.groupByMinutesAndBytesLocked(TimelineDumpDefaultIntervalMinutes, m.getEffectiveBucketByteSize()).GetAllRenderable()
+	return projectTimelineRenderableBlocksForPrompt(blocks).RenderWithFrozenBoundary(
+		TimelineDumpDefaultAITagName,
+		TimelineFrozenBoundaryTagName,
+		TimelineFrozenBoundaryNonce,
+	)
 }
 
 func (m *Timeline) dumpLocked() string {
@@ -1291,6 +1308,15 @@ func (m *Timeline) ReassignIDs(idGenerator func() int64) int64 {
 	m.tsToTimelineItem.ForEach(func(ts int64, item *TimelineItem) bool {
 		orderedItems = append(orderedItems, itemWithTs{ts: ts, item: item})
 		return true
+	})
+	// UnmarshalTimeline rebuilds this ordered map from JSON object keys, whose
+	// iteration order is intentionally undefined. Sort explicitly so restored
+	// IDs, promotion watermarks and pending journal order remain deterministic.
+	sort.SliceStable(orderedItems, func(i, j int) bool {
+		if orderedItems[i].ts == orderedItems[j].ts {
+			return orderedItems[i].item.GetID() < orderedItems[j].item.GetID()
+		}
+		return orderedItems[i].ts < orderedItems[j].ts
 	})
 
 	if len(orderedItems) == 0 {

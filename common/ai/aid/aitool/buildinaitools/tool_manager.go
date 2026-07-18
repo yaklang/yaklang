@@ -24,38 +24,6 @@ import (
 
 const defaultRecentToolCacheMaxTokens = 30 * 1024
 
-func isSupportedRecentToolAITagParamName(paramName string) bool {
-	if paramName == "" {
-		return false
-	}
-	for _, ch := range paramName {
-		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_' {
-			continue
-		}
-		return false
-	}
-	return true
-}
-
-func filterSupportedRecentToolAITagParamNames(paramNames []string) []string {
-	if len(paramNames) == 0 {
-		return nil
-	}
-	filtered := make([]string, 0, len(paramNames))
-	seen := make(map[string]struct{}, len(paramNames))
-	for _, paramName := range paramNames {
-		if !isSupportedRecentToolAITagParamName(paramName) {
-			continue
-		}
-		if _, ok := seen[paramName]; ok {
-			continue
-		}
-		seen[paramName] = struct{}{}
-		filtered = append(filtered, paramName)
-	}
-	return filtered
-}
-
 // RecentToolEntry records a recently used tool for directly_call_tool action.
 type RecentToolEntry struct {
 	Name          string `json:"name"`
@@ -591,21 +559,6 @@ func (m *AiToolManager) AddRecentlyUsedTool(tool *aitool.Tool) RecentToolCacheMu
 	return mutation
 }
 
-// GetRecentToolEntries returns a defensive snapshot in execution-side LRU order.
-func (m *AiToolManager) GetRecentToolEntries() []*RecentToolEntry {
-	m.recentToolsMu.Lock()
-	defer m.recentToolsMu.Unlock()
-	out := make([]*RecentToolEntry, 0, len(m.recentToolsCache))
-	for _, entry := range m.recentToolsCache {
-		if entry == nil {
-			continue
-		}
-		cp := *entry
-		out = append(out, &cp)
-	}
-	return out
-}
-
 // RenderRecentToolEntryForPromotion renders one stable, params-only schema.
 // Collection ordering and the shared routing instructions are owned by the
 // Timeline promoted-state projection.
@@ -671,40 +624,6 @@ Direct Params Schema (for directly_call_tool only):
 {{ end }}<|TOOL_{{ .Name }}_END_{{ .Nonce }}|>
 `
 
-const recentToolSummaryFooterTemplate = `## How to use directly_call_tool
-
-The schema shown above is the params-only shape for directly_call_tool.
-Pass it directly as directly_call_tool_params. Do not wrap it with @action, tool, or params.
-
-### JSON-only mode
-{"@action": "directly_call_tool", "directly_call_tool_name": "<name>", "directly_call_identifier": "<snake_case_intent>", "directly_call_expectations": "<timing and fallback>", "directly_call_tool_params": <params object matching the Params Schema>}
-
-### Hybrid mode for block parameters
-Use JSON for simple fields and AITAG blocks for multi-line or escape-heavy fields such as command, body, packet, headers, script, content, query.
-
-Example (the literal "{{ .Nonce }}" below is a placeholder; replace it with the SAME nonce that other AITAG blocks in this prompt are using, e.g. the nonce from <|USER_QUERY_xxxx|>):
-{"@action": "directly_call_tool", "directly_call_tool_name": "<name>", "directly_call_identifier": "<snake_case_intent>", "directly_call_expectations": "<timing and fallback>", "directly_call_tool_params": {"timeout": 20}}
-<|TOOL_PARAM_command_{{ .Nonce }}|>
-#!/bin/bash
-echo "hello"
-<|TOOL_PARAM_command_END_{{ .Nonce }}|>
-
-AITAG rules:
-- Start tag: <|TOOL_PARAM_{param_name}_{nonce}|>
-- End tag:   <|TOOL_PARAM_{param_name}_END_{nonce}|>
-- The token "{{ .Nonce }}" written above in this prompt is a PLACEHOLDER for "the current per-turn nonce". When you emit your AITAG blocks, prefer to substitute it with the same nonce that is used by other AITAG blocks in this prompt (look at <|USER_QUERY_xxxx|> for the exact value).
-- If unsure, you may also keep the literal "{{ .Nonce }}" verbatim; the parser accepts both forms.
-- AITAG block values override same-named JSON params.
-- If all params are block-style, directly_call_tool_params may be omitted or left as an empty object.
-{{ if .ParamNames }}
-
-AITAG-capable params seen in cached tools:
-{{- range .ParamNames }}
-- {{ . }}
-{{- end }}
-{{ end }}
-`
-
 func extractDirectlyCallParamsSchema(schemaSnippet string) aitool.InvokeParams {
 	if strings.TrimSpace(schemaSnippet) == "" {
 		return nil
@@ -743,13 +662,6 @@ func extractDirectlyCallParamNamesFromSchema(schemaSnippet string) []string {
 	}
 	sort.Strings(names)
 	return names
-}
-
-func renderRecentToolSummaryFooter(nonce string, paramNames []string) string {
-	return utils.MustRenderTemplate(recentToolSummaryFooterTemplate, map[string]any{
-		"Nonce":      nonce,
-		"ParamNames": filterSupportedRecentToolAITagParamNames(paramNames),
-	})
 }
 
 func renderDirectlyCallParamsSchema(schemaSnippet string) string {
@@ -821,102 +733,6 @@ func (m *AiToolManager) GetRecentToolParamNamesByTool(name string) []string {
 		return nil
 	}
 	return extractDirectlyCallParamNamesFromSchema(tool.ToJSONSchemaString())
-}
-
-// ExportRecentToolCache serializes the recent-tool cache entries to a JSON string
-// for persistent storage (e.g. in AIAgentRuntime.RecentToolsCache).
-func (m *AiToolManager) ExportRecentToolCache() string {
-	m.recentToolsMu.Lock()
-	defer m.recentToolsMu.Unlock()
-
-	if len(m.recentToolsCache) == 0 {
-		return ""
-	}
-	raw, err := json.Marshal(m.recentToolsCache)
-	if err != nil {
-		log.Errorf("ExportRecentToolCache marshal error: %v", err)
-		return ""
-	}
-	return string(raw)
-}
-
-// ImportRecentToolCache restores cache entries from a JSON string produced by ExportRecentToolCache.
-// Existing entries with the same name are replaced; FIFO eviction still applies.
-func (m *AiToolManager) ImportRecentToolCache(jsonStr string) {
-	if jsonStr == "" {
-		return
-	}
-	var entries []*RecentToolEntry
-	if err := json.Unmarshal([]byte(jsonStr), &entries); err != nil {
-		log.Errorf("ImportRecentToolCache unmarshal error: %v", err)
-		return
-	}
-
-	m.recentToolsMu.Lock()
-	defer m.recentToolsMu.Unlock()
-
-	existing := make(map[string]struct{})
-	for _, e := range m.recentToolsCache {
-		existing[e.Name] = struct{}{}
-	}
-	for _, entry := range entries {
-		if _, ok := existing[entry.Name]; ok {
-			continue
-		}
-		m.recentToolsCache = append(m.recentToolsCache, entry)
-		existing[entry.Name] = struct{}{}
-	}
-
-	maxTokens := m.getMaxCacheTokens()
-	for m.totalCacheSize() > maxTokens && len(m.recentToolsCache) > 1 {
-		m.recentToolsCache = m.recentToolsCache[1:]
-	}
-}
-
-// GetRecentToolsSummary builds a prompt-friendly summary of cached tools within maxTokens.
-// Each tool is wrapped in AITAG boundaries <|TOOL_{name}_{nonce}|> to prevent confusion.
-//
-// 注意: 自从 CACHE_TOOL_CALL 块迁到 semi-dynamic 段并加上 AI_CACHE_SEMI 缓存边界后,
-// 块内所有 AITAG (TOOL_xxx 包装 / TOOL_PARAM_xxx 示例) 的 nonce 一律使用字面量稳定
-// 常量 RecentToolCacheStableNonce, 让该段跨 turn 字节稳定、可命中 prefix cache.
-// 参数 nonce 保留是为了向后兼容旧调用方, 但不再参与渲染.
-//
-// 关键词: GetRecentToolsSummary, RecentToolCacheStableNonce, prefix cache
-func (m *AiToolManager) GetRecentToolsSummary(maxTokens int, nonce string) string {
-	m.recentToolsMu.Lock()
-	defer m.recentToolsMu.Unlock()
-	_ = nonce // 保留参数兼容旧调用; 真正用于渲染的是稳定 nonce.
-
-	if len(m.recentToolsCache) == 0 {
-		return ""
-	}
-
-	var sb strings.Builder
-	sb.WriteString("# Recently Used Tools (available for directly_call_tool)\n\n")
-	totalTokens := ytoken.CalcTokenCount(sb.String())
-	entryWritten := false
-	for reverseIndex := len(m.recentToolsCache) - 1; reverseIndex >= 0; reverseIndex-- {
-		entry := m.recentToolsCache[reverseIndex]
-		block := utils.MustRenderTemplate(recentToolEntryTemplate, map[string]interface{}{
-			"Name":                 entry.Name,
-			"Nonce":                RecentToolCacheStableNonce,
-			"Description":          entry.Description,
-			"DisplaySchemaSnippet": renderDirectlyCallParamsSchema(entry.SchemaSnippet),
-			"Usage":                entry.Usage,
-		})
-		// Always include the most recent entry even if it exceeds maxTokens.
-		if entryWritten && maxTokens > 0 && totalTokens+ytoken.CalcTokenCount(block) > maxTokens {
-			break
-		}
-		sb.WriteString(block)
-		totalTokens += ytoken.CalcTokenCount(block)
-		entryWritten = true
-	}
-	if !entryWritten {
-		return ""
-	}
-	sb.WriteString(renderRecentToolSummaryFooter(RecentToolCacheStableNonce, m.getRecentToolParamNamesLocked()))
-	return sb.String()
 }
 
 // BuildStubToolFromMCPCachePublic is the exported wrapper for buildStubToolFromMCPCache.

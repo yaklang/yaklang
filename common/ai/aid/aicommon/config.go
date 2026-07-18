@@ -1319,25 +1319,6 @@ func (c *Config) SaveLoadedSkillNames(skillNames []string) {
 	}
 }
 
-// SaveRecentToolCache persists the recent-tool cache to the DB for the current persistent session.
-func (c *Config) SaveRecentToolCache() {
-	if c.PersistentSessionId == "" {
-		return
-	}
-	tm := c.GetAiToolManager()
-	if tm == nil {
-		return
-	}
-	db := c.GetDB()
-	if db == nil {
-		return
-	}
-	cacheJSON := tm.ExportRecentToolCache()
-	if err := yakit.UpdateAIAgentRuntimeRecentToolsCache(db, c.PersistentSessionId, cacheJSON); err != nil {
-		log.Warnf("failed to save recent tool cache for session [%s]: %v", c.PersistentSessionId, err)
-	}
-}
-
 // RecordRecentlyUsedTool keeps execution authorization in AiToolManager while
 // recording only prompt-visible mutations in Timeline Open.
 func (c *Config) RecordRecentlyUsedTool(tool *aitool.Tool) buildinaitools.RecentToolCacheMutation {
@@ -1347,38 +1328,38 @@ func (c *Config) RecordRecentlyUsedTool(tool *aitool.Tool) buildinaitools.Recent
 	}
 	mutation = c.GetAiToolManager().AddRecentlyUsedTool(tool)
 	timeline := c.GetTimeline()
+	promptMutated := false
 	if timeline != nil && mutation.Upsert != nil {
-		timeline.PushPromotable(c.AcquireId(), TimelinePromotedKindRecentTool, TimelinePromotedTargetSemiDynamic1,
+		promptMutated = timeline.PushPromotable(c.AcquireId(), TimelinePromotedKindRecentTool, TimelinePromotedTargetSemiDynamic1,
 			mutation.Upsert.Name, TimelinePromotedOperationUpsert,
-			buildinaitools.RenderRecentToolEntryForPromotion(mutation.Upsert))
+			buildinaitools.RenderRecentToolEntryForPromotion(mutation.Upsert)) || promptMutated
 	}
 	if timeline != nil {
 		for _, deleted := range mutation.Deleted {
 			if deleted == nil {
 				continue
 			}
-			timeline.PushPromotable(c.AcquireId(), TimelinePromotedKindRecentTool, TimelinePromotedTargetSemiDynamic1,
-				deleted.Name, TimelinePromotedOperationDelete, "")
+			promptMutated = timeline.PushPromotable(c.AcquireId(), TimelinePromotedKindRecentTool, TimelinePromotedTargetSemiDynamic1,
+				deleted.Name, TimelinePromotedOperationDelete, "") || promptMutated
 		}
 	}
-	c.SaveRecentToolCache()
+	if promptMutated && c.PersistentSessionId != "" && c.GetDB() != nil {
+		timeline.Save(c.GetDB(), c.PersistentSessionId)
+	}
 	return mutation
 }
 
-func (c *Config) bootstrapRecentToolsIntoTimeline() {
-	if c == nil || c.GetTimeline() == nil || c.GetAiToolManager() == nil || c.GetTimeline().HasPromotableKind(TimelinePromotedKindRecentTool) {
+func (c *Config) restoreRecentToolsFromTimeline() {
+	if c == nil || c.GetTimeline() == nil || c.GetAiToolManager() == nil {
 		return
 	}
-	entries := c.GetAiToolManager().GetRecentToolEntries()
-	for _, entry := range entries {
-		if entry == nil {
+	for _, name := range c.GetTimeline().effectivePromotedKeys(TimelinePromotedTargetSemiDynamic1, TimelinePromotedKindRecentTool) {
+		tool, err := c.GetAiToolManager().GetToolByName(name)
+		if err != nil || tool == nil {
+			log.Warnf("failed to restore promoted recent tool [%s] for session [%s]: %v", name, c.PersistentSessionId, err)
 			continue
 		}
-		c.GetTimeline().PushPromotable(c.AcquireId(), TimelinePromotedKindRecentTool, TimelinePromotedTargetSemiDynamic1,
-			entry.Name, TimelinePromotedOperationUpsert, buildinaitools.RenderRecentToolEntryForPromotion(entry))
-	}
-	if len(entries) > 0 {
-		c.GetTimeline().ForcePromoteAll()
+		c.GetAiToolManager().AddRecentlyUsedTool(tool)
 	}
 }
 
@@ -3845,7 +3826,7 @@ func (c *Config) restorePersistentSession() {
 
 	// Reassign IDs to all restored timeline items to avoid ID conflicts
 	// This uses the current idGenerator to ensure sequential IDs
-	lastID := timelineInstance.ReassignIDs(c.SeqIdProvider.CurrentID)
+	lastID := timelineInstance.ReassignIDs(c.AcquireId)
 	if lastID > 0 {
 		log.Infof("reassigned timeline IDs, last assigned ID: %d", lastID)
 	}
@@ -3892,14 +3873,7 @@ func (c *Config) restorePersistentSession() {
 			c.PersistentSessionId, len([]rune(evidence)))
 	}
 
-	// Restore recent-tool cache from previous session
-	if runtime.RecentToolsCache != "" {
-		if tm := c.GetAiToolManager(); tm != nil {
-			tm.ImportRecentToolCache(runtime.RecentToolsCache)
-			c.bootstrapRecentToolsIntoTimeline()
-			log.Infof("restored recent tool cache from persistent session [%s]", c.PersistentSessionId)
-		}
-	}
+	c.restoreRecentToolsFromTimeline()
 
 	c.InitStatus.SetPersistentSessionRestored(true)
 	log.Infof("successfully restored timeline instance from persistent session [%s] with %d items",

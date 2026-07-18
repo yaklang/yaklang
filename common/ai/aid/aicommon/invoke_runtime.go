@@ -207,10 +207,6 @@ type LoopPromptAssemblyInput struct {
 	ReactiveData   string
 	InjectedMemory string
 
-	// Deprecated: ignored by prompt assembly. Recent tool schemas are supplied by
-	// Timeline promotion state so they have exactly one prompt source.
-	RecentToolsCache string
-
 	// FrozenUserContext 用于承载 PE-TASK 等场景下"PLAN 阶段产出 + 用户原始
 	// 输入"两类只读上下文。注: 命名虽为 "Frozen", 但实际并不放入冻结段;
 	// 跨同一 plan 周期内同一子任务执行的多次 turn 字节稳定, 但子任务切换仍

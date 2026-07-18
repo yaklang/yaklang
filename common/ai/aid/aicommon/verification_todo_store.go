@@ -3,6 +3,7 @@ package aicommon
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/ytoken"
@@ -665,7 +666,10 @@ func (s *VerificationTodoStore) Render() string {
 	if s == nil || len(s.Items) == 0 {
 		return "- no tracked TODO items"
 	}
-	return truncateVerificationTodoLines(renderVerificationTodoItemLines(s.SnapshotItems()))
+	active, closed := splitVerificationTodoPromptItems(s.SnapshotItems())
+	lines := renderVerificationTodoActiveLines(active)
+	lines = append(lines, renderVerificationTodoClosedSummaryLines(closed)...)
+	return truncateVerificationTodoLines(lines)
 }
 
 // RenderWithCurrentScope renders the session TODO snapshot grouped by task
@@ -697,20 +701,39 @@ func (s *VerificationTodoStore) RenderWithCurrentScope(currentScope Verification
 		}
 	}
 
-	lines := make([]string, 0, len(s.Items)+8)
+	currentActive, currentClosed := splitVerificationTodoPromptItems(currentItems)
+	lines := make([]string, 0, len(s.Items)+12)
 	lines = append(lines, formatVerificationTodoCurrentTaskHeader(currentScope))
 	if len(currentItems) == 0 {
 		lines = append(lines, "- (no TODO items tracked for the current task yet)")
 	} else {
 		lines = append(lines, "- You MUST advance or close ONLY the TODOs in this section via adjust_todolist / verification next_movements.")
-		lines = append(lines, renderVerificationTodoItemLines(currentItems)...)
+		if len(currentActive) == 0 {
+			lines = append(lines, "- (no active TODO items for the current task)")
+		} else {
+			lines = append(lines, renderVerificationTodoActiveLines(currentActive)...)
+		}
 	}
 
 	if len(otherItems) > 0 {
 		lines = append(lines, "")
 		lines = append(lines, "### OTHER TASKS (read-only context)")
 		lines = append(lines, "- TODOs below belong to sibling or finished tasks. Do NOT mutate them; use them only as history/context.")
-		lines = append(lines, renderVerificationTodoOtherTaskSections(otherItems)...)
+		lines = append(lines, renderVerificationTodoOtherTaskActiveSections(otherItems)...)
+	}
+
+	// Closed state is useful for avoiding repeated work, but its content is not
+	// actionable. Render it only after all active TODOs so history cannot evict
+	// current work from the fixed prompt budget.
+	if len(currentClosed) > 0 {
+		lines = append(lines, "", "### CURRENT TASK CLOSED SUMMARY")
+		lines = append(lines, renderVerificationTodoClosedSummaryLines(currentClosed)...)
+	}
+	if len(otherItems) > 0 {
+		if closedLines := renderVerificationTodoOtherTaskClosedSections(otherItems); len(closedLines) > 0 {
+			lines = append(lines, "", "### OTHER TASKS CLOSED SUMMARY (read-only)")
+			lines = append(lines, closedLines...)
+		}
 	}
 
 	return truncateVerificationTodoLines(lines)
@@ -728,9 +751,9 @@ func formatVerificationTodoCurrentTaskHeader(scope VerificationTodoScope) string
 	}
 }
 
-func renderVerificationTodoOtherTaskSections(items []VerificationTodoItem) []string {
+func groupVerificationTodoItemsByTask(items []VerificationTodoItem) ([]string, map[string][]VerificationTodoItem) {
 	if len(items) == 0 {
-		return nil
+		return nil, nil
 	}
 	grouped := make(map[string][]VerificationTodoItem)
 	order := make([]string, 0)
@@ -741,12 +764,34 @@ func renderVerificationTodoOtherTaskSections(items []VerificationTodoItem) []str
 		}
 		grouped[key] = append(grouped[key], item)
 	}
+	return order, grouped
+}
 
+func renderVerificationTodoOtherTaskActiveSections(items []VerificationTodoItem) []string {
+	order, grouped := groupVerificationTodoItemsByTask(items)
 	lines := make([]string, 0, len(items)+len(order))
 	for _, key := range order {
+		active, _ := splitVerificationTodoPromptItems(grouped[key])
+		if len(active) == 0 {
+			continue
+		}
 		lines = append(lines, "")
 		lines = append(lines, "#### "+key)
-		lines = append(lines, renderVerificationTodoItemLines(grouped[key])...)
+		lines = append(lines, renderVerificationTodoActiveLines(active)...)
+	}
+	return lines
+}
+
+func renderVerificationTodoOtherTaskClosedSections(items []VerificationTodoItem) []string {
+	order, grouped := groupVerificationTodoItemsByTask(items)
+	lines := make([]string, 0, len(items)+len(order))
+	for _, key := range order {
+		_, closed := splitVerificationTodoPromptItems(grouped[key])
+		if len(closed) == 0 {
+			continue
+		}
+		lines = append(lines, "#### "+key)
+		lines = append(lines, renderVerificationTodoClosedSummaryLines(closed)...)
 	}
 	return lines
 }
@@ -765,31 +810,82 @@ func formatVerificationTodoOtherTaskGroupKey(item VerificationTodoItem) string {
 	}
 }
 
-func renderVerificationTodoItemLines(items []VerificationTodoItem) []string {
-	pending := make([]VerificationTodoItem, 0)
-	doing := make([]VerificationTodoItem, 0)
-	closed := make([]VerificationTodoItem, 0)
+func splitVerificationTodoPromptItems(items []VerificationTodoItem) (active, closed []VerificationTodoItem) {
+	active = make([]VerificationTodoItem, 0, len(items))
+	closed = make([]VerificationTodoItem, 0, len(items))
 	for _, item := range items {
 		switch item.Status {
-		case VerificationTodoStatusPending:
-			pending = append(pending, item)
-		case VerificationTodoStatusDoing:
-			doing = append(doing, item)
+		case VerificationTodoStatusPending, VerificationTodoStatusDoing:
+			active = append(active, item)
 		default:
 			closed = append(closed, item)
 		}
 	}
+	sortVerificationTodoItemsRecentFirst(active)
+	sortVerificationTodoItemsRecentFirst(closed)
+	return active, closed
+}
 
-	// 倒序输出每组, 让"最近更新"先被 LLM 看到
+func sortVerificationTodoItemsRecentFirst(items []VerificationTodoItem) {
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].UpdatedAt != items[j].UpdatedAt {
+			return items[i].UpdatedAt > items[j].UpdatedAt
+		}
+		if items[i].CreatedAt != items[j].CreatedAt {
+			return items[i].CreatedAt > items[j].CreatedAt
+		}
+		return items[i].ID < items[j].ID
+	})
+}
+
+func renderVerificationTodoActiveLines(items []VerificationTodoItem) []string {
 	lines := make([]string, 0, len(items))
-	for index := len(doing) - 1; index >= 0; index-- {
-		lines = append(lines, FormatVerificationTodoLine(doing[index]))
+	for _, item := range items {
+		status := "[ ]"
+		if item.Status == VerificationTodoStatusDoing {
+			status = "[DOING]"
+		}
+		content := strings.Join(strings.Fields(item.Content), " ")
+		if content == "" {
+			content = "(no content)"
+		}
+		lines = append(lines, fmt.Sprintf("- %s: [id: %s]: %s", status, item.ID, content))
 	}
-	for index := len(pending) - 1; index >= 0; index-- {
-		lines = append(lines, FormatVerificationTodoLine(pending[index]))
+	return lines
+}
+
+const verificationTodoClosedIDsPerStatus = 64
+
+func renderVerificationTodoClosedSummaryLines(items []VerificationTodoItem) []string {
+	byStatus := map[VerificationTodoStatus][]VerificationTodoItem{}
+	for _, item := range items {
+		byStatus[item.Status] = append(byStatus[item.Status], item)
 	}
-	for index := len(closed) - 1; index >= 0; index-- {
-		lines = append(lines, FormatVerificationTodoLine(closed[index]))
+	statuses := []VerificationTodoStatus{
+		VerificationTodoStatusDone,
+		VerificationTodoStatusDeleted,
+		VerificationTodoStatusSkipped,
+	}
+	lines := make([]string, 0, len(statuses))
+	for _, status := range statuses {
+		statusItems := byStatus[status]
+		if len(statusItems) == 0 {
+			continue
+		}
+		sortVerificationTodoItemsRecentFirst(statusItems)
+		visible := len(statusItems)
+		if visible > verificationTodoClosedIDsPerStatus {
+			visible = verificationTodoClosedIDsPerStatus
+		}
+		ids := make([]string, 0, visible)
+		for _, item := range statusItems[:visible] {
+			ids = append(ids, item.ID)
+		}
+		line := fmt.Sprintf("- %s (%d): %s", status, len(statusItems), strings.Join(ids, ", "))
+		if omitted := len(statusItems) - visible; omitted > 0 {
+			line += fmt.Sprintf("; +%d omitted", omitted)
+		}
+		lines = append(lines, line)
 	}
 	return lines
 }

@@ -396,7 +396,9 @@ func (m *Timeline) renderBatchCompressPrompt(currentHead *TimelineCompressedHead
 
 	// 1) 先构造 RECENT_KEEP 段（从最新向旧填，超限就在前面加 truncate notice）
 	// 关键词: renderBatchCompressPrompt, RECENT_KEEP 截断, 从新向旧填充
-	recentStr, recentCount, recentTruncated := buildRecentKeptString(recentKeep, MaxBatchCompressRecentSize)
+	promptRecentKeep := projectTimelineItemsForPrompt(recentKeep)
+	promptToCompress := projectTimelineItemsForPrompt(toCompress)
+	recentStr, recentCount, recentTruncated := buildRecentKeptString(promptRecentKeep, MaxBatchCompressRecentSize)
 
 	// 2) 剩余预算给 ITEMS_TO_COMPRESS（保留 1KB 给模板/指引/JSON schema）
 	const templateOverheadReserve = 1024
@@ -406,17 +408,22 @@ func (m *Timeline) renderBatchCompressPrompt(currentHead *TimelineCompressedHead
 		remainingBudget = 1024
 	}
 
-	itemsStr, actualItemCount, itemsTruncated := buildItemsToCompressString(toCompress, remainingBudget)
+	itemsStr, actualItemCount, itemsTruncated := buildItemsToCompressString(promptToCompress, remainingBudget)
 
 	if actualItemCount == 0 {
-		log.Warnf("batch compress: no items could fit within size limit, using truncated first item")
-		firstItem := toCompress[0].String()
-		if len(firstItem) > remainingBudget-100 {
-			firstItem = firstItem[:remainingBudget-100] + "... [truncated]"
+		if len(promptToCompress) == 0 {
+			itemsStr = "[system bookkeeping omitted from prompt projection]"
+			itemsTruncated = false
+		} else {
+			log.Warnf("batch compress: no items could fit within size limit, using truncated first item")
+			firstItem := promptToCompress[0].String()
+			if len(firstItem) > remainingBudget-100 {
+				firstItem = firstItem[:remainingBudget-100] + "... [truncated]"
+			}
+			itemsStr = fmt.Sprintf("[1] %s", firstItem)
+			actualItemCount = 1
+			itemsTruncated = true
 		}
-		itemsStr = fmt.Sprintf("[1] %s", firstItem)
-		actualItemCount = 1
-		itemsTruncated = true
 	}
 
 	if recentTruncated {
