@@ -385,15 +385,18 @@ func (e *AIEngine) processOutputEvent(event *schema.AiOutputEvent) {
 			e.handleStreamFinishedEvent(event)
 		}
 		if event.NodeId == "react_task_created" {
-			taskInfo := map[string]string{}
+			// Structured task events can carry non-string metadata (for example,
+			// boolean flags). Decode them as mixed JSON values so an unrelated
+			// field cannot make us drop the task lifecycle event entirely.
+			taskInfo := map[string]any{}
 			err := json.Unmarshal(event.Content, &taskInfo)
 			if err != nil {
 				log.Errorf("failed to unmarshal task info: %v", err)
 				return
 			}
 			// {"react_task_id":"re-act-task-355VUaVpMxVpglfOyMuuacTWGcV","react_task_status":"created","react_user_input":"你好"}
-			taskID := taskInfo["react_task_id"]
-			taskStatus := aicommon.AITaskState(taskInfo["react_task_status"])
+			taskID := utils.InterfaceToString(taskInfo["react_task_id"])
+			taskStatus := aicommon.AITaskState(utils.InterfaceToString(taskInfo["react_task_status"]))
 
 			// 记录新任务
 			e.tasksMutex.Lock()
@@ -410,7 +413,7 @@ func (e *AIEngine) processOutputEvent(event *schema.AiOutputEvent) {
 		}
 		// {"react_task_id":"re-act-task-355VUaVpMxVpglfOyMuuacTWGcV","react_task_now_status":"completed","react_task_old_status":"processing"}
 		if event.NodeId == "react_task_status_changed" {
-			taskInfo := map[string]string{}
+			taskInfo := map[string]any{}
 			err := json.Unmarshal(event.Content, &taskInfo)
 			if err != nil {
 				log.Errorf("failed to unmarshal task info: %v", err)
@@ -418,8 +421,8 @@ func (e *AIEngine) processOutputEvent(event *schema.AiOutputEvent) {
 			}
 
 			// 更新任务状态
-			taskID := taskInfo["react_task_id"]
-			nowStatus := aicommon.AITaskState(taskInfo["react_task_now_status"])
+			taskID := utils.InterfaceToString(taskInfo["react_task_id"])
+			nowStatus := aicommon.AITaskState(utils.InterfaceToString(taskInfo["react_task_now_status"]))
 
 			e.tasksMutex.Lock()
 			e.activeTasks[taskID] = nowStatus

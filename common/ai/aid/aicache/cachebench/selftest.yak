@@ -1,0 +1,91 @@
+// cachebench deterministic attribution self-test
+//
+// 用法:
+//   go run common/yak/cmd/yak.go common/ai/aid/aicache/cachebench/selftest.yak
+//
+// 该脚本不访问模型或数据库, 专门防止 correlationID 漏 callback 后的顺序串线
+// 以及 intelligent-only 混入非精确记录。
+
+include "common/ai/aid/aicache/cachebench/lib.yak"
+
+func must(cond, message) {
+    if !cond {
+        die("cachebench selftest failed: " + message)
+    }
+}
+
+func fakeDump(seq, model) {
+    return {
+        "seqId":            seq,
+        "model":            model,
+        "missing":          false,
+        "sections":         [],
+        "advices":          [],
+        "sectionHashCount": {"high-static": 1},
+        "sectionTotalUses": {"high-static": 1},
+        "sectionReuseRate": {"high-static": 1.0},
+        "totalRequests":    1,
+        "totalChunks":      1,
+        "prefixHitChunks":  0,
+        "prefixHitRatio":   0.0,
+        "totalBytes":       100,
+        "prefixHitBytes":   0,
+        "rawText":          "",
+    }
+}
+
+dumps = [
+    fakeDump(1, "memfit-standard-free"),
+    fakeDump(2, "memfit-light-free"),
+    fakeDump(3, "memfit-standard-free"),
+]
+usages = [
+    {"correlationID": "1", "missing": false, "promptTokens": 100, "cachedTokens": 80},
+    // seq=2 故意漏 callback. seq=3 绝不能被顺序兜底错配给 dump 2.
+    {"correlationID": "3", "missing": false, "promptTokens": 300, "cachedTokens": 240},
+]
+
+records = alignDumpsAndUsages(dumps, usages, false)
+must(len(records) == 3, "expected three dump records")
+must(records[0]["alignment"] == "correlation_id", "seq1 must use exact correlation")
+must(records[1]["alignment"] == "missing", "seq2 missing callback must remain missing")
+must(records[1]["usage"] == nil, "seq2 must not steal seq3 usage")
+must(records[2]["alignment"] == "correlation_id", "seq3 must use exact correlation")
+must(records[2]["usage"]["correlationID"] == "3", "seq3 correlation must be preserved")
+
+records[0]["modelName"] = "memfit-standard-free"
+records[0]["modelTier"] = "intelligent"
+records[1]["modelName"] = "memfit-light-free"
+records[1]["modelTier"] = "lightweight"
+records[2]["modelName"] = "memfit-standard-free"
+records[2]["modelTier"] = "intelligent"
+
+intel = summarizeIntelligentOnly(records)
+must(intel["totalCalls"] == 2, "intelligent-only must contain two exact standard calls")
+must(intel["sumPromptTokens"] == 400, "intelligent prompt token total must be exact")
+must(intel["sumCachedTokens"] == 320, "intelligent cached token total must be exact")
+must(intel["hitRatioTokenReal"] == 0.8, "intelligent hit ratio must be 80 percent")
+must(intel["excludedUnalignedCount"] == 1, "missing record must be excluded explicitly")
+
+legacy = alignDumpsAndUsages([fakeDump(1, "legacy-model")], [
+    {"correlationID": "", "missing": false, "promptTokens": 10, "cachedTokens": 5},
+], false)
+must(legacy[0]["alignment"] == "legacy_order", "usage without ID may use legacy order fallback")
+
+orphanUsage = alignDumpsAndUsages([fakeDump(1, "memfit-standard-free")], [
+    {"correlationID": "1", "missing": false, "promptTokens": 10, "cachedTokens": 5},
+    {"correlationID": "9", "missing": false, "promptTokens": 90, "cachedTokens": 45},
+], false)
+must(len(orphanUsage) == 2, "usage without matching dump must remain visible")
+must(orphanUsage[1]["alignment"] == "usage_without_dump", "orphan usage must be classified")
+must(orphanUsage[1]["usage"]["correlationID"] == "9", "orphan usage ID must be preserved")
+
+cancelled = alignDumpsAndUsages([
+    fakeDump(1, "memfit-standard-free"),
+    fakeDump(2, "memfit-standard-free"),
+], [
+    {"correlationID": "1", "missing": false, "promptTokens": 10, "cachedTokens": 5},
+], true)
+must(cancelled[1]["alignment"] == "in_flight_cancelled", "trailing cancelled dump must not count as missing")
+
+println("cachebench selftest passed")

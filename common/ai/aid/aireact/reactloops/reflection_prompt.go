@@ -68,7 +68,7 @@ func (r *ReActLoop) buildReflectionPrompt(
 	prompt := aicommon.BuildTaggedPromptSections(
 		highStatic,
 		frozenBlock,
-		"", // semi-dynamic-1 (反思不需要 SkillsContext / RecentToolsCache)
+		"", // semi-dynamic-1 (反思不需要 SkillsContext)
 		"", // semi-dynamic-2 (反思不需要主循环的 TaskInstruction / Schema)
 		timelineOpen,
 		dynamic,
@@ -186,4 +186,3 @@ func buildReflectionSchema() string {
 	)
 	return schema
 }
-

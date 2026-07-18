@@ -502,10 +502,11 @@ func classifyReason(tag) {
 //      ChatUsage.MirrorCorrelationID, aicache.Observe 把本次 SeqId 写到上面,
 //      ChatBase 透传到 SSE 末帧 callback. dump 文件名 (000XXX.txt) 同名 SeqId,
 //      所以 dump.seqId.toString() 就能直接 join.
-//   2. 没 ID 的 usage (老 yak 二进制 / 异常 callback) 退化成"按 usages 列表
-//      顺序消费 + 跳过已被 ID 命中的"兜底, 兼容性安全.
-//   3. 这样即便中途漏 callback, 也不会让后续 dump 与 usage 累计错位
-//      (这是上一轮 hostscan 长跑里 28% 记录归因错位的根因).
+//   2. 只有真正没有 correlationID 的 usage (老 yak 二进制 / 非 mirror 路径)
+//      才允许按顺序兜底. 带 ID 但 ID 不等于当前 dump.seqId 的 usage 绝不能
+//      被兜底消费, 否则一次漏 callback 会把后续所有记录整体左移.
+//   3. 每条 record 写入 alignment 字段, 让报告明确区分 correlation_id / legacy_order /
+//      missing / in_flight_cancelled / usage_without_dump, 并计算精确关联覆盖率.
 //
 // maxPromptsTriggered 透传"末尾 trailing dumps 是否 ctx cancel 飞行中"语义,
 // 标 inFlightCancelled 避免误判 missing.
@@ -516,12 +517,14 @@ func alignDumpsAndUsages(dumps, usages, maxPromptsTriggered) {
     nDumps = len(dumps)
     nUsages = len(usages)
 
-    // 第一遍: 建 correlationID -> usage 索引, 同时统计带/不带 ID 的 usage 数,
+    // 第一遍: 建 correlationID -> usage 索引, 同时单独保存无 ID usage.
     // 让上层一眼看出新旧二进制的部署状态 (启动期就能分辨"还在跑老 binary").
     // 关键词: cachebench correlationID stats, ID 部署可观测
     usageByID = {}
+    usagesWithoutID = []
     usagesWithID = 0
     usagesNoID = 0
+    maxUsageSeqID = 0
     j = 0
     for j < nUsages {
         u = usages[j]
@@ -532,23 +535,29 @@ func alignDumpsAndUsages(dumps, usages, maxPromptsTriggered) {
         if cid != "" {
             usageByID[cid] = u
             usagesWithID++
+            cidInt = ccbAsInt(cid)
+            if cidInt > maxUsageSeqID {
+                maxUsageSeqID = cidInt
+            }
         } else {
             usagesNoID++
+            usagesWithoutID = append(usagesWithoutID, u)
         }
         j++
     }
     log.info("cachebench align: nDumps=%d nUsages=%d usagesWithID=%d usagesNoID=%d",
         nDumps, nUsages, usagesWithID, usagesNoID)
 
-    // 第二遍: 按 dump 顺序产 records. 优先 ID 匹配, 否则下标兜底游标取下一条
-    // 还没被 ID 路径消费掉的 usage.
+    // 第二遍: 按 dump 顺序产 records. 优先 ID 匹配; 不匹配时只允许消费
+    // usagesWithoutID, 永远不跨 correlationID 错配.
     consumedByID = {}
-    nextUsagePtr = 0
+    nextNoIDPtr = 0
 
     i = 0
     for i < nDumps {
         rec = dumps[i]
         usage = nil
+        alignment = "missing"
         seqStr = ""
         if !ccbIsNil(rec) {
             seqStr = sprintf("%d", ccbAsInt(rec["seqId"]))
@@ -556,22 +565,12 @@ func alignDumpsAndUsages(dumps, usages, maxPromptsTriggered) {
         if seqStr != "" && seqStr != "0" && !ccbIsNil(usageByID[seqStr]) && consumedByID[seqStr] != true {
             usage = usageByID[seqStr]
             consumedByID[seqStr] = true
+            alignment = "correlation_id"
         } else {
-            for nextUsagePtr < nUsages {
-                u = usages[nextUsagePtr]
-                nextUsagePtr++
-                cid = ""
-                if !ccbIsNil(u) {
-                    cid = ccbToString(u["correlationID"])
-                }
-                if cid != "" && consumedByID[cid] == true {
-                    continue
-                }
-                usage = u
-                if cid != "" {
-                    consumedByID[cid] = true
-                }
-                break
+            if nextNoIDPtr < len(usagesWithoutID) {
+                usage = usagesWithoutID[nextNoIDPtr]
+                nextNoIDPtr++
+                alignment = "legacy_order"
             }
         }
 
@@ -594,12 +593,18 @@ func alignDumpsAndUsages(dumps, usages, maxPromptsTriggered) {
         }
         // max-prompts 触发后, 没 usage 的 trailing dump 视为 in-flight cancelled
         // 而非真实 missing (chat 被 ctx cancel 抛错, callback 没机会触发).
-        if ccbIsNil(usage) && maxPromptsTriggered && i >= nUsages {
+        seqID = ccbAsInt(rec["seqId"])
+        trailingCancelled = usagesWithID > 0 && seqID > maxUsageSeqID
+        if usagesWithID == 0 {
+            trailingCancelled = i >= nUsages
+        }
+        if ccbIsNil(usage) && maxPromptsTriggered && trailingCancelled {
             usage = {
                 "seq":               i + 1,
                 "missing":           false,
                 "inFlightCancelled": true,
             }
+            alignment = "in_flight_cancelled"
         }
 
         tag = TAG_UNKNOWN
@@ -615,6 +620,7 @@ func alignDumpsAndUsages(dumps, usages, maxPromptsTriggered) {
             "usage":  usage,
             "tag":    tag,
             "reason": classifyReason(tag),
+            "alignment": alignment,
         }
         records = append(records, item)
         i++
@@ -623,16 +629,45 @@ func alignDumpsAndUsages(dumps, usages, maxPromptsTriggered) {
     // 第三遍: 兜底处理 trailing usages (dump 落盘失败但 callback 跑过的边界场景),
     // 用 placeholder dump 反映真实情况, 不让任何 usage 被静默吞掉.
     // 关键词: alignDumpsAndUsages trailing usages placeholder
-    for nextUsagePtr < nUsages {
-        u = usages[nextUsagePtr]
-        nextUsagePtr++
-        cid = ""
-        if !ccbIsNil(u) {
-            cid = ccbToString(u["correlationID"])
-        }
-        if cid != "" && consumedByID[cid] == true {
+    // 先补带 ID 但没有对应 dump 的 usage.
+    for cid, u in usageByID {
+        if consumedByID[cid] == true {
             continue
         }
+        idx = len(records)
+        rec = {
+            "seqId":            ccbAsInt(cid),
+            "missing":          true,
+            "sections":         [],
+            "advices":          [],
+            "sectionHashCount": {},
+            "sectionTotalUses": {},
+            "totalRequests":    0,
+            "totalChunks":      0,
+            "prefixHitChunks":  0,
+            "prefixHitRatio":   0.0,
+            "totalBytes":       0,
+            "prefixHitBytes":   0,
+            "rawText":          "",
+        }
+        tag = TAG_UNKNOWN
+        item = {
+            "seq":       ccbAsInt(cid),
+            "dump":      rec,
+            "usage":     u,
+            "tag":       tag,
+            "reason":    classifyReason(tag),
+            "alignment": "usage_without_dump",
+        }
+        records = append(records, item)
+        consumedByID[cid] = true
+    }
+
+    // 再补无 ID 且顺序兜底没有消费完的 legacy usage.
+    for nextNoIDPtr < len(usagesWithoutID) {
+        u = usagesWithoutID[nextNoIDPtr]
+        nextNoIDPtr++
+        cid = ""
         idx = len(records)
         rec = {
             "seqId":            idx + 1,
@@ -662,6 +697,7 @@ func alignDumpsAndUsages(dumps, usages, maxPromptsTriggered) {
             "usage":  u,
             "tag":    tag,
             "reason": classifyReason(tag),
+            "alignment": "usage_without_dump",
         }
         records = append(records, item)
     }
@@ -678,6 +714,11 @@ func summarize(records) {
         "cacheHitCount":         0,
         "missingUsageCount":     0,
         "inFlightCancelledCount": 0,
+        "exactCorrelationCount": 0,
+        "legacyOrderCount":      0,
+        "unalignedDumpCount":    0,
+        "usageWithoutDumpCount": 0,
+        "alignmentCoverage":     0.0,
         "tagCount":              {},
         "sumPromptTokens":       0,
         "sumCachedTokens":       0,
@@ -693,6 +734,17 @@ func summarize(records) {
     }
 
     for item in records {
+        alignment = ccbToString(item["alignment"])
+        if alignment == "correlation_id" {
+            summary["exactCorrelationCount"]++
+        } else if alignment == "legacy_order" {
+            summary["legacyOrderCount"]++
+        } else if alignment == "usage_without_dump" {
+            summary["usageWithoutDumpCount"]++
+        } else if alignment == "missing" {
+            summary["unalignedDumpCount"]++
+        }
+
         tag = item["tag"]
         tagCount = summary["tagCount"]
         if ccbIsNil(tagCount[tag]) {
@@ -770,6 +822,8 @@ func summarize(records) {
     summary["hitRatioTokenReal"] = ccbSafeRatio(summary["sumCachedTokens"], summary["sumPromptTokens"])
     summary["hitRatioLcpClient"] = ccbSafeRatio(summary["sumPrefixHitBytes"], summary["sumRequestBytes"])
     summary["upstreamCreationCost"] = float(summary["sumCacheCreation"]) * 1.25
+    alignedDen = summary["exactCorrelationCount"] + summary["legacyOrderCount"] + summary["unalignedDumpCount"]
+    summary["alignmentCoverage"] = ccbSafeRatio(summary["exactCorrelationCount"], alignedDen)
 
     return summary
 }
@@ -907,7 +961,7 @@ func renderMarkdown(benchReport) {
     intelOnly = summary["intelligentOnly"]
     if !ccbIsNil(intelOnly) {
         md += "## intelligent-only summary (主指标, 验收基线)\n\n"
-        md += "_仅统计 modelTier == intelligent 的高推理成本调用, 排除 lightweight (verification / quick judge) 干扰._\n\n"
+        md += "_仅统计 modelTier == intelligent 且 correlationID 精确关联的高推理成本调用, 排除 lightweight 与顺序兜底污染._\n\n"
         md += sprintf("- intelligent calls:                 %d\n", intelOnly["totalCalls"])
         md += sprintf("- intelligent prompt_tokens:         %d\n", intelOnly["sumPromptTokens"])
         md += sprintf("- intelligent cached_tokens:         %d\n", intelOnly["sumCachedTokens"])
@@ -916,6 +970,7 @@ func renderMarkdown(benchReport) {
         md += sprintf("- intelligent lcp_hit_ratio:         %.2f%% (in-proc)\n", intelOnly["hitRatioLcpClient"]*100.0)
         md += sprintf("- intelligent cache_hit_count:       %d\n", intelOnly["cacheHitCount"])
         md += sprintf("- intelligent cache_create_count:    %d\n", intelOnly["cacheCreateCount"])
+        md += sprintf("- excluded unaligned records:        %d\n", intelOnly["excludedUnalignedCount"])
         md += sprintf("- intelligent upstream_creation_cost (1.25x): %.0f tokens\n", intelOnly["upstreamCreationCost"])
         hsDistinct = ccbAsInt(intelOnly["highStaticDistinct"])
         passLine = "PASS"
@@ -933,6 +988,11 @@ func renderMarkdown(benchReport) {
     md += sprintf("- cache_hit_count    (cached>0):    %d\n", summary["cacheHitCount"])
     md += sprintf("- missing usage callbacks:          %d\n", summary["missingUsageCount"])
     md += sprintf("- in_flight cancelled (max-prompts): %d\n", summary["inFlightCancelledCount"])
+    md += sprintf("- exact correlation joins:           %d\n", summary["exactCorrelationCount"])
+    md += sprintf("- legacy order joins:                %d\n", summary["legacyOrderCount"])
+    md += sprintf("- unaligned dumps:                   %d\n", summary["unalignedDumpCount"])
+    md += sprintf("- usages without dump:               %d\n", summary["usageWithoutDumpCount"])
+    md += sprintf("- exact alignment coverage:          %.2f%%\n", summary["alignmentCoverage"]*100.0)
     md += sprintf("- sum prompt_tokens:                %d\n", summary["sumPromptTokens"])
     md += sprintf("- sum cached_tokens:                %d\n", summary["sumCachedTokens"])
     md += sprintf("- sum cache_creation_input_tokens:  %d\n", summary["sumCacheCreation"])
@@ -1215,8 +1275,8 @@ func analyzeBenchmark(sessionDir, usageList, events, invokeErr, inputText, maxPr
 // 之前按 ts 就近匹配 modelName 在 hostscan 长跑里被 stream-finished 漏 callback
 // 引发的累计错位污染, 出现"242KB prompt 配 830 tokens"等离谱 join, 是 cachebench
 // 归因 bug 的根因之一. 切到 dump.model 后, per-tier 命中率才真实可信.
-// modelTier 仍来自 record["modelTier"] (analyzeBenchmarkWithModels 按 ts 匹配
-// ai_first_byte_cost_ms 事件), tier 信息只用于展示, 不再决定 group key.
+// modelTier 来自 analyzeBenchmarkWithModels 建立的 modelName -> tier 元数据表,
+// 不再逐请求按时间猜测, 避免漏 first-byte / usage callback 后跨模型串线.
 //
 // 关键词: cachebench summarizeByModel 直读 dump.model, 修复跨记录归因错位
 func summarizeByModel(records) {
@@ -1330,9 +1390,17 @@ func summarizeIntelligentOnly(records) {
 		"sectionTotalMax":      {},
 		"sectionReuseRateMin":  {},
 		"modelNames":           {},
+		"excludedUnalignedCount": 0,
 	}
 
     for item in records {
+        // intelligent-only 是验收主指标, 只接受 correlationID 精确 join.
+        // legacy 顺序关联仍保留在全量报告中用于兼容旧 binary, 但不能作为
+        // 高成本模型缓存优化的验收依据.
+        if ccbToString(item["alignment"]) != "correlation_id" {
+            view["excludedUnalignedCount"]++
+            continue
+        }
         tier = ccbToString(item["modelTier"])
         if tier != "intelligent" {
             continue
@@ -1420,92 +1488,61 @@ func summarizeIntelligentOnly(records) {
 
 // analyzeBenchmarkWithModels 在 analyzeBenchmark 基础上额外接受 modelList,
 // 为每条 record 注入 modelName / modelTier, 并在 summary 中产出 byModel 子表.
-// modelList 来自 captureEvent 解析 ai_first_byte_cost_ms 事件, 与 usageList
-// 同源 (一次 chat 先 first-byte 后 SSE 末帧 usageCallback).
 //
-// 对齐策略: 不能简单按 index 对齐, 因为某些 LiteForge/RAG 路径不发 first_byte
-// (走 TeeAIResponse wrapper 路径才 emit), 导致 modelList 数量可能 < usageList.
-// 这里按时间戳就近匹配: 对每个 usage[i], 在 modelList 里找 ts <= usage.ts 且
-// 时间差最小的未消费 entry, 匹配上就标记已消费, 没匹配上就标 (unknown).
-// 关键词: cachebench analyzeBenchmarkWithModels, ts 就近对齐, modelList 短缺兜底
+// 模型归因策略:
+//   1. modelName 永远优先取 dump.model, 它与 prompt dump 在 ChatBase 入口同步落盘.
+//   2. modelList 只用来建立 modelName -> (tier, provider) 元数据表; 不再按时间
+//      或顺序逐请求匹配. 同一实际模型的 tier/provider 是稳定属性.
+//   3. 没有 dump.model 的记录保留 unknown, 不把猜测结果混入 intelligent-only.
+//
+// 关键词: cachebench analyzeBenchmarkWithModels, dump model 真值, model 元数据表
 func analyzeBenchmarkWithModels(sessionDir, usageList, modelList, events, invokeErr, inputText, maxPromptsTriggered) {
     benchReport = analyzeBenchmark(sessionDir, usageList, events, invokeErr, inputText, maxPromptsTriggered)
     records = benchReport["records"]
-    n = len(records)
     nModel = len(modelList)
-
-    // 准备 modelList 的可消费拷贝, 加入 consumed 标志
-    pool = []
-    j = 0
-    for j < nModel {
-        entry = modelList[j]
-        ts = ccbAsInt(entry["ts"])
-        pool = append(pool, {
-            "modelName": ccbToString(entry["modelName"]),
-            "modelTier": ccbToString(entry["modelTier"]),
-            "ts":        ts,
-            "consumed":  false,
-        })
-        j++
+    modelMeta = {}
+    for entry in modelList {
+        name = ccbToString(entry["modelName"])
+        if name == "" {
+            continue
+        }
+        tier = ccbToString(entry["modelTier"])
+        provider = ccbToString(entry["providerName"])
+        old = modelMeta[name]
+        if ccbIsNil(old) {
+            modelMeta[name] = {"modelTier": tier, "providerName": provider}
+            continue
+        }
+        if ccbToString(old["modelTier"]) == "" && tier != "" {
+            old["modelTier"] = tier
+        }
+        if ccbToString(old["providerName"]) == "" && provider != "" {
+            old["providerName"] = provider
+        }
+        modelMeta[name] = old
     }
 
-    // 第一轮: 严格按 ts <= usage.ts 就近匹配
     i = 0
-    for i < n {
+    for i < len(records) {
         rec = records[i]
-        usage = rec["usage"]
-        usageTs = 0
-        if !ccbIsNil(usage) {
-            usageTs = ccbAsInt(usage["ts"])
+        modelName = ""
+        dumpRec = rec["dump"]
+        if !ccbIsNil(dumpRec) && dumpRec["missing"] != true {
+            modelName = ccbToString(dumpRec["model"])
         }
-        bestIdx = -1
-        bestDelta = 99999999
-        if usageTs > 0 {
-            k = 0
-            for k < len(pool) {
-                p = pool[k]
-                if p["consumed"] != true && p["ts"] <= usageTs {
-                    delta = usageTs - p["ts"]
-                    if delta < bestDelta {
-                        bestDelta = delta
-                        bestIdx = k
-                    }
-                }
-                k++
+        rec["modelName"] = modelName
+        rec["modelTier"] = ""
+        rec["providerName"] = ""
+        rec["modelAttribution"] = "unknown"
+        if modelName != "" {
+            rec["modelAttribution"] = "dump_model"
+            meta = modelMeta[modelName]
+            if !ccbIsNil(meta) {
+                rec["modelTier"] = ccbToString(meta["modelTier"])
+                rec["providerName"] = ccbToString(meta["providerName"])
             }
-        }
-        if bestIdx >= 0 {
-            picked = pool[bestIdx]
-            rec["modelName"] = picked["modelName"]
-            rec["modelTier"] = picked["modelTier"]
-            picked["consumed"] = true
-            pool[bestIdx] = picked
-        } else {
-            rec["modelName"] = ""
-            rec["modelTier"] = ""
         }
         records[i] = rec
-        i++
-    }
-
-    // 第二轮: 给仍未匹配的 record 顺序填补未消费 entry (兜底)
-    fillIdx = 0
-    i = 0
-    for i < n {
-        rec = records[i]
-        if rec["modelName"] == "" {
-            for fillIdx < len(pool) && pool[fillIdx]["consumed"] == true {
-                fillIdx++
-            }
-            if fillIdx < len(pool) {
-                p = pool[fillIdx]
-                rec["modelName"] = p["modelName"]
-                rec["modelTier"] = p["modelTier"]
-                p["consumed"] = true
-                pool[fillIdx] = p
-                records[i] = rec
-            }
-        }
         i++
     }
     benchReport["records"] = records
@@ -1520,5 +1557,6 @@ func analyzeBenchmarkWithModels(sessionDir, usageList, modelList, events, invoke
     benchReport["summary"] = summary
 
     benchReport["modelEventCount"] = nModel
+    benchReport["modelMetadata"] = modelMeta
     return benchReport
 }

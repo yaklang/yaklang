@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 // newEngineForTerminalTest builds a minimal AIEngine with its task state maps
@@ -22,6 +23,43 @@ func newEngineForTerminalTest(t *testing.T) *AIEngine {
 		activeTasks:   make(map[string]aicommon.AITaskState),
 		taskEndpoints: make(map[string]*aicommon.Endpoint),
 	}
+}
+
+func TestProcessOutputEventAcceptsMixedTaskMetadata(t *testing.T) {
+	e := newEngineForTerminalTest(t)
+	e.processOutputEvent(&schema.AiOutputEvent{
+		Type:   schema.EVENT_TYPE_STRUCTURED,
+		NodeId: "react_task_created",
+		Content: []byte(`{
+			"react_task_id":"task-with-flags",
+			"react_task_status":"created",
+			"react_user_input":"进行主机体检",
+			"is_root_task":true,
+			"iteration":1
+		}`),
+	})
+
+	requireTaskState := func(want aicommon.AITaskState) {
+		t.Helper()
+		e.tasksMutex.Lock()
+		defer e.tasksMutex.Unlock()
+		if got := e.activeTasks["task-with-flags"]; got != want {
+			t.Fatalf("unexpected task state: got %q want %q", got, want)
+		}
+	}
+	requireTaskState(aicommon.AITaskState_Created)
+
+	e.processOutputEvent(&schema.AiOutputEvent{
+		Type:   schema.EVENT_TYPE_STRUCTURED,
+		NodeId: "react_task_status_changed",
+		Content: []byte(`{
+			"react_task_id":"task-with-flags",
+			"react_task_now_status":"processing",
+			"react_task_old_status":"created",
+			"success":true
+		}`),
+	})
+	requireTaskState(aicommon.AITaskState_Processing)
 }
 
 // TestWaitTaskFinishByTaskNameFastPath verifies the fast-path terminal-state

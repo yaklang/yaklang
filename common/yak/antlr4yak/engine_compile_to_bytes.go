@@ -8,11 +8,15 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	parser "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
@@ -36,11 +40,87 @@ func HaveYakcCache(code string) ([]byte, bool) {
 }
 
 func calcHash(code string, key []byte) string {
-	codeHashBasic := codec.Sha256(code + consts.GetYakVersion())
+	// `include` is compiled into the parent program, so hashing only the parent
+	// source can silently execute stale bytecode after an included file changes.
+	// Add the resolved dependency graph (path + contents) to the cache key. The
+	// absolute path also separates identical parent scripts executed from
+	// different working directories, matching include's cwd-relative semantics.
+	codeHashBasic := codec.Sha256(code + consts.GetYakVersion() + includeCacheMaterial(code, make(map[string]struct{})))
 	if key != nil {
 		return codec.Sha256(codeHashBasic + string(key))
 	}
 	return codeHashBasic
+}
+
+func includeCacheMaterial(code string, visited map[string]struct{}) string {
+	if !strings.Contains(code, "include") {
+		return ""
+	}
+
+	lexer := parser.NewYaklangLexer(antlr.NewInputStream(code))
+	var material strings.Builder
+	for {
+		token := lexer.NextToken()
+		if token.GetTokenType() == antlr.TokenEOF {
+			break
+		}
+		if token.GetTokenType() != parser.YaklangLexerInclude {
+			continue
+		}
+
+		var literal antlr.Token
+		for {
+			candidate := lexer.NextToken()
+			if candidate.GetTokenType() == antlr.TokenEOF {
+				break
+			}
+			if candidate.GetChannel() != antlr.TokenDefaultChannel {
+				continue
+			}
+			if candidate.GetTokenType() == parser.YaklangLexerStringLiteral {
+				literal = candidate
+			}
+			break
+		}
+		if literal == nil {
+			continue
+		}
+
+		includePath, err := strconv.Unquote(literal.GetText())
+		if err != nil {
+			continue
+		}
+		resolvedPath, err := utils.GetFirstExistedFileE(includePath)
+		if err != nil {
+			// A missing dependency cannot have produced a valid new cache entry,
+			// but the marker keeps it distinct from a source with no include.
+			material.WriteString("\x00missing-include\x00")
+			material.WriteString(includePath)
+			continue
+		}
+		absolutePath, err := filepath.Abs(resolvedPath)
+		if err != nil {
+			absolutePath = filepath.Clean(resolvedPath)
+		}
+		material.WriteString("\x00include-path\x00")
+		material.WriteString(absolutePath)
+		if _, ok := visited[absolutePath]; ok {
+			material.WriteString("\x00include-cycle\x00")
+			continue
+		}
+
+		includedCode, err := os.ReadFile(resolvedPath)
+		if err != nil {
+			material.WriteString("\x00unreadable-include\x00")
+			material.WriteString(err.Error())
+			continue
+		}
+		visited[absolutePath] = struct{}{}
+		material.WriteString("\x00include-code\x00")
+		material.Write(includedCode)
+		material.WriteString(includeCacheMaterial(string(includedCode), visited))
+	}
+	return material.String()
 }
 
 func HaveYakcCacheWithKey(code string, key []byte) ([]byte, bool) {

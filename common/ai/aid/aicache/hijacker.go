@@ -516,7 +516,7 @@ func splitBySemiBoundary(res *aitag.SplitResult) (user1, user2, user3 string, ok
 //	<Tool/Forge/Timeline-Frozen>
 //	<|AI_CACHE_FROZEN_END_semi-dynamic|>
 //	<|AI_CACHE_SEMI_semi|>
-//	<Skills + RecentToolsCache>
+//	<Stable Skills Context>
 //	<|AI_CACHE_SEMI_END_semi|>
 //	<|AI_CACHE_SEMI2_semi|>
 //	<Persistent + Schema + OutputExample>

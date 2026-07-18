@@ -261,12 +261,11 @@ func (r *ReActLoop) generateLoopPrompt(
 		}
 	}
 
-	// CACHE_TOOL_CALL 块的渲染. 整段都用稳定 nonce
-	// aicommon.RecentToolCacheStableNonce, 让该段跨 turn 字节稳定; 物理位置从
-	// dynamic/REFLECTION 迁到 semi-dynamic 段 (经 LoopPromptAssemblyInput.
-	// RecentToolsCache 字段透传, 由 semi_dynamic_section.txt 模板渲染).
+	// CACHE_TOOL_CALL 块的标签使用稳定 nonce, 但 Summary 正文会随最近工具集合
+	// 变化。物理位置放在 timeline-open 段、最后 cache boundary 之后, 避免正文
+	// 变化击穿前面的 Skills + Schema prefix cache.
 	//
-	// 关键词: CACHE_TOOL_CALL 物理迁移, semi-dynamic 段, 稳定 nonce 渲染
+	// 关键词: CACHE_TOOL_CALL 物理位置, timeline-open, cache boundary 之后
 	var recentToolsCacheBlock string
 	if tm := r.config.GetAiToolManager(); tm != nil && tm.HasRecentlyUsedTools() {
 		r.syncRecentToolParamAITagFields(tm.GetRecentToolParamNames())
