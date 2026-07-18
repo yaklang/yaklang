@@ -695,7 +695,7 @@ func (s *VerificationTodoStore) RenderWithCurrentScope(currentScope Verification
 	if len(currentItems) == 0 {
 		lines = append(lines, "- (no TODO items tracked for the current task yet)")
 	} else {
-		lines = append(lines, "- You MUST advance or close ONLY the TODOs in this section via adjust_todolist / verification next_movements.")
+		lines = append(lines, "- You MUST advance or close ONLY the TODOs in this section via adjust_todolist or an action next_movements delta.")
 		lines = append(lines, renderVerificationTodoItemLines(currentItems)...)
 	}
 

@@ -14,7 +14,7 @@
 
 {{ if .TodoSnapshot }}
 
-全局待办清单（TODO LIST）由历轮 Verify 阶段累积维护，跨整段会话保持可见，是当前最权威的"应做、正在做、已关闭"事项集合。在选择下一步动作前请先对照此清单：优先沿 [DOING] 项继续推进、不要重复创建已存在的 [ ] 项、[DELETED] / [SKIPPED] 已显式放弃不应再尝试。任何新增 / 完成 / 删除都只能通过 verify-satisfaction 的 next_movements 走，正常 loop 动作不直接写入。
+全局待办清单（TODO LIST）由所有动作的 `next_movements` 与 `adjust_todolist` 共同维护，跨整段会话保持可见，是当前最权威的"应做、正在做、已关闭"事项集合。在选择下一步动作前请先对照此清单：优先沿 [DOING] 项继续推进、不要重复创建已存在的 [ ] 项、[DELETED] / [SKIPPED] 已显式放弃不应再尝试。任何正常 loop 动作都可以携带 `next_movements` 来新增、推进或关闭当前任务的 TODO；需要单独调整时使用 `adjust_todolist`。只有当前任务的 TODO 全部显式关闭后，`finish` 才能结束循环。
 
 {{ .TodoSnapshot }}
 {{ end }}

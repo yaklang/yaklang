@@ -114,6 +114,15 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 			directlyAnswerResult = enhancedAnswer
 		}
 
+		if aicommon.IsAIVerificationDisabled(loop.GetConfig()) {
+			invoker.AddToTimeline(
+				"knowledge_enhance_verification_skipped",
+				"AI verification is disabled; use finish after explicitly closing the current task TODOs.",
+			)
+			op.Continue()
+			return
+		}
+
 		verifyResult, err := invoker.VerifyUserSatisfaction(
 			ctx,
 			rewriteQuery,

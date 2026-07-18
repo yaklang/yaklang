@@ -704,9 +704,11 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		}
 	}
 
-	if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_REQUEST_VERIFICATION); !ok {
-		if verifyNow, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_REQUEST_VERIFICATION); ok {
-			r.actions.Set(verifyNow.ActionType, verifyNow)
+	if !aicommon.IsAIVerificationDisabled(r.GetConfig()) {
+		if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_REQUEST_VERIFICATION); !ok {
+			if verifyNow, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_REQUEST_VERIFICATION); ok {
+				r.actions.Set(verifyNow.ActionType, verifyNow)
+			}
 		}
 	}
 

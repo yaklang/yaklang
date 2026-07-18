@@ -70,6 +70,8 @@ outputDir  = cli.String("output-dir",
 // reload + reassign 所有条目, 造成多分钟"卡顿"假象 (见 P3-X2 排障).
 sessionID = cli.String("session-id", cli.setDefault(""),
     cli.setHelp("传给 aim.sessionID 的会话 ID, 留空 = 自动生成独立 cachebench session 避免污染默认 session"))
+disableAIVerification = cli.Bool("disable-ai-verification",
+    cli.setHelp("禁用所有 AI satisfaction verification；仅允许 finish 在当前任务 TODO 全部关闭后结束循环"))
 
 // =============================================================================
 // 失速 / 限流 / 错误的"立即退出"开关 (P3-A1: fast-fail switches)
@@ -98,8 +100,8 @@ if sessionID == "" {
     sessionID = sprintf("cachebench-%d-%d", time.Now().Unix(), os.Getpid())
 }
 
-log.info("aicache cachebench - input=%s ai-type=%s session-id=%s max-iteration=%d max-prompts=%d max-intelligent-prompts=%d max-duration=%ds stall-timeout=%ds max-throttle-events=%d abort-on-fatal-error=%v fatal-error-threshold=%d",
-    inputText, aiType, sessionID, maxIter, maxPrompts, maxIntelligentPrompts, maxDuration, stallTimeout, maxThrottleEvents, abortOnFatalError, fatalErrorThreshold)
+log.info("aicache cachebench - input=%s ai-type=%s session-id=%s max-iteration=%d max-prompts=%d max-intelligent-prompts=%d max-duration=%ds stall-timeout=%ds max-throttle-events=%d abort-on-fatal-error=%v fatal-error-threshold=%d disable-ai-verification=%v",
+    inputText, aiType, sessionID, maxIter, maxPrompts, maxIntelligentPrompts, maxDuration, stallTimeout, maxThrottleEvents, abortOnFatalError, fatalErrorThreshold, disableAIVerification)
 
 // =============================================================================
 // 取消上下文 (用于 max-prompts 限流 / max-duration 时间硬截断)
@@ -499,6 +501,7 @@ err = aim.InvokeReAct(
     aim.language(language),
     aim.yoloMode(),
     aim.allowUserInteract(false),
+    aim.disableAIVerification(disableAIVerification),
     aim.onEvent(captureEvent),
 )
 
@@ -565,6 +568,7 @@ benchReport = analyzeBenchmarkWithModels(sessionDir, usageList, modelList, event
 benchReport["durationSec"] = durationSec
 benchReport["aiType"] = aiType
 benchReport["aiModel"] = aiModel
+benchReport["disableAIVerification"] = disableAIVerification
 benchReport["maxIteration"] = maxIter
 benchReport["maxPrompts"] = maxPrompts
 benchReport["maxPromptsTriggered"] = maxPromptsTriggered

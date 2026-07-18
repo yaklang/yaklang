@@ -39,6 +39,7 @@ type AIEngineConfig struct {
 
 	// 工具配置
 	DisableToolUse        bool     // 禁用工具调用
+	DisableAIVerification bool     // 禁用 AI 满意度验证，仅允许 finish + TODO 状态结束任务
 	DisableAIForge        bool     // 禁用 Forge 调用
 	DisableMCPServers     bool     // 禁用 MCPServers
 	EnableAISearchTool    bool     // 启用 AI 搜索工具
@@ -295,6 +296,15 @@ func WithLanguage(lang string) AIEngineConfigOption {
 func WithDisableToolUse(disable bool) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.DisableToolUse = disable
+	}
+}
+
+// WithDisableAIVerification disables AI-backed satisfaction verification.
+// Completion remains available only through the finish action after all TODOs
+// owned by the current task have been explicitly closed.
+func WithDisableAIVerification(disable bool) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.DisableAIVerification = disable
 	}
 }
 

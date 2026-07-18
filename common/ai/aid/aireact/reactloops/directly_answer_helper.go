@@ -47,6 +47,9 @@ func ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop *ReActLoop, action *aic
 	if loop == nil || action == nil {
 		return false
 	}
+	if aicommon.IsAIVerificationDisabled(loop.GetConfig()) {
+		return false
+	}
 	if strings.TrimSpace(loop.Get("intent_hint")) != loopIntentHintSimpleQuery {
 		return false
 	}

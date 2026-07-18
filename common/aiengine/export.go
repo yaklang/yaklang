@@ -18,6 +18,7 @@ var Exports = map[string]interface{}{
 	"workdir":                   WithWorkdir,
 	"language":                  WithLanguage,
 	"disableToolUse":            WithDisableToolUse,
+	"disableAIVerification":     WithDisableAIVerification,
 	"disableAIForge":            WithDisableAIForge,
 	"disableMCPServers":         WithDisableMCPServers,
 	"enableAISearchTool":        WithEnableAISearchTool,

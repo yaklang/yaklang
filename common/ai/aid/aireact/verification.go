@@ -18,6 +18,12 @@ import (
 
 // VerifyUserSatisfaction verifies if the materials satisfied the user's needs and provides human-readable output
 func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string, isToolCall bool, payload string) (*aicommon.VerifySatisfactionResult, error) {
+	if r != nil && aicommon.IsAIVerificationDisabled(r.config) {
+		return &aicommon.VerifySatisfactionResult{
+			Satisfied: false,
+			Reasoning: "AI verification is disabled; completion is controlled by finish and the current TODO state",
+		}, nil
+	}
 	if utils.IsNil(ctx) {
 		ctx = r.config.GetContext()
 	}

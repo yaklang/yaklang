@@ -32,6 +32,27 @@ func (i *verificationGateTestInvoker) VerifyUserSatisfaction(ctx context.Context
 	return aicommon.NewVerifySatisfactionResult(false, "keep iterating", ""), nil
 }
 
+func TestVerificationGate_DisabledNeverCallsAI(t *testing.T) {
+	invoker := &verificationGateTestInvoker{
+		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
+	}
+	invoker.GetConfig().SetConfig(aicommon.ConfigKeyDisableAIVerification, true)
+	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
+	loop.currentIterationIndex = verificationFirstFireIterationThreshold
+	loop.SetLastPromptObservation(&PromptObservation{PromptTokens: verificationAutoTriggerHardPromptDelta})
+
+	result, triggered, err := loop.MaybeVerifyUserSatisfaction(context.Background(), "query", true, "tool")
+	require.NoError(t, err)
+	require.False(t, triggered)
+	require.Nil(t, result)
+
+	result, err = loop.VerifyUserSatisfactionNow(context.Background(), "query", true, "tool")
+	require.NoError(t, err)
+	require.Nil(t, result)
+	require.Zero(t, invoker.verifyCalls)
+	require.Nil(t, loop.GetVerificationRuntimeSnapshot())
+}
+
 func TestShouldTriggerPeriodicCheckpointOnIteration_UsesLoopInterval(t *testing.T) {
 	invoker := &verificationGateTestInvoker{
 		MockInvoker: mockcfg.NewMockInvoker(context.Background()),

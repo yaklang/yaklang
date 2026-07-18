@@ -1210,6 +1210,9 @@ func verifyFuzzCompletion(loop *reactloops.ReActLoop, taskCtx context.Context, a
 	if invoker == nil || task == nil {
 		return nil, "", nil
 	}
+	if aicommon.IsAIVerificationDisabled(loop.GetConfig()) {
+		return nil, "", nil
+	}
 
 	reactloops.EmitStatus(loop, "验证测试目标中 / Verifying Test Goal...")
 	verifyResult, err := invoker.VerifyUserSatisfaction(taskCtx, task.GetUserInput(), true, verificationPayload)

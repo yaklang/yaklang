@@ -38,6 +38,32 @@ import (
 // reactloops/docs/16-verification-frequency-experiment.md.
 // 关键词: DefaultPeriodicVerificationInterval 6, iter 门基础节拍, verification 节流
 const DefaultPeriodicVerificationInterval = 6
+
+// ConfigKeyDisableAIVerification controls the deterministic-completion
+// experiment. When enabled, no verification prompt may be sent to an AI model;
+// task completion is decided only by the finish action and the current TODO
+// state.
+const ConfigKeyDisableAIVerification = "disable_ai_verification"
+
+// IsAIVerificationDisabled is deliberately defined on KeyValueConfigIf so loop
+// and action implementations can honor the switch without widening the large
+// AICallerConfigIf interface (and breaking lightweight test invokers).
+func IsAIVerificationDisabled(config KeyValueConfigIf) (disabled bool) {
+	if utils.IsNil(config) {
+		return false
+	}
+	// Some minimal/test invokers satisfy KeyValueConfigIf by embedding a nil
+	// *KeyValueConfig. The interface itself is non-nil, but invoking the promoted
+	// method would panic. Treat missing backing config as the default (enabled)
+	// behavior so the experimental switch never destabilizes existing callers.
+	defer func() {
+		if recover() != nil {
+			disabled = false
+		}
+	}()
+	return config.GetConfigBool(ConfigKeyDisableAIVerification, false)
+}
+
 const DefaultGoalMinIterations = 6
 const GoalModeIterationBuffer = 2
 
@@ -1650,6 +1676,16 @@ func WithDisableToolUse(disable bool) ConfigOption {
 		c.m.Lock()
 		c.DisableToolUse = disable
 		c.m.Unlock()
+		return nil
+	}
+}
+
+// WithDisableAIVerification disables every AI-backed satisfaction check. The
+// ReAct loop must then terminate through finish, whose handler deterministically
+// rejects completion while the current task owns active TODO items.
+func WithDisableAIVerification(disable bool) ConfigOption {
+	return func(c *Config) error {
+		c.SetConfig(ConfigKeyDisableAIVerification, disable)
 		return nil
 	}
 }
@@ -3939,6 +3975,9 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 
 	// Disable tool use flag
 	opts = append(opts, WithDisableToolUse(i.DisableToolUse))
+	// Deterministic completion is session-wide. Child ReAct/plan/forge configs
+	// must inherit it or nested loops can silently re-enable verification AI.
+	opts = append(opts, WithDisableAIVerification(IsAIVerificationDisabled(i)))
 
 	// Capability managers: child configs reuse parent instances when present.
 	if i.AiToolManager != nil {

@@ -641,7 +641,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 		}
 	}
 
-	if !r.DisablePeriodicVerification {
+	if !r.DisablePeriodicVerification && !aicommon.IsAIVerificationDisabled(r.GetConfig()) {
 		r.startVerificationWatchdog(task)
 		var clearWatchdogToolHooks func()
 		if inv := r.GetInvoker(); inv != nil {

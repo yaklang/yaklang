@@ -280,9 +280,9 @@ Example - Sequential file operations(With AI-Tag tags):
 			fmt.Sprintf("工具编排完成: %d nodes / Tool Compose Complete: %d nodes", len(resultSummary), len(resultSummary)),
 			strings.Join(resultSummary, "\n"))
 
-		// Verify user satisfaction
+		// Verify user satisfaction unless deterministic-completion mode is active.
 		task := loop.GetCurrentTask()
-		if task != nil {
+		if task != nil && !aicommon.IsAIVerificationDisabled(loop.GetConfig()) {
 			verifyResult, err := invoker.VerifyUserSatisfaction(ctx, task.GetUserInput(), true, payload)
 			if err != nil {
 				operator.Fail(err)

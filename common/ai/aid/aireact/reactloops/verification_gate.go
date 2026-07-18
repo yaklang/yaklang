@@ -190,6 +190,9 @@ func (r *ReActLoop) VerifyUserSatisfactionNow(
 	if r == nil || r.invoker == nil {
 		return nil, nil
 	}
+	if aicommon.IsAIVerificationDisabled(r.GetConfig()) {
+		return nil, nil
+	}
 	r.touchVerificationWatchdog()
 	if !r.verificationInFlight.CompareAndSwap(false, true) {
 		// 已有一次 verification 在跑, 不重入. 这条路径会被 explicit
@@ -282,6 +285,9 @@ func (r *ReActLoop) MaybeVerifyUserSatisfaction(
 	payload string,
 ) (*aicommon.VerifySatisfactionResult, bool, error) {
 	if r == nil || r.invoker == nil {
+		return nil, false, nil
+	}
+	if aicommon.IsAIVerificationDisabled(r.GetConfig()) {
 		return nil, false, nil
 	}
 	r.touchVerificationWatchdog()

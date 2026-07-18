@@ -164,6 +164,27 @@ func TestShouldAutoFinishAfterSimpleQueryDirectlyAnswer(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.False(t, ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, actionWithNM))
+
+	loop.GetConfig().SetConfig(aicommon.ConfigKeyDisableAIVerification, true)
+	assert.False(t, ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action),
+		"deterministic completion mode requires the explicit finish action")
+}
+
+func TestDirectlyAnswerContinue_DisabledVerificationRequiresFinish(t *testing.T) {
+	loop, _, _, task := newTodoGateTestLoop(t, nil)
+	loop.GetConfig().SetConfig(aicommon.ConfigKeyDisableAIVerification, true)
+	loop.Set("intent_hint", loopIntentHintSimpleQuery)
+	action, err := aicommon.ExtractAction(`{"@action":"directly_answer","answer_payload":"你好"}`, "directly_answer")
+	require.NoError(t, err)
+	require.NoError(t, loopAction_DirectlyAnswer.ActionVerifier(loop, action))
+
+	op := NewActionHandlerOperator(task)
+	loopAction_DirectlyAnswer.ActionHandler(loop, action, op)
+
+	terminated, termErr := op.IsTerminated()
+	require.False(t, terminated)
+	require.NoError(t, termErr)
+	require.True(t, op.IsContinued())
 }
 
 func TestDirectlyAnswerContinue_AutoFinishesSimpleQuery(t *testing.T) {

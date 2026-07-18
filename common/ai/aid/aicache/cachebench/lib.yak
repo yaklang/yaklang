@@ -949,6 +949,9 @@ func renderMarkdown(benchReport) {
     md += sprintf("- generated:    %s\n", benchReport["generatedAt"])
     md += sprintf("- input:        %s\n", ccbTruncate(inputText, 200))
     md += sprintf("- session dir:  %s\n", sessionDir)
+    if !ccbIsNil(benchReport["disableAIVerification"]) {
+        md += sprintf("- AI verification disabled: %v\n", benchReport["disableAIVerification"])
+    }
     if invokeError != "" {
         md += sprintf("- invoke error: %s\n", invokeError)
     }

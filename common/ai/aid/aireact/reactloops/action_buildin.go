@@ -18,7 +18,7 @@ func buildExitBlockedByTodoMessage(actionName string, items []aicommon.Verificat
 		lines = append(lines, aicommon.FormatVerificationTodoLine(item))
 	}
 	return fmt.Sprintf(
-		"current task still has %d active TODO item(s); %s cannot exit until each one is explicitly closed via adjust_todolist or verification next_movements with op=done / op=delete / op=skip.\nRemaining TODOs:\n%s",
+		"current task still has %d active TODO item(s); %s cannot exit until each one is explicitly closed via adjust_todolist or an action next_movements delta with op=done / op=delete / op=skip.\nRemaining TODOs:\n%s",
 		len(items),
 		actionName,
 		strings.Join(lines, "\n"),
