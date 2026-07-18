@@ -57,6 +57,7 @@ type PromptMaterials struct {
 
 	TimelineFrozen         string
 	TimelineOpen           string
+	PromotedTimelineOpen   string
 	TimelineFrozenTimeUnix int64
 	FrozenPartitions       []FrozenBlockPartition
 	SessionArtifactsFrozen string
@@ -188,6 +189,7 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 	}
 	return map[string]any{
 		"TimelineOpen":           m.TimelineOpen,
+		"PromotedTimelineOpen":   m.PromotedTimelineOpen,
 		"TimelineFrozenTimeUnix": m.TimelineFrozenTimeUnix,
 		"SessionEvidence":        sessionEvidenceOpen,
 		"TodoSnapshot":           m.TodoSnapshot,
@@ -204,6 +206,7 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 type TimelineFrozenOpenBlocks struct {
 	Frozen               string
 	Open                 string
+	PromotedOpen         string
 	PromotedSemiDynamic1 string
 	FrozenTimeUnix       int64
 }
@@ -223,16 +226,10 @@ func RenderTimelineFrozenOpen(timeline *Timeline) TimelineFrozenOpenBlocks {
 		break
 	}
 	promotedSemi1, openDeltas := timeline.projectPromoted(sealedBeforeID)
-	open := rb.RenderOpenOnly(TimelineDumpDefaultAITagName)
-	if openDeltas != "" {
-		if open != "" {
-			open += "\n\n"
-		}
-		open += openDeltas
-	}
 	return TimelineFrozenOpenBlocks{
 		Frozen:               rb.RenderFrozenOnly(TimelineDumpDefaultAITagName),
-		Open:                 open,
+		Open:                 rb.RenderOpenOnly(TimelineDumpDefaultAITagName),
+		PromotedOpen:         openDeltas,
 		PromotedSemiDynamic1: promotedSemi1,
 		FrozenTimeUnix:       timelineFrozenTimeUnixFromRenderable(rb),
 	}
@@ -241,6 +238,7 @@ func RenderTimelineFrozenOpen(timeline *Timeline) TimelineFrozenOpenBlocks {
 type PromptFrozenOpenMaterials struct {
 	TimelineFrozen         string
 	TimelineOpen           string
+	PromotedTimelineOpen   string
 	PromotedSemiDynamic1   string
 	TimelineFrozenTimeUnix int64
 	FrozenPartitions       []FrozenBlockPartition
@@ -266,6 +264,7 @@ func BuildPromptFrozenOpenMaterials(config *Config, openNonce ...string) PromptF
 	return PromptFrozenOpenMaterials{
 		TimelineFrozen:         timelineBlocks.Frozen,
 		TimelineOpen:           timelineBlocks.Open,
+		PromotedTimelineOpen:   timelineBlocks.PromotedOpen,
 		PromotedSemiDynamic1:   timelineBlocks.PromotedSemiDynamic1,
 		TimelineFrozenTimeUnix: timelineBlocks.FrozenTimeUnix,
 		FrozenPartitions:       FrozenBlockPartitionsFromConfig(config),
@@ -280,6 +279,7 @@ func ApplyPromptFrozenOpenMaterials(materials *PromptMaterials, frozenOpen Promp
 	}
 	materials.TimelineFrozen = frozenOpen.TimelineFrozen
 	materials.TimelineOpen = frozenOpen.TimelineOpen
+	materials.PromotedTimelineOpen = frozenOpen.PromotedTimelineOpen
 	materials.PromotedSemiDynamic1 = frozenOpen.PromotedSemiDynamic1
 	materials.TimelineFrozenTimeUnix = frozenOpen.TimelineFrozenTimeUnix
 	materials.FrozenPartitions = append([]FrozenBlockPartition(nil), NormalizeFrozenBlockPartitions(frozenOpen.FrozenPartitions)...)

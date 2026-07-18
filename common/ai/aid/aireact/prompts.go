@@ -459,6 +459,8 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 	prefixMaterials.ForgeInventory = false
 	prefixMaterials.AIForgeList = ""
 	prefixMaterials.SkillsContext = ""
+	prefixMaterials.PromotedSemiDynamic1 = ""
+	prefixMaterials.PromotedTimelineOpen = ""
 	prefixMaterials.RecentToolsCache = ""
 	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,
@@ -519,6 +521,8 @@ func (pm *PromptManager) GenerateAIReviewPrompt(userQuery, toolOrTitle, params s
 	prefixMaterials.ForgeInventory = false
 	prefixMaterials.AIForgeList = ""
 	prefixMaterials.SkillsContext = ""
+	prefixMaterials.PromotedSemiDynamic1 = ""
+	prefixMaterials.PromotedTimelineOpen = ""
 	prefixMaterials.RecentToolsCache = ""
 
 	dynamicData := pm.buildLoopPromptSectionData(base, &reactloops.LoopPromptAssemblyInput{
@@ -958,6 +962,8 @@ func (pm *PromptManager) GenerateIntervalReviewPromptWithContext(
 	prefixMaterials.ForgeInventory = false
 	prefixMaterials.AIForgeList = ""
 	prefixMaterials.SkillsContext = ""
+	prefixMaterials.PromotedSemiDynamic1 = ""
+	prefixMaterials.PromotedTimelineOpen = ""
 	prefixMaterials.RecentToolsCache = ""
 
 	userQuery := ""

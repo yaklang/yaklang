@@ -4,6 +4,9 @@
 请把它作为"目前已经做了什么"的事实依据：判断任务进度、确认已经尝试过哪些路径、避免重复发起同一工具调用。若条目以 "midterm-memory:" 起头，则是引擎按当前主题从更早的归档时间线中召回的相关旧片段，不是本回合新发生的事件。
 
 {{ .TimelineOpen }}{{ end }}
+{{ if .PromotedTimelineOpen }}
+
+{{ .PromotedTimelineOpen }}{{ end }}
 
 {{ if .SessionEvidence }}
 

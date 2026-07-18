@@ -1000,6 +1000,19 @@ func TestPromptManager_GenerateVerificationPrompt_UsesPromptSections(t *testing.
 	if err != nil {
 		t.Fatalf("Failed to create ReAct instance: %v", err)
 	}
+	// Specialized non-tool prompts must not inherit the promoted recent-tool
+	// cache even though it is part of the shared Timeline projection.
+	react.config.RecordRecentlyUsedTool(aitool.NewWithoutCallback(
+		"sealed_promoted_tool_must_not_leak",
+		aitool.WithDescription("sentinel sealed promoted tool"),
+		aitool.WithStringParam("value"),
+	))
+	react.config.GetTimeline().ForcePromoteAll()
+	react.config.RecordRecentlyUsedTool(aitool.NewWithoutCallback(
+		"open_promoted_tool_must_not_leak",
+		aitool.WithDescription("sentinel open promoted tool"),
+		aitool.WithStringParam("value"),
+	))
 
 	prompt, nonce, err := react.promptManager.GenerateVerificationPrompt(
 		"请验证当前子任务是否完成",
@@ -1024,6 +1037,9 @@ func TestPromptManager_GenerateVerificationPrompt_UsesPromptSections(t *testing.
 		"<|ENHANCE_DATA_"+nonce+"|>",
 	) {
 		t.Fatalf("verification prompt should be composed by prompt sections. Got:\n%s", prompt)
+	}
+	if strings.Contains(prompt, "promoted_tool_must_not_leak") {
+		t.Fatalf("verification prompt must not include promoted recent-tool state")
 	}
 }
 
